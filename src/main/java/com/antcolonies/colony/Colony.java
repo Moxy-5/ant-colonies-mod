@@ -91,11 +91,17 @@ public class Colony {
     @Nullable
     private Layout layout;
 
-    /** How long (in ticks) an ant that went to close a leak keeps the other ants away from it. */
+    /** How long (in ticks) an ant that went to close a leak counts as working on it. */
     private static final int LEAK_CLAIM_TICKS = 600;
+    /** At most this many ants work on one leak at the same time; an opening nobody is at yet beats a crowded one. */
+    private static final int MAX_WORKERS_PER_LEAK = 4;
+    /** How much closer (in blocks) an empty opening counts than a crowded one, per ant already on it. */
+    private static final double CROWD_PENALTY = 6.0;
 
-    /** Leaks an ant is already taking care of: hole -> game time when the claim runs out. Not saved. */
-    private final Map<BlockPos, Long> claimedLeaks = new HashMap<>();
+    /** The ants working on each leak: hole -> (ant -> game time when its claim runs out). Not saved. */
+    private final Map<BlockPos, Map<UUID, Long>> claimedLeaks = new HashMap<>();
+    /** How far each leak is closed (1.0 = shut): every ant adds its share, so more ants close it sooner. Not saved. */
+    private final Map<BlockPos, Float> sealProgress = new HashMap<>();
 
     /**
      * An opening in the nest walls: {@code hole} is open space (a cave, a crack, water) right next to a dug-out
@@ -211,29 +217,49 @@ public class Colony {
         return leaks;
     }
 
-    /** The leak closest to {@code near} that an ant can reach and no other ant is on its way to, or null. */
+    /**
+     * The leak an ant at {@code near} should work on, or null: the closest one that can be reached, but one nobody
+     * is at yet beats a crowded one a little closer, so every leak gets an ant before any gets many.
+     */
     @Nullable
     public Leak findLeak(Level level, BlockPos near) {
         long now = level.getGameTime();
-        claimedLeaks.values().removeIf(until -> until <= now);
+        for (Map<UUID, Long> workers : claimedLeaks.values()) {
+            workers.values().removeIf(until -> until <= now);
+        }
+        claimedLeaks.values().removeIf(Map::isEmpty);
         Leak best = null;
-        double bestDistance = Double.MAX_VALUE;
+        double bestScore = Double.MAX_VALUE;
         for (Leak leak : getLeaks(level)) {
-            if (leak.stand() == null || claimedLeaks.containsKey(leak.hole())) {
+            int workers = claimedLeaks.getOrDefault(leak.hole(), Map.of()).size();
+            if (leak.stand() == null || workers >= MAX_WORKERS_PER_LEAK) {
                 continue;
             }
-            double distance = leak.stand().distSqr(near);
-            if (distance < bestDistance) {
+            double score = Math.sqrt(leak.stand().distSqr(near)) + workers * CROWD_PENALTY;
+            if (score < bestScore) {
                 best = leak;
-                bestDistance = distance;
+                bestScore = score;
             }
         }
         return best;
     }
 
-    /** Tells the other ants that one of them is on its way to close this leak (for a while). */
-    public void claimLeak(Level level, BlockPos hole) {
-        claimedLeaks.put(hole.immutable(), level.getGameTime() + LEAK_CLAIM_TICKS);
+    /** Tells the other ants that this one is working on the leak (for a while, or until {@link #releaseLeak}). */
+    public void claimLeak(Level level, BlockPos hole, UUID ant) {
+        claimedLeaks.computeIfAbsent(hole.immutable(), key -> new HashMap<>()).put(ant, level.getGameTime() + LEAK_CLAIM_TICKS);
+    }
+
+    /** The ant stops working on the leak (finished, or gave up). */
+    public void releaseLeak(BlockPos hole, UUID ant) {
+        Map<UUID, Long> workers = claimedLeaks.get(hole);
+        if (workers != null) {
+            workers.remove(ant);
+        }
+    }
+
+    /** One ant's pack of soil: adds its share to the leak and returns the total so far (1.0 or more = enough to close it). */
+    public float addSealProgress(BlockPos hole, float amount) {
+        return sealProgress.merge(hole.immutable(), amount, Float::sum);
     }
 
     /** True while this block is still open space (so the leak is still there). */
@@ -252,6 +278,7 @@ public class Colony {
         }
         level.setBlock(hole, ModBlocks.BURROWED_DIRT.get().defaultBlockState(), 3);
         claimedLeaks.remove(hole);
+        sealProgress.remove(hole);
         return true;
     }
 

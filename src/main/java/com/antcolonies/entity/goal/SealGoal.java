@@ -23,9 +23,9 @@ import net.minecraft.world.phys.Vec3;
  * another room) and packs it full of soil. The entrance hole is the only opening that stays.
  */
 public class SealGoal extends Goal {
-    /** Ticks between two packs of soil, and how many it takes to close a hole. */
+    /** Ticks between two packs of soil, and the share of a hole one pack closes (an ant on its own needs four packs). */
     private static final int PACK_INTERVAL = 10;
-    private static final int PACKS_NEEDED = 4;
+    private static final float PACK_SHARE = 0.25F;
     /** If the ant can't finish within 20 seconds it gives up (another ant, or later, will try). */
     private static final int GIVE_UP_TICKS = 400;
 
@@ -35,7 +35,6 @@ public class SealGoal extends Goal {
     @Nullable
     private Colony.Leak leak;
     private int ticks;
-    private int packs;
     private int packCooldown;
 
     public SealGoal(AbstractAntEntity ant) {
@@ -58,7 +57,7 @@ public class SealGoal extends Goal {
         if (leak == null) {
             return false;
         }
-        colony.claimLeak(level, leak.hole());
+        colony.claimLeak(level, leak.hole(), ant.getUUID());
         return true;
     }
 
@@ -71,13 +70,15 @@ public class SealGoal extends Goal {
     @Override
     public void start() {
         ticks = 0;
-        packs = 0;
         packCooldown = PACK_INTERVAL;
     }
 
     @Override
     public void stop() {
         ant.getNavigator().stop();
+        if (colony != null && leak != null) {
+            colony.releaseLeak(leak.hole(), ant.getUUID());
+        }
         leak = null;
         colony = null;
     }
@@ -107,7 +108,7 @@ public class SealGoal extends Goal {
         level.playSound(null, hole, soil.getSoundType().getHitSound(), SoundSource.BLOCKS, 0.4F, 1.0F);
         level.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, soil),
                 hole.getX() + 0.5, hole.getY() + 0.5, hole.getZ() + 0.5, 4, 0.2, 0.2, 0.2, 0.05);
-        if (++packs >= PACKS_NEEDED && colony.plugLeak(level, hole)) {
+        if (colony.addSealProgress(hole, PACK_SHARE) >= 1.0F && colony.plugLeak(level, hole)) {
             level.playSound(null, hole, soil.getSoundType().getPlaceSound(), SoundSource.BLOCKS, 0.4F, 1.2F);
         }
     }
