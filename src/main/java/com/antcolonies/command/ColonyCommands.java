@@ -36,7 +36,8 @@ public class ColonyCommands {
                     + " | center " + colony.getCenter().toShortString()
                     + " | queen " + colony.getQueenId().toString().substring(0, 8)
                     + " | members " + colony.getMemberCount()
-                    + " | food " + colony.getFood();
+                    + " | food " + colony.getFood()
+                    + " | eggs " + colony.countEggs(source.getLevel());
             source.sendSuccess(() -> Component.literal(line), false);
         }
         return colonies.size();

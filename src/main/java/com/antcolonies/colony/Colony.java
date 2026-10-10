@@ -12,7 +12,9 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.block.SeedPileBlock;
+import com.antcolonies.entity.AntEggEntity;
 import com.antcolonies.registry.ModBlocks;
+import com.antcolonies.registry.ModEntities;
 import com.antcolonies.registry.ModTags;
 
 import net.minecraft.core.BlockPos;
@@ -103,11 +105,14 @@ public class Colony {
     private static final int GRASS_REST_TICKS = 200;
     /** A tuft of grass gives this many seeds; after the last one it is used up and breaks. */
     public static final int SEEDS_PER_GRASS = 10;
-    /** How many random spots around the nest an ant looks at when it goes looking for grass. */
-    private static final int GRASS_LOOKS = 24;
+    /** The tufts of grass around the nest are looked up again after this many ticks (a scan of the whole area). */
+    private static final int GRASS_SCAN_TICKS = 100;
 
     /** Grass tufts an ant is on its way to, or just clipped: position -> game time until which the others leave it alone. Not saved. */
     private final Map<BlockPos, Long> busyGrass = new HashMap<>();
+    /** The tufts of short grass found at the last scan, and when the next scan is due. Not saved. */
+    private final List<BlockPos> grassTufts = new ArrayList<>();
+    private long grassScanTime;
 
     /** How many seeds have been clipped from each tuft of grass so far (only tufts that were clipped at least once). Saved. */
     private final Map<BlockPos, Integer> grassClips = new HashMap<>();
@@ -207,6 +212,15 @@ public class Colony {
      * whole food store are dug out (or while its chunks are not loaded).
      */
     public List<BlockPos> getFoodStoreCells(Level level) {
+        return getRoomCells(level, NestPlan.Kind.FOOD);
+    }
+
+    /** The floor cells of the nursery (the room, without its tunnel), once the shaft and the whole nursery are dug out. */
+    public List<BlockPos> getNurseryCells(Level level) {
+        return getRoomCells(level, NestPlan.Kind.NURSERY);
+    }
+
+    private List<BlockPos> getRoomCells(Level level, NestPlan.Kind kind) {
         Layout layout = getLayout(level);
         if (layout == null) {
             return List.of();
@@ -217,7 +231,7 @@ public class Colony {
             }
         }
         for (NestPlan.Chamber chamber : layout.chambers()) {
-            if (chamber.kind() != NestPlan.Kind.FOOD) {
+            if (chamber.kind() != kind) {
                 continue;
             }
             for (BlockPos pos : chamber.cells()) {
@@ -281,8 +295,8 @@ public class Colony {
 
     /**
      * A tuft of short grass near the nest that an ant could clip seeds from, or null: only once the food store is
-     * ready and not full. Looks at a handful of random spots within {@link #FOOD_RADIUS} of the entrance and takes the
-     * one nearest to {@code near}. A tuft another ant is on its way to, or clipped lately, is skipped, and so is one in
+     * ready and not full. Scans the area within {@link #FOOD_RADIUS} of the entrance (at most every few seconds) and takes
+     * the tuft nearest to {@code near}. A tuft another ant is on its way to, or clipped lately, is skipped, and so is one in
      * {@code avoid} (this ant found no way to it).
      */
     @Nullable
@@ -292,17 +306,25 @@ public class Colony {
         }
         long now = level.getGameTime();
         busyGrass.values().removeIf(until -> until <= now);
+        if (now >= grassScanTime) {
+            grassScanTime = now + GRASS_SCAN_TICKS;
+            grassTufts.clear();
+            for (int x = center.getX() - FOOD_RADIUS; x <= center.getX() + FOOD_RADIUS; x++) {
+                for (int z = center.getZ() - FOOD_RADIUS; z <= center.getZ() + FOOD_RADIUS; z++) {
+                    if (!level.hasChunkAt(new BlockPos(x, center.getY(), z))) {
+                        continue;
+                    }
+                    BlockPos pos = new BlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z), z);
+                    if (pos.getY() >= center.getY() - 1 && pos.getY() <= center.getY() + 4 && level.getBlockState(pos).is(Blocks.SHORT_GRASS)) {
+                        grassTufts.add(pos);
+                    }
+                }
+            }
+        }
         BlockPos best = null;
         double bestDistance = Double.MAX_VALUE;
-        for (int i = 0; i < GRASS_LOOKS; i++) {
-            int x = center.getX() + level.getRandom().nextIntBetweenInclusive(-FOOD_RADIUS, FOOD_RADIUS);
-            int z = center.getZ() + level.getRandom().nextIntBetweenInclusive(-FOOD_RADIUS, FOOD_RADIUS);
-            if (!level.hasChunkAt(new BlockPos(x, center.getY(), z))) {
-                continue;
-            }
-            BlockPos pos = new BlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z), z);
-            if (!level.getBlockState(pos).is(Blocks.SHORT_GRASS) || pos.getY() < center.getY() - 1 || pos.getY() > center.getY() + 4
-                    || busyGrass.containsKey(pos) || avoid.contains(pos)) {
+        for (BlockPos pos : grassTufts) {
+            if (busyGrass.containsKey(pos) || avoid.contains(pos) || !level.getBlockState(pos).is(Blocks.SHORT_GRASS)) {
                 continue;
             }
             double distance = pos.distSqr(near);
@@ -362,6 +384,93 @@ public class Colony {
             return false;
         }
         food++;
+        return true;
+    }
+
+    // ---- Eggs
+
+    /** How many seeds an egg costs the colony. */
+    public static final int EGG_COST = 3;
+    /** The nursery holds at most this many eggs at the same time. */
+    public static final int MAX_EGGS = 10;
+
+    /** The eggs of this colony lying in its nursery. */
+    public List<AntEggEntity> getEggs(Level level) {
+        List<BlockPos> cells = getNurseryCells(level);
+        if (cells.isEmpty()) {
+            return List.of();
+        }
+        AABB box = null;
+        for (BlockPos pos : cells) {
+            box = box == null ? new AABB(pos) : box.minmax(new AABB(pos));
+        }
+        return level.getEntitiesOfClass(AntEggEntity.class, box.inflate(0.5), egg -> id.equals(egg.getColonyId()));
+    }
+
+    public int countEggs(Level level) {
+        return getEggs(level).size();
+    }
+
+    /**
+     * A free spot in the nursery for the next egg, or null if the queen should not lay one now: the nursery is not
+     * ready, it already holds {@link #MAX_EGGS} eggs, or the food store has fewer than {@link #EGG_COST} seeds.
+     */
+    @Nullable
+    public BlockPos pickEggSpot(Level level, RandomSource random) {
+        List<BlockPos> cells = getNurseryCells(level);
+        List<AntEggEntity> eggs = getEggs(level);
+        if (cells.isEmpty() || eggs.size() >= MAX_EGGS || food < EGG_COST) {
+            return null;
+        }
+        List<BlockPos> free = new ArrayList<>();
+        for (BlockPos pos : cells) {
+            boolean taken = false;
+            for (AntEggEntity egg : eggs) {
+                if (egg.blockPosition().equals(pos)) {
+                    taken = true;
+                    break;
+                }
+            }
+            if (!taken) {
+                free.add(pos);
+            }
+        }
+        return free.isEmpty() ? null : free.get(random.nextInt(free.size()));
+    }
+
+    /** The queen lays an egg at {@code spot}: it costs {@link #EGG_COST} seeds from the food store. False if there are not enough. */
+    public boolean layEgg(Level level, BlockPos spot) {
+        if (food < EGG_COST || !level.getBlockState(spot).isAir()) {
+            return false;
+        }
+        for (int i = 0; i < EGG_COST; i++) {
+            if (!takeSeed(level)) {
+                return false;
+            }
+        }
+        AntEggEntity egg = new AntEggEntity(ModEntities.ANT_EGG.get(), level);
+        egg.setColonyId(id);
+        egg.moveTo(spot.getX() + 0.5, spot.getY(), spot.getZ() + 0.5, level.getRandom().nextFloat() * 360.0F, 0.0F);
+        level.addFreshEntity(egg);
+        return true;
+    }
+
+    /** Takes one seed out of a heap in the food store (the heap gets a layer lower). False if there is none. */
+    public boolean takeSeed(Level level) {
+        List<BlockPos> piles = new ArrayList<>();
+        for (BlockPos pos : getFoodStoreCells(level)) {
+            if (level.getBlockState(pos).is(ModBlocks.SEED_PILE.get())) {
+                piles.add(pos);
+            }
+        }
+        if (piles.isEmpty()) {
+            return false;
+        }
+        BlockPos pos = piles.get(level.getRandom().nextInt(piles.size()));
+        BlockState state = level.getBlockState(pos);
+        int layers = state.getValue(SeedPileBlock.LAYERS);
+        level.setBlock(pos, layers <= 1 ? Blocks.AIR.defaultBlockState() : state.setValue(SeedPileBlock.LAYERS, layers - 1), 3);
+        food = Math.max(0, food - 1);
         return true;
     }
 

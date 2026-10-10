@@ -4,5 +4,6 @@
   "entity.antcolonies.queen_ant": "Queen Ant",
   "item.antcolonies.worker_ant_spawn_egg": "Worker Ant Spawn Egg",
   "item.antcolonies.queen_ant_spawn_egg": "Queen Ant Spawn Egg",
-  "block.antcolonies.seed_pile": "Seed Pile"
+  "block.antcolonies.seed_pile": "Seed Pile",
+  "entity.antcolonies.ant_egg": "Ant Egg"
 }

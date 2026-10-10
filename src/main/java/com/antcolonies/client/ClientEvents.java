@@ -15,6 +15,11 @@ import software.bernie.geckolib.model.DefaultedEntityGeoModel;
 @EventBusSubscriber(modid = AntColoniesMod.MODID, value = Dist.CLIENT)
 public class ClientEvents {
     @SubscribeEvent
+    public static void onRegisterLayers(EntityRenderersEvent.RegisterLayerDefinitions event) {
+        event.registerLayerDefinition(AntEggRenderer.LAYER, AntEggRenderer::createLayer);
+    }
+
+    @SubscribeEvent
     public static void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event) {
         // Looks for: geo/entity/worker_ant.geo.json, animations/entity/worker_ant.animation.json,
         // textures/entity/worker_ant.png
@@ -22,6 +27,8 @@ public class ClientEvents {
                 context, new DefaultedEntityGeoModel<WorkerAntEntity>(
                         ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "worker_ant")))
                 .withScale(0.65F));
+
+        event.registerEntityRenderer(ModEntities.ANT_EGG.get(), AntEggRenderer::new);
 
         // Placeholder: the queen reuses the worker model and animations, just bigger and with her own texture.
         ResourceLocation workerAsset = ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "worker_ant");
