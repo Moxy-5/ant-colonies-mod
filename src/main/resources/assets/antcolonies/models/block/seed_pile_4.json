@@ -1,7 +1,8 @@
 {
   "textures": {
-    "particle": "antcolonies:block/seed_pile",
-    "texture": "antcolonies:block/seed_pile"
+    "particle": "antcolonies:block/seed_pile_top",
+    "top": "antcolonies:block/seed_pile_top",
+    "side": "antcolonies:block/seed_pile_side"
   },
   "elements": [
     {
@@ -23,7 +24,7 @@
             16,
             16
           ],
-          "texture": "#texture",
+          "texture": "#top",
           "cullface": "down"
         },
         "up": {
@@ -33,7 +34,7 @@
             16,
             16
           ],
-          "texture": "#texture"
+          "texture": "#top"
         },
         "north": {
           "uv": [
@@ -42,7 +43,7 @@
             16,
             16
           ],
-          "texture": "#texture"
+          "texture": "#side"
         },
         "south": {
           "uv": [
@@ -51,7 +52,7 @@
             16,
             16
           ],
-          "texture": "#texture"
+          "texture": "#side"
         },
         "west": {
           "uv": [
@@ -60,7 +61,7 @@
             16,
             16
           ],
-          "texture": "#texture"
+          "texture": "#side"
         },
         "east": {
           "uv": [
@@ -69,7 +70,7 @@
             16,
             16
           ],
-          "texture": "#texture"
+          "texture": "#side"
         }
       }
     }
