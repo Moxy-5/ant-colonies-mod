@@ -5,8 +5,13 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.entity.ai.navigation.PathNavigation;
+import net.minecraft.world.entity.ai.navigation.WallClimberNavigation;
 import net.minecraft.world.level.Level;
 import software.bernie.geckolib.animatable.GeoEntity;
 import software.bernie.geckolib.animatable.instance.AnimatableInstanceCache;
@@ -22,6 +27,10 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     private static final RawAnimation IDLE = RawAnimation.begin().thenLoop("idle");
     private static final RawAnimation WALK = RawAnimation.begin().thenLoop("walk");
 
+    /** True while the ant is climbing a wall. Synced to the client so the renderer can tilt the model. */
+    private static final EntityDataAccessor<Boolean> DATA_CLIMBING =
+            SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.BOOLEAN);
+
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
 
     /** Which colony this ant belongs to (null = none). Saved with the ant. */
@@ -30,6 +39,37 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
 
     protected AbstractAntEntity(EntityType<? extends AbstractAntEntity> type, Level level) {
         super(type, level);
+    }
+
+    @Override
+    protected void defineSynchedData(SynchedEntityData.Builder builder) {
+        super.defineSynchedData(builder);
+        builder.define(DATA_CLIMBING, false);
+    }
+
+    // Ants climb walls like spiders: pathfinding is allowed to aim at spots up a wall.
+    @Override
+    protected PathNavigation createNavigation(Level level) {
+        return new WallClimberNavigation(this, level);
+    }
+
+    @Override
+    public void tick() {
+        super.tick();
+        // Pushing into a wall = climbing it (same rule vanilla spiders use).
+        if (!level().isClientSide) {
+            entityData.set(DATA_CLIMBING, horizontalCollision);
+        }
+    }
+
+    public boolean isClimbing() {
+        return entityData.get(DATA_CLIMBING);
+    }
+
+    // Tells the game this entity can climb right now (ladder-style movement up the wall).
+    @Override
+    public boolean onClimbable() {
+        return isClimbing();
     }
 
     @Nullable
@@ -75,6 +115,11 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     }
 
     private PlayState animate(AnimationState<AbstractAntEntity> state) {
+        // Going up a wall isn't "horizontal" movement, so check climbing separately.
+        if (isClimbing() && Math.abs(getDeltaMovement().y) > 0.01) {
+            state.getController().setAnimationSpeed(1.5);
+            return state.setAndContinue(WALK);
+        }
         if (state.isMoving()) {
             // Legs move faster when the ant moves faster, so they don't slide.
             state.getController().setAnimationSpeed(Math.max(0.6, state.getLimbSwingAmount() * 6.0));
