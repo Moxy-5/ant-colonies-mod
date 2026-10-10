@@ -144,7 +144,7 @@ Goal: a mature colony can hold 1,000+ ants or termites without lag.
 
 ## Milestones
 - [x] M0: Project setup: NeoForge 1.21.1 MDK, git, `runClient` launches the game with the mod loaded.
-- [ ] M1: Worker ant with a placeholder model and spawn egg that walks around.
+- [x] M1: Worker ant with a placeholder model and spawn egg that walks around.
 - [ ] M2: Swap in the real worker model and animations.
 - [ ] M3: Queen + colony brain + saving and loading.
 - [ ] M4: Digging phase 1 + soil pellets + mound.
@@ -163,4 +163,5 @@ Goal: a mature colony can hold 1,000+ ants or termites without lag.
 ## Current status
 - Mod name: **Ant & Termite Colonies**, mod ID: **antcolonies**, package `com.antcolonies`.
 - M0 done: project from the official NeoForge 1.21.1 MDK, build passes, `runClient` confirmed working by the user.
-- Next: M1 (worker ant with placeholder model + spawn egg; adds GeckoLib). Real Blockbench model comes at M2.
+- M1 done: worker ant with placeholder GeckoLib model, walk/idle animations, and spawn egg; user confirmed working in-game.
+- Next: M2 (real Blockbench worker model). Bone names from it become the standard for all ants and termites.
