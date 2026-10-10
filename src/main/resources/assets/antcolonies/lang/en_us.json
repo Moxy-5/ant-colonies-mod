@@ -1,4 +1,6 @@
 {
   "entity.antcolonies.worker_ant": "Worker Ant",
-  "item.antcolonies.worker_ant_spawn_egg": "Worker Ant Spawn Egg"
+  "entity.antcolonies.queen_ant": "Queen Ant",
+  "item.antcolonies.worker_ant_spawn_egg": "Worker Ant Spawn Egg",
+  "item.antcolonies.queen_ant_spawn_egg": "Queen Ant Spawn Egg"
 }

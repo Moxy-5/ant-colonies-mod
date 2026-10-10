@@ -1,6 +1,7 @@
 package com.antcolonies.registry;
 
 import com.antcolonies.AntColoniesMod;
+import com.antcolonies.entity.QueenAntEntity;
 import com.antcolonies.entity.WorkerAntEntity;
 
 import net.minecraft.core.registries.Registries;
@@ -19,4 +20,11 @@ public class ModEntities {
                     .of(WorkerAntEntity::new, MobCategory.CREATURE)
                     .sized(0.3F, 0.2F)
                     .build("worker_ant"));
+
+    // Queen is about twice the worker's size.
+    public static final DeferredHolder<EntityType<?>, EntityType<QueenAntEntity>> QUEEN_ANT =
+            ENTITY_TYPES.register("queen_ant", () -> EntityType.Builder
+                    .of(QueenAntEntity::new, MobCategory.CREATURE)
+                    .sized(0.6F, 0.4F)
+                    .build("queen_ant"));
 }

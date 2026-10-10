@@ -1,6 +1,7 @@
 package com.antcolonies.client;
 
 import com.antcolonies.AntColoniesMod;
+import com.antcolonies.entity.QueenAntEntity;
 import com.antcolonies.entity.WorkerAntEntity;
 import com.antcolonies.registry.ModEntities;
 
@@ -22,5 +23,14 @@ public class ClientEvents {
                 context, new DefaultedEntityGeoModel<WorkerAntEntity>(
                         ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "worker_ant")))
                 .withScale(0.65F));
+
+        // Placeholder: the queen reuses the worker model and animations, just bigger and with her own texture.
+        ResourceLocation workerAsset = ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "worker_ant");
+        event.registerEntityRenderer(ModEntities.QUEEN_ANT.get(), context -> new GeoEntityRenderer<>(
+                context, new DefaultedEntityGeoModel<QueenAntEntity>(
+                        ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "queen_ant"))
+                .withAltModel(workerAsset)
+                .withAltAnimations(workerAsset))
+                .withScale(1.3F));
     }
 }

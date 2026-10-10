@@ -1,5 +1,6 @@
 package com.antcolonies;
 
+import com.antcolonies.entity.QueenAntEntity;
 import com.antcolonies.entity.WorkerAntEntity;
 import com.antcolonies.registry.ModEntities;
 import com.antcolonies.registry.ModItems;
@@ -15,12 +16,14 @@ public class ModEvents {
     @SubscribeEvent
     public static void onAttributes(EntityAttributeCreationEvent event) {
         event.put(ModEntities.WORKER_ANT.get(), WorkerAntEntity.createAttributes().build());
+        event.put(ModEntities.QUEEN_ANT.get(), QueenAntEntity.createAttributes().build());
     }
 
     @SubscribeEvent
     public static void onCreativeTab(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey() == CreativeModeTabs.SPAWN_EGGS) {
             event.accept(ModItems.WORKER_ANT_SPAWN_EGG);
+            event.accept(ModItems.QUEEN_ANT_SPAWN_EGG);
         }
     }
 }
