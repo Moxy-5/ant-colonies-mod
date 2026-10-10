@@ -2,6 +2,7 @@ package com.antcolonies;
 
 import org.slf4j.Logger;
 
+import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.registry.ModEntities;
 import com.antcolonies.registry.ModItems;
 import com.mojang.logging.LogUtils;
@@ -16,6 +17,7 @@ public class AntColoniesMod {
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public AntColoniesMod(IEventBus modEventBus) {
+        ModBlocks.BLOCKS.register(modEventBus);
         ModEntities.ENTITY_TYPES.register(modEventBus);
         ModItems.ITEMS.register(modEventBus);
         LOGGER.info("Ant & Termite Colonies loaded");

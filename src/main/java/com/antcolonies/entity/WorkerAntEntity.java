@@ -2,6 +2,7 @@ package com.antcolonies.entity;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.entity.goal.CarryPelletGoal;
 import com.antcolonies.entity.goal.DigGoal;
 
 import net.minecraft.server.level.ServerLevel;
@@ -37,9 +38,10 @@ public class WorkerAntEntity extends AbstractAntEntity {
     @Override
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));
-        this.goalSelector.addGoal(1, new DigGoal(this));
-        this.goalSelector.addGoal(2, new WaterAvoidingRandomStrollGoal(this, 1.0));
-        this.goalSelector.addGoal(3, new RandomLookAroundGoal(this));
+        this.goalSelector.addGoal(1, new CarryPelletGoal(this));
+        this.goalSelector.addGoal(2, new DigGoal(this));
+        this.goalSelector.addGoal(3, new WaterAvoidingRandomStrollGoal(this, 1.0));
+        this.goalSelector.addGoal(4, new RandomLookAroundGoal(this));
     }
 
     @Override

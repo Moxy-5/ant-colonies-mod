@@ -1,4 +1,5 @@
 {
+  "block.antcolonies.burrowed_dirt": "Burrowed Dirt",
   "entity.antcolonies.worker_ant": "Worker Ant",
   "entity.antcolonies.queen_ant": "Queen Ant",
   "item.antcolonies.worker_ant_spawn_egg": "Worker Ant Spawn Egg",

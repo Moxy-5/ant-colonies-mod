@@ -15,6 +15,7 @@ import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.ai.goal.Goal;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 
@@ -40,7 +41,8 @@ public class DigGoal extends Goal {
     @Override
     public boolean canUse() {
         // Only look for work now and then, so ants don't all think on the same tick.
-        if (ant.getColonyId() == null || ant.getRandom().nextInt(20) != 0) {
+        // An ant with a pellet in its mouth must carry it out before biting again.
+        if (ant.getColonyId() == null || ant.isCarrying() || ant.getRandom().nextInt(20) != 0) {
             return false;
         }
         if (!(ant.level() instanceof ServerLevel level)) {
@@ -53,7 +55,7 @@ public class DigGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        return target != null && stuckTicks < GIVE_UP_TICKS
+        return target != null && !ant.isCarrying() && stuckTicks < GIVE_UP_TICKS
                 && ant.level().getBlockState(target).is(ModTags.DIGGABLE);
     }
 
@@ -65,9 +67,8 @@ public class DigGoal extends Goal {
 
     @Override
     public void stop() {
-        if (target != null && ant.level() instanceof ServerLevel level) {
-            level.destroyBlockProgress(ant.getId(), target, -1);
-        }
+        // The crack overlay is left in place (the game fades it out by itself): the ant leaves to
+        // carry a pellet and the block is still half dug.
         ant.getNavigation().stop();
         target = null;
         colony = null;
@@ -103,6 +104,10 @@ public class DigGoal extends Goal {
         // Harder blocks take more bites: plain dirt is about 6 bites, roughly 3 seconds for one ant.
         float bitesNeeded = Math.max(1.0F, state.getDestroySpeed(level, target) * 12.0F);
         float progress = colony.addDigProgress(target, 1.0F / bitesNeeded);
+
+        // Every bite leaves a soil pellet in the mandibles. Grass and roots turn into plain dirt.
+        ant.setCarriedBlock(state.is(Blocks.GRASS_BLOCK) || state.is(Blocks.ROOTED_DIRT)
+                ? Blocks.DIRT.defaultBlockState() : state);
 
         level.playSound(null, target, state.getSoundType().getHitSound(), SoundSource.BLOCKS, 0.4F, 1.3F);
         level.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, state),

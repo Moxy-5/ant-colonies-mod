@@ -1,5 +1,6 @@
 package com.antcolonies.entity;
 
+import java.util.Optional;
 import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
@@ -13,6 +14,7 @@ import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.ai.navigation.PathNavigation;
 import net.minecraft.world.entity.ai.navigation.WallClimberNavigation;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
 import software.bernie.geckolib.animatable.GeoEntity;
 import software.bernie.geckolib.animatable.instance.AnimatableInstanceCache;
 import software.bernie.geckolib.animation.AnimatableManager;
@@ -31,6 +33,10 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     private static final EntityDataAccessor<Boolean> DATA_CLIMBING =
             SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.BOOLEAN);
 
+    /** The soil pellet held in the mandibles (empty = carrying nothing). Synced so the renderer can draw it. */
+    private static final EntityDataAccessor<Optional<BlockState>> DATA_CARRIED =
+            SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.OPTIONAL_BLOCK_STATE);
+
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
 
     /** Which colony this ant belongs to (null = none). Saved with the ant. */
@@ -45,6 +51,21 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         super.defineSynchedData(builder);
         builder.define(DATA_CLIMBING, false);
+        builder.define(DATA_CARRIED, Optional.empty());
+    }
+
+    /** The block type of the pellet this ant carries, or null if its mandibles are empty. */
+    @Nullable
+    public BlockState getCarriedBlock() {
+        return entityData.get(DATA_CARRIED).orElse(null);
+    }
+
+    public boolean isCarrying() {
+        return entityData.get(DATA_CARRIED).isPresent();
+    }
+
+    public void setCarriedBlock(@Nullable BlockState state) {
+        entityData.set(DATA_CARRIED, Optional.ofNullable(state));
     }
 
     // Ants climb walls like spiders: pathfinding is allowed to aim at spots up a wall.
