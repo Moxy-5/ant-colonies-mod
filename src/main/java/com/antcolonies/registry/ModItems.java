@@ -12,9 +12,9 @@ public class ModItems {
 
     public static final DeferredItem<DeferredSpawnEggItem> WORKER_ANT_SPAWN_EGG =
             ITEMS.register("worker_ant_spawn_egg",
-                    () -> new DeferredSpawnEggItem(ModEntities.WORKER_ANT, 0x7A2E14, 0x2B1208, new Item.Properties()));
+                    () -> new DeferredSpawnEggItem(ModEntities.WORKER_ANT, 0x5A1A0C, 0xD9A441, new Item.Properties()));
 
     public static final DeferredItem<DeferredSpawnEggItem> QUEEN_ANT_SPAWN_EGG =
             ITEMS.register("queen_ant_spawn_egg",
-                    () -> new DeferredSpawnEggItem(ModEntities.QUEEN_ANT, 0x5A1A0C, 0xD9A441, new Item.Properties()));
+                    () -> new DeferredSpawnEggItem(ModEntities.QUEEN_ANT, 0x7A2E14, 0x2B1208, new Item.Properties()));
 }
