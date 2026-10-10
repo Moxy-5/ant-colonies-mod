@@ -24,6 +24,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 
@@ -97,6 +98,14 @@ public class Colony {
     public static final int FOOD_RADIUS = 24;
     /** An ant that went for a seed keeps the others away from it this long (in ticks). */
     private static final int SEED_CLAIM_TICKS = 600;
+
+    /** A tuft of grass an ant clipped seeds from is left alone this long (in ticks) before it grows new ones. */
+    private static final int GRASS_REGROW_TICKS = 3600;
+    /** How many random spots around the nest an ant looks at when it goes looking for grass. */
+    private static final int GRASS_LOOKS = 24;
+
+    /** Grass tufts an ant is on its way to, or just clipped: position -> game time until which the others leave it alone. Not saved. */
+    private final Map<BlockPos, Long> busyGrass = new HashMap<>();
 
     /** How much food the colony has stored (one per seed in the food store). Saved. */
     private int food;
@@ -263,6 +272,56 @@ public class Colony {
             }
         }
         return best;
+    }
+
+    /**
+     * A tuft of short grass near the nest that an ant could clip seeds from, or null: only once the food store is
+     * ready and not full. Looks at a handful of random spots within {@link #FOOD_RADIUS} of the entrance and takes the
+     * one nearest to {@code near}. A tuft another ant is on its way to, or clipped lately, is skipped, and so is one in
+     * {@code avoid} (this ant found no way to it).
+     */
+    @Nullable
+    public BlockPos findGrass(Level level, BlockPos near, Set<BlockPos> avoid) {
+        if (pickFoodSpot(level, level.getRandom()) == null) {
+            return null;
+        }
+        long now = level.getGameTime();
+        busyGrass.values().removeIf(until -> until <= now);
+        BlockPos best = null;
+        double bestDistance = Double.MAX_VALUE;
+        for (int i = 0; i < GRASS_LOOKS; i++) {
+            int x = center.getX() + level.getRandom().nextIntBetweenInclusive(-FOOD_RADIUS, FOOD_RADIUS);
+            int z = center.getZ() + level.getRandom().nextIntBetweenInclusive(-FOOD_RADIUS, FOOD_RADIUS);
+            if (!level.hasChunkAt(new BlockPos(x, center.getY(), z))) {
+                continue;
+            }
+            BlockPos pos = new BlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z), z);
+            if (!level.getBlockState(pos).is(Blocks.SHORT_GRASS) || pos.getY() < center.getY() - 1 || pos.getY() > center.getY() + 4
+                    || busyGrass.containsKey(pos) || avoid.contains(pos)) {
+                continue;
+            }
+            double distance = pos.distSqr(near);
+            if (distance < bestDistance) {
+                best = pos;
+                bestDistance = distance;
+            }
+        }
+        return best;
+    }
+
+    /** An ant is on its way to this tuft of grass: the others look elsewhere for a while. */
+    public void claimGrass(Level level, BlockPos grass) {
+        busyGrass.put(grass.immutable(), level.getGameTime() + SEED_CLAIM_TICKS);
+    }
+
+    /** The ant gave up on this tuft. */
+    public void releaseGrass(BlockPos grass) {
+        busyGrass.remove(grass);
+    }
+
+    /** The ant clipped its seed: the tuft stays, but it has to grow new seeds before anyone clips it again. */
+    public void clippedGrass(Level level, BlockPos grass) {
+        busyGrass.put(grass.immutable(), level.getGameTime() + GRASS_REGROW_TICKS);
     }
 
     public void claimSeed(Level level, ItemEntity seed) {

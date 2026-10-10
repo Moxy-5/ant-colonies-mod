@@ -4,6 +4,7 @@ import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.entity.goal.CarryPelletGoal;
+import com.antcolonies.entity.goal.ClipGrassGoal;
 import com.antcolonies.entity.goal.DigGoal;
 import com.antcolonies.entity.goal.GatherSeedGoal;
 import com.antcolonies.entity.goal.SealGoal;
@@ -45,9 +46,10 @@ public class WorkerAntEntity extends AbstractAntEntity {
         this.goalSelector.addGoal(2, new CarryPelletGoal(this));
         this.goalSelector.addGoal(3, new SealGoal(this));
         this.goalSelector.addGoal(4, new GatherSeedGoal(this));
-        this.goalSelector.addGoal(5, new DigGoal(this, () -> true));
-        this.goalSelector.addGoal(6, new AntWanderGoal(this, 1.0, 120, 6, () -> true));
-        this.goalSelector.addGoal(7, new RandomLookAroundGoal(this));
+        this.goalSelector.addGoal(5, new ClipGrassGoal(this));
+        this.goalSelector.addGoal(6, new DigGoal(this, () -> true));
+        this.goalSelector.addGoal(7, new AntWanderGoal(this, 1.0, 120, 6, () -> true));
+        this.goalSelector.addGoal(8, new RandomLookAroundGoal(this));
     }
 
     @Override

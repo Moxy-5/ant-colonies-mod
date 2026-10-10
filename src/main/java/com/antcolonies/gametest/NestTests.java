@@ -257,6 +257,43 @@ public class NestTests {
         });
     }
 
+    /**
+     * Three tufts of short grass around a finished nest: the workers clip seeds off them (the grass stays), carry every
+     * seed to the food store, and what the colony counts is exactly what lies in the store.
+     */
+    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    public static void workersClipSeedsFromGrass(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        startColony(helper);
+        int[][] tufts = {{MIDDLE + 6, MIDDLE}, {MIDDLE - 6, MIDDLE + 2}, {MIDDLE + 1, MIDDLE - 7}};
+
+        boolean[] planted = {false};
+        helper.onEachTick(() -> {
+            Colony colony = colony(helper);
+            if (planted[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.findDigTarget(level) != null
+                    || !hillProblems(helper).isEmpty()) {
+                return;
+            }
+            planted[0] = true;
+            for (int[] tuft : tufts) {
+                helper.setBlock(tuft[0], SURFACE, tuft[1], Blocks.SHORT_GRASS);
+            }
+            AntColoniesMod.LOGGER.info("[grass-test] tick {}: 3 tufts of grass planted", helper.getTick());
+        });
+
+        helper.succeedWhen(() -> {
+            Colony colony = colony(helper);
+            helper.assertTrue(planted[0] && colony != null, "no grass has been planted yet");
+            helper.assertTrue(colony.getFood() >= 3, "the colony counts only " + colony.getFood() + " food");
+            helper.assertTrue(seedsIn(level, storeBox(level, colony)) == colony.getFood(),
+                    "food " + colony.getFood() + " but " + seedsIn(level, storeBox(level, colony)) + " seeds in the store");
+            for (int[] tuft : tufts) {
+                helper.assertBlock(new BlockPos(tuft[0], SURFACE, tuft[1]), block -> block == Blocks.SHORT_GRASS, "a tuft of grass was eaten");
+            }
+        });
+    }
+
     private static void dropSeeds(GameTestHelper helper, int x, int z, int count) {
         BlockPos at = helper.absolutePos(new BlockPos(x, SURFACE, z));
         var item = new net.minecraft.world.entity.item.ItemEntity(helper.getLevel(), at.getX() + 0.5, at.getY(), at.getZ() + 0.5,
