@@ -58,6 +58,13 @@ public class WorkerAntEntity extends AbstractAntEntity {
         this.goalSelector.addGoal(10, new RandomLookAroundGoal(this));
     }
 
+    /** A worker that hatched in this colony's nursery belongs to it from the start (and is counted). */
+    public void joinColony(Colony colony) {
+        setColonyId(colony.getId());
+        colonyChecked = true;
+        colony.setCount(CASTE, colony.getCount(CASTE) + 1);
+    }
+
     @Override
     public void tick() {
         super.tick();

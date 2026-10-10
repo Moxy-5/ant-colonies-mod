@@ -14,6 +14,7 @@ import org.jetbrains.annotations.Nullable;
 import com.antcolonies.block.SeedPileBlock;
 import com.antcolonies.entity.AntEggEntity;
 import com.antcolonies.entity.QueenAntEntity;
+import com.antcolonies.entity.WorkerAntEntity;
 import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.registry.ModEntities;
 import com.antcolonies.registry.ModTags;
@@ -393,8 +394,12 @@ public class Colony {
 
     /** The workers must feed the queen this many seeds (any kind) before she carries an egg. */
     public static final int QUEEN_MEAL = 20;
-    /** How long (in ticks) she carries the egg before it comes out behind her: 5 minutes at normal speed. */
-    public static final int INCUBATION_TICKS = 6000;
+    /** How long (in ticks) she carries the egg before it comes out behind her: 3 minutes at normal speed. */
+    public static final int INCUBATION_TICKS = 3600;
+    /** An egg hatches into a worker this many ticks after it was put in the nursery: 2 minutes at normal speed. */
+    public static final int HATCH_TICKS = 2400;
+    /** Eggs hatch only while the colony has fewer than this many workers; the other eggs wait in the nursery. */
+    public static final int MAX_WORKERS = 20;
     /** At most this many eggs (in the nursery or lying about) at the same time; while there are that many the queen is not fed. */
     public static final int MAX_EGGS = 10;
     /** How long (in ticks) a worker on its way to feed the queen counts as feeding her. */
@@ -554,6 +559,30 @@ public class Colony {
     public List<AntEggEntity> getLooseEggs(Level level) {
         Set<BlockPos> cells = new HashSet<>(getNurseryCells(level));
         return getEggs(level).stream().filter(egg -> !cells.contains(egg.blockPosition())).toList();
+    }
+
+    /** Whether this block is a floor cell of the nursery (so an egg lying there is being kept warm and will hatch). */
+    public boolean isInNursery(Level level, BlockPos pos) {
+        return getNurseryCells(level).contains(pos);
+    }
+
+    /**
+     * The egg hatches: a new worker takes its place and joins the colony. False (the egg stays) while the colony has
+     * {@link #MAX_WORKERS} workers.
+     */
+    public boolean hatchEgg(ServerLevel level, AntEggEntity egg) {
+        if (getCount(WorkerAntEntity.CASTE) >= MAX_WORKERS) {
+            return false;
+        }
+        WorkerAntEntity worker = ModEntities.WORKER_ANT.get().create(level);
+        if (worker == null) {
+            return false;
+        }
+        worker.moveTo(egg.getX(), egg.getY(), egg.getZ(), egg.getYRot(), 0.0F);
+        worker.joinColony(this);
+        level.addFreshEntity(worker);
+        egg.discard();
+        return true;
     }
 
     /** A free spot in the nursery for an egg, or null if the nursery is not dug out yet or full. */

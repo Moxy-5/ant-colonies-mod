@@ -10,6 +10,7 @@ import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.AbstractAntEntity;
+import com.antcolonies.entity.WorkerAntEntity;
 import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.registry.ModEntities;
 
@@ -306,7 +307,7 @@ public class NestTests {
 
     /**
      * In a finished nest with 25 seeds in the food store the workers feed the queen 20 of them. She then carries an egg
-     * for 5 minutes (6000 ticks), the egg comes out behind her in her room, and a worker carries it into the nursery.
+     * for 3 minutes (3600 ticks), the egg comes out behind her in her room, and a worker carries it into the nursery.
      * After that she is fed the 5 seeds that are left.
      */
     @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
@@ -380,6 +381,89 @@ public class NestTests {
             for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
                 helper.assertTrue(!ant.hasFullMandibles(), "an ant is still carrying something");
             }
+        });
+    }
+
+    /**
+     * Three eggs put in the nursery of a finished nest hatch after 2 minutes: each becomes a real worker of the same
+     * colony, and the colony counts them.
+     */
+    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    public static void eggsInTheNurseryHatchIntoWorkers(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        startColony(helper);
+
+        boolean[] placed = {false};
+        int[] workersBefore = {0};
+        helper.onEachTick(() -> {
+            Colony colony = colony(helper);
+            if (placed[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.findDigTarget(level) != null
+                    || !hillProblems(helper).isEmpty()) {
+                return;
+            }
+            placed[0] = true;
+            workersBefore[0] = colony.getCount(WorkerAntEntity.CASTE);
+            var cells = colony.getNurseryCells(level);
+            for (int i = 0; i < 3; i++) {
+                colony.placeEgg(level, cells.get(i * 7));
+            }
+            AntColoniesMod.LOGGER.info("[hatch-test] tick {}: 3 eggs put in the nursery, {} workers", helper.getTick(), workersBefore[0]);
+        });
+
+        helper.succeedWhen(() -> {
+            Colony colony = colony(helper);
+            helper.assertTrue(placed[0] && colony != null, "no eggs have been put in the nursery yet");
+            helper.assertTrue(colony.countEggs(level) == 0, colony.countEggs(level) + " eggs are still there");
+            helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == workersBefore[0] + 3,
+                    "the colony counts " + colony.getCount(WorkerAntEntity.CASTE) + " workers, expected " + (workersBefore[0] + 3));
+            var workers = level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds());
+            helper.assertTrue(workers.size() == workersBefore[0] + 3, "there are " + workers.size() + " worker ants, expected " + (workersBefore[0] + 3));
+            for (var worker : workers) {
+                helper.assertTrue(colony.getId().equals(worker.getColonyId()), "a worker belongs to no colony or the wrong one");
+            }
+        });
+    }
+
+    /**
+     * When the colony already has one worker less than the most it can have, three eggs in the nursery make exactly one
+     * worker; the other two stay eggs.
+     */
+    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    public static void eggsWaitWhenTheColonyHasEnoughWorkers(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        startColony(helper);
+
+        boolean[] placed = {false};
+        long[] placedAt = {0};
+        int[] workersBefore = {0};
+        helper.onEachTick(() -> {
+            Colony colony = colony(helper);
+            if (placed[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.findDigTarget(level) != null
+                    || !hillProblems(helper).isEmpty()) {
+                return;
+            }
+            placed[0] = true;
+            placedAt[0] = level.getGameTime();
+            workersBefore[0] = colony.getCount(WorkerAntEntity.CASTE);
+            colony.setCount(WorkerAntEntity.CASTE, Colony.MAX_WORKERS - 1);
+            var cells = colony.getNurseryCells(level);
+            for (int i = 0; i < 3; i++) {
+                colony.placeEgg(level, cells.get(i * 7));
+            }
+        });
+
+        helper.succeedWhen(() -> {
+            Colony colony = colony(helper);
+            helper.assertTrue(placed[0] && colony != null, "no eggs have been put in the nursery yet");
+            // Wait well past the hatching time, so the two eggs had every chance to hatch too.
+            helper.assertTrue(level.getGameTime() >= placedAt[0] + Colony.HATCH_TICKS + 400, "still waiting for the eggs to have hatched");
+            helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == Colony.MAX_WORKERS,
+                    "the colony counts " + colony.getCount(WorkerAntEntity.CASTE) + " workers, expected " + Colony.MAX_WORKERS);
+            helper.assertTrue(colony.countEggs(level) == 2, colony.countEggs(level) + " eggs are left, expected 2");
+            helper.assertTrue(level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds()).size() == workersBefore[0] + 1,
+                    "expected exactly one new worker");
         });
     }
 
