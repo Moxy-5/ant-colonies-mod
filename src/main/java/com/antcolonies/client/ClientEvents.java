@@ -20,6 +20,7 @@ public class ClientEvents {
         // textures/entity/worker_ant.png
         event.registerEntityRenderer(ModEntities.WORKER_ANT.get(), context -> new GeoEntityRenderer<>(
                 context, new DefaultedEntityGeoModel<WorkerAntEntity>(
-                        ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "worker_ant"))));
+                        ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "worker_ant")))
+                .withScale(0.65F));
     }
 }
