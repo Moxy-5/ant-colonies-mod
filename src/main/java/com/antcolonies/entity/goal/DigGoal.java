@@ -61,7 +61,6 @@ public class DigGoal extends Goal {
     @Override
     public boolean canContinueToUse() {
         return target != null && !ant.isCarrying() && stuckTicks < GIVE_UP_TICKS && allowed.getAsBoolean()
-                && (colony == null || !colony.isAlarmed(ant.level()))
                 && ant.level().getBlockState(target).is(ModTags.DIGGABLE);
     }
 

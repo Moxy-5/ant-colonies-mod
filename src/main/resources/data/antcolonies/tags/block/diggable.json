@@ -8,7 +8,6 @@
     "minecraft:clay",
     "minecraft:mud",
     "minecraft:sand",
-    "minecraft:red_sand",
-    "antcolonies:burrowed_dirt"
+    "minecraft:red_sand"
   ]
 }

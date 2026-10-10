@@ -50,9 +50,6 @@ public class AntNavigator {
     private double speed = 1.0;
     private boolean failed;
     private boolean climbing;
-    /** Set by {@link #cling()} each tick the ant should hold on where it is; makes it stick to the wall instead of falling. */
-    private boolean clingRequested;
-    private boolean holding;
     private double rise;
     private Vec3 climbMotion = Vec3.ZERO;
     private int replans;
@@ -114,21 +111,7 @@ public class AntNavigator {
         route = null;
         failed = false;
         climbing = false;
-        holding = false;
         rise = 0.0;
-    }
-
-    /**
-     * Asks the ant to hold on to the wall beside it where it is (call it every tick it should hold). Ants cling to
-     * any solid wall, so one can work on something high up a cliff or a tree without falling off.
-     */
-    public void cling() {
-        clingRequested = true;
-    }
-
-    /** True while the ant is holding on to a wall (the entity then does not fall). */
-    public boolean isHolding() {
-        return holding;
     }
 
     private boolean plan() {
@@ -157,11 +140,9 @@ public class AntNavigator {
     public void tick() {
         rise = 0.0;
         if (route == null) {
-            hold();
+            climbing = false;
             return;
         }
-        clingRequested = false;
-        holding = false;
         CellMap map = new LevelCellMap(ant.level());
         BlockPos here = ant.blockPosition();
         int last = route.size() - 1;
@@ -213,7 +194,7 @@ public class AntNavigator {
             climbing = up && (here.equals(from) || here.equals(corner) || here.equals(waypoint));
             aim = Vec3.atBottomCenterOf(waypoint);
             if (climbing) {
-                rise = Math.max(0.0, Math.min(CLIMB_SPEED * speed, waypoint.getY() - ant.getY()));
+                rise = Math.max(0.0, Math.min(CLIMB_SPEED, waypoint.getY() - ant.getY()));
                 if (waypoint.getX() == from.getX() && waypoint.getZ() == from.getZ()) {
                     // Straight up: hug a wall, preferably the one the ant will climb out over.
                     Direction wall = findWall(map, here, waypoint, exitDirection());
@@ -255,27 +236,6 @@ public class AntNavigator {
                     : new Vec3(sideX / distance * slide, rise, sideZ / distance * slide);
         }
         ant.getMoveControl().setWantedPosition(aim.x, aim.y, aim.z, speed);
-    }
-
-    /** Holds the ant against a wall of the cell it is in if it was asked to (see {@link #cling()}), otherwise lets go. */
-    private void hold() {
-        boolean wanted = clingRequested;
-        clingRequested = false;
-        holding = false;
-        climbing = false;
-        if (!wanted) {
-            return;
-        }
-        BlockPos here = ant.blockPosition();
-        Direction wall = findWall(new LevelCellMap(ant.level()), here, here, null);
-        if (wall == null) {
-            return;
-        }
-        holding = true;
-        climbing = true;
-        // Get against the wall, then stay put.
-        climbMotion = gapToWall(here, wall) > WALL_GAP
-                ? new Vec3(wall.getStepX() * CLING_SIDE_SPEED, 0.0, wall.getStepZ() * CLING_SIDE_SPEED) : Vec3.ZERO;
     }
 
     /** How far (in blocks) the ant's body still is from the wall on this side of the cell it is in. */

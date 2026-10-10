@@ -49,31 +49,15 @@ public final class NestPlan {
      * {@code direction}, in the order they are dug. The queen's room (with the main tunnel) is always first.
      */
     public static List<Chamber> chambers(BlockPos bottom, Direction direction) {
-        return specs(bottom, direction).stream().map(Spec::chamber).toList();
-    }
-
-    /**
-     * Where a room and its tunnel go: the kind, the block the tunnel leaves from (an already open block of the
-     * nest) and the direction it runs in. Small enough to save, and the same data is used to plan a replacement
-     * room when one has to be given up.
-     */
-    public record Spec(Kind kind, BlockPos start, Direction forward) {
-        public Chamber chamber() {
-            return NestPlan.chamber(kind, start, forward);
-        }
-    }
-
-    /** The three starting rooms (queen, nursery, food store) as specs, in the order they are dug. */
-    public static List<Spec> specs(BlockPos bottom, Direction direction) {
         BlockPos branch = bottom.relative(direction, BRANCH_AT);
         return List.of(
-                new Spec(Kind.QUEEN, bottom, direction),
-                new Spec(Kind.NURSERY, branch, direction.getClockWise()),
-                new Spec(Kind.FOOD, branch, direction.getCounterClockWise()));
+                chamber(Kind.QUEEN, bottom, direction),
+                chamber(Kind.NURSERY, branch, direction.getClockWise()),
+                chamber(Kind.FOOD, branch, direction.getCounterClockWise()));
     }
 
     /** A tunnel leaving {@code start} in direction {@code forward}, then a room at the end of it. */
-    public static Chamber chamber(Kind kind, BlockPos start, Direction forward) {
+    private static Chamber chamber(Kind kind, BlockPos start, Direction forward) {
         List<BlockPos> cells = new ArrayList<>();
         for (int i = 1; i <= TUNNEL_LENGTH; i++) {
             cells.add(start.relative(forward, i));

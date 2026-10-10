@@ -114,13 +114,6 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return isClimbing();
     }
 
-    // While the ant holds on to a wall (see AntNavigator.cling) gravity does not pull at it. Nothing is stored, so
-    // an ant that is saved while holding on simply falls when it is loaded again.
-    @Override
-    public boolean isNoGravity() {
-        return (navigator != null && navigator.isHolding()) || super.isNoGravity();
-    }
-
     // Ants are light enough to survive any fall (needed for the deep shaft).
     @Override
     public boolean causeFallDamage(float fallDistance, float multiplier, DamageSource source) {
