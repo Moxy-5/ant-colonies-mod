@@ -135,6 +135,54 @@ public class NestTests {
         });
     }
 
+    /**
+     * Thin soil: only the top three blocks of the ground are dirt, everything under them is stone (like a plains
+     * world where the stone starts right below the grass). The rooms do not fit at the usual depth, so the whole
+     * nest must sit one block higher, and the ants must still dig all of it and never touch the stone.
+     */
+    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    public static void nestSitsOneBlockHigherWhenTheStoneIsTooClose(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        startColony(helper);
+        int stoneTop = SURFACE - Colony.SHAFT_DEPTH; // the layer the rooms would normally be on
+        for (int x = 0; x < 25; x++) {
+            for (int z = 0; z < 25; z++) {
+                for (int y = 0; y <= stoneTop; y++) {
+                    helper.setBlock(x, y, z, Blocks.STONE);
+                }
+            }
+        }
+
+        helper.onEachTick(() -> {
+            if (helper.getTick() % 400 == 0) {
+                AntColoniesMod.LOGGER.info("[thin-soil-test] tick {}: {} cells dug. {}", helper.getTick(), airBelowSurface(helper), describe(helper));
+            }
+        });
+
+        helper.succeedWhen(() -> {
+            Colony colony = colony(helper);
+            helper.assertTrue(colony != null, "no colony yet");
+            int expected = NEST_CELLS - 1; // the shaft is one block shorter
+            helper.assertTrue(airBelowSurface(helper) == expected,
+                    "nest not finished: " + airBelowSurface(helper) + " of " + expected + " cells dug. " + describe(helper));
+            helper.assertTrue(colony.findDigTarget(level) == null, "something is still left to dig");
+            helper.assertTrue(colony.getPlannedChambers(level).size() == 3, "expected 3 rooms");
+            BlockPos room = colony.getFinishedRoomCenter(level);
+            helper.assertTrue(room != null, "the room is not finished");
+            var queens = level.getEntitiesOfClass(com.antcolonies.entity.QueenAntEntity.class, helper.getBounds());
+            helper.assertTrue(!queens.isEmpty() && queens.get(0).blockPosition().equals(room), "the queen is not in the middle of the room yet");
+            for (int x = 0; x < 25; x++) {
+                for (int z = 0; z < 25; z++) {
+                    helper.assertTrue(!helper.getBlockState(new BlockPos(x, stoneTop, z)).isAir(), "an ant dug into the stone layer at " + x + "," + z);
+                }
+            }
+            var leaks = colony.getLeaks(level);
+            helper.assertTrue(leaks.isEmpty(), "the nest still has openings: " + leaks);
+            AntColoniesMod.LOGGER.info("[thin-soil-test] finished at tick {}", helper.getTick());
+        });
+    }
+
     /** Dirt ground with a grass top across the whole test area, a queen at the entrance spot and six workers. */
     private static void startColony(GameTestHelper helper) {
         // Ground: dirt with a grass top, SURFACE blocks deep, across the whole test area.

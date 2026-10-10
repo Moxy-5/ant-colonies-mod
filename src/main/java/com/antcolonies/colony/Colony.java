@@ -45,6 +45,11 @@ public class Colony {
 
     /** How deep the entrance shaft goes, in blocks (will come from the species profile later). */
     public static final int SHAFT_DEPTH = 3;
+    /**
+     * Where the soil is too thin or too stony for the rooms at full depth, the whole nest sits one block higher
+     * (the shaft is one block shorter). Never shallower than this.
+     */
+    public static final int MIN_SHAFT_DEPTH = 2;
 
     /** The mound reaches this far (in blocks, sideways) from the entrance. */
     public static final int MOUND_RADIUS = 3;
@@ -69,9 +74,9 @@ public class Colony {
     private final Map<BlockPos, Float> digProgress = new HashMap<>();
 
     /** Where the nest's rooms go. Decided once (see {@link #getLayout}); not saved, it comes out the same after a reload. */
-    private record Layout(List<NestPlan.Chamber> chambers, Set<BlockPos> cells) {
-        Layout(List<NestPlan.Chamber> chambers) {
-            this(chambers, cellsOf(chambers));
+    private record Layout(List<NestPlan.Chamber> chambers, Set<BlockPos> cells, int shaftDepth) {
+        Layout(List<NestPlan.Chamber> chambers, int shaftDepth) {
+            this(chambers, cellsOf(chambers), shaftDepth);
         }
 
         private static Set<BlockPos> cellsOf(List<NestPlan.Chamber> chambers) {
@@ -107,8 +112,10 @@ public class Colony {
      */
     @Nullable
     public BlockPos findDigTarget(Level level) {
+        // The rooms are planned before the first block is dug, because the plan decides how deep the shaft goes.
+        int depth = shaftDepth(level);
         List<BlockPos> shaft = new ArrayList<>();
-        for (int i = 1; i <= SHAFT_DEPTH; i++) {
+        for (int i = 1; i <= depth; i++) {
             shaft.add(center.below(i));
         }
         BlockPos next = firstDiggable(level, shaft);
@@ -116,11 +123,11 @@ public class Colony {
             return next;
         }
         // Only start the tunnels once the shaft is completely open down to its bottom.
-        BlockPos bottom = center.below(SHAFT_DEPTH);
+        BlockPos bottom = center.below(depth);
         if (!level.isLoaded(bottom) || !level.getBlockState(bottom).isAir()) {
             return null;
         }
-        Layout layout = getLayout(level, bottom);
+        Layout layout = getLayout(level);
         if (layout == null) {
             return null;
         }
@@ -139,18 +146,14 @@ public class Colony {
      */
     @Nullable
     public BlockPos getFinishedRoomCenter(Level level) {
-        BlockPos bottom = center.below(SHAFT_DEPTH);
-        if (!level.isLoaded(bottom)) {
-            return null;
-        }
-        for (int i = 1; i <= SHAFT_DEPTH; i++) {
-            if (!level.getBlockState(center.below(i)).isAir()) {
-                return null;
-            }
-        }
-        Layout layout = getLayout(level, bottom);
+        Layout layout = getLayout(level);
         if (layout == null) {
             return null;
+        }
+        for (int i = 1; i <= layout.shaftDepth(); i++) {
+            if (!level.isLoaded(center.below(i)) || !level.getBlockState(center.below(i)).isAir()) {
+                return null;
+            }
         }
         NestPlan.Chamber queen = layout.chambers().get(0);
         for (BlockPos pos : queen.cells()) {
@@ -163,19 +166,20 @@ public class Colony {
 
     /** The rooms this nest is being dug with (empty until the layout is decided). For tests and debugging. */
     public List<NestPlan.Chamber> getPlannedChambers(Level level) {
-        Layout layout = getLayout(level, center.below(SHAFT_DEPTH));
+        Layout layout = getLayout(level);
         return layout == null ? List.of() : layout.chambers();
     }
 
     /** Every block that is part of the nest plan: the shaft, and the rooms once their layout is decided. */
     private Set<BlockPos> nestCells(Level level) {
         Set<BlockPos> cells = new HashSet<>();
-        for (int i = 1; i <= SHAFT_DEPTH; i++) {
+        int depth = shaftDepth(level);
+        for (int i = 1; i <= depth; i++) {
             cells.add(center.below(i));
         }
-        BlockPos bottom = center.below(SHAFT_DEPTH);
+        BlockPos bottom = center.below(depth);
         if (level.isLoaded(bottom) && level.getBlockState(bottom).isAir()) {
-            Layout layout = getLayout(level, bottom);
+            Layout layout = getLayout(level);
             if (layout != null) {
                 cells.addAll(layout.cells());
             }
@@ -305,20 +309,50 @@ public class Colony {
 
     /** The layout of the rooms: worked out the first time it is needed, then kept. Null = wait (chunk not loaded) or no room. */
     @Nullable
-    private Layout getLayout(Level level, BlockPos bottom) {
+    private Layout getLayout(Level level) {
         if (layout == null) {
-            layout = chooseLayout(level, bottom);
+            layout = chooseLayout(level);
         }
         return layout;
     }
 
+    /** How deep the entrance shaft goes for this nest: the depth of the room plan (the normal depth until it is known). */
+    private int shaftDepth(Level level) {
+        Layout planned = getLayout(level);
+        return planned == null ? SHAFT_DEPTH : planned.shaftDepth();
+    }
+
     /**
-     * Picks which of the four sides the main tunnel leaves toward. The queen's room must fit in the soil;
-     * of the sides where it does, the one with the most rooms that fit wins (a tie goes to the first,
-     * counting from a side that is fixed per colony). A room that would run into stone, water or lava is left out.
+     * Picks how deep the nest sits and which side the main tunnel leaves toward. Full depth is tried first; only
+     * where no side has room for the queen there (thin soil, stone, water) is the nest put one block higher.
+     * Null while chunks are missing, or when there is no room at all.
      */
     @Nullable
-    private Layout chooseLayout(Level level, BlockPos bottom) {
+    private Layout chooseLayout(Level level) {
+        // Full depth first. If no side has room for the queen there (stone, water), try one block higher.
+        for (int depth = SHAFT_DEPTH; depth >= MIN_SHAFT_DEPTH; depth--) {
+            for (Direction direction : Direction.Plane.HORIZONTAL) {
+                for (NestPlan.Chamber chamber : NestPlan.chambers(center.below(depth), direction)) {
+                    for (BlockPos pos : chamber.cells()) {
+                        if (!level.isLoaded(pos)) {
+                            return null;
+                        }
+                    }
+                }
+            }
+        }
+        for (int depth = SHAFT_DEPTH; depth >= MIN_SHAFT_DEPTH; depth--) {
+            Layout found = chooseLayout(level, center.below(depth), depth);
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
+    }
+
+    /** The best layout with the shaft {@code depth} blocks deep (all the chunks involved are loaded), or null if the queen does not fit. */
+    @Nullable
+    private Layout chooseLayout(Level level, BlockPos bottom, int depth) {
         int start = Math.floorMod(id.hashCode(), 4);
         Layout best = null;
         for (int i = 0; i < 4; i++) {
@@ -336,7 +370,7 @@ public class Colony {
             }
             boolean queenFits = !fitting.isEmpty() && fitting.get(0).kind() == NestPlan.Kind.QUEEN;
             if (queenFits && (best == null || fitting.size() > best.chambers().size())) {
-                best = new Layout(fitting);
+                best = new Layout(fitting, depth);
             }
         }
         return best;
