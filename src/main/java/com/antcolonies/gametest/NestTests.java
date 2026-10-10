@@ -183,8 +183,43 @@ public class NestTests {
         });
     }
 
+    /**
+     * A queen on her own (no workers), as when she founds a nest: she digs the shaft, the tunnel and her own room
+     * herself, then settles in the middle of it. She cannot place blocks, so no hill is built.
+     */
+    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    public static void aloneQueenDigsHerOwnRoom(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        startColony(helper, 0);
+
+        helper.onEachTick(() -> {
+            if (helper.getTick() % 400 == 0) {
+                AntColoniesMod.LOGGER.info("[queen-dig-test] tick {}: {} cells dug. {}", helper.getTick(), airBelowSurface(helper), describe(helper));
+            }
+        });
+
+        helper.succeedWhen(() -> {
+            Colony colony = colony(helper);
+            helper.assertTrue(colony != null, "no colony yet");
+            BlockPos room = colony.getFinishedRoomCenter(level);
+            helper.assertTrue(room != null, "her room is not finished: " + airBelowSurface(helper) + " cells dug");
+            var queens = level.getEntitiesOfClass(com.antcolonies.entity.QueenAntEntity.class, helper.getBounds());
+            helper.assertTrue(!queens.isEmpty() && queens.get(0).blockPosition().equals(room), "the queen is not in the middle of her room yet");
+            // Shaft + the queen's tunnel and room only: the workers do the nursery and the food store.
+            int expected = Colony.SHAFT_DEPTH + colony.getPlannedChambers(level).get(0).cells().size();
+            helper.assertTrue(airBelowSurface(helper) == expected, "dug " + airBelowSurface(helper) + " cells but expected " + expected);
+            helper.assertTrue(moundBlocks(helper) == 0, "the queen placed soil");
+            AntColoniesMod.LOGGER.info("[queen-dig-test] finished at tick {}", helper.getTick());
+        });
+    }
+
     /** Dirt ground with a grass top across the whole test area, a queen at the entrance spot and six workers. */
     private static void startColony(GameTestHelper helper) {
+        startColony(helper, 6);
+    }
+
+    private static void startColony(GameTestHelper helper, int workers) {
         // Ground: dirt with a grass top, SURFACE blocks deep, across the whole test area.
         for (int x = 0; x < 25; x++) {
             for (int z = 0; z < 25; z++) {
@@ -197,7 +232,7 @@ public class NestTests {
 
         helper.spawn(ModEntities.QUEEN_ANT.get(), MIDDLE, SURFACE, MIDDLE);
         helper.runAfterDelay(5, () -> {
-            for (int i = 0; i < 6; i++) {
+            for (int i = 0; i < workers; i++) {
                 helper.spawn(ModEntities.WORKER_ANT.get(), MIDDLE - 2 + i % 3 * 2, SURFACE, MIDDLE - 3 + i / 3 * 6);
             }
         });

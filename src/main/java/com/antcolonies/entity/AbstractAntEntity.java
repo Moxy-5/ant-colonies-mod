@@ -65,6 +65,11 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return entityData.get(DATA_CARRIED).orElse(null);
     }
 
+    /** Whether this ant can carry soil out and pack it into place. A queen can only dig: the soil stays where it falls. */
+    public boolean canPlaceBlocks() {
+        return true;
+    }
+
     public boolean isCarrying() {
         return entityData.get(DATA_CARRIED).isPresent();
     }

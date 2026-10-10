@@ -1,6 +1,7 @@
 package com.antcolonies.entity.goal;
 
 import java.util.EnumSet;
+import java.util.function.BooleanSupplier;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -27,6 +28,8 @@ public class DigGoal extends Goal {
     private static final int GIVE_UP_TICKS = 60;
 
     private final AbstractAntEntity ant;
+    /** Lets an ant dig only some of the time (the queen stops once her room is finished). */
+    private final BooleanSupplier allowed;
     @Nullable
     private Colony colony;
     @Nullable
@@ -34,8 +37,9 @@ public class DigGoal extends Goal {
     private int biteCooldown;
     private int stuckTicks;
 
-    public DigGoal(AbstractAntEntity ant) {
+    public DigGoal(AbstractAntEntity ant, BooleanSupplier allowed) {
         this.ant = ant;
+        this.allowed = allowed;
         setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
     }
 
@@ -43,7 +47,7 @@ public class DigGoal extends Goal {
     public boolean canUse() {
         // Only look for work now and then, so ants don't all think on the same tick.
         // An ant with a pellet in its mouth must carry it out before biting again.
-        if (ant.getColonyId() == null || ant.isCarrying() || ant.getRandom().nextInt(20) != 0) {
+        if (ant.getColonyId() == null || ant.isCarrying() || ant.getRandom().nextInt(20) != 0 || !allowed.getAsBoolean()) {
             return false;
         }
         if (!(ant.level() instanceof ServerLevel level)) {
@@ -56,7 +60,7 @@ public class DigGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        return target != null && !ant.isCarrying() && stuckTicks < GIVE_UP_TICKS
+        return target != null && !ant.isCarrying() && stuckTicks < GIVE_UP_TICKS && allowed.getAsBoolean()
                 && ant.level().getBlockState(target).is(ModTags.DIGGABLE);
     }
 
@@ -120,7 +124,7 @@ public class DigGoal extends Goal {
 
         // Every bite leaves a soil pellet in the mandibles (grass and roots turn into plain dirt), as long as
         // the hill still has room for it. Once the hill is complete the soil is simply left behind.
-        if (colony.hasMoundRoom(level)) {
+        if (ant.canPlaceBlocks() && colony.hasMoundRoom(level)) {
             ant.setCarriedBlock(state.is(Blocks.GRASS_BLOCK) || state.is(Blocks.ROOTED_DIRT)
                     ? Blocks.DIRT.defaultBlockState() : state);
         }

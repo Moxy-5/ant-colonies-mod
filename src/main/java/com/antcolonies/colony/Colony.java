@@ -323,9 +323,10 @@ public class Colony {
     }
 
     /**
-     * Picks how deep the nest sits and which side the main tunnel leaves toward. Full depth is tried first; only
-     * where no side has room for the queen there (thin soil, stone, water) is the nest put one block higher.
-     * Null while chunks are missing, or when there is no room at all.
+     * Picks how deep the nest sits and which side the main tunnel leaves toward, by looking at the ground: a
+     * depth only counts if the whole shaft is soil and the queen's room fits (no stone or water in the way).
+     * The depth where the most rooms fit wins, the deeper one on a tie. Null while chunks are missing, or when
+     * there is no room at all.
      */
     @Nullable
     private Layout chooseLayout(Level level) {
@@ -341,18 +342,27 @@ public class Colony {
                 }
             }
         }
+        Layout best = null;
         for (int depth = SHAFT_DEPTH; depth >= MIN_SHAFT_DEPTH; depth--) {
             Layout found = chooseLayout(level, center.below(depth), depth);
-            if (found != null) {
-                return found;
+            // The depth with the most rooms wins; on a tie the deeper one (it is tried first).
+            if (found != null && (best == null || found.chambers().size() > best.chambers().size())) {
+                best = found;
             }
         }
-        return null;
+        return best;
     }
 
-    /** The best layout with the shaft {@code depth} blocks deep (all the chunks involved are loaded), or null if the queen does not fit. */
+    /** The best layout with the shaft {@code depth} blocks deep (all the chunks involved are loaded), or null if the shaft or the queen's room does not fit. */
     @Nullable
     private Layout chooseLayout(Level level, BlockPos bottom, int depth) {
+        List<BlockPos> shaft = new ArrayList<>();
+        for (int i = 1; i <= depth; i++) {
+            shaft.add(center.below(i));
+        }
+        if (!allSoilOrAir(level, shaft)) {
+            return null; // stone in the way of the shaft itself
+        }
         int start = Math.floorMod(id.hashCode(), 4);
         Layout best = null;
         for (int i = 0; i < 4; i++) {

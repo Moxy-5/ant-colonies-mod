@@ -41,7 +41,7 @@ public class WorkerAntEntity extends AbstractAntEntity {
         this.goalSelector.addGoal(0, new FloatGoal(this));
         this.goalSelector.addGoal(1, new CarryPelletGoal(this));
         this.goalSelector.addGoal(2, new SealGoal(this));
-        this.goalSelector.addGoal(3, new DigGoal(this));
+        this.goalSelector.addGoal(3, new DigGoal(this, () -> true));
         this.goalSelector.addGoal(4, new AntWanderGoal(this, 1.0, 120, 6, () -> true));
         this.goalSelector.addGoal(5, new RandomLookAroundGoal(this));
     }
