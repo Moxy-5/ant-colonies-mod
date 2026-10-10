@@ -12,6 +12,7 @@ public class ModItems {
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(AntColoniesMod.MODID);
 
     public static final DeferredItem<BlockItem> BURROWED_DIRT = ITEMS.registerSimpleBlockItem(ModBlocks.BURROWED_DIRT);
+    public static final DeferredItem<BlockItem> SEED_PILE = ITEMS.registerSimpleBlockItem(ModBlocks.SEED_PILE);
 
     public static final DeferredItem<DeferredSpawnEggItem> WORKER_ANT_SPAWN_EGG =
             ITEMS.register("worker_ant_spawn_egg",

@@ -11,6 +11,7 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import com.antcolonies.block.SeedPileBlock;
 import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.registry.ModTags;
 
@@ -21,7 +22,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.block.state.BlockState;
@@ -207,7 +207,7 @@ public class Colony {
                 continue;
             }
             for (BlockPos pos : chamber.cells()) {
-                if (!level.isLoaded(pos) || !level.getBlockState(pos).isAir()) {
+                if (!level.isLoaded(pos) || !(level.getBlockState(pos).isAir() || level.getBlockState(pos).is(ModBlocks.SEED_PILE.get()))) {
                     return List.of();
                 }
             }
@@ -216,11 +216,24 @@ public class Colony {
         return List.of();
     }
 
-    /** A random spot on the floor of the food store, or null if the store is not ready. */
+    /**
+     * A spot on the floor of the food store that can take one more seed, or null if the store is not ready or full.
+     * Most of the time it is a heap that already exists (so the heaps grow, not a thin layer everywhere).
+     */
     @Nullable
     public BlockPos pickFoodSpot(Level level, RandomSource random) {
-        List<BlockPos> cells = getFoodStoreCells(level);
-        return cells.isEmpty() ? null : cells.get(random.nextInt(cells.size()));
+        List<BlockPos> growing = new ArrayList<>();
+        List<BlockPos> empty = new ArrayList<>();
+        for (BlockPos pos : getFoodStoreCells(level)) {
+            BlockState state = level.getBlockState(pos);
+            if (state.isAir()) {
+                empty.add(pos);
+            } else if (state.getValue(SeedPileBlock.LAYERS) < SeedPileBlock.MAX_LAYERS) {
+                growing.add(pos);
+            }
+        }
+        List<BlockPos> from = !growing.isEmpty() && (empty.isEmpty() || random.nextFloat() < 0.75F) ? growing : empty;
+        return from.isEmpty() ? null : from.get(random.nextInt(from.size()));
     }
 
     /**
@@ -230,8 +243,8 @@ public class Colony {
      */
     @Nullable
     public ItemEntity findSeed(Level level, BlockPos near, Set<Integer> avoid) {
-        if (getFoodStoreCells(level).isEmpty()) {
-            return null;
+        if (pickFoodSpot(level, level.getRandom()) == null) {
+            return null; // no food store yet, or it is full
         }
         long now = level.getGameTime();
         claimedSeeds.values().removeIf(until -> until <= now);
@@ -260,13 +273,21 @@ public class Colony {
         claimedSeeds.remove(seed.getId());
     }
 
-    /** An ant puts its seed down in the food store: it stays there as an item on the floor and counts as one food. */
-    public void depositSeed(Level level, BlockPos spot, ItemStack seed) {
-        ItemEntity item = new ItemEntity(level, spot.getX() + 0.5, spot.getY() + 0.1, spot.getZ() + 0.5, seed.copy());
-        item.setDeltaMovement(0, 0, 0);
-        item.setUnlimitedLifetime();
-        level.addFreshEntity(item);
-        food += seed.getCount();
+    /**
+     * An ant puts its seed down at {@code spot} in the food store: the heap there grows by one layer (or a new heap
+     * starts) and the colony counts one more food. False if that spot is full (the ant looks for another).
+     */
+    public boolean depositSeed(Level level, BlockPos spot) {
+        BlockState state = level.getBlockState(spot);
+        if (state.isAir()) {
+            level.setBlock(spot, ModBlocks.SEED_PILE.get().defaultBlockState(), 3);
+        } else if (state.is(ModBlocks.SEED_PILE.get()) && state.getValue(SeedPileBlock.LAYERS) < SeedPileBlock.MAX_LAYERS) {
+            level.setBlock(spot, state.setValue(SeedPileBlock.LAYERS, state.getValue(SeedPileBlock.LAYERS) + 1), 3);
+        } else {
+            return false;
+        }
+        food++;
+        return true;
     }
 
     /** The rooms this nest is being dug with (empty until the layout is decided). For tests and debugging. */

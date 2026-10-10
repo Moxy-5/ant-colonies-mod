@@ -12,7 +12,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.ai.goal.Goal;
 
-/** An ant holding a seed carries it to the food store and leaves it on the floor there. */
+/** An ant holding a seed carries it to the food store and adds it to a heap of seeds on the floor there. */
 public class StoreSeedGoal extends Goal {
     /** How close (sideways, in blocks) the ant must get before it puts the seed down. */
     private static final double REACH = 0.9;
@@ -81,9 +81,17 @@ public class StoreSeedGoal extends Goal {
         double dz = ant.getZ() - (spot.getZ() + 0.5);
         double dy = ant.getY() - spot.getY();
         if (dx * dx + dz * dz <= REACH * REACH && Math.abs(dy) < 1.5) {
-            colony.depositSeed(level, spot, ant.getCarriedSeed());
-            ant.setCarriedSeed(net.minecraft.world.item.ItemStack.EMPTY);
-            ColonyManager.get(level).markChanged();
+            if (colony.depositSeed(level, spot)) {
+                ant.setCarriedSeed(net.minecraft.world.item.ItemStack.EMPTY);
+                ColonyManager.get(level).markChanged();
+            } else {
+                spot = colony.pickFoodSpot(level, ant.getRandom()); // that heap is full
+                if (spot == null) {
+                    dropSeed();
+                } else {
+                    walkToSpot();
+                }
+            }
         } else if (ant.getNavigator().isDone()) {
             walkToSpot();
         }

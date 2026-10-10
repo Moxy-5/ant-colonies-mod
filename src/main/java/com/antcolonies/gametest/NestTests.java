@@ -274,9 +274,16 @@ public class NestTests {
         return box == null ? new AABB(0, 0, 0, 0, 0, 0) : box;
     }
 
-    /** How many seeds (counting every one in a pile) lie as items in the box. */
+    /** How many seeds lie in the box: every layer of a seed pile block counts one, and so does every seed lying as an item. */
     private static int seedsIn(ServerLevel level, AABB box) {
         int seeds = 0;
+        for (BlockPos pos : BlockPos.betweenClosed(BlockPos.containing(box.minX + 0.01, box.minY + 0.01, box.minZ + 0.01),
+                BlockPos.containing(box.maxX - 0.01, box.maxY - 0.01, box.maxZ - 0.01))) {
+            var state = level.getBlockState(pos);
+            if (state.is(ModBlocks.SEED_PILE.get())) {
+                seeds += state.getValue(com.antcolonies.block.SeedPileBlock.LAYERS);
+            }
+        }
         for (var item : level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, box)) {
             seeds += item.getItem().getCount();
         }
