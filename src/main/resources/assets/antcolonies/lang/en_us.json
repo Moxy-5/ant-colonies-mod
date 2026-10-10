@@ -1,1 +1,4 @@
-{}
+{
+  "entity.antcolonies.worker_ant": "Worker Ant",
+  "item.antcolonies.worker_ant_spawn_egg": "Worker Ant Spawn Egg"
+}

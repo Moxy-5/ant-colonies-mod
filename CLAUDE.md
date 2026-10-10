@@ -143,7 +143,7 @@ Goal: a mature colony can hold 1,000+ ants or termites without lag.
 - Until real art exists, use simple placeholder models so code is never blocked by art.
 
 ## Milestones
-- [ ] M0: Project setup: NeoForge 1.21.1 MDK, git, `runClient` launches the game with the mod loaded.
+- [x] M0: Project setup: NeoForge 1.21.1 MDK, git, `runClient` launches the game with the mod loaded.
 - [ ] M1: Worker ant with a placeholder model and spawn egg that walks around.
 - [ ] M2: Swap in the real worker model and animations.
 - [ ] M3: Queen + colony brain + saving and loading.
@@ -162,4 +162,5 @@ Goal: a mature colony can hold 1,000+ ants or termites without lag.
 
 ## Current status
 - Mod name: **Ant & Termite Colonies**, mod ID: **antcolonies**, package `com.antcolonies`.
-- M0: project created from the official NeoForge 1.21.1 MDK, `./gradlew build` passes. Waiting for the user to confirm `runClient` launches the game with the mod listed. GeckoLib is not added yet (comes with M1).
+- M0 done: project from the official NeoForge 1.21.1 MDK, build passes, `runClient` confirmed working by the user.
+- Next: M1 (worker ant with placeholder model + spawn egg; adds GeckoLib). Real Blockbench model comes at M2.
