@@ -214,6 +214,78 @@ public class NestTests {
         });
     }
 
+    /**
+     * Water starts running down the entrance hole of a finished nest (a source block on top of the hill). The ants
+     * above must block the source, the ants below must shut the doors of the rooms, and once the water is gone
+     * the doors must be opened again, so the nest ends up exactly as it was and no water is left in it.
+     */
+    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    public static void antsBlockWaterAndShutTheDoorsThenOpenThemAgain(GameTestHelper helper) {
+        floodTest(helper, Blocks.WATER, "water-test", false);
+    }
+
+    /** The same with lava, which is slower than water but would kill a worker that touched it. */
+    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    public static void antsBlockLavaAndShutTheDoorsThenOpenThemAgain(GameTestHelper helper) {
+        floodTest(helper, Blocks.LAVA, "lava-test", true);
+    }
+
+    /**
+     * {@code doorsInTime}: lava is slow enough for the ants below to shut the doors before it arrives; water floods the
+     * tunnels in a few seconds, so there only the source being blocked and the water draining away is checked.
+     */
+    private static void floodTest(GameTestHelper helper, net.minecraft.world.level.block.Block fluid, String tag, boolean doorsInTime) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        startColony(helper);
+
+        BlockPos[] source = {null};
+        boolean[] sawDoorShut = {false};
+        helper.onEachTick(() -> {
+            Colony colony = colony(helper);
+            if (colony == null) {
+                return;
+            }
+            if (source[0] == null) {
+                // Wait until the nest and the hill are finished, then pour the water.
+                if (airBelowSurface(helper) == NEST_CELLS && colony.findDigTarget(level) == null && hillProblems(helper).isEmpty()
+                        && colony.getFinishedRoomCenter(level) != null) {
+                    source[0] = colony.getCenter().offset(1, 3, 0);
+                    level.setBlock(source[0], fluid.defaultBlockState(), 3);
+                    AntColoniesMod.LOGGER.info("[{}] tick {}: poured at {}", tag, helper.getTick(), source[0]);
+                    // A colony always has some workers out on the surface: three of them are up on the ground now.
+                    for (int i = 0; i < 3; i++) {
+                        helper.spawn(ModEntities.WORKER_ANT.get(), MIDDLE + 4 + i, SURFACE, MIDDLE + 3);
+                    }
+                }
+                return;
+            }
+            for (var chamber : colony.getPlannedChambers(level)) {
+                if (!level.getBlockState(chamber.cells().get(com.antcolonies.colony.NestPlan.TUNNEL_LENGTH - 1)).isAir()
+                        && level.getFluidState(chamber.cells().get(com.antcolonies.colony.NestPlan.TUNNEL_LENGTH - 1)).isEmpty()) {
+                    sawDoorShut[0] = true;
+                }
+            }
+            if (helper.getTick() % 200 == 0) {
+                AntColoniesMod.LOGGER.info("[{}] tick {}: alert {}, source {}, doorShut {}, {} cells open. {}", tag, helper.getTick(),
+                        colony.getAlert(level), level.getBlockState(source[0]).getBlock(), sawDoorShut[0], airBelowSurface(helper), describe(helper));
+            }
+        });
+
+        helper.succeedWhen(() -> {
+            Colony colony = colony(helper);
+            helper.assertTrue(colony != null && source[0] != null, "nothing has been poured yet");
+            helper.assertTrue(level.getFluidState(source[0]).isEmpty(), "the source is still there");
+            helper.assertTrue(sawDoorShut[0] || !doorsInTime, "the ants never shut a door");
+            helper.assertTrue(!colony.isAlarmed(level), "the colony is still on alert: " + colony.getAlert(level));
+            helper.assertTrue(airBelowSurface(helper) == NEST_CELLS,
+                    "the nest is not open again: " + airBelowSurface(helper) + " of " + NEST_CELLS + " cells. " + describe(helper));
+            helper.assertTrue(colony.findDigTarget(level) == null, "something is still left to dig");
+            helper.assertTrue(colony.getLeaks(level).isEmpty(), "the nest has openings");
+            AntColoniesMod.LOGGER.info("[{}] finished at tick {}", tag, helper.getTick());
+        });
+    }
+
     /** Dirt ground with a grass top across the whole test area, a queen at the entrance spot and six workers. */
     private static void startColony(GameTestHelper helper) {
         startColony(helper, 6);

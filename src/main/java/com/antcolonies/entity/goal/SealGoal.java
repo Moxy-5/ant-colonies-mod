@@ -54,7 +54,7 @@ public class SealGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        leak = colony == null ? null : colony.findLeak(level, ant.blockPosition());
+        leak = colony == null ? null : colony.findSealTask(level, ant.blockPosition());
         if (leak == null) {
             return false;
         }

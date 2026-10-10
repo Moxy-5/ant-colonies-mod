@@ -1,5 +1,6 @@
 package com.antcolonies.colony;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -106,12 +107,37 @@ public class Colony {
     }
 
     /**
+     * Water or lava near the nest. SURFACE: it is close to the entrance (the ants above go and block its source).
+     * INSIDE: it has got into the hole or the nest. From the first warning on, the ants below close the doors
+     * of the rooms: water and lava are far quicker than an ant, so they must not wait until it is in the nest.
+     */
+    public enum Alert {
+        NONE, SURFACE, INSIDE
+    }
+
+    private static final int ALERT_CHECK_TICKS = 10;
+    /** The doors stay shut this long after the last water or lava was seen (10 seconds), then the ants open them again. */
+    private static final int CALM_TICKS = 200;
+    /** Only water and lava this close to the entrance is dealt with, and no more than this many blocks of one stream. */
+    private static final int HAZARD_RANGE = 8;
+    private static final int HAZARD_BODY_LIMIT = 600;
+
+    private long alertCheckedAt = -1000;
+    private Alert alert = Alert.NONE;
+    private long lastAlertAt = -1000000;
+    private final Set<BlockPos> hazardCells = new HashSet<>();
+
+    /**
      * The next block to dig, or null if all the digging is done (or blocked). Order: the entrance
      * shaft, then the queen's tunnel and room, then the nursery, then the food store. The shaft is
      * never widened, so its walls stay solid for the ants to climb.
      */
     @Nullable
     public BlockPos findDigTarget(Level level) {
+        // No digging (and so no opening of the doors) while water or lava is about, and for a while after.
+        if (isAlarmed(level)) {
+            return null;
+        }
         // The rooms are planned before the first block is dug, because the plan decides how deep the shaft goes.
         int depth = shaftDepth(level);
         List<BlockPos> shaft = new ArrayList<>();
@@ -209,6 +235,182 @@ public class Colony {
             }
         }
         return leaks;
+    }
+
+    /** The current alert level, looked at again every half second at most. */
+    public Alert getAlert(Level level) {
+        long now = level.getGameTime();
+        if (now - alertCheckedAt >= ALERT_CHECK_TICKS || now < alertCheckedAt) {
+            scanHazards(level, now);
+        }
+        return alert;
+    }
+
+    /** True while water or lava is near, and for a few seconds after it has gone. */
+    public boolean isAlarmed(Level level) {
+        return getAlert(level) != Alert.NONE || level.getGameTime() - lastAlertAt < CALM_TICKS;
+    }
+
+    private void scanHazards(Level level, long now) {
+        alertCheckedAt = now;
+        hazardCells.clear();
+        Alert found = Alert.NONE;
+        List<BlockPos> inside = new ArrayList<>();
+        inside.add(center);
+        inside.addAll(nestCells(level));
+        Layout planned = getLayout(level);
+        if (planned != null) {
+            inside.addAll(planned.cells());
+        }
+        for (BlockPos pos : inside) {
+            if (hasFluid(level, pos)) {
+                hazardCells.add(pos.immutable());
+                found = Alert.INSIDE;
+            }
+        }
+        // Around the hole, where a stream would run into it.
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dz = -2; dz <= 2; dz++) {
+                for (int dy = -1; dy <= 3; dy++) {
+                    BlockPos pos = center.offset(dx, dy, dz);
+                    if (hasFluid(level, pos) && hazardCells.add(pos)) {
+                        found = found == Alert.NONE ? Alert.SURFACE : found;
+                    }
+                }
+            }
+        }
+        alert = found;
+        if (found != Alert.NONE) {
+            lastAlertAt = now;
+        }
+    }
+
+    private static boolean hasFluid(Level level, BlockPos pos) {
+        return level.isLoaded(pos) && !level.getFluidState(pos).isEmpty();
+    }
+
+    /**
+     * What an ant standing at {@code near} should close next: while water or lava threatens the nest, the ants
+     * below shut the doors of the rooms and the ants above go for the source of it; otherwise (and when there is
+     * nothing of that left to do) a plain opening in the walls. Null if there is nothing to close.
+     */
+    @Nullable
+    public Leak findSealTask(Level level, BlockPos near) {
+        long now = level.getGameTime();
+        claimedLeaks.values().removeIf(until -> until <= now);
+        Alert current = getAlert(level);
+        if (current != Alert.NONE) {
+            Leak task = null;
+            if (near.getY() < center.getY()) {
+                // Below ground: shut the doors first (while the water or lava is still on its way down), then help up top.
+                task = findDoorTask(level, near);
+            }
+            if (task == null) {
+                task = findSourceTask(level, near);
+            }
+            if (task != null) {
+                return task;
+            }
+        }
+        return findLeak(level, near);
+    }
+
+    /** The door of a room that is still open: the last block of its tunnel. An ant plugs it from the block before. */
+    @Nullable
+    private Leak findDoorTask(Level level, BlockPos near) {
+        Layout planned = getLayout(level);
+        if (planned == null) {
+            return null;
+        }
+        Leak best = null;
+        double bestDistance = Double.MAX_VALUE;
+        for (NestPlan.Chamber chamber : planned.chambers()) {
+            BlockPos door = chamber.cells().get(NestPlan.TUNNEL_LENGTH - 1);
+            BlockPos stand = chamber.cells().get(NestPlan.TUNNEL_LENGTH - 2);
+            if (!isOpen(level, door) || claimedLeaks.containsKey(door) || !canStandAt(level, stand)) {
+                continue;
+            }
+            double distance = stand.distSqr(near);
+            if (distance < bestDistance) {
+                best = new Leak(door, stand);
+                bestDistance = distance;
+            }
+        }
+        return best;
+    }
+
+    /**
+     * The nearest source block of the water or lava that is running towards the hole (found by following the
+     * stream from where it reaches the nest). If no source is in reach, a piece of the stream is blocked instead.
+     */
+    @Nullable
+    private Leak findSourceTask(Level level, BlockPos near) {
+        Set<BlockPos> body = new HashSet<>();
+        ArrayDeque<BlockPos> queue = new ArrayDeque<>();
+        for (BlockPos start : hazardCells) {
+            if (body.add(start)) {
+                queue.add(start);
+            }
+        }
+        while (!queue.isEmpty() && body.size() < HAZARD_BODY_LIMIT) {
+            BlockPos pos = queue.poll();
+            for (Direction direction : Direction.values()) {
+                BlockPos next = pos.relative(direction);
+                if (Math.abs(next.getX() - center.getX()) <= HAZARD_RANGE && Math.abs(next.getZ() - center.getZ()) <= HAZARD_RANGE
+                        && Math.abs(next.getY() - center.getY()) <= HAZARD_RANGE && hasFluid(level, next) && body.add(next)) {
+                    queue.add(next);
+                }
+            }
+        }
+        Leak bestSource = null;
+        double bestSourceDistance = Double.MAX_VALUE;
+        Leak bestStream = null;
+        double bestStreamDistance = Double.MAX_VALUE;
+        for (BlockPos pos : body) {
+            if (pos.equals(center) || claimedLeaks.containsKey(pos)) {
+                continue;
+            }
+            BlockPos stand = findStandNear(level, pos);
+            if (stand == null) {
+                continue;
+            }
+            double distance = stand.distSqr(near);
+            if (level.getFluidState(pos).isSource()) {
+                if (distance < bestSourceDistance) {
+                    bestSource = new Leak(pos.immutable(), stand);
+                    bestSourceDistance = distance;
+                }
+            } else if (distance < bestStreamDistance) {
+                bestStream = new Leak(pos.immutable(), stand);
+                bestStreamDistance = distance;
+            }
+        }
+        return bestSource != null ? bestSource : bestStream;
+    }
+
+    /** A free block with a floor next to (or above or below) the target, not in water, where an ant can stand to pack it shut. */
+    @Nullable
+    private static BlockPos findStandNear(Level level, BlockPos target) {
+        BlockPos best = null;
+        double bestDistance = Double.MAX_VALUE;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dy = -1; dy <= 1; dy++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    BlockPos spot = target.offset(dx, dy, dz);
+                    double distance = target.distSqr(spot);
+                    if (distance > 0 && distance < bestDistance && canStandAt(level, spot)) {
+                        best = spot;
+                        bestDistance = distance;
+                    }
+                }
+            }
+        }
+        return best;
+    }
+
+    private static boolean canStandAt(Level level, BlockPos spot) {
+        return level.isLoaded(spot) && level.getBlockState(spot).isAir() && level.getFluidState(spot).isEmpty()
+                && level.getBlockState(spot.below()).isFaceSturdy(level, spot.below(), Direction.UP);
     }
 
     /** The leak closest to {@code near} that an ant can reach and no other ant is on its way to, or null. */
