@@ -1,6 +1,10 @@
 package com.antcolonies.gametest;
 
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
@@ -10,6 +14,7 @@ import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.registry.ModEntities;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
@@ -38,22 +43,7 @@ public class NestTests {
         // Run the game faster than normal so the test doesn't take minutes.
         level.getServer().tickRateManager().setTickRate(2000.0F);
 
-        // Ground: dirt with a grass top, SURFACE blocks deep, across the whole test area.
-        for (int x = 0; x < 25; x++) {
-            for (int z = 0; z < 25; z++) {
-                for (int y = 0; y < SURFACE - 1; y++) {
-                    helper.setBlock(x, y, z, Blocks.DIRT);
-                }
-                helper.setBlock(x, SURFACE - 1, z, Blocks.GRASS_BLOCK);
-            }
-        }
-
-        helper.spawn(ModEntities.QUEEN_ANT.get(), MIDDLE, SURFACE, MIDDLE);
-        helper.runAfterDelay(5, () -> {
-            for (int i = 0; i < 6; i++) {
-                helper.spawn(ModEntities.WORKER_ANT.get(), MIDDLE - 2 + i % 3 * 2, SURFACE, MIDDLE - 3 + i / 3 * 6);
-            }
-        });
+        startColony(helper);
 
         int[] lastAirCount = {0};
         helper.onEachTick(() -> {
@@ -84,6 +74,126 @@ public class NestTests {
             helper.assertTrue(hill.isEmpty(), "the mound is not the planned hill yet: " + hill);
             AntColoniesMod.LOGGER.info("[nest-test] finished at tick {}: {}", helper.getTick(), describe(helper));
         });
+    }
+
+    /**
+     * The nest has holes in its walls: cave pockets next to the shaft and the rooms, a crack from the queen's room
+     * up to the open air, a pit under a corner of the nursery, and a gap that links the queen's room with the
+     * nursery. The ants must close every one of them with soil, so that the only way in is the entrance hole and
+     * the rooms are joined only by their own tunnels.
+     */
+    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    public static void workersCloseEveryHoleInTheNestWalls(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        startColony(helper);
+
+        // The holes are cut as soon as the layout is known (before any digging: the ants start with the shaft).
+        List<BlockPos> holes = new ArrayList<>();
+        helper.onEachTick(() -> {
+            Colony colony = colony(helper);
+            if (!holes.isEmpty() || colony == null) {
+                return;
+            }
+            var rooms = colony.getPlannedChambers(level);
+            if (rooms.isEmpty()) {
+                return;
+            }
+            BlockPos bottom = colony.getCenter().below(Colony.SHAFT_DEPTH);
+            Direction tunnel = Direction.fromDelta(
+                    rooms.get(0).cells().get(0).getX() - bottom.getX(), 0, rooms.get(0).cells().get(0).getZ() - bottom.getZ());
+            BlockPos queenRoom = rooms.get(0).center();
+            int groundTop = helper.absolutePos(new BlockPos(0, SURFACE - 1, 0)).getY();
+            for (int y = queenRoom.getY() + 1; y <= groundTop; y++) {
+                holes.add(new BlockPos(queenRoom.getX(), y, queenRoom.getZ()));
+            }
+            holes.add(bottom.relative(tunnel, 4).relative(tunnel.getClockWise(), 3));
+            holes.add(rooms.get(1).cells().get(rooms.get(1).cells().size() - 1).below());
+            holes.add(bottom.above().relative(tunnel.getOpposite()));
+            for (BlockPos hole : holes) {
+                level.setBlock(hole, Blocks.AIR.defaultBlockState(), 3);
+            }
+            AntColoniesMod.LOGGER.info("[seal-test] cut {} holes: {}", holes.size(), holes);
+        });
+        helper.onEachTick(() -> {
+            if (helper.getTick() % 400 == 0) {
+                Colony colony = colony(helper);
+                AntColoniesMod.LOGGER.info("[seal-test] tick {}: {} open leaks, {} open cells under the surface. {}",
+                        helper.getTick(), colony == null ? -1 : colony.getLeaks(level).size(), airBelowSurface(helper), describe(helper));
+            }
+        });
+
+        helper.succeedWhen(() -> {
+            Colony colony = colony(helper);
+            helper.assertTrue(colony != null && !holes.isEmpty(), "no colony or holes yet");
+            helper.assertTrue(colony.findDigTarget(level) == null, "something is still left to dig");
+            var leaks = colony.getLeaks(level);
+            helper.assertTrue(leaks.isEmpty(), "the nest still has openings: " + leaks);
+            String reach = openSpaceProblems(helper, colony);
+            helper.assertTrue(reach.isEmpty(), "open space joined to the nest that is not part of it: " + reach);
+            AntColoniesMod.LOGGER.info("[seal-test] finished at tick {}", helper.getTick());
+        });
+    }
+
+    /** Dirt ground with a grass top across the whole test area, a queen at the entrance spot and six workers. */
+    private static void startColony(GameTestHelper helper) {
+        // Ground: dirt with a grass top, SURFACE blocks deep, across the whole test area.
+        for (int x = 0; x < 25; x++) {
+            for (int z = 0; z < 25; z++) {
+                for (int y = 0; y < SURFACE - 1; y++) {
+                    helper.setBlock(x, y, z, Blocks.DIRT);
+                }
+                helper.setBlock(x, SURFACE - 1, z, Blocks.GRASS_BLOCK);
+            }
+        }
+
+        helper.spawn(ModEntities.QUEEN_ANT.get(), MIDDLE, SURFACE, MIDDLE);
+        helper.runAfterDelay(5, () -> {
+            for (int i = 0; i < 6; i++) {
+                helper.spawn(ModEntities.WORKER_ANT.get(), MIDDLE - 2 + i % 3 * 2, SURFACE, MIDDLE - 3 + i / 3 * 6);
+            }
+        });
+    }
+
+    /**
+     * Follows the open space from the bottom of the shaft through the underground (stopping at the surface
+     * layer, where the entrance hole opens into the sky) and lists every open block it reaches that is not part
+     * of the nest plan. Empty text = the nest is sealed and its rooms are joined only by their own tunnels.
+     */
+    private static String openSpaceProblems(GameTestHelper helper, Colony colony) {
+        ServerLevel level = helper.getLevel();
+        Set<BlockPos> planned = new HashSet<>();
+        for (int i = 1; i <= Colony.SHAFT_DEPTH; i++) {
+            planned.add(colony.getCenter().below(i));
+        }
+        for (var chamber : colony.getPlannedChambers(level)) {
+            planned.addAll(chamber.cells());
+        }
+        int ceiling = colony.getCenter().getY() - 1; // the shaft's top block: nothing above it counts
+        AABB area = helper.getBounds();
+        Set<BlockPos> seen = new HashSet<>();
+        ArrayDeque<BlockPos> queue = new ArrayDeque<>();
+        BlockPos start = colony.getCenter().below(Colony.SHAFT_DEPTH);
+        seen.add(start);
+        queue.add(start);
+        StringBuilder problems = new StringBuilder();
+        while (!queue.isEmpty()) {
+            BlockPos pos = queue.poll();
+            if (!planned.contains(pos)) {
+                problems.append(pos.toShortString()).append("; ");
+            }
+            for (Direction direction : Direction.values()) {
+                BlockPos next = pos.relative(direction);
+                if (next.getY() <= ceiling && area.contains(Vec3.atCenterOf(next))
+                        && level.getBlockState(next).isAir() && seen.add(next)) {
+                    queue.add(next);
+                }
+            }
+        }
+        if (seen.size() != planned.size()) {
+            problems.append("(reached ").append(seen.size()).append(" blocks, the plan has ").append(planned.size()).append(")");
+        }
+        return problems.toString();
     }
 
     /**

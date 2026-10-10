@@ -2,9 +2,11 @@ package com.antcolonies.colony;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
@@ -67,11 +69,36 @@ public class Colony {
     private final Map<BlockPos, Float> digProgress = new HashMap<>();
 
     /** Where the nest's rooms go. Decided once (see {@link #getLayout}); not saved, it comes out the same after a reload. */
-    private record Layout(List<NestPlan.Chamber> chambers) {
+    private record Layout(List<NestPlan.Chamber> chambers, Set<BlockPos> cells) {
+        Layout(List<NestPlan.Chamber> chambers) {
+            this(chambers, cellsOf(chambers));
+        }
+
+        private static Set<BlockPos> cellsOf(List<NestPlan.Chamber> chambers) {
+            Set<BlockPos> cells = new HashSet<>();
+            for (NestPlan.Chamber chamber : chambers) {
+                cells.addAll(chamber.cells());
+            }
+            return cells;
+        }
     }
 
     @Nullable
     private Layout layout;
+
+    /** How long (in ticks) an ant that went to close a leak keeps the other ants away from it. */
+    private static final int LEAK_CLAIM_TICKS = 600;
+
+    /** Leaks an ant is already taking care of: hole -> game time when the claim runs out. Not saved. */
+    private final Map<BlockPos, Long> claimedLeaks = new HashMap<>();
+
+    /**
+     * An opening in the nest walls: {@code hole} is open space (a cave, a crack, water) right next to a dug-out
+     * nest cell, and {@code stand} is a dug-out cell with a floor, no further than one block from the hole, where
+     * an ant can stand to close it (null when no ant can get close enough). The entrance itself is never a leak.
+     */
+    public record Leak(BlockPos hole, @Nullable BlockPos stand) {
+    }
 
     /**
      * The next block to dig, or null if all the digging is done (or blocked). Order: the entrance
@@ -138,6 +165,126 @@ public class Colony {
     public List<NestPlan.Chamber> getPlannedChambers(Level level) {
         Layout layout = getLayout(level, center.below(SHAFT_DEPTH));
         return layout == null ? List.of() : layout.chambers();
+    }
+
+    /** Every block that is part of the nest plan: the shaft, and the rooms once their layout is decided. */
+    private Set<BlockPos> nestCells(Level level) {
+        Set<BlockPos> cells = new HashSet<>();
+        for (int i = 1; i <= SHAFT_DEPTH; i++) {
+            cells.add(center.below(i));
+        }
+        BlockPos bottom = center.below(SHAFT_DEPTH);
+        if (level.isLoaded(bottom) && level.getBlockState(bottom).isAir()) {
+            Layout layout = getLayout(level, bottom);
+            if (layout != null) {
+                cells.addAll(layout.cells());
+            }
+        }
+        return cells;
+    }
+
+    /**
+     * Every opening in the walls of the dug-out nest: any open block (air, water, lava, grass) that touches a dug
+     * nest cell but is not itself part of the nest. Caves, cracks and the gaps between rooms all show up here.
+     * The entrance hole above the shaft is the one opening that is allowed. For tests, and for {@link #findLeak}.
+     */
+    public List<Leak> getLeaks(Level level) {
+        Set<BlockPos> nest = nestCells(level);
+        Set<BlockPos> seen = new HashSet<>();
+        List<Leak> leaks = new ArrayList<>();
+        for (BlockPos cell : nest) {
+            if (!level.isLoaded(cell) || !level.getBlockState(cell).isAir()) {
+                continue;
+            }
+            for (Direction direction : Direction.values()) {
+                BlockPos hole = cell.relative(direction);
+                if (nest.contains(hole) || hole.equals(center) || !seen.add(hole) || !isOpen(level, hole)) {
+                    continue;
+                }
+                leaks.add(new Leak(hole, findPlugSpot(level, nest, hole)));
+            }
+        }
+        return leaks;
+    }
+
+    /** The leak closest to {@code near} that an ant can reach and no other ant is on its way to, or null. */
+    @Nullable
+    public Leak findLeak(Level level, BlockPos near) {
+        long now = level.getGameTime();
+        claimedLeaks.values().removeIf(until -> until <= now);
+        Leak best = null;
+        double bestDistance = Double.MAX_VALUE;
+        for (Leak leak : getLeaks(level)) {
+            if (leak.stand() == null || claimedLeaks.containsKey(leak.hole())) {
+                continue;
+            }
+            double distance = leak.stand().distSqr(near);
+            if (distance < bestDistance) {
+                best = leak;
+                bestDistance = distance;
+            }
+        }
+        return best;
+    }
+
+    /** Tells the other ants that one of them is on its way to close this leak (for a while). */
+    public void claimLeak(Level level, BlockPos hole) {
+        claimedLeaks.put(hole.immutable(), level.getGameTime() + LEAK_CLAIM_TICKS);
+    }
+
+    /** True while this block is still open space (so the leak is still there). */
+    public boolean isLeakOpen(Level level, BlockPos hole) {
+        return isOpen(level, hole);
+    }
+
+    /** Fills a leak with burrowed dirt. False if it is already closed or someone is standing in it (try again later). */
+    public boolean plugLeak(Level level, BlockPos hole) {
+        if (hole.equals(center) || !isOpen(level, hole)) {
+            return false;
+        }
+        // Never bury anyone, same as with the hill.
+        if (!level.getEntitiesOfClass(LivingEntity.class, new AABB(hole)).isEmpty()) {
+            return false;
+        }
+        level.setBlock(hole, ModBlocks.BURROWED_DIRT.get().defaultBlockState(), 3);
+        claimedLeaks.remove(hole);
+        return true;
+    }
+
+    /**
+     * Open space that soil can be packed into: air, water, lava, grass and the like. Anything else (stone, a
+     * chest, a flower someone planted) is left alone. A chunk that is not loaded counts as closed.
+     */
+    private static boolean isOpen(Level level, BlockPos pos) {
+        if (!level.isLoaded(pos)) {
+            return false;
+        }
+        BlockState state = level.getBlockState(pos);
+        return state.isAir() || state.canBeReplaced() || !state.getFluidState().isEmpty();
+    }
+
+    /** The dug-out nest cell with a floor that is closest to the hole (within one block of it, corners included), or null. */
+    @Nullable
+    private static BlockPos findPlugSpot(Level level, Set<BlockPos> nest, BlockPos hole) {
+        BlockPos best = null;
+        double bestDistance = Double.MAX_VALUE;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dy = -1; dy <= 1; dy++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    BlockPos spot = hole.offset(dx, dy, dz);
+                    if (!nest.contains(spot) || !level.isLoaded(spot) || !level.getBlockState(spot).isAir()
+                            || !level.getBlockState(spot.below()).isFaceSturdy(level, spot.below(), Direction.UP)) {
+                        continue;
+                    }
+                    double distance = hole.distSqr(spot);
+                    if (distance < bestDistance) {
+                        best = spot;
+                        bestDistance = distance;
+                    }
+                }
+            }
+        }
+        return best;
     }
 
     /** The first block in the list that is diggable, can be reached from open space, and is safe to open. */
@@ -208,17 +355,28 @@ public class Colony {
     /** Open space next to a block where an ant can stand to bite it: above first, then the four sides. */
     @Nullable
     public static BlockPos findStandSpot(Level level, BlockPos target) {
+        List<BlockPos> spots = findStandSpots(level, target);
+        return spots.isEmpty() ? null : spots.get(0);
+    }
+
+    /**
+     * All the open cells next to a block where an ant could stand to bite it, best first (above, then the four
+     * sides). Not every one can be walked to: a sealed-off cave pocket next to the block is open space too, so
+     * an ant tries them one after the other until it finds a route.
+     */
+    public static List<BlockPos> findStandSpots(Level level, BlockPos target) {
+        List<BlockPos> spots = new ArrayList<>();
         BlockPos above = target.above();
         if (level.getBlockState(above).isAir()) {
-            return above;
+            spots.add(above);
         }
         for (Direction side : Direction.Plane.HORIZONTAL) {
             BlockPos pos = target.relative(side);
             if (level.getBlockState(pos).isAir()) {
-                return pos;
+                spots.add(pos);
             }
         }
-        return null;
+        return spots;
     }
 
     /** Ants never open a block that touches water or lava (it would flood the nest). */

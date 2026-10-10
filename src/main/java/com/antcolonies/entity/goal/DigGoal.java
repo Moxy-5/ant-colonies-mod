@@ -87,8 +87,14 @@ public class DigGoal extends Goal {
             // Walk to the open space next to the block (above it in the shaft, beside it in the tunnel).
             AntNavigator legs = ant.getNavigator();
             if (legs.isDone()) {
-                BlockPos stand = Colony.findStandSpot(level, target);
-                if (stand == null || !legs.moveTo(stand, 1.0)) {
+                boolean walking = false;
+                for (BlockPos stand : Colony.findStandSpots(level, target)) {
+                    if (legs.moveTo(stand, 1.0)) {
+                        walking = true;
+                        break;
+                    }
+                }
+                if (!walking) {
                     stuckTicks = GIVE_UP_TICKS; // no way to get there: let another block (or ant) have a go
                 } else {
                     // Arrived but still out of reach counts toward giving up.
