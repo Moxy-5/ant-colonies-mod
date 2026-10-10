@@ -4,6 +4,7 @@ import java.util.List;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.NestPlan;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.QueenAntEntity;
 import com.antcolonies.entity.WorkerAntEntity;
@@ -11,6 +12,7 @@ import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.registry.ModEntities;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.level.block.Blocks;
@@ -143,18 +145,45 @@ public class NavigationTests {
                 helper.setBlock(x, SURFACE - 1, z, Blocks.GRASS_BLOCK);
             }
         }
-        int bottom = SURFACE - 3;
-        for (int y = bottom; y < SURFACE; y++) {
+        for (int y = SURFACE - 3; y < SURFACE; y++) {
             helper.setBlock(MIDDLE, y, MIDDLE, Blocks.AIR); // shaft
         }
-        for (int i = 1; i <= 3; i++) {
-            helper.setBlock(MIDDLE + i, bottom, MIDDLE, Blocks.AIR); // tunnel
-        }
-        for (int row = 1; row <= 5; row++) {
-            for (int side = -2; side <= 2; side++) {
-                helper.setBlock(MIDDLE + 3 + row, bottom, MIDDLE + side, Blocks.AIR); // room
+        for (NestPlan.Chamber chamber : chambers(helper)) {
+            for (BlockPos cell : chamber.cells()) {
+                helper.setBlock(cell.subtract(helper.absolutePos(BlockPos.ZERO)), Blocks.AIR); // tunnels and rooms
             }
         }
+    }
+
+    /** The three rooms of the ready-made nest: the queen's room (east of the shaft), the nursery and the food store. */
+    private static List<NestPlan.Chamber> chambers(GameTestHelper helper) {
+        BlockPos bottom = helper.absolutePos(new BlockPos(MIDDLE, SURFACE - 3, MIDDLE));
+        return NestPlan.chambers(bottom, Direction.EAST);
+    }
+
+    @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
+    public static void antWalksFromTheSurfaceDownToTheNursery(GameTestHelper helper) {
+        buildNest(helper);
+        WorkerAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), MIDDLE - 3, SURFACE, MIDDLE + 3);
+        BlockPos goal = chambers(helper).get(1).center();
+        helper.runAfterDelay(10, () -> ant.getNavigator().moveTo(goal, 1.0));
+        watch(helper, ant);
+        helper.succeedWhen(() -> helper.assertTrue(
+                ant.getNavigator().isDone() && !ant.getNavigator().hasFailed() && ant.blockPosition().equals(goal) && helper.getTick() > 20,
+                "the ant has not reached the nursery yet"));
+    }
+
+    @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
+    public static void antWalksFromTheFoodStoreUpToTheSurface(GameTestHelper helper) {
+        buildNest(helper);
+        BlockPos start = chambers(helper).get(2).center().subtract(helper.absolutePos(BlockPos.ZERO));
+        WorkerAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), start.getX(), start.getY(), start.getZ());
+        BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE + 3, SURFACE, MIDDLE + 2));
+        helper.runAfterDelay(10, () -> ant.getNavigator().moveTo(goal, 1.0));
+        watch(helper, ant);
+        helper.succeedWhen(() -> helper.assertTrue(
+                ant.getNavigator().isDone() && !ant.getNavigator().hasFailed() && ant.blockPosition().equals(goal) && helper.getTick() > 20,
+                "the ant has not climbed out of the food store yet"));
     }
 
     /** Logs the ant's position and what its walker is doing every 4 ticks. */

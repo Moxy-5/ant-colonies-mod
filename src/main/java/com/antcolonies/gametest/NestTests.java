@@ -29,8 +29,8 @@ public class NestTests {
     /** Height (inside the test area) of the first open cell above the ground. */
     private static final int SURFACE = 8;
     private static final int MIDDLE = 12;
-    /** The whole nest: a 3-deep shaft, a 3-long tunnel and a 5x5 room. */
-    private static final int NEST_CELLS = 3 + 3 + 25;
+    /** The whole nest: a 3-deep shaft, then three rooms (queen, nursery, food store), each a 3-long tunnel and a 5x5 room. */
+    private static final int NEST_CELLS = 3 + 3 * (3 + 25);
 
     @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
     public static void workersDigTheWholeNestAndBuildTheMound(GameTestHelper helper) {
@@ -73,6 +73,8 @@ public class NestTests {
             helper.assertTrue(airBelowSurface(helper) == NEST_CELLS,
                     "nest not finished: " + airBelowSurface(helper) + " of " + NEST_CELLS + " cells dug. " + describe(helper));
             helper.assertTrue(colony.findDigTarget(level) == null, "something is still left to dig");
+            var rooms = colony.getPlannedChambers(level);
+            helper.assertTrue(rooms.size() == 3, "expected 3 rooms (queen, nursery, food store) but the nest has " + rooms.size());
             BlockPos room = colony.getFinishedRoomCenter(level);
             helper.assertTrue(room != null, "the room is not finished");
             var queens = level.getEntitiesOfClass(com.antcolonies.entity.QueenAntEntity.class, helper.getBounds());

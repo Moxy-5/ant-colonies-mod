@@ -44,13 +44,6 @@ public class Colony {
     /** How deep the entrance shaft goes, in blocks (will come from the species profile later). */
     public static final int SHAFT_DEPTH = 3;
 
-    /** From the bottom of the shaft a tunnel this long leads sideways to a room. */
-    private static final int TUNNEL_LENGTH = 3;
-
-    /** The room is this many blocks long (along the tunnel) and 2 * ROOM_HALF_WIDTH + 1 wide, one block tall. */
-    private static final int ROOM_LENGTH = 5;
-    private static final int ROOM_HALF_WIDTH = 2;
-
     /** The mound reaches this far (in blocks, sideways) from the entrance. */
     public static final int MOUND_RADIUS = 3;
 
@@ -73,9 +66,16 @@ public class Colony {
     /** Bite progress per block (0..1). Not saved: a half-dug block just restarts after a reload. */
     private final Map<BlockPos, Float> digProgress = new HashMap<>();
 
+    /** Where the nest's rooms go. Decided once (see {@link #getLayout}); not saved, it comes out the same after a reload. */
+    private record Layout(List<NestPlan.Chamber> chambers) {
+    }
+
+    @Nullable
+    private Layout layout;
+
     /**
      * The next block to dig, or null if all the digging is done (or blocked). Order: the entrance
-     * shaft, then the tunnel off its bottom, then the room at the end of the tunnel. The shaft is
+     * shaft, then the queen's tunnel and room, then the nursery, then the food store. The shaft is
      * never widened, so its walls stay solid for the ants to climb.
      */
     @Nullable
@@ -88,18 +88,27 @@ public class Colony {
         if (next != null) {
             return next;
         }
-        // Only start the tunnel once the shaft is completely open down to its bottom.
+        // Only start the tunnels once the shaft is completely open down to its bottom.
         BlockPos bottom = center.below(SHAFT_DEPTH);
         if (!level.isLoaded(bottom) || !level.getBlockState(bottom).isAir()) {
             return null;
         }
-        Direction direction = chooseTunnelDirection(level, bottom);
-        return direction == null ? null : firstDiggable(level, tunnelAndRoomCells(bottom, direction));
+        Layout layout = getLayout(level, bottom);
+        if (layout == null) {
+            return null;
+        }
+        for (NestPlan.Chamber chamber : layout.chambers()) {
+            next = firstDiggable(level, chamber.cells());
+            if (next != null) {
+                return next;
+            }
+        }
+        return null;
     }
 
     /**
-     * The middle of the room, once the whole nest (shaft, tunnel and room) is dug out; null while there is
-     * still digging to do (or the chunk is not loaded).
+     * The middle of the queen's room, once the shaft and her room (with its tunnel) are dug out; null while
+     * there is still digging to do for it (or the chunk is not loaded). The other rooms don't matter here.
      */
     @Nullable
     public BlockPos getFinishedRoomCenter(Level level) {
@@ -107,20 +116,28 @@ public class Colony {
         if (!level.isLoaded(bottom)) {
             return null;
         }
-        Direction direction = chooseTunnelDirection(level, bottom);
-        if (direction == null) {
+        for (int i = 1; i <= SHAFT_DEPTH; i++) {
+            if (!level.getBlockState(center.below(i)).isAir()) {
+                return null;
+            }
+        }
+        Layout layout = getLayout(level, bottom);
+        if (layout == null) {
             return null;
         }
-        List<BlockPos> cells = new ArrayList<>(tunnelAndRoomCells(bottom, direction));
-        for (int i = 1; i <= SHAFT_DEPTH; i++) {
-            cells.add(center.below(i));
-        }
-        for (BlockPos pos : cells) {
+        NestPlan.Chamber queen = layout.chambers().get(0);
+        for (BlockPos pos : queen.cells()) {
             if (!level.isLoaded(pos) || !level.getBlockState(pos).isAir()) {
                 return null;
             }
         }
-        return bottom.relative(direction, TUNNEL_LENGTH + (ROOM_LENGTH + 1) / 2);
+        return queen.center();
+    }
+
+    /** The rooms this nest is being dug with (empty until the layout is decided). For tests and debugging. */
+    public List<NestPlan.Chamber> getPlannedChambers(Level level) {
+        Layout layout = getLayout(level, center.below(SHAFT_DEPTH));
+        return layout == null ? List.of() : layout.chambers();
     }
 
     /** The first block in the list that is diggable, can be reached from open space, and is safe to open. */
@@ -139,50 +156,53 @@ public class Colony {
         return null;
     }
 
-    /** Every block of the tunnel and room, in digging order, for a tunnel leaving the shaft bottom in this direction. */
-    private static List<BlockPos> tunnelAndRoomCells(BlockPos bottom, Direction direction) {
-        List<BlockPos> cells = new ArrayList<>();
-        for (int i = 1; i <= TUNNEL_LENGTH; i++) {
-            cells.add(bottom.relative(direction, i));
+    /** The layout of the rooms: worked out the first time it is needed, then kept. Null = wait (chunk not loaded) or no room. */
+    @Nullable
+    private Layout getLayout(Level level, BlockPos bottom) {
+        if (layout == null) {
+            layout = chooseLayout(level, bottom);
         }
-        Direction sideways = direction.getClockWise();
-        for (int row = 1; row <= ROOM_LENGTH; row++) {
-            BlockPos rowCenter = bottom.relative(direction, TUNNEL_LENGTH + row);
-            // Middle of the row first, then outward, so every block touches already-dug space.
-            cells.add(rowCenter);
-            for (int offset = 1; offset <= ROOM_HALF_WIDTH; offset++) {
-                cells.add(rowCenter.relative(sideways, offset));
-                cells.add(rowCenter.relative(sideways, -offset));
-            }
-        }
-        return cells;
+        return layout;
     }
 
     /**
-     * Picks which of the four sides the tunnel leaves toward: the first (starting from a side
-     * that is fixed per colony) where everything to dig is soil. Null = wait (chunk not loaded) or no room.
+     * Picks which of the four sides the main tunnel leaves toward. The queen's room must fit in the soil;
+     * of the sides where it does, the one with the most rooms that fit wins (a tie goes to the first,
+     * counting from a side that is fixed per colony). A room that would run into stone, water or lava is left out.
      */
     @Nullable
-    private Direction chooseTunnelDirection(Level level, BlockPos bottom) {
+    private Layout chooseLayout(Level level, BlockPos bottom) {
         int start = Math.floorMod(id.hashCode(), 4);
+        Layout best = null;
         for (int i = 0; i < 4; i++) {
             Direction direction = Direction.from2DDataValue((start + i) % 4);
-            boolean fits = true;
-            for (BlockPos pos : tunnelAndRoomCells(bottom, direction)) {
-                if (!level.isLoaded(pos)) {
-                    return null;
+            List<NestPlan.Chamber> fitting = new ArrayList<>();
+            for (NestPlan.Chamber chamber : NestPlan.chambers(bottom, direction)) {
+                for (BlockPos pos : chamber.cells()) {
+                    if (!level.isLoaded(pos)) {
+                        return null;
+                    }
                 }
-                BlockState state = level.getBlockState(pos);
-                if (!(state.is(ModTags.DIGGABLE) || state.isAir()) || touchesFluid(level, pos)) {
-                    fits = false;
-                    break;
+                if (allSoilOrAir(level, chamber.cells())) {
+                    fitting.add(chamber);
                 }
             }
-            if (fits) {
-                return direction;
+            boolean queenFits = !fitting.isEmpty() && fitting.get(0).kind() == NestPlan.Kind.QUEEN;
+            if (queenFits && (best == null || fitting.size() > best.chambers().size())) {
+                best = new Layout(fitting);
             }
         }
-        return null;
+        return best;
+    }
+
+    private static boolean allSoilOrAir(Level level, List<BlockPos> cells) {
+        for (BlockPos pos : cells) {
+            BlockState state = level.getBlockState(pos);
+            if (!(state.is(ModTags.DIGGABLE) || state.isAir()) || touchesFluid(level, pos)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** Open space next to a block where an ant can stand to bite it: above first, then the four sides. */
