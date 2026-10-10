@@ -107,6 +107,17 @@ Goal: a mature colony can hold 1,000+ ants or termites without lag.
 - A stage unlocks only with enough workers AND enough stored food.
 - Starving colonies stop growing and can shrink. The colony dies when the queen dies.
 
+### Colony life cycle (planned for M6 and M9, not started)
+- Real cycle as a game loop: mature colony releases winged queens and males after rain; they mate in a nuptial flight; the queen lands, drops her wings, digs a small chamber, seals it, lays eggs and raises the first (smaller) workers alone; most founding queens fail; the colony grows over years; it ends when the queen dies or it starves.
+- Prepare these before M9 (design M6 with them in mind):
+  1. **Queen life stages:** winged virgin, flying, landed (wings off), sealed founding queen, settled queen of an established colony. The colony is created when she founds her nest, not when she spawns.
+  2. **Nest plan as data:** shaft, tunnel and room sizes move out of `Colony` constants into a per-stage list of cells (founding plan is much smaller), later read from the species profile.
+  3. **Colony clock and brood pipeline:** each colony stores its age and stage start; the brain keeps counts of eggs, larvae and pupae with timers, gated by food and queen health (numbers only, so it is cheap).
+  4. **Colonies live offline:** the brain keeps ageing, growing brood and eating in unloaded chunks; physical digging only happens near the player and catches up when chunks load.
+  5. **Flying legs:** a separate flying mover for winged queens and males, driven by the same mind layer as walking.
+  6. **Site choice:** scoring weights from the species profile (soil, distance to other colonies, food).
+- **Decisions (user):** how long a colony takes to mature is decided later, once more of the mod exists (make it a config number, "life speed"). No built-in seasons: use rain stopping, the day count and a random chance, behind one small "what season is it" switch so a seasons-mod compatibility can be added later. Males are mostly numbers, with a handful shown as real flying ants during a flight. Founding queens can be threatened by predators, rival colonies and the player. Ants fight any ant of another colony and fight termites (one rule: different colony id = enemy). An anteater mob is planned later; when it kills real ants the colony headcount drops too. Hunger and eating: for our own mobs only, not vanilla animals.
+
 ### Digging, phase 1 (current plan)
 - Bite-by-bite digging using the vanilla crack overlay (`destroyBlockProgress`), dirt particles, and a bite sound.
 - Several ants on one block share progress. About one block every few seconds per worker, slower for harder blocks.
