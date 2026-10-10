@@ -1,12 +1,19 @@
 package com.antcolonies.colony;
 
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import org.jetbrains.annotations.Nullable;
+
+import com.antcolonies.registry.ModTags;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
 
 /**
  * One colony's "brain" data. Species-neutral: the species is just an id that will point at a
@@ -24,6 +31,43 @@ public class Colony {
         this.species = species;
         this.queenId = queenId;
         this.center = center;
+    }
+
+    /** How deep the entrance shaft goes, in blocks (will come from the species profile later). */
+    public static final int SHAFT_DEPTH = 4;
+
+    /** Bite progress per block (0..1). Not saved: a half-dug block just restarts after a reload. */
+    private final Map<BlockPos, Float> digProgress = new HashMap<>();
+
+    /**
+     * The next block to dig in the entrance shaft (a column straight down from the center), or
+     * null if the shaft is finished or blocked by something ants can't dig.
+     */
+    @Nullable
+    public BlockPos findDigTarget(Level level) {
+        for (int i = 1; i <= SHAFT_DEPTH; i++) {
+            BlockPos pos = center.below(i);
+            if (!level.isLoaded(pos)) {
+                return null;
+            }
+            BlockState state = level.getBlockState(pos);
+            if (state.is(ModTags.DIGGABLE)) {
+                return pos;
+            }
+            if (!state.isAir()) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    /** Adds bite progress to a block and returns the new total. Several ants share it. */
+    public float addDigProgress(BlockPos pos, float amount) {
+        return digProgress.merge(pos.immutable(), amount, Float::sum);
+    }
+
+    public void clearDigProgress(BlockPos pos) {
+        digProgress.remove(pos);
     }
 
     public UUID getId() {
