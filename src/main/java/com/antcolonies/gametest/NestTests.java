@@ -258,8 +258,8 @@ public class NestTests {
     }
 
     /**
-     * Three tufts of short grass around a finished nest: the workers clip seeds off them (the grass stays), carry every
-     * seed to the food store, and what the colony counts is exactly what lies in the store.
+     * Three tufts of short grass around a finished nest: the workers clip ten seeds off each (then the tuft breaks),
+     * carry every seed to the food store, and what the colony counts is exactly what lies in the store.
      */
     @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
     public static void workersClipSeedsFromGrass(GameTestHelper helper) {
@@ -285,11 +285,15 @@ public class NestTests {
         helper.succeedWhen(() -> {
             Colony colony = colony(helper);
             helper.assertTrue(planted[0] && colony != null, "no grass has been planted yet");
-            helper.assertTrue(colony.getFood() >= 3, "the colony counts only " + colony.getFood() + " food");
-            helper.assertTrue(seedsIn(level, storeBox(level, colony)) == colony.getFood(),
-                    "food " + colony.getFood() + " but " + seedsIn(level, storeBox(level, colony)) + " seeds in the store");
+            int expected = tufts.length * Colony.SEEDS_PER_GRASS;
             for (int[] tuft : tufts) {
-                helper.assertBlock(new BlockPos(tuft[0], SURFACE, tuft[1]), block -> block == Blocks.SHORT_GRASS, "a tuft of grass was eaten");
+                helper.assertBlock(new BlockPos(tuft[0], SURFACE, tuft[1]), block -> block == Blocks.AIR, "a tuft of grass is still there");
+            }
+            helper.assertTrue(colony.getFood() == expected, "the colony counts " + colony.getFood() + " food, expected " + expected);
+            helper.assertTrue(seedsIn(level, storeBox(level, colony)) == expected,
+                    "only " + seedsIn(level, storeBox(level, colony)) + " seeds are in the store");
+            for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
+                helper.assertTrue(!ant.isCarryingSeed(), "an ant is still carrying a seed");
             }
         });
     }

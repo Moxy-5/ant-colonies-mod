@@ -99,13 +99,18 @@ public class Colony {
     /** An ant that went for a seed keeps the others away from it this long (in ticks). */
     private static final int SEED_CLAIM_TICKS = 600;
 
-    /** A tuft of grass an ant clipped seeds from is left alone this long (in ticks) before it grows new ones. */
-    private static final int GRASS_REGROW_TICKS = 3600;
+    /** A tuft of grass an ant just clipped is left alone this long (in ticks), so the ants don't all crowd one tuft. */
+    private static final int GRASS_REST_TICKS = 200;
+    /** A tuft of grass gives this many seeds; after the last one it is used up and breaks. */
+    public static final int SEEDS_PER_GRASS = 10;
     /** How many random spots around the nest an ant looks at when it goes looking for grass. */
     private static final int GRASS_LOOKS = 24;
 
     /** Grass tufts an ant is on its way to, or just clipped: position -> game time until which the others leave it alone. Not saved. */
     private final Map<BlockPos, Long> busyGrass = new HashMap<>();
+
+    /** How many seeds have been clipped from each tuft of grass so far (only tufts that were clipped at least once). Saved. */
+    private final Map<BlockPos, Integer> grassClips = new HashMap<>();
 
     /** How much food the colony has stored (one per seed in the food store). Saved. */
     private int food;
@@ -319,9 +324,20 @@ public class Colony {
         busyGrass.remove(grass);
     }
 
-    /** The ant clipped its seed: the tuft stays, but it has to grow new seeds before anyone clips it again. */
+    /**
+     * The ant clipped its seed. The tuft rests for a moment; after {@link #SEEDS_PER_GRASS} seeds it is used up and
+     * breaks (without dropping anything).
+     */
     public void clippedGrass(Level level, BlockPos grass) {
-        busyGrass.put(grass.immutable(), level.getGameTime() + GRASS_REGROW_TICKS);
+        BlockPos pos = grass.immutable();
+        int clips = grassClips.merge(pos, 1, Integer::sum);
+        if (clips >= SEEDS_PER_GRASS) {
+            grassClips.remove(pos);
+            busyGrass.remove(pos);
+            level.destroyBlock(pos, false);
+        } else {
+            busyGrass.put(pos, level.getGameTime() + GRASS_REST_TICKS);
+        }
     }
 
     public void claimSeed(Level level, ItemEntity seed) {
@@ -775,6 +791,9 @@ public class Colony {
         casteCounts.forEach(castes::putInt);
         tag.put("castes", castes);
         tag.putInt("food", food);
+        CompoundTag clips = new CompoundTag();
+        grassClips.forEach((pos, count) -> clips.putInt(Long.toString(pos.asLong()), count));
+        tag.put("grassClips", clips);
         return tag;
     }
 
@@ -785,6 +804,10 @@ public class Colony {
                 tag.getUUID("queen"),
                 BlockPos.of(tag.getLong("center")));
         colony.food = tag.getInt("food");
+        CompoundTag clips = tag.getCompound("grassClips");
+        for (String key : clips.getAllKeys()) {
+            colony.grassClips.put(BlockPos.of(Long.parseLong(key)), clips.getInt(key));
+        }
         CompoundTag castes = tag.getCompound("castes");
         for (String key : castes.getAllKeys()) {
             colony.casteCounts.put(key, castes.getInt(key));

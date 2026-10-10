@@ -22,8 +22,8 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
 
 /**
- * Walks to a tuft of short grass near the nest, nibbles at it for a couple of seconds and clips one seed off it. The
- * grass stays where it is (it needs a few minutes to grow new seeds); {@link StoreSeedGoal} then carries the seed down
+ * Walks to a tuft of short grass near the nest, nibbles at it for a couple of seconds and clips one seed off it. A tuft
+ * gives up to {@link Colony#SEEDS_PER_GRASS} seeds and then breaks; {@link StoreSeedGoal} then carries the seed down
  * to the food store. Only looks for grass once the food store is dug out.
  */
 public class ClipGrassGoal extends Goal {
@@ -124,6 +124,7 @@ public class ClipGrassGoal extends Goal {
         if (clipping >= CLIP_TICKS) {
             ant.setCarriedSeed(new ItemStack(Items.WHEAT_SEEDS));
             colony.clippedGrass(level, grass);
+            ColonyManager.get(level).markChanged();
             grass = null; // so stop() does not free the tuft again
         }
     }
