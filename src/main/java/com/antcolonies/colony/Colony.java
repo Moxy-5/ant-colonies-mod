@@ -134,6 +134,8 @@ public class Colony {
     private static final int GIVEN_UP_PATIENCE_TICKS = 1200;
     /** The doors stay shut this long after the last water or lava was seen (10 seconds), then the ants open them again. */
     private static final int CALM_TICKS = 200;
+    /** How far (in blocks) a creature must reach into a block before soil is no longer packed into it. */
+    private static final double PLUG_EDGE_MARGIN = 0.1;
     /** Soil packed into the hole is bitten out again this far above the entrance cell (the hill is 3 blocks high around it). */
     private static final int ENTRANCE_REOPEN_HEIGHT = 3;
     /** At most this many pieces of a stream are looked at when no source can be reached. */
@@ -699,8 +701,9 @@ public class Colony {
         if ((isEntranceColumn(hole) && !leak.fluidOnly()) || !isLeakOpen(level, leak)) {
             return false;
         }
-        // Never bury anyone, same as with the hill.
-        if (!level.getEntitiesOfClass(LivingEntity.class, new AABB(hole)).isEmpty()) {
+        // Never bury anyone, same as with the hill. An ant that only touches the edge of the block (the ant packing it
+        // shut usually stands pressed against it) is not in it: without this margin it blocks its own work for good.
+        if (!level.getEntitiesOfClass(LivingEntity.class, new AABB(hole).deflate(PLUG_EDGE_MARGIN)).isEmpty()) {
             return false;
         }
         level.setBlock(hole, ModBlocks.BURROWED_DIRT.get().defaultBlockState(), 3);

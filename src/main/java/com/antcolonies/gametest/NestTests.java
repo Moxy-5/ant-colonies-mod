@@ -567,6 +567,50 @@ public class NestTests {
         });
     }
 
+    /**
+     * The ant that packs a door shut stands pressed against it, so its body can reach a hair into the doorway. That
+     * used to stop the door from ever closing (the ants kept packing, with dust and sounds, and nothing appeared).
+     * A creature that only touches the edge must not stop the plug; one really standing in the doorway still must.
+     */
+    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    public static void aDoorClosesEvenIfAnAntTouchesItsEdge(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        startColony(helper);
+
+        boolean[] done = {false};
+        helper.onEachTick(() -> {
+            Colony colony = colony(helper);
+            if (done[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.findDigTarget(level) != null) {
+                return;
+            }
+            // Only the queen stays, so no other ant wanders into the doorway during the test.
+            for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
+                if (!(ant instanceof com.antcolonies.entity.QueenAntEntity)) {
+                    ant.discard();
+                }
+            }
+            var cells = colony.getPlannedChambers(level).get(1).cells();
+            BlockPos door = cells.get(NestPlan.TUNNEL_LENGTH - 1);
+            BlockPos stand = cells.get(NestPlan.TUNNEL_LENGTH - 2);
+            Direction toDoor = Direction.fromDelta(door.getX() - stand.getX(), 0, door.getZ() - stand.getZ());
+            Colony.Leak leak = new Colony.Leak(door, stand);
+
+            AbstractAntEntity ant = ModEntities.WORKER_ANT.get().create(level);
+            ant.setNoAi(true);
+            ant.moveTo(stand.getX() + 0.5 + toDoor.getStepX() * 0.4, stand.getY(), stand.getZ() + 0.5 + toDoor.getStepZ() * 0.4, 0.0F, 0.0F);
+            level.addFreshEntity(ant);
+            helper.assertTrue(colony.plugLeak(level, leak), "an ant at the edge of the doorway stopped the door from closing");
+            helper.assertTrue(level.getBlockState(door).is(ModBlocks.BURROWED_DIRT.get()), "the door was not closed");
+
+            level.setBlock(door, Blocks.AIR.defaultBlockState(), 3);
+            ant.moveTo(door.getX() + 0.5, door.getY(), door.getZ() + 0.5, 0.0F, 0.0F);
+            helper.assertTrue(!colony.plugLeak(level, leak), "soil was packed on top of an ant standing in the doorway");
+            done[0] = true;
+        });
+        helper.succeedWhen(() -> helper.assertTrue(done[0], "the nest is not finished yet"));
+    }
+
     /** Dirt ground with a grass top across the whole test area, a queen at the entrance spot and six workers. */
     private static void startColony(GameTestHelper helper) {
         startColony(helper, 6);
