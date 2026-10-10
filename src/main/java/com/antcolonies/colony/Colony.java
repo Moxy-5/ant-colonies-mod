@@ -1,7 +1,9 @@
 package com.antcolonies.colony;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -38,7 +40,14 @@ public class Colony {
     }
 
     /** How deep the entrance shaft goes, in blocks (will come from the species profile later). */
-    public static final int SHAFT_DEPTH = 4;
+    public static final int SHAFT_DEPTH = 3;
+
+    /** From the bottom of the shaft a tunnel this long leads sideways to a room. */
+    private static final int TUNNEL_LENGTH = 3;
+
+    /** The room is this many blocks long (along the tunnel) and 2 * ROOM_HALF_WIDTH + 1 wide, one block tall. */
+    private static final int ROOM_LENGTH = 5;
+    private static final int ROOM_HALF_WIDTH = 2;
 
     /** The mound is at most this many blocks tall above the entrance's ground level. */
     public static final int MOUND_HEIGHT = 3;
@@ -47,25 +56,115 @@ public class Colony {
     private final Map<BlockPos, Float> digProgress = new HashMap<>();
 
     /**
-     * The next block to dig in the entrance shaft (a column straight down from the center), or
-     * null if the shaft is finished or blocked by something ants can't dig.
+     * The next block to dig, or null if all the digging is done (or blocked). Order: the entrance
+     * shaft, then the tunnel off its bottom, then the room at the end of the tunnel. The shaft is
+     * never widened, so its walls stay solid for the ants to climb.
      */
     @Nullable
     public BlockPos findDigTarget(Level level) {
+        List<BlockPos> shaft = new ArrayList<>();
         for (int i = 1; i <= SHAFT_DEPTH; i++) {
-            BlockPos pos = center.below(i);
+            shaft.add(center.below(i));
+        }
+        BlockPos next = firstDiggable(level, shaft);
+        if (next != null) {
+            return next;
+        }
+        // Only start the tunnel once the shaft is completely open down to its bottom.
+        BlockPos bottom = center.below(SHAFT_DEPTH);
+        if (!level.isLoaded(bottom) || !level.getBlockState(bottom).isAir()) {
+            return null;
+        }
+        Direction direction = chooseTunnelDirection(level, bottom);
+        return direction == null ? null : firstDiggable(level, tunnelAndRoomCells(bottom, direction));
+    }
+
+    /** The first block in the list that is diggable, can be reached from open space, and is safe to open. */
+    @Nullable
+    private static BlockPos firstDiggable(Level level, List<BlockPos> cells) {
+        for (BlockPos pos : cells) {
             if (!level.isLoaded(pos)) {
                 return null;
             }
-            BlockState state = level.getBlockState(pos);
-            if (state.is(ModTags.DIGGABLE)) {
+            if (level.getBlockState(pos).is(ModTags.DIGGABLE)
+                    && findStandSpot(level, pos) != null
+                    && !touchesFluid(level, pos)) {
                 return pos;
-            }
-            if (!state.isAir()) {
-                return null;
             }
         }
         return null;
+    }
+
+    /** Every block of the tunnel and room, in digging order, for a tunnel leaving the shaft bottom in this direction. */
+    private static List<BlockPos> tunnelAndRoomCells(BlockPos bottom, Direction direction) {
+        List<BlockPos> cells = new ArrayList<>();
+        for (int i = 1; i <= TUNNEL_LENGTH; i++) {
+            cells.add(bottom.relative(direction, i));
+        }
+        Direction sideways = direction.getClockWise();
+        for (int row = 1; row <= ROOM_LENGTH; row++) {
+            BlockPos rowCenter = bottom.relative(direction, TUNNEL_LENGTH + row);
+            // Middle of the row first, then outward, so every block touches already-dug space.
+            cells.add(rowCenter);
+            for (int offset = 1; offset <= ROOM_HALF_WIDTH; offset++) {
+                cells.add(rowCenter.relative(sideways, offset));
+                cells.add(rowCenter.relative(sideways, -offset));
+            }
+        }
+        return cells;
+    }
+
+    /**
+     * Picks which of the four sides the tunnel leaves toward: the first (starting from a side
+     * that is fixed per colony) where everything to dig is soil. Null = wait (chunk not loaded) or no room.
+     */
+    @Nullable
+    private Direction chooseTunnelDirection(Level level, BlockPos bottom) {
+        int start = Math.floorMod(id.hashCode(), 4);
+        for (int i = 0; i < 4; i++) {
+            Direction direction = Direction.from2DDataValue((start + i) % 4);
+            boolean fits = true;
+            for (BlockPos pos : tunnelAndRoomCells(bottom, direction)) {
+                if (!level.isLoaded(pos)) {
+                    return null;
+                }
+                BlockState state = level.getBlockState(pos);
+                if (!(state.is(ModTags.DIGGABLE) || state.isAir()) || touchesFluid(level, pos)) {
+                    fits = false;
+                    break;
+                }
+            }
+            if (fits) {
+                return direction;
+            }
+        }
+        return null;
+    }
+
+    /** Open space next to a block where an ant can stand to bite it: above first, then the four sides. */
+    @Nullable
+    public static BlockPos findStandSpot(Level level, BlockPos target) {
+        BlockPos above = target.above();
+        if (level.getBlockState(above).isAir()) {
+            return above;
+        }
+        for (Direction side : Direction.Plane.HORIZONTAL) {
+            BlockPos pos = target.relative(side);
+            if (level.getBlockState(pos).isAir()) {
+                return pos;
+            }
+        }
+        return null;
+    }
+
+    /** Ants never open a block that touches water or lava (it would flood the nest). */
+    private static boolean touchesFluid(Level level, BlockPos pos) {
+        for (Direction direction : Direction.values()) {
+            if (!level.getFluidState(pos.relative(direction)).isEmpty()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

@@ -83,9 +83,14 @@ public class DigGoal extends Goal {
         ant.getLookControl().setLookAt(blockCenter);
 
         if (ant.distanceToSqr(blockCenter) > REACH * REACH) {
-            // Stand on the open space just above the block (inside the shaft).
+            // Stand in the open space next to the block (above it in the shaft, beside it in the tunnel).
             if (ant.getNavigation().isDone()) {
-                ant.getNavigation().moveTo(blockCenter.x, target.getY() + 1.0, blockCenter.z, 1.0);
+                BlockPos stand = Colony.findStandSpot(level, target);
+                if (stand == null) {
+                    stuckTicks = GIVE_UP_TICKS;
+                    return;
+                }
+                ant.getNavigation().moveTo(stand.getX() + 0.5, stand.getY(), stand.getZ() + 0.5, 1.0);
                 stuckTicks++;
             }
             return;

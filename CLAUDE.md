@@ -121,7 +121,7 @@ Goal: a mature colony can hold 1,000+ ants or termites without lag.
 - Ant colonies and termite colonies are hostile. Territories overlap where savanna meets plains and desert.
 - Version 1: defenders attack intruders near their territory. Later: organized raids.
 
-### Alarm level and hazards (LATER, after M10)
+### Alarm level and hazards (LATER, after M11)
 - Each colony has an alarm level. Attacks, floods, fire, and lava raise it; it calms down over time.
 - Levels: normal work → seal tunnels → evacuate the brood → move the whole colony.
 - Hazards should cost the colony something lasting (lost brood, spoiled food, an abandoned nest), not just deal extra damage.
@@ -148,12 +148,13 @@ Goal: a mature colony can hold 1,000+ ants or termites without lag.
 - [ ] M2: Swap in the real worker model and animations.
 - [x] M3: Queen + colony brain + saving and loading.
 - [x] M4: Digging phase 1 + soil pellets + mound.
-- [ ] M5: Food gathering (seeds) + nest stages + colony growth.
-- [ ] M6: Termites: worker, soldiers, king, queen, mound, fungus garden.
-- [ ] M7: Ant vs termite fights.
-- [ ] M8: Nuptial flights + founding new colonies.
-- [ ] M9: Grama grass + Termitomyces mushrooms.
-- [ ] M10: Digging phase 2 (bite stages).
+- [ ] M5: Burrowing: shaft stops at block 3, then a tunnel and a room are dug under the soil.
+- [ ] M6: Food gathering (seeds) + nest stages + colony growth.
+- [ ] M7: Termites: worker, soldiers, king, queen, mound, fungus garden.
+- [ ] M8: Ant vs termite fights.
+- [ ] M9: Nuptial flights + founding new colonies.
+- [ ] M10: Grama grass + Termitomyces mushrooms.
+- [ ] M11: Digging phase 2 (bite stages).
 - [ ] Later: alarm level + hazards, Matabele ants, leafcutters, army ants, ant farm, field journal.
 
 ## Testing tips
@@ -167,4 +168,5 @@ Goal: a mature colony can hold 1,000+ ants or termites without lag.
 - M2 deferred: a detailed blocky placeholder worker model exists (bone names: body, abdomen, petiole, thorax, head, mandible_l/r, antenna_l/r_1/2, leg_{l,r}{1,2,3} with _lower and _foot children). User will make the real animations in Blockbench later and must keep these bone names.
 - M3 done (user confirmed): queen ant (placeholder, reuses worker model, bigger) + spawn egg; colony brain in `com.antcolonies.colony` (Colony, ColonyManager as SavedData per dimension); queen creates a colony, workers within 32 blocks join it, counts update on death; colony removed when queen dies; `/antcolonies list` debug command. Shared base class `AbstractAntEntity`.
 - M4 done (user confirmed): workers dig a 4-deep entrance shaft bite by bite (`DigGoal`, diggable tag), climb walls like spiders (`AbstractAntEntity`, `AntRenderer` tilts the model), carry each bite as a soil pellet shown on the "head" bone (`PelletLayer`) and drop it to build a mound 3 blocks high around the entrance (`CarryPelletGoal`). The mound is made of the new **Burrowed Dirt** block (`ModBlocks`). Ants take no fall damage.
-- Saved for M5 (user's decision): deeper shaft + chamber digging until the mound is full, and a stepped ant-hill mound (3 high in the first ring, 2 in the second, 1 in the third). One block per pellet stays. Needs ~64 blocks dug, so it requires chamber digging.
+- M5 in progress (user's design): shaft stops at block 3 (block 4 can hit stone); the shaft is never widened so its 4 walls stay solid for climbing out; a 3-block tunnel leaves the shaft bottom toward one side (fixed per colony, falls back to another side if the soil doesn't fit), ending in a 5x5 room, one block tall. Ants stop when the room is finished. Code: `Colony.findDigTarget`.
+- Saved for later (user's decision): deeper shaft + chamber digging until the mound is full, and a stepped ant-hill mound (3 high in the first ring, 2 in the second, 1 in the third). One block per pellet stays. Needs ~64 blocks dug, so it requires chamber digging.
