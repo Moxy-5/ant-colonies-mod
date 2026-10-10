@@ -147,7 +147,7 @@ Goal: a mature colony can hold 1,000+ ants or termites without lag.
 - [x] M1: Worker ant with a placeholder model and spawn egg that walks around.
 - [ ] M2: Swap in the real worker model and animations.
 - [x] M3: Queen + colony brain + saving and loading.
-- [ ] M4: Digging phase 1 + soil pellets + mound.
+- [x] M4: Digging phase 1 + soil pellets + mound.
 - [ ] M5: Food gathering (seeds) + nest stages + colony growth.
 - [ ] M6: Termites: worker, soldiers, king, queen, mound, fungus garden.
 - [ ] M7: Ant vs termite fights.
@@ -166,6 +166,5 @@ Goal: a mature colony can hold 1,000+ ants or termites without lag.
 - M1 done: worker ant with placeholder GeckoLib model, walk/idle animations, and spawn egg; user confirmed working in-game.
 - M2 deferred: a detailed blocky placeholder worker model exists (bone names: body, abdomen, petiole, thorax, head, mandible_l/r, antenna_l/r_1/2, leg_{l,r}{1,2,3} with _lower and _foot children). User will make the real animations in Blockbench later and must keep these bone names.
 - M3 done (user confirmed): queen ant (placeholder, reuses worker model, bigger) + spawn egg; colony brain in `com.antcolonies.colony` (Colony, ColonyManager as SavedData per dimension); queen creates a colony, workers within 32 blocks join it, counts update on death; colony removed when queen dies; `/antcolonies list` debug command. Shared base class `AbstractAntEntity`.
-- M4 in progress (user confirmed working): workers dig a 4-deep entrance shaft bite by bite (`DigGoal`, diggable tag), climb walls like spiders (`AbstractAntEntity`, `AntRenderer` tilts the model), carry each bite as a soil pellet shown on the "head" bone (`PelletLayer`) and drop it to build a mound 3 blocks high around the entrance (`CarryPelletGoal`). The mound is made of the new **Burrowed Dirt** block (`ModBlocks`). Ants take no fall damage.
+- M4 done (user confirmed): workers dig a 4-deep entrance shaft bite by bite (`DigGoal`, diggable tag), climb walls like spiders (`AbstractAntEntity`, `AntRenderer` tilts the model), carry each bite as a soil pellet shown on the "head" bone (`PelletLayer`) and drop it to build a mound 3 blocks high around the entrance (`CarryPelletGoal`). The mound is made of the new **Burrowed Dirt** block (`ModBlocks`). Ants take no fall damage.
 - Saved for M5 (user's decision): deeper shaft + chamber digging until the mound is full, and a stepped ant-hill mound (3 high in the first ring, 2 in the second, 1 in the third). One block per pellet stays. Needs ~64 blocks dug, so it requires chamber digging.
-- Still to confirm for M4: Burrowed Dirt block in-game (texture, drops, shovel).
