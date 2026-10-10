@@ -44,6 +44,10 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     private static final EntityDataAccessor<ItemStack> DATA_CARRIED_SEED =
             SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.ITEM_STACK);
 
+    /** True while the ant holds an egg in its mandibles (carrying it to the nursery). Synced so the renderer can draw it. Not saved. */
+    private static final EntityDataAccessor<Boolean> DATA_CARRIED_EGG =
+            SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.BOOLEAN);
+
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
 
     private final AntNavigator navigator = new AntNavigator(this);
@@ -51,6 +55,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     /** Which colony this ant belongs to (null = none). Saved with the ant. */
     @Nullable
     private UUID colonyId;
+
+    private boolean seedForQueen;
 
     protected AbstractAntEntity(EntityType<? extends AbstractAntEntity> type, Level level) {
         super(type, level);
@@ -63,6 +69,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         builder.define(DATA_CLIMBING, false);
         builder.define(DATA_CARRIED, Optional.empty());
         builder.define(DATA_CARRIED_SEED, ItemStack.EMPTY);
+        builder.define(DATA_CARRIED_EGG, false);
     }
 
     /** The block type of the pellet this ant carries, or null if its mandibles are empty. */
@@ -95,6 +102,29 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
 
     public void setCarriedSeed(ItemStack seed) {
         entityData.set(DATA_CARRIED_SEED, seed);
+    }
+
+    /** Whether this ant holds an egg in its mandibles (a worker bringing it to the nursery). */
+    public boolean isCarryingEgg() {
+        return entityData.get(DATA_CARRIED_EGG);
+    }
+
+    public void setCarryingEgg(boolean carrying) {
+        entityData.set(DATA_CARRIED_EGG, carrying);
+    }
+
+    /** The seed in the mandibles is for the queen, not for the food store. Server side only, not saved. */
+    public boolean isSeedForQueen() {
+        return seedForQueen;
+    }
+
+    public void setSeedForQueen(boolean forQueen) {
+        this.seedForQueen = forQueen;
+    }
+
+    /** Whether the mandibles are full (a soil pellet, a seed or an egg), so the ant can't pick up anything else. */
+    public boolean hasFullMandibles() {
+        return isCarrying() || isCarryingSeed() || isCarryingEgg();
     }
 
     /** The legs: plans routes (walk, climb, drop) and walks them. Goals only say where to go. */

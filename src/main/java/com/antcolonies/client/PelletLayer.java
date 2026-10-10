@@ -1,18 +1,28 @@
 package com.antcolonies.client;
 
+import com.antcolonies.AntColoniesMod;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.math.Axis;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.state.BlockState;
 import software.bernie.geckolib.cache.object.GeoBone;
 import software.bernie.geckolib.renderer.GeoRenderer;
 import software.bernie.geckolib.renderer.layer.BlockAndItemGeoLayer;
 
-/** Draws the soil pellet (a tiny block) in front of the mandibles while the ant is carrying one. */
+/**
+ * Draws what the ant holds in its mandibles: the soil pellet (a tiny block), a seed, or an egg (the same grain the
+ * nursery shows, lying across the mandibles).
+ */
 public class PelletLayer<T extends AbstractAntEntity> extends BlockAndItemGeoLayer<T> {
     /** The bone the pellet follows (so it moves with the head). Must exist in the model. */
     private static final String HOLD_BONE = "head";
@@ -20,15 +30,25 @@ public class PelletLayer<T extends AbstractAntEntity> extends BlockAndItemGeoLay
     private static final float SIZE = 0.12F;
     /** A carried seed is drawn this big (as a fraction of a full item). */
     private static final float SEED_SIZE = 0.3F;
+    /** A carried egg is drawn at this fraction of the size it has in the nursery. */
+    private static final float EGG_SIZE = 0.6F;
+    /** Stands in for the egg: the layer asks for an item per bone, so the egg is passed as this one and drawn differently. */
+    private static final ItemStack EGG_MARKER = new ItemStack(Items.EGG);
+    private static final ResourceLocation EGG_TEXTURE =
+            ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "textures/entity/ant_egg.png");
     // Where the pellet sits, in model pixels (16 = one block): just in front of the mandible tips.
     private static final float X = 0.0F;
     private static final float Y = 2.3F;
     private static final float Z = -6.8F;
 
-    public PelletLayer(GeoRenderer<T> renderer) {
+    private final ModelPart eggModel;
+
+    public PelletLayer(GeoRenderer<T> renderer, ModelPart eggModel) {
         super(renderer,
-                (bone, ant) -> HOLD_BONE.equals(bone.getName()) && ant.isCarryingSeed() ? ant.getCarriedSeed() : null,
+                (bone, ant) -> !HOLD_BONE.equals(bone.getName()) ? null
+                        : ant.isCarryingEgg() ? EGG_MARKER : ant.isCarryingSeed() ? ant.getCarriedSeed() : null,
                 (bone, ant) -> HOLD_BONE.equals(bone.getName()) ? ant.getCarriedBlock() : null);
+        this.eggModel = eggModel;
     }
 
     @Override
@@ -36,9 +56,18 @@ public class PelletLayer<T extends AbstractAntEntity> extends BlockAndItemGeoLay
             MultiBufferSource bufferSource, float partialTick, int packedLight, int packedOverlay) {
         poseStack.pushPose();
         poseStack.translate(X / 16.0F, Y / 16.0F, Z / 16.0F);
-        poseStack.scale(SEED_SIZE, SEED_SIZE, SEED_SIZE);
-        Minecraft.getInstance().getItemRenderer().renderStatic(stack, ItemDisplayContext.FIXED, packedLight, packedOverlay,
-                poseStack, bufferSource, ant.level(), ant.getId());
+        if (stack == EGG_MARKER) {
+            // The egg model stands on its foot point and is 6 pixels tall: lay it along the ant and centre it.
+            poseStack.scale(EGG_SIZE, EGG_SIZE, EGG_SIZE);
+            poseStack.mulPose(Axis.XP.rotationDegrees(90.0F));
+            poseStack.translate(0.0F, -3.0F / 16.0F, 0.0F);
+            eggModel.render(poseStack, bufferSource.getBuffer(RenderType.entityCutoutNoCull(EGG_TEXTURE)), packedLight,
+                    OverlayTexture.NO_OVERLAY);
+        } else {
+            poseStack.scale(SEED_SIZE, SEED_SIZE, SEED_SIZE);
+            Minecraft.getInstance().getItemRenderer().renderStatic(stack, ItemDisplayContext.FIXED, packedLight, packedOverlay,
+                    poseStack, bufferSource, ant.level(), ant.getId());
+        }
         poseStack.popPose();
     }
 

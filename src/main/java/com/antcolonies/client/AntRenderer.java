@@ -20,7 +20,7 @@ public class AntRenderer<T extends AbstractAntEntity> extends GeoEntityRenderer<
 
     public AntRenderer(EntityRendererProvider.Context context, GeoModel<T> model) {
         super(context, model);
-        addRenderLayer(new PelletLayer<>(this));
+        addRenderLayer(new PelletLayer<>(this, context.bakeLayer(AntEggRenderer.LAYER)));
     }
 
     @Override

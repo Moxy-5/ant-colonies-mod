@@ -45,8 +45,8 @@ public class SealGoal extends Goal {
     @Override
     public boolean canUse() {
         // Only look for work now and then, so ants don't all think on the same tick.
-        // An ant with a pellet in its mouth must carry it out first.
-        if (ant.getColonyId() == null || ant.isCarrying() || ant.getRandom().nextInt(20) != 0) {
+        // An ant with a pellet (or a seed, or an egg) in its mouth must carry it to its place first.
+        if (ant.getColonyId() == null || ant.hasFullMandibles() || ant.getRandom().nextInt(20) != 0) {
             return false;
         }
         if (!(ant.level() instanceof ServerLevel level)) {
@@ -63,7 +63,7 @@ public class SealGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        return colony != null && leak != null && !ant.isCarrying() && ticks < GIVE_UP_TICKS
+        return colony != null && leak != null && !ant.hasFullMandibles() && ticks < GIVE_UP_TICKS
                 && colony.isLeakOpen(ant.level(), leak.hole());
     }
 

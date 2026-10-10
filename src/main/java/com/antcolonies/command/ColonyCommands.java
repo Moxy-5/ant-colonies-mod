@@ -37,9 +37,19 @@ public class ColonyCommands {
                     + " | queen " + colony.getQueenId().toString().substring(0, 8)
                     + " | members " + colony.getMemberCount()
                     + " | food " + colony.getFood()
-                    + " | eggs " + colony.countEggs(source.getLevel());
+                    + " | queen fed " + colony.getQueenSeeds() + "/" + Colony.QUEEN_MEAL + incubation(colony, level)
+                    + " | eggs " + colony.countEggs(level);
             source.sendSuccess(() -> Component.literal(line), false);
         }
         return colonies.size();
+    }
+
+    /** " (egg in 3:25)" while the queen carries an egg, otherwise nothing. */
+    private static String incubation(Colony colony, ServerLevel level) {
+        if (!colony.isIncubating()) {
+            return "";
+        }
+        long seconds = Math.max(0, colony.getEggDue() - level.getGameTime()) / 20;
+        return String.format(" (egg in %d:%02d)", seconds / 60, seconds % 60);
     }
 }

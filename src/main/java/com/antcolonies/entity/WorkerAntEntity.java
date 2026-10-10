@@ -3,9 +3,11 @@ package com.antcolonies.entity;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.goal.AntWanderGoal;
+import com.antcolonies.entity.goal.CarryEggGoal;
 import com.antcolonies.entity.goal.CarryPelletGoal;
 import com.antcolonies.entity.goal.ClipGrassGoal;
 import com.antcolonies.entity.goal.DigGoal;
+import com.antcolonies.entity.goal.FeedQueenGoal;
 import com.antcolonies.entity.goal.GatherSeedGoal;
 import com.antcolonies.entity.goal.SealGoal;
 import com.antcolonies.entity.goal.StoreSeedGoal;
@@ -45,11 +47,15 @@ public class WorkerAntEntity extends AbstractAntEntity {
         this.goalSelector.addGoal(1, new StoreSeedGoal(this));
         this.goalSelector.addGoal(2, new CarryPelletGoal(this));
         this.goalSelector.addGoal(3, new SealGoal(this));
-        this.goalSelector.addGoal(4, new GatherSeedGoal(this));
-        this.goalSelector.addGoal(5, new ClipGrassGoal(this));
-        this.goalSelector.addGoal(6, new DigGoal(this, () -> true));
-        this.goalSelector.addGoal(7, new AntWanderGoal(this, 1.0, 120, 6, () -> true));
-        this.goalSelector.addGoal(8, new RandomLookAroundGoal(this));
+        // The queen's egg comes out behind her: a worker carries it to the nursery.
+        this.goalSelector.addGoal(4, new CarryEggGoal(this));
+        // Feeding the queen (seeds from the food store) comes before fetching more seeds.
+        this.goalSelector.addGoal(5, new FeedQueenGoal(this));
+        this.goalSelector.addGoal(6, new GatherSeedGoal(this));
+        this.goalSelector.addGoal(7, new ClipGrassGoal(this));
+        this.goalSelector.addGoal(8, new DigGoal(this, () -> true));
+        this.goalSelector.addGoal(9, new AntWanderGoal(this, 1.0, 120, 6, () -> true));
+        this.goalSelector.addGoal(10, new RandomLookAroundGoal(this));
     }
 
     @Override
@@ -70,7 +76,7 @@ public class WorkerAntEntity extends AbstractAntEntity {
         }
     }
 
-    // A dead worker leaves the colony's headcount.
+    // A dead worker leaves the colony's headcount, and the egg it carried falls to the ground for another worker to pick up.
     @Override
     public void die(DamageSource source) {
         super.die(source);
@@ -78,6 +84,10 @@ public class WorkerAntEntity extends AbstractAntEntity {
             ColonyManager manager = ColonyManager.get(serverLevel);
             Colony colony = manager.getColony(getColonyId());
             if (colony != null) {
+                if (isCarryingEgg()) {
+                    setCarryingEgg(false);
+                    colony.spawnEgg(serverLevel, getX(), getY(), getZ());
+                }
                 colony.setCount(CASTE, colony.getCount(CASTE) - 1);
                 manager.markChanged();
             }

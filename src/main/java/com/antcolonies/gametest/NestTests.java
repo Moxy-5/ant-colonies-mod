@@ -248,9 +248,10 @@ public class NestTests {
         helper.succeedWhen(() -> {
             Colony colony = colony(helper);
             helper.assertTrue(dropped[0] && colony != null, "no seeds have been dropped yet");
-            // The queen may already have used 3 seeds for an egg: count those too.
-            int total = colony.getFood() + Colony.EGG_COST * colony.countEggs(level);
-            helper.assertTrue(total == 5, "the colony has " + colony.getFood() + " food and " + colony.countEggs(level) + " eggs, expected 5 seeds in all");
+            // The workers also feed the queen from the store: count what she has eaten too.
+            int total = seedsAccountedFor(colony);
+            helper.assertTrue(total == 5, "the colony has " + colony.getFood() + " food and the queen ate " + colony.getQueenSeeds()
+                    + " (+ " + colony.getEggsLaid() + " eggs laid), expected 5 seeds in all");
             helper.assertTrue(seedsIn(level, storeBox(level, colony)) == colony.getFood(), "only " + seedsIn(level, storeBox(level, colony)) + " seeds are in the food store");
             helper.assertTrue(seedsIn(level, helper.getBounds()) == colony.getFood(), "some seeds are still lying around outside the store");
             for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
@@ -291,9 +292,10 @@ public class NestTests {
             for (int[] tuft : tufts) {
                 helper.assertBlock(new BlockPos(tuft[0], SURFACE, tuft[1]), block -> block == Blocks.AIR, "a tuft of grass is still there");
             }
-            // The queen may already have used seeds for eggs: count those too.
-            int total = colony.getFood() + Colony.EGG_COST * colony.countEggs(level);
-            helper.assertTrue(total == expected, "the colony has " + colony.getFood() + " food and " + colony.countEggs(level) + " eggs, expected " + expected + " seeds in all");
+            // The workers also feed the queen from the store: count what she has eaten too.
+            int total = seedsAccountedFor(colony);
+            helper.assertTrue(total == expected, "the colony has " + colony.getFood() + " food and the queen ate " + colony.getQueenSeeds()
+                    + " (+ " + colony.getEggsLaid() + " eggs laid), expected " + expected + " seeds in all");
             helper.assertTrue(seedsIn(level, storeBox(level, colony)) == colony.getFood(),
                     "only " + seedsIn(level, storeBox(level, colony)) + " seeds are in the store");
             for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
@@ -303,16 +305,20 @@ public class NestTests {
     }
 
     /**
-     * In a finished nest with 12 seeds in the food store the queen lays eggs in the nursery, one at a time, for 3 seeds
-     * each: 4 eggs, all inside the nursery, one per spot, the store empty and the colony's food at 0.
+     * In a finished nest with 25 seeds in the food store the workers feed the queen 20 of them. She then carries an egg
+     * for 5 minutes (6000 ticks), the egg comes out behind her in her room, and a worker carries it into the nursery.
+     * After that she is fed the 5 seeds that are left.
      */
-    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
-    public static void queenLaysEggsInTheNursery(GameTestHelper helper) {
+    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
+    public static void queenIsFedAndHerEggGoesToTheNursery(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
         startColony(helper);
 
         boolean[] stocked = {false};
+        long[] incubationStart = {-1};
+        long[] laidAt = {-1};
+        boolean[] cameOutBehindHer = {false};
         helper.onEachTick(() -> {
             Colony colony = colony(helper);
             if (stocked[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.findDigTarget(level) != null
@@ -321,32 +327,65 @@ public class NestTests {
             }
             stocked[0] = true;
             var store = colony.getFoodStoreCells(level);
-            for (int i = 0; i < 12; i++) {
+            for (int i = 0; i < 25; i++) {
                 colony.depositSeed(level, store.get(i / 8));
             }
-            AntColoniesMod.LOGGER.info("[egg-test] tick {}: 12 seeds put in the food store", helper.getTick());
+            AntColoniesMod.LOGGER.info("[egg-test] tick {}: 25 seeds put in the food store", helper.getTick());
         });
         helper.onEachTick(() -> {
-            if (stocked[0] && helper.getTick() % 400 == 0) {
-                Colony colony = colony(helper);
-                AntColoniesMod.LOGGER.info("[egg-test] tick {}: food {}, eggs {}", helper.getTick(), colony.getFood(), colony.countEggs(level));
+            Colony colony = colony(helper);
+            if (!stocked[0] || colony == null) {
+                return;
+            }
+            if (incubationStart[0] < 0 && colony.isIncubating()) {
+                incubationStart[0] = level.getGameTime();
+                AntColoniesMod.LOGGER.info("[egg-test] tick {}: the queen is full and carries an egg, food {}", helper.getTick(), colony.getFood());
+            }
+            if (laidAt[0] < 0 && colony.getEggsLaid() > 0) {
+                laidAt[0] = level.getGameTime();
+                // The egg must lie in her room, behind her (she looks the other way), and not in the nursery yet.
+                var queens = level.getEntitiesOfClass(com.antcolonies.entity.QueenAntEntity.class, helper.getBounds());
+                var eggs = colony.getLooseEggs(level);
+                if (queens.size() == 1 && eggs.size() == 1) {
+                    var queen = queens.get(0);
+                    Vec3 away = eggs.get(0).position().subtract(queen.position());
+                    Vec3 facing = Vec3.directionFromRotation(0.0F, queen.getYRot());
+                    BlockPos room = colony.getFinishedRoomCenter(level);
+                    cameOutBehindHer[0] = away.dot(facing) <= 0.001 && room != null
+                            && Math.abs(eggs.get(0).getX() - (room.getX() + 0.5)) <= 2.5 && Math.abs(eggs.get(0).getZ() - (room.getZ() + 0.5)) <= 2.5;
+                    AntColoniesMod.LOGGER.info("[egg-test] tick {}: egg laid {} from the queen, facing {}", helper.getTick(), away, facing);
+                }
+            }
+            if (helper.getTick() % 1000 == 0) {
+                AntColoniesMod.LOGGER.info("[egg-test] tick {}: food {}, queen fed {}, eggs laid {}, eggs {} (nursery {})", helper.getTick(),
+                        colony.getFood(), colony.getQueenSeeds(), colony.getEggsLaid(), colony.countEggs(level), colony.getNurseryEggs(level).size());
             }
         });
 
         helper.succeedWhen(() -> {
             Colony colony = colony(helper);
             helper.assertTrue(stocked[0] && colony != null, "the store has not been stocked yet");
+            helper.assertTrue(colony.getEggsLaid() == 1, "the queen has laid " + colony.getEggsLaid() + " eggs, expected 1");
+            long carried = laidAt[0] - incubationStart[0];
+            helper.assertTrue(carried >= Colony.INCUBATION_TICKS && carried <= Colony.INCUBATION_TICKS + 100,
+                    "the egg came out after " + carried + " ticks, expected " + Colony.INCUBATION_TICKS);
+            helper.assertTrue(cameOutBehindHer[0], "the egg did not come out behind the queen in her room");
             var eggs = colony.getEggs(level);
-            helper.assertTrue(eggs.size() == 4, "the nursery holds " + eggs.size() + " eggs, expected 4");
-            helper.assertTrue(level.getEntitiesOfClass(com.antcolonies.entity.AntEggEntity.class, helper.getBounds()).size() == 4,
-                    "there are eggs outside the nursery");
-            helper.assertTrue(colony.getFood() == 0, "the colony still counts " + colony.getFood() + " food");
-            helper.assertTrue(seedsIn(level, storeBox(level, colony)) == 0, "seeds are left in the store");
-            java.util.Set<BlockPos> spots = new java.util.HashSet<>();
-            for (var egg : eggs) {
-                helper.assertTrue(spots.add(egg.blockPosition()), "two eggs lie in the same spot");
+            helper.assertTrue(eggs.size() == 1 && colony.getNurseryEggs(level).size() == 1,
+                    "expected 1 egg, in the nursery, but there are " + eggs.size() + " (" + colony.getNurseryEggs(level).size() + " in the nursery)");
+            helper.assertTrue(level.getEntitiesOfClass(com.antcolonies.entity.AntEggEntity.class, helper.getBounds()).size() == 1,
+                    "there is an egg somewhere else");
+            helper.assertTrue(colony.getQueenSeeds() == 5, "the queen was fed " + colony.getQueenSeeds() + " seeds for the next egg, expected the 5 that were left");
+            helper.assertTrue(colony.getFood() == 0 && seedsIn(level, storeBox(level, colony)) == 0, "seeds are left in the store");
+            for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
+                helper.assertTrue(!ant.hasFullMandibles(), "an ant is still carrying something");
             }
         });
+    }
+
+    /** The seeds the colony can account for: in the store, eaten by the queen for her next egg, or used for the eggs she has laid. */
+    private static int seedsAccountedFor(Colony colony) {
+        return colony.getFood() + colony.getQueenSeeds() + Colony.QUEEN_MEAL * colony.getEggsLaid();
     }
 
     private static void dropSeeds(GameTestHelper helper, int x, int z, int count) {

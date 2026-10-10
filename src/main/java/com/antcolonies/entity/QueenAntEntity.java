@@ -7,9 +7,9 @@ import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.entity.goal.DigGoal;
-import com.antcolonies.entity.goal.LayEggGoal;
 import com.antcolonies.entity.goal.QueenToRoomGoal;
 
+import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.damagesource.DamageSource;
@@ -20,12 +20,16 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.FloatGoal;
 import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
 
 /** Queen ant: bigger, tougher and slow. The colony lives and dies with her. */
 public class QueenAntEntity extends AbstractAntEntity {
     // Placeholder until species profiles (JSON) exist.
     private static final ResourceLocation SPECIES =
             ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "red_harvester_ant");
+
+    /** How far (in blocks) behind the queen her egg comes out. */
+    private static final double EGG_BEHIND = 0.7;
 
     private boolean colonyChecked;
 
@@ -43,14 +47,33 @@ public class QueenAntEntity extends AbstractAntEntity {
     @Override
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));
-        // Settled in her room she lays an egg in the nursery now and then, and goes back to her room afterwards.
-        this.goalSelector.addGoal(1, new LayEggGoal(this));
         // She helps dig the shaft and her own room; when the room is finished she goes down and sits in its middle.
-        this.goalSelector.addGoal(2, new QueenToRoomGoal(this));
+        this.goalSelector.addGoal(1, new QueenToRoomGoal(this));
         // Otherwise she hardly ever wanders: low chance to start a stroll, and never far. Settled in her room, never.
-        this.goalSelector.addGoal(3, new DigGoal(this, () -> QueenToRoomGoal.findFinishedRoom(this) == null));
-        this.goalSelector.addGoal(4, new AntWanderGoal(this, 0.6, 400, 4, () -> QueenToRoomGoal.findFinishedRoom(this) == null));
-        this.goalSelector.addGoal(5, new RandomLookAroundGoal(this));
+        this.goalSelector.addGoal(2, new DigGoal(this, () -> QueenToRoomGoal.findFinishedRoom(this) == null));
+        this.goalSelector.addGoal(3, new AntWanderGoal(this, 0.6, 400, 4, () -> QueenToRoomGoal.findFinishedRoom(this) == null));
+        this.goalSelector.addGoal(4, new RandomLookAroundGoal(this));
+    }
+
+    // Every second: has the egg she carries grown? Then it comes out behind her (she has to be in her room).
+    @Override
+    protected void customServerAiStep() {
+        super.customServerAiStep();
+        if (tickCount % 20 != 0 || getColonyId() == null || !(level() instanceof ServerLevel serverLevel)) {
+            return;
+        }
+        ColonyManager manager = ColonyManager.get(serverLevel);
+        Colony colony = manager.getColony(getColonyId());
+        if (colony == null || !colony.isEggDue(serverLevel) || !colony.isQueenHome(serverLevel)) {
+            return;
+        }
+        Vec3 at = position().subtract(Vec3.directionFromRotation(0.0F, getYRot()).scale(EGG_BEHIND));
+        BlockPos cell = BlockPos.containing(at.x, getY() + 0.1, at.z);
+        if (!serverLevel.getBlockState(cell).getCollisionShape(serverLevel, cell).isEmpty()) {
+            at = position(); // a wall behind her: the egg comes out where she sits
+        }
+        colony.layEgg(serverLevel, at.x, getY(), at.z);
+        manager.markChanged();
     }
 
     // She digs her own room with the workers, but cannot place blocks: no soil pellets for the hill, no sealing.
