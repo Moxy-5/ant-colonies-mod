@@ -35,7 +35,8 @@ public class ColonyCommands {
                     + " | " + colony.getSpecies()
                     + " | center " + colony.getCenter().toShortString()
                     + " | queen " + colony.getQueenId().toString().substring(0, 8)
-                    + " | members " + colony.getMemberCount();
+                    + " | members " + colony.getMemberCount()
+                    + " | food " + colony.getFood();
             source.sendSuccess(() -> Component.literal(line), false);
         }
         return colonies.size();

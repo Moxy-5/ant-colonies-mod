@@ -5,7 +5,9 @@ import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.entity.goal.CarryPelletGoal;
 import com.antcolonies.entity.goal.DigGoal;
+import com.antcolonies.entity.goal.GatherSeedGoal;
 import com.antcolonies.entity.goal.SealGoal;
+import com.antcolonies.entity.goal.StoreSeedGoal;
 
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.damagesource.DamageSource;
@@ -39,11 +41,13 @@ public class WorkerAntEntity extends AbstractAntEntity {
     @Override
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));
-        this.goalSelector.addGoal(1, new CarryPelletGoal(this));
-        this.goalSelector.addGoal(2, new SealGoal(this));
-        this.goalSelector.addGoal(3, new DigGoal(this, () -> true));
-        this.goalSelector.addGoal(4, new AntWanderGoal(this, 1.0, 120, 6, () -> true));
-        this.goalSelector.addGoal(5, new RandomLookAroundGoal(this));
+        this.goalSelector.addGoal(1, new StoreSeedGoal(this));
+        this.goalSelector.addGoal(2, new CarryPelletGoal(this));
+        this.goalSelector.addGoal(3, new SealGoal(this));
+        this.goalSelector.addGoal(4, new GatherSeedGoal(this));
+        this.goalSelector.addGoal(5, new DigGoal(this, () -> true));
+        this.goalSelector.addGoal(6, new AntWanderGoal(this, 1.0, 120, 6, () -> true));
+        this.goalSelector.addGoal(7, new RandomLookAroundGoal(this));
     }
 
     @Override

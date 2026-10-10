@@ -20,6 +20,8 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.block.state.BlockState;
@@ -90,6 +92,16 @@ public class Colony {
 
     @Nullable
     private Layout layout;
+
+    /** Seeds lying within this many blocks (sideways) of the entrance are fetched by the workers. */
+    public static final int FOOD_RADIUS = 24;
+    /** An ant that went for a seed keeps the others away from it this long (in ticks). */
+    private static final int SEED_CLAIM_TICKS = 600;
+
+    /** How much food the colony has stored (one per seed in the food store). Saved. */
+    private int food;
+    /** Seeds an ant is on its way to: item entity id -> game time when the claim runs out. Not saved. */
+    private final Map<Integer, Long> claimedSeeds = new HashMap<>();
 
     /** How long (in ticks) an ant that went to close a leak counts as working on it. */
     private static final int LEAK_CLAIM_TICKS = 600;
@@ -168,6 +180,93 @@ public class Colony {
             }
         }
         return queen.center();
+    }
+
+    // ---- Food
+
+    public int getFood() {
+        return food;
+    }
+
+    /**
+     * The floor cells of the food store (the room, without its tunnel), or an empty list until the shaft and the
+     * whole food store are dug out (or while its chunks are not loaded).
+     */
+    public List<BlockPos> getFoodStoreCells(Level level) {
+        Layout layout = getLayout(level);
+        if (layout == null) {
+            return List.of();
+        }
+        for (int i = 1; i <= layout.shaftDepth(); i++) {
+            if (!level.isLoaded(center.below(i)) || !level.getBlockState(center.below(i)).isAir()) {
+                return List.of();
+            }
+        }
+        for (NestPlan.Chamber chamber : layout.chambers()) {
+            if (chamber.kind() != NestPlan.Kind.FOOD) {
+                continue;
+            }
+            for (BlockPos pos : chamber.cells()) {
+                if (!level.isLoaded(pos) || !level.getBlockState(pos).isAir()) {
+                    return List.of();
+                }
+            }
+            return chamber.cells().subList(NestPlan.TUNNEL_LENGTH, chamber.cells().size());
+        }
+        return List.of();
+    }
+
+    /** A random spot on the floor of the food store, or null if the store is not ready. */
+    @Nullable
+    public BlockPos pickFoodSpot(Level level, RandomSource random) {
+        List<BlockPos> cells = getFoodStoreCells(level);
+        return cells.isEmpty() ? null : cells.get(random.nextInt(cells.size()));
+    }
+
+    /**
+     * The seed on the ground nearest to {@code near} that the ants should fetch, or null: only once the food store
+     * is ready, only on the surface (not what is already stored below), within {@link #FOOD_RADIUS} of the entrance,
+     * and not one another ant is on its way to. {@code avoid}: item entity ids this ant could not reach.
+     */
+    @Nullable
+    public ItemEntity findSeed(Level level, BlockPos near, Set<Integer> avoid) {
+        if (getFoodStoreCells(level).isEmpty()) {
+            return null;
+        }
+        long now = level.getGameTime();
+        claimedSeeds.values().removeIf(until -> until <= now);
+        AABB area = new AABB(center).inflate(FOOD_RADIUS, 0, FOOD_RADIUS).expandTowards(0, 8, 0);
+        ItemEntity best = null;
+        double bestDistance = Double.MAX_VALUE;
+        for (ItemEntity item : level.getEntitiesOfClass(ItemEntity.class, area)) {
+            if (!item.isAlive() || !item.getItem().is(ModTags.SEEDS) || item.getY() < center.getY() - 0.5
+                    || claimedSeeds.containsKey(item.getId()) || avoid.contains(item.getId())) {
+                continue;
+            }
+            double distance = item.distanceToSqr(near.getX() + 0.5, near.getY() + 0.5, near.getZ() + 0.5);
+            if (distance < bestDistance) {
+                best = item;
+                bestDistance = distance;
+            }
+        }
+        return best;
+    }
+
+    public void claimSeed(Level level, ItemEntity seed) {
+        claimedSeeds.put(seed.getId(), level.getGameTime() + SEED_CLAIM_TICKS);
+    }
+
+    public void releaseSeed(ItemEntity seed) {
+        claimedSeeds.remove(seed.getId());
+    }
+
+    /** An ant puts its seed down in the food store: it stays there as an item on the floor and counts as one food. */
+    public void depositSeed(Level level, BlockPos spot, ItemStack seed) {
+        ItemEntity item = new ItemEntity(level, spot.getX() + 0.5, spot.getY() + 0.1, spot.getZ() + 0.5, seed.copy());
+        item.setDeltaMovement(0, 0, 0);
+        item.setUnlimitedLifetime();
+        level.addFreshEntity(item);
+        food += seed.getCount();
     }
 
     /** The rooms this nest is being dug with (empty until the layout is decided). For tests and debugging. */
@@ -595,6 +694,7 @@ public class Colony {
         CompoundTag castes = new CompoundTag();
         casteCounts.forEach(castes::putInt);
         tag.put("castes", castes);
+        tag.putInt("food", food);
         return tag;
     }
 
@@ -604,6 +704,7 @@ public class Colony {
                 ResourceLocation.parse(tag.getString("species")),
                 tag.getUUID("queen"),
                 BlockPos.of(tag.getLong("center")));
+        colony.food = tag.getInt("food");
         CompoundTag castes = tag.getCompound("castes");
         for (String key : castes.getAllKeys()) {
             colony.casteCounts.put(key, castes.getInt(key));

@@ -15,6 +15,7 @@ import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import software.bernie.geckolib.animatable.GeoEntity;
@@ -39,6 +40,10 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     private static final EntityDataAccessor<Optional<BlockState>> DATA_CARRIED =
             SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.OPTIONAL_BLOCK_STATE);
 
+    /** The seed held in the mandibles (empty = none). Synced so the renderer can draw it. Not saved. */
+    private static final EntityDataAccessor<ItemStack> DATA_CARRIED_SEED =
+            SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.ITEM_STACK);
+
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
 
     private final AntNavigator navigator = new AntNavigator(this);
@@ -57,6 +62,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         super.defineSynchedData(builder);
         builder.define(DATA_CLIMBING, false);
         builder.define(DATA_CARRIED, Optional.empty());
+        builder.define(DATA_CARRIED_SEED, ItemStack.EMPTY);
     }
 
     /** The block type of the pellet this ant carries, or null if its mandibles are empty. */
@@ -76,6 +82,19 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
 
     public void setCarriedBlock(@Nullable BlockState state) {
         entityData.set(DATA_CARRIED, Optional.ofNullable(state));
+    }
+
+    /** The seed this ant carries to the food store (empty if none). */
+    public ItemStack getCarriedSeed() {
+        return entityData.get(DATA_CARRIED_SEED);
+    }
+
+    public boolean isCarryingSeed() {
+        return !getCarriedSeed().isEmpty();
+    }
+
+    public void setCarriedSeed(ItemStack seed) {
+        entityData.set(DATA_CARRIED_SEED, seed);
     }
 
     /** The legs: plans routes (walk, climb, drop) and walks them. Goals only say where to go. */

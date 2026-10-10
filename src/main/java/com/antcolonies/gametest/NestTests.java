@@ -214,6 +214,75 @@ public class NestTests {
         });
     }
 
+    /**
+     * Seeds lying on the ground around a finished nest (two single ones and a pile of three) are fetched one by one:
+     * every one ends up on the floor of the food store, the colony counts them, and nothing is left outside.
+     */
+    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    public static void workersCarrySeedsToTheFoodStore(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        startColony(helper);
+
+        boolean[] dropped = {false};
+        helper.onEachTick(() -> {
+            Colony colony = colony(helper);
+            if (dropped[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.findDigTarget(level) != null
+                    || !hillProblems(helper).isEmpty()) {
+                return;
+            }
+            dropped[0] = true;
+            dropSeeds(helper, MIDDLE + 6, MIDDLE, 1);
+            dropSeeds(helper, MIDDLE - 6, MIDDLE + 2, 1);
+            dropSeeds(helper, MIDDLE + 1, MIDDLE - 7, 3);
+            AntColoniesMod.LOGGER.info("[seed-test] tick {}: 5 seeds dropped around the hill", helper.getTick());
+        });
+        helper.onEachTick(() -> {
+            if (dropped[0] && helper.getTick() % 200 == 0) {
+                Colony colony = colony(helper);
+                AntColoniesMod.LOGGER.info("[seed-test] tick {}: food {}, seeds in the store {}, seeds anywhere {}",
+                        helper.getTick(), colony.getFood(), seedsIn(level, storeBox(level, colony)), seedsIn(level, helper.getBounds()));
+            }
+        });
+
+        helper.succeedWhen(() -> {
+            Colony colony = colony(helper);
+            helper.assertTrue(dropped[0] && colony != null, "no seeds have been dropped yet");
+            helper.assertTrue(colony.getFood() == 5, "the colony counts " + colony.getFood() + " food, expected 5");
+            helper.assertTrue(seedsIn(level, storeBox(level, colony)) == 5, "only " + seedsIn(level, storeBox(level, colony)) + " seeds are in the food store");
+            helper.assertTrue(seedsIn(level, helper.getBounds()) == 5, "some seeds are still lying around outside the store");
+            for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
+                helper.assertTrue(!ant.isCarryingSeed(), "an ant is still carrying a seed");
+            }
+        });
+    }
+
+    private static void dropSeeds(GameTestHelper helper, int x, int z, int count) {
+        BlockPos at = helper.absolutePos(new BlockPos(x, SURFACE, z));
+        var item = new net.minecraft.world.entity.item.ItemEntity(helper.getLevel(), at.getX() + 0.5, at.getY(), at.getZ() + 0.5,
+                new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.WHEAT_SEEDS, count));
+        item.setDeltaMovement(0, 0, 0);
+        helper.getLevel().addFreshEntity(item);
+    }
+
+    /** A box around the floor cells of the colony's food store. */
+    private static AABB storeBox(ServerLevel level, Colony colony) {
+        AABB box = null;
+        for (BlockPos pos : colony.getFoodStoreCells(level)) {
+            box = box == null ? new AABB(pos) : box.minmax(new AABB(pos));
+        }
+        return box == null ? new AABB(0, 0, 0, 0, 0, 0) : box;
+    }
+
+    /** How many seeds (counting every one in a pile) lie as items in the box. */
+    private static int seedsIn(ServerLevel level, AABB box) {
+        int seeds = 0;
+        for (var item : level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, box)) {
+            seeds += item.getItem().getCount();
+        }
+        return seeds;
+    }
+
     /** Dirt ground with a grass top across the whole test area, a queen at the entrance spot and six workers. */
     private static void startColony(GameTestHelper helper) {
         startColony(helper, 6);
