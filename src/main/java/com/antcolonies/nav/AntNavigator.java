@@ -160,6 +160,11 @@ public class AntNavigator {
             next = at + 1;
             offRouteTicks = 0;
         } else if (next > last) {
+            if (last == 0) {
+                // The route was only the goal cell (the ant started in it) and the ant has drifted out: plan a real route back.
+                replan("left the goal cell");
+                return;
+            }
             next = last; // wandered out of the goal cell while centring: head back
         }
 

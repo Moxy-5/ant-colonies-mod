@@ -88,6 +88,21 @@ public class NavigationTests {
                 "the queen has not reached the room yet"));
     }
 
+    /** Regression test for a crash: the route was only the cell the ant already stood in, and the ant then left that cell. */
+    @GameTest(template = "arena", timeoutTicks = 400, skyAccess = true)
+    public static void antToldToGoToItsOwnCellSurvivesBeingMovedAway(GameTestHelper helper) {
+        buildNest(helper);
+        WorkerAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), MIDDLE + 5, SURFACE, MIDDLE + 5);
+        BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE + 5, SURFACE, MIDDLE + 5));
+        helper.runAfterDelay(10, () -> {
+            ant.getNavigator().moveTo(ant.blockPosition(), 1.0);
+            ant.setPos(ant.getX() + 1.6, ant.getY(), ant.getZ()); // out of the cell before the first step
+        });
+        helper.succeedWhen(() -> helper.assertTrue(
+                ant.getNavigator().isDone() && !ant.getNavigator().hasFailed() && ant.blockPosition().equals(goal) && helper.getTick() > 20,
+                "the ant has not walked back to its cell yet"));
+    }
+
     /** With the finished hill around the entrance the hole is a funnel 3 blocks deeper: the ant must still climb out of it. */
     @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
     public static void antClimbsOutOfTheHoleThroughTheFinishedHill(GameTestHelper helper) {

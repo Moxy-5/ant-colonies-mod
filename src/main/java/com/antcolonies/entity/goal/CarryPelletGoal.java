@@ -9,6 +9,7 @@ import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.AbstractAntEntity;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
@@ -107,10 +108,32 @@ public class CarryPelletGoal extends Goal {
         }
     }
 
+    /** Starts walking to a free cell next to the spot. False if there is none to go to. */
+    private boolean stepAside(ServerLevel level) {
+        for (Direction side : Direction.Plane.HORIZONTAL) {
+            BlockPos next = spot.relative(side);
+            if (level.getBlockState(next).canBeReplaced() && ant.getNavigator().moveTo(next, 1.0)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void place(ServerLevel level) {
-        // Don't wall the ant into its own block: if it is standing in the spot, try another one.
-        boolean antInTheWay = ant.getBoundingBox().intersects(new AABB(spot));
-        if (antInTheWay || !colony.placePellet(level, spot)) {
+        // Don't wall the ant into its own block: if it is standing in the spot, it steps to the side first
+        // (it can place the pellet from the next cell), and tries again when it is out of the way.
+        if (ant.getBoundingBox().intersects(new AABB(spot))) {
+            if (ant.getNavigator().isDone() && !stepAside(level)) {
+                spot = colony.pickMoundSpot(level, ant.getRandom());
+                if (spot == null) {
+                    ant.setCarriedBlock(null);
+                } else {
+                    walkToSpot();
+                }
+            }
+            return;
+        }
+        if (!colony.placePellet(level, spot)) {
             spot = colony.pickMoundSpot(level, ant.getRandom());
             if (spot == null) {
                 ant.setCarriedBlock(null);

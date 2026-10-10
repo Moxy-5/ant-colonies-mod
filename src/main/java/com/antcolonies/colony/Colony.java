@@ -242,12 +242,22 @@ public class Colony {
         if (spots.isEmpty()) {
             return null;
         }
-        int lowest = Integer.MAX_VALUE;
+        // Spots nobody is standing in come first (an ant can't put a pellet where someone stands), then the lowest layer.
+        List<BlockPos> candidates = new ArrayList<>();
         for (BlockPos spot : spots) {
+            if (level.getEntitiesOfClass(LivingEntity.class, new AABB(spot)).isEmpty()) {
+                candidates.add(spot);
+            }
+        }
+        if (candidates.isEmpty()) {
+            candidates = spots;
+        }
+        int lowest = Integer.MAX_VALUE;
+        for (BlockPos spot : candidates) {
             lowest = Math.min(lowest, spot.getY());
         }
         List<BlockPos> lowestSpots = new ArrayList<>();
-        for (BlockPos spot : spots) {
+        for (BlockPos spot : candidates) {
             if (spot.getY() == lowest) {
                 lowestSpots.add(spot);
             }
