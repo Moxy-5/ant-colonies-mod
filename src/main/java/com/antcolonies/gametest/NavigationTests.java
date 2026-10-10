@@ -3,9 +3,11 @@ package com.antcolonies.gametest;
 import java.util.List;
 
 import com.antcolonies.AntColoniesMod;
+import com.antcolonies.colony.Colony;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.QueenAntEntity;
 import com.antcolonies.entity.WorkerAntEntity;
+import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.registry.ModEntities;
 
 import net.minecraft.core.BlockPos;
@@ -33,7 +35,7 @@ public class NavigationTests {
         BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE + 3, SURFACE, MIDDLE + 2));
         helper.runAfterDelay(10, () -> {
             boolean found = ant.getNavigator().moveTo(goal, 1.0);
-            AntColoniesMod.LOGGER.info("[nav-test] route found: {} -> {}", found,
+            AntColoniesMod.LOGGER.info("[nav-test] #{} route found: {} -> {}", ant.getId(), found,
                     ant.getNavigator().getRoute() == null ? "none" : relative(helper, ant.getNavigator().getRoute()));
         });
         watch(helper, ant);
@@ -50,7 +52,7 @@ public class NavigationTests {
         BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE + 8, SURFACE - 3, MIDDLE - 2));
         helper.runAfterDelay(10, () -> {
             boolean found = ant.getNavigator().moveTo(goal, 1.0);
-            AntColoniesMod.LOGGER.info("[nav-test] route found: {} -> {}", found,
+            AntColoniesMod.LOGGER.info("[nav-test] #{} route found: {} -> {}", ant.getId(), found,
                     ant.getNavigator().getRoute() == null ? "none" : relative(helper, ant.getNavigator().getRoute()));
         });
         watch(helper, ant);
@@ -82,6 +84,54 @@ public class NavigationTests {
         helper.succeedWhen(() -> helper.assertTrue(
                 ant.getNavigator().isDone() && !ant.getNavigator().hasFailed() && ant.blockPosition().equals(goal) && helper.getTick() > 20,
                 "the queen has not reached the room yet"));
+    }
+
+    /** With the finished hill around the entrance the hole is a funnel 3 blocks deeper: the ant must still climb out of it. */
+    @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
+    public static void antClimbsOutOfTheHoleThroughTheFinishedHill(GameTestHelper helper) {
+        buildNest(helper);
+        buildHill(helper);
+        WorkerAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), MIDDLE + 8, SURFACE - 3, MIDDLE + 2);
+        BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE - 5, SURFACE, MIDDLE - 2));
+        helper.runAfterDelay(10, () -> {
+            boolean found = ant.getNavigator().moveTo(goal, 1.0);
+            AntColoniesMod.LOGGER.info("[nav-test] #{} route found: {} -> {}", ant.getId(), found,
+                    ant.getNavigator().getRoute() == null ? "none" : relative(helper, ant.getNavigator().getRoute()));
+        });
+        watch(helper, ant);
+        helper.succeedWhen(() -> helper.assertTrue(
+                ant.getNavigator().isDone() && !ant.getNavigator().hasFailed()
+                        && ant.blockPosition().equals(goal) && helper.getTick() > 20,
+                "the ant has not climbed out over the hill yet"));
+    }
+
+    @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
+    public static void antWalksDownIntoTheHoleThroughTheFinishedHill(GameTestHelper helper) {
+        buildNest(helper);
+        buildHill(helper);
+        WorkerAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), MIDDLE - 5, SURFACE, MIDDLE - 2);
+        BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE + 8, SURFACE - 3, MIDDLE - 2));
+        helper.runAfterDelay(10, () -> {
+            boolean found = ant.getNavigator().moveTo(goal, 1.0);
+            AntColoniesMod.LOGGER.info("[nav-test] #{} route found: {} -> {}", ant.getId(), found,
+                    ant.getNavigator().getRoute() == null ? "none" : relative(helper, ant.getNavigator().getRoute()));
+        });
+        watch(helper, ant);
+        helper.succeedWhen(() -> helper.assertTrue(
+                ant.getNavigator().isDone() && !ant.getNavigator().hasFailed()
+                        && ant.blockPosition().equals(goal) && helper.getTick() > 20,
+                "the ant has not gone down into the room yet"));
+    }
+
+    /** The complete ant hill around the entrance (the hole at MIDDLE, MIDDLE stays open). */
+    private static void buildHill(GameTestHelper helper) {
+        for (int dx = -Colony.MOUND_RADIUS; dx <= Colony.MOUND_RADIUS; dx++) {
+            for (int dz = -Colony.MOUND_RADIUS; dz <= Colony.MOUND_RADIUS; dz++) {
+                for (int h = 0; h < Colony.moundHeightAt(dx, dz); h++) {
+                    helper.setBlock(MIDDLE + dx, SURFACE + h, MIDDLE + dz, ModBlocks.BURROWED_DIRT.get());
+                }
+            }
+        }
     }
 
     private static void buildNest(GameTestHelper helper) {
@@ -126,8 +176,8 @@ public class NavigationTests {
                 List<BlockPos> route = ant.getNavigator().getRoute();
                 String next = route == null || ant.getNavigator().getNextWaypoint() >= route.size()
                         ? "-" : route.get(ant.getNavigator().getNextWaypoint()).subtract(BlockPos.containing(origin)).toShortString();
-                AntColoniesMod.LOGGER.info("[nav-test] t{} pos {},{},{} cell {} next {} climbing={} collided={} done={} failed={}",
-                        helper.getTick(), r(at.x), r(at.y), r(at.z),
+                AntColoniesMod.LOGGER.info("[nav-test] #{} t{} pos {},{},{} cell {} next {} climbing={} collided={} done={} failed={}",
+                        ant.getId(), helper.getTick(), r(at.x), r(at.y), r(at.z),
                         ant.blockPosition().subtract(BlockPos.containing(origin)).toShortString(), next,
                         ant.getNavigator().isClimbing(), ant.horizontalCollision,
                         ant.getNavigator().isDone(), ant.getNavigator().hasFailed());

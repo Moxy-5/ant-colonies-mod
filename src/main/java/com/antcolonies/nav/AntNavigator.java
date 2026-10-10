@@ -196,12 +196,16 @@ public class AntNavigator {
                     if (wall != null) {
                         aim = aim.add(wall.getStepX() * 0.7, 0.0, wall.getStepZ() * 0.7);
                         // Get against the wall first, then rise: no floating up the middle of the shaft.
-                        double towardWall = (ant.getX() - (here.getX() + 0.5)) * wall.getStepX()
-                                + (ant.getZ() - (here.getZ() + 0.5)) * wall.getStepZ();
-                        if (0.5 - towardWall - ant.getBbWidth() / 2.0 > WALL_GAP) {
+                        if (gapToWall(here, wall) > WALL_GAP) {
                             rise = 0.0;
                         }
                     }
+                } else if (here.equals(from) && map.isSolidFace(from.below(), Direction.UP)
+                        && gapToWall(here, Direction.fromDelta(waypoint.getX() - from.getX(), 0, waypoint.getZ() - from.getZ())) > WALL_GAP) {
+                    // Up and over a ledge from a floor (not from the top of a shaft): first walk up to the foot of
+                    // the wall, and only then start climbing. No rising through the air in front of it.
+                    climbing = false;
+                    rise = 0.0;
                 }
             }
 
@@ -227,6 +231,16 @@ public class AntNavigator {
                     : new Vec3(sideX / distance * slide, rise, sideZ / distance * slide);
         }
         ant.getMoveControl().setWantedPosition(aim.x, aim.y, aim.z, speed);
+    }
+
+    /** How far (in blocks) the ant's body still is from the wall on this side of the cell it is in. */
+    private double gapToWall(BlockPos cell, @Nullable Direction wall) {
+        if (wall == null) {
+            return 0.0;
+        }
+        double towardWall = (ant.getX() - (cell.getX() + 0.5)) * wall.getStepX()
+                + (ant.getZ() - (cell.getZ() + 0.5)) * wall.getStepZ();
+        return 0.5 - towardWall - ant.getBbWidth() / 2.0;
     }
 
     /**

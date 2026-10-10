@@ -167,7 +167,7 @@ Goal: a mature colony can hold 1,000+ ants or termites without lag.
 - [ ] M2: Swap in the real worker model and animations.
 - [x] M3: Queen + colony brain + saving and loading.
 - [x] M4: Digging phase 1 + soil pellets + mound.
-- [ ] M5: Burrowing: shaft stops at block 3, then a tunnel and a room are dug under the soil.
+- [x] M5: Burrowing: shaft stops at block 3, then a tunnel and a room are dug under the soil.
 - [ ] M6: Food gathering (seeds) + nest stages + colony growth.
 - [ ] M7: Termites: worker, soldiers, king, queen, mound, fungus garden.
 - [ ] M8: Ant vs termite fights.
@@ -193,4 +193,6 @@ Goal: a mature colony can hold 1,000+ ants or termites without lag.
 - M5 in progress (user's design): shaft stops at block 3 (block 4 can hit stone); the shaft is never widened so its 4 walls stay solid for climbing out; a 3-block tunnel leaves the shaft bottom toward one side (fixed per colony, falls back to another side if the soil doesn't fit), ending in a 5x5 room, one block tall. Ants stop when the room is finished. Code: `Colony.findDigTarget`.
 - Queen goes down and settles in the middle of the finished room (`QueenToRoomGoal`, `Colony.getFinishedRoomCenter`) and stops wandering. Climbing ants get against a wall before rising, and never cross the open shaft.
 - Ant navigation rewritten (package `com.antcolonies.nav`): own route planner and walker instead of vanilla pathfinding, own `AntMoveControl`, ants climb at a steady speed along routes, wander goal replaces vanilla strolling. Pellets are never dropped on a living creature (a pellet once buried the queen). Worker speed raised to 0.25 (was 0.15, about 1 block per second; the number is in `WorkerAntEntity.createAttributes`). Verified with the automatic tests; waiting for the user to confirm in-game.
-- Saved for later (user's decision): deeper shaft + chamber digging until the mound is full, and a stepped ant-hill mound (3 high in the first ring, 2 in the second, 1 in the third). One block per pellet stays. Needs ~64 blocks dug, so it requires chamber digging.
+- M5 done (user confirmed "works perfectly").
+- Ant hill (user's design): the mound is a round, stepped hill: 3 blocks high in the first ring around the hole, 2 in the second, 1 in the third, hole left open (64 blocks; shape in `Colony.moundHeightAt`). It is built from the bottom up, layer by layer, and then it is capped: once it is full, ants stop carrying soil out and just leave it behind. One block per pellet stays; every bite makes a pellet, so the hill is complete after the first ~11 dug blocks. The finished hill makes the hole a 3-block-deeper funnel; ants climb out of it and walk back down.
+- Ants climbing over a ledge (like each hill step) now first walk up to the foot of the wall and only then rise, so they never float up in front of it (`AntNavigator`).

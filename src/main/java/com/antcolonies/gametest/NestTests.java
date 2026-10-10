@@ -78,8 +78,33 @@ public class NestTests {
             var queens = level.getEntitiesOfClass(com.antcolonies.entity.QueenAntEntity.class, helper.getBounds());
             helper.assertTrue(!queens.isEmpty(), "the queen is gone");
             helper.assertTrue(queens.get(0).blockPosition().equals(room), "the queen is not in the middle of the room yet: " + queens.get(0).blockPosition().subtract(room));
+            String hill = hillProblems(helper);
+            helper.assertTrue(hill.isEmpty(), "the mound is not the planned hill yet: " + hill);
             AntColoniesMod.LOGGER.info("[nest-test] finished at tick {}: {}", helper.getTick(), describe(helper));
         });
+    }
+
+    /**
+     * Compares the mound with the planned hill, column by column around the entrance (the queen is spawned at
+     * MIDDLE, SURFACE, MIDDLE, so that is the entrance). Empty text = exactly the planned hill.
+     */
+    private static String hillProblems(GameTestHelper helper) {
+        StringBuilder problems = new StringBuilder();
+        for (int dx = -5; dx <= 5; dx++) {
+            for (int dz = -5; dz <= 5; dz++) {
+                int built = 0;
+                for (int y = SURFACE; y < SURFACE + 6; y++) {
+                    if (helper.getBlockState(new BlockPos(MIDDLE + dx, y, MIDDLE + dz)).is(ModBlocks.BURROWED_DIRT.get())) {
+                        built++;
+                    }
+                }
+                int planned = Colony.moundHeightAt(dx, dz);
+                if (built != planned) {
+                    problems.append(String.format("(%d,%d) has %d of %d; ", dx, dz, built, planned));
+                }
+            }
+        }
+        return problems.toString();
     }
 
     /** The colony inside this test's area (a test world can still hold colonies from earlier runs). */

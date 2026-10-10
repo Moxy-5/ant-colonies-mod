@@ -112,9 +112,12 @@ public class DigGoal extends Goal {
         float bitesNeeded = Math.max(1.0F, state.getDestroySpeed(level, target) * 12.0F);
         float progress = colony.addDigProgress(target, 1.0F / bitesNeeded);
 
-        // Every bite leaves a soil pellet in the mandibles. Grass and roots turn into plain dirt.
-        ant.setCarriedBlock(state.is(Blocks.GRASS_BLOCK) || state.is(Blocks.ROOTED_DIRT)
-                ? Blocks.DIRT.defaultBlockState() : state);
+        // Every bite leaves a soil pellet in the mandibles (grass and roots turn into plain dirt), as long as
+        // the hill still has room for it. Once the hill is complete the soil is simply left behind.
+        if (colony.hasMoundRoom(level)) {
+            ant.setCarriedBlock(state.is(Blocks.GRASS_BLOCK) || state.is(Blocks.ROOTED_DIRT)
+                    ? Blocks.DIRT.defaultBlockState() : state);
+        }
 
         level.playSound(null, target, state.getSoundType().getHitSound(), SoundSource.BLOCKS, 0.4F, 1.3F);
         level.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, state),

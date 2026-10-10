@@ -51,8 +51,24 @@ public class Colony {
     private static final int ROOM_LENGTH = 5;
     private static final int ROOM_HALF_WIDTH = 2;
 
-    /** The mound is at most this many blocks tall above the entrance's ground level. */
-    public static final int MOUND_HEIGHT = 3;
+    /** The mound reaches this far (in blocks, sideways) from the entrance. */
+    public static final int MOUND_RADIUS = 3;
+
+    /**
+     * How tall the mound is meant to be this far (in whole blocks, sideways and forwards) from the entrance:
+     * a round hill that is 3 blocks high in the first ring around the hole, 2 in the second ring, 1 in the
+     * third, and nothing further out. The hole itself (0, 0) stays open. Adds up to 64 blocks.
+     */
+    public static int moundHeightAt(int dx, int dz) {
+        int distanceSquared = dx * dx + dz * dz;
+        if (distanceSquared == 0) {
+            return 0;
+        }
+        if (distanceSquared <= 2) {
+            return 3;
+        }
+        return distanceSquared <= 5 ? 2 : distanceSquared <= 10 ? 1 : 0;
+    }
 
     /** Bite progress per block (0..1). Not saved: a half-dug block just restarts after a reload. */
     private final Map<BlockPos, Float> digProgress = new HashMap<>();
@@ -196,34 +212,60 @@ public class Colony {
     }
 
     /**
-     * A spot on the surface near the entrance where an ant drops its soil pellet. Random each
-     * time, so pellets spread into a ring around the hole (step 3 turns them into a mound).
+     * A spot on the surface near the entrance where an ant drops its soil pellet, or null when the hill
+     * is complete. The hill is built from the bottom up, layer by layer, so every pellet rests on another
+     * and the finished mound has exactly the shape of {@link #moundHeightAt}.
      */
     @Nullable
     public BlockPos pickMoundSpot(Level level, RandomSource random) {
-        BlockPos best = null;
-        // Try a few random spots in a ring around the entrance and take the lowest one,
-        // so the mound fills in evenly instead of growing into thin towers.
-        for (int i = 0; i < 12; i++) {
-            double angle = random.nextDouble() * Math.PI * 2.0;
-            double radius = 2.0 + random.nextDouble() * 1.5;
-            int x = center.getX() + (int) Math.round(Math.cos(angle) * radius);
-            int z = center.getZ() + (int) Math.round(Math.sin(angle) * radius);
-            if (!level.hasChunk(x >> 4, z >> 4)) {
-                continue;
-            }
-            // The first free block above the ground at that column.
-            BlockPos pos = new BlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z), z);
-            if (isMoundSpot(level, pos) && (best == null || pos.getY() < best.getY())) {
-                best = pos;
+        List<BlockPos> spots = openMoundSpots(level);
+        if (spots.isEmpty()) {
+            return null;
+        }
+        int lowest = Integer.MAX_VALUE;
+        for (BlockPos spot : spots) {
+            lowest = Math.min(lowest, spot.getY());
+        }
+        List<BlockPos> lowestSpots = new ArrayList<>();
+        for (BlockPos spot : spots) {
+            if (spot.getY() == lowest) {
+                lowestSpots.add(spot);
             }
         }
-        return best;
+        return lowestSpots.get(random.nextInt(lowestSpots.size()));
     }
 
-    /** A pellet may go here if it is free, rests on something solid, and the mound isn't too tall yet. */
+    /** False once the hill is complete: ants then stop carrying soil out. */
+    public boolean hasMoundRoom(Level level) {
+        return !openMoundSpots(level).isEmpty();
+    }
+
+    /** In every column of the hill that is not full yet: the first free block above the ground. */
+    private List<BlockPos> openMoundSpots(Level level) {
+        List<BlockPos> spots = new ArrayList<>();
+        for (int dx = -MOUND_RADIUS; dx <= MOUND_RADIUS; dx++) {
+            for (int dz = -MOUND_RADIUS; dz <= MOUND_RADIUS; dz++) {
+                if (moundHeightAt(dx, dz) == 0) {
+                    continue;
+                }
+                int x = center.getX() + dx;
+                int z = center.getZ() + dz;
+                if (!level.hasChunk(x >> 4, z >> 4)) {
+                    continue;
+                }
+                BlockPos pos = new BlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z), z);
+                if (isMoundSpot(level, pos)) {
+                    spots.add(pos);
+                }
+            }
+        }
+        return spots;
+    }
+
+    /** A pellet may go here if it is free, rests on something solid, and the hill is not yet full at this spot. */
     private boolean isMoundSpot(Level level, BlockPos pos) {
-        return pos.getY() < center.getY() + MOUND_HEIGHT
+        int height = moundHeightAt(pos.getX() - center.getX(), pos.getZ() - center.getZ());
+        return pos.getY() < center.getY() + height
                 && pos.getY() >= center.getY() - 2
                 && level.getBlockState(pos).canBeReplaced()
                 && level.getBlockState(pos.below()).isFaceSturdy(level, pos.below(), Direction.UP);
