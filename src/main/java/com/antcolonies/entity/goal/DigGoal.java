@@ -90,7 +90,15 @@ public class DigGoal extends Goal {
                     stuckTicks = GIVE_UP_TICKS;
                     return;
                 }
-                ant.getNavigation().moveTo(stand.getX() + 0.5, stand.getY(), stand.getZ() + 0.5, 1.0);
+                Vec3 standCenter = Vec3.atBottomCenterOf(stand);
+                if (ant.distanceToSqr(standCenter) < 1.0) {
+                    // Walking counts as "arrived" a little before the middle of the spot, which can
+                    // leave the ant just out of biting range of the next block along a tunnel:
+                    // so take the last small step straight toward the block.
+                    ant.getMoveControl().setWantedPosition(blockCenter.x, ant.getY(), blockCenter.z, 0.6);
+                } else {
+                    ant.getNavigation().moveTo(standCenter.x, standCenter.y, standCenter.z, 1.0);
+                }
                 stuckTicks++;
             }
             return;
@@ -98,6 +106,8 @@ public class DigGoal extends Goal {
 
         stuckTicks = 0;
         ant.getNavigation().stop();
+        // Cancel any leftover step toward the block.
+        ant.getMoveControl().setWantedPosition(ant.getX(), ant.getY(), ant.getZ(), 0.0);
         if (--biteCooldown <= 0) {
             biteCooldown = BITE_INTERVAL;
             bite(level, blockCenter);
