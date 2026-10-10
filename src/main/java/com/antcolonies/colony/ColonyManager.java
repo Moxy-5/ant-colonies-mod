@@ -35,6 +35,7 @@ public class ColonyManager extends SavedData {
 
     public Colony createColony(ResourceLocation species, UUID queenId, BlockPos center) {
         Colony colony = new Colony(UUID.randomUUID(), species, queenId, center);
+        colony.setChangeListener(this::setDirty);
         colonies.put(colony.getId(), colony);
         setDirty();
         return colony;
@@ -90,6 +91,7 @@ public class ColonyManager extends SavedData {
         ListTag list = tag.getList("colonies", Tag.TAG_COMPOUND);
         for (int i = 0; i < list.size(); i++) {
             Colony colony = Colony.load(list.getCompound(i));
+            colony.setChangeListener(manager::setDirty);
             manager.colonies.put(colony.getId(), colony);
         }
         return manager;

@@ -9,7 +9,10 @@ import java.util.Set;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.colony.NestPlan;
 import com.antcolonies.entity.AbstractAntEntity;
+import com.antcolonies.nav.AntPathFinder;
+import com.antcolonies.nav.LevelCellMap;
 import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.registry.ModEntities;
 
@@ -282,6 +285,9 @@ public class NestTests {
                     "the nest is not open again: " + airBelowSurface(helper) + " of " + NEST_CELLS + " cells. " + describe(helper));
             helper.assertTrue(colony.findDigTarget(level) == null, "something is still left to dig");
             helper.assertTrue(colony.getLeaks(level).isEmpty(), "the nest has openings");
+            // Only the source was blocked: no soil left lying in the air where the stream used to run.
+            helper.assertTrue(moundBlocks(helper) == 64 + 1, "expected the hill and the one blocked source, but there are " + moundBlocks(helper) + " blocks of soil above the ground");
+            helper.assertTrue(colony.getGivenUpDoors().isEmpty(), "a room was given up because of the flood");
             AntColoniesMod.LOGGER.info("[{}] finished at tick {}", tag, helper.getTick());
         });
     }
@@ -325,6 +331,152 @@ public class NestTests {
                 }
             }
             AntColoniesMod.LOGGER.info("[pool-test] finished at tick {}", helper.getTick());
+        });
+    }
+
+    /**
+     * The ants are digging the nursery when the digging runs into a lava pool (a lava source appears in the middle of the
+     * room). They must come out of the room, shut its door for good, give the room up and dig a new nursery somewhere
+     * else, without ever cutting off the way out of the nest.
+     */
+    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    public static void antsGiveUpARoomThatRunsIntoLavaAndDigANewOne(GameTestHelper helper) {
+        lostRoomTest(helper, "lava-room-test", true);
+    }
+
+    /**
+     * A lava pool turns up right behind the far wall of the nursery before it is dug: the ants never open a block that
+     * touches lava, so that room could never be finished. It is given up and replaced the same way.
+     */
+    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    public static void antsGiveUpARoomThatCanNeverBeFinishedBecauseOfAPool(GameTestHelper helper) {
+        lostRoomTest(helper, "pool-room-test", false);
+    }
+
+    private static void lostRoomTest(GameTestHelper helper, String tag, boolean intoTheRoom) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        startColony(helper);
+
+        BlockPos[] lava = {null};
+        BlockPos[] oldDoor = {null};
+        helper.onEachTick(() -> {
+            Colony colony = colony(helper);
+            if (colony == null || lava[0] != null) {
+                return;
+            }
+            var rooms = colony.getPlannedChambers(level);
+            if (rooms.size() < 3) {
+                return;
+            }
+            var nursery = rooms.get(1);
+            oldDoor[0] = nursery.cells().get(NestPlan.TUNNEL_LENGTH - 1);
+            if (intoTheRoom) {
+                int open = 0;
+                for (BlockPos pos : nursery.cells().subList(NestPlan.TUNNEL_LENGTH, nursery.cells().size())) {
+                    open += level.getBlockState(pos).isAir() ? 1 : 0;
+                }
+                if (open >= 8) {
+                    lava[0] = nursery.center();
+                }
+            } else {
+                BlockPos c0 = nursery.cells().get(0);
+                BlockPos c1 = nursery.cells().get(1);
+                Direction forward = Direction.fromDelta(c1.getX() - c0.getX(), 0, c1.getZ() - c0.getZ());
+                lava[0] = nursery.center().relative(forward, 3);
+            }
+            if (lava[0] != null) {
+                level.setBlock(lava[0], Blocks.LAVA.defaultBlockState(), 3);
+                AntColoniesMod.LOGGER.info("[{}] tick {}: lava at {}, nursery door at {}", tag, helper.getTick(), lava[0], oldDoor[0]);
+            }
+        });
+        helper.onEachTick(() -> {
+            if (helper.getTick() % 400 == 0) {
+                Colony colony = colony(helper);
+                AntColoniesMod.LOGGER.info("[{}] tick {}: given up {}, alarmed {}, {} cells dug. {}", tag, helper.getTick(),
+                        colony == null ? "?" : colony.getGivenUpDoors(), colony != null && colony.isAlarmed(level), airBelowSurface(helper), describe(helper));
+            }
+        });
+
+        helper.succeedWhen(() -> {
+            Colony colony = colony(helper);
+            helper.assertTrue(colony != null && lava[0] != null, "the lava is not there yet");
+            helper.assertTrue(colony.getGivenUpDoors().equals(List.of(oldDoor[0])), "the nursery was not given up: " + colony.getGivenUpDoors());
+            // Shut: packed with soil by the ants, or never dug at all.
+            helper.assertTrue(!level.getBlockState(oldDoor[0]).isAir() && level.getFluidState(oldDoor[0]).isEmpty(), "the old door is not shut: " + level.getBlockState(oldDoor[0]));
+            if (intoTheRoom) {
+                helper.assertTrue(level.getBlockState(oldDoor[0]).is(ModBlocks.BURROWED_DIRT.get()), "the ants did not pack the door: " + level.getBlockState(oldDoor[0]));
+            }
+            helper.assertTrue(level.getBlockState(lava[0]).is(Blocks.LAVA), "the lava was touched");
+            var rooms = colony.getPlannedChambers(level);
+            helper.assertTrue(rooms.size() == 3, "expected queen, food store and a new nursery but there are " + rooms.size() + " rooms");
+            helper.assertTrue(rooms.stream().noneMatch(room -> room.cells().contains(oldDoor[0])), "the old nursery is still in the plan");
+            helper.assertTrue(rooms.stream().filter(room -> room.kind() == NestPlan.Kind.NURSERY).count() == 1, "there is no new nursery");
+            for (var room : rooms) {
+                for (BlockPos cell : room.cells()) {
+                    helper.assertTrue(level.getBlockState(cell).isAir(), "a room is not dug yet at " + cell.toShortString() + " (" + room.kind() + ")");
+                }
+            }
+            helper.assertTrue(colony.findDigTarget(level) == null, "something is still left to dig");
+            helper.assertTrue(!colony.isAlarmed(level), "the colony is still on alert: " + colony.getAlert(level));
+            helper.assertTrue(colony.getLeaks(level).isEmpty(), "the nest has openings: " + colony.getLeaks(level));
+            // The way out: every room still has a route to the entrance.
+            for (var room : rooms) {
+                var route = AntPathFinder.find(new LevelCellMap(level), room.center(), colony.getCenter(), 4000);
+                helper.assertTrue(route != null, "no way out of the " + room.kind() + " room");
+            }
+            BlockPos room = colony.getFinishedRoomCenter(level);
+            var queens = level.getEntitiesOfClass(com.antcolonies.entity.QueenAntEntity.class, helper.getBounds());
+            helper.assertTrue(room != null && !queens.isEmpty() && queens.get(0).blockPosition().equals(room), "the queen is not in her room");
+            AntColoniesMod.LOGGER.info("[{}] finished at tick {}: new rooms {}", tag, helper.getTick(),
+                    rooms.stream().map(r -> r.kind() + "@" + r.cells().get(0).toShortString()).toList());
+        });
+    }
+
+    /**
+     * A source hangs against the side of a six-block tower next to the hill, so high up that the ants cannot reach it
+     * from the ground. They must climb the tower, hold on to its wall and block the source.
+     */
+    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    public static void antsClimbAWallToBlockASourceHighAbove(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        startColony(helper);
+
+        BlockPos[] source = {null};
+        helper.onEachTick(() -> {
+            Colony colony = colony(helper);
+            if (colony == null) {
+                return;
+            }
+            if (source[0] == null) {
+                if (airBelowSurface(helper) == NEST_CELLS && colony.findDigTarget(level) == null && hillProblems(helper).isEmpty()
+                        && colony.getFinishedRoomCenter(level) != null) {
+                    BlockPos c = colony.getCenter();
+                    for (int y = 0; y <= 5; y++) {
+                        level.setBlock(c.offset(2, y, 0), Blocks.COBBLESTONE.defaultBlockState(), 3);
+                    }
+                    source[0] = c.offset(3, 4, 0);
+                    level.setBlock(source[0], Blocks.WATER.defaultBlockState(), 3);
+                    AntColoniesMod.LOGGER.info("[tower-test] tick {}: tower at {}, source at {}", helper.getTick(), c.offset(2, 0, 0), source[0]);
+                    for (int i = 0; i < 3; i++) {
+                        helper.spawn(ModEntities.WORKER_ANT.get(), MIDDLE + 4 + i, SURFACE, MIDDLE + 3);
+                    }
+                }
+                return;
+            }
+            if (helper.getTick() % 100 == 0) {
+                AntColoniesMod.LOGGER.info("[tower-test] tick {}: source {}, alert {}. {}", helper.getTick(),
+                        level.getBlockState(source[0]).getBlock(), colony.getAlert(level), describe(helper));
+            }
+        });
+
+        helper.succeedWhen(() -> {
+            Colony colony = colony(helper);
+            helper.assertTrue(colony != null && source[0] != null, "nothing has been poured yet");
+            helper.assertTrue(level.getBlockState(source[0]).is(ModBlocks.BURROWED_DIRT.get()), "the source is not blocked: " + level.getBlockState(source[0]));
+            helper.assertTrue(!colony.isAlarmed(level), "the colony is still on alert: " + colony.getAlert(level));
+            AntColoniesMod.LOGGER.info("[tower-test] finished at tick {}", helper.getTick());
         });
     }
 

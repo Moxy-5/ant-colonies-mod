@@ -7,6 +7,7 @@ import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.entity.goal.DigGoal;
+import com.antcolonies.entity.goal.EvacuateGoal;
 import com.antcolonies.entity.goal.QueenToRoomGoal;
 
 import net.minecraft.resources.ResourceLocation;
@@ -42,12 +43,14 @@ public class QueenAntEntity extends AbstractAntEntity {
     @Override
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));
+        // If her room has to be given up, she comes out of it first.
+        this.goalSelector.addGoal(1, new EvacuateGoal(this));
         // She helps dig the shaft and her own room; when the room is finished she goes down and sits in its middle.
-        this.goalSelector.addGoal(1, new QueenToRoomGoal(this));
+        this.goalSelector.addGoal(2, new QueenToRoomGoal(this));
         // Otherwise she hardly ever wanders: low chance to start a stroll, and never far. Settled in her room, never.
-        this.goalSelector.addGoal(2, new DigGoal(this, () -> QueenToRoomGoal.findFinishedRoom(this) == null));
-        this.goalSelector.addGoal(3, new AntWanderGoal(this, 0.6, 400, 4, () -> QueenToRoomGoal.findFinishedRoom(this) == null));
-        this.goalSelector.addGoal(4, new RandomLookAroundGoal(this));
+        this.goalSelector.addGoal(3, new DigGoal(this, () -> QueenToRoomGoal.findFinishedRoom(this) == null));
+        this.goalSelector.addGoal(4, new AntWanderGoal(this, 0.6, 400, 4, () -> QueenToRoomGoal.findFinishedRoom(this) == null));
+        this.goalSelector.addGoal(5, new RandomLookAroundGoal(this));
     }
 
     // She digs her own room with the workers, but cannot place blocks: no soil pellets for the hill, no sealing.
