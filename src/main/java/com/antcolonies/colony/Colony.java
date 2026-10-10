@@ -134,6 +134,8 @@ public class Colony {
     private static final int GIVEN_UP_PATIENCE_TICKS = 1200;
     /** The doors stay shut this long after the last water or lava was seen (10 seconds), then the ants open them again. */
     private static final int CALM_TICKS = 200;
+    /** Soil packed into the hole is bitten out again this far above the entrance cell (the hill is 3 blocks high around it). */
+    private static final int ENTRANCE_REOPEN_HEIGHT = 3;
     /** At most this many pieces of a stream are looked at when no source can be reached. */
     private static final int STREAM_PIECES_LOOKED_AT = 40;
 
@@ -160,6 +162,13 @@ public class Colony {
         // The rooms are planned before the first block is dug, because the plan decides how deep the shaft goes.
         int depth = shaftDepth(level);
         List<BlockPos> shaft = new ArrayList<>();
+        // Soil the ants packed into the hole itself (to block a source poured straight in) is bitten out again, top first.
+        for (int i = ENTRANCE_REOPEN_HEIGHT; i >= 0; i--) {
+            BlockPos pos = center.above(i);
+            if (level.isLoaded(pos) && level.getBlockState(pos).is(ModBlocks.BURROWED_DIRT.get())) {
+                shaft.add(pos);
+            }
+        }
         for (int i = 1; i <= depth; i++) {
             shaft.add(center.below(i));
         }
@@ -531,7 +540,7 @@ public class Colony {
                 continue;
             }
             anySourceLeft = true;
-            Leak leak = fluidTask(level, pos, near);
+            Leak leak = fluidTask(level, pos, near, true);
             if (leak != null) {
                 sources.add(leak);
             }
@@ -557,7 +566,7 @@ public class Colony {
             if (pos.getY() < center.getY()) {
                 continue; // underground the nest is left alone: soil is never packed into its rooms and tunnels this way
             }
-            Leak leak = fluidTask(level, pos, near);
+            Leak leak = fluidTask(level, pos, near, false);
             if (leak != null) {
                 pieces.add(leak);
             }
@@ -565,10 +574,14 @@ public class Colony {
         return pick(pieces, near, avoid);
     }
 
-    /** Closing this piece of water or lava, if soil may go there and an ant can get next to it. */
+    /**
+     * Closing this piece of water or lava, if soil may go there and an ant can get next to it. A source in the hole
+     * or the shaft is blocked like any other (the soil is bitten out again once the danger is over, see
+     * {@link #findDigTarget}); a mere piece of a stream is never packed into the way out.
+     */
     @Nullable
-    private Leak fluidTask(Level level, BlockPos pos, BlockPos near) {
-        if (!hasFluid(level, pos) || isEntranceColumn(pos)) {
+    private Leak fluidTask(Level level, BlockPos pos, BlockPos near, boolean isSource) {
+        if (!hasFluid(level, pos) || (isEntranceColumn(pos) && !isSource)) {
             return null;
         }
         // Inside the nest: never close a block that would shut a room off from the way out.
@@ -682,8 +695,8 @@ public class Colony {
     /** Fills an opening with burrowed dirt. False if it is already closed or someone is standing in it (try again later). */
     public boolean plugLeak(Level level, Leak leak) {
         BlockPos hole = leak.hole();
-        // The entrance, the shaft and the air above it are never closed: that is the way out.
-        if (isEntranceColumn(hole) || !isLeakOpen(level, leak)) {
+        // The hole and the shaft are the way out: only a source of water or lava in them is ever blocked (and dug out again later).
+        if ((isEntranceColumn(hole) && !leak.fluidOnly()) || !isLeakOpen(level, leak)) {
             return false;
         }
         // Never bury anyone, same as with the hill.

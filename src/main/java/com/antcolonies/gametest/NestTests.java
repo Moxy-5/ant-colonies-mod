@@ -480,6 +480,93 @@ public class NestTests {
         });
     }
 
+    /**
+     * Lava is poured straight down the entrance hole: the source lands on the floor of the shaft (the bottom cell) and
+     * the lava runs off into the tunnel. The ants must block that source (it is in the way out, so the soil has to be
+     * bitten out again afterwards) and end up with the nest exactly as it was, every ant alive.
+     */
+    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    public static void antsBlockLavaPouredOntoTheFloorOfTheShaft(GameTestHelper helper) {
+        pouredIntoTheHoleTest(helper, Blocks.LAVA, "lava-in-shaft-test", Colony.SHAFT_DEPTH);
+    }
+
+    /** Water poured into the entrance cell itself, the hole in the middle of the hill. */
+    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    public static void antsBlockWaterPouredIntoTheHoleItself(GameTestHelper helper) {
+        pouredIntoTheHoleTest(helper, Blocks.WATER, "water-in-hole-test", 0);
+    }
+
+    /** Lava poured against the wall of the funnel, one block above the entrance cell. */
+    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    public static void antsBlockLavaPouredIntoTheFunnelOfTheHill(GameTestHelper helper) {
+        pouredIntoTheHoleTest(helper, Blocks.LAVA, "lava-in-funnel-test", -1);
+    }
+
+    /** {@code below}: how many blocks under the entrance cell the source is put (0 = in it, negative = above it). */
+    private static void pouredIntoTheHoleTest(GameTestHelper helper, net.minecraft.world.level.block.Block fluid, String tag, int below) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        startColony(helper);
+
+        BlockPos[] source = {null};
+        int[] antsBefore = {0};
+        Set<Integer> aboveGround = new HashSet<>();
+        helper.onEachTick(() -> {
+            Colony colony = colony(helper);
+            if (colony == null) {
+                return;
+            }
+            if (source[0] == null) {
+                if (airBelowSurface(helper) == NEST_CELLS && colony.findDigTarget(level) == null && hillProblems(helper).isEmpty()
+                        && colony.getFinishedRoomCenter(level) != null) {
+                    // A colony always has some workers out on the surface: three of them are up on the ground now.
+                    for (int i = 0; i < 3; i++) {
+                        helper.spawn(ModEntities.WORKER_ANT.get(), MIDDLE + 4 + i, SURFACE, MIDDLE + 3);
+                    }
+                    var ants = level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds());
+                    antsBefore[0] = ants.size();
+                    double groundY = helper.absolutePos(BlockPos.ZERO).getY() + SURFACE - 0.5;
+                    for (AbstractAntEntity ant : ants) {
+                        if (ant.getY() >= groundY) {
+                            aboveGround.add(ant.getId());
+                        }
+                    }
+                    source[0] = colony.getCenter().below(below);
+                    level.setBlock(source[0], fluid.defaultBlockState(), 3);
+                    AntColoniesMod.LOGGER.info("[{}] tick {}: poured at {} ({} ants)", tag, helper.getTick(), source[0], antsBefore[0]);
+                }
+                return;
+            }
+            if (helper.getTick() % 200 == 0) {
+                AntColoniesMod.LOGGER.info("[{}] tick {}: alert {}, source cell {}, {} cells open, given up {}. {}", tag, helper.getTick(),
+                        colony.getAlert(level), level.getBlockState(source[0]).getBlock(), airBelowSurface(helper),
+                        colony.getGivenUpDoors(), describe(helper));
+            }
+        });
+
+        helper.succeedWhen(() -> {
+            Colony colony = colony(helper);
+            helper.assertTrue(colony != null && source[0] != null, "nothing has been poured yet");
+            helper.assertTrue(level.getBlockState(source[0]).isAir(), "the hole is not open again: " + level.getBlockState(source[0]));
+            helper.assertTrue(!colony.isAlarmed(level), "the colony is still on alert: " + colony.getAlert(level));
+            helper.assertTrue(airBelowSurface(helper) == NEST_CELLS,
+                    "the nest is not open again: " + airBelowSurface(helper) + " of " + NEST_CELLS + " cells. " + describe(helper));
+            helper.assertTrue(colony.findDigTarget(level) == null, "something is still left to dig");
+            helper.assertTrue(colony.getLeaks(level).isEmpty(), "the nest has openings");
+            helper.assertTrue(moundBlocks(helper) == 64, "expected exactly the hill, but there are " + moundBlocks(helper) + " blocks of soil above the ground");
+            helper.assertTrue(colony.getGivenUpDoors().isEmpty(), "a room was given up because of the flood");
+            // Lava that runs through the tunnels can still catch an ant that happens to be down there (they have no way to
+            // run from it yet), but nobody who was working above the ground, and not the queen, may be lost.
+            for (int id : aboveGround) {
+                var ant = level.getEntity(id);
+                helper.assertTrue(ant != null && ant.isAlive(), "an ant that was working above the ground was lost");
+            }
+            helper.assertTrue(!level.getEntitiesOfClass(com.antcolonies.entity.QueenAntEntity.class, helper.getBounds()).isEmpty(), "the queen was lost");
+            int ants = level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds()).size();
+            AntColoniesMod.LOGGER.info("[{}] finished at tick {}: {} of {} ants left", tag, helper.getTick(), ants, antsBefore[0]);
+        });
+    }
+
     /** Dirt ground with a grass top across the whole test area, a queen at the entrance spot and six workers. */
     private static void startColony(GameTestHelper helper) {
         startColony(helper, 6);
