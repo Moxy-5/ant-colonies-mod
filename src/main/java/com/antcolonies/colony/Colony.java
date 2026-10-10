@@ -107,8 +107,9 @@ public class Colony {
     }
 
     /**
-     * Water or lava near the nest. SURFACE: it is close to the entrance (the ants above go and block its source).
-     * INSIDE: it has got into the hole or the nest. From the first warning on, the ants below close the doors
+     * Water or lava heading for the nest. SURFACE: a running stream on the square of the hill (the ants above go
+     * and block its source). INSIDE: it has got into the hole or the nest. A pool next to the hill that is not
+     * running into it is not an alert. From the first warning on, the ants below close the doors
      * of the rooms: water and lava are far quicker than an ant, so they must not wait until it is in the nest.
      */
     public enum Alert {
@@ -118,7 +119,7 @@ public class Colony {
     private static final int ALERT_CHECK_TICKS = 10;
     /** The doors stay shut this long after the last water or lava was seen (10 seconds), then the ants open them again. */
     private static final int CALM_TICKS = 200;
-    /** Only water and lava this close to the entrance is dealt with, and no more than this many blocks of one stream. */
+    /** Following a stream back to its source goes no further than this from the entrance, and no more than this many blocks. */
     private static final int HAZARD_RANGE = 8;
     private static final int HAZARD_BODY_LIMIT = 600;
 
@@ -268,12 +269,13 @@ public class Colony {
                 found = Alert.INSIDE;
             }
         }
-        // Around the hole, where a stream would run into it.
-        for (int dx = -2; dx <= 2; dx++) {
-            for (int dz = -2; dz <= 2; dz++) {
-                for (int dy = -1; dy <= 3; dy++) {
+        // On the square of the hill, a stream that is running (flowing water or lava, not a still pool or a lone
+        // source block) is on its way to the hole. Anything outside the square, and anything standing still, is ignored.
+        for (int dx = -MOUND_RADIUS; dx <= MOUND_RADIUS; dx++) {
+            for (int dz = -MOUND_RADIUS; dz <= MOUND_RADIUS; dz++) {
+                for (int dy = 0; dy <= 3; dy++) {
                     BlockPos pos = center.offset(dx, dy, dz);
-                    if (hasFluid(level, pos) && hazardCells.add(pos)) {
+                    if (hasFluid(level, pos) && !level.getFluidState(pos).isSource() && hazardCells.add(pos)) {
                         found = found == Alert.NONE ? Alert.SURFACE : found;
                     }
                 }
@@ -367,7 +369,9 @@ public class Colony {
         Leak bestStream = null;
         double bestStreamDistance = Double.MAX_VALUE;
         for (BlockPos pos : body) {
-            if (pos.equals(center) || claimedLeaks.containsKey(pos)) {
+            // Never pack soil into the entrance itself or the air above it: the hole stays open.
+            boolean aboveEntrance = pos.getX() == center.getX() && pos.getZ() == center.getZ() && pos.getY() >= center.getY();
+            if (aboveEntrance || claimedLeaks.containsKey(pos)) {
                 continue;
             }
             BlockPos stand = findStandNear(level, pos);

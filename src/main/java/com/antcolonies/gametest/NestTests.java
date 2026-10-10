@@ -286,6 +286,48 @@ public class NestTests {
         });
     }
 
+    /**
+     * A false alarm must not happen: a still water pool and a still lava pool sit right next to the hill (just outside
+     * its square), not running into anything. The colony must never go on alert, never pack soil into the pools, and
+     * just dig its nest as usual.
+     */
+    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    public static void poolsNextToTheHillAreIgnored(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        startColony(helper);
+        // Two 3x3 pools sunk into the grass layer, 4 to 6 blocks from the hole on either side.
+        for (int x = 0; x < 3; x++) {
+            for (int z = 0; z < 3; z++) {
+                helper.setBlock(MIDDLE + 4 + x, SURFACE - 1, MIDDLE - 1 + z, Blocks.WATER);
+                helper.setBlock(MIDDLE - 6 + x, SURFACE - 1, MIDDLE - 1 + z, Blocks.LAVA);
+            }
+        }
+        boolean[] alarmed = {false};
+        helper.onEachTick(() -> {
+            Colony colony = colony(helper);
+            if (colony != null && colony.isAlarmed(level)) {
+                alarmed[0] = true;
+            }
+        });
+
+        helper.succeedWhen(() -> {
+            Colony colony = colony(helper);
+            helper.assertTrue(colony != null, "no colony yet");
+            helper.assertTrue(!alarmed[0], "the colony went on alert because of a still pool");
+            helper.assertTrue(airBelowSurface(helper) == NEST_CELLS, "nest not finished: " + airBelowSurface(helper) + " of " + NEST_CELLS);
+            helper.assertTrue(colony.findDigTarget(level) == null, "something is still left to dig");
+            helper.assertTrue(hillProblems(helper).isEmpty(), "the mound is not the planned hill yet");
+            for (int x = 0; x < 3; x++) {
+                for (int z = 0; z < 3; z++) {
+                    helper.assertTrue(helper.getBlockState(new BlockPos(MIDDLE + 4 + x, SURFACE - 1, MIDDLE - 1 + z)).is(Blocks.WATER), "the water pool was disturbed");
+                    helper.assertTrue(helper.getBlockState(new BlockPos(MIDDLE - 6 + x, SURFACE - 1, MIDDLE - 1 + z)).is(Blocks.LAVA), "the lava pool was disturbed");
+                }
+            }
+            AntColoniesMod.LOGGER.info("[pool-test] finished at tick {}", helper.getTick());
+        });
+    }
+
     /** Dirt ground with a grass top across the whole test area, a queen at the entrance spot and six workers. */
     private static void startColony(GameTestHelper helper) {
         startColony(helper, 6);
