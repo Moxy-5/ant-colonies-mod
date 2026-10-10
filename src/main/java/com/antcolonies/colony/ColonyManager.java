@@ -51,6 +51,26 @@ public class ColonyManager extends SavedData {
         return colonies.get(id);
     }
 
+    /** The closest colony whose center is within maxDistance blocks, or null. */
+    @Nullable
+    public Colony findNearest(BlockPos pos, double maxDistance) {
+        Colony best = null;
+        double bestDist = maxDistance * maxDistance;
+        for (Colony colony : colonies.values()) {
+            double dist = colony.getCenter().distSqr(pos);
+            if (dist <= bestDist) {
+                bestDist = dist;
+                best = colony;
+            }
+        }
+        return best;
+    }
+
+    /** Call after changing a colony's numbers so the change gets saved. */
+    public void markChanged() {
+        setDirty();
+    }
+
     public Collection<Colony> getColonies() {
         return Collections.unmodifiableCollection(colonies.values());
     }

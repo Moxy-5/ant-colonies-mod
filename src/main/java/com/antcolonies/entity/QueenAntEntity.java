@@ -1,14 +1,11 @@
 package com.antcolonies.entity;
 
-import java.util.UUID;
-
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.damagesource.DamageSource;
@@ -27,9 +24,6 @@ public class QueenAntEntity extends AbstractAntEntity {
     private static final ResourceLocation SPECIES =
             ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "red_harvester_ant");
 
-    /** Which colony this queen founded. Saved with the queen. */
-    @Nullable
-    private UUID colonyId;
     private boolean colonyChecked;
 
     public QueenAntEntity(EntityType<? extends QueenAntEntity> type, Level level) {
@@ -51,11 +45,6 @@ public class QueenAntEntity extends AbstractAntEntity {
         this.goalSelector.addGoal(2, new RandomLookAroundGoal(this));
     }
 
-    @Nullable
-    public UUID getColonyId() {
-        return colonyId;
-    }
-
     @Override
     public void tick() {
         super.tick();
@@ -63,9 +52,10 @@ public class QueenAntEntity extends AbstractAntEntity {
         if (!colonyChecked && level() instanceof ServerLevel serverLevel) {
             colonyChecked = true;
             ColonyManager manager = ColonyManager.get(serverLevel);
-            if (colonyId == null || manager.getColony(colonyId) == null) {
+            @Nullable var existing = getColonyId() == null ? null : manager.getColony(getColonyId());
+            if (existing == null) {
                 Colony colony = manager.createColony(SPECIES, getUUID(), blockPosition());
-                colonyId = colony.getId();
+                setColonyId(colony.getId());
             }
         }
     }
@@ -74,24 +64,8 @@ public class QueenAntEntity extends AbstractAntEntity {
     @Override
     public void die(DamageSource source) {
         super.die(source);
-        if (colonyId != null && level() instanceof ServerLevel serverLevel) {
-            ColonyManager.get(serverLevel).removeColony(colonyId);
-        }
-    }
-
-    @Override
-    public void addAdditionalSaveData(CompoundTag tag) {
-        super.addAdditionalSaveData(tag);
-        if (colonyId != null) {
-            tag.putUUID("ColonyId", colonyId);
-        }
-    }
-
-    @Override
-    public void readAdditionalSaveData(CompoundTag tag) {
-        super.readAdditionalSaveData(tag);
-        if (tag.hasUUID("ColonyId")) {
-            colonyId = tag.getUUID("ColonyId");
+        if (getColonyId() != null && level() instanceof ServerLevel serverLevel) {
+            ColonyManager.get(serverLevel).removeColony(getColonyId());
         }
     }
 }

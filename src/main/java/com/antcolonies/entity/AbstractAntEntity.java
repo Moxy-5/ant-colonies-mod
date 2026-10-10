@@ -1,5 +1,10 @@
 package com.antcolonies.entity;
 
+import java.util.UUID;
+
+import org.jetbrains.annotations.Nullable;
+
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.level.Level;
@@ -19,8 +24,37 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
 
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
 
+    /** Which colony this ant belongs to (null = none). Saved with the ant. */
+    @Nullable
+    private UUID colonyId;
+
     protected AbstractAntEntity(EntityType<? extends AbstractAntEntity> type, Level level) {
         super(type, level);
+    }
+
+    @Nullable
+    public UUID getColonyId() {
+        return colonyId;
+    }
+
+    protected void setColonyId(@Nullable UUID colonyId) {
+        this.colonyId = colonyId;
+    }
+
+    @Override
+    public void addAdditionalSaveData(CompoundTag tag) {
+        super.addAdditionalSaveData(tag);
+        if (colonyId != null) {
+            tag.putUUID("ColonyId", colonyId);
+        }
+    }
+
+    @Override
+    public void readAdditionalSaveData(CompoundTag tag) {
+        super.readAdditionalSaveData(tag);
+        if (tag.hasUUID("ColonyId")) {
+            colonyId = tag.getUUID("ColonyId");
+        }
     }
 
     // Colony members never despawn.
