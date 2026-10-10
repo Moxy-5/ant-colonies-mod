@@ -6,6 +6,7 @@ import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.goal.AntWanderGoal;
+import com.antcolonies.entity.goal.QueenToRoomGoal;
 
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -40,9 +41,11 @@ public class QueenAntEntity extends AbstractAntEntity {
     @Override
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));
-        // She hardly ever wanders: low chance to start a stroll, and never far.
-        this.goalSelector.addGoal(1, new AntWanderGoal(this, 0.6, 400, 4));
-        this.goalSelector.addGoal(2, new RandomLookAroundGoal(this));
+        // When the room is finished she goes down and sits in its middle.
+        this.goalSelector.addGoal(1, new QueenToRoomGoal(this));
+        // Otherwise she hardly ever wanders: low chance to start a stroll, and never far. Settled in her room, never.
+        this.goalSelector.addGoal(2, new AntWanderGoal(this, 0.6, 400, 4, () -> QueenToRoomGoal.findFinishedRoom(this) == null));
+        this.goalSelector.addGoal(3, new RandomLookAroundGoal(this));
     }
 
     @Override

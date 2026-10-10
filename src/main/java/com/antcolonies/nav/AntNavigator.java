@@ -38,6 +38,8 @@ public class AntNavigator {
     private static final double CLIMB_SPEED = 0.06;
     /** Blocks per tick an ant slides sideways while clinging (toward the wall it hugs or the ledge it climbs over). */
     private static final double CLING_SIDE_SPEED = 0.04;
+    /** The ant waits to rise until it is closer than this (in blocks) to the wall it hugs. */
+    private static final double WALL_GAP = 0.06;
 
     private final AbstractAntEntity ant;
     @Nullable
@@ -193,6 +195,12 @@ public class AntNavigator {
                     Direction wall = findWall(map, here, waypoint, exitDirection());
                     if (wall != null) {
                         aim = aim.add(wall.getStepX() * 0.7, 0.0, wall.getStepZ() * 0.7);
+                        // Get against the wall first, then rise: no floating up the middle of the shaft.
+                        double towardWall = (ant.getX() - (here.getX() + 0.5)) * wall.getStepX()
+                                + (ant.getZ() - (here.getZ() + 0.5)) * wall.getStepZ();
+                        if (0.5 - towardWall - ant.getBbWidth() / 2.0 > WALL_GAP) {
+                            rise = 0.0;
+                        }
                     }
                 }
             }
@@ -246,8 +254,17 @@ public class AntNavigator {
     @Nullable
     private static Direction findWall(CellMap map, BlockPos here, BlockPos waypoint, @Nullable Direction preferred) {
         Direction fallback = null;
-        if (preferred != null && map.isSolidFace(here.relative(preferred), preferred.getOpposite())) {
-            return preferred;
+        if (preferred != null) {
+            if (map.isSolidFace(here.relative(preferred), preferred.getOpposite())) {
+                return preferred;
+            }
+            // The exit wall is not solid here (for example the tunnel opening): hug a wall next to it, so the
+            // ant slides along it to the exit wall and never crosses the open shaft.
+            for (Direction side : Direction.Plane.HORIZONTAL) {
+                if (side.getAxis() != preferred.getAxis() && map.isSolidFace(here.relative(side), side.getOpposite())) {
+                    return side;
+                }
+            }
         }
         for (Direction side : Direction.Plane.HORIZONTAL) {
             if (map.isSolidFace(here.relative(side), side.getOpposite())) {

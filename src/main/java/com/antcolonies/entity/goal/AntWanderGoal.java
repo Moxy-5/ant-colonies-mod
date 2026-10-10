@@ -1,6 +1,7 @@
 package com.antcolonies.entity.goal;
 
 import java.util.EnumSet;
+import java.util.function.BooleanSupplier;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -19,8 +20,10 @@ public class AntWanderGoal extends Goal {
     /** On average one stroll starts every this many goal checks. */
     private final int interval;
     private final int radius;
+    private final BooleanSupplier allowed;
 
-    public AntWanderGoal(AbstractAntEntity ant, double speed, int interval, int radius) {
+    public AntWanderGoal(AbstractAntEntity ant, double speed, int interval, int radius, BooleanSupplier allowed) {
+        this.allowed = allowed;
         this.ant = ant;
         this.speed = speed;
         this.interval = interval;
@@ -30,7 +33,7 @@ public class AntWanderGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        if (ant.getRandom().nextInt(interval) != 0) {
+        if (ant.getRandom().nextInt(interval) != 0 || !allowed.getAsBoolean()) {
             return false;
         }
         CellMap map = new LevelCellMap(ant.level());

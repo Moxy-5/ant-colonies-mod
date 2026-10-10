@@ -73,6 +73,11 @@ public class NestTests {
             helper.assertTrue(airBelowSurface(helper) == NEST_CELLS,
                     "nest not finished: " + airBelowSurface(helper) + " of " + NEST_CELLS + " cells dug. " + describe(helper));
             helper.assertTrue(colony.findDigTarget(level) == null, "something is still left to dig");
+            BlockPos room = colony.getFinishedRoomCenter(level);
+            helper.assertTrue(room != null, "the room is not finished");
+            var queens = level.getEntitiesOfClass(com.antcolonies.entity.QueenAntEntity.class, helper.getBounds());
+            helper.assertTrue(!queens.isEmpty(), "the queen is gone");
+            helper.assertTrue(queens.get(0).blockPosition().equals(room), "the queen is not in the middle of the room yet: " + queens.get(0).blockPosition().subtract(room));
             AntColoniesMod.LOGGER.info("[nest-test] finished at tick {}: {}", helper.getTick(), describe(helper));
         });
     }

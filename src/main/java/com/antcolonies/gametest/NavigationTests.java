@@ -108,8 +108,18 @@ public class NavigationTests {
     }
 
     /** Logs the ant's position and what its walker is doing every 4 ticks. */
+    /** Most climbing ticks in a row an ant may hang in mid-air, touching nothing (a short moment at the very top is fine). */
+    private static final int MAX_FLOATING_TICKS = 6;
+
     private static void watch(GameTestHelper helper, AbstractAntEntity ant) {
         Vec3 origin = Vec3.atLowerCornerOf(helper.absolutePos(BlockPos.ZERO));
+        int[] floating = {0};
+        helper.onEachTick(() -> {
+            boolean hanging = ant.getNavigator().isClimbing()
+                    && helper.getLevel().noCollision(ant, ant.getBoundingBox().inflate(0.08));
+            floating[0] = hanging ? floating[0] + 1 : 0;
+            helper.assertTrue(floating[0] <= MAX_FLOATING_TICKS, "the ant is floating while climbing");
+        });
         helper.onEachTick(() -> {
             if (helper.getTick() % 4 == 0 && helper.getTick() >= 8) {
                 Vec3 at = ant.position().subtract(origin);

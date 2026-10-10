@@ -81,6 +81,32 @@ public class Colony {
         return direction == null ? null : firstDiggable(level, tunnelAndRoomCells(bottom, direction));
     }
 
+    /**
+     * The middle of the room, once the whole nest (shaft, tunnel and room) is dug out; null while there is
+     * still digging to do (or the chunk is not loaded).
+     */
+    @Nullable
+    public BlockPos getFinishedRoomCenter(Level level) {
+        BlockPos bottom = center.below(SHAFT_DEPTH);
+        if (!level.isLoaded(bottom)) {
+            return null;
+        }
+        Direction direction = chooseTunnelDirection(level, bottom);
+        if (direction == null) {
+            return null;
+        }
+        List<BlockPos> cells = new ArrayList<>(tunnelAndRoomCells(bottom, direction));
+        for (int i = 1; i <= SHAFT_DEPTH; i++) {
+            cells.add(center.below(i));
+        }
+        for (BlockPos pos : cells) {
+            if (!level.isLoaded(pos) || !level.getBlockState(pos).isAir()) {
+                return null;
+            }
+        }
+        return bottom.relative(direction, TUNNEL_LENGTH + (ROOM_LENGTH + 1) / 2);
+    }
+
     /** The first block in the list that is diggable, can be reached from open space, and is safe to open. */
     @Nullable
     private static BlockPos firstDiggable(Level level, List<BlockPos> cells) {
