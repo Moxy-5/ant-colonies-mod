@@ -7,6 +7,7 @@ import org.jetbrains.annotations.Nullable;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.AbstractAntEntity;
+import com.antcolonies.nav.AntNavigator;
 import com.antcolonies.registry.ModTags;
 
 import net.minecraft.core.BlockPos;
@@ -69,7 +70,7 @@ public class DigGoal extends Goal {
     public void stop() {
         // The crack overlay is left in place (the game fades it out by itself): the ant leaves to
         // carry a pellet and the block is still half dug.
-        ant.getNavigation().stop();
+        ant.getNavigator().stop();
         target = null;
         colony = null;
     }
@@ -83,31 +84,22 @@ public class DigGoal extends Goal {
         ant.getLookControl().setLookAt(blockCenter);
 
         if (ant.distanceToSqr(blockCenter) > REACH * REACH) {
-            // Stand in the open space next to the block (above it in the shaft, beside it in the tunnel).
-            if (ant.getNavigation().isDone()) {
+            // Walk to the open space next to the block (above it in the shaft, beside it in the tunnel).
+            AntNavigator legs = ant.getNavigator();
+            if (legs.isDone()) {
                 BlockPos stand = Colony.findStandSpot(level, target);
-                if (stand == null) {
-                    stuckTicks = GIVE_UP_TICKS;
-                    return;
-                }
-                Vec3 standCenter = Vec3.atBottomCenterOf(stand);
-                if (ant.distanceToSqr(standCenter) < 1.0) {
-                    // Walking counts as "arrived" a little before the middle of the spot, which can
-                    // leave the ant just out of biting range of the next block along a tunnel:
-                    // so take the last small step straight toward the block.
-                    ant.getMoveControl().setWantedPosition(blockCenter.x, ant.getY(), blockCenter.z, 0.6);
+                if (stand == null || !legs.moveTo(stand, 1.0)) {
+                    stuckTicks = GIVE_UP_TICKS; // no way to get there: let another block (or ant) have a go
                 } else {
-                    ant.getNavigation().moveTo(standCenter.x, standCenter.y, standCenter.z, 1.0);
+                    // Arrived but still out of reach counts toward giving up.
+                    stuckTicks++;
                 }
-                stuckTicks++;
             }
             return;
         }
 
         stuckTicks = 0;
-        ant.getNavigation().stop();
-        // Cancel any leftover step toward the block.
-        ant.getMoveControl().setWantedPosition(ant.getX(), ant.getY(), ant.getZ(), 0.0);
+        ant.getNavigator().stop();
         if (--biteCooldown <= 0) {
             biteCooldown = BITE_INTERVAL;
             bite(level, blockCenter);

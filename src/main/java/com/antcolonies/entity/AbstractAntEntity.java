@@ -5,6 +5,9 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import com.antcolonies.nav.AntMoveControl;
+import com.antcolonies.nav.AntNavigator;
+
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -12,8 +15,6 @@ import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.PathfinderMob;
-import net.minecraft.world.entity.ai.navigation.PathNavigation;
-import net.minecraft.world.entity.ai.navigation.WallClimberNavigation;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import software.bernie.geckolib.animatable.GeoEntity;
@@ -40,12 +41,15 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
 
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
 
+    private final AntNavigator navigator = new AntNavigator(this);
+
     /** Which colony this ant belongs to (null = none). Saved with the ant. */
     @Nullable
     private UUID colonyId;
 
     protected AbstractAntEntity(EntityType<? extends AbstractAntEntity> type, Level level) {
         super(type, level);
+        this.moveControl = new AntMoveControl(this);
     }
 
     @Override
@@ -69,18 +73,29 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         entityData.set(DATA_CARRIED, Optional.ofNullable(state));
     }
 
-    // Ants climb walls like spiders: pathfinding is allowed to aim at spots up a wall.
+    /** The legs: plans routes (walk, climb, drop) and walks them. Goals only say where to go. */
+    public AntNavigator getNavigator() {
+        return navigator;
+    }
+
+    // Runs every tick, just before the move control: keeps the ant walking its planned route.
     @Override
-    protected PathNavigation createNavigation(Level level) {
-        return new WallClimberNavigation(this, level);
+    protected void customServerAiStep() {
+        super.customServerAiStep();
+        navigator.tick();
+        if (navigator.isClimbing()) {
+            // Clinging to a wall: the navigator decides the exact motion (rise at a steady speed, or hold
+            // still when level with the target), whether or not the ant happens to touch the wall this tick.
+            setDeltaMovement(navigator.getClimbMotion());
+        }
     }
 
     @Override
     public void tick() {
         super.tick();
-        // Pushing into a wall = climbing it (same rule vanilla spiders use).
+        // Only the route's climbing stretches make the ant climb, so ants never wander up walls by themselves.
         if (!level().isClientSide) {
-            entityData.set(DATA_CLIMBING, horizontalCollision);
+            entityData.set(DATA_CLIMBING, navigator.isClimbing());
         }
     }
 

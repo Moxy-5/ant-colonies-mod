@@ -32,6 +32,14 @@ A Minecraft mod where ants and termites live as real colonies: they dig, build, 
 - Adding a species should mean: a new profile, new models, and only the special code that species truly needs.
 - When building any system, check: will this work for a species we haven't added yet?
 
+## Ant minds (the user plans truly intelligent ants and termites later)
+- Keep three layers apart, so a smarter mind can replace a simpler one without touching the rest:
+  1. **Mind (what to do and why):** goals today (`DigGoal`, `CarryPelletGoal`, `AntWanderGoal`), the colony brain's jobs, memory, learning and communication later.
+  2. **Legs (how to get there):** `AntNavigator` (walks a route cell by cell) and `AntPathFinder` (plans routes that walk, climb walls, go over ledges and drop down holes). A mind only says "go to this cell". Species-neutral, so termites reuse it.
+  3. **Body:** move control, animations, renderer.
+- Never put "decide what to do" logic into the navigator or the move control, and never let a goal steer an ant with vanilla navigation or `MoveControl` directly.
+- When adding behaviour, ask: could a smarter mind reuse this as a building block (perceive, remember, choose, act)?
+
 ## Species (version 1)
 
 ### Red harvester ant (Pogonomyrmex)
@@ -158,6 +166,9 @@ Goal: a mature colony can hold 1,000+ ants or termites without lag.
 - [ ] Later: alarm level + hazards, Matabele ants, leafcutters, army ants, ant farm, field journal.
 
 ## Testing tips
+- Automatic tests Claude runs before asking the user to test:
+  - `./gradlew test`: route planner on a pretend nest (part of `./gradlew build`).
+  - `./gradlew runGameTestServer`: real ants in a headless game (about 1 minute). Walks workers and the queen through a ready-made nest, and runs the whole dig (`gametest` package). Uses its own `run-test/` folder; delete `run-test/world` first for a clean run. Debug lines about routes go to `run-test/logs/debug.log`.
 - Use a creative test world, `/summon`, and F3 for coordinates.
 - `/tick rate 100` speeds up time for testing growth; `/tick rate 20` sets it back to normal.
 
@@ -169,4 +180,5 @@ Goal: a mature colony can hold 1,000+ ants or termites without lag.
 - M3 done (user confirmed): queen ant (placeholder, reuses worker model, bigger) + spawn egg; colony brain in `com.antcolonies.colony` (Colony, ColonyManager as SavedData per dimension); queen creates a colony, workers within 32 blocks join it, counts update on death; colony removed when queen dies; `/antcolonies list` debug command. Shared base class `AbstractAntEntity`.
 - M4 done (user confirmed): workers dig a 4-deep entrance shaft bite by bite (`DigGoal`, diggable tag), climb walls like spiders (`AbstractAntEntity`, `AntRenderer` tilts the model), carry each bite as a soil pellet shown on the "head" bone (`PelletLayer`) and drop it to build a mound 3 blocks high around the entrance (`CarryPelletGoal`). The mound is made of the new **Burrowed Dirt** block (`ModBlocks`). Ants take no fall damage.
 - M5 in progress (user's design): shaft stops at block 3 (block 4 can hit stone); the shaft is never widened so its 4 walls stay solid for climbing out; a 3-block tunnel leaves the shaft bottom toward one side (fixed per colony, falls back to another side if the soil doesn't fit), ending in a 5x5 room, one block tall. Ants stop when the room is finished. Code: `Colony.findDigTarget`.
+- Ant navigation rewritten (package `com.antcolonies.nav`): own route planner and walker instead of vanilla pathfinding, own `AntMoveControl`, ants climb at a steady speed along routes, wander goal replaces vanilla strolling. Pellets are never dropped on a living creature (a pellet once buried the queen). Worker speed raised to 0.25 (was 0.15, about 1 block per second; the number is in `WorkerAntEntity.createAttributes`). Verified with the automatic tests; waiting for the user to confirm in-game.
 - Saved for later (user's decision): deeper shaft + chamber digging until the mound is full, and a stepped ant-hill mound (3 high in the first ring, 2 in the second, 1 in the third). One block per pellet stays. Needs ~64 blocks dug, so it requires chamber digging.

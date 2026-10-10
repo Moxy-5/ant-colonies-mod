@@ -2,6 +2,7 @@ package com.antcolonies.entity;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.entity.goal.CarryPelletGoal;
 import com.antcolonies.entity.goal.DigGoal;
 
@@ -13,7 +14,6 @@ import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.FloatGoal;
 import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
-import net.minecraft.world.entity.ai.goal.WaterAvoidingRandomStrollGoal;
 import net.minecraft.world.level.Level;
 
 /** Worker ant: joins the nearest colony when spawned, then just wanders for now. */
@@ -31,7 +31,7 @@ public class WorkerAntEntity extends AbstractAntEntity {
     public static AttributeSupplier.Builder createAttributes() {
         return PathfinderMob.createMobAttributes()
                 .add(Attributes.MAX_HEALTH, 3.0)
-                .add(Attributes.MOVEMENT_SPEED, 0.15)
+                .add(Attributes.MOVEMENT_SPEED, 0.25)
                 .add(Attributes.ATTACK_DAMAGE, 1.0);
     }
 
@@ -40,7 +40,7 @@ public class WorkerAntEntity extends AbstractAntEntity {
         this.goalSelector.addGoal(0, new FloatGoal(this));
         this.goalSelector.addGoal(1, new CarryPelletGoal(this));
         this.goalSelector.addGoal(2, new DigGoal(this));
-        this.goalSelector.addGoal(3, new WaterAvoidingRandomStrollGoal(this, 1.0));
+        this.goalSelector.addGoal(3, new AntWanderGoal(this, 1.0, 120, 6));
         this.goalSelector.addGoal(4, new RandomLookAroundGoal(this));
     }
 

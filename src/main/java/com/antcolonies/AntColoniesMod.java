@@ -2,6 +2,8 @@ package com.antcolonies;
 
 import org.slf4j.Logger;
 
+import com.antcolonies.gametest.NavigationTests;
+import com.antcolonies.gametest.NestTests;
 import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.registry.ModEntities;
 import com.antcolonies.registry.ModItems;
@@ -9,6 +11,7 @@ import com.mojang.logging.LogUtils;
 
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 
 // The value here must match the mod id in gradle.properties / neoforge.mods.toml
 @Mod(AntColoniesMod.MODID)
@@ -20,6 +23,11 @@ public class AntColoniesMod {
         ModBlocks.BLOCKS.register(modEventBus);
         ModEntities.ENTITY_TYPES.register(modEventBus);
         ModItems.ITEMS.register(modEventBus);
+        // In-game tests: only loaded when the game is started in game-test mode.
+        modEventBus.addListener((RegisterGameTestsEvent event) -> {
+            event.register(NestTests.class);
+            event.register(NavigationTests.class);
+        });
         LOGGER.info("Ant & Termite Colonies loaded");
     }
 }

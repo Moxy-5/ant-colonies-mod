@@ -5,6 +5,7 @@ import org.jetbrains.annotations.Nullable;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.entity.goal.AntWanderGoal;
 
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -15,7 +16,6 @@ import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.FloatGoal;
 import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
-import net.minecraft.world.entity.ai.goal.WaterAvoidingRandomStrollGoal;
 import net.minecraft.world.level.Level;
 
 /** Queen ant: bigger, tougher and slow. The colony lives and dies with her. */
@@ -40,8 +40,8 @@ public class QueenAntEntity extends AbstractAntEntity {
     @Override
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));
-        // She hardly ever wanders: low chance to start a stroll.
-        this.goalSelector.addGoal(1, new WaterAvoidingRandomStrollGoal(this, 0.6, 0.002F));
+        // She hardly ever wanders: low chance to start a stroll, and never far.
+        this.goalSelector.addGoal(1, new AntWanderGoal(this, 0.6, 400, 4));
         this.goalSelector.addGoal(2, new RandomLookAroundGoal(this));
     }
 

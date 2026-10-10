@@ -27,6 +27,7 @@ sourceSets.main.resources {
 }
 
 repositories {
+    mavenCentral()
     maven {
         name = "GeckoLib"
         url = "https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/"
@@ -72,6 +73,8 @@ neoForge {
         // The gametest system is also enabled by default for other run configs under the /test command.
         gameTestServer {
             type = "gameTestServer"
+            // Its own folder, so test worlds never touch the real game's saves.
+            gameDirectory = project.file('run-test')
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         }
 
@@ -108,6 +111,12 @@ neoForge {
             sourceSet(sourceSets.main)
         }
     }
+
+    // Puts Minecraft on the test classpath so tests can use BlockPos, Direction and so on.
+    unitTest {
+        enable()
+        testedMod = mods.getByName(project.mod_id)
+    }
 }
 
 // Sets up a dependency configuration called 'localRuntime'.
@@ -120,6 +129,10 @@ configurations {
 
 dependencies {
     implementation "software.bernie.geckolib:geckolib-neoforge-${minecraft_version}:4.9.3"
+
+    // Automatic tests (run by ./gradlew build): the route planner is tested on a pretend nest.
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.2'
 
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
@@ -184,6 +197,10 @@ publishing {
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
 }
 
 // IDEA no longer automatically downloads sources/javadoc jars for dependencies, so we need to explicitly enable the behavior.

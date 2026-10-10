@@ -17,9 +17,11 @@ import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
 
 /**
  * One colony's "brain" data. Species-neutral: the species is just an id that will point at a
@@ -204,6 +206,10 @@ public class Colony {
     /** Turns a delivered pellet into a real block of the mound. Returns false if the spot is no longer valid. */
     public boolean placePellet(Level level, BlockPos pos) {
         if (!isMoundSpot(level, pos)) {
+            return false;
+        }
+        // Never bury anyone: an ant, the queen, an animal or a player standing in the spot means try elsewhere.
+        if (!level.getEntitiesOfClass(LivingEntity.class, new AABB(pos)).isEmpty()) {
             return false;
         }
         // Whatever the ant dug, the mound is built of burrowed dirt (and it never slides away like sand).

@@ -23,6 +23,8 @@ public class CarryPelletGoal extends Goal {
     private static final double REACH = 1.3;
     /** If the ant can't get there in 20 seconds it just lets the pellet go. */
     private static final int GIVE_UP_TICKS = 400;
+    /** After this many spots with no route to them, the ant lets the pellet go. */
+    private static final int MAX_FAILED_ROUTES = 4;
 
     private final AbstractAntEntity ant;
     @Nullable
@@ -30,6 +32,7 @@ public class CarryPelletGoal extends Goal {
     @Nullable
     private BlockPos spot;
     private int ticks;
+    private int failedRoutes;
 
     public CarryPelletGoal(AbstractAntEntity ant) {
         this.ant = ant;
@@ -59,12 +62,13 @@ public class CarryPelletGoal extends Goal {
     @Override
     public void start() {
         ticks = 0;
+        failedRoutes = 0;
         walkToSpot();
     }
 
     @Override
     public void stop() {
-        ant.getNavigation().stop();
+        ant.getNavigator().stop();
         spot = null;
         colony = null;
     }
@@ -84,13 +88,23 @@ public class CarryPelletGoal extends Goal {
         double dy = ant.getY() - spot.getY();
         if (dx * dx + dz * dz <= REACH * REACH && dy > -2.5 && dy < 2.0) {
             place(level);
-        } else if (ant.getNavigation().isDone()) {
+        } else if (ant.getNavigator().isDone()) {
             walkToSpot();
         }
     }
 
+    /** Plans the walk to the mound spot. If there is no route, tries other spots, and lets the pellet go after a few failures. */
     private void walkToSpot() {
-        ant.getNavigation().moveTo(spot.getX() + 0.5, spot.getY(), spot.getZ() + 0.5, 1.0);
+        while (spot != null && !ant.getNavigator().moveTo(spot, 1.0)) {
+            if (++failedRoutes >= MAX_FAILED_ROUTES) {
+                ant.setCarriedBlock(null);
+                return;
+            }
+            spot = colony.pickMoundSpot(ant.level(), ant.getRandom());
+        }
+        if (spot == null) {
+            ant.setCarriedBlock(null);
+        }
     }
 
     private void place(ServerLevel level) {
