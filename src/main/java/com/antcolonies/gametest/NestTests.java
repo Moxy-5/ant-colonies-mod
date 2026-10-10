@@ -583,10 +583,38 @@ public class NestTests {
             }
         }
 
+        watchForRepeatedPlacing(helper);
         helper.spawn(ModEntities.QUEEN_ANT.get(), MIDDLE, SURFACE, MIDDLE);
         helper.runAfterDelay(5, () -> {
             for (int i = 0; i < workers; i++) {
                 helper.spawn(ModEntities.WORKER_ANT.get(), MIDDLE - 2 + i % 3 * 2, SURFACE, MIDDLE - 3 + i / 3 * 6);
+            }
+        });
+    }
+
+    /**
+     * Logs every time a block around the nest is filled with burrowed dirt a second time (or more): ants that place and
+     * break the same block over and over show up here as "[flap]" lines.
+     */
+    private static void watchForRepeatedPlacing(GameTestHelper helper) {
+        java.util.Map<BlockPos, Integer> placed = new java.util.HashMap<>();
+        java.util.Set<BlockPos> dirt = new HashSet<>();
+        helper.onEachTick(() -> {
+            for (int x = 3; x <= 21; x++) {
+                for (int z = 3; z <= 21; z++) {
+                    for (int y = 0; y <= SURFACE + 5; y++) {
+                        BlockPos pos = new BlockPos(x, y, z);
+                        boolean now = helper.getBlockState(pos).is(ModBlocks.BURROWED_DIRT.get());
+                        if (now && dirt.add(pos)) {
+                            int times = placed.merge(pos, 1, Integer::sum);
+                            if (times >= 2) {
+                                AntColoniesMod.LOGGER.info("[flap] tick {}: {} filled with soil for the {}. time", helper.getTick(), pos.toShortString(), times);
+                            }
+                        } else if (!now) {
+                            dirt.remove(pos);
+                        }
+                    }
+                }
             }
         });
     }
