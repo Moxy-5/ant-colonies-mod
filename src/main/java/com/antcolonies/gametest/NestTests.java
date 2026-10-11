@@ -154,6 +154,7 @@ public class NestTests {
         startColony(helper);
 
         boolean[] damaged = {false};
+        logStalls(helper);
         helper.onEachTick(() -> {
             Colony colony = colony(helper);
             if (damaged[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.findDigTarget(level) != null
@@ -564,7 +565,7 @@ public class NestTests {
             }
             placed[0] = true;
             workersBefore[0] = colony.getCount(WorkerAntEntity.CASTE);
-            antsBefore[0] = level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds()).size();
+            antsBefore[0] = colonyWorkers(helper, colony).size();
             var cells = colony.getNurseryCells(level);
             for (int i = 0; i < 3; i++) {
                 colony.placeEgg(level, cells.get(i * 7));
@@ -590,7 +591,7 @@ public class NestTests {
             helper.assertTrue(colony.countLarvae(level) == 0, colony.countLarvae(level) + " larvae are still there");
             helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == workersBefore[0] + 3,
                     "the colony counts " + colony.getCount(WorkerAntEntity.CASTE) + " workers, expected " + (workersBefore[0] + 3));
-            var workers = level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds());
+            var workers = colonyWorkers(helper, colony);
             helper.assertTrue(workers.size() == antsBefore[0] + 3, "there are " + workers.size() + " worker ants, expected " + (antsBefore[0] + 3));
             for (var worker : workers) {
                 helper.assertTrue(colony.getId().equals(worker.getColonyId()), "a worker belongs to no colony or the wrong one");
@@ -621,7 +622,7 @@ public class NestTests {
             placed[0] = true;
             placedAt[0] = level.getGameTime();
             workersBefore[0] = colony.getCount(WorkerAntEntity.CASTE);
-            antsBefore[0] = level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds()).size();
+            antsBefore[0] = colonyWorkers(helper, colony).size();
             colony.setCount(WorkerAntEntity.CASTE, Colony.MAX_WORKERS - 1);
             var cells = colony.getNurseryCells(level);
             for (int i = 0; i < 3; i++) {
@@ -638,8 +639,8 @@ public class NestTests {
             helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == Colony.MAX_WORKERS,
                     "the colony counts " + colony.getCount(WorkerAntEntity.CASTE) + " workers, expected " + Colony.MAX_WORKERS);
             helper.assertTrue(colony.countLarvae(level) == 2, colony.countLarvae(level) + " larvae are left, expected 2");
-            helper.assertTrue(level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds()).size() == antsBefore[0] + 1,
-                    "expected exactly one new worker");
+            helper.assertTrue(colonyWorkers(helper, colony).size() == antsBefore[0] + 1,
+                    "expected exactly one new worker, but there are " + colonyWorkers(helper, colony).size() + " workers and there were " + antsBefore[0]);
         });
     }
 
@@ -647,6 +648,48 @@ public class NestTests {
      * The seeds the colony can account for: in the store, milled into bread (waiting in the nursery or eaten by the queen
      * for her next egg), or used for the eggs she has laid. A seed on its way or in the mill is not counted yet.
      */
+    /** The real workers of this colony: also the ones that have wandered a little outside the test area. */
+    private static List<WorkerAntEntity> colonyWorkers(GameTestHelper helper, Colony colony) {
+        return helper.getLevel().getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds().inflate(20.0)).stream()
+                .filter(worker -> colony.getId().equals(worker.getColonyId())).toList();
+    }
+
+    /**
+     * Debug aid: logs every moment an ant that is on its way somewhere has not moved for 10 ticks (where it is, what it
+     * carries, which waypoint it is heading for), and when it moves again.
+     */
+    private static void logStalls(GameTestHelper helper) {
+        java.util.Map<Integer, Vec3> lastPos = new java.util.HashMap<>();
+        java.util.Map<Integer, Integer> still = new java.util.HashMap<>();
+        helper.onEachTick(() -> {
+            BlockPos origin = helper.absolutePos(BlockPos.ZERO);
+            for (AbstractAntEntity ant : helper.getLevel().getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
+                var nav = ant.getNavigator();
+                Vec3 before = lastPos.put(ant.getId(), ant.position());
+                if (nav.isDone() || before == null) {
+                    still.put(ant.getId(), 0);
+                    continue;
+                }
+                int count = ant.position().distanceToSqr(before) < 0.004 * 0.004 ? still.merge(ant.getId(), 1, Integer::sum) : 0;
+                still.put(ant.getId(), count);
+                if (count == 10) {
+                    var route = nav.getRoute();
+                    String next = route == null || nav.getNextWaypoint() >= route.size() ? "-"
+                            : route.get(nav.getNextWaypoint()).subtract(origin).toShortString();
+                    String goal = route == null ? "-" : route.get(route.size() - 1).subtract(origin).toShortString();
+                    String from = route == null || nav.getNextWaypoint() < 1 ? "-" : route.get(nav.getNextWaypoint() - 1).subtract(origin).toShortString();
+                    String whole = route == null ? "-" : route.stream().map(c -> c.subtract(origin).toShortString().replace(", ", ",")).toList().toString();
+                    AntColoniesMod.LOGGER.info("[stall] from {} route {}", from, whole);
+                    AntColoniesMod.LOGGER.info("[stall] tick {} ant #{} at {} ({},{},{}) next {} goal {} climbing={} onGround={} carrying={} collided={}",
+                            helper.getTick(), ant.getId(), ant.blockPosition().subtract(origin).toShortString(),
+                            String.format("%.2f", ant.getX() - origin.getX()), String.format("%.2f", ant.getY() - origin.getY()),
+                            String.format("%.2f", ant.getZ() - origin.getZ()), next, goal, nav.isClimbing(), ant.onGround(),
+                            ant.isCarrying(), ant.horizontalCollision);
+                }
+            }
+        });
+    }
+
     private static int seedsAccountedFor(Colony colony) {
         return colony.getFood() + colony.getBread() + colony.getQueenBread() + Colony.QUEEN_MEAL * colony.getEggsLaid();
     }

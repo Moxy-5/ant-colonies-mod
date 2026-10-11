@@ -20,7 +20,9 @@ import net.minecraft.world.phys.Vec3;
  * <p>An ant counts as having reached a waypoint when it is inside that waypoint's cell (no fuzzy
  * distances), and the final goal is reached when it is standing near the middle of its cell.
  * On a stretch of the route that goes up, the ant clings to the wall and rises at a steady speed
- * (the entity applies {@link #getRiseSpeed()}), so climbing never depends on touching a wall.
+ * (the entity applies {@link #getClimbMotion()}), so climbing never depends on touching a wall.
+ * It picks one wall for a whole straight stretch (so it never crosses a shaft in mid-air), and when a walk ends
+ * with the ant hanging in a shaft it keeps clinging to the wall instead of falling.
  */
 public class AntNavigator {
     /** How many waypoints ahead to check, in case the ant skipped some (for example it fell down a shaft). */
@@ -42,6 +44,8 @@ public class AntNavigator {
     private static final double CLING_SIDE_SPEED = 0.04;
     /** The ant waits to rise until it is closer than this (in blocks) to the wall it hugs. */
     private static final double WALL_GAP = 0.06;
+    /** Blocks per tick an ant that has stopped in a shaft slides to the wall it clings to. */
+    private static final double HOLD_SIDE_SPEED = 0.08;
 
     private final AbstractAntEntity ant;
     @Nullable
@@ -63,6 +67,13 @@ public class AntNavigator {
     private int bestNext;
     private int circleTicks;
     private Vec3 stuckPos = Vec3.ZERO;
+    /** The wall the ant hugs on the straight climb it is on, and the last route index of that climb (null = not chosen yet). */
+    @Nullable
+    private Direction climbWall;
+    private int climbEnd;
+    /** The wall an ant that has stopped in a shaft clings to. */
+    @Nullable
+    private Direction holdWall;
 
     public AntNavigator(AbstractAntEntity ant) {
         this.ant = ant;
@@ -117,6 +128,7 @@ public class AntNavigator {
         failed = false;
         climbing = false;
         rise = 0.0;
+        climbWall = null;
     }
 
     private boolean plan() {
@@ -126,6 +138,7 @@ public class AntNavigator {
         route = found;
         next = 1;
         bestNext = next;
+        climbWall = null;
         circleTicks = 0;
         arriveTicks = 0;
         offRouteTicks = 0;
@@ -146,11 +159,11 @@ public class AntNavigator {
     /** Called every tick from the ant, before the move control does the actual walking. */
     public void tick() {
         rise = 0.0;
+        CellMap map = new LevelCellMap(ant.level());
         if (route == null) {
-            climbing = false;
+            holdOnToWall(map);
             return;
         }
-        CellMap map = new LevelCellMap(ant.level());
         BlockPos here = ant.blockPosition();
         int last = route.size() - 1;
 
@@ -194,8 +207,12 @@ public class AntNavigator {
             aim = Vec3.atBottomCenterOf(goal);
             double dx = ant.getX() - aim.x;
             double dz = ant.getZ() - aim.z;
-            if (dx * dx + dz * dz <= ARRIVE_DISTANCE_SQR || ++arriveTicks > ARRIVE_TIMEOUT) {
+            // A goal cell with no floor (in a shaft) counts as reached as soon as the ant is in it: it clings to the wall
+            // there (see holdOnToWall) instead of falling while it tries to get to the middle of the cell.
+            boolean noFloor = !map.isSolidFace(goal.below(), Direction.UP);
+            if (noFloor || dx * dx + dz * dz <= ARRIVE_DISTANCE_SQR || ++arriveTicks > ARRIVE_TIMEOUT) {
                 stop();
+                holdOnToWall(map);
                 return;
             }
             climbing = false;
@@ -216,18 +233,16 @@ public class AntNavigator {
             if (climbing) {
                 rise = Math.max(0.0, Math.min(CLIMB_SPEED, waypoint.getY() - ant.getY()));
                 if (waypoint.getX() == from.getX() && waypoint.getZ() == from.getZ()) {
-                    // Straight up: hug a wall, preferably the one the ant will climb out over.
-                    Direction wall = findWall(map, here, waypoint, exitDirection());
+                    // Straight up: hug one wall for the whole stretch, preferably the one the ant will climb out over.
+                    Direction wall = chooseWall(map, here, waypoint);
                     if (wall != null) {
                         aim = aim.add(wall.getStepX() * 0.7, 0.0, wall.getStepZ() * 0.7);
-                        // Get against the wall first, then rise: no floating up the middle of the shaft.
-                        if (gapToWall(here, wall) > WALL_GAP) {
+                        if (gapToWall(here, wall) > WALL_GAP && standsOnFloor(map, here)) {
+                            // Still on the floor: walk up to the wall like any walk. Only the ant that is against
+                            // the wall clings to it (and leans against it), so it never looks like it hovers.
+                            // In the air (a shaft) the ant keeps rising while it slides to its wall: it never hangs waiting.
                             rise = 0.0;
-                            if (ant.onGround()) {
-                                // Still on the floor: walk up to the wall like any walk. Only the ant that is against
-                                // the wall clings to it (and leans against it), so it never looks like it hovers.
-                                climbing = false;
-                            }
+                            climbing = false;
                         }
                     }
                 } else if (here.equals(from) && map.isSolidFace(from.below(), Direction.UP)
@@ -261,6 +276,91 @@ public class AntNavigator {
                     : new Vec3(sideX / distance * slide, rise, sideZ / distance * slide);
         }
         ant.getMoveControl().setWantedPosition(aim.x, aim.y, aim.z, speed);
+    }
+
+    /** Whether the ant is standing on the floor of the cell it is in (also when it just stopped pushing down on it). */
+    private boolean standsOnFloor(CellMap map, BlockPos cell) {
+        return ant.onGround() || (map.isSolidFace(cell.below(), Direction.UP) && ant.getY() - cell.getY() < 0.05);
+    }
+
+    /**
+     * The wall to hug on the straight climb the ant is on. It is chosen once for the whole climb, from the cells the
+     * climb still goes through: a wall that is solid beside every one of them, the one the ant will climb out over if
+     * there is one, otherwise a side wall. Switching walls from cell to cell would make the ant slide across the shaft in mid-air.
+     */
+    @Nullable
+    private Direction chooseWall(CellMap map, BlockPos here, BlockPos waypoint) {
+        if (climbWall != null && next <= climbEnd && map.isSolidFace(here.relative(climbWall), climbWall.getOpposite())) {
+            return climbWall;
+        }
+        int end = next;
+        while (end + 1 < route.size()
+                && route.get(end + 1).getX() == route.get(end).getX() && route.get(end + 1).getZ() == route.get(end).getZ()
+                && route.get(end + 1).getY() > route.get(end).getY()) {
+            end++;
+        }
+        Direction exit = exitDirection();
+        Direction best = null;
+        double bestScore = -Double.MAX_VALUE;
+        for (Direction side : Direction.Plane.HORIZONTAL) {
+            boolean solidAlong = true;
+            for (int i = next - 1; i <= end && solidAlong; i++) {
+                BlockPos cell = route.get(i);
+                solidAlong = map.isSolidFace(cell.relative(side), side.getOpposite());
+            }
+            if (!solidAlong) {
+                continue;
+            }
+            // Out wall first, then a side wall of it (the shortest turn at the top), then the wall the ant is nearest to.
+            double score = (side == exit ? 100.0 : exit != null && side.getAxis() != exit.getAxis() ? 10.0 : 0.0)
+                    - gapToWall(here, side);
+            if (score > bestScore) {
+                best = side;
+                bestScore = score;
+            }
+        }
+        if (best == null) {
+            climbWall = null;
+            return findWall(map, here, waypoint, exit);
+        }
+        climbWall = best;
+        climbEnd = end;
+        return best;
+    }
+
+    /**
+     * Nothing left to walk. An ant that is hanging in a shaft (no floor in its cell, a wall beside it) keeps clinging
+     * to the wall where it is, so it does not fall to the bottom and have to climb all the way up again
+     * (for example while it scrapes up soil, or after it has put a pellet in the hill from inside the shaft).
+     */
+    private void holdOnToWall(CellMap map) {
+        climbing = false;
+        climbMotion = Vec3.ZERO;
+        BlockPos here = ant.blockPosition();
+        if (ant.onGround() || ant.isInLiquid() || map.isSolidFace(here.below(), Direction.UP)) {
+            holdWall = null;
+            return;
+        }
+        if (holdWall == null || !map.isSolidFace(here.relative(holdWall), holdWall.getOpposite())) {
+            holdWall = null;
+            double nearest = Double.MAX_VALUE;
+            for (Direction side : Direction.Plane.HORIZONTAL) {
+                double gap = gapToWall(here, side);
+                if (map.isSolidFace(here.relative(side), side.getOpposite()) && gap < nearest) {
+                    holdWall = side;
+                    nearest = gap;
+                }
+            }
+        }
+        if (holdWall == null) {
+            return; // nothing to cling to: it falls
+        }
+        double slide = Math.max(0.0, Math.min(HOLD_SIDE_SPEED, gapToWall(here, holdWall)));
+        climbing = true;
+        climbMotion = new Vec3(holdWall.getStepX() * slide, 0.0, holdWall.getStepZ() * slide);
+        // Face the wall (the renderer leans the ant against what it faces), without pushing anywhere.
+        Vec3 face = Vec3.atBottomCenterOf(here).add(holdWall.getStepX() * 0.7, 0.0, holdWall.getStepZ() * 0.7);
+        ant.getMoveControl().setWantedPosition(face.x, ant.getY(), face.z, 0.0);
     }
 
     /** The corner cell of an up-and-over stretch (the cell above its start), or null if the stretch is not one. */

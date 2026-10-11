@@ -250,8 +250,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     }
 
     private PlayState animate(AnimationState<AbstractAntEntity> state) {
-        // Going up a wall isn't "horizontal" movement, so check climbing separately.
-        if (isClimbing() && Math.abs(getDeltaMovement().y) > 0.01) {
+        // Going up a wall isn't "horizontal" movement, so check climbing separately (an ant hanging still does not move its legs).
+        if (isClimbing() && Math.abs(getY() - yo) > 0.01) {
             state.getController().setAnimationSpeed(1.5);
             return state.setAndContinue(WALK);
         }
