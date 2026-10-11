@@ -87,10 +87,13 @@ public class Colony {
     /** Bite progress per block (0..1). Not saved: a half-dug block just restarts after a reload. */
     private final Map<BlockPos, Float> digProgress = new HashMap<>();
 
-    /** Where the nest's rooms go. Decided once (see {@link #getLayout}); not saved, it comes out the same after a reload. */
-    private record Layout(List<NestPlan.Chamber> chambers, Set<BlockPos> cells, int shaftDepth) {
-        Layout(List<NestPlan.Chamber> chambers, int shaftDepth) {
-            this(chambers, cellsOf(chambers), shaftDepth);
+    /**
+     * Where the nest's rooms go. Decided once (see {@link #getLayout}) and saved: worked out again after a reload, the
+     * answer could differ, because the ground has changed since (seed and bread heaps lie in the rooms).
+     */
+    private record Layout(List<NestPlan.Chamber> chambers, Set<BlockPos> cells, int shaftDepth, Direction direction) {
+        Layout(List<NestPlan.Chamber> chambers, int shaftDepth, Direction direction) {
+            this(chambers, cellsOf(chambers), shaftDepth, direction);
         }
 
         /** The level used for this purpose, or null if the nest has none. */
@@ -1566,7 +1569,7 @@ public class Colony {
                     }
                 }
                 if (fits) {
-                    best = new Layout(plan, depth);
+                    best = new Layout(plan, depth, direction);
                     break;
                 }
             }
@@ -1574,10 +1577,11 @@ public class Colony {
         return best;
     }
 
+    /** Soil, or already dug out (a heap of seeds or bread on the floor counts as dug: in an old save the plan is worked out again on a nest in use). */
     private static boolean allSoilOrAir(Level level, List<BlockPos> cells) {
         for (BlockPos pos : cells) {
             BlockState state = level.getBlockState(pos);
-            if (!(state.is(ModTags.DIGGABLE) || state.isAir()) || touchesFluid(level, pos)) {
+            if (!(state.is(ModTags.DIGGABLE) || isDugOut(level, pos)) || touchesFluid(level, pos)) {
                 return false;
             }
         }
@@ -1862,6 +1866,11 @@ public class Colony {
         CompoundTag clips = new CompoundTag();
         grassClips.forEach((pos, count) -> clips.putInt(Long.toString(pos.asLong()), count));
         tag.put("grassClips", clips);
+        if (layout != null) {
+            tag.putInt("nestDepth", layout.shaftDepth());
+            tag.putInt("nestDirection", layout.direction().get2DDataValue());
+            tag.putInt("nestLevels", layout.chambers().size());
+        }
         return tag;
     }
 
@@ -1889,6 +1898,12 @@ public class Colony {
         CompoundTag castes = tag.getCompound("castes");
         for (String key : castes.getAllKeys()) {
             colony.casteCounts.put(key, castes.getInt(key));
+        }
+        // The nest plan it was digging (old saves have none: it is worked out again from the ground).
+        if (tag.contains("nestLevels")) {
+            int depth = tag.getInt("nestDepth");
+            Direction direction = Direction.from2DDataValue(tag.getInt("nestDirection"));
+            colony.layout = new Layout(NestPlan.chambers(colony.center.below(depth), direction, tag.getInt("nestLevels")), depth, direction);
         }
         return colony;
     }

@@ -935,6 +935,68 @@ public class NestTests {
     }
 
     /**
+     * After a save and reload the colony keeps the nest it was digging: with seeds lying in the seed store and bread in
+     * the nursery, the reloaded colony plans exactly the same rooms (it must not start a new nest in another direction).
+     */
+    @GameTest(template = "arena", timeoutTicks = 200, skyAccess = true)
+    public static void theNestPlanIsTheSameAfterAReload(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        startColony(helper, 0);
+
+        helper.runAfterDelay(20, () -> {
+            Colony colony = colony(helper);
+            helper.assertTrue(colony != null, "no colony");
+            List<NestPlan.Chamber> before = colony.getPlannedChambers(level);
+            helper.assertTrue(before.size() == NestPlan.MAX_LEVELS, "the nest has " + before.size() + " levels, expected " + NestPlan.MAX_LEVELS);
+            // Dig the whole nest out at once.
+            for (int i = 1; i <= Colony.SHAFT_DEPTH; i++) {
+                level.setBlock(colony.getCenter().below(i), Blocks.AIR.defaultBlockState(), 3);
+            }
+            for (NestPlan.Chamber chamber : before) {
+                for (BlockPos pos : chamber.cells()) {
+                    level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+                }
+            }
+            // A heap of seeds in the far corner of the seed store, a heap of bread in the far corner of the nursery.
+            for (NestPlan.Chamber chamber : before) {
+                BlockPos corner = chamber.room().get(chamber.room().size() - 1);
+                if (chamber.kind() == NestPlan.Kind.FOOD) {
+                    level.setBlock(corner, ModBlocks.SEED_PILE.get().defaultBlockState(), 3);
+                } else if (chamber.kind() == NestPlan.Kind.NURSERY) {
+                    level.setBlock(corner, ModBlocks.BREAD_PILE.get().defaultBlockState(), 3);
+                }
+            }
+            // An old save has no nest plan stored: worked out again from the ground, the heaps count as dug out.
+            var oldSave = colony.save();
+            oldSave.remove("nestDepth");
+            oldSave.remove("nestDirection");
+            oldSave.remove("nestLevels");
+            List<NestPlan.Chamber> fromOldSave = Colony.load(oldSave).getPlannedChambers(level);
+            helper.assertTrue(fromOldSave.equals(before), "from an old save the nest plan changed: " + describePlan(before, colony)
+                    + " became " + describePlan(fromOldSave, colony));
+            // A torch a player put on the floor of the refuse chamber: only a saved plan gets past that.
+            BlockPos torch = before.get(before.size() - 1).room().get(0);
+            level.setBlock(torch, Blocks.TORCH.defaultBlockState(), 3);
+            // A reload: the colony is written to the save and read back as a new object.
+            Colony reloaded = Colony.load(colony.save());
+            List<NestPlan.Chamber> after = reloaded.getPlannedChambers(level);
+            helper.assertTrue(after.equals(before), "after the reload the nest plan changed: " + describePlan(before, colony)
+                    + " became " + describePlan(after, colony));
+            helper.succeed();
+        });
+    }
+
+    /** The plan in a few words for the log: how many levels and which way the first tunnel leaves the shaft. */
+    private static String describePlan(List<NestPlan.Chamber> plan, Colony colony) {
+        if (plan.isEmpty()) {
+            return "no plan";
+        }
+        BlockPos room = plan.get(0).center();
+        return plan.size() + " levels, rooms toward " + Direction.getNearest(room.getX() - colony.getCenter().getX(), 0,
+                room.getZ() - colony.getCenter().getZ());
+    }
+
+    /**
      * Dead ants are carried down to the refuse chamber: three bodies lying on the ground around the hill, one lying in
      * the nursery, and a worker that is killed (it leaves its body behind where it died). Every body ends up in the
      * refuse chamber, one to a cell, and none is left lying about or in an ant's mandibles.
