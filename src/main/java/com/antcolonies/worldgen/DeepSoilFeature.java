@@ -20,7 +20,7 @@ import net.minecraft.world.level.levelgen.feature.configurations.NoneFeatureConf
  * surface are left alone, so only biomes with dirt get it.
  */
 public class DeepSoilFeature extends Feature<NoneFeatureConfiguration> {
-    public static final int MIN_LAYERS = 1;
+    public static final int MIN_LAYERS = 2;
     public static final int MAX_LAYERS = 3;
     /** How far below the surface the dirt is followed before giving up. */
     private static final int MAX_DIRT_DEPTH = 12;
