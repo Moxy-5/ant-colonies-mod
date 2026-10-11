@@ -33,6 +33,8 @@ public class AntNavigator {
     private static final int STUCK_TICKS = 30;
     /** Not on the route at all for this many ticks: plan the route again. */
     private static final int OFF_ROUTE_TICKS = 20;
+    /** The ant keeps moving but reaches no waypoint it has not been at before for this many ticks: it is going in circles, plan again. */
+    private static final int CIRCLE_TICKS = 160;
     private static final int MAX_REPLANS = 3;
     /** Blocks per tick an ant rises while climbing. */
     private static final double CLIMB_SPEED = 0.06;
@@ -57,6 +59,9 @@ public class AntNavigator {
     private int offRouteTicks;
     private int stuckTicks;
     private int stuckNext;
+    /** The furthest waypoint the ant has been heading for on this route, and how long it has gone without getting any further. */
+    private int bestNext;
+    private int circleTicks;
     private Vec3 stuckPos = Vec3.ZERO;
 
     public AntNavigator(AbstractAntEntity ant) {
@@ -120,6 +125,8 @@ public class AntNavigator {
         failed = found == null;
         route = found;
         next = 1;
+        bestNext = next;
+        circleTicks = 0;
         arriveTicks = 0;
         offRouteTicks = 0;
         resetStuckClock();
@@ -148,10 +155,14 @@ public class AntNavigator {
         int last = route.size() - 1;
 
         // Where on the route is the ant? Look a few waypoints ahead (it may have skipped some) and
-        // anywhere behind (it may have fallen back).
+        // anywhere behind (it may have fallen back). The corner cell of the up-and-over stretch it is on is
+        // not a waypoint, but the ant passes through it, and it can be the very cell the route started from
+        // (planned in mid-air above a ledge): that must not read as "back at the start of the route", or the
+        // ant would walk back down and climb the same ledge again for ever.
+        BlockPos stretchCorner = next >= 1 && next <= last ? cornerOf(route.get(next - 1), route.get(next)) : null;
         int at = -1;
         for (int i = Math.min(last, next + LOOKAHEAD); i >= 0; i--) {
-            if (route.get(i).equals(here)) {
+            if (route.get(i).equals(here) && !(i < next - 1 && here.equals(stretchCorner))) {
                 at = i;
                 break;
             }
@@ -166,6 +177,15 @@ public class AntNavigator {
                 return;
             }
             next = last; // wandered out of the goal cell while centring: head back
+        }
+
+        // Safety net: a healthy walk gets to a new waypoint every few seconds at most.
+        if (next > bestNext) {
+            bestNext = next;
+            circleTicks = 0;
+        } else if (next <= last && ++circleTicks > CIRCLE_TICKS) {
+            replan("going in circles");
+            return;
         }
 
         Vec3 aim;
@@ -236,6 +256,13 @@ public class AntNavigator {
                     : new Vec3(sideX / distance * slide, rise, sideZ / distance * slide);
         }
         ant.getMoveControl().setWantedPosition(aim.x, aim.y, aim.z, speed);
+    }
+
+    /** The corner cell of an up-and-over stretch (the cell above its start), or null if the stretch is not one. */
+    @Nullable
+    private static BlockPos cornerOf(BlockPos from, BlockPos waypoint) {
+        boolean sideways = waypoint.getX() != from.getX() || waypoint.getZ() != from.getZ();
+        return sideways && waypoint.getY() > from.getY() ? new BlockPos(from.getX(), waypoint.getY(), from.getZ()) : null;
     }
 
     /** How far (in blocks) the ant's body still is from the wall on this side of the cell it is in. */

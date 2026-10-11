@@ -140,6 +140,156 @@ public class NavigationTests {
                 "the ant has not gone down into the room yet"));
     }
 
+    /** A one-block pit in the ground: an ant at the bottom must climb out over its wall. */
+    @GameTest(template = "arena", timeoutTicks = 600, skyAccess = true)
+    public static void antClimbsOutOfAOneBlockPit(GameTestHelper helper) {
+        buildNest(helper);
+        helper.setBlock(MIDDLE + 6, SURFACE - 1, MIDDLE + 9, Blocks.AIR);
+        WorkerAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), MIDDLE + 6.5F, (float) (SURFACE - 1), MIDDLE + 9.5F);
+        BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE + 3, SURFACE, MIDDLE + 9));
+        helper.runAfterDelay(10, () -> ant.getNavigator().moveTo(goal, 1.0));
+        watch(helper, ant);
+        helper.succeedWhen(() -> helper.assertTrue(
+                ant.getNavigator().isDone() && !ant.getNavigator().hasFailed() && ant.blockPosition().equals(goal) && helper.getTick() > 20,
+                "the ant has not climbed out of the pit yet"));
+    }
+
+    /** The same, but the route is planned while the ant is still in the air above the pit (it falls in on its way). */
+    @GameTest(template = "arena", timeoutTicks = 600, skyAccess = true)
+    public static void antPlanningAboveAPitFallsInAndClimbsOut(GameTestHelper helper) {
+        buildNest(helper);
+        helper.setBlock(MIDDLE + 6, SURFACE - 1, MIDDLE + 9, Blocks.AIR);
+        WorkerAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), MIDDLE + 6.5F, (float) SURFACE, MIDDLE + 9.5F);
+        BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE + 3, SURFACE, MIDDLE + 9));
+        helper.runAfterDelay(1, () -> ant.getNavigator().moveTo(goal, 1.0));
+        watch(helper, ant);
+        helper.succeedWhen(() -> helper.assertTrue(
+                ant.getNavigator().isDone() && !ant.getNavigator().hasFailed() && ant.blockPosition().equals(goal) && helper.getTick() > 20,
+                "the ant has not climbed out of the pit yet"));
+    }
+
+    /**
+     * One ant on every surface cell (flat ground and every step of the hill) around the finished hill, all sent into the
+     * food store at the same time: every one of them must get there, and none may take much longer than the others.
+     */
+    @GameTest(template = "arena", timeoutTicks = 4000, skyAccess = true)
+    public static void antsFromAllAroundTheHillReachTheFoodStore(GameTestHelper helper) {
+        scan(helper, 1L, false, false, false);
+    }
+
+    /** The same, but every ant starts somewhere inside its cell instead of in the middle. */
+    @GameTest(template = "arena", timeoutTicks = 4000, skyAccess = true)
+    public static void antsStartingAnywhereInTheirCellReachTheFoodStore(GameTestHelper helper) {
+        scan(helper, 2L, true, false, false);
+    }
+
+    /** The same on bumpy ground: single blocks piled on the grass and single grass blocks missing. */
+    @GameTest(template = "arena", timeoutTicks = 4000, skyAccess = true)
+    public static void antsOnBumpyGroundReachTheFoodStore(GameTestHelper helper) {
+        scan(helper, 3L, true, true, false);
+    }
+
+    /** The same with a hill that is only partly built: some blocks of its top layers are missing. */
+    @GameTest(template = "arena", timeoutTicks = 4000, skyAccess = true)
+    public static void antsOverAHalfBuiltHillReachTheFoodStore(GameTestHelper helper) {
+        scan(helper, 4L, true, false, true);
+    }
+
+    /** The cell an ant stands in on top of the highest solid block in this column. */
+    private static int standingY(GameTestHelper helper, int x, int z) {
+        for (int y = SURFACE + 4; y > 0; y--) {
+            if (!helper.getBlockState(new BlockPos(x, y - 1, z)).getCollisionShape(helper.getLevel(), BlockPos.ZERO).isEmpty()) {
+                return y;
+            }
+        }
+        return 1;
+    }
+
+    private static void scan(GameTestHelper helper, long seed, boolean anywhereInCell, boolean bumpy, boolean gappyHill) {
+        helper.getLevel().getServer().tickRateManager().setTickRate(2000.0F);
+        buildNest(helper);
+        java.util.Random random = new java.util.Random(seed);
+        if (bumpy) {
+            for (int dx = -11; dx <= 11; dx++) {
+                for (int dz = -11; dz <= 11; dz++) {
+                    if (Math.abs(dx) <= Colony.MOUND_RADIUS + 1 && Math.abs(dz) <= Colony.MOUND_RADIUS + 1) {
+                        continue; // the hill keeps flat ground around it
+                    }
+                    double roll = random.nextDouble();
+                    if (roll < 0.12) {
+                        helper.setBlock(MIDDLE + dx, SURFACE, MIDDLE + dz, Blocks.DIRT);
+                    } else if (roll < 0.20) {
+                        helper.setBlock(MIDDLE + dx, SURFACE - 1, MIDDLE + dz, Blocks.AIR);
+                    }
+                }
+            }
+        }
+        buildHill(helper);
+        if (gappyHill) {
+            for (int dx = -Colony.MOUND_RADIUS; dx <= Colony.MOUND_RADIUS; dx++) {
+                for (int dz = -Colony.MOUND_RADIUS; dz <= Colony.MOUND_RADIUS; dz++) {
+                    int height = Colony.moundHeightAt(dx, dz);
+                    if (height > 1 && random.nextDouble() < 0.35) {
+                        helper.setBlock(MIDDLE + dx, SURFACE + height - 1, MIDDLE + dz, Blocks.AIR);
+                    }
+                }
+            }
+        }
+        BlockPos goal = chambers(helper).get(2).center();
+        List<WorkerAntEntity> ants = new java.util.ArrayList<>();
+        List<String> starts = new java.util.ArrayList<>();
+        for (int dx = -10; dx <= 10; dx++) {
+            for (int dz = -10; dz <= 10; dz++) {
+                if (dx == 0 && dz == 0) {
+                    continue; // the hole itself
+                }
+                int y = standingY(helper, MIDDLE + dx, MIDDLE + dz);
+                float fx = MIDDLE + dx + (anywhereInCell ? 0.2F + 0.6F * random.nextFloat() : 0.5F);
+                float fz = MIDDLE + dz + (anywhereInCell ? 0.2F + 0.6F * random.nextFloat() : 0.5F);
+                ants.add(helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), fx, (float) y, fz));
+                starts.add(dx + "," + dz + " y" + y);
+            }
+        }
+        long[] arrived = new long[ants.size()];
+        helper.runAfterDelay(10, () -> {
+            for (WorkerAntEntity ant : ants) {
+                ant.getNavigator().moveTo(goal, 1.0);
+            }
+        });
+        helper.onEachTick(() -> {
+            if (helper.getTick() <= 10) {
+                return;
+            }
+            for (int i = 0; i < ants.size(); i++) {
+                WorkerAntEntity ant = ants.get(i);
+                if (arrived[i] == 0 && ant.getNavigator().isDone() && ant.blockPosition().equals(goal)) {
+                    arrived[i] = helper.getTick();
+                }
+            }
+        });
+        helper.runAfterDelay(3000, () -> {
+            long slowest = 0;
+            int late = 0;
+            for (int i = 0; i < ants.size(); i++) {
+                if (arrived[i] == 0 || arrived[i] > 700) {
+                    late++;
+                    AntColoniesMod.LOGGER.info("[scan {}] ant from {} {} (arrived at tick {}, now at {}, route failed {})", seed, starts.get(i),
+                            arrived[i] == 0 ? "NEVER ARRIVED" : "was slow", arrived[i],
+                            ants.get(i).position().subtract(Vec3.atLowerCornerOf(helper.absolutePos(BlockPos.ZERO))),
+                            ants.get(i).getNavigator().hasFailed());
+                    var navigator = ants.get(i).getNavigator();
+                    AntColoniesMod.LOGGER.info("[scan {}]   cell {} next waypoint {} climbing {} route {}", seed,
+                            ants.get(i).blockPosition().subtract(helper.absolutePos(BlockPos.ZERO)).toShortString(), navigator.getNextWaypoint(),
+                            navigator.isClimbing(), navigator.getRoute() == null ? "none" : relative(helper, navigator.getRoute()));
+                }
+                slowest = Math.max(slowest, arrived[i]);
+            }
+            AntColoniesMod.LOGGER.info("[scan {}] {} ants, {} late or lost, slowest arrival at tick {}", seed, ants.size(), late, slowest);
+            helper.assertTrue(late == 0, late + " of " + ants.size() + " ants were late or never arrived");
+            helper.succeed();
+        });
+    }
+
     /** The complete ant hill around the entrance (the hole at MIDDLE, MIDDLE stays open). */
     private static void buildHill(GameTestHelper helper) {
         for (int dx = -Colony.MOUND_RADIUS; dx <= Colony.MOUND_RADIUS; dx++) {
