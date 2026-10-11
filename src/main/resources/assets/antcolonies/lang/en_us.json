@@ -7,6 +7,7 @@
   "block.antcolonies.seed_pile": "Seed Pile",
   "entity.antcolonies.ant_egg": "Ant Egg",
   "entity.antcolonies.ant_larva": "Ant Larva",
+  "entity.antcolonies.ant_corpse": "Dead Ant",
   "block.antcolonies.bread_pile": "Ant Bread Pile",
   "item.antcolonies.ant_bread": "Ant Bread",
   "block.antcolonies.deep_soil": "Deep Soil"

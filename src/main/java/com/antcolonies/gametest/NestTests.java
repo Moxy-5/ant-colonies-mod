@@ -645,6 +645,97 @@ public class NestTests {
     }
 
     /**
+     * Dead ants are carried down to the refuse chamber: three bodies lying on the ground around the hill, one lying in
+     * the nursery, and a worker that is killed (it leaves its body behind where it died). Every body ends up in the
+     * refuse chamber, one to a cell, and none is left lying about or in an ant's mandibles.
+     */
+    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
+    public static void workersCarryTheDeadToTheRefuseChamber(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        startColony(helper);
+
+        boolean[] placed = {false};
+        int[] workersBefore = {0};
+        helper.onEachTick(() -> {
+            Colony colony = colony(helper);
+            if (placed[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.findDigTarget(level) != null
+                    || !hillProblems(helper).isEmpty()) {
+                return;
+            }
+            placed[0] = true;
+            for (int[] spot : new int[][] {{5, 1}, {-4, 4}, {1, -6}}) {
+                BlockPos pos = helper.absolutePos(new BlockPos(MIDDLE + spot[0], SURFACE, MIDDLE + spot[1]));
+                colony.spawnCorpse(level, pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5);
+            }
+            BlockPos nursery = colony.getNurseryCells(level).get(3);
+            colony.spawnCorpse(level, nursery.getX() + 0.5, nursery.getY(), nursery.getZ() + 0.5);
+            var workers = colonyWorkers(helper, colony);
+            workersBefore[0] = workers.size();
+            workers.get(0).hurt(level.damageSources().genericKill(), 1000.0F);
+            AntColoniesMod.LOGGER.info("[refuse-test] tick {}: 4 bodies put out, one worker killed ({} workers before)", helper.getTick(), workersBefore[0]);
+        });
+        helper.onEachTick(() -> {
+            Colony colony = colony(helper);
+            if (placed[0] && colony != null && helper.getTick() % 500 == 0) {
+                AntColoniesMod.LOGGER.info("[refuse-test] tick {}: {} bodies, {} in the refuse chamber ({} cells)", helper.getTick(),
+                        colony.getCorpses(level).size(), colony.getRefuseCorpses(level).size(), colony.getRefuseCells(level).size());
+            }
+        });
+
+        helper.succeedWhen(() -> {
+            Colony colony = colony(helper);
+            helper.assertTrue(placed[0] && colony != null, "no dead ants have been put out yet");
+            var all = colony.getCorpses(level);
+            helper.assertTrue(all.size() == 5, "expected 5 bodies (4 put out and the killed worker), found " + all.size());
+            var inChamber = colony.getRefuseCorpses(level);
+            helper.assertTrue(inChamber.size() == 5, inChamber.size() + " of 5 bodies are in the refuse chamber");
+            Set<BlockPos> cells = new HashSet<>();
+            for (var corpse : inChamber) {
+                cells.add(corpse.blockPosition());
+                helper.assertTrue(corpse.isPlaced(), "a body in the refuse chamber is not marked as put there");
+            }
+            helper.assertTrue(cells.size() == 5, "two bodies lie in the same cell");
+            var workers = colonyWorkers(helper, colony);
+            helper.assertTrue(workers.size() == workersBefore[0] - 1, "expected " + (workersBefore[0] - 1) + " workers but found " + workers.size());
+            for (var worker : workers) {
+                helper.assertTrue(!worker.isCarryingCorpse(), "an ant is still carrying a body");
+            }
+        });
+    }
+
+    /**
+     * Where the soil is so thin that the nest has no refuse chamber, nobody can carry a dead ant anywhere: it stays where
+     * it lies for the five minutes of {@link Colony#CORPSE_DECAY_TICKS} and then crumbles to dust.
+     */
+    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
+    public static void deadAntsNobodyCanCarryAwayCrumbleToDust(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        startColony(helper);
+        int stoneTop = SURFACE - Colony.SHAFT_DEPTH - NestPlan.LEVEL_SPACING + 1; // only the queen's room fits (see theNestHasFewerLevelsWhenTheSoilIsThin)
+        for (int x = 0; x < 25; x++) {
+            for (int z = 0; z < 25; z++) {
+                for (int y = 0; y <= stoneTop; y++) {
+                    helper.setBlock(x, y, z, Blocks.STONE);
+                }
+            }
+        }
+
+        com.antcolonies.entity.AntCorpseEntity[] corpse = {null};
+        helper.runAfterDelay(20, () -> {
+            BlockPos pos = helper.absolutePos(new BlockPos(MIDDLE + 5, SURFACE, MIDDLE + 5));
+            corpse[0] = colony(helper).spawnCorpse(level, pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5);
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(corpse[0] != null && !corpse[0].isAlive(), "the body is still there");
+            if (corpse[0].tickCount < Colony.CORPSE_DECAY_TICKS) {
+                helper.fail("the body was gone after " + corpse[0].tickCount + " ticks, but nobody could have carried it away");
+            }
+        });
+    }
+
+    /**
      * The seeds the colony can account for: in the store, milled into bread (waiting in the nursery or eaten by the queen
      * for her next egg), or used for the eggs she has laid. A seed on its way or in the mill is not counted yet.
      */

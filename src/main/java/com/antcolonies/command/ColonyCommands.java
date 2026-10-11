@@ -39,7 +39,8 @@ public class ColonyCommands {
                     + " | food " + colony.getFood()
                     + " | bread " + colony.getBread() + " (milling " + colony.getMilling() + ")"
                     + " | queen fed " + colony.getQueenBread() + "/" + Colony.QUEEN_MEAL + incubation(colony, level)
-                    + " | eggs " + colony.countEggs(level) + " | larvae " + colony.countLarvae(level);
+                    + " | eggs " + colony.countEggs(level) + " | larvae " + colony.countLarvae(level)
+                    + " | dead ants " + colony.getCorpses(level).size() + " (refuse chamber " + colony.getRefuseCorpses(level).size() + ")";
             source.sendSuccess(() -> Component.literal(line), false);
         }
         return colonies.size();

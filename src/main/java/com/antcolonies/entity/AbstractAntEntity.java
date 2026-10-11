@@ -53,6 +53,10 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     private static final EntityDataAccessor<Boolean> DATA_CARRIED_EGG =
             SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.BOOLEAN);
 
+    /** True while the ant holds a dead nestmate in its mandibles (carrying it to the refuse chamber). Synced so the renderer can draw it. Not saved. */
+    private static final EntityDataAccessor<Boolean> DATA_CARRIED_CORPSE =
+            SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.BOOLEAN);
+
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
 
     private final AntNavigator navigator = new AntNavigator(this);
@@ -77,6 +81,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         builder.define(DATA_CARRIED, Optional.empty());
         builder.define(DATA_CARRIED_SEED, ItemStack.EMPTY);
         builder.define(DATA_CARRIED_EGG, false);
+        builder.define(DATA_CARRIED_CORPSE, false);
     }
 
     /** The block type of the pellet this ant carries, or null if its mandibles are empty. */
@@ -126,6 +131,15 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         entityData.set(DATA_CARRIED_EGG, carrying);
     }
 
+    /** Whether this ant holds a dead nestmate in its mandibles (a worker bringing it to the refuse chamber). */
+    public boolean isCarryingCorpse() {
+        return entityData.get(DATA_CARRIED_CORPSE);
+    }
+
+    public void setCarryingCorpse(boolean carrying) {
+        entityData.set(DATA_CARRIED_CORPSE, carrying);
+    }
+
     /** The seed in the mandibles is for the mill (it becomes bread), not for the food store. Server side only, not saved. */
     public boolean isSeedForBread() {
         return seedForBread;
@@ -135,9 +149,9 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         this.seedForBread = forBread;
     }
 
-    /** Whether the mandibles are full (a soil pellet, a seed, bread or an egg), so the ant can't pick up anything else. */
+    /** Whether the mandibles are full (a soil pellet, a seed, bread, an egg or a dead ant), so the ant can't pick up anything else. */
     public boolean hasFullMandibles() {
-        return isCarrying() || !getCarriedSeed().isEmpty() || isCarryingEgg();
+        return isCarrying() || !getCarriedSeed().isEmpty() || isCarryingEgg() || isCarryingCorpse();
     }
 
     /** How long (in seconds) an ant must have nothing to do before it helps with work that is not its role's. */

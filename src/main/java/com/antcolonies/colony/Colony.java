@@ -12,6 +12,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.block.SeedPileBlock;
+import com.antcolonies.entity.AntCorpseEntity;
 import com.antcolonies.entity.AntEggEntity;
 import com.antcolonies.entity.AntLarvaEntity;
 import com.antcolonies.entity.QueenAntEntity;
@@ -571,6 +572,8 @@ public class Colony {
     private final Map<UUID, Long> feeders = new HashMap<>();
     /** The eggs a worker is on its way to: egg -> game time when the claim runs out. Not saved. */
     private final Map<UUID, Long> claimedEggs = new HashMap<>();
+    /** The dead ants a worker is on its way to: corpse -> game time when the claim runs out. Not saved. */
+    private final Map<UUID, Long> claimedCorpses = new HashMap<>();
 
     public int getQueenBread() {
         return queenBread;
@@ -824,14 +827,14 @@ public class Colony {
         return egg;
     }
 
-    /** The area (around the nest) where the colony's eggs are looked for. */
-    private AABB eggArea() {
+    /** The area (around the nest, down to the refuse chamber) where the colony's eggs, larvae and dead ants are looked for. */
+    private AABB nestArea() {
         return new AABB(center).inflate(FOOD_RADIUS, 0, FOOD_RADIUS).expandTowards(0, 8, 0).expandTowards(0, -12, 0);
     }
 
     /** All the eggs of this colony around the nest: in the nursery, lying where the queen laid them, or dropped on the way. */
     public List<AntEggEntity> getEggs(Level level) {
-        return level.getEntitiesOfClass(AntEggEntity.class, eggArea(), egg -> egg.isAlive() && id.equals(egg.getColonyId()));
+        return level.getEntitiesOfClass(AntEggEntity.class, nestArea(), egg -> egg.isAlive() && id.equals(egg.getColonyId()));
     }
 
     public int countEggs(Level level) {
@@ -876,7 +879,7 @@ public class Colony {
 
     /** All the larvae of this colony around the nest. */
     public List<AntLarvaEntity> getLarvae(Level level) {
-        return level.getEntitiesOfClass(AntLarvaEntity.class, eggArea(), larva -> larva.isAlive() && id.equals(larva.getColonyId()));
+        return level.getEntitiesOfClass(AntLarvaEntity.class, nestArea(), larva -> larva.isAlive() && id.equals(larva.getColonyId()));
     }
 
     public int countLarvae(Level level) {
@@ -1016,6 +1019,111 @@ public class Colony {
 
     public void releaseEgg(AntEggEntity egg) {
         claimedEggs.remove(egg.getUUID());
+    }
+
+    // ---- Dead ants and the refuse chamber
+
+    /** A dead ant that no worker brings to the refuse chamber crumbles to dust after this many ticks (5 minutes at normal speed). */
+    public static final int CORPSE_DECAY_TICKS = 6000;
+    /** How long (in ticks) a worker on its way to a dead ant keeps the others away from it. */
+    private static final int CORPSE_CLAIM_TICKS = 1200;
+
+    /** The floor cells of the refuse chamber that are dug out and can be walked to (the room does not have to be finished). */
+    public List<BlockPos> getRefuseCells(Level level) {
+        return getRoomCells(level, NestPlan.Kind.REFUSE);
+    }
+
+    /** Puts the body of a dead ant of this colony into the world, where it lies until a worker carries it away. */
+    public AntCorpseEntity spawnCorpse(Level level, double x, double y, double z) {
+        AntCorpseEntity corpse = new AntCorpseEntity(ModEntities.ANT_CORPSE.get(), level);
+        corpse.setColonyId(id);
+        corpse.moveTo(x, y, z, level.getRandom().nextFloat() * 360.0F, 0.0F);
+        level.addFreshEntity(corpse);
+        return corpse;
+    }
+
+    /** All the dead ants of this colony around the nest: in the refuse chamber, or lying where they died. */
+    public List<AntCorpseEntity> getCorpses(Level level) {
+        return level.getEntitiesOfClass(AntCorpseEntity.class, nestArea(), corpse -> corpse.isAlive() && id.equals(corpse.getColonyId()));
+    }
+
+    /** The dead ants that lie in the refuse chamber. */
+    public List<AntCorpseEntity> getRefuseCorpses(Level level) {
+        Set<BlockPos> cells = new HashSet<>(getRefuseCells(level));
+        return getCorpses(level).stream().filter(corpse -> cells.contains(corpse.blockPosition())).toList();
+    }
+
+    /** Whether this block is a floor cell of the refuse chamber (so a body lying there is where it belongs and stays). */
+    public boolean isInRefuseChamber(Level level, BlockPos pos) {
+        return getRefuseCells(level).contains(pos);
+    }
+
+    /** A free floor cell of the refuse chamber (one body to a cell), or null if there is none (not dug yet, or full). */
+    @Nullable
+    public BlockPos pickCorpseSpot(Level level, RandomSource random) {
+        Set<BlockPos> taken = new HashSet<>();
+        for (AntCorpseEntity corpse : getCorpses(level)) {
+            taken.add(corpse.blockPosition());
+        }
+        List<BlockPos> free = new ArrayList<>();
+        for (BlockPos pos : getRefuseCells(level)) {
+            if (!taken.contains(pos) && level.getBlockState(pos).isAir()) {
+                free.add(pos);
+            }
+        }
+        return free.isEmpty() ? null : free.get(random.nextInt(free.size()));
+    }
+
+    /** A worker sets its dead nestmate down at {@code spot}. False if another body lies there (the worker looks for another spot). */
+    public boolean placeCorpse(Level level, BlockPos spot) {
+        if (!level.getBlockState(spot).isAir()) {
+            return false;
+        }
+        for (AntCorpseEntity corpse : getCorpses(level)) {
+            if (corpse.blockPosition().equals(spot)) {
+                return false;
+            }
+        }
+        spawnCorpse(level, spot.getX() + 0.5, spot.getY(), spot.getZ() + 0.5).setPlaced(true);
+        return true;
+    }
+
+    /**
+     * The dead ant nearest to {@code near} that a worker should carry to the refuse chamber, or null: only when there is
+     * a free spot for it, not one that lies in the chamber already, not one another worker is on its way to.
+     * {@code avoid}: bodies this worker found no way to.
+     */
+    @Nullable
+    public AntCorpseEntity findLooseCorpse(Level level, BlockPos near, Set<UUID> avoid) {
+        if (pickCorpseSpot(level, level.getRandom()) == null) {
+            return null;
+        }
+        long now = level.getGameTime();
+        claimedCorpses.values().removeIf(until -> until <= now);
+        Set<BlockPos> chamber = new HashSet<>(getRefuseCells(level));
+        AntCorpseEntity best = null;
+        double bestDistance = Double.MAX_VALUE;
+        for (AntCorpseEntity corpse : getCorpses(level)) {
+            if (corpse.isPlaced() || chamber.contains(corpse.blockPosition()) || claimedCorpses.containsKey(corpse.getUUID())
+                    || avoid.contains(corpse.getUUID())) {
+                continue;
+            }
+            double distance = corpse.distanceToSqr(near.getX() + 0.5, near.getY() + 0.5, near.getZ() + 0.5);
+            if (distance < bestDistance) {
+                best = corpse;
+                bestDistance = distance;
+            }
+        }
+        return best;
+    }
+
+    /** A worker is on its way to this dead ant: the others leave it alone for a while. */
+    public void claimCorpse(Level level, AntCorpseEntity corpse) {
+        claimedCorpses.put(corpse.getUUID(), level.getGameTime() + CORPSE_CLAIM_TICKS);
+    }
+
+    public void releaseCorpse(AntCorpseEntity corpse) {
+        claimedCorpses.remove(corpse.getUUID());
     }
 
     /** The rooms this nest is being dug with (empty until the layout is decided). For tests and debugging. */

@@ -4,6 +4,7 @@ import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.goal.AntWanderGoal;
+import com.antcolonies.entity.goal.CarryCorpseGoal;
 import com.antcolonies.entity.goal.CarryEggGoal;
 import com.antcolonies.entity.goal.CarryPelletGoal;
 import com.antcolonies.entity.goal.ClipGrassGoal;
@@ -19,6 +20,7 @@ import com.antcolonies.entity.goal.StoreSeedGoal;
 
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
@@ -58,6 +60,8 @@ public class WorkerAntEntity extends AbstractAntEntity {
         this.goalSelector.addGoal(5, new FeedLarvaGoal(this));
         this.goalSelector.addGoal(5, new FeedQueenGoal(this));
         this.goalSelector.addGoal(5, new MillBreadGoal(this));
+        // Dead nestmates are carried down to the refuse chamber (the builders' job) before more seeds are fetched.
+        this.goalSelector.addGoal(6, new CarryCorpseGoal(this));
         this.goalSelector.addGoal(6, new GatherSeedGoal(this));
         this.goalSelector.addGoal(7, new ClipGrassGoal(this));
         this.goalSelector.addGoal(8, new DigGoal(this, () -> true, () -> mayDo(ColonyRole.BUILDER)));
@@ -109,7 +113,19 @@ public class WorkerAntEntity extends AbstractAntEntity {
         }
     }
 
-    // A dead worker leaves the colony's headcount, and the egg it carried falls to the ground for another worker to pick up.
+    // A dead worker leaves a body behind where it died (once the death animation is over), for the workers to carry to the refuse chamber.
+    @Override
+    public void remove(Entity.RemovalReason reason) {
+        if (reason == Entity.RemovalReason.KILLED && getColonyId() != null && level() instanceof ServerLevel serverLevel) {
+            Colony colony = ColonyManager.get(serverLevel).getColony(getColonyId());
+            if (colony != null) {
+                colony.spawnCorpse(serverLevel, getX(), getY(), getZ());
+            }
+        }
+        super.remove(reason);
+    }
+
+    // A dead worker leaves the colony's headcount, and the egg or body it carried falls to the ground for another worker to pick up.
     @Override
     public void die(DamageSource source) {
         super.die(source);
@@ -120,6 +136,10 @@ public class WorkerAntEntity extends AbstractAntEntity {
                 if (isCarryingEgg()) {
                     setCarryingEgg(false);
                     colony.spawnEgg(serverLevel, getX(), getY(), getZ());
+                }
+                if (isCarryingCorpse()) {
+                    setCarryingCorpse(false);
+                    colony.spawnCorpse(serverLevel, getX(), getY(), getZ());
                 }
                 colony.setCount(CASTE, colony.getCount(CASTE) - 1);
                 manager.markChanged();

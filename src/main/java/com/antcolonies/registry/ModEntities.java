@@ -1,6 +1,7 @@
 package com.antcolonies.registry;
 
 import com.antcolonies.AntColoniesMod;
+import com.antcolonies.entity.AntCorpseEntity;
 import com.antcolonies.entity.AntEggEntity;
 import com.antcolonies.entity.AntLarvaEntity;
 import com.antcolonies.entity.QueenAntEntity;
@@ -40,6 +41,15 @@ public class ModEntities {
                     .clientTrackingRange(6)
                     .updateInterval(20)
                     .build("ant_larva"));
+
+    // The body of a dead ant.
+    public static final DeferredHolder<EntityType<?>, EntityType<AntCorpseEntity>> ANT_CORPSE =
+            ENTITY_TYPES.register("ant_corpse", () -> EntityType.Builder
+                    .of(AntCorpseEntity::new, MobCategory.MISC)
+                    .sized(0.25F, 0.15F)
+                    .clientTrackingRange(6)
+                    .updateInterval(20)
+                    .build("ant_corpse"));
 
     // Queen is about twice the worker's size.
     public static final DeferredHolder<EntityType<?>, EntityType<QueenAntEntity>> QUEEN_ANT =
