@@ -55,7 +55,7 @@ public class ClipGrassGoal extends Goal {
     @Override
     public boolean canUse() {
         // Only look for work now and then, so ants don't all think on the same tick.
-        if (ant.getColonyId() == null || ant.isCarrying() || ant.isCarryingSeed() || ant.getRandom().nextInt(40) != 0
+        if (ant.getColonyId() == null || ant.hasFullMandibles() || ant.getRandom().nextInt(40) != 0
                 || !ant.mayDo(ColonyRole.FORAGER) || !(ant.level() instanceof ServerLevel level)) {
             return false;
         }
@@ -76,7 +76,7 @@ public class ClipGrassGoal extends Goal {
     @Override
     public boolean canContinueToUse() {
         return colony != null && grass != null && ant.level().getBlockState(grass).is(Blocks.SHORT_GRASS)
-                && !ant.isCarrying() && !ant.isCarryingSeed() && ticks < GIVE_UP_TICKS;
+                && !ant.hasFullMandibles() && ticks < GIVE_UP_TICKS;
     }
 
     @Override
@@ -124,7 +124,7 @@ public class ClipGrassGoal extends Goal {
         }
         if (clipping >= CLIP_TICKS) {
             ant.setCarriedSeed(new ItemStack(Items.WHEAT_SEEDS));
-            ant.setSeedForQueen(colony.claimFeeding(level, ant.getUUID())); // straight to the queen if she wants it
+            ant.setSeedForBread(colony.claimSeedForBread(level, ant.getUUID())); // to the mill if there is no store yet
             colony.clippedGrass(level, grass);
             ColonyManager.get(level).markChanged();
             grass = null; // so stop() does not free the tuft again

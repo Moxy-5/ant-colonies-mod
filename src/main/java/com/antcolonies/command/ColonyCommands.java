@@ -37,7 +37,8 @@ public class ColonyCommands {
                     + " | queen " + colony.getQueenId().toString().substring(0, 8)
                     + " | members " + colony.getMemberCount()
                     + " | food " + colony.getFood()
-                    + " | queen fed " + colony.getQueenSeeds() + "/" + Colony.QUEEN_MEAL + incubation(colony, level)
+                    + " | bread " + colony.getBread() + " (milling " + colony.getMilling() + ")"
+                    + " | queen fed " + colony.getQueenBread() + "/" + Colony.QUEEN_MEAL + incubation(colony, level)
                     + " | eggs " + colony.countEggs(level);
             source.sendSuccess(() -> Component.literal(line), false);
         }

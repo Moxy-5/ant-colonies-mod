@@ -24,6 +24,7 @@ public class ModEvents {
         if (event.getTabKey() == CreativeModeTabs.NATURAL_BLOCKS) {
             event.accept(ModItems.BURROWED_DIRT);
             event.accept(ModItems.SEED_PILE);
+            event.accept(ModItems.BREAD_PILE);
         }
         if (event.getTabKey() == CreativeModeTabs.SPAWN_EGGS) {
             event.accept(ModItems.WORKER_ANT_SPAWN_EGG);

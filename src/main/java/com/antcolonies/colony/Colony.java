@@ -197,7 +197,7 @@ public class Colony {
         }
         NestPlan.Chamber queen = layout.chambers().get(0);
         for (BlockPos pos : queen.cells()) {
-            if (!level.isLoaded(pos) || !level.getBlockState(pos).isAir()) {
+            if (!isDugOut(level, pos)) { // (bread may lie on her floor while there is no nursery)
                 return null;
             }
         }
@@ -229,7 +229,11 @@ public class Colony {
     }
 
     private static boolean isDugOut(Level level, BlockPos pos) {
-        return level.isLoaded(pos) && (level.getBlockState(pos).isAir() || level.getBlockState(pos).is(ModBlocks.SEED_PILE.get()));
+        if (!level.isLoaded(pos)) {
+            return false;
+        }
+        BlockState state = level.getBlockState(pos);
+        return state.isAir() || state.is(ModBlocks.SEED_PILE.get()) || state.is(ModBlocks.BREAD_PILE.get());
     }
 
     private static boolean touchesSideways(BlockPos a, BlockPos b) {
@@ -471,7 +475,7 @@ public class Colony {
 
     // ---- The queen and her eggs
 
-    /** The workers must feed the queen this many seeds (any kind) before she carries an egg. */
+    /** The workers must feed the queen this many pieces of ant bread before she carries an egg. */
     public static final int QUEEN_MEAL = 20;
     /** How long (in ticks) she carries the egg before it comes out behind her: 3 minutes at normal speed. */
     public static final int INCUBATION_TICKS = 3600;
@@ -486,8 +490,8 @@ public class Colony {
     /** How long (in ticks) a worker on its way to an egg keeps the others away from it. */
     private static final int EGG_CLAIM_TICKS = 600;
 
-    /** How many seeds the workers have fed the queen for her next egg (QUEEN_MEAL = full). Saved. */
-    private int queenSeeds;
+    /** How many pieces of bread the workers have fed the queen for her next egg (QUEEN_MEAL = full). Saved. */
+    private int queenBread;
     /** The game time when the egg she carries comes out (-1 = she carries none). Saved. */
     private long eggDue = -1;
     /** How many eggs the queen has laid in all. Saved. */
@@ -499,8 +503,8 @@ public class Colony {
     /** The eggs a worker is on its way to: egg -> game time when the claim runs out. Not saved. */
     private final Map<UUID, Long> claimedEggs = new HashMap<>();
 
-    public int getQueenSeeds() {
-        return queenSeeds;
+    public int getQueenBread() {
+        return queenBread;
     }
 
     /** Whether the queen carries an egg right now. */
@@ -532,25 +536,25 @@ public class Colony {
     }
 
     /**
-     * Whether the queen can take more seeds: she is home and not carrying an egg, there are not yet {@link #MAX_EGGS}
-     * eggs, and the workers already on their way (from the food store or straight from outside) would not fill her.
+     * Whether the queen can take more bread: she is home and not carrying an egg, there are not yet {@link #MAX_EGGS}
+     * eggs, and the workers already on their way with bread would not fill her.
      */
     public boolean needsFeeding(ServerLevel level) {
         long now = level.getGameTime();
         feeders.values().removeIf(until -> until <= now);
-        return eggDue < 0 && queenSeeds + feeders.size() < QUEEN_MEAL && isQueenHome(level)
+        return eggDue < 0 && queenBread + feeders.size() < QUEEN_MEAL && isQueenHome(level)
                 && countEggs(level) < MAX_EGGS;
     }
 
     /**
-     * Whether it is worth fetching a seed from outside: the food store has room for it, or the queen still wants
-     * seeds (the ant then brings it straight to her, so nothing is put down without a store).
+     * Whether it is worth fetching a seed from outside: the food store has room for it, or bread still has to be milled
+     * (the ant then brings the seed straight to the mill, so nothing is put down without a store).
      */
     public boolean wantsSeeds(ServerLevel level) {
-        return pickFoodSpot(level, level.getRandom()) != null || needsFeeding(level);
+        return pickFoodSpot(level, level.getRandom()) != null || needsBread(level);
     }
 
-    /** A worker sets out to feed the queen. False if she needs no more food right now. */
+    /** A worker sets out to bring the queen bread. False if she needs no more food right now. */
     public boolean claimFeeding(ServerLevel level, UUID ant) {
         if (!needsFeeding(level)) {
             return false;
@@ -588,16 +592,140 @@ public class Colony {
         return true;
     }
 
+    // ---- Ant bread
+
+    /** The nurses keep this much bread ready for the queen (one meal). */
+    public static final int BREAD_STOCK = QUEEN_MEAL;
+    /** Milling one seed into a piece of bread takes this long: 3 seconds. */
+    public static final int MILL_TICKS = 60;
+    /** How long (in ticks) a worker on its way to mill a seed counts as making bread. */
+    private static final int MILL_CLAIM_TICKS = 1300;
+
+    /** The pieces of bread lying in bread piles in the nest. Saved. */
+    private int bread;
+    /** The workers carrying a seed to the mill or milling it: ant -> game time when the claim runs out. Not saved. */
+    private final Map<UUID, Long> millers = new HashMap<>();
+
+    public int getBread() {
+        return bread;
+    }
+
+    /** How many seeds are being milled right now (on their way to the mill, or in it). */
+    public int getMilling() {
+        return millers.size();
+    }
+
     /**
-     * A worker gives the queen one seed. With {@link #QUEEN_MEAL} seeds she starts carrying an egg, which comes out
-     * {@link #INCUBATION_TICKS} later. False if she takes no more right now (the worker keeps the seed).
+     * Whether more bread should be milled: there is a place for it (the nursery, or the queen's room while there is no
+     * nursery), the pile plus the seeds already being milled are under one meal, and the queen has room for more eggs.
      */
-    public boolean feedQueen(ServerLevel level) {
-        if (eggDue >= 0 || queenSeeds >= QUEEN_MEAL) {
+    public boolean needsBread(ServerLevel level) {
+        long now = level.getGameTime();
+        millers.values().removeIf(until -> until <= now);
+        return bread + millers.size() < BREAD_STOCK && countEggs(level) < MAX_EGGS && pickBreadSpot(level, level.getRandom()) != null;
+    }
+
+    /** A worker sets out to mill a seed. False if no more bread is needed right now. */
+    public boolean claimMilling(ServerLevel level, UUID ant) {
+        if (!needsBread(level)) {
             return false;
         }
-        queenSeeds++;
-        if (queenSeeds >= QUEEN_MEAL) {
+        millers.put(ant, level.getGameTime() + MILL_CLAIM_TICKS);
+        return true;
+    }
+
+    /** The worker has made its bread, or gave up. */
+    public void releaseMilling(UUID ant) {
+        millers.remove(ant);
+    }
+
+    /**
+     * A worker that has just picked up a seed outside decides where it goes: to the food store if that has room,
+     * otherwise (no store yet, or full) to the mill if bread is needed. True = the mill; the worker is then counted.
+     */
+    public boolean claimSeedForBread(ServerLevel level, UUID ant) {
+        return pickFoodSpot(level, level.getRandom()) == null && claimMilling(level, ant);
+    }
+
+    /**
+     * A spot for one more piece of bread, or null if there is none: a growing heap or an empty cell of the nursery, and
+     * while the nursery has none, the same in the queen's room. Cells with an egg are left out.
+     */
+    @Nullable
+    public BlockPos pickBreadSpot(Level level, RandomSource random) {
+        Set<BlockPos> eggs = new HashSet<>();
+        for (AntEggEntity egg : getEggs(level)) {
+            eggs.add(egg.blockPosition());
+        }
+        for (List<BlockPos> cells : List.of(getNurseryCells(level), getQueenRoomCells(level))) {
+            List<BlockPos> growing = new ArrayList<>();
+            List<BlockPos> empty = new ArrayList<>();
+            for (BlockPos pos : cells) {
+                BlockState state = level.getBlockState(pos);
+                if (state.isAir() && !eggs.contains(pos)) {
+                    empty.add(pos);
+                } else if (state.is(ModBlocks.BREAD_PILE.get()) && state.getValue(SeedPileBlock.LAYERS) < SeedPileBlock.MAX_LAYERS) {
+                    growing.add(pos);
+                }
+            }
+            List<BlockPos> from = !growing.isEmpty() && (empty.isEmpty() || random.nextFloat() < 0.75F) ? growing : empty;
+            if (!from.isEmpty()) {
+                return from.get(random.nextInt(from.size()));
+            }
+        }
+        return null;
+    }
+
+    /** A worker puts its freshly milled bread at {@code spot}: the heap grows by a layer (or a new one starts). False if that spot is full. */
+    public boolean depositBread(Level level, BlockPos spot) {
+        BlockState state = level.getBlockState(spot);
+        if (state.isAir()) {
+            level.setBlock(spot, ModBlocks.BREAD_PILE.get().defaultBlockState(), 3);
+        } else if (state.is(ModBlocks.BREAD_PILE.get()) && state.getValue(SeedPileBlock.LAYERS) < SeedPileBlock.MAX_LAYERS) {
+            level.setBlock(spot, state.setValue(SeedPileBlock.LAYERS, state.getValue(SeedPileBlock.LAYERS) + 1), 3);
+        } else {
+            return false;
+        }
+        bread++;
+        return true;
+    }
+
+    /** A heap of bread to take a piece from, or null if there is none (nursery and queen's room are both searched). */
+    @Nullable
+    public BlockPos findBreadPile(Level level, RandomSource random) {
+        List<BlockPos> piles = new ArrayList<>();
+        for (List<BlockPos> cells : List.of(getNurseryCells(level), getQueenRoomCells(level))) {
+            for (BlockPos pos : cells) {
+                if (level.getBlockState(pos).is(ModBlocks.BREAD_PILE.get())) {
+                    piles.add(pos);
+                }
+            }
+        }
+        return piles.isEmpty() ? null : piles.get(random.nextInt(piles.size()));
+    }
+
+    /** A worker takes one piece of bread off the heap at {@code pile}. False if the heap is gone. */
+    public boolean takeBreadAt(Level level, BlockPos pile) {
+        BlockState state = level.getBlockState(pile);
+        if (!state.is(ModBlocks.BREAD_PILE.get())) {
+            return false;
+        }
+        int layers = state.getValue(SeedPileBlock.LAYERS);
+        level.setBlock(pile, layers <= 1 ? Blocks.AIR.defaultBlockState() : state.setValue(SeedPileBlock.LAYERS, layers - 1), 3);
+        bread = Math.max(0, bread - 1);
+        return true;
+    }
+
+    /**
+     * A worker gives the queen one piece of bread. With {@link #QUEEN_MEAL} pieces she starts carrying an egg, which
+     * comes out {@link #INCUBATION_TICKS} later. False if she takes no more right now (the worker keeps the bread).
+     */
+    public boolean feedQueen(ServerLevel level) {
+        if (eggDue >= 0 || queenBread >= QUEEN_MEAL) {
+            return false;
+        }
+        queenBread++;
+        if (queenBread >= QUEEN_MEAL) {
             eggDue = level.getGameTime() + INCUBATION_TICKS;
         }
         return true;
@@ -610,7 +738,7 @@ public class Colony {
 
     /** The egg comes out of the queen at this spot; she starts over with an empty stomach. */
     public void layEgg(ServerLevel level, double x, double y, double z) {
-        queenSeeds = 0;
+        queenBread = 0;
         eggDue = -1;
         eggsLaid++;
         spawnEgg(level, x, y, z);
@@ -782,7 +910,7 @@ public class Colony {
         Set<BlockPos> seen = new HashSet<>();
         List<Leak> leaks = new ArrayList<>();
         for (BlockPos cell : nest) {
-            if (!level.isLoaded(cell) || !level.getBlockState(cell).isAir()) {
+            if (!isDugOut(level, cell)) {
                 continue;
             }
             for (Direction direction : Direction.values()) {
@@ -1175,7 +1303,8 @@ public class Colony {
         casteCounts.forEach(castes::putInt);
         tag.put("castes", castes);
         tag.putInt("food", food);
-        tag.putInt("queenSeeds", queenSeeds);
+        tag.putInt("queenBread", queenBread);
+        tag.putInt("bread", bread);
         tag.putLong("eggDue", eggDue);
         tag.putInt("eggsLaid", eggsLaid);
         CompoundTag clips = new CompoundTag();
@@ -1191,7 +1320,8 @@ public class Colony {
                 tag.getUUID("queen"),
                 BlockPos.of(tag.getLong("center")));
         colony.food = tag.getInt("food");
-        colony.queenSeeds = tag.getInt("queenSeeds");
+        colony.queenBread = tag.contains("queenBread") ? tag.getInt("queenBread") : tag.getInt("queenSeeds"); // (old saves: seeds)
+        colony.bread = tag.getInt("bread");
         colony.eggDue = tag.contains("eggDue") ? tag.getLong("eggDue") : -1;
         colony.eggsLaid = tag.getInt("eggsLaid");
         CompoundTag clips = tag.getCompound("grassClips");

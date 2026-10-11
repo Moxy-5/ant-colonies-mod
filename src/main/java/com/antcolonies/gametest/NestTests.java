@@ -251,7 +251,7 @@ public class NestTests {
             helper.assertTrue(dropped[0] && colony != null, "no seeds have been dropped yet");
             // The workers also feed the queen from the store: count what she has eaten too.
             int total = seedsAccountedFor(colony);
-            helper.assertTrue(total == 5, "the colony has " + colony.getFood() + " food and the queen ate " + colony.getQueenSeeds()
+            helper.assertTrue(total == 5, "the colony has " + colony.getFood() + " food and the queen ate " + colony.getQueenBread()
                     + " (+ " + colony.getEggsLaid() + " eggs laid), expected 5 seeds in all");
             helper.assertTrue(seedsIn(level, storeBox(level, colony)) == colony.getFood(), "only " + seedsIn(level, storeBox(level, colony)) + " seeds are in the food store");
             helper.assertTrue(seedsIn(level, helper.getBounds()) == colony.getFood(), "some seeds are still lying around outside the store");
@@ -295,7 +295,7 @@ public class NestTests {
             }
             // The workers also feed the queen from the store: count what she has eaten too.
             int total = seedsAccountedFor(colony);
-            helper.assertTrue(total == expected, "the colony has " + colony.getFood() + " food and the queen ate " + colony.getQueenSeeds()
+            helper.assertTrue(total == expected, "the colony has " + colony.getFood() + " food and the queen ate " + colony.getQueenBread()
                     + " (+ " + colony.getEggsLaid() + " eggs laid), expected " + expected + " seeds in all");
             helper.assertTrue(seedsIn(level, storeBox(level, colony)) == colony.getFood(),
                     "only " + seedsIn(level, storeBox(level, colony)) + " seeds are in the store");
@@ -306,9 +306,9 @@ public class NestTests {
     }
 
     /**
-     * In a finished nest with 25 seeds in the food store the workers feed the queen 20 of them. She then carries an egg
-     * for 3 minutes (3600 ticks), the egg comes out behind her in her room, and a worker carries it into the nursery.
-     * After that she is fed the 5 seeds that are left.
+     * In a finished nest with 25 seeds in the food store the nurse mills them into ant bread in the nursery and the
+     * workers feed the queen 20 pieces. She then carries an egg for 3 minutes (3600 ticks), the egg comes out behind her
+     * in her room, and a worker carries it into the nursery. After that she is fed the 5 pieces that are left.
      */
     @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
     public static void queenIsFedAndHerEggGoesToTheNursery(GameTestHelper helper) {
@@ -320,6 +320,7 @@ public class NestTests {
         long[] incubationStart = {-1};
         long[] laidAt = {-1};
         boolean[] cameOutBehindHer = {false};
+        boolean[] breadInNursery = {false};
         helper.onEachTick(() -> {
             Colony colony = colony(helper);
             if (stocked[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.findDigTarget(level) != null
@@ -337,6 +338,11 @@ public class NestTests {
             Colony colony = colony(helper);
             if (!stocked[0] || colony == null) {
                 return;
+            }
+            if (!breadInNursery[0] && colony.getBread() > 0) {
+                for (BlockPos pos : colony.getNurseryCells(level)) {
+                    breadInNursery[0] |= level.getBlockState(pos).is(ModBlocks.BREAD_PILE.get());
+                }
             }
             if (incubationStart[0] < 0 && colony.isIncubating()) {
                 incubationStart[0] = level.getGameTime();
@@ -359,7 +365,7 @@ public class NestTests {
             }
             if (helper.getTick() % 1000 == 0) {
                 AntColoniesMod.LOGGER.info("[egg-test] tick {}: food {}, queen fed {}, eggs laid {}, eggs {} (nursery {})", helper.getTick(),
-                        colony.getFood(), colony.getQueenSeeds(), colony.getEggsLaid(), colony.countEggs(level), colony.getNurseryEggs(level).size());
+                        colony.getFood(), colony.getQueenBread(), colony.getEggsLaid(), colony.countEggs(level), colony.getNurseryEggs(level).size());
             }
         });
 
@@ -376,8 +382,70 @@ public class NestTests {
                     "expected 1 egg, in the nursery, but there are " + eggs.size() + " (" + colony.getNurseryEggs(level).size() + " in the nursery)");
             helper.assertTrue(level.getEntitiesOfClass(com.antcolonies.entity.AntEggEntity.class, helper.getBounds()).size() == 1,
                     "there is an egg somewhere else");
-            helper.assertTrue(colony.getQueenSeeds() == 5, "the queen was fed " + colony.getQueenSeeds() + " seeds for the next egg, expected the 5 that were left");
+            helper.assertTrue(breadInNursery[0], "no bread was ever seen on the nursery floor");
+            helper.assertTrue(colony.getQueenBread() == 5, "the queen was fed " + colony.getQueenBread() + " pieces of bread for the next egg, expected the 5 that were left");
             helper.assertTrue(colony.getFood() == 0 && seedsIn(level, storeBox(level, colony)) == 0, "seeds are left in the store");
+            helper.assertTrue(colony.getBread() == 0 && breadIn(level, helper.getBounds()) == 0, "bread is left in the nursery");
+            for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
+                helper.assertTrue(!ant.hasFullMandibles(), "an ant is still carrying something");
+            }
+        });
+    }
+
+    /**
+     * One seed in the food store of a finished nest: the nurse carries it to the nursery, mills it for 3 seconds (it is
+     * gone from the store but not yet bread until then), and it becomes one piece of bread on the nursery floor, which
+     * then goes to the queen.
+     */
+    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    public static void nurseMillsASeedIntoBreadInTheNursery(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        startColony(helper);
+
+        boolean[] stocked = {false};
+        long[] seedTakenAt = {-1};
+        long[] breadAt = {-1};
+        boolean[] pileInNursery = {false};
+        helper.onEachTick(() -> {
+            Colony colony = colony(helper);
+            if (colony == null) {
+                return;
+            }
+            if (!stocked[0]) {
+                if (airBelowSurface(helper) == NEST_CELLS && colony.findDigTarget(level) == null && hillProblems(helper).isEmpty()) {
+                    stocked[0] = true;
+                    colony.depositSeed(level, colony.getFoodStoreCells(level).get(0));
+                    AntColoniesMod.LOGGER.info("[bread-test] tick {}: one seed put in the food store", helper.getTick());
+                }
+                return;
+            }
+            if (seedTakenAt[0] < 0 && colony.getFood() == 0) {
+                seedTakenAt[0] = level.getGameTime();
+                AntColoniesMod.LOGGER.info("[bread-test] tick {}: the nurse took the seed", helper.getTick());
+            }
+            if (breadAt[0] < 0 && colony.getBread() + colony.getQueenBread() >= 1) {
+                breadAt[0] = level.getGameTime();
+                AntColoniesMod.LOGGER.info("[bread-test] tick {}: there is bread ({} seconds after the seed was taken)", helper.getTick(),
+                        (breadAt[0] - seedTakenAt[0]) / 20.0);
+            }
+            if (!pileInNursery[0] && colony.getBread() > 0) {
+                for (BlockPos pos : colony.getNurseryCells(level)) {
+                    pileInNursery[0] |= level.getBlockState(pos).is(ModBlocks.BREAD_PILE.get());
+                }
+            }
+        });
+
+        helper.succeedWhen(() -> {
+            Colony colony = colony(helper);
+            helper.assertTrue(stocked[0] && colony != null && breadAt[0] >= 0, "no bread has been made yet");
+            long milling = breadAt[0] - seedTakenAt[0];
+            helper.assertTrue(milling >= Colony.MILL_TICKS, "the bread was ready " + milling + " ticks after the seed was taken, milling takes " + Colony.MILL_TICKS);
+            helper.assertTrue(milling <= Colony.MILL_TICKS + 600, "milling took " + milling + " ticks, far longer than " + Colony.MILL_TICKS);
+            helper.assertTrue(pileInNursery[0], "the bread never lay on the nursery floor");
+            helper.assertTrue(colony.getQueenBread() == 1 && colony.getBread() == 0 && colony.getFood() == 0,
+                    "the queen has " + colony.getQueenBread() + " bread, " + colony.getBread() + " in the nursery, " + colony.getFood() + " seeds in the store; expected 1, 0, 0");
+            helper.assertTrue(breadIn(level, helper.getBounds()) == 0 && seedsIn(level, helper.getBounds()) == 0, "something is left lying around");
             for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
                 helper.assertTrue(!ant.hasFullMandibles(), "an ant is still carrying something");
             }
@@ -471,9 +539,12 @@ public class NestTests {
         });
     }
 
-    /** The seeds the colony can account for: in the store, eaten by the queen for her next egg, or used for the eggs she has laid. */
+    /**
+     * The seeds the colony can account for: in the store, milled into bread (waiting in the nursery or eaten by the queen
+     * for her next egg), or used for the eggs she has laid. A seed on its way or in the mill is not counted yet.
+     */
     private static int seedsAccountedFor(Colony colony) {
-        return colony.getFood() + colony.getQueenSeeds() + Colony.QUEEN_MEAL * colony.getEggsLaid();
+        return colony.getFood() + colony.getBread() + colony.getQueenBread() + Colony.QUEEN_MEAL * colony.getEggsLaid();
     }
 
     private static void dropSeeds(GameTestHelper helper, int x, int z, int count) {
@@ -481,13 +552,15 @@ public class NestTests {
         var item = new net.minecraft.world.entity.item.ItemEntity(helper.getLevel(), at.getX() + 0.5, at.getY(), at.getZ() + 0.5,
                 new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.WHEAT_SEEDS, count));
         item.setDeltaMovement(0, 0, 0);
+        item.setUnlimitedLifetime(); // the seeds must not despawn (5 minutes) while the slow ants take their time
         helper.getLevel().addFreshEntity(item);
     }
 
     /**
      * Seeds lie on the ground as soon as the queen's room is finished, long before any food store is dug. The workers
-     * bring them straight to the queen (20 for her first egg) and put nothing down anywhere else; the rest waits on the
-     * ground until a part of the food store exists. In the end every seed is accounted for.
+     * bring them straight to the mill (20 are enough for her first egg), the nurse feeds the queen the bread, and nothing
+     * is put down anywhere else; the rest waits on the ground until a part of the food store exists. In the end every
+     * seed is accounted for.
      */
     @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
     public static void workersFeedTheQueenBeforeTheFoodStoreExists(GameTestHelper helper) {
@@ -510,15 +583,23 @@ public class NestTests {
                 AntColoniesMod.LOGGER.info("[early-feed-test] tick {}: queen room finished, 30 seeds dropped, {} nest cells dug",
                         helper.getTick(), airBelowSurface(helper));
             }
-            if (dropped[0] && !fedWithoutStore[0] && colony.getQueenSeeds() > 0 && colony.getFoodStoreCells(level).isEmpty()) {
+            if (dropped[0] && !fedWithoutStore[0] && colony.getQueenBread() > 0 && colony.getFoodStoreCells(level).isEmpty()) {
                 fedWithoutStore[0] = true;
                 AntColoniesMod.LOGGER.info("[early-feed-test] tick {}: the queen got a seed and there is no food store yet (food {})",
                         helper.getTick(), colony.getFood());
             }
             if (dropped[0] && helper.getTick() % 400 == 0) {
-                AntColoniesMod.LOGGER.info("[early-feed-test] tick {}: queen fed {}, food {}, eggs laid {}, store cells {}, nest cells {}",
-                        helper.getTick(), colony.getQueenSeeds(), colony.getFood(), colony.getEggsLaid(),
-                        colony.getFoodStoreCells(level).size(), airBelowSurface(helper));
+                int carrying = 0;
+                int forMill = 0;
+                int breadCarried = 0;
+                for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
+                    carrying += ant.isCarryingSeed() ? 1 : 0;
+                    forMill += ant.isCarryingSeed() && ant.isSeedForBread() ? 1 : 0;
+                    breadCarried += ant.isCarryingBread() ? 1 : 0;
+                }
+                AntColoniesMod.LOGGER.info("[early-feed-test] tick {}: queen fed {}, bread {} (milling {}), food {}, eggs laid {}, store cells {}, nest cells {}, seeds carried {} (for the mill {}), bread carried {}, bread blocks {}, seeds on the ground {}",
+                        helper.getTick(), colony.getQueenBread(), colony.getBread(), colony.getMilling(), colony.getFood(), colony.getEggsLaid(),
+                        colony.getFoodStoreCells(level).size(), airBelowSurface(helper), carrying, forMill, breadCarried, breadIn(level, helper.getBounds()), seedsIn(level, helper.getBounds()) - colony.getFood());
             }
         });
 
@@ -527,7 +608,7 @@ public class NestTests {
             helper.assertTrue(dropped[0] && colony != null, "no seeds have been dropped yet");
             helper.assertTrue(fedWithoutStore[0], "the queen was not fed before the food store existed");
             helper.assertTrue(seedsAccountedFor(colony) == 30, "the colony has " + colony.getFood() + " food and the queen ate "
-                    + colony.getQueenSeeds() + " (+ " + colony.getEggsLaid() + " eggs laid), expected 30 seeds in all");
+                    + colony.getQueenBread() + " (+ " + colony.getEggsLaid() + " eggs laid), expected 30 seeds in all");
             helper.assertTrue(seedsIn(level, helper.getBounds()) == colony.getFood(), "some seeds are still lying around outside the store");
             for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
                 helper.assertTrue(!ant.isCarryingSeed(), "an ant is still carrying a seed");
@@ -626,6 +707,19 @@ public class NestTests {
                     "roles (builder, forager, nurse): " + java.util.Arrays.toString(roles) + ", expected [3, 2, 1]");
             helper.assertTrue(nursesNearQueen == 1, "the nurse is not next to the queen");
         });
+    }
+
+    /** How many pieces of bread lie in the box (every layer of a bread pile block counts one). */
+    private static int breadIn(ServerLevel level, AABB box) {
+        int bread = 0;
+        for (BlockPos pos : BlockPos.betweenClosed(BlockPos.containing(box.minX + 0.01, box.minY + 0.01, box.minZ + 0.01),
+                BlockPos.containing(box.maxX - 0.01, box.maxY - 0.01, box.maxZ - 0.01))) {
+            var state = level.getBlockState(pos);
+            if (state.is(ModBlocks.BREAD_PILE.get())) {
+                bread += state.getValue(com.antcolonies.block.SeedPileBlock.LAYERS);
+            }
+        }
+        return bread;
     }
 
     /** A box around the floor cells of the colony's food store. */

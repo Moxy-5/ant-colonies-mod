@@ -9,17 +9,17 @@ import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.QueenAntEntity;
+import com.antcolonies.registry.ModItems;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 
 /**
- * Feeds the queen: the worker takes one seed off a heap in the food store, carries it to the queen in her room and
- * gives it to her. After {@link Colony#QUEEN_MEAL} seeds she carries an egg. If something goes wrong on the way, the
- * seed is not lost: {@link StoreSeedGoal} puts it back in the food store.
+ * Feeds the queen: the worker takes one piece of ant bread off a heap in the nursery, carries it to the queen in her
+ * room and gives it to her. After {@link Colony#QUEEN_MEAL} pieces she carries an egg. If the queen does not want the
+ * bread after all, the worker puts it back on a bread heap.
  */
 public class FeedQueenGoal extends Goal {
     /** How close (sideways, in blocks) the ant must get to a heap or to the queen. */
@@ -29,10 +29,13 @@ public class FeedQueenGoal extends Goal {
     /** Time (in ticks) before this ant looks for the queen's food again after finding no way to a heap. */
     private static final int RETRY_TICKS = 200;
 
+    private enum Leg { TO_PILE, TO_QUEEN, BACK_TO_PILE }
+
     private final AbstractAntEntity ant;
     @Nullable
     private Colony colony;
-    /** The heap to take a seed from; null once the ant has its seed. */
+    private Leg leg = Leg.TO_PILE;
+    /** The heap to take bread from, or to put it back on. */
     @Nullable
     private BlockPos pile;
     private int ticks;
@@ -47,27 +50,32 @@ public class FeedQueenGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        // An ant that took a seed outside for the queen carries on to her (it already counts as feeding her).
-        if (ant.getColonyId() != null && ant.isCarryingSeed() && ant.isSeedForQueen() && ant.level() instanceof ServerLevel level) {
+        if (ant.getColonyId() == null || !(ant.level() instanceof ServerLevel level)) {
+            return false;
+        }
+        // An ant that holds bread (something interrupted the walk) carries on to the queen.
+        if (ant.isCarryingBread()) {
             colony = ColonyManager.get(level).getColony(ant.getColonyId());
+            leg = Leg.TO_QUEEN;
             pile = null;
             return colony != null;
         }
         // Only look for work now and then, so ants don't all think on the same tick.
-        if (ant.getColonyId() == null || ant.hasFullMandibles() || ant.getRandom().nextInt(20) != 0
-                || !ant.mayDo(ColonyRole.NURSE) || !(ant.level() instanceof ServerLevel level) || level.getGameTime() < nextTry) {
+        if (ant.hasFullMandibles() || ant.getRandom().nextInt(20) != 0 || !ant.mayDo(ColonyRole.NURSE)
+                || level.getGameTime() < nextTry) {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        if (colony == null || colony.getFood() <= 0 || !colony.claimFeeding(level, ant.getUUID())) {
+        if (colony == null || colony.getBread() <= 0 || !colony.claimFeeding(level, ant.getUUID())) {
             return false;
         }
-        pile = colony.findSeedPile(level, ant.getRandom());
+        pile = colony.findBreadPile(level, ant.getRandom());
         if (pile == null || !ant.getNavigator().moveTo(pile, 1.0)) {
             colony.releaseFeeding(ant.getUUID());
-            nextTry = level.getGameTime() + RETRY_TICKS; // no seeds, or no way to them
+            nextTry = level.getGameTime() + RETRY_TICKS; // no bread, or no way to it
             return false;
         }
+        leg = Leg.TO_PILE;
         return true;
     }
 
@@ -88,8 +96,6 @@ public class FeedQueenGoal extends Goal {
         if (colony != null) {
             colony.releaseFeeding(ant.getUUID());
         }
-        // A seed that did not reach the queen goes back to the food store.
-        ant.setSeedForQueen(false);
         pile = null;
         colony = null;
     }
@@ -100,26 +106,23 @@ public class FeedQueenGoal extends Goal {
             return;
         }
         ticks++;
-        if (pile != null) {
-            walkToPile(level);
-        } else {
-            walkToQueen(level);
+        switch (leg) {
+            case TO_PILE -> walkToPile(level);
+            case TO_QUEEN -> walkToQueen(level);
+            case BACK_TO_PILE -> walkBack(level);
         }
     }
 
-    /** First leg: to a heap in the food store, where the ant takes a seed. */
+    /** First leg: to a heap of bread in the nursery, where the ant takes a piece. */
     private void walkToPile(ServerLevel level) {
-        double dx = ant.getX() - (pile.getX() + 0.5);
-        double dz = ant.getZ() - (pile.getZ() + 0.5);
-        if (dx * dx + dz * dz <= REACH * REACH && Math.abs(ant.getY() - pile.getY()) < 1.5) {
-            if (colony.takeSeedAt(level, pile)) {
-                ant.setCarriedSeed(new ItemStack(Items.WHEAT_SEEDS));
-                ant.setSeedForQueen(true);
+        if (near(pile)) {
+            if (colony.takeBreadAt(level, pile)) {
+                ant.setCarriedSeed(new ItemStack(ModItems.ANT_BREAD.get()));
                 ColonyManager.get(level).markChanged();
-                pile = null;
+                leg = Leg.TO_QUEEN;
                 ant.getNavigator().stop();
             } else {
-                pile = colony.findSeedPile(level, ant.getRandom()); // somebody else took the last seed there
+                pile = colony.findBreadPile(level, ant.getRandom()); // somebody else took the last piece there
                 if (pile == null || !ant.getNavigator().moveTo(pile, 1.0)) {
                     done = true;
                 }
@@ -129,7 +132,7 @@ public class FeedQueenGoal extends Goal {
         }
     }
 
-    /** Second leg: to the queen, who takes the seed. */
+    /** Second leg: to the queen, who takes the bread. */
     private void walkToQueen(ServerLevel level) {
         QueenAntEntity queen = colony.getQueen(level);
         if (queen == null) {
@@ -142,12 +145,49 @@ public class FeedQueenGoal extends Goal {
         if (dx * dx + dz * dz <= REACH * REACH && Math.abs(ant.getY() - queen.getY()) < 1.5) {
             if (colony.feedQueen(level)) {
                 ant.setCarriedSeed(ItemStack.EMPTY);
-                ant.setSeedForQueen(false);
                 ColonyManager.get(level).markChanged();
+                done = true;
+            } else {
+                // She wants no more right now: the bread goes back on a heap.
+                pile = colony.pickBreadSpot(level, ant.getRandom());
+                if (pile == null || !ant.getNavigator().moveTo(pile, 1.0)) {
+                    ant.setCarriedSeed(ItemStack.EMPTY); // nowhere to put it
+                    done = true;
+                } else {
+                    leg = Leg.BACK_TO_PILE;
+                }
             }
-            done = true; // (if she took no more, stop() lets the ant put the seed back)
         } else if (ant.getNavigator().isDone() && !ant.getNavigator().moveTo(queen.blockPosition(), 1.0)) {
             done = true;
         }
+    }
+
+    /** Third leg, only if the queen did not want the bread: back to a bread heap. */
+    private void walkBack(ServerLevel level) {
+        if (near(pile)) {
+            if (!colony.depositBread(level, pile)) {
+                pile = colony.pickBreadSpot(level, ant.getRandom());
+                if (pile == null || !ant.getNavigator().moveTo(pile, 1.0)) {
+                    ant.setCarriedSeed(ItemStack.EMPTY);
+                    done = true;
+                }
+                return;
+            }
+            ant.setCarriedSeed(ItemStack.EMPTY);
+            ColonyManager.get(level).markChanged();
+            done = true;
+        } else if (ant.getNavigator().isDone() && !ant.getNavigator().moveTo(pile, 1.0)) {
+            ant.setCarriedSeed(ItemStack.EMPTY);
+            done = true;
+        }
+    }
+
+    private boolean near(@Nullable BlockPos spot) {
+        if (spot == null) {
+            return false;
+        }
+        double dx = ant.getX() - (spot.getX() + 0.5);
+        double dz = ant.getZ() - (spot.getZ() + 0.5);
+        return dx * dx + dz * dz <= REACH * REACH && Math.abs(ant.getY() - spot.getY()) < 1.5;
     }
 }

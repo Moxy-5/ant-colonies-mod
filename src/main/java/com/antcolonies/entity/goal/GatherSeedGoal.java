@@ -47,7 +47,7 @@ public class GatherSeedGoal extends Goal {
     @Override
     public boolean canUse() {
         // Only look for work now and then, so ants don't all think on the same tick.
-        if (ant.getColonyId() == null || ant.isCarrying() || ant.isCarryingSeed() || ant.getRandom().nextInt(20) != 0
+        if (ant.getColonyId() == null || ant.hasFullMandibles() || ant.getRandom().nextInt(20) != 0
                 || !ant.mayDo(ColonyRole.FORAGER) || !(ant.level() instanceof ServerLevel level)) {
             return false;
         }
@@ -68,7 +68,7 @@ public class GatherSeedGoal extends Goal {
     @Override
     public boolean canContinueToUse() {
         return colony != null && seed != null && seed.isAlive() && !seed.getItem().isEmpty()
-                && !ant.isCarrying() && !ant.isCarryingSeed() && ticks < GIVE_UP_TICKS;
+                && !ant.hasFullMandibles() && ticks < GIVE_UP_TICKS;
     }
 
     @Override
@@ -114,7 +114,7 @@ public class GatherSeedGoal extends Goal {
             seed.setItem(stack);
         }
         ant.setCarriedSeed(one);
-        ant.setSeedForQueen(colony.claimFeeding(level, ant.getUUID())); // straight to the queen if she wants it
+        ant.setSeedForBread(colony.claimSeedForBread(level, ant.getUUID())); // to the mill if there is no store yet
         level.playSound(null, ant.blockPosition(), SoundEvents.ITEM_PICKUP, SoundSource.NEUTRAL, 0.15F, 1.6F);
     }
 }

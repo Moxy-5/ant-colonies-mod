@@ -36,8 +36,8 @@ public class StoreSeedGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        // A seed on its way to the queen is not stored (unless the trip is called off: then FeedQueenGoal lets go of it).
-        if (!ant.isCarryingSeed() || ant.isSeedForQueen() || ant.getColonyId() == null || !(ant.level() instanceof ServerLevel level)) {
+        // A seed on its way to the mill is not stored (unless the trip is called off: then MillBreadGoal lets go of it).
+        if (!ant.isCarryingSeed() || ant.isSeedForBread() || ant.getColonyId() == null || !(ant.level() instanceof ServerLevel level)) {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());

@@ -13,6 +13,10 @@ public class ModItems {
 
     public static final DeferredItem<BlockItem> BURROWED_DIRT = ITEMS.registerSimpleBlockItem(ModBlocks.BURROWED_DIRT);
     public static final DeferredItem<BlockItem> SEED_PILE = ITEMS.registerSimpleBlockItem(ModBlocks.SEED_PILE);
+    public static final DeferredItem<BlockItem> BREAD_PILE = ITEMS.registerSimpleBlockItem(ModBlocks.BREAD_PILE);
+
+    /** One piece of ant bread: what the ants carry from the mill to the queen, and what a broken bread pile drops. */
+    public static final DeferredItem<Item> ANT_BREAD = ITEMS.registerSimpleItem("ant_bread");
 
     public static final DeferredItem<DeferredSpawnEggItem> WORKER_ANT_SPAWN_EGG =
             ITEMS.register("worker_ant_spawn_egg",

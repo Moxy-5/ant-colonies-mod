@@ -9,6 +9,7 @@ import com.antcolonies.nav.AntMoveControl;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.nav.AntNavigator;
+import com.antcolonies.registry.ModItems;
 
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -60,7 +61,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     @Nullable
     private UUID colonyId;
 
-    private boolean seedForQueen;
+    private boolean seedForBread;
     /** How many seconds in a row the ant has had nothing to do. Server side only, not saved. */
     private int idleSeconds;
 
@@ -97,13 +98,19 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         entityData.set(DATA_CARRIED, Optional.ofNullable(state));
     }
 
-    /** The seed this ant carries to the food store (empty if none). */
+    /** What this ant carries in its mandibles besides soil and eggs: a seed, or a piece of ant bread (empty if none). */
     public ItemStack getCarriedSeed() {
         return entityData.get(DATA_CARRIED_SEED);
     }
 
+    /** Whether the ant holds a seed (on its way to the food store or the mill). */
     public boolean isCarryingSeed() {
-        return !getCarriedSeed().isEmpty();
+        return !getCarriedSeed().isEmpty() && !isCarryingBread();
+    }
+
+    /** Whether the ant holds a piece of ant bread (on its way to the queen). */
+    public boolean isCarryingBread() {
+        return getCarriedSeed().is(ModItems.ANT_BREAD.get());
     }
 
     public void setCarriedSeed(ItemStack seed) {
@@ -119,18 +126,18 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         entityData.set(DATA_CARRIED_EGG, carrying);
     }
 
-    /** The seed in the mandibles is for the queen, not for the food store. Server side only, not saved. */
-    public boolean isSeedForQueen() {
-        return seedForQueen;
+    /** The seed in the mandibles is for the mill (it becomes bread), not for the food store. Server side only, not saved. */
+    public boolean isSeedForBread() {
+        return seedForBread;
     }
 
-    public void setSeedForQueen(boolean forQueen) {
-        this.seedForQueen = forQueen;
+    public void setSeedForBread(boolean forBread) {
+        this.seedForBread = forBread;
     }
 
-    /** Whether the mandibles are full (a soil pellet, a seed or an egg), so the ant can't pick up anything else. */
+    /** Whether the mandibles are full (a soil pellet, a seed, bread or an egg), so the ant can't pick up anything else. */
     public boolean hasFullMandibles() {
-        return isCarrying() || isCarryingSeed() || isCarryingEgg();
+        return isCarrying() || !getCarriedSeed().isEmpty() || isCarryingEgg();
     }
 
     /** How long (in seconds) an ant must have nothing to do before it helps with work that is not its role's. */
