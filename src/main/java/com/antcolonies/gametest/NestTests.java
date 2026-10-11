@@ -453,11 +453,12 @@ public class NestTests {
     }
 
     /**
-     * Three eggs put in the nursery of a finished nest hatch after 2 minutes: each becomes a real worker of the same
-     * colony, and the colony counts them.
+     * Three eggs put in the nursery of a finished nest hatch after 1 minute into larvae. The nurses feed each larva 5
+     * pieces of bread (35 seeds are in the store: 20 for the queen, 15 for the larvae), and each then becomes a real
+     * worker of the same colony, which the colony counts.
      */
-    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
-    public static void eggsInTheNurseryHatchIntoWorkers(GameTestHelper helper) {
+    @GameTest(template = "arena", timeoutTicks = 80000, skyAccess = true)
+    public static void eggsBecomeLarvaeAndNursesFeedThemIntoWorkers(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
         startColony(helper);
@@ -478,13 +479,25 @@ public class NestTests {
             for (int i = 0; i < 3; i++) {
                 colony.placeEgg(level, cells.get(i * 7));
             }
-            AntColoniesMod.LOGGER.info("[hatch-test] tick {}: 3 eggs put in the nursery, {} workers", helper.getTick(), workersBefore[0]);
+            var store = colony.getFoodStoreCells(level);
+            for (int i = 0; i < 35; i++) {
+                colony.depositSeed(level, store.get(i / 8));
+            }
+            AntColoniesMod.LOGGER.info("[hatch-test] tick {}: 3 eggs put in the nursery, 35 seeds in the store, {} workers", helper.getTick(), workersBefore[0]);
+        });
+        helper.onEachTick(() -> {
+            Colony colony = colony(helper);
+            if (placed[0] && colony != null && helper.getTick() % 500 == 0) {
+                AntColoniesMod.LOGGER.info("[hatch-test] tick {}: eggs {}, larvae {} (hunger {}), bread {}, food {}, workers {}", helper.getTick(),
+                        colony.countEggs(level), colony.countLarvae(level), colony.larvaHunger(level), colony.getBread(), colony.getFood(),
+                        colony.getCount(WorkerAntEntity.CASTE));
+            }
         });
 
         helper.succeedWhen(() -> {
             Colony colony = colony(helper);
             helper.assertTrue(placed[0] && colony != null, "no eggs have been put in the nursery yet");
-            helper.assertTrue(colony.countEggs(level) == 0, colony.countEggs(level) + " eggs are still there");
+            helper.assertTrue(colony.countLarvae(level) == 0, colony.countLarvae(level) + " larvae are still there");
             helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == workersBefore[0] + 3,
                     "the colony counts " + colony.getCount(WorkerAntEntity.CASTE) + " workers, expected " + (workersBefore[0] + 3));
             var workers = level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds());
@@ -496,11 +509,11 @@ public class NestTests {
     }
 
     /**
-     * When the colony already has one worker less than the most it can have, three eggs in the nursery make exactly one
-     * worker; the other two stay eggs.
+     * When the colony already has one worker less than the most it can have, three fully fed larvae in the nursery make
+     * exactly one worker; the other two stay larvae.
      */
     @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
-    public static void eggsWaitWhenTheColonyHasEnoughWorkers(GameTestHelper helper) {
+    public static void larvaeWaitWhenTheColonyHasEnoughWorkers(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
         startColony(helper);
@@ -522,18 +535,19 @@ public class NestTests {
             colony.setCount(WorkerAntEntity.CASTE, Colony.MAX_WORKERS - 1);
             var cells = colony.getNurseryCells(level);
             for (int i = 0; i < 3; i++) {
-                colony.placeEgg(level, cells.get(i * 7));
+                BlockPos cell = cells.get(i * 7);
+                colony.spawnLarva(level, cell.getX() + 0.5, cell.getY(), cell.getZ() + 0.5).setFed(Colony.LARVA_MEAL);
             }
         });
 
         helper.succeedWhen(() -> {
             Colony colony = colony(helper);
-            helper.assertTrue(placed[0] && colony != null, "no eggs have been put in the nursery yet");
-            // Wait well past the hatching time, so the two eggs had every chance to hatch too.
-            helper.assertTrue(level.getGameTime() >= placedAt[0] + Colony.HATCH_TICKS + 400, "still waiting for the eggs to have hatched");
+            helper.assertTrue(placed[0] && colony != null, "no larvae have been put in the nursery yet");
+            // Wait well past the moment the first one grows up, so the other two had every chance to grow up too.
+            helper.assertTrue(level.getGameTime() >= placedAt[0] + 600, "still waiting for the larvae to have grown up");
             helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == Colony.MAX_WORKERS,
                     "the colony counts " + colony.getCount(WorkerAntEntity.CASTE) + " workers, expected " + Colony.MAX_WORKERS);
-            helper.assertTrue(colony.countEggs(level) == 2, colony.countEggs(level) + " eggs are left, expected 2");
+            helper.assertTrue(colony.countLarvae(level) == 2, colony.countLarvae(level) + " larvae are left, expected 2");
             helper.assertTrue(level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds()).size() == antsBefore[0] + 1,
                     "expected exactly one new worker");
         });
@@ -618,7 +632,7 @@ public class NestTests {
 
     /**
      * A nursery that cannot be dug (turned to stone) does not stop the colony: the egg is set down on the floor of the
-     * queen's room by a worker, and it hatches there.
+     * queen's room by a worker, and it hatches there into a larva.
      */
     @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
     public static void eggsGoToTheQueensRoomWhenThereIsNoNursery(GameTestHelper helper) {
@@ -666,11 +680,11 @@ public class NestTests {
             Colony colony = colony(helper);
             helper.assertTrue(ready[0] && colony != null, "the egg has not been laid yet");
             helper.assertTrue(colony.getNurseryCells(level).isEmpty(), "the nursery is usable after all");
-            helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == workersBefore[0] + 1,
-                    "the colony has " + colony.getCount(WorkerAntEntity.CASTE) + " workers, expected " + (workersBefore[0] + 1));
             helper.assertTrue(colony.countEggs(level) == 0, "an egg is left");
-            helper.assertTrue(level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds()).size() == antsBefore[0] + 1,
-                    "the new worker is not there");
+            helper.assertTrue(colony.countLarvae(level) == 1, colony.countLarvae(level) + " larvae, expected 1");
+            helper.assertTrue(colony.getQueenRoomCells(level).contains(colony.getLarvae(level).get(0).blockPosition()),
+                    "the larva is not in the queen's room");
+            helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == workersBefore[0], "the colony has a new worker already");
         });
     }
 

@@ -17,6 +17,7 @@ public class ClientEvents {
     @SubscribeEvent
     public static void onRegisterLayers(EntityRenderersEvent.RegisterLayerDefinitions event) {
         event.registerLayerDefinition(AntEggRenderer.LAYER, AntEggRenderer::createLayer);
+        event.registerLayerDefinition(AntLarvaRenderer.LAYER, AntLarvaRenderer::createLayer);
     }
 
     @SubscribeEvent
@@ -29,6 +30,7 @@ public class ClientEvents {
                 .withScale(0.65F));
 
         event.registerEntityRenderer(ModEntities.ANT_EGG.get(), AntEggRenderer::new);
+        event.registerEntityRenderer(ModEntities.ANT_LARVA.get(), AntLarvaRenderer::new);
 
         // Placeholder: the queen reuses the worker model and animations, just bigger and with her own texture.
         ResourceLocation workerAsset = ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "worker_ant");

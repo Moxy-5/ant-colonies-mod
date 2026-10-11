@@ -2,6 +2,7 @@ package com.antcolonies.registry;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.entity.AntEggEntity;
+import com.antcolonies.entity.AntLarvaEntity;
 import com.antcolonies.entity.QueenAntEntity;
 import com.antcolonies.entity.WorkerAntEntity;
 
@@ -30,6 +31,15 @@ public class ModEntities {
                     .clientTrackingRange(6)
                     .updateInterval(20)
                     .build("ant_egg"));
+
+    // A larva lying in the nursery.
+    public static final DeferredHolder<EntityType<?>, EntityType<AntLarvaEntity>> ANT_LARVA =
+            ENTITY_TYPES.register("ant_larva", () -> EntityType.Builder
+                    .of(AntLarvaEntity::new, MobCategory.MISC)
+                    .sized(0.2F, 0.15F)
+                    .clientTrackingRange(6)
+                    .updateInterval(20)
+                    .build("ant_larva"));
 
     // Queen is about twice the worker's size.
     public static final DeferredHolder<EntityType<?>, EntityType<QueenAntEntity>> QUEEN_ANT =

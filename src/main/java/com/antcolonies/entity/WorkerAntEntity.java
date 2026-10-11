@@ -8,6 +8,7 @@ import com.antcolonies.entity.goal.CarryEggGoal;
 import com.antcolonies.entity.goal.CarryPelletGoal;
 import com.antcolonies.entity.goal.ClipGrassGoal;
 import com.antcolonies.entity.goal.DigGoal;
+import com.antcolonies.entity.goal.FeedLarvaGoal;
 import com.antcolonies.entity.goal.FeedQueenGoal;
 import com.antcolonies.entity.goal.MillBreadGoal;
 import com.antcolonies.entity.goal.GatherSeedGoal;
@@ -53,6 +54,7 @@ public class WorkerAntEntity extends AbstractAntEntity {
         // The queen's egg comes out behind her: a worker carries it to the nursery.
         this.goalSelector.addGoal(4, new CarryEggGoal(this));
         // Feeding the queen (bread from the nursery) and milling seeds into bread come before fetching more seeds.
+        this.goalSelector.addGoal(5, new FeedLarvaGoal(this));
         this.goalSelector.addGoal(5, new FeedQueenGoal(this));
         this.goalSelector.addGoal(5, new MillBreadGoal(this));
         this.goalSelector.addGoal(6, new GatherSeedGoal(this));

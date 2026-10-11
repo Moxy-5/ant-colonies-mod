@@ -39,7 +39,7 @@ public class ColonyCommands {
                     + " | food " + colony.getFood()
                     + " | bread " + colony.getBread() + " (milling " + colony.getMilling() + ")"
                     + " | queen fed " + colony.getQueenBread() + "/" + Colony.QUEEN_MEAL + incubation(colony, level)
-                    + " | eggs " + colony.countEggs(level);
+                    + " | eggs " + colony.countEggs(level) + " | larvae " + colony.countLarvae(level);
             source.sendSuccess(() -> Component.literal(line), false);
         }
         return colonies.size();

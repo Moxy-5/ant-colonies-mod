@@ -13,6 +13,7 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.block.SeedPileBlock;
 import com.antcolonies.entity.AntEggEntity;
+import com.antcolonies.entity.AntLarvaEntity;
 import com.antcolonies.entity.QueenAntEntity;
 import com.antcolonies.entity.WorkerAntEntity;
 import com.antcolonies.registry.ModBlocks;
@@ -440,9 +441,13 @@ public class Colony {
     public static final int NURSE_FROM_WORKERS = 3;
     /** From this many workers on, two of them are nurses. */
     public static final int SECOND_NURSE_FROM_WORKERS = 8;
+    /** From this many workers on, three of them are nurses. */
+    public static final int THIRD_NURSE_FROM_WORKERS = 12;
+    /** From this many workers on, four of them are nurses. */
+    public static final int FOURTH_NURSE_FROM_WORKERS = 20;
 
     /**
-     * The role of this worker. Roles are shared out evenly: one nurse (from {@link #NURSE_FROM_WORKERS} workers on, two from {@link #SECOND_NURSE_FROM_WORKERS}),
+     * The role of this worker. Roles are shared out evenly: one nurse (from {@link #NURSE_FROM_WORKERS} workers on, two from {@link #SECOND_NURSE_FROM_WORKERS}, three from {@link #THIRD_NURSE_FROM_WORKERS}, four from {@link #FOURTH_NURSE_FROM_WORKERS}),
      * the rest half builders and half foragers (builders first). A worker keeps its role until it is one too many for
      * it, so roles only change when workers are born or die.
      */
@@ -456,7 +461,8 @@ public class Colony {
                 total++;
             }
         }
-        int nurses = total >= SECOND_NURSE_FROM_WORKERS ? 2 : total >= NURSE_FROM_WORKERS ? 1 : 0;
+        int nurses = total >= FOURTH_NURSE_FROM_WORKERS ? 4 : total >= THIRD_NURSE_FROM_WORKERS ? 3
+                : total >= SECOND_NURSE_FROM_WORKERS ? 2 : total >= NURSE_FROM_WORKERS ? 1 : 0;
         int[] target = new int[ColonyRole.values().length];
         target[ColonyRole.NURSE.ordinal()] = nurses;
         target[ColonyRole.BUILDER.ordinal()] = (total - nurses + 1) / 2;
@@ -481,11 +487,15 @@ public class Colony {
     public static final int QUEEN_MEAL = 20;
     /** How long (in ticks) she carries the egg before it comes out behind her: 3 minutes at normal speed. */
     public static final int INCUBATION_TICKS = 3600;
-    /** An egg hatches into a worker this many ticks after it was put in the nursery: 2 minutes at normal speed. */
-    public static final int HATCH_TICKS = 2400;
-    /** Eggs hatch only while the colony has fewer than this many workers; the other eggs wait in the nursery. */
+    /** An egg hatches into a larva this many ticks after it was put in the nursery: 1 minute at normal speed. */
+    public static final int HATCH_TICKS = 1200;
+    /** A larva needs this many pieces of ant bread, fed by the nurses, before it grows into a worker. */
+    public static final int LARVA_MEAL = 5;
+    /** Larvae grow into workers only while the colony has fewer than this many workers; the other larvae wait in the nursery. */
     public static final int MAX_WORKERS = 20;
-    /** At most this many eggs (in the nursery or lying about) at the same time; while there are that many the queen is not fed. */
+    /** How long (in ticks) a nurse on its way to a larva keeps the other nurses away from it. */
+    public static final int LARVA_CLAIM_TICKS = 600;
+    /** At most this many young (eggs and larvae, in the nursery or lying about) at the same time; while there are that many the queen is not fed. */
     public static final int MAX_EGGS = 10;
     /** How long (in ticks) a worker on its way to feed the queen counts as feeding her. */
     private static final int FEED_CLAIM_TICKS = 1300;
@@ -545,7 +555,7 @@ public class Colony {
         long now = level.getGameTime();
         feeders.values().removeIf(until -> until <= now);
         return eggDue < 0 && queenBread + feeders.size() < QUEEN_MEAL && isQueenHome(level)
-                && countEggs(level) < MAX_EGGS;
+                && countBrood(level) < MAX_EGGS;
     }
 
     /**
@@ -619,12 +629,14 @@ public class Colony {
 
     /**
      * Whether more bread should be milled: there is a place for it (the nursery, or the queen's room while there is no
-     * nursery), the pile plus the seeds already being milled are under one meal, and the queen has room for more eggs.
+     * nursery), and the pile plus the seeds already being milled are under what is wanted: one meal for the queen (while
+     * she has room for more young) plus what the hungry larvae still have to eat.
      */
     public boolean needsBread(ServerLevel level) {
         long now = level.getGameTime();
         millers.values().removeIf(until -> until <= now);
-        return bread + millers.size() < BREAD_STOCK && countEggs(level) < MAX_EGGS && pickBreadSpot(level, level.getRandom()) != null;
+        int wanted = (countBrood(level) < MAX_EGGS ? BREAD_STOCK : 0) + larvaHunger(level);
+        return bread + millers.size() < wanted && pickBreadSpot(level, level.getRandom()) != null;
     }
 
     /** A worker sets out to mill a seed. False if no more bread is needed right now. */
@@ -655,10 +667,7 @@ public class Colony {
      */
     @Nullable
     public BlockPos pickBreadSpot(Level level, RandomSource random) {
-        Set<BlockPos> eggs = new HashSet<>();
-        for (AntEggEntity egg : getEggs(level)) {
-            eggs.add(egg.blockPosition());
-        }
+        Set<BlockPos> eggs = getBroodCells(level);
         for (List<BlockPos> cells : List.of(getNurseryCells(level), getQueenRoomCells(level))) {
             List<BlockPos> growing = new ArrayList<>();
             List<BlockPos> empty = new ArrayList<>();
@@ -786,11 +795,86 @@ public class Colony {
         return getNurseryCells(level).contains(pos);
     }
 
-    /**
-     * The egg hatches: a new worker takes its place and joins the colony. False (the egg stays) while the colony has
-     * {@link #MAX_WORKERS} workers.
-     */
+    /** The egg hatches: a larva takes its place (in the same spot). */
     public boolean hatchEgg(ServerLevel level, AntEggEntity egg) {
+        AntLarvaEntity larva = new AntLarvaEntity(ModEntities.ANT_LARVA.get(), level);
+        larva.setColonyId(id);
+        larva.moveTo(egg.getX(), egg.getY(), egg.getZ(), egg.getYRot(), 0.0F);
+        level.addFreshEntity(larva);
+        egg.discard();
+        return true;
+    }
+
+    /** Puts a larva of this colony into the world (used by the tests). */
+    public AntLarvaEntity spawnLarva(Level level, double x, double y, double z) {
+        AntLarvaEntity larva = new AntLarvaEntity(ModEntities.ANT_LARVA.get(), level);
+        larva.setColonyId(id);
+        larva.moveTo(x, y, z, level.getRandom().nextFloat() * 360.0F, 0.0F);
+        level.addFreshEntity(larva);
+        return larva;
+    }
+
+    /** All the larvae of this colony around the nest. */
+    public List<AntLarvaEntity> getLarvae(Level level) {
+        return level.getEntitiesOfClass(AntLarvaEntity.class, eggArea(), larva -> larva.isAlive() && id.equals(larva.getColonyId()));
+    }
+
+    public int countLarvae(Level level) {
+        return getLarvae(level).size();
+    }
+
+    /** Eggs and larvae together. */
+    public int countBrood(Level level) {
+        return countEggs(level) + countLarvae(level);
+    }
+
+    /** The cells that eggs and larvae lie in (nothing else is put there). */
+    private Set<BlockPos> getBroodCells(Level level) {
+        Set<BlockPos> cells = new HashSet<>();
+        for (AntEggEntity egg : getEggs(level)) {
+            cells.add(egg.blockPosition());
+        }
+        for (AntLarvaEntity larva : getLarvae(level)) {
+            cells.add(larva.blockPosition());
+        }
+        return cells;
+    }
+
+    /** How many more pieces of bread all the larvae together still have to eat. */
+    public int larvaHunger(Level level) {
+        int hunger = 0;
+        for (AntLarvaEntity larva : getLarvae(level)) {
+            hunger += Math.max(0, LARVA_MEAL - larva.getFed());
+        }
+        return hunger;
+    }
+
+    /**
+     * A larva that still has to eat and that no other nurse is on its way to, or null. The nurse {@code ant} is entered
+     * as its feeder.
+     */
+    @Nullable
+    public AntLarvaEntity claimHungryLarva(ServerLevel level, UUID ant) {
+        long now = level.getGameTime();
+        List<AntLarvaEntity> hungry = new ArrayList<>();
+        for (AntLarvaEntity larva : getLarvae(level)) {
+            if (!larva.isFull() && !larva.hasFeeder(now)) {
+                hungry.add(larva);
+            }
+        }
+        if (hungry.isEmpty()) {
+            return null;
+        }
+        AntLarvaEntity larva = hungry.get(level.getRandom().nextInt(hungry.size()));
+        larva.claim(ant, now + LARVA_CLAIM_TICKS);
+        return larva;
+    }
+
+    /**
+     * The larva has eaten enough: a new worker takes its place and joins the colony. False (the larva stays) while the
+     * colony has {@link #MAX_WORKERS} workers.
+     */
+    public boolean hatchLarva(ServerLevel level, AntLarvaEntity larva) {
         if (getCount(WorkerAntEntity.CASTE) >= MAX_WORKERS) {
             return false;
         }
@@ -798,10 +882,10 @@ public class Colony {
         if (worker == null) {
             return false;
         }
-        worker.moveTo(egg.getX(), egg.getY(), egg.getZ(), egg.getYRot(), 0.0F);
+        worker.moveTo(larva.getX(), larva.getY(), larva.getZ(), larva.getYRot(), 0.0F);
         worker.joinColony(this);
         level.addFreshEntity(worker);
-        egg.discard();
+        larva.discard();
         return true;
     }
 
@@ -811,10 +895,7 @@ public class Colony {
      */
     @Nullable
     public BlockPos pickEggSpot(Level level, RandomSource random) {
-        Set<BlockPos> taken = new HashSet<>();
-        for (AntEggEntity egg : getEggs(level)) {
-            taken.add(egg.blockPosition());
-        }
+        Set<BlockPos> taken = getBroodCells(level);
         for (List<BlockPos> cells : List.of(getNurseryCells(level), getQueenRoomCells(level))) {
             List<BlockPos> free = new ArrayList<>();
             for (BlockPos pos : cells) {
@@ -834,10 +915,8 @@ public class Colony {
         if (!level.getBlockState(spot).isAir()) {
             return false;
         }
-        for (AntEggEntity egg : getEggs(level)) {
-            if (egg.blockPosition().equals(spot)) {
-                return false;
-            }
+        if (getBroodCells(level).contains(spot)) {
+            return false;
         }
         spawnEgg(level, spot.getX() + 0.5, spot.getY(), spot.getZ() + 0.5).setPlaced(true);
         return true;

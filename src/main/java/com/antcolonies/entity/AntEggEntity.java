@@ -18,7 +18,7 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * An egg of one colony. It just lies on the floor (it falls if the floor goes away), is saved with the world, and
- * disappears when its colony is gone. Once a worker has put it in its place (the nursery, or the queen's room while there is none) it hatches after a while into a worker.
+ * disappears when its colony is gone. Once a worker has put it in its place (the nursery, or the queen's room while there is none) it hatches after a while into a larva (see AntLarvaEntity).
  */
 public class AntEggEntity extends Entity {
     @Nullable
