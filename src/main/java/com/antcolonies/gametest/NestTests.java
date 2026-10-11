@@ -948,15 +948,7 @@ public class NestTests {
             helper.assertTrue(colony != null, "no colony");
             List<NestPlan.Chamber> before = colony.getPlannedChambers(level);
             helper.assertTrue(before.size() == NestPlan.MAX_LEVELS, "the nest has " + before.size() + " levels, expected " + NestPlan.MAX_LEVELS);
-            // Dig the whole nest out at once.
-            for (int i = 1; i <= Colony.SHAFT_DEPTH; i++) {
-                level.setBlock(colony.getCenter().below(i), Blocks.AIR.defaultBlockState(), 3);
-            }
-            for (NestPlan.Chamber chamber : before) {
-                for (BlockPos pos : chamber.cells()) {
-                    level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
-                }
-            }
+            digNestAtOnce(level, colony);
             // A heap of seeds in the far corner of the seed store, a heap of bread in the far corner of the nursery.
             for (NestPlan.Chamber chamber : before) {
                 BlockPos corner = chamber.room().get(chamber.room().size() - 1);
@@ -984,6 +976,76 @@ public class NestTests {
                     + " became " + describePlan(after, colony));
             helper.succeed();
         });
+    }
+
+    /**
+     * What an ant holds in its mandibles survives a save and reload: soil, a seed for the mill, bread, an egg and a dead
+     * ant. And a worker that was reloaded while carrying an egg still takes it to the nursery afterwards.
+     */
+    @GameTest(template = "arena", timeoutTicks = 2400, skyAccess = true)
+    public static void whatAnAntCarriesIsKeptAfterAReload(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        startColony(helper, 1);
+
+        WorkerAntEntity[] reloaded = {null};
+        helper.runAfterDelay(20, () -> {
+            Colony colony = colony(helper);
+            helper.assertTrue(colony != null, "no colony");
+            WorkerAntEntity worker = colonyWorkers(helper, colony).get(0);
+
+            // Every kind of load, one at a time, written to the save and read back into a new ant.
+            worker.setCarriedBlock(Blocks.COARSE_DIRT.defaultBlockState());
+            helper.assertTrue(Blocks.COARSE_DIRT.defaultBlockState().equals(reload(level, worker).getCarriedBlock()), "the soil pellet was lost");
+            worker.setCarriedBlock(null);
+            worker.setCarriedSeed(new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.PUMPKIN_SEEDS));
+            worker.setSeedForBread(true);
+            WorkerAntEntity copy = reload(level, worker);
+            helper.assertTrue(copy.getCarriedSeed().is(net.minecraft.world.item.Items.PUMPKIN_SEEDS) && copy.isSeedForBread(), "the seed for the mill was lost");
+            worker.setSeedForBread(false);
+            worker.setCarriedSeed(new net.minecraft.world.item.ItemStack(com.antcolonies.registry.ModItems.RICH_ANT_BREAD.get()));
+            helper.assertTrue(reload(level, worker).isCarryingRichBread(), "the rich bread was lost");
+            worker.setCarriedSeed(net.minecraft.world.item.ItemStack.EMPTY);
+            worker.setCarryingCorpse(true);
+            helper.assertTrue(reload(level, worker).isCarryingCorpse(), "the dead ant was lost");
+            worker.setCarryingCorpse(false);
+            helper.assertTrue(!reload(level, worker).hasFullMandibles(), "an ant with empty mandibles came back holding something");
+
+            // The real thing: the worker is reloaded while it carries an egg, in a dug-out nest.
+            digNestAtOnce(level, colony);
+            worker.setCarryingEgg(true);
+            reloaded[0] = reload(level, worker);
+            reloaded[0].setUUID(java.util.UUID.randomUUID());
+            worker.discard();
+            level.addFreshEntity(reloaded[0]);
+        });
+        helper.succeedWhen(() -> {
+            Colony colony = colony(helper);
+            helper.assertTrue(reloaded[0] != null, "not reloaded yet");
+            helper.assertTrue(!reloaded[0].isCarryingEgg(), "the reloaded worker still holds the egg");
+            helper.assertTrue(colony.getEggs(level).size() == 1, colony.getEggs(level).size() + " eggs, expected 1");
+            helper.assertTrue(colony.getNurseryEggs(level).size() == 1, "the egg is not in the nursery");
+        });
+    }
+
+    /** A new worker read back from this worker's save, as after a reload (not put into the world). */
+    private static WorkerAntEntity reload(ServerLevel level, WorkerAntEntity worker) {
+        net.minecraft.nbt.CompoundTag tag = new net.minecraft.nbt.CompoundTag();
+        worker.saveWithoutId(tag);
+        WorkerAntEntity copy = ModEntities.WORKER_ANT.get().create(level);
+        copy.load(tag);
+        return copy;
+    }
+
+    /** Digs the colony's whole planned nest (shaft, stairs, tunnels, rooms) out at once. */
+    private static void digNestAtOnce(ServerLevel level, Colony colony) {
+        for (int i = 1; i <= Colony.SHAFT_DEPTH; i++) {
+            level.setBlock(colony.getCenter().below(i), Blocks.AIR.defaultBlockState(), 3);
+        }
+        for (NestPlan.Chamber chamber : colony.getPlannedChambers(level)) {
+            for (BlockPos pos : chamber.cells()) {
+                level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+            }
+        }
     }
 
     /** The plan in a few words for the log: how many levels and which way the first tunnel leaves the shaft. */

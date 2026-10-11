@@ -11,7 +11,9 @@ import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.nav.AntNavigator;
 import com.antcolonies.registry.ModItems;
 
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtUtils;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
@@ -45,15 +47,15 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     private static final EntityDataAccessor<Optional<BlockState>> DATA_CARRIED =
             SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.OPTIONAL_BLOCK_STATE);
 
-    /** The seed held in the mandibles (empty = none). Synced so the renderer can draw it. Not saved. */
+    /** The seed held in the mandibles (empty = none). Synced so the renderer can draw it. Saved. */
     private static final EntityDataAccessor<ItemStack> DATA_CARRIED_SEED =
             SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.ITEM_STACK);
 
-    /** True while the ant holds an egg in its mandibles (carrying it to the nursery). Synced so the renderer can draw it. Not saved. */
+    /** True while the ant holds an egg in its mandibles (carrying it to the nursery). Synced so the renderer can draw it. Saved. */
     private static final EntityDataAccessor<Boolean> DATA_CARRIED_EGG =
             SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.BOOLEAN);
 
-    /** True while the ant holds a dead nestmate in its mandibles (carrying it to the refuse chamber). Synced so the renderer can draw it. Not saved. */
+    /** True while the ant holds a dead nestmate in its mandibles (carrying it to the refuse chamber). Synced so the renderer can draw it. Saved. */
     private static final EntityDataAccessor<Boolean> DATA_CARRIED_CORPSE =
             SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.BOOLEAN);
 
@@ -145,7 +147,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         entityData.set(DATA_CARRIED_CORPSE, carrying);
     }
 
-    /** The seed in the mandibles is for the mill (it becomes bread), not for the food store. Server side only, not saved. */
+    /** The seed in the mandibles is for the mill (it becomes bread), not for the food store. Server side only, saved. */
     public boolean isSeedForBread() {
         return seedForBread;
     }
@@ -241,6 +243,18 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         if (colonyId != null) {
             tag.putUUID("ColonyId", colonyId);
         }
+        // What the ant holds in its mandibles, so nothing is lost when the world is saved and loaded again: the job that
+        // carries it picks it up again after the reload (each one carries on when the ant already holds its load).
+        BlockState pellet = getCarriedBlock();
+        if (pellet != null) {
+            tag.put("CarriedBlock", NbtUtils.writeBlockState(pellet));
+        }
+        if (!getCarriedSeed().isEmpty()) {
+            tag.put("CarriedSeed", getCarriedSeed().save(registryAccess()));
+        }
+        tag.putBoolean("CarryingEgg", isCarryingEgg());
+        tag.putBoolean("CarryingCorpse", isCarryingCorpse());
+        tag.putBoolean("SeedForBread", seedForBread);
     }
 
     @Override
@@ -249,6 +263,15 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         if (tag.hasUUID("ColonyId")) {
             colonyId = tag.getUUID("ColonyId");
         }
+        if (tag.contains("CarriedBlock")) {
+            setCarriedBlock(NbtUtils.readBlockState(registryAccess().lookupOrThrow(Registries.BLOCK), tag.getCompound("CarriedBlock")));
+        }
+        if (tag.contains("CarriedSeed")) {
+            setCarriedSeed(ItemStack.parse(registryAccess(), tag.getCompound("CarriedSeed")).orElse(ItemStack.EMPTY));
+        }
+        setCarryingEgg(tag.getBoolean("CarryingEgg"));
+        setCarryingCorpse(tag.getBoolean("CarryingCorpse"));
+        seedForBread = tag.getBoolean("SeedForBread");
     }
 
     // Colony members never despawn.
