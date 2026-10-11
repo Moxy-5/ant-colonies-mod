@@ -15,7 +15,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 
 /**
- * Checks the shape of the underground nest: four stacked levels (seed store 7x7, nursery 4x4, queen 3x3, refuse chamber
+ * Checks the shape of the underground nest: four stacked levels (seed store 5x5, nursery 5x5, queen 3x3, refuse chamber
  * 5x5), a spiral staircase, no overlaps, walls between the levels.
  */
 class NestPlanTest {
@@ -63,9 +63,9 @@ class NestPlanTest {
     }
 
     @Test
-    void roomSizesAre7x7Seeds4x4Nursery3x3Queen5x5Refuse() {
-        assertEquals(new NestPlan.RoomSize(7, 7), NestPlan.roomSize(NestPlan.Kind.FOOD));
-        assertEquals(new NestPlan.RoomSize(4, 4), NestPlan.roomSize(NestPlan.Kind.NURSERY));
+    void roomSizesAre5x5SeedsAndNursery3x3Queen5x5Refuse() {
+        assertEquals(new NestPlan.RoomSize(5, 5), NestPlan.roomSize(NestPlan.Kind.FOOD));
+        assertEquals(new NestPlan.RoomSize(5, 5), NestPlan.roomSize(NestPlan.Kind.NURSERY));
         assertEquals(new NestPlan.RoomSize(3, 3), NestPlan.roomSize(NestPlan.Kind.QUEEN));
         assertEquals(new NestPlan.RoomSize(5, 5), NestPlan.roomSize(NestPlan.Kind.REFUSE));
     }
@@ -113,7 +113,7 @@ class NestPlanTest {
                 }
             }
             assertEquals(3 * NestPlan.STAIR_LENGTH + 4 * 3 + rooms, all.size());
-            assertEquals(3 * 3 + 4 * 3 + 49 + 16 + 9 + 25, all.size());
+            assertEquals(3 * 3 + 4 * 3 + 25 + 25 + 9 + 25, all.size());
             assertTrue(!all.contains(BOTTOM), "the shaft bottom is not part of any level");
         }
     }

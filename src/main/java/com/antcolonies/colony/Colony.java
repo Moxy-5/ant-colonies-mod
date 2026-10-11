@@ -194,8 +194,8 @@ public class Colony {
 
     /**
      * The middle of the room the queen lives in, or null if there is none yet (or the chunk is not loaded). That is
-     * her own room (the queen level) once it is finished; until then the first room that is finished, which is the
-     * seed store at the top (see {@link #getHomeChamber}). The other rooms don't matter here.
+     * her own room (the queen level) once it is finished; until then the nursery, where the bread is, once that is
+     * finished (see {@link #getHomeChamber}). The other rooms don't matter here.
      */
     @Nullable
     public BlockPos getFinishedRoomCenter(Level level) {
@@ -205,8 +205,9 @@ public class Colony {
 
     /**
      * The level the queen lives in: the queen level once it is finished (the shaft, every stair down to it, its tunnel
-     * and the whole room are dug out), otherwise the first finished level from the top. Null if no level is finished.
-     * The refuse chamber is never a home.
+     * and the whole room are dug out), until then the nursery once that is finished (the bread is there). Where the soil
+     * is too thin for a nursery, the first finished level from the top. Null if she has no home yet. The refuse chamber
+     * is never a home, and neither is the seed store when the plan has a nursery.
      */
     @Nullable
     public NestPlan.Chamber getHomeChamber(Level level) {
@@ -217,6 +218,10 @@ public class Colony {
         NestPlan.Chamber queen = layout.of(NestPlan.Kind.QUEEN);
         if (queen != null && isFinished(level, queen)) {
             return queen;
+        }
+        NestPlan.Chamber nursery = layout.of(NestPlan.Kind.NURSERY);
+        if (nursery != null) {
+            return isFinished(level, nursery) ? nursery : null;
         }
         for (NestPlan.Chamber chamber : layout.chambers()) {
             if (chamber.kind() != NestPlan.Kind.REFUSE && isFinished(level, chamber)) {
@@ -337,7 +342,7 @@ public class Colony {
     public BlockPos pickFoodSpot(Level level, RandomSource random) {
         List<BlockPos> growing = new ArrayList<>();
         List<BlockPos> empty = new ArrayList<>();
-        Set<BlockPos> young = getBroodCells(level); // eggs and larvae may lie in the seed store while the queen lives there
+        Set<BlockPos> young = getBroodCells(level); // eggs and larvae may lie in the seed store where it is the queen's home (no nursery)
         for (BlockPos pos : getFoodStoreCells(level)) {
             BlockState state = level.getBlockState(pos);
             if (state.isAir()) {
@@ -743,7 +748,7 @@ public class Colony {
 
     /**
      * A heap of bread to take a piece from, or null if there is none. Every room is searched, because bread made while
-     * the queen lived in the seed store stays there when she moves down.
+     * the queen lived in another room stays there when she moves down.
      */
     @Nullable
     public BlockPos findBreadPile(Level level, RandomSource random) {

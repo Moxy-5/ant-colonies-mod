@@ -11,7 +11,7 @@ import net.minecraft.core.Direction;
  *
  * <p>The nest is a stack of up to four levels, joined by a spiral staircase. Each level has one room, 1 block tall,
  * and the levels are {@link #LEVEL_SPACING} blocks apart (the room, then a 1-block wall of soil under it). From top
- * to bottom: the seed store (7x7), the nursery and the bread (4x4), the queen's room (3x3), the refuse chamber
+ * to bottom: the seed store (5x5), the nursery and the bread (5x5), the queen's room (3x3), the refuse chamber
  * (dead ants, 5x5). See {@link #roomSize}.
  *
  * <p>Seen from above, with {@code R} the direction the rooms lie in (hub = where a level's tunnel starts; hub 1 is
@@ -28,8 +28,8 @@ import net.minecraft.core.Direction;
  * Everything that is not a stair is on the level of its hub and one block tall.
  *
  * <p>A room is as long as its size says (counted from the end of its tunnel) and as wide, with the tunnel entering
- * the middle of its first row. A room with an even width (the 4x4 nursery) has one more column on the clockwise side of
- * the tunnel than on the other.
+ * the middle of its first row. A room with an even width has no middle column, so it gets one more column on the clockwise
+ * side of the tunnel than on the other.
  *
  * <p>With less soil there are fewer levels (the plan is cut off after the last level that fits): then the levels are
  * seeds + queen (2), seeds + nursery + queen (3), or only the queen's room (1). The queen's room is the smallest, so a
@@ -78,8 +78,8 @@ public final class NestPlan {
     public static RoomSize roomSize(Kind kind) {
         return switch (kind) {
             case QUEEN -> new RoomSize(3, 3);
-            case NURSERY -> new RoomSize(4, 4);
-            case FOOD -> new RoomSize(7, 7);
+            case NURSERY -> new RoomSize(5, 5);
+            case FOOD -> new RoomSize(5, 5);
             case REFUSE -> new RoomSize(5, 5);
         };
     }
