@@ -4,6 +4,7 @@ import java.util.EnumSet;
 
 import org.jetbrains.annotations.Nullable;
 
+import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.AbstractAntEntity;
@@ -83,6 +84,10 @@ public class CarryPelletGoal extends Goal {
             return;
         }
         if (++ticks >= GIVE_UP_TICKS) {
+            AntColoniesMod.LOGGER.info("[pellet] ant at {} gave up on spot {} after {} ticks (navigator done: {}, spot valid: {}, living things in the spot: {}, block there: {}, block below: {})",
+                    ant.blockPosition().toShortString(), spot.toShortString(), ticks, ant.getNavigator().isDone(),
+                    colony.isMoundSpotValid(level, spot), level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class, new AABB(spot)).size(),
+                    level.getBlockState(spot), level.getBlockState(spot.below()));
             ant.setCarriedBlock(null);
             colony.pauseHillRepair(level); // a gap that can't be reached: don't keep fetching soil for it
             return;
@@ -102,6 +107,7 @@ public class CarryPelletGoal extends Goal {
     private void walkToSpot() {
         while (spot != null && !ant.getNavigator().moveTo(spot, 1.0)) {
             if (++failedRoutes >= MAX_FAILED_ROUTES) {
+                AntColoniesMod.LOGGER.info("[pellet] ant at {} found no route to mound spots (last: {})", ant.blockPosition().toShortString(), spot.toShortString());
                 ant.setCarriedBlock(null);
                 colony.pauseHillRepair(ant.level());
                 return;

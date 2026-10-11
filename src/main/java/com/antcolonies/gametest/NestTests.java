@@ -210,6 +210,50 @@ public class NestTests {
     }
 
     /**
+     * Many ants with a soil pellet each and only ONE gap left in the hill (the user saw them jam in the shaft): the first
+     * pellet fills the gap, all the others must let go of theirs, and nobody may stay stuck with soil in the mandibles.
+     */
+    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
+    public static void manyAntsWithPelletsAndOneGapDoNotJam(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        startColony(helper, 12);
+
+        int[] stage = {0};
+        long[] startedAt = {0};
+        helper.onEachTick(() -> {
+            Colony colony = colony(helper);
+            if (stage[0] != 0 || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.findDigTarget(level) != null
+                    || !hillProblems(helper).isEmpty() || !colony.getLeaks(level).isEmpty()) {
+                return;
+            }
+            stage[0] = 1;
+            startedAt[0] = helper.getTick();
+            helper.setBlock(MIDDLE + 1, SURFACE, MIDDLE, Blocks.AIR); // one gap in the first ring of the hill
+            for (var worker : colonyWorkers(helper, colony)) {
+                worker.setCarriedBlock(ModBlocks.BURROWED_DIRT.get().defaultBlockState());
+            }
+            AntColoniesMod.LOGGER.info("[jam-test] tick {}: one gap, every worker has a pellet", helper.getTick());
+        });
+        helper.onEachTick(() -> {
+            if (stage[0] == 1 && helper.getTick() % 100 == 0) {
+                Colony colony = colony(helper);
+                long carrying = colonyWorkers(helper, colony).stream().filter(w -> w.isCarrying()).count();
+                AntColoniesMod.LOGGER.info("[jam-test] tick {}: {} ants still carry soil, hill problems: {}", helper.getTick(), carrying,
+                        hillProblems(helper));
+            }
+        });
+        helper.succeedWhen(() -> {
+            Colony colony = colony(helper);
+            helper.assertTrue(stage[0] == 1 && colony != null, "the gap has not been made yet");
+            helper.assertTrue(helper.getTick() - startedAt[0] > 100, "too early");
+            helper.assertTrue(hillProblems(helper).isEmpty(), "the gap is not filled: " + hillProblems(helper));
+            long carrying = colonyWorkers(helper, colony).stream().filter(w -> w.isCarrying()).count();
+            helper.assertTrue(carrying == 0, carrying + " ants still carry soil");
+        });
+    }
+
+    /**
      * Thin soil: stone starts right under the third level. The rooms do not fit at the usual depth (only two levels
      * would), so the whole nest must sit one block higher and have three levels (seed store, nursery, queen), and the
      * ants must still dig all of it and never touch the stone.

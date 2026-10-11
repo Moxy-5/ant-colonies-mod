@@ -1731,6 +1731,11 @@ public class Colony {
                 && level.getBlockState(pos.below()).isFaceSturdy(level, pos.below(), Direction.UP);
     }
 
+    /** For the log: is a pellet still allowed at this spot? */
+    public boolean isMoundSpotValid(Level level, BlockPos pos) {
+        return isMoundSpot(level, pos);
+    }
+
     /** Turns a delivered pellet into a real block of the mound. Returns false if the spot is no longer valid. */
     public boolean placePellet(Level level, BlockPos pos) {
         if (!isMoundSpot(level, pos)) {
