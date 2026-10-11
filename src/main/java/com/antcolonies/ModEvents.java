@@ -23,6 +23,7 @@ public class ModEvents {
     public static void onCreativeTab(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey() == CreativeModeTabs.NATURAL_BLOCKS) {
             event.accept(ModItems.BURROWED_DIRT);
+            event.accept(ModItems.DEEP_SOIL);
             event.accept(ModItems.SEED_PILE);
             event.accept(ModItems.BREAD_PILE);
         }

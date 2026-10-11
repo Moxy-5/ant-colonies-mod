@@ -6,6 +6,7 @@ import com.antcolonies.gametest.NavigationTests;
 import com.antcolonies.gametest.NestTests;
 import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.registry.ModEntities;
+import com.antcolonies.registry.ModFeatures;
 import com.antcolonies.registry.ModItems;
 import com.mojang.logging.LogUtils;
 
@@ -21,6 +22,7 @@ public class AntColoniesMod {
 
     public AntColoniesMod(IEventBus modEventBus) {
         ModBlocks.BLOCKS.register(modEventBus);
+        ModFeatures.FEATURES.register(modEventBus);
         ModEntities.ENTITY_TYPES.register(modEventBus);
         ModItems.ITEMS.register(modEventBus);
         // In-game tests: only loaded when the game is started in game-test mode.

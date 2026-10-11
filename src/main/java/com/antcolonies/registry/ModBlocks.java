@@ -19,6 +19,10 @@ public class ModBlocks {
     public static final DeferredBlock<Block> BURROWED_DIRT =
             BLOCKS.registerSimpleBlock("burrowed_dirt", BlockBehaviour.Properties.ofFullCopy(Blocks.DIRT));
 
+    /** Darker soil under the topsoil, laid by world generation (see DeepSoilFeature). Diggable by ants. */
+    public static final DeferredBlock<Block> DEEP_SOIL = BLOCKS.registerSimpleBlock("deep_soil",
+            BlockBehaviour.Properties.ofFullCopy(Blocks.DIRT).mapColor(MapColor.COLOR_BROWN).strength(0.8F));
+
     /** A heap of seeds in the food store: one layer per seed an ant delivers. */
     public static final DeferredBlock<SeedPileBlock> SEED_PILE = BLOCKS.registerBlock("seed_pile", SeedPileBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_YELLOW).strength(0.2F).sound(SoundType.SAND)
