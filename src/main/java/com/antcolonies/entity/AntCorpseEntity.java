@@ -5,6 +5,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.Refuse;
 import com.antcolonies.colony.ColonyManager;
 
 import net.minecraft.nbt.CompoundTag;
@@ -19,7 +20,7 @@ import net.minecraft.world.phys.Vec3;
 /**
  * The body of a dead ant of one colony. It lies where the ant died (it falls if the floor goes away) until a worker
  * carries it to the refuse chamber and sets it down there; a corpse in the refuse chamber stays for good. A corpse that
- * nobody brings there crumbles to dust after {@link Colony#CORPSE_DECAY_TICKS}, so nothing is left lying about for ever.
+ * nobody brings there crumbles to dust after {@link Refuse#CORPSE_DECAY_TICKS}, so nothing is left lying about for ever.
  * Saved with the world; disappears when its colony is gone.
  */
 public class AntCorpseEntity extends Entity {
@@ -80,9 +81,9 @@ public class AntCorpseEntity extends Entity {
         Colony colony = ColonyManager.get(level).getColony(colonyId);
         if (colony == null) {
             discard(); // the queen died
-        } else if (!placed && colony.isInRefuseChamber(level, blockPosition())) {
+        } else if (!placed && colony.refuse().isInRefuseChamber(level, blockPosition())) {
             placed = true; // it lies where it belongs: it stays
-        } else if (!placed && tickCount >= Colony.CORPSE_DECAY_TICKS) {
+        } else if (!placed && tickCount >= Refuse.CORPSE_DECAY_TICKS) {
             discard(); // nobody carried it away: it crumbles to dust
         }
     }

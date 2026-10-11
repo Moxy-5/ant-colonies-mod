@@ -28,7 +28,7 @@ public class QueenToRoomGoal extends Goal {
             return null;
         }
         Colony colony = ColonyManager.get(level).getColony(queen.getColonyId());
-        return colony == null ? null : colony.getFinishedRoomCenter(level);
+        return colony == null ? null : colony.nest().getFinishedRoomCenter(level);
     }
 
     @Override

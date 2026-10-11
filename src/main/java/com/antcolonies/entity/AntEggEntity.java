@@ -5,6 +5,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.Brood;
 import com.antcolonies.colony.ColonyManager;
 
 import net.minecraft.nbt.CompoundTag;
@@ -87,10 +88,10 @@ public class AntEggEntity extends Entity {
         }
         long now = level.getGameTime();
         if (hatchAt < 0) {
-            if (placed || colony.isInNursery(level, blockPosition())) {
-                hatchAt = now + Colony.HATCH_TICKS; // a worker put it in its place: the clock starts
+            if (placed || colony.brood().isInNursery(level, blockPosition())) {
+                hatchAt = now + Brood.HATCH_TICKS; // a worker put it in its place: the clock starts
             }
-        } else if (now >= hatchAt && colony.hatchEgg(level, this)) {
+        } else if (now >= hatchAt && colony.brood().hatchEgg(level, this)) {
             manager.markChanged();
         }
     }

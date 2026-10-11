@@ -5,6 +5,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.Brood;
 import com.antcolonies.colony.ColonyManager;
 
 import net.minecraft.nbt.CompoundTag;
@@ -20,7 +21,7 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * A larva of one colony: what an egg turns into. It lies in the nursery, cannot move, and is fed ant bread by the
- * nurses. After {@link Colony#LARVA_MEAL} pieces it grows into a worker (as soon as the colony has room for one).
+ * nurses. After {@link Brood#LARVA_MEAL} pieces it grows into a worker (as soon as the colony has room for one).
  * Saved with the world; disappears when its colony is gone.
  */
 public class AntLarvaEntity extends Entity {
@@ -34,7 +35,7 @@ public class AntLarvaEntity extends Entity {
     @Nullable
     private UUID feeder;
     private long feederUntil;
-    /** Game time of the last piece of bread. A larva that goes {@link Colony#LARVA_STARVE_TICKS} without one starves. Saved. */
+    /** Game time of the last piece of bread. A larva that goes {@link Brood#LARVA_STARVE_TICKS} without one starves. Saved. */
     private long lastFed = Colony.NOT_SET;
 
     public AntLarvaEntity(EntityType<? extends AntLarvaEntity> type, Level level) {
@@ -74,7 +75,7 @@ public class AntLarvaEntity extends Entity {
     }
 
     public boolean isFull() {
-        return getFed() >= Colony.LARVA_MEAL;
+        return getFed() >= Brood.LARVA_MEAL;
     }
 
     /** Whether a nurse is already on its way with bread for this larva. */
@@ -134,12 +135,12 @@ public class AntLarvaEntity extends Entity {
         long now = level.getGameTime();
         if (lastFed == Colony.NOT_SET || isFull() || !colony.isHungerOn()) {
             lastFed = now;
-        } else if (now - lastFed >= Colony.LARVA_STARVE_TICKS) {
-            colony.starveLarva(level, this);
+        } else if (now - lastFed >= Brood.LARVA_STARVE_TICKS) {
+            colony.brood().starveLarva(level, this);
             manager.markChanged();
             return;
         }
-        if (isFull() && colony.hatchLarva(level, this)) {
+        if (isFull() && colony.brood().hatchLarva(level, this)) {
             manager.markChanged();
         }
     }

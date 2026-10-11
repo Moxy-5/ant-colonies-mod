@@ -57,11 +57,11 @@ public class GatherSeedGoal extends Goal {
         }
         long now = level.getGameTime();
         unreachable.values().removeIf(until -> until <= now);
-        seed = colony.findSeed(level, ant.blockPosition(), unreachable.keySet());
+        seed = colony.food().findSeed(level, ant.blockPosition(), unreachable.keySet());
         if (seed == null) {
             return false;
         }
-        colony.claimSeed(level, seed);
+        colony.food().claimSeed(level, seed);
         return true;
     }
 
@@ -80,7 +80,7 @@ public class GatherSeedGoal extends Goal {
     public void stop() {
         ant.getNavigator().stop();
         if (colony != null && seed != null) {
-            colony.releaseSeed(seed);
+            colony.food().releaseSeed(seed);
         }
         seed = null;
         colony = null;
@@ -114,7 +114,7 @@ public class GatherSeedGoal extends Goal {
             seed.setItem(stack);
         }
         ant.setCarriedSeed(one);
-        ant.setSeedForBread(colony.claimSeedForBread(level, ant.getUUID())); // to the mill if there is no store yet
+        ant.setSeedForBread(colony.bakery().claimSeedForBread(level, ant.getUUID())); // to the mill if there is no store yet
         level.playSound(null, ant.blockPosition(), SoundEvents.ITEM_PICKUP, SoundSource.NEUTRAL, 0.15F, 1.6F);
     }
 }

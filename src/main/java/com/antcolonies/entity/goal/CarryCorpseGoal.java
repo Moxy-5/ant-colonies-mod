@@ -62,7 +62,7 @@ public class CarryCorpseGoal extends Goal {
         if (ant.isCarryingCorpse()) {
             // Carrying a body (something else interrupted the walk): carry on to the refuse chamber.
             colony = ColonyManager.get(level).getColony(ant.getColonyId());
-            spot = colony == null ? null : colony.pickCorpseSpot(level, ant.getRandom());
+            spot = colony == null ? null : colony.refuse().pickCorpseSpot(level, ant.getRandom());
             corpse = null;
             if (spot == null) {
                 putDown(level);
@@ -80,11 +80,11 @@ public class CarryCorpseGoal extends Goal {
         }
         long now = level.getGameTime();
         unreachable.values().removeIf(until -> until <= now);
-        corpse = colony.findLooseCorpse(level, ant.blockPosition(), unreachable.keySet());
+        corpse = colony.refuse().findLooseCorpse(level, ant.blockPosition(), unreachable.keySet());
         if (corpse == null) {
             return false;
         }
-        colony.claimCorpse(level, corpse);
+        colony.refuse().claimCorpse(level, corpse);
         return true;
     }
 
@@ -109,7 +109,7 @@ public class CarryCorpseGoal extends Goal {
     public void stop() {
         ant.getNavigator().stop();
         if (colony != null && corpse != null) {
-            colony.releaseCorpse(corpse);
+            colony.refuse().releaseCorpse(corpse);
         }
         if (ant.isCarryingCorpse() && (done || ticks >= GIVE_UP_TICKS) && ant.level() instanceof ServerLevel level) {
             putDown(level); // could not finish the job
@@ -143,12 +143,12 @@ public class CarryCorpseGoal extends Goal {
         double dx = ant.getX() - corpse.getX();
         double dz = ant.getZ() - corpse.getZ();
         if (dx * dx + dz * dz <= REACH * REACH && Math.abs(ant.getY() - corpse.getY()) < 1.5) {
-            colony.releaseCorpse(corpse);
+            colony.refuse().releaseCorpse(corpse);
             corpse.discard();
             corpse = null;
             ant.setCarryingCorpse(true);
             level.playSound(null, ant.blockPosition(), SoundEvents.ITEM_PICKUP, SoundSource.NEUTRAL, 0.15F, 0.8F);
-            spot = colony.pickCorpseSpot(level, ant.getRandom());
+            spot = colony.refuse().pickCorpseSpot(level, ant.getRandom());
             if (spot == null) {
                 done = true; // no room in the refuse chamber after all: stop() puts the body down
             } else {
@@ -165,11 +165,11 @@ public class CarryCorpseGoal extends Goal {
         double dx = ant.getX() - (spot.getX() + 0.5);
         double dz = ant.getZ() - (spot.getZ() + 0.5);
         if (dx * dx + dz * dz <= REACH * REACH && Math.abs(ant.getY() - spot.getY()) < 1.5) {
-            if (colony.placeCorpse(level, spot)) {
+            if (colony.refuse().placeCorpse(level, spot)) {
                 ant.setCarryingCorpse(false);
                 done = true;
             } else {
-                spot = colony.pickCorpseSpot(level, ant.getRandom()); // another body lies there now
+                spot = colony.refuse().pickCorpseSpot(level, ant.getRandom()); // another body lies there now
                 if (spot == null) {
                     done = true;
                 } else {
@@ -188,7 +188,7 @@ public class CarryCorpseGoal extends Goal {
                 done = true;
                 return;
             }
-            spot = colony.pickCorpseSpot(ant.level(), ant.getRandom());
+            spot = colony.refuse().pickCorpseSpot(ant.level(), ant.getRandom());
         }
         if (spot == null) {
             done = true;
@@ -199,7 +199,7 @@ public class CarryCorpseGoal extends Goal {
     private void putDown(ServerLevel level) {
         ant.setCarryingCorpse(false);
         if (colony != null) {
-            colony.spawnCorpse(level, ant.getX(), ant.getY(), ant.getZ());
+            colony.refuse().spawnCorpse(level, ant.getX(), ant.getY(), ant.getZ());
         }
     }
 }

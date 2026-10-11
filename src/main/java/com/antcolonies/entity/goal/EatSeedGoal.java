@@ -55,11 +55,11 @@ public class EatSeedGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        if (colony == null || colony.getFood() <= 0) {
+        if (colony == null || colony.food().getFood() <= 0) {
             nextTry = level.getGameTime() + RETRY_TICKS; // nothing to eat yet
             return false;
         }
-        pile = colony.findSeedPile(level, ant.getRandom());
+        pile = colony.food().findSeedPile(level, ant.getRandom());
         if (pile == null || !ant.getNavigator().moveTo(pile, 1.0)) {
             nextTry = level.getGameTime() + RETRY_TICKS; // no seeds, or no way to them
             return false;
@@ -113,14 +113,14 @@ public class EatSeedGoal extends Goal {
         double dx = ant.getX() - (pile.getX() + 0.5);
         double dz = ant.getZ() - (pile.getZ() + 0.5);
         if (dx * dx + dz * dz <= REACH * REACH && Math.abs(ant.getY() - pile.getY()) < 1.5) {
-            ItemStack seed = colony.eatSeedAt(level, pile, ant.getUUID());
+            ItemStack seed = colony.food().eatSeedAt(level, pile, ant.getUUID());
             if (!seed.isEmpty()) {
                 ant.setCarriedSeed(seed);
                 ant.getNavigator().stop();
                 eating = true;
                 eatenFor = 0;
             } else {
-                pile = colony.findSeedPile(level, ant.getRandom()); // somebody else took the last seed there
+                pile = colony.food().findSeedPile(level, ant.getRandom()); // somebody else took the last seed there
                 if (pile == null || !ant.getNavigator().moveTo(pile, 1.0)) {
                     done = true;
                 }

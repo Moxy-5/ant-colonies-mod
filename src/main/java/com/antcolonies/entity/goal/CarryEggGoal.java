@@ -62,7 +62,7 @@ public class CarryEggGoal extends Goal {
         if (ant.isCarryingEgg()) {
             // Carrying an egg (something else interrupted the walk): carry on to the nursery.
             colony = ColonyManager.get(level).getColony(ant.getColonyId());
-            spot = colony == null ? null : colony.pickEggSpot(level, ant.getRandom());
+            spot = colony == null ? null : colony.brood().pickEggSpot(level, ant.getRandom());
             egg = null;
             if (spot == null) {
                 putDown(level);
@@ -80,11 +80,11 @@ public class CarryEggGoal extends Goal {
         }
         long now = level.getGameTime();
         unreachable.values().removeIf(until -> until <= now);
-        egg = colony.findLooseEgg(level, ant.blockPosition(), unreachable.keySet());
+        egg = colony.brood().findLooseEgg(level, ant.blockPosition(), unreachable.keySet());
         if (egg == null) {
             return false;
         }
-        colony.claimEgg(level, egg);
+        colony.brood().claimEgg(level, egg);
         return true;
     }
 
@@ -109,7 +109,7 @@ public class CarryEggGoal extends Goal {
     public void stop() {
         ant.getNavigator().stop();
         if (colony != null && egg != null) {
-            colony.releaseEgg(egg);
+            colony.brood().releaseEgg(egg);
         }
         if (ant.isCarryingEgg() && (done || ticks >= GIVE_UP_TICKS) && ant.level() instanceof ServerLevel level) {
             putDown(level); // could not finish the job
@@ -143,12 +143,12 @@ public class CarryEggGoal extends Goal {
         double dx = ant.getX() - egg.getX();
         double dz = ant.getZ() - egg.getZ();
         if (dx * dx + dz * dz <= REACH * REACH && Math.abs(ant.getY() - egg.getY()) < 1.5) {
-            colony.releaseEgg(egg);
+            colony.brood().releaseEgg(egg);
             egg.discard();
             egg = null;
             ant.setCarryingEgg(true);
             level.playSound(null, ant.blockPosition(), SoundEvents.ITEM_PICKUP, SoundSource.NEUTRAL, 0.15F, 1.6F);
-            spot = colony.pickEggSpot(level, ant.getRandom());
+            spot = colony.brood().pickEggSpot(level, ant.getRandom());
             if (spot == null) {
                 done = true; // no room in the nursery after all: stop() puts the egg down
             } else {
@@ -165,11 +165,11 @@ public class CarryEggGoal extends Goal {
         double dx = ant.getX() - (spot.getX() + 0.5);
         double dz = ant.getZ() - (spot.getZ() + 0.5);
         if (dx * dx + dz * dz <= REACH * REACH && Math.abs(ant.getY() - spot.getY()) < 1.5) {
-            if (colony.placeEgg(level, spot)) {
+            if (colony.brood().placeEgg(level, spot)) {
                 ant.setCarryingEgg(false);
                 done = true;
             } else {
-                spot = colony.pickEggSpot(level, ant.getRandom()); // another egg lies there now
+                spot = colony.brood().pickEggSpot(level, ant.getRandom()); // another egg lies there now
                 if (spot == null) {
                     done = true;
                 } else {
@@ -188,7 +188,7 @@ public class CarryEggGoal extends Goal {
                 done = true;
                 return;
             }
-            spot = colony.pickEggSpot(ant.level(), ant.getRandom());
+            spot = colony.brood().pickEggSpot(ant.level(), ant.getRandom());
         }
         if (spot == null) {
             done = true;
@@ -199,7 +199,7 @@ public class CarryEggGoal extends Goal {
     private void putDown(ServerLevel level) {
         ant.setCarryingEgg(false);
         if (colony != null) {
-            colony.spawnEgg(level, ant.getX(), ant.getY(), ant.getZ());
+            colony.brood().spawnEgg(level, ant.getX(), ant.getY(), ant.getZ());
         }
     }
 }

@@ -47,7 +47,7 @@ public class StandByQueenGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        return colony != null && colony.isQueenHome(level);
+        return colony != null && colony.queenCare().isQueenHome(level);
     }
 
     @Override

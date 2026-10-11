@@ -5,6 +5,7 @@ import java.util.EnumSet;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.QueenCare;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.AbstractAntEntity;
@@ -17,7 +18,7 @@ import net.minecraft.world.item.ItemStack;
 
 /**
  * Feeds the queen: the worker takes one piece of ant bread off a heap in the nursery, carries it to the queen in her
- * room and gives it to her. After {@link Colony#QUEEN_MEAL} pieces she carries an egg. If the queen does not want the
+ * room and gives it to her. After {@link QueenCare#QUEEN_MEAL} pieces she carries an egg. If the queen does not want the
  * bread after all, the worker puts it back on a bread heap.
  */
 public class FeedQueenGoal extends Goal {
@@ -65,12 +66,12 @@ public class FeedQueenGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        if (colony == null || colony.getBread() <= 0 || !colony.claimFeeding(level, ant.getUUID())) {
+        if (colony == null || colony.bakery().getBread() <= 0 || !colony.queenCare().claimFeeding(level, ant.getUUID())) {
             return false;
         }
-        pile = colony.findBreadPile(level, ant.getRandom());
+        pile = colony.bakery().findBreadPile(level, ant.getRandom());
         if (pile == null || !ant.getNavigator().moveTo(pile, 1.0)) {
-            colony.releaseFeeding(ant.getUUID());
+            colony.queenCare().releaseFeeding(ant.getUUID());
             nextTry = level.getGameTime() + RETRY_TICKS; // no bread, or no way to it
             return false;
         }
@@ -93,7 +94,7 @@ public class FeedQueenGoal extends Goal {
     public void stop() {
         ant.getNavigator().stop();
         if (colony != null) {
-            colony.releaseFeeding(ant.getUUID());
+            colony.queenCare().releaseFeeding(ant.getUUID());
         }
         pile = null;
         colony = null;
@@ -115,14 +116,14 @@ public class FeedQueenGoal extends Goal {
     /** First leg: to a heap of bread in the nursery, where the ant takes a piece. */
     private void walkToPile(ServerLevel level) {
         if (near(pile)) {
-            ItemStack taken = colony.takeBreadAt(level, pile, true); // she gets the rich bread first
+            ItemStack taken = colony.bakery().takeBreadAt(level, pile, true); // she gets the rich bread first
             if (!taken.isEmpty()) {
                 ant.setCarriedSeed(taken);
                 ColonyManager.get(level).markChanged();
                 leg = Leg.TO_QUEEN;
                 ant.getNavigator().stop();
             } else {
-                pile = colony.findBreadPile(level, ant.getRandom()); // somebody else took the last piece there
+                pile = colony.bakery().findBreadPile(level, ant.getRandom()); // somebody else took the last piece there
                 if (pile == null || !ant.getNavigator().moveTo(pile, 1.0)) {
                     done = true;
                 }
@@ -143,13 +144,13 @@ public class FeedQueenGoal extends Goal {
         double dx = ant.getX() - queen.getX();
         double dz = ant.getZ() - queen.getZ();
         if (dx * dx + dz * dz <= REACH * REACH && Math.abs(ant.getY() - queen.getY()) < 1.5) {
-            if (colony.feedQueen(level, ant.isCarryingRichBread())) {
+            if (colony.queenCare().feedQueen(level, ant.isCarryingRichBread())) {
                 ant.setCarriedSeed(ItemStack.EMPTY);
                 ColonyManager.get(level).markChanged();
                 done = true;
             } else {
                 // She wants no more right now: the bread goes back on a heap.
-                pile = colony.pickBreadSpot(level, ant.getRandom());
+                pile = colony.bakery().pickBreadSpot(level, ant.getRandom());
                 if (pile == null || !ant.getNavigator().moveTo(pile, 1.0)) {
                     ant.setCarriedSeed(ItemStack.EMPTY); // nowhere to put it
                     done = true;
@@ -165,8 +166,8 @@ public class FeedQueenGoal extends Goal {
     /** Third leg, only if the queen did not want the bread: back to a bread heap. */
     private void walkBack(ServerLevel level) {
         if (near(pile)) {
-            if (!colony.depositBread(level, pile, ant.isCarryingRichBread())) {
-                pile = colony.pickBreadSpot(level, ant.getRandom());
+            if (!colony.bakery().depositBread(level, pile, ant.isCarryingRichBread())) {
+                pile = colony.bakery().pickBreadSpot(level, ant.getRandom());
                 if (pile == null || !ant.getNavigator().moveTo(pile, 1.0)) {
                     ant.setCarriedSeed(ItemStack.EMPTY);
                     done = true;

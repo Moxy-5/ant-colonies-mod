@@ -5,6 +5,7 @@ import java.util.EnumSet;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.Brood;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.AbstractAntEntity;
@@ -22,7 +23,7 @@ import net.minecraft.world.item.ItemStack;
 
 /**
  * Feeds the larvae: a nurse takes one piece of ant bread off a heap, carries it to a hungry larva and gives it to it.
- * After {@link Colony#LARVA_MEAL} pieces the larva grows into a worker. If the larva needs no more by the time the nurse
+ * After {@link Brood#LARVA_MEAL} pieces the larva grows into a worker. If the larva needs no more by the time the nurse
  * arrives, the bread goes back on a heap. (An ant that is interrupted while carrying bread is picked up by
  * {@link FeedQueenGoal}, which takes it to the queen.)
  */
@@ -65,14 +66,14 @@ public class FeedLarvaGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        if (colony == null || colony.getBread() <= 0) {
+        if (colony == null || colony.bakery().getBread() <= 0) {
             return false;
         }
-        larva = colony.claimHungryLarva(level, ant.getUUID());
+        larva = colony.brood().claimHungryLarva(level, ant.getUUID());
         if (larva == null) {
             return false;
         }
-        pile = colony.findBreadPile(level, ant.getRandom());
+        pile = colony.bakery().findBreadPile(level, ant.getRandom());
         if (pile == null || !ant.getNavigator().moveTo(pile, 1.0)) {
             larva.release(ant.getUUID());
             nextTry = level.getGameTime() + RETRY_TICKS; // no bread, or no way to it
@@ -120,14 +121,14 @@ public class FeedLarvaGoal extends Goal {
     /** First leg: to a heap of bread, where the ant takes a piece. */
     private void walkToPile(ServerLevel level) {
         if (near(pile)) {
-            ItemStack taken = colony.takeBreadAt(level, pile, false); // plain bread; rich only if nothing else is left
+            ItemStack taken = colony.bakery().takeBreadAt(level, pile, false); // plain bread; rich only if nothing else is left
             if (!taken.isEmpty()) {
                 ant.setCarriedSeed(taken);
                 ColonyManager.get(level).markChanged();
                 leg = Leg.TO_LARVA;
                 ant.getNavigator().stop();
             } else {
-                pile = colony.findBreadPile(level, ant.getRandom()); // somebody else took the last piece there
+                pile = colony.bakery().findBreadPile(level, ant.getRandom()); // somebody else took the last piece there
                 if (pile == null || !ant.getNavigator().moveTo(pile, 1.0)) {
                     done = true;
                 }
@@ -161,7 +162,7 @@ public class FeedLarvaGoal extends Goal {
 
     /** The larva is gone or full: the bread goes back on a heap. */
     private void putBack(ServerLevel level) {
-        pile = colony.pickBreadSpot(level, ant.getRandom());
+        pile = colony.bakery().pickBreadSpot(level, ant.getRandom());
         if (pile == null || !ant.getNavigator().moveTo(pile, 1.0)) {
             ant.setCarriedSeed(ItemStack.EMPTY); // nowhere to put it
             done = true;
@@ -173,8 +174,8 @@ public class FeedLarvaGoal extends Goal {
     /** Third leg, only if the larva did not need the bread: back to a bread heap. */
     private void walkBack(ServerLevel level) {
         if (near(pile)) {
-            if (!colony.depositBread(level, pile, ant.isCarryingRichBread())) {
-                pile = colony.pickBreadSpot(level, ant.getRandom());
+            if (!colony.bakery().depositBread(level, pile, ant.isCarryingRichBread())) {
+                pile = colony.bakery().pickBreadSpot(level, ant.getRandom());
                 if (pile == null || !ant.getNavigator().moveTo(pile, 1.0)) {
                     ant.setCarriedSeed(ItemStack.EMPTY);
                     done = true;

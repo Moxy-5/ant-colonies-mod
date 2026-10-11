@@ -41,7 +41,7 @@ public class StoreSeedGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        spot = colony == null ? null : colony.pickFoodSpot(level, ant.getRandom());
+        spot = colony == null ? null : colony.food().pickFoodSpot(level, ant.getRandom());
         if (spot == null) {
             // Colony gone, or the food store is not usable (any more): nowhere to put it.
             dropSeed();
@@ -82,11 +82,11 @@ public class StoreSeedGoal extends Goal {
         double dz = ant.getZ() - (spot.getZ() + 0.5);
         double dy = ant.getY() - spot.getY();
         if (dx * dx + dz * dz <= REACH * REACH && Math.abs(dy) < 1.5) {
-            if (colony.depositSeed(level, spot, ant.getCarriedSeed().is(com.antcolonies.registry.ModTags.RICH_SEEDS))) {
+            if (colony.food().depositSeed(level, spot, ant.getCarriedSeed().is(com.antcolonies.registry.ModTags.RICH_SEEDS))) {
                 ant.setCarriedSeed(net.minecraft.world.item.ItemStack.EMPTY);
                 ColonyManager.get(level).markChanged();
             } else {
-                spot = colony.pickFoodSpot(level, ant.getRandom()); // that heap is full
+                spot = colony.food().pickFoodSpot(level, ant.getRandom()); // that heap is full
                 if (spot == null) {
                     dropSeed();
                 } else {
@@ -105,7 +105,7 @@ public class StoreSeedGoal extends Goal {
                 dropSeed();
                 return;
             }
-            spot = colony.pickFoodSpot(ant.level(), ant.getRandom());
+            spot = colony.food().pickFoodSpot(ant.level(), ant.getRandom());
         }
         if (spot == null) {
             dropSeed();

@@ -53,11 +53,11 @@ public class RepairHillGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        if (colony == null || !colony.needsHillRepair(level)) {
+        if (colony == null || !colony.hill().needsHillRepair(level)) {
             return false;
         }
-        soilSpot = colony.getRepairSoilSpot();
-        colony.claimHillRepair(level, ant.getUUID());
+        soilSpot = colony.hill().getRepairSoilSpot();
+        colony.hill().claimHillRepair(level, ant.getUUID());
         return true;
     }
 

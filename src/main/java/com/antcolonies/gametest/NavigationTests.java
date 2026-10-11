@@ -4,6 +4,7 @@ import java.util.List;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.Hill;
 import com.antcolonies.colony.NestPlan;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.QueenAntEntity;
@@ -212,7 +213,7 @@ public class NavigationTests {
         if (bumpy) {
             for (int dx = -11; dx <= 11; dx++) {
                 for (int dz = -11; dz <= 11; dz++) {
-                    if (Math.abs(dx) <= Colony.MOUND_RADIUS + 1 && Math.abs(dz) <= Colony.MOUND_RADIUS + 1) {
+                    if (Math.abs(dx) <= Hill.MOUND_RADIUS + 1 && Math.abs(dz) <= Hill.MOUND_RADIUS + 1) {
                         continue; // the hill keeps flat ground around it
                     }
                     double roll = random.nextDouble();
@@ -226,9 +227,9 @@ public class NavigationTests {
         }
         buildHill(helper);
         if (gappyHill) {
-            for (int dx = -Colony.MOUND_RADIUS; dx <= Colony.MOUND_RADIUS; dx++) {
-                for (int dz = -Colony.MOUND_RADIUS; dz <= Colony.MOUND_RADIUS; dz++) {
-                    int height = Colony.moundHeightAt(dx, dz);
+            for (int dx = -Hill.MOUND_RADIUS; dx <= Hill.MOUND_RADIUS; dx++) {
+                for (int dz = -Hill.MOUND_RADIUS; dz <= Hill.MOUND_RADIUS; dz++) {
+                    int height = Hill.moundHeightAt(dx, dz);
                     if (height > 1 && random.nextDouble() < 0.35) {
                         helper.setBlock(MIDDLE + dx, SURFACE + height - 1, MIDDLE + dz, Blocks.AIR);
                     }
@@ -292,9 +293,9 @@ public class NavigationTests {
 
     /** The complete ant hill around the entrance (the hole at MIDDLE, MIDDLE stays open). */
     private static void buildHill(GameTestHelper helper) {
-        for (int dx = -Colony.MOUND_RADIUS; dx <= Colony.MOUND_RADIUS; dx++) {
-            for (int dz = -Colony.MOUND_RADIUS; dz <= Colony.MOUND_RADIUS; dz++) {
-                for (int h = 0; h < Colony.moundHeightAt(dx, dz); h++) {
+        for (int dx = -Hill.MOUND_RADIUS; dx <= Hill.MOUND_RADIUS; dx++) {
+            for (int dz = -Hill.MOUND_RADIUS; dz <= Hill.MOUND_RADIUS; dz++) {
+                for (int h = 0; h < Hill.moundHeightAt(dx, dz); h++) {
                     helper.setBlock(MIDDLE + dx, SURFACE + h, MIDDLE + dz, ModBlocks.BURROWED_DIRT.get());
                 }
             }

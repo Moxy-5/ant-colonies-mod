@@ -67,14 +67,14 @@ public class QueenAntEntity extends AbstractAntEntity {
         if (colony == null) {
             return;
         }
-        if (colony.queenStarves(serverLevel)) {
+        if (colony.queenCare().queenStarves(serverLevel)) {
             hurt(damageSources().starve(), 1000.0F); // five days without food: she dies and the colony ends (see die)
             return;
         }
         if (tickCount % 1200 == 0) {
             manager.markChanged(); // the hunger clock changes all the time: make sure it gets saved
         }
-        if (!colony.isEggDue(serverLevel) || !colony.isQueenHome(serverLevel)) {
+        if (!colony.queenCare().isEggDue(serverLevel) || !colony.queenCare().isQueenHome(serverLevel)) {
             return;
         }
         Vec3 at = position().subtract(Vec3.directionFromRotation(0.0F, getYRot()).scale(EGG_BEHIND));
@@ -82,7 +82,7 @@ public class QueenAntEntity extends AbstractAntEntity {
         if (!serverLevel.getBlockState(cell).getCollisionShape(serverLevel, cell).isEmpty()) {
             at = position(); // a wall behind her: the egg comes out where she sits
         }
-        colony.layEgg(serverLevel, at.x, getY(), at.z);
+        colony.queenCare().layEgg(serverLevel, at.x, getY(), at.z);
         manager.markChanged();
     }
 

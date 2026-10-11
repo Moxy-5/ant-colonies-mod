@@ -205,7 +205,7 @@ public class WorkerAntEntity extends AbstractAntEntity {
         if (reason == Entity.RemovalReason.KILLED && getColonyId() != null && level() instanceof ServerLevel serverLevel) {
             Colony colony = ColonyManager.get(serverLevel).getColony(getColonyId());
             if (colony != null) {
-                colony.spawnCorpse(serverLevel, getX(), getY(), getZ());
+                colony.refuse().spawnCorpse(serverLevel, getX(), getY(), getZ());
             }
         }
         super.remove(reason);
@@ -221,11 +221,11 @@ public class WorkerAntEntity extends AbstractAntEntity {
             if (colony != null) {
                 if (isCarryingEgg()) {
                     setCarryingEgg(false);
-                    colony.spawnEgg(serverLevel, getX(), getY(), getZ());
+                    colony.brood().spawnEgg(serverLevel, getX(), getY(), getZ());
                 }
                 if (isCarryingCorpse()) {
                     setCarryingCorpse(false);
-                    colony.spawnCorpse(serverLevel, getX(), getY(), getZ());
+                    colony.refuse().spawnCorpse(serverLevel, getX(), getY(), getZ());
                 }
                 colony.setCount(CASTE, colony.getCount(CASTE) - 1);
                 manager.markChanged();

@@ -50,7 +50,7 @@ public class CarryPelletGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        spot = colony == null ? null : colony.pickMoundSpot(level, ant.getRandom(), ant.getUUID());
+        spot = colony == null ? null : colony.hill().pickMoundSpot(level, ant.getRandom(), ant.getUUID());
         if (spot == null) {
             // Colony gone, or the mound is finished: nowhere to put it, so let go.
             ant.setCarriedBlock(null);
@@ -75,7 +75,7 @@ public class CarryPelletGoal extends Goal {
     public void stop() {
         ant.getNavigator().stop();
         if (colony != null) {
-            colony.releaseMoundSpot(ant.getUUID());
+            colony.hill().releaseMoundSpot(ant.getUUID());
         }
         spot = null;
         colony = null;
@@ -89,10 +89,10 @@ public class CarryPelletGoal extends Goal {
         if (++ticks >= GIVE_UP_TICKS) {
             AntColoniesMod.LOGGER.info("[pellet] ant at {} gave up on spot {} after {} ticks (navigator done: {}, spot valid: {}, living things in the spot: {}, block there: {}, block below: {})",
                     ant.blockPosition().toShortString(), spot.toShortString(), ticks, ant.getNavigator().isDone(),
-                    colony.isMoundSpotValid(level, spot), level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class, new AABB(spot)).size(),
+                    colony.hill().isMoundSpotValid(level, spot), level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class, new AABB(spot)).size(),
                     level.getBlockState(spot), level.getBlockState(spot.below()));
             ant.setCarriedBlock(null);
-            colony.pauseHillRepair(level); // a gap that can't be reached: don't keep fetching soil for it
+            colony.hill().pauseHillRepair(level); // a gap that can't be reached: don't keep fetching soil for it
             return;
         }
         // Sideways distance only: a small height difference (a step up or down) doesn't matter.
@@ -112,10 +112,10 @@ public class CarryPelletGoal extends Goal {
             if (++failedRoutes >= MAX_FAILED_ROUTES) {
                 AntColoniesMod.LOGGER.info("[pellet] ant at {} found no route to mound spots (last: {})", ant.blockPosition().toShortString(), spot.toShortString());
                 ant.setCarriedBlock(null);
-                colony.pauseHillRepair(ant.level());
+                colony.hill().pauseHillRepair(ant.level());
                 return;
             }
-            spot = colony.pickMoundSpot(ant.level(), ant.getRandom(), ant.getUUID());
+            spot = colony.hill().pickMoundSpot(ant.level(), ant.getRandom(), ant.getUUID());
         }
         if (spot == null) {
             ant.setCarriedBlock(null);
@@ -138,7 +138,7 @@ public class CarryPelletGoal extends Goal {
         // (it can place the pellet from the next cell), and tries again when it is out of the way.
         if (ant.getBoundingBox().intersects(new AABB(spot))) {
             if (ant.getNavigator().isDone() && !stepAside(level)) {
-                spot = colony.pickMoundSpot(level, ant.getRandom(), ant.getUUID());
+                spot = colony.hill().pickMoundSpot(level, ant.getRandom(), ant.getUUID());
                 if (spot == null) {
                     ant.setCarriedBlock(null);
                 } else {
@@ -147,11 +147,11 @@ public class CarryPelletGoal extends Goal {
             }
             return;
         }
-        if (!colony.placePellet(level, spot)) {
-            if (colony.isMoundSpotValid(level, spot)) {
+        if (!colony.hill().placePellet(level, spot)) {
+            if (colony.hill().isMoundSpotValid(level, spot)) {
                 return; // someone is standing in the spot: wait a moment (the spot is ours, nobody else carries soil to it)
             }
-            spot = colony.pickMoundSpot(level, ant.getRandom(), ant.getUUID());
+            spot = colony.hill().pickMoundSpot(level, ant.getRandom(), ant.getUUID());
             if (spot == null) {
                 ant.setCarriedBlock(null);
             } else {

@@ -8,6 +8,13 @@ import java.util.Set;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.Brood;
+import com.antcolonies.colony.Refuse;
+import com.antcolonies.colony.FoodStore;
+import com.antcolonies.colony.QueenCare;
+import com.antcolonies.colony.Hill;
+import com.antcolonies.colony.Bakery;
+import com.antcolonies.colony.Nest;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.NestPlan;
 import com.antcolonies.entity.AbstractAntEntity;
@@ -69,10 +76,10 @@ public class NestTests {
             helper.assertTrue(colony != null, "no colony yet");
             helper.assertTrue(airBelowSurface(helper) == NEST_CELLS,
                     "nest not finished: " + airBelowSurface(helper) + " of " + NEST_CELLS + " cells dug. " + describe(helper));
-            helper.assertTrue(colony.findDigTarget(level) == null, "something is still left to dig");
-            var rooms = colony.getPlannedChambers(level);
+            helper.assertTrue(colony.nest().findDigTarget(level) == null, "something is still left to dig");
+            var rooms = colony.nest().getPlannedChambers(level);
             helper.assertTrue(rooms.size() == 4, "expected 4 levels (food store, nursery, queen, refuse chamber) but the nest has " + rooms.size());
-            BlockPos room = colony.getFinishedRoomCenter(level);
+            BlockPos room = colony.nest().getFinishedRoomCenter(level);
             helper.assertTrue(room != null, "the room is not finished");
             var queens = level.getEntitiesOfClass(com.antcolonies.entity.QueenAntEntity.class, helper.getBounds());
             helper.assertTrue(!queens.isEmpty(), "the queen is gone");
@@ -102,11 +109,11 @@ public class NestTests {
             if (!holes.isEmpty() || colony == null) {
                 return;
             }
-            var rooms = colony.getPlannedChambers(level);
+            var rooms = colony.nest().getPlannedChambers(level);
             if (rooms.isEmpty()) {
                 return;
             }
-            BlockPos bottom = colony.getCenter().below(Colony.SHAFT_DEPTH);
+            BlockPos bottom = colony.getCenter().below(Nest.SHAFT_DEPTH);
             Direction tunnel = Direction.fromDelta(
                     rooms.get(0).cells().get(0).getX() - bottom.getX(), 0, rooms.get(0).cells().get(0).getZ() - bottom.getZ());
             BlockPos queenRoom = rooms.get(2).center();
@@ -126,15 +133,15 @@ public class NestTests {
             if (helper.getTick() % 400 == 0) {
                 Colony colony = colony(helper);
                 AntColoniesMod.LOGGER.info("[seal-test] tick {}: {} open leaks, {} open cells under the surface. {}",
-                        helper.getTick(), colony == null ? -1 : colony.getLeaks(level).size(), airBelowSurface(helper), describe(helper));
+                        helper.getTick(), colony == null ? -1 : colony.walls().getLeaks(level).size(), airBelowSurface(helper), describe(helper));
             }
         });
 
         helper.succeedWhen(() -> {
             Colony colony = colony(helper);
             helper.assertTrue(colony != null && !holes.isEmpty(), "no colony or holes yet");
-            helper.assertTrue(colony.findDigTarget(level) == null, "something is still left to dig");
-            var leaks = colony.getLeaks(level);
+            helper.assertTrue(colony.nest().findDigTarget(level) == null, "something is still left to dig");
+            var leaks = colony.walls().getLeaks(level);
             helper.assertTrue(leaks.isEmpty(), "the nest still has openings: " + leaks);
             String reach = openSpaceProblems(helper, colony);
             helper.assertTrue(reach.isEmpty(), "open space joined to the nest that is not part of it: " + reach);
@@ -159,8 +166,8 @@ public class NestTests {
         logStalls(helper);
         helper.onEachTick(() -> {
             Colony colony = colony(helper);
-            if (damaged[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.findDigTarget(level) != null
-                    || !hillProblems(helper).isEmpty() || !colony.getLeaks(level).isEmpty()) {
+            if (damaged[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.nest().findDigTarget(level) != null
+                    || !hillProblems(helper).isEmpty() || !colony.walls().getLeaks(level).isEmpty()) {
                 return;
             }
             damaged[0] = true;
@@ -172,8 +179,8 @@ public class NestTests {
                 }
             }
             // The walls: next to the top and the middle of the shaft, next to the nursery, between the nursery and the queen's room.
-            var rooms = colony.getPlannedChambers(level);
-            BlockPos bottom = colony.getCenter().below(Colony.SHAFT_DEPTH);
+            var rooms = colony.nest().getPlannedChambers(level);
+            BlockPos bottom = colony.getCenter().below(Nest.SHAFT_DEPTH);
             Direction tunnel = Direction.fromDelta(
                     rooms.get(0).cells().get(0).getX() - bottom.getX(), 0, rooms.get(0).cells().get(0).getZ() - bottom.getZ());
             List<BlockPos> holes = List.of(
@@ -186,13 +193,13 @@ public class NestTests {
                 level.setBlock(hole, Blocks.AIR.defaultBlockState(), 3);
             }
             AntColoniesMod.LOGGER.info("[mend-test] tick {}: hill and walls damaged, {} nest openings: {}",
-                    helper.getTick(), colony.getLeaks(level).size(), holes);
+                    helper.getTick(), colony.walls().getLeaks(level).size(), holes);
         });
         helper.onEachTick(() -> {
             if (damaged[0] && helper.getTick() % 200 == 0) {
                 Colony colony = colony(helper);
                 AntColoniesMod.LOGGER.info("[mend-test] tick {}: hill problems: {} | open leaks {}", helper.getTick(),
-                        hillProblems(helper), colony == null ? -1 : colony.getLeaks(level).size());
+                        hillProblems(helper), colony == null ? -1 : colony.walls().getLeaks(level).size());
             }
         });
 
@@ -201,7 +208,7 @@ public class NestTests {
             helper.assertTrue(damaged[0] && colony != null, "the nest has not been damaged yet");
             String hill = hillProblems(helper);
             helper.assertTrue(hill.isEmpty(), "the hill is not mended yet: " + hill);
-            var leaks = colony.getLeaks(level);
+            var leaks = colony.walls().getLeaks(level);
             helper.assertTrue(leaks.isEmpty(), "the nest still has openings: " + leaks);
             String reach = openSpaceProblems(helper, colony);
             helper.assertTrue(reach.isEmpty(), "open space joined to the nest that is not part of it: " + reach);
@@ -223,8 +230,8 @@ public class NestTests {
         long[] startedAt = {0};
         helper.onEachTick(() -> {
             Colony colony = colony(helper);
-            if (stage[0] != 0 || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.findDigTarget(level) != null
-                    || !hillProblems(helper).isEmpty() || !colony.getLeaks(level).isEmpty()) {
+            if (stage[0] != 0 || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.nest().findDigTarget(level) != null
+                    || !hillProblems(helper).isEmpty() || !colony.walls().getLeaks(level).isEmpty()) {
                 return;
             }
             stage[0] = 1;
@@ -271,8 +278,8 @@ public class NestTests {
         boolean[] done = {false};
         helper.onEachTick(() -> {
             Colony colony = colony(helper);
-            if (done[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.findDigTarget(level) != null
-                    || !hillProblems(helper).isEmpty() || !colony.getLeaks(level).isEmpty()) {
+            if (done[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.nest().findDigTarget(level) != null
+                    || !hillProblems(helper).isEmpty() || !colony.walls().getLeaks(level).isEmpty()) {
                 return;
             }
             done[0] = true;
@@ -291,9 +298,9 @@ public class NestTests {
             sheep.moveTo(gap.getX() + 0.5, gap.getY(), gap.getZ() + 0.5);
             sheep.setNoAi(true);
             level.addFreshEntity(sheep);
-            helper.assertTrue(!colony.placePellet(level, gap), "the pellet was set on top of a sheep");
+            helper.assertTrue(!colony.hill().placePellet(level, gap), "the pellet was set on top of a sheep");
             sheep.discard();
-            helper.assertTrue(colony.placePellet(level, gap), "the pellet was not set with ants standing in the gap");
+            helper.assertTrue(colony.hill().placePellet(level, gap), "the pellet was not set with ants standing in the gap");
             helper.assertTrue(level.getBlockState(gap).is(ModBlocks.BURROWED_DIRT.get()), "no block was placed");
             for (WorkerAntEntity ant : crowd) {
                 helper.assertTrue(ant.getY() >= gap.getY() + 1 - 0.01, "an ant is still inside the new block (y " + ant.getY() + ")");
@@ -312,13 +319,13 @@ public class NestTests {
     public static void nestSitsOneBlockHigherWhenTheStoneIsTooClose(GameTestHelper helper) {
         // Stone up to the floor layer of the third level at the usual depth (SURFACE - 3 - 4 = 5): two levels fit there,
         // but one block higher the third level fits and the fourth does not.
-        thinSoil(helper, SURFACE - Colony.SHAFT_DEPTH - 2 * NestPlan.LEVEL_SPACING, 3, Colony.SHAFT_DEPTH - 1);
+        thinSoil(helper, SURFACE - Nest.SHAFT_DEPTH - 2 * NestPlan.LEVEL_SPACING, 3, Nest.SHAFT_DEPTH - 1);
     }
 
     /** Even thinner soil: only the first level fits, so the nest is just the queen's room. */
     @GameTest(template = "arena", timeoutTicks = 90000, skyAccess = true)
     public static void theNestHasFewerLevelsWhenTheSoilIsThin(GameTestHelper helper) {
-        thinSoil(helper, SURFACE - Colony.SHAFT_DEPTH - NestPlan.LEVEL_SPACING + 1, 1, Colony.SHAFT_DEPTH);
+        thinSoil(helper, SURFACE - Nest.SHAFT_DEPTH - NestPlan.LEVEL_SPACING + 1, 1, Nest.SHAFT_DEPTH);
     }
 
     /** Stone fills the ground up to and including layer {@code stoneTop}; the nest must have {@code levels} levels and a shaft {@code shaft} deep. */
@@ -343,7 +350,7 @@ public class NestTests {
         helper.succeedWhen(() -> {
             Colony colony = colony(helper);
             helper.assertTrue(colony != null, "no colony yet");
-            var rooms = colony.getPlannedChambers(level);
+            var rooms = colony.nest().getPlannedChambers(level);
             helper.assertTrue(rooms.size() == levels, "the nest has " + rooms.size() + " levels, expected " + levels);
             helper.assertTrue(rooms.get(rooms.size() - 1).kind() == NestPlan.Kind.QUEEN, "the last level is not the queen's room");
             int expected = shaft;
@@ -352,8 +359,8 @@ public class NestTests {
             }
             helper.assertTrue(airBelowSurface(helper) == expected,
                     "nest not finished: " + airBelowSurface(helper) + " of " + expected + " cells dug. " + describe(helper));
-            helper.assertTrue(colony.findDigTarget(level) == null, "something is still left to dig");
-            BlockPos room = colony.getFinishedRoomCenter(level);
+            helper.assertTrue(colony.nest().findDigTarget(level) == null, "something is still left to dig");
+            BlockPos room = colony.nest().getFinishedRoomCenter(level);
             helper.assertTrue(room != null, "the room is not finished");
             var queens = level.getEntitiesOfClass(com.antcolonies.entity.QueenAntEntity.class, helper.getBounds());
             helper.assertTrue(!queens.isEmpty() && queens.get(0).blockPosition().equals(room), "the queen is not in the middle of the room yet");
@@ -362,7 +369,7 @@ public class NestTests {
                     helper.assertTrue(!helper.getBlockState(new BlockPos(x, stoneTop, z)).isAir(), "an ant dug into the stone layer at " + x + "," + z);
                 }
             }
-            var leaks = colony.getLeaks(level);
+            var leaks = colony.walls().getLeaks(level);
             helper.assertTrue(leaks.isEmpty(), "the nest still has openings: " + leaks);
             AntColoniesMod.LOGGER.info("[thin-soil-test] finished at tick {}", helper.getTick());
         });
@@ -388,14 +395,14 @@ public class NestTests {
         helper.succeedWhen(() -> {
             Colony colony = colony(helper);
             helper.assertTrue(colony != null, "no colony yet");
-            BlockPos room = colony.getFinishedRoomCenter(level);
+            BlockPos room = colony.nest().getFinishedRoomCenter(level);
             helper.assertTrue(room != null, "her home is not finished: " + airBelowSurface(helper) + " cells dug");
             var queens = level.getEntitiesOfClass(com.antcolonies.entity.QueenAntEntity.class, helper.getBounds());
             helper.assertTrue(!queens.isEmpty() && queens.get(0).blockPosition().equals(room), "the queen is not in the middle of her room yet");
             // Shaft + the two top levels only: she stops digging as soon as she has a home, the workers dig the rest.
-            helper.assertTrue(room.equals(colony.getPlannedChambers(level).get(1).center()), "she did not settle in the nursery");
-            int expected = Colony.SHAFT_DEPTH + colony.getPlannedChambers(level).get(0).cells().size()
-                    + colony.getPlannedChambers(level).get(1).cells().size();
+            helper.assertTrue(room.equals(colony.nest().getPlannedChambers(level).get(1).center()), "she did not settle in the nursery");
+            int expected = Nest.SHAFT_DEPTH + colony.nest().getPlannedChambers(level).get(0).cells().size()
+                    + colony.nest().getPlannedChambers(level).get(1).cells().size();
             helper.assertTrue(airBelowSurface(helper) == expected, "dug " + airBelowSurface(helper) + " cells but expected " + expected);
             helper.assertTrue(moundBlocks(helper) == 0, "the queen placed soil");
             AntColoniesMod.LOGGER.info("[queen-dig-test] finished at tick {}", helper.getTick());
@@ -415,7 +422,7 @@ public class NestTests {
         boolean[] dropped = {false};
         helper.onEachTick(() -> {
             Colony colony = colony(helper);
-            if (dropped[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.findDigTarget(level) != null
+            if (dropped[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.nest().findDigTarget(level) != null
                     || !hillProblems(helper).isEmpty()) {
                 return;
             }
@@ -429,7 +436,7 @@ public class NestTests {
             if (dropped[0] && helper.getTick() % 200 == 0) {
                 Colony colony = colony(helper);
                 AntColoniesMod.LOGGER.info("[seed-test] tick {}: food {}, seeds in the store {}, seeds anywhere {}",
-                        helper.getTick(), colony.getFood(), seedsIn(level, storeBox(level, colony)), seedsIn(level, helper.getBounds()));
+                        helper.getTick(), colony.food().getFood(), seedsIn(level, storeBox(level, colony)), seedsIn(level, helper.getBounds()));
             }
         });
 
@@ -438,10 +445,10 @@ public class NestTests {
             helper.assertTrue(dropped[0] && colony != null, "no seeds have been dropped yet");
             // The workers also feed the queen from the store: count what she has eaten too.
             int total = seedsAccountedFor(colony);
-            helper.assertTrue(total == 5, "the colony has " + colony.getFood() + " food and the queen ate " + colony.getQueenBread()
-                    + " (+ " + colony.getEggsLaid() + " eggs laid), expected 5 seeds in all");
-            helper.assertTrue(seedsIn(level, storeBox(level, colony)) == colony.getFood(), "only " + seedsIn(level, storeBox(level, colony)) + " seeds are in the food store");
-            helper.assertTrue(seedsIn(level, helper.getBounds()) == colony.getFood(), "some seeds are still lying around outside the store");
+            helper.assertTrue(total == 5, "the colony has " + colony.food().getFood() + " food and the queen ate " + colony.queenCare().getQueenBread()
+                    + " (+ " + colony.queenCare().getEggsLaid() + " eggs laid), expected 5 seeds in all");
+            helper.assertTrue(seedsIn(level, storeBox(level, colony)) == colony.food().getFood(), "only " + seedsIn(level, storeBox(level, colony)) + " seeds are in the food store");
+            helper.assertTrue(seedsIn(level, helper.getBounds()) == colony.food().getFood(), "some seeds are still lying around outside the store");
             for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
                 helper.assertTrue(!ant.isCarryingSeed(), "an ant is still carrying a seed");
             }
@@ -462,7 +469,7 @@ public class NestTests {
         boolean[] planted = {false};
         helper.onEachTick(() -> {
             Colony colony = colony(helper);
-            if (planted[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.findDigTarget(level) != null
+            if (planted[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.nest().findDigTarget(level) != null
                     || !hillProblems(helper).isEmpty()) {
                 return;
             }
@@ -476,15 +483,15 @@ public class NestTests {
         helper.succeedWhen(() -> {
             Colony colony = colony(helper);
             helper.assertTrue(planted[0] && colony != null, "no grass has been planted yet");
-            int expected = tufts.length * Colony.SEEDS_PER_GRASS;
+            int expected = tufts.length * FoodStore.SEEDS_PER_GRASS;
             for (int[] tuft : tufts) {
                 helper.assertBlock(new BlockPos(tuft[0], SURFACE, tuft[1]), block -> block == Blocks.AIR, "a tuft of grass is still there");
             }
             // The workers also feed the queen from the store: count what she has eaten too.
             int total = seedsAccountedFor(colony);
-            helper.assertTrue(total == expected, "the colony has " + colony.getFood() + " food and the queen ate " + colony.getQueenBread()
-                    + " (+ " + colony.getEggsLaid() + " eggs laid), expected " + expected + " seeds in all");
-            helper.assertTrue(seedsIn(level, storeBox(level, colony)) == colony.getFood(),
+            helper.assertTrue(total == expected, "the colony has " + colony.food().getFood() + " food and the queen ate " + colony.queenCare().getQueenBread()
+                    + " (+ " + colony.queenCare().getEggsLaid() + " eggs laid), expected " + expected + " seeds in all");
+            helper.assertTrue(seedsIn(level, storeBox(level, colony)) == colony.food().getFood(),
                     "only " + seedsIn(level, storeBox(level, colony)) + " seeds are in the store");
             for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
                 helper.assertTrue(!ant.isCarryingSeed(), "an ant is still carrying a seed");
@@ -510,14 +517,14 @@ public class NestTests {
         boolean[] breadInNursery = {false};
         helper.onEachTick(() -> {
             Colony colony = colony(helper);
-            if (stocked[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.findDigTarget(level) != null
+            if (stocked[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.nest().findDigTarget(level) != null
                     || !hillProblems(helper).isEmpty()) {
                 return;
             }
             stocked[0] = true;
-            var store = colony.getFoodStoreCells(level);
+            var store = colony.nest().getFoodStoreCells(level);
             for (int i = 0; i < 25; i++) {
-                colony.depositSeed(level, store.get(i / 8));
+                colony.food().depositSeed(level, store.get(i / 8));
             }
             AntColoniesMod.LOGGER.info("[egg-test] tick {}: 25 seeds put in the food store", helper.getTick());
         });
@@ -526,25 +533,25 @@ public class NestTests {
             if (!stocked[0] || colony == null) {
                 return;
             }
-            if (!breadInNursery[0] && colony.getBread() > 0) {
-                for (BlockPos pos : colony.getNurseryCells(level)) {
+            if (!breadInNursery[0] && colony.bakery().getBread() > 0) {
+                for (BlockPos pos : colony.nest().getNurseryCells(level)) {
                     breadInNursery[0] |= level.getBlockState(pos).is(ModBlocks.BREAD_PILE.get());
                 }
             }
-            if (incubationStart[0] < 0 && colony.isIncubating()) {
+            if (incubationStart[0] < 0 && colony.queenCare().isIncubating()) {
                 incubationStart[0] = level.getGameTime();
-                AntColoniesMod.LOGGER.info("[egg-test] tick {}: the queen is full and carries an egg, food {}", helper.getTick(), colony.getFood());
+                AntColoniesMod.LOGGER.info("[egg-test] tick {}: the queen is full and carries an egg, food {}", helper.getTick(), colony.food().getFood());
             }
-            if (laidAt[0] < 0 && colony.getEggsLaid() > 0) {
+            if (laidAt[0] < 0 && colony.queenCare().getEggsLaid() > 0) {
                 laidAt[0] = level.getGameTime();
                 // The egg must lie in her room, behind her (she looks the other way), and not in the nursery yet.
                 var queens = level.getEntitiesOfClass(com.antcolonies.entity.QueenAntEntity.class, helper.getBounds());
-                var eggs = colony.getLooseEggs(level);
+                var eggs = colony.brood().getLooseEggs(level);
                 if (queens.size() == 1 && eggs.size() == 1) {
                     var queen = queens.get(0);
                     Vec3 away = eggs.get(0).position().subtract(queen.position());
                     Vec3 facing = Vec3.directionFromRotation(0.0F, queen.getYRot());
-                    BlockPos room = colony.getFinishedRoomCenter(level);
+                    BlockPos room = colony.nest().getFinishedRoomCenter(level);
                     cameOutBehindHer[0] = away.dot(facing) <= 0.001 && room != null
                             && Math.abs(eggs.get(0).getX() - (room.getX() + 0.5)) <= 2.5 && Math.abs(eggs.get(0).getZ() - (room.getZ() + 0.5)) <= 2.5;
                     AntColoniesMod.LOGGER.info("[egg-test] tick {}: egg laid {} from the queen, facing {}", helper.getTick(), away, facing);
@@ -556,27 +563,27 @@ public class NestTests {
             }
             if (helper.getTick() % 1000 == 0) {
                 AntColoniesMod.LOGGER.info("[egg-test] tick {}: food {}, queen fed {}, eggs laid {}, eggs {} (nursery {})", helper.getTick(),
-                        colony.getFood(), colony.getQueenBread(), colony.getEggsLaid(), colony.countEggs(level), colony.getNurseryEggs(level).size());
+                        colony.food().getFood(), colony.queenCare().getQueenBread(), colony.queenCare().getEggsLaid(), colony.brood().countEggs(level), colony.brood().getNurseryEggs(level).size());
             }
         });
 
         helper.succeedWhen(() -> {
             Colony colony = colony(helper);
             helper.assertTrue(stocked[0] && colony != null, "the store has not been stocked yet");
-            helper.assertTrue(colony.getEggsLaid() == 1, "the queen has laid " + colony.getEggsLaid() + " eggs, expected 1");
+            helper.assertTrue(colony.queenCare().getEggsLaid() == 1, "the queen has laid " + colony.queenCare().getEggsLaid() + " eggs, expected 1");
             long carried = laidAt[0] - incubationStart[0];
-            helper.assertTrue(carried >= Colony.INCUBATION_TICKS && carried <= Colony.INCUBATION_TICKS + 100,
-                    "the egg came out after " + carried + " ticks, expected " + Colony.INCUBATION_TICKS);
+            helper.assertTrue(carried >= QueenCare.INCUBATION_TICKS && carried <= QueenCare.INCUBATION_TICKS + 100,
+                    "the egg came out after " + carried + " ticks, expected " + QueenCare.INCUBATION_TICKS);
             helper.assertTrue(cameOutBehindHer[0], "the egg did not come out behind the queen in her room");
-            var eggs = colony.getEggs(level);
-            helper.assertTrue(eggs.size() == 1 && colony.getNurseryEggs(level).size() == 1,
-                    "expected 1 egg, in the nursery, but there are " + eggs.size() + " (" + colony.getNurseryEggs(level).size() + " in the nursery)");
+            var eggs = colony.brood().getEggs(level);
+            helper.assertTrue(eggs.size() == 1 && colony.brood().getNurseryEggs(level).size() == 1,
+                    "expected 1 egg, in the nursery, but there are " + eggs.size() + " (" + colony.brood().getNurseryEggs(level).size() + " in the nursery)");
             helper.assertTrue(level.getEntitiesOfClass(com.antcolonies.entity.AntEggEntity.class, helper.getBounds()).size() == 1,
                     "there is an egg somewhere else");
             helper.assertTrue(breadInNursery[0], "no bread was ever seen on the nursery floor");
-            helper.assertTrue(colony.getQueenBread() == 5, "the queen was fed " + colony.getQueenBread() + " pieces of bread for the next egg, expected the 5 that were left");
-            helper.assertTrue(colony.getFood() == 0 && seedsIn(level, storeBox(level, colony)) == 0, "seeds are left in the store");
-            helper.assertTrue(colony.getBread() == 0 && breadIn(level, helper.getBounds()) == 0, "bread is left in the nursery");
+            helper.assertTrue(colony.queenCare().getQueenBread() == 5, "the queen was fed " + colony.queenCare().getQueenBread() + " pieces of bread for the next egg, expected the 5 that were left");
+            helper.assertTrue(colony.food().getFood() == 0 && seedsIn(level, storeBox(level, colony)) == 0, "seeds are left in the store");
+            helper.assertTrue(colony.bakery().getBread() == 0 && breadIn(level, helper.getBounds()) == 0, "bread is left in the nursery");
             for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
                 helper.assertTrue(!ant.hasFullMandibles(), "an ant is still carrying something");
             }
@@ -604,24 +611,24 @@ public class NestTests {
                 return;
             }
             if (!stocked[0]) {
-                if (airBelowSurface(helper) == NEST_CELLS && colony.findDigTarget(level) == null && hillProblems(helper).isEmpty()) {
+                if (airBelowSurface(helper) == NEST_CELLS && colony.nest().findDigTarget(level) == null && hillProblems(helper).isEmpty()) {
                     stocked[0] = true;
-                    colony.depositSeed(level, colony.getFoodStoreCells(level).get(0));
+                    colony.food().depositSeed(level, colony.nest().getFoodStoreCells(level).get(0));
                     AntColoniesMod.LOGGER.info("[bread-test] tick {}: one seed put in the food store", helper.getTick());
                 }
                 return;
             }
-            if (seedTakenAt[0] < 0 && colony.getFood() == 0) {
+            if (seedTakenAt[0] < 0 && colony.food().getFood() == 0) {
                 seedTakenAt[0] = level.getGameTime();
                 AntColoniesMod.LOGGER.info("[bread-test] tick {}: the nurse took the seed", helper.getTick());
             }
-            if (breadAt[0] < 0 && colony.getBread() + colony.getQueenBread() >= 1) {
+            if (breadAt[0] < 0 && colony.bakery().getBread() + colony.queenCare().getQueenBread() >= 1) {
                 breadAt[0] = level.getGameTime();
                 AntColoniesMod.LOGGER.info("[bread-test] tick {}: there is bread ({} seconds after the seed was taken)", helper.getTick(),
                         (breadAt[0] - seedTakenAt[0]) / 20.0);
             }
-            if (!pileInNursery[0] && colony.getBread() > 0) {
-                for (BlockPos pos : colony.getNurseryCells(level)) {
+            if (!pileInNursery[0] && colony.bakery().getBread() > 0) {
+                for (BlockPos pos : colony.nest().getNurseryCells(level)) {
                     pileInNursery[0] |= level.getBlockState(pos).is(ModBlocks.BREAD_PILE.get());
                 }
             }
@@ -631,11 +638,11 @@ public class NestTests {
             Colony colony = colony(helper);
             helper.assertTrue(stocked[0] && colony != null && breadAt[0] >= 0, "no bread has been made yet");
             long milling = breadAt[0] - seedTakenAt[0];
-            helper.assertTrue(milling >= Colony.MILL_TICKS, "the bread was ready " + milling + " ticks after the seed was taken, milling takes " + Colony.MILL_TICKS);
-            helper.assertTrue(milling <= Colony.MILL_TICKS + 600, "milling took " + milling + " ticks, far longer than " + Colony.MILL_TICKS);
+            helper.assertTrue(milling >= Bakery.MILL_TICKS, "the bread was ready " + milling + " ticks after the seed was taken, milling takes " + Bakery.MILL_TICKS);
+            helper.assertTrue(milling <= Bakery.MILL_TICKS + 600, "milling took " + milling + " ticks, far longer than " + Bakery.MILL_TICKS);
             helper.assertTrue(pileInNursery[0], "the bread never lay on the nursery floor");
-            helper.assertTrue(colony.getQueenBread() == 1 && colony.getBread() == 0 && colony.getFood() == 0,
-                    "the queen has " + colony.getQueenBread() + " bread, " + colony.getBread() + " in the nursery, " + colony.getFood() + " seeds in the store; expected 1, 0, 0");
+            helper.assertTrue(colony.queenCare().getQueenBread() == 1 && colony.bakery().getBread() == 0 && colony.food().getFood() == 0,
+                    "the queen has " + colony.queenCare().getQueenBread() + " bread, " + colony.bakery().getBread() + " in the nursery, " + colony.food().getFood() + " seeds in the store; expected 1, 0, 0");
             helper.assertTrue(breadIn(level, helper.getBounds()) == 0 && seedsIn(level, helper.getBounds()) == 0, "something is left lying around");
             for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
                 helper.assertTrue(!ant.hasFullMandibles(), "an ant is still carrying something");
@@ -663,41 +670,41 @@ public class NestTests {
                 return;
             }
             if (!stocked[0]) {
-                if (airBelowSurface(helper) == NEST_CELLS && colony.findDigTarget(level) == null && hillProblems(helper).isEmpty()) {
+                if (airBelowSurface(helper) == NEST_CELLS && colony.nest().findDigTarget(level) == null && hillProblems(helper).isEmpty()) {
                     stocked[0] = true;
-                    for (int i = 0; i < Colony.RICH_MEAL; i++) {
-                        colony.depositSeed(level, colony.getFoodStoreCells(level).get(0), true);
+                    for (int i = 0; i < QueenCare.RICH_MEAL; i++) {
+                        colony.food().depositSeed(level, colony.nest().getFoodStoreCells(level).get(0), true);
                     }
-                    AntColoniesMod.LOGGER.info("[burst-test] tick {}: {} rich seeds put in the food store", helper.getTick(), colony.getRichSeeds());
+                    AntColoniesMod.LOGGER.info("[burst-test] tick {}: {} rich seeds put in the food store", helper.getTick(), colony.food().getRichSeeds());
                 }
                 return;
             }
-            if (burstStart[0] < 0 && colony.getBurstLeft() > 0) {
+            if (burstStart[0] < 0 && colony.queenCare().getBurstLeft() > 0) {
                 burstStart[0] = level.getGameTime();
                 AntColoniesMod.LOGGER.info("[burst-test] tick {}: the burst starts", helper.getTick());
             }
-            if (colony.getEggsLaid() != lastLaid[0]) {
-                lastLaid[0] = colony.getEggsLaid();
+            if (colony.queenCare().getEggsLaid() != lastLaid[0]) {
+                lastLaid[0] = colony.queenCare().getEggsLaid();
                 layTimes.add(level.getGameTime());
-                AntColoniesMod.LOGGER.info("[burst-test] tick {}: egg {} laid, {} left in the burst", helper.getTick(), lastLaid[0], colony.getBurstLeft());
+                AntColoniesMod.LOGGER.info("[burst-test] tick {}: egg {} laid, {} left in the burst", helper.getTick(), lastLaid[0], colony.queenCare().getBurstLeft());
             }
         });
 
         helper.succeedWhen(() -> {
             Colony colony = colony(helper);
             helper.assertTrue(stocked[0] && colony != null && burstStart[0] >= 0, "the burst has not started yet");
-            helper.assertTrue(layTimes.size() >= Colony.BURST_EGGS, layTimes.size() + " of " + Colony.BURST_EGGS + " burst eggs laid so far");
-            helper.assertTrue(layTimes.size() == Colony.BURST_EGGS, layTimes.size() + " eggs laid, expected exactly " + Colony.BURST_EGGS);
+            helper.assertTrue(layTimes.size() >= QueenCare.BURST_EGGS, layTimes.size() + " of " + QueenCare.BURST_EGGS + " burst eggs laid so far");
+            helper.assertTrue(layTimes.size() == QueenCare.BURST_EGGS, layTimes.size() + " eggs laid, expected exactly " + QueenCare.BURST_EGGS);
             long previous = burstStart[0];
             for (long laid : layTimes) {
                 long gap = laid - previous;
-                helper.assertTrue(gap >= Colony.BURST_INTERVAL_TICKS && gap <= Colony.BURST_INTERVAL_TICKS + 60,
-                        "an egg came " + gap + " ticks after the one before, expected " + Colony.BURST_INTERVAL_TICKS);
+                helper.assertTrue(gap >= QueenCare.BURST_INTERVAL_TICKS && gap <= QueenCare.BURST_INTERVAL_TICKS + 60,
+                        "an egg came " + gap + " ticks after the one before, expected " + QueenCare.BURST_INTERVAL_TICKS);
                 previous = laid;
             }
-            helper.assertTrue(colony.getBurstLeft() == 0 && !colony.isIncubating(), "the burst is not over");
-            helper.assertTrue(colony.getQueenRich() == 0 && colony.getRichBread() == 0 && colony.getRichSeeds() == 0,
-                    "rich food is left: queen " + colony.getQueenRich() + ", bread " + colony.getRichBread() + ", seeds " + colony.getRichSeeds());
+            helper.assertTrue(colony.queenCare().getBurstLeft() == 0 && !colony.queenCare().isIncubating(), "the burst is not over");
+            helper.assertTrue(colony.queenCare().getQueenRich() == 0 && colony.bakery().getRichBread() == 0 && colony.food().getRichSeeds() == 0,
+                    "rich food is left: queen " + colony.queenCare().getQueenRich() + ", bread " + colony.bakery().getRichBread() + ", seeds " + colony.food().getRichSeeds());
         });
     }
 
@@ -717,20 +724,20 @@ public class NestTests {
         int[] antsBefore = {0};
         helper.onEachTick(() -> {
             Colony colony = colony(helper);
-            if (placed[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.findDigTarget(level) != null
+            if (placed[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.nest().findDigTarget(level) != null
                     || !hillProblems(helper).isEmpty()) {
                 return;
             }
             placed[0] = true;
             workersBefore[0] = colony.getCount(WorkerAntEntity.CASTE);
             antsBefore[0] = colonyWorkers(helper, colony).size();
-            var cells = colony.getNurseryCells(level);
+            var cells = colony.nest().getNurseryCells(level);
             for (int i = 0; i < 3; i++) {
-                colony.placeEgg(level, cells.get(i * 7));
+                colony.brood().placeEgg(level, cells.get(i * 7));
             }
-            var store = colony.getFoodStoreCells(level);
+            var store = colony.nest().getFoodStoreCells(level);
             for (int i = 0; i < 35; i++) {
-                colony.depositSeed(level, store.get(i / 8));
+                colony.food().depositSeed(level, store.get(i / 8));
             }
             AntColoniesMod.LOGGER.info("[hatch-test] tick {}: 3 eggs put in the nursery, 35 seeds in the store, {} workers", helper.getTick(), workersBefore[0]);
         });
@@ -738,7 +745,7 @@ public class NestTests {
             Colony colony = colony(helper);
             if (placed[0] && colony != null && helper.getTick() % 500 == 0) {
                 AntColoniesMod.LOGGER.info("[hatch-test] tick {}: eggs {}, larvae {} (hunger {}), bread {}, food {}, workers {}", helper.getTick(),
-                        colony.countEggs(level), colony.countLarvae(level), colony.larvaHunger(level), colony.getBread(), colony.getFood(),
+                        colony.brood().countEggs(level), colony.brood().countLarvae(level), colony.brood().larvaHunger(level), colony.bakery().getBread(), colony.food().getFood(),
                         colony.getCount(WorkerAntEntity.CASTE));
             }
         });
@@ -746,7 +753,7 @@ public class NestTests {
         helper.succeedWhen(() -> {
             Colony colony = colony(helper);
             helper.assertTrue(placed[0] && colony != null, "no eggs have been put in the nursery yet");
-            helper.assertTrue(colony.countLarvae(level) == 0, colony.countLarvae(level) + " larvae are still there");
+            helper.assertTrue(colony.brood().countLarvae(level) == 0, colony.brood().countLarvae(level) + " larvae are still there");
             helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == workersBefore[0] + 3,
                     "the colony counts " + colony.getCount(WorkerAntEntity.CASTE) + " workers, expected " + (workersBefore[0] + 3));
             var workers = colonyWorkers(helper, colony);
@@ -773,7 +780,7 @@ public class NestTests {
         int[] antsBefore = {0};
         helper.onEachTick(() -> {
             Colony colony = colony(helper);
-            if (placed[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.findDigTarget(level) != null
+            if (placed[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.nest().findDigTarget(level) != null
                     || !hillProblems(helper).isEmpty()) {
                 return;
             }
@@ -782,10 +789,10 @@ public class NestTests {
             workersBefore[0] = colony.getCount(WorkerAntEntity.CASTE);
             antsBefore[0] = colonyWorkers(helper, colony).size();
             colony.setCount(WorkerAntEntity.CASTE, Colony.MAX_WORKERS - 1);
-            var cells = colony.getNurseryCells(level);
+            var cells = colony.nest().getNurseryCells(level);
             for (int i = 0; i < 3; i++) {
                 BlockPos cell = cells.get(i * 7);
-                colony.spawnLarva(level, cell.getX() + 0.5, cell.getY(), cell.getZ() + 0.5).setFed(Colony.LARVA_MEAL);
+                colony.brood().spawnLarva(level, cell.getX() + 0.5, cell.getY(), cell.getZ() + 0.5).setFed(Brood.LARVA_MEAL);
             }
         });
 
@@ -796,7 +803,7 @@ public class NestTests {
             helper.assertTrue(level.getGameTime() >= placedAt[0] + 600, "still waiting for the larvae to have grown up");
             helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == Colony.MAX_WORKERS,
                     "the colony counts " + colony.getCount(WorkerAntEntity.CASTE) + " workers, expected " + Colony.MAX_WORKERS);
-            helper.assertTrue(colony.countLarvae(level) == 2, colony.countLarvae(level) + " larvae are left, expected 2");
+            helper.assertTrue(colony.brood().countLarvae(level) == 2, colony.brood().countLarvae(level) + " larvae are left, expected 2");
             helper.assertTrue(colonyWorkers(helper, colony).size() == antsBefore[0] + 1,
                     "expected exactly one new worker, but there are " + colonyWorkers(helper, colony).size() + " workers and there were " + antsBefore[0]);
         });
@@ -817,16 +824,16 @@ public class NestTests {
         int[] foodBefore = {0};
         helper.onEachTick(() -> {
             Colony colony = colony(helper);
-            if (started[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.findDigTarget(level) != null
+            if (started[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.nest().findDigTarget(level) != null
                     || !hillProblems(helper).isEmpty()) {
                 return;
             }
             started[0] = true;
-            var store = colony.getFoodStoreCells(level);
+            var store = colony.nest().getFoodStoreCells(level);
             for (int i = 0; i < 40; i++) {
-                colony.depositSeed(level, store.get(i / 8));
+                colony.food().depositSeed(level, store.get(i / 8));
             }
-            foodBefore[0] = colony.getFood();
+            foodBefore[0] = colony.food().getFood();
             colony.setHungerOn(true);
             for (WorkerAntEntity worker : colonyWorkers(helper, colony)) {
                 worker.setLastAte(level.getGameTime());
@@ -839,8 +846,8 @@ public class NestTests {
         helper.succeedWhen(() -> {
             Colony colony = colony(helper);
             helper.assertTrue(started[0] && colony != null, "the nest is not finished yet");
-            helper.assertTrue(colony.getSeedsEaten() >= 1, "nobody has eaten a seed yet");
-            helper.assertTrue(colony.getSeedsEaten() == 1, colony.getSeedsEaten() + " seeds were eaten, expected exactly 1");
+            helper.assertTrue(colony.food().getSeedsEaten() >= 1, "nobody has eaten a seed yet");
+            helper.assertTrue(colony.food().getSeedsEaten() == 1, colony.food().getSeedsEaten() + " seeds were eaten, expected exactly 1");
             helper.assertTrue(hungry[0].isAlive() && !hungry[0].isHungry(), "the worker is still hungry");
         });
     }
@@ -875,7 +882,7 @@ public class NestTests {
             helper.assertTrue(slowed[0], "not slowed down yet");
             helper.assertTrue(!worker[0].isAlive(), "the worker has not starved yet");
             helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == 0, "the colony still counts " + colony.getCount(WorkerAntEntity.CASTE) + " workers");
-            helper.assertTrue(colony.getCorpses(level).size() == 1, colony.getCorpses(level).size() + " bodies, expected 1");
+            helper.assertTrue(colony.refuse().getCorpses(level).size() == 1, colony.refuse().getCorpses(level).size() + " bodies, expected 1");
         });
     }
 
@@ -895,18 +902,18 @@ public class NestTests {
             long now = level.getGameTime();
             BlockPos base = helper.absolutePos(new BlockPos(MIDDLE + 4, SURFACE, MIDDLE + 4));
             for (int i = 0; i < 3; i++) {
-                larvae[i] = colony.spawnLarva(level, base.getX() + 0.5 + i, base.getY(), base.getZ() + 0.5);
-                larvae[i].setLastFed(now - Colony.LARVA_STARVE_TICKS + 60); // three seconds from starving
+                larvae[i] = colony.brood().spawnLarva(level, base.getX() + 0.5 + i, base.getY(), base.getZ() + 0.5);
+                larvae[i].setLastFed(now - Brood.LARVA_STARVE_TICKS + 60); // three seconds from starving
             }
             larvae[1].feed(); // fed just now: starts over
-            larvae[2].setFed(Colony.LARVA_MEAL); // full: nothing to starve of (it waits for a place as a worker, or hatches)
+            larvae[2].setFed(Brood.LARVA_MEAL); // full: nothing to starve of (it waits for a place as a worker, or hatches)
         });
         helper.succeedWhen(() -> {
             Colony colony = colony(helper);
             helper.assertTrue(larvae[0] != null && !larvae[0].isAlive(), "the unfed larva has not starved yet");
             helper.assertTrue(larvae[1].isAlive(), "the larva that was just fed starved");
             helper.assertTrue(!larvae[2].isAlive() || larvae[2].isFull(), "the full larva is not full");
-            helper.assertTrue(colony.getCorpses(level).size() == 1, colony.getCorpses(level).size() + " bodies, expected 1");
+            helper.assertTrue(colony.refuse().getCorpses(level).size() == 1, colony.refuse().getCorpses(level).size() + " bodies, expected 1");
         });
     }
 
@@ -924,7 +931,7 @@ public class NestTests {
             Colony colony = colony(helper);
             colony.setHungerOn(true);
             queen[0] = colony.getQueen(level);
-            colony.setQueenLastFed(level.getGameTime() - Colony.QUEEN_STARVE_TICKS + 60); // three seconds from starving
+            colony.queenCare().setQueenLastFed(level.getGameTime() - QueenCare.QUEEN_STARVE_TICKS + 60); // three seconds from starving
             started[0] = true;
         });
         helper.succeedWhen(() -> {
@@ -946,7 +953,7 @@ public class NestTests {
         helper.runAfterDelay(20, () -> {
             Colony colony = colony(helper);
             helper.assertTrue(colony != null, "no colony");
-            List<NestPlan.Chamber> before = colony.getPlannedChambers(level);
+            List<NestPlan.Chamber> before = colony.nest().getPlannedChambers(level);
             helper.assertTrue(before.size() == NestPlan.MAX_LEVELS, "the nest has " + before.size() + " levels, expected " + NestPlan.MAX_LEVELS);
             digNestAtOnce(level, colony);
             // A heap of seeds in the far corner of the seed store, a heap of bread in the far corner of the nursery.
@@ -963,7 +970,7 @@ public class NestTests {
             oldSave.remove("nestDepth");
             oldSave.remove("nestDirection");
             oldSave.remove("nestLevels");
-            List<NestPlan.Chamber> fromOldSave = Colony.load(oldSave).getPlannedChambers(level);
+            List<NestPlan.Chamber> fromOldSave = Colony.load(oldSave).nest().getPlannedChambers(level);
             helper.assertTrue(fromOldSave.equals(before), "from an old save the nest plan changed: " + describePlan(before, colony)
                     + " became " + describePlan(fromOldSave, colony));
             // A torch a player put on the floor of the refuse chamber: only a saved plan gets past that.
@@ -971,7 +978,7 @@ public class NestTests {
             level.setBlock(torch, Blocks.TORCH.defaultBlockState(), 3);
             // A reload: the colony is written to the save and read back as a new object.
             Colony reloaded = Colony.load(colony.save());
-            List<NestPlan.Chamber> after = reloaded.getPlannedChambers(level);
+            List<NestPlan.Chamber> after = reloaded.nest().getPlannedChambers(level);
             helper.assertTrue(after.equals(before), "after the reload the nest plan changed: " + describePlan(before, colony)
                     + " became " + describePlan(after, colony));
             helper.succeed();
@@ -1022,8 +1029,8 @@ public class NestTests {
             Colony colony = colony(helper);
             helper.assertTrue(reloaded[0] != null, "not reloaded yet");
             helper.assertTrue(!reloaded[0].isCarryingEgg(), "the reloaded worker still holds the egg");
-            helper.assertTrue(colony.getEggs(level).size() == 1, colony.getEggs(level).size() + " eggs, expected 1");
-            helper.assertTrue(colony.getNurseryEggs(level).size() == 1, "the egg is not in the nursery");
+            helper.assertTrue(colony.brood().getEggs(level).size() == 1, colony.brood().getEggs(level).size() + " eggs, expected 1");
+            helper.assertTrue(colony.brood().getNurseryEggs(level).size() == 1, "the egg is not in the nursery");
         });
     }
 
@@ -1038,10 +1045,10 @@ public class NestTests {
 
     /** Digs the colony's whole planned nest (shaft, stairs, tunnels, rooms) out at once. */
     private static void digNestAtOnce(ServerLevel level, Colony colony) {
-        for (int i = 1; i <= Colony.SHAFT_DEPTH; i++) {
+        for (int i = 1; i <= Nest.SHAFT_DEPTH; i++) {
             level.setBlock(colony.getCenter().below(i), Blocks.AIR.defaultBlockState(), 3);
         }
-        for (NestPlan.Chamber chamber : colony.getPlannedChambers(level)) {
+        for (NestPlan.Chamber chamber : colony.nest().getPlannedChambers(level)) {
             for (BlockPos pos : chamber.cells()) {
                 level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
             }
@@ -1073,17 +1080,17 @@ public class NestTests {
         int[] workersBefore = {0};
         helper.onEachTick(() -> {
             Colony colony = colony(helper);
-            if (placed[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.findDigTarget(level) != null
+            if (placed[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.nest().findDigTarget(level) != null
                     || !hillProblems(helper).isEmpty()) {
                 return;
             }
             placed[0] = true;
             for (int[] spot : new int[][] {{5, 1}, {-4, 4}, {1, -6}}) {
                 BlockPos pos = helper.absolutePos(new BlockPos(MIDDLE + spot[0], SURFACE, MIDDLE + spot[1]));
-                colony.spawnCorpse(level, pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5);
+                colony.refuse().spawnCorpse(level, pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5);
             }
-            BlockPos nursery = colony.getNurseryCells(level).get(3);
-            colony.spawnCorpse(level, nursery.getX() + 0.5, nursery.getY(), nursery.getZ() + 0.5);
+            BlockPos nursery = colony.nest().getNurseryCells(level).get(3);
+            colony.refuse().spawnCorpse(level, nursery.getX() + 0.5, nursery.getY(), nursery.getZ() + 0.5);
             var workers = colonyWorkers(helper, colony);
             workersBefore[0] = workers.size();
             workers.get(0).hurt(level.damageSources().genericKill(), 1000.0F);
@@ -1093,16 +1100,16 @@ public class NestTests {
             Colony colony = colony(helper);
             if (placed[0] && colony != null && helper.getTick() % 500 == 0) {
                 AntColoniesMod.LOGGER.info("[refuse-test] tick {}: {} bodies, {} in the refuse chamber ({} cells)", helper.getTick(),
-                        colony.getCorpses(level).size(), colony.getRefuseCorpses(level).size(), colony.getRefuseCells(level).size());
+                        colony.refuse().getCorpses(level).size(), colony.refuse().getRefuseCorpses(level).size(), colony.nest().getRefuseCells(level).size());
             }
         });
 
         helper.succeedWhen(() -> {
             Colony colony = colony(helper);
             helper.assertTrue(placed[0] && colony != null, "no dead ants have been put out yet");
-            var all = colony.getCorpses(level);
+            var all = colony.refuse().getCorpses(level);
             helper.assertTrue(all.size() == 5, "expected 5 bodies (4 put out and the killed worker), found " + all.size());
-            var inChamber = colony.getRefuseCorpses(level);
+            var inChamber = colony.refuse().getRefuseCorpses(level);
             helper.assertTrue(inChamber.size() == 5, inChamber.size() + " of 5 bodies are in the refuse chamber");
             Set<BlockPos> cells = new HashSet<>();
             for (var corpse : inChamber) {
@@ -1120,14 +1127,14 @@ public class NestTests {
 
     /**
      * Where the soil is so thin that the nest has no refuse chamber, nobody can carry a dead ant anywhere: it stays where
-     * it lies for the five minutes of {@link Colony#CORPSE_DECAY_TICKS} and then crumbles to dust.
+     * it lies for the five minutes of {@link Refuse#CORPSE_DECAY_TICKS} and then crumbles to dust.
      */
     @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
     public static void deadAntsNobodyCanCarryAwayCrumbleToDust(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
         startColony(helper);
-        int stoneTop = SURFACE - Colony.SHAFT_DEPTH - NestPlan.LEVEL_SPACING + 1; // only the queen's room fits (see theNestHasFewerLevelsWhenTheSoilIsThin)
+        int stoneTop = SURFACE - Nest.SHAFT_DEPTH - NestPlan.LEVEL_SPACING + 1; // only the queen's room fits (see theNestHasFewerLevelsWhenTheSoilIsThin)
         for (int x = 0; x < 25; x++) {
             for (int z = 0; z < 25; z++) {
                 for (int y = 0; y <= stoneTop; y++) {
@@ -1139,11 +1146,11 @@ public class NestTests {
         com.antcolonies.entity.AntCorpseEntity[] corpse = {null};
         helper.runAfterDelay(20, () -> {
             BlockPos pos = helper.absolutePos(new BlockPos(MIDDLE + 5, SURFACE, MIDDLE + 5));
-            corpse[0] = colony(helper).spawnCorpse(level, pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5);
+            corpse[0] = colony(helper).refuse().spawnCorpse(level, pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5);
         });
         helper.succeedWhen(() -> {
             helper.assertTrue(corpse[0] != null && !corpse[0].isAlive(), "the body is still there");
-            if (corpse[0].tickCount < Colony.CORPSE_DECAY_TICKS) {
+            if (corpse[0].tickCount < Refuse.CORPSE_DECAY_TICKS) {
                 helper.fail("the body was gone after " + corpse[0].tickCount + " ticks, but nobody could have carried it away");
             }
         });
@@ -1196,7 +1203,7 @@ public class NestTests {
     }
 
     private static int seedsAccountedFor(Colony colony) {
-        return colony.getFood() + colony.getBread() + colony.getQueenBread() + Colony.QUEEN_MEAL * colony.getEggsLaid() + colony.getSeedsEaten();
+        return colony.food().getFood() + colony.bakery().getBread() + colony.queenCare().getQueenBread() + QueenCare.QUEEN_MEAL * colony.queenCare().getEggsLaid() + colony.food().getSeedsEaten();
     }
 
     private static void dropSeeds(GameTestHelper helper, int x, int z, int count) {
@@ -1229,35 +1236,35 @@ public class NestTests {
             if (colony == null) {
                 return;
             }
-            var rooms = colony.getPlannedChambers(level);
+            var rooms = colony.nest().getPlannedChambers(level);
             if (!blocked[0] && !rooms.isEmpty()) {
                 blocked[0] = true;
                 for (BlockPos pos : rooms.get(2).cells()) { // the stair and the queen's room: nothing deeper can be dug
                     level.setBlock(pos, Blocks.STONE.defaultBlockState(), 3);
                 }
             }
-            if (!dropped[0] && colony.getFinishedRoomCenter(level) != null) {
+            if (!dropped[0] && colony.nest().getFinishedRoomCenter(level) != null) {
                 dropped[0] = true;
                 dropSeeds(helper, MIDDLE + 6, MIDDLE, 10);
                 dropSeeds(helper, MIDDLE - 6, MIDDLE + 2, 10);
                 dropSeeds(helper, MIDDLE + 1, MIDDLE - 7, 10);
                 AntColoniesMod.LOGGER.info("[early-feed-test] tick {}: the nursery is finished, 30 seeds dropped", helper.getTick());
             }
-            if (dropped[0] && colony.getQueenBread() > 0 && colony.getQueenRoomCells(level).isEmpty()) {
+            if (dropped[0] && colony.queenCare().getQueenBread() > 0 && colony.nest().getQueenRoomCells(level).isEmpty()) {
                 fedAtHome[0] = true;
             }
-            if (dropped[0] && colony.getEggsLaid() > 0) {
-                for (var egg : colony.getEggs(level)) {
-                    eggAtHome[0] |= colony.getHomeRoomCells(level).contains(egg.blockPosition());
+            if (dropped[0] && colony.queenCare().getEggsLaid() > 0) {
+                for (var egg : colony.brood().getEggs(level)) {
+                    eggAtHome[0] |= colony.nest().getHomeRoomCells(level).contains(egg.blockPosition());
                 }
-                for (var larva : colony.getLarvae(level)) {
-                    eggAtHome[0] |= colony.getHomeRoomCells(level).contains(larva.blockPosition());
+                for (var larva : colony.brood().getLarvae(level)) {
+                    eggAtHome[0] |= colony.nest().getHomeRoomCells(level).contains(larva.blockPosition());
                 }
             }
             if (dropped[0] && helper.getTick() % 400 == 0) {
                 AntColoniesMod.LOGGER.info("[early-feed-test] tick {}: queen fed {}, bread {} (milling {}), food {}, eggs laid {}, eggs {}, larvae {}, seeds on the ground {}",
-                        helper.getTick(), colony.getQueenBread(), colony.getBread(), colony.getMilling(), colony.getFood(), colony.getEggsLaid(),
-                        colony.countEggs(level), colony.countLarvae(level), seedsIn(level, helper.getBounds()) - colony.getFood());
+                        helper.getTick(), colony.queenCare().getQueenBread(), colony.bakery().getBread(), colony.bakery().getMilling(), colony.food().getFood(), colony.queenCare().getEggsLaid(),
+                        colony.brood().countEggs(level), colony.brood().countLarvae(level), seedsIn(level, helper.getBounds()) - colony.food().getFood());
             }
         });
 
@@ -1265,13 +1272,13 @@ public class NestTests {
             Colony colony = colony(helper);
             helper.assertTrue(dropped[0] && colony != null, "no seeds have been dropped yet");
             helper.assertTrue(fedAtHome[0], "the queen was not fed in the nursery");
-            helper.assertTrue(colony.getEggsLaid() >= 1 && eggAtHome[0], "no egg has been put down in the nursery yet");
-            helper.assertTrue(colony.getFinishedRoomCenter(level).equals(colony.getPlannedChambers(level).get(1).center()),
+            helper.assertTrue(colony.queenCare().getEggsLaid() >= 1 && eggAtHome[0], "no egg has been put down in the nursery yet");
+            helper.assertTrue(colony.nest().getFinishedRoomCenter(level).equals(colony.nest().getPlannedChambers(level).get(1).center()),
                     "the queen's home is not the nursery");
             for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
                 helper.assertTrue(!ant.isCarryingSeed(), "an ant is still carrying a seed");
             }
-            helper.assertTrue(seedsIn(level, helper.getBounds()) == colony.getFood(), "some seeds are still lying around outside the store");
+            helper.assertTrue(seedsIn(level, helper.getBounds()) == colony.food().getFood(), "some seeds are still lying around outside the store");
         });
     }
 
@@ -1290,7 +1297,7 @@ public class NestTests {
         int[] antsBefore = {0};
         helper.onEachTick(() -> {
             Colony colony = colony(helper);
-            if (ready[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.findDigTarget(level) != null
+            if (ready[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.nest().findDigTarget(level) != null
                     || !hillProblems(helper).isEmpty()) {
                 return;
             }
@@ -1300,7 +1307,7 @@ public class NestTests {
                 AntColoniesMod.LOGGER.info("[room-egg-test] worker {} at {} colony {} (ours {}) alive {}", w.getId(), w.blockPosition(),
                         w.getColonyId(), colony.getId(), w.isAlive());
             }
-            for (var chamber : colony.getPlannedChambers(level)) {
+            for (var chamber : colony.nest().getPlannedChambers(level)) {
                 if (chamber.kind() == com.antcolonies.colony.NestPlan.Kind.NURSERY) {
                     for (BlockPos pos : chamber.room()) { // not the stairs: they lead on to the queen's room
                         level.setBlock(pos, Blocks.STONE.defaultBlockState(), 3);
@@ -1308,14 +1315,14 @@ public class NestTests {
                 }
             }
             workersBefore[0] = colony.getCount(WorkerAntEntity.CASTE);
-            BlockPos room = colony.getFinishedRoomCenter(level);
-            colony.layEgg(level, room.getX() + 0.5, room.getY(), room.getZ() + 0.5);
+            BlockPos room = colony.nest().getFinishedRoomCenter(level);
+            colony.queenCare().layEgg(level, room.getX() + 0.5, room.getY(), room.getZ() + 0.5);
             AntColoniesMod.LOGGER.info("[room-egg-test] tick {}: nursery turned to stone, egg laid, {} workers counted, {} real", helper.getTick(), workersBefore[0], antsBefore[0]);
         });
         helper.onEachTick(() -> {
             Colony colony = colony(helper);
             if (ready[0] && colony != null && helper.getTick() % 400 == 0) {
-                var eggs = colony.getEggs(level);
+                var eggs = colony.brood().getEggs(level);
                 AntColoniesMod.LOGGER.info("[room-egg-test] tick {}: {} eggs (placed {}), {} workers", helper.getTick(), eggs.size(),
                         eggs.stream().filter(com.antcolonies.entity.AntEggEntity::isPlaced).count(), colony.getCount(WorkerAntEntity.CASTE));
             }
@@ -1324,10 +1331,10 @@ public class NestTests {
         helper.succeedWhen(() -> {
             Colony colony = colony(helper);
             helper.assertTrue(ready[0] && colony != null, "the egg has not been laid yet");
-            helper.assertTrue(colony.getNurseryCells(level).isEmpty(), "the nursery is usable after all");
-            helper.assertTrue(colony.countEggs(level) == 0, "an egg is left");
-            helper.assertTrue(colony.countLarvae(level) == 1, colony.countLarvae(level) + " larvae, expected 1");
-            helper.assertTrue(colony.getQueenRoomCells(level).contains(colony.getLarvae(level).get(0).blockPosition()),
+            helper.assertTrue(colony.nest().getNurseryCells(level).isEmpty(), "the nursery is usable after all");
+            helper.assertTrue(colony.brood().countEggs(level) == 0, "an egg is left");
+            helper.assertTrue(colony.brood().countLarvae(level) == 1, colony.brood().countLarvae(level) + " larvae, expected 1");
+            helper.assertTrue(colony.nest().getQueenRoomCells(level).contains(colony.brood().getLarvae(level).get(0).blockPosition()),
                     "the larva is not in the queen's room");
             helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == workersBefore[0], "the colony has a new worker already");
         });
@@ -1345,7 +1352,7 @@ public class NestTests {
 
         helper.succeedWhen(() -> {
             Colony colony = colony(helper);
-            helper.assertTrue(colony != null && airBelowSurface(helper) == NEST_CELLS && colony.findDigTarget(level) == null
+            helper.assertTrue(colony != null && airBelowSurface(helper) == NEST_CELLS && colony.nest().findDigTarget(level) == null
                     && hillProblems(helper).isEmpty(), "the nest is not finished yet");
             var queens = level.getEntitiesOfClass(com.antcolonies.entity.QueenAntEntity.class, helper.getBounds());
             helper.assertTrue(queens.size() == 1, "no queen");
@@ -1384,7 +1391,7 @@ public class NestTests {
     /** A box around the floor cells of the colony's food store. */
     private static AABB storeBox(ServerLevel level, Colony colony) {
         AABB box = null;
-        for (BlockPos pos : colony.getFoodStoreCells(level)) {
+        for (BlockPos pos : colony.nest().getFoodStoreCells(level)) {
             box = box == null ? new AABB(pos) : box.minmax(new AABB(pos));
         }
         return box == null ? new AABB(0, 0, 0, 0, 0, 0) : box;
@@ -1445,17 +1452,17 @@ public class NestTests {
     private static String openSpaceProblems(GameTestHelper helper, Colony colony) {
         ServerLevel level = helper.getLevel();
         Set<BlockPos> planned = new HashSet<>();
-        for (int i = 1; i <= Colony.SHAFT_DEPTH; i++) {
+        for (int i = 1; i <= Nest.SHAFT_DEPTH; i++) {
             planned.add(colony.getCenter().below(i));
         }
-        for (var chamber : colony.getPlannedChambers(level)) {
+        for (var chamber : colony.nest().getPlannedChambers(level)) {
             planned.addAll(chamber.cells());
         }
         int ceiling = colony.getCenter().getY() - 1; // the shaft's top block: nothing above it counts
         AABB area = helper.getBounds();
         Set<BlockPos> seen = new HashSet<>();
         ArrayDeque<BlockPos> queue = new ArrayDeque<>();
-        BlockPos start = colony.getCenter().below(Colony.SHAFT_DEPTH);
+        BlockPos start = colony.getCenter().below(Nest.SHAFT_DEPTH);
         seen.add(start);
         queue.add(start);
         StringBuilder problems = new StringBuilder();
@@ -1492,7 +1499,7 @@ public class NestTests {
                         built++;
                     }
                 }
-                int planned = Colony.moundHeightAt(dx, dz);
+                int planned = Hill.moundHeightAt(dx, dz);
                 if (built != planned) {
                     problems.append(String.format("(%d,%d) has %d of %d; ", dx, dz, built, planned));
                 }
@@ -1546,7 +1553,7 @@ public class NestTests {
         Colony colony = colony(helper);
         StringBuilder text = new StringBuilder();
         if (colony != null) {
-            BlockPos spot = colony.pickMoundSpot(level, level.random, null);
+            BlockPos spot = colony.hill().pickMoundSpot(level, level.random, null);
             text.append("mound spot ").append(spot == null ? "none" : spot.subtract(BlockPos.containing(origin)).toShortString());
             if (spot != null) {
                 BlockPos bottom = colony.getCenter().below(3);
@@ -1558,12 +1565,12 @@ public class NestTests {
             text.append(" [center ").append(c.toShortString()).append(" origin ").append(BlockPos.containing(origin).toShortString())
                     .append(" height@+2 ").append(h)
                     .append(" hasChunk ").append(level.hasChunk((c.getX() + 2) >> 4, c.getZ() >> 4))
-                    .append(" target ").append(colony.findDigTarget(level) == null ? "none" : colony.findDigTarget(level).toShortString())
+                    .append(" target ").append(colony.nest().findDigTarget(level) == null ? "none" : colony.nest().findDigTarget(level).toShortString())
                     .append("]; ");
         }
         text.append("next target ")
-                .append(colony == null || colony.findDigTarget(level) == null
-                        ? "none" : colony.findDigTarget(level).subtract(BlockPos.containing(origin)).toShortString())
+                .append(colony == null || colony.nest().findDigTarget(level) == null
+                        ? "none" : colony.nest().findDigTarget(level).subtract(BlockPos.containing(origin)).toShortString())
                 .append(", mound blocks ").append(moundBlocks(helper)).append(". Ants:");
         List<AbstractAntEntity> ants = level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds().inflate(10));
         for (AbstractAntEntity ant : ants) {

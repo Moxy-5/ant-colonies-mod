@@ -5,6 +5,7 @@ import java.util.EnumSet;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.NestWalls;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.AbstractAntEntity;
@@ -34,7 +35,7 @@ public class SealGoal extends Goal {
     @Nullable
     private Colony colony;
     @Nullable
-    private Colony.Leak leak;
+    private NestWalls.Leak leak;
     private int ticks;
     private int packCooldown;
 
@@ -55,18 +56,18 @@ public class SealGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        leak = colony == null ? null : colony.findLeak(level, ant.blockPosition());
+        leak = colony == null ? null : colony.walls().findLeak(level, ant.blockPosition());
         if (leak == null) {
             return false;
         }
-        colony.claimLeak(level, leak.hole(), ant.getUUID());
+        colony.walls().claimLeak(level, leak.hole(), ant.getUUID());
         return true;
     }
 
     @Override
     public boolean canContinueToUse() {
         return colony != null && leak != null && !ant.hasFullMandibles() && ticks < GIVE_UP_TICKS
-                && colony.isLeakOpen(ant.level(), leak.hole());
+                && colony.walls().isLeakOpen(ant.level(), leak.hole());
     }
 
     @Override
@@ -79,7 +80,7 @@ public class SealGoal extends Goal {
     public void stop() {
         ant.getNavigator().stop();
         if (colony != null && leak != null) {
-            colony.releaseLeak(leak.hole(), ant.getUUID());
+            colony.walls().releaseLeak(leak.hole(), ant.getUUID());
         }
         leak = null;
         colony = null;
@@ -110,7 +111,7 @@ public class SealGoal extends Goal {
         level.playSound(null, hole, soil.getSoundType().getHitSound(), SoundSource.BLOCKS, 0.4F, 1.0F);
         level.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, soil),
                 hole.getX() + 0.5, hole.getY() + 0.5, hole.getZ() + 0.5, 4, 0.2, 0.2, 0.2, 0.05);
-        if (colony.addSealProgress(hole, PACK_SHARE) >= 1.0F && colony.plugLeak(level, hole)) {
+        if (colony.walls().addSealProgress(hole, PACK_SHARE) >= 1.0F && colony.walls().plugLeak(level, hole)) {
             level.playSound(null, hole, soil.getSoundType().getPlaceSound(), SoundSource.BLOCKS, 0.4F, 1.2F);
         }
     }

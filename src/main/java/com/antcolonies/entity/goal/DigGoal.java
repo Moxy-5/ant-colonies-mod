@@ -6,6 +6,7 @@ import java.util.function.BooleanSupplier;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.Nest;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.nav.AntNavigator;
@@ -63,7 +64,7 @@ public class DigGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        target = colony == null ? null : colony.findDigTarget(level);
+        target = colony == null ? null : colony.nest().findDigTarget(level);
         return target != null;
     }
 
@@ -101,7 +102,7 @@ public class DigGoal extends Goal {
             AntNavigator legs = ant.getNavigator();
             if (legs.isDone()) {
                 boolean walking = false;
-                for (BlockPos stand : Colony.findStandSpots(level, target)) {
+                for (BlockPos stand : Nest.findStandSpots(level, target)) {
                     if (legs.moveTo(stand, 1.0)) {
                         walking = true;
                         break;
@@ -129,11 +130,11 @@ public class DigGoal extends Goal {
         BlockState state = level.getBlockState(target);
         // Harder blocks take more bites: plain dirt is about 6 bites, roughly 3 seconds for one ant.
         float bitesNeeded = Math.max(1.0F, state.getDestroySpeed(level, target) * 12.0F);
-        float progress = colony.addDigProgress(target, 1.0F / bitesNeeded);
+        float progress = colony.nest().addDigProgress(target, 1.0F / bitesNeeded);
 
         // Every bite leaves a soil pellet in the mandibles (grass and roots turn into plain dirt), as long as
         // the hill still has room for it. Once the hill is complete the soil is simply left behind.
-        if (ant.canPlaceBlocks() && colony.hasMoundRoom(level)) {
+        if (ant.canPlaceBlocks() && colony.hill().hasMoundRoom(level)) {
             ant.setCarriedBlock(state.is(Blocks.GRASS_BLOCK) || state.is(Blocks.ROOTED_DIRT)
                     ? Blocks.DIRT.defaultBlockState() : state);
         }
@@ -143,7 +144,7 @@ public class DigGoal extends Goal {
                 blockCenter.x, target.getY() + 1.0, blockCenter.z, 4, 0.15, 0.05, 0.15, 0.05);
 
         if (progress >= 1.0F) {
-            colony.clearDigProgress(target);
+            colony.nest().clearDigProgress(target);
             level.destroyBlockProgress(ant.getId(), target, -1);
             level.destroyBlock(target, false, ant);
         } else {

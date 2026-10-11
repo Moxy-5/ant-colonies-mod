@@ -2,6 +2,7 @@ package com.antcolonies.command;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.QueenCare;
 import com.antcolonies.colony.ColonyManager;
 
 import net.minecraft.commands.CommandSourceStack;
@@ -36,13 +37,13 @@ public class ColonyCommands {
                     + " | center " + colony.getCenter().toShortString()
                     + " | queen " + colony.getQueenId().toString().substring(0, 8)
                     + " | members " + colony.getMemberCount()
-                    + " | food " + colony.getFood() + " (rich " + colony.getRichSeeds() + ", eaten " + colony.getSeedsEaten() + ")"
-                    + " | bread " + colony.getBread() + " (rich " + colony.getRichBread() + ", milling " + colony.getMilling() + ")"
-                    + " | queen fed " + colony.getQueenBread() + "/" + Colony.QUEEN_MEAL + ", rich " + colony.getQueenRich() + "/"
-                    + Colony.RICH_MEAL + incubation(colony, level)
-                    + " | queen unfed " + unfedMinutes(colony, level) + " of " + Colony.QUEEN_STARVE_TICKS / 1200 + " min"
-                    + " | eggs " + colony.countEggs(level) + " | larvae " + colony.countLarvae(level)
-                    + " | dead ants " + colony.getCorpses(level).size() + " (refuse chamber " + colony.getRefuseCorpses(level).size() + ")";
+                    + " | food " + colony.food().getFood() + " (rich " + colony.food().getRichSeeds() + ", eaten " + colony.food().getSeedsEaten() + ")"
+                    + " | bread " + colony.bakery().getBread() + " (rich " + colony.bakery().getRichBread() + ", milling " + colony.bakery().getMilling() + ")"
+                    + " | queen fed " + colony.queenCare().getQueenBread() + "/" + QueenCare.QUEEN_MEAL + ", rich " + colony.queenCare().getQueenRich() + "/"
+                    + QueenCare.RICH_MEAL + incubation(colony, level)
+                    + " | queen unfed " + unfedMinutes(colony, level) + " of " + QueenCare.QUEEN_STARVE_TICKS / 1200 + " min"
+                    + " | eggs " + colony.brood().countEggs(level) + " | larvae " + colony.brood().countLarvae(level)
+                    + " | dead ants " + colony.refuse().getCorpses(level).size() + " (refuse chamber " + colony.refuse().getRefuseCorpses(level).size() + ")";
             source.sendSuccess(() -> Component.literal(line), false);
         }
         return colonies.size();
@@ -50,19 +51,19 @@ public class ColonyCommands {
 
     /** How many minutes the queen has gone without food she wanted (0 while she is satisfied). */
     private static long unfedMinutes(Colony colony, ServerLevel level) {
-        if (colony.getQueenLastFed() == Colony.NOT_SET) {
+        if (colony.queenCare().getQueenLastFed() == Colony.NOT_SET) {
             return 0;
         }
-        return Math.max(0, level.getGameTime() - colony.getQueenLastFed()) / 1200;
+        return Math.max(0, level.getGameTime() - colony.queenCare().getQueenLastFed()) / 1200;
     }
 
     /** " (egg in 3:25)" while the queen carries an egg, otherwise nothing. */
     private static String incubation(Colony colony, ServerLevel level) {
-        if (!colony.isIncubating()) {
+        if (!colony.queenCare().isIncubating()) {
             return "";
         }
-        long seconds = Math.max(0, colony.getEggDue() - level.getGameTime()) / 20;
-        String burst = colony.getBurstLeft() > 0 ? ", burst: " + colony.getBurstLeft() + " left" : "";
+        long seconds = Math.max(0, colony.queenCare().getEggDue() - level.getGameTime()) / 20;
+        String burst = colony.queenCare().getBurstLeft() > 0 ? ", burst: " + colony.queenCare().getBurstLeft() + " left" : "";
         return String.format(" (egg in %d:%02d%s)", seconds / 60, seconds % 60, burst);
     }
 }
