@@ -245,3 +245,39 @@ Goal: a mature colony can hold 1,000+ ants or termites without lag.
   - Workers of a colony whose queen died are left colonyless and keep wandering (not decided by the user yet). The abandoned-nest idea is only noted, not built.
   - Debug logging: `[pellet] ... gave up` lines in `CarryPelletGoal` are intentional (kept for bug reports); the test code has `[..-test]` log lines.
 
+
+## Bugs we have had (watch for these; most are pathing)
+Every one of these was found by the user in-game or by a game test, and has a regression test unless noted. Check this list before touching `AntNavigator`, `AntPathFinder`, the goals, or anything that places blocks.
+
+**Pathing and climbing (the legs, `nav` package)**
+1. **Route that was only the ant's own cell crashed the game.** When the ant drifted out of that cell, the walker had no next waypoint. Fix in `AntNavigator`, with a test. Lesson: a route of length 1 is a legal route.
+2. **Ant went up and down one block for minutes.** It planned its route while hanging in the air above a pit. Climbing back out passed through that same cell, which the walker read as "back at the start", so it walked down and climbed again for ever. The stuck check never fired because the ant kept moving. Fix: the cell above the start of an up-and-over stretch is never read as an earlier waypoint (`cornerOf`), plus a safety net that replans after 160 ticks without a new waypoint. Lesson: "moving" is not "making progress".
+3. **Ants floated up in front of a wall** before climbing over a ledge (each hill step). Now they walk to the foot of the wall first.
+4. **Ants hovered at the foot of the shaft wall** with the model tilted up. They slid sideways while already counted as climbing. Now they walk to the wall and only start clinging once they touch it (only while `onGround`).
+5. **Ants stuck and hovering inside the shaft** (three causes): a walk that ended in the shaft made the ant fall and re-climb about 15 times (now `holdOnToWall`); the wall was chosen cell by cell, so ants slid across the shaft in mid-air (now one wall per straight climb, `chooseWall`); an ant coming off a stair counted as "in the air" (now `standsOnFloor` checks the world). `watch` in `NavigationTests` now fails any walk where a climbing ant hangs without rising for more than 4 ticks.
+6. **Ants never cross the open shaft** and must get against a wall before rising. Keep this when adding new moves.
+
+**Several ants, one cell (ants do not collide)**
+7. **Hill last spots deadlocked** because several ants stood in the same spot. Ants now prefer free spots and step aside before placing.
+8. **Hill jam with 4 to 12 ants in one gap** (user's report, found with the `[pellet]` log). All ants with soil walked to the same spot, which lies where every ant leaving the hole passes, so someone was always inside and `placePellet` (refuses while anyone is in the cell) never got a turn. Fix: one claim per spot (`moundClaims`), the soil nudges ants out onto the new block (`nudgeOut`), and a player or animal in the spot still stops it. Lesson: any rule of the form "do X only if the cell is empty" will fail for ever where traffic is dense.
+9. **A pellet once buried the queen.** Pellets are never placed on a living creature (players and animals still block it).
+
+**Nest shape and soil**
+10. **Ants stopped once the shaft was dug** in a world where only the top 3 blocks were dirt and the room layer was full of stone. Now the layout is planned before the first block is dug (`chooseLayout`), with fewer levels or one block higher where the soil is thin. Ants never dig stone.
+11. **A sealed-off pocket next to a block stopped the dig.** `DigGoal` now tries every open side of a block as a place to stand.
+12. **Holes in the nest walls** (caves, cracks, a gap between two rooms) and **a hole right next to the top of the shaft** that nobody could reach: fixed by `SealGoal` / `getLeaks` and `findPlugSpot` (floors first, then walls).
+13. **Water and lava defence** got too complicated and was removed (commits ad0fcf4 to ec5253c). It is still in git history. Hazards stay a later item.
+
+**Colony logic**
+14. **A queen could have starved with a full bread store** (caught in design): her 5-day clock only runs while she wants food and gets none; it resets while she carries an egg, has her full meal, or the nursery holds 10 young.
+15. **A full larva waiting for a worker slot must not starve** (same idea: the clock only runs for a larva that still has to eat).
+16. **Old saves:** ants and colonies from before a change must still load. New saved fields use a "not set" marker (`Colony.NOT_SET`) and old keys are still read (`queenSeeds`). Existing nests keep their old shape; new layouts only apply to new colonies.
+
+**Test-only traps**
+17. **A neighbouring test's leftover colony** was found by the `colony(helper)` helper (a colony with no living queen). The helper now requires a living queen. New tests shift the arena positions, so this can come back.
+18. **Timing flakes under load:** `antsOnBumpyGroundReachTheFoodStore`, `aStarvingWorkerSlowsDownAndDies`, `queenIsFedAndHerEggGoesToTheNursery` (a nurse can pick up the egg in the very tick it is laid). Re-run once before assuming a real bug.
+19. **A test that passes on the old code proves nothing** (`manyAntsWithPelletsAndOneGapDoNotJam` never failed before the hill-jam fix). Prefer a test that is first shown to fail.
+
+**How to find the next one fast**
+- Ask the user for F3 coordinates and `run\logs\latest.log`; add a one-line `[tag]` log where an ant gives up, with the spot, the ant's cell, the navigator state and what is in the spot. That found the hill jam in one round.
+- Most pathing bugs come from one of: the start cell is in the air, the goal cell is where traffic passes, the route has one step, or "done" is decided from a cell instead of from real progress.
