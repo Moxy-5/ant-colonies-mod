@@ -14,7 +14,10 @@ import org.junit.jupiter.api.Test;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 
-/** Checks the shape of the underground nest: four stacked levels, a spiral staircase, no overlaps, walls between the levels. */
+/**
+ * Checks the shape of the underground nest: four stacked levels (seed store 7x7, nursery 4x4, queen 3x3, refuse chamber
+ * 5x5), a spiral staircase, no overlaps, walls between the levels.
+ */
 class NestPlanTest {
     private static final BlockPos BOTTOM = new BlockPos(100, 61, -40);
 
@@ -44,23 +47,42 @@ class NestPlanTest {
                 }
             }
             assertEquals(1, queens, levels + " levels");
-            // The shorter nests are the top of the full one: the same cells, only the use of the levels differs.
+            // A shorter nest has the same stairs and tunnels as the full one. Its levels are used differently, and the
+            // last one is the small queen's room, which lies inside the room it replaces.
+            List<NestPlan.Chamber> fullPlan = full(Direction.NORTH);
             for (int i = 0; i < levels; i++) {
-                assertEquals(full(Direction.NORTH).get(i).cells(), chambers.get(i).cells());
+                assertEquals(fullPlan.get(i).wayIn(), chambers.get(i).wayIn(), "level " + (i + 1) + " of " + levels);
+                if (i < levels - 1) {
+                    assertEquals(fullPlan.get(i).cells(), chambers.get(i).cells());
+                } else {
+                    assertTrue(fullPlan.get(i).room().containsAll(chambers.get(i).room()),
+                            "the queen's room of a " + levels + "-level nest lies inside the room of the full nest");
+                }
             }
         }
     }
 
     @Test
-    void everyLevelIsOneRoomOf5x5OnItsOwnFloorTwoBlocksUnderTheLevelAbove() {
+    void roomSizesAre7x7Seeds4x4Nursery3x3Queen5x5Refuse() {
+        assertEquals(new NestPlan.RoomSize(7, 7), NestPlan.roomSize(NestPlan.Kind.FOOD));
+        assertEquals(new NestPlan.RoomSize(4, 4), NestPlan.roomSize(NestPlan.Kind.NURSERY));
+        assertEquals(new NestPlan.RoomSize(3, 3), NestPlan.roomSize(NestPlan.Kind.QUEEN));
+        assertEquals(new NestPlan.RoomSize(5, 5), NestPlan.roomSize(NestPlan.Kind.REFUSE));
+    }
+
+    @Test
+    void everyLevelIsOneFlatRoomOfItsOwnSizeTwoBlocksUnderTheLevelAbove() {
         for (Direction direction : Direction.Plane.HORIZONTAL) {
             Set<BlockPos> all = new HashSet<>();
             List<NestPlan.Chamber> chambers = full(direction);
+            int rooms = 0;
             for (int level = 0; level < chambers.size(); level++) {
                 NestPlan.Chamber chamber = chambers.get(level);
+                NestPlan.RoomSize size = NestPlan.roomSize(chamber.kind());
+                rooms += size.cells();
                 int stairs = level == 0 ? 0 : NestPlan.STAIR_LENGTH;
-                assertEquals(stairs + 3 + 25, chamber.cells().size());
-                assertEquals(25, chamber.room().size());
+                assertEquals(stairs + 3 + size.cells(), chamber.cells().size());
+                assertEquals(size.cells(), chamber.room().size());
                 int floor = BOTTOM.getY() - NestPlan.LEVEL_SPACING * level;
                 for (BlockPos cell : chamber.room()) {
                     assertEquals(floor, cell.getY(), "the room is flat and 1 block tall");
@@ -68,11 +90,30 @@ class NestPlanTest {
                 assertEquals(floor, chamber.center().getY());
                 assertEquals(floor, chamber.tunnelEnd().getY());
                 assertTrue(chamber.room().contains(chamber.center()), "the room's middle is part of the room");
+                // The room is a full rectangle of the right size, and the tunnel enters the middle of its first row.
+                boolean alongX = direction.getAxis() == Direction.Axis.X;
+                int[] along = {Integer.MAX_VALUE, Integer.MIN_VALUE};
+                int[] across = {Integer.MAX_VALUE, Integer.MIN_VALUE};
+                for (BlockPos cell : chamber.room()) {
+                    int a = alongX ? cell.getX() : cell.getZ();
+                    int c = alongX ? cell.getZ() : cell.getX();
+                    along[0] = Math.min(along[0], a);
+                    along[1] = Math.max(along[1], a);
+                    across[0] = Math.min(across[0], c);
+                    across[1] = Math.max(across[1], c);
+                }
+                assertEquals(size.length(), along[1] - along[0] + 1, chamber.kind() + " length");
+                assertEquals(size.width(), across[1] - across[0] + 1, chamber.kind() + " width");
+                assertTrue(chamber.room().contains(chamber.tunnelEnd().relative(direction)), "the tunnel opens into the room");
+                int tunnelAcross = alongX ? chamber.tunnelEnd().getZ() : chamber.tunnelEnd().getX();
+                assertTrue(Math.abs((tunnelAcross - across[0]) - (across[1] - tunnelAcross)) <= 1,
+                        "the tunnel enters the middle of the room (within one block when the width is even)");
                 for (BlockPos cell : chamber.cells()) {
                     assertTrue(all.add(cell), "cell " + cell + " is in two places (" + direction + ")");
                 }
             }
-            assertEquals(3 * NestPlan.STAIR_LENGTH + 4 * (3 + 25), all.size());
+            assertEquals(3 * NestPlan.STAIR_LENGTH + 4 * 3 + rooms, all.size());
+            assertEquals(3 * 3 + 4 * 3 + 49 + 16 + 9 + 25, all.size());
             assertTrue(!all.contains(BOTTOM), "the shaft bottom is not part of any level");
         }
     }

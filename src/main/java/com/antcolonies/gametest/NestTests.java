@@ -37,10 +37,10 @@ public class NestTests {
     private static final int SURFACE = 12;
     private static final int MIDDLE = 12;
     /**
-     * The whole nest: a 3-deep shaft, then four levels (food store, nursery, queen, refuse chamber), each a 3-long
-     * tunnel and a 5x5 room, and a 3-block stair down to every level but the first.
+     * The whole nest: a 3-deep shaft, then four levels (food store 7x7, nursery 4x4, queen 3x3, refuse chamber 5x5),
+     * each a 3-long tunnel and its room, and a 3-block stair down to every level but the first.
      */
-    private static final int NEST_CELLS = 3 + 4 * (3 + 25) + 3 * NestPlan.STAIR_LENGTH;
+    private static final int NEST_CELLS = 3 + 4 * 3 + (49 + 16 + 9 + 25) + 3 * NestPlan.STAIR_LENGTH;
 
     @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
     public static void workersDigTheWholeNestAndBuildTheMound(GameTestHelper helper) {
@@ -112,7 +112,7 @@ public class NestTests {
             for (int y = queenRoom.getY() + 1; y <= groundTop; y++) {
                 holes.add(new BlockPos(queenRoom.getX(), y, queenRoom.getZ()));
             }
-            holes.add(bottom.relative(tunnel, 4).relative(tunnel.getClockWise(), 3));
+            holes.add(bottom.relative(tunnel, 4).relative(tunnel.getClockWise(), 4)); // next to the corner of the 7x7 seed store
             holes.add(rooms.get(1).cells().get(rooms.get(1).cells().size() - 1).below());
             holes.add(bottom.above().relative(tunnel.getOpposite()));
             for (BlockPos hole : holes) {

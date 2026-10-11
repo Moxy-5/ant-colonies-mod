@@ -1182,9 +1182,9 @@ public class Colony {
 
     /**
      * Picks how deep the nest sits, which side the rooms lie toward and how many levels it has, by looking at the
-     * ground: a depth only counts if the whole shaft is soil, and a level only counts if its stair, tunnel and room
-     * are all soil (no stone or water in the way) and so are all the levels above it. The nest with the most levels
-     * wins, the deeper one on a tie. Null while chunks are missing, or when there is no room at all.
+     * ground: a depth only counts if the whole shaft is soil, and a nest only counts if every stair, tunnel and
+     * room of its plan is soil (no stone or water in the way). The nest with the most levels wins, the deeper one on
+     * a tie. Null while chunks are missing, or when there is no room at all.
      */
     @Nullable
     private Layout chooseLayout(Level level) {
@@ -1225,15 +1225,24 @@ public class Colony {
         Layout best = null;
         for (int i = 0; i < 4; i++) {
             Direction direction = Direction.from2DDataValue((start + i) % 4);
-            int fitting = 0;
-            for (NestPlan.Chamber chamber : NestPlan.chambers(bottom, direction, NestPlan.MAX_LEVELS)) {
-                if (!allSoilOrAir(level, chamber.cells())) {
-                    break; // this level does not fit, so none of the deeper ones can be reached
+            // The most levels whose whole plan is soil. A shorter nest uses its levels differently (and its last one is
+            // always the small queen's room), so each length is checked as the plan it really is.
+            for (int levels = NestPlan.MAX_LEVELS; levels >= 1; levels--) {
+                List<NestPlan.Chamber> plan = NestPlan.chambers(bottom, direction, levels);
+                if (best != null && levels <= best.chambers().size()) {
+                    break; // not better than what is already found
                 }
-                fitting++;
-            }
-            if (fitting > 0 && (best == null || fitting > best.chambers().size())) {
-                best = new Layout(NestPlan.chambers(bottom, direction, fitting), depth);
+                boolean fits = true;
+                for (NestPlan.Chamber chamber : plan) {
+                    if (!allSoilOrAir(level, chamber.cells())) {
+                        fits = false;
+                        break;
+                    }
+                }
+                if (fits) {
+                    best = new Layout(plan, depth);
+                    break;
+                }
             }
         }
         return best;

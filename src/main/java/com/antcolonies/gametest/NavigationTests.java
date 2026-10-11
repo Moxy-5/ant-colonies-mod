@@ -22,7 +22,7 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
  * Watches one ant at a time walk through a ready-made nest: a 3-deep shaft in the middle of the
- * test area, a tunnel going east from its bottom and a 5x5 room at the end.
+ * test area, then four levels joined by a spiral staircase, each a tunnel going east and a room at the end.
  */
 @GameTestHolder(AntColoniesMod.MODID)
 @PrefixGameTestTemplate(false)
