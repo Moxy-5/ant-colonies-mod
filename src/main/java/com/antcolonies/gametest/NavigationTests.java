@@ -354,10 +354,19 @@ public class NavigationTests {
     /** Logs the ant's position and what its walker is doing every 4 ticks. */
     /** Most climbing ticks in a row an ant may hang in mid-air, touching nothing (a short moment at the very top is fine). */
     private static final int MAX_FLOATING_TICKS = 6;
+    /** Most ticks in a row an ant may lean on a wall while standing on the floor without touching it (a moment at the very top is fine). */
+    private static final int MAX_LEANING_TICKS = 8;
 
     private static void watch(GameTestHelper helper, AbstractAntEntity ant) {
         Vec3 origin = Vec3.atLowerCornerOf(helper.absolutePos(BlockPos.ZERO));
         int[] floating = {0};
+        int[] leaning = {0};
+        helper.onEachTick(() -> {
+            // An ant standing on the floor away from any wall must walk, not lean against the wall: that looks like hovering.
+            boolean leansOnTheFloor = ant.getNavigator().isClimbing() && ant.onGround() && !ant.horizontalCollision;
+            leaning[0] = leansOnTheFloor ? leaning[0] + 1 : 0;
+            helper.assertTrue(leaning[0] <= MAX_LEANING_TICKS, "the ant leans against a wall it has not reached");
+        });
         helper.onEachTick(() -> {
             boolean hanging = ant.getNavigator().isClimbing()
                     && helper.getLevel().noCollision(ant, ant.getBoundingBox().inflate(0.08));

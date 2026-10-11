@@ -223,6 +223,11 @@ public class AntNavigator {
                         // Get against the wall first, then rise: no floating up the middle of the shaft.
                         if (gapToWall(here, wall) > WALL_GAP) {
                             rise = 0.0;
+                            if (ant.onGround()) {
+                                // Still on the floor: walk up to the wall like any walk. Only the ant that is against
+                                // the wall clings to it (and leans against it), so it never looks like it hovers.
+                                climbing = false;
+                            }
                         }
                     }
                 } else if (here.equals(from) && map.isSolidFace(from.below(), Direction.UP)
