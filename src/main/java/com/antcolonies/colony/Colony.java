@@ -211,18 +211,35 @@ public class Colony {
     }
 
     /**
-     * The floor cells of the food store (the room, without its tunnel), or an empty list until the shaft and the
-     * whole food store are dug out (or while its chunks are not loaded).
+     * The floor cells of the food store that are dug out and can be walked to (the room, without its tunnel). The
+     * room does not have to be finished: every cell that is already dug counts. Empty until the way in is dug.
      */
     public List<BlockPos> getFoodStoreCells(Level level) {
         return getRoomCells(level, NestPlan.Kind.FOOD);
     }
 
-    /** The floor cells of the nursery (the room, without its tunnel), once the shaft and the whole nursery are dug out. */
+    /** The floor cells of the nursery that are dug out and can be walked to (the room does not have to be finished). */
     public List<BlockPos> getNurseryCells(Level level) {
         return getRoomCells(level, NestPlan.Kind.NURSERY);
     }
 
+    /** The floor cells of the queen's room that are dug out and can be walked to. */
+    public List<BlockPos> getQueenRoomCells(Level level) {
+        return getRoomCells(level, NestPlan.Kind.QUEEN);
+    }
+
+    private static boolean isDugOut(Level level, BlockPos pos) {
+        return level.isLoaded(pos) && (level.getBlockState(pos).isAir() || level.getBlockState(pos).is(ModBlocks.SEED_PILE.get()));
+    }
+
+    private static boolean touchesSideways(BlockPos a, BlockPos b) {
+        return a.getY() == b.getY() && Math.abs(a.getX() - b.getX()) + Math.abs(a.getZ() - b.getZ()) == 1;
+    }
+
+    /**
+     * The dug-out floor cells of one room. They count once the shaft and the tunnel to the room are dug; after that
+     * every cell that is dug and joins up with the tunnel (or with another counted cell) is in.
+     */
     private List<BlockPos> getRoomCells(Level level, NestPlan.Kind kind) {
         Layout layout = getLayout(level);
         if (layout == null) {
@@ -233,16 +250,39 @@ public class Colony {
                 return List.of();
             }
         }
+        NestPlan.Chamber main = layout.chambers().get(0);
         for (NestPlan.Chamber chamber : layout.chambers()) {
             if (chamber.kind() != kind) {
                 continue;
             }
-            for (BlockPos pos : chamber.cells()) {
-                if (!level.isLoaded(pos) || !(level.getBlockState(pos).isAir() || level.getBlockState(pos).is(ModBlocks.SEED_PILE.get()))) {
+            // The way in: the main tunnel up to the branch (side rooms only), then the room's own tunnel.
+            if (chamber != main) {
+                for (int i = 0; i < NestPlan.BRANCH_AT; i++) {
+                    if (!isDugOut(level, main.cells().get(i))) {
+                        return List.of();
+                    }
+                }
+            }
+            for (int i = 0; i < NestPlan.TUNNEL_LENGTH; i++) {
+                if (!isDugOut(level, chamber.cells().get(i))) {
                     return List.of();
                 }
             }
-            return chamber.cells().subList(NestPlan.TUNNEL_LENGTH, chamber.cells().size());
+            BlockPos tunnelEnd = chamber.cells().get(NestPlan.TUNNEL_LENGTH - 1);
+            List<BlockPos> reached = new ArrayList<>();
+            for (BlockPos pos : chamber.cells().subList(NestPlan.TUNNEL_LENGTH, chamber.cells().size())) {
+                if (!isDugOut(level, pos)) {
+                    continue;
+                }
+                boolean joined = touchesSideways(pos, tunnelEnd);
+                for (int k = 0; k < reached.size() && !joined; k++) {
+                    joined = touchesSideways(pos, reached.get(k));
+                }
+                if (joined) {
+                    reached.add(pos);
+                }
+            }
+            return reached;
         }
         return List.of();
     }
@@ -269,13 +309,13 @@ public class Colony {
 
     /**
      * The seed on the ground nearest to {@code near} that the ants should fetch, or null: only once the food store
-     * is ready, only on the surface (not what is already stored below), within {@link #FOOD_RADIUS} of the entrance,
+     * has room (or the queen wants seeds), only on the surface (not what is already stored below), within {@link #FOOD_RADIUS} of the entrance,
      * and not one another ant is on its way to. {@code avoid}: item entity ids this ant could not reach.
      */
     @Nullable
     public ItemEntity findSeed(Level level, BlockPos near, Set<Integer> avoid) {
-        if (pickFoodSpot(level, level.getRandom()) == null) {
-            return null; // no food store yet, or it is full
+        if (!(level instanceof ServerLevel serverLevel) || !wantsSeeds(serverLevel)) {
+            return null; // no food store yet (and the queen wants nothing), or it is full
         }
         long now = level.getGameTime();
         claimedSeeds.values().removeIf(until -> until <= now);
@@ -304,7 +344,7 @@ public class Colony {
      */
     @Nullable
     public BlockPos findGrass(Level level, BlockPos near, Set<BlockPos> avoid) {
-        if (pickFoodSpot(level, level.getRandom()) == null) {
+        if (!(level instanceof ServerLevel serverLevel) || !wantsSeeds(serverLevel)) {
             return null;
         }
         long now = level.getGameTime();
@@ -390,6 +430,45 @@ public class Colony {
         return true;
     }
 
+    // ---- Roles
+
+    /** From this many workers on, one of them is the nurse who stays by the queen. */
+    public static final int NURSE_FROM_WORKERS = 3;
+
+    /**
+     * The role of this worker. Roles are shared out evenly: one nurse (from {@link #NURSE_FROM_WORKERS} workers on),
+     * the rest half builders and half foragers (builders first). A worker keeps its role until it is one too many for
+     * it, so roles only change when workers are born or die.
+     */
+    public ColonyRole roleOf(ServerLevel level, UUID ant) {
+        roles.keySet().removeIf(id -> !id.equals(ant) && !(level.getEntity(id) instanceof WorkerAntEntity worker && worker.isAlive()));
+        int[] others = new int[ColonyRole.values().length];
+        int total = 1;
+        for (Map.Entry<UUID, ColonyRole> entry : roles.entrySet()) {
+            if (!entry.getKey().equals(ant)) {
+                others[entry.getValue().ordinal()]++;
+                total++;
+            }
+        }
+        int nurses = total >= NURSE_FROM_WORKERS ? 1 : 0;
+        int[] target = new int[ColonyRole.values().length];
+        target[ColonyRole.NURSE.ordinal()] = nurses;
+        target[ColonyRole.BUILDER.ordinal()] = (total - nurses + 1) / 2;
+        target[ColonyRole.FORAGER.ordinal()] = (total - nurses) / 2;
+        ColonyRole current = roles.get(ant);
+        if (current == null || others[current.ordinal()] >= target[current.ordinal()]) {
+            current = ColonyRole.BUILDER;
+            for (ColonyRole role : new ColonyRole[] {ColonyRole.NURSE, ColonyRole.FORAGER, ColonyRole.BUILDER}) {
+                if (others[role.ordinal()] < target[role.ordinal()]) {
+                    current = role;
+                    break;
+                }
+            }
+            roles.put(ant, current);
+        }
+        return current;
+    }
+
     // ---- The queen and her eggs
 
     /** The workers must feed the queen this many seeds (any kind) before she carries an egg. */
@@ -413,6 +492,8 @@ public class Colony {
     private long eggDue = -1;
     /** How many eggs the queen has laid in all. Saved. */
     private int eggsLaid;
+    /** The role of each worker: ant -> role. Not saved: after a reload the workers ask again and get a balanced share. */
+    private final Map<UUID, ColonyRole> roles = new HashMap<>();
     /** The workers on their way to feed the queen: ant -> game time when the claim runs out. Not saved. */
     private final Map<UUID, Long> feeders = new HashMap<>();
     /** The eggs a worker is on its way to: egg -> game time when the claim runs out. Not saved. */
@@ -451,14 +532,22 @@ public class Colony {
     }
 
     /**
-     * Whether the queen can take more seeds: she is home and not carrying an egg, the pantry has seeds, there are not
-     * yet {@link #MAX_EGGS} eggs, and the workers already on their way would not fill her.
+     * Whether the queen can take more seeds: she is home and not carrying an egg, there are not yet {@link #MAX_EGGS}
+     * eggs, and the workers already on their way (from the food store or straight from outside) would not fill her.
      */
     public boolean needsFeeding(ServerLevel level) {
         long now = level.getGameTime();
         feeders.values().removeIf(until -> until <= now);
-        return eggDue < 0 && queenSeeds + feeders.size() < QUEEN_MEAL && food > 0 && isQueenHome(level)
+        return eggDue < 0 && queenSeeds + feeders.size() < QUEEN_MEAL && isQueenHome(level)
                 && countEggs(level) < MAX_EGGS;
+    }
+
+    /**
+     * Whether it is worth fetching a seed from outside: the food store has room for it, or the queen still wants
+     * seeds (the ant then brings it straight to her, so nothing is put down without a store).
+     */
+    public boolean wantsSeeds(ServerLevel level) {
+        return pickFoodSpot(level, level.getRandom()) != null || needsFeeding(level);
     }
 
     /** A worker sets out to feed the queen. False if she needs no more food right now. */
@@ -528,11 +617,12 @@ public class Colony {
     }
 
     /** Puts an egg of this colony into the world. */
-    public void spawnEgg(Level level, double x, double y, double z) {
+    public AntEggEntity spawnEgg(Level level, double x, double y, double z) {
         AntEggEntity egg = new AntEggEntity(ModEntities.ANT_EGG.get(), level);
         egg.setColonyId(id);
         egg.moveTo(x, y, z, level.getRandom().nextFloat() * 360.0F, 0.0F);
         level.addFreshEntity(egg);
+        return egg;
     }
 
     /** The area (around the nest) where the colony's eggs are looked for. */
@@ -555,10 +645,10 @@ public class Colony {
         return getEggs(level).stream().filter(egg -> cells.contains(egg.blockPosition())).toList();
     }
 
-    /** The eggs that are not in the nursery (yet). */
+    /** The eggs that no worker has put in its place yet (not in the nursery and not set down by a worker). */
     public List<AntEggEntity> getLooseEggs(Level level) {
         Set<BlockPos> cells = new HashSet<>(getNurseryCells(level));
-        return getEggs(level).stream().filter(egg -> !cells.contains(egg.blockPosition())).toList();
+        return getEggs(level).stream().filter(egg -> !egg.isPlaced() && !cells.contains(egg.blockPosition())).toList();
     }
 
     /** Whether this block is a floor cell of the nursery (so an egg lying there is being kept warm and will hatch). */
@@ -585,48 +675,52 @@ public class Colony {
         return true;
     }
 
-    /** A free spot in the nursery for an egg, or null if the nursery is not dug out yet or full. */
+    /**
+     * A free spot for an egg, or null if there is none: in the nursery if any of it is dug out, otherwise (or when the
+     * nursery is full) on the floor of the queen's room. The nursery is the preferred place, not a must.
+     */
     @Nullable
-    public BlockPos pickNurserySpot(Level level, RandomSource random) {
-        List<BlockPos> cells = getNurseryCells(level);
-        if (cells.isEmpty()) {
-            return null;
-        }
+    public BlockPos pickEggSpot(Level level, RandomSource random) {
         Set<BlockPos> taken = new HashSet<>();
-        for (AntEggEntity egg : getNurseryEggs(level)) {
+        for (AntEggEntity egg : getEggs(level)) {
             taken.add(egg.blockPosition());
         }
-        List<BlockPos> free = new ArrayList<>();
-        for (BlockPos pos : cells) {
-            if (!taken.contains(pos)) {
-                free.add(pos);
+        for (List<BlockPos> cells : List.of(getNurseryCells(level), getQueenRoomCells(level))) {
+            List<BlockPos> free = new ArrayList<>();
+            for (BlockPos pos : cells) {
+                if (!taken.contains(pos) && level.getBlockState(pos).isAir()) {
+                    free.add(pos);
+                }
+            }
+            if (!free.isEmpty()) {
+                return free.get(random.nextInt(free.size()));
             }
         }
-        return free.isEmpty() ? null : free.get(random.nextInt(free.size()));
+        return null;
     }
 
-    /** A worker puts its egg down at {@code spot} in the nursery. False if another egg lies there (the worker looks for another spot). */
+    /** A worker puts its egg down at {@code spot}. False if another egg lies there (the worker looks for another spot). */
     public boolean placeEgg(Level level, BlockPos spot) {
         if (!level.getBlockState(spot).isAir()) {
             return false;
         }
-        for (AntEggEntity egg : getNurseryEggs(level)) {
+        for (AntEggEntity egg : getEggs(level)) {
             if (egg.blockPosition().equals(spot)) {
                 return false;
             }
         }
-        spawnEgg(level, spot.getX() + 0.5, spot.getY(), spot.getZ() + 0.5);
+        spawnEgg(level, spot.getX() + 0.5, spot.getY(), spot.getZ() + 0.5).setPlaced(true);
         return true;
     }
 
     /**
-     * The egg nearest to {@code near} that a worker should carry to the nursery, or null: only once the nursery is dug out
-     * and has room, not one that already lies in the nursery, not one another worker is on its way to. {@code avoid}: eggs
+     * The egg nearest to {@code near} that a worker should carry to its place, or null: only when there is a free spot
+     * for it, not one that already lies in its place, not one another worker is on its way to. {@code avoid}: eggs
      * this worker found no way to.
      */
     @Nullable
     public AntEggEntity findLooseEgg(Level level, BlockPos near, Set<UUID> avoid) {
-        if (pickNurserySpot(level, level.getRandom()) == null) {
+        if (pickEggSpot(level, level.getRandom()) == null) {
             return null;
         }
         long now = level.getGameTime();

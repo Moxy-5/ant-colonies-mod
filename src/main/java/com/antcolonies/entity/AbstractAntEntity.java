@@ -6,6 +6,8 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.nav.AntMoveControl;
+import com.antcolonies.colony.ColonyRole;
+import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.nav.AntNavigator;
 
 import net.minecraft.nbt.CompoundTag;
@@ -15,6 +17,8 @@ import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.entity.ai.goal.FloatGoal;
+import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
@@ -57,6 +61,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     private UUID colonyId;
 
     private boolean seedForQueen;
+    /** How many seconds in a row the ant has had nothing to do. Server side only, not saved. */
+    private int idleSeconds;
 
     protected AbstractAntEntity(EntityType<? extends AbstractAntEntity> type, Level level) {
         super(type, level);
@@ -127,6 +133,24 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return isCarrying() || isCarryingSeed() || isCarryingEgg();
     }
 
+    /** How long (in seconds) an ant must have nothing to do before it helps with work that is not its role's. */
+    public static final int IDLE_SECONDS = 5;
+
+    /** Nothing to do for a few seconds: time to help with other work. */
+    public boolean isIdle() {
+        return idleSeconds >= IDLE_SECONDS;
+    }
+
+    /** Whether this ant takes up work of this role now: its own role's work always, the others' only when it is idle. Everything goes for ants without roles. */
+    public boolean mayDo(ColonyRole role) {
+        return true;
+    }
+
+    /** Whether this ant's own role is {@code role}. */
+    public boolean hasRole(ColonyRole role) {
+        return false;
+    }
+
     /** The legs: plans routes (walk, climb, drop) and walks them. Goals only say where to go. */
     public AntNavigator getNavigator() {
         return navigator;
@@ -137,6 +161,13 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     protected void customServerAiStep() {
         super.customServerAiStep();
         navigator.tick();
+        // Once a second (staggered): is the ant doing anything, or only wandering and looking around?
+        if (tickCount % 20 == getId() % 20) {
+            boolean busy = goalSelector.getAvailableGoals().stream().anyMatch(wrapped -> wrapped.isRunning()
+                    && !(wrapped.getGoal() instanceof FloatGoal || wrapped.getGoal() instanceof AntWanderGoal
+                    || wrapped.getGoal() instanceof RandomLookAroundGoal));
+            idleSeconds = busy ? 0 : idleSeconds + 1;
+        }
         if (navigator.isClimbing()) {
             // Clinging to a wall: the navigator decides the exact motion (rise at a steady speed, or hold
             // still when level with the target), whether or not the ant happens to touch the wall this tick.

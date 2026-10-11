@@ -6,6 +6,7 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.registry.ModBlocks;
 
@@ -46,7 +47,8 @@ public class SealGoal extends Goal {
     public boolean canUse() {
         // Only look for work now and then, so ants don't all think on the same tick.
         // An ant with a pellet (or a seed, or an egg) in its mouth must carry it to its place first.
-        if (ant.getColonyId() == null || ant.hasFullMandibles() || ant.getRandom().nextInt(20) != 0) {
+        if (ant.getColonyId() == null || ant.hasFullMandibles() || ant.getRandom().nextInt(20) != 0
+                || !ant.mayDo(ColonyRole.BUILDER)) {
             return false;
         }
         if (!(ant.level() instanceof ServerLevel level)) {

@@ -18,13 +18,15 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * An egg of one colony. It just lies on the floor (it falls if the floor goes away), is saved with the world, and
- * disappears when its colony is gone. Once it lies in the nursery it hatches after a while into a worker.
+ * disappears when its colony is gone. Once a worker has put it in its place (the nursery, or the queen's room while there is none) it hatches after a while into a worker.
  */
 public class AntEggEntity extends Entity {
     @Nullable
     private UUID colonyId;
     /** The game time when the egg hatches; -1 until it lies in the nursery (the clock starts there). Saved. */
     private long hatchAt = -1;
+    /** True once a worker has set the egg down in its place (the nursery, or the queen's room while there is none). Saved. */
+    private boolean placed;
 
     public AntEggEntity(EntityType<? extends AntEggEntity> type, Level level) {
         super(type, level);
@@ -39,6 +41,14 @@ public class AntEggEntity extends Entity {
         this.colonyId = colonyId;
     }
 
+    public boolean isPlaced() {
+        return placed;
+    }
+
+    public void setPlaced(boolean placed) {
+        this.placed = placed;
+    }
+
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
     }
@@ -47,6 +57,7 @@ public class AntEggEntity extends Entity {
     protected void readAdditionalSaveData(CompoundTag tag) {
         colonyId = tag.hasUUID("colony") ? tag.getUUID("colony") : null;
         hatchAt = tag.contains("hatchAt") ? tag.getLong("hatchAt") : -1;
+        placed = tag.getBoolean("placed");
     }
 
     @Override
@@ -55,6 +66,7 @@ public class AntEggEntity extends Entity {
             tag.putUUID("colony", colonyId);
         }
         tag.putLong("hatchAt", hatchAt);
+        tag.putBoolean("placed", placed);
     }
 
     @Override
@@ -75,8 +87,8 @@ public class AntEggEntity extends Entity {
         }
         long now = level.getGameTime();
         if (hatchAt < 0) {
-            if (colony.isInNursery(level, blockPosition())) {
-                hatchAt = now + Colony.HATCH_TICKS; // kept warm in the nursery: the clock starts
+            if (placed || colony.isInNursery(level, blockPosition())) {
+                hatchAt = now + Colony.HATCH_TICKS; // a worker put it in its place: the clock starts
             }
         } else if (now >= hatchAt && colony.hatchEgg(level, this)) {
             manager.markChanged();

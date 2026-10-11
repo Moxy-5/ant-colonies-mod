@@ -8,6 +8,7 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.AbstractAntEntity;
 
 import net.minecraft.server.level.ServerLevel;
@@ -19,7 +20,7 @@ import net.minecraft.world.item.ItemStack;
 
 /**
  * Walks to a seed lying on the ground near the nest and takes one seed in its mandibles. {@link StoreSeedGoal}
- * then carries it down to the food store. Only looks for seeds once the food store is dug out.
+ * then carries it down to the food store. Only looks for seeds when there is somewhere for them to go: part of the food store is dug out, or the queen wants them.
  */
 public class GatherSeedGoal extends Goal {
     /** How close (sideways, in blocks) the ant must get to take the seed. */
@@ -47,7 +48,7 @@ public class GatherSeedGoal extends Goal {
     public boolean canUse() {
         // Only look for work now and then, so ants don't all think on the same tick.
         if (ant.getColonyId() == null || ant.isCarrying() || ant.isCarryingSeed() || ant.getRandom().nextInt(20) != 0
-                || !(ant.level() instanceof ServerLevel level)) {
+                || !ant.mayDo(ColonyRole.FORAGER) || !(ant.level() instanceof ServerLevel level)) {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
@@ -113,6 +114,7 @@ public class GatherSeedGoal extends Goal {
             seed.setItem(stack);
         }
         ant.setCarriedSeed(one);
+        ant.setSeedForQueen(colony.claimFeeding(level, ant.getUUID())); // straight to the queen if she wants it
         level.playSound(null, ant.blockPosition(), SoundEvents.ITEM_PICKUP, SoundSource.NEUTRAL, 0.15F, 1.6F);
     }
 }

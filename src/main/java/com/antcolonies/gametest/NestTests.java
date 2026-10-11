@@ -396,6 +396,7 @@ public class NestTests {
 
         boolean[] placed = {false};
         int[] workersBefore = {0};
+        int[] antsBefore = {0};
         helper.onEachTick(() -> {
             Colony colony = colony(helper);
             if (placed[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.findDigTarget(level) != null
@@ -404,6 +405,7 @@ public class NestTests {
             }
             placed[0] = true;
             workersBefore[0] = colony.getCount(WorkerAntEntity.CASTE);
+            antsBefore[0] = level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds()).size();
             var cells = colony.getNurseryCells(level);
             for (int i = 0; i < 3; i++) {
                 colony.placeEgg(level, cells.get(i * 7));
@@ -418,7 +420,7 @@ public class NestTests {
             helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == workersBefore[0] + 3,
                     "the colony counts " + colony.getCount(WorkerAntEntity.CASTE) + " workers, expected " + (workersBefore[0] + 3));
             var workers = level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds());
-            helper.assertTrue(workers.size() == workersBefore[0] + 3, "there are " + workers.size() + " worker ants, expected " + (workersBefore[0] + 3));
+            helper.assertTrue(workers.size() == antsBefore[0] + 3, "there are " + workers.size() + " worker ants, expected " + (antsBefore[0] + 3));
             for (var worker : workers) {
                 helper.assertTrue(colony.getId().equals(worker.getColonyId()), "a worker belongs to no colony or the wrong one");
             }
@@ -438,6 +440,7 @@ public class NestTests {
         boolean[] placed = {false};
         long[] placedAt = {0};
         int[] workersBefore = {0};
+        int[] antsBefore = {0};
         helper.onEachTick(() -> {
             Colony colony = colony(helper);
             if (placed[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.findDigTarget(level) != null
@@ -447,6 +450,7 @@ public class NestTests {
             placed[0] = true;
             placedAt[0] = level.getGameTime();
             workersBefore[0] = colony.getCount(WorkerAntEntity.CASTE);
+            antsBefore[0] = level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds()).size();
             colony.setCount(WorkerAntEntity.CASTE, Colony.MAX_WORKERS - 1);
             var cells = colony.getNurseryCells(level);
             for (int i = 0; i < 3; i++) {
@@ -462,7 +466,7 @@ public class NestTests {
             helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == Colony.MAX_WORKERS,
                     "the colony counts " + colony.getCount(WorkerAntEntity.CASTE) + " workers, expected " + Colony.MAX_WORKERS);
             helper.assertTrue(colony.countEggs(level) == 2, colony.countEggs(level) + " eggs are left, expected 2");
-            helper.assertTrue(level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds()).size() == workersBefore[0] + 1,
+            helper.assertTrue(level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds()).size() == antsBefore[0] + 1,
                     "expected exactly one new worker");
         });
     }
@@ -478,6 +482,150 @@ public class NestTests {
                 new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.WHEAT_SEEDS, count));
         item.setDeltaMovement(0, 0, 0);
         helper.getLevel().addFreshEntity(item);
+    }
+
+    /**
+     * Seeds lie on the ground as soon as the queen's room is finished, long before any food store is dug. The workers
+     * bring them straight to the queen (20 for her first egg) and put nothing down anywhere else; the rest waits on the
+     * ground until a part of the food store exists. In the end every seed is accounted for.
+     */
+    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
+    public static void workersFeedTheQueenBeforeTheFoodStoreExists(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        startColony(helper);
+
+        boolean[] dropped = {false};
+        boolean[] fedWithoutStore = {false};
+        helper.onEachTick(() -> {
+            Colony colony = colony(helper);
+            if (colony == null) {
+                return;
+            }
+            if (!dropped[0] && colony.getFinishedRoomCenter(level) != null) {
+                dropped[0] = true;
+                dropSeeds(helper, MIDDLE + 6, MIDDLE, 10);
+                dropSeeds(helper, MIDDLE - 6, MIDDLE + 2, 10);
+                dropSeeds(helper, MIDDLE + 1, MIDDLE - 7, 10);
+                AntColoniesMod.LOGGER.info("[early-feed-test] tick {}: queen room finished, 30 seeds dropped, {} nest cells dug",
+                        helper.getTick(), airBelowSurface(helper));
+            }
+            if (dropped[0] && !fedWithoutStore[0] && colony.getQueenSeeds() > 0 && colony.getFoodStoreCells(level).isEmpty()) {
+                fedWithoutStore[0] = true;
+                AntColoniesMod.LOGGER.info("[early-feed-test] tick {}: the queen got a seed and there is no food store yet (food {})",
+                        helper.getTick(), colony.getFood());
+            }
+            if (dropped[0] && helper.getTick() % 400 == 0) {
+                AntColoniesMod.LOGGER.info("[early-feed-test] tick {}: queen fed {}, food {}, eggs laid {}, store cells {}, nest cells {}",
+                        helper.getTick(), colony.getQueenSeeds(), colony.getFood(), colony.getEggsLaid(),
+                        colony.getFoodStoreCells(level).size(), airBelowSurface(helper));
+            }
+        });
+
+        helper.succeedWhen(() -> {
+            Colony colony = colony(helper);
+            helper.assertTrue(dropped[0] && colony != null, "no seeds have been dropped yet");
+            helper.assertTrue(fedWithoutStore[0], "the queen was not fed before the food store existed");
+            helper.assertTrue(seedsAccountedFor(colony) == 30, "the colony has " + colony.getFood() + " food and the queen ate "
+                    + colony.getQueenSeeds() + " (+ " + colony.getEggsLaid() + " eggs laid), expected 30 seeds in all");
+            helper.assertTrue(seedsIn(level, helper.getBounds()) == colony.getFood(), "some seeds are still lying around outside the store");
+            for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
+                helper.assertTrue(!ant.isCarryingSeed(), "an ant is still carrying a seed");
+            }
+        });
+    }
+
+    /**
+     * A nursery that cannot be dug (turned to stone) does not stop the colony: the egg is set down on the floor of the
+     * queen's room by a worker, and it hatches there.
+     */
+    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
+    public static void eggsGoToTheQueensRoomWhenThereIsNoNursery(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        startColony(helper);
+
+        boolean[] ready = {false};
+        int[] workersBefore = {0};
+        int[] antsBefore = {0};
+        helper.onEachTick(() -> {
+            Colony colony = colony(helper);
+            if (ready[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.findDigTarget(level) != null
+                    || !hillProblems(helper).isEmpty()) {
+                return;
+            }
+            ready[0] = true;
+            antsBefore[0] = level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds()).size();
+            for (WorkerAntEntity w : level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds().inflate(60))) {
+                AntColoniesMod.LOGGER.info("[room-egg-test] worker {} at {} colony {} (ours {}) alive {}", w.getId(), w.blockPosition(),
+                        w.getColonyId(), colony.getId(), w.isAlive());
+            }
+            for (var chamber : colony.getPlannedChambers(level)) {
+                if (chamber.kind() == com.antcolonies.colony.NestPlan.Kind.NURSERY) {
+                    for (BlockPos pos : chamber.cells()) {
+                        level.setBlock(pos, Blocks.STONE.defaultBlockState(), 3);
+                    }
+                }
+            }
+            workersBefore[0] = colony.getCount(WorkerAntEntity.CASTE);
+            BlockPos room = colony.getFinishedRoomCenter(level);
+            colony.layEgg(level, room.getX() + 0.5, room.getY(), room.getZ() + 0.5);
+            AntColoniesMod.LOGGER.info("[room-egg-test] tick {}: nursery turned to stone, egg laid, {} workers counted, {} real", helper.getTick(), workersBefore[0], antsBefore[0]);
+        });
+        helper.onEachTick(() -> {
+            Colony colony = colony(helper);
+            if (ready[0] && colony != null && helper.getTick() % 400 == 0) {
+                var eggs = colony.getEggs(level);
+                AntColoniesMod.LOGGER.info("[room-egg-test] tick {}: {} eggs (placed {}), {} workers", helper.getTick(), eggs.size(),
+                        eggs.stream().filter(com.antcolonies.entity.AntEggEntity::isPlaced).count(), colony.getCount(WorkerAntEntity.CASTE));
+            }
+        });
+
+        helper.succeedWhen(() -> {
+            Colony colony = colony(helper);
+            helper.assertTrue(ready[0] && colony != null, "the egg has not been laid yet");
+            helper.assertTrue(colony.getNurseryCells(level).isEmpty(), "the nursery is usable after all");
+            helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == workersBefore[0] + 1,
+                    "the colony has " + colony.getCount(WorkerAntEntity.CASTE) + " workers, expected " + (workersBefore[0] + 1));
+            helper.assertTrue(colony.countEggs(level) == 0, "an egg is left");
+            helper.assertTrue(level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds()).size() == antsBefore[0] + 1,
+                    "the new worker is not there");
+        });
+    }
+
+    /**
+     * With six workers the colony hands out one nurse, three builders and two foragers. Once the nest is finished the nurse
+     * waits next to the queen.
+     */
+    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    public static void workersShareTheJobsAndTheNurseStaysByTheQueen(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        startColony(helper);
+
+        helper.succeedWhen(() -> {
+            Colony colony = colony(helper);
+            helper.assertTrue(colony != null && airBelowSurface(helper) == NEST_CELLS && colony.findDigTarget(level) == null
+                    && hillProblems(helper).isEmpty(), "the nest is not finished yet");
+            var queens = level.getEntitiesOfClass(com.antcolonies.entity.QueenAntEntity.class, helper.getBounds());
+            helper.assertTrue(queens.size() == 1, "no queen");
+            int[] roles = new int[com.antcolonies.colony.ColonyRole.values().length];
+            int nursesNearQueen = 0;
+            for (WorkerAntEntity worker : level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds())) {
+                var role = colony.roleOf(level, worker.getUUID());
+                roles[role.ordinal()]++;
+                double dx = worker.getX() - queens.get(0).getX();
+                double dz = worker.getZ() - queens.get(0).getZ();
+                if (role == com.antcolonies.colony.ColonyRole.NURSE && dx * dx + dz * dz <= 3.0 * 3.0) {
+                    nursesNearQueen++;
+                }
+            }
+            helper.assertTrue(roles[com.antcolonies.colony.ColonyRole.NURSE.ordinal()] == 1
+                    && roles[com.antcolonies.colony.ColonyRole.BUILDER.ordinal()] == 3
+                    && roles[com.antcolonies.colony.ColonyRole.FORAGER.ordinal()] == 2,
+                    "roles (builder, forager, nurse): " + java.util.Arrays.toString(roles) + ", expected [3, 2, 1]");
+            helper.assertTrue(nursesNearQueen == 1, "the nurse is not next to the queen");
+        });
     }
 
     /** A box around the floor cells of the colony's food store. */

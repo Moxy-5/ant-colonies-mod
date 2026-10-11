@@ -37,9 +37,17 @@ public class DigGoal extends Goal {
     private int biteCooldown;
     private int stuckTicks;
 
+    /** Checked only when the ant starts digging (a worker's role), not while it digs. */
+    private final BooleanSupplier mayStart;
+
     public DigGoal(AbstractAntEntity ant, BooleanSupplier allowed) {
+        this(ant, allowed, () -> true);
+    }
+
+    public DigGoal(AbstractAntEntity ant, BooleanSupplier allowed, BooleanSupplier mayStart) {
         this.ant = ant;
         this.allowed = allowed;
+        this.mayStart = mayStart;
         setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
     }
 
@@ -47,7 +55,8 @@ public class DigGoal extends Goal {
     public boolean canUse() {
         // Only look for work now and then, so ants don't all think on the same tick.
         // An ant with a pellet in its mouth must carry it out before biting again.
-        if (ant.getColonyId() == null || ant.isCarrying() || ant.getRandom().nextInt(20) != 0 || !allowed.getAsBoolean()) {
+        if (ant.getColonyId() == null || ant.isCarrying() || ant.getRandom().nextInt(20) != 0 || !allowed.getAsBoolean()
+                || !mayStart.getAsBoolean()) {
             return false;
         }
         if (!(ant.level() instanceof ServerLevel level)) {

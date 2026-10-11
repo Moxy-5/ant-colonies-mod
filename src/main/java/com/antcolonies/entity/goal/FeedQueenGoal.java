@@ -6,6 +6,7 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.QueenAntEntity;
 
@@ -46,13 +47,19 @@ public class FeedQueenGoal extends Goal {
 
     @Override
     public boolean canUse() {
+        // An ant that took a seed outside for the queen carries on to her (it already counts as feeding her).
+        if (ant.getColonyId() != null && ant.isCarryingSeed() && ant.isSeedForQueen() && ant.level() instanceof ServerLevel level) {
+            colony = ColonyManager.get(level).getColony(ant.getColonyId());
+            pile = null;
+            return colony != null;
+        }
         // Only look for work now and then, so ants don't all think on the same tick.
         if (ant.getColonyId() == null || ant.hasFullMandibles() || ant.getRandom().nextInt(20) != 0
-                || !(ant.level() instanceof ServerLevel level) || level.getGameTime() < nextTry) {
+                || !ant.mayDo(ColonyRole.NURSE) || !(ant.level() instanceof ServerLevel level) || level.getGameTime() < nextTry) {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        if (colony == null || !colony.claimFeeding(level, ant.getUUID())) {
+        if (colony == null || colony.getFood() <= 0 || !colony.claimFeeding(level, ant.getUUID())) {
             return false;
         }
         pile = colony.findSeedPile(level, ant.getRandom());

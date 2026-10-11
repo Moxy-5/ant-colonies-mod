@@ -9,6 +9,7 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.AntEggEntity;
 
@@ -61,7 +62,7 @@ public class CarryEggGoal extends Goal {
         if (ant.isCarryingEgg()) {
             // Carrying an egg (something else interrupted the walk): carry on to the nursery.
             colony = ColonyManager.get(level).getColony(ant.getColonyId());
-            spot = colony == null ? null : colony.pickNurserySpot(level, ant.getRandom());
+            spot = colony == null ? null : colony.pickEggSpot(level, ant.getRandom());
             egg = null;
             if (spot == null) {
                 putDown(level);
@@ -70,7 +71,7 @@ public class CarryEggGoal extends Goal {
             return true;
         }
         // Only look for work now and then, so ants don't all think on the same tick.
-        if (ant.hasFullMandibles() || ant.getRandom().nextInt(20) != 0) {
+        if (ant.hasFullMandibles() || ant.getRandom().nextInt(20) != 0 || !ant.mayDo(ColonyRole.NURSE)) {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
@@ -147,7 +148,7 @@ public class CarryEggGoal extends Goal {
             egg = null;
             ant.setCarryingEgg(true);
             level.playSound(null, ant.blockPosition(), SoundEvents.ITEM_PICKUP, SoundSource.NEUTRAL, 0.15F, 1.6F);
-            spot = colony.pickNurserySpot(level, ant.getRandom());
+            spot = colony.pickEggSpot(level, ant.getRandom());
             if (spot == null) {
                 done = true; // no room in the nursery after all: stop() puts the egg down
             } else {
@@ -168,7 +169,7 @@ public class CarryEggGoal extends Goal {
                 ant.setCarryingEgg(false);
                 done = true;
             } else {
-                spot = colony.pickNurserySpot(level, ant.getRandom()); // another egg lies there now
+                spot = colony.pickEggSpot(level, ant.getRandom()); // another egg lies there now
                 if (spot == null) {
                     done = true;
                 } else {
@@ -187,7 +188,7 @@ public class CarryEggGoal extends Goal {
                 done = true;
                 return;
             }
-            spot = colony.pickNurserySpot(ant.level(), ant.getRandom());
+            spot = colony.pickEggSpot(ant.level(), ant.getRandom());
         }
         if (spot == null) {
             done = true;

@@ -2,6 +2,7 @@ package com.antcolonies.entity;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.entity.goal.CarryEggGoal;
 import com.antcolonies.entity.goal.CarryPelletGoal;
@@ -10,6 +11,7 @@ import com.antcolonies.entity.goal.DigGoal;
 import com.antcolonies.entity.goal.FeedQueenGoal;
 import com.antcolonies.entity.goal.GatherSeedGoal;
 import com.antcolonies.entity.goal.SealGoal;
+import com.antcolonies.entity.goal.StandByQueenGoal;
 import com.antcolonies.entity.goal.StoreSeedGoal;
 
 import net.minecraft.server.level.ServerLevel;
@@ -53,9 +55,26 @@ public class WorkerAntEntity extends AbstractAntEntity {
         this.goalSelector.addGoal(5, new FeedQueenGoal(this));
         this.goalSelector.addGoal(6, new GatherSeedGoal(this));
         this.goalSelector.addGoal(7, new ClipGrassGoal(this));
-        this.goalSelector.addGoal(8, new DigGoal(this, () -> true));
-        this.goalSelector.addGoal(9, new AntWanderGoal(this, 1.0, 120, 6, () -> true));
-        this.goalSelector.addGoal(10, new RandomLookAroundGoal(this));
+        this.goalSelector.addGoal(8, new DigGoal(this, () -> true, () -> mayDo(ColonyRole.BUILDER)));
+        // The nurse waits by the queen until there is an egg or a meal for her.
+        this.goalSelector.addGoal(9, new StandByQueenGoal(this));
+        this.goalSelector.addGoal(10, new AntWanderGoal(this, 1.0, 120, 6, () -> true));
+        this.goalSelector.addGoal(11, new RandomLookAroundGoal(this));
+    }
+
+    @Override
+    public boolean hasRole(ColonyRole role) {
+        if (getColonyId() == null || !(level() instanceof ServerLevel serverLevel)) {
+            return false;
+        }
+        Colony colony = ColonyManager.get(serverLevel).getColony(getColonyId());
+        return colony != null && colony.roleOf(serverLevel, getUUID()) == role;
+    }
+
+    @Override
+    public boolean mayDo(ColonyRole role) {
+        return isIdle() || getColonyId() == null || hasRole(role) || !(level() instanceof ServerLevel serverLevel)
+                || ColonyManager.get(serverLevel).getColony(getColonyId()) == null;
     }
 
     /** A worker that hatched in this colony's nursery belongs to it from the start (and is counted). */

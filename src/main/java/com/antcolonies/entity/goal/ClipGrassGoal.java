@@ -8,6 +8,7 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.AbstractAntEntity;
 
 import net.minecraft.core.BlockPos;
@@ -24,7 +25,7 @@ import net.minecraft.world.level.block.Blocks;
 /**
  * Walks to a tuft of short grass near the nest, nibbles at it for a couple of seconds and clips one seed off it. A tuft
  * gives up to {@link Colony#SEEDS_PER_GRASS} seeds and then breaks; {@link StoreSeedGoal} then carries the seed down
- * to the food store. Only looks for grass once the food store is dug out.
+ * to the food store. Only looks for grass when there is somewhere for the seeds to go: part of the food store is dug out, or the queen wants them.
  */
 public class ClipGrassGoal extends Goal {
     /** How close (sideways, in blocks) the ant must get to the grass. */
@@ -55,7 +56,7 @@ public class ClipGrassGoal extends Goal {
     public boolean canUse() {
         // Only look for work now and then, so ants don't all think on the same tick.
         if (ant.getColonyId() == null || ant.isCarrying() || ant.isCarryingSeed() || ant.getRandom().nextInt(40) != 0
-                || !(ant.level() instanceof ServerLevel level)) {
+                || !ant.mayDo(ColonyRole.FORAGER) || !(ant.level() instanceof ServerLevel level)) {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
@@ -123,6 +124,7 @@ public class ClipGrassGoal extends Goal {
         }
         if (clipping >= CLIP_TICKS) {
             ant.setCarriedSeed(new ItemStack(Items.WHEAT_SEEDS));
+            ant.setSeedForQueen(colony.claimFeeding(level, ant.getUUID())); // straight to the queen if she wants it
             colony.clippedGrass(level, grass);
             ColonyManager.get(level).markChanged();
             grass = null; // so stop() does not free the tuft again
