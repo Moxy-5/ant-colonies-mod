@@ -16,4 +16,8 @@ public class ModTags {
     /** Seeds ants take to the food store (data/antcolonies/tags/item/seeds.json). Will become the food tag of the species profile. */
     public static final TagKey<Item> SEEDS = TagKey.create(Registries.ITEM,
             ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "seeds"));
+
+    /** Rich seeds: bread milled from them is rich ant bread (data/antcolonies/tags/item/rich_seeds.json). */
+    public static final TagKey<Item> RICH_SEEDS = TagKey.create(Registries.ITEM,
+            ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "rich_seeds"));
 }

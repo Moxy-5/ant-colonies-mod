@@ -120,8 +120,9 @@ public class FeedLarvaGoal extends Goal {
     /** First leg: to a heap of bread, where the ant takes a piece. */
     private void walkToPile(ServerLevel level) {
         if (near(pile)) {
-            if (colony.takeBreadAt(level, pile)) {
-                ant.setCarriedSeed(new ItemStack(ModItems.ANT_BREAD.get()));
+            ItemStack taken = colony.takeBreadAt(level, pile, false); // plain bread; rich only if nothing else is left
+            if (!taken.isEmpty()) {
+                ant.setCarriedSeed(taken);
                 ColonyManager.get(level).markChanged();
                 leg = Leg.TO_LARVA;
                 ant.getNavigator().stop();
@@ -172,7 +173,7 @@ public class FeedLarvaGoal extends Goal {
     /** Third leg, only if the larva did not need the bread: back to a bread heap. */
     private void walkBack(ServerLevel level) {
         if (near(pile)) {
-            if (!colony.depositBread(level, pile)) {
+            if (!colony.depositBread(level, pile, ant.isCarryingRichBread())) {
                 pile = colony.pickBreadSpot(level, ant.getRandom());
                 if (pile == null || !ant.getNavigator().moveTo(pile, 1.0)) {
                     ant.setCarriedSeed(ItemStack.EMPTY);

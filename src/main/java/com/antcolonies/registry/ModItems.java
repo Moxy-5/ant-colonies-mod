@@ -19,6 +19,9 @@ public class ModItems {
     /** One piece of ant bread: what the ants carry from the mill to the queen, and what a broken bread pile drops. */
     public static final DeferredItem<Item> ANT_BREAD = ITEMS.registerSimpleItem("ant_bread");
 
+    /** Rich ant bread, milled from rich seeds (pumpkin): fed to the queen it starts a burst of eggs. */
+    public static final DeferredItem<Item> RICH_ANT_BREAD = ITEMS.registerSimpleItem("rich_ant_bread");
+
     public static final DeferredItem<DeferredSpawnEggItem> WORKER_ANT_SPAWN_EGG =
             ITEMS.register("worker_ant_spawn_egg",
                     () -> new DeferredSpawnEggItem(ModEntities.WORKER_ANT, 0x5A1A0C, 0xD9A441, new Item.Properties()));

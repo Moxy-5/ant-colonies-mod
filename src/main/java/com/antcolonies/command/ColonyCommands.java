@@ -36,9 +36,10 @@ public class ColonyCommands {
                     + " | center " + colony.getCenter().toShortString()
                     + " | queen " + colony.getQueenId().toString().substring(0, 8)
                     + " | members " + colony.getMemberCount()
-                    + " | food " + colony.getFood()
-                    + " | bread " + colony.getBread() + " (milling " + colony.getMilling() + ")"
-                    + " | queen fed " + colony.getQueenBread() + "/" + Colony.QUEEN_MEAL + incubation(colony, level)
+                    + " | food " + colony.getFood() + " (rich " + colony.getRichSeeds() + ")"
+                    + " | bread " + colony.getBread() + " (rich " + colony.getRichBread() + ", milling " + colony.getMilling() + ")"
+                    + " | queen fed " + colony.getQueenBread() + "/" + Colony.QUEEN_MEAL + ", rich " + colony.getQueenRich() + "/"
+                    + Colony.RICH_MEAL + incubation(colony, level)
                     + " | eggs " + colony.countEggs(level) + " | larvae " + colony.countLarvae(level)
                     + " | dead ants " + colony.getCorpses(level).size() + " (refuse chamber " + colony.getRefuseCorpses(level).size() + ")";
             source.sendSuccess(() -> Component.literal(line), false);
@@ -52,6 +53,7 @@ public class ColonyCommands {
             return "";
         }
         long seconds = Math.max(0, colony.getEggDue() - level.getGameTime()) / 20;
-        return String.format(" (egg in %d:%02d)", seconds / 60, seconds % 60);
+        String burst = colony.getBurstLeft() > 0 ? ", burst: " + colony.getBurstLeft() + " left" : "";
+        return String.format(" (egg in %d:%02d%s)", seconds / 60, seconds % 60, burst);
     }
 }

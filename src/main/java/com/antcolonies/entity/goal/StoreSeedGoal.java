@@ -82,7 +82,7 @@ public class StoreSeedGoal extends Goal {
         double dz = ant.getZ() - (spot.getZ() + 0.5);
         double dy = ant.getY() - spot.getY();
         if (dx * dx + dz * dz <= REACH * REACH && Math.abs(dy) < 1.5) {
-            if (colony.depositSeed(level, spot)) {
+            if (colony.depositSeed(level, spot, ant.getCarriedSeed().is(com.antcolonies.registry.ModTags.RICH_SEEDS))) {
                 ant.setCarriedSeed(net.minecraft.world.item.ItemStack.EMPTY);
                 ColonyManager.get(level).markChanged();
             } else {

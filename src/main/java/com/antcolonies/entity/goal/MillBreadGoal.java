@@ -134,8 +134,9 @@ public class MillBreadGoal extends Goal {
     /** First leg: to a heap of seeds in the food store, where the ant takes one. */
     private void walkToPile(ServerLevel level) {
         if (near(target)) {
-            if (colony.takeSeedAt(level, target)) {
-                ant.setCarriedSeed(new ItemStack(net.minecraft.world.item.Items.WHEAT_SEEDS));
+            ItemStack taken = colony.takeSeedAt(level, target, ant.getUUID(), colony.wantsRichBread());
+            if (!taken.isEmpty()) {
+                ant.setCarriedSeed(taken);
                 ant.setSeedForBread(true);
                 ColonyManager.get(level).markChanged();
                 target = colony.pickBreadSpot(level, ant.getRandom());
@@ -176,7 +177,7 @@ public class MillBreadGoal extends Goal {
         if (++milled < Colony.MILL_TICKS) {
             return;
         }
-        if (colony.depositBread(level, target)) {
+        if (colony.depositBread(level, target, ant.getCarriedSeed().is(com.antcolonies.registry.ModTags.RICH_SEEDS))) {
             ant.setCarriedSeed(ItemStack.EMPTY);
             ant.setSeedForBread(false);
             ColonyManager.get(level).markChanged();

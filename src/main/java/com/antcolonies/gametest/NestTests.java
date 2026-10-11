@@ -544,6 +544,64 @@ public class NestTests {
     }
 
     /**
+     * Five rich seeds (pumpkin) in the food store: the nurses mill them into rich ant bread and feed it to the queen, and
+     * the fifth piece starts a burst. She then lays one egg a minute for five minutes without being fed any more.
+     */
+    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
+    public static void richBreadStartsABurstOfEggs(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        startColony(helper);
+
+        boolean[] stocked = {false};
+        long[] burstStart = {-1};
+        List<Long> layTimes = new ArrayList<>();
+        int[] lastLaid = {0};
+        helper.onEachTick(() -> {
+            Colony colony = colony(helper);
+            if (colony == null) {
+                return;
+            }
+            if (!stocked[0]) {
+                if (airBelowSurface(helper) == NEST_CELLS && colony.findDigTarget(level) == null && hillProblems(helper).isEmpty()) {
+                    stocked[0] = true;
+                    for (int i = 0; i < Colony.RICH_MEAL; i++) {
+                        colony.depositSeed(level, colony.getFoodStoreCells(level).get(0), true);
+                    }
+                    AntColoniesMod.LOGGER.info("[burst-test] tick {}: {} rich seeds put in the food store", helper.getTick(), colony.getRichSeeds());
+                }
+                return;
+            }
+            if (burstStart[0] < 0 && colony.getBurstLeft() > 0) {
+                burstStart[0] = level.getGameTime();
+                AntColoniesMod.LOGGER.info("[burst-test] tick {}: the burst starts", helper.getTick());
+            }
+            if (colony.getEggsLaid() != lastLaid[0]) {
+                lastLaid[0] = colony.getEggsLaid();
+                layTimes.add(level.getGameTime());
+                AntColoniesMod.LOGGER.info("[burst-test] tick {}: egg {} laid, {} left in the burst", helper.getTick(), lastLaid[0], colony.getBurstLeft());
+            }
+        });
+
+        helper.succeedWhen(() -> {
+            Colony colony = colony(helper);
+            helper.assertTrue(stocked[0] && colony != null && burstStart[0] >= 0, "the burst has not started yet");
+            helper.assertTrue(layTimes.size() >= Colony.BURST_EGGS, layTimes.size() + " of " + Colony.BURST_EGGS + " burst eggs laid so far");
+            helper.assertTrue(layTimes.size() == Colony.BURST_EGGS, layTimes.size() + " eggs laid, expected exactly " + Colony.BURST_EGGS);
+            long previous = burstStart[0];
+            for (long laid : layTimes) {
+                long gap = laid - previous;
+                helper.assertTrue(gap >= Colony.BURST_INTERVAL_TICKS && gap <= Colony.BURST_INTERVAL_TICKS + 60,
+                        "an egg came " + gap + " ticks after the one before, expected " + Colony.BURST_INTERVAL_TICKS);
+                previous = laid;
+            }
+            helper.assertTrue(colony.getBurstLeft() == 0 && !colony.isIncubating(), "the burst is not over");
+            helper.assertTrue(colony.getQueenRich() == 0 && colony.getRichBread() == 0 && colony.getRichSeeds() == 0,
+                    "rich food is left: queen " + colony.getQueenRich() + ", bread " + colony.getRichBread() + ", seeds " + colony.getRichSeeds());
+        });
+    }
+
+    /**
      * Three eggs put in the nursery of a finished nest hatch after 1 minute into larvae. The nurses feed each larva 5
      * pieces of bread (35 seeds are in the store: 20 for the queen, 15 for the larvae), and each then becomes a real
      * worker of the same colony, which the colony counts.

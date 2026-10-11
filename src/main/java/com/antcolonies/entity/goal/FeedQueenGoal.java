@@ -9,7 +9,6 @@ import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.QueenAntEntity;
-import com.antcolonies.registry.ModItems;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -116,8 +115,9 @@ public class FeedQueenGoal extends Goal {
     /** First leg: to a heap of bread in the nursery, where the ant takes a piece. */
     private void walkToPile(ServerLevel level) {
         if (near(pile)) {
-            if (colony.takeBreadAt(level, pile)) {
-                ant.setCarriedSeed(new ItemStack(ModItems.ANT_BREAD.get()));
+            ItemStack taken = colony.takeBreadAt(level, pile, true); // she gets the rich bread first
+            if (!taken.isEmpty()) {
+                ant.setCarriedSeed(taken);
                 ColonyManager.get(level).markChanged();
                 leg = Leg.TO_QUEEN;
                 ant.getNavigator().stop();
@@ -143,7 +143,7 @@ public class FeedQueenGoal extends Goal {
         double dx = ant.getX() - queen.getX();
         double dz = ant.getZ() - queen.getZ();
         if (dx * dx + dz * dz <= REACH * REACH && Math.abs(ant.getY() - queen.getY()) < 1.5) {
-            if (colony.feedQueen(level)) {
+            if (colony.feedQueen(level, ant.isCarryingRichBread())) {
                 ant.setCarriedSeed(ItemStack.EMPTY);
                 ColonyManager.get(level).markChanged();
                 done = true;
@@ -165,7 +165,7 @@ public class FeedQueenGoal extends Goal {
     /** Third leg, only if the queen did not want the bread: back to a bread heap. */
     private void walkBack(ServerLevel level) {
         if (near(pile)) {
-            if (!colony.depositBread(level, pile)) {
+            if (!colony.depositBread(level, pile, ant.isCarryingRichBread())) {
                 pile = colony.pickBreadSpot(level, ant.getRandom());
                 if (pile == null || !ant.getNavigator().moveTo(pile, 1.0)) {
                     ant.setCarriedSeed(ItemStack.EMPTY);

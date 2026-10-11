@@ -19,6 +19,7 @@ import com.antcolonies.entity.QueenAntEntity;
 import com.antcolonies.entity.WorkerAntEntity;
 import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.registry.ModEntities;
+import com.antcolonies.registry.ModItems;
 import com.antcolonies.registry.ModTags;
 
 import net.minecraft.core.BlockPos;
@@ -29,6 +30,8 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.block.Blocks;
@@ -481,6 +484,11 @@ public class Colony {
      * starts) and the colony counts one more food. False if that spot is full (the ant looks for another).
      */
     public boolean depositSeed(Level level, BlockPos spot) {
+        return depositSeed(level, spot, false);
+    }
+
+    /** As above; {@code rich}: the seed is a rich one (pumpkin), which the mill keeps for the queen's rich bread. */
+    public boolean depositSeed(Level level, BlockPos spot, boolean rich) {
         BlockState state = level.getBlockState(spot);
         if (state.isAir()) {
             level.setBlock(spot, ModBlocks.SEED_PILE.get().defaultBlockState(), 3);
@@ -490,6 +498,9 @@ public class Colony {
             return false;
         }
         food++;
+        if (rich) {
+            richSeeds++;
+        }
         return true;
     }
 
@@ -543,6 +554,12 @@ public class Colony {
 
     /** The workers must feed the queen this many pieces of ant bread before she carries an egg. */
     public static final int QUEEN_MEAL = 20;
+    /** This many pieces of rich ant bread (made from rich seeds, see {@code antcolonies:rich_seeds}) fed to the queen start a burst of eggs. */
+    public static final int RICH_MEAL = 5;
+    /** In a burst she lays this many eggs ... */
+    public static final int BURST_EGGS = 5;
+    /** ... one every minute at normal speed (an egg is still held back while the colony has {@link #MAX_EGGS} young). */
+    public static final int BURST_INTERVAL_TICKS = 1200;
     /** How long (in ticks) she carries the egg before it comes out behind her: 3 minutes at normal speed. */
     public static final int INCUBATION_TICKS = 3600;
     /** An egg hatches into a larva this many ticks after it was put in the nursery: 1 minute at normal speed. */
@@ -562,8 +579,18 @@ public class Colony {
 
     /** How many pieces of bread the workers have fed the queen for her next egg (QUEEN_MEAL = full). Saved. */
     private int queenBread;
-    /** The game time when the egg she carries comes out (-1 = she carries none). Saved. */
+    /** The game time when the egg she carries comes out (-1 = she carries none). During a burst: when the next egg is due. Saved. */
     private long eggDue = -1;
+    /** How many of the seeds in the food store are rich ones (never more than {@link #food}). Saved. */
+    private int richSeeds;
+    /** How many of the pieces of bread in the nest are rich ant bread (never more than {@link #bread}). Saved. */
+    private int richBread;
+    /** How many pieces of rich bread the workers have fed the queen towards a burst ({@link #RICH_MEAL} = it starts). Saved. */
+    private int queenRich;
+    /** Eggs the queen still has to lay in her burst (0 = no burst going on). Saved. */
+    private int burstLeft;
+    /** The workers carrying a rich seed to the mill or milling it. Not saved. */
+    private final Set<UUID> richMillers = new HashSet<>();
     /** How many eggs the queen has laid in all. Saved. */
     private int eggsLaid;
     /** The role of each worker: ant -> role. Not saved: after a reload the workers ask again and get a balanced share. */
@@ -577,6 +604,23 @@ public class Colony {
 
     public int getQueenBread() {
         return queenBread;
+    }
+
+    public int getQueenRich() {
+        return queenRich;
+    }
+
+    /** Eggs left in the queen's burst (0 = none going on). */
+    public int getBurstLeft() {
+        return burstLeft;
+    }
+
+    public int getRichSeeds() {
+        return Math.min(richSeeds, food);
+    }
+
+    public int getRichBread() {
+        return Math.min(richBread, bread);
     }
 
     /** Whether the queen carries an egg right now. */
@@ -652,16 +696,26 @@ public class Colony {
         return piles.isEmpty() ? null : piles.get(random.nextInt(piles.size()));
     }
 
-    /** A worker takes one seed off the heap at {@code pile}: the heap gets a layer lower and the colony counts one food less. False if the heap is gone. */
-    public boolean takeSeedAt(Level level, BlockPos pile) {
+    /**
+     * A worker takes one seed off the heap at {@code pile}: the heap gets a layer lower and the colony counts one food
+     * less. Returns the seed (a pumpkin seed if it is a rich one, else a wheat seed), or an empty stack if the heap is
+     * gone. A rich seed is taken if {@code wantRich} and the colony has one (or if every seed in the store is a rich one).
+     */
+    public ItemStack takeSeedAt(Level level, BlockPos pile, UUID ant, boolean wantRich) {
         BlockState state = level.getBlockState(pile);
         if (!state.is(ModBlocks.SEED_PILE.get())) {
-            return false;
+            return ItemStack.EMPTY;
         }
         int layers = state.getValue(SeedPileBlock.LAYERS);
         level.setBlock(pile, layers <= 1 ? Blocks.AIR.defaultBlockState() : state.setValue(SeedPileBlock.LAYERS, layers - 1), 3);
+        richSeeds = Math.min(richSeeds, food);
+        boolean rich = richSeeds > 0 && (wantRich || food <= richSeeds);
         food = Math.max(0, food - 1);
-        return true;
+        if (rich) {
+            richSeeds--;
+            richMillers.add(ant);
+        }
+        return new ItemStack(rich ? Items.PUMPKIN_SEEDS : Items.WHEAT_SEEDS);
     }
 
     // ---- Ant bread
@@ -711,6 +765,16 @@ public class Colony {
     /** The worker has made its bread, or gave up. */
     public void releaseMilling(UUID ant) {
         millers.remove(ant);
+        richMillers.remove(ant);
+    }
+
+    /**
+     * Whether the next seed to be milled should be a rich one: rich bread is wanted (the queen is not in a burst and
+     * has not enough rich bread fed or ready yet) and the store has a rich seed.
+     */
+    public boolean wantsRichBread() {
+        return burstLeft == 0 && eggDue < 0 && Math.min(richSeeds, food) > 0
+                && queenRich + getRichBread() + richMillers.size() < RICH_MEAL;
     }
 
     /**
@@ -748,7 +812,7 @@ public class Colony {
     }
 
     /** A worker puts its freshly milled bread at {@code spot}: the heap grows by a layer (or a new one starts). False if that spot is full. */
-    public boolean depositBread(Level level, BlockPos spot) {
+    public boolean depositBread(Level level, BlockPos spot, boolean rich) {
         BlockState state = level.getBlockState(spot);
         if (state.isAir()) {
             level.setBlock(spot, ModBlocks.BREAD_PILE.get().defaultBlockState(), 3);
@@ -758,6 +822,9 @@ public class Colony {
             return false;
         }
         bread++;
+        if (rich) {
+            richBread++;
+        }
         return true;
     }
 
@@ -778,25 +845,44 @@ public class Colony {
         return piles.isEmpty() ? null : piles.get(random.nextInt(piles.size()));
     }
 
-    /** A worker takes one piece of bread off the heap at {@code pile}. False if the heap is gone. */
-    public boolean takeBreadAt(Level level, BlockPos pile) {
+    /**
+     * A worker takes one piece of bread off the heap at {@code pile}. Returns the piece (rich ant bread or plain ant
+     * bread), or an empty stack if the heap is gone. Rich bread is taken if {@code wantRich} (for the queen) and the
+     * colony has some, or if all the bread in the nest is rich.
+     */
+    public ItemStack takeBreadAt(Level level, BlockPos pile, boolean wantRich) {
         BlockState state = level.getBlockState(pile);
         if (!state.is(ModBlocks.BREAD_PILE.get())) {
-            return false;
+            return ItemStack.EMPTY;
         }
         int layers = state.getValue(SeedPileBlock.LAYERS);
         level.setBlock(pile, layers <= 1 ? Blocks.AIR.defaultBlockState() : state.setValue(SeedPileBlock.LAYERS, layers - 1), 3);
+        richBread = Math.min(richBread, bread);
+        boolean rich = richBread > 0 && (wantRich || bread <= richBread);
         bread = Math.max(0, bread - 1);
-        return true;
+        if (rich) {
+            richBread--;
+        }
+        return new ItemStack(rich ? ModItems.RICH_ANT_BREAD.get() : ModItems.ANT_BREAD.get());
     }
 
     /**
      * A worker gives the queen one piece of bread. With {@link #QUEEN_MEAL} pieces she starts carrying an egg, which
      * comes out {@link #INCUBATION_TICKS} later. False if she takes no more right now (the worker keeps the bread).
      */
-    public boolean feedQueen(ServerLevel level) {
+    public boolean feedQueen(ServerLevel level, boolean rich) {
         if (eggDue >= 0 || queenBread >= QUEEN_MEAL) {
             return false;
+        }
+        if (rich) {
+            // Rich bread: with RICH_MEAL pieces a burst of eggs starts, one every BURST_INTERVAL_TICKS, and she needs no more food for it.
+            if (++queenRich >= RICH_MEAL) {
+                queenRich = 0;
+                queenBread = 0;
+                burstLeft = BURST_EGGS;
+                eggDue = level.getGameTime() + BURST_INTERVAL_TICKS;
+            }
+            return true;
         }
         queenBread++;
         if (queenBread >= QUEEN_MEAL) {
@@ -807,14 +893,23 @@ public class Colony {
 
     /** Whether the egg the queen carries is ready to come out. */
     public boolean isEggDue(ServerLevel level) {
-        return eggDue >= 0 && level.getGameTime() >= eggDue;
+        if (eggDue < 0 || level.getGameTime() < eggDue) {
+            return false;
+        }
+        return burstLeft == 0 || countBrood(level) < MAX_EGGS; // a burst egg waits while the nursery is full of young
     }
 
     /** The egg comes out of the queen at this spot; she starts over with an empty stomach. */
     public void layEgg(ServerLevel level, double x, double y, double z) {
-        queenBread = 0;
-        eggDue = -1;
         eggsLaid++;
+        if (burstLeft > 0) {
+            // A burst egg: the next one is due a minute later, until the burst is over.
+            burstLeft--;
+            eggDue = burstLeft > 0 ? level.getGameTime() + BURST_INTERVAL_TICKS : -1;
+        } else {
+            queenBread = 0;
+            eggDue = -1;
+        }
         spawnEgg(level, x, y, z);
     }
 
@@ -1628,6 +1723,10 @@ public class Colony {
         tag.putInt("food", food);
         tag.putInt("queenBread", queenBread);
         tag.putInt("bread", bread);
+        tag.putInt("richSeeds", richSeeds);
+        tag.putInt("richBread", richBread);
+        tag.putInt("queenRich", queenRich);
+        tag.putInt("burstLeft", burstLeft);
         tag.putLong("eggDue", eggDue);
         tag.putInt("eggsLaid", eggsLaid);
         CompoundTag clips = new CompoundTag();
@@ -1645,6 +1744,10 @@ public class Colony {
         colony.food = tag.getInt("food");
         colony.queenBread = tag.contains("queenBread") ? tag.getInt("queenBread") : tag.getInt("queenSeeds"); // (old saves: seeds)
         colony.bread = tag.getInt("bread");
+        colony.richSeeds = tag.getInt("richSeeds");
+        colony.richBread = tag.getInt("richBread");
+        colony.queenRich = tag.getInt("queenRich");
+        colony.burstLeft = tag.getInt("burstLeft");
         colony.eggDue = tag.contains("eggDue") ? tag.getLong("eggDue") : -1;
         colony.eggsLaid = tag.getInt("eggsLaid");
         CompoundTag clips = tag.getCompound("grassClips");
