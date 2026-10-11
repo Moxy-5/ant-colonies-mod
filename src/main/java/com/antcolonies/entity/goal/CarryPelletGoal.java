@@ -50,7 +50,7 @@ public class CarryPelletGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        spot = colony == null ? null : colony.pickMoundSpot(level, ant.getRandom());
+        spot = colony == null ? null : colony.pickMoundSpot(level, ant.getRandom(), ant.getUUID());
         if (spot == null) {
             // Colony gone, or the mound is finished: nowhere to put it, so let go.
             ant.setCarriedBlock(null);
@@ -74,6 +74,9 @@ public class CarryPelletGoal extends Goal {
     @Override
     public void stop() {
         ant.getNavigator().stop();
+        if (colony != null) {
+            colony.releaseMoundSpot(ant.getUUID());
+        }
         spot = null;
         colony = null;
     }
@@ -112,7 +115,7 @@ public class CarryPelletGoal extends Goal {
                 colony.pauseHillRepair(ant.level());
                 return;
             }
-            spot = colony.pickMoundSpot(ant.level(), ant.getRandom());
+            spot = colony.pickMoundSpot(ant.level(), ant.getRandom(), ant.getUUID());
         }
         if (spot == null) {
             ant.setCarriedBlock(null);
@@ -135,7 +138,7 @@ public class CarryPelletGoal extends Goal {
         // (it can place the pellet from the next cell), and tries again when it is out of the way.
         if (ant.getBoundingBox().intersects(new AABB(spot))) {
             if (ant.getNavigator().isDone() && !stepAside(level)) {
-                spot = colony.pickMoundSpot(level, ant.getRandom());
+                spot = colony.pickMoundSpot(level, ant.getRandom(), ant.getUUID());
                 if (spot == null) {
                     ant.setCarriedBlock(null);
                 } else {
@@ -145,7 +148,10 @@ public class CarryPelletGoal extends Goal {
             return;
         }
         if (!colony.placePellet(level, spot)) {
-            spot = colony.pickMoundSpot(level, ant.getRandom());
+            if (colony.isMoundSpotValid(level, spot)) {
+                return; // someone is standing in the spot: wait a moment (the spot is ours, nobody else carries soil to it)
+            }
+            spot = colony.pickMoundSpot(level, ant.getRandom(), ant.getUUID());
             if (spot == null) {
                 ant.setCarriedBlock(null);
             } else {

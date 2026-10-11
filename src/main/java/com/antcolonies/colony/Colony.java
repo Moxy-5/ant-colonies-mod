@@ -158,6 +158,12 @@ public class Colony {
 
     /** The ants that fetched soil to repair the hill: ant -> game time when the pellet should have arrived. Not saved. */
     private final Map<UUID, Long> repairers = new HashMap<>();
+    /** The hill spot each ant with a pellet is on its way to (not saved). */
+    private final Map<UUID, MoundClaim> moundClaims = new HashMap<>();
+    private static final int MOUND_CLAIM_TICKS = 400;
+
+    private record MoundClaim(BlockPos spot, long until) {
+    }
     /** No repair soil is fetched before this game time (see {@link #HILL_PAUSE_TICKS}). Not saved. */
     private long hillPausedUntil;
 
@@ -1621,8 +1627,13 @@ public class Colony {
      * and the finished mound has exactly the shape of {@link #moundHeightAt}.
      */
     @Nullable
-    public BlockPos pickMoundSpot(Level level, RandomSource random) {
+    public BlockPos pickMoundSpot(Level level, RandomSource random, @Nullable UUID ant) {
+        long now = level.getGameTime();
+        moundClaims.values().removeIf(claim -> claim.until <= now);
         List<BlockPos> spots = openMoundSpots(level);
+        // One ant to a spot: ants don't push each other, so a crowd in one cell could never place the pellet (nobody may stand in it).
+        spots.removeIf(spot -> moundClaims.entrySet().stream()
+                .anyMatch(entry -> !entry.getKey().equals(ant) && entry.getValue().spot.equals(spot)));
         if (spots.isEmpty()) {
             return null;
         }
@@ -1646,7 +1657,16 @@ public class Colony {
                 lowestSpots.add(spot);
             }
         }
-        return lowestSpots.get(random.nextInt(lowestSpots.size()));
+        BlockPos chosen = lowestSpots.get(random.nextInt(lowestSpots.size()));
+        if (ant != null) {
+            moundClaims.put(ant, new MoundClaim(chosen.immutable(), now + MOUND_CLAIM_TICKS));
+        }
+        return chosen;
+    }
+
+    /** The ant has put its pellet down or given up: its hill spot is free for others again. */
+    public void releaseMoundSpot(UUID ant) {
+        moundClaims.remove(ant);
     }
 
     /** False once the hill is complete: ants then stop carrying soil out. */
@@ -1731,6 +1751,26 @@ public class Colony {
                 && level.getBlockState(pos.below()).isFaceSturdy(level, pos.below(), Direction.UP);
     }
 
+    /** Moves an ant out of a cell that is about to be filled: on top of it if that is free, else to a free cell beside it. */
+    private static void nudgeOut(Level level, LivingEntity ant, BlockPos pos) {
+        List<BlockPos> targets = new ArrayList<>();
+        targets.add(pos.above());
+        for (Direction side : Direction.Plane.HORIZONTAL) {
+            targets.add(pos.relative(side));
+            targets.add(pos.relative(side).above());
+        }
+        for (BlockPos target : targets) {
+            if (level.getBlockState(target).getCollisionShape(level, target).isEmpty()) {
+                ant.moveTo(target.getX() + 0.5, target.getY(), target.getZ() + 0.5);
+                ant.setDeltaMovement(0, 0, 0);
+                if (ant instanceof com.antcolonies.entity.AbstractAntEntity abstractAnt) {
+                    abstractAnt.getNavigator().stop();
+                }
+                return;
+            }
+        }
+    }
+
     /** For the log: is a pellet still allowed at this spot? */
     public boolean isMoundSpotValid(Level level, BlockPos pos) {
         return isMoundSpot(level, pos);
@@ -1741,9 +1781,16 @@ public class Colony {
         if (!isMoundSpot(level, pos)) {
             return false;
         }
-        // Never bury anyone: an ant, the queen, an animal or a player standing in the spot means try elsewhere.
-        if (!level.getEntitiesOfClass(LivingEntity.class, new AABB(pos)).isEmpty()) {
-            return false;
+        // Never bury anyone: an animal or a player standing in the spot means try elsewhere. Ants do not push each other
+        // and the spot is where the whole traffic of the hole passes, so the soil nudges them out onto the new block.
+        List<LivingEntity> inSpot = level.getEntitiesOfClass(LivingEntity.class, new AABB(pos));
+        for (LivingEntity living : inSpot) {
+            if (!(living instanceof com.antcolonies.entity.AbstractAntEntity)) {
+                return false;
+            }
+        }
+        for (LivingEntity ant : inSpot) {
+            nudgeOut(level, ant, pos);
         }
         // Whatever the ant dug, the mound is built of burrowed dirt (and it never slides away like sand).
         level.setBlock(pos, ModBlocks.BURROWED_DIRT.get().defaultBlockState(), 3);

@@ -229,8 +229,12 @@ public class NestTests {
             }
             stage[0] = 1;
             startedAt[0] = helper.getTick();
-            helper.setBlock(MIDDLE + 1, SURFACE, MIDDLE, Blocks.AIR); // one gap in the first ring of the hill
+            // One gap in the first ring of the hill: the top two layers of one column (the user's picture), so the spot is one block up.
+            helper.setBlock(MIDDLE + 1, SURFACE + 1, MIDDLE, Blocks.AIR);
+            helper.setBlock(MIDDLE + 1, SURFACE + 2, MIDDLE, Blocks.AIR);
+            Vec3 shaft = Vec3.atBottomCenterOf(colony.getCenter().below(2));
             for (var worker : colonyWorkers(helper, colony)) {
+                worker.moveTo(shaft.x, shaft.y, shaft.z); // all of them come up the shaft with soil, as in the report
                 worker.setCarriedBlock(ModBlocks.BURROWED_DIRT.get().defaultBlockState());
             }
             AntColoniesMod.LOGGER.info("[jam-test] tick {}: one gap, every worker has a pellet", helper.getTick());
@@ -250,6 +254,52 @@ public class NestTests {
             helper.assertTrue(hillProblems(helper).isEmpty(), "the gap is not filled: " + hillProblems(helper));
             long carrying = colonyWorkers(helper, colony).stream().filter(w -> w.isCarrying()).count();
             helper.assertTrue(carrying == 0, carrying + " ants still carry soil");
+        });
+    }
+
+    /**
+     * The user's jam: the gap in the hill lies where the whole traffic of the hole passes, so ants always stood in it and
+     * the pellet could never be set. Now the pellet goes in and the ants standing there are nudged out onto the new block;
+     * a player or an animal in the spot still stops it.
+     */
+    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
+    public static void aPelletIsSetEvenWhenAntsStandInTheGap(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        startColony(helper);
+
+        boolean[] done = {false};
+        helper.onEachTick(() -> {
+            Colony colony = colony(helper);
+            if (done[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.findDigTarget(level) != null
+                    || !hillProblems(helper).isEmpty() || !colony.getLeaks(level).isEmpty()) {
+                return;
+            }
+            done[0] = true;
+            helper.setBlock(MIDDLE + 1, SURFACE + 2, MIDDLE, Blocks.AIR);
+            BlockPos gap = helper.absolutePos(new BlockPos(MIDDLE + 1, SURFACE + 2, MIDDLE));
+            // Freeze the ants so they stay in the gap, and put a sheep in as well: the sheep must stop the pellet.
+            var crowd = new java.util.ArrayList<WorkerAntEntity>();
+            for (int i = 0; i < 5; i++) {
+                WorkerAntEntity ant = ModEntities.WORKER_ANT.get().create(level);
+                ant.moveTo(gap.getX() + 0.5, gap.getY(), gap.getZ() + 0.5);
+                ant.setNoAi(true);
+                level.addFreshEntity(ant);
+                crowd.add(ant);
+            }
+            var sheep = net.minecraft.world.entity.EntityType.SHEEP.create(level);
+            sheep.moveTo(gap.getX() + 0.5, gap.getY(), gap.getZ() + 0.5);
+            sheep.setNoAi(true);
+            level.addFreshEntity(sheep);
+            helper.assertTrue(!colony.placePellet(level, gap), "the pellet was set on top of a sheep");
+            sheep.discard();
+            helper.assertTrue(colony.placePellet(level, gap), "the pellet was not set with ants standing in the gap");
+            helper.assertTrue(level.getBlockState(gap).is(ModBlocks.BURROWED_DIRT.get()), "no block was placed");
+            for (WorkerAntEntity ant : crowd) {
+                helper.assertTrue(ant.getY() >= gap.getY() + 1 - 0.01, "an ant is still inside the new block (y " + ant.getY() + ")");
+                ant.discard();
+            }
+            helper.succeed();
         });
     }
 
@@ -1372,7 +1422,7 @@ public class NestTests {
         Colony colony = colony(helper);
         StringBuilder text = new StringBuilder();
         if (colony != null) {
-            BlockPos spot = colony.pickMoundSpot(level, level.random);
+            BlockPos spot = colony.pickMoundSpot(level, level.random, null);
             text.append("mound spot ").append(spot == null ? "none" : spot.subtract(BlockPos.containing(origin)).toShortString());
             if (spot != null) {
                 BlockPos bottom = colony.getCenter().below(3);
