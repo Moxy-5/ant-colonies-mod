@@ -18,6 +18,7 @@ import com.antcolonies.entity.goal.RepairHillGoal;
 import com.antcolonies.entity.goal.SealGoal;
 import com.antcolonies.entity.goal.StandByQueenGoal;
 import com.antcolonies.entity.goal.StoreSeedGoal;
+import com.antcolonies.species.SpeciesProfile;
 
 import com.antcolonies.AntColoniesMod;
 
@@ -41,12 +42,8 @@ public class WorkerAntEntity extends AbstractAntEntity {
     /** How close (in blocks) a queen must be for a new worker to join her colony. */
     private static final double JOIN_RADIUS = 32.0;
 
-    /** A worker eats one seed a day: after this many ticks without a meal (a day = 24000 ticks) it is hungry and goes to the food store. */
-    public static final int MEAL_INTERVAL_TICKS = 24000;
-    /** Without a meal for this long (a day and a half) it slows down ... */
-    public static final int SLOW_AFTER_TICKS = 36000;
-    /** ... and without one for this long (three days) it starves to death and leaves its body. */
-    public static final int STARVE_AFTER_TICKS = 72000;
+    // A worker eats one seed a day; without one it slows down and then starves to death and leaves its body. How long
+    // each takes comes from its colony's species profile: colony.profile().worker().
     private static final ResourceLocation STARVING_SLOWDOWN =
             ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "starving");
 
@@ -117,15 +114,22 @@ public class WorkerAntEntity extends AbstractAntEntity {
         colony.setCount(CASTE, colony.getCount(CASTE) + 1);
     }
 
-    /** Whether this worker has not eaten for a day. */
+    /** Whether this worker has not eaten for a day (its species' meal interval). */
     public boolean isHungry() {
-        return lastAte != NOT_SET && level().getGameTime() - lastAte >= MEAL_INTERVAL_TICKS;
+        return lastAte != NOT_SET && level().getGameTime() - lastAte >= hungerNumbers().mealIntervalTicks();
+    }
+
+    /** The hunger times of this worker's species (the red harvester ant's built-in ones while it has no colony). */
+    private SpeciesProfile.WorkerNumbers hungerNumbers() {
+        Colony colony = getColonyId() == null || !(level() instanceof ServerLevel serverLevel) ? null
+                : ColonyManager.get(serverLevel).getColony(getColonyId());
+        return (colony == null ? SpeciesProfile.RED_HARVESTER_ANT : colony.profile()).worker();
     }
 
     /** The worker has eaten: it is full for another day. */
     public void eat() {
         lastAte = level().getGameTime();
-        updateStarving(0);
+        updateStarving(false);
     }
 
     public long getLastAte() {
@@ -150,19 +154,20 @@ public class WorkerAntEntity extends AbstractAntEntity {
             lastAte = now; // the clock only runs for a worker in a colony that gets hungry
         }
         long hungry = now - lastAte;
-        updateStarving(hungry);
-        if (hungry >= STARVE_AFTER_TICKS) {
+        SpeciesProfile.WorkerNumbers numbers = colony == null ? SpeciesProfile.RED_HARVESTER_ANT.worker() : colony.profile().worker();
+        updateStarving(hungry >= numbers.slowAfterTicks());
+        if (hungry >= numbers.starveAfterTicks()) {
             hurt(damageSources().starve(), 1000.0F);
         }
     }
 
-    /** Slows the worker down while it has gone without a meal for {@link #SLOW_AFTER_TICKS}. */
-    private void updateStarving(long ticksWithoutMeal) {
+    /** Slows the worker down while it has gone without a meal for long (its species' slow_after_ticks). */
+    private void updateStarving(boolean slow) {
         var speed = getAttribute(Attributes.MOVEMENT_SPEED);
         if (speed == null) {
             return;
         }
-        if (ticksWithoutMeal >= SLOW_AFTER_TICKS) {
+        if (slow) {
             speed.addOrUpdateTransientModifier(new AttributeModifier(STARVING_SLOWDOWN, -0.5, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
         } else {
             speed.removeModifier(STARVING_SLOWDOWN);

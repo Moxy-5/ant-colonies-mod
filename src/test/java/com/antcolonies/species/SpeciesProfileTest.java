@@ -1,0 +1,47 @@
+package com.antcolonies.species;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+
+import org.junit.jupiter.api.Test;
+
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
+import com.mojang.serialization.JsonOps;
+
+/** Checks that the species profile files read without errors and hold sensible numbers. */
+class SpeciesProfileTest {
+    private static SpeciesProfile read(String name) throws Exception {
+        try (InputStream in = SpeciesProfileTest.class.getResourceAsStream("/data/antcolonies/species/" + name + ".json")) {
+            assertNotNull(in, "no file data/antcolonies/species/" + name + ".json");
+            JsonElement json = JsonParser.parseReader(new InputStreamReader(in, StandardCharsets.UTF_8));
+            return SpeciesProfile.CODEC.parse(JsonOps.INSTANCE, json).getOrThrow(error -> new AssertionError(name + ": " + error));
+        }
+    }
+
+    @Test
+    void theRedHarvesterAntFileReadsAndItsNumbersMakeSense() throws Exception {
+        SpeciesProfile profile = read("red_harvester_ant");
+        assertTrue(profile.colony().maxWorkers() > 0);
+        assertTrue(profile.queen().meal() > 0 && profile.queen().richMeal() > 0 && profile.brood().larvaMeal() > 0);
+        assertTrue(profile.worker().mealIntervalTicks() < profile.worker().slowAfterTicks()
+                && profile.worker().slowAfterTicks() < profile.worker().starveAfterTicks(), "a worker must get hungry before it slows down, and slow down before it starves");
+        assertTrue(profile.food().radius() > 0 && profile.food().seedsPerGrass() > 0);
+    }
+
+    @Test
+    void nursesAreCountedFromTheHeadcount() {
+        SpeciesProfile.ColonyNumbers colony = SpeciesProfile.RED_HARVESTER_ANT.colony();
+        assertEquals(0, colony.nurses(2));
+        assertEquals(1, colony.nurses(3));
+        assertEquals(1, colony.nurses(7));
+        assertEquals(2, colony.nurses(8));
+        assertEquals(3, colony.nurses(12));
+        assertEquals(4, colony.nurses(20));
+    }
+}

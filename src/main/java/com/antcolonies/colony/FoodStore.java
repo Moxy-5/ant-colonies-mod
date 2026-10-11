@@ -31,14 +31,13 @@ import net.minecraft.world.phys.AABB;
  * seed store, and taken from there to be milled or eaten. Counts how many seeds (and rich seeds) are stored.
  */
 public class FoodStore {
-    /** Seeds lying within this many blocks (sideways) of the entrance are fetched by the workers. */
-    public static final int FOOD_RADIUS = 24;
+    // How far the workers look for food and how many seeds a tuft of grass gives come from the species profile:
+    // colony.profile().food().
+
     /** An ant that went for a seed keeps the others away from it this long (in ticks). */
     private static final int SEED_CLAIM_TICKS = 600;
     /** A tuft of grass an ant just clipped is left alone this long (in ticks), so the ants don't all crowd one tuft. */
     private static final int GRASS_REST_TICKS = 200;
-    /** A tuft of grass gives this many seeds; after the last one it is used up and breaks. */
-    public static final int SEEDS_PER_GRASS = 10;
     /** The tufts of grass around the nest are looked up again after this many ticks (a scan of the whole area). */
     private static final int GRASS_SCAN_TICKS = 100;
 
@@ -112,7 +111,7 @@ public class FoodStore {
 
     /**
      * The seed on the ground nearest to {@code near} that the ants should fetch, or null: only once the food store
-     * has room (or the queen wants seeds), only on the surface (not what is already stored below), within {@link #FOOD_RADIUS} of the entrance,
+     * has room (or the queen wants seeds), only on the surface (not what is already stored below), within the profile's food radius of the entrance,
      * and not one another ant is on its way to. {@code avoid}: item entity ids this ant could not reach.
      */
     @Nullable
@@ -121,7 +120,8 @@ public class FoodStore {
             return null; // no food store yet (and the queen wants nothing), or it is full
         }
         claimedSeeds.prune(level.getGameTime());
-        AABB area = new AABB(center).inflate(FOOD_RADIUS, 0, FOOD_RADIUS).expandTowards(0, 8, 0);
+        int radius = colony.profile().food().radius();
+        AABB area = new AABB(center).inflate(radius, 0, radius).expandTowards(0, 8, 0);
         ItemEntity best = null;
         double bestDistance = Double.MAX_VALUE;
         for (ItemEntity item : level.getEntitiesOfClass(ItemEntity.class, area)) {
@@ -148,7 +148,7 @@ public class FoodStore {
 
     /**
      * A tuft of short grass near the nest that an ant could clip seeds from, or null: only once the food store is
-     * ready and not full. Scans the area within {@link #FOOD_RADIUS} of the entrance (at most every few seconds) and takes
+     * ready and not full. Scans the area within the profile's food radius of the entrance (at most every few seconds) and takes
      * the tuft nearest to {@code near}. A tuft another ant is on its way to, or clipped lately, is skipped, and so is one in
      * {@code avoid} (this ant found no way to it).
      */
@@ -162,8 +162,9 @@ public class FoodStore {
         if (now >= grassScanTime) {
             grassScanTime = now + GRASS_SCAN_TICKS;
             grassTufts.clear();
-            for (int x = center.getX() - FOOD_RADIUS; x <= center.getX() + FOOD_RADIUS; x++) {
-                for (int z = center.getZ() - FOOD_RADIUS; z <= center.getZ() + FOOD_RADIUS; z++) {
+            int radius = colony.profile().food().radius();
+            for (int x = center.getX() - radius; x <= center.getX() + radius; x++) {
+                for (int z = center.getZ() - radius; z <= center.getZ() + radius; z++) {
                     if (!level.hasChunkAt(new BlockPos(x, center.getY(), z))) {
                         continue;
                     }
@@ -200,13 +201,13 @@ public class FoodStore {
     }
 
     /**
-     * The ant clipped its seed. The tuft rests for a moment; after {@link #SEEDS_PER_GRASS} seeds it is used up and
+     * The ant clipped its seed. The tuft rests for a moment; after the profile's seeds per tuft it is used up and
      * breaks (without dropping anything).
      */
     public void clippedGrass(Level level, BlockPos grass) {
         BlockPos pos = grass.immutable();
         int clips = grassClips.merge(pos, 1, Integer::sum);
-        if (clips >= SEEDS_PER_GRASS) {
+        if (clips >= colony.profile().food().seedsPerGrass()) {
             grassClips.remove(pos);
             busyGrass.remove(pos);
             level.destroyBlock(pos, false);

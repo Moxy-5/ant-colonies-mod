@@ -7,7 +7,6 @@ import java.util.Map;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.FoodStore;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.AbstractAntEntity;
@@ -25,7 +24,7 @@ import net.minecraft.world.level.block.Blocks;
 
 /**
  * Walks to a tuft of short grass near the nest, nibbles at it for a couple of seconds and clips one seed off it. A tuft
- * gives up to {@link FoodStore#SEEDS_PER_GRASS} seeds and then breaks; {@link StoreSeedGoal} then carries the seed down
+ * gives up to the species profile's seeds_per_grass seeds and then breaks; {@link StoreSeedGoal} then carries the seed down
  * to the food store. Only looks for grass when there is somewhere for the seeds to go: part of the food store is dug out, or the queen wants them.
  */
 public class ClipGrassGoal extends Goal {

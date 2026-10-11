@@ -9,6 +9,8 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.entity.QueenAntEntity;
 import com.antcolonies.entity.WorkerAntEntity;
+import com.antcolonies.species.SpeciesProfile;
+import com.antcolonies.species.SpeciesProfiles;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -17,7 +19,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.phys.AABB;
 
 /**
- * One colony's "brain" data. Species-neutral: the species is just an id that will point at a species profile later.
+ * One colony's "brain" data. Species-neutral: the species is an id that points at a species profile ({@link #profile()}).
  * Member counts are stored per caste (mostly virtual, not real mobs).
  *
  * <p>The colony itself holds who it is, its headcount and the workers' roles. Everything else lives in its parts, one
@@ -28,17 +30,6 @@ import net.minecraft.world.phys.AABB;
 public class Colony {
     /** "No time saved": a hunger clock that has not started yet. */
     public static final long NOT_SET = Long.MIN_VALUE;
-    /** Larvae grow into workers only while the colony has fewer than this many workers; the other larvae wait in the nursery. */
-    public static final int MAX_WORKERS = 20;
-
-    /** From this many workers on, one of them is the nurse who stays by the queen. */
-    public static final int NURSE_FROM_WORKERS = 3;
-    /** From this many workers on, two of them are nurses. */
-    public static final int SECOND_NURSE_FROM_WORKERS = 8;
-    /** From this many workers on, three of them are nurses. */
-    public static final int THIRD_NURSE_FROM_WORKERS = 12;
-    /** From this many workers on, four of them are nurses. */
-    public static final int FOURTH_NURSE_FROM_WORKERS = 20;
 
     private final UUID id;
     private final ResourceLocation species;
@@ -123,6 +114,11 @@ public class Colony {
         return species;
     }
 
+    /** The numbers this colony runs on, from its species profile (a JSON file, see {@link SpeciesProfiles}). */
+    public SpeciesProfile profile() {
+        return SpeciesProfiles.get(species);
+    }
+
     public UUID getQueenId() {
         return queenId;
     }
@@ -139,7 +135,8 @@ public class Colony {
 
     /** The area (around the nest, down to the refuse chamber) where the colony's eggs, larvae and dead ants are looked for. */
     AABB nestArea() {
-        return new AABB(center).inflate(FoodStore.FOOD_RADIUS, 0, FoodStore.FOOD_RADIUS).expandTowards(0, 8, 0).expandTowards(0, -12, 0);
+        int radius = profile().food().radius();
+        return new AABB(center).inflate(radius, 0, radius).expandTowards(0, 8, 0).expandTowards(0, -12, 0);
     }
 
     public boolean isHungerOn() {
@@ -151,8 +148,8 @@ public class Colony {
     }
 
     /**
-     * The role of this worker. Roles are shared out evenly: one nurse (from {@link #NURSE_FROM_WORKERS} workers on, two from {@link #SECOND_NURSE_FROM_WORKERS}, three from {@link #THIRD_NURSE_FROM_WORKERS}, four from {@link #FOURTH_NURSE_FROM_WORKERS}),
-     * the rest half builders and half foragers (builders first). A worker keeps its role until it is one too many for
+     * The role of this worker. Roles are shared out evenly: the nurses (how many depends on the headcount, see the
+     * profile's {@code nurses_from_workers}), the rest half builders and half foragers (builders first). A worker keeps its role until it is one too many for
      * it, so roles only change when workers are born or die.
      */
     public ColonyRole roleOf(ServerLevel level, UUID ant) {
@@ -165,8 +162,7 @@ public class Colony {
                 total++;
             }
         }
-        int nurses = total >= FOURTH_NURSE_FROM_WORKERS ? 4 : total >= THIRD_NURSE_FROM_WORKERS ? 3
-                : total >= SECOND_NURSE_FROM_WORKERS ? 2 : total >= NURSE_FROM_WORKERS ? 1 : 0;
+        int nurses = profile().colony().nurses(total);
         int[] target = new int[ColonyRole.values().length];
         target[ColonyRole.NURSE.ordinal()] = nurses;
         target[ColonyRole.BUILDER.ordinal()] = (total - nurses + 1) / 2;

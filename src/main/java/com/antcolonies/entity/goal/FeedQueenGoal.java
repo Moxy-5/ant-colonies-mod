@@ -5,7 +5,6 @@ import java.util.EnumSet;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.QueenCare;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.AbstractAntEntity;
@@ -18,7 +17,7 @@ import net.minecraft.world.item.ItemStack;
 
 /**
  * Feeds the queen: the worker takes one piece of ant bread off a heap in the nursery, carries it to the queen in her
- * room and gives it to her. After {@link QueenCare#QUEEN_MEAL} pieces she carries an egg. If the queen does not want the
+ * room and gives it to her. After the species profile's queen meal she carries an egg. If the queen does not want the
  * bread after all, the worker puts it back on a bread heap.
  */
 public class FeedQueenGoal extends Goal {

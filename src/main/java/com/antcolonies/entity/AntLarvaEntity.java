@@ -5,8 +5,8 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.Brood;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.species.SpeciesProfile;
 
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -21,12 +21,15 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * A larva of one colony: what an egg turns into. It lies in the nursery, cannot move, and is fed ant bread by the
- * nurses. After {@link Brood#LARVA_MEAL} pieces it grows into a worker (as soon as the colony has room for one).
+ * nurses. After its meal (the species profile's larva_meal) it grows into a worker (as soon as the colony has room for one).
  * Saved with the world; disappears when its colony is gone.
  */
 public class AntLarvaEntity extends Entity {
     /** How many pieces of bread this larva has eaten (drawn bigger the more it has eaten). Synced to the client. */
     private static final EntityDataAccessor<Integer> DATA_FED =
+            SynchedEntityData.defineId(AntLarvaEntity.class, EntityDataSerializers.INT);
+    /** How many pieces of bread it needs to grow up (from its colony's species profile). Synced, so the client can draw its size. */
+    private static final EntityDataAccessor<Integer> DATA_MEAL =
             SynchedEntityData.defineId(AntLarvaEntity.class, EntityDataSerializers.INT);
 
     @Nullable
@@ -35,7 +38,7 @@ public class AntLarvaEntity extends Entity {
     @Nullable
     private UUID feeder;
     private long feederUntil;
-    /** Game time of the last piece of bread. A larva that goes {@link Brood#LARVA_STARVE_TICKS} without one starves. Saved. */
+    /** Game time of the last piece of bread. A larva that goes the species profile's larva_starve_ticks without one starves. Saved. */
     private long lastFed = Colony.NOT_SET;
 
     public AntLarvaEntity(EntityType<? extends AntLarvaEntity> type, Level level) {
@@ -59,6 +62,15 @@ public class AntLarvaEntity extends Entity {
         entityData.set(DATA_FED, fed);
     }
 
+    /** How many pieces of bread it needs to grow up. */
+    public int getMeal() {
+        return entityData.get(DATA_MEAL);
+    }
+
+    public void setMeal(int meal) {
+        entityData.set(DATA_MEAL, Math.max(1, meal));
+    }
+
     /** One more piece of bread eaten. */
     public void feed() {
         setFed(getFed() + 1);
@@ -75,7 +87,7 @@ public class AntLarvaEntity extends Entity {
     }
 
     public boolean isFull() {
-        return getFed() >= Brood.LARVA_MEAL;
+        return getFed() >= getMeal();
     }
 
     /** Whether a nurse is already on its way with bread for this larva. */
@@ -97,6 +109,7 @@ public class AntLarvaEntity extends Entity {
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         builder.define(DATA_FED, 0);
+        builder.define(DATA_MEAL, SpeciesProfile.RED_HARVESTER_ANT.brood().larvaMeal());
     }
 
     @Override
@@ -131,11 +144,12 @@ public class AntLarvaEntity extends Entity {
             discard(); // the queen died
             return;
         }
+        setMeal(colony.profile().brood().larvaMeal()); // (the profile can change with /reload)
         // The hunger clock only runs for a larva that still has to eat; a full one waiting to grow up has been fed.
         long now = level.getGameTime();
         if (lastFed == Colony.NOT_SET || isFull() || !colony.isHungerOn()) {
             lastFed = now;
-        } else if (now - lastFed >= Brood.LARVA_STARVE_TICKS) {
+        } else if (now - lastFed >= colony.profile().brood().larvaStarveTicks()) {
             colony.brood().starveLarva(level, this);
             manager.markChanged();
             return;

@@ -8,10 +8,13 @@ import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.registry.ModEntities;
 import com.antcolonies.registry.ModFeatures;
 import com.antcolonies.registry.ModItems;
+import com.antcolonies.species.SpeciesProfiles;
 import com.mojang.logging.LogUtils;
 
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.AddReloadListenerEvent;
 import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 
 // The value here must match the mod id in gradle.properties / neoforge.mods.toml
@@ -30,6 +33,8 @@ public class AntColoniesMod {
             event.register(NestTests.class);
             event.register(NavigationTests.class);
         });
+        // Species profiles (data/<namespace>/species/*.json), loaded with the world's data and on /reload.
+        NeoForge.EVENT_BUS.addListener((AddReloadListenerEvent event) -> event.addListener(SpeciesProfiles.INSTANCE));
         LOGGER.info("Ant & Termite Colonies loaded");
     }
 }

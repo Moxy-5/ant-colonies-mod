@@ -5,7 +5,6 @@ import java.util.EnumSet;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.Bakery;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.AbstractAntEntity;
@@ -21,7 +20,7 @@ import net.minecraft.world.item.ItemStack;
 
 /**
  * Makes ant bread: the nurse takes one seed off a heap in the food store, carries it to a spot in the nursery, mills it
- * there for {@link Bakery#MILL_TICKS} (3 seconds) and the spot gets one more piece of bread. A worker that already
+ * there for the species profile's mill_ticks (3 seconds) and the spot gets one more piece of bread. A worker that already
  * holds a seed meant for the mill (a forager that found one before there was a food store) carries on from the
  * carrying leg, whatever its role. If the trip is called off the seed goes back to the food store ({@link StoreSeedGoal}).
  */
@@ -175,7 +174,7 @@ public class MillBreadGoal extends Goal {
                     ant.getZ(), 3, 0.1, 0.05, 0.1, 0.02);
             level.playSound(null, ant.blockPosition(), SoundEvents.GRAVEL_BREAK, SoundSource.NEUTRAL, 0.2F, 1.6F);
         }
-        if (++milled < Bakery.MILL_TICKS) {
+        if (++milled < colony.profile().food().millTicks()) {
             return;
         }
         if (colony.bakery().depositBread(level, target, ant.getCarriedSeed().is(com.antcolonies.registry.ModTags.RICH_SEEDS))) {

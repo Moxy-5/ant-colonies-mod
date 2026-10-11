@@ -26,10 +26,8 @@ import net.minecraft.world.level.block.state.BlockState;
  * nursery (or the queen's room), and feed it to the queen and the larvae. Counts the bread and who is milling.
  */
 public class Bakery {
-    /** The nurses keep this much bread ready for the queen (one meal). */
-    public static final int BREAD_STOCK = QueenCare.QUEEN_MEAL;
-    /** Milling one seed into a piece of bread takes this long: 3 seconds. */
-    public static final int MILL_TICKS = 60;
+    // How much bread the nurses keep ready for the queen and how long milling takes come from the species profile:
+    // colony.profile().food().
     /** How long (in ticks) a worker on its way to mill a seed counts as making bread. */
     private static final int MILL_CLAIM_TICKS = 1300;
 
@@ -69,7 +67,7 @@ public class Bakery {
     public boolean needsBread(ServerLevel level) {
         millers.prune(level.getGameTime());
         Brood brood = colony.brood();
-        int wanted = (brood.countBrood(level) < Brood.MAX_EGGS ? BREAD_STOCK : 0) + brood.larvaHunger(level);
+        int wanted = (brood.isFull(level) ? 0 : colony.profile().food().breadStock()) + brood.larvaHunger(level);
         return bread + millers.size() < wanted && pickBreadSpot(level, level.getRandom()) != null;
     }
 
@@ -104,7 +102,7 @@ public class Bakery {
     public boolean wantsRichBread() {
         QueenCare queen = colony.queenCare();
         return queen.getBurstLeft() == 0 && !queen.isIncubating() && colony.food().getRichSeeds() > 0
-                && queen.getQueenRich() + getRichBread() + richMillers.size() < QueenCare.RICH_MEAL;
+                && queen.getQueenRich() + getRichBread() + richMillers.size() < colony.profile().queen().richMeal();
     }
 
     /**

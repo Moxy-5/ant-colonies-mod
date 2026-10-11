@@ -2,7 +2,6 @@ package com.antcolonies.client;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.Brood;
 import com.antcolonies.entity.AntLarvaEntity;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
@@ -53,7 +52,7 @@ public class AntLarvaRenderer extends EntityRenderer<AntLarvaEntity> {
     public void render(AntLarvaEntity larva, float yaw, float partialTick, PoseStack pose, MultiBufferSource buffers, int light) {
         pose.pushPose();
         pose.mulPose(Axis.YP.rotationDegrees(180.0F - larva.getYRot()));
-        float size = 0.45F + 0.4F * Math.min(larva.getFed(), Brood.LARVA_MEAL) / Brood.LARVA_MEAL;
+        float size = 0.45F + 0.4F * Math.min(larva.getFed(), larva.getMeal()) / larva.getMeal();
         pose.scale(size, size, size);
         VertexConsumer consumer = buffers.getBuffer(RenderType.entityCutoutNoCull(TEXTURE));
         model.render(pose, consumer, light, OverlayTexture.NO_OVERLAY);

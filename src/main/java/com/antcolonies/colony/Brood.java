@@ -25,16 +25,11 @@ import net.minecraft.world.level.Level;
  * finds them, picks spots for them and keeps track of who is carrying or feeding which.
  */
 public class Brood {
-    /** An egg hatches into a larva this many ticks after it was put in the nursery: 1 minute at normal speed. */
-    public static final int HATCH_TICKS = 1200;
-    /** A larva needs this many pieces of ant bread, fed by the nurses, before it grows into a worker. */
-    public static final int LARVA_MEAL = 5;
-    /** A larva that has not been fed for this many ticks (2 days) dies: young larvae are the most sensitive. */
-    public static final long LARVA_STARVE_TICKS = 48000;
+    // How long an egg takes to hatch, how much a larva eats, how long it lasts unfed and how many young there may be
+    // come from the species profile: colony.profile().brood().
+
     /** How long (in ticks) a nurse on its way to a larva keeps the other nurses away from it. */
     public static final int LARVA_CLAIM_TICKS = 600;
-    /** At most this many young (eggs and larvae, in the nursery or lying about) at the same time; while there are that many the queen is not fed. */
-    public static final int MAX_EGGS = 10;
     /** How long (in ticks) a worker on its way to an egg keeps the others away from it. */
     private static final int EGG_CLAIM_TICKS = 600;
 
@@ -88,6 +83,7 @@ public class Brood {
     public boolean hatchEgg(ServerLevel level, AntEggEntity egg) {
         AntLarvaEntity larva = new AntLarvaEntity(ModEntities.ANT_LARVA.get(), level);
         larva.setColonyId(id);
+        larva.setMeal(colony.profile().brood().larvaMeal());
         larva.moveTo(egg.getX(), egg.getY(), egg.getZ(), egg.getYRot(), 0.0F);
         level.addFreshEntity(larva);
         egg.discard();
@@ -98,6 +94,7 @@ public class Brood {
     public AntLarvaEntity spawnLarva(Level level, double x, double y, double z) {
         AntLarvaEntity larva = new AntLarvaEntity(ModEntities.ANT_LARVA.get(), level);
         larva.setColonyId(id);
+        larva.setMeal(colony.profile().brood().larvaMeal());
         larva.moveTo(x, y, z, level.getRandom().nextFloat() * 360.0F, 0.0F);
         level.addFreshEntity(larva);
         return larva;
@@ -117,6 +114,11 @@ public class Brood {
         return countEggs(level) + countLarvae(level);
     }
 
+    /** Whether there are as many young (eggs and larvae, in the nursery or lying about) as there may be: the queen is not fed then. */
+    public boolean isFull(Level level) {
+        return countBrood(level) >= colony.profile().brood().maxYoung();
+    }
+
     /** The cells that eggs and larvae lie in (nothing else is put there). */
     Set<BlockPos> getBroodCells(Level level) {
         Set<BlockPos> cells = new HashSet<>();
@@ -132,8 +134,9 @@ public class Brood {
     /** How many more pieces of bread all the larvae together still have to eat. */
     public int larvaHunger(Level level) {
         int hunger = 0;
+        int meal = colony.profile().brood().larvaMeal();
         for (AntLarvaEntity larva : getLarvae(level)) {
-            hunger += Math.max(0, LARVA_MEAL - larva.getFed());
+            hunger += Math.max(0, meal - larva.getFed());
         }
         return hunger;
     }
@@ -161,10 +164,10 @@ public class Brood {
 
     /**
      * The larva has eaten enough: a new worker takes its place and joins the colony. False (the larva stays) while the
-     * colony has {@link Colony#MAX_WORKERS} workers.
+     * colony has as many workers as it may (the profile's max_workers).
      */
     public boolean hatchLarva(ServerLevel level, AntLarvaEntity larva) {
-        if (colony.getCount(WorkerAntEntity.CASTE) >= Colony.MAX_WORKERS) {
+        if (colony.getCount(WorkerAntEntity.CASTE) >= colony.profile().colony().maxWorkers()) {
             return false;
         }
         WorkerAntEntity worker = ModEntities.WORKER_ANT.get().create(level);

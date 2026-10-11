@@ -20,8 +20,8 @@ import net.minecraft.world.level.Level;
  * a cell), and crumbling to dust when nobody can carry them away.
  */
 public class Refuse {
-    /** A dead ant that no worker brings to the refuse chamber crumbles to dust after this many ticks (5 minutes at normal speed). */
-    public static final int CORPSE_DECAY_TICKS = 6000;
+    // A dead ant that no worker brings to the refuse chamber crumbles to dust after the profile's
+    // colony.profile().refuse().corpseDecayTicks().
     /** How long (in ticks) a worker on its way to a dead ant keeps the others away from it. */
     private static final int CORPSE_CLAIM_TICKS = 1200;
 

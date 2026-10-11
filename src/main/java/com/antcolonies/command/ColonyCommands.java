@@ -2,7 +2,6 @@ package com.antcolonies.command;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.QueenCare;
 import com.antcolonies.colony.ColonyManager;
 
 import net.minecraft.commands.CommandSourceStack;
@@ -39,9 +38,9 @@ public class ColonyCommands {
                     + " | members " + colony.getMemberCount()
                     + " | food " + colony.food().getFood() + " (rich " + colony.food().getRichSeeds() + ", eaten " + colony.food().getSeedsEaten() + ")"
                     + " | bread " + colony.bakery().getBread() + " (rich " + colony.bakery().getRichBread() + ", milling " + colony.bakery().getMilling() + ")"
-                    + " | queen fed " + colony.queenCare().getQueenBread() + "/" + QueenCare.QUEEN_MEAL + ", rich " + colony.queenCare().getQueenRich() + "/"
-                    + QueenCare.RICH_MEAL + incubation(colony, level)
-                    + " | queen unfed " + unfedMinutes(colony, level) + " of " + QueenCare.QUEEN_STARVE_TICKS / 1200 + " min"
+                    + " | queen fed " + colony.queenCare().getQueenBread() + "/" + colony.profile().queen().meal() + ", rich " + colony.queenCare().getQueenRich() + "/"
+                    + colony.profile().queen().richMeal() + incubation(colony, level)
+                    + " | queen unfed " + unfedMinutes(colony, level) + " of " + colony.profile().queen().starveTicks() / 1200 + " min"
                     + " | eggs " + colony.brood().countEggs(level) + " | larvae " + colony.brood().countLarvae(level)
                     + " | dead ants " + colony.refuse().getCorpses(level).size() + " (refuse chamber " + colony.refuse().getRefuseCorpses(level).size() + ")";
             source.sendSuccess(() -> Component.literal(line), false);

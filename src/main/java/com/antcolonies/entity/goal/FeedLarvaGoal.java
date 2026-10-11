@@ -5,7 +5,6 @@ import java.util.EnumSet;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.Brood;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.AbstractAntEntity;
@@ -23,7 +22,7 @@ import net.minecraft.world.item.ItemStack;
 
 /**
  * Feeds the larvae: a nurse takes one piece of ant bread off a heap, carries it to a hungry larva and gives it to it.
- * After {@link Brood#LARVA_MEAL} pieces the larva grows into a worker. If the larva needs no more by the time the nurse
+ * After the species profile's larva_meal pieces the larva grows into a worker. If the larva needs no more by the time the nurse
  * arrives, the bread goes back on a heap. (An ant that is interrupted while carrying bread is picked up by
  * {@link FeedQueenGoal}, which takes it to the queen.)
  */
