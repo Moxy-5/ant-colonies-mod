@@ -438,9 +438,11 @@ public class Colony {
 
     /** From this many workers on, one of them is the nurse who stays by the queen. */
     public static final int NURSE_FROM_WORKERS = 3;
+    /** From this many workers on, two of them are nurses. */
+    public static final int SECOND_NURSE_FROM_WORKERS = 8;
 
     /**
-     * The role of this worker. Roles are shared out evenly: one nurse (from {@link #NURSE_FROM_WORKERS} workers on),
+     * The role of this worker. Roles are shared out evenly: one nurse (from {@link #NURSE_FROM_WORKERS} workers on, two from {@link #SECOND_NURSE_FROM_WORKERS}),
      * the rest half builders and half foragers (builders first). A worker keeps its role until it is one too many for
      * it, so roles only change when workers are born or die.
      */
@@ -454,7 +456,7 @@ public class Colony {
                 total++;
             }
         }
-        int nurses = total >= NURSE_FROM_WORKERS ? 1 : 0;
+        int nurses = total >= SECOND_NURSE_FROM_WORKERS ? 2 : total >= NURSE_FROM_WORKERS ? 1 : 0;
         int[] target = new int[ColonyRole.values().length];
         target[ColonyRole.NURSE.ordinal()] = nurses;
         target[ColonyRole.BUILDER.ordinal()] = (total - nurses + 1) / 2;
