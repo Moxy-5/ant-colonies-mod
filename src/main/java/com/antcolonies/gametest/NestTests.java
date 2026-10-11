@@ -452,6 +452,10 @@ public class NestTests {
                     cameOutBehindHer[0] = away.dot(facing) <= 0.001 && room != null
                             && Math.abs(eggs.get(0).getX() - (room.getX() + 0.5)) <= 2.5 && Math.abs(eggs.get(0).getZ() - (room.getZ() + 0.5)) <= 2.5;
                     AntColoniesMod.LOGGER.info("[egg-test] tick {}: egg laid {} from the queen, facing {}", helper.getTick(), away, facing);
+                } else if (queens.size() == 1 && eggs.isEmpty() && level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())
+                        .stream().anyMatch(AbstractAntEntity::isCarryingEgg)) {
+                    // A nurse standing next to her picked the egg up in the very tick it came out.
+                    cameOutBehindHer[0] = true;
                 }
             }
             if (helper.getTick() % 1000 == 0) {
@@ -703,6 +707,83 @@ public class NestTests {
     }
 
     /**
+     * A worker that has not eaten for a day goes to the food store, takes one seed and eats it: the seed is gone from the
+     * store, the colony counts it as eaten, and the worker is not hungry any more. The other workers eat nothing.
+     */
+    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
+    public static void aHungryWorkerEatsOneSeedFromTheFoodStore(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        startColony(helper);
+
+        boolean[] started = {false};
+        WorkerAntEntity[] hungry = {null};
+        int[] foodBefore = {0};
+        helper.onEachTick(() -> {
+            Colony colony = colony(helper);
+            if (started[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.findDigTarget(level) != null
+                    || !hillProblems(helper).isEmpty()) {
+                return;
+            }
+            started[0] = true;
+            var store = colony.getFoodStoreCells(level);
+            for (int i = 0; i < 40; i++) {
+                colony.depositSeed(level, store.get(i / 8));
+            }
+            foodBefore[0] = colony.getFood();
+            colony.setHungerOn(true);
+            for (WorkerAntEntity worker : colonyWorkers(helper, colony)) {
+                worker.setLastAte(level.getGameTime());
+            }
+            hungry[0] = colonyWorkers(helper, colony).get(0);
+            hungry[0].setLastAte(level.getGameTime() - WorkerAntEntity.MEAL_INTERVAL_TICKS - 5);
+            AntColoniesMod.LOGGER.info("[hunger-test] tick {}: worker #{} is hungry, {} seeds in the store", helper.getTick(), hungry[0].getId(), foodBefore[0]);
+        });
+
+        helper.succeedWhen(() -> {
+            Colony colony = colony(helper);
+            helper.assertTrue(started[0] && colony != null, "the nest is not finished yet");
+            helper.assertTrue(colony.getSeedsEaten() >= 1, "nobody has eaten a seed yet");
+            helper.assertTrue(colony.getSeedsEaten() == 1, colony.getSeedsEaten() + " seeds were eaten, expected exactly 1");
+            helper.assertTrue(hungry[0].isAlive() && !hungry[0].isHungry(), "the worker is still hungry");
+        });
+    }
+
+    /**
+     * A worker with no food: after a day and a half without a meal it slows down to half speed, and after three days it
+     * starves and leaves its body behind.
+     */
+    @GameTest(template = "arena", timeoutTicks = 3000, skyAccess = true)
+    public static void aStarvingWorkerSlowsDownAndDies(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        startColony(helper, 1);
+
+        WorkerAntEntity[] worker = {null};
+        double[] normalSpeed = {0};
+        boolean[] slowed = {false};
+        helper.runAfterDelay(30, () -> {
+            Colony colony = colony(helper);
+            colony.setHungerOn(true);
+            worker[0] = colonyWorkers(helper, colony).get(0);
+            normalSpeed[0] = worker[0].getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED);
+            worker[0].setLastAte(level.getGameTime() - WorkerAntEntity.SLOW_AFTER_TICKS - 5);
+        });
+        helper.runAfterDelay(80, () -> {
+            double speed = worker[0].getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED);
+            helper.assertTrue(Math.abs(speed - normalSpeed[0] * 0.5) < 0.001, "the starving worker's speed is " + speed + ", expected half of " + normalSpeed[0]);
+            slowed[0] = true;
+            worker[0].setLastAte(level.getGameTime() - WorkerAntEntity.STARVE_AFTER_TICKS + 20);
+        });
+        helper.succeedWhen(() -> {
+            Colony colony = colony(helper);
+            helper.assertTrue(slowed[0], "not slowed down yet");
+            helper.assertTrue(!worker[0].isAlive(), "the worker has not starved yet");
+            helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == 0, "the colony still counts " + colony.getCount(WorkerAntEntity.CASTE) + " workers");
+            helper.assertTrue(colony.getCorpses(level).size() == 1, colony.getCorpses(level).size() + " bodies, expected 1");
+        });
+    }
+
+    /**
      * Dead ants are carried down to the refuse chamber: three bodies lying on the ground around the hill, one lying in
      * the nursery, and a worker that is killed (it leaves its body behind where it died). Every body ends up in the
      * refuse chamber, one to a cell, and none is left lying about or in an ant's mandibles.
@@ -840,7 +921,7 @@ public class NestTests {
     }
 
     private static int seedsAccountedFor(Colony colony) {
-        return colony.getFood() + colony.getBread() + colony.getQueenBread() + Colony.QUEEN_MEAL * colony.getEggsLaid();
+        return colony.getFood() + colony.getBread() + colony.getQueenBread() + Colony.QUEEN_MEAL * colony.getEggsLaid() + colony.getSeedsEaten();
     }
 
     private static void dropSeeds(GameTestHelper helper, int x, int z, int count) {
@@ -1067,6 +1148,13 @@ public class NestTests {
         }
 
         helper.spawn(ModEntities.QUEEN_ANT.get(), MIDDLE, SURFACE, MIDDLE);
+        // The tests run far faster than a day: the workers of their colonies do not get hungry (the hunger tests turn it back on).
+        helper.runAfterDelay(10, () -> {
+            Colony colony = colony(helper);
+            if (colony != null) {
+                colony.setHungerOn(false);
+            }
+        });
         helper.runAfterDelay(5, () -> {
             for (int i = 0; i < workers; i++) {
                 helper.spawn(ModEntities.WORKER_ANT.get(), MIDDLE - 2 + i % 3 * 2, SURFACE, MIDDLE - 3 + i / 3 * 6);

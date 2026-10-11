@@ -504,6 +504,38 @@ public class Colony {
         return true;
     }
 
+    // ---- Hunger
+
+    /** How many seeds the workers have eaten in all. Saved. */
+    private int seedsEaten;
+    /** Whether the workers of this colony get hungry. On, except in some tests. Not saved. */
+    private boolean hungerOn = true;
+
+    public int getSeedsEaten() {
+        return seedsEaten;
+    }
+
+    public boolean isHungerOn() {
+        return hungerOn;
+    }
+
+    public void setHungerOn(boolean on) {
+        hungerOn = on;
+    }
+
+    /**
+     * A hungry worker takes one raw seed off the heap at {@code pile} to eat it: plain seeds first (a rich one only if
+     * nothing else is left). Returns the seed, or an empty stack if the heap is gone.
+     */
+    public ItemStack eatSeedAt(Level level, BlockPos pile, UUID ant) {
+        ItemStack seed = takeSeedAt(level, pile, ant, false);
+        richMillers.remove(ant); // eaten, not milled
+        if (!seed.isEmpty()) {
+            seedsEaten++;
+        }
+        return seed;
+    }
+
     // ---- Roles
 
     /** From this many workers on, one of them is the nurse who stays by the queen. */
@@ -1723,6 +1755,7 @@ public class Colony {
         tag.putInt("food", food);
         tag.putInt("queenBread", queenBread);
         tag.putInt("bread", bread);
+        tag.putInt("seedsEaten", seedsEaten);
         tag.putInt("richSeeds", richSeeds);
         tag.putInt("richBread", richBread);
         tag.putInt("queenRich", queenRich);
@@ -1744,6 +1777,7 @@ public class Colony {
         colony.food = tag.getInt("food");
         colony.queenBread = tag.contains("queenBread") ? tag.getInt("queenBread") : tag.getInt("queenSeeds"); // (old saves: seeds)
         colony.bread = tag.getInt("bread");
+        colony.seedsEaten = tag.getInt("seedsEaten");
         colony.richSeeds = tag.getInt("richSeeds");
         colony.richBread = tag.getInt("richBread");
         colony.queenRich = tag.getInt("queenRich");

@@ -36,7 +36,7 @@ public class ColonyCommands {
                     + " | center " + colony.getCenter().toShortString()
                     + " | queen " + colony.getQueenId().toString().substring(0, 8)
                     + " | members " + colony.getMemberCount()
-                    + " | food " + colony.getFood() + " (rich " + colony.getRichSeeds() + ")"
+                    + " | food " + colony.getFood() + " (rich " + colony.getRichSeeds() + ", eaten " + colony.getSeedsEaten() + ")"
                     + " | bread " + colony.getBread() + " (rich " + colony.getRichBread() + ", milling " + colony.getMilling() + ")"
                     + " | queen fed " + colony.getQueenBread() + "/" + Colony.QUEEN_MEAL + ", rich " + colony.getQueenRich() + "/"
                     + Colony.RICH_MEAL + incubation(colony, level)
