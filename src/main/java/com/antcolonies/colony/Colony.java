@@ -24,6 +24,7 @@ import com.antcolonies.registry.ModTags;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -523,6 +524,48 @@ public class Colony {
         hungerOn = on;
     }
 
+    // ---- Starvation of the colony
+
+    /** A larva that has not been fed for this many ticks (2 days) dies: young larvae are the most sensitive. */
+    public static final long LARVA_STARVE_TICKS = 48000;
+    /** A queen who has not been fed for this many ticks (5 days) dies: she lives on her fat for a while. */
+    public static final long QUEEN_STARVE_TICKS = 120000;
+    /** "No time saved": the queen's clock has not started yet. */
+    public static final long NOT_SET = Long.MIN_VALUE;
+
+    /** The game time of the queen's last piece of bread, or of the last time she needed none. Saved. */
+    private long queenLastFed = NOT_SET;
+
+    public long getQueenLastFed() {
+        return queenLastFed;
+    }
+
+    public void setQueenLastFed(long time) {
+        queenLastFed = time;
+    }
+
+    /**
+     * Called by the queen once a second. Her hunger clock only runs while she wants food and gets none: it starts over
+     * every time she is fed and for as long as she needs nothing (she carries an egg, she has her full meal, or the
+     * nursery is full of young). Returns true when she has gone {@link #QUEEN_STARVE_TICKS} without it.
+     */
+    public boolean queenStarves(ServerLevel level) {
+        long now = level.getGameTime();
+        boolean satisfied = !hungerOn || eggDue >= 0 || queenBread >= QUEEN_MEAL || countBrood(level) >= MAX_EGGS;
+        if (queenLastFed == NOT_SET || satisfied) {
+            queenLastFed = now;
+            return false;
+        }
+        return now - queenLastFed >= QUEEN_STARVE_TICKS;
+    }
+
+    /** A larva has starved: it dies and leaves a body, which the workers carry to the refuse chamber. */
+    public void starveLarva(ServerLevel level, AntLarvaEntity larva) {
+        spawnCorpse(level, larva.getX(), larva.getY(), larva.getZ());
+        level.sendParticles(ParticleTypes.SMOKE, larva.getX(), larva.getY() + 0.1, larva.getZ(), 4, 0.05, 0.03, 0.05, 0.01);
+        larva.discard();
+    }
+
     /**
      * A hungry worker takes one raw seed off the heap at {@code pile} to eat it: plain seeds first (a rich one only if
      * nothing else is left). Returns the seed, or an empty stack if the heap is gone.
@@ -906,6 +949,7 @@ public class Colony {
         if (eggDue >= 0 || queenBread >= QUEEN_MEAL) {
             return false;
         }
+        queenLastFed = level.getGameTime();
         if (rich) {
             // Rich bread: with RICH_MEAL pieces a burst of eggs starts, one every BURST_INTERVAL_TICKS, and she needs no more food for it.
             if (++queenRich >= RICH_MEAL) {
@@ -1760,6 +1804,7 @@ public class Colony {
         tag.putInt("richBread", richBread);
         tag.putInt("queenRich", queenRich);
         tag.putInt("burstLeft", burstLeft);
+        tag.putLong("queenLastFed", queenLastFed);
         tag.putLong("eggDue", eggDue);
         tag.putInt("eggsLaid", eggsLaid);
         CompoundTag clips = new CompoundTag();
@@ -1782,6 +1827,7 @@ public class Colony {
         colony.richBread = tag.getInt("richBread");
         colony.queenRich = tag.getInt("queenRich");
         colony.burstLeft = tag.getInt("burstLeft");
+        colony.queenLastFed = tag.contains("queenLastFed") ? tag.getLong("queenLastFed") : NOT_SET;
         colony.eggDue = tag.contains("eggDue") ? tag.getLong("eggDue") : -1;
         colony.eggsLaid = tag.getInt("eggsLaid");
         CompoundTag clips = tag.getCompound("grassClips");

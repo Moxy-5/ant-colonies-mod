@@ -11,6 +11,8 @@ import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.NestPlan;
 import com.antcolonies.entity.AbstractAntEntity;
+import com.antcolonies.entity.AntLarvaEntity;
+import com.antcolonies.entity.QueenAntEntity;
 import com.antcolonies.entity.WorkerAntEntity;
 import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.registry.ModEntities;
@@ -784,6 +786,61 @@ public class NestTests {
     }
 
     /**
+     * A larva that goes two days without bread starves and leaves a body; a larva that was just fed lives on, and so does
+     * a full one that waits to grow up.
+     */
+    @GameTest(template = "arena", timeoutTicks = 3000, skyAccess = true)
+    public static void aLarvaThatIsNotFedForTwoDaysStarves(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        startColony(helper, 1);
+
+        AntLarvaEntity[] larvae = new AntLarvaEntity[3];
+        helper.runAfterDelay(30, () -> {
+            Colony colony = colony(helper);
+            colony.setHungerOn(true);
+            long now = level.getGameTime();
+            BlockPos base = helper.absolutePos(new BlockPos(MIDDLE + 4, SURFACE, MIDDLE + 4));
+            for (int i = 0; i < 3; i++) {
+                larvae[i] = colony.spawnLarva(level, base.getX() + 0.5 + i, base.getY(), base.getZ() + 0.5);
+                larvae[i].setLastFed(now - Colony.LARVA_STARVE_TICKS + 60); // three seconds from starving
+            }
+            larvae[1].feed(); // fed just now: starts over
+            larvae[2].setFed(Colony.LARVA_MEAL); // full: nothing to starve of (it waits for a place as a worker, or hatches)
+        });
+        helper.succeedWhen(() -> {
+            Colony colony = colony(helper);
+            helper.assertTrue(larvae[0] != null && !larvae[0].isAlive(), "the unfed larva has not starved yet");
+            helper.assertTrue(larvae[1].isAlive(), "the larva that was just fed starved");
+            helper.assertTrue(!larvae[2].isAlive() || larvae[2].isFull(), "the full larva is not full");
+            helper.assertTrue(colony.getCorpses(level).size() == 1, colony.getCorpses(level).size() + " bodies, expected 1");
+        });
+    }
+
+    /**
+     * A queen who gets no food for five days starves, and the colony ends with her: the nest itself stays behind.
+     */
+    @GameTest(template = "arena", timeoutTicks = 3000, skyAccess = true)
+    public static void aQueenThatIsNotFedForFiveDaysStarves(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        startColony(helper, 1);
+
+        QueenAntEntity[] queen = {null};
+        boolean[] started = {false};
+        helper.runAfterDelay(30, () -> {
+            Colony colony = colony(helper);
+            colony.setHungerOn(true);
+            queen[0] = colony.getQueen(level);
+            colony.setQueenLastFed(level.getGameTime() - Colony.QUEEN_STARVE_TICKS + 60); // three seconds from starving
+            started[0] = true;
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(started[0], "not started yet");
+            helper.assertTrue(!queen[0].isAlive(), "the queen has not starved yet");
+            helper.assertTrue(colony(helper) == null, "the colony is still there");
+        });
+    }
+
+    /**
      * Dead ants are carried down to the refuse chamber: three bodies lying on the ground around the hill, one lying in
      * the nursery, and a worker that is killed (it leaves its body behind where it died). Every body ends up in the
      * refuse chamber, one to a cell, and none is left lying about or in an ant's mandibles.
@@ -1229,8 +1286,9 @@ public class NestTests {
     /** The colony inside this test's area (a test world can still hold colonies from earlier runs). */
     private static Colony colony(GameTestHelper helper) {
         AABB area = helper.getBounds();
+        // A colony left over from an earlier test in this spot has no living queen (the test cleanup removed her): skip it.
         return ColonyManager.get(helper.getLevel()).getColonies().stream()
-                .filter(colony -> area.contains(Vec3.atCenterOf(colony.getCenter())))
+                .filter(colony -> area.contains(Vec3.atCenterOf(colony.getCenter())) && colony.getQueen(helper.getLevel()) != null)
                 .findFirst().orElse(null);
     }
 

@@ -64,7 +64,17 @@ public class QueenAntEntity extends AbstractAntEntity {
         }
         ColonyManager manager = ColonyManager.get(serverLevel);
         Colony colony = manager.getColony(getColonyId());
-        if (colony == null || !colony.isEggDue(serverLevel) || !colony.isQueenHome(serverLevel)) {
+        if (colony == null) {
+            return;
+        }
+        if (colony.queenStarves(serverLevel)) {
+            hurt(damageSources().starve(), 1000.0F); // five days without food: she dies and the colony ends (see die)
+            return;
+        }
+        if (tickCount % 1200 == 0) {
+            manager.markChanged(); // the hunger clock changes all the time: make sure it gets saved
+        }
+        if (!colony.isEggDue(serverLevel) || !colony.isQueenHome(serverLevel)) {
             return;
         }
         Vec3 at = position().subtract(Vec3.directionFromRotation(0.0F, getYRot()).scale(EGG_BEHIND));

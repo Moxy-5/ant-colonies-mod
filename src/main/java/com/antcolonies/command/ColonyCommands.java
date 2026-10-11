@@ -40,11 +40,20 @@ public class ColonyCommands {
                     + " | bread " + colony.getBread() + " (rich " + colony.getRichBread() + ", milling " + colony.getMilling() + ")"
                     + " | queen fed " + colony.getQueenBread() + "/" + Colony.QUEEN_MEAL + ", rich " + colony.getQueenRich() + "/"
                     + Colony.RICH_MEAL + incubation(colony, level)
+                    + " | queen unfed " + unfedMinutes(colony, level) + " of " + Colony.QUEEN_STARVE_TICKS / 1200 + " min"
                     + " | eggs " + colony.countEggs(level) + " | larvae " + colony.countLarvae(level)
                     + " | dead ants " + colony.getCorpses(level).size() + " (refuse chamber " + colony.getRefuseCorpses(level).size() + ")";
             source.sendSuccess(() -> Component.literal(line), false);
         }
         return colonies.size();
+    }
+
+    /** How many minutes the queen has gone without food she wanted (0 while she is satisfied). */
+    private static long unfedMinutes(Colony colony, ServerLevel level) {
+        if (colony.getQueenLastFed() == Colony.NOT_SET) {
+            return 0;
+        }
+        return Math.max(0, level.getGameTime() - colony.getQueenLastFed()) / 1200;
     }
 
     /** " (egg in 3:25)" while the queen carries an egg, otherwise nothing. */

@@ -34,6 +34,8 @@ public class AntLarvaEntity extends Entity {
     @Nullable
     private UUID feeder;
     private long feederUntil;
+    /** Game time of the last piece of bread. A larva that goes {@link Colony#LARVA_STARVE_TICKS} without one starves. Saved. */
+    private long lastFed = Colony.NOT_SET;
 
     public AntLarvaEntity(EntityType<? extends AntLarvaEntity> type, Level level) {
         super(type, level);
@@ -59,6 +61,16 @@ public class AntLarvaEntity extends Entity {
     /** One more piece of bread eaten. */
     public void feed() {
         setFed(getFed() + 1);
+        lastFed = level().getGameTime();
+    }
+
+    /** The game time of the last meal (or of the last time it needed none); {@link Colony#NOT_SET} before the first second. */
+    public long getLastFed() {
+        return lastFed;
+    }
+
+    public void setLastFed(long time) {
+        lastFed = time;
     }
 
     public boolean isFull() {
@@ -90,6 +102,7 @@ public class AntLarvaEntity extends Entity {
     protected void readAdditionalSaveData(CompoundTag tag) {
         colonyId = tag.hasUUID("colony") ? tag.getUUID("colony") : null;
         setFed(tag.getInt("fed"));
+        lastFed = tag.contains("lastFed") ? tag.getLong("lastFed") : Colony.NOT_SET;
     }
 
     @Override
@@ -98,6 +111,7 @@ public class AntLarvaEntity extends Entity {
             tag.putUUID("colony", colonyId);
         }
         tag.putInt("fed", getFed());
+        tag.putLong("lastFed", lastFed);
     }
 
     @Override
@@ -114,6 +128,15 @@ public class AntLarvaEntity extends Entity {
         Colony colony = manager.getColony(colonyId);
         if (colony == null) {
             discard(); // the queen died
+            return;
+        }
+        // The hunger clock only runs for a larva that still has to eat; a full one waiting to grow up has been fed.
+        long now = level.getGameTime();
+        if (lastFed == Colony.NOT_SET || isFull() || !colony.isHungerOn()) {
+            lastFed = now;
+        } else if (now - lastFed >= Colony.LARVA_STARVE_TICKS) {
+            colony.starveLarva(level, this);
+            manager.markChanged();
             return;
         }
         if (isFull() && colony.hatchLarva(level, this)) {
