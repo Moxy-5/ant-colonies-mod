@@ -7,6 +7,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.feature.Feature;
@@ -15,13 +16,17 @@ import net.minecraft.world.level.levelgen.feature.configurations.NoneFeatureConf
 
 /**
  * Lays Deep Soil under the dirt: in every column of the chunk whose surface is dirt (grass, dirt, podzol, mud...), the
- * first {@link #MIN_LAYERS} to {@link #MAX_LAYERS} blocks of plain stone right under the dirt become Deep Soil. How many
- * is decided per biome (by the world seed), so each biome has its own thickness. Columns with a sand, stone or snow
+ * dirt is made {@link #MIN_DIRT} to {@link #MAX_DIRT} blocks thick (plain stone under it turns to dirt), and the
+ * next {@link #DEEP_LAYERS} blocks of plain stone become Deep Soil. The dirt thickness is decided per biome (by the
+ * world seed), so each biome has its own. Columns with a sand, stone or snow
  * surface are left alone, so only biomes with dirt get it.
  */
 public class DeepSoilFeature extends Feature<NoneFeatureConfiguration> {
-    public static final int MIN_LAYERS = 5;
-    public static final int MAX_LAYERS = 7;
+    /** The dirt is made at least this thick (counted from the surface, grass included): 6 to 7 per biome. */
+    public static final int MIN_DIRT = 6;
+    public static final int MAX_DIRT = 7;
+    /** Deep Soil layers under the dirt, so dirt and Deep Soil together are 10 to 11 blocks. */
+    public static final int DEEP_LAYERS = 4;
     /** How far below the surface the dirt is followed before giving up. */
     private static final int MAX_DIRT_DEPTH = 12;
 
@@ -45,13 +50,22 @@ public class DeepSoilFeature extends Feature<NoneFeatureConfiguration> {
                 if (!level.getBlockState(pos).is(BlockTags.DIRT)) {
                     continue;
                 }
-                // follow the dirt down to the stone under it
+                // follow the dirt down, turning plain stone into dirt until the dirt is thick enough
+                int dirt = dirtFor(level, pos.set(x, top, z));
                 int y = top;
-                while (y > top - MAX_DIRT_DEPTH && level.getBlockState(pos.set(x, y, z)).is(BlockTags.DIRT)) {
-                    y--;
+                while (y > top - MAX_DIRT_DEPTH) {
+                    BlockState state = level.getBlockState(pos.set(x, y, z));
+                    if (state.is(BlockTags.DIRT)) {
+                        y--;
+                    } else if (top - y < dirt && state.is(BlockTags.BASE_STONE_OVERWORLD)) {
+                        level.setBlock(pos, Blocks.DIRT.defaultBlockState(), 2);
+                        placed = true;
+                        y--;
+                    } else {
+                        break;
+                    }
                 }
-                int layers = layersFor(level, pos.set(x, top, z));
-                for (int i = 0; i < layers; i++) {
+                for (int i = 0; i < DEEP_LAYERS; i++) {
                     pos.set(x, y - i, z);
                     if (!level.getBlockState(pos).is(BlockTags.BASE_STONE_OVERWORLD)) {
                         break;
@@ -64,10 +78,10 @@ public class DeepSoilFeature extends Feature<NoneFeatureConfiguration> {
         return placed;
     }
 
-    /** The thickness for the biome at this spot: the same everywhere in that biome, different between biomes and seeds. */
-    private static int layersFor(WorldGenLevel level, BlockPos pos) {
+    /** The dirt thickness for the biome at this spot: the same everywhere in that biome, different between biomes and seeds. */
+    private static int dirtFor(WorldGenLevel level, BlockPos pos) {
         long key = level.getBiome(pos).unwrapKey().map(k -> (long) k.location().hashCode()).orElse(0L);
         RandomSource random = RandomSource.create(level.getSeed() ^ (key * 0x9E3779B97F4A7C15L));
-        return MIN_LAYERS + random.nextInt(MAX_LAYERS - MIN_LAYERS + 1);
+        return MIN_DIRT + random.nextInt(MAX_DIRT - MIN_DIRT + 1);
     }
 }
