@@ -12,6 +12,7 @@ import com.antcolonies.entity.goal.FeedLarvaGoal;
 import com.antcolonies.entity.goal.FeedQueenGoal;
 import com.antcolonies.entity.goal.MillBreadGoal;
 import com.antcolonies.entity.goal.GatherSeedGoal;
+import com.antcolonies.entity.goal.RepairHillGoal;
 import com.antcolonies.entity.goal.SealGoal;
 import com.antcolonies.entity.goal.StandByQueenGoal;
 import com.antcolonies.entity.goal.StoreSeedGoal;
@@ -60,6 +61,8 @@ public class WorkerAntEntity extends AbstractAntEntity {
         this.goalSelector.addGoal(6, new GatherSeedGoal(this));
         this.goalSelector.addGoal(7, new ClipGrassGoal(this));
         this.goalSelector.addGoal(8, new DigGoal(this, () -> true, () -> mayDo(ColonyRole.BUILDER)));
+        // Once the nest is dug, builders mend the hill when a block of it has been knocked out.
+        this.goalSelector.addGoal(8, new RepairHillGoal(this));
         // The nurse waits by the queen until there is an egg or a meal for her.
         this.goalSelector.addGoal(9, new StandByQueenGoal(this));
         this.goalSelector.addGoal(10, new AntWanderGoal(this, 1.0, 120, 6, () -> true));

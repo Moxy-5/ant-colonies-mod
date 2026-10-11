@@ -144,6 +144,18 @@ public class Colony {
     /** How much closer (in blocks) an empty opening counts than a crowded one, per ant already on it. */
     private static final double CROWD_PENALTY = 6.0;
 
+    /** Most ants that fetch soil for the hill at the same time (never more than the hill has gaps). */
+    private static final int MAX_REPAIRERS = 3;
+    /** How long (in ticks) a soil pellet fetched for the hill counts as on its way to the gap. */
+    private static final int REPAIR_CLAIM_TICKS = 300;
+    /** After a repair pellet could not be delivered (no route to the gap), no more repair soil is fetched for this long (in ticks). */
+    private static final int HILL_PAUSE_TICKS = 1200;
+
+    /** The ants that fetched soil to repair the hill: ant -> game time when the pellet should have arrived. Not saved. */
+    private final Map<UUID, Long> repairers = new HashMap<>();
+    /** No repair soil is fetched before this game time (see {@link #HILL_PAUSE_TICKS}). Not saved. */
+    private long hillPausedUntil;
+
     /** The ants working on each leak: hole -> (ant -> game time when its claim runs out). Not saved. */
     private final Map<BlockPos, Map<UUID, Long>> claimedLeaks = new HashMap<>();
     /** How far each leak is closed (1.0 = shut): every ant adds its share, so more ants close it sooner. Not saved. */
@@ -1130,9 +1142,19 @@ public class Colony {
         return state.isAir() || state.canBeReplaced() || !state.getFluidState().isEmpty();
     }
 
-    /** The dug-out nest cell with a floor that is closest to the hole (within one block of it, corners included), or null. */
+    /**
+     * The dug-out nest cell closest to the hole (within one block of it, corners included) where an ant can work on it,
+     * or null. A cell with a floor is preferred; failing that, a cell with a solid wall next to it that the ant can
+     * cling to (the shaft and the middle of a stair have no floor), so a hole next to the top of the shaft can be closed too.
+     */
     @Nullable
     private static BlockPos findPlugSpot(Level level, Set<BlockPos> nest, BlockPos hole) {
+        BlockPos onFloor = closestPlugSpot(level, nest, hole, true);
+        return onFloor != null ? onFloor : closestPlugSpot(level, nest, hole, false);
+    }
+
+    @Nullable
+    private static BlockPos closestPlugSpot(Level level, Set<BlockPos> nest, BlockPos hole, boolean needFloor) {
         BlockPos best = null;
         double bestDistance = Double.MAX_VALUE;
         for (int dx = -1; dx <= 1; dx++) {
@@ -1140,7 +1162,7 @@ public class Colony {
                 for (int dz = -1; dz <= 1; dz++) {
                     BlockPos spot = hole.offset(dx, dy, dz);
                     if (!nest.contains(spot) || !level.isLoaded(spot) || !level.getBlockState(spot).isAir()
-                            || !level.getBlockState(spot.below()).isFaceSturdy(level, spot.below(), Direction.UP)) {
+                            || !(needFloor ? hasFloor(level, spot) : hasWallToClingTo(level, spot))) {
                         continue;
                     }
                     double distance = hole.distSqr(spot);
@@ -1152,6 +1174,20 @@ public class Colony {
             }
         }
         return best;
+    }
+
+    private static boolean hasFloor(Level level, BlockPos spot) {
+        return level.getBlockState(spot.below()).isFaceSturdy(level, spot.below(), Direction.UP);
+    }
+
+    private static boolean hasWallToClingTo(Level level, BlockPos spot) {
+        for (Direction side : Direction.Plane.HORIZONTAL) {
+            BlockPos wall = spot.relative(side);
+            if (level.getBlockState(wall).isFaceSturdy(level, wall, side.getOpposite())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** The first block in the list that is diggable, can be reached from open space, and is safe to open. */
@@ -1339,6 +1375,35 @@ public class Colony {
         return !openMoundSpots(level).isEmpty();
     }
 
+    /**
+     * Whether a worker should fetch soil to mend the hill now: the nest is dug (until then the digging makes the soil),
+     * the hill has a gap that no pellet is on its way to, and a repair has not just failed.
+     */
+    public boolean needsHillRepair(ServerLevel level) {
+        long now = level.getGameTime();
+        repairers.values().removeIf(until -> until <= now);
+        if (now < hillPausedUntil || repairers.size() >= MAX_REPAIRERS) {
+            return false;
+        }
+        int gaps = openMoundSpots(level).size();
+        return gaps > repairers.size() && findDigTarget(level) == null;
+    }
+
+    /** A worker has set out for repair soil: it counts as a pellet on its way until it should have arrived. */
+    public void claimHillRepair(ServerLevel level, UUID ant) {
+        repairers.put(ant, level.getGameTime() + REPAIR_CLAIM_TICKS);
+    }
+
+    /** A soil pellet could not be brought to the hill (no route to the gap): wait a while before fetching more for repairs. */
+    public void pauseHillRepair(Level level) {
+        hillPausedUntil = level.getGameTime() + HILL_PAUSE_TICKS;
+    }
+
+    /** Where repair soil is scraped up: inside the entrance shaft, right under the hole. */
+    public BlockPos getRepairSoilSpot() {
+        return center.below();
+    }
+
     /** In every column of the hill that is not full yet: the first free block above the ground. */
     private List<BlockPos> openMoundSpots(Level level) {
         List<BlockPos> spots = new ArrayList<>();
@@ -1356,9 +1421,26 @@ public class Colony {
                 if (isMoundSpot(level, pos)) {
                     spots.add(pos);
                 }
+                // A block knocked out from the middle of a column leaves a gap under the blocks that are still there.
+                for (int y = pos.getY() - 1; y >= center.getY(); y--) {
+                    BlockPos gap = new BlockPos(x, y, z);
+                    if (isMoundSpot(level, gap) && isCoveredByHill(level, gap, moundHeightAt(dx, dz))) {
+                        spots.add(gap);
+                    }
+                }
             }
         }
         return spots;
+    }
+
+    /** True if a block of the hill is still standing above this gap (so it is a gap in the hill, not just open ground). */
+    private boolean isCoveredByHill(Level level, BlockPos gap, int height) {
+        for (int y = gap.getY() + 1; y < center.getY() + height; y++) {
+            if (level.getBlockState(new BlockPos(gap.getX(), y, gap.getZ())).is(ModBlocks.BURROWED_DIRT.get())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** A pellet may go here if it is free, rests on something solid, and the hill is not yet full at this spot. */

@@ -141,6 +141,72 @@ public class NestTests {
     }
 
     /**
+     * Damage to a finished nest: nine blocks of the hill are knocked out (a top block, a block from the middle of a
+     * column with the top still hanging over the gap, whole columns, the single block of the outer ring), and the nest
+     * walls are opened in five places (three beside the top and the middle of the shaft, one next to the nursery, and
+     * one between the nursery and the queen's room). The workers must mend all of it: the hill is the planned hill again,
+     * and the nest has no opening but the entrance hole.
+     */
+    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
+    public static void workersMendTheHillAndTheNestWallsAfterDamage(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        startColony(helper);
+
+        boolean[] damaged = {false};
+        helper.onEachTick(() -> {
+            Colony colony = colony(helper);
+            if (damaged[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.findDigTarget(level) != null
+                    || !hillProblems(helper).isEmpty() || !colony.getLeaks(level).isEmpty()) {
+                return;
+            }
+            damaged[0] = true;
+            // The hill: {column dx, column dz, first layer, last layer} of the blocks that are knocked out.
+            int[][] hill = {{1, 0, 2, 2}, {0, -1, 1, 1}, {-1, -1, 0, 2}, {2, 1, 1, 1}, {3, 0, 0, 0}, {-2, 0, 0, 1}};
+            for (int[] column : hill) {
+                for (int layer = column[2]; layer <= column[3]; layer++) {
+                    helper.setBlock(MIDDLE + column[0], SURFACE + layer, MIDDLE + column[1], Blocks.AIR);
+                }
+            }
+            // The walls: next to the top and the middle of the shaft, next to the nursery, between the nursery and the queen's room.
+            var rooms = colony.getPlannedChambers(level);
+            BlockPos bottom = colony.getCenter().below(Colony.SHAFT_DEPTH);
+            Direction tunnel = Direction.fromDelta(
+                    rooms.get(0).cells().get(0).getX() - bottom.getX(), 0, rooms.get(0).cells().get(0).getZ() - bottom.getZ());
+            List<BlockPos> holes = List.of(
+                    colony.getCenter().below(1).east(),
+                    colony.getCenter().below(2).west(),
+                    rooms.get(1).center().relative(tunnel.getClockWise(), 3),
+                    rooms.get(2).center().above(),
+                    colony.getCenter().below(1).north());
+            for (BlockPos hole : holes) {
+                level.setBlock(hole, Blocks.AIR.defaultBlockState(), 3);
+            }
+            AntColoniesMod.LOGGER.info("[mend-test] tick {}: hill and walls damaged, {} nest openings: {}",
+                    helper.getTick(), colony.getLeaks(level).size(), holes);
+        });
+        helper.onEachTick(() -> {
+            if (damaged[0] && helper.getTick() % 200 == 0) {
+                Colony colony = colony(helper);
+                AntColoniesMod.LOGGER.info("[mend-test] tick {}: hill problems: {} | open leaks {}", helper.getTick(),
+                        hillProblems(helper), colony == null ? -1 : colony.getLeaks(level).size());
+            }
+        });
+
+        helper.succeedWhen(() -> {
+            Colony colony = colony(helper);
+            helper.assertTrue(damaged[0] && colony != null, "the nest has not been damaged yet");
+            String hill = hillProblems(helper);
+            helper.assertTrue(hill.isEmpty(), "the hill is not mended yet: " + hill);
+            var leaks = colony.getLeaks(level);
+            helper.assertTrue(leaks.isEmpty(), "the nest still has openings: " + leaks);
+            String reach = openSpaceProblems(helper, colony);
+            helper.assertTrue(reach.isEmpty(), "open space joined to the nest that is not part of it: " + reach);
+            AntColoniesMod.LOGGER.info("[mend-test] finished at tick {}", helper.getTick());
+        });
+    }
+
+    /**
      * Thin soil: stone starts right under the third level. The rooms do not fit at the usual depth (only two levels
      * would), so the whole nest must sit one block higher and have three levels (seed store, nursery, queen), and the
      * ants must still dig all of it and never touch the stone.

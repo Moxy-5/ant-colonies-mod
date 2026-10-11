@@ -18,7 +18,10 @@ import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 
-/** An ant holding a soil pellet carries it out of the hole and adds it to the mound around the entrance. */
+/**
+ * An ant holding a soil pellet carries it out of the hole and adds it to the mound around the entrance (or into a gap
+ * in the hill that was knocked out; see {@link RepairHillGoal}).
+ */
 public class CarryPelletGoal extends Goal {
     /** How close (sideways, in blocks) the ant must get before it places the pellet. */
     private static final double REACH = 1.3;
@@ -81,6 +84,7 @@ public class CarryPelletGoal extends Goal {
         }
         if (++ticks >= GIVE_UP_TICKS) {
             ant.setCarriedBlock(null);
+            colony.pauseHillRepair(level); // a gap that can't be reached: don't keep fetching soil for it
             return;
         }
         // Sideways distance only: a small height difference (a step up or down) doesn't matter.
@@ -99,6 +103,7 @@ public class CarryPelletGoal extends Goal {
         while (spot != null && !ant.getNavigator().moveTo(spot, 1.0)) {
             if (++failedRoutes >= MAX_FAILED_ROUTES) {
                 ant.setCarriedBlock(null);
+                colony.pauseHillRepair(ant.level());
                 return;
             }
             spot = colony.pickMoundSpot(ant.level(), ant.getRandom());
