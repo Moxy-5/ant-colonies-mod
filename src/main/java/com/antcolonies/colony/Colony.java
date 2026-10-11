@@ -88,6 +88,17 @@ public class Colony {
             this(chambers, cellsOf(chambers), shaftDepth);
         }
 
+        /** The level used for this purpose, or null if the nest has none. */
+        @Nullable
+        NestPlan.Chamber of(NestPlan.Kind kind) {
+            for (NestPlan.Chamber chamber : chambers) {
+                if (chamber.kind() == kind) {
+                    return chamber;
+                }
+            }
+            return null;
+        }
+
         private static Set<BlockPos> cellsOf(List<NestPlan.Chamber> chambers) {
             Set<BlockPos> cells = new HashSet<>();
             for (NestPlan.Chamber chamber : chambers) {
@@ -148,8 +159,8 @@ public class Colony {
 
     /**
      * The next block to dig, or null if all the digging is done (or blocked). Order: the entrance
-     * shaft, then the queen's tunnel and room, then the nursery, then the food store. The shaft is
-     * never widened, so its walls stay solid for the ants to climb.
+     * shaft, then the levels from the top down (the stair, the tunnel and the room of each: seed store,
+     * nursery, queen, refuse chamber). The shaft is never widened, so its walls stay solid for the ants to climb.
      */
     @Nullable
     public BlockPos findDigTarget(Level level) {
@@ -182,27 +193,62 @@ public class Colony {
     }
 
     /**
-     * The middle of the queen's room, once the shaft and her room (with its tunnel) are dug out; null while
-     * there is still digging to do for it (or the chunk is not loaded). The other rooms don't matter here.
+     * The middle of the room the queen lives in, or null if there is none yet (or the chunk is not loaded). That is
+     * her own room (the queen level) once it is finished; until then the first room that is finished, which is the
+     * seed store at the top (see {@link #getHomeChamber}). The other rooms don't matter here.
      */
     @Nullable
     public BlockPos getFinishedRoomCenter(Level level) {
+        NestPlan.Chamber home = getHomeChamber(level);
+        return home == null ? null : home.center();
+    }
+
+    /**
+     * The level the queen lives in: the queen level once it is finished (the shaft, every stair down to it, its tunnel
+     * and the whole room are dug out), otherwise the first finished level from the top. Null if no level is finished.
+     * The refuse chamber is never a home.
+     */
+    @Nullable
+    public NestPlan.Chamber getHomeChamber(Level level) {
         Layout layout = getLayout(level);
-        if (layout == null) {
+        if (layout == null || !isShaftOpen(level, layout)) {
             return null;
         }
+        NestPlan.Chamber queen = layout.of(NestPlan.Kind.QUEEN);
+        if (queen != null && isFinished(level, queen)) {
+            return queen;
+        }
+        for (NestPlan.Chamber chamber : layout.chambers()) {
+            if (chamber.kind() != NestPlan.Kind.REFUSE && isFinished(level, chamber)) {
+                return chamber;
+            }
+        }
+        return null;
+    }
+
+    /** True once everything needed to live in this level is dug out: the way in and the whole room (bread may lie on its floor). */
+    private static boolean isFinished(Level level, NestPlan.Chamber chamber) {
+        for (BlockPos pos : chamber.wayIn()) {
+            if (!isDugOut(level, pos)) {
+                return false;
+            }
+        }
+        for (BlockPos pos : chamber.room()) {
+            if (!isDugOut(level, pos)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** True when the whole entrance shaft is dug out. */
+    private boolean isShaftOpen(Level level, Layout layout) {
         for (int i = 1; i <= layout.shaftDepth(); i++) {
             if (!level.isLoaded(center.below(i)) || !level.getBlockState(center.below(i)).isAir()) {
-                return null;
+                return false;
             }
         }
-        NestPlan.Chamber queen = layout.chambers().get(0);
-        for (BlockPos pos : queen.cells()) {
-            if (!isDugOut(level, pos)) { // (bread may lie on her floor while there is no nursery)
-                return null;
-            }
-        }
-        return queen.center();
+        return true;
     }
 
     // ---- Food
@@ -229,6 +275,12 @@ public class Colony {
         return getRoomCells(level, NestPlan.Kind.QUEEN);
     }
 
+    /** The floor cells of the room the queen lives in now (see {@link #getHomeChamber}); empty if she has none yet. */
+    public List<BlockPos> getHomeRoomCells(Level level) {
+        NestPlan.Chamber home = getHomeChamber(level);
+        return home == null ? List.of() : getRoomCells(level, home.kind());
+    }
+
     private static boolean isDugOut(Level level, BlockPos pos) {
         if (!level.isLoaded(pos)) {
             return false;
@@ -242,54 +294,39 @@ public class Colony {
     }
 
     /**
-     * The dug-out floor cells of one room. They count once the shaft and the tunnel to the room are dug; after that
-     * every cell that is dug and joins up with the tunnel (or with another counted cell) is in.
+     * The dug-out floor cells of one room. They count once the shaft, the stairs down to its level and the tunnel to
+     * the room are dug; after that every cell that is dug and joins up with the tunnel (or with another counted cell)
+     * is in.
      */
     private List<BlockPos> getRoomCells(Level level, NestPlan.Kind kind) {
         Layout layout = getLayout(level);
-        if (layout == null) {
+        if (layout == null || !isShaftOpen(level, layout)) {
             return List.of();
         }
-        for (int i = 1; i <= layout.shaftDepth(); i++) {
-            if (!level.isLoaded(center.below(i)) || !level.getBlockState(center.below(i)).isAir()) {
+        NestPlan.Chamber chamber = layout.of(kind);
+        if (chamber == null) {
+            return List.of();
+        }
+        for (BlockPos pos : chamber.wayIn()) {
+            if (!isDugOut(level, pos)) {
                 return List.of();
             }
         }
-        NestPlan.Chamber main = layout.chambers().get(0);
-        for (NestPlan.Chamber chamber : layout.chambers()) {
-            if (chamber.kind() != kind) {
+        BlockPos tunnelEnd = chamber.tunnelEnd();
+        List<BlockPos> reached = new ArrayList<>();
+        for (BlockPos pos : chamber.room()) {
+            if (!isDugOut(level, pos)) {
                 continue;
             }
-            // The way in: the main tunnel up to the branch (side rooms only), then the room's own tunnel.
-            if (chamber != main) {
-                for (int i = 0; i < NestPlan.BRANCH_AT; i++) {
-                    if (!isDugOut(level, main.cells().get(i))) {
-                        return List.of();
-                    }
-                }
+            boolean joined = touchesSideways(pos, tunnelEnd);
+            for (int k = 0; k < reached.size() && !joined; k++) {
+                joined = touchesSideways(pos, reached.get(k));
             }
-            for (int i = 0; i < NestPlan.TUNNEL_LENGTH; i++) {
-                if (!isDugOut(level, chamber.cells().get(i))) {
-                    return List.of();
-                }
+            if (joined) {
+                reached.add(pos);
             }
-            BlockPos tunnelEnd = chamber.cells().get(NestPlan.TUNNEL_LENGTH - 1);
-            List<BlockPos> reached = new ArrayList<>();
-            for (BlockPos pos : chamber.cells().subList(NestPlan.TUNNEL_LENGTH, chamber.cells().size())) {
-                if (!isDugOut(level, pos)) {
-                    continue;
-                }
-                boolean joined = touchesSideways(pos, tunnelEnd);
-                for (int k = 0; k < reached.size() && !joined; k++) {
-                    joined = touchesSideways(pos, reached.get(k));
-                }
-                if (joined) {
-                    reached.add(pos);
-                }
-            }
-            return reached;
         }
-        return List.of();
+        return reached;
     }
 
     /**
@@ -300,11 +337,14 @@ public class Colony {
     public BlockPos pickFoodSpot(Level level, RandomSource random) {
         List<BlockPos> growing = new ArrayList<>();
         List<BlockPos> empty = new ArrayList<>();
+        Set<BlockPos> young = getBroodCells(level); // eggs and larvae may lie in the seed store while the queen lives there
         for (BlockPos pos : getFoodStoreCells(level)) {
             BlockState state = level.getBlockState(pos);
             if (state.isAir()) {
-                empty.add(pos);
-            } else if (state.getValue(SeedPileBlock.LAYERS) < SeedPileBlock.MAX_LAYERS) {
+                if (!young.contains(pos)) {
+                    empty.add(pos);
+                }
+            } else if (state.is(ModBlocks.SEED_PILE.get()) && state.getValue(SeedPileBlock.LAYERS) < SeedPileBlock.MAX_LAYERS) {
                 growing.add(pos);
             }
         }
@@ -668,7 +708,7 @@ public class Colony {
     @Nullable
     public BlockPos pickBreadSpot(Level level, RandomSource random) {
         Set<BlockPos> eggs = getBroodCells(level);
-        for (List<BlockPos> cells : List.of(getNurseryCells(level), getQueenRoomCells(level))) {
+        for (List<BlockPos> cells : List.of(getNurseryCells(level), getHomeRoomCells(level))) {
             List<BlockPos> growing = new ArrayList<>();
             List<BlockPos> empty = new ArrayList<>();
             for (BlockPos pos : cells) {
@@ -701,11 +741,14 @@ public class Colony {
         return true;
     }
 
-    /** A heap of bread to take a piece from, or null if there is none (nursery and queen's room are both searched). */
+    /**
+     * A heap of bread to take a piece from, or null if there is none. Every room is searched, because bread made while
+     * the queen lived in the seed store stays there when she moves down.
+     */
     @Nullable
     public BlockPos findBreadPile(Level level, RandomSource random) {
         List<BlockPos> piles = new ArrayList<>();
-        for (List<BlockPos> cells : List.of(getNurseryCells(level), getQueenRoomCells(level))) {
+        for (List<BlockPos> cells : List.of(getNurseryCells(level), getHomeRoomCells(level), getFoodStoreCells(level), getQueenRoomCells(level))) {
             for (BlockPos pos : cells) {
                 if (level.getBlockState(pos).is(ModBlocks.BREAD_PILE.get())) {
                     piles.add(pos);
@@ -896,7 +939,7 @@ public class Colony {
     @Nullable
     public BlockPos pickEggSpot(Level level, RandomSource random) {
         Set<BlockPos> taken = getBroodCells(level);
-        for (List<BlockPos> cells : List.of(getNurseryCells(level), getQueenRoomCells(level))) {
+        for (List<BlockPos> cells : List.of(getNurseryCells(level), getHomeRoomCells(level))) {
             List<BlockPos> free = new ArrayList<>();
             for (BlockPos pos : cells) {
                 if (!taken.contains(pos) && level.getBlockState(pos).isAir()) {
@@ -1138,17 +1181,17 @@ public class Colony {
     }
 
     /**
-     * Picks how deep the nest sits and which side the main tunnel leaves toward, by looking at the ground: a
-     * depth only counts if the whole shaft is soil and the queen's room fits (no stone or water in the way).
-     * The depth where the most rooms fit wins, the deeper one on a tie. Null while chunks are missing, or when
-     * there is no room at all.
+     * Picks how deep the nest sits, which side the rooms lie toward and how many levels it has, by looking at the
+     * ground: a depth only counts if the whole shaft is soil, and a level only counts if its stair, tunnel and room
+     * are all soil (no stone or water in the way) and so are all the levels above it. The nest with the most levels
+     * wins, the deeper one on a tie. Null while chunks are missing, or when there is no room at all.
      */
     @Nullable
     private Layout chooseLayout(Level level) {
-        // Full depth first. If no side has room for the queen there (stone, water), try one block higher.
+        // Everything the plan could touch must be loaded, or the answer would change later.
         for (int depth = SHAFT_DEPTH; depth >= MIN_SHAFT_DEPTH; depth--) {
             for (Direction direction : Direction.Plane.HORIZONTAL) {
-                for (NestPlan.Chamber chamber : NestPlan.chambers(center.below(depth), direction)) {
+                for (NestPlan.Chamber chamber : NestPlan.chambers(center.below(depth), direction, NestPlan.MAX_LEVELS)) {
                     for (BlockPos pos : chamber.cells()) {
                         if (!level.isLoaded(pos)) {
                             return null;
@@ -1160,7 +1203,7 @@ public class Colony {
         Layout best = null;
         for (int depth = SHAFT_DEPTH; depth >= MIN_SHAFT_DEPTH; depth--) {
             Layout found = chooseLayout(level, center.below(depth), depth);
-            // The depth with the most rooms wins; on a tie the deeper one (it is tried first).
+            // The depth with the most levels wins; on a tie the deeper one (it is tried first).
             if (found != null && (best == null || found.chambers().size() > best.chambers().size())) {
                 best = found;
             }
@@ -1168,7 +1211,7 @@ public class Colony {
         return best;
     }
 
-    /** The best layout with the shaft {@code depth} blocks deep (all the chunks involved are loaded), or null if the shaft or the queen's room does not fit. */
+    /** The best layout with the shaft {@code depth} blocks deep (all the chunks involved are loaded), or null if the shaft or the first level does not fit. */
     @Nullable
     private Layout chooseLayout(Level level, BlockPos bottom, int depth) {
         List<BlockPos> shaft = new ArrayList<>();
@@ -1182,20 +1225,15 @@ public class Colony {
         Layout best = null;
         for (int i = 0; i < 4; i++) {
             Direction direction = Direction.from2DDataValue((start + i) % 4);
-            List<NestPlan.Chamber> fitting = new ArrayList<>();
-            for (NestPlan.Chamber chamber : NestPlan.chambers(bottom, direction)) {
-                for (BlockPos pos : chamber.cells()) {
-                    if (!level.isLoaded(pos)) {
-                        return null;
-                    }
+            int fitting = 0;
+            for (NestPlan.Chamber chamber : NestPlan.chambers(bottom, direction, NestPlan.MAX_LEVELS)) {
+                if (!allSoilOrAir(level, chamber.cells())) {
+                    break; // this level does not fit, so none of the deeper ones can be reached
                 }
-                if (allSoilOrAir(level, chamber.cells())) {
-                    fitting.add(chamber);
-                }
+                fitting++;
             }
-            boolean queenFits = !fitting.isEmpty() && fitting.get(0).kind() == NestPlan.Kind.QUEEN;
-            if (queenFits && (best == null || fitting.size() > best.chambers().size())) {
-                best = new Layout(fitting, depth);
+            if (fitting > 0 && (best == null || fitting > best.chambers().size())) {
+                best = new Layout(NestPlan.chambers(bottom, direction, fitting), depth);
             }
         }
         return best;

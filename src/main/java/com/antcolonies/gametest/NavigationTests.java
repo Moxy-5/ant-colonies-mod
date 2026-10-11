@@ -27,7 +27,7 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 @GameTestHolder(AntColoniesMod.MODID)
 @PrefixGameTestTemplate(false)
 public class NavigationTests {
-    private static final int SURFACE = 8;
+    private static final int SURFACE = 12;
     private static final int MIDDLE = 12;
 
     @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
@@ -235,7 +235,7 @@ public class NavigationTests {
                 }
             }
         }
-        BlockPos goal = chambers(helper).get(2).center();
+        BlockPos goal = chambers(helper).get(0).center();
         List<WorkerAntEntity> ants = new java.util.ArrayList<>();
         List<String> starts = new java.util.ArrayList<>();
         for (int dx = -10; dx <= 10; dx++) {
@@ -320,10 +320,10 @@ public class NavigationTests {
         }
     }
 
-    /** The three rooms of the ready-made nest: the queen's room (east of the shaft), the nursery and the food store. */
+    /** The four levels of the ready-made nest: the food store (east of the shaft), the nursery, the queen's room and the refuse chamber. */
     private static List<NestPlan.Chamber> chambers(GameTestHelper helper) {
         BlockPos bottom = helper.absolutePos(new BlockPos(MIDDLE, SURFACE - 3, MIDDLE));
-        return NestPlan.chambers(bottom, Direction.EAST);
+        return NestPlan.chambers(bottom, Direction.EAST, NestPlan.MAX_LEVELS);
     }
 
     @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
@@ -339,16 +339,48 @@ public class NavigationTests {
     }
 
     @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
-    public static void antWalksFromTheFoodStoreUpToTheSurface(GameTestHelper helper) {
+    public static void antWalksFromTheSurfaceDownToTheDeepestRoom(GameTestHelper helper) {
+        buildNest(helper);
+        WorkerAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), MIDDLE - 3, SURFACE, MIDDLE + 3);
+        BlockPos goal = chambers(helper).get(3).center();
+        helper.runAfterDelay(10, () -> ant.getNavigator().moveTo(goal, 1.0));
+        watch(helper, ant);
+        helper.succeedWhen(() -> helper.assertTrue(
+                ant.getNavigator().isDone() && !ant.getNavigator().hasFailed() && ant.blockPosition().equals(goal) && helper.getTick() > 20,
+                "the ant has not reached the deepest room yet"));
+    }
+
+    @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
+    public static void antWalksFromTheQueensRoomDownToTheRefuseChamberAndBack(GameTestHelper helper) {
         buildNest(helper);
         BlockPos start = chambers(helper).get(2).center().subtract(helper.absolutePos(BlockPos.ZERO));
+        WorkerAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), start.getX(), start.getY(), start.getZ());
+        BlockPos deep = chambers(helper).get(3).center();
+        BlockPos back = chambers(helper).get(2).center();
+        boolean[] wentDown = {false};
+        helper.runAfterDelay(10, () -> ant.getNavigator().moveTo(deep, 1.0));
+        watch(helper, ant);
+        helper.succeedWhen(() -> {
+            if (!wentDown[0] && ant.getNavigator().isDone() && ant.blockPosition().equals(deep)) {
+                wentDown[0] = true;
+                ant.getNavigator().moveTo(back, 1.0);
+            }
+            helper.assertTrue(wentDown[0] && ant.getNavigator().isDone() && !ant.getNavigator().hasFailed()
+                    && ant.blockPosition().equals(back), "the ant has not been down and back yet");
+        });
+    }
+
+    @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
+    public static void antWalksFromTheDeepestRoomUpToTheSurface(GameTestHelper helper) {
+        buildNest(helper);
+        BlockPos start = chambers(helper).get(3).center().subtract(helper.absolutePos(BlockPos.ZERO));
         WorkerAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), start.getX(), start.getY(), start.getZ());
         BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE + 3, SURFACE, MIDDLE + 2));
         helper.runAfterDelay(10, () -> ant.getNavigator().moveTo(goal, 1.0));
         watch(helper, ant);
         helper.succeedWhen(() -> helper.assertTrue(
                 ant.getNavigator().isDone() && !ant.getNavigator().hasFailed() && ant.blockPosition().equals(goal) && helper.getTick() > 20,
-                "the ant has not climbed out of the food store yet"));
+                "the ant has not climbed out of the deepest room yet"));
     }
 
     /** Logs the ant's position and what its walker is doing every 4 ticks. */

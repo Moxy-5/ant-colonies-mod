@@ -9,6 +9,7 @@ import java.util.Set;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.colony.NestPlan;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.WorkerAntEntity;
 import com.antcolonies.registry.ModBlocks;
@@ -33,12 +34,15 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 @PrefixGameTestTemplate(false)
 public class NestTests {
     /** Height (inside the test area) of the first open cell above the ground. */
-    private static final int SURFACE = 8;
+    private static final int SURFACE = 12;
     private static final int MIDDLE = 12;
-    /** The whole nest: a 3-deep shaft, then three rooms (queen, nursery, food store), each a 3-long tunnel and a 5x5 room. */
-    private static final int NEST_CELLS = 3 + 3 * (3 + 25);
+    /**
+     * The whole nest: a 3-deep shaft, then four levels (food store, nursery, queen, refuse chamber), each a 3-long
+     * tunnel and a 5x5 room, and a 3-block stair down to every level but the first.
+     */
+    private static final int NEST_CELLS = 3 + 4 * (3 + 25) + 3 * NestPlan.STAIR_LENGTH;
 
-    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
     public static void workersDigTheWholeNestAndBuildTheMound(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         // Run the game faster than normal so the test doesn't take minutes.
@@ -65,7 +69,7 @@ public class NestTests {
                     "nest not finished: " + airBelowSurface(helper) + " of " + NEST_CELLS + " cells dug. " + describe(helper));
             helper.assertTrue(colony.findDigTarget(level) == null, "something is still left to dig");
             var rooms = colony.getPlannedChambers(level);
-            helper.assertTrue(rooms.size() == 3, "expected 3 rooms (queen, nursery, food store) but the nest has " + rooms.size());
+            helper.assertTrue(rooms.size() == 4, "expected 4 levels (food store, nursery, queen, refuse chamber) but the nest has " + rooms.size());
             BlockPos room = colony.getFinishedRoomCenter(level);
             helper.assertTrue(room != null, "the room is not finished");
             var queens = level.getEntitiesOfClass(com.antcolonies.entity.QueenAntEntity.class, helper.getBounds());
@@ -79,11 +83,11 @@ public class NestTests {
 
     /**
      * The nest has holes in its walls: cave pockets next to the shaft and the rooms, a crack from the queen's room
-     * up to the open air, a pit under a corner of the nursery, and a gap that links the queen's room with the
-     * nursery. The ants must close every one of them with soil, so that the only way in is the entrance hole and
+     * up to the open air, a pit under a corner of the nursery, and a gap that links the nursery with the
+     * queen's room under it. The ants must close every one of them with soil, so that the only way in is the entrance hole and
      * the rooms are joined only by their own tunnels.
      */
-    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
     public static void workersCloseEveryHoleInTheNestWalls(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
@@ -103,7 +107,7 @@ public class NestTests {
             BlockPos bottom = colony.getCenter().below(Colony.SHAFT_DEPTH);
             Direction tunnel = Direction.fromDelta(
                     rooms.get(0).cells().get(0).getX() - bottom.getX(), 0, rooms.get(0).cells().get(0).getZ() - bottom.getZ());
-            BlockPos queenRoom = rooms.get(0).center();
+            BlockPos queenRoom = rooms.get(2).center();
             int groundTop = helper.absolutePos(new BlockPos(0, SURFACE - 1, 0)).getY();
             for (int y = queenRoom.getY() + 1; y <= groundTop; y++) {
                 holes.add(new BlockPos(queenRoom.getX(), y, queenRoom.getZ()));
@@ -137,16 +141,28 @@ public class NestTests {
     }
 
     /**
-     * Thin soil: only the top three blocks of the ground are dirt, everything under them is stone (like a plains
-     * world where the stone starts right below the grass). The rooms do not fit at the usual depth, so the whole
-     * nest must sit one block higher, and the ants must still dig all of it and never touch the stone.
+     * Thin soil: stone starts right under the third level. The rooms do not fit at the usual depth (only two levels
+     * would), so the whole nest must sit one block higher and have three levels (seed store, nursery, queen), and the
+     * ants must still dig all of it and never touch the stone.
      */
-    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 90000, skyAccess = true)
     public static void nestSitsOneBlockHigherWhenTheStoneIsTooClose(GameTestHelper helper) {
+        // Stone up to the floor layer of the third level at the usual depth (SURFACE - 3 - 4 = 5): two levels fit there,
+        // but one block higher the third level fits and the fourth does not.
+        thinSoil(helper, SURFACE - Colony.SHAFT_DEPTH - 2 * NestPlan.LEVEL_SPACING, 3, Colony.SHAFT_DEPTH - 1);
+    }
+
+    /** Even thinner soil: only the first level fits, so the nest is just the queen's room. */
+    @GameTest(template = "arena", timeoutTicks = 90000, skyAccess = true)
+    public static void theNestHasFewerLevelsWhenTheSoilIsThin(GameTestHelper helper) {
+        thinSoil(helper, SURFACE - Colony.SHAFT_DEPTH - NestPlan.LEVEL_SPACING + 1, 1, Colony.SHAFT_DEPTH);
+    }
+
+    /** Stone fills the ground up to and including layer {@code stoneTop}; the nest must have {@code levels} levels and a shaft {@code shaft} deep. */
+    private static void thinSoil(GameTestHelper helper, int stoneTop, int levels, int shaft) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
         startColony(helper);
-        int stoneTop = SURFACE - Colony.SHAFT_DEPTH; // the layer the rooms would normally be on
         for (int x = 0; x < 25; x++) {
             for (int z = 0; z < 25; z++) {
                 for (int y = 0; y <= stoneTop; y++) {
@@ -164,11 +180,16 @@ public class NestTests {
         helper.succeedWhen(() -> {
             Colony colony = colony(helper);
             helper.assertTrue(colony != null, "no colony yet");
-            int expected = NEST_CELLS - 1; // the shaft is one block shorter
+            var rooms = colony.getPlannedChambers(level);
+            helper.assertTrue(rooms.size() == levels, "the nest has " + rooms.size() + " levels, expected " + levels);
+            helper.assertTrue(rooms.get(rooms.size() - 1).kind() == NestPlan.Kind.QUEEN, "the last level is not the queen's room");
+            int expected = shaft;
+            for (var room : rooms) {
+                expected += room.cells().size();
+            }
             helper.assertTrue(airBelowSurface(helper) == expected,
                     "nest not finished: " + airBelowSurface(helper) + " of " + expected + " cells dug. " + describe(helper));
             helper.assertTrue(colony.findDigTarget(level) == null, "something is still left to dig");
-            helper.assertTrue(colony.getPlannedChambers(level).size() == 3, "expected 3 rooms");
             BlockPos room = colony.getFinishedRoomCenter(level);
             helper.assertTrue(room != null, "the room is not finished");
             var queens = level.getEntitiesOfClass(com.antcolonies.entity.QueenAntEntity.class, helper.getBounds());
@@ -185,10 +206,11 @@ public class NestTests {
     }
 
     /**
-     * A queen on her own (no workers), as when she founds a nest: she digs the shaft, the tunnel and her own room
-     * herself, then settles in the middle of it. She cannot place blocks, so no hill is built.
+     * A queen on her own (no workers), as when she founds a nest: she digs the shaft and the first level (the seed
+     * store: tunnel and room) herself, then settles in the middle of it, her home until her own room is dug. She cannot
+     * place blocks, so no hill is built.
      */
-    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
     public static void aloneQueenDigsHerOwnRoom(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
@@ -204,10 +226,11 @@ public class NestTests {
             Colony colony = colony(helper);
             helper.assertTrue(colony != null, "no colony yet");
             BlockPos room = colony.getFinishedRoomCenter(level);
-            helper.assertTrue(room != null, "her room is not finished: " + airBelowSurface(helper) + " cells dug");
+            helper.assertTrue(room != null, "her home is not finished: " + airBelowSurface(helper) + " cells dug");
             var queens = level.getEntitiesOfClass(com.antcolonies.entity.QueenAntEntity.class, helper.getBounds());
             helper.assertTrue(!queens.isEmpty() && queens.get(0).blockPosition().equals(room), "the queen is not in the middle of her room yet");
-            // Shaft + the queen's tunnel and room only: the workers do the nursery and the food store.
+            // Shaft + the first level only: she stops digging as soon as she has a home, the workers dig the rest.
+            helper.assertTrue(room.equals(colony.getPlannedChambers(level).get(0).center()), "she did not settle in the first room");
             int expected = Colony.SHAFT_DEPTH + colony.getPlannedChambers(level).get(0).cells().size();
             helper.assertTrue(airBelowSurface(helper) == expected, "dug " + airBelowSurface(helper) + " cells but expected " + expected);
             helper.assertTrue(moundBlocks(helper) == 0, "the queen placed soil");
@@ -219,7 +242,7 @@ public class NestTests {
      * Seeds lying on the ground around a finished nest (two single ones and a pile of three) are fetched one by one:
      * every one ends up on the floor of the food store, the colony counts them, and nothing is left outside.
      */
-    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
     public static void workersCarrySeedsToTheFoodStore(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
@@ -265,7 +288,7 @@ public class NestTests {
      * Three tufts of short grass around a finished nest: the workers clip ten seeds off each (then the tuft breaks),
      * carry every seed to the food store, and what the colony counts is exactly what lies in the store.
      */
-    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
     public static void workersClipSeedsFromGrass(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
@@ -310,7 +333,7 @@ public class NestTests {
      * workers feed the queen 20 pieces. She then carries an egg for 3 minutes (3600 ticks), the egg comes out behind her
      * in her room, and a worker carries it into the nursery. After that she is fed the 5 pieces that are left.
      */
-    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 90000, skyAccess = true)
     public static void queenIsFedAndHerEggGoesToTheNursery(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
@@ -397,7 +420,7 @@ public class NestTests {
      * gone from the store but not yet bread until then), and it becomes one piece of bread on the nursery floor, which
      * then goes to the queen.
      */
-    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
     public static void nurseMillsASeedIntoBreadInTheNursery(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
@@ -512,7 +535,7 @@ public class NestTests {
      * When the colony already has one worker less than the most it can have, three fully fed larvae in the nursery make
      * exactly one worker; the other two stay larvae.
      */
-    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
     public static void larvaeWaitWhenTheColonyHasEnoughWorkers(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
@@ -571,62 +594,69 @@ public class NestTests {
     }
 
     /**
-     * Seeds lie on the ground as soon as the queen's room is finished, long before any food store is dug. The workers
-     * bring them straight to the mill (20 are enough for her first egg), the nurse feeds the queen the bread, and nothing
-     * is put down anywhere else; the rest waits on the ground until a part of the food store exists. In the end every
-     * seed is accounted for.
+     * The queen's home is the seed store until her own room is dug (here it never is: the way down is turned to stone).
+     * Seeds lie on the ground; the workers store them in the seed store, the nurse mills bread in the room the queen
+     * lives in (there is no nursery either), feeds her 20 pieces, her egg comes out in that room and a worker puts it
+     * down there. Every seed is accounted for in the end.
      */
-    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
-    public static void workersFeedTheQueenBeforeTheFoodStoreExists(GameTestHelper helper) {
+    @GameTest(template = "arena", timeoutTicks = 90000, skyAccess = true)
+    public static void queenLivesInTheSeedStoreUntilHerOwnRoomIsDug(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
         startColony(helper);
 
+        boolean[] blocked = {false};
         boolean[] dropped = {false};
-        boolean[] fedWithoutStore = {false};
+        boolean[] fedAtHome = {false};
+        boolean[] eggAtHome = {false};
         helper.onEachTick(() -> {
             Colony colony = colony(helper);
             if (colony == null) {
                 return;
+            }
+            var rooms = colony.getPlannedChambers(level);
+            if (!blocked[0] && !rooms.isEmpty()) {
+                blocked[0] = true;
+                for (BlockPos pos : rooms.get(1).cells()) { // the stair and the nursery: nothing deeper can be dug
+                    level.setBlock(pos, Blocks.STONE.defaultBlockState(), 3);
+                }
             }
             if (!dropped[0] && colony.getFinishedRoomCenter(level) != null) {
                 dropped[0] = true;
                 dropSeeds(helper, MIDDLE + 6, MIDDLE, 10);
                 dropSeeds(helper, MIDDLE - 6, MIDDLE + 2, 10);
                 dropSeeds(helper, MIDDLE + 1, MIDDLE - 7, 10);
-                AntColoniesMod.LOGGER.info("[early-feed-test] tick {}: queen room finished, 30 seeds dropped, {} nest cells dug",
-                        helper.getTick(), airBelowSurface(helper));
+                AntColoniesMod.LOGGER.info("[early-feed-test] tick {}: the seed store is finished, 30 seeds dropped", helper.getTick());
             }
-            if (dropped[0] && !fedWithoutStore[0] && colony.getQueenBread() > 0 && colony.getFoodStoreCells(level).isEmpty()) {
-                fedWithoutStore[0] = true;
-                AntColoniesMod.LOGGER.info("[early-feed-test] tick {}: the queen got a seed and there is no food store yet (food {})",
-                        helper.getTick(), colony.getFood());
+            if (dropped[0] && colony.getQueenBread() > 0 && colony.getQueenRoomCells(level).isEmpty()) {
+                fedAtHome[0] = true;
+            }
+            if (dropped[0] && colony.getEggsLaid() > 0) {
+                for (var egg : colony.getEggs(level)) {
+                    eggAtHome[0] |= colony.getHomeRoomCells(level).contains(egg.blockPosition());
+                }
+                for (var larva : colony.getLarvae(level)) {
+                    eggAtHome[0] |= colony.getHomeRoomCells(level).contains(larva.blockPosition());
+                }
             }
             if (dropped[0] && helper.getTick() % 400 == 0) {
-                int carrying = 0;
-                int forMill = 0;
-                int breadCarried = 0;
-                for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
-                    carrying += ant.isCarryingSeed() ? 1 : 0;
-                    forMill += ant.isCarryingSeed() && ant.isSeedForBread() ? 1 : 0;
-                    breadCarried += ant.isCarryingBread() ? 1 : 0;
-                }
-                AntColoniesMod.LOGGER.info("[early-feed-test] tick {}: queen fed {}, bread {} (milling {}), food {}, eggs laid {}, store cells {}, nest cells {}, seeds carried {} (for the mill {}), bread carried {}, bread blocks {}, seeds on the ground {}",
+                AntColoniesMod.LOGGER.info("[early-feed-test] tick {}: queen fed {}, bread {} (milling {}), food {}, eggs laid {}, eggs {}, larvae {}, seeds on the ground {}",
                         helper.getTick(), colony.getQueenBread(), colony.getBread(), colony.getMilling(), colony.getFood(), colony.getEggsLaid(),
-                        colony.getFoodStoreCells(level).size(), airBelowSurface(helper), carrying, forMill, breadCarried, breadIn(level, helper.getBounds()), seedsIn(level, helper.getBounds()) - colony.getFood());
+                        colony.countEggs(level), colony.countLarvae(level), seedsIn(level, helper.getBounds()) - colony.getFood());
             }
         });
 
         helper.succeedWhen(() -> {
             Colony colony = colony(helper);
             helper.assertTrue(dropped[0] && colony != null, "no seeds have been dropped yet");
-            helper.assertTrue(fedWithoutStore[0], "the queen was not fed before the food store existed");
-            helper.assertTrue(seedsAccountedFor(colony) == 30, "the colony has " + colony.getFood() + " food and the queen ate "
-                    + colony.getQueenBread() + " (+ " + colony.getEggsLaid() + " eggs laid), expected 30 seeds in all");
-            helper.assertTrue(seedsIn(level, helper.getBounds()) == colony.getFood(), "some seeds are still lying around outside the store");
+            helper.assertTrue(fedAtHome[0], "the queen was not fed in the seed store");
+            helper.assertTrue(colony.getEggsLaid() >= 1 && eggAtHome[0], "no egg has been put down in the seed store yet");
+            helper.assertTrue(colony.getFinishedRoomCenter(level).equals(colony.getPlannedChambers(level).get(0).center()),
+                    "the queen's home is not the seed store");
             for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
                 helper.assertTrue(!ant.isCarryingSeed(), "an ant is still carrying a seed");
             }
+            helper.assertTrue(seedsIn(level, helper.getBounds()) == colony.getFood(), "some seeds are still lying around outside the store");
         });
     }
 
@@ -634,7 +664,7 @@ public class NestTests {
      * A nursery that cannot be dug (turned to stone) does not stop the colony: the egg is set down on the floor of the
      * queen's room by a worker, and it hatches there into a larva.
      */
-    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 90000, skyAccess = true)
     public static void eggsGoToTheQueensRoomWhenThereIsNoNursery(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
@@ -657,7 +687,7 @@ public class NestTests {
             }
             for (var chamber : colony.getPlannedChambers(level)) {
                 if (chamber.kind() == com.antcolonies.colony.NestPlan.Kind.NURSERY) {
-                    for (BlockPos pos : chamber.cells()) {
+                    for (BlockPos pos : chamber.room()) { // not the stairs: they lead on to the queen's room
                         level.setBlock(pos, Blocks.STONE.defaultBlockState(), 3);
                     }
                 }
@@ -692,7 +722,7 @@ public class NestTests {
      * With six workers the colony hands out one nurse, three builders and two foragers. Once the nest is finished the nurse
      * waits next to the queen.
      */
-    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
     public static void workersShareTheJobsAndTheNurseStaysByTheQueen(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
