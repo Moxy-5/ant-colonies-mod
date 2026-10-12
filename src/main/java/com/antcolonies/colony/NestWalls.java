@@ -159,6 +159,33 @@ public class NestWalls {
      * cling to (the shaft and the middle of a stair have no floor), so a hole next to the top of the shaft can be closed too.
      */
     @Nullable
+    /**
+     * Every nest cell a hole could be closed from, best first: cells with a floor, then cells with a wall to cling to,
+     * each closest first. The sealer takes the first it can reach without passing through the hole (from the far side
+     * it would shut itself in).
+     */
+    public List<BlockPos> plugSpots(Level level, BlockPos hole) {
+        Set<BlockPos> nest = colony.nest().nestCells(level);
+        List<BlockPos> spots = new ArrayList<>();
+        for (boolean needFloor : new boolean[] {true, false}) {
+            List<BlockPos> found = new ArrayList<>();
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dy = -1; dy <= 1; dy++) {
+                    for (int dz = -1; dz <= 1; dz++) {
+                        BlockPos spot = hole.offset(dx, dy, dz);
+                        if (nest.contains(spot) && !spots.contains(spot) && level.isLoaded(spot) && level.getBlockState(spot).isAir()
+                                && (needFloor ? hasFloor(level, spot) : hasWallToClingTo(level, spot))) {
+                            found.add(spot);
+                        }
+                    }
+                }
+            }
+            found.sort(java.util.Comparator.comparingDouble(hole::distSqr));
+            spots.addAll(found);
+        }
+        return spots;
+    }
+
     private static BlockPos findPlugSpot(Level level, Set<BlockPos> nest, BlockPos hole) {
         BlockPos onFloor = closestPlugSpot(level, nest, hole, true);
         return onFloor != null ? onFloor : closestPlugSpot(level, nest, hole, false);

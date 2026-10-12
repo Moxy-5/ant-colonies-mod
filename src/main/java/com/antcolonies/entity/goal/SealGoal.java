@@ -9,6 +9,7 @@ import com.antcolonies.colony.NestWalls;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.AbstractAntEntity;
+import com.antcolonies.nav.AntPathFinder;
 import com.antcolonies.registry.ModBlocks;
 
 import net.minecraft.core.BlockPos;
@@ -36,6 +37,9 @@ public class SealGoal extends Goal {
     private Colony colony;
     @Nullable
     private NestWalls.Leak leak;
+    /** Where this ant closes the hole from: a spot it can reach without passing through the hole. */
+    @Nullable
+    private BlockPos stand;
     private int ticks;
     private int packCooldown;
 
@@ -83,6 +87,7 @@ public class SealGoal extends Goal {
             colony.walls().releaseLeak(leak.hole(), ant.getUUID());
         }
         leak = null;
+        stand = null;
         colony = null;
     }
 
@@ -95,8 +100,8 @@ public class SealGoal extends Goal {
         BlockPos hole = leak.hole();
         ant.getLookControl().setLookAt(Vec3.atCenterOf(hole));
 
-        if (!ant.blockPosition().equals(leak.stand())) {
-            if (ant.getNavigator().isDone() && !ant.getNavigator().moveTo(leak.stand(), 1.0)) {
+        if (stand == null || !ant.blockPosition().equals(stand)) {
+            if (ant.getNavigator().isDone() && !walkToAPlugSpot(level, hole)) {
                 ticks = GIVE_UP_TICKS; // no way to get there: let another ant have a go
             }
             return;
@@ -114,5 +119,20 @@ public class SealGoal extends Goal {
         if (colony.walls().addSealProgress(hole, PACK_SHARE) >= 1.0F && colony.walls().plugLeak(level, hole)) {
             level.playSound(null, hole, soil.getSoundType().getPlaceSound(), SoundSource.BLOCKS, 0.4F, 1.2F);
         }
+    }
+
+    /**
+     * Walks to the best place to close the hole from that it can reach without passing through the hole itself: a
+     * spot only reachable through the hole is on its far side, and the ant would shut itself in. False if there is none.
+     */
+    private boolean walkToAPlugSpot(ServerLevel level, BlockPos hole) {
+        AntPathFinder.StepCosts notThroughTheHole = AntPathFinder.StepCosts.forbid(java.util.List.of(hole));
+        for (BlockPos spot : colony.walls().plugSpots(level, hole)) {
+            if (ant.getNavigator().moveTo(spot, 1.0, notThroughTheHole)) {
+                stand = spot;
+                return true;
+            }
+        }
+        return false;
     }
 }

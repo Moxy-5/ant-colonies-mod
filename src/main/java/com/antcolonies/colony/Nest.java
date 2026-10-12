@@ -267,11 +267,22 @@ public class Nest {
     }
 
     /**
-     * Where a worker can stand to bite this block (see {@link #findStandSpots}); the entrance plug is bitten from
-     * the top of the shaft under it, clinging to the shaft wall.
+     * Where a worker can stand to bite this block (see {@link #findStandSpots}): only inside the nest's own space, at
+     * the entrance or out in the open, never down a cave or a crack next to the nest (the hole it came in by may be
+     * sealed while it is in there, and it would be shut in). The entrance plug is bitten from the top of the shaft
+     * under it, clinging to the shaft wall.
      */
     public List<BlockPos> standSpotsFor(Level level, BlockPos target) {
-        List<BlockPos> spots = new ArrayList<>(findStandSpots(level, target));
+        return standSpotsFor(level, target, nestCells(level));
+    }
+
+    private List<BlockPos> standSpotsFor(Level level, BlockPos target, Set<BlockPos> nestCells) {
+        List<BlockPos> spots = new ArrayList<>();
+        for (BlockPos spot : findStandSpots(level, target)) {
+            if (spot.equals(center) || nestCells.contains(spot) || spot.getY() >= center.getY()) { // nest, entrance, or above ground
+                spots.add(spot);
+            }
+        }
         if (target.equals(center)) {
             spots.add(0, center.below());
         }
@@ -368,15 +379,21 @@ public class Nest {
         return cells;
     }
 
-    /** The first block in the list that is diggable, can be reached from open space, and is safe to open. */
+    /** The first block in the list that is diggable, has a place to stand next to it (see {@link #standSpotsFor}), and is safe to open. */
     @Nullable
-    private static BlockPos firstDiggable(Level level, List<BlockPos> cells) {
+    private BlockPos firstDiggable(Level level, List<BlockPos> cells) {
+        Set<BlockPos> nestCells = null;
         for (BlockPos pos : cells) {
             if (!level.isLoaded(pos)) {
                 return null;
             }
-            if (level.getBlockState(pos).is(ModTags.DIGGABLE)
-                    && findStandSpot(level, pos) != null
+            if (!level.getBlockState(pos).is(ModTags.DIGGABLE)) {
+                continue;
+            }
+            if (nestCells == null) {
+                nestCells = nestCells(level);
+            }
+            if (!standSpotsFor(level, pos, nestCells).isEmpty()
                     && !touchesFluid(level, pos)) {
                 return pos;
             }

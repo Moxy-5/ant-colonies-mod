@@ -1,6 +1,9 @@
 package com.antcolonies.nav;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -9,75 +12,83 @@ import com.antcolonies.entity.AbstractAntEntity;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.util.Mth;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * The legs of an ant: given a goal cell, plans a route with {@link AntPathFinder} and walks it.
+ * The legs of an insect: given a goal cell, plans a route over floors and walls with {@link AntPathFinder} and walks it.
  *
- * <p>This is only "how to get there". Deciding "where to go and why" belongs to the goals now and to
- * the colony brain later, so a smarter mind can be put on top without touching the movement.
+ * <p>This is only "how to get there". Deciding "where to go and why" belongs to the goals now and to the colony brain
+ * later, so a smarter mind can be put on top without touching the movement. A mind says {@link #moveTo} a cell, or
+ * hands over a route it planned itself ({@link #follow}: later a trail or a marching column shared by many insects).
  *
- * <p>An ant counts as having reached a waypoint when it is inside that waypoint's cell (no fuzzy
- * distances), and the final goal is reached when it is standing near the middle of its cell.
- * On a stretch of the route that goes up, the ant clings to the wall and rises at a steady speed
- * (the entity applies {@link #getClimbMotion()}), so climbing never depends on touching a wall.
- * It picks one wall for a whole straight stretch (so it never crosses a shaft in mid-air), and when a walk ends
- * with the ant hanging in a shaft it keeps clinging to the wall instead of falling.
+ * <p>Every step of a route says which surface the insect holds and what kind of move it is, so nothing is guessed:
+ * walking on a floor uses the normal walking (with gravity), and every move on a wall or round an edge is an exact
+ * motion along the surface, the body pressed against it, so the insect never floats. It climbs up head up, down head
+ * first, sideways head sideways, turns inside corners and rounds outside edges, and goes over the top of a wall and
+ * over the edge of a drop like a real ant. {@link #getSurface} and {@link #getHeading} tell the body how to lie.
+ * When a walk ends on a wall (in a shaft) the insect keeps holding on there.
  */
 public class AntNavigator {
-    /** How many waypoints ahead to check, in case the ant skipped some (for example it fell down a shaft). */
-    private static final int LOOKAHEAD = 3;
-    /** The ant must be this close (in blocks, sideways) to the middle of the goal cell to count as arrived. */
+    /** The insect must be this close (in blocks, sideways) to the middle of a floor goal cell to count as arrived. */
     private static final double ARRIVE_DISTANCE_SQR = 0.3 * 0.3;
-    /** If the ant can't get to the middle of the goal cell within this many ticks, it counts as arrived anyway. */
+    /** If it can't get to the middle of the goal cell within this many ticks, it counts as arrived anyway. */
     private static final int ARRIVE_TIMEOUT = 20;
-    /** No progress for this many ticks means stuck: plan the route again. */
-    private static final int STUCK_TICKS = 30;
-    /** Not on the route at all for this many ticks: plan the route again. */
-    private static final int OFF_ROUTE_TICKS = 20;
-    /** The ant keeps moving but reaches no waypoint it has not been at before for this many ticks: it is going in circles, plan again. */
-    private static final int CIRCLE_TICKS = 160;
+    /** A step that is not done after this many ticks (6 seconds) means stuck: plan the route again. */
+    private static final int STEP_TICKS = 120;
+    /** Waiting this long for a falling insect to land is the most. */
+    private static final int FALL_TICKS = 200;
     private static final int MAX_REPLANS = 3;
-    /** Blocks per tick an ant rises while climbing. */
-    private static final double CLIMB_SPEED = 0.06;
-    /** Blocks per tick an ant slides sideways while clinging (toward the wall it hugs or the ledge it climbs over). */
-    private static final double CLING_SIDE_SPEED = 0.04;
-    /** The ant waits to rise until it is closer than this (in blocks) to the wall it hugs. */
-    private static final double WALL_GAP = 0.06;
-    /** Blocks per tick an ant that has stopped in a shaft slides to the wall it clings to. */
-    private static final double HOLD_SIDE_SPEED = 0.08;
-    /** An ant this close (in blocks) to a wall of its cell counts as hanging on it. */
-    private static final double CLING_GAP = 0.12;
+    /** How far (in blocks per tick) an insect moves along a wall, per point of its speed attribute (a worker: 0.25 -> 0.06). */
+    private static final double CLIMB_FACTOR = 0.24;
+    private static final double MIN_CLIMB_SPEED = 0.012;
+    /** An insect this close (in blocks) to a wall of its cell counts as holding on to it. */
+    private static final double CLING_GAP = 0.2;
+    /** Kept between the body and the faces it holds, so the collision never catches on them. */
+    private static final double EPS = 0.002;
+    /** A move along a surface that gets nowhere for this many ticks is blocked: plan round it. */
+    private static final int BLOCKED_TICKS = 20;
+    /** How long (in ticks) a foothold that blocked a move is avoided when planning. */
+    private static final int AVOID_TICKS = 400;
+    /** Corrections up to this size (in blocks) are made at once, before the body moves on (see moveAttached). */
+    private static final double SQUARE_UP = 0.03;
+    /** How far past the edge (in blocks) the body goes onto the top of a block when it climbs over. */
+    private static final double OVER_THE_TOP = 0.05;
 
     private final AbstractAntEntity ant;
     @Nullable
-    private List<BlockPos> route;
-    /** The next waypoint to reach (route[0] is where the ant started). */
+    private Route route;
+    /** The step being walked (step 0 is the start). */
     private int next;
+    /** The part of the current step (some steps are two moves: up the wall, then over the top). */
+    private int leg;
     private BlockPos goal = BlockPos.ZERO;
     private double speed = 1.0;
     private boolean failed;
-    private boolean climbing;
-    private double rise;
-    private Vec3 climbMotion = Vec3.ZERO;
     private int replans;
+    private int stepTicks;
     private int arriveTicks;
-    private int offRouteTicks;
-    private int stuckTicks;
-    private int stuckNext;
-    /** The furthest waypoint the ant has been heading for on this route, and how long it has gone without getting any further. */
-    private int bestNext;
-    private int circleTicks;
-    private Vec3 stuckPos = Vec3.ZERO;
-    /** The wall the ant hugs on the straight climb it is on, and the last route index of that climb (null = not chosen yet). */
+    /** The foothold the current step starts from; null while the insect drops to where its route starts. */
     @Nullable
-    private Direction climbWall;
-    private int climbEnd;
-    /** The wall an ant that has stopped in a shaft clings to. */
-    @Nullable
-    private Direction holdWall;
-    /** The wall an ant crawling round the corner of its cell is on (set by crawlAim). */
-    private Direction crawlWall = Direction.NORTH;
+    private Foothold at;
+    /** The surface the body is on right now: {@link Direction#DOWN} = a floor, a horizontal direction = that wall. */
+    private Direction surface = Direction.DOWN;
+    /** On a wall: where its head points, in degrees within the wall: 0 up, 180 down, +90 to its left, -90 to its right. */
+    private float heading;
+    /** True while the motion is set exactly (holding a wall, going round an edge), not by walking. */
+    private boolean attached;
+    private Vec3 motion = Vec3.ZERO;
+    /** For noticing a blocked move: where the insect was when the clock started, and for how long it has not got further. */
+    private Vec3 blockedFrom = Vec3.ZERO;
+    private int blockedTicks;
+    /**
+     * Footholds where a move got physically stuck (something the planner can't see), avoided for a while: the game
+     * time until which each one is avoided. A small memory of the legs, so a new route goes round the trouble.
+     */
+    private final Map<Foothold, Long> avoid = new HashMap<>();
+    /** The extra costs the mind gave for this walk (see {@link #moveTo(BlockPos, double, AntPathFinder.StepCosts)}). */
+    private AntPathFinder.StepCosts mindCosts = AntPathFinder.StepCosts.NONE;
 
     public AntNavigator(AbstractAntEntity ant) {
         this.ant = ant;
@@ -85,13 +96,35 @@ public class AntNavigator {
 
     /**
      * Starts walking to the goal cell. Returns false (and does nothing) if there is no route to it.
-     * {@code speed} multiplies the ant's normal walking speed.
+     * {@code speed} multiplies the insect's normal speed.
      */
     public boolean moveTo(BlockPos goal, double speed) {
+        return moveTo(goal, speed, AntPathFinder.StepCosts.NONE);
+    }
+
+    /**
+     * Like {@link #moveTo(BlockPos, double)}, with the mind's own costs for this walk (kept when the route is planned
+     * again): for example {@link AntPathFinder.StepCosts#forbid} the hole it is about to seal, so it never ends up on
+     * the far side of it.
+     */
+    public boolean moveTo(BlockPos goal, double speed, AntPathFinder.StepCosts mindCosts) {
         this.goal = goal.immutable();
         this.speed = speed;
         this.replans = 0;
-        return plan();
+        this.mindCosts = mindCosts;
+        return plan(null);
+    }
+
+    /**
+     * Walks a route a mind planned (a trail, a marching column: one route for many insects). The insect first finds
+     * its way onto the route's start, then follows it to the end. False if it cannot get onto it.
+     */
+    public boolean follow(Route shared, double speed) {
+        this.goal = shared.end().cell();
+        this.speed = speed;
+        this.replans = 0;
+        this.mindCosts = AntPathFinder.StepCosts.NONE;
+        return plan(shared);
     }
 
     /** True when there is nothing left to walk: arrived, stopped, or no route. See {@link #hasFailed()}. */
@@ -99,419 +132,546 @@ public class AntNavigator {
         return route == null;
     }
 
-    /** True if the last {@link #moveTo} found no route, or the ant got stuck and couldn't recover. */
+    /** True if the last {@link #moveTo} found no route, or the insect got stuck and couldn't recover. */
     public boolean hasFailed() {
         return failed;
     }
 
-    /** True while the ant is on an upward stretch of the route (clinging to a wall and rising). */
+    /** True while the body is on a wall (climbing, crawling or holding on). */
     public boolean isClimbing() {
-        return climbing;
+        return surface.getAxis().isHorizontal();
     }
 
-    /**
-     * The exact motion (blocks per tick) the ant should have this tick while climbing: rising toward the
-     * next waypoint (or holding still when level with it) and sliding toward the wall or ledge it is aiming at.
-     */
+    /** True while the navigator sets the exact motion (see {@link #getClimbMotion}): on a wall, or going round an edge. */
+    public boolean isAttached() {
+        return attached;
+    }
+
+    /** The exact motion (blocks per tick) the insect has this tick while {@link #isAttached}. */
     public Vec3 getClimbMotion() {
-        return climbMotion;
+        return motion;
     }
 
-    /** The planned route (null when idle) and which waypoint the ant is heading for: for tests and debugging. */
+    /** The surface the body is on: {@link Direction#DOWN} = a floor, a horizontal direction = the wall on that side. */
+    public Direction getSurface() {
+        return surface;
+    }
+
+    /** On a wall: where the head points within the wall, in degrees (0 up, 180 down, +90 to its left). */
+    public float getHeading() {
+        return heading;
+    }
+
+    /** The foothold the insect holds (or the current step starts from); null while it drops. */
     @Nullable
-    public List<BlockPos> getRoute() {
+    public Foothold getFoothold() {
+        return at;
+    }
+
+    /** The planned route (null when idle). */
+    @Nullable
+    public Route getPlannedRoute() {
         return route;
     }
 
+    /** The cell of every step of the planned route (null when idle): for tests and debugging. See {@link #getNextWaypoint}. */
+    @Nullable
+    public List<BlockPos> getRoute() {
+        if (route == null) {
+            return null;
+        }
+        List<BlockPos> cells = new ArrayList<>();
+        for (Route.Step step : route.steps()) {
+            cells.add(step.to().cell());
+        }
+        return cells;
+    }
+
+    /** How many times the current walk had to be planned again (stuck, blocked, the way changed): for tests and debugging. */
+    public int getReplans() {
+        return replans;
+    }
+
+    /** The step being walked: an index into {@link #getRoute}. */
     public int getNextWaypoint() {
         return next;
     }
 
+    /** Stops walking. An insect on a wall keeps holding on where it is. */
     public void stop() {
+        if (route != null) {
+            Foothold here = currentFoothold(new LevelCellMap(ant.level()));
+            if (here != null) {
+                at = here;
+            }
+        }
         route = null;
         failed = false;
-        climbing = false;
-        rise = 0.0;
-        climbWall = null;
+        leg = 0;
     }
 
-    private boolean plan() {
-        List<BlockPos> found = AntPathFinder.find(
-                new LevelCellMap(ant.level()), ant.blockPosition(), goal, AntPathFinder.DEFAULT_MAX_EXPANSIONS);
+    /** Plans from where the insect is: to the goal cell, or onto the start of a shared route and then along it. */
+    private boolean plan(@Nullable Route shared) {
+        CellMap map = new LevelCellMap(ant.level());
+        Foothold start = currentFoothold(map);
+        List<Foothold> starts = new ArrayList<>();
+        if (start != null) {
+            starts.add(start);
+        } else {
+            // In the air: plan from where it will land.
+            Foothold landing = AntPathFinder.landing(map, ant.blockPosition());
+            if (landing != null) {
+                starts.add(landing);
+            }
+        }
+        long now = ant.level().getGameTime();
+        avoid.values().removeIf(until -> until <= now);
+        AntPathFinder.StepCosts costs = avoid.isEmpty() ? mindCosts
+                : mindCosts.and((from, to, kind) -> avoid.containsKey(to) ? 50.0 : 0.0);
+        Route found = null;
+        if (!starts.isEmpty()) {
+            if (shared == null) {
+                found = AntPathFinder.find(map, starts, goal, AntPathFinder.DEFAULT_MAX_EXPANSIONS, costs);
+            } else {
+                Foothold join = shared.start();
+                Route onto = AntPathFinder.find(map, starts, join::equals, join.cell(),
+                        AntPathFinder.DEFAULT_MAX_EXPANSIONS, costs);
+                if (onto != null) {
+                    List<Route.Step> steps = new ArrayList<>(onto.steps());
+                    steps.addAll(shared.steps().subList(1, shared.size()));
+                    found = new Route(steps, onto.cost() + shared.cost());
+                }
+            }
+        }
         failed = found == null;
         route = found;
         next = 1;
-        bestNext = next;
-        climbWall = null;
-        circleTicks = 0;
+        leg = 0;
+        stepTicks = 0;
         arriveTicks = 0;
-        offRouteTicks = 0;
-        resetStuckClock();
-        if (found == null) {
-            climbing = false;
-            rise = 0.0;
-        }
+        blockedTicks = 0;
+        blockedFrom = ant.position();
+        at = start;
         return found != null;
     }
 
-    private void resetStuckClock() {
-        stuckTicks = 0;
-        stuckNext = next;
-        stuckPos = ant.position();
+    /** Called every tick from the insect, before it moves. */
+    public void tick() {
+        CellMap map = new LevelCellMap(ant.level());
+        attached = false;
+        motion = Vec3.ZERO;
+        if (route == null) {
+            hold(map);
+            return;
+        }
+        if (at == null) {
+            // Dropping to where the route starts.
+            surface = Direction.DOWN;
+            if (!standsOnFloor(map, ant.blockPosition())) {
+                if (++stepTicks > FALL_TICKS) {
+                    replan("never landed");
+                }
+                return;
+            }
+            Foothold landed = Foothold.floor(ant.blockPosition());
+            if (!landed.equals(route.start())) {
+                replan("landed somewhere else");
+                return;
+            }
+            at = landed;
+            stepTicks = 0;
+        }
+        if (next >= route.size()) {
+            arrive(map);
+            return;
+        }
+        Route.Step step = route.step(next);
+        String changed = !step.to().isValid(map) ? "nothing to hold at " + step.to()
+                : !at.isValid(map) && step.kind() != StepKind.FALL ? "lost its hold at " + at
+                : AntPathFinder.passesThrough(at, step.to(), step.kind()).stream().anyMatch(cell -> !map.isOpen(cell))
+                        ? "blocked on the way from " + at + " to " + step.to() : null;
+        if (changed != null) {
+            replan("the way changed: " + changed + ", " + step.kind().name().toLowerCase()); // a block put in the way (the hill growing, a hole sealed, a player)
+            return;
+        }
+        if (step.kind() != StepKind.FALL && ant.position().distanceToSqr(Vec3.atCenterOf(step.to().cell())) > 9.0) {
+            replan("knocked off the route");
+            return;
+        }
+        if (advance(map, at, step)) {
+            at = step.to();
+            next++;
+            leg = 0;
+            stepTicks = 0;
+        } else if (isBlocked()) {
+            // Pushing along a surface and getting nowhere: something is in the way that the planner can't see.
+            avoid.put(step.to(), ant.level().getGameTime() + AVOID_TICKS);
+            replan("blocked on " + step.kind().name().toLowerCase() + " (part " + leg + ") from " + from(step) + " to " + step.to() + " at "
+                    + String.format("%.3f, %.3f, %.3f", ant.getX(), ant.getY(), ant.getZ()));
+            return;
+        } else if (++stepTicks > (step.kind() == StepKind.FALL ? FALL_TICKS : STEP_TICKS)) {
+            replan("stuck on " + step.kind().name().toLowerCase() + " (part " + leg + ") from " + from(step) + " to " + step.to()
+                    + " at " + String.format("%.3f, %.3f, %.3f", ant.getX(), ant.getY(), ant.getZ()) + ", motion " + motion);
+            return;
+        }
+        faceTheWayItGoes();
     }
 
-    /** Called every tick from the ant, before the move control does the actual walking. */
-    public void tick() {
-        rise = 0.0;
-        CellMap map = new LevelCellMap(ant.level());
-        if (route == null) {
-            holdOnToWall(map);
-            return;
-        }
-        BlockPos here = ant.blockPosition();
-        int last = route.size() - 1;
-
-        // Where on the route is the ant? Look a few waypoints ahead (it may have skipped some) and
-        // anywhere behind (it may have fallen back). The corner cell of the up-and-over stretch it is on is
-        // not a waypoint, but the ant passes through it, and it can be the very cell the route started from
-        // (planned in mid-air above a ledge): that must not read as "back at the start of the route", or the
-        // ant would walk back down and climb the same ledge again for ever.
-        BlockPos stretchCorner = next >= 1 && next <= last ? cornerOf(route.get(next - 1), route.get(next)) : null;
-        int at = -1;
-        for (int i = Math.min(last, next + LOOKAHEAD); i >= 0; i--) {
-            if (route.get(i).equals(here) && !(i < next - 1 && here.equals(stretchCorner))) {
-                at = i;
-                break;
+    /** Moves the insect one tick along a step. True once the step is done (this tick's motion completes it). */
+    private boolean advance(CellMap map, Foothold from, Route.Step step) {
+        Foothold to = step.to();
+        BlockPos c = from.cell();
+        switch (step.kind()) {
+            case START:
+                return true;
+            case WALK: {
+                surface = Direction.DOWN;
+                Vec3 aim = Vec3.atBottomCenterOf(to.cell());
+                ant.getMoveControl().setWantedPosition(aim.x, aim.y, aim.z, speed);
+                return ant.blockPosition().equals(to.cell());
             }
-        }
-        if (at >= 0) {
-            next = at + 1;
-            offRouteTicks = 0;
-        } else if (next > last) {
-            if (last == 0) {
-                // The route was only the goal cell (the ant started in it) and the ant has drifted out: plan a real route back.
-                replan("left the goal cell");
-                return;
+            case FALL: {
+                surface = Direction.DOWN;
+                Vec3 aim = Vec3.atBottomCenterOf(to.cell());
+                ant.getMoveControl().setWantedPosition(aim.x, ant.getY(), aim.z, speed);
+                return ant.onGround() && ant.blockPosition().equals(to.cell());
             }
-            next = last; // wandered out of the goal cell while centring: head back
+            case ONTO_WALL: {
+                // Walk up to the foot of the wall, then the body tips up onto it.
+                surface = Direction.DOWN;
+                if (moveAttached(wallPoint(to, c.getY()))) {
+                    surface = to.surface();
+                    heading = 0.0F;
+                    return true;
+                }
+                return false;
+            }
+            case OFF_WALL: {
+                // Down the wall to the floor, then the body tips back onto it.
+                surface = from.surface();
+                if (moveAttached(wallPoint(from, c.getY()))) {
+                    setYaw(from.surface().toYRot() - heading);
+                    surface = Direction.DOWN;
+                    return true;
+                }
+                return false;
+            }
+            case CLIMB_UP:
+            case CLIMB_DOWN:
+            case CRAWL_SIDEWAYS: {
+                surface = to.surface();
+                Vec3 target = wallPoint(to, clampY(to.cell(), ant.getY()));
+                if (step.kind() != StepKind.CRAWL_SIDEWAYS) {
+                    target = new Vec3(target.x, to.cell().getY(), target.z);
+                } else {
+                    target = with(target, sideAxis(to.surface()), centerOf(to.cell(), sideAxis(to.surface())));
+                }
+                return moveAttached(target);
+            }
+            case TURN_CORNER: {
+                // Along this wall into the corner, where the body turns onto the next wall.
+                surface = from.surface();
+                Vec3 corner = with(wallPoint(from, clampY(c, ant.getY())), to.surface().getAxis(), pinned(c, to.surface()));
+                if (moveAttached(corner)) {
+                    surface = to.surface();
+                    return true;
+                }
+                return false;
+            }
+            case ROUND_EDGE: {
+                // The wall ends sideways: along it until the body is past the block's edge, then round the edge onto its side face.
+                Direction w = from.surface();
+                BlockPos n = to.cell().relative(w.getOpposite());
+                Direction side = Direction.fromDelta(n.getX() - c.getX(), 0, n.getZ() - c.getZ());
+                double past = pinned(n, side.getOpposite());
+                if (leg == 0) {
+                    surface = w;
+                    Vec3 edge = with(wallPoint(from, clampY(c, ant.getY())), side.getAxis(), past);
+                    if (moveAttached(edge)) {
+                        leg = 1;
+                    }
+                    return false;
+                }
+                surface = to.surface();
+                Vec3 round = with(with(ant.position(), side.getAxis(), past), w.getAxis(), pinned(to.cell(), w.getOpposite()));
+                return moveAttached(round);
+            }
+            case OVER_TOP: {
+                // Up the wall until the feet reach its top, then over the edge onto the block.
+                Direction w = from.surface();
+                if (leg == 0) {
+                    surface = w;
+                    if (moveAttached(wallPoint(from, c.getY() + 1 + EPS))) {
+                        setYaw(w.toYRot() - heading);
+                        leg = 1;
+                    }
+                    return false;
+                }
+                surface = Direction.DOWN;
+                BlockPos block = c.relative(w);
+                double onTop = centerOf(block, w.getAxis()) - w.getAxisDirection().getStep() * (0.5 - half() - OVER_THE_TOP);
+                return moveAttached(with(new Vec3(ant.getX(), c.getY() + 1 + EPS, ant.getZ()), w.getAxis(), onTop));
+            }
+            case OVER_EDGE: {
+                // To the edge of the floor and over it, then head first down the side of the block.
+                Direction wall = to.surface();
+                Direction out = wall.getOpposite();
+                if (leg == 0) {
+                    surface = Direction.DOWN;
+                    double over = pinned(to.cell(), wall);
+                    Vec3 edge = with(new Vec3(ant.getX(), c.getY(), ant.getZ()), out.getAxis(), over);
+                    edge = with(edge, sideAxis(wall), clampIn(c, sideAxis(wall), coord(ant.position(), sideAxis(wall))));
+                    if (moveAttached(edge)) {
+                        surface = wall;
+                        heading = 180.0F;
+                        leg = 1;
+                    }
+                    return false;
+                }
+                surface = wall;
+                return moveAttached(wallPoint(to, to.cell().getY()));
+            }
+            default:
+                return true;
         }
+    }
 
-        // Safety net: a healthy walk gets to a new waypoint every few seconds at most.
-        if (next > bestNext) {
-            bestNext = next;
-            circleTicks = 0;
-        } else if (next <= last && ++circleTicks > CIRCLE_TICKS) {
-            replan("going in circles");
-            return;
+    private String from(Route.Step step) {
+        return at == null ? "the air" : at.toString();
+    }
+
+    /** True when the insect has pushed along a surface for {@link #BLOCKED_TICKS} ticks without getting anywhere. */
+    private boolean isBlocked() {
+        if (!attached || motion.lengthSqr() < 1.0E-4 || ant.position().distanceToSqr(blockedFrom) > 0.01 * 0.01) {
+            blockedTicks = 0;
+            blockedFrom = ant.position();
+            return false;
         }
+        return ++blockedTicks >= BLOCKED_TICKS;
+    }
 
-        Vec3 aim;
-        Vec3 face = null;
-        if (next > last) {
-            // In the goal cell: finish walking to its middle.
-            aim = Vec3.atBottomCenterOf(goal);
+    /** At the end of the route: on a floor, walk to the middle of the cell; on a wall, hold on. */
+    private void arrive(CellMap map) {
+        Foothold end = route.end();
+        if (end.isFloor()) {
+            surface = Direction.DOWN;
+            Vec3 aim = Vec3.atBottomCenterOf(end.cell());
             double dx = ant.getX() - aim.x;
             double dz = ant.getZ() - aim.z;
-            // A goal cell with no floor (in a shaft) counts as reached as soon as the ant is in it: it clings to the wall
-            // there (see holdOnToWall) instead of falling while it tries to get to the middle of the cell.
-            boolean noFloor = !map.isSolidFace(goal.below(), Direction.UP);
-            if (noFloor || dx * dx + dz * dz <= ARRIVE_DISTANCE_SQR || ++arriveTicks > ARRIVE_TIMEOUT) {
-                stop();
-                holdOnToWall(map);
+            if (dx * dx + dz * dz > ARRIVE_DISTANCE_SQR && ++arriveTicks <= ARRIVE_TIMEOUT) {
+                ant.getMoveControl().setWantedPosition(aim.x, aim.y, aim.z, speed);
                 return;
-            }
-            climbing = false;
-        } else {
-            BlockPos from = route.get(next - 1);
-            BlockPos waypoint = route.get(next);
-            if (!map.isOpen(waypoint)) {
-                replan("the way ahead was blocked");
-                return;
-            }
-
-            // Up stretch: straight up a wall, or up and over the top of one. The ant counts as on it
-            // while in the cell it starts from, the cell it ends in, or the cell above its start (the corner).
-            BlockPos corner = new BlockPos(from.getX(), waypoint.getY(), from.getZ());
-            boolean up = waypoint.getY() > from.getY();
-            climbing = up && (here.equals(from) || here.equals(corner) || here.equals(waypoint));
-            aim = Vec3.atBottomCenterOf(waypoint);
-            if (climbing) {
-                rise = Math.max(0.0, Math.min(CLIMB_SPEED, waypoint.getY() - ant.getY()));
-                // The wall the ant has to be on for this stretch (to rise along it, or to climb out over it).
-                Direction needed = null;
-                if (waypoint.getX() == from.getX() && waypoint.getZ() == from.getZ()) {
-                    // Straight up: hug one wall for the whole stretch, preferably the one the ant will climb out over.
-                    Direction wall = chooseWall(map, here, waypoint);
-                    needed = wall;
-                    if (wall != null) {
-                        aim = aim.add(wall.getStepX() * 0.7, 0.0, wall.getStepZ() * 0.7);
-                        if (gapToWall(here, wall) > WALL_GAP && standsOnFloor(map, here)) {
-                            // Still on the floor: walk up to the wall like any walk. Only the ant that is against
-                            // the wall clings to it (and leans against it), so it never looks like it hovers.
-                            // In the air (a shaft) the ant keeps rising while it slides to its wall: it never hangs waiting.
-                            rise = 0.0;
-                            climbing = false;
-                        }
-                    }
-                } else if (here.equals(from) && map.isSolidFace(from.below(), Direction.UP)
-                        && gapToWall(here, Direction.fromDelta(waypoint.getX() - from.getX(), 0, waypoint.getZ() - from.getZ())) > WALL_GAP) {
-                    // Up and over a ledge from a floor (not from the top of a shaft): first walk up to the foot of
-                    // the wall, and only then start climbing. No rising through the air in front of it.
-                    climbing = false;
-                    rise = 0.0;
-                } else if (here.equals(from)) {
-                    needed = Direction.fromDelta(waypoint.getX() - from.getX(), 0, waypoint.getZ() - from.getZ());
-                }
-                if (climbing && needed != null && !standsOnFloor(map, here)) {
-                    // Hanging on another wall of this cell (a new job came while it clung there): crawl over the walls
-                    // and round the corner to the one it needs, never letting go and drifting across the open cell.
-                    Vec3 crawl = crawlAim(map, here, needed);
-                    if (crawl != null) {
-                        aim = crawl;
-                        face = Vec3.atBottomCenterOf(here).add(crawlWall.getStepX() * 0.7, 0.0, crawlWall.getStepZ() * 0.7);
-                        if (!map.isSolidFace(here.above().relative(crawlWall), crawlWall.getOpposite())) {
-                            rise = 0.0; // the wall it crawls on ends above: get round the corner first
-                        }
-                    }
-                }
-            }
-
-            if (at < 0 && !here.equals(corner) && ++offRouteTicks > OFF_ROUTE_TICKS) {
-                replan("off the route");
-                return;
-            }
-            if (++stuckTicks >= STUCK_TICKS) {
-                boolean moved = ant.position().distanceToSqr(stuckPos) > 0.05 * 0.05;
-                if (next == stuckNext && !moved) {
-                    replan("stuck");
-                    return;
-                }
-                resetStuckClock();
             }
         }
-        if (climbing) {
-            double sideX = aim.x - ant.getX();
-            double sideZ = aim.z - ant.getZ();
-            double distance = Math.sqrt(sideX * sideX + sideZ * sideZ);
-            double slide = Math.min(CLING_SIDE_SPEED * speed, distance);
-            climbMotion = distance < 1.0E-6 ? new Vec3(0.0, rise, 0.0)
-                    : new Vec3(sideX / distance * slide, rise, sideZ / distance * slide);
-        }
-        // A crawling ant keeps facing the wall it is on (the renderer leans it against what it faces).
-        Vec3 look = face != null ? face : aim;
-        ant.getMoveControl().setWantedPosition(look.x, aim.y, look.z, speed);
+        at = end;
+        route = null;
+        failed = false;
+        hold(map);
     }
 
     /**
-     * The point an ant hanging on a wall of its cell crawls to on its way to the {@code needed} wall of the same cell:
-     * the corner where the wall it is on meets the needed one, or, from the opposite wall, the corner with a side wall
-     * first. Sets {@link #crawlWall} to the wall it is on. Null when it is already on the needed wall, is on no wall
-     * at all, or there is no way round (then it slides straight there, as before).
+     * Nothing to walk. An insect on a wall (in a shaft, say) keeps holding on to it where it is, so it never falls to the
+     * bottom and has to climb all the way up again; on a floor it just stands.
      */
-    @Nullable
-    private Vec3 crawlAim(CellMap map, BlockPos here, Direction needed) {
-        if (gapToWall(here, needed) <= WALL_GAP || !map.isSolidFace(here.relative(needed), needed.getOpposite())) {
-            return null;
+    private void hold(CellMap map) {
+        if (at != null && at.isWall() && at.isValid(map)
+                && ant.position().distanceToSqr(Vec3.atCenterOf(at.cell())) < 1.5 * 1.5) {
+            surface = at.surface();
+            moveAttached(wallPoint(at, clampY(at.cell(), ant.getY())));
+            faceTheWayItGoes();
+            return;
         }
-        // The wall it is on: one it touches, a side wall of the needed one first (from there it can go straight round).
-        Direction on = null;
-        boolean onSideWall = false;
-        for (Direction side : Direction.Plane.HORIZONTAL) {
-            if (side == needed || gapToWall(here, side) > CLING_GAP || !map.isSolidFace(here.relative(side), side.getOpposite())) {
-                continue;
-            }
-            boolean sideWall = side.getAxis() != needed.getAxis();
-            if (on == null || sideWall && !onSideWall) {
-                on = side;
-                onSideWall = sideWall;
-            }
+        if (at != null && at.isWall()) {
+            at = null; // its wall is gone: let go
         }
-        if (on == null) {
-            return null;
-        }
-        Direction toward = needed;
-        if (!onSideWall) {
-            // On the opposite wall: go round by the nearer side wall.
-            toward = null;
-            double nearest = Double.MAX_VALUE;
-            for (Direction side : Direction.Plane.HORIZONTAL) {
-                if (side.getAxis() != needed.getAxis() && map.isSolidFace(here.relative(side), side.getOpposite())
-                        && gapToWall(here, side) < nearest) {
-                    toward = side;
-                    nearest = gapToWall(here, side);
-                }
-            }
-            if (toward == null) {
-                return null;
-            }
-        }
-        crawlWall = on;
-        double inset = 0.5 - ant.getBbWidth() / 2.0;
-        return new Vec3(here.getX() + 0.5 + (on.getStepX() + toward.getStepX()) * inset, ant.getY(),
-                here.getZ() + 0.5 + (on.getStepZ() + toward.getStepZ()) * inset);
+        surface = Direction.DOWN;
     }
 
-    /** Whether the ant is standing on the floor of the cell it is in (also when it just stopped pushing down on it). */
+    /**
+     * Where the insect really holds on now, worked out from where its body is (a route must start where the body is,
+     * or its first move cuts across to the wrong place): the wall it is on in its cell, else its floor, else the wall
+     * of its cell it is closest to. Only between two cells (going over an edge) the foothold the step started from.
+     * Null in the air.
+     */
+    @Nullable
+    private Foothold currentFoothold(CellMap map) {
+        BlockPos cell = ant.blockPosition();
+        if (surface.getAxis().isHorizontal() && Foothold.isValid(map, cell, surface) && gapToWall(cell, surface) < CLING_GAP) {
+            return new Foothold(cell, surface);
+        }
+        if (standsOnFloor(map, cell)) {
+            if (Foothold.isValid(map, cell, Direction.DOWN)) {
+                return Foothold.floor(cell);
+            }
+            // On the ground, but its middle is over an edge (the rim of a hole): it stands on the floor of a cell next to it.
+            Foothold under = floorBeside(map, cell);
+            if (under != null) {
+                return under;
+            }
+        }
+        Foothold nearest = null;
+        double best = CLING_GAP;
+        for (Direction side : Direction.Plane.HORIZONTAL) {
+            double gap = gapToWall(cell, side);
+            if (Foothold.isValid(map, cell, side) && gap < best) {
+                nearest = new Foothold(cell, side);
+                best = gap;
+            }
+        }
+        if (nearest == null && at != null && at.isValid(map) && ant.position().distanceToSqr(Vec3.atCenterOf(at.cell())) < 1.2 * 1.2) {
+            return at;
+        }
+        return nearest;
+    }
+
+    /** The floor of a cell beside {@code cell} that the body overlaps (standing at the edge of it), the nearest one; or null. */
+    @Nullable
+    private Foothold floorBeside(CellMap map, BlockPos cell) {
+        Foothold best = null;
+        double bestDistance = Double.MAX_VALUE;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                BlockPos other = cell.offset(dx, 0, dz);
+                if ((dx != 0 || dz != 0) && Foothold.isValid(map, other, Direction.DOWN)
+                        && ant.getBoundingBox().intersects(other.getX(), other.getY(), other.getZ(), other.getX() + 1, other.getY() + 1, other.getZ() + 1)) {
+                    double distance = ant.position().distanceToSqr(Vec3.atBottomCenterOf(other));
+                    if (distance < bestDistance) {
+                        best = Foothold.floor(other);
+                        bestDistance = distance;
+                    }
+                }
+            }
+        }
+        return best;
+    }
+
+    /** Whether the insect is standing on the floor of the cell it is in (also when it just stopped pushing down on it). */
     private boolean standsOnFloor(CellMap map, BlockPos cell) {
         return ant.onGround() || (map.isSolidFace(cell.below(), Direction.UP) && ant.getY() - cell.getY() < 0.05);
     }
 
     /**
-     * The wall to hug on the straight climb the ant is on. It is chosen once for the whole climb, from the cells the
-     * climb still goes through: a wall that is solid beside every one of them, the one the ant will climb out over if
-     * there is one, otherwise a side wall. Switching walls from cell to cell would make the ant slide across the shaft in mid-air.
+     * Sets the exact motion toward a point at the insect's climbing speed. True if this tick's motion gets there.
+     * Tiny sideways corrections (the body a hair over the edge of its cell) are made first, on their own: moving on with
+     * the body poking into the next column would catch on the block there and stop it for good.
      */
-    @Nullable
-    private Direction chooseWall(CellMap map, BlockPos here, BlockPos waypoint) {
-        if (climbWall != null && next <= climbEnd && map.isSolidFace(here.relative(climbWall), climbWall.getOpposite())) {
-            return climbWall;
-        }
-        int end = next;
-        while (end + 1 < route.size()
-                && route.get(end + 1).getX() == route.get(end).getX() && route.get(end + 1).getZ() == route.get(end).getZ()
-                && route.get(end + 1).getY() > route.get(end).getY()) {
-            end++;
-        }
-        Direction exit = exitDirection();
-        Direction best = null;
-        double bestScore = -Double.MAX_VALUE;
-        for (Direction side : Direction.Plane.HORIZONTAL) {
-            boolean solidAlong = true;
-            for (int i = next - 1; i <= end && solidAlong; i++) {
-                BlockPos cell = route.get(i);
-                solidAlong = map.isSolidFace(cell.relative(side), side.getOpposite());
-            }
-            if (!solidAlong) {
-                continue;
-            }
-            // Out wall first, then a side wall of it (the shortest turn at the top), then the wall the ant is nearest to.
-            double score = (side == exit ? 100.0 : exit != null && side.getAxis() != exit.getAxis() ? 10.0 : 0.0)
-                    - gapToWall(here, side);
-            if (score > bestScore) {
-                best = side;
-                bestScore = score;
+    private boolean moveAttached(Vec3 target) {
+        attached = true;
+        Vec3 delta = target.subtract(ant.position());
+        double largest = Math.max(Math.abs(delta.x), Math.max(Math.abs(delta.y), Math.abs(delta.z)));
+        if (largest > SQUARE_UP) {
+            Vec3 squareUp = new Vec3(small(delta.x), small(delta.y), small(delta.z));
+            if (squareUp.lengthSqr() > 0.0) {
+                motion = squareUp;
+                return false;
             }
         }
-        if (best == null) {
-            climbWall = null;
-            return findWall(map, here, waypoint, exit);
-        }
-        climbWall = best;
-        climbEnd = end;
-        return best;
+        double distance = delta.length();
+        double step = climbSpeed();
+        motion = distance <= step ? delta : delta.scale(step / distance);
+        return distance <= step;
     }
 
     /**
-     * Nothing left to walk. An ant that is hanging in a shaft (no floor in its cell, a wall beside it) keeps clinging
-     * to the wall where it is, so it does not fall to the bottom and have to climb all the way up again
-     * (for example while it scrapes up soil, or after it has put a pellet in the hill from inside the shaft).
+     * A correction worth making first: up to {@link #SQUARE_UP}, but not under a thousandth of a block (that is still
+     * inside the cell's margin, and the game drops motions that small anyway, so waiting for it would wait for ever).
      */
-    private void holdOnToWall(CellMap map) {
-        climbing = false;
-        climbMotion = Vec3.ZERO;
-        BlockPos here = ant.blockPosition();
-        if (ant.onGround() || ant.isInLiquid() || map.isSolidFace(here.below(), Direction.UP)) {
-            holdWall = null;
-            return;
-        }
-        if (holdWall == null || !map.isSolidFace(here.relative(holdWall), holdWall.getOpposite())) {
-            holdWall = null;
-            double nearest = Double.MAX_VALUE;
-            for (Direction side : Direction.Plane.HORIZONTAL) {
-                double gap = gapToWall(here, side);
-                if (map.isSolidFace(here.relative(side), side.getOpposite()) && gap < nearest) {
-                    holdWall = side;
-                    nearest = gap;
-                }
-            }
-        }
-        if (holdWall == null) {
-            return; // nothing to cling to: it falls
-        }
-        double slide = Math.max(0.0, Math.min(HOLD_SIDE_SPEED, gapToWall(here, holdWall)));
-        climbing = true;
-        climbMotion = new Vec3(holdWall.getStepX() * slide, 0.0, holdWall.getStepZ() * slide);
-        // Face the wall (the renderer leans the ant against what it faces), without pushing anywhere.
-        Vec3 face = Vec3.atBottomCenterOf(here).add(holdWall.getStepX() * 0.7, 0.0, holdWall.getStepZ() * 0.7);
-        ant.getMoveControl().setWantedPosition(face.x, ant.getY(), face.z, 0.0);
+    private static double small(double value) {
+        return Math.abs(value) <= SQUARE_UP && Math.abs(value) > 1.0E-3 ? value : 0.0;
     }
 
-    /** The corner cell of an up-and-over stretch (the cell above its start), or null if the stretch is not one. */
-    @Nullable
-    private static BlockPos cornerOf(BlockPos from, BlockPos waypoint) {
-        boolean sideways = waypoint.getX() != from.getX() || waypoint.getZ() != from.getZ();
-        return sideways && waypoint.getY() > from.getY() ? new BlockPos(from.getX(), waypoint.getY(), from.getZ()) : null;
+    private double climbSpeed() {
+        return Math.max(MIN_CLIMB_SPEED, ant.getAttributeValue(Attributes.MOVEMENT_SPEED) * CLIMB_FACTOR * speed);
     }
 
-    /** How far (in blocks) the ant's body still is from the wall on this side of the cell it is in. */
-    private double gapToWall(BlockPos cell, @Nullable Direction wall) {
-        if (wall == null) {
-            return 0.0;
+    /** On a wall the body faces the wall and the head turns the way it moves; on a floor it faces the way it moves. */
+    private void faceTheWayItGoes() {
+        if (surface.getAxis().isHorizontal()) {
+            setYaw(surface.toYRot());
+            if (attached && motion.lengthSqr() > 1.0E-8) {
+                Direction left = surface.getCounterClockWise();
+                double sideways = motion.x * left.getStepX() + motion.z * left.getStepZ();
+                if (Math.abs(sideways) > 1.0E-5 || Math.abs(motion.y) > 1.0E-5) {
+                    heading = (float) Math.toDegrees(Math.atan2(sideways, motion.y));
+                }
+            }
+        } else if (attached && motion.horizontalDistanceSqr() > 1.0E-8) {
+            setYaw((float) (Mth.atan2(motion.z, motion.x) * 180.0 / Math.PI) - 90.0F);
         }
-        double towardWall = (ant.getX() - (cell.getX() + 0.5)) * wall.getStepX()
-                + (ant.getZ() - (cell.getZ() + 0.5)) * wall.getStepZ();
-        return 0.5 - towardWall - ant.getBbWidth() / 2.0;
     }
 
-    /**
-     * If the current stretch of straight-up climbing ends by going over the top of a wall, the direction
-     * of that wall from the last climbing cell; otherwise null.
-     */
-    @Nullable
-    private Direction exitDirection() {
-        for (int i = next; i < route.size(); i++) {
-            BlockPos before = route.get(i - 1);
-            BlockPos cell = route.get(i);
-            if (cell.getX() != before.getX() || cell.getZ() != before.getZ()) {
-                if (cell.getY() > before.getY()) {
-                    return Direction.fromDelta(cell.getX() - before.getX(), 0, cell.getZ() - before.getZ());
-                }
-                return null;
-            }
-            if (cell.getY() < before.getY()) {
-                return null;
-            }
-        }
-        return null;
+    private void setYaw(float yaw) {
+        ant.setYRot(yaw);
+        ant.yBodyRot = yaw;
+        ant.yHeadRot = yaw;
     }
 
-    @Nullable
-    private static Direction findWall(CellMap map, BlockPos here, BlockPos waypoint, @Nullable Direction preferred) {
-        Direction fallback = null;
-        if (preferred != null) {
-            if (map.isSolidFace(here.relative(preferred), preferred.getOpposite())) {
-                return preferred;
-            }
-            // The exit wall is not solid here (for example the tunnel opening): hug a wall next to it, so the
-            // ant slides along it to the exit wall and never crosses the open shaft.
-            for (Direction side : Direction.Plane.HORIZONTAL) {
-                if (side.getAxis() != preferred.getAxis() && map.isSolidFace(here.relative(side), side.getOpposite())) {
-                    return side;
-                }
-            }
-        }
-        for (Direction side : Direction.Plane.HORIZONTAL) {
-            if (map.isSolidFace(here.relative(side), side.getOpposite())) {
-                if (map.isSolidFace(waypoint.relative(side), side.getOpposite())) {
-                    return side;
-                }
-                fallback = side;
-            }
-        }
-        return fallback;
+    // --- Geometry of a cell: where the body's middle is when it holds a surface ---
+
+    private double half() {
+        return ant.getBbWidth() / 2.0;
+    }
+
+    /** The body's middle on the wall's axis when it holds the wall on side {@code wall} of {@code cell}. */
+    private double pinned(BlockPos cell, Direction wall) {
+        return centerOf(cell, wall.getAxis()) + wall.getAxisDirection().getStep() * (0.5 - half() - EPS);
+    }
+
+    /** The point on a wall foothold at height {@code y}: pressed against the wall, sideways where the body is (kept inside the cell). */
+    private Vec3 wallPoint(Foothold foothold, double y) {
+        Direction wall = foothold.surface();
+        Direction.Axis along = sideAxis(wall);
+        Vec3 point = with(new Vec3(ant.getX(), y, ant.getZ()), wall.getAxis(), pinned(foothold.cell(), wall));
+        return with(point, along, clampIn(foothold.cell(), along, coord(ant.position(), along)));
+    }
+
+    /** The horizontal axis along a wall (sideways on it). */
+    private static Direction.Axis sideAxis(Direction wall) {
+        return wall.getAxis() == Direction.Axis.X ? Direction.Axis.Z : Direction.Axis.X;
+    }
+
+    private double clampIn(BlockPos cell, Direction.Axis axis, double value) {
+        double low = cell.get(axis) + half() + EPS;
+        return Mth.clamp(value, low, cell.get(axis) + 1 - half() - EPS);
+    }
+
+    private double clampY(BlockPos cell, double y) {
+        return Mth.clamp(y, cell.getY(), cell.getY() + 1 - ant.getBbHeight() - EPS);
+    }
+
+    private static double centerOf(BlockPos cell, Direction.Axis axis) {
+        return cell.get(axis) + 0.5;
+    }
+
+    private static double coord(Vec3 v, Direction.Axis axis) {
+        return axis.choose(v.x, v.y, v.z);
+    }
+
+    private static Vec3 with(Vec3 v, Direction.Axis axis, double value) {
+        return switch (axis) {
+            case X -> new Vec3(value, v.y, v.z);
+            case Y -> new Vec3(v.x, value, v.z);
+            case Z -> new Vec3(v.x, v.y, value);
+        };
+    }
+
+    /** How far (in blocks) the body still is from the wall on this side of the cell it is in. */
+    private double gapToWall(BlockPos cell, Direction wall) {
+        double toward = (ant.getX() - (cell.getX() + 0.5)) * wall.getStepX() + (ant.getZ() - (cell.getZ() + 0.5)) * wall.getStepZ();
+        return 0.5 - toward - half();
     }
 
     private void replan(String reason) {
         if (++replans > MAX_REPLANS) {
             AntColoniesMod.LOGGER.debug("Ant {} gave up walking to {} ({})", ant.getId(), goal.toShortString(), reason);
+            Foothold here = currentFoothold(new LevelCellMap(ant.level()));
             route = null;
             failed = true;
-            climbing = false;
-            rise = 0.0;
+            at = here;
             return;
         }
         AntColoniesMod.LOGGER.debug("Ant {} plans a new route to {} ({})", ant.getId(), goal.toShortString(), reason);
-        if (!plan()) {
+        if (!plan(null)) {
             AntColoniesMod.LOGGER.debug("Ant {} found no route to {}", ant.getId(), goal.toShortString());
         }
     }

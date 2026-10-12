@@ -9,6 +9,9 @@ import com.antcolonies.colony.NestPlan;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.QueenAntEntity;
 import com.antcolonies.entity.WorkerAntEntity;
+import com.antcolonies.nav.Foothold;
+import com.antcolonies.nav.Route;
+import com.antcolonies.nav.StepKind;
 import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.registry.ModEntities;
 
@@ -532,6 +535,45 @@ public class NavigationTests {
             helper.assertTrue(goal[0] != null, "the ant has not reached its spot in the shaft yet");
             helper.assertTrue(ant.getNavigator().isDone() && !ant.getNavigator().hasFailed() && ant.blockPosition().equals(goal[0]),
                     "the ant (from the " + clung[0] + " wall) has not climbed out over the opposite side yet");
+        });
+    }
+
+    /**
+     * Round the outside edge of a block standing on the ground (like the edge of a hill block), in every direction and
+     * both ways round: an ant holding one side of the block goes round its vertical edge onto the next side. It must get
+     * there without ever being blocked (no new plans) and without floating.
+     */
+    @GameTest(template = "arena", timeoutTicks = 600, skyAccess = true)
+    public static void antsGoRoundTheOutsideEdgeOfABlock(GameTestHelper helper) {
+        buildNest(helper);
+        List<WorkerAntEntity> ants = new java.util.ArrayList<>();
+        List<BlockPos> ends = new java.util.ArrayList<>();
+        int i = 0;
+        for (Direction wall : Direction.Plane.HORIZONTAL) {
+            for (Direction side : new Direction[] {wall.getClockWise(), wall.getCounterClockWise()}) {
+                BlockPos block = new BlockPos(3 + (i % 4) * 5, SURFACE, 3 + (i / 4) * 16);
+                helper.setBlock(block, ModBlocks.BURROWED_DIRT.get());
+                BlockPos start = block.relative(wall.getOpposite());
+                BlockPos end = start.relative(side).relative(wall);
+                Route route = new Route(List.of(
+                        new Route.Step(new Foothold(helper.absolutePos(start), wall), StepKind.START),
+                        new Route.Step(new Foothold(helper.absolutePos(end), side.getOpposite()), StepKind.ROUND_EDGE)), 1.2);
+                WorkerAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), start.getX(), start.getY(), start.getZ());
+                helper.runAfterDelay(10, () -> helper.assertTrue(ant.getNavigator().follow(route, 1.0), "no way onto the route " + route));
+                watch(helper, ant, false);
+                ants.add(ant);
+                ends.add(helper.absolutePos(end));
+                i++;
+            }
+        }
+        helper.succeedWhen(() -> {
+            helper.assertTrue(helper.getTick() > 20, "not started yet");
+            for (int k = 0; k < ants.size(); k++) {
+                WorkerAntEntity ant = ants.get(k);
+                helper.assertTrue(ant.getNavigator().getReplans() == 0, "ant " + k + " had to plan again (it was blocked)");
+                helper.assertTrue(ant.getNavigator().isDone() && !ant.getNavigator().hasFailed() && ant.blockPosition().equals(ends.get(k)),
+                        "ant " + k + " has not gone round the edge yet");
+            }
         });
     }
 
