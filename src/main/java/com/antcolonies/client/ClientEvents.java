@@ -2,6 +2,7 @@ package com.antcolonies.client;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.entity.QueenAntEntity;
+import com.antcolonies.entity.TermiteKingEntity;
 import com.antcolonies.entity.WorkerAntEntity;
 import com.antcolonies.registry.ModEntities;
 
@@ -42,5 +43,13 @@ public class ClientEvents {
                 .withAltModel(workerAsset)
                 .withAltAnimations(workerAsset))
                 .withScale(1.3F));
+
+        // Termites (placeholder models made by tools/termite_models.py). The queen shares the king's animations;
+        // her swelling and pulsing are done in TermiteQueenModel.
+        event.registerEntityRenderer(ModEntities.TERMITE_KING.get(), context -> new AntRenderer<>(
+                context, new DefaultedEntityGeoModel<TermiteKingEntity>(
+                        ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "termite_king")))
+                .withScale(TermiteQueenModel.RENDER_SCALE));
+        event.registerEntityRenderer(ModEntities.TERMITE_QUEEN.get(), TermiteQueenRenderer::new);
     }
 }

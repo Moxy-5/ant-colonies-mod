@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 
 import com.antcolonies.gametest.NavigationTests;
 import com.antcolonies.gametest.NestTests;
+import com.antcolonies.gametest.TermiteTests;
 import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.registry.ModEntities;
 import com.antcolonies.registry.ModFeatures;
@@ -32,6 +33,7 @@ public class AntColoniesMod {
         modEventBus.addListener((RegisterGameTestsEvent event) -> {
             event.register(NestTests.class);
             event.register(NavigationTests.class);
+            event.register(TermiteTests.class);
         });
         // Species profiles (data/<namespace>/species/*.json), loaded with the world's data and on /reload.
         NeoForge.EVENT_BUS.addListener((AddReloadListenerEvent event) -> event.addListener(SpeciesProfiles.INSTANCE));

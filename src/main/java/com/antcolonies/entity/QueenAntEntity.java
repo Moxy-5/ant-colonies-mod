@@ -2,15 +2,14 @@ package com.antcolonies.entity;
 
 import org.jetbrains.annotations.Nullable;
 
-import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.entity.goal.DigGoal;
 import com.antcolonies.entity.goal.QueenToRoomGoal;
+import com.antcolonies.species.Species;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EntityType;
@@ -24,10 +23,6 @@ import net.minecraft.world.phys.Vec3;
 
 /** Queen ant: bigger, tougher and slow. The colony lives and dies with her. */
 public class QueenAntEntity extends AbstractAntEntity {
-    // Placeholder until species profiles (JSON) exist.
-    private static final ResourceLocation SPECIES =
-            ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "red_harvester_ant");
-
     /** How far (in blocks) behind the queen her egg comes out. */
     private static final double EGG_BEHIND = 0.7;
 
@@ -101,7 +96,7 @@ public class QueenAntEntity extends AbstractAntEntity {
             ColonyManager manager = ColonyManager.get(serverLevel);
             @Nullable var existing = getColonyId() == null ? null : manager.getColony(getColonyId());
             if (existing == null) {
-                Colony colony = manager.createColony(SPECIES, getUUID(), blockPosition());
+                Colony colony = manager.createColony(Species.RED_HARVESTER_ANT, getUUID(), blockPosition());
                 setColonyId(colony.getId());
             }
         }

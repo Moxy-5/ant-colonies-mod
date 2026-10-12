@@ -2,7 +2,7 @@ package com.antcolonies.colony;
 
 import java.util.UUID;
 
-import com.antcolonies.entity.QueenAntEntity;
+import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.species.SpeciesProfile;
 
 import net.minecraft.core.BlockPos;
@@ -79,7 +79,7 @@ public class QueenCare {
     /** True when the queen sits in her finished room (the workers feed her there, and her egg comes out there). */
     public boolean isQueenHome(ServerLevel level) {
         BlockPos room = colony.nest().getFinishedRoomCenter(level);
-        QueenAntEntity queen = room == null ? null : colony.getQueen(level);
+        AbstractAntEntity queen = room == null ? null : colony.getQueen(level);
         return queen != null && Math.abs(queen.getX() - (room.getX() + 0.5)) <= 2.5
                 && Math.abs(queen.getZ() - (room.getZ() + 0.5)) <= 2.5 && Math.abs(queen.getY() - room.getY()) < 1.5;
     }

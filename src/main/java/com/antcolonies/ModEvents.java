@@ -1,6 +1,8 @@
 package com.antcolonies;
 
 import com.antcolonies.entity.QueenAntEntity;
+import com.antcolonies.entity.TermiteKingEntity;
+import com.antcolonies.entity.TermiteQueenEntity;
 import com.antcolonies.entity.WorkerAntEntity;
 import com.antcolonies.registry.ModEntities;
 import com.antcolonies.registry.ModItems;
@@ -17,6 +19,8 @@ public class ModEvents {
     public static void onAttributes(EntityAttributeCreationEvent event) {
         event.put(ModEntities.WORKER_ANT.get(), WorkerAntEntity.createAttributes().build());
         event.put(ModEntities.QUEEN_ANT.get(), QueenAntEntity.createAttributes().build());
+        event.put(ModEntities.TERMITE_KING.get(), TermiteKingEntity.createAttributes().build());
+        event.put(ModEntities.TERMITE_QUEEN.get(), TermiteQueenEntity.createAttributes().build());
     }
 
     @SubscribeEvent
@@ -30,6 +34,8 @@ public class ModEvents {
         if (event.getTabKey() == CreativeModeTabs.SPAWN_EGGS) {
             event.accept(ModItems.WORKER_ANT_SPAWN_EGG);
             event.accept(ModItems.QUEEN_ANT_SPAWN_EGG);
+            event.accept(ModItems.TERMITE_QUEEN_SPAWN_EGG);
+            event.accept(ModItems.TERMITE_KING_SPAWN_EGG);
         }
     }
 }

@@ -202,6 +202,20 @@ public class Nest {
         return home == null ? List.of() : getRoomCells(level, home.kind());
     }
 
+    /**
+     * The block right above the top of the shaft, at ground level: the hole a founding pair closes from inside (see
+     * the species profile's {@code seal_while_founding}). It is not part of the plan, so nobody digs it open again.
+     */
+    public BlockPos getEntrance() {
+        return center;
+    }
+
+    /** Whether the entrance hole is open: nothing solid in it (grass or snow do not close it). */
+    public boolean isEntranceOpen(Level level) {
+        BlockState state = level.getBlockState(center);
+        return level.isLoaded(center) && state.canBeReplaced() && state.getFluidState().isEmpty();
+    }
+
     /** Open, or only a heap of seeds or bread on the floor: the block is dug out. A chunk that is not loaded counts as not dug. */
     static boolean isDugOut(Level level, BlockPos pos) {
         if (!level.isLoaded(pos)) {
@@ -352,7 +366,8 @@ public class Nest {
             Direction direction = Direction.from2DDataValue((start + i) % 4);
             // The most levels whose whole plan is soil. A shorter nest uses its levels differently (and its last one is
             // always the small queen's room), so each length is checked as the plan it really is.
-            for (int levels = NestPlan.MAX_LEVELS; levels >= 1; levels--) {
+            int maxLevels = Math.min(NestPlan.MAX_LEVELS, Math.max(1, colony.profile().nest().maxLevels())); // from the species profile
+            for (int levels = maxLevels; levels >= 1; levels--) {
                 List<NestPlan.Chamber> plan = NestPlan.chambers(bottom, direction, levels);
                 if (best != null && levels <= best.chambers().size()) {
                     break; // not better than what is already found

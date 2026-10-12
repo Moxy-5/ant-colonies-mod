@@ -920,7 +920,7 @@ public class NestTests {
         ServerLevel level = helper.getLevel();
         startColony(helper, 1);
 
-        QueenAntEntity[] queen = {null};
+        com.antcolonies.entity.AbstractAntEntity[] queen = {null};
         boolean[] started = {false};
         helper.runAfterDelay(30, () -> {
             Colony colony = colony(helper);

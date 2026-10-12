@@ -3,11 +3,18 @@ package com.antcolonies.command;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.entity.TermiteQueenEntity;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
+
+import java.util.Comparator;
 
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
@@ -19,7 +26,25 @@ public class ColonyCommands {
     public static void onRegisterCommands(RegisterCommandsEvent event) {
         event.getDispatcher().register(Commands.literal("antcolonies")
                 .requires(source -> source.hasPermission(2))
-                .then(Commands.literal("list").executes(context -> list(context.getSource()))));
+                .then(Commands.literal("list").executes(context -> list(context.getSource())))
+                // Sets how far the nearest termite queen has swollen (0 = just founded, 100 = full grown), to see her
+                // grow without waiting for a big colony. She never shrinks by herself, so the size stays.
+                .then(Commands.literal("queensize")
+                        .then(Commands.argument("percent", IntegerArgumentType.integer(0, 100))
+                                .executes(context -> queenSize(context.getSource(), IntegerArgumentType.getInteger(context, "percent"))))));
+    }
+
+    private static int queenSize(CommandSourceStack source, int percent) {
+        Vec3 at = source.getPosition();
+        TermiteQueenEntity queen = source.getLevel().getEntitiesOfClass(TermiteQueenEntity.class, new AABB(BlockPos.containing(at)).inflate(32))
+                .stream().min(Comparator.comparingDouble(q -> q.distanceToSqr(at))).orElse(null);
+        if (queen == null) {
+            source.sendFailure(Component.literal("No termite queen within 32 blocks."));
+            return 0;
+        }
+        queen.setSize(percent / 100.0F);
+        source.sendSuccess(() -> Component.literal("Termite queen set to " + percent + "% grown."), false);
+        return 1;
     }
 
     private static int list(CommandSourceStack source) {

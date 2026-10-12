@@ -8,7 +8,6 @@ import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.AbstractAntEntity;
-import com.antcolonies.entity.QueenAntEntity;
 
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.ai.goal.Goal;
@@ -66,7 +65,7 @@ public class StandByQueenGoal extends Goal {
         if (colony == null || !(ant.level() instanceof ServerLevel level)) {
             return;
         }
-        QueenAntEntity queen = colony.getQueen(level);
+        AbstractAntEntity queen = colony.getQueen(level);
         if (queen == null) {
             return;
         }

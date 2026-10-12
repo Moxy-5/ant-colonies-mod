@@ -1,6 +1,7 @@
 package com.antcolonies.species;
 
 import java.util.List;
+import java.util.Optional;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
@@ -10,11 +11,11 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
  * (see {@link SpeciesProfiles}). The shared colony code asks the colony's profile instead of using fixed numbers, so a
  * new species (termites) only needs its own file. Times are in ticks (20 ticks = 1 second, a day = 24000 ticks).
  *
- * <p>Not in the profile yet (still in code): the nest shape and room sizes ({@code NestPlan}, {@code Nest}), the hill
+ * <p>Not in the profile yet (still in code): the room sizes and the spiral ({@code NestPlan}), the hill
  * ({@code Hill}), the castes' size, health and speed (fixed when the game starts), and the block and item tags.
  */
 public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNumbers queen, BroodNumbers brood,
-        FoodNumbers food, RefuseNumbers refuse) {
+        FoodNumbers food, RefuseNumbers refuse, NestNumbers nest, Optional<QueenBody> queenBody) {
 
     /**
      * The whole colony. {@code maxWorkers}: young grow into workers only while there are fewer. {@code nursesFrom}: from
@@ -98,13 +99,39 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
         ).apply(i, RefuseNumbers::new));
     }
 
+    /**
+     * The nest. {@code maxLevels}: how many levels (rooms stacked below each other) the nest may have, 1 to 4.
+     * {@code sealWhileFounding}: while the colony has no workers yet, the founders close the entrance from inside.
+     */
+    public record NestNumbers(int maxLevels, boolean sealWhileFounding) {
+        public static final Codec<NestNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.INT.fieldOf("max_levels").forGetter(NestNumbers::maxLevels),
+                Codec.BOOL.fieldOf("seal_while_founding").forGetter(NestNumbers::sealWhileFounding)
+        ).apply(i, NestNumbers::new));
+    }
+
+    /**
+     * A queen that swells as her colony grows (termites). Her size goes from 0 (just founded) to 1 (full grown, at
+     * {@code fullSizeAtMembers} colony members besides the king); she grows by at most {@code growthPerDay} each day
+     * and never shrinks. From {@code tooBigToWalkAt} on she can no longer walk.
+     */
+    public record QueenBody(int fullSizeAtMembers, float growthPerDay, float tooBigToWalkAt) {
+        public static final Codec<QueenBody> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.INT.fieldOf("full_size_at_members").forGetter(QueenBody::fullSizeAtMembers),
+                Codec.FLOAT.fieldOf("growth_per_day").forGetter(QueenBody::growthPerDay),
+                Codec.FLOAT.fieldOf("too_big_to_walk_at").forGetter(QueenBody::tooBigToWalkAt)
+        ).apply(i, QueenBody::new));
+    }
+
     public static final Codec<SpeciesProfile> CODEC = RecordCodecBuilder.create(i -> i.group(
             ColonyNumbers.CODEC.fieldOf("colony").forGetter(SpeciesProfile::colony),
             WorkerNumbers.CODEC.fieldOf("worker").forGetter(SpeciesProfile::worker),
             QueenNumbers.CODEC.fieldOf("queen").forGetter(SpeciesProfile::queen),
             BroodNumbers.CODEC.fieldOf("brood").forGetter(SpeciesProfile::brood),
             FoodNumbers.CODEC.fieldOf("food").forGetter(SpeciesProfile::food),
-            RefuseNumbers.CODEC.fieldOf("refuse").forGetter(SpeciesProfile::refuse)
+            RefuseNumbers.CODEC.fieldOf("refuse").forGetter(SpeciesProfile::refuse),
+            NestNumbers.CODEC.fieldOf("nest").forGetter(SpeciesProfile::nest),
+            QueenBody.CODEC.optionalFieldOf("queen_body").forGetter(SpeciesProfile::queenBody)
     ).apply(i, SpeciesProfile::new));
 
     /**
@@ -117,5 +144,7 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
             new QueenNumbers(20, 5, 5, 1200, 3600, 120000L),
             new BroodNumbers(10, 1200, 5, 48000L),
             new FoodNumbers(24, 10, 60, 20),
-            new RefuseNumbers(6000));
+            new RefuseNumbers(6000),
+            new NestNumbers(4, false),
+            Optional.empty());
 }

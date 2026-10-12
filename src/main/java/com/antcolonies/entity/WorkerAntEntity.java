@@ -18,6 +18,7 @@ import com.antcolonies.entity.goal.RepairHillGoal;
 import com.antcolonies.entity.goal.SealGoal;
 import com.antcolonies.entity.goal.StandByQueenGoal;
 import com.antcolonies.entity.goal.StoreSeedGoal;
+import com.antcolonies.species.Species;
 import com.antcolonies.species.SpeciesProfile;
 
 import com.antcolonies.AntColoniesMod;
@@ -194,7 +195,7 @@ public class WorkerAntEntity extends AbstractAntEntity {
             colonyChecked = true;
             if (getColonyId() == null) {
                 ColonyManager manager = ColonyManager.get(serverLevel);
-                Colony colony = manager.findNearest(blockPosition(), JOIN_RADIUS);
+                Colony colony = manager.findNearest(blockPosition(), JOIN_RADIUS, Species.RED_HARVESTER_ANT);
                 if (colony != null) {
                     setColonyId(colony.getId());
                     colony.setCount(CASTE, colony.getCount(CASTE) + 1);

@@ -5,6 +5,8 @@ import com.antcolonies.entity.AntCorpseEntity;
 import com.antcolonies.entity.AntEggEntity;
 import com.antcolonies.entity.AntLarvaEntity;
 import com.antcolonies.entity.QueenAntEntity;
+import com.antcolonies.entity.TermiteKingEntity;
+import com.antcolonies.entity.TermiteQueenEntity;
 import com.antcolonies.entity.WorkerAntEntity;
 
 import net.minecraft.core.registries.Registries;
@@ -57,4 +59,18 @@ public class ModEntities {
                     .of(QueenAntEntity::new, MobCategory.CREATURE)
                     .sized(0.6F, 0.4F)
                     .build("queen_ant"));
+
+    // Termite king (Macrotermes): about twice a worker's length, dark brown with eyes and wing stubs.
+    public static final DeferredHolder<EntityType<?>, EntityType<TermiteKingEntity>> TERMITE_KING =
+            ENTITY_TYPES.register("termite_king", () -> EntityType.Builder
+                    .of(TermiteKingEntity::new, MobCategory.CREATURE)
+                    .sized(0.35F, 0.25F)
+                    .build("termite_king"));
+
+    // Termite queen: starts the king's size; her hitbox grows as she swells (TermiteQueenEntity.getDefaultDimensions).
+    public static final DeferredHolder<EntityType<?>, EntityType<TermiteQueenEntity>> TERMITE_QUEEN =
+            ENTITY_TYPES.register("termite_queen", () -> EntityType.Builder
+                    .of(TermiteQueenEntity::new, MobCategory.CREATURE)
+                    .sized(0.35F, 0.25F)
+                    .build("termite_queen"));
 }

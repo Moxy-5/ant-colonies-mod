@@ -11,5 +11,9 @@
   "block.antcolonies.bread_pile": "Ant Bread Pile",
   "item.antcolonies.ant_bread": "Ant Bread",
   "item.antcolonies.rich_ant_bread": "Rich Ant Bread",
-  "block.antcolonies.deep_soil": "Deep Soil"
+  "block.antcolonies.deep_soil": "Deep Soil",
+  "entity.antcolonies.termite_king": "Termite King",
+  "entity.antcolonies.termite_queen": "Termite Queen",
+  "item.antcolonies.termite_king_spawn_egg": "Termite King Spawn Egg",
+  "item.antcolonies.termite_queen_spawn_egg": "Termite Queen Spawn Egg"
 }

@@ -7,7 +7,7 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import com.antcolonies.entity.QueenAntEntity;
+import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.WorkerAntEntity;
 import com.antcolonies.species.SpeciesProfile;
 import com.antcolonies.species.SpeciesProfiles;
@@ -127,10 +127,10 @@ public class Colony {
         return center;
     }
 
-    /** The queen, if she is loaded and alive. */
+    /** The queen (of whatever species), if she is loaded and alive. */
     @Nullable
-    public QueenAntEntity getQueen(ServerLevel level) {
-        return level.getEntity(queenId) instanceof QueenAntEntity queen && queen.isAlive() ? queen : null;
+    public AbstractAntEntity getQueen(ServerLevel level) {
+        return level.getEntity(queenId) instanceof AbstractAntEntity queen && queen.isAlive() ? queen : null;
     }
 
     /** The area (around the nest, down to the refuse chamber) where the colony's eggs, larvae and dead ants are looked for. */

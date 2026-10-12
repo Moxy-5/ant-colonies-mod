@@ -8,7 +8,6 @@ import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.AbstractAntEntity;
-import com.antcolonies.entity.QueenAntEntity;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -134,7 +133,7 @@ public class FeedQueenGoal extends Goal {
 
     /** Second leg: to the queen, who takes the bread. */
     private void walkToQueen(ServerLevel level) {
-        QueenAntEntity queen = colony.getQueen(level);
+        AbstractAntEntity queen = colony.getQueen(level);
         if (queen == null) {
             done = true;
             return;

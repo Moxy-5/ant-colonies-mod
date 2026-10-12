@@ -29,4 +29,12 @@ public class ModItems {
     public static final DeferredItem<DeferredSpawnEggItem> QUEEN_ANT_SPAWN_EGG =
             ITEMS.register("queen_ant_spawn_egg",
                     () -> new DeferredSpawnEggItem(ModEntities.QUEEN_ANT, 0x7A2E14, 0x2B1208, new Item.Properties()));
+
+    public static final DeferredItem<DeferredSpawnEggItem> TERMITE_KING_SPAWN_EGG =
+            ITEMS.register("termite_king_spawn_egg",
+                    () -> new DeferredSpawnEggItem(ModEntities.TERMITE_KING, 0x42210F, 0xC4923F, new Item.Properties()));
+
+    public static final DeferredItem<DeferredSpawnEggItem> TERMITE_QUEEN_SPAWN_EGG =
+            ITEMS.register("termite_queen_spawn_egg",
+                    () -> new DeferredSpawnEggItem(ModEntities.TERMITE_QUEEN, 0xEEE2C4, 0x42210F, new Item.Properties()));
 }

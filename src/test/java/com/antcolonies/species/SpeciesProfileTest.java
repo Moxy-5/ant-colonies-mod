@@ -32,6 +32,17 @@ class SpeciesProfileTest {
         assertTrue(profile.worker().mealIntervalTicks() < profile.worker().slowAfterTicks()
                 && profile.worker().slowAfterTicks() < profile.worker().starveAfterTicks(), "a worker must get hungry before it slows down, and slow down before it starves");
         assertTrue(profile.food().radius() > 0 && profile.food().seedsPerGrass() > 0);
+        assertEquals(4, profile.nest().maxLevels());
+        assertTrue(profile.queenBody().isEmpty(), "the ant queen does not swell");
+    }
+
+    @Test
+    void theMacrotermesFileReadsWithAOneLevelSealedNestAndASwellingQueen() throws Exception {
+        SpeciesProfile profile = read("macrotermes");
+        assertEquals(1, profile.nest().maxLevels());
+        assertTrue(profile.nest().sealWhileFounding());
+        assertTrue(profile.queenBody().isPresent(), "the termite queen should swell");
+        assertTrue(profile.queenBody().get().tooBigToWalkAt() > 0 && profile.queenBody().get().tooBigToWalkAt() <= 1);
     }
 
     @Test

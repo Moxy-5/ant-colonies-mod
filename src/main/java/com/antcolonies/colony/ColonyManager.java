@@ -51,12 +51,15 @@ public class ColonyManager extends SavedData {
         return colonies.get(id);
     }
 
-    /** The closest colony whose center is within maxDistance blocks, or null. */
+    /** The closest colony of this species whose center is within maxDistance blocks, or null. */
     @Nullable
-    public Colony findNearest(BlockPos pos, double maxDistance) {
+    public Colony findNearest(BlockPos pos, double maxDistance, ResourceLocation species) {
         Colony best = null;
         double bestDist = maxDistance * maxDistance;
         for (Colony colony : colonies.values()) {
+            if (!colony.getSpecies().equals(species)) {
+                continue;
+            }
             double dist = colony.getCenter().distSqr(pos);
             if (dist <= bestDist) {
                 bestDist = dist;
