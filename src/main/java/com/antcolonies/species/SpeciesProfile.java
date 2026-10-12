@@ -102,11 +102,14 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
     /**
      * The nest. {@code maxLevels}: how many levels (rooms stacked below each other) the nest may have, 1 to 4.
      * {@code sealWhileFounding}: while the colony has no workers yet, the founders close the entrance from inside.
+     * {@code foundingChamber}: the queen first digs a small founding chamber of her own just under the surface (see
+     * {@code NestPlan.foundingChamber}), her home until the workers have dug her deep room (optional, default false).
      */
-    public record NestNumbers(int maxLevels, boolean sealWhileFounding) {
+    public record NestNumbers(int maxLevels, boolean sealWhileFounding, boolean foundingChamber) {
         public static final Codec<NestNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("max_levels").forGetter(NestNumbers::maxLevels),
-                Codec.BOOL.fieldOf("seal_while_founding").forGetter(NestNumbers::sealWhileFounding)
+                Codec.BOOL.fieldOf("seal_while_founding").forGetter(NestNumbers::sealWhileFounding),
+                Codec.BOOL.optionalFieldOf("founding_chamber", false).forGetter(NestNumbers::foundingChamber)
         ).apply(i, NestNumbers::new));
     }
 
@@ -124,9 +127,9 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
     }
 
     /**
-     * A founding batch (termites): after the founders have sealed themselves in, the queen lays {@code eggs} eggs, one
-     * every {@code eggIntervalTicks}, and the royal pair feed the young on their own body fat (one piece every
-     * {@code feedIntervalTicks}), so the first workers need no food from outside.
+     * A founding batch: after the founders have sealed themselves in, the queen lays {@code eggs} eggs, one every
+     * {@code eggIntervalTicks}, and the founders (the queen, and the king if the species has one) feed the young on
+     * their own body fat (one piece every {@code feedIntervalTicks}), so the first workers need no food from outside.
      */
     public record Founding(int eggs, int eggIntervalTicks, int feedIntervalTicks) {
         public static final Codec<Founding> CODEC = RecordCodecBuilder.create(i -> i.group(
@@ -159,7 +162,7 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
             new BroodNumbers(10, 1200, 5, 48000L),
             new FoodNumbers(24, 10, 60, 20),
             new RefuseNumbers(6000),
-            new NestNumbers(4, false),
+            new NestNumbers(4, true, true),
             Optional.empty(),
-            Optional.empty());
+            Optional.of(new Founding(3, 400, 200)));
 }

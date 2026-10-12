@@ -34,7 +34,8 @@ class SpeciesProfileTest {
         assertTrue(profile.food().radius() > 0 && profile.food().seedsPerGrass() > 0);
         assertEquals(4, profile.nest().maxLevels());
         assertTrue(profile.queenBody().isEmpty(), "the ant queen does not swell");
-        assertTrue(profile.founding().isEmpty(), "the ant queen has no founding batch (yet)");
+        assertTrue(profile.founding().isPresent() && profile.founding().get().eggs() == 3, "the ant queen raises 3 eggs on her own fat");
+        assertTrue(profile.nest().sealWhileFounding() && profile.nest().foundingChamber(), "the ant queen seals herself into a founding chamber");
     }
 
     @Test
@@ -42,6 +43,7 @@ class SpeciesProfileTest {
         SpeciesProfile profile = read("macrotermes");
         assertEquals(1, profile.nest().maxLevels());
         assertTrue(profile.nest().sealWhileFounding());
+        assertTrue(!profile.nest().foundingChamber(), "the termites' royal chamber is their founding nest");
         assertTrue(profile.queenBody().isPresent(), "the termite queen should swell");
         assertTrue(profile.queenBody().get().tooBigToWalkAt() > 0 && profile.queenBody().get().tooBigToWalkAt() <= 1);
         assertTrue(profile.founding().isPresent() && profile.founding().get().eggs() > 0, "termites raise a founding batch");

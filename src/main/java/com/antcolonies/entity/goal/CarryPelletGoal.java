@@ -83,6 +83,11 @@ public class CarryPelletGoal extends Goal {
 
     @Override
     public void tick() {
+        if (!ant.isCarrying()) {
+            // It let the pellet go (no route to any spot, see walkToSpot) in this very tick, maybe while standing right
+            // next to the spot: nothing left to place.
+            spot = null;
+        }
         if (spot == null || !(ant.level() instanceof ServerLevel level)) {
             return;
         }
@@ -113,6 +118,7 @@ public class CarryPelletGoal extends Goal {
                 AntColoniesMod.LOGGER.info("[pellet] ant at {} found no route to mound spots (last: {})", ant.blockPosition().toShortString(), spot.toShortString());
                 ant.setCarriedBlock(null);
                 colony.hill().pauseHillRepair(ant.level());
+                spot = null;
                 return;
             }
             spot = colony.hill().pickMoundSpot(ant.level(), ant.getRandom(), ant.getUUID());

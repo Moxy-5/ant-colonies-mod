@@ -31,13 +31,18 @@ import net.minecraft.core.Direction;
  * the middle of its first row. A room with an even width has no middle column, so it gets one more column on the clockwise
  * side of the tunnel than on the other.
  *
+ * <p>Species whose queen founds alone (the profile's {@code nest.founding_chamber}) also get a small founding chamber
+ * just under the surface, dug first, on the far side of the shaft from the rooms: see {@link #foundingChamber}.
+ *
  * <p>With less soil there are fewer levels (the plan is cut off after the last level that fits): then the levels are
  * seeds + queen (2), seeds + nursery + queen (3), or only the queen's room (1). The queen's room is the smallest, so a
  * level that is used as the queen's room always lies inside the bigger room it would have been.
  */
 public final class NestPlan {
     public enum Kind {
-        QUEEN, NURSERY, FOOD, REFUSE
+        QUEEN, NURSERY, FOOD, REFUSE,
+        /** The small room a queen digs on her own when she founds the colony (not one of the levels, see {@link #foundingChamber}). */
+        FOUNDING
     }
 
     /**
@@ -66,6 +71,14 @@ public final class NestPlan {
     public static final int TUNNEL_LENGTH = 3;
     /** The most levels a nest has. */
     public static final int MAX_LEVELS = 4;
+    /**
+     * How deep the founding chamber lies: this many blocks of the entrance shaft, so 1 block of soil is its roof. It is
+     * dug first, by the queen alone (species with a founding chamber in their profile), and the shaft goes on down
+     * to the levels from there.
+     */
+    public static final int FOUNDING_DEPTH = 2;
+    /** The founding chamber's tunnel is this short: one block from the shaft, then the room. */
+    public static final int FOUNDING_TUNNEL_LENGTH = 1;
     /** How far apart (in blocks, floor to floor) two levels are: a 1-block room and a 1-block wall. */
     public static final int LEVEL_SPACING = 2;
     /** A stair is this many blocks: one sideways, then {@link #LEVEL_SPACING} straight down. */
@@ -81,6 +94,7 @@ public final class NestPlan {
             case NURSERY -> new RoomSize(5, 5);
             case FOOD -> new RoomSize(5, 5);
             case REFUSE -> new RoomSize(5, 5);
+            case FOUNDING -> new RoomSize(3, 3);
         };
     }
 
@@ -120,7 +134,7 @@ public final class NestPlan {
                 tunnel.add(hub.relative(direction, i));
             }
             RoomSize size = roomSize(kinds.get(level));
-            List<BlockPos> room = room(hub, direction, size);
+            List<BlockPos> room = room(hub, direction, size, TUNNEL_LENGTH);
             cells.addAll(tunnel);
             cells.addAll(room);
             List<BlockPos> wayIn = new ArrayList<>(stairs);
@@ -131,15 +145,36 @@ public final class NestPlan {
         return List.copyOf(chambers);
     }
 
-    /** The blocks of a room that lies after a tunnel leaving {@code start} in direction {@code forward}, in digging order. */
-    private static List<BlockPos> room(BlockPos start, Direction forward, RoomSize size) {
+    /**
+     * The founding chamber of a nest whose levels lie toward {@code direction}: a 3x3 room on the opposite side of the
+     * shaft, off the shaft's block {@link #FOUNDING_DEPTH} deep ({@code shaftCell}) through a 1-block tunnel. That side
+     * is clear of the levels' tunnels and rooms, and of the first stair (it steps off clockwise of {@code direction});
+     * the stairs that pass under it lie at least one block of soil lower. Its wayIn is its tunnel only (the shaft above
+     * is not part of a chamber).
+     */
+    public static Chamber foundingChamber(BlockPos shaftCell, Direction direction) {
+        Direction away = direction.getOpposite();
+        List<BlockPos> tunnel = new ArrayList<>();
+        for (int i = 1; i <= FOUNDING_TUNNEL_LENGTH; i++) {
+            tunnel.add(shaftCell.relative(away, i));
+        }
+        RoomSize size = roomSize(Kind.FOUNDING);
+        List<BlockPos> room = room(shaftCell, away, size, FOUNDING_TUNNEL_LENGTH);
+        List<BlockPos> cells = new ArrayList<>(tunnel);
+        cells.addAll(room);
+        BlockPos center = shaftCell.relative(away, FOUNDING_TUNNEL_LENGTH + (size.length() + 1) / 2);
+        return new Chamber(Kind.FOUNDING, List.copyOf(cells), center, List.copyOf(tunnel), List.copyOf(room));
+    }
+
+    /** The blocks of a room that lies after a tunnel ({@code tunnelLength} long) leaving {@code start} in direction {@code forward}, in digging order. */
+    private static List<BlockPos> room(BlockPos start, Direction forward, RoomSize size, int tunnelLength) {
         List<BlockPos> cells = new ArrayList<>();
         Direction sideways = forward.getClockWise();
         // Columns left and right of the tunnel's line; an even width gives the extra one to the clockwise side.
         int left = (size.width() - 1) / 2;
         int right = size.width() / 2;
         for (int row = 1; row <= size.length(); row++) {
-            BlockPos rowCenter = start.relative(forward, TUNNEL_LENGTH + row);
+            BlockPos rowCenter = start.relative(forward, tunnelLength + row);
             // Middle of the row first, then outward, so every block touches already-dug space.
             cells.add(rowCenter);
             for (int offset = 1; offset <= Math.max(left, right); offset++) {

@@ -25,6 +25,41 @@ class NestPlanTest {
         return NestPlan.chambers(BOTTOM, direction, NestPlan.MAX_LEVELS);
     }
 
+    /**
+     * The founding chamber (a 3x3 room off the shaft 2 blocks down, on the far side from the rooms) never touches a
+     * cell of the levels, not even through a corner of a face: the only way between them is the shaft. Checked with the
+     * shaft 3 deep (the levels start one block under it) and 2 deep (the first level is on the same layer).
+     */
+    @Test
+    void theFoundingChamberStaysClearOfTheLevels() {
+        for (int depth = 2; depth <= 3; depth++) {
+            BlockPos entrance = BOTTOM.above(depth);
+            BlockPos shaftCell = entrance.below(NestPlan.FOUNDING_DEPTH);
+            for (Direction direction : Direction.Plane.HORIZONTAL) {
+                NestPlan.Chamber founding = NestPlan.foundingChamber(shaftCell, direction);
+                assertEquals(NestPlan.Kind.FOUNDING, founding.kind());
+                assertEquals(1 + 9, founding.cells().size());
+                assertTrue(founding.room().contains(founding.center()));
+                Set<BlockPos> shaft = new HashSet<>();
+                for (int i = 1; i <= depth; i++) {
+                    shaft.add(entrance.below(i));
+                }
+                for (NestPlan.Chamber level : NestPlan.chambers(entrance.below(depth), direction, NestPlan.MAX_LEVELS)) {
+                    for (BlockPos a : founding.cells()) {
+                        for (BlockPos b : level.cells()) {
+                            int dist = Math.abs(a.getX() - b.getX()) + Math.abs(a.getY() - b.getY()) + Math.abs(a.getZ() - b.getZ());
+                            assertTrue(dist > 1, "depth " + depth + ", rooms " + direction + ": founding cell " + a
+                                    + " touches " + level.kind() + " cell " + b);
+                        }
+                    }
+                }
+                // It joins the shaft only through its tunnel.
+                BlockPos tunnel = founding.wayIn().get(0);
+                assertTrue(shaft.contains(tunnel.relative(direction)), "the tunnel does not start at the shaft");
+            }
+        }
+    }
+
     @Test
     void fourLevelsInOrderSeedsNurseryQueenRefuse() {
         List<NestPlan.Chamber> chambers = full(Direction.EAST);

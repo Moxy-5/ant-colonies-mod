@@ -44,7 +44,9 @@ public class NestTests {
      * The whole nest: a 3-deep shaft, then four levels (food store 5x5, nursery 5x5, queen 3x3, refuse chamber 5x5),
      * each a 3-long tunnel and its room, and a 3-block stair down to every level but the first.
      */
-    private static final int NEST_CELLS = 3 + 4 * 3 + (25 + 25 + 9 + 25) + 3 * NestPlan.STAIR_LENGTH;
+    /** The shaft, the founding chamber (1-block tunnel, 3x3 room), 4 tunnels, the 4 rooms and 3 stairs. */
+    private static final int FOUNDING_CELLS = 1 + 9;
+    private static final int NEST_CELLS = 3 + FOUNDING_CELLS + 4 * 3 + (25 + 25 + 9 + 25) + 3 * NestPlan.STAIR_LENGTH;
 
     @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
     public static void workersDigTheWholeNestAndBuildTheMound(GameTestHelper helper) {
@@ -348,7 +350,7 @@ public class NestTests {
             var rooms = colony.nest().getPlannedChambers(level);
             helper.assertTrue(rooms.size() == levels, "the nest has " + rooms.size() + " levels, expected " + levels);
             helper.assertTrue(rooms.get(rooms.size() - 1).kind() == NestPlan.Kind.QUEEN, "the last level is not the queen's room");
-            int expected = shaft;
+            int expected = shaft + FOUNDING_CELLS;
             for (var room : rooms) {
                 expected += room.cells().size();
             }
@@ -371,36 +373,56 @@ public class NestTests {
     }
 
     /**
-     * A queen on her own (no workers), as when she founds a nest: she digs the shaft, the seed store and the nursery
-     * (each with its tunnel, and the stair down to the nursery) herself, then settles in the middle of the nursery, her
-     * home until her own room is dug. She cannot place blocks, so no hill is built.
+     * A queen on her own (no workers), as when she founds a colony: she digs the shaft 2 blocks down and her small
+     * founding chamber off it, and nothing else; she settles in it, closes the entrance from inside, lays her 3 eggs and
+     * feeds the larvae on her own fat until they are her first 3 workers. They open the entrance again. She cannot
+     * place blocks, so no hill is built while she is alone.
      */
     @GameTest(template = "arena", timeoutTicks = 90000, skyAccess = true)
-    public static void aloneQueenDigsHerOwnRoom(GameTestHelper helper) {
+    public static void aLoneQueenFoundsHerColonyAndRaisesHerFirstWorkers(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
         startColony(helper, 0);
+        int[] dugWhenSealed = {-1};
+        int[] moundWhenSealed = {-1};
+        BlockPos entrance = helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE));
 
         helper.onEachTick(() -> {
+            Colony colony = colony(helper);
+            if (colony == null) {
+                return;
+            }
+            if (dugWhenSealed[0] < 0 && level.getBlockState(entrance).is(ModBlocks.BURROWED_DIRT.get())) {
+                dugWhenSealed[0] = airBelowSurface(helper);
+                moundWhenSealed[0] = moundBlocks(helper);
+                AntColoniesMod.LOGGER.info("[founding-test] tick {}: sealed in, {} cells dug. {}", helper.getTick(), dugWhenSealed[0], describe(helper));
+            }
             if (helper.getTick() % 400 == 0) {
-                AntColoniesMod.LOGGER.info("[queen-dig-test] tick {}: {} cells dug. {}", helper.getTick(), airBelowSurface(helper), describe(helper));
+                AntColoniesMod.LOGGER.info("[founding-test] tick {}: eggs laid {}, eggs {}, larvae {}, workers {}, {} cells dug",
+                        helper.getTick(), colony.queenCare().getEggsLaid(), colony.brood().countEggs(level), colony.brood().countLarvae(level),
+                        colony.getCount(WorkerAntEntity.CASTE), airBelowSurface(helper));
             }
         });
 
         helper.succeedWhen(() -> {
             Colony colony = colony(helper);
             helper.assertTrue(colony != null, "no colony yet");
-            BlockPos room = colony.nest().getFinishedRoomCenter(level);
-            helper.assertTrue(room != null, "her home is not finished: " + airBelowSurface(helper) + " cells dug");
-            var queens = level.getEntitiesOfClass(com.antcolonies.entity.QueenAntEntity.class, helper.getBounds());
-            helper.assertTrue(!queens.isEmpty() && queens.get(0).blockPosition().equals(room), "the queen is not in the middle of her room yet");
-            // Shaft + the two top levels only: she stops digging as soon as she has a home, the workers dig the rest.
-            helper.assertTrue(room.equals(colony.nest().getPlannedChambers(level).get(1).center()), "she did not settle in the nursery");
-            int expected = Nest.SHAFT_DEPTH + colony.nest().getPlannedChambers(level).get(0).cells().size()
-                    + colony.nest().getPlannedChambers(level).get(1).cells().size();
-            helper.assertTrue(airBelowSurface(helper) == expected, "dug " + airBelowSurface(helper) + " cells but expected " + expected);
-            helper.assertTrue(moundBlocks(helper) == 0, "the queen placed soil");
-            AntColoniesMod.LOGGER.info("[queen-dig-test] finished at tick {}", helper.getTick());
+            helper.assertTrue(dugWhenSealed[0] >= 0, "she has not sealed herself in yet: " + airBelowSurface(helper) + " cells dug");
+            // Shaft 2 down + the founding chamber only: the workers dig the rest.
+            int expected = NestPlan.FOUNDING_DEPTH + FOUNDING_CELLS;
+            helper.assertTrue(dugWhenSealed[0] == expected, "she had dug " + dugWhenSealed[0] + " cells when she sealed herself in, expected " + expected);
+            // The only Burrowed Dirt above ground is the plug in the entrance.
+            helper.assertTrue(moundWhenSealed[0] == 1, "the queen placed soil (" + moundWhenSealed[0] + " blocks above ground, only the plug expected)");
+            NestPlan.Chamber founding = colony.nest().getFoundingChamber(level);
+            helper.assertTrue(founding != null, "the nest has no founding chamber");
+            helper.assertTrue(colony.queenCare().getEggsLaid() == 3, colony.queenCare().getEggsLaid() + " eggs laid, expected 3");
+            helper.assertTrue(colony.brood().countBrood(level) == 0, "still " + colony.brood().countBrood(level) + " eggs and larvae");
+            var workers = level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds(), w -> colony.getId().equals(w.getColonyId()));
+            helper.assertTrue(workers.size() == 3 && colony.getCount(WorkerAntEntity.CASTE) == 3,
+                    workers.size() + " workers, the colony counts " + colony.getCount(WorkerAntEntity.CASTE) + ", expected 3");
+            helper.assertTrue(colony.nest().isEntranceOpen(level), "the entrance is still closed");
+            helper.assertTrue(airBelowSurface(helper) > expected, "the workers have not started on the rest of the nest");
+            AntColoniesMod.LOGGER.info("[founding-test] finished at tick {}", helper.getTick());
         });
     }
 
@@ -965,6 +987,7 @@ public class NestTests {
             oldSave.remove("nestDepth");
             oldSave.remove("nestDirection");
             oldSave.remove("nestLevels");
+            oldSave.remove("nestFounding");
             List<NestPlan.Chamber> fromOldSave = Colony.load(oldSave).nest().getPlannedChambers(level);
             helper.assertTrue(fromOldSave.equals(before), "from an old save the nest plan changed: " + describePlan(before, colony)
                     + " became " + describePlan(fromOldSave, colony));
@@ -976,6 +999,9 @@ public class NestTests {
             List<NestPlan.Chamber> after = reloaded.nest().getPlannedChambers(level);
             helper.assertTrue(after.equals(before), "after the reload the nest plan changed: " + describePlan(before, colony)
                     + " became " + describePlan(after, colony));
+            helper.assertTrue(colony.nest().getFoundingChamber(level) != null
+                    && colony.nest().getFoundingChamber(level).equals(reloaded.nest().getFoundingChamber(level)),
+                    "the founding chamber changed after the reload");
             helper.succeed();
         });
     }
@@ -1043,7 +1069,11 @@ public class NestTests {
         for (int i = 1; i <= Nest.SHAFT_DEPTH; i++) {
             level.setBlock(colony.getCenter().below(i), Blocks.AIR.defaultBlockState(), 3);
         }
-        for (NestPlan.Chamber chamber : colony.nest().getPlannedChambers(level)) {
+        List<NestPlan.Chamber> all = new java.util.ArrayList<>(colony.nest().getPlannedChambers(level));
+        if (colony.nest().getFoundingChamber(level) != null) {
+            all.add(colony.nest().getFoundingChamber(level));
+        }
+        for (NestPlan.Chamber chamber : all) {
             for (BlockPos pos : chamber.cells()) {
                 level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
             }
@@ -1211,13 +1241,12 @@ public class NestTests {
     }
 
     /**
-     * The queen's home is the nursery until her own room is dug (here it never is: the way down is turned to stone).
-     * Seeds lie on the ground; the workers store them in the seed store, the nurse mills bread in the nursery where the
-     * queen lives, feeds her 20 pieces, her egg comes out in that room and a worker puts it down there. Every seed is
-     * accounted for in the end.
+     * The queen lives in her founding chamber until her own deep room is dug (here it never is: it is turned to stone).
+     * Seeds lie on the ground; the workers store them in the seed store, the nurse mills bread in the nursery and feeds
+     * her 20 pieces up in the founding chamber, and her egg is carried down to the nursery. Every seed is accounted for.
      */
     @GameTest(template = "arena", timeoutTicks = 90000, skyAccess = true)
-    public static void queenLivesInTheNurseryUntilHerOwnRoomIsDug(GameTestHelper helper) {
+    public static void queenLivesInTheFoundingChamberUntilHerOwnRoomIsDug(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
         startColony(helper);
@@ -1225,7 +1254,7 @@ public class NestTests {
         boolean[] blocked = {false};
         boolean[] dropped = {false};
         boolean[] fedAtHome = {false};
-        boolean[] eggAtHome = {false};
+        boolean[] eggInNursery = {false};
         helper.onEachTick(() -> {
             Colony colony = colony(helper);
             if (colony == null) {
@@ -1243,17 +1272,17 @@ public class NestTests {
                 dropSeeds(helper, MIDDLE + 6, MIDDLE, 10);
                 dropSeeds(helper, MIDDLE - 6, MIDDLE + 2, 10);
                 dropSeeds(helper, MIDDLE + 1, MIDDLE - 7, 10);
-                AntColoniesMod.LOGGER.info("[early-feed-test] tick {}: the nursery is finished, 30 seeds dropped", helper.getTick());
+                AntColoniesMod.LOGGER.info("[early-feed-test] tick {}: the founding chamber is finished, 30 seeds dropped", helper.getTick());
             }
             if (dropped[0] && colony.queenCare().getQueenBread() > 0 && colony.nest().getQueenRoomCells(level).isEmpty()) {
                 fedAtHome[0] = true;
             }
             if (dropped[0] && colony.queenCare().getEggsLaid() > 0) {
                 for (var egg : colony.brood().getEggs(level)) {
-                    eggAtHome[0] |= colony.nest().getHomeRoomCells(level).contains(egg.blockPosition());
+                    eggInNursery[0] |= colony.nest().getNurseryCells(level).contains(egg.blockPosition());
                 }
                 for (var larva : colony.brood().getLarvae(level)) {
-                    eggAtHome[0] |= colony.nest().getHomeRoomCells(level).contains(larva.blockPosition());
+                    eggInNursery[0] |= colony.nest().getNurseryCells(level).contains(larva.blockPosition());
                 }
             }
             if (dropped[0] && helper.getTick() % 400 == 0) {
@@ -1266,10 +1295,12 @@ public class NestTests {
         helper.succeedWhen(() -> {
             Colony colony = colony(helper);
             helper.assertTrue(dropped[0] && colony != null, "no seeds have been dropped yet");
-            helper.assertTrue(fedAtHome[0], "the queen was not fed in the nursery");
-            helper.assertTrue(colony.queenCare().getEggsLaid() >= 1 && eggAtHome[0], "no egg has been put down in the nursery yet");
-            helper.assertTrue(colony.nest().getFinishedRoomCenter(level).equals(colony.nest().getPlannedChambers(level).get(1).center()),
-                    "the queen's home is not the nursery");
+            helper.assertTrue(fedAtHome[0], "the queen was not fed in her founding chamber");
+            helper.assertTrue(colony.queenCare().getEggsLaid() >= 1 && eggInNursery[0], "no egg has been put down in the nursery yet");
+            helper.assertTrue(colony.nest().getFinishedRoomCenter(level).equals(colony.nest().getFoundingChamber(level).center()),
+                    "the queen's home is not the founding chamber");
+            helper.assertTrue(colony.getQueen(level).blockPosition().equals(colony.nest().getFoundingChamber(level).center()),
+                    "the queen is not in her founding chamber");
             for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
                 helper.assertTrue(!ant.isCarryingSeed(), "an ant is still carrying a seed");
             }
@@ -1452,6 +1483,9 @@ public class NestTests {
         }
         for (var chamber : colony.nest().getPlannedChambers(level)) {
             planned.addAll(chamber.cells());
+        }
+        if (colony.nest().getFoundingChamber(level) != null) {
+            planned.addAll(colony.nest().getFoundingChamber(level).cells());
         }
         int ceiling = colony.getCenter().getY() - 1; // the shaft's top block: nothing above it counts
         AABB area = helper.getBounds();

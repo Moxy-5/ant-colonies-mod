@@ -7,6 +7,7 @@ import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.entity.goal.DigGoal;
 import com.antcolonies.entity.goal.QueenToRoomGoal;
+import com.antcolonies.entity.goal.SealEntranceGoal;
 import com.antcolonies.species.Species;
 
 import net.minecraft.core.BlockPos;
@@ -21,7 +22,12 @@ import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
-/** Queen ant: bigger, tougher and slow. The colony lives and dies with her. */
+/**
+ * Queen ant: bigger, tougher and slow. The colony lives and dies with her. On her own she founds the colony like a
+ * real harvester ant queen: she digs a small founding chamber just under the surface, seals the entrance from inside,
+ * and raises her founding batch on her own body fat (species profile {@code nest.founding_chamber}, {@code founding};
+ * see {@code QueenCare.raiseFoundingBatch}); the first workers open the entrance and dig the rest of the nest.
+ */
 public class QueenAntEntity extends AbstractAntEntity {
     /** How far (in blocks) behind the queen her egg comes out. */
     private static final double EGG_BEHIND = 0.7;
@@ -42,12 +48,14 @@ public class QueenAntEntity extends AbstractAntEntity {
     @Override
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));
+        // Alone (no workers yet), once her founding chamber is dug she closes the entrance from inside.
+        this.goalSelector.addGoal(1, new SealEntranceGoal(this));
         // She helps dig the shaft and her own room; when the room is finished she goes down and sits in its middle.
-        this.goalSelector.addGoal(1, new QueenToRoomGoal(this));
+        this.goalSelector.addGoal(2, new QueenToRoomGoal(this));
         // Otherwise she hardly ever wanders: low chance to start a stroll, and never far. Settled in her room, never.
-        this.goalSelector.addGoal(2, new DigGoal(this, () -> QueenToRoomGoal.findFinishedRoom(this) == null));
-        this.goalSelector.addGoal(3, new AntWanderGoal(this, 0.6, 400, 4, () -> QueenToRoomGoal.findFinishedRoom(this) == null));
-        this.goalSelector.addGoal(4, new RandomLookAroundGoal(this));
+        this.goalSelector.addGoal(3, new DigGoal(this, () -> QueenToRoomGoal.findFinishedRoom(this) == null));
+        this.goalSelector.addGoal(4, new AntWanderGoal(this, 0.6, 400, 4, () -> QueenToRoomGoal.findFinishedRoom(this) == null));
+        this.goalSelector.addGoal(5, new RandomLookAroundGoal(this));
     }
 
     // Every second: has the egg she carries grown? Then it comes out behind her (she has to be in her room).
@@ -69,6 +77,9 @@ public class QueenAntEntity extends AbstractAntEntity {
         if (tickCount % 1200 == 0) {
             manager.markChanged(); // the hunger clock changes all the time: make sure it gets saved
         }
+        if (colony.queenCare().raiseFoundingBatch(serverLevel, this)) {
+            manager.markChanged();
+        }
         if (!colony.queenCare().isEggDue(serverLevel) || !colony.queenCare().isQueenHome(serverLevel)) {
             return;
         }
@@ -81,7 +92,8 @@ public class QueenAntEntity extends AbstractAntEntity {
         manager.markChanged();
     }
 
-    // She digs her own room with the workers, but cannot place blocks: no soil pellets for the hill, no sealing.
+    // She digs her own room with the workers, but cannot place blocks: no soil pellets for the hill, no sealing of
+    // holes in the nest walls (closing the entrance while she founds is a goal of its own).
     @Override
     public boolean canPlaceBlocks() {
         return false;

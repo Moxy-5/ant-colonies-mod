@@ -3,11 +3,14 @@ package com.antcolonies.colony;
 import java.util.UUID;
 
 import com.antcolonies.entity.AbstractAntEntity;
+import com.antcolonies.entity.WorkerAntEntity;
 import com.antcolonies.species.SpeciesProfile;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * The queen's side of the colony: how much bread she has been fed, the egg she carries (or the burst of eggs after rich
@@ -32,6 +35,8 @@ public class QueenCare {
     private int burstLeft;
     /** How many eggs the queen has laid in all. Saved. */
     private int eggsLaid;
+    /** When the next egg of the founding batch comes ({@link Colony#NOT_SET} = not counting yet). Saved. */
+    private long nextFoundingEgg = Colony.NOT_SET;
     /** The game time of the queen's last piece of bread, or of the last time she needed none. Saved. */
     private long queenLastFed = Colony.NOT_SET;
     /** The workers on their way to feed the queen: ant -> game time when the claim runs out. Not saved. */
@@ -152,6 +157,46 @@ public class QueenCare {
         colony.brood().spawnEgg(level, x, y, z).setPlaced(true);
     }
 
+    /**
+     * The founding batch (species with {@code founding} in their profile), called by the queen once a second. Once the
+     * founders have sealed themselves in and she lies in her home, she lays the batch's eggs one by one from her own
+     * reserves; and the founders feed the young on their own body fat, the hungriest one a piece every feed interval,
+     * until the batch has grown into the first workers. Fat feeding stops once that many workers exist, or once she has
+     * laid eggs beyond the batch (those are fed by the nurses). Returns true if anything changed that should be saved.
+     */
+    public boolean raiseFoundingBatch(ServerLevel level, AbstractAntEntity queen) {
+        SpeciesProfile.Founding founding = colony.profile().founding().orElse(null);
+        if (founding == null) {
+            return false;
+        }
+        long now = level.getGameTime();
+        boolean changed = false;
+        boolean sealedIn = isQueenHome(level) && !colony.nest().isEntranceOpen(level);
+        if (sealedIn && colony.isFounding() && eggsLaid < founding.eggs()) {
+            if (nextFoundingEgg == Colony.NOT_SET) {
+                nextFoundingEgg = now + founding.eggIntervalTicks();
+                changed = true;
+            } else if (now >= nextFoundingEgg) {
+                BlockPos spot = colony.brood().pickEggSpot(level, queen.getRandom());
+                Vec3 at = spot == null ? queen.position() : Vec3.atBottomCenterOf(spot);
+                layFoundingEgg(level, at.x, at.y, at.z);
+                nextFoundingEgg = now + founding.eggIntervalTicks();
+                changed = true;
+            }
+        }
+        boolean raising = eggsLaid <= founding.eggs() && colony.getCount(WorkerAntEntity.CASTE) < founding.eggs();
+        if (raising && now % founding.feedIntervalTicks() < 20) {
+            // The hungriest young one gets the next piece.
+            colony.brood().getLarvae(level).stream().filter(young -> !young.isFull())
+                    .min((a, b) -> Integer.compare(a.getFed(), b.getFed()))
+                    .ifPresent(young -> {
+                        young.feed();
+                        level.sendParticles(ParticleTypes.HAPPY_VILLAGER, young.getX(), young.getY() + 0.2, young.getZ(), 2, 0.1, 0.05, 0.1, 0.0);
+                    });
+        }
+        return changed;
+    }
+
     /** The egg comes out of the queen at this spot; she starts over with an empty stomach. */
     public void layEgg(ServerLevel level, double x, double y, double z) {
         eggsLaid++;
@@ -174,8 +219,9 @@ public class QueenCare {
     public boolean queenStarves(ServerLevel level) {
         long now = level.getGameTime();
         SpeciesProfile.QueenNumbers numbers = colony.profile().queen();
+        // A founding queen lives on her own body fat (nobody could feed her yet).
         boolean satisfied = !colony.isHungerOn() || eggDue >= 0 || queenBread >= numbers.meal()
-                || colony.brood().isFull(level);
+                || colony.brood().isFull(level) || colony.isFounding();
         if (queenLastFed == Colony.NOT_SET || satisfied) {
             queenLastFed = now;
             return false;
@@ -190,6 +236,7 @@ public class QueenCare {
         tag.putLong("queenLastFed", queenLastFed);
         tag.putLong("eggDue", eggDue);
         tag.putInt("eggsLaid", eggsLaid);
+        tag.putLong("nextFoundingEgg", nextFoundingEgg);
     }
 
     void load(CompoundTag tag) {
@@ -199,5 +246,6 @@ public class QueenCare {
         queenLastFed = tag.contains("queenLastFed") ? tag.getLong("queenLastFed") : Colony.NOT_SET;
         eggDue = tag.contains("eggDue") ? tag.getLong("eggDue") : -1;
         eggsLaid = tag.getInt("eggsLaid");
+        nextFoundingEgg = tag.contains("nextFoundingEgg") ? tag.getLong("nextFoundingEgg") : Colony.NOT_SET;
     }
 }

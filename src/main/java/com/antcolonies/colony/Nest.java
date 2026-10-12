@@ -41,14 +41,18 @@ public class Nest {
      * Where the nest's rooms go. Decided once (see {@link #getLayout}) and saved: worked out again after a reload, the
      * answer could differ, because the ground has changed since (seed and bread heaps lie in the rooms).
      */
-    private record Layout(List<NestPlan.Chamber> chambers, Set<BlockPos> cells, int shaftDepth, Direction direction) {
-        Layout(List<NestPlan.Chamber> chambers, int shaftDepth, Direction direction) {
-            this(chambers, cellsOf(chambers), shaftDepth, direction);
+    private record Layout(List<NestPlan.Chamber> chambers, Set<BlockPos> cells, int shaftDepth, Direction direction,
+            @Nullable NestPlan.Chamber founding) {
+        Layout(List<NestPlan.Chamber> chambers, int shaftDepth, Direction direction, @Nullable NestPlan.Chamber founding) {
+            this(chambers, cellsOf(chambers), shaftDepth, direction, founding);
         }
 
-        /** The level used for this purpose, or null if the nest has none. */
+        /** The level used for this purpose (or the founding chamber), or null if the nest has none. */
         @Nullable
         NestPlan.Chamber of(NestPlan.Kind kind) {
+            if (kind == NestPlan.Kind.FOUNDING) {
+                return founding;
+            }
             for (NestPlan.Chamber chamber : chambers) {
                 if (chamber.kind() == kind) {
                     return chamber;
@@ -75,9 +79,11 @@ public class Nest {
     }
 
     /**
-     * The next block to dig, or null if all the digging is done (or blocked). Order: the entrance
-     * shaft, then the levels from the top down (the stair, the tunnel and the room of each: seed store,
-     * nursery, queen, refuse chamber). The shaft is never widened, so its walls stay solid for the ants to climb.
+     * The next block to dig, or null if all the digging is done (or blocked). Order: the founding chamber if the
+     * species has one (the shaft down to it, then its tunnel and room: the queen's first home), then the rest of the
+     * entrance shaft, then the levels from the top down (the stair, the tunnel and the room of each: seed store,
+     * nursery, queen, refuse chamber). While the colony is still founding (the queen alone), only the founding chamber
+     * is dug. The shaft is never widened, so its walls stay solid for the ants to climb.
      */
     @Nullable
     public BlockPos findDigTarget(Level level) {
@@ -86,6 +92,25 @@ public class Nest {
             return center;
         }
         // The rooms are planned before the first block is dug, because the plan decides how deep the shaft goes.
+        Layout planned = getLayout(level);
+        if (planned != null && planned.founding() != null) {
+            List<BlockPos> top = new ArrayList<>();
+            for (int i = 1; i <= NestPlan.FOUNDING_DEPTH; i++) {
+                top.add(center.below(i));
+            }
+            BlockPos next = firstDiggable(level, top);
+            if (next != null) {
+                return next;
+            }
+            BlockPos shaftCell = center.below(NestPlan.FOUNDING_DEPTH);
+            if (!level.isLoaded(shaftCell) || !level.getBlockState(shaftCell).isAir()) {
+                return null;
+            }
+            next = firstDiggable(level, planned.founding().cells());
+            if (next != null || colony.isFounding()) {
+                return next; // the queen alone digs nothing but her founding chamber
+            }
+        }
         int depth = shaftDepth(level);
         List<BlockPos> shaft = new ArrayList<>();
         for (int i = 1; i <= depth; i++) {
@@ -126,19 +151,27 @@ public class Nest {
 
     /**
      * The level the queen lives in: the queen level once it is finished (the shaft, every stair down to it, its tunnel
-     * and the whole room are dug out), until then the nursery once that is finished (the bread is there). Where the soil
-     * is too thin for a nursery, the first finished level from the top. Null if she has no home yet. The refuse chamber
-     * is never a home, and neither is the seed store when the plan has a nursery.
+     * and the whole room are dug out). Until then her founding chamber once that is finished, if the nest has one (she
+     * digs it herself and moves down when the workers have dug her deep room). In nests planned without one (older
+     * saves): the nursery once that is finished (the bread is there), or where the soil is too thin for a nursery,
+     * the first finished level from the top. Null if she has no home yet. The refuse chamber is never a home, and
+     * neither is the seed store when the plan has a nursery.
      */
     @Nullable
     public NestPlan.Chamber getHomeChamber(Level level) {
         Layout layout = getLayout(level);
-        if (layout == null || !isShaftOpen(level, layout)) {
+        if (layout == null) {
             return null;
         }
         NestPlan.Chamber queen = layout.of(NestPlan.Kind.QUEEN);
-        if (queen != null && isFinished(level, queen)) {
+        if (queen != null && isShaftOpen(level, layout) && isFinished(level, queen)) {
             return queen;
+        }
+        if (layout.founding() != null) {
+            return isShaftOpen(level, NestPlan.FOUNDING_DEPTH) && isFinished(level, layout.founding()) ? layout.founding() : null;
+        }
+        if (!isShaftOpen(level, layout)) {
+            return null;
         }
         NestPlan.Chamber nursery = layout.of(NestPlan.Kind.NURSERY);
         if (nursery != null) {
@@ -169,7 +202,12 @@ public class Nest {
 
     /** True when the whole entrance shaft is dug out. */
     private boolean isShaftOpen(Level level, Layout layout) {
-        for (int i = 1; i <= layout.shaftDepth(); i++) {
+        return isShaftOpen(level, layout.shaftDepth());
+    }
+
+    /** True when the entrance shaft is dug out down to {@code depth} blocks. */
+    private boolean isShaftOpen(Level level, int depth) {
+        for (int i = 1; i <= depth; i++) {
             if (!level.isLoaded(center.below(i)) || !level.getBlockState(center.below(i)).isAir()) {
                 return false;
             }
@@ -266,7 +304,7 @@ public class Nest {
      */
     private List<BlockPos> getRoomCells(Level level, NestPlan.Kind kind) {
         Layout layout = getLayout(level);
-        if (layout == null || !isShaftOpen(level, layout)) {
+        if (layout == null || !isShaftOpen(level, kind == NestPlan.Kind.FOUNDING ? NestPlan.FOUNDING_DEPTH : layout.shaftDepth())) {
             return List.of();
         }
         NestPlan.Chamber chamber = layout.of(kind);
@@ -301,12 +339,24 @@ public class Nest {
         return layout == null ? List.of() : layout.chambers();
     }
 
+    /** The founding chamber of the plan, or null if the nest has none (or no plan yet). For tests and debugging. */
+    @Nullable
+    public NestPlan.Chamber getFoundingChamber(Level level) {
+        Layout layout = getLayout(level);
+        return layout == null ? null : layout.founding();
+    }
+
     /** Every block that is part of the nest plan: the shaft, and the rooms once their layout is decided. */
     Set<BlockPos> nestCells(Level level) {
         Set<BlockPos> cells = new HashSet<>();
         int depth = shaftDepth(level);
         for (int i = 1; i <= depth; i++) {
             cells.add(center.below(i));
+        }
+        NestPlan.Chamber founding = getFoundingChamber(level);
+        BlockPos foundingShaft = center.below(NestPlan.FOUNDING_DEPTH);
+        if (founding != null && level.isLoaded(foundingShaft) && level.getBlockState(foundingShaft).isAir()) {
+            cells.addAll(founding.cells());
         }
         BlockPos bottom = center.below(depth);
         if (level.isLoaded(bottom) && level.getBlockState(bottom).isAir()) {
@@ -360,7 +410,9 @@ public class Nest {
         // Everything the plan could touch must be loaded, or the answer would change later.
         for (int depth = SHAFT_DEPTH; depth >= MIN_SHAFT_DEPTH; depth--) {
             for (Direction direction : Direction.Plane.HORIZONTAL) {
-                for (NestPlan.Chamber chamber : NestPlan.chambers(center.below(depth), direction, NestPlan.MAX_LEVELS)) {
+                List<NestPlan.Chamber> all = new ArrayList<>(NestPlan.chambers(center.below(depth), direction, NestPlan.MAX_LEVELS));
+                all.add(NestPlan.foundingChamber(center.below(NestPlan.FOUNDING_DEPTH), direction));
+                for (NestPlan.Chamber chamber : all) {
                     for (BlockPos pos : chamber.cells()) {
                         if (!level.isLoaded(pos)) {
                             return null;
@@ -391,9 +443,15 @@ public class Nest {
             return null; // stone in the way of the shaft itself
         }
         int start = Math.floorMod(colony.getId().hashCode(), 4);
+        boolean withFounding = colony.profile().nest().foundingChamber();
         Layout best = null;
         for (int i = 0; i < 4; i++) {
             Direction direction = Direction.from2DDataValue((start + i) % 4);
+            // The founding chamber (the queen's first home, on the far side of the shaft) has to fit too.
+            NestPlan.Chamber founding = withFounding ? NestPlan.foundingChamber(center.below(NestPlan.FOUNDING_DEPTH), direction) : null;
+            if (founding != null && !allSoilOrAir(level, founding.cells())) {
+                continue;
+            }
             // The most levels whose whole plan is soil. A shorter nest uses its levels differently (and its last one is
             // always the small queen's room), so each length is checked as the plan it really is.
             int maxLevels = Math.min(NestPlan.MAX_LEVELS, Math.max(1, colony.profile().nest().maxLevels())); // from the species profile
@@ -410,7 +468,7 @@ public class Nest {
                     }
                 }
                 if (fits) {
-                    best = new Layout(plan, depth, direction);
+                    best = new Layout(plan, depth, direction, founding);
                     break;
                 }
             }
@@ -480,6 +538,7 @@ public class Nest {
             tag.putInt("nestDepth", layout.shaftDepth());
             tag.putInt("nestDirection", layout.direction().get2DDataValue());
             tag.putInt("nestLevels", layout.chambers().size());
+            tag.putBoolean("nestFounding", layout.founding() != null);
         }
     }
 
@@ -488,7 +547,10 @@ public class Nest {
         if (tag.contains("nestLevels")) {
             int depth = tag.getInt("nestDepth");
             Direction direction = Direction.from2DDataValue(tag.getInt("nestDirection"));
-            layout = new Layout(NestPlan.chambers(center.below(depth), direction, tag.getInt("nestLevels")), depth, direction);
+            // Nests planned before founding chambers existed have none (the key is missing: false).
+            NestPlan.Chamber founding = tag.getBoolean("nestFounding")
+                    ? NestPlan.foundingChamber(center.below(NestPlan.FOUNDING_DEPTH), direction) : null;
+            layout = new Layout(NestPlan.chambers(center.below(depth), direction, tag.getInt("nestLevels")), depth, direction, founding);
         }
     }
 }
