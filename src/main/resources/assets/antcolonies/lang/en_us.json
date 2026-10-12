@@ -18,5 +18,7 @@
   "item.antcolonies.termite_queen_spawn_egg": "Termite Queen Spawn Egg",
   "entity.antcolonies.termite_worker": "Termite Worker",
   "entity.antcolonies.termite_nymph": "Termite Nymph",
-  "item.antcolonies.termite_worker_spawn_egg": "Termite Worker Spawn Egg"
+  "item.antcolonies.termite_worker_spawn_egg": "Termite Worker Spawn Egg",
+  "block.antcolonies.termite_mound": "Termite Mound Soil",
+  "block.antcolonies.termite_hole": "Termite Chimney"
 }

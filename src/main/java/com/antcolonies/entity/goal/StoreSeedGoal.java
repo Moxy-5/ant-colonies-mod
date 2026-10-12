@@ -114,6 +114,8 @@ public class StoreSeedGoal extends Goal {
 
     private void dropSeed() {
         if (ant.isCarryingSeed()) {
+            com.antcolonies.AntColoniesMod.LOGGER.info("[seed] ant {} could not take its seed to the food store and dropped it at {} (after {} ticks, {} failed routes)",
+                    ant.getId(), ant.blockPosition().toShortString(), ticks, failedRoutes);
             ant.spawnAtLocation(ant.getCarriedSeed());
             ant.setCarriedSeed(net.minecraft.world.item.ItemStack.EMPTY);
         }

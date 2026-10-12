@@ -2,6 +2,8 @@ package com.antcolonies.registry;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.block.SeedPileBlock;
+import com.antcolonies.block.TermiteHoleBlock;
+import com.antcolonies.block.TermiteMoundBlock;
 
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.SoundType;
@@ -32,4 +34,14 @@ public class ModBlocks {
     public static final DeferredBlock<SeedPileBlock> BREAD_PILE = BLOCKS.registerBlock("bread_pile", SeedPileBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BROWN).strength(0.2F).sound(SoundType.SAND)
                     .noCollission().noOcclusion().pushReaction(PushReaction.DESTROY));
+
+    /** Termite mound soil: built up in layers, then dries and hardens with age (see TermiteMoundBlock). */
+    public static final DeferredBlock<TermiteMoundBlock> TERMITE_MOUND = BLOCKS.registerBlock("termite_mound", TermiteMoundBlock::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_ORANGE).strength(0.6F, 3.0F).sound(SoundType.MUD)
+                    .randomTicks());
+
+    /** The termites' chimney crown: solid for everyone but termites (see TermiteHoleBlock). */
+    public static final DeferredBlock<TermiteHoleBlock> TERMITE_HOLE = BLOCKS.registerBlock("termite_hole", TermiteHoleBlock::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_ORANGE).strength(1.5F, 3.0F).sound(SoundType.MUD_BRICKS)
+                    .noOcclusion().isSuffocating((state, level, pos) -> false).isViewBlocking((state, level, pos) -> false));
 }

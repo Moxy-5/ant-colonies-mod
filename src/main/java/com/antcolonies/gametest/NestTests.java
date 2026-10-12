@@ -463,7 +463,7 @@ public class NestTests {
             // The workers also feed the queen from the store: count what she has eaten too.
             int total = seedsAccountedFor(colony);
             helper.assertTrue(total == 5, "the colony has " + colony.food().getFood() + " food and the queen ate " + colony.queenCare().getQueenBread()
-                    + " (+ " + colony.queenCare().getEggsLaid() + " eggs laid), expected 5 seeds in all");
+                    + " (+ " + colony.queenCare().getEggsLaid() + " eggs laid), expected 5 seeds in all; holding: " + carriers(helper));
             helper.assertTrue(seedsIn(level, storeBox(level, colony)) == colony.food().getFood(), "only " + seedsIn(level, storeBox(level, colony)) + " seeds are in the food store");
             helper.assertTrue(seedsIn(level, helper.getBounds()) == colony.food().getFood(), "some seeds are still lying around outside the store");
             for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
@@ -1225,6 +1225,22 @@ public class NestTests {
                 }
             }
         });
+    }
+
+    /** Every ant in the test area that holds a seed or bread, with where it is: to find a seed that went missing. */
+    private static String carriers(GameTestHelper helper) {
+        List<String> out = new java.util.ArrayList<>();
+        for (AbstractAntEntity ant : helper.getLevel().getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds().inflate(64))) {
+            if (!ant.getCarriedSeed().isEmpty()) {
+                out.add("#" + ant.getId() + " " + ant.getCarriedSeed().getItem() + " at "
+                        + ant.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO)).toShortString()
+                        + (ant.isClimbing() ? " on " + ant.getSurface() : "") + (ant.getNavigator().isDone() ? " standing" : " walking"));
+            }
+        }
+        for (var item : helper.getLevel().getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, helper.getBounds().inflate(64))) {
+            out.add("an item " + item.getItem() + " lying at " + item.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO)).toShortString());
+        }
+        return out.isEmpty() ? "nobody" : String.join(", ", out);
     }
 
     private static int seedsAccountedFor(Colony colony) {

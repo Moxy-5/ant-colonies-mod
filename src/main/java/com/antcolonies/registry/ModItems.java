@@ -15,6 +15,8 @@ public class ModItems {
     public static final DeferredItem<BlockItem> DEEP_SOIL = ITEMS.registerSimpleBlockItem(ModBlocks.DEEP_SOIL);
     public static final DeferredItem<BlockItem> SEED_PILE = ITEMS.registerSimpleBlockItem(ModBlocks.SEED_PILE);
     public static final DeferredItem<BlockItem> BREAD_PILE = ITEMS.registerSimpleBlockItem(ModBlocks.BREAD_PILE);
+    public static final DeferredItem<BlockItem> TERMITE_MOUND = ITEMS.registerSimpleBlockItem(ModBlocks.TERMITE_MOUND);
+    public static final DeferredItem<BlockItem> TERMITE_HOLE = ITEMS.registerSimpleBlockItem(ModBlocks.TERMITE_HOLE);
 
     /** One piece of ant bread: what the ants carry from the mill to the queen, and what a broken bread pile drops. */
     public static final DeferredItem<Item> ANT_BREAD = ITEMS.registerSimpleItem("ant_bread");

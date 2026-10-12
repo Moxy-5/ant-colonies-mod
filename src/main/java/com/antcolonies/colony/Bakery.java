@@ -8,11 +8,14 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import com.antcolonies.AntColoniesMod;
 import com.antcolonies.block.SeedPileBlock;
+import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.registry.ModItems;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
@@ -141,6 +144,22 @@ public class Bakery {
     }
 
     /** A worker puts its freshly milled bread at {@code spot}: the heap grows by a layer (or a new one starts). False if that spot is full. */
+    /**
+     * Last resort for an ant holding bread it can take nowhere (no heap to reach, nobody wants it): it puts the piece
+     * down where it stands, as a bread heap, so the colony never loses it. Only if even that is impossible (no floor, the
+     * cell taken) is it lost, and that is logged. Returns true if the piece was put down.
+     */
+    public boolean putDownBreadWhereItStands(Level level, AbstractAntEntity ant) {
+        BlockPos here = ant.blockPosition();
+        boolean floor = level.getBlockState(here.below()).isFaceSturdy(level, here.below(), Direction.UP);
+        if (floor && depositBread(level, here, ant.isCarryingRichBread())) {
+            AntColoniesMod.LOGGER.info("[bread] ant {} could take its bread nowhere and put it down at {}", ant.getId(), here.toShortString());
+            return true;
+        }
+        AntColoniesMod.LOGGER.info("[bread] ant {} could take its bread nowhere and lost it at {}", ant.getId(), here.toShortString());
+        return false;
+    }
+
     public boolean depositBread(Level level, BlockPos spot, boolean rich) {
         BlockState state = level.getBlockState(spot);
         if (state.isAir()) {

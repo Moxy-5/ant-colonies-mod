@@ -150,7 +150,8 @@ public class FeedQueenGoal extends Goal {
                 // She wants no more right now: the bread goes back on a heap.
                 pile = colony.bakery().pickBreadSpot(level, ant.getRandom());
                 if (pile == null || !ant.getNavigator().moveTo(pile, 1.0)) {
-                    ant.setCarriedSeed(ItemStack.EMPTY); // nowhere to put it
+                    colony.bakery().putDownBreadWhereItStands(level, ant); // nowhere to put it
+                    ant.setCarriedSeed(ItemStack.EMPTY);
                     done = true;
                 } else {
                     leg = Leg.BACK_TO_PILE;
@@ -167,6 +168,7 @@ public class FeedQueenGoal extends Goal {
             if (!colony.bakery().depositBread(level, pile, ant.isCarryingRichBread())) {
                 pile = colony.bakery().pickBreadSpot(level, ant.getRandom());
                 if (pile == null || !ant.getNavigator().moveTo(pile, 1.0)) {
+                    colony.bakery().putDownBreadWhereItStands(level, ant);
                     ant.setCarriedSeed(ItemStack.EMPTY);
                     done = true;
                 }
@@ -176,6 +178,7 @@ public class FeedQueenGoal extends Goal {
             ColonyManager.get(level).markChanged();
             done = true;
         } else if (ant.getNavigator().isDone() && !ant.getNavigator().moveTo(pile, 1.0)) {
+            colony.bakery().putDownBreadWhereItStands(level, ant);
             ant.setCarriedSeed(ItemStack.EMPTY);
             done = true;
         }

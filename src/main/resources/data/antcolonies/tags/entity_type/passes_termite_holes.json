@@ -1,0 +1,8 @@
+{
+  "values": [
+    "antcolonies:termite_worker",
+    "antcolonies:termite_king",
+    "antcolonies:termite_queen",
+    "antcolonies:termite_nymph"
+  ]
+}
