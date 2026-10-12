@@ -11,7 +11,8 @@ import net.minecraft.client.renderer.entity.EntityRendererProvider;
 /**
  * Renderer for every ant and termite. On a wall the whole model lies on the wall: it faces the wall, is tipped upright
  * so its belly and legs are against it, and is turned within the wall so its head points the way it goes (up, down
- * head first, or sideways). The angles come from the insect and turn smoothly (see {@code AbstractAntEntity.turnBody}).
+ * head first, or sideways). On a ceiling it is tipped on over, upside down with its feet on the ceiling, and turned
+ * the way it goes. The angles come from the insect and turn smoothly (see {@code AbstractAntEntity.turnBody}).
  */
 public class AntRenderer<T extends AbstractAntEntity> extends GeoEntityRenderer<T> {
     /** How far the model is moved up while climbing, so the tail doesn't sink into the floor. */
@@ -31,11 +32,18 @@ public class AntRenderer<T extends AbstractAntEntity> extends GeoEntityRenderer<
             super.applyRotations(ant, poseStack, ageInTicks, rotationYaw, partialTick, nativeScale);
             return;
         }
-        // Face the wall, slide against it, tip upright (head up), then turn within the wall to the heading.
+        // Face the wall, slide against it, tip upright (head up) or on over (upside down), then turn to the heading.
         super.applyRotations(ant, poseStack, ageInTicks, ant.getWallYaw(partialTick), partialTick, nativeScale);
         float tilt = ant.getBodyTilt(partialTick);
-        float share = tilt / 90.0F;
-        poseStack.translate(0.0F, CLIMB_LIFT * share, -CLIMB_INTO_WALL * share);
+        if (tilt <= 90.0F) {
+            float share = tilt / 90.0F;
+            poseStack.translate(0.0F, CLIMB_LIFT * share, -CLIMB_INTO_WALL * share);
+        } else {
+            // From the wall onto the ceiling: the feet go up to the top of the hitbox, against the ceiling.
+            float share = (tilt - 90.0F) / 90.0F;
+            float ceiling = ant.getBbHeight() / scaleHeight;
+            poseStack.translate(0.0F, CLIMB_LIFT + (ceiling - CLIMB_LIFT) * share, -CLIMB_INTO_WALL * (1.0F - share));
+        }
         poseStack.mulPose(Axis.XP.rotationDegrees(tilt));
         poseStack.mulPose(Axis.YP.rotationDegrees(ant.getBodyHeading(partialTick)));
     }

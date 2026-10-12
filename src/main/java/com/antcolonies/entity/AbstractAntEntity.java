@@ -9,8 +9,10 @@ import com.antcolonies.nav.AntMoveControl;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.nav.AntNavigator;
+import com.antcolonies.nav.Foothold;
 import com.antcolonies.registry.ModItems;
 
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
@@ -43,9 +45,11 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     private static final RawAnimation WALK = RawAnimation.begin().thenLoop("walk");
 
     /**
-     * The surface the body is on (a {@link Direction} 3D id: 0 = DOWN = a floor, 2 to 5 = the wall on that side), and on
-     * a wall where the head points (degrees: 0 up, 180 down, +90 to its left). Synced so the renderer can lay the body
-     * on the surface (see {@link #getBodyTilt} and the other body angles).
+     * The surface the body is on (a {@link Direction} 3D id in the low 3 bits: 0 = DOWN = a floor, 1 = UP = a ceiling,
+     * 2 to 5 = the wall on that side; on a ceiling the high bits hold the wall its heading is measured from), and where
+     * the head points (degrees: on a wall 0 up, 180 down, +90 to its left; on a ceiling see
+     * {@link AntNavigator#getCeilingRef}). Synced so the renderer can lay the body on the surface (see
+     * {@link #getBodyTilt} and the other body angles).
      */
     private static final EntityDataAccessor<Byte> DATA_SURFACE =
             SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.BYTE);
@@ -235,21 +239,27 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         super.tick();
         // Only the route's climbing stretches make the ant climb, so ants never wander up walls by themselves.
         if (!level().isClientSide) {
-            entityData.set(DATA_SURFACE, (byte) navigator.getSurface().get3DDataValue());
+            entityData.set(DATA_SURFACE, (byte) (navigator.getSurface().get3DDataValue() | navigator.getCeilingRef().get3DDataValue() << 3));
             entityData.set(DATA_HEADING, navigator.getHeading());
         } else {
             turnBody();
         }
     }
 
-    /** The surface the body is on: {@link Direction#DOWN} = a floor, a horizontal direction = the wall on that side. */
+    /** The surface the body is on: {@link Direction#DOWN} = a floor, {@link Direction#UP} = a ceiling, a horizontal direction = the wall on that side. */
     public Direction getSurface() {
-        return Direction.from3DDataValue(entityData.get(DATA_SURFACE));
+        return Direction.from3DDataValue(entityData.get(DATA_SURFACE) & 7);
     }
 
-    /** True while the body is on a wall. */
+    /** On a ceiling: the wall the head's direction is measured from (see {@link AntNavigator#getCeilingRef}). */
+    private Direction getCeilingRef() {
+        Direction ref = Direction.from3DDataValue(entityData.get(DATA_SURFACE) >> 3 & 7);
+        return ref.getAxis().isHorizontal() ? ref : Direction.NORTH;
+    }
+
+    /** True while the body is on a wall or a ceiling. */
     public boolean isClimbing() {
-        return getSurface().getAxis().isHorizontal();
+        return getSurface() != Direction.DOWN;
     }
 
     // Tells the game this entity is holding on to something (no falling while the navigator moves it along a surface).
@@ -258,26 +268,53 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return isClimbing() || (!level().isClientSide && navigator.isAttached());
     }
 
-    /** Client: turns the drawn body a little toward the synced surface and heading, so it never snaps round. */
+    /**
+     * Client: turns the drawn body a little toward the synced surface and heading, so it never snaps round. The tilt is
+     * 0 on a floor, 90 upright on a wall and 180 upside down on a ceiling: going from a wall onto the ceiling the body
+     * just tips on over, so it keeps the yaw of the wall it came up (on a ceiling the yaw and the heading both turn the
+     * body round the vertical, so one can stand in for the other).
+     */
     private void turnBody() {
         bodyTiltO = bodyTilt;
         wallYawO = wallYaw;
         bodyHeadingO = bodyHeading;
         Direction surface = getSurface();
-        if (surface.getAxis().isHorizontal()) {
+        if (surface != Direction.DOWN) {
+            Direction wall = surface == Direction.UP ? getCeilingRef() : surface;
+            float targetTilt = surface == Direction.UP ? 180.0F : 90.0F;
             if (!wallPose) {
                 // Tipping up from the floor: start from how the body lies now (facing its body yaw).
                 wallPose = true;
-                wallYaw = surface.toYRot();
+                wallYaw = wall.toYRot();
                 bodyHeading = Mth.wrapDegrees(wallYaw - yBodyRot);
                 bodyTilt = 0.0F;
+                if (tickCount < 3) {
+                    // Just loaded (or spawned) already on a wall or a ceiling: no tipping up, it is simply there.
+                    bodyTilt = targetTilt;
+                    bodyHeading = entityData.get(DATA_HEADING);
+                }
                 wallYawO = wallYaw;
                 bodyHeadingO = bodyHeading;
                 bodyTiltO = bodyTilt;
             }
-            wallYaw = approach(wallYaw, surface.toYRot());
-            bodyTilt = Math.min(90.0F, bodyTilt + BODY_TURN_SPEED);
-            bodyHeading = approach(bodyHeading, entityData.get(DATA_HEADING));
+            if (surface == Direction.UP) {
+                // Keep the yaw it has; turn the heading so the head points the synced way.
+                bodyHeading = approach(bodyHeading, entityData.get(DATA_HEADING) + Mth.wrapDegrees(wall.toYRot() - wallYaw));
+            } else {
+                if (bodyTilt > 90.0F && Mth.wrapDegrees(wall.toYRot() - wallYaw) != 0.0F) {
+                    // Coming off the ceiling onto another wall: take that wall's yaw, and turn the heading back by as
+                    // much, which looks the same while the body is upside down.
+                    float turn = Mth.wrapDegrees(wall.toYRot() - wallYaw);
+                    wallYaw += turn;
+                    wallYawO += turn;
+                    bodyHeading -= turn;
+                    bodyHeadingO -= turn;
+                }
+                wallYaw = approach(wallYaw, wall.toYRot());
+                bodyHeading = approach(bodyHeading, entityData.get(DATA_HEADING));
+            }
+            bodyTilt = bodyTilt < targetTilt ? Math.min(targetTilt, bodyTilt + BODY_TURN_SPEED)
+                    : Math.max(targetTilt, bodyTilt - BODY_TURN_SPEED);
         } else if (wallPose) {
             // Tipping back onto the floor, ending up facing the body yaw.
             bodyTilt = Math.max(0.0F, bodyTilt - BODY_TURN_SPEED);
@@ -297,7 +334,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return wallPose;
     }
 
-    /** Client: how far the body is tipped up onto the wall, 0 (floor) to 90 (upright on the wall). */
+    /** Client: how far the body is tipped up onto the wall, 0 (floor) to 90 (upright on the wall) to 180 (upside down on a ceiling). */
     public float getBodyTilt(float partialTick) {
         return Mth.lerp(partialTick, bodyTiltO, bodyTilt);
     }
@@ -345,6 +382,12 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         tag.putBoolean("CarryingEgg", isCarryingEgg());
         tag.putBoolean("CarryingCorpse", isCarryingCorpse());
         tag.putBoolean("SeedForBread", seedForBread);
+        // The wall or ceiling it holds on to, so after a reload it is still up there instead of dropping to the bottom.
+        Foothold hold = navigator.getHold();
+        if (hold != null) {
+            tag.putLong("HoldCell", hold.cell().asLong());
+            tag.putByte("HoldSurface", (byte) hold.surface().get3DDataValue());
+        }
     }
 
     @Override
@@ -362,6 +405,9 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         setCarryingEgg(tag.getBoolean("CarryingEgg"));
         setCarryingCorpse(tag.getBoolean("CarryingCorpse"));
         seedForBread = tag.getBoolean("SeedForBread");
+        if (tag.contains("HoldCell") && tag.contains("HoldSurface")) {
+            navigator.restoreHold(new Foothold(BlockPos.of(tag.getLong("HoldCell")), Direction.from3DDataValue(tag.getByte("HoldSurface"))));
+        }
     }
 
     // Colony members never despawn.

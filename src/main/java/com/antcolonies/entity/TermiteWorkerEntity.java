@@ -44,7 +44,7 @@ public class TermiteWorkerEntity extends AbstractAntEntity {
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));
         this.goalSelector.addGoal(1, new DigGoal(this, () -> true));
-        this.goalSelector.addGoal(2, new AntWanderGoal(this, 1.0, 160, 5, () -> true));
+        this.goalSelector.addGoal(2, new AntWanderGoal(this, 1.0, 160, 5, () -> true).hangsFromCeilings(0.25F));
         this.goalSelector.addGoal(3, new RandomLookAroundGoal(this));
     }
 

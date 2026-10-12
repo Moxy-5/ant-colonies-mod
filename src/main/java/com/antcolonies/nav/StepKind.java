@@ -27,6 +27,16 @@ public enum StepKind {
     OVER_TOP,
     /** Off the edge of a floor and down the side of the block, head first. */
     OVER_EDGE,
-    /** Lets go and drops to the floor below: only where there is nothing to climb down. */
+    /** From the top of a wall onto the ceiling of the same cell (an inside corner): from now on upside down. */
+    ONTO_CEILING,
+    /** From the ceiling onto a wall of the same cell, head first down it. */
+    OFF_CEILING,
+    /** Upside down along the ceiling to the next cell. */
+    CRAWL_CEILING,
+    /** Down a wall and round the block's bottom edge onto its underside (the ceiling of the cell beside), upside down. */
+    UNDER_EDGE,
+    /** Along a ceiling to where it ends and round the block's bottom edge up onto its side face. */
+    OUT_FROM_UNDER,
+    /** Lets go and drops to the floor below: only where there is nothing to climb down (or off a ceiling). */
     FALL
 }

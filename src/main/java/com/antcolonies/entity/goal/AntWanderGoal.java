@@ -7,13 +7,18 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.nav.CellMap;
+import com.antcolonies.nav.Foothold;
 import com.antcolonies.nav.LevelCellMap;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.entity.ai.goal.Goal;
 
-/** Idle wandering: now and then walks to a random nearby spot, through tunnels too. */
+/**
+ * Idle wandering: now and then walks to a random nearby spot, through tunnels too. Underground some insects now and
+ * then pick a spot on the ceiling instead and hang there upside down for a while, like real ants in their nest
+ * ({@link #hangsFromCeilings}).
+ */
 public class AntWanderGoal extends Goal {
     private final AbstractAntEntity ant;
     private final double speed;
@@ -21,6 +26,8 @@ public class AntWanderGoal extends Goal {
     private final int interval;
     private final int radius;
     private final BooleanSupplier allowed;
+    /** The chance (0 to 1) that a stroll underground ends on the ceiling instead of the floor. */
+    private float ceilingChance;
 
     public AntWanderGoal(AbstractAntEntity ant, double speed, int interval, int radius, BooleanSupplier allowed) {
         this.allowed = allowed;
@@ -29,6 +36,12 @@ public class AntWanderGoal extends Goal {
         this.interval = interval;
         this.radius = radius;
         setFlags(EnumSet.of(Flag.MOVE));
+    }
+
+    /** Underground, this share of strolls (0 to 1) goes up a wall and ends hanging from the ceiling. */
+    public AntWanderGoal hangsFromCeilings(float chance) {
+        this.ceilingChance = chance;
+        return this;
     }
 
     @Override
@@ -42,7 +55,15 @@ public class AntWanderGoal extends Goal {
             int dx = ant.getRandom().nextInt(radius * 2 + 1) - radius;
             int dz = ant.getRandom().nextInt(radius * 2 + 1) - radius;
             BlockPos spot = findFloor(map, here.offset(dx, 0, dz));
-            if (spot != null && ant.getNavigator().moveTo(spot, speed)) {
+            if (spot == null) {
+                continue;
+            }
+            if (ceilingChance > 0.0F && ant.getRandom().nextFloat() < ceilingChance && !ant.level().canSeeSky(spot)
+                    && Foothold.ceiling(spot).isValid(map)
+                    && ant.getNavigator().moveTo(Foothold.ceiling(spot), speed)) {
+                return true;
+            }
+            if (ant.getNavigator().moveTo(spot, speed)) {
                 return true;
             }
         }

@@ -17,7 +17,7 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * The legs of an insect: given a goal cell, plans a route over floors and walls with {@link AntPathFinder} and walks it.
+ * The legs of an insect: given a goal cell, plans a route over floors, walls and ceilings with {@link AntPathFinder} and walks it.
  *
  * <p>This is only "how to get there". Deciding "where to go and why" belongs to the goals now and to the colony brain
  * later, so a smarter mind can be put on top without touching the movement. A mind says {@link #moveTo} a cell, or
@@ -27,8 +27,10 @@ import net.minecraft.world.phys.Vec3;
  * walking on a floor uses the normal walking (with gravity), and every move on a wall or round an edge is an exact
  * motion along the surface, the body pressed against it, so the insect never floats. It climbs up head up, down head
  * first, sideways head sideways, turns inside corners and rounds outside edges, and goes over the top of a wall and
- * over the edge of a drop like a real ant. {@link #getSurface} and {@link #getHeading} tell the body how to lie.
- * When a walk ends on a wall (in a shaft) the insect keeps holding on there.
+ * over the edge of a drop like a real ant, and hangs upside down from ceilings and the undersides of blocks.
+ * {@link #getSurface}, {@link #getHeading} and {@link #getCeilingRef} tell the body how to lie. When a walk ends on a
+ * wall (in a shaft) or a ceiling the insect keeps holding on there, also after the world is saved and loaded again
+ * ({@link #getHold}, {@link #restoreHold}).
  */
 public class AntNavigator {
     /** The insect must be this close (in blocks, sideways) to the middle of a floor goal cell to count as arrived. */
@@ -64,6 +66,9 @@ public class AntNavigator {
     /** The part of the current step (some steps are two moves: up the wall, then over the top). */
     private int leg;
     private BlockPos goal = BlockPos.ZERO;
+    /** When the mind asked for one exact foothold (a spot on a ceiling, say) instead of a cell; else null. */
+    @Nullable
+    private Foothold goalFoothold;
     private double speed = 1.0;
     private boolean failed;
     private int replans;
@@ -74,8 +79,14 @@ public class AntNavigator {
     private Foothold at;
     /** The surface the body is on right now: {@link Direction#DOWN} = a floor, a horizontal direction = that wall. */
     private Direction surface = Direction.DOWN;
-    /** On a wall: where its head points, in degrees within the wall: 0 up, 180 down, +90 to its left, -90 to its right. */
+    /**
+     * On a wall: where its head points, in degrees within the wall: 0 up, 180 down, +90 to its left, -90 to its right.
+     * On a ceiling: the same, measured from {@link #ceilingRef} as if the wall went on over the ceiling: 0 = away from
+     * that wall, 180 = toward it, +90 = to the left as seen on that wall.
+     */
     private float heading;
+    /** On a ceiling: the wall its heading is measured from (the wall it came up, so the body turns on without a jump). */
+    private Direction ceilingRef = Direction.NORTH;
     /** True while the motion is set exactly (holding a wall, going round an edge), not by walking. */
     private boolean attached;
     private Vec3 motion = Vec3.ZERO;
@@ -109,9 +120,23 @@ public class AntNavigator {
      */
     public boolean moveTo(BlockPos goal, double speed, AntPathFinder.StepCosts mindCosts) {
         this.goal = goal.immutable();
+        this.goalFoothold = null;
         this.speed = speed;
         this.replans = 0;
         this.mindCosts = mindCosts;
+        return plan(null);
+    }
+
+    /**
+     * Starts walking to one exact foothold, for example a spot on a ceiling to hang from, or one wall of a shaft.
+     * False (and does nothing) if there is no route to it.
+     */
+    public boolean moveTo(Foothold goal, double speed) {
+        this.goal = goal.cell();
+        this.goalFoothold = goal;
+        this.speed = speed;
+        this.replans = 0;
+        this.mindCosts = AntPathFinder.StepCosts.NONE;
         return plan(null);
     }
 
@@ -121,6 +146,7 @@ public class AntNavigator {
      */
     public boolean follow(Route shared, double speed) {
         this.goal = shared.end().cell();
+        this.goalFoothold = null;
         this.speed = speed;
         this.replans = 0;
         this.mindCosts = AntPathFinder.StepCosts.NONE;
@@ -137,9 +163,9 @@ public class AntNavigator {
         return failed;
     }
 
-    /** True while the body is on a wall (climbing, crawling or holding on). */
+    /** True while the body is on a wall or a ceiling (climbing, crawling, hanging or holding on), not on a floor. */
     public boolean isClimbing() {
-        return surface.getAxis().isHorizontal();
+        return surface != Direction.DOWN;
     }
 
     /** True while the navigator sets the exact motion (see {@link #getClimbMotion}): on a wall, or going round an edge. */
@@ -157,9 +183,38 @@ public class AntNavigator {
         return surface;
     }
 
-    /** On a wall: where the head points within the wall, in degrees (0 up, 180 down, +90 to its left). */
+    /** On a wall: where the head points within the wall, in degrees (0 up, 180 down, +90 to its left). On a ceiling see {@link #getCeilingRef}. */
     public float getHeading() {
         return heading;
+    }
+
+    /** On a ceiling: the wall the heading is measured from (0 = head away from it, 180 = toward it). */
+    public Direction getCeilingRef() {
+        return ceilingRef;
+    }
+
+    /**
+     * The wall or ceiling the insect holds on to right now, to be saved with it; null on a floor or in the air (then
+     * there is nothing to keep: it just stands, or falls).
+     */
+    @Nullable
+    public Foothold getHold() {
+        Foothold here = route == null ? at : currentFoothold(new LevelCellMap(ant.level()));
+        return here == null || here.isFloor() ? null : here;
+    }
+
+    /**
+     * After loading: the insect was saved holding this wall or ceiling, so it holds on to it again from its first tick
+     * instead of dropping and climbing all the way back up. (If the block is gone it lets go as usual.)
+     */
+    public void restoreHold(Foothold hold) {
+        if (hold.isFloor()) {
+            return;
+        }
+        at = hold;
+        surface = hold.surface();
+        heading = 0.0F;
+        route = null;
     }
 
     /** The foothold the insect holds (or the current step starts from); null while it drops. */
@@ -231,7 +286,9 @@ public class AntNavigator {
         Route found = null;
         if (!starts.isEmpty()) {
             if (shared == null) {
-                found = AntPathFinder.find(map, starts, goal, AntPathFinder.DEFAULT_MAX_EXPANSIONS, costs);
+                found = goalFoothold == null
+                        ? AntPathFinder.find(map, starts, goal, AntPathFinder.DEFAULT_MAX_EXPANSIONS, costs)
+                        : AntPathFinder.find(map, starts, goalFoothold::equals, goal, AntPathFinder.DEFAULT_MAX_EXPANSIONS, costs);
             } else {
                 Foothold join = shared.start();
                 Route onto = AntPathFinder.find(map, starts, join::equals, join.cell(),
@@ -431,6 +488,64 @@ public class AntNavigator {
                 surface = wall;
                 return moveAttached(wallPoint(to, to.cell().getY()));
             }
+            case ONTO_CEILING: {
+                // Up the wall into the corner, where the body tips on over onto the ceiling.
+                surface = from.surface();
+                if (moveAttached(wallPoint(from, ceilingY(c)))) {
+                    surface = Direction.UP;
+                    ceilingRef = from.surface();
+                    heading = 0.0F;
+                    return true;
+                }
+                return false;
+            }
+            case OFF_CEILING: {
+                // Along the ceiling to the wall, then the body tips down onto it, head first.
+                surface = Direction.UP;
+                if (moveAttached(with(ceilingPoint(from), to.surface().getAxis(), pinned(c, to.surface())))) {
+                    surface = to.surface();
+                    heading = 180.0F;
+                    return true;
+                }
+                return false;
+            }
+            case CRAWL_CEILING: {
+                surface = Direction.UP;
+                Direction.Axis along = to.cell().getX() != c.getX() ? Direction.Axis.X : Direction.Axis.Z;
+                return moveAttached(with(ceilingPoint(to), along, centerOf(to.cell(), along)));
+            }
+            case UNDER_EDGE: {
+                // Down the wall until the body is below the block's bottom edge, then in under the block, upside down.
+                Direction w = from.surface();
+                if (leg == 0) {
+                    surface = w;
+                    if (moveAttached(wallPoint(from, c.getY() - ant.getBbHeight() - EPS))) {
+                        surface = Direction.UP;
+                        ceilingRef = w;
+                        heading = 180.0F;
+                        leg = 1;
+                    }
+                    return false;
+                }
+                surface = Direction.UP;
+                return moveAttached(with(ceilingPoint(to), w.getAxis(), pinned(to.cell(), w.getOpposite())));
+            }
+            case OUT_FROM_UNDER: {
+                // Along the ceiling until the body is past its edge, then round the edge and up the block's side face.
+                Direction out = to.surface().getOpposite();
+                BlockPos beside = to.cell().below();
+                if (leg == 0) {
+                    surface = Direction.UP;
+                    if (moveAttached(with(ceilingPoint(from), out.getAxis(), pinned(beside, to.surface())))) {
+                        surface = to.surface();
+                        heading = 0.0F;
+                        leg = 1;
+                    }
+                    return false;
+                }
+                surface = to.surface();
+                return moveAttached(wallPoint(to, to.cell().getY()));
+            }
             default:
                 return true;
         }
@@ -470,19 +585,19 @@ public class AntNavigator {
     }
 
     /**
-     * Nothing to walk. An insect on a wall (in a shaft, say) keeps holding on to it where it is, so it never falls to the
-     * bottom and has to climb all the way up again; on a floor it just stands.
+     * Nothing to walk. An insect on a wall (in a shaft, say) or a ceiling keeps holding on to it where it is, so it never
+     * falls to the bottom and has to climb all the way up again; on a floor it just stands.
      */
     private void hold(CellMap map) {
-        if (at != null && at.isWall() && at.isValid(map)
+        if (at != null && !at.isFloor() && at.isValid(map)
                 && ant.position().distanceToSqr(Vec3.atCenterOf(at.cell())) < 1.5 * 1.5) {
             surface = at.surface();
-            moveAttached(wallPoint(at, clampY(at.cell(), ant.getY())));
+            moveAttached(at.isCeiling() ? ceilingPoint(at) : wallPoint(at, clampY(at.cell(), ant.getY())));
             faceTheWayItGoes();
             return;
         }
-        if (at != null && at.isWall()) {
-            at = null; // its wall is gone: let go
+        if (at != null && !at.isFloor()) {
+            at = null; // its wall or ceiling is gone: let go
         }
         surface = Direction.DOWN;
     }
@@ -496,6 +611,10 @@ public class AntNavigator {
     @Nullable
     private Foothold currentFoothold(CellMap map) {
         BlockPos cell = ant.blockPosition();
+        if (surface == Direction.UP && Foothold.isValid(map, cell, Direction.UP)
+                && cell.getY() + 1 - (ant.getY() + ant.getBbHeight()) < CLING_GAP) {
+            return Foothold.ceiling(cell);
+        }
         if (surface.getAxis().isHorizontal() && Foothold.isValid(map, cell, surface) && gapToWall(cell, surface) < CLING_GAP) {
             return new Foothold(cell, surface);
         }
@@ -584,9 +703,22 @@ public class AntNavigator {
         return Math.max(MIN_CLIMB_SPEED, ant.getAttributeValue(Attributes.MOVEMENT_SPEED) * CLIMB_FACTOR * speed);
     }
 
-    /** On a wall the body faces the wall and the head turns the way it moves; on a floor it faces the way it moves. */
+    /**
+     * On a wall the body faces the wall and the head turns the way it moves; on a ceiling the head turns the way it
+     * moves (measured from {@link #ceilingRef}); on a floor it faces the way it moves.
+     */
     private void faceTheWayItGoes() {
-        if (surface.getAxis().isHorizontal()) {
+        if (surface == Direction.UP) {
+            if (attached && motion.horizontalDistanceSqr() > 1.0E-8) {
+                Direction left = ceilingRef.getCounterClockWise();
+                double sideways = motion.x * left.getStepX() + motion.z * left.getStepZ();
+                double away = -(motion.x * ceilingRef.getStepX() + motion.z * ceilingRef.getStepZ());
+                if (Math.abs(sideways) > 1.0E-5 || Math.abs(away) > 1.0E-5) {
+                    heading = (float) Math.toDegrees(Math.atan2(sideways, away));
+                }
+            }
+            setYaw(ceilingRef.toYRot() + 180.0F + heading);
+        } else if (surface.getAxis().isHorizontal()) {
             setYaw(surface.toYRot());
             if (attached && motion.lengthSqr() > 1.0E-8) {
                 Direction left = surface.getCounterClockWise();
@@ -633,6 +765,17 @@ public class AntNavigator {
     private double clampIn(BlockPos cell, Direction.Axis axis, double value) {
         double low = cell.get(axis) + half() + EPS;
         return Mth.clamp(value, low, cell.get(axis) + 1 - half() - EPS);
+    }
+
+    /** The height of the body's feet when its back is pressed against the ceiling of this cell. */
+    private double ceilingY(BlockPos cell) {
+        return cell.getY() + 1 - ant.getBbHeight() - EPS;
+    }
+
+    /** The point on a ceiling foothold: pressed against the ceiling, sideways where the body is (kept inside the cell). */
+    private Vec3 ceilingPoint(Foothold foothold) {
+        BlockPos cell = foothold.cell();
+        return new Vec3(clampIn(cell, Direction.Axis.X, ant.getX()), ceilingY(cell), clampIn(cell, Direction.Axis.Z, ant.getZ()));
     }
 
     private double clampY(BlockPos cell, double y) {

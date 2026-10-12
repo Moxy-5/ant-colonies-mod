@@ -16,7 +16,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 
 /**
- * Plans a route for a tiny climbing insect over the surfaces of the world: floors and walls (see {@link Foothold}).
+ * Plans a route for a tiny climbing insect over the surfaces of the world: floors, walls and ceilings (see {@link Foothold}).
  *
  * <p>The insect always holds on to a surface, so a route never crosses open air: to get to another wall it crawls
  * round the corner, to get up a step it climbs the wall and over the top, to get down a hole it goes over the edge and
@@ -30,12 +30,21 @@ import net.minecraft.core.Direction;
  * <li>{@link StepKind#ROUND_EDGE} (1.2): an outside edge, where a wall ends sideways, onto the block's side face</li>
  * <li>{@link StepKind#OVER_TOP} (1.5): up over the top edge of a wall onto the block; {@link StepKind#OVER_EDGE} (1.5): off a
  * floor's edge onto the side of the block below</li>
- * <li>{@link StepKind#FALL} (3 + the height): let go and drop, only where nothing can be climbed down</li>
+ * <li>{@link StepKind#ONTO_CEILING} / {@link StepKind#OFF_CEILING} (0.8): from the top of a wall onto the ceiling and back</li>
+ * <li>{@link StepKind#CRAWL_CEILING} (1.3): upside down along a ceiling; a little dearer than a floor, so a route only
+ * takes the ceiling where it is a real shortcut (a mind can ask for a ceiling spot on purpose)</li>
+ * <li>{@link StepKind#UNDER_EDGE} / {@link StepKind#OUT_FROM_UNDER} (2): round a block's bottom edge between its side
+ * face and its underside (an overhang)</li>
+ * <li>{@link StepKind#FALL} (3 + the height): let go and drop, only where nothing can be climbed down (or off a ceiling)</li>
  * </ul>
+ * Turning over onto a ceiling costs a little extra, so a route never flips upside down for a tiny shortcut (like
+ * curling from the tunnel ceiling up into the shaft instead of walking the last block).
  * A mind can add its own costs to any step ({@link StepCosts}: later scent trails, avoiding enemies, raids). Nothing
  * here is specific to ants, so termites and later species use the same planner.
  */
 public final class AntPathFinder {
+    /** Cost of one block upside down along a ceiling. */
+    public static final double CEILING_COST = 1.3;
     /** Stops a search that can't find the goal, so an unreachable goal never costs much time. */
     public static final int DEFAULT_MAX_EXPANSIONS = 6000;
     /** The deepest drop a route may take (where nothing can be climbed down). */
@@ -69,13 +78,16 @@ public final class AntPathFinder {
 
     /**
      * The cells a move passes through on its way besides where it starts and ends (going over a top edge passes the
-     * cell above the start, over an edge or round an edge the cell beside it). They must stay open while it is walked.
+     * cell above the start, over an edge or round an edge the cell beside it, under or out from under a block the cell
+     * below the wall). They must stay open while it is walked.
      */
     public static List<BlockPos> passesThrough(Foothold from, Foothold to, StepKind kind) {
         return switch (kind) {
             case OVER_TOP -> List.of(from.cell().above());
             case OVER_EDGE -> List.of(to.cell().above());
             case ROUND_EDGE -> List.of(to.cell().relative(from.surface().getOpposite()));
+            case UNDER_EDGE -> List.of(from.cell().below());
+            case OUT_FROM_UNDER -> List.of(to.cell().below());
             default -> List.of();
         };
     }
@@ -191,7 +203,10 @@ public final class AntPathFinder {
         return new Route(steps, end.cost);
     }
 
-    /** Every surface an insect could hold on to in this cell: the floor first, then the walls. Empty if the cell is not open. */
+    /**
+     * Every surface an insect could start from in this cell: the floor first, then the walls. Empty if the cell is not
+     * open. (Not the ceiling: an insect is only up there if it climbed up on purpose, and then it knows.)
+     */
     public static List<Foothold> footholdsIn(CellMap map, BlockPos cell) {
         List<Foothold> found = new ArrayList<>();
         if (Foothold.isValid(map, cell, Direction.DOWN)) {
@@ -247,7 +262,8 @@ public final class AntPathFinder {
             }
             return;
         }
-        if (!from.isWall()) {
+        if (from.isCeiling()) {
+            ceilingNeighbours(map, from, out);
             return;
         }
         Direction w = from.surface();
@@ -283,10 +299,40 @@ public final class AntPathFinder {
         if (map.isOpen(c.above()) && Foothold.isValid(map, top, Direction.DOWN)) {
             out.add(Foothold.floor(top), StepKind.OVER_TOP, 1.5);
         }
+        // Up into the corner and onto the ceiling.
+        if (Foothold.isValid(map, c, Direction.UP)) {
+            out.add(Foothold.ceiling(c), StepKind.ONTO_CEILING, 0.8);
+        }
+        // The wall ends below and the block hangs over open space: round its bottom edge onto its underside.
+        BlockPos under = c.relative(w).below();
+        if (map.isOpen(c.below()) && Foothold.isValid(map, under, Direction.UP)) {
+            out.add(Foothold.ceiling(under), StepKind.UNDER_EDGE, 2.0);
+        }
         // The wall ends below and there is no floor: nothing left but to let go.
         if (!climbs && map.isOpen(c.below())) {
             addFall(map, c.below(), out);
         }
+    }
+
+    /** The moves from a ceiling: down a wall of the cell, on along the ceiling, out round its edge, or let go. */
+    private static void ceilingNeighbours(CellMap map, Foothold from, MoveSink out) {
+        BlockPos c = from.cell();
+        for (Direction d : Direction.Plane.HORIZONTAL) {
+            if (Foothold.isValid(map, c, d)) {
+                out.add(new Foothold(c, d), StepKind.OFF_CEILING, 0.8);
+            }
+            BlockPos n = c.relative(d);
+            if (!map.isOpen(n)) {
+                continue;
+            }
+            if (Foothold.isValid(map, n, Direction.UP)) {
+                out.add(Foothold.ceiling(n), StepKind.CRAWL_CEILING, CEILING_COST);
+            } else if (Foothold.isValid(map, n.above(), d.getOpposite())) {
+                // The ceiling ends: round the block's bottom edge and up its side face.
+                out.add(new Foothold(n.above(), d.getOpposite()), StepKind.OUT_FROM_UNDER, 2.0);
+            }
+        }
+        addFall(map, c, out);
     }
 
     private static void addFall(CellMap map, BlockPos from, MoveSink out) {

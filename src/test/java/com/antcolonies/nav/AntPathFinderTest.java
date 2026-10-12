@@ -192,6 +192,60 @@ class AntPathFinderTest {
         assertTrue(route.hasFall(), route.toString());
     }
 
+    /** The room's middle cell, one row in from the tunnel: a ceiling spot far from every wall. */
+    private static final BlockPos ROOM_MIDDLE = SHAFT_BOTTOM.east(6);
+
+    private Route routeTo(Foothold from, Foothold to) {
+        return AntPathFinder.find(map, List.of(from), to::equals, to.cell(), AntPathFinder.DEFAULT_MAX_EXPANSIONS, AntPathFinder.StepCosts.NONE);
+    }
+
+    @Test
+    void anAntClimbsUpTheRoomWallAndCrawlsUpsideDownToTheMiddleOfTheCeiling() {
+        Route route = routeTo(Foothold.floor(SHAFT_BOTTOM.east(8).south(2)), Foothold.ceiling(ROOM_MIDDLE));
+        assertNotNull(route);
+        assertLegal(route);
+        assertTrue(has(route, StepKind.ONTO_WALL) && has(route, StepKind.ONTO_CEILING) && has(route, StepKind.CRAWL_CEILING), route.toString());
+        assertFalse(route.hasFall());
+        assertEquals(Foothold.ceiling(ROOM_MIDDLE), route.end());
+    }
+
+    @Test
+    void anAntHangingFromTheCeilingGetsBackToTheFloor() {
+        Route route = routeTo(Foothold.ceiling(ROOM_MIDDLE), Foothold.floor(SHAFT_BOTTOM.east(8).north(2)));
+        assertNotNull(route);
+        assertLegal(route);
+        assertEquals(Foothold.floor(SHAFT_BOTTOM.east(8).north(2)), route.end());
+    }
+
+    @Test
+    void floorsBeatCeilingsWhenBothGoTheSameWay() {
+        Route route = route(SHAFT_BOTTOM.east(4).south(2), SHAFT_BOTTOM.east(8).north(2));
+        assertNotNull(route);
+        for (Route.Step step : route.steps()) {
+            assertTrue(step.to().isFloor(), "a plain walk across the room stays on the floor: " + route);
+        }
+    }
+
+    @Test
+    void anAntGoesUnderAnOverhangingBlockAndOutTheOtherSide() {
+        // A block hanging in the air two blocks above the ground: from its north face, round its bottom edge onto its
+        // underside, and from there round the far bottom edge and up its south face.
+        BlockPos block = new BlockPos(10, 66, 10);
+        solid.add(block);
+        Foothold north = new Foothold(block.north(), Direction.SOUTH);
+        Foothold under = Foothold.ceiling(block.below());
+        Foothold south = new Foothold(block.south(), Direction.NORTH);
+        Route in = routeTo(north, under);
+        assertNotNull(in);
+        assertLegal(in);
+        assertTrue(has(in, StepKind.UNDER_EDGE), in.toString());
+        Route out = routeTo(under, south);
+        assertNotNull(out);
+        assertLegal(out);
+        assertTrue(has(out, StepKind.OUT_FROM_UNDER), out.toString());
+        assertFalse(out.hasFall());
+    }
+
     @Test
     void aSealedPocketOfAirCannotBeReached() {
         BlockPos pocket = new BlockPos(10, 50, 10);

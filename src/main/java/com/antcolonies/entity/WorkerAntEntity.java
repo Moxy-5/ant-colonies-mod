@@ -89,7 +89,7 @@ public class WorkerAntEntity extends AbstractAntEntity {
         this.goalSelector.addGoal(8, new RepairHillGoal(this));
         // The nurse waits by the queen until there is an egg or a meal for her.
         this.goalSelector.addGoal(9, new StandByQueenGoal(this));
-        this.goalSelector.addGoal(10, new AntWanderGoal(this, 1.0, 120, 6, () -> true));
+        this.goalSelector.addGoal(10, new AntWanderGoal(this, 1.0, 120, 6, () -> true).hangsFromCeilings(0.25F));
         this.goalSelector.addGoal(11, new RandomLookAroundGoal(this));
     }
 
