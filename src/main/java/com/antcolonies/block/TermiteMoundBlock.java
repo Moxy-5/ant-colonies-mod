@@ -86,8 +86,36 @@ public class TermiteMoundBlock extends Block {
     }
 
     /**
-     * Adds one layer of soil at {@code pos}: starts a new block in an empty space (only on something it may be built on)
-     * or adds to a block still being built. False if nothing was added. For the termites' building job.
+     * Whether termites may start a new block in this empty space: on top of something it may be built on (see
+     * {@link #canBuildOn}), or, where there is nothing under it at all (over a tunnel in the mound), built out from a
+     * finished block that has set right beside it, like an arch. Never on wet soil that has not set.
+     */
+    public static boolean canStartAt(LevelReader level, BlockPos pos) {
+        BlockPos below = pos.below();
+        BlockState under = level.getBlockState(below);
+        if (canBuildOn(under, level, below)) {
+            return true;
+        }
+        if (under.getBlock() instanceof TermiteMoundBlock || !under.getCollisionShape(level, below).isEmpty()) {
+            return false;
+        }
+        return besideSetSoil(level, pos);
+    }
+
+    /** True if a finished mound block that has set stands right beside this space (sideways). */
+    private static boolean besideSetSoil(LevelReader level, BlockPos pos) {
+        for (Direction side : Direction.Plane.HORIZONTAL) {
+            BlockState beside = level.getBlockState(pos.relative(side));
+            if (beside.getBlock() instanceof TermiteMoundBlock && isFinished(beside) && beside.getValue(AGE) >= 1) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Adds one layer of soil at {@code pos}: starts a new block in an empty space (only where {@link #canStartAt}
+     * allows) or adds to a block still being built. False if nothing was added. For the termites' building job.
      */
     public boolean addLayer(Level level, BlockPos pos) {
         BlockState here = level.getBlockState(pos);
@@ -97,7 +125,7 @@ public class TermiteMoundBlock extends Block {
             }
             return level.setBlockAndUpdate(pos, here.setValue(LAYERS, here.getValue(LAYERS) + 1));
         }
-        if (!here.canBeReplaced() || !canBuildOn(level.getBlockState(pos.below()), level, pos.below())) {
+        if (!here.canBeReplaced() || !canStartAt(level, pos)) {
             return false;
         }
         return level.setBlockAndUpdate(pos, defaultBlockState());
@@ -113,14 +141,15 @@ public class TermiteMoundBlock extends Block {
         return true;
     }
 
-    // A block still being built needs a solid floor; a finished one stays where it is (a mound is not undermined by one gap).
+    // A block still being built needs a solid floor, or set soil beside it to stick to (built out over a tunnel); a
+    // finished one stays where it is (a mound is not undermined by one gap).
     @Override
     protected boolean canSurvive(BlockState state, LevelReader level, BlockPos pos) {
         if (isFinished(state)) {
             return true;
         }
         BlockPos below = pos.below();
-        return level.getBlockState(below).isFaceSturdy(level, below, Direction.UP);
+        return level.getBlockState(below).isFaceSturdy(level, below, Direction.UP) || besideSetSoil(level, pos);
     }
 
     @Override

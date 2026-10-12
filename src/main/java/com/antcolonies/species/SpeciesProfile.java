@@ -15,7 +15,8 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
  * ({@code Hill}), the castes' size, health and speed (fixed when the game starts), and the block and item tags.
  */
 public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNumbers queen, BroodNumbers brood,
-        FoodNumbers food, RefuseNumbers refuse, NestNumbers nest, Optional<QueenBody> queenBody, Optional<Founding> founding) {
+        FoodNumbers food, RefuseNumbers refuse, NestNumbers nest, Optional<QueenBody> queenBody, Optional<Founding> founding,
+        Optional<MoundNumbers> mound) {
 
     /**
      * The whole colony. {@code maxWorkers}: young grow into workers only while there are fewer. {@code nursesFrom}: from
@@ -139,6 +140,29 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
         ).apply(i, Founding::new));
     }
 
+    /**
+     * A tall mound built of termite mound soil (termites; species without it build the ant hill instead). It grows in
+     * stages, one block taller each ({@code MoundPlan}), up to {@code maxHeight} blocks with a base {@code baseRadius}
+     * blocks wide (from the middle) and {@code sideChimneys} smaller chimneys around the tower, the first of them up to
+     * {@code sideChimneyHeight} blocks above the mound's slope. How big the colony lets it get grows with time: every
+     * day it may have {@code blocksPerDay} more blocks, plus {@code blocksPerDayPerWorker} for each worker (so an old
+     * small colony still adds to it slowly, and a big one builds fast). The soil comes from galleries dug under it:
+     * {@code galleryLevels} levels, reaching up to {@code galleryRadius} blocks out from the shaft.
+     */
+    public record MoundNumbers(int maxHeight, float baseRadius, int sideChimneys, int sideChimneyHeight, float blocksPerDay,
+            float blocksPerDayPerWorker, int galleryLevels, int galleryRadius) {
+        public static final Codec<MoundNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.INT.fieldOf("max_height").forGetter(MoundNumbers::maxHeight),
+                Codec.FLOAT.fieldOf("base_radius").forGetter(MoundNumbers::baseRadius),
+                Codec.INT.fieldOf("side_chimneys").forGetter(MoundNumbers::sideChimneys),
+                Codec.INT.fieldOf("side_chimney_height").forGetter(MoundNumbers::sideChimneyHeight),
+                Codec.FLOAT.fieldOf("blocks_per_day").forGetter(MoundNumbers::blocksPerDay),
+                Codec.FLOAT.fieldOf("blocks_per_day_per_worker").forGetter(MoundNumbers::blocksPerDayPerWorker),
+                Codec.INT.fieldOf("gallery_levels").forGetter(MoundNumbers::galleryLevels),
+                Codec.INT.fieldOf("gallery_radius").forGetter(MoundNumbers::galleryRadius)
+        ).apply(i, MoundNumbers::new));
+    }
+
     public static final Codec<SpeciesProfile> CODEC = RecordCodecBuilder.create(i -> i.group(
             ColonyNumbers.CODEC.fieldOf("colony").forGetter(SpeciesProfile::colony),
             WorkerNumbers.CODEC.fieldOf("worker").forGetter(SpeciesProfile::worker),
@@ -148,7 +172,8 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
             RefuseNumbers.CODEC.fieldOf("refuse").forGetter(SpeciesProfile::refuse),
             NestNumbers.CODEC.fieldOf("nest").forGetter(SpeciesProfile::nest),
             QueenBody.CODEC.optionalFieldOf("queen_body").forGetter(SpeciesProfile::queenBody),
-            Founding.CODEC.optionalFieldOf("founding").forGetter(SpeciesProfile::founding)
+            Founding.CODEC.optionalFieldOf("founding").forGetter(SpeciesProfile::founding),
+            MoundNumbers.CODEC.optionalFieldOf("mound").forGetter(SpeciesProfile::mound)
     ).apply(i, SpeciesProfile::new));
 
     /**
@@ -164,5 +189,6 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
             new RefuseNumbers(6000),
             new NestNumbers(4, true, true),
             Optional.empty(),
-            Optional.of(new Founding(3, 400, 200)));
+            Optional.of(new Founding(3, 400, 200)),
+            Optional.empty());
 }

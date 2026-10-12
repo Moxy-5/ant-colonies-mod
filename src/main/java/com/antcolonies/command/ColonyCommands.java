@@ -31,7 +31,38 @@ public class ColonyCommands {
                 // grow without waiting for a big colony. She never shrinks by herself, so the size stays.
                 .then(Commands.literal("queensize")
                         .then(Commands.argument("percent", IntegerArgumentType.integer(0, 100))
-                                .executes(context -> queenSize(context.getSource(), IntegerArgumentType.getInteger(context, "percent"))))));
+                                .executes(context -> queenSize(context.getSource(), IntegerArgumentType.getInteger(context, "percent")))))
+                // Sets how tall the nearest termite mound may grow (the termites then build up to it), or with "instant"
+                // puts the whole mound of that height up at once, to look at its shape.
+                .then(Commands.literal("mound")
+                        .then(Commands.argument("height", IntegerArgumentType.integer(1, 64))
+                                .executes(context -> mound(context.getSource(), IntegerArgumentType.getInteger(context, "height"), false))
+                                .then(Commands.literal("instant")
+                                        .executes(context -> mound(context.getSource(), IntegerArgumentType.getInteger(context, "height"), true))))));
+    }
+
+    private static int mound(CommandSourceStack source, int height, boolean instant) {
+        ServerLevel level = source.getLevel();
+        BlockPos at = BlockPos.containing(source.getPosition());
+        Colony colony = ColonyManager.get(level).getColonies().stream()
+                .filter(c -> c.mound().numbers() != null && c.getCenter().distSqr(at) <= 64 * 64)
+                .min(Comparator.comparingDouble(c -> c.getCenter().distSqr(at))).orElse(null);
+        if (colony == null) {
+            source.sendFailure(Component.literal("No termite colony within 64 blocks."));
+            return 0;
+        }
+        int max = colony.mound().numbers().maxHeight();
+        int h = Math.min(height, max);
+        if (instant) {
+            colony.mound().buildInstantly(level, h);
+        } else {
+            colony.mound().setStage(level, h);
+        }
+        ColonyManager.get(level).markChanged();
+        String done = instant ? "built at once" : "set: the termites build up to it";
+        source.sendSuccess(() -> Component.literal("Mound height " + h + " of " + max + " (" + colony.mound().wallsAt(h) + " blocks) " + done
+                + (colony.isFounding() ? ". The colony has no workers yet, so nobody builds." : ".")), false);
+        return 1;
     }
 
     private static int queenSize(CommandSourceStack source, int percent) {
@@ -67,10 +98,21 @@ public class ColonyCommands {
                     + colony.profile().queen().richMeal() + incubation(colony, level)
                     + " | queen unfed " + unfedMinutes(colony, level) + " of " + colony.profile().queen().starveTicks() / 1200 + " min"
                     + " | eggs " + colony.brood().countEggs(level) + " | larvae " + colony.brood().countLarvae(level)
-                    + " | dead ants " + colony.refuse().getCorpses(level).size() + " (refuse chamber " + colony.refuse().getRefuseCorpses(level).size() + ")";
+                    + " | dead ants " + colony.refuse().getCorpses(level).size() + " (refuse chamber " + colony.refuse().getRefuseCorpses(level).size() + ")"
+                    + mound(colony, level);
             source.sendSuccess(() -> Component.literal(line), false);
         }
         return colonies.size();
+    }
+
+    /** " | mound height 3 of 22, 30/36 blocks finished, earned 41.2" for colonies that build a mound, otherwise nothing. */
+    private static String mound(Colony colony, ServerLevel level) {
+        if (colony.mound().numbers() == null) {
+            return "";
+        }
+        int h = colony.mound().getStage(level);
+        return String.format(" | mound height %d of %d, %d/%d blocks finished, earned %.1f", h, colony.mound().numbers().maxHeight(),
+                colony.mound().countFinished(level), colony.mound().wallsAt(h), colony.mound().getAllowance(level));
     }
 
     /** How many minutes the queen has gone without food she wanted (0 while she is satisfied). */

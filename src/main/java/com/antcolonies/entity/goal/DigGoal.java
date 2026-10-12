@@ -5,11 +5,14 @@ import java.util.function.BooleanSupplier;
 
 import org.jetbrains.annotations.Nullable;
 
+import com.antcolonies.block.TermiteHoleBlock;
+import com.antcolonies.block.TermiteMoundBlock;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.Nest;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.nav.AntNavigator;
+import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.registry.ModTags;
 
 import net.minecraft.core.BlockPos;
@@ -64,7 +67,7 @@ public class DigGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        target = colony == null ? null : colony.nest().findDigTarget(level);
+        target = colony == null ? null : colony.nest().findDigTarget(level, ant.getUUID());
         return target != null;
     }
 
@@ -135,10 +138,13 @@ public class DigGoal extends Goal {
         float progress = colony.nest().addDigProgress(target, 1.0F / bitesNeeded);
 
         // Every bite leaves a soil pellet in the mandibles (grass and roots turn into plain dirt), as long as
-        // the hill still has room for it. Once the hill is complete the soil is simply left behind.
-        if (ant.canPlaceBlocks() && colony.hill().hasMoundRoom(level)) {
-            ant.setCarriedBlock(state.is(Blocks.GRASS_BLOCK) || state.is(Blocks.ROOTED_DIRT)
-                    ? Blocks.DIRT.defaultBlockState() : state);
+        // the hill still has room for it. Once the hill is complete the soil is simply left behind. A termite mound
+        // takes one pellet per layer of a mound block from each dug block (one dug block builds one mound block).
+        boolean mound = colony.mound().numbers() != null;
+        if (ant.canPlaceBlocks() && (mound ? colony.mound().takePellet(target, ant.getUUID()) : colony.hill().hasMoundRoom(level))) {
+            ant.setCarriedBlock(state.is(Blocks.GRASS_BLOCK) || state.is(Blocks.ROOTED_DIRT) ? Blocks.DIRT.defaultBlockState()
+                    : state.getBlock() instanceof TermiteMoundBlock || state.getBlock() instanceof TermiteHoleBlock
+                            ? ModBlocks.TERMITE_MOUND.get().defaultBlockState() : state);
         }
 
         level.playSound(null, target, state.getSoundType().getHitSound(), SoundSource.BLOCKS, 0.4F, 1.3F);
@@ -147,6 +153,7 @@ public class DigGoal extends Goal {
 
         if (progress >= 1.0F) {
             colony.nest().clearDigProgress(target);
+            colony.mound().blockDug(target);
             level.destroyBlockProgress(ant.getId(), target, -1);
             level.destroyBlock(target, false, ant);
         } else {

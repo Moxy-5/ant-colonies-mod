@@ -87,6 +87,16 @@ public class Nest {
      */
     @Nullable
     public BlockPos findDigTarget(Level level) {
+        return findDigTarget(level, null);
+    }
+
+    /**
+     * Like {@link #findDigTarget(Level)}, for a worker that is about to dig ({@code digger}). Once the nest is dug, a
+     * species that builds a mound goes on with the mound's digging (see {@link Mound#findDigTarget}): what has to be
+     * cleared out of the mound, and the galleries for its soil.
+     */
+    @Nullable
+    public BlockPos findDigTarget(Level level, @Nullable java.util.UUID digger) {
         // A colony that closed itself in while it was founded opens up again once it has workers: the plug first.
         if (isEntrancePlugged(level)) {
             return center;
@@ -135,7 +145,7 @@ public class Nest {
                 return next;
             }
         }
-        return null;
+        return colony.mound().findDigTarget(level, digger);
     }
 
     /**
@@ -263,7 +273,8 @@ public class Nest {
 
     /** Whether a worker may bite this block: soil (the diggable tag), or the plug in its own entrance. */
     public boolean canDig(Level level, BlockPos pos) {
-        return level.getBlockState(pos).is(ModTags.DIGGABLE) || (pos.equals(center) && isEntrancePlugged(level));
+        return level.getBlockState(pos).is(ModTags.DIGGABLE) || (pos.equals(center) && isEntrancePlugged(level))
+                || colony.mound().isClearJob(level, pos);
     }
 
     /**
@@ -285,6 +296,10 @@ public class Nest {
         }
         if (target.equals(center)) {
             spots.add(0, center.below());
+        }
+        // The mound's own soil in a shaft is cleared from below too (the old cap of a chimney that grew).
+        if (colony.mound().isClearJob(level, target) && level.getBlockState(target.below()).isAir()) {
+            spots.add(target.below());
         }
         return spots;
     }
@@ -375,13 +390,14 @@ public class Nest {
             if (layout != null) {
                 cells.addAll(layout.cells());
             }
+            cells.addAll(colony.mound().getGalleries(level)); // none for species without a mound
         }
         return cells;
     }
 
     /** The first block in the list that is diggable, has a place to stand next to it (see {@link #standSpotsFor}), and is safe to open. */
     @Nullable
-    private BlockPos firstDiggable(Level level, List<BlockPos> cells) {
+    BlockPos firstDiggable(Level level, List<BlockPos> cells) {
         Set<BlockPos> nestCells = null;
         for (BlockPos pos : cells) {
             if (!level.isLoaded(pos)) {
@@ -411,7 +427,7 @@ public class Nest {
     }
 
     /** How deep the entrance shaft goes for this nest: the depth of the room plan (the normal depth until it is known). */
-    private int shaftDepth(Level level) {
+    int shaftDepth(Level level) {
         Layout planned = getLayout(level);
         return planned == null ? SHAFT_DEPTH : planned.shaftDepth();
     }

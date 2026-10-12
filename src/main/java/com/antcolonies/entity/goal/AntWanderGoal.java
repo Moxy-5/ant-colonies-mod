@@ -49,7 +49,7 @@ public class AntWanderGoal extends Goal {
         if (ant.getRandom().nextInt(interval) != 0 || !allowed.getAsBoolean()) {
             return false;
         }
-        CellMap map = new LevelCellMap(ant.level());
+        CellMap map = new LevelCellMap(ant.level(), ant);
         BlockPos here = ant.blockPosition();
         for (int attempt = 0; attempt < 6; attempt++) {
             int dx = ant.getRandom().nextInt(radius * 2 + 1) - radius;

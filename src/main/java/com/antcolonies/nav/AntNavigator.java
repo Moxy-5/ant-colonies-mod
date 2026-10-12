@@ -14,6 +14,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -39,6 +41,20 @@ public class AntNavigator {
     private static final int ARRIVE_TIMEOUT = 20;
     /** A step that is not done after this many ticks (6 seconds) means stuck: plan the route again. */
     private static final int STEP_TICKS = 120;
+    /** Coming out of a doorway's mouth or going in by it takes longer (up through the spire, a look round, down the outside). */
+    private static final int DOORWAY_STEP_TICKS = 400;
+    /** How long (in ticks) an insect coming out of a doorway's mouth stops with its head out, looking round. */
+    private static final int PEEK_TICKS = 30;
+    /** How far below the mouth's rim its feet are while it looks out (so the front half of the body is out). */
+    private static final double PEEK_DEPTH = 0.2;
+    /**
+     * On a wall the body is drawn this far toward the wall from the hitbox's middle (the renderer's push into the wall at
+     * a termite's 3/4 size). In and on a narrow spire the hitbox is moved the other way by as much, so the drawn body is
+     * in the middle of the mouth, and against the spire's outside, not through it.
+     */
+    private static final double DRAWN_INTO_WALL = 0.13;
+    /** Half the thickness of a body lying on a wall, from its feet to its back. */
+    private static final double BODY_THICKNESS = 0.03;
     /** Waiting this long for a falling insect to land is the most. */
     private static final int FALL_TICKS = 200;
     private static final int MAX_REPLANS = 3;
@@ -69,10 +85,15 @@ public class AntNavigator {
     /** When the mind asked for one exact foothold (a spot on a ceiling, say) instead of a cell; else null. */
     @Nullable
     private Foothold goalFoothold;
+    /** When the mind accepts any foothold that passes a test (anywhere within reach of a block, say); else null. */
+    @Nullable
+    private java.util.function.Predicate<Foothold> goalTest;
     private double speed = 1.0;
     private boolean failed;
     private int replans;
     private int stepTicks;
+    /** Ticks spent in the current part of a step that waits (looking out of a doorway's mouth). */
+    private int legTicks;
     private int arriveTicks;
     /** The foothold the current step starts from; null while the insect drops to where its route starts. */
     @Nullable
@@ -121,6 +142,7 @@ public class AntNavigator {
     public boolean moveTo(BlockPos goal, double speed, AntPathFinder.StepCosts mindCosts) {
         this.goal = goal.immutable();
         this.goalFoothold = null;
+        this.goalTest = null;
         this.speed = speed;
         this.replans = 0;
         this.mindCosts = mindCosts;
@@ -134,6 +156,21 @@ public class AntNavigator {
     public boolean moveTo(Foothold goal, double speed) {
         this.goal = goal.cell();
         this.goalFoothold = goal;
+        this.goalTest = null;
+        this.speed = speed;
+        this.replans = 0;
+        this.mindCosts = AntPathFinder.StepCosts.NONE;
+        return plan(null);
+    }
+
+    /**
+     * Starts walking to the nearest foothold the mind accepts ({@code isGoal}, for example any spot from which a block
+     * can be reached), searching toward {@code towards} first. False (and does nothing) if there is none to walk to.
+     */
+    public boolean moveTo(java.util.function.Predicate<Foothold> isGoal, BlockPos towards, double speed) {
+        this.goal = towards.immutable();
+        this.goalFoothold = null;
+        this.goalTest = isGoal;
         this.speed = speed;
         this.replans = 0;
         this.mindCosts = AntPathFinder.StepCosts.NONE;
@@ -147,6 +184,7 @@ public class AntNavigator {
     public boolean follow(Route shared, double speed) {
         this.goal = shared.end().cell();
         this.goalFoothold = null;
+        this.goalTest = null;
         this.speed = speed;
         this.replans = 0;
         this.mindCosts = AntPathFinder.StepCosts.NONE;
@@ -199,7 +237,7 @@ public class AntNavigator {
      */
     @Nullable
     public Foothold getHold() {
-        Foothold here = route == null ? at : currentFoothold(new LevelCellMap(ant.level()));
+        Foothold here = route == null ? at : currentFoothold(new LevelCellMap(ant.level(), ant));
         return here == null || here.isFloor() ? null : here;
     }
 
@@ -255,7 +293,7 @@ public class AntNavigator {
     /** Stops walking. An insect on a wall keeps holding on where it is. */
     public void stop() {
         if (route != null) {
-            Foothold here = currentFoothold(new LevelCellMap(ant.level()));
+            Foothold here = currentFoothold(new LevelCellMap(ant.level(), ant));
             if (here != null) {
                 at = here;
             }
@@ -267,7 +305,7 @@ public class AntNavigator {
 
     /** Plans from where the insect is: to the goal cell, or onto the start of a shared route and then along it. */
     private boolean plan(@Nullable Route shared) {
-        CellMap map = new LevelCellMap(ant.level());
+        CellMap map = new LevelCellMap(ant.level(), ant);
         Foothold start = currentFoothold(map);
         List<Foothold> starts = new ArrayList<>();
         if (start != null) {
@@ -286,7 +324,9 @@ public class AntNavigator {
         Route found = null;
         if (!starts.isEmpty()) {
             if (shared == null) {
-                found = goalFoothold == null
+                found = goalTest != null
+                        ? AntPathFinder.find(map, starts, goalTest, goal, AntPathFinder.DEFAULT_MAX_EXPANSIONS, costs)
+                        : goalFoothold == null
                         ? AntPathFinder.find(map, starts, goal, AntPathFinder.DEFAULT_MAX_EXPANSIONS, costs)
                         : AntPathFinder.find(map, starts, goalFoothold::equals, goal, AntPathFinder.DEFAULT_MAX_EXPANSIONS, costs);
             } else {
@@ -314,7 +354,7 @@ public class AntNavigator {
 
     /** Called every tick from the insect, before it moves. */
     public void tick() {
-        CellMap map = new LevelCellMap(ant.level());
+        CellMap map = new LevelCellMap(ant.level(), ant);
         attached = false;
         motion = Vec3.ZERO;
         if (route == null) {
@@ -366,7 +406,7 @@ public class AntNavigator {
             replan("blocked on " + step.kind().name().toLowerCase() + " (part " + leg + ") from " + from(step) + " to " + step.to() + " at "
                     + String.format("%.3f, %.3f, %.3f", ant.getX(), ant.getY(), ant.getZ()));
             return;
-        } else if (++stepTicks > (step.kind() == StepKind.FALL ? FALL_TICKS : STEP_TICKS)) {
+        } else if (++stepTicks > (step.kind() == StepKind.FALL ? FALL_TICKS : isDoorwayStep(step) ? DOORWAY_STEP_TICKS : STEP_TICKS)) {
             replan("stuck on " + step.kind().name().toLowerCase() + " (part " + leg + ") from " + from(step) + " to " + step.to()
                     + " at " + String.format("%.3f, %.3f, %.3f", ant.getX(), ant.getY(), ant.getZ()) + ", motion " + motion);
             return;
@@ -454,6 +494,10 @@ public class AntNavigator {
                 return moveAttached(round);
             }
             case OVER_TOP: {
+                Doorway door = doorwayAt(c);
+                if (door != null) {
+                    return comeOutOf(door, from, step);
+                }
                 // Up the wall until the feet reach its top, then over the edge onto the block.
                 Direction w = from.surface();
                 if (leg == 0) {
@@ -470,6 +514,10 @@ public class AntNavigator {
                 return moveAttached(with(new Vec3(ant.getX(), c.getY() + 1 + EPS, ant.getZ()), w.getAxis(), onTop));
             }
             case OVER_EDGE: {
+                Doorway door = doorwayAt(to.cell());
+                if (door != null) {
+                    return goInto(door, from, step);
+                }
                 // To the edge of the floor and over it, then head first down the side of the block.
                 Direction wall = to.surface();
                 Direction out = wall.getOpposite();
@@ -548,6 +596,163 @@ public class AntNavigator {
             }
             default:
                 return true;
+        }
+    }
+
+    /** The doorway block in this cell if this insect passes through it (a termite in a chimney block), else null. */
+    @Nullable
+    private Doorway doorwayAt(BlockPos cell) {
+        BlockState state = ant.level().getBlockState(cell);
+        return state.getBlock() instanceof Doorway door
+                && state.getCollisionShape(ant.level(), cell, CollisionContext.of(ant)).isEmpty() ? door : null;
+    }
+
+    /** Whether this step comes out of a doorway's mouth or goes in by it (it takes longer than other steps). */
+    private boolean isDoorwayStep(Route.Step step) {
+        return (step.kind() == StepKind.OVER_TOP && at != null && doorwayAt(at.cell()) != null)
+                || (step.kind() == StepKind.OVER_EDGE && doorwayAt(step.to().cell()) != null);
+    }
+
+    /**
+     * Out of a doorway over its top, by its mouth: from the wall inside the block to its middle, up inside the spire
+     * until the head is out, a look round, up onto the rim, over it and head first down the outside of the spire, and
+     * off onto the top of the block beside (where the route goes on). The body is hidden inside the block until it
+     * comes up the spire.
+     */
+    private boolean comeOutOf(Doorway door, Foothold from, Route.Step step) {
+        BlockPos c = from.cell();
+        Direction w = from.surface();
+        double midX = c.getX() + 0.5 - w.getStepX() * DRAWN_INTO_WALL;
+        double midZ = c.getZ() + 0.5 - w.getStepZ() * DRAWN_INTO_WALL;
+        double rim = c.getY() + door.mouthHeight();
+        switch (leg) {
+            case 0 -> {
+                // Inside the block, to its middle under the mouth.
+                surface = w;
+                if (moveAttached(new Vec3(midX, c.getY() + 0.5, midZ))) {
+                    heading = 0.0F;
+                    leg = 1;
+                }
+                return false;
+            }
+            case 1 -> {
+                // Up inside the spire until the front of the body is out.
+                surface = w;
+                heading = 0.0F;
+                if (moveAttached(new Vec3(midX, rim - PEEK_DEPTH, midZ))) {
+                    legTicks = 0;
+                    leg = 2;
+                }
+                return false;
+            }
+            case 2 -> {
+                // A look round: the head turns from side to side.
+                surface = w;
+                attached = true;
+                motion = Vec3.ZERO;
+                heading = (float) (35.0 * Math.sin(legTicks * 0.35));
+                if (++legTicks >= PEEK_TICKS) {
+                    heading = 0.0F;
+                    leg = 3;
+                }
+                return false;
+            }
+            case 3 -> {
+                // On up until the feet are at the rim.
+                surface = w;
+                if (moveAttached(new Vec3(midX, rim + EPS, midZ))) {
+                    setYaw(w.toYRot() - heading);
+                    leg = 4;
+                }
+                return false;
+            }
+            case 4 -> {
+                // Over the rim toward the block it goes to, until it is over the spire's outside.
+                surface = Direction.DOWN;
+                double out = door.mouthRadius() + DRAWN_INTO_WALL + BODY_THICKNESS;
+                if (moveAttached(new Vec3(c.getX() + 0.5 + w.getStepX() * out, rim + EPS, c.getZ() + 0.5 + w.getStepZ() * out))) {
+                    surface = w.getOpposite();
+                    heading = 180.0F;
+                    leg = 5;
+                }
+                return false;
+            }
+            case 5 -> {
+                // Head first down the outside of the spire to the top of the block.
+                surface = w.getOpposite();
+                if (moveAttached(new Vec3(ant.getX(), c.getY() + 1 + EPS, ant.getZ()))) {
+                    setYaw(w.toYRot());
+                    leg = 6;
+                }
+                return false;
+            }
+            default -> {
+                // Off the spire's foot and onto the block beside, as at the end of any climb over the top.
+                surface = Direction.DOWN;
+                BlockPos block = c.relative(w);
+                double onTop = centerOf(block, w.getAxis()) - w.getAxisDirection().getStep() * (0.5 - half() - OVER_THE_TOP);
+                return moveAttached(with(new Vec3(ant.getX(), c.getY() + 1 + EPS, ant.getZ()), w.getAxis(), onTop));
+            }
+        }
+    }
+
+    /**
+     * Into a doorway over its edge, by its mouth: from the top of the block beside onto the doorway's top to the foot of
+     * the spire, up its outside, over the rim and head first down inside it into the block, to the wall the route goes
+     * on from (hidden inside).
+     */
+    private boolean goInto(Doorway door, Foothold from, Route.Step step) {
+        Foothold to = step.to();
+        BlockPos c = to.cell();
+        Direction s = to.surface(); // toward the block the insect comes from
+        Direction in = s.getOpposite(); // the way it goes
+        double midX = c.getX() + 0.5;
+        double midZ = c.getZ() + 0.5;
+        double rim = c.getY() + door.mouthHeight();
+        double foot = door.mouthRadius() + DRAWN_INTO_WALL + BODY_THICKNESS;
+        switch (leg) {
+            case 0 -> {
+                // Along the top to the foot of the spire.
+                surface = Direction.DOWN;
+                if (moveAttached(new Vec3(midX + s.getStepX() * foot, c.getY() + 1 + EPS, midZ + s.getStepZ() * foot))) {
+                    surface = in;
+                    heading = 0.0F;
+                    leg = 1;
+                }
+                return false;
+            }
+            case 1 -> {
+                // Up the outside of the spire to the rim.
+                surface = in;
+                if (moveAttached(new Vec3(ant.getX(), rim + EPS, ant.getZ()))) {
+                    setYaw(in.toYRot() - heading);
+                    leg = 2;
+                }
+                return false;
+            }
+            case 2 -> {
+                // Over the rim to the middle of the mouth.
+                surface = Direction.DOWN;
+                if (moveAttached(new Vec3(midX, rim + EPS, midZ))) {
+                    surface = s;
+                    heading = 180.0F;
+                    leg = 3;
+                }
+                return false;
+            }
+            case 3 -> {
+                // Head first down inside the spire into the block (the body drawn in the middle of the mouth).
+                surface = s;
+                if (moveAttached(new Vec3(midX - s.getStepX() * DRAWN_INTO_WALL, c.getY() + 0.5, midZ - s.getStepZ() * DRAWN_INTO_WALL))) {
+                    leg = 4;
+                }
+                return false;
+            }
+            default -> {
+                // Inside, over to the wall the route goes on from.
+                surface = s;
+                return moveAttached(wallPoint(to, clampY(c, c.getY() + 0.5)));
+            }
         }
     }
 
@@ -807,7 +1012,7 @@ public class AntNavigator {
     private void replan(String reason) {
         if (++replans > MAX_REPLANS) {
             AntColoniesMod.LOGGER.debug("Ant {} gave up walking to {} ({})", ant.getId(), goal.toShortString(), reason);
-            Foothold here = currentFoothold(new LevelCellMap(ant.level()));
+            Foothold here = currentFoothold(new LevelCellMap(ant.level(), ant));
             route = null;
             failed = true;
             at = here;

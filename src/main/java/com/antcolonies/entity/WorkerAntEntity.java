@@ -187,6 +187,14 @@ public class WorkerAntEntity extends AbstractAntEntity {
         lastAte = tag.contains("lastAte") ? tag.getLong("lastAte") : NOT_SET;
     }
 
+    /**
+     * This worker joins no colony (an ant a test walks around by hand): otherwise it would join the nearest colony on
+     * its first tick, which may be another test's colony nearby and spoil that test's headcount.
+     */
+    public void keepOutOfColonies() {
+        colonyChecked = true;
+    }
+
     @Override
     public void tick() {
         super.tick();

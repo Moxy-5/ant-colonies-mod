@@ -1,5 +1,5 @@
 {
-  "_note": "Macrotermes (M7). Used by termites so far: nest, queen_body, founding, and from brood hatch_ticks, larva_meal (pieces a nymph eats) and larva_starve_ticks, and colony max_workers. The other numbers are placeholders until the fungus garden exists (M7 step 5).",
+  "_note": "Macrotermes (M7). Used by termites so far: nest, queen_body, founding, mound, and from brood hatch_ticks, larva_meal (pieces a nymph eats) and larva_starve_ticks, and colony max_workers. The other numbers are placeholders until the fungus garden exists (M7 step 5).",
   "colony": {
     "max_workers": 20,
     "nurses_from_workers": [3, 8, 12, 20]
@@ -45,5 +45,15 @@
     "eggs": 5,
     "egg_interval_ticks": 400,
     "feed_interval_ticks": 200
+  },
+  "mound": {
+    "max_height": 22,
+    "base_radius": 6.5,
+    "side_chimneys": 3,
+    "side_chimney_height": 9,
+    "blocks_per_day": 2.0,
+    "blocks_per_day_per_worker": 0.5,
+    "gallery_levels": 3,
+    "gallery_radius": 13
   }
 }

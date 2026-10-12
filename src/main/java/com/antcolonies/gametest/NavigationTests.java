@@ -37,7 +37,7 @@ public class NavigationTests {
     @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
     public static void antWalksFromTheRoomUpTheShaftToTheSurface(GameTestHelper helper) {
         buildNest(helper);
-        WorkerAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), MIDDLE + 8, SURFACE - 3, MIDDLE + 2);
+        WorkerAntEntity ant = TestAnts.loneAnt(helper, MIDDLE + 8, SURFACE - 3, MIDDLE + 2);
         BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE + 3, SURFACE, MIDDLE + 2));
         helper.runAfterDelay(10, () -> {
             boolean found = ant.getNavigator().moveTo(goal, 1.0);
@@ -54,7 +54,7 @@ public class NavigationTests {
     @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
     public static void antWalksFromTheSurfaceDownToTheRoom(GameTestHelper helper) {
         buildNest(helper);
-        WorkerAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), MIDDLE + 2, SURFACE, MIDDLE - 3);
+        WorkerAntEntity ant = TestAnts.loneAnt(helper, MIDDLE + 2, SURFACE, MIDDLE - 3);
         BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE + 8, SURFACE - 3, MIDDLE - 2));
         helper.runAfterDelay(10, () -> {
             boolean found = ant.getNavigator().moveTo(goal, 1.0);
@@ -96,7 +96,7 @@ public class NavigationTests {
     @GameTest(template = "arena", timeoutTicks = 400, skyAccess = true)
     public static void antToldToGoToItsOwnCellSurvivesBeingMovedAway(GameTestHelper helper) {
         buildNest(helper);
-        WorkerAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), MIDDLE + 5, SURFACE, MIDDLE + 5);
+        WorkerAntEntity ant = TestAnts.loneAnt(helper, MIDDLE + 5, SURFACE, MIDDLE + 5);
         BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE + 5, SURFACE, MIDDLE + 5));
         helper.runAfterDelay(10, () -> {
             ant.getNavigator().moveTo(ant.blockPosition(), 1.0);
@@ -112,7 +112,7 @@ public class NavigationTests {
     public static void antClimbsOutOfTheHoleThroughTheFinishedHill(GameTestHelper helper) {
         buildNest(helper);
         buildHill(helper);
-        WorkerAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), MIDDLE + 8, SURFACE - 3, MIDDLE + 2);
+        WorkerAntEntity ant = TestAnts.loneAnt(helper, MIDDLE + 8, SURFACE - 3, MIDDLE + 2);
         BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE - 5, SURFACE, MIDDLE - 2));
         helper.runAfterDelay(10, () -> {
             boolean found = ant.getNavigator().moveTo(goal, 1.0);
@@ -130,7 +130,7 @@ public class NavigationTests {
     public static void antWalksDownIntoTheHoleThroughTheFinishedHill(GameTestHelper helper) {
         buildNest(helper);
         buildHill(helper);
-        WorkerAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), MIDDLE - 5, SURFACE, MIDDLE - 2);
+        WorkerAntEntity ant = TestAnts.loneAnt(helper, MIDDLE - 5, SURFACE, MIDDLE - 2);
         BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE + 8, SURFACE - 3, MIDDLE - 2));
         helper.runAfterDelay(10, () -> {
             boolean found = ant.getNavigator().moveTo(goal, 1.0);
@@ -149,7 +149,7 @@ public class NavigationTests {
     public static void antClimbsOutOfAOneBlockPit(GameTestHelper helper) {
         buildNest(helper);
         helper.setBlock(MIDDLE + 6, SURFACE - 1, MIDDLE + 9, Blocks.AIR);
-        WorkerAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), MIDDLE + 6.5F, (float) (SURFACE - 1), MIDDLE + 9.5F);
+        WorkerAntEntity ant = TestAnts.loneAnt(helper, MIDDLE + 6.5F, (float) (SURFACE - 1), MIDDLE + 9.5F);
         BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE + 3, SURFACE, MIDDLE + 9));
         helper.runAfterDelay(10, () -> ant.getNavigator().moveTo(goal, 1.0));
         watch(helper, ant);
@@ -163,7 +163,7 @@ public class NavigationTests {
     public static void antPlanningAboveAPitFallsInAndClimbsOut(GameTestHelper helper) {
         buildNest(helper);
         helper.setBlock(MIDDLE + 6, SURFACE - 1, MIDDLE + 9, Blocks.AIR);
-        WorkerAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), MIDDLE + 6.5F, (float) SURFACE, MIDDLE + 9.5F);
+        WorkerAntEntity ant = TestAnts.loneAnt(helper, MIDDLE + 6.5F, (float) SURFACE, MIDDLE + 9.5F);
         BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE + 3, SURFACE, MIDDLE + 9));
         helper.runAfterDelay(1, () -> ant.getNavigator().moveTo(goal, 1.0));
         watch(helper, ant);
@@ -250,7 +250,7 @@ public class NavigationTests {
                 int y = standingY(helper, MIDDLE + dx, MIDDLE + dz);
                 float fx = MIDDLE + dx + (anywhereInCell ? 0.2F + 0.6F * random.nextFloat() : 0.5F);
                 float fz = MIDDLE + dz + (anywhereInCell ? 0.2F + 0.6F * random.nextFloat() : 0.5F);
-                ants.add(helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), fx, (float) y, fz));
+                ants.add(TestAnts.loneAnt(helper, fx, (float) y, fz));
                 starts.add(dx + "," + dz + " y" + y);
             }
         }
@@ -333,7 +333,7 @@ public class NavigationTests {
     @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
     public static void antWalksFromTheSurfaceDownToTheNursery(GameTestHelper helper) {
         buildNest(helper);
-        WorkerAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), MIDDLE - 3, SURFACE, MIDDLE + 3);
+        WorkerAntEntity ant = TestAnts.loneAnt(helper, MIDDLE - 3, SURFACE, MIDDLE + 3);
         BlockPos goal = chambers(helper).get(1).center();
         helper.runAfterDelay(10, () -> ant.getNavigator().moveTo(goal, 1.0));
         watch(helper, ant);
@@ -345,7 +345,7 @@ public class NavigationTests {
     @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
     public static void antWalksFromTheSurfaceDownToTheDeepestRoom(GameTestHelper helper) {
         buildNest(helper);
-        WorkerAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), MIDDLE - 3, SURFACE, MIDDLE + 3);
+        WorkerAntEntity ant = TestAnts.loneAnt(helper, MIDDLE - 3, SURFACE, MIDDLE + 3);
         BlockPos goal = chambers(helper).get(3).center();
         helper.runAfterDelay(10, () -> ant.getNavigator().moveTo(goal, 1.0));
         watch(helper, ant);
@@ -358,7 +358,7 @@ public class NavigationTests {
     public static void antWalksFromTheQueensRoomDownToTheRefuseChamberAndBack(GameTestHelper helper) {
         buildNest(helper);
         BlockPos start = chambers(helper).get(2).center().subtract(helper.absolutePos(BlockPos.ZERO));
-        WorkerAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), start.getX(), start.getY(), start.getZ());
+        WorkerAntEntity ant = TestAnts.loneAnt(helper, start.getX(), start.getY(), start.getZ());
         BlockPos deep = chambers(helper).get(3).center();
         BlockPos back = chambers(helper).get(2).center();
         boolean[] wentDown = {false};
@@ -378,7 +378,7 @@ public class NavigationTests {
     public static void antWalksFromTheDeepestRoomUpToTheSurface(GameTestHelper helper) {
         buildNest(helper);
         BlockPos start = chambers(helper).get(3).center().subtract(helper.absolutePos(BlockPos.ZERO));
-        WorkerAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), start.getX(), start.getY(), start.getZ());
+        WorkerAntEntity ant = TestAnts.loneAnt(helper, start.getX(), start.getY(), start.getZ());
         BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE + 3, SURFACE, MIDDLE + 2));
         helper.runAfterDelay(10, () -> ant.getNavigator().moveTo(goal, 1.0));
         watch(helper, ant);
@@ -420,7 +420,7 @@ public class NavigationTests {
         List<WorkerAntEntity> ants = new java.util.ArrayList<>();
         List<BlockPos> targets = new java.util.ArrayList<>();
         for (int[] goal : goals) {
-            ants.add(helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), start.getX(), start.getY(), start.getZ()));
+            ants.add(TestAnts.loneAnt(helper, start.getX(), start.getY(), start.getZ()));
             targets.add(helper.absolutePos(new BlockPos(MIDDLE + goal[0], SURFACE, MIDDLE + goal[1])));
         }
         helper.runAfterDelay(10, () -> {
@@ -449,7 +449,7 @@ public class NavigationTests {
         buildNest(helper);
         buildHill(helper);
         BlockPos start = chambers(helper).get(1).center().subtract(helper.absolutePos(BlockPos.ZERO));
-        WorkerAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), start.getX(), start.getY(), start.getZ());
+        WorkerAntEntity ant = TestAnts.loneAnt(helper, start.getX(), start.getY(), start.getZ());
         BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE, SURFACE - 1, MIDDLE));
         long[] arrived = {-1};
         helper.runAfterDelay(10, () -> ant.getNavigator().moveTo(goal, 1.0));
@@ -471,7 +471,7 @@ public class NavigationTests {
         buildNest(helper);
         buildHill(helper);
         BlockPos start = chambers(helper).get(1).center().subtract(helper.absolutePos(BlockPos.ZERO));
-        WorkerAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), start.getX(), start.getY(), start.getZ());
+        WorkerAntEntity ant = TestAnts.loneAnt(helper, start.getX(), start.getY(), start.getZ());
         BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE - 5, SURFACE, MIDDLE - 2));
         double[] stoppedAt = {Double.NaN};
         long[] stoppedTick = {0};
@@ -508,7 +508,7 @@ public class NavigationTests {
     private static void crawlRoundTheShaft(GameTestHelper helper, int depth) {
         buildNest(helper);
         BlockPos start = chambers(helper).get(1).center().subtract(helper.absolutePos(BlockPos.ZERO));
-        WorkerAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), start.getX(), start.getY(), start.getZ());
+        WorkerAntEntity ant = TestAnts.loneAnt(helper, start.getX(), start.getY(), start.getZ());
         BlockPos hang = helper.absolutePos(new BlockPos(MIDDLE, SURFACE - depth, MIDDLE));
         BlockPos[] goal = {null};
         Direction[] clung = {null};
@@ -558,7 +558,7 @@ public class NavigationTests {
                 Route route = new Route(List.of(
                         new Route.Step(new Foothold(helper.absolutePos(start), wall), StepKind.START),
                         new Route.Step(new Foothold(helper.absolutePos(end), side.getOpposite()), StepKind.ROUND_EDGE)), 1.2);
-                WorkerAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), start.getX(), start.getY(), start.getZ());
+                WorkerAntEntity ant = TestAnts.loneAnt(helper, start.getX(), start.getY(), start.getZ());
                 helper.runAfterDelay(10, () -> helper.assertTrue(ant.getNavigator().follow(route, 1.0), "no way onto the route " + route));
                 watch(helper, ant, false);
                 ants.add(ant);
@@ -586,7 +586,7 @@ public class NavigationTests {
         buildNest(helper);
         NestPlan.Chamber store = chambers(helper).get(0);
         BlockPos corner = store.room().get(store.room().size() - 1).subtract(helper.absolutePos(BlockPos.ZERO));
-        WorkerAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), corner.getX(), corner.getY(), corner.getZ());
+        WorkerAntEntity ant = TestAnts.loneAnt(helper, corner.getX(), corner.getY(), corner.getZ());
         Foothold goal = Foothold.ceiling(store.center());
         long[] arrived = {-1};
         helper.runAfterDelay(10, () -> helper.assertTrue(ant.getNavigator().moveTo(goal, 1.0), "no route to the ceiling"));
@@ -631,7 +631,7 @@ public class NavigationTests {
                     new Route.Step(Foothold.ceiling(helper.absolutePos(overhang.below())), StepKind.UNDER_EDGE),
                     new Route.Step(new Foothold(helper.absolutePos(end), side.getOpposite()), StepKind.OUT_FROM_UNDER)), 4.0);
             BlockPos ground = start.below();
-            WorkerAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), ground.getX(), ground.getY(), ground.getZ());
+            WorkerAntEntity ant = TestAnts.loneAnt(helper, ground.getX(), ground.getY(), ground.getZ());
             helper.runAfterDelay(10, () -> helper.assertTrue(ant.getNavigator().follow(route, 1.0), "no way onto the route " + route));
             watch(helper, ant, false);
             ants.add(ant);
@@ -653,7 +653,7 @@ public class NavigationTests {
     public static void antOnTheShaftWallIsStillThereAfterAReload(GameTestHelper helper) {
         buildNest(helper);
         BlockPos start = chambers(helper).get(1).center().subtract(helper.absolutePos(BlockPos.ZERO));
-        WorkerAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), start.getX(), start.getY(), start.getZ());
+        WorkerAntEntity ant = TestAnts.loneAnt(helper, start.getX(), start.getY(), start.getZ());
         BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE, SURFACE - 1, MIDDLE));
         helper.runAfterDelay(10, () -> ant.getNavigator().moveTo(goal, 1.0));
         reloadOnceUpAndCheckItStays(helper, ant, () -> ant.getNavigator().isDone() && ant.blockPosition().equals(goal));
@@ -665,7 +665,7 @@ public class NavigationTests {
         buildNest(helper);
         NestPlan.Chamber store = chambers(helper).get(0);
         BlockPos corner = store.room().get(0).subtract(helper.absolutePos(BlockPos.ZERO));
-        WorkerAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), corner.getX(), corner.getY(), corner.getZ());
+        WorkerAntEntity ant = TestAnts.loneAnt(helper, corner.getX(), corner.getY(), corner.getZ());
         Foothold goal = Foothold.ceiling(store.center());
         helper.runAfterDelay(10, () -> ant.getNavigator().moveTo(goal, 1.0));
         reloadOnceUpAndCheckItStays(helper, ant, () -> ant.getNavigator().isDone() && ant.blockPosition().equals(goal.cell())
@@ -696,6 +696,9 @@ public class NavigationTests {
                 ant.discard();
                 WorkerAntEntity loaded = ModEntities.WORKER_ANT.get().create(helper.getLevel());
                 loaded.load(tag);
+                // Like the ant it replaces: no mind of its own (no job or stroll may move it) and no colony.
+                loaded.removeFreeWill();
+                loaded.keepOutOfColonies();
                 helper.getLevel().addFreshEntity(loaded);
                 copy[0] = loaded;
                 loadedAt[0] = helper.getTick();

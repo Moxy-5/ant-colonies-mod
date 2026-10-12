@@ -3,6 +3,8 @@ package com.antcolonies.entity;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.goal.AntWanderGoal;
+import com.antcolonies.entity.goal.BuildMoundGoal;
+import com.antcolonies.entity.goal.ShapeHoleGoal;
 import com.antcolonies.entity.goal.DigGoal;
 import com.antcolonies.species.Species;
 
@@ -17,8 +19,9 @@ import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.level.Level;
 
 /**
- * A termite worker (Macrotermes): pale, soft and blind. For now it digs (the first workers open the entrance the
- * royal pair sealed) and wanders near the nest; building the mound (step 3b) and gathering food come later. It joins
+ * A termite worker (Macrotermes): pale, soft and blind. It digs (the first workers open the entrance the royal pair
+ * sealed, then galleries under the mound for soil), builds the mound layer by layer and shapes its chimney blocks, and
+ * wanders near the nest; gathering food comes later. It joins
  * the nearest termite colony when put down with a spawn egg, and is born into its colony when a nymph grows up.
  */
 public class TermiteWorkerEntity extends AbstractAntEntity {
@@ -43,15 +46,11 @@ public class TermiteWorkerEntity extends AbstractAntEntity {
     @Override
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));
-        this.goalSelector.addGoal(1, new DigGoal(this, () -> true));
-        this.goalSelector.addGoal(2, new AntWanderGoal(this, 1.0, 160, 5, () -> true).hangsFromCeilings(0.25F));
-        this.goalSelector.addGoal(3, new RandomLookAroundGoal(this));
-    }
-
-    // Until the mound is built (step 3b) the soil it bites off is left where it falls.
-    @Override
-    public boolean canPlaceBlocks() {
-        return false;
+        this.goalSelector.addGoal(1, new BuildMoundGoal(this));
+        this.goalSelector.addGoal(2, new ShapeHoleGoal(this));
+        this.goalSelector.addGoal(3, new DigGoal(this, () -> true));
+        this.goalSelector.addGoal(4, new AntWanderGoal(this, 1.0, 160, 5, () -> true).hangsFromCeilings(0.25F));
+        this.goalSelector.addGoal(5, new RandomLookAroundGoal(this));
     }
 
     /** A worker that grew up from a nymph of this colony belongs to it from the start (and is counted). */

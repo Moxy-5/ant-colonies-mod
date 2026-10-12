@@ -26,7 +26,7 @@ import net.minecraft.world.phys.AABB;
  * <p>The colony itself holds who it is, its headcount and the workers' roles. Everything else lives in its parts, one
  * per subject: {@link #nest()} (the underground plan and digging), {@link #walls()} (sealing the nest), {@link #hill()},
  * {@link #food()} (seeds), {@link #bakery()} (ant bread), {@link #queenCare()} (feeding the queen and her eggs),
- * {@link #brood()} (eggs and larvae) and {@link #refuse()} (dead ants).
+ * {@link #brood()} (eggs and larvae), {@link #refuse()} (dead ants) and {@link #mound()} (the termite mound).
  */
 public class Colony {
     /** "No time saved": a hunger clock that has not started yet. */
@@ -51,6 +51,7 @@ public class Colony {
     private final QueenCare queenCare;
     private final Brood brood;
     private final Refuse refuse;
+    private final Mound mound;
 
     public Colony(UUID id, ResourceLocation species, UUID queenId, BlockPos center) {
         this.id = id;
@@ -65,6 +66,7 @@ public class Colony {
         this.queenCare = new QueenCare(this);
         this.brood = new Brood(this);
         this.refuse = new Refuse(this);
+        this.mound = new Mound(this);
     }
 
     /** The underground nest: its plan, the next block to dig, and the dug-out cells of each room. */
@@ -105,6 +107,11 @@ public class Colony {
     /** Dead ants and the refuse chamber. */
     public Refuse refuse() {
         return refuse;
+    }
+
+    /** The termite mound (only species whose profile has a {@code mound} build one; see {@link Mound#numbers}). */
+    public Mound mound() {
+        return mound;
     }
 
     public UUID getId() {
@@ -218,6 +225,7 @@ public class Colony {
         bakery.save(tag);
         queenCare.save(tag);
         nest.save(tag);
+        mound.save(tag);
         return tag;
     }
 
@@ -235,6 +243,7 @@ public class Colony {
         colony.bakery.load(tag);
         colony.queenCare.load(tag);
         colony.nest.load(tag);
+        colony.mound.load(tag);
         return colony;
     }
 }
