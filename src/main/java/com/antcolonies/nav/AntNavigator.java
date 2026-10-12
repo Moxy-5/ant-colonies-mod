@@ -46,6 +46,8 @@ public class AntNavigator {
     private static final double WALL_GAP = 0.06;
     /** Blocks per tick an ant that has stopped in a shaft slides to the wall it clings to. */
     private static final double HOLD_SIDE_SPEED = 0.08;
+    /** An ant this close (in blocks) to a wall of its cell counts as hanging on it. */
+    private static final double CLING_GAP = 0.12;
 
     private final AbstractAntEntity ant;
     @Nullable
@@ -74,6 +76,8 @@ public class AntNavigator {
     /** The wall an ant that has stopped in a shaft clings to. */
     @Nullable
     private Direction holdWall;
+    /** The wall an ant crawling round the corner of its cell is on (set by crawlAim). */
+    private Direction crawlWall = Direction.NORTH;
 
     public AntNavigator(AbstractAntEntity ant) {
         this.ant = ant;
@@ -202,6 +206,7 @@ public class AntNavigator {
         }
 
         Vec3 aim;
+        Vec3 face = null;
         if (next > last) {
             // In the goal cell: finish walking to its middle.
             aim = Vec3.atBottomCenterOf(goal);
@@ -232,9 +237,12 @@ public class AntNavigator {
             aim = Vec3.atBottomCenterOf(waypoint);
             if (climbing) {
                 rise = Math.max(0.0, Math.min(CLIMB_SPEED, waypoint.getY() - ant.getY()));
+                // The wall the ant has to be on for this stretch (to rise along it, or to climb out over it).
+                Direction needed = null;
                 if (waypoint.getX() == from.getX() && waypoint.getZ() == from.getZ()) {
                     // Straight up: hug one wall for the whole stretch, preferably the one the ant will climb out over.
                     Direction wall = chooseWall(map, here, waypoint);
+                    needed = wall;
                     if (wall != null) {
                         aim = aim.add(wall.getStepX() * 0.7, 0.0, wall.getStepZ() * 0.7);
                         if (gapToWall(here, wall) > WALL_GAP && standsOnFloor(map, here)) {
@@ -251,6 +259,20 @@ public class AntNavigator {
                     // the wall, and only then start climbing. No rising through the air in front of it.
                     climbing = false;
                     rise = 0.0;
+                } else if (here.equals(from)) {
+                    needed = Direction.fromDelta(waypoint.getX() - from.getX(), 0, waypoint.getZ() - from.getZ());
+                }
+                if (climbing && needed != null && !standsOnFloor(map, here)) {
+                    // Hanging on another wall of this cell (a new job came while it clung there): crawl over the walls
+                    // and round the corner to the one it needs, never letting go and drifting across the open cell.
+                    Vec3 crawl = crawlAim(map, here, needed);
+                    if (crawl != null) {
+                        aim = crawl;
+                        face = Vec3.atBottomCenterOf(here).add(crawlWall.getStepX() * 0.7, 0.0, crawlWall.getStepZ() * 0.7);
+                        if (!map.isSolidFace(here.above().relative(crawlWall), crawlWall.getOpposite())) {
+                            rise = 0.0; // the wall it crawls on ends above: get round the corner first
+                        }
+                    }
                 }
             }
 
@@ -275,7 +297,58 @@ public class AntNavigator {
             climbMotion = distance < 1.0E-6 ? new Vec3(0.0, rise, 0.0)
                     : new Vec3(sideX / distance * slide, rise, sideZ / distance * slide);
         }
-        ant.getMoveControl().setWantedPosition(aim.x, aim.y, aim.z, speed);
+        // A crawling ant keeps facing the wall it is on (the renderer leans it against what it faces).
+        Vec3 look = face != null ? face : aim;
+        ant.getMoveControl().setWantedPosition(look.x, aim.y, look.z, speed);
+    }
+
+    /**
+     * The point an ant hanging on a wall of its cell crawls to on its way to the {@code needed} wall of the same cell:
+     * the corner where the wall it is on meets the needed one, or, from the opposite wall, the corner with a side wall
+     * first. Sets {@link #crawlWall} to the wall it is on. Null when it is already on the needed wall, is on no wall
+     * at all, or there is no way round (then it slides straight there, as before).
+     */
+    @Nullable
+    private Vec3 crawlAim(CellMap map, BlockPos here, Direction needed) {
+        if (gapToWall(here, needed) <= WALL_GAP || !map.isSolidFace(here.relative(needed), needed.getOpposite())) {
+            return null;
+        }
+        // The wall it is on: one it touches, a side wall of the needed one first (from there it can go straight round).
+        Direction on = null;
+        boolean onSideWall = false;
+        for (Direction side : Direction.Plane.HORIZONTAL) {
+            if (side == needed || gapToWall(here, side) > CLING_GAP || !map.isSolidFace(here.relative(side), side.getOpposite())) {
+                continue;
+            }
+            boolean sideWall = side.getAxis() != needed.getAxis();
+            if (on == null || sideWall && !onSideWall) {
+                on = side;
+                onSideWall = sideWall;
+            }
+        }
+        if (on == null) {
+            return null;
+        }
+        Direction toward = needed;
+        if (!onSideWall) {
+            // On the opposite wall: go round by the nearer side wall.
+            toward = null;
+            double nearest = Double.MAX_VALUE;
+            for (Direction side : Direction.Plane.HORIZONTAL) {
+                if (side.getAxis() != needed.getAxis() && map.isSolidFace(here.relative(side), side.getOpposite())
+                        && gapToWall(here, side) < nearest) {
+                    toward = side;
+                    nearest = gapToWall(here, side);
+                }
+            }
+            if (toward == null) {
+                return null;
+            }
+        }
+        crawlWall = on;
+        double inset = 0.5 - ant.getBbWidth() / 2.0;
+        return new Vec3(here.getX() + 0.5 + (on.getStepX() + toward.getStepX()) * inset, ant.getY(),
+                here.getZ() + 0.5 + (on.getStepZ() + toward.getStepZ()) * inset);
     }
 
     /** Whether the ant is standing on the floor of the cell it is in (also when it just stopped pushing down on it). */

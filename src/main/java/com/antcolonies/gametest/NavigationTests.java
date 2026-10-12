@@ -487,6 +487,54 @@ public class NavigationTests {
         });
     }
 
+    /**
+     * An ant hanging on one wall of the shaft that gets a new job on the far side (it has to climb out over the opposite
+     * wall) crawls over the walls and round the corners to it, and never lets go to drift across the open shaft.
+     * The walk ends at the top of the shaft, or one cell lower (then the way out starts with a straight climb).
+     */
+    @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
+    public static void antHangingAtTheTopOfTheShaftCrawlsRoundToTheOtherWall(GameTestHelper helper) {
+        crawlRoundTheShaft(helper, 1);
+    }
+
+    @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
+    public static void antHangingHalfWayUpTheShaftCrawlsRoundToTheOtherWall(GameTestHelper helper) {
+        crawlRoundTheShaft(helper, 2);
+    }
+
+    private static void crawlRoundTheShaft(GameTestHelper helper, int depth) {
+        buildNest(helper);
+        BlockPos start = chambers(helper).get(1).center().subtract(helper.absolutePos(BlockPos.ZERO));
+        WorkerAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), start.getX(), start.getY(), start.getZ());
+        BlockPos hang = helper.absolutePos(new BlockPos(MIDDLE, SURFACE - depth, MIDDLE));
+        BlockPos[] goal = {null};
+        Direction[] clung = {null};
+        long[] arrived = {-1};
+        helper.runAfterDelay(10, () -> ant.getNavigator().moveTo(hang, 1.0));
+        helper.onEachTick(() -> {
+            if (arrived[0] < 0 && helper.getTick() > 12 && ant.getNavigator().isDone() && ant.blockPosition().equals(hang)) {
+                arrived[0] = helper.getTick();
+            }
+            if (goal[0] == null && arrived[0] >= 0 && helper.getTick() >= arrived[0] + 30) {
+                // The wall it hangs on is the side its body is pushed furthest toward; send it out over the opposite one.
+                double dx = ant.getX() - (hang.getX() + 0.5);
+                double dz = ant.getZ() - (hang.getZ() + 0.5);
+                clung[0] = Math.abs(dx) > Math.abs(dz) ? (dx > 0 ? Direction.EAST : Direction.WEST) : (dz > 0 ? Direction.SOUTH : Direction.NORTH);
+                Direction out = clung[0].getOpposite();
+                goal[0] = helper.absolutePos(new BlockPos(MIDDLE + out.getStepX() * 4, SURFACE, MIDDLE + out.getStepZ() * 4));
+                boolean found = ant.getNavigator().moveTo(goal[0], 1.0);
+                AntColoniesMod.LOGGER.info("[nav-test] #{} hangs on the {} wall, sent out to the {}: route found {} -> {}", ant.getId(),
+                        clung[0], out, found, ant.getNavigator().getRoute() == null ? "none" : relative(helper, ant.getNavigator().getRoute()));
+            }
+        });
+        watch(helper, ant);
+        helper.succeedWhen(() -> {
+            helper.assertTrue(goal[0] != null, "the ant has not reached its spot in the shaft yet");
+            helper.assertTrue(ant.getNavigator().isDone() && !ant.getNavigator().hasFailed() && ant.blockPosition().equals(goal[0]),
+                    "the ant (from the " + clung[0] + " wall) has not climbed out over the opposite side yet");
+        });
+    }
+
     /** Fails if a climbing ant stands still for 12 ticks or more, or slides sideways away from the wall it hugs. */
     private static void trackSteadiness(GameTestHelper helper, AbstractAntEntity ant) {
         Vec3[] last = {null};
@@ -526,12 +574,13 @@ public class NavigationTests {
         int[] floating = {0};
         int[] leaning = {0};
         int[] hovering = {0};
-        double[] lastY = {Double.NaN};
+        Vec3[] lastPos = {null};
         helper.onEachTick(() -> {
-            // An ant on its way up that neither rises nor has anything under it hangs in the air: it must always be moving on.
-            double dy = ant.getY() - lastY[0];
-            lastY[0] = ant.getY();
-            boolean hovers = ant.getNavigator().isClimbing() && !ant.getNavigator().isDone() && Math.abs(dy) < 0.01
+            // An ant on its way up that neither rises (nor crawls sideways along its wall) nor has anything under it
+            // hangs in the air: it must always be moving on.
+            boolean moved = lastPos[0] != null && ant.position().distanceTo(lastPos[0]) >= 0.01;
+            lastPos[0] = ant.position();
+            boolean hovers = ant.getNavigator().isClimbing() && !ant.getNavigator().isDone() && !moved
                     && helper.getLevel().noCollision(ant, ant.getBoundingBox().move(0.0, -0.05, 0.0));
             hovering[0] = hovers ? hovering[0] + 1 : 0;
             helper.assertTrue(hovering[0] <= MAX_HOVER_TICKS, "the ant hangs in the air without climbing at "
