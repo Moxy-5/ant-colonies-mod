@@ -51,10 +51,8 @@ public class SealEntranceGoal extends Goal {
         if (!colony.profile().nest().sealWhileFounding()) {
             return false;
         }
-        int kings = colony.getCount(TermiteKingEntity.CASTE);
-        boolean founding = colony.getMemberCount() - kings == 0; // nobody but the royal pair yet
-        boolean mine = ant instanceof TermiteKingEntity || kings == 0;
-        return founding && mine && colony.nest().getHomeChamber(level) != null && colony.nest().findDigTarget(level) == null
+        boolean mine = ant instanceof TermiteKingEntity || colony.getCount(TermiteKingEntity.CASTE) == 0;
+        return colony.isFounding() && mine && colony.nest().getHomeChamber(level) != null && colony.nest().findDigTarget(level) == null
                 && colony.nest().isEntranceOpen(level);
     }
 

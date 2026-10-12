@@ -11,6 +11,8 @@ import com.antcolonies.entity.goal.SealEntranceGoal;
 import com.antcolonies.species.Species;
 import com.antcolonies.species.SpeciesProfile;
 
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -27,11 +29,13 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.FloatGoal;
 import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * The termite queen. With her king she founds the colony, digs the royal chamber and settles in it. She starts the
  * size of the king and swells as her colony grows (her species profile's {@code queen_body}): her head, thorax and legs
- * stay the same, only her abdomen stretches, and past a certain size she can no longer walk. The colony dies with her.
+ * stay the same, only her abdomen stretches, and past a certain size she can no longer walk. Sealed in, she lays the
+ * founding batch, and the pair raise it (see {@link #foundingBatch}). The colony dies with her.
  */
 public class TermiteQueenEntity extends AbstractAntEntity {
     /** How far she has swollen: 0 = just founded (king-sized), 1 = full grown. Synced so the renderer can draw her. Saved. */
@@ -39,6 +43,8 @@ public class TermiteQueenEntity extends AbstractAntEntity {
             SynchedEntityData.defineId(TermiteQueenEntity.class, EntityDataSerializers.FLOAT);
 
     private boolean colonyChecked;
+    /** When the next egg of the founding batch comes ({@link Colony#NOT_SET} = not counting yet). Saved. */
+    private long nextFoundingEgg = Colony.NOT_SET;
 
     public TermiteQueenEntity(EntityType<? extends TermiteQueenEntity> type, Level level) {
         super(type, level);
@@ -133,6 +139,7 @@ public class TermiteQueenEntity extends AbstractAntEntity {
         if (tickCount % 20 == 0 && getColonyId() != null) {
             Colony colony = manager.getColony(getColonyId());
             if (colony != null) {
+                colony.profile().founding().ifPresent(founding -> foundingBatch(serverLevel, manager, colony, founding));
                 colony.profile().queenBody().ifPresent(body -> {
                     int members = colony.getMemberCount() - colony.getCount(TermiteKingEntity.CASTE);
                     float target = Math.min(1.0F, members / (float) Math.max(1, body.fullSizeAtMembers()));
@@ -145,16 +152,48 @@ public class TermiteQueenEntity extends AbstractAntEntity {
         }
     }
 
+    /**
+     * The founding batch (once a second): once she has sealed herself in and lies in her chamber, the queen lays the
+     * batch's eggs one by one from her own reserves; and the royal pair feed the nymphs on their own body fat, one
+     * piece of food at a time, until the nymphs grow into the first workers.
+     */
+    private void foundingBatch(ServerLevel level, ColonyManager manager, Colony colony, SpeciesProfile.Founding founding) {
+        long now = level.getGameTime();
+        boolean sealedIn = colony.queenCare().isQueenHome(level) && !colony.nest().isEntranceOpen(level);
+        if (sealedIn && colony.queenCare().getEggsLaid() < founding.eggs()) {
+            if (nextFoundingEgg == Colony.NOT_SET) {
+                nextFoundingEgg = now + founding.eggIntervalTicks();
+            } else if (now >= nextFoundingEgg) {
+                BlockPos spot = colony.brood().pickEggSpot(level, getRandom());
+                Vec3 at = spot == null ? position() : Vec3.atBottomCenterOf(spot);
+                colony.queenCare().layFoundingEgg(level, at.x, at.y, at.z);
+                nextFoundingEgg = now + founding.eggIntervalTicks();
+                manager.markChanged();
+            }
+        }
+        if (now % founding.feedIntervalTicks() < 20) {
+            // The hungriest nymph gets the next piece.
+            colony.brood().getLarvae(level).stream().filter(nymph -> !nymph.isFull())
+                    .min((a, b) -> Integer.compare(a.getFed(), b.getFed()))
+                    .ifPresent(nymph -> {
+                        nymph.feed();
+                        level.sendParticles(ParticleTypes.HAPPY_VILLAGER, nymph.getX(), nymph.getY() + 0.2, nymph.getZ(), 2, 0.1, 0.05, 0.1, 0.0);
+                    });
+        }
+    }
+
     @Override
     public void addAdditionalSaveData(CompoundTag tag) {
         super.addAdditionalSaveData(tag);
         tag.putFloat("Size", getSize());
+        tag.putLong("NextFoundingEgg", nextFoundingEgg);
     }
 
     @Override
     public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
         setSize(tag.getFloat("Size"));
+        nextFoundingEgg = tag.contains("NextFoundingEgg") ? tag.getLong("NextFoundingEgg") : Colony.NOT_SET;
     }
 
     // The colony dies when the queen dies.

@@ -5,6 +5,7 @@ import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.TermiteKingEntity;
 import com.antcolonies.entity.TermiteQueenEntity;
+import com.antcolonies.entity.TermiteWorkerEntity;
 import com.antcolonies.entity.WorkerAntEntity;
 import com.antcolonies.entity.goal.StayWithQueenGoal;
 import com.antcolonies.registry.ModBlocks;
@@ -73,6 +74,41 @@ public class TermiteTests {
             helper.assertBlockPresent(ModBlocks.BURROWED_DIRT.get(), new BlockPos(MIDDLE, SURFACE, MIDDLE));
             helper.assertTrue(colony.getQueen(level).blockPosition().equals(colony.nest().getFinishedRoomCenter(level)),
                     "the queen is not in the middle of the chamber");
+        });
+    }
+
+    /**
+     * The founding batch: once the pair have sealed themselves in, the queen lays 5 eggs in the chamber, they hatch into
+     * nymphs, the pair feed the nymphs on their own fat until they grow into the first 5 workers, and the workers dig
+     * the entrance open again.
+     */
+    @GameTest(template = "arena", timeoutTicks = 45000, skyAccess = true)
+    public static void theFoundingBatchGrowsIntoWorkersWhoOpenTheEntrance(GameTestHelper helper) {
+        foundColony(helper, true);
+        boolean[] sealed = {false};
+        helper.onEachTick(() -> {
+            if (!sealed[0] && helper.getBlockState(new BlockPos(MIDDLE, SURFACE, MIDDLE)).is(ModBlocks.BURROWED_DIRT.get())) {
+                sealed[0] = true;
+                AntColoniesMod.LOGGER.info("[termite-test] tick {}: sealed in", helper.getTick());
+            }
+            Colony colony = colony(helper);
+            if (colony != null && helper.getTick() % 400 == 0) {
+                AntColoniesMod.LOGGER.info("[termite-test] tick {}: eggs laid {}, eggs {}, nymphs {}, workers {}", helper.getTick(),
+                        colony.queenCare().getEggsLaid(), colony.brood().countEggs(helper.getLevel()),
+                        colony.brood().countLarvae(helper.getLevel()), colony.getCount(TermiteWorkerEntity.CASTE));
+            }
+        });
+        helper.succeedWhen(() -> {
+            ServerLevel level = helper.getLevel();
+            Colony colony = colony(helper);
+            helper.assertTrue(colony != null && sealed[0], "not sealed in yet");
+            helper.assertTrue(colony.queenCare().getEggsLaid() == 5, colony.queenCare().getEggsLaid() + " eggs laid, expected 5");
+            helper.assertTrue(colony.brood().countBrood(level) == 0, "still " + colony.brood().countBrood(level) + " eggs and nymphs");
+            var workers = level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds());
+            helper.assertTrue(workers.size() == 5 && colony.getCount(TermiteWorkerEntity.CASTE) == 5,
+                    workers.size() + " termite workers, the colony counts " + colony.getCount(TermiteWorkerEntity.CASTE) + ", expected 5");
+            helper.assertTrue(workers.stream().allMatch(w -> colony.getId().equals(w.getColonyId())), "a worker is not in the colony");
+            helper.assertTrue(colony.nest().isEntranceOpen(level), "the entrance is still closed");
         });
     }
 

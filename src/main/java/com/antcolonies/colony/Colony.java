@@ -8,6 +8,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.entity.AbstractAntEntity;
+import com.antcolonies.entity.TermiteKingEntity;
 import com.antcolonies.entity.WorkerAntEntity;
 import com.antcolonies.species.SpeciesProfile;
 import com.antcolonies.species.SpeciesProfiles;
@@ -137,6 +138,11 @@ public class Colony {
     AABB nestArea() {
         int radius = profile().food().radius();
         return new AABB(center).inflate(radius, 0, radius).expandTowards(0, 8, 0).expandTowards(0, -12, 0);
+    }
+
+    /** Whether the colony is still being founded: nobody yet but the queen (and her king, for termites). */
+    public boolean isFounding() {
+        return getMemberCount() - getCount(TermiteKingEntity.CASTE) == 0;
     }
 
     public boolean isHungerOn() {

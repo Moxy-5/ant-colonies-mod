@@ -8,9 +8,12 @@ skin (seg_N_skin), a dark back plate (seg_N_plate) and a lighter belly plate (se
 (TermiteQueenModel) stretches the skin as she grows and keeps the plates their size, so they drift apart.
 Keep these bone names: the Java code looks them up.
 
+The worker (termite_worker) is the king's skeleton made pale, blind and wingless, a little smaller; it uses the
+king's animations. The nymph's texture (termite_nymph.png) is four colour bands for TermiteNymphRenderer.
+
 The model checker: references/termites/preview/ gets one labelled picture per camera angle (front.png looking at
-her face, front_above.png, side.png, top.png), each showing the king and the queen at 0%, 50%, 75% and 100% grown, all
-at the same scale.
+her face, front_above.png, side.png, top.png), each showing the king, the worker and the queen at 0%, 50%, 75% and
+100% grown, all at the same scale, and walk.png with four moments of a step.
 """
 import json, math, os, random, struct, zlib
 
@@ -34,7 +37,18 @@ SWATCH = {
     'wing':     (0, 1, (92, 56, 30)),    # wing stubs (scales) left after the wings were dropped
     'skin':     (1, 1, (238, 226, 196)), # the queen's stretched pale skin
     'thorax':   (2, 1, (78, 39, 19)),
+    # The worker (from the real photo): pale and soft, a round yellowish head, food showing grey through the abdomen.
+    'w_head':    (0, 2, (212, 172, 96)),
+    'w_body':    (1, 2, (236, 226, 200)),
+    'w_belly':   (2, 2, (226, 214, 188)),
+    'w_gut':     (3, 2, (178, 170, 154)),
+    'w_leg':     (4, 2, (228, 212, 170)),
+    'w_antenna': (5, 2, (214, 186, 128)),
+    'w_jaw':     (6, 2, (132, 86, 42)),
 }
+
+# The nymph's texture (TermiteNymphRenderer): four colour bands of 8 rows each, 32x32.
+NYMPH_BANDS = [(222, 196, 140), (240, 232, 210), (196, 190, 176), (234, 222, 192)]
 
 def write_png(path, width, height, pixels):
     raw = b''.join(b'\x00' + bytes([c for px in pixels[y * width:(y + 1) * width] for c in px]) for y in range(height))
@@ -226,16 +240,74 @@ def queen_pose(size):
         pose[f'seg_{n}_belly'] = (-plate_lift, 0, (1, 1, 1))
     return pose
 
+WORKER_SCALE = 0.85
+WORKER_COLOURS = {'head': 'w_head', 'thorax': 'w_body', 'back': 'w_body', 'belly': 'w_belly', 'leg': 'w_leg',
+                  'antenna': 'w_antenna', 'jaw': 'w_jaw', 'joint': 'w_body'}
+WORKER_ABDOMEN_COLOURS = {'back': 'w_gut', 'belly': 'w_belly', 'joint': 'w_body'}
+
+def worker_model():
+    """The worker: the king's bones and boxes, a little smaller, pale, blind (no eyes) and wingless."""
+    name_of = {(c * 8 + 1, r * 8 + 1): name for name, (c, r, _) in SWATCH.items()}
+    bones = []
+    for b in front_half() + king_abdomen():
+        if b['name'] == 'wing_stubs':
+            continue
+        colours = WORKER_ABDOMEN_COLOURS if b['name'] == 'abdomen' else WORKER_COLOURS
+        nb = {k: v for k, v in b.items() if k != 'cubes'}
+        nb['pivot'] = [round(v * WORKER_SCALE, 3) for v in b['pivot']]
+        cubes = []
+        for c in b.get('cubes', []):
+            swatch = name_of[tuple(c['uv']['north']['uv'])]
+            if swatch == 'eye':
+                continue
+            nc = cube([v * WORKER_SCALE for v in c['origin']], [v * WORKER_SCALE for v in c['size']], colours.get(swatch, swatch),
+                      [v * WORKER_SCALE for v in c['pivot']] if 'pivot' in c else None, c['rotation'][1] if 'rotation' in c else 0.0)
+            cubes.append(nc)
+        if cubes:
+            nb['cubes'] = cubes
+        bones.append(nb)
+    return bones
+
+def make_nymph_texture(path):
+    pixels = []
+    for y in range(32):
+        rgb = NYMPH_BANDS[y // 8]
+        pixels += [rgb + (255,)] * 32
+    write_png(path, 32, 32, pixels)
+
 def geo(identifier, bones):
     return {'format_version': '1.12.0', 'minecraft:geometry': [{
         'description': {'identifier': identifier, 'texture_width': 64, 'texture_height': 64,
                         'visible_bounds_width': 4, 'visible_bounds_height': 3, 'visible_bounds_offset': [0, 1, 0]},
         'bones': bones}]}
 
+# The walk: a tripod gait, like real insects. Front-left, middle-right and back-left step together, then the other
+# three. Each leg swings forward lifted off the ground, then pushes back on the ground. Angles in degrees, as in
+# Blockbench: a positive turn (Y) swings a left leg forward and a right leg back; a negative tilt (Z) lifts a left leg
+# and a positive one lifts a right leg.
+WALK_SECONDS, STEP_SWING, STEP_LIFT = 0.5, 25.0, 22.0
+
+def walk_legs():
+    legs = {}
+    half = WALK_SECONDS / 2
+    for name in ('leg_l1', 'leg_r2', 'leg_l3', 'leg_r1', 'leg_l2', 'leg_r3'):
+        left = name[4] == 'l'
+        forward = STEP_SWING if left else -STEP_SWING
+        lift = -STEP_LIFT if left else STEP_LIFT
+        first_group = name in ('leg_l1', 'leg_r2', 'leg_l3')
+        if first_group:
+            # Forward at the start, pushes back on the ground, then swings forward lifted.
+            frames = [(0, [0, forward, 0]), (half / 2, [0, 0, 0]), (half, [0, -forward, 0]),
+                      (half * 1.5, [0, 0, lift]), (WALK_SECONDS, [0, forward, 0])]
+        else:
+            # Back at the start, swings forward lifted, then pushes back on the ground.
+            frames = [(0, [0, -forward, 0]), (half / 2, [0, 0, lift]), (half, [0, forward, 0]),
+                      (half * 1.5, [0, 0, 0]), (WALK_SECONDS, [0, -forward, 0])]
+        legs[name] = {'rotation': {f'{t:g}': r for t, r in frames}}
+    return legs
+
 def animations():
-    swing = lambda a: {'0': [0, a, 0], '0.25': [0, -a, 0], '0.5': [0, a, 0]}
-    walk = {name: {'rotation': swing(22 if name in ('leg_l1', 'leg_r2', 'leg_l3') else -22)}
-            for name in ('leg_l1', 'leg_r2', 'leg_l3', 'leg_r1', 'leg_l2', 'leg_r3')}
+    walk = walk_legs()
     wiggle = lambda a: {'0': [0, 0, 0], '0.6': [a, 0, 0], '1.2': [0, 0, 0], '1.8': [-a, 0, 0], '2.4': [0, 0, 0]}
     walk['antenna_l_1'] = {'rotation': {'0': [8, 0, 0], '0.25': [-8, 0, 0], '0.5': [8, 0, 0]}}
     walk['antenna_r_1'] = {'rotation': {'0': [-8, 0, 0], '0.25': [8, 0, 0], '0.5': [-8, 0, 0]}}
@@ -243,7 +315,19 @@ def animations():
             'head': {'rotation': {'0': [0, 0, 0], '1.2': [0, 5, 0], '2.4': [0, 0, 0]}}}
     return {'format_version': '1.8.0', 'animations': {
         'idle': {'loop': True, 'animation_length': 2.4, 'bones': idle},
-        'walk': {'loop': True, 'animation_length': 0.5, 'bones': walk}}}
+        'walk': {'loop': True, 'animation_length': WALK_SECONDS, 'bones': walk}}}
+
+def sample(bones_anim, t):
+    """The rotation of every bone of an animation at time t (straight lines between the key frames)."""
+    out = {}
+    for name, channels in bones_anim.items():
+        frames = sorted((float(k), v) for k, v in channels['rotation'].items())
+        for (t0, r0), (t1, r1) in zip(frames, frames[1:]):
+            if t0 <= t <= t1:
+                f = 0 if t1 == t0 else (t - t0) / (t1 - t0)
+                out[name] = [a + (b - a) * f for a, b in zip(r0, r1)]
+                break
+    return out
 
 def dump(rel, data):
     path = os.path.join(ROOT, rel)
@@ -252,9 +336,11 @@ def dump(rel, data):
         json.dump(data, f, indent=1)
 
 # --- preview: a small software renderer (boxes, depth buffer, flat light) --------------------------------------
-def model_boxes(bones, pose=None):
-    """Every cube as (8 corners, swatch colour), with cube turns and the queen's bone pose applied."""
+def model_boxes(bones, pose=None, anim=None):
+    """Every cube as (8 corners, swatch colour), with cube turns, the queen's bone pose and an animation frame
+    (bone -> [x, y, z] degrees, as in the animation file) applied."""
     pose = pose or {}
+    anim = anim or {}
     by_name = {b['name']: b for b in bones}
     swatch_of = {(c * 8 + 1, r * 8 + 1): rgb for c, r, rgb in SWATCH.values()}
 
@@ -262,14 +348,21 @@ def model_boxes(bones, pose=None):
         # Innermost bone first, then its parents: scale about the pivot, then move.
         while name:
             b = by_name[name]
-            if name in pose:
-                dy, dz, (sx, sy, sz) = pose[name][:3]
-                tilt = math.radians(pose[name][3]) if len(pose[name]) > 3 else 0.0
+            if name in pose or name in anim:
+                dy, dz, (sx, sy, sz) = pose[name][:3] if name in pose else (0, 0, (1, 1, 1))
+                # Tilt about X as GeckoLib's setRotX (+Y turns toward +Z; a negative tilt puts the head down); an
+                # animation's X is the other way round, as in Blockbench.
+                tilt = math.radians(pose[name][3]) if name in pose and len(pose[name]) > 3 else 0.0
+                ax, ay, az = anim.get(name, (0, 0, 0))
+                tilt -= math.radians(ax)
                 px, py, pz = b['pivot']
-                ry, rz = (p[1] - py) * sy, (p[2] - pz) * sz
-                # A tilt about X (GeckoLib setRotX): +Y turns toward +Z; a negative tilt puts the head (-Z) down.
-                ry, rz = ry * math.cos(tilt) - rz * math.sin(tilt), ry * math.sin(tilt) + rz * math.cos(tilt)
-                p = (px + (p[0] - px) * sx, py + ry + dy, pz + rz + dz)
+                x, y, z = (p[0] - px) * sx, (p[1] - py) * sy, (p[2] - pz) * sz
+                y, z = y * math.cos(tilt) - z * math.sin(tilt), y * math.sin(tilt) + z * math.cos(tilt)
+                x, z = turn(x, z, ay)
+                # Z as in Blockbench: a positive tilt lowers +X (a left leg's foot) and raises -X.
+                c, s = math.cos(math.radians(-az)), math.sin(math.radians(-az))
+                x, y = x * c - y * s, x * s + y * c
+                p = (px + x, py + y + dy, pz + z + dz)
             name = b.get('parent')
         return p
 
@@ -420,6 +513,25 @@ SHEETS = [
 TITLE_H = 50
 LABEL_H = 34
 
+def render_walk(bones, frames=4):
+    """walk.png: the king at a few moments of one step, from the front (top row) and from above (bottom row)."""
+    rows = [('FRONT', 0, 0, 34.0, 300, 0.85), ('FROM ABOVE', -90, -89.9, 26.0, 330, 0.5)]
+    cw = 420
+    canvas = Canvas(cw * frames, TITLE_H + sum(r[4] + LABEL_H for r in rows))
+    canvas.text(12, 12, 'WALK - ONE STEP, FRONT AND FROM ABOVE', scale=4)
+    walk = animations()['animations']['walk']['bones']
+    y0 = TITLE_H
+    for title, yaw, pitch, ppx, ch, floor in rows:
+        for k in range(frames):
+            t = WALK_SECONDS * k / frames
+            x0 = cw * k
+            canvas.frame(x0, y0, cw, ch + LABEL_H)
+            canvas.text(x0 + 10, y0 + 8, f'{title} {int(t * 1000)} MS')
+            draw(canvas, model_boxes(bones, anim=sample(walk, t)), (x0 + 1, y0 + LABEL_H, cw - 2, ch - 1), floor,
+                 math.radians(yaw), math.radians(pitch), ppx)
+        y0 += ch + LABEL_H
+    canvas.save(os.path.join(PREVIEW_DIR, 'walk.png'))
+
 def render(models):
     """Writes one labelled picture per camera angle into references/termites/preview/. models: [(label, boxes)]."""
     os.makedirs(PREVIEW_DIR, exist_ok=True)
@@ -444,6 +556,11 @@ if __name__ == '__main__':
     os.makedirs(os.path.join(ROOT, 'textures', 'entity'), exist_ok=True)
     make_texture(os.path.join(ROOT, 'textures', 'entity', 'termite_king.png'))
     make_texture(os.path.join(ROOT, 'textures', 'entity', 'termite_queen.png'))
-    render([('KING', model_boxes(king))] + [(f'QUEEN {int(s * 100)}%', model_boxes(queen, queen_pose(s)))
-                                            for s in (0.0, 0.5, 0.75, 1.0)])
+    worker = worker_model()
+    dump('geo/entity/termite_worker.geo.json', geo('geometry.termite_worker', worker))
+    make_texture(os.path.join(ROOT, 'textures', 'entity', 'termite_worker.png'))
+    make_nymph_texture(os.path.join(ROOT, 'textures', 'entity', 'termite_nymph.png'))
+    render([('KING', model_boxes(king)), ('WORKER', model_boxes(worker))]
+           + [(f'QUEEN {int(s * 100)}%', model_boxes(queen, queen_pose(s))) for s in (0.0, 0.5, 0.75, 1.0)])
+    render_walk(king)
     print('termite models and preview pictures written')

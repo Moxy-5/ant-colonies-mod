@@ -3,6 +3,7 @@ package com.antcolonies.client;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.entity.QueenAntEntity;
 import com.antcolonies.entity.TermiteKingEntity;
+import com.antcolonies.entity.TermiteWorkerEntity;
 import com.antcolonies.entity.WorkerAntEntity;
 import com.antcolonies.registry.ModEntities;
 
@@ -20,6 +21,7 @@ public class ClientEvents {
         event.registerLayerDefinition(AntEggRenderer.LAYER, AntEggRenderer::createLayer);
         event.registerLayerDefinition(AntLarvaRenderer.LAYER, AntLarvaRenderer::createLayer);
         event.registerLayerDefinition(AntCorpseRenderer.LAYER, AntCorpseRenderer::createLayer);
+        event.registerLayerDefinition(TermiteNymphRenderer.LAYER, TermiteNymphRenderer::createLayer);
     }
 
     @SubscribeEvent
@@ -51,5 +53,11 @@ public class ClientEvents {
                         ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "termite_king")))
                 .withScale(TermiteQueenModel.RENDER_SCALE));
         event.registerEntityRenderer(ModEntities.TERMITE_QUEEN.get(), TermiteQueenRenderer::new);
+        event.registerEntityRenderer(ModEntities.TERMITE_WORKER.get(), context -> new AntRenderer<>(
+                context, new DefaultedEntityGeoModel<TermiteWorkerEntity>(
+                        ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "termite_worker"))
+                .withAltAnimations(ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "termite_king")))
+                .withScale(TermiteQueenModel.RENDER_SCALE));
+        event.registerEntityRenderer(ModEntities.TERMITE_NYMPH.get(), TermiteNymphRenderer::new);
     }
 }

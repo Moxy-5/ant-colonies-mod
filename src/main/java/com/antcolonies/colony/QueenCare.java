@@ -143,6 +143,15 @@ public class QueenCare {
         return burstLeft == 0 || !colony.brood().isFull(level); // a burst egg waits while the nursery is full of young
     }
 
+    /**
+     * A queen founding her colony lays one egg of her founding batch, from her own reserves (no meal needed), at this
+     * spot; it is put in its place at once (it hatches where it lies).
+     */
+    public void layFoundingEgg(ServerLevel level, double x, double y, double z) {
+        eggsLaid++;
+        colony.brood().spawnEgg(level, x, y, z).setPlaced(true);
+    }
+
     /** The egg comes out of the queen at this spot; she starts over with an empty stomach. */
     public void layEgg(ServerLevel level, double x, double y, double z) {
         eggsLaid++;

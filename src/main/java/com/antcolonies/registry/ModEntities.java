@@ -7,6 +7,7 @@ import com.antcolonies.entity.AntLarvaEntity;
 import com.antcolonies.entity.QueenAntEntity;
 import com.antcolonies.entity.TermiteKingEntity;
 import com.antcolonies.entity.TermiteQueenEntity;
+import com.antcolonies.entity.TermiteWorkerEntity;
 import com.antcolonies.entity.WorkerAntEntity;
 
 import net.minecraft.core.registries.Registries;
@@ -73,4 +74,20 @@ public class ModEntities {
                     .of(TermiteQueenEntity::new, MobCategory.CREATURE)
                     .sized(0.35F, 0.25F)
                     .build("termite_queen"));
+
+    // Termite worker: about the size of an ant worker.
+    public static final DeferredHolder<EntityType<?>, EntityType<TermiteWorkerEntity>> TERMITE_WORKER =
+            ENTITY_TYPES.register("termite_worker", () -> EntityType.Builder
+                    .of(TermiteWorkerEntity::new, MobCategory.CREATURE)
+                    .sized(0.3F, 0.2F)
+                    .build("termite_worker"));
+
+    // A termite nymph: what a termite egg hatches into (the same kind of young as an ant larva, drawn as a small pale termite).
+    public static final DeferredHolder<EntityType<?>, EntityType<AntLarvaEntity>> TERMITE_NYMPH =
+            ENTITY_TYPES.register("termite_nymph", () -> EntityType.Builder
+                    .<AntLarvaEntity>of(AntLarvaEntity::new, MobCategory.MISC)
+                    .sized(0.2F, 0.12F)
+                    .clientTrackingRange(6)
+                    .updateInterval(20)
+                    .build("termite_nymph"));
 }

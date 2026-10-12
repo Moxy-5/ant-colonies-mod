@@ -15,5 +15,8 @@
   "entity.antcolonies.termite_king": "Termite King",
   "entity.antcolonies.termite_queen": "Termite Queen",
   "item.antcolonies.termite_king_spawn_egg": "Termite King Spawn Egg",
-  "item.antcolonies.termite_queen_spawn_egg": "Termite Queen Spawn Egg"
+  "item.antcolonies.termite_queen_spawn_egg": "Termite Queen Spawn Egg",
+  "entity.antcolonies.termite_worker": "Termite Worker",
+  "entity.antcolonies.termite_nymph": "Termite Nymph",
+  "item.antcolonies.termite_worker_spawn_egg": "Termite Worker Spawn Egg"
 }

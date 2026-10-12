@@ -15,7 +15,7 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
  * ({@code Hill}), the castes' size, health and speed (fixed when the game starts), and the block and item tags.
  */
 public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNumbers queen, BroodNumbers brood,
-        FoodNumbers food, RefuseNumbers refuse, NestNumbers nest, Optional<QueenBody> queenBody) {
+        FoodNumbers food, RefuseNumbers refuse, NestNumbers nest, Optional<QueenBody> queenBody, Optional<Founding> founding) {
 
     /**
      * The whole colony. {@code maxWorkers}: young grow into workers only while there are fewer. {@code nursesFrom}: from
@@ -123,6 +123,19 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
         ).apply(i, QueenBody::new));
     }
 
+    /**
+     * A founding batch (termites): after the founders have sealed themselves in, the queen lays {@code eggs} eggs, one
+     * every {@code eggIntervalTicks}, and the royal pair feed the young on their own body fat (one piece every
+     * {@code feedIntervalTicks}), so the first workers need no food from outside.
+     */
+    public record Founding(int eggs, int eggIntervalTicks, int feedIntervalTicks) {
+        public static final Codec<Founding> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.INT.fieldOf("eggs").forGetter(Founding::eggs),
+                Codec.INT.fieldOf("egg_interval_ticks").forGetter(Founding::eggIntervalTicks),
+                Codec.INT.fieldOf("feed_interval_ticks").forGetter(Founding::feedIntervalTicks)
+        ).apply(i, Founding::new));
+    }
+
     public static final Codec<SpeciesProfile> CODEC = RecordCodecBuilder.create(i -> i.group(
             ColonyNumbers.CODEC.fieldOf("colony").forGetter(SpeciesProfile::colony),
             WorkerNumbers.CODEC.fieldOf("worker").forGetter(SpeciesProfile::worker),
@@ -131,7 +144,8 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
             FoodNumbers.CODEC.fieldOf("food").forGetter(SpeciesProfile::food),
             RefuseNumbers.CODEC.fieldOf("refuse").forGetter(SpeciesProfile::refuse),
             NestNumbers.CODEC.fieldOf("nest").forGetter(SpeciesProfile::nest),
-            QueenBody.CODEC.optionalFieldOf("queen_body").forGetter(SpeciesProfile::queenBody)
+            QueenBody.CODEC.optionalFieldOf("queen_body").forGetter(SpeciesProfile::queenBody),
+            Founding.CODEC.optionalFieldOf("founding").forGetter(SpeciesProfile::founding)
     ).apply(i, SpeciesProfile::new));
 
     /**
@@ -146,5 +160,6 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
             new FoodNumbers(24, 10, 60, 20),
             new RefuseNumbers(6000),
             new NestNumbers(4, false),
+            Optional.empty(),
             Optional.empty());
 }

@@ -37,4 +37,8 @@ public class ModItems {
     public static final DeferredItem<DeferredSpawnEggItem> TERMITE_QUEEN_SPAWN_EGG =
             ITEMS.register("termite_queen_spawn_egg",
                     () -> new DeferredSpawnEggItem(ModEntities.TERMITE_QUEEN, 0xEEE2C4, 0x42210F, new Item.Properties()));
+
+    public static final DeferredItem<DeferredSpawnEggItem> TERMITE_WORKER_SPAWN_EGG =
+            ITEMS.register("termite_worker_spawn_egg",
+                    () -> new DeferredSpawnEggItem(ModEntities.TERMITE_WORKER, 0xECE2C8, 0xD4AC60, new Item.Properties()));
 }

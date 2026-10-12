@@ -81,6 +81,10 @@ public class Nest {
      */
     @Nullable
     public BlockPos findDigTarget(Level level) {
+        // A colony that closed itself in while it was founded opens up again once it has workers: the plug first.
+        if (isEntrancePlugged(level)) {
+            return center;
+        }
         // The rooms are planned before the first block is dug, because the plan decides how deep the shaft goes.
         int depth = shaftDepth(level);
         List<BlockPos> shaft = new ArrayList<>();
@@ -208,6 +212,32 @@ public class Nest {
      */
     public BlockPos getEntrance() {
         return center;
+    }
+
+    /**
+     * Whether the entrance is closed with the soil the founders packed into it while the colony has members to open
+     * it again (species with {@code seal_while_founding}).
+     */
+    public boolean isEntrancePlugged(Level level) {
+        return colony.profile().nest().sealWhileFounding() && !colony.isFounding() && level.isLoaded(center)
+                && level.getBlockState(center).is(ModBlocks.BURROWED_DIRT.get());
+    }
+
+    /** Whether a worker may bite this block: soil (the diggable tag), or the plug in its own entrance. */
+    public boolean canDig(Level level, BlockPos pos) {
+        return level.getBlockState(pos).is(ModTags.DIGGABLE) || (pos.equals(center) && isEntrancePlugged(level));
+    }
+
+    /**
+     * Where a worker can stand to bite this block (see {@link #findStandSpots}); the entrance plug is bitten from
+     * the top of the shaft under it, clinging to the shaft wall.
+     */
+    public List<BlockPos> standSpotsFor(Level level, BlockPos target) {
+        List<BlockPos> spots = new ArrayList<>(findStandSpots(level, target));
+        if (target.equals(center)) {
+            spots.add(0, center.below());
+        }
+        return spots;
     }
 
     /** Whether the entrance hole is open: nothing solid in it (grass or snow do not close it). */

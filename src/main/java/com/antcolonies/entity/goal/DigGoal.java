@@ -71,7 +71,7 @@ public class DigGoal extends Goal {
     @Override
     public boolean canContinueToUse() {
         return target != null && !ant.isCarrying() && stuckTicks < GIVE_UP_TICKS && allowed.getAsBoolean()
-                && ant.level().getBlockState(target).is(ModTags.DIGGABLE);
+                && colony != null && colony.nest().canDig(ant.level(), target);
     }
 
     @Override
@@ -97,12 +97,14 @@ public class DigGoal extends Goal {
         Vec3 blockCenter = Vec3.atCenterOf(target);
         ant.getLookControl().setLookAt(blockCenter);
 
-        if (ant.distanceToSqr(blockCenter) > REACH * REACH) {
+        // Clinging right under the block (biting an entrance plug from the shaft) counts as within reach too.
+        boolean underIt = ant.blockPosition().equals(target.below());
+        if (!underIt && ant.distanceToSqr(blockCenter) > REACH * REACH) {
             // Walk to the open space next to the block (above it in the shaft, beside it in the tunnel).
             AntNavigator legs = ant.getNavigator();
             if (legs.isDone()) {
                 boolean walking = false;
-                for (BlockPos stand : Nest.findStandSpots(level, target)) {
+                for (BlockPos stand : colony.nest().standSpotsFor(level, target)) {
                     if (legs.moveTo(stand, 1.0)) {
                         walking = true;
                         break;

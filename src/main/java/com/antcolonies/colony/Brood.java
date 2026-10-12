@@ -10,13 +10,16 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.entity.AntEggEntity;
 import com.antcolonies.entity.AntLarvaEntity;
+import com.antcolonies.entity.TermiteWorkerEntity;
 import com.antcolonies.entity.WorkerAntEntity;
 import com.antcolonies.registry.ModEntities;
+import com.antcolonies.species.Species;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.Level;
 
 /**
@@ -79,9 +82,14 @@ public class Brood {
         return colony.nest().getNurseryCells(level).contains(pos);
     }
 
-    /** The egg hatches: a larva takes its place (in the same spot). */
+    /** What an egg of this colony hatches into: an ant larva, or a termite nymph (a small pale termite). */
+    private EntityType<AntLarvaEntity> youngType() {
+        return colony.getSpecies().equals(Species.MACROTERMES) ? ModEntities.TERMITE_NYMPH.get() : ModEntities.ANT_LARVA.get();
+    }
+
+    /** The egg hatches: a larva (or nymph) takes its place (in the same spot). */
     public boolean hatchEgg(ServerLevel level, AntEggEntity egg) {
-        AntLarvaEntity larva = new AntLarvaEntity(ModEntities.ANT_LARVA.get(), level);
+        AntLarvaEntity larva = new AntLarvaEntity(youngType(), level);
         larva.setColonyId(id);
         larva.setMeal(colony.profile().brood().larvaMeal());
         larva.moveTo(egg.getX(), egg.getY(), egg.getZ(), egg.getYRot(), 0.0F);
@@ -92,7 +100,7 @@ public class Brood {
 
     /** Puts a larva of this colony into the world (used by the tests). */
     public AntLarvaEntity spawnLarva(Level level, double x, double y, double z) {
-        AntLarvaEntity larva = new AntLarvaEntity(ModEntities.ANT_LARVA.get(), level);
+        AntLarvaEntity larva = new AntLarvaEntity(youngType(), level);
         larva.setColonyId(id);
         larva.setMeal(colony.profile().brood().larvaMeal());
         larva.moveTo(x, y, z, level.getRandom().nextFloat() * 360.0F, 0.0F);
@@ -169,6 +177,17 @@ public class Brood {
     public boolean hatchLarva(ServerLevel level, AntLarvaEntity larva) {
         if (colony.getCount(WorkerAntEntity.CASTE) >= colony.profile().colony().maxWorkers()) {
             return false;
+        }
+        if (colony.getSpecies().equals(Species.MACROTERMES)) {
+            TermiteWorkerEntity worker = ModEntities.TERMITE_WORKER.get().create(level);
+            if (worker == null) {
+                return false;
+            }
+            worker.moveTo(larva.getX(), larva.getY(), larva.getZ(), larva.getYRot(), 0.0F);
+            worker.joinColony(colony);
+            level.addFreshEntity(worker);
+            larva.discard();
+            return true;
         }
         WorkerAntEntity worker = ModEntities.WORKER_ANT.get().create(level);
         if (worker == null) {
