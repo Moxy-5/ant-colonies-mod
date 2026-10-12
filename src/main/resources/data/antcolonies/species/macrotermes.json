@@ -1,8 +1,8 @@
 {
-  "_note": "Macrotermes (M7). Used by termites so far: nest, queen_body, founding, mound, and from brood hatch_ticks, larva_meal (pieces a nymph eats) and larva_starve_ticks, and colony max_workers. The other numbers are placeholders until the fungus garden exists (M7 step 5).",
+  "_note": "Macrotermes (M7). Used by termites so far: nest, queen_body, founding, mound, food (what they gather and where they keep it; no bread), and from brood hatch_ticks, larva_meal (pieces a nymph eats) and larva_starve_ticks, and colony max_workers. No nurses yet (they come with the fungus garden, M7 step 5). The other numbers are placeholders until the fungus garden exists.",
   "colony": {
     "max_workers": 20,
-    "nurses_from_workers": [3, 8, 12, 20]
+    "nurses_from_workers": []
   },
   "worker": {
     "meal_interval_ticks": 24000,
@@ -25,16 +25,24 @@
   },
   "food": {
     "radius": 24,
-    "seeds_per_grass": 10,
-    "mill_ticks": 60,
-    "bread_stock": 20
+    "items": "antcolonies:termite_food",
+    "plants": [
+      { "block": "minecraft:short_grass", "pieces": 4 },
+      { "block": "minecraft:tall_grass", "pieces": 8 },
+      { "block": "minecraft:dead_bush", "pieces": 6 },
+      { "block": "#minecraft:leaves", "pieces": 2, "only_decaying": true },
+      { "block": "minecraft:hay_block", "pieces": 48, "foragers": 4 }
+    ],
+    "piece": "antcolonies:forage",
+    "pile": "antcolonies:forage_pile"
   },
   "refuse": {
     "corpse_decay_ticks": 6000
   },
   "nest": {
     "max_levels": 1,
-    "seal_while_founding": true
+    "seal_while_founding": true,
+    "side_rooms": ["food"]
   },
   "queen_body": {
     "full_size_at_members": 60,

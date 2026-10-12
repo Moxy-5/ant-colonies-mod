@@ -30,6 +30,48 @@ class NestPlanTest {
      * cell of the levels, not even through a corner of a face: the only way between them is the shaft. Checked with the
      * shaft 3 deep (the levels start one block under it) and 2 deep (the first level is on the same layer).
      */
+    /** Manhattan distance: 1 = the two blocks share a face. */
+    private static int dist(BlockPos a, BlockPos b) {
+        return Math.abs(a.getX() - b.getX()) + Math.abs(a.getY() - b.getY()) + Math.abs(a.getZ() - b.getZ());
+    }
+
+    @Test
+    void sideRoomsLieBesideTheShaftFootClearOfTheRoomsTheGalleriesAndEachOther() {
+        List<NestPlan.Kind> kinds = List.of(NestPlan.Kind.FOOD, NestPlan.Kind.FOOD, NestPlan.Kind.FOOD);
+        List<BlockPos> galleries = MoundPlan.galleries(3, 13).stream().map(BOTTOM::offset).toList();
+        for (Direction direction : Direction.Plane.HORIZONTAL) {
+            List<NestPlan.Chamber> levels = NestPlan.chambers(BOTTOM, direction, 1);
+            List<NestPlan.Chamber> side = NestPlan.sideRooms(BOTTOM, direction, kinds);
+            assertEquals(3, side.size());
+            assertEquals(direction.getOpposite(), Direction.getNearest(
+                    side.get(0).center().getX() - BOTTOM.getX(), 0, side.get(0).center().getZ() - BOTTOM.getZ()), "the first side room lies across from the rooms");
+            for (int i = 0; i < side.size(); i++) {
+                NestPlan.Chamber room = side.get(i);
+                assertEquals(NestPlan.TUNNEL_LENGTH + 25, room.cells().size(), "a food store side room is a 3-block tunnel and a 5x5 room");
+                assertEquals(1, dist(room.wayIn().get(0), BOTTOM), "the tunnel starts at the foot of the shaft");
+                Set<BlockPos> dug = new HashSet<>(Set.of(BOTTOM));
+                for (BlockPos cell : room.cells()) {
+                    assertEquals(BOTTOM.getY(), cell.getY(), "a side room lies on the top level");
+                    assertTrue(dug.stream().anyMatch(d -> dist(d, cell) == 1), cell + " is dug before anything next to it");
+                    dug.add(cell);
+                    for (NestPlan.Chamber level : levels) {
+                        for (BlockPos b : level.cells()) {
+                            assertTrue(dist(cell, b) > 1, "rooms " + direction + ": side room cell " + cell + " touches the " + level.kind() + " cell " + b);
+                        }
+                    }
+                    for (BlockPos b : galleries) {
+                        assertTrue(dist(cell, b) > 1, "rooms " + direction + ": side room cell " + cell + " touches the gallery cell " + b);
+                    }
+                    for (int k = i + 1; k < side.size(); k++) {
+                        for (BlockPos b : side.get(k).cells()) {
+                            assertTrue(dist(cell, b) > 1, "rooms " + direction + ": side rooms " + i + " and " + k + " touch at " + cell);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     @Test
     void theFoundingChamberStaysClearOfTheLevels() {
         for (int depth = 2; depth <= 3; depth++) {

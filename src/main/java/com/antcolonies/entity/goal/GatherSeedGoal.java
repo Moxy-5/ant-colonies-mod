@@ -19,7 +19,8 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 
 /**
- * Walks to a seed lying on the ground near the nest and takes one seed in its mandibles. {@link StoreSeedGoal}
+ * Walks to a seed lying on the ground near the nest (any item of the species profile's food {@code items}: seeds for
+ * the harvester ant, sticks, saplings and wheat for termites) and takes one in its mandibles. {@link StoreSeedGoal}
  * then carries it down to the food store. Only looks for seeds when there is somewhere for them to go: part of the food store is dug out, or the queen wants them.
  */
 public class GatherSeedGoal extends Goal {

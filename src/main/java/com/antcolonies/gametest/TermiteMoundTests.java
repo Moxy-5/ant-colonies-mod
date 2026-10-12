@@ -26,11 +26,11 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 @GameTestHolder(AntColoniesMod.MODID)
 @PrefixGameTestTemplate(false)
 public class TermiteMoundTests {
-    private static final int SURFACE = 12;
-    private static final int MIDDLE = 12;
+    static final int SURFACE = 12;
+    static final int MIDDLE = 12;
 
     /** Earth 12 blocks deep under grass over the whole test area (room for the nest and the galleries). */
-    private static void deepGround(GameTestHelper helper) {
+    static void deepGround(GameTestHelper helper) {
         for (int x = 0; x < 25; x++) {
             for (int z = 0; z < 25; z++) {
                 for (int y = 0; y < SURFACE - 1; y++) {
@@ -42,7 +42,7 @@ public class TermiteMoundTests {
     }
 
     /** The termite colony in this test area (one with a living queen). */
-    private static Colony colony(GameTestHelper helper) {
+    static Colony colony(GameTestHelper helper) {
         net.minecraft.world.phys.AABB area = helper.getBounds();
         return ColonyManager.get(helper.getLevel()).getColonies().stream()
                 .filter(colony -> area.contains(net.minecraft.world.phys.Vec3.atCenterOf(colony.getCenter()))

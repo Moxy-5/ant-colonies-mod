@@ -35,6 +35,14 @@ public class ModBlocks {
             BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BROWN).strength(0.2F).sound(SoundType.SAND)
                     .noCollission().noOcclusion().pushReaction(PushReaction.DESTROY));
 
+    /**
+     * A heap of forage (pieces of dead grass, leaves and twigs) in the termites' food store: one layer per piece a
+     * termite brings in. Same block as the seed pile, other look.
+     */
+    public static final DeferredBlock<SeedPileBlock> FORAGE_PILE = BLOCKS.registerBlock("forage_pile", SeedPileBlock::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.SAND).strength(0.2F).sound(SoundType.GRASS)
+                    .noCollission().noOcclusion().pushReaction(PushReaction.DESTROY));
+
     /** Termite mound soil: built up in layers, then dries and hardens with age (see TermiteMoundBlock). */
     public static final DeferredBlock<TermiteMoundBlock> TERMITE_MOUND = BLOCKS.registerBlock("termite_mound", TermiteMoundBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_ORANGE).strength(0.6F, 3.0F).sound(SoundType.MUD)

@@ -92,8 +92,10 @@ public class ColonyCommands {
                     + " | center " + colony.getCenter().toShortString()
                     + " | queen " + colony.getQueenId().toString().substring(0, 8)
                     + " | members " + colony.getMemberCount()
-                    + " | food " + colony.food().getFood() + " (rich " + colony.food().getRichSeeds() + ", eaten " + colony.food().getSeedsEaten() + ")"
-                    + " | bread " + colony.bakery().getBread() + " (rich " + colony.bakery().getRichBread() + ", milling " + colony.bakery().getMilling() + ")"
+                    + (colony.profile().food().makesBread()
+                            ? " | food " + colony.food().getFood() + " (rich " + colony.food().getRichSeeds() + ", eaten " + colony.food().getSeedsEaten() + ")"
+                                    + " | bread " + colony.bakery().getBread() + " (rich " + colony.bakery().getRichBread() + ", milling " + colony.bakery().getMilling() + ")"
+                            : " | food " + colony.food().getFood() + " pieces in the store")
                     + " | queen fed " + colony.queenCare().getQueenBread() + "/" + colony.profile().queen().meal() + ", rich " + colony.queenCare().getQueenRich() + "/"
                     + colony.profile().queen().richMeal() + incubation(colony, level)
                     + " | queen unfed " + unfedMinutes(colony, level) + " of " + colony.profile().queen().starveTicks() / 1200 + " min"

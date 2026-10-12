@@ -3,6 +3,7 @@ package com.antcolonies.entity.goal;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Predicate;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -10,26 +11,26 @@ import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.AbstractAntEntity;
+import com.antcolonies.nav.Foothold;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.ai.goal.Goal;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.level.block.state.BlockState;
 
 /**
- * Walks to a tuft of short grass near the nest, nibbles at it for a couple of seconds and clips one seed off it. A tuft
- * gives up to the species profile's seeds_per_grass seeds and then breaks; {@link StoreSeedGoal} then carries the seed down
- * to the food store. Only looks for grass when there is somewhere for the seeds to go: part of the food store is dug out, or the queen wants them.
+ * Walks to a food plant near the nest, nibbles at it for a couple of seconds and cuts one piece off it: a seed off a
+ * tuft of short grass for the harvester ant, a piece of forage off a dead bush, dry grass, dying leaves or a hay bale
+ * for termites (the species profile's food {@code plants}). A plant gives the profile's number of pieces and then
+ * breaks; {@link StoreSeedGoal} then carries the piece down to the food store. Only looks for plants when there is
+ * somewhere for the food to go: part of the food store is dug out, or the queen wants seeds. The ant works from the
+ * plant's own cell (grass can be walked into) or from any spot right next to it (a hay bale is solid).
  */
 public class ClipGrassGoal extends Goal {
-    /** How close (sideways, in blocks) the ant must get to the grass. */
-    private static final double REACH = 0.6;
     /** How long (in ticks) the ant nibbles before the seed comes off. */
     private static final int CLIP_TICKS = 50;
     /** If the ant can't get there in 30 seconds it leaves the grass to the others. */
@@ -69,14 +70,24 @@ public class ClipGrassGoal extends Goal {
         if (grass == null) {
             return false;
         }
-        colony.food().claimGrass(level, grass);
+        colony.food().claimGrass(level, grass, ant.getUUID());
         return true;
     }
 
     @Override
     public boolean canContinueToUse() {
-        return colony != null && grass != null && ant.level().getBlockState(grass).is(Blocks.SHORT_GRASS)
+        return colony != null && grass != null && colony.food().isFoodPlant(ant.level().getBlockState(grass))
                 && !ant.hasFullMandibles() && ticks < GIVE_UP_TICKS;
+    }
+
+    /** Any foothold from which the ant can nibble at {@code plant}: in its own cell or one of the 26 round it. */
+    private static Predicate<Foothold> nearPlant(BlockPos plant) {
+        return at -> isNear(at.cell(), plant);
+    }
+
+    private static boolean isNear(BlockPos cell, BlockPos plant) {
+        return Math.abs(cell.getX() - plant.getX()) <= 1 && Math.abs(cell.getY() - plant.getY()) <= 1
+                && Math.abs(cell.getZ() - plant.getZ()) <= 1;
     }
 
     @Override
@@ -88,8 +99,8 @@ public class ClipGrassGoal extends Goal {
     @Override
     public void stop() {
         ant.getNavigator().stop();
-        if (colony != null && grass != null) {
-            colony.food().releaseGrass(grass); // a clipped tuft is marked again by clippedGrass, after this
+        if (colony != null) {
+            colony.food().releaseGrass(ant.getUUID());
         }
         grass = null;
         colony = null;
@@ -102,30 +113,28 @@ public class ClipGrassGoal extends Goal {
         }
         ticks++;
         ant.getLookControl().setLookAt(grass.getX() + 0.5, grass.getY() + 0.3, grass.getZ() + 0.5);
-        double dx = ant.getX() - (grass.getX() + 0.5);
-        double dz = ant.getZ() - (grass.getZ() + 0.5);
-        double dy = ant.getY() - grass.getY();
-        if (dx * dx + dz * dz <= REACH * REACH && Math.abs(dy) < 1.5) {
-            ant.getNavigator().stop();
+        if (ant.getNavigator().isDone() && isNear(ant.blockPosition(), grass)) {
             clip(level);
-        } else if (ant.getNavigator().isDone() && !ant.getNavigator().moveTo(grass, 1.0)) {
+        } else if (ant.getNavigator().isDone() && !ant.getNavigator().moveTo(nearPlant(grass), grass, 1.0)) {
             unreachable.put(grass.immutable(), level.getGameTime() + UNREACHABLE_TICKS);
             ticks = GIVE_UP_TICKS; // no way to get there: let another ant have a go
         }
     }
 
-    /** Nibbles at the grass; after a while one seed comes off and the ant takes it. */
+    /** Nibbles at the plant; after a while one piece comes off and the ant takes it. */
     private void clip(ServerLevel level) {
         clipping++;
         if (clipping % 12 == 1) {
-            level.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, level.getBlockState(grass)),
+            BlockState plant = level.getBlockState(grass);
+            SoundType sound = plant.getSoundType();
+            level.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, plant),
                     grass.getX() + 0.5, grass.getY() + 0.3, grass.getZ() + 0.5, 3, 0.15, 0.1, 0.15, 0.02);
-            level.playSound(null, grass, SoundEvents.GRASS_HIT, SoundSource.NEUTRAL, 0.2F, 1.6F);
+            level.playSound(null, grass, sound.getHitSound(), SoundSource.NEUTRAL, 0.2F, 1.6F);
         }
         if (clipping >= CLIP_TICKS) {
-            ant.setCarriedSeed(new ItemStack(Items.WHEAT_SEEDS));
+            ant.setCarriedSeed(colony.food().cutPiece());
             ant.setSeedForBread(colony.bakery().claimSeedForBread(level, ant.getUUID())); // to the mill if there is no store yet
-            colony.food().clippedGrass(level, grass);
+            colony.food().clippedGrass(level, grass, ant.getUUID());
             ColonyManager.get(level).markChanged();
             grass = null; // so stop() does not free the tuft again
         }

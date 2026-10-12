@@ -441,10 +441,16 @@ public class Mound {
 
     /**
      * A termite bit a block: whether the bite gives it a soil pellet to carry. A block gives one pellet per layer of a
-     * mound block ({@link TermiteMoundBlock#FINISHED}), so one dug block builds one mound block.
+     * mound block ({@link TermiteMoundBlock#FINISHED}), so one dug block builds one mound block. Only while the mound
+     * wants soil (or the termite went for gallery soil it was counted for): soil from digging the nest's rooms when the
+     * mound has nothing to build is left behind, so termites are not left holding soil with nowhere to put it.
      */
-    public boolean takePellet(BlockPos dug, UUID ant) {
+    public boolean takePellet(Level level, BlockPos dug, UUID ant) {
+        boolean counted = soilClaims.contains(ant);
         soilClaims.remove(ant);
+        if (!counted && !wantsSoil(level)) {
+            return false;
+        }
         if (pelletsTaken.size() > 64) {
             pelletsTaken.clear(); // only blocks being dug right now matter
         }

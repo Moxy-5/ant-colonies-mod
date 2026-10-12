@@ -15,11 +15,18 @@ public class ModItems {
     public static final DeferredItem<BlockItem> DEEP_SOIL = ITEMS.registerSimpleBlockItem(ModBlocks.DEEP_SOIL);
     public static final DeferredItem<BlockItem> SEED_PILE = ITEMS.registerSimpleBlockItem(ModBlocks.SEED_PILE);
     public static final DeferredItem<BlockItem> BREAD_PILE = ITEMS.registerSimpleBlockItem(ModBlocks.BREAD_PILE);
+    public static final DeferredItem<BlockItem> FORAGE_PILE = ITEMS.registerSimpleBlockItem(ModBlocks.FORAGE_PILE);
     public static final DeferredItem<BlockItem> TERMITE_MOUND = ITEMS.registerSimpleBlockItem(ModBlocks.TERMITE_MOUND);
     public static final DeferredItem<BlockItem> TERMITE_HOLE = ITEMS.registerSimpleBlockItem(ModBlocks.TERMITE_HOLE);
 
     /** One piece of ant bread: what the ants carry from the mill to the queen, and what a broken bread pile drops. */
     public static final DeferredItem<Item> ANT_BREAD = ITEMS.registerSimpleItem("ant_bread");
+
+    /**
+     * A piece of forage: dead plant material a termite cut off a plant (dry grass, a dead bush, dying leaves, a hay
+     * bale). What termites carry home to their food store, and what a broken forage pile drops.
+     */
+    public static final DeferredItem<Item> FORAGE = ITEMS.registerSimpleItem("forage");
 
     /** Rich ant bread, milled from rich seeds (pumpkin): fed to the queen it starts a burst of eggs. */
     public static final DeferredItem<Item> RICH_ANT_BREAD = ITEMS.registerSimpleItem("rich_ant_bread");

@@ -166,6 +166,34 @@ public final class NestPlan {
         return new Chamber(Kind.FOUNDING, List.copyOf(cells), center, List.copyOf(tunnel), List.copyOf(room));
     }
 
+    /**
+     * Side rooms (the profile's {@code nest.side_rooms}, such as the termites' food store): more rooms on the top level,
+     * each at the end of its own {@link #TUNNEL_LENGTH}-block tunnel leaving the foot of the shaft ({@code hub}) toward
+     * another side than the levels' rooms ({@code direction}): the first straight across from them, the next to their
+     * left, the third to their right (at most three). They are as big as their kind says ({@link #roomSize}), and two
+     * of them never touch (a 5x5 room across and one to the left keep two blocks of soil between their corners). Only
+     * for nests with one level and no founding chamber, like the termites': the first stair steps off to the right,
+     * and a founding chamber lies across from the rooms one block higher.
+     */
+    public static List<Chamber> sideRooms(BlockPos hub, Direction direction, List<Kind> kinds) {
+        Direction[] sides = {direction.getOpposite(), direction.getCounterClockWise(), direction.getClockWise()};
+        List<Chamber> rooms = new ArrayList<>();
+        for (int i = 0; i < kinds.size() && i < sides.length; i++) {
+            Direction side = sides[i];
+            List<BlockPos> tunnel = new ArrayList<>();
+            for (int k = 1; k <= TUNNEL_LENGTH; k++) {
+                tunnel.add(hub.relative(side, k));
+            }
+            RoomSize size = roomSize(kinds.get(i));
+            List<BlockPos> room = room(hub, side, size, TUNNEL_LENGTH);
+            List<BlockPos> cells = new ArrayList<>(tunnel);
+            cells.addAll(room);
+            BlockPos center = hub.relative(side, TUNNEL_LENGTH + (size.length() + 1) / 2);
+            rooms.add(new Chamber(kinds.get(i), List.copyOf(cells), center, List.copyOf(tunnel), List.copyOf(room)));
+        }
+        return List.copyOf(rooms);
+    }
+
     /** The blocks of a room that lies after a tunnel ({@code tunnelLength} long) leaving {@code start} in direction {@code forward}, in digging order. */
     private static List<BlockPos> room(BlockPos start, Direction forward, RoomSize size, int tunnelLength) {
         List<BlockPos> cells = new ArrayList<>();

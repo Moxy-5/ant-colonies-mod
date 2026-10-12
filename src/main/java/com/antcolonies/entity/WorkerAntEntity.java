@@ -94,18 +94,8 @@ public class WorkerAntEntity extends AbstractAntEntity {
     }
 
     @Override
-    public boolean hasRole(ColonyRole role) {
-        if (getColonyId() == null || !(level() instanceof ServerLevel serverLevel)) {
-            return false;
-        }
-        Colony colony = ColonyManager.get(serverLevel).getColony(getColonyId());
-        return colony != null && colony.roleOf(serverLevel, getUUID()) == role;
-    }
-
-    @Override
-    public boolean mayDo(ColonyRole role) {
-        return isIdle() || getColonyId() == null || hasRole(role) || !(level() instanceof ServerLevel serverLevel)
-                || ColonyManager.get(serverLevel).getColony(getColonyId()) == null;
+    protected boolean hasColonyRole() {
+        return true;
     }
 
     /** A worker that hatched in this colony's nursery belongs to it from the start (and is counted). */

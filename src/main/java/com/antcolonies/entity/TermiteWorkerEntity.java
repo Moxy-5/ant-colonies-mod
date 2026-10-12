@@ -2,9 +2,13 @@ package com.antcolonies.entity;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.entity.goal.BuildMoundGoal;
+import com.antcolonies.entity.goal.ClipGrassGoal;
+import com.antcolonies.entity.goal.GatherSeedGoal;
 import com.antcolonies.entity.goal.ShapeHoleGoal;
+import com.antcolonies.entity.goal.StoreSeedGoal;
 import com.antcolonies.entity.goal.DigGoal;
 import com.antcolonies.species.Species;
 
@@ -20,9 +24,11 @@ import net.minecraft.world.level.Level;
 
 /**
  * A termite worker (Macrotermes): pale, soft and blind. It digs (the first workers open the entrance the royal pair
- * sealed, then galleries under the mound for soil), builds the mound layer by layer and shapes its chimney blocks, and
- * wanders near the nest; gathering food comes later. It joins
- * the nearest termite colony when put down with a spawn egg, and is born into its colony when a nymph grows up.
+ * sealed, then the food store and galleries under the mound for soil), builds the mound layer by layer and shapes its
+ * chimney blocks, gathers dead plant material (forage) into the food store, and wanders near the nest. Half the
+ * workers are builders (digging and building) and half foragers, like the ants' roles; one with nothing to do for a
+ * few seconds helps with the other job. It joins the nearest termite colony when put down with a spawn egg, and is
+ * born into its colony when a nymph grows up.
  */
 public class TermiteWorkerEntity extends AbstractAntEntity {
     /** Counted under the same caste name as ant workers (each colony has its own counts). */
@@ -46,11 +52,21 @@ public class TermiteWorkerEntity extends AbstractAntEntity {
     @Override
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));
+        // What a termite holds goes where it belongs first: forage to the food store, soil to the mound.
+        this.goalSelector.addGoal(1, new StoreSeedGoal(this));
         this.goalSelector.addGoal(1, new BuildMoundGoal(this));
         this.goalSelector.addGoal(2, new ShapeHoleGoal(this));
-        this.goalSelector.addGoal(3, new DigGoal(this, () -> true));
-        this.goalSelector.addGoal(4, new AntWanderGoal(this, 1.0, 160, 5, () -> true).hangsFromCeilings(0.25F));
-        this.goalSelector.addGoal(5, new RandomLookAroundGoal(this));
+        // Builders dig, foragers fetch food off the ground and cut it off plants.
+        this.goalSelector.addGoal(3, new DigGoal(this, () -> true, () -> mayDo(ColonyRole.BUILDER)));
+        this.goalSelector.addGoal(3, new GatherSeedGoal(this));
+        this.goalSelector.addGoal(4, new ClipGrassGoal(this));
+        this.goalSelector.addGoal(5, new AntWanderGoal(this, 1.0, 160, 5, () -> true).hangsFromCeilings(0.25F));
+        this.goalSelector.addGoal(6, new RandomLookAroundGoal(this));
+    }
+
+    @Override
+    protected boolean hasColonyRole() {
+        return true;
     }
 
     /** A worker that grew up from a nymph of this colony belongs to it from the start (and is counted). */

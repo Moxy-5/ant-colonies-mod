@@ -24,7 +24,12 @@
   },
   "food": {
     "radius": 24,
-    "seeds_per_grass": 10,
+    "items": "antcolonies:seeds",
+    "plants": [
+      { "block": "minecraft:short_grass", "pieces": 10 }
+    ],
+    "piece": "minecraft:wheat_seeds",
+    "pile": "antcolonies:seed_pile",
     "mill_ticks": 60,
     "bread_stock": 20
   },

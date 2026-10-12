@@ -500,7 +500,7 @@ public class NestTests {
         helper.succeedWhen(() -> {
             Colony colony = colony(helper);
             helper.assertTrue(planted[0] && colony != null, "no grass has been planted yet");
-            int expected = tufts.length * colony.profile().food().seedsPerGrass();
+            int expected = tufts.length * colony.food().piecesOf(Blocks.SHORT_GRASS.defaultBlockState());
             for (int[] tuft : tufts) {
                 helper.assertBlock(new BlockPos(tuft[0], SURFACE, tuft[1]), block -> block == Blocks.AIR, "a tuft of grass is still there");
             }

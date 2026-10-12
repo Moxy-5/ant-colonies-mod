@@ -29,6 +29,11 @@ public class BuildMoundGoal extends Goal {
     private static final int GIVE_UP_TICKS = 600;
     /** After this many spots with no route to them, it waits a while before trying again. */
     private static final int MAX_FAILED_ROUTES = 4;
+    /**
+     * A termite that finds no spot for its soil this many times in a row (one look every half second or so, so about
+     * 15 seconds) leaves it behind: the mound has nothing more to build for now.
+     */
+    private static final int MAX_LOOKS_WITHOUT_SPOT = 30;
 
     private final AbstractAntEntity ant;
     @Nullable
@@ -37,6 +42,7 @@ public class BuildMoundGoal extends Goal {
     private BlockPos spot;
     private int ticks;
     private int failedRoutes;
+    private int looksWithoutSpot;
 
     public BuildMoundGoal(AbstractAntEntity ant) {
         this.ant = ant;
@@ -66,11 +72,25 @@ public class BuildMoundGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        if (colony == null || !colony.mound().isActive()) {
+        spot = colony == null || !colony.mound().isActive() ? null : colony.mound().pickBuildSpot(level, ant);
+        if (spot == null) {
+            if (++looksWithoutSpot >= MAX_LOOKS_WITHOUT_SPOT) {
+                leaveSoilBehind(level);
+            }
             return false;
         }
-        spot = colony.mound().pickBuildSpot(level, ant);
-        return spot != null;
+        looksWithoutSpot = 0;
+        return true;
+    }
+
+    /** Puts the soil down where the termite is: it crumbles away (nothing to build with it now). */
+    private void leaveSoilBehind(ServerLevel level) {
+        BlockState soil = ant.getCarriedBlock();
+        if (soil != null) {
+            level.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, soil), ant.getX(), ant.getY() + 0.1, ant.getZ(), 4, 0.1, 0.05, 0.1, 0.02);
+        }
+        ant.setCarriedBlock(null);
+        looksWithoutSpot = 0;
     }
 
     @Override

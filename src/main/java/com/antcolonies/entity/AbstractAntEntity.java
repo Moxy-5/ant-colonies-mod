@@ -6,6 +6,8 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.nav.AntMoveControl;
+import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.nav.AntNavigator;
@@ -17,6 +19,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtUtils;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -198,14 +201,27 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return idleSeconds >= IDLE_SECONDS;
     }
 
-    /** Whether this ant takes up work of this role now: its own role's work always, the others' only when it is idle. Everything goes for ants without roles. */
+    /** Whether this insect is a worker that gets a role from its colony (builder, forager, nurse). Queens and kings don't. */
+    protected boolean hasColonyRole() {
+        return false;
+    }
+
+    /**
+     * Whether this ant takes up work of this role now: its own role's work always, the others' only when it is idle.
+     * Everything goes for insects without roles, and for a worker without a colony.
+     */
     public boolean mayDo(ColonyRole role) {
-        return true;
+        return !hasColonyRole() || isIdle() || getColonyId() == null || hasRole(role) || !(level() instanceof ServerLevel serverLevel)
+                || ColonyManager.get(serverLevel).getColony(getColonyId()) == null;
     }
 
     /** Whether this ant's own role is {@code role}. */
     public boolean hasRole(ColonyRole role) {
-        return false;
+        if (!hasColonyRole() || getColonyId() == null || !(level() instanceof ServerLevel serverLevel)) {
+            return false;
+        }
+        Colony colony = ColonyManager.get(serverLevel).getColony(getColonyId());
+        return colony != null && colony.roleOf(serverLevel, getUUID()) == role;
     }
 
     /** The legs: plans routes (walk, climb, drop) and walks them. Goals only say where to go. */

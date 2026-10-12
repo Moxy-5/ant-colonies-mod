@@ -32,8 +32,12 @@ public class ModEvents {
             event.accept(ModItems.DEEP_SOIL);
             event.accept(ModItems.SEED_PILE);
             event.accept(ModItems.BREAD_PILE);
+            event.accept(ModItems.FORAGE_PILE);
             event.accept(ModItems.TERMITE_MOUND);
             event.accept(ModItems.TERMITE_HOLE);
+        }
+        if (event.getTabKey() == CreativeModeTabs.INGREDIENTS) {
+            event.accept(ModItems.FORAGE);
         }
         if (event.getTabKey() == CreativeModeTabs.SPAWN_EGGS) {
             event.accept(ModItems.WORKER_ANT_SPAWN_EGG);

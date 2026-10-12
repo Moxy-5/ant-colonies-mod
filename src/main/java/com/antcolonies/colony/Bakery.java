@@ -68,6 +68,9 @@ public class Bakery {
      * she has room for more young) plus what the hungry larvae still have to eat.
      */
     public boolean needsBread(ServerLevel level) {
+        if (!colony.profile().food().makesBread()) {
+            return false; // a species that mills no bread (termites)
+        }
         millers.prune(level.getGameTime());
         Brood brood = colony.brood();
         int wanted = (brood.isFull(level) ? 0 : colony.profile().food().breadStock()) + brood.larvaHunger(level);

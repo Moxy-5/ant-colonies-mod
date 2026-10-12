@@ -12,7 +12,10 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.ai.goal.Goal;
 
-/** An ant holding a seed carries it to the food store and adds it to a heap of seeds on the floor there. */
+/**
+ * An ant holding a seed (or any piece of its species' food, such as a termite's forage or a stick it picked up) carries
+ * it to the food store and adds it to a heap on the floor there (a seed pile, a forage pile: the species profile's pile).
+ */
 public class StoreSeedGoal extends Goal {
     /** How close (sideways, in blocks) the ant must get before it puts the seed down. */
     private static final double REACH = 0.9;

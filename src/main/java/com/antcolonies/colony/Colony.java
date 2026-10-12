@@ -166,7 +166,7 @@ public class Colony {
      * it, so roles only change when workers are born or die.
      */
     public ColonyRole roleOf(ServerLevel level, UUID ant) {
-        roles.keySet().removeIf(id -> !id.equals(ant) && !(level.getEntity(id) instanceof WorkerAntEntity worker && worker.isAlive()));
+        roles.keySet().removeIf(id -> !id.equals(ant) && !(level.getEntity(id) instanceof AbstractAntEntity worker && worker.isAlive()));
         int[] others = new int[ColonyRole.values().length];
         int total = 1;
         for (Map.Entry<UUID, ColonyRole> entry : roles.entrySet()) {

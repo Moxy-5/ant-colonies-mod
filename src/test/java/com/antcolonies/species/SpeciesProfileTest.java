@@ -31,7 +31,7 @@ class SpeciesProfileTest {
         assertTrue(profile.queen().meal() > 0 && profile.queen().richMeal() > 0 && profile.brood().larvaMeal() > 0);
         assertTrue(profile.worker().mealIntervalTicks() < profile.worker().slowAfterTicks()
                 && profile.worker().slowAfterTicks() < profile.worker().starveAfterTicks(), "a worker must get hungry before it slows down, and slow down before it starves");
-        assertTrue(profile.food().radius() > 0 && profile.food().seedsPerGrass() > 0);
+        assertTrue(profile.food().radius() > 0 && profile.food().plants().get(0).pieces() > 0 && profile.food().makesBread());
         assertEquals(4, profile.nest().maxLevels());
         assertTrue(profile.queenBody().isEmpty(), "the ant queen does not swell");
         assertTrue(profile.founding().isPresent() && profile.founding().get().eggs() == 3, "the ant queen raises 3 eggs on her own fat");
@@ -47,6 +47,14 @@ class SpeciesProfileTest {
         assertTrue(profile.queenBody().isPresent(), "the termite queen should swell");
         assertTrue(profile.queenBody().get().tooBigToWalkAt() > 0 && profile.queenBody().get().tooBigToWalkAt() <= 1);
         assertTrue(profile.founding().isPresent() && profile.founding().get().eggs() > 0, "termites raise a founding batch");
+        // Food: dead plant material into a forage store beside the shaft, no bread.
+        assertEquals(java.util.List.of("food"), profile.nest().sideRooms(), "termites keep their forage in a side room");
+        assertTrue(!profile.food().makesBread(), "termites mill no bread");
+        assertEquals("antcolonies:forage_pile", profile.food().pile());
+        assertTrue(profile.food().plants().stream().anyMatch(plant -> plant.block().equals("minecraft:hay_block") && plant.foragers() > 1),
+                "a hay bale is a big meal several termites cut at");
+        assertTrue(profile.food().plants().stream().anyMatch(plant -> plant.block().equals("#minecraft:leaves") && plant.onlyDecaying()),
+                "only dying leaves are food");
     }
 
     @Test

@@ -3,8 +3,22 @@ package com.antcolonies.species;
 import java.util.List;
 import java.util.Optional;
 
+import org.jetbrains.annotations.Nullable;
+
+import com.antcolonies.block.SeedPileBlock;
+import com.antcolonies.registry.ModBlocks;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.LeavesBlock;
+import net.minecraft.world.level.block.state.BlockState;
 
 /**
  * A species profile: the numbers one species' colony runs on, read from {@code data/<namespace>/species/<name>.json}
@@ -12,7 +26,8 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
  * new species (termites) only needs its own file. Times are in ticks (20 ticks = 1 second, a day = 24000 ticks).
  *
  * <p>Not in the profile yet (still in code): the room sizes and the spiral ({@code NestPlan}), the hill
- * ({@code Hill}), the castes' size, health and speed (fixed when the game starts), and the block and item tags.
+ * ({@code Hill}), the castes' size, health and speed (fixed when the game starts), and the diggable blocks tag (the food
+ * the workers gather is in {@link FoodNumbers}).
  */
 public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNumbers queen, BroodNumbers brood,
         FoodNumbers food, RefuseNumbers refuse, NestNumbers nest, Optional<QueenBody> queenBody, Optional<Founding> founding,
@@ -80,17 +95,89 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
     }
 
     /**
-     * Food. {@code radius}: how far (sideways, in blocks) from the entrance the workers look for food.
-     * {@code seedsPerGrass}: seeds clipped from one tuft. {@code millTicks}: milling one seed into bread.
-     * {@code breadStock}: bread the nurses keep ready for the queen.
+     * Food. {@code radius}: how far (sideways, in blocks) from the entrance the workers look for food. {@code items}:
+     * the item tag of the food they pick up off the ground (seeds, sticks), one item at a time. {@code plants}: plants
+     * they cut pieces off where they grow (a tuft of grass, a dead bush, a hay bale), see {@link PlantFood}; every
+     * piece is a {@code piece} item. The colony keeps its food in the food store as heaps of the {@code pile} block
+     * (a {@link SeedPileBlock}), one layer per piece. Bread, for species that mill it: {@code millTicks} to mill one
+     * seed into bread, and {@code breadStock} pieces the nurses keep ready for the queen; a species without bread leaves
+     * both out.
      */
-    public record FoodNumbers(int radius, int seedsPerGrass, int millTicks, int breadStock) {
+    public record FoodNumbers(int radius, String items, List<PlantFood> plants, String piece, String pile, int millTicks, int breadStock) {
         public static final Codec<FoodNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("radius").forGetter(FoodNumbers::radius),
-                Codec.INT.fieldOf("seeds_per_grass").forGetter(FoodNumbers::seedsPerGrass),
-                Codec.INT.fieldOf("mill_ticks").forGetter(FoodNumbers::millTicks),
-                Codec.INT.fieldOf("bread_stock").forGetter(FoodNumbers::breadStock)
+                Codec.STRING.fieldOf("items").forGetter(FoodNumbers::items),
+                PlantFood.CODEC.listOf().fieldOf("plants").forGetter(FoodNumbers::plants),
+                Codec.STRING.fieldOf("piece").forGetter(FoodNumbers::piece),
+                Codec.STRING.fieldOf("pile").forGetter(FoodNumbers::pile),
+                Codec.INT.optionalFieldOf("mill_ticks", 0).forGetter(FoodNumbers::millTicks),
+                Codec.INT.optionalFieldOf("bread_stock", 0).forGetter(FoodNumbers::breadStock)
         ).apply(i, FoodNumbers::new));
+
+        /** Whether the nurses mill the food into bread (the harvester ant's seeds). */
+        public boolean makesBread() {
+            return breadStock > 0;
+        }
+
+        /** The food items picked up off the ground (the seeds tag if the name is broken). */
+        public TagKey<Item> itemTag() {
+            ResourceLocation id = ResourceLocation.tryParse(items);
+            return TagKey.create(Registries.ITEM, id != null ? id
+                    : ResourceLocation.fromNamespaceAndPath(com.antcolonies.AntColoniesMod.MODID, "seeds"));
+        }
+
+        /** What a piece cut off a plant is (a wheat seed if the name is unknown). */
+        public Item pieceItem() {
+            ResourceLocation id = ResourceLocation.tryParse(piece);
+            return id == null ? Items.WHEAT_SEEDS : BuiltInRegistries.ITEM.getOptional(id).orElse(Items.WHEAT_SEEDS);
+        }
+
+        /** The heap block of the food store (the seed pile if the name is unknown or not a heap block). */
+        public SeedPileBlock pileBlock() {
+            ResourceLocation id = ResourceLocation.tryParse(pile);
+            Block block = id == null ? null : BuiltInRegistries.BLOCK.getOptional(id).orElse(null);
+            return block instanceof SeedPileBlock heap ? heap : ModBlocks.SEED_PILE.get();
+        }
+
+        /** The plant this block is as food, or null if it is none. */
+        @Nullable
+        public PlantFood plantFor(BlockState state) {
+            for (PlantFood plant : plants) {
+                if (plant.matches(state)) {
+                    return plant;
+                }
+            }
+            return null;
+        }
+    }
+
+    /**
+     * A plant the workers cut food off: {@code block} is a block id ("minecraft:dead_bush") or a block tag
+     * ("#minecraft:leaves"). One plant gives {@code pieces} pieces and is then used up (it breaks and drops nothing).
+     * {@code onlyDecaying}: only dying leaves count (cut off from their tree, about to fall), never living ones.
+     * {@code foragers}: how many workers may cut at it at the same time (a big plant like a hay bale feeds several).
+     */
+    public record PlantFood(String block, int pieces, boolean onlyDecaying, int foragers) {
+        public static final Codec<PlantFood> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.STRING.fieldOf("block").forGetter(PlantFood::block),
+                Codec.INT.fieldOf("pieces").forGetter(PlantFood::pieces),
+                Codec.BOOL.optionalFieldOf("only_decaying", false).forGetter(PlantFood::onlyDecaying),
+                Codec.INT.optionalFieldOf("foragers", 1).forGetter(PlantFood::foragers)
+        ).apply(i, PlantFood::new));
+
+        /** Whether this block is this plant (and, for dying leaves only, is dying). */
+        public boolean matches(BlockState state) {
+            if (onlyDecaying && !(state.hasProperty(LeavesBlock.PERSISTENT) && state.hasProperty(LeavesBlock.DISTANCE)
+                    && !state.getValue(LeavesBlock.PERSISTENT) && state.getValue(LeavesBlock.DISTANCE) >= LeavesBlock.DECAY_DISTANCE)) {
+                return false;
+            }
+            if (block.startsWith("#")) {
+                ResourceLocation id = ResourceLocation.tryParse(block.substring(1));
+                return id != null && state.is(TagKey.create(Registries.BLOCK, id));
+            }
+            ResourceLocation id = ResourceLocation.tryParse(block);
+            return id != null && BuiltInRegistries.BLOCK.getOptional(id).map(state::is).orElse(false);
+        }
     }
 
     /** Dead nestmates: a body nobody carries to the refuse chamber crumbles after {@code corpseDecayTicks}. */
@@ -105,12 +192,15 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * {@code sealWhileFounding}: while the colony has no workers yet, the founders close the entrance from inside.
      * {@code foundingChamber}: the queen first digs a small founding chamber of her own just under the surface (see
      * {@code NestPlan.foundingChamber}), her home until the workers have dug her deep room (optional, default false).
+     * {@code sideRooms}: more rooms on the top level, beside the shaft's foot, dug by the workers once the colony is
+     * founded (see {@code NestPlan.sideRooms}; names of room kinds, such as "food" for a food store; optional, none).
      */
-    public record NestNumbers(int maxLevels, boolean sealWhileFounding, boolean foundingChamber) {
+    public record NestNumbers(int maxLevels, boolean sealWhileFounding, boolean foundingChamber, List<String> sideRooms) {
         public static final Codec<NestNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("max_levels").forGetter(NestNumbers::maxLevels),
                 Codec.BOOL.fieldOf("seal_while_founding").forGetter(NestNumbers::sealWhileFounding),
-                Codec.BOOL.optionalFieldOf("founding_chamber", false).forGetter(NestNumbers::foundingChamber)
+                Codec.BOOL.optionalFieldOf("founding_chamber", false).forGetter(NestNumbers::foundingChamber),
+                Codec.STRING.listOf().optionalFieldOf("side_rooms", List.of()).forGetter(NestNumbers::sideRooms)
         ).apply(i, NestNumbers::new));
     }
 
@@ -185,9 +275,10 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
             new WorkerNumbers(24000, 36000, 72000),
             new QueenNumbers(20, 5, 5, 1200, 3600, 120000L),
             new BroodNumbers(10, 1200, 5, 48000L),
-            new FoodNumbers(24, 10, 60, 20),
+            new FoodNumbers(24, "antcolonies:seeds", List.of(new PlantFood("minecraft:short_grass", 10, false, 1)),
+                    "minecraft:wheat_seeds", "antcolonies:seed_pile", 60, 20),
             new RefuseNumbers(6000),
-            new NestNumbers(4, true, true),
+            new NestNumbers(4, true, true, List.of()),
             Optional.empty(),
             Optional.of(new Founding(3, 400, 200)),
             Optional.empty());
