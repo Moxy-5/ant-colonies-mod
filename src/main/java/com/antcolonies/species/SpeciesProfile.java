@@ -319,13 +319,37 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * {@code workersPerRoom} workers. The food the foragers bring in is built into fungus comb there (the profile's food
      * {@code pile}), and on every comb block a white nodule grows about every {@code noduleTicks} (while it has a layer
      * to spare and room for one); the nurses feed the nodules to the queen and the young instead of bread.
+     * <p>
+     * Termitomyces mushrooms (step 5c): when a rain ends, a colony whose gardens hold at least {@code mushroomCombLayers}
+     * layers of comb (a healthy garden) sends up one mushroom for every {@code combLayersPerMushroom} layers, at most
+     * {@code maxMushrooms}, on the ground and the mound's lower slopes within {@code mushroomRadius} blocks of the
+     * entrance; each one is a rare giant with the chance {@code giantMushroomChance} (see {@code colony.Mushrooms}).
      */
-    public record GardenNumbers(int rooms, int workersPerRoom, int noduleTicks) {
+    public record GardenNumbers(int rooms, int workersPerRoom, int noduleTicks, int mushroomCombLayers, int combLayersPerMushroom,
+            int maxMushrooms, int mushroomRadius, float giantMushroomChance) {
+        /** The numbers with the default mushrooms. */
+        public GardenNumbers(int rooms, int workersPerRoom, int noduleTicks) {
+            this(rooms, workersPerRoom, noduleTicks, 8, 6, 8, 12, 0.04F);
+        }
+
         public static final Codec<GardenNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("rooms").forGetter(GardenNumbers::rooms),
                 Codec.INT.fieldOf("workers_per_room").forGetter(GardenNumbers::workersPerRoom),
-                Codec.INT.fieldOf("nodule_ticks").forGetter(GardenNumbers::noduleTicks)
+                Codec.INT.fieldOf("nodule_ticks").forGetter(GardenNumbers::noduleTicks),
+                Codec.INT.optionalFieldOf("mushroom_comb_layers", 8).forGetter(GardenNumbers::mushroomCombLayers),
+                Codec.INT.optionalFieldOf("comb_layers_per_mushroom", 6).forGetter(GardenNumbers::combLayersPerMushroom),
+                Codec.INT.optionalFieldOf("max_mushrooms", 8).forGetter(GardenNumbers::maxMushrooms),
+                Codec.INT.optionalFieldOf("mushroom_radius", 12).forGetter(GardenNumbers::mushroomRadius),
+                Codec.FLOAT.optionalFieldOf("giant_mushroom_chance", 0.04F).forGetter(GardenNumbers::giantMushroomChance)
         ).apply(i, GardenNumbers::new));
+
+        /** How many mushrooms come up after a rain from gardens holding this many layers of comb (none below a healthy garden). */
+        public int mushroomsFor(int combLayers) {
+            if (combLayers < mushroomCombLayers) {
+                return 0;
+            }
+            return Math.max(1, Math.min(maxMushrooms, combLayers / Math.max(1, combLayersPerMushroom)));
+        }
 
         /** How many garden rooms a colony with this many workers wants (none while it has no workers). */
         public int roomsFor(int workers) {

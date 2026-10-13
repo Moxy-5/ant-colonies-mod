@@ -45,6 +45,10 @@ public class ModEvents {
             event.accept(ModItems.FORAGE);
             event.accept(ModItems.FUNGUS_NODULE);
         }
+        if (event.getTabKey() == CreativeModeTabs.FOOD_AND_DRINKS) {
+            event.accept(ModItems.TERMITOMYCES);
+            event.accept(ModItems.COOKED_TERMITOMYCES);
+        }
         if (event.getTabKey() == CreativeModeTabs.SPAWN_EGGS) {
             event.accept(ModItems.WORKER_ANT_SPAWN_EGG);
             event.accept(ModItems.QUEEN_ANT_SPAWN_EGG);

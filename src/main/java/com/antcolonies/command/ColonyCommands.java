@@ -1,12 +1,15 @@
 package com.antcolonies.command;
 
 import com.antcolonies.AntColoniesMod;
+import com.antcolonies.block.GiantTermitomycesBlock;
 import com.antcolonies.block.MoundPieceBlock;
 import com.antcolonies.block.MoundSoil;
 import com.antcolonies.block.TermiteMoundBlock;
+import com.antcolonies.block.TermitomycesBlock;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.TermiteQueenEntity;
+import com.antcolonies.registry.ModBlocks;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 
 import java.util.Comparator;
@@ -47,6 +50,17 @@ public class ColonyCommands {
                 // Sets how dry and hard the termite mound soil around you is (0 fresh, 1 setting, 2 dry, 3 old), every
                 // finished mound block and cathedral piece within the radius (default 8 blocks), to see the ages
                 // without waiting hours.
+                // Termitomyces mushrooms round the nearest termite mound: with no number, as if a rain had just ended (as many
+                // as its garden sends up, none if the garden is not healthy yet); with a number, that many whatever the
+                // garden; with "giant", giants wherever they fit. "grow" moves every mushroom within 16 blocks on one stage
+                // (to see them open and wilt without waiting days).
+                .then(Commands.literal("mushrooms")
+                        .executes(context -> mushrooms(context.getSource(), -1, false))
+                        .then(Commands.literal("grow").executes(context -> growMushrooms(context.getSource())))
+                        .then(Commands.argument("count", IntegerArgumentType.integer(1, 32))
+                                .executes(context -> mushrooms(context.getSource(), IntegerArgumentType.getInteger(context, "count"), false))
+                                .then(Commands.literal("giant")
+                                        .executes(context -> mushrooms(context.getSource(), IntegerArgumentType.getInteger(context, "count"), true)))))
                 .then(Commands.literal("age")
                         .then(Commands.argument("age", IntegerArgumentType.integer(0, MoundSoil.OLDEST))
                                 .executes(context -> age(context.getSource(), IntegerArgumentType.getInteger(context, "age"), 8))
@@ -73,12 +87,59 @@ public class ColonyCommands {
         return 1;
     }
 
-    private static int mound(CommandSourceStack source, int height, boolean instant) {
+    private static int mushrooms(CommandSourceStack source, int count, boolean giants) {
+        ServerLevel level = source.getLevel();
+        Colony colony = nearestTermiteColony(level, BlockPos.containing(source.getPosition()));
+        if (colony == null || !colony.garden().exists()) {
+            source.sendFailure(Component.literal("No termite colony within 64 blocks."));
+            return 0;
+        }
+        int wanted = count > 0 ? count : colony.mushrooms().wanted(level);
+        if (wanted == 0) {
+            source.sendSuccess(() -> Component.literal("The garden is not healthy yet: it has " + colony.garden().countCombLayers(level)
+                    + " layers of comb, mushrooms need " + colony.profile().garden().get().mushroomCombLayers() + ". None came up."), false);
+            return 1;
+        }
+        int sprouted = colony.mushrooms().sprout(level, wanted, giants);
+        source.sendSuccess(() -> Component.literal(sprouted + " of " + wanted + " Termitomyces came up round the mound"
+                + (giants ? " (giants where they fit)" : "") + ". They grow on random ticks; bone meal or /antcolonies mushrooms grow speeds them up."), false);
+        return 1;
+    }
+
+    private static int growMushrooms(CommandSourceStack source) {
         ServerLevel level = source.getLevel();
         BlockPos at = BlockPos.containing(source.getPosition());
-        Colony colony = ColonyManager.get(level).getColonies().stream()
+        java.util.List<BlockPos> small = new java.util.ArrayList<>();
+        java.util.List<BlockPos> giants = new java.util.ArrayList<>();
+        for (BlockPos pos : BlockPos.betweenClosed(at.offset(-16, -8, -16), at.offset(16, 8, 16))) {
+            BlockState state = level.getBlockState(pos);
+            if (state.getBlock() instanceof TermitomycesBlock) {
+                small.add(pos.immutable());
+            } else if (state.getBlock() instanceof GiantTermitomycesBlock && state.getValue(GiantTermitomycesBlock.PART) == GiantTermitomycesBlock.FOOT) {
+                giants.add(pos.immutable());
+            }
+        }
+        for (BlockPos pos : small) {
+            TermitomycesBlock.growOn(level.getBlockState(pos), level, pos);
+        }
+        for (BlockPos pos : giants) {
+            ModBlocks.GIANT_TERMITOMYCES.get().growOn(level, pos);
+        }
+        int count = small.size() + giants.size();
+        source.sendSuccess(() -> Component.literal(count + " Termitomyces moved on one stage."), false);
+        return 1;
+    }
+
+    /** The termite colony (one that builds a mound) nearest to {@code at} within 64 blocks, or null. */
+    private static Colony nearestTermiteColony(ServerLevel level, BlockPos at) {
+        return ColonyManager.get(level).getColonies().stream()
                 .filter(c -> c.mound().numbers() != null && c.getCenter().distSqr(at) <= 64 * 64)
                 .min(Comparator.comparingDouble(c -> c.getCenter().distSqr(at))).orElse(null);
+    }
+
+    private static int mound(CommandSourceStack source, int height, boolean instant) {
+        ServerLevel level = source.getLevel();
+        Colony colony = nearestTermiteColony(level, BlockPos.containing(source.getPosition()));
         if (colony == null) {
             source.sendFailure(Component.literal("No termite colony within 64 blocks."));
             return 0;
@@ -157,13 +218,25 @@ public class ColonyCommands {
                 colony.mound().numbers().maxHeight(), colony.mound().countFinished(level), colony.mound().wallsAt(h), colony.mound().getAllowance(level));
     }
 
-    /** " | gardens 2 dug (planned 6), comb 14 layers on 5 blocks, nodules 3" for colonies with a fungus garden. */
+    /** " | gardens 2 dug (planned 6), comb 14 layers on 5 blocks, nodules 3, mushrooms ..." for colonies with a fungus garden. */
     private static String garden(Colony colony, ServerLevel level) {
         java.util.Set<net.minecraft.core.BlockPos> cells = new java.util.HashSet<>(colony.nest().getGardenCells(level));
         long dug = colony.nest().getGardens(level).stream().filter(garden -> cells.containsAll(garden.room())).count();
         return " | gardens " + dug + " dug (planned " + colony.nest().getGardens(level).size() + "), comb "
                 + colony.garden().countCombLayers(level) + " layers on " + colony.garden().getCombs(level).size() + " blocks, nodules "
-                + colony.garden().available(level);
+                + colony.garden().available(level) + mushrooms(colony, level);
+    }
+
+    /** ", mushrooms after rain: 2 (last rain 2 came up)" or ", no mushrooms yet (comb 5 of 8 layers)". */
+    private static String mushrooms(Colony colony, ServerLevel level) {
+        int wanted = colony.mushrooms().wanted(level);
+        int last = colony.mushrooms().getLastFlush();
+        String lastRain = last < 0 ? "" : " (last rain " + last + " came up)";
+        if (wanted == 0) {
+            return ", no mushrooms yet (comb " + colony.garden().countCombLayers(level) + " of "
+                    + colony.profile().garden().get().mushroomCombLayers() + " layers)" + lastRain;
+        }
+        return ", mushrooms after rain: " + wanted + lastRain;
     }
 
     /** ", next egg in 1:20" while a queen who lays a steady stream can lay, otherwise ", not laying". */

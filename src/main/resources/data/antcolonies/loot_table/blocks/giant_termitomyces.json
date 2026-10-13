@@ -1,0 +1,56 @@
+{
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "rolls": 1.0,
+      "bonus_rolls": 0.0,
+      "entries": [
+        {
+          "type": "minecraft:alternatives",
+          "children": [
+            {
+              "type": "minecraft:item",
+              "name": "antcolonies:termitomyces",
+              "conditions": [
+                {
+                  "condition": "minecraft:block_state_property",
+                  "block": "antcolonies:giant_termitomyces",
+                  "properties": {
+                    "part": "0",
+                    "stage": "0"
+                  }
+                }
+              ],
+              "functions": [
+                {
+                  "function": "minecraft:set_count",
+                  "count": 6
+                }
+              ]
+            },
+            {
+              "type": "minecraft:item",
+              "name": "antcolonies:termitomyces",
+              "conditions": [
+                {
+                  "condition": "minecraft:block_state_property",
+                  "block": "antcolonies:giant_termitomyces",
+                  "properties": {
+                    "part": "0",
+                    "stage": "1"
+                  }
+                }
+              ],
+              "functions": [
+                {
+                  "function": "minecraft:set_count",
+                  "count": 10
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

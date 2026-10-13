@@ -28,5 +28,9 @@
   "block.antcolonies.termite_spire": "Termite Spire",
   "block.antcolonies.termite_mouth": "Termite Chimney Mouth",
   "block.antcolonies.termite_ramp": "Termite Mound Ramp",
-  "block.antcolonies.termite_tunnel": "Termite Tunnel"
+  "block.antcolonies.termite_tunnel": "Termite Tunnel",
+  "block.antcolonies.termitomyces": "Termitomyces",
+  "block.antcolonies.giant_termitomyces": "Giant Termitomyces",
+  "item.antcolonies.termitomyces": "Termitomyces",
+  "item.antcolonies.cooked_termitomyces": "Cooked Termitomyces"
 }

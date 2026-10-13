@@ -2,6 +2,7 @@ package com.antcolonies.registry;
 
 import com.antcolonies.AntColoniesMod;
 
+import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.neoforged.neoforge.common.DeferredSpawnEggItem;
@@ -38,6 +39,17 @@ public class ModItems {
      * termite queen and the nymphs, and what a broken comb with nodules drops.
      */
     public static final DeferredItem<Item> FUNGUS_NODULE = ITEMS.registerSimpleItem("fungus_nodule");
+
+    /**
+     * A Termitomyces mushroom, picked round a termite mound after rain: a little food raw (1 drumstick, my pick), a good
+     * meal cooked. Not a block item: it is never planted (the mushrooms only come from the termites' gardens).
+     */
+    public static final DeferredItem<Item> TERMITOMYCES = ITEMS.registerSimpleItem("termitomyces",
+            new Item.Properties().food(new FoodProperties.Builder().nutrition(2).saturationModifier(0.3F).build()));
+
+    /** A cooked Termitomyces (furnace, smoker or campfire): 3 drumsticks, about as good as cooked fish (my pick). */
+    public static final DeferredItem<Item> COOKED_TERMITOMYCES = ITEMS.registerSimpleItem("cooked_termitomyces",
+            new Item.Properties().food(new FoodProperties.Builder().nutrition(6).saturationModifier(0.6F).build()));
 
     /** Rich ant bread, milled from rich seeds (pumpkin): fed to the queen it starts a burst of eggs. */
     public static final DeferredItem<Item> RICH_ANT_BREAD = ITEMS.registerSimpleItem("rich_ant_bread");

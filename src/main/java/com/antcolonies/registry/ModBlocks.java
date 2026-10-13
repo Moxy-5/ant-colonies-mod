@@ -2,6 +2,7 @@ package com.antcolonies.registry;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.block.FungusCombBlock;
+import com.antcolonies.block.GiantTermitomycesBlock;
 import com.antcolonies.block.SeedPileBlock;
 import com.antcolonies.block.TermiteHoleBlock;
 import com.antcolonies.block.TermiteMoundBlock;
@@ -9,6 +10,7 @@ import com.antcolonies.block.TermiteMouthBlock;
 import com.antcolonies.block.TermiteRampBlock;
 import com.antcolonies.block.TermiteSpireBlock;
 import com.antcolonies.block.TermiteTunnelBlock;
+import com.antcolonies.block.TermitomycesBlock;
 
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.SoundType;
@@ -86,6 +88,16 @@ public class ModBlocks {
      */
     public static final DeferredBlock<TermiteTunnelBlock> TERMITE_TUNNEL = BLOCKS.registerBlock("termite_tunnel", TermiteTunnelBlock::new,
             pieceProperties().isSuffocating((state, level, pos) -> false));
+
+    /** A Termitomyces mushroom that comes up round a termite mound after rain (see TermitomycesBlock). */
+    public static final DeferredBlock<TermitomycesBlock> TERMITOMYCES = BLOCKS.registerBlock("termitomyces", TermitomycesBlock::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_WHITE).noCollission().instabreak().sound(SoundType.FUNGUS)
+                    .replaceable().offsetType(BlockBehaviour.OffsetType.XZ).pushReaction(PushReaction.DESTROY).randomTicks());
+
+    /** A rare giant Termitomyces, three blocks tall (see GiantTermitomycesBlock). */
+    public static final DeferredBlock<GiantTermitomycesBlock> GIANT_TERMITOMYCES = BLOCKS.registerBlock("giant_termitomyces",
+            GiantTermitomycesBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_WHITE).strength(0.4F)
+                    .sound(SoundType.FUNGUS).noOcclusion().pushReaction(PushReaction.DESTROY).randomTicks());
 
     private static BlockBehaviour.Properties pieceProperties() {
         return BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_ORANGE).strength(0.6F, 3.0F).sound(SoundType.MUD)

@@ -145,6 +145,7 @@ public class TermiteQueenEntity extends AbstractAntEntity {
                     manager.markChanged();
                 }
                 colony.garden().grow(serverLevel);
+                colony.mushrooms().tick(serverLevel);
                 if (colony.queenCare().layInStream(serverLevel, getSize())) {
                     Vec3 at = position().subtract(Vec3.directionFromRotation(0.0F, getYRot()).scale(EGG_BEHIND + 0.4 * getSize()));
                     BlockPos cell = BlockPos.containing(at.x, getY() + 0.1, at.z);

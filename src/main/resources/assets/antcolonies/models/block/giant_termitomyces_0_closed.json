@@ -1,0 +1,151 @@
+{
+  "ambientocclusion": false,
+  "textures": {
+    "particle": "antcolonies:block/termitomyces_stalk",
+    "top": "antcolonies:block/termitomyces_cap_top",
+    "side": "antcolonies:block/termitomyces_cap_side",
+    "gills": "antcolonies:block/termitomyces_gills",
+    "stalk": "antcolonies:block/termitomyces_stalk",
+    "point": "antcolonies:block/termitomyces_point",
+    "gtop": "antcolonies:block/giant_termitomyces_cap_top",
+    "ggills": "antcolonies:block/giant_termitomyces_gills"
+  },
+  "elements": [
+    {
+      "from": [
+        6,
+        0,
+        6
+      ],
+      "to": [
+        10,
+        16,
+        10
+      ],
+      "faces": {
+        "up": {
+          "uv": [
+            6,
+            6,
+            10,
+            10
+          ],
+          "texture": "#stalk"
+        },
+        "down": {
+          "uv": [
+            6,
+            6,
+            10,
+            10
+          ],
+          "texture": "#stalk"
+        },
+        "north": {
+          "uv": [
+            6,
+            0,
+            10,
+            16
+          ],
+          "texture": "#stalk"
+        },
+        "south": {
+          "uv": [
+            6,
+            0,
+            10,
+            16
+          ],
+          "texture": "#stalk"
+        },
+        "west": {
+          "uv": [
+            6,
+            0,
+            10,
+            16
+          ],
+          "texture": "#stalk"
+        },
+        "east": {
+          "uv": [
+            6,
+            0,
+            10,
+            16
+          ],
+          "texture": "#stalk"
+        }
+      }
+    },
+    {
+      "from": [
+        5,
+        0,
+        5
+      ],
+      "to": [
+        11,
+        4,
+        11
+      ],
+      "faces": {
+        "up": {
+          "uv": [
+            5,
+            5,
+            11,
+            11
+          ],
+          "texture": "#stalk"
+        },
+        "down": {
+          "uv": [
+            5,
+            5,
+            11,
+            11
+          ],
+          "texture": "#stalk"
+        },
+        "north": {
+          "uv": [
+            5,
+            12,
+            11,
+            16
+          ],
+          "texture": "#stalk"
+        },
+        "south": {
+          "uv": [
+            5,
+            12,
+            11,
+            16
+          ],
+          "texture": "#stalk"
+        },
+        "west": {
+          "uv": [
+            5,
+            12,
+            11,
+            16
+          ],
+          "texture": "#stalk"
+        },
+        "east": {
+          "uv": [
+            5,
+            12,
+            11,
+            16
+          ],
+          "texture": "#stalk"
+        }
+      }
+    }
+  ]
+}

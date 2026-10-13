@@ -67,6 +67,7 @@ public class Colony {
     private final Mound mound;
     private final ForagingHoles foragingHoles;
     private final FungusGarden garden;
+    private final Mushrooms mushrooms;
 
     public Colony(UUID id, ResourceLocation species, UUID queenId, BlockPos center) {
         this.id = id;
@@ -84,6 +85,7 @@ public class Colony {
         this.mound = new Mound(this);
         this.foragingHoles = new ForagingHoles(this);
         this.garden = new FungusGarden(this);
+        this.mushrooms = new Mushrooms(this);
     }
 
     /** The underground nest: its plan, the next block to dig, and the dug-out cells of each room. */
@@ -134,6 +136,11 @@ public class Colony {
     /** The fungus garden: comb, nodules (only species whose profile has a {@code garden}). */
     public FungusGarden garden() {
         return garden;
+    }
+
+    /** The Termitomyces mushrooms a healthy garden sends up round the mound after rain. */
+    public Mushrooms mushrooms() {
+        return mushrooms;
     }
 
     /**
@@ -295,6 +302,9 @@ public class Colony {
         rolesWorkedOutAt = now;
         grownUp.keySet().removeIf(id -> !(level.getEntity(id) instanceof AbstractAntEntity worker && worker.isAlive()
                 && getId().equals(worker.getColonyId())));
+        // Every worker's age as it is now (one may have changed since it last asked for its job).
+        grownUp.replaceAll((id, grew) -> level.getEntity(id) instanceof AbstractAntEntity worker
+                && worker.getGrownUpAt() != AbstractAntEntity.AGE_NOT_SET ? worker.getGrownUpAt() : grew);
         List<Map.Entry<UUID, Long>> workers = new ArrayList<>(grownUp.entrySet());
         // Youngest first (grew up last); same age: by id, so the order does not change from one second to the next.
         workers.sort(Comparator.comparing((Map.Entry<UUID, Long> entry) -> -entry.getValue()).thenComparing(Map.Entry::getKey));

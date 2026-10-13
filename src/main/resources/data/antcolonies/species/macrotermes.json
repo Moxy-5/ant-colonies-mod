@@ -1,5 +1,5 @@
 {
-  "_note": "Macrotermes (M7). Used by termites so far: nest (with the foraging holes), queen_body, founding, mound (with how often a walk may use a chimney), food (what they gather, when they go out: at night and in the rain; no bread; the pieces are built into fungus comb in the garden rooms), garden (the garden rooms and how fast the fungus nodules grow), laying (the queen's steady stream of eggs; queen meal = how many nodules she holds), the nurses, and from brood max_young, hatch_ticks, larva_meal (nodules a nymph eats) and larva_starve_ticks, and colony max_workers. The queen's other numbers (rich meal, burst, incubation, starve) and the worker numbers are not used by termites.",
+  "_note": "Macrotermes (M7). Used by termites so far: nest (with the foraging holes), queen_body, founding, mound (with how often a walk may use a chimney), food (what they gather, when they go out: at night and in the rain; no bread; the pieces are built into fungus comb in the garden rooms), garden (the garden rooms and how fast the fungus nodules grow, and the Termitomyces mushrooms that come up after rain round a colony with a healthy garden), laying (the queen's steady stream of eggs; queen meal = how many nodules she holds), the nurses, and from brood max_young, hatch_ticks, larva_meal (nodules a nymph eats) and larva_starve_ticks, and colony max_workers. The queen's other numbers (rich meal, burst, incubation, starve) and the worker numbers are not used by termites.",
   "colony": {
     "max_workers": 20,
     "nurses_from_workers": [3, 8, 12, 20]
@@ -62,7 +62,12 @@
   "garden": {
     "rooms": 6,
     "workers_per_room": 4,
-    "nodule_ticks": 1200
+    "nodule_ticks": 1200,
+    "mushroom_comb_layers": 8,
+    "comb_layers_per_mushroom": 6,
+    "max_mushrooms": 8,
+    "mushroom_radius": 12,
+    "giant_mushroom_chance": 0.04
   },
   "laying": {
     "egg_interval_ticks": 2400,
