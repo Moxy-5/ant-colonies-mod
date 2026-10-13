@@ -25,5 +25,6 @@
   "block.antcolonies.termite_hole": "Termite Chimney",
   "block.antcolonies.termite_spire": "Termite Spire",
   "block.antcolonies.termite_mouth": "Termite Chimney Mouth",
-  "block.antcolonies.termite_ramp": "Termite Mound Ramp"
+  "block.antcolonies.termite_ramp": "Termite Mound Ramp",
+  "block.antcolonies.termite_tunnel": "Termite Tunnel"
 }

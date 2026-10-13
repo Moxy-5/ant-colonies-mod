@@ -38,6 +38,7 @@ public class ModEvents {
             event.accept(ModItems.TERMITE_SPIRE);
             event.accept(ModItems.TERMITE_MOUTH);
             event.accept(ModItems.TERMITE_RAMP);
+            event.accept(ModItems.TERMITE_TUNNEL);
         }
         if (event.getTabKey() == CreativeModeTabs.INGREDIENTS) {
             event.accept(ModItems.FORAGE);

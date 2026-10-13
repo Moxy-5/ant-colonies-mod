@@ -7,6 +7,7 @@ import com.antcolonies.block.TermiteMoundBlock;
 import com.antcolonies.block.TermiteMouthBlock;
 import com.antcolonies.block.TermiteRampBlock;
 import com.antcolonies.block.TermiteSpireBlock;
+import com.antcolonies.block.TermiteTunnelBlock;
 
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.SoundType;
@@ -68,6 +69,10 @@ public class ModBlocks {
 
     /** A ramp that hides the steps of the mound's sides, joining into corners like stairs (see TermiteRampBlock). */
     public static final DeferredBlock<TermiteRampBlock> TERMITE_RAMP = BLOCKS.registerBlock("termite_ramp", TermiteRampBlock::new,
+            pieceProperties());
+
+    /** Mound soil with a termite-sized channel through it, joining up with the tunnel blocks beside it (see TermiteTunnelBlock). */
+    public static final DeferredBlock<TermiteTunnelBlock> TERMITE_TUNNEL = BLOCKS.registerBlock("termite_tunnel", TermiteTunnelBlock::new,
             pieceProperties());
 
     private static BlockBehaviour.Properties pieceProperties() {

@@ -1,0 +1,44 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "antcolonies:block/termite_mound_dry_side",
+    "top": "antcolonies:block/termite_mound_dry_top",
+    "side": "antcolonies:block/termite_mound_dry_side",
+    "inside": "antcolonies:block/termite_tunnel_dry_inside"
+  },
+  "elements": [
+    {
+      "from": [
+        5,
+        5,
+        0
+      ],
+      "to": [
+        11,
+        11,
+        5
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            5,
+            5,
+            11,
+            11
+          ],
+          "texture": "#side",
+          "cullface": "north"
+        },
+        "south": {
+          "uv": [
+            5,
+            5,
+            11,
+            11
+          ],
+          "texture": "#inside"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "antcolonies:block/termite_mound_fresh_side",
+    "top": "antcolonies:block/termite_mound_fresh_top",
+    "side": "antcolonies:block/termite_mound_fresh_side",
+    "inside": "antcolonies:block/termite_tunnel_fresh_inside"
+  },
+  "elements": [
+    {
+      "from": [
+        11,
+        5,
+        5
+      ],
+      "to": [
+        16,
+        11,
+        11
+      ],
+      "faces": {
+        "west": {
+          "uv": [
+            5,
+            5,
+            11,
+            11
+          ],
+          "texture": "#inside"
+        },
+        "east": {
+          "uv": [
+            5,
+            5,
+            11,
+            11
+          ],
+          "texture": "#side",
+          "cullface": "east"
+        }
+      }
+    }
+  ]
+}

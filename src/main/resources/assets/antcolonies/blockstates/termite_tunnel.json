@@ -1,0 +1,252 @@
+{
+  "multipart": [
+    {
+      "when": {
+        "age": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/termite_tunnel_frame_fresh"
+      }
+    },
+    {
+      "when": {
+        "age": "0",
+        "north": "false"
+      },
+      "apply": {
+        "model": "antcolonies:block/termite_tunnel_plug_north_fresh"
+      }
+    },
+    {
+      "when": {
+        "age": "0",
+        "south": "false"
+      },
+      "apply": {
+        "model": "antcolonies:block/termite_tunnel_plug_south_fresh"
+      }
+    },
+    {
+      "when": {
+        "age": "0",
+        "west": "false"
+      },
+      "apply": {
+        "model": "antcolonies:block/termite_tunnel_plug_west_fresh"
+      }
+    },
+    {
+      "when": {
+        "age": "0",
+        "east": "false"
+      },
+      "apply": {
+        "model": "antcolonies:block/termite_tunnel_plug_east_fresh"
+      }
+    },
+    {
+      "when": {
+        "age": "0",
+        "down": "false"
+      },
+      "apply": {
+        "model": "antcolonies:block/termite_tunnel_plug_down_fresh"
+      }
+    },
+    {
+      "when": {
+        "age": "0",
+        "up": "false"
+      },
+      "apply": {
+        "model": "antcolonies:block/termite_tunnel_plug_up_fresh"
+      }
+    },
+    {
+      "when": {
+        "age": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/termite_tunnel_frame_setting"
+      }
+    },
+    {
+      "when": {
+        "age": "1",
+        "north": "false"
+      },
+      "apply": {
+        "model": "antcolonies:block/termite_tunnel_plug_north_setting"
+      }
+    },
+    {
+      "when": {
+        "age": "1",
+        "south": "false"
+      },
+      "apply": {
+        "model": "antcolonies:block/termite_tunnel_plug_south_setting"
+      }
+    },
+    {
+      "when": {
+        "age": "1",
+        "west": "false"
+      },
+      "apply": {
+        "model": "antcolonies:block/termite_tunnel_plug_west_setting"
+      }
+    },
+    {
+      "when": {
+        "age": "1",
+        "east": "false"
+      },
+      "apply": {
+        "model": "antcolonies:block/termite_tunnel_plug_east_setting"
+      }
+    },
+    {
+      "when": {
+        "age": "1",
+        "down": "false"
+      },
+      "apply": {
+        "model": "antcolonies:block/termite_tunnel_plug_down_setting"
+      }
+    },
+    {
+      "when": {
+        "age": "1",
+        "up": "false"
+      },
+      "apply": {
+        "model": "antcolonies:block/termite_tunnel_plug_up_setting"
+      }
+    },
+    {
+      "when": {
+        "age": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/termite_tunnel_frame_dry"
+      }
+    },
+    {
+      "when": {
+        "age": "2",
+        "north": "false"
+      },
+      "apply": {
+        "model": "antcolonies:block/termite_tunnel_plug_north_dry"
+      }
+    },
+    {
+      "when": {
+        "age": "2",
+        "south": "false"
+      },
+      "apply": {
+        "model": "antcolonies:block/termite_tunnel_plug_south_dry"
+      }
+    },
+    {
+      "when": {
+        "age": "2",
+        "west": "false"
+      },
+      "apply": {
+        "model": "antcolonies:block/termite_tunnel_plug_west_dry"
+      }
+    },
+    {
+      "when": {
+        "age": "2",
+        "east": "false"
+      },
+      "apply": {
+        "model": "antcolonies:block/termite_tunnel_plug_east_dry"
+      }
+    },
+    {
+      "when": {
+        "age": "2",
+        "down": "false"
+      },
+      "apply": {
+        "model": "antcolonies:block/termite_tunnel_plug_down_dry"
+      }
+    },
+    {
+      "when": {
+        "age": "2",
+        "up": "false"
+      },
+      "apply": {
+        "model": "antcolonies:block/termite_tunnel_plug_up_dry"
+      }
+    },
+    {
+      "when": {
+        "age": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/termite_tunnel_frame_old"
+      }
+    },
+    {
+      "when": {
+        "age": "3",
+        "north": "false"
+      },
+      "apply": {
+        "model": "antcolonies:block/termite_tunnel_plug_north_old"
+      }
+    },
+    {
+      "when": {
+        "age": "3",
+        "south": "false"
+      },
+      "apply": {
+        "model": "antcolonies:block/termite_tunnel_plug_south_old"
+      }
+    },
+    {
+      "when": {
+        "age": "3",
+        "west": "false"
+      },
+      "apply": {
+        "model": "antcolonies:block/termite_tunnel_plug_west_old"
+      }
+    },
+    {
+      "when": {
+        "age": "3",
+        "east": "false"
+      },
+      "apply": {
+        "model": "antcolonies:block/termite_tunnel_plug_east_old"
+      }
+    },
+    {
+      "when": {
+        "age": "3",
+        "down": "false"
+      },
+      "apply": {
+        "model": "antcolonies:block/termite_tunnel_plug_down_old"
+      }
+    },
+    {
+      "when": {
+        "age": "3",
+        "up": "false"
+      },
+      "apply": {
+        "model": "antcolonies:block/termite_tunnel_plug_up_old"
+      }
+    }
+  ]
+}

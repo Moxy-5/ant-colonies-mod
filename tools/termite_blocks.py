@@ -10,7 +10,10 @@ It rewrites:
   textures/block/termite_mound_<age>_side_b / _c.png            two more looks of a finished side (random per block)
   textures/block/termite_mouth_<age>_top.png                    the chimney mouth's open tip
   models and blockstates of the cathedral pieces: termite_spire (5 thicknesses), termite_mouth, termite_ramp
+  textures/block/termite_tunnel_<age>_inside.png                the inside of a tunnel's channel (darker, worn smooth)
+  models and the multipart blockstate of termite_tunnel (a frame and a plug for each closed side)
   references/termites/preview/blocks.png                        labelled pictures of every block and a small mound
+  references/termites/preview/tunnel_blocks.png                 tunnel shapes, and a small network seen whole and cut open
   references/termites/preview/cathedral_blocks.png              the cathedral pieces and a corner of a cathedral mound
 
 The textures are drawn here, not cut from a picture (the user's hole-block picture is AI made): packed earth made of
@@ -153,6 +156,18 @@ def paint(soil, colour, light=1.0, flutes=False, streaks=None, streak_strength=0
     return image
 
 
+def smoothed(soil):
+    """The soil pattern worn smooth: every pixel half way to the average of its neighbours, and the bumps flattened."""
+    out = []
+    for y in range(16):
+        row = []
+        for x in range(16):
+            around = (soil[y][(x - 1) % 16] + soil[y][(x + 1) % 16] + soil[(y - 1) % 16][x] + soil[(y + 1) % 16][x]) / 4
+            row.append(0.6 * (0.5 * soil[y][x] + 0.5 * around))
+        out.append(row)
+    return out
+
+
 def clamp(c):
     return max(0, min(255, int(c)))
 
@@ -210,6 +225,8 @@ def make_textures():
                 else:
                     mouth.putpixel((x, y), (30, 17, 11, 255))
         out[f'termite_mouth_{age}_top'] = mouth
+        # The inside of a tunnel's channel: the same soil, worn smooth by traffic and in shadow.
+        out[f'termite_tunnel_{age}_inside'] = paint(smoothed(top_soil), AGE_COLOUR[age], 0.66)
     # The chimney crown: setting-coloured soil with a few breathing pores in the sides, and the spires' openings.
     hole_side = paint(side_soil, AGE_COLOUR['setting'])
     for x, y in ((3, 4), (11, 7), (6, 11), (13, 13)):
@@ -428,6 +445,68 @@ def piece_blockstates():
     write_json('models/item/termite_ramp.json', {'parent': 'antcolonies:block/termite_ramp_straight_setting'})
 
 
+# --- The tunnel block: a 6-pixel channel through finished soil ------------------------------------------------------
+
+# The block cut into 3 x 3 x 3 boxes along the channel's edges (TermiteTunnelBlock.CHANNEL_FROM / CHANNEL_TO): the middle
+# box is always hollow, the 6 boxes between it and the sides ("arms") are hollow where the channel opens out of that
+# side, the other 20 are always soil (the frame).
+TUNNEL_SPLIT = [(0, 5), (5, 11), (11, 16)]
+TUNNEL_DIRS = ['north', 'south', 'west', 'east', 'down', 'up']
+TUNNEL_STEP = {'north': (0, 0, -1), 'south': (0, 0, 1), 'west': (-1, 0, 0), 'east': (1, 0, 0), 'down': (0, -1, 0), 'up': (0, 1, 0)}
+TUNNEL_MIDDLE = (1, 1, 1)
+TUNNEL_ARM = {d: tuple(1 + c for c in TUNNEL_STEP[d]) for d in TUNNEL_DIRS}
+
+
+def tunnel_box(cell):
+    """A box of the tunnel block with the faces that can be seen: the block's outside (culled against a neighbour that
+    hides it) and the faces toward the hollow middle or an arm (the channel's walls, in the inside texture)."""
+    frm = [TUNNEL_SPLIT[c][0] for c in cell]
+    to = [TUNNEL_SPLIT[c][1] for c in cell]
+    hollow = {TUNNEL_MIDDLE} | set(TUNNEL_ARM.values())
+    faces = {}
+    for name, step in TUNNEL_STEP.items():
+        n = tuple(c + d for c, d in zip(cell, step))
+        uv = auto_uv(name, frm, to)
+        if any(c < 0 or c > 2 for c in n):
+            faces[name] = face('#top' if name in ('up', 'down') else '#side', uv, name)
+        elif n in hollow and (cell not in TUNNEL_ARM.values() or n == TUNNEL_MIDDLE):
+            faces[name] = face('#inside', uv)
+    return {'from': frm, 'to': to, 'faces': faces}
+
+
+def tunnel_frame_elements():
+    hollow = {TUNNEL_MIDDLE} | set(TUNNEL_ARM.values())
+    return [tunnel_box((i, j, k)) for i in range(3) for j in range(3) for k in range(3) if (i, j, k) not in hollow]
+
+
+def tunnel_model(elements, age):
+    return piece_model(elements, f'termite_mound_{age}_top', f'termite_mound_{age}_side',
+                       {'inside': f'antcolonies:block/termite_tunnel_{age}_inside'})
+
+
+def make_tunnel_models(models):
+    for age in AGES:
+        models[f'termite_tunnel_frame_{age}'] = tunnel_model(tunnel_frame_elements(), age)
+        for d in TUNNEL_DIRS:
+            models[f'termite_tunnel_plug_{d}_{age}'] = tunnel_model([tunnel_box(TUNNEL_ARM[d])], age)
+
+
+def tunnel_state_model(open_sides, age):
+    """The whole tunnel block with its channel opening out of `open_sides` (for the item and the preview)."""
+    elements = tunnel_frame_elements() + [tunnel_box(TUNNEL_ARM[d]) for d in TUNNEL_DIRS if d not in open_sides]
+    return tunnel_model(elements, age)
+
+
+def tunnel_blockstate():
+    parts = []
+    for a, age in enumerate(AGES):
+        parts.append({'when': {'age': str(a)}, 'apply': {'model': f'antcolonies:block/termite_tunnel_frame_{age}'}})
+        for d in TUNNEL_DIRS:
+            parts.append({'when': {'age': str(a), d: 'false'}, 'apply': {'model': f'antcolonies:block/termite_tunnel_plug_{d}_{age}'}})
+    write_json('blockstates/termite_tunnel.json', {'multipart': parts})
+    write_json('models/item/termite_tunnel.json', tunnel_state_model({'north', 'south'}, 'setting'))
+
+
 def write_json(rel, data):
     path = os.path.join(ROOT, rel)
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -444,6 +523,7 @@ def make_models():
         models[f'termite_mound_{age}'] = slab_model(f'termite_mound_{age}_top', f'termite_mound_{age}_side', 16)
     models['termite_hole'] = hole_model()
     make_piece_models(models)
+    make_tunnel_models(models)
     for name, model in models.items():
         write_json(f'models/block/{name}.json', model)
     variants = {}
@@ -458,6 +538,7 @@ def make_models():
     write_json('models/item/termite_mound.json', {'parent': 'antcolonies:block/termite_mound_fresh'})
     write_json('models/item/termite_hole.json', {'parent': 'antcolonies:block/termite_hole'})
     piece_blockstates()
+    tunnel_blockstate()
     return models
 
 
@@ -692,9 +773,78 @@ def render_cathedral_preview(models, textures):
     scene.image.save(CATHEDRAL_PREVIEW)
 
 
+TUNNEL_PREVIEW = os.path.join(HERE, '..', 'references', 'termites', 'preview', 'tunnel_blocks.png')
+
+
+def clipped(model, min_z):
+    """The model cut open at `min_z` pixels: everything on the near (north) side taken away; the cut faces show the soil."""
+    elements = []
+    for element in model['elements']:
+        frm, to = element['from'], element['to']
+        if to[2] <= min_z:
+            continue
+        faces = dict(element['faces'])
+        if frm[2] < min_z:
+            frm = [frm[0], frm[1], min_z]
+            faces['north'] = face('#side', auto_uv('north', frm, to))
+        elements.append({'from': frm, 'to': to, 'faces': faces})
+    return dict(model, elements=elements)
+
+
+def tunnel_network():
+    """A little network in one upright slice (z = 0): {(x, y): open sides}. Tunnels join up with each other; the one
+    at the left end has a window open to the air (on the side we look at); the rest of the slice is plain soil."""
+    cells = {(0, 0), (1, 0), (2, 0), (3, 0), (4, 0), (4, 1), (4, 2), (2, 1), (2, 2), (1, 2)}
+    out = {}
+    for x in range(5):
+        for y in range(3):
+            if (x, y) not in cells:
+                out[(x, y)] = None
+                continue
+            sides = set()
+            for d, (dx, dy, dz) in TUNNEL_STEP.items():
+                if dz == 0 and (x + dx, y + dy) in cells:
+                    sides.add(d)
+            if (x, y) == (0, 0):
+                sides.add('north')   # a window
+            out[(x, y)] = sides
+    return out
+
+
+def render_tunnel_preview(models, textures):
+    cell, label_h, title_h = 230, 34, 54
+    shapes = [('STRAIGHT', {'west', 'east'}), ('BEND', {'west', 'south'}), ('T', {'west', 'east', 'south'}),
+              ('CROSSING', {'west', 'east', 'north', 'south'}), ('TURNING UP', {'west', 'up'})]
+    width = cell * 5
+    net_h = 470
+    height = title_h + cell + label_h + title_h + net_h
+    scene = Scene(width, height)
+    draw = ImageDraw.Draw(scene.image)
+    draw.text((12, 18), 'TERMITE TUNNEL: A 6-PIXEL CHANNEL THAT JOINS UP WITH THE TUNNELS BESIDE IT', fill=(40, 30, 25))
+    y = title_h
+    for k, (label, sides) in enumerate(shapes):
+        x0 = k * cell
+        draw.rectangle([x0, y, x0 + cell - 1, y + cell + label_h - 1], outline=(170, 165, 155))
+        draw.text((x0 + 10, y + 10), label, fill=(40, 30, 25))
+        scene.draw_model(tunnel_state_model(sides, 'setting'), textures, (-0.5, 0, -0.5), (x0 + cell * 0.5, y + label_h + cell * 0.7), 92)
+    y += cell + label_h
+    draw.text((12, y + 18), 'A SMALL NETWORK: FROM OUTSIDE ONLY THE WINDOW SHOWS (LEFT); CUT OPEN, THE CHANNELS (RIGHT)', fill=(40, 30, 25))
+    y += title_h
+    for half, cut in ((0, False), (1, True)):
+        for (bx, by), sides in tunnel_network().items():
+            age = 'dry' if by == 0 else 'setting'
+            model = tunnel_state_model(sides, age) if sides is not None else models[f'termite_mound_{age}']
+            if cut:
+                model = clipped(model, 8)
+            scene.draw_model(model, textures, (bx - 2.5, by, -0.5), (width * (0.27 + 0.5 * half), y + net_h * 0.78), 62)
+    os.makedirs(os.path.dirname(TUNNEL_PREVIEW), exist_ok=True)
+    scene.image.save(TUNNEL_PREVIEW)
+
+
 if __name__ == '__main__':
     textures = make_textures()
     models = make_models()
     render_preview(models, textures)
     render_cathedral_preview(models, textures)
+    render_tunnel_preview(models, textures)
     print('termite blocks and preview written')

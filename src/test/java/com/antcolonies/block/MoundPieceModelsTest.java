@@ -102,6 +102,48 @@ class MoundPieceModelsTest {
         }
     }
 
+    /**
+     * The tunnel block's multipart models (a frame, and a plug for every closed side) fill exactly the block without
+     * the channel, for every age and every set of open sides, and their files and textures exist.
+     */
+    @Test
+    void tunnelModelsLeaveExactlyTheChannelOpen() throws Exception {
+        var parts = json("blockstates/termite_tunnel.json").getAsJsonArray("multipart");
+        int channel = TermiteTunnelBlock.CHANNEL_TO - TermiteTunnelBlock.CHANNEL_FROM;
+        int arm = channel * channel * TermiteTunnelBlock.CHANNEL_FROM;
+        for (int age = 0; age < AGES.length; age++) {
+            for (int mask = 0; mask < 64; mask++) {
+                double volume = 0;
+                for (JsonElement p : parts) {
+                    JsonObject when = p.getAsJsonObject().getAsJsonObject("when");
+                    boolean applies = when.get("age").getAsString().equals(String.valueOf(age));
+                    for (Direction side : Direction.values()) {
+                        if (when.has(side.getName())) {
+                            boolean open = (mask & (1 << side.get3DDataValue())) != 0;
+                            applies &= when.get(side.getName()).getAsString().equals(String.valueOf(open));
+                        }
+                    }
+                    if (!applies) {
+                        continue;
+                    }
+                    String model = p.getAsJsonObject().getAsJsonObject("apply").get("model").getAsString().replace("antcolonies:", "");
+                    JsonObject file = json("models/" + model + ".json");
+                    for (var texture : file.getAsJsonObject("textures").entrySet()) {
+                        String path = texture.getValue().getAsString().replace("antcolonies:", "textures/") + ".png";
+                        assertTrue(exists(path), model + " uses a missing texture " + path);
+                    }
+                    for (JsonElement e : file.getAsJsonArray("elements")) {
+                        double[] from = numbers(e.getAsJsonObject(), "from");
+                        double[] to = numbers(e.getAsJsonObject(), "to");
+                        volume += (to[0] - from[0]) * (to[1] - from[1]) * (to[2] - from[2]);
+                    }
+                }
+                int expected = 16 * 16 * 16 - channel * channel * channel - arm * Integer.bitCount(mask);
+                assertEquals(expected, volume, 1e-9, "tunnel age " + AGES[age] + ", open sides " + mask);
+            }
+        }
+    }
+
     @Test
     void everyStateHasAModelWithItsTextures() throws Exception {
         int states = 0;

@@ -119,6 +119,82 @@ public class TermiteMoundTests {
         helper.succeed();
     }
 
+    /**
+     * Tunnel blocks placed by hand join up on their own: sides next to another tunnel block open, sides against solid
+     * blocks stay closed, and a side toward open air keeps what it was (a shovel opens and closes a window there; soil
+     * put against it closes it; a neighbour broken away leaves its side open). An open tunnel lets a little light in,
+     * it is still solid for termites (they learn to crawl through later), and it dries with age.
+     */
+    @GameTest(template = "arena", timeoutTicks = 100)
+    public static void tunnelBlocksJoinUpOnTheirOwn(GameTestHelper helper) {
+        ground(helper);
+        ServerLevel level = helper.getLevel();
+        net.minecraft.world.entity.player.Player player = helper.makeMockPlayer(net.minecraft.world.level.GameType.CREATIVE);
+        net.minecraft.world.item.ItemStack tunnels = new net.minecraft.world.item.ItemStack(com.antcolonies.registry.ModItems.TERMITE_TUNNEL.get(), 64);
+        BlockPos a = new BlockPos(3, 1, 3);
+        BlockPos b = a.east();
+        BlockPos c = a.above();
+        place(helper, player, tunnels, a.below());
+        place(helper, player, tunnels, b.below());
+        place(helper, player, tunnels, a);
+        helper.assertTrue(helper.getBlockState(a).is(ModBlocks.TERMITE_TUNNEL.get()) && helper.getBlockState(b).is(ModBlocks.TERMITE_TUNNEL.get())
+                && helper.getBlockState(c).is(ModBlocks.TERMITE_TUNNEL.get()), "the tunnel blocks were not placed");
+        assertOpen(helper, a, "a tunnel with one beside it and one on top", net.minecraft.core.Direction.EAST, net.minecraft.core.Direction.UP);
+        assertOpen(helper, b, "the tunnel beside it", net.minecraft.core.Direction.WEST);
+        assertOpen(helper, c, "the tunnel on top", net.minecraft.core.Direction.DOWN);
+        // A shovel opens a window toward open air, and closes it again; not toward the ground.
+        net.minecraft.world.item.ItemStack shovel = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.WOODEN_SHOVEL);
+        useShovel(helper, player, shovel, a, net.minecraft.core.Direction.NORTH);
+        assertOpen(helper, a, "after the shovel on its north side", net.minecraft.core.Direction.EAST, net.minecraft.core.Direction.UP,
+                net.minecraft.core.Direction.NORTH);
+        useShovel(helper, player, shovel, a, net.minecraft.core.Direction.DOWN);
+        assertOpen(helper, a, "after the shovel on the side against the ground", net.minecraft.core.Direction.EAST, net.minecraft.core.Direction.UP,
+                net.minecraft.core.Direction.NORTH);
+        useShovel(helper, player, shovel, a, net.minecraft.core.Direction.NORTH);
+        assertOpen(helper, a, "after the shovel closed the window", net.minecraft.core.Direction.EAST, net.minecraft.core.Direction.UP);
+        // A window with soil put against it closes, and stays closed when the soil is taken away.
+        useShovel(helper, player, shovel, a, net.minecraft.core.Direction.NORTH);
+        helper.setBlock(a.north(), Blocks.DIRT);
+        assertOpen(helper, a, "with soil against its window", net.minecraft.core.Direction.EAST, net.minecraft.core.Direction.UP);
+        helper.setBlock(a.north(), Blocks.AIR);
+        assertOpen(helper, a, "after the soil was taken away", net.minecraft.core.Direction.EAST, net.minecraft.core.Direction.UP);
+        // A neighbour broken away leaves the side open (a broken-into tunnel).
+        helper.setBlock(b, Blocks.AIR);
+        assertOpen(helper, a, "after the tunnel beside it was broken", net.minecraft.core.Direction.EAST, net.minecraft.core.Direction.UP);
+        BlockPos absA = helper.absolutePos(a);
+        helper.assertTrue(helper.getBlockState(a).getLightBlock(level, absA) < level.getMaxLightLevel(), "no light gets into an open tunnel");
+        TermiteWorkerEntity termite = helper.spawnWithNoFreeWill(ModEntities.TERMITE_WORKER.get(), 0, 1, 0);
+        helper.assertTrue(!helper.getBlockState(a).getCollisionShape(level, absA, CollisionContext.of(termite)).isEmpty(),
+                "a termite can pass through a tunnel block already");
+        for (int i = 0; i < 20000 && helper.getBlockState(a).getValue(com.antcolonies.block.MoundSoil.AGE) < com.antcolonies.block.MoundSoil.OLDEST; i++) {
+            helper.randomTick(a);
+        }
+        helper.assertTrue(helper.getBlockState(a).getValue(com.antcolonies.block.MoundSoil.AGE) == com.antcolonies.block.MoundSoil.OLDEST,
+                "a tunnel block did not dry to old");
+        assertOpen(helper, a, "after it dried", net.minecraft.core.Direction.EAST, net.minecraft.core.Direction.UP);
+        helper.succeed();
+    }
+
+    /** The tunnel block at {@code pos} opens out of exactly these sides. */
+    private static void assertOpen(GameTestHelper helper, BlockPos pos, String what, net.minecraft.core.Direction... open) {
+        BlockState state = helper.getBlockState(pos);
+        java.util.Set<net.minecraft.core.Direction> expected = java.util.Set.of(open);
+        for (net.minecraft.core.Direction side : net.minecraft.core.Direction.values()) {
+            boolean isOpen = state.getValue(com.antcolonies.block.TermiteTunnelBlock.OPEN.get(side));
+            helper.assertTrue(isOpen == expected.contains(side), what + ": its " + side + " side is " + (isOpen ? "open" : "closed"));
+        }
+    }
+
+    /** The player uses a shovel on one side of a block. */
+    private static void useShovel(GameTestHelper helper, net.minecraft.world.entity.player.Player player, net.minecraft.world.item.ItemStack shovel,
+            BlockPos pos, net.minecraft.core.Direction side) {
+        BlockPos abs = helper.absolutePos(pos);
+        player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, shovel);
+        net.minecraft.world.phys.Vec3 hit = net.minecraft.world.phys.Vec3.atCenterOf(abs).relative(side, 0.5);
+        helper.getBlockState(pos).useItemOn(shovel, helper.getLevel(), player, net.minecraft.world.InteractionHand.MAIN_HAND,
+                new net.minecraft.world.phys.BlockHitResult(hit, side, abs, false));
+    }
+
     /** The player places the item on top of the block at {@code below}, holding it in its hand. */
     private static void place(GameTestHelper helper, net.minecraft.world.entity.player.Player player, net.minecraft.world.item.ItemStack stack,
             BlockPos below) {
