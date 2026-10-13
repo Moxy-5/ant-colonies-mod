@@ -1,6 +1,9 @@
 package com.antcolonies.command;
 
 import com.antcolonies.AntColoniesMod;
+import com.antcolonies.block.MoundPieceBlock;
+import com.antcolonies.block.MoundSoil;
+import com.antcolonies.block.TermiteMoundBlock;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.TermiteQueenEntity;
@@ -13,6 +16,8 @@ import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -38,7 +43,34 @@ public class ColonyCommands {
                         .then(Commands.argument("height", IntegerArgumentType.integer(1, 64))
                                 .executes(context -> mound(context.getSource(), IntegerArgumentType.getInteger(context, "height"), false))
                                 .then(Commands.literal("instant")
-                                        .executes(context -> mound(context.getSource(), IntegerArgumentType.getInteger(context, "height"), true))))));
+                                        .executes(context -> mound(context.getSource(), IntegerArgumentType.getInteger(context, "height"), true)))))
+                // Sets how dry and hard the termite mound soil around you is (0 fresh, 1 setting, 2 dry, 3 old), every
+                // finished mound block and cathedral piece within the radius (default 8 blocks), to see the ages
+                // without waiting hours.
+                .then(Commands.literal("age")
+                        .then(Commands.argument("age", IntegerArgumentType.integer(0, MoundSoil.OLDEST))
+                                .executes(context -> age(context.getSource(), IntegerArgumentType.getInteger(context, "age"), 8))
+                                .then(Commands.argument("radius", IntegerArgumentType.integer(1, 32))
+                                        .executes(context -> age(context.getSource(), IntegerArgumentType.getInteger(context, "age"),
+                                                IntegerArgumentType.getInteger(context, "radius")))))));
+    }
+
+    private static int age(CommandSourceStack source, int age, int radius) {
+        ServerLevel level = source.getLevel();
+        BlockPos at = BlockPos.containing(source.getPosition());
+        int changed = 0;
+        for (BlockPos pos : BlockPos.betweenClosed(at.offset(-radius, -radius, -radius), at.offset(radius, radius, radius))) {
+            BlockState state = level.getBlockState(pos);
+            boolean finishedSoil = state.getBlock() instanceof TermiteMoundBlock && TermiteMoundBlock.isFinished(state);
+            if ((finishedSoil || state.getBlock() instanceof MoundPieceBlock) && state.getValue(MoundSoil.AGE) != age) {
+                level.setBlock(pos, state.setValue(MoundSoil.AGE, age), Block.UPDATE_CLIENTS);
+                changed++;
+            }
+        }
+        int count = changed;
+        String[] names = {"fresh", "setting", "dry", "old"};
+        source.sendSuccess(() -> Component.literal(count + " termite mound blocks set to " + names[age] + "."), false);
+        return 1;
     }
 
     private static int mound(CommandSourceStack source, int height, boolean instant) {

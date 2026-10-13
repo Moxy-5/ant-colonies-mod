@@ -3,6 +3,7 @@ package com.antcolonies.gametest;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.block.TermiteHoleBlock;
 import com.antcolonies.block.TermiteMoundBlock;
+import com.antcolonies.block.TermiteMouthBlock;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.species.Species;
@@ -56,6 +57,73 @@ public class TermiteMoundTests {
                 helper.setBlock(x, 0, z, Blocks.DIRT);
             }
         }
+    }
+
+    /**
+     * The cathedral pieces placed by hand, as a player does: spire pieces stacked in a column get thinner one by one up
+     * to the tip; two ramps meeting at a right angle join into a corner like stairs; a chimney mouth alone on a spire
+     * is slim and becomes a full block when soil is put beside it, and termites pass through it while a player cannot;
+     * the pieces dry with age like mound soil.
+     */
+    @GameTest(template = "arena", timeoutTicks = 100)
+    public static void cathedralPiecesArePlacedByHand(GameTestHelper helper) {
+        ground(helper);
+        net.minecraft.world.entity.player.Player player = helper.makeMockPlayer(net.minecraft.world.level.GameType.CREATIVE);
+        net.minecraft.world.item.ItemStack spires = new net.minecraft.world.item.ItemStack(com.antcolonies.registry.ModItems.TERMITE_SPIRE.get(), 64);
+        // A spire: five pieces in a column narrow to the tip.
+        for (int y = 0; y < 6; y++) {
+            place(helper, player, spires, new BlockPos(1, y, 1));
+        }
+        for (int y = 1; y <= 6; y++) {
+            BlockState piece = helper.getBlockState(new BlockPos(1, y, 1));
+            helper.assertTrue(piece.is(ModBlocks.TERMITE_SPIRE.get()), "no spire piece at height " + y);
+            int expected = Math.min(com.antcolonies.block.TermiteSpireBlock.TIP, y - 1);
+            helper.assertTrue(piece.getValue(com.antcolonies.block.TermiteSpireBlock.THICKNESS) == expected,
+                    "spire piece " + y + " has thickness " + piece.getValue(com.antcolonies.block.TermiteSpireBlock.THICKNESS) + ", not " + expected);
+        }
+        // Two ramps: one rising east, and ahead of it one rising north: the first becomes an outer corner.
+        net.minecraft.world.item.ItemStack ramps = new net.minecraft.world.item.ItemStack(com.antcolonies.registry.ModItems.TERMITE_RAMP.get(), 64);
+        player.setYRot(-90.0F); // looking east
+        place(helper, player, ramps, new BlockPos(3, 0, 3));
+        player.setYRot(180.0F); // looking north
+        place(helper, player, ramps, new BlockPos(4, 0, 3));
+        BlockState first = helper.getBlockState(new BlockPos(3, 1, 3));
+        BlockState second = helper.getBlockState(new BlockPos(4, 1, 3));
+        helper.assertTrue(first.is(ModBlocks.TERMITE_RAMP.get()) && second.is(ModBlocks.TERMITE_RAMP.get()), "the ramps were not placed");
+        helper.assertTrue(first.getValue(com.antcolonies.block.TermiteRampBlock.FACING) == net.minecraft.core.Direction.EAST
+                && second.getValue(com.antcolonies.block.TermiteRampBlock.FACING) == net.minecraft.core.Direction.NORTH,
+                "the ramps do not rise the way the player looked");
+        helper.assertTrue(first.getValue(com.antcolonies.block.TermiteRampBlock.SHAPE) == net.minecraft.world.level.block.state.properties.StairsShape.OUTER_LEFT,
+                "the ramps did not join into a corner (" + first.getValue(com.antcolonies.block.TermiteRampBlock.SHAPE) + ")");
+        // A chimney mouth on top of a spire piece: slim; with soil beside it, a full block.
+        helper.setBlock(new BlockPos(4, 1, 1), ModBlocks.TERMITE_SPIRE.get());
+        place(helper, player, new net.minecraft.world.item.ItemStack(com.antcolonies.registry.ModItems.TERMITE_MOUTH.get()), new BlockPos(4, 1, 1));
+        BlockPos mouth = new BlockPos(4, 2, 1);
+        helper.assertTrue(helper.getBlockState(mouth).is(ModBlocks.TERMITE_MOUTH.get()) && helper.getBlockState(mouth).getValue(TermiteMouthBlock.SLIM),
+                "a chimney mouth alone on a spire is not slim");
+        helper.setBlock(new BlockPos(5, 2, 1), ModBlocks.TERMITE_MOUND.get().defaultBlockState().setValue(TermiteMoundBlock.LAYERS, TermiteMoundBlock.FINISHED));
+        helper.assertTrue(!helper.getBlockState(mouth).getValue(TermiteMouthBlock.SLIM), "a chimney mouth with soil beside it is still slim");
+        TermiteWorkerEntity termite = helper.spawnWithNoFreeWill(ModEntities.TERMITE_WORKER.get(), 0, 1, 0);
+        BlockPos abs = helper.absolutePos(mouth);
+        helper.assertTrue(helper.getBlockState(mouth).getCollisionShape(helper.getLevel(), abs, CollisionContext.of(termite)).isEmpty(),
+                "a termite cannot pass through the chimney mouth");
+        helper.assertTrue(!helper.getBlockState(mouth).getCollisionShape(helper.getLevel(), abs, CollisionContext.of(player)).isEmpty(),
+                "a player can pass through the chimney mouth");
+        // Ageing: random ticks dry a spire piece through the ages to old.
+        BlockPos aged = new BlockPos(1, 1, 1);
+        for (int i = 0; i < 20000 && helper.getBlockState(aged).getValue(com.antcolonies.block.MoundSoil.AGE) < com.antcolonies.block.MoundSoil.OLDEST; i++) {
+            helper.randomTick(aged);
+        }
+        helper.assertTrue(helper.getBlockState(aged).getValue(com.antcolonies.block.MoundSoil.AGE) == com.antcolonies.block.MoundSoil.OLDEST,
+                "a spire piece did not dry to old");
+        helper.succeed();
+    }
+
+    /** The player places the item on top of the block at {@code below}, holding it in its hand. */
+    private static void place(GameTestHelper helper, net.minecraft.world.entity.player.Player player, net.minecraft.world.item.ItemStack stack,
+            BlockPos below) {
+        player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, stack);
+        helper.placeAt(player, stack, below, net.minecraft.core.Direction.UP);
     }
 
     /**
@@ -236,6 +304,19 @@ public class TermiteMoundTests {
      */
     @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
     public static void aTermiteComesOutOfTheChimneyMouthAndGoesBackIn(GameTestHelper helper) {
+        comeOutOfTheMouthAndGoBackIn(helper, ModBlocks.TERMITE_HOLE.get().defaultBlockState());
+    }
+
+    /**
+     * The same with the cathedral mound's chimney mouth (a tube on top of the block, see TermiteMouthBlock) on top of
+     * the shaft: the termite comes up the tube, looks round, climbs over its rim and down it, and goes back in by it.
+     */
+    @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
+    public static void aTermiteComesOutOfTheSpireMouthAndGoesBackIn(GameTestHelper helper) {
+        comeOutOfTheMouthAndGoBackIn(helper, ModBlocks.TERMITE_MOUTH.get().defaultBlockState().setValue(TermiteMouthBlock.SLIM, false));
+    }
+
+    private static void comeOutOfTheMouthAndGoBackIn(GameTestHelper helper, BlockState doorway) {
         ground(helper);
         // A chimney: a ring of soil round a shaft, 3 blocks high, with a chimney block on top of the shaft.
         BlockState soil = ModBlocks.TERMITE_MOUND.get().defaultBlockState().setValue(TermiteMoundBlock.LAYERS, TermiteMoundBlock.FINISHED);
@@ -248,12 +329,12 @@ public class TermiteMoundTests {
                 }
             }
         }
-        helper.setBlock(new BlockPos(2, 3, 2), ModBlocks.TERMITE_HOLE.get());
+        helper.setBlock(new BlockPos(2, 3, 2), doorway);
         BlockPos hole = helper.absolutePos(new BlockPos(2, 3, 2));
         BlockPos bottom = helper.absolutePos(new BlockPos(2, 1, 2));
         BlockPos onTop = helper.absolutePos(new BlockPos(3, 4, 2));
         TermiteWorkerEntity termite = helper.spawnWithNoFreeWill(ModEntities.TERMITE_WORKER.get(), 2, 1, 2);
-        double rim = hole.getY() + ModBlocks.TERMITE_HOLE.get().mouthHeight();
+        double rim = hole.getY() + ((com.antcolonies.nav.Doorway) doorway.getBlock()).mouthHeight();
         int[] phase = {0};
         int[] lookingOut = {0};
         double[] highest = {0};

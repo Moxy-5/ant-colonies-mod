@@ -35,6 +35,9 @@ public class ModEvents {
             event.accept(ModItems.FORAGE_PILE);
             event.accept(ModItems.TERMITE_MOUND);
             event.accept(ModItems.TERMITE_HOLE);
+            event.accept(ModItems.TERMITE_SPIRE);
+            event.accept(ModItems.TERMITE_MOUTH);
+            event.accept(ModItems.TERMITE_RAMP);
         }
         if (event.getTabKey() == CreativeModeTabs.INGREDIENTS) {
             event.accept(ModItems.FORAGE);

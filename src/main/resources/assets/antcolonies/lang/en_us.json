@@ -22,5 +22,8 @@
   "entity.antcolonies.termite_nymph": "Termite Nymph",
   "item.antcolonies.termite_worker_spawn_egg": "Termite Worker Spawn Egg",
   "block.antcolonies.termite_mound": "Termite Mound Soil",
-  "block.antcolonies.termite_hole": "Termite Chimney"
+  "block.antcolonies.termite_hole": "Termite Chimney",
+  "block.antcolonies.termite_spire": "Termite Spire",
+  "block.antcolonies.termite_mouth": "Termite Chimney Mouth",
+  "block.antcolonies.termite_ramp": "Termite Mound Ramp"
 }

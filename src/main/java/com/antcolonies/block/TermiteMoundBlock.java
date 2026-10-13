@@ -36,22 +36,13 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 public class TermiteMoundBlock extends Block {
     /** The layer on which the block is finished (layers 1 to 4 build it up a quarter at a time). */
     public static final int FINISHED = 5;
-    public static final int OLDEST = 3;
+    public static final int OLDEST = MoundSoil.OLDEST;
     public static final IntegerProperty LAYERS = IntegerProperty.create("layers", 1, FINISHED);
-    /** How dry and hard a finished block is: 0 fresh, 1 setting, 2 dry, 3 old. Only finished blocks age. */
-    public static final IntegerProperty AGE = IntegerProperty.create("age", 0, OLDEST);
+    /** How dry and hard a finished block is: 0 fresh, 1 setting, 2 dry, 3 old (see {@link MoundSoil}). Only finished blocks age. */
+    public static final IntegerProperty AGE = MoundSoil.AGE;
 
     /** How hard a block still being built is to break (wet, cracked soil). */
     private static final float BUILDING_HARDNESS = 0.3F;
-    /** How hard a finished block is at each age (dirt is 0.5, clay 0.6, stone 1.5). */
-    private static final float[] HARDNESS = {0.6F, 1.0F, 1.5F, 2.5F};
-    /**
-     * On each random tick a finished block grows one age older with a chance of 1 in this (a block gets a random tick
-     * about once a minute at the normal tick speed): setting after about 20 minutes, dry after about 50 more, old
-     * after about 2.5 hours more.
-     */
-    private static final int[] AGE_CHANCE = {20, 45, 130};
-
     private static final VoxelShape[] SHAPES = new VoxelShape[FINISHED + 1];
 
     static {
@@ -187,36 +178,28 @@ public class TermiteMoundBlock extends Block {
 
     @Override
     protected void randomTick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
-        int age = state.getValue(AGE);
-        if (random.nextInt(AGE_CHANCE[age]) == 0) {
-            level.setBlock(pos, state.setValue(AGE, age + 1), Block.UPDATE_CLIENTS);
-        }
+        MoundSoil.age(state, level, pos, random);
     }
 
     /** How hard the block is to break now. */
     public static float hardness(BlockState state) {
-        return isFinished(state) ? HARDNESS[state.getValue(AGE)] : BUILDING_HARDNESS;
+        return isFinished(state) ? MoundSoil.hardness(state.getValue(AGE)) : BUILDING_HARDNESS;
     }
 
     /** Whether the block is hard enough that it breaks like stone (needs a pickaxe) rather than like dirt (a shovel helps). */
     public static boolean isStoneHard(BlockState state) {
-        return isFinished(state) && state.getValue(AGE) >= 2;
+        return isFinished(state) && MoundSoil.isStoneHard(state.getValue(AGE));
     }
 
     // Breaking speed follows the age: young soil breaks like dirt (a shovel is quick), dry and old soil like stone
     // (a pickaxe is needed, by hand it is very slow). Worked out as for dirt or stone, with this block's hardness.
     @Override
     protected float getDestroyProgress(BlockState state, Player player, BlockGetter level, BlockPos pos) {
-        BlockState feel = isStoneHard(state) ? Blocks.STONE.defaultBlockState() : Blocks.DIRT.defaultBlockState();
-        int divisor = player.hasCorrectToolForDrops(feel) ? 30 : 100;
-        return player.getDigSpeed(feel, pos) / hardness(state) / divisor;
+        return MoundSoil.destroyProgress(isStoneHard(state), hardness(state), player, pos);
     }
 
     @Override
     public SoundType getSoundType(BlockState state, LevelReader level, BlockPos pos, @Nullable Entity entity) {
-        if (!isFinished(state) || state.getValue(AGE) == 0) {
-            return SoundType.MUD;
-        }
-        return state.getValue(AGE) == 1 ? SoundType.PACKED_MUD : SoundType.MUD_BRICKS;
+        return isFinished(state) ? MoundSoil.sound(state.getValue(AGE)) : SoundType.MUD;
     }
 }

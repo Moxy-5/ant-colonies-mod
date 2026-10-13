@@ -1,0 +1,28 @@
+{
+  "variants": {
+    "age=0,slim=true": {
+      "model": "antcolonies:block/termite_mouth_slim_fresh"
+    },
+    "age=0,slim=false": {
+      "model": "antcolonies:block/termite_mouth_full_fresh"
+    },
+    "age=1,slim=true": {
+      "model": "antcolonies:block/termite_mouth_slim_setting"
+    },
+    "age=1,slim=false": {
+      "model": "antcolonies:block/termite_mouth_full_setting"
+    },
+    "age=2,slim=true": {
+      "model": "antcolonies:block/termite_mouth_slim_dry"
+    },
+    "age=2,slim=false": {
+      "model": "antcolonies:block/termite_mouth_full_dry"
+    },
+    "age=3,slim=true": {
+      "model": "antcolonies:block/termite_mouth_slim_old"
+    },
+    "age=3,slim=false": {
+      "model": "antcolonies:block/termite_mouth_full_old"
+    }
+  }
+}

@@ -4,6 +4,9 @@ import com.antcolonies.AntColoniesMod;
 import com.antcolonies.block.SeedPileBlock;
 import com.antcolonies.block.TermiteHoleBlock;
 import com.antcolonies.block.TermiteMoundBlock;
+import com.antcolonies.block.TermiteMouthBlock;
+import com.antcolonies.block.TermiteRampBlock;
+import com.antcolonies.block.TermiteSpireBlock;
 
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.SoundType;
@@ -52,4 +55,23 @@ public class ModBlocks {
     public static final DeferredBlock<TermiteHoleBlock> TERMITE_HOLE = BLOCKS.registerBlock("termite_hole", TermiteHoleBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_ORANGE).strength(1.5F, 3.0F).sound(SoundType.MUD_BRICKS)
                     .noOcclusion().isSuffocating((state, level, pos) -> false).isViewBlocking((state, level, pos) -> false));
+
+    // The cathedral mound's pieces (shaped, finished mound soil that ages like the mound block).
+
+    /** A piece of a spire, in 5 thicknesses narrowing to a point (see TermiteSpireBlock). */
+    public static final DeferredBlock<TermiteSpireBlock> TERMITE_SPIRE = BLOCKS.registerBlock("termite_spire", TermiteSpireBlock::new,
+            pieceProperties());
+
+    /** The chimney mouth at a spire's tip: solid for everyone but termites (see TermiteMouthBlock). */
+    public static final DeferredBlock<TermiteMouthBlock> TERMITE_MOUTH = BLOCKS.registerBlock("termite_mouth", TermiteMouthBlock::new,
+            pieceProperties().isSuffocating((state, level, pos) -> false).isViewBlocking((state, level, pos) -> false));
+
+    /** A ramp that hides the steps of the mound's sides, joining into corners like stairs (see TermiteRampBlock). */
+    public static final DeferredBlock<TermiteRampBlock> TERMITE_RAMP = BLOCKS.registerBlock("termite_ramp", TermiteRampBlock::new,
+            pieceProperties());
+
+    private static BlockBehaviour.Properties pieceProperties() {
+        return BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_ORANGE).strength(0.6F, 3.0F).sound(SoundType.MUD)
+                .randomTicks();
+    }
 }

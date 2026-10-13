@@ -12,9 +12,17 @@
     "age=0,layers=4": {
       "model": "antcolonies:block/termite_mound_layer4"
     },
-    "age=0,layers=5": {
-      "model": "antcolonies:block/termite_mound_fresh"
-    },
+    "age=0,layers=5": [
+      {
+        "model": "antcolonies:block/termite_mound_fresh"
+      },
+      {
+        "model": "antcolonies:block/termite_mound_fresh_b"
+      },
+      {
+        "model": "antcolonies:block/termite_mound_fresh_c"
+      }
+    ],
     "age=1,layers=1": {
       "model": "antcolonies:block/termite_mound_layer1"
     },
@@ -27,9 +35,17 @@
     "age=1,layers=4": {
       "model": "antcolonies:block/termite_mound_layer4"
     },
-    "age=1,layers=5": {
-      "model": "antcolonies:block/termite_mound_setting"
-    },
+    "age=1,layers=5": [
+      {
+        "model": "antcolonies:block/termite_mound_setting"
+      },
+      {
+        "model": "antcolonies:block/termite_mound_setting_b"
+      },
+      {
+        "model": "antcolonies:block/termite_mound_setting_c"
+      }
+    ],
     "age=2,layers=1": {
       "model": "antcolonies:block/termite_mound_layer1"
     },
@@ -42,9 +58,17 @@
     "age=2,layers=4": {
       "model": "antcolonies:block/termite_mound_layer4"
     },
-    "age=2,layers=5": {
-      "model": "antcolonies:block/termite_mound_dry"
-    },
+    "age=2,layers=5": [
+      {
+        "model": "antcolonies:block/termite_mound_dry"
+      },
+      {
+        "model": "antcolonies:block/termite_mound_dry_b"
+      },
+      {
+        "model": "antcolonies:block/termite_mound_dry_c"
+      }
+    ],
     "age=3,layers=1": {
       "model": "antcolonies:block/termite_mound_layer1"
     },
@@ -57,8 +81,16 @@
     "age=3,layers=4": {
       "model": "antcolonies:block/termite_mound_layer4"
     },
-    "age=3,layers=5": {
-      "model": "antcolonies:block/termite_mound_old"
-    }
+    "age=3,layers=5": [
+      {
+        "model": "antcolonies:block/termite_mound_old"
+      },
+      {
+        "model": "antcolonies:block/termite_mound_old_b"
+      },
+      {
+        "model": "antcolonies:block/termite_mound_old_c"
+      }
+    ]
   }
 }

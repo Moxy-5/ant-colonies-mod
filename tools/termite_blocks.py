@@ -7,13 +7,22 @@ It rewrites:
   textures/block/termite_mound_<age>_side.png / _top.png        a finished block (layer 5), per age
   textures/block/termite_hole_*.png                             the chimney crown block
   models/block/termite_mound_*.json, models/block/termite_hole.json, the item models, both blockstates
+  textures/block/termite_mound_<age>_side_b / _c.png            two more looks of a finished side (random per block)
+  textures/block/termite_mouth_<age>_top.png                    the chimney mouth's open tip
+  models and blockstates of the cathedral pieces: termite_spire (5 thicknesses), termite_mouth, termite_ramp
   references/termites/preview/blocks.png                        labelled pictures of every block and a small mound
+  references/termites/preview/cathedral_blocks.png              the cathedral pieces and a corner of a cathedral mound
 
 The textures are drawn here, not cut from a picture (the user's hole-block picture is AI made): packed earth made of
 little soil pellets, lit from above. A block grows in 4 layers of wet soil, cracked as it dries (layer 1 the most, a
 bit less on 2, less on 3, much less on 4, which is already full height); on layer 5 the termites seal the cracks and
 the block is finished. A finished block then dries and hardens: fresh (dark, damp red-brown), setting (red-orange),
 dry (tan, with rain-worn flutes), old (pale and sun-baked), like the user's photos of real Macrotermes mounds.
+
+Cathedral mound (user's design, concept pictures in references/termites/preview/concept/): the sides of finished soil
+carry rain streaks that run down the mound (the same streak columns on every side texture, so they carry on from one
+block to the next), and the shaped pieces (spire, chimney mouth, ramp) are built from 2-pixel layers like the concept.
+Their shapes are worked out with the same sums as the game's code (MoundPieceBlock.taper, TermiteRampBlock.height).
 """
 import json, math, os, random
 
@@ -104,11 +113,38 @@ def top_cracks(seed):
     return out
 
 
-def paint(soil, colour, light=1.0, flutes=False):
+def streak_field(seed):
+    """Rain streaks for a side face (-1 to 1): every column has its own shade that runs from top to bottom, and some
+    columns carry a drip that comes and goes down the face. Repeats every 16 pixels both ways, so the streaks carry on
+    into the block below and beside."""
+    rng = random.Random(seed)
+    raw = [rng.uniform(-1, 1) for _ in range(16)]
+    col = [(raw[(x - 1) % 16] + 2 * raw[x] + raw[(x + 1) % 16]) / 4 for x in range(16)]
+    drips = {x: (rng.uniform(0.4, 1.0) * rng.choice((-1, 1)), rng.uniform(0, 2 * math.pi)) for x in rng.sample(range(16), 5)}
+    field = []
+    for y in range(16):
+        row = []
+        for x in range(16):
+            v = col[x] * 1.6
+            if x in drips:
+                amp, phase = drips[x]
+                v += amp * (0.5 + 0.5 * math.sin(2 * math.pi * y / 16 + phase))
+            row.append(max(-1.0, min(1.0, v)))
+        field.append(row)
+    return field
+
+
+# How strongly the rain streaks show on a side at each age (wet fresh soil hardly, old sun-baked soil the most).
+STREAKS = {'fresh': 0.07, 'setting': 0.11, 'dry': 0.15, 'old': 0.17}
+
+
+def paint(soil, colour, light=1.0, flutes=False, streaks=None, streak_strength=0.0):
     image = Image.new('RGBA', (16, 16))
     for x in range(16):
         for y in range(16):
             v = soil[y][x]
+            if streaks is not None:
+                v += streaks[y][x] * streak_strength / 0.17
             if flutes:
                 v += 0.22 * math.sin((x + 0.5) / 16.0 * 2 * math.pi * 3)  # rain-worn ridges running down the side
             k = light * (1.0 + 0.17 * v)
@@ -155,10 +191,25 @@ def make_textures():
     for layer in range(1, 5):
         out[f'termite_mound_layer{layer}_side'] = crack_side(paint(side_soil, AGE_COLOUR['fresh'], WET[layer]), paths, layer)
         out[f'termite_mound_layer{layer}_top'] = crack_top(paint(top_soil, AGE_COLOUR['fresh'], WET[layer]), mud, layer)
+    streaks = streak_field(13)
+    looks = {'': side_soil, '_b': soil_map(17, False), '_c': soil_map(19, False)}
     for age in AGES:
         flutes = age in ('dry', 'old')
-        out[f'termite_mound_{age}_side'] = paint(side_soil, AGE_COLOUR[age], 1.0, flutes)
-        out[f'termite_mound_{age}_top'] = paint(top_soil, AGE_COLOUR[age])
+        for suffix, soil in looks.items():
+            out[f'termite_mound_{age}_side{suffix}'] = paint(soil, AGE_COLOUR[age], 1.0, flutes, streaks, STREAKS[age])
+        top = paint(top_soil, AGE_COLOUR[age])
+        out[f'termite_mound_{age}_top'] = top
+        # The chimney mouth's tip: the top of a 6-pixel tube (pixels 5 to 10) with its opening in the middle.
+        mouth = top.copy()
+        for x in range(5, 11):
+            for y in range(5, 11):
+                if x in (5, 10) or y in (5, 10):
+                    darken(mouth, x, y, 1.08)
+                elif x in (6, 9) or y in (6, 9):
+                    darken(mouth, x, y, 0.55)
+                else:
+                    mouth.putpixel((x, y), (30, 17, 11, 255))
+        out[f'termite_mouth_{age}_top'] = mouth
     # The chimney crown: setting-coloured soil with a few breathing pores in the sides, and the spires' openings.
     hole_side = paint(side_soil, AGE_COLOUR['setting'])
     for x, y in ((3, 4), (11, 7), (6, 11), (13, 13)):
@@ -235,6 +286,148 @@ def hole_model():
     }
 
 
+# --- The cathedral pieces: shapes from 2-pixel layers --------------------------------------------------------------
+
+LAYER = 2          # pixels per layer (MoundPieceBlock.LAYER_PIXELS)
+LAYERS = 16 // LAYER
+SPIRE_WIDTHS = [(16, 12), (12, 10), (10, 8), (8, 6), (6, 0)]   # TermiteSpireBlock.WIDTHS: base, thick, middle, thin, tip
+SPIRE_NAMES = ['base', 'thick', 'middle', 'thin', 'tip']
+RAMP_SHAPES = ['straight', 'outer', 'inner']
+LOOKS = ['', '_b', '_c']
+
+
+def taper(bottom, top, v, count):
+    """MoundPieceBlock.taper: the width of layer v of count in a column narrowing evenly from bottom to top."""
+    halves = bottom / 2.0 + (top - bottom) / 2.0 * (v + 0.5) / count
+    return 2 * math.floor(halves + 0.5)
+
+
+def auto_uv(name, frm, to):
+    """The texture area Minecraft picks for a face when a model gives none (by the face's position in the block)."""
+    (x0, y0, z0), (x1, y1, z1) = frm, to
+    return {
+        'up': [x0, z0, x1, z1], 'down': [x0, 16 - z1, x1, 16 - z0],
+        'north': [16 - x1, 16 - y1, 16 - x0, 16 - y0], 'south': [x0, 16 - y1, x1, 16 - y0],
+        'west': [z0, 16 - y1, z1, 16 - y0], 'east': [16 - z1, 16 - y1, 16 - z0, 16 - y0],
+    }[name]
+
+
+def solid(frm, to, bottom=True):
+    """A box of soil, every face textured by its position (the top texture on top and below, the side texture round
+    it). Faces on the block's outside are culled against a neighbour that hides them."""
+    faces = {}
+    for name in ('up', 'down', 'north', 'south', 'west', 'east'):
+        if name == 'down' and not bottom:
+            continue
+        uv = auto_uv(name, frm, to)
+        if name not in ('up', 'down') and uv[1] < 0:   # above the block (the mouth's tube): the same texture again
+            uv = [uv[0], uv[1] + 16, uv[2], uv[3] + 16]
+        edge = {'up': to[1] == 16, 'down': frm[1] == 0, 'north': frm[2] == 0, 'south': to[2] == 16,
+                'west': frm[0] == 0, 'east': to[0] == 16}[name]
+        faces[name] = face('#top' if name in ('up', 'down') else '#side', uv, name if edge else None)
+    return {'from': list(frm), 'to': list(to), 'faces': faces}
+
+
+def tapered_elements(bottom, top, start, count):
+    """A square column narrowing from `bottom` to `top` pixels over `count` layers from layer `start`, merged into as
+    few boxes as the steps allow."""
+    elements = []
+    v = 0
+    while v < count:
+        width = taper(bottom, top, v, count)
+        run = 1
+        while v + run < count and taper(bottom, top, v + run, count) == width:
+            run += 1
+        if width > 0:
+            lo = (16 - width) // 2
+            elements.append(solid([lo, (start + v) * LAYER, lo], [lo + width, (start + v + run) * LAYER, lo + width],
+                                  bottom=not elements))
+        v += run
+    return elements
+
+
+def ramp_elements(shape):
+    """A ramp rising toward east (+x); the corners rise toward east and south (TermiteRampBlock.height at facing east,
+    shape *_right). Turned for the other directions in the blockstate."""
+    elements = []
+    for k in range(LAYERS):
+        y0, y1, a = k * LAYER, (k + 1) * LAYER, k * LAYER
+        if shape == 'straight':
+            boxes = [([a, y0, 0], [16, y1, 16])]
+        elif shape == 'outer':
+            boxes = [([a, y0, a], [16, y1, 16])]
+        else:
+            boxes = [([a, y0, 0], [16, y1, 16])] + ([([0, y0, a], [a, y1, 16])] if a > 0 else [])
+        for frm, to in boxes:
+            elements.append(solid(frm, to, bottom=k == 0))
+    return elements
+
+
+def piece_model(elements, top, side, extra=None):
+    textures = {'particle': f'antcolonies:block/{side}', 'top': f'antcolonies:block/{top}', 'side': f'antcolonies:block/{side}'}
+    textures.update(extra or {})
+    return {'parent': 'minecraft:block/block', 'textures': textures, 'elements': elements}
+
+
+def mouth_elements(slim):
+    """The chimney mouth (TermiteMouthBlock): below, a full block or (alone on a spire) a piece narrowing from 10 to 6
+    pixels; on top a 6-pixel tube up to 28 pixels, its tip the mouth texture with the opening."""
+    lower = tapered_elements(10, 6, 0, LAYERS) if slim else [solid([0, 0, 0], [16, 16, 16])]
+    tube = solid([5, 16, 5], [11, 28, 11], bottom=False)
+    tube['faces']['up'] = face('#mouth', [5, 5, 11, 11])
+    if not slim:
+        lower[0]['faces']['up'].pop('cullface', None)
+    return lower + [tube]
+
+
+def make_piece_models(models):
+    for age in AGES:
+        top = f'termite_mound_{age}_top'
+        side = f'termite_mound_{age}_side'
+        for t, name in enumerate(SPIRE_NAMES):
+            models[f'termite_spire_{name}_{age}'] = piece_model(tapered_elements(*SPIRE_WIDTHS[t], 0, LAYERS), top, side)
+        for slim in (True, False):
+            kind = 'slim' if slim else 'full'
+            models[f'termite_mouth_{kind}_{age}'] = piece_model(
+                mouth_elements(slim), top, side, {'mouth': f'antcolonies:block/termite_mouth_{age}_top'})
+        for shape in RAMP_SHAPES:
+            for look in LOOKS:
+                models[f'termite_ramp_{shape}_{age}{look}'] = piece_model(ramp_elements(shape), top, side + look)
+        for look in LOOKS[1:]:
+            models[f'termite_mound_{age}{look}'] = slab_model(top, side + look, 16)
+
+
+FACING_Y = {'east': 0, 'south': 90, 'west': 180, 'north': 270}
+
+
+def piece_blockstates():
+    spire, mouth, ramp = {}, {}, {}
+    for a, age in enumerate(AGES):
+        for t, name in enumerate(SPIRE_NAMES):
+            spire[f'age={a},thickness={t}'] = {'model': f'antcolonies:block/termite_spire_{name}_{age}'}
+        for slim in ('true', 'false'):
+            kind = 'slim' if slim == 'true' else 'full'
+            mouth[f'age={a},slim={slim}'] = {'model': f'antcolonies:block/termite_mouth_{kind}_{age}'}
+        for facing, y in FACING_Y.items():
+            for shape in ('straight', 'outer_left', 'outer_right', 'inner_left', 'inner_right'):
+                kind = shape.split('_')[0]
+                # a left corner is the right corner of the side a quarter turn counter-clockwise
+                rot = (y - 90) % 360 if shape.endswith('_left') else y
+                options = []
+                for look in LOOKS:
+                    option = {'model': f'antcolonies:block/termite_ramp_{kind}_{age}{look}', 'uvlock': True}
+                    if rot:
+                        option['y'] = rot
+                    options.append(option)
+                ramp[f'age={a},facing={facing},shape={shape}'] = options
+    write_json('blockstates/termite_spire.json', {'variants': spire})
+    write_json('blockstates/termite_mouth.json', {'variants': mouth})
+    write_json('blockstates/termite_ramp.json', {'variants': ramp})
+    write_json('models/item/termite_spire.json', {'parent': 'antcolonies:block/termite_spire_thick_setting'})
+    write_json('models/item/termite_mouth.json', {'parent': 'antcolonies:block/termite_mouth_slim_setting'})
+    write_json('models/item/termite_ramp.json', {'parent': 'antcolonies:block/termite_ramp_straight_setting'})
+
+
 def write_json(rel, data):
     path = os.path.join(ROOT, rel)
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -250,17 +443,21 @@ def make_models():
     for age in AGES:
         models[f'termite_mound_{age}'] = slab_model(f'termite_mound_{age}_top', f'termite_mound_{age}_side', 16)
     models['termite_hole'] = hole_model()
+    make_piece_models(models)
     for name, model in models.items():
         write_json(f'models/block/{name}.json', model)
     variants = {}
     for age_index, age in enumerate(AGES):
         for layer in range(1, 6):
-            model = f'termite_mound_layer{layer}' if layer < 5 else f'termite_mound_{age}'
-            variants[f'age={age_index},layers={layer}'] = {'model': f'antcolonies:block/{model}'}
+            if layer < 5:
+                variants[f'age={age_index},layers={layer}'] = {'model': f'antcolonies:block/termite_mound_layer{layer}'}
+            else:  # a finished block: one of three looks, picked by its position
+                variants[f'age={age_index},layers={layer}'] = [{'model': f'antcolonies:block/termite_mound_{age}{look}'} for look in LOOKS]
     write_json('blockstates/termite_mound.json', {'variants': variants})
     write_json('blockstates/termite_hole.json', {'variants': {'': {'model': 'antcolonies:block/termite_hole'}}})
     write_json('models/item/termite_mound.json', {'parent': 'antcolonies:block/termite_mound_fresh'})
     write_json('models/item/termite_hole.json', {'parent': 'antcolonies:block/termite_hole'})
+    piece_blockstates()
     return models
 
 
@@ -394,8 +591,110 @@ def render_preview(models, textures):
     scene.image.save(PREVIEW)
 
 
+CATHEDRAL_PREVIEW = os.path.join(HERE, '..', 'references', 'termites', 'preview', 'cathedral_blocks.png')
+TURN = {'east': 0, 'south': 90, 'west': 180, 'north': 270}
+
+
+def turned(model, degrees):
+    """The model turned clockwise (seen from above) by a multiple of 90 degrees, as a blockstate's y does (for the
+    preview only; the texture areas are kept, as uvlock does for these plain soil textures)."""
+    if not degrees:
+        return model
+    names = {'east': 'south', 'south': 'west', 'west': 'north', 'north': 'east', 'up': 'up', 'down': 'down'}
+    elements = []
+    for element in model['elements']:
+        frm, to = element['from'], element['to']
+        faces = element['faces']
+        for _ in range(degrees // 90):
+            corners = [(16 - frm[2], frm[0]), (16 - to[2], to[0])]
+            frm = [min(c[0] for c in corners), frm[1], min(c[1] for c in corners)]
+            to = [max(c[0] for c in corners), to[1], max(c[1] for c in corners)]
+            faces = {names[n]: dict(f, uv=auto_uv(names[n], frm, to)) if n not in ('up', 'down') else f
+                     for n, f in faces.items()}
+        faces = {n: (dict(f, uv=auto_uv(n, frm, to)) if n in ('up', 'down') and f['texture'] == '#top' else f)
+                 for n, f in faces.items()}
+        elements.append({'from': frm, 'to': to, 'faces': faces})
+    return dict(model, elements=elements)
+
+
+def cathedral_corner():
+    """A small piece of a cathedral mound built from the new pieces: a stepped base dressed in ramps, a column
+    narrowing into spire pieces and a chimney mouth, and a lone spire beside it. Old pale soil low down, fresher above.
+    Returns [(model, (x, y, z))]."""
+    blocks = []
+    rings = [(0, 1, 5, 'old'), (1, 2, 4, 'dry'), (2, 3, 3, 'setting')]  # (y, low, high, age of the full blocks)
+    ramp_age = {0: 'dry', 1: 'setting', 2: 'setting'}
+    for y, lo, hi, age in rings:
+        for x in range(lo, hi + 1):
+            for z in range(lo, hi + 1):
+                edge = x in (lo, hi) or z in (lo, hi)
+                if not edge or lo == hi:
+                    blocks.append((f'termite_mound_{age}', (x, y, z), 0))
+                    continue
+                # the ring's edge: a ramp rising toward the middle
+                rises = []
+                if x == lo:
+                    rises.append('east')
+                if x == hi:
+                    rises.append('west')
+                if z == lo:
+                    rises.append('south')
+                if z == hi:
+                    rises.append('north')
+                if len(rises) == 1:
+                    blocks.append((f'termite_ramp_straight_{ramp_age[y]}', (x, y, z), TURN[rises[0]]))
+                else:  # an outer corner rising toward both sides (the model rises east and south)
+                    pair = set(rises)
+                    turn = next(t for t, s in ((0, {'east', 'south'}), (90, {'south', 'west'}), (180, {'west', 'north'}),
+                                               (270, {'north', 'east'})) if s == pair)
+                    blocks.append((f'termite_ramp_outer_{ramp_age[y]}', (x, y, z), turn))
+    for y, name in ((3, 'termite_mound_fresh'), (4, 'termite_spire_base_setting'), (5, 'termite_spire_thick_fresh'),
+                    (6, 'termite_mouth_slim_fresh')):
+        blocks.append((name, (3, y, 3), 0))
+    for y, t in enumerate(SPIRE_NAMES):
+        blocks.append((f'termite_spire_{t}_{"dry" if y < 2 else "setting"}', (6, y, 1), 0))
+    return blocks
+
+
+def render_cathedral_preview(models, textures):
+    cell, label_h, title_h = 230, 34, 54
+    rows = [
+        ('SPIRE PIECES: BASE, THICK, MIDDLE, THIN, TIP (STACKED THEY NARROW TO A POINT)',
+         [(n.upper(), f'termite_spire_{n}_setting') for n in SPIRE_NAMES]),
+        ('CHIMNEY MOUTH (ALONE ON A SPIRE, IN THE MOUND) AND RAMPS (STRAIGHT, OUTER CORNER, INNER CORNER)',
+         [('MOUTH, SLIM', 'termite_mouth_slim_setting'), ('MOUTH, IN THE MOUND', 'termite_mouth_full_setting')]
+         + [(f'RAMP {s.upper()}', f'termite_ramp_{s}_setting') for s in RAMP_SHAPES]),
+        ('A FINISHED SIDE IN EVERY AGE, WITH RAIN STREAKS (THREE LOOKS EACH)',
+         [(age.upper(), f'termite_mound_{age}') for age in AGES] + [('OLD, LOOK B', 'termite_mound_old_b')]),
+    ]
+    width = cell * 5
+    corner_h = 640
+    height = len(rows) * (cell + label_h + title_h) + corner_h + title_h
+    scene = Scene(width, height)
+    draw = ImageDraw.Draw(scene.image)
+    y = 0
+    for title, items in rows:
+        draw.text((12, y + 18), title, fill=(40, 30, 25))
+        y += title_h
+        for k, (label, name) in enumerate(items):
+            x0 = k * cell
+            draw.rectangle([x0, y, x0 + cell - 1, y + cell + label_h - 1], outline=(170, 165, 155))
+            draw.text((x0 + 10, y + 10), label, fill=(40, 30, 25))
+            scene.draw_model(models[name], textures, (-0.5, 0, -0.5), (x0 + cell * 0.5, y + label_h + cell * 0.78), 70)
+        y += cell + label_h
+    draw.text((12, y + 18), 'A PIECE OF A CATHEDRAL MOUND: RAMPS OVER THE STEPS, A SPIRE WITH ITS CHIMNEY MOUTH, A LONE SPIRE',
+              fill=(40, 30, 25))
+    y += title_h
+    for name, offset, turn in cathedral_corner():
+        scene.draw_model(turned(models[name], turn), textures, (offset[0] - 3.5, offset[1], offset[2] - 3.5),
+                         (width * 0.5, y + corner_h * 0.8), 56)
+    os.makedirs(os.path.dirname(CATHEDRAL_PREVIEW), exist_ok=True)
+    scene.image.save(CATHEDRAL_PREVIEW)
+
+
 if __name__ == '__main__':
     textures = make_textures()
     models = make_models()
     render_preview(models, textures)
+    render_cathedral_preview(models, textures)
     print('termite blocks and preview written')

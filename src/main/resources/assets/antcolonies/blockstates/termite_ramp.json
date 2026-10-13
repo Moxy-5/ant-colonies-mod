@@ -1,0 +1,1304 @@
+{
+  "variants": {
+    "age=0,facing=east,shape=straight": [
+      {
+        "model": "antcolonies:block/termite_ramp_straight_fresh",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_straight_fresh_b",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_straight_fresh_c",
+        "uvlock": true
+      }
+    ],
+    "age=0,facing=east,shape=outer_left": [
+      {
+        "model": "antcolonies:block/termite_ramp_outer_fresh",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_fresh_b",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_fresh_c",
+        "uvlock": true,
+        "y": 270
+      }
+    ],
+    "age=0,facing=east,shape=outer_right": [
+      {
+        "model": "antcolonies:block/termite_ramp_outer_fresh",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_fresh_b",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_fresh_c",
+        "uvlock": true
+      }
+    ],
+    "age=0,facing=east,shape=inner_left": [
+      {
+        "model": "antcolonies:block/termite_ramp_inner_fresh",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_fresh_b",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_fresh_c",
+        "uvlock": true,
+        "y": 270
+      }
+    ],
+    "age=0,facing=east,shape=inner_right": [
+      {
+        "model": "antcolonies:block/termite_ramp_inner_fresh",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_fresh_b",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_fresh_c",
+        "uvlock": true
+      }
+    ],
+    "age=0,facing=south,shape=straight": [
+      {
+        "model": "antcolonies:block/termite_ramp_straight_fresh",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_straight_fresh_b",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_straight_fresh_c",
+        "uvlock": true,
+        "y": 90
+      }
+    ],
+    "age=0,facing=south,shape=outer_left": [
+      {
+        "model": "antcolonies:block/termite_ramp_outer_fresh",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_fresh_b",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_fresh_c",
+        "uvlock": true
+      }
+    ],
+    "age=0,facing=south,shape=outer_right": [
+      {
+        "model": "antcolonies:block/termite_ramp_outer_fresh",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_fresh_b",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_fresh_c",
+        "uvlock": true,
+        "y": 90
+      }
+    ],
+    "age=0,facing=south,shape=inner_left": [
+      {
+        "model": "antcolonies:block/termite_ramp_inner_fresh",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_fresh_b",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_fresh_c",
+        "uvlock": true
+      }
+    ],
+    "age=0,facing=south,shape=inner_right": [
+      {
+        "model": "antcolonies:block/termite_ramp_inner_fresh",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_fresh_b",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_fresh_c",
+        "uvlock": true,
+        "y": 90
+      }
+    ],
+    "age=0,facing=west,shape=straight": [
+      {
+        "model": "antcolonies:block/termite_ramp_straight_fresh",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_straight_fresh_b",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_straight_fresh_c",
+        "uvlock": true,
+        "y": 180
+      }
+    ],
+    "age=0,facing=west,shape=outer_left": [
+      {
+        "model": "antcolonies:block/termite_ramp_outer_fresh",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_fresh_b",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_fresh_c",
+        "uvlock": true,
+        "y": 90
+      }
+    ],
+    "age=0,facing=west,shape=outer_right": [
+      {
+        "model": "antcolonies:block/termite_ramp_outer_fresh",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_fresh_b",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_fresh_c",
+        "uvlock": true,
+        "y": 180
+      }
+    ],
+    "age=0,facing=west,shape=inner_left": [
+      {
+        "model": "antcolonies:block/termite_ramp_inner_fresh",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_fresh_b",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_fresh_c",
+        "uvlock": true,
+        "y": 90
+      }
+    ],
+    "age=0,facing=west,shape=inner_right": [
+      {
+        "model": "antcolonies:block/termite_ramp_inner_fresh",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_fresh_b",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_fresh_c",
+        "uvlock": true,
+        "y": 180
+      }
+    ],
+    "age=0,facing=north,shape=straight": [
+      {
+        "model": "antcolonies:block/termite_ramp_straight_fresh",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_straight_fresh_b",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_straight_fresh_c",
+        "uvlock": true,
+        "y": 270
+      }
+    ],
+    "age=0,facing=north,shape=outer_left": [
+      {
+        "model": "antcolonies:block/termite_ramp_outer_fresh",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_fresh_b",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_fresh_c",
+        "uvlock": true,
+        "y": 180
+      }
+    ],
+    "age=0,facing=north,shape=outer_right": [
+      {
+        "model": "antcolonies:block/termite_ramp_outer_fresh",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_fresh_b",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_fresh_c",
+        "uvlock": true,
+        "y": 270
+      }
+    ],
+    "age=0,facing=north,shape=inner_left": [
+      {
+        "model": "antcolonies:block/termite_ramp_inner_fresh",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_fresh_b",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_fresh_c",
+        "uvlock": true,
+        "y": 180
+      }
+    ],
+    "age=0,facing=north,shape=inner_right": [
+      {
+        "model": "antcolonies:block/termite_ramp_inner_fresh",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_fresh_b",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_fresh_c",
+        "uvlock": true,
+        "y": 270
+      }
+    ],
+    "age=1,facing=east,shape=straight": [
+      {
+        "model": "antcolonies:block/termite_ramp_straight_setting",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_straight_setting_b",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_straight_setting_c",
+        "uvlock": true
+      }
+    ],
+    "age=1,facing=east,shape=outer_left": [
+      {
+        "model": "antcolonies:block/termite_ramp_outer_setting",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_setting_b",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_setting_c",
+        "uvlock": true,
+        "y": 270
+      }
+    ],
+    "age=1,facing=east,shape=outer_right": [
+      {
+        "model": "antcolonies:block/termite_ramp_outer_setting",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_setting_b",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_setting_c",
+        "uvlock": true
+      }
+    ],
+    "age=1,facing=east,shape=inner_left": [
+      {
+        "model": "antcolonies:block/termite_ramp_inner_setting",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_setting_b",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_setting_c",
+        "uvlock": true,
+        "y": 270
+      }
+    ],
+    "age=1,facing=east,shape=inner_right": [
+      {
+        "model": "antcolonies:block/termite_ramp_inner_setting",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_setting_b",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_setting_c",
+        "uvlock": true
+      }
+    ],
+    "age=1,facing=south,shape=straight": [
+      {
+        "model": "antcolonies:block/termite_ramp_straight_setting",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_straight_setting_b",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_straight_setting_c",
+        "uvlock": true,
+        "y": 90
+      }
+    ],
+    "age=1,facing=south,shape=outer_left": [
+      {
+        "model": "antcolonies:block/termite_ramp_outer_setting",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_setting_b",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_setting_c",
+        "uvlock": true
+      }
+    ],
+    "age=1,facing=south,shape=outer_right": [
+      {
+        "model": "antcolonies:block/termite_ramp_outer_setting",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_setting_b",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_setting_c",
+        "uvlock": true,
+        "y": 90
+      }
+    ],
+    "age=1,facing=south,shape=inner_left": [
+      {
+        "model": "antcolonies:block/termite_ramp_inner_setting",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_setting_b",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_setting_c",
+        "uvlock": true
+      }
+    ],
+    "age=1,facing=south,shape=inner_right": [
+      {
+        "model": "antcolonies:block/termite_ramp_inner_setting",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_setting_b",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_setting_c",
+        "uvlock": true,
+        "y": 90
+      }
+    ],
+    "age=1,facing=west,shape=straight": [
+      {
+        "model": "antcolonies:block/termite_ramp_straight_setting",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_straight_setting_b",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_straight_setting_c",
+        "uvlock": true,
+        "y": 180
+      }
+    ],
+    "age=1,facing=west,shape=outer_left": [
+      {
+        "model": "antcolonies:block/termite_ramp_outer_setting",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_setting_b",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_setting_c",
+        "uvlock": true,
+        "y": 90
+      }
+    ],
+    "age=1,facing=west,shape=outer_right": [
+      {
+        "model": "antcolonies:block/termite_ramp_outer_setting",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_setting_b",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_setting_c",
+        "uvlock": true,
+        "y": 180
+      }
+    ],
+    "age=1,facing=west,shape=inner_left": [
+      {
+        "model": "antcolonies:block/termite_ramp_inner_setting",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_setting_b",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_setting_c",
+        "uvlock": true,
+        "y": 90
+      }
+    ],
+    "age=1,facing=west,shape=inner_right": [
+      {
+        "model": "antcolonies:block/termite_ramp_inner_setting",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_setting_b",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_setting_c",
+        "uvlock": true,
+        "y": 180
+      }
+    ],
+    "age=1,facing=north,shape=straight": [
+      {
+        "model": "antcolonies:block/termite_ramp_straight_setting",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_straight_setting_b",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_straight_setting_c",
+        "uvlock": true,
+        "y": 270
+      }
+    ],
+    "age=1,facing=north,shape=outer_left": [
+      {
+        "model": "antcolonies:block/termite_ramp_outer_setting",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_setting_b",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_setting_c",
+        "uvlock": true,
+        "y": 180
+      }
+    ],
+    "age=1,facing=north,shape=outer_right": [
+      {
+        "model": "antcolonies:block/termite_ramp_outer_setting",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_setting_b",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_setting_c",
+        "uvlock": true,
+        "y": 270
+      }
+    ],
+    "age=1,facing=north,shape=inner_left": [
+      {
+        "model": "antcolonies:block/termite_ramp_inner_setting",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_setting_b",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_setting_c",
+        "uvlock": true,
+        "y": 180
+      }
+    ],
+    "age=1,facing=north,shape=inner_right": [
+      {
+        "model": "antcolonies:block/termite_ramp_inner_setting",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_setting_b",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_setting_c",
+        "uvlock": true,
+        "y": 270
+      }
+    ],
+    "age=2,facing=east,shape=straight": [
+      {
+        "model": "antcolonies:block/termite_ramp_straight_dry",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_straight_dry_b",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_straight_dry_c",
+        "uvlock": true
+      }
+    ],
+    "age=2,facing=east,shape=outer_left": [
+      {
+        "model": "antcolonies:block/termite_ramp_outer_dry",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_dry_b",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_dry_c",
+        "uvlock": true,
+        "y": 270
+      }
+    ],
+    "age=2,facing=east,shape=outer_right": [
+      {
+        "model": "antcolonies:block/termite_ramp_outer_dry",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_dry_b",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_dry_c",
+        "uvlock": true
+      }
+    ],
+    "age=2,facing=east,shape=inner_left": [
+      {
+        "model": "antcolonies:block/termite_ramp_inner_dry",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_dry_b",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_dry_c",
+        "uvlock": true,
+        "y": 270
+      }
+    ],
+    "age=2,facing=east,shape=inner_right": [
+      {
+        "model": "antcolonies:block/termite_ramp_inner_dry",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_dry_b",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_dry_c",
+        "uvlock": true
+      }
+    ],
+    "age=2,facing=south,shape=straight": [
+      {
+        "model": "antcolonies:block/termite_ramp_straight_dry",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_straight_dry_b",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_straight_dry_c",
+        "uvlock": true,
+        "y": 90
+      }
+    ],
+    "age=2,facing=south,shape=outer_left": [
+      {
+        "model": "antcolonies:block/termite_ramp_outer_dry",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_dry_b",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_dry_c",
+        "uvlock": true
+      }
+    ],
+    "age=2,facing=south,shape=outer_right": [
+      {
+        "model": "antcolonies:block/termite_ramp_outer_dry",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_dry_b",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_dry_c",
+        "uvlock": true,
+        "y": 90
+      }
+    ],
+    "age=2,facing=south,shape=inner_left": [
+      {
+        "model": "antcolonies:block/termite_ramp_inner_dry",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_dry_b",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_dry_c",
+        "uvlock": true
+      }
+    ],
+    "age=2,facing=south,shape=inner_right": [
+      {
+        "model": "antcolonies:block/termite_ramp_inner_dry",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_dry_b",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_dry_c",
+        "uvlock": true,
+        "y": 90
+      }
+    ],
+    "age=2,facing=west,shape=straight": [
+      {
+        "model": "antcolonies:block/termite_ramp_straight_dry",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_straight_dry_b",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_straight_dry_c",
+        "uvlock": true,
+        "y": 180
+      }
+    ],
+    "age=2,facing=west,shape=outer_left": [
+      {
+        "model": "antcolonies:block/termite_ramp_outer_dry",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_dry_b",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_dry_c",
+        "uvlock": true,
+        "y": 90
+      }
+    ],
+    "age=2,facing=west,shape=outer_right": [
+      {
+        "model": "antcolonies:block/termite_ramp_outer_dry",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_dry_b",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_dry_c",
+        "uvlock": true,
+        "y": 180
+      }
+    ],
+    "age=2,facing=west,shape=inner_left": [
+      {
+        "model": "antcolonies:block/termite_ramp_inner_dry",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_dry_b",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_dry_c",
+        "uvlock": true,
+        "y": 90
+      }
+    ],
+    "age=2,facing=west,shape=inner_right": [
+      {
+        "model": "antcolonies:block/termite_ramp_inner_dry",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_dry_b",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_dry_c",
+        "uvlock": true,
+        "y": 180
+      }
+    ],
+    "age=2,facing=north,shape=straight": [
+      {
+        "model": "antcolonies:block/termite_ramp_straight_dry",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_straight_dry_b",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_straight_dry_c",
+        "uvlock": true,
+        "y": 270
+      }
+    ],
+    "age=2,facing=north,shape=outer_left": [
+      {
+        "model": "antcolonies:block/termite_ramp_outer_dry",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_dry_b",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_dry_c",
+        "uvlock": true,
+        "y": 180
+      }
+    ],
+    "age=2,facing=north,shape=outer_right": [
+      {
+        "model": "antcolonies:block/termite_ramp_outer_dry",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_dry_b",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_dry_c",
+        "uvlock": true,
+        "y": 270
+      }
+    ],
+    "age=2,facing=north,shape=inner_left": [
+      {
+        "model": "antcolonies:block/termite_ramp_inner_dry",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_dry_b",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_dry_c",
+        "uvlock": true,
+        "y": 180
+      }
+    ],
+    "age=2,facing=north,shape=inner_right": [
+      {
+        "model": "antcolonies:block/termite_ramp_inner_dry",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_dry_b",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_dry_c",
+        "uvlock": true,
+        "y": 270
+      }
+    ],
+    "age=3,facing=east,shape=straight": [
+      {
+        "model": "antcolonies:block/termite_ramp_straight_old",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_straight_old_b",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_straight_old_c",
+        "uvlock": true
+      }
+    ],
+    "age=3,facing=east,shape=outer_left": [
+      {
+        "model": "antcolonies:block/termite_ramp_outer_old",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_old_b",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_old_c",
+        "uvlock": true,
+        "y": 270
+      }
+    ],
+    "age=3,facing=east,shape=outer_right": [
+      {
+        "model": "antcolonies:block/termite_ramp_outer_old",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_old_b",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_old_c",
+        "uvlock": true
+      }
+    ],
+    "age=3,facing=east,shape=inner_left": [
+      {
+        "model": "antcolonies:block/termite_ramp_inner_old",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_old_b",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_old_c",
+        "uvlock": true,
+        "y": 270
+      }
+    ],
+    "age=3,facing=east,shape=inner_right": [
+      {
+        "model": "antcolonies:block/termite_ramp_inner_old",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_old_b",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_old_c",
+        "uvlock": true
+      }
+    ],
+    "age=3,facing=south,shape=straight": [
+      {
+        "model": "antcolonies:block/termite_ramp_straight_old",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_straight_old_b",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_straight_old_c",
+        "uvlock": true,
+        "y": 90
+      }
+    ],
+    "age=3,facing=south,shape=outer_left": [
+      {
+        "model": "antcolonies:block/termite_ramp_outer_old",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_old_b",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_old_c",
+        "uvlock": true
+      }
+    ],
+    "age=3,facing=south,shape=outer_right": [
+      {
+        "model": "antcolonies:block/termite_ramp_outer_old",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_old_b",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_old_c",
+        "uvlock": true,
+        "y": 90
+      }
+    ],
+    "age=3,facing=south,shape=inner_left": [
+      {
+        "model": "antcolonies:block/termite_ramp_inner_old",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_old_b",
+        "uvlock": true
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_old_c",
+        "uvlock": true
+      }
+    ],
+    "age=3,facing=south,shape=inner_right": [
+      {
+        "model": "antcolonies:block/termite_ramp_inner_old",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_old_b",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_old_c",
+        "uvlock": true,
+        "y": 90
+      }
+    ],
+    "age=3,facing=west,shape=straight": [
+      {
+        "model": "antcolonies:block/termite_ramp_straight_old",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_straight_old_b",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_straight_old_c",
+        "uvlock": true,
+        "y": 180
+      }
+    ],
+    "age=3,facing=west,shape=outer_left": [
+      {
+        "model": "antcolonies:block/termite_ramp_outer_old",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_old_b",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_old_c",
+        "uvlock": true,
+        "y": 90
+      }
+    ],
+    "age=3,facing=west,shape=outer_right": [
+      {
+        "model": "antcolonies:block/termite_ramp_outer_old",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_old_b",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_old_c",
+        "uvlock": true,
+        "y": 180
+      }
+    ],
+    "age=3,facing=west,shape=inner_left": [
+      {
+        "model": "antcolonies:block/termite_ramp_inner_old",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_old_b",
+        "uvlock": true,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_old_c",
+        "uvlock": true,
+        "y": 90
+      }
+    ],
+    "age=3,facing=west,shape=inner_right": [
+      {
+        "model": "antcolonies:block/termite_ramp_inner_old",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_old_b",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_old_c",
+        "uvlock": true,
+        "y": 180
+      }
+    ],
+    "age=3,facing=north,shape=straight": [
+      {
+        "model": "antcolonies:block/termite_ramp_straight_old",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_straight_old_b",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_straight_old_c",
+        "uvlock": true,
+        "y": 270
+      }
+    ],
+    "age=3,facing=north,shape=outer_left": [
+      {
+        "model": "antcolonies:block/termite_ramp_outer_old",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_old_b",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_old_c",
+        "uvlock": true,
+        "y": 180
+      }
+    ],
+    "age=3,facing=north,shape=outer_right": [
+      {
+        "model": "antcolonies:block/termite_ramp_outer_old",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_old_b",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_outer_old_c",
+        "uvlock": true,
+        "y": 270
+      }
+    ],
+    "age=3,facing=north,shape=inner_left": [
+      {
+        "model": "antcolonies:block/termite_ramp_inner_old",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_old_b",
+        "uvlock": true,
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_old_c",
+        "uvlock": true,
+        "y": 180
+      }
+    ],
+    "age=3,facing=north,shape=inner_right": [
+      {
+        "model": "antcolonies:block/termite_ramp_inner_old",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_old_b",
+        "uvlock": true,
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/termite_ramp_inner_old_c",
+        "uvlock": true,
+        "y": 270
+      }
+    ]
+  }
+}
