@@ -11,6 +11,7 @@ import com.antcolonies.entity.goal.SealEntranceGoal;
 import com.antcolonies.species.Species;
 import com.antcolonies.species.SpeciesProfile;
 
+import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -27,17 +28,23 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.FloatGoal;
 import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * The termite queen. With her king she founds the colony, digs the royal chamber and settles in it. She starts the
  * size of the king and swells as her colony grows (her species profile's {@code queen_body}): her head, thorax and legs
  * stay the same, only her abdomen stretches, and past a certain size she can no longer walk. Sealed in, she lays the
- * founding batch, and the pair raise it (see {@code QueenCare.raiseFoundingBatch}). The colony dies with her.
+ * founding batch, and the pair raise it (see {@code QueenCare.raiseFoundingBatch}). Then, fed fungus nodules by the
+ * nurses, she lays a steady stream of eggs behind her, faster the bigger she is ({@code QueenCare.layInStream}). She
+ * also keeps the colony's fungus garden growing (once a second). The colony dies with her.
  */
 public class TermiteQueenEntity extends AbstractAntEntity {
     /** How far she has swollen: 0 = just founded (king-sized), 1 = full grown. Synced so the renderer can draw her. Saved. */
     private static final EntityDataAccessor<Float> DATA_SIZE =
             SynchedEntityData.defineId(TermiteQueenEntity.class, EntityDataSerializers.FLOAT);
+
+    /** How far (in blocks) behind her middle her egg comes out (more as her abdomen grows). */
+    private static final double EGG_BEHIND = 0.4;
 
     private boolean colonyChecked;
 
@@ -135,6 +142,16 @@ public class TermiteQueenEntity extends AbstractAntEntity {
             Colony colony = manager.getColony(getColonyId());
             if (colony != null) {
                 if (colony.queenCare().raiseFoundingBatch(serverLevel, this)) {
+                    manager.markChanged();
+                }
+                colony.garden().grow(serverLevel);
+                if (colony.queenCare().layInStream(serverLevel, getSize())) {
+                    Vec3 at = position().subtract(Vec3.directionFromRotation(0.0F, getYRot()).scale(EGG_BEHIND + 0.4 * getSize()));
+                    BlockPos cell = BlockPos.containing(at.x, getY() + 0.1, at.z);
+                    if (!serverLevel.getBlockState(cell).getCollisionShape(serverLevel, cell).isEmpty()) {
+                        at = position(); // a wall behind her: the egg comes out where she lies
+                    }
+                    colony.queenCare().layStreamEgg(serverLevel, at.x, getY(), at.z, getSize());
                     manager.markChanged();
                 }
                 colony.profile().queenBody().ifPresent(body -> {

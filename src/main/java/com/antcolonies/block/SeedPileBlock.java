@@ -35,6 +35,11 @@ public class SeedPileBlock extends Block {
         registerDefaultState(stateDefinition.any().setValue(LAYERS, 1));
     }
 
+    /** How many layers this heap may have at most (a full block for seeds, bread and forage). */
+    public int maxLayers() {
+        return MAX_LAYERS;
+    }
+
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
         builder.add(LAYERS);

@@ -127,9 +127,12 @@ public class ColonyCommands {
                     + (colony.profile().food().makesBread()
                             ? " | food " + colony.food().getFood() + " (rich " + colony.food().getRichSeeds() + ", eaten " + colony.food().getSeedsEaten() + ")"
                                     + " | bread " + colony.bakery().getBread() + " (rich " + colony.bakery().getRichBread() + ", milling " + colony.bakery().getMilling() + ")"
+                            : colony.garden().exists() ? garden(colony, level)
                             : " | food " + colony.food().getFood() + " pieces in the store")
-                    + " | queen fed " + colony.queenCare().getQueenBread() + "/" + colony.profile().queen().meal() + ", rich " + colony.queenCare().getQueenRich() + "/"
-                    + colony.profile().queen().richMeal() + incubation(colony, level)
+                    + (colony.profile().laying().isPresent()
+                            ? " | queen holds " + colony.queenCare().getQueenBread() + "/" + colony.profile().queen().meal() + " nodules" + nextEgg(colony, level)
+                            : " | queen fed " + colony.queenCare().getQueenBread() + "/" + colony.profile().queen().meal() + ", rich " + colony.queenCare().getQueenRich() + "/"
+                                    + colony.profile().queen().richMeal() + incubation(colony, level))
                     + " | queen unfed " + unfedMinutes(colony, level) + " of " + colony.profile().queen().starveTicks() / 1200 + " min"
                     + " | eggs " + colony.brood().countEggs(level) + " | larvae " + colony.brood().countLarvae(level)
                     + " | dead ants " + colony.refuse().getCorpses(level).size() + " (refuse chamber " + colony.refuse().getRefuseCorpses(level).size() + ")"
@@ -151,6 +154,25 @@ public class ColonyCommands {
         int h = colony.mound().getStage(level);
         return String.format(" | mound stage %d (earned %d) of %d, %d/%d blocks finished, earned %.1f blocks", h, colony.mound().getEarnedStage(level),
                 colony.mound().numbers().maxHeight(), colony.mound().countFinished(level), colony.mound().wallsAt(h), colony.mound().getAllowance(level));
+    }
+
+    /** " | gardens 2 dug (planned 6), comb 14 layers on 5 blocks, nodules 3" for colonies with a fungus garden. */
+    private static String garden(Colony colony, ServerLevel level) {
+        java.util.Set<net.minecraft.core.BlockPos> cells = new java.util.HashSet<>(colony.nest().getGardenCells(level));
+        long dug = colony.nest().getGardens(level).stream().filter(garden -> cells.containsAll(garden.room())).count();
+        return " | gardens " + dug + " dug (planned " + colony.nest().getGardens(level).size() + "), comb "
+                + colony.garden().countCombLayers(level) + " layers on " + colony.garden().getCombs(level).size() + " blocks, nodules "
+                + colony.garden().available(level);
+    }
+
+    /** ", next egg in 1:20" while a queen who lays a steady stream can lay, otherwise ", not laying". */
+    private static String nextEgg(Colony colony, ServerLevel level) {
+        long next = colony.queenCare().getNextStreamEgg();
+        if (next == Colony.NOT_SET) {
+            return ", not laying";
+        }
+        long seconds = Math.max(0, next - level.getGameTime()) / 20;
+        return String.format(", next egg in %d:%02d", seconds / 60, seconds % 60);
     }
 
     /** " | foraging now (night, rain), holes open 1 of 2" for colonies that keep a schedule or have foraging holes, otherwise nothing. */

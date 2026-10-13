@@ -50,10 +50,15 @@ public record Foothold(BlockPos cell, Direction surface, boolean inChannel) {
         return inChannel;
     }
 
+    /** A slope this low (in pixels, at its highest) leaves room for an insect over it in its own cell, even under a ceiling. */
+    static final int LOW_SLOPE_PIXELS = 8;
+
     /**
      * Whether an insect can hold on here: the cell is open and the block on that side has a solid face toward it. A
-     * slope's cell has a floor too (its surface), if there is room over it; nothing else in it can be held. A channel
-     * foothold: the block in the cell has a channel the insect fits through, open out of at least one side.
+     * slope's cell has a floor too (its surface), if there is room over it: the cell above is open, or the slope is low
+     * (at most {@link #LOW_SLOPE_PIXELS}, like a fungus comb on the floor of a room one block tall); nothing else in it
+     * can be held. A channel foothold: the block in the cell has a channel the insect fits through, open out of at
+     * least one side.
      */
     public boolean isValid(CellMap map) {
         if (inChannel) {
@@ -64,7 +69,7 @@ public record Foothold(BlockPos cell, Direction surface, boolean inChannel) {
 
     static boolean isValid(CellMap map, BlockPos cell, Direction surface) {
         if (surface == Direction.DOWN && map.isSlope(cell)) {
-            return map.isOpen(cell.above());
+            return map.isOpen(cell.above()) || map.slopeTop(cell) <= LOW_SLOPE_PIXELS;
         }
         return map.isOpen(cell) && map.isSolidFace(cell.relative(surface), surface.getOpposite());
     }

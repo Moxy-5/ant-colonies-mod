@@ -8,10 +8,12 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import com.antcolonies.block.FungusCombBlock;
 import com.antcolonies.entity.AntEggEntity;
 import com.antcolonies.entity.AntLarvaEntity;
 import com.antcolonies.entity.TermiteWorkerEntity;
 import com.antcolonies.entity.WorkerAntEntity;
+import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.registry.ModEntities;
 import com.antcolonies.species.Species;
 
@@ -21,6 +23,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
 
 /**
  * The colony's young: eggs (laid by the queen, carried to the nursery, hatching into larvae) and larvae (fed bread by
@@ -71,15 +74,16 @@ public class Brood {
         return getEggs(level).stream().filter(egg -> cells.contains(egg.blockPosition())).toList();
     }
 
-    /** The eggs that no worker has put in its place yet (not in the nursery and not set down by a worker). */
+    /** The eggs that no worker has put in its place yet (not in the nursery or a garden, and not set down by a worker). */
     public List<AntEggEntity> getLooseEggs(Level level) {
         Set<BlockPos> cells = new HashSet<>(colony.nest().getNurseryCells(level));
+        cells.addAll(colony.nest().getGardenCells(level));
         return getEggs(level).stream().filter(egg -> !egg.isPlaced() && !cells.contains(egg.blockPosition())).toList();
     }
 
-    /** Whether this block is a floor cell of the nursery (so an egg lying there is being kept warm and will hatch). */
+    /** Whether this block is a floor cell of the nursery or a garden room (so an egg lying there is being kept and will hatch). */
     public boolean isInNursery(Level level, BlockPos pos) {
-        return colony.nest().getNurseryCells(level).contains(pos);
+        return colony.nest().getNurseryCells(level).contains(pos) || colony.nest().getGardenCells(level).contains(pos);
     }
 
     /** What an egg of this colony hatches into: an ant larva, or a termite nymph (a small pale termite). */
@@ -208,36 +212,59 @@ public class Brood {
     }
 
     /**
-     * A free spot for an egg, or null if there is none: in the nursery if any of it is dug out, otherwise (or when the
-     * nursery is full) on the floor of the queen's room. The nursery is the preferred place, not a must.
+     * A free spot for an egg, or null if there is none: in the nursery if any of it is dug out, then in a garden room
+     * (termites: on the fungus comb, or on the floor beside it), otherwise (or when those are full) on the floor of the
+     * queen's room. The nursery and the gardens are the preferred places, not a must.
      */
     @Nullable
     public BlockPos pickEggSpot(Level level, RandomSource random) {
         Set<BlockPos> taken = getBroodCells(level);
         Nest nest = colony.nest();
-        for (List<BlockPos> cells : List.of(nest.getNurseryCells(level), nest.getHomeRoomCells(level))) {
+        for (List<BlockPos> cells : List.of(nest.getNurseryCells(level), nest.getGardenCells(level), nest.getHomeRoomCells(level))) {
             List<BlockPos> free = new ArrayList<>();
+            List<BlockPos> onComb = new ArrayList<>();
             for (BlockPos pos : cells) {
-                if (!taken.contains(pos) && level.getBlockState(pos).isAir()) {
+                if (taken.contains(pos)) {
+                    continue;
+                }
+                BlockState state = level.getBlockState(pos);
+                if (state.isAir()) {
                     free.add(pos);
+                } else if (state.is(ModBlocks.FUNGUS_COMB.get())) {
+                    onComb.add(pos);
                 }
             }
-            if (!free.isEmpty()) {
-                return free.get(random.nextInt(free.size()));
+            // On the comb first, where the nymph will find its food.
+            List<BlockPos> from = !onComb.isEmpty() ? onComb : free;
+            if (!from.isEmpty()) {
+                return from.get(random.nextInt(from.size()));
             }
         }
         return null;
     }
 
+    /**
+     * How high over the bottom of this cell an egg or a young one lies: on top of a fungus comb, otherwise on the floor.
+     * -1 if nothing can be put there (a block in the way).
+     */
+    public static double restingHeight(Level level, BlockPos spot) {
+        BlockState state = level.getBlockState(spot);
+        if (state.isAir()) {
+            return 0.0;
+        }
+        return state.is(ModBlocks.FUNGUS_COMB.get()) ? FungusCombBlock.topOf(state) : -1.0;
+    }
+
     /** A worker puts its egg down at {@code spot}. False if another egg lies there (the worker looks for another spot). */
     public boolean placeEgg(Level level, BlockPos spot) {
-        if (!level.getBlockState(spot).isAir()) {
+        double height = restingHeight(level, spot);
+        if (height < 0) {
             return false;
         }
         if (getBroodCells(level).contains(spot)) {
             return false;
         }
-        spawnEgg(level, spot.getX() + 0.5, spot.getY(), spot.getZ() + 0.5).setPlaced(true);
+        spawnEgg(level, spot.getX() + 0.5, spot.getY() + height, spot.getZ() + 0.5).setPlaced(true);
         return true;
     }
 

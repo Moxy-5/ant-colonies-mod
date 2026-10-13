@@ -26,8 +26,8 @@ import net.minecraft.world.phys.AABB;
  * <p>The colony itself holds who it is, its headcount and the workers' roles. Everything else lives in its parts, one
  * per subject: {@link #nest()} (the underground plan and digging), {@link #walls()} (sealing the nest), {@link #hill()},
  * {@link #food()} (seeds), {@link #bakery()} (ant bread), {@link #queenCare()} (feeding the queen and her eggs),
- * {@link #brood()} (eggs and larvae), {@link #refuse()} (dead ants), {@link #mound()} (the termite mound) and
- * {@link #foragingHoles()} (the termites' ways out to forage).
+ * {@link #brood()} (eggs and larvae), {@link #refuse()} (dead ants), {@link #mound()} (the termite mound),
+ * {@link #foragingHoles()} (the termites' ways out to forage) and {@link #garden()} (the termites' fungus garden).
  */
 public class Colony {
     /** "No time saved": a hunger clock that has not started yet. */
@@ -57,6 +57,7 @@ public class Colony {
     private final Refuse refuse;
     private final Mound mound;
     private final ForagingHoles foragingHoles;
+    private final FungusGarden garden;
 
     public Colony(UUID id, ResourceLocation species, UUID queenId, BlockPos center) {
         this.id = id;
@@ -73,6 +74,7 @@ public class Colony {
         this.refuse = new Refuse(this);
         this.mound = new Mound(this);
         this.foragingHoles = new ForagingHoles(this);
+        this.garden = new FungusGarden(this);
     }
 
     /** The underground nest: its plan, the next block to dig, and the dug-out cells of each room. */
@@ -118,6 +120,19 @@ public class Colony {
     /** The termite mound (only species whose profile has a {@code mound} build one; see {@link Mound#numbers}). */
     public Mound mound() {
         return mound;
+    }
+
+    /** The fungus garden: comb, nodules (only species whose profile has a {@code garden}). */
+    public FungusGarden garden() {
+        return garden;
+    }
+
+    /**
+     * What the nurses feed the queen and the young: fungus nodules for a species with a fungus garden, ant bread
+     * otherwise.
+     */
+    public NurseFood nurseFood() {
+        return garden.exists() ? garden : bakery;
     }
 
     /** The foraging holes and their tunnels (only species whose profile has {@code nest.foraging_holes}). */

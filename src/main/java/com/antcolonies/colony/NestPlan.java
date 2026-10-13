@@ -42,7 +42,9 @@ public final class NestPlan {
     public enum Kind {
         QUEEN, NURSERY, FOOD, REFUSE,
         /** The small room a queen digs on her own when she founds the colony (not one of the levels, see {@link #foundingChamber}). */
-        FOUNDING
+        FOUNDING,
+        /** A termite fungus garden room round the royal chamber (see {@link #gardens}): fungus comb, eggs and nymphs. */
+        GARDEN
     }
 
     /**
@@ -95,6 +97,7 @@ public final class NestPlan {
             case FOOD -> new RoomSize(5, 5);
             case REFUSE -> new RoomSize(5, 5);
             case FOUNDING -> new RoomSize(3, 3);
+            case GARDEN -> new RoomSize(3, 3);
         };
     }
 
@@ -192,6 +195,72 @@ public final class NestPlan {
             rooms.add(new Chamber(kinds.get(i), List.copyOf(cells), center, List.copyOf(tunnel), List.copyOf(room)));
         }
         return List.copyOf(rooms);
+    }
+
+    /**
+     * Where the garden rooms lie, in the order they are dug: {@code row} and {@code side} are the middle of the room,
+     * counted from the royal chamber's middle (rows along the rooms' direction, sides clockwise of it); the doorway is
+     * the block between the room and the room it opens into ({@code parent}: the royal chamber, -1, or an earlier
+     * garden). Seen from above, with the royal chamber {@code Q} at the bottom middle and its tunnel coming up from the
+     * shaft below it:
+     * <pre>
+     *            6
+     *            |
+     *      4 --  1  -- 5        (4 opens into 2, 5 into 3, 6 into 1)
+     *      |     |     |
+     *      2 --  Q  -- 3
+     *            |
+     *          tunnel
+     * </pre>
+     * Every room is 3x3 with a wall of one block of soil to the next, crossed only by its doorway.
+     */
+    private record GardenSpot(int row, int side, int parent) {
+    }
+
+    private static final GardenSpot[] GARDEN_SPOTS = {
+            new GardenSpot(4, 0, -1), new GardenSpot(0, -4, -1), new GardenSpot(0, 4, -1),
+            new GardenSpot(4, -4, 1), new GardenSpot(4, 4, 2), new GardenSpot(8, 0, 0)};
+
+    /** The most garden rooms a nest can have (see {@link #gardens}). */
+    public static final int MAX_GARDENS = GARDEN_SPOTS.length;
+
+    /**
+     * The garden rooms (termites' fungus gardens, at most {@link #MAX_GARDENS}) round the royal chamber {@code royal}
+     * (a 3x3 room at the end of its tunnel, the nest's only level) of a nest whose rooms lie toward {@code direction}:
+     * on the same level, beside and beyond it (see {@link GardenSpot}), each joined to the royal chamber or to the garden
+     * before it by a doorway. Real Macrotermes keep their fungus gardens in many small chambers all round the royal
+     * cell. A garden's cells are its doorway, then its room; its way in is the royal chamber's way in, the royal chamber
+     * itself, the rooms and doorways in between and its own doorway, so it counts once all of those are dug.
+     */
+    public static List<Chamber> gardens(Chamber royal, Direction direction, int count) {
+        Direction sideways = direction.getClockWise();
+        List<Chamber> gardens = new ArrayList<>();
+        for (int i = 0; i < count && i < GARDEN_SPOTS.length; i++) {
+            GardenSpot spot = GARDEN_SPOTS[i];
+            Chamber parent = spot.parent() < 0 ? royal : gardens.get(spot.parent());
+            BlockPos center = royal.center().relative(direction, spot.row()).relative(sideways, spot.side());
+            // The doorway lies between this room's middle and the parent room's middle, one block outside this room.
+            BlockPos parentCenter = parent.center();
+            int stepX = Integer.signum(parentCenter.getX() - center.getX());
+            int stepZ = Integer.signum(parentCenter.getZ() - center.getZ());
+            BlockPos door = center.offset(2 * stepX, 0, 2 * stepZ);
+            List<BlockPos> room = new ArrayList<>();
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    room.add(center.offset(dx, 0, dz));
+                }
+            }
+            // Dug from the doorway inward: nearest first, so every block touches space already dug.
+            room.sort(java.util.Comparator.comparingInt((BlockPos pos) -> pos.distManhattan(door)).thenComparing(BlockPos::compareTo));
+            List<BlockPos> cells = new ArrayList<>();
+            cells.add(door);
+            cells.addAll(room);
+            List<BlockPos> wayIn = new ArrayList<>(parent.wayIn());
+            wayIn.addAll(parent.room());
+            wayIn.add(door);
+            gardens.add(new Chamber(Kind.GARDEN, List.copyOf(cells), center, List.copyOf(wayIn), List.copyOf(room)));
+        }
+        return List.copyOf(gardens);
     }
 
     /**

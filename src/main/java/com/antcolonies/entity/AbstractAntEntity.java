@@ -175,9 +175,12 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return !getCarriedSeed().isEmpty() && !isCarryingBread();
     }
 
-    /** Whether the ant holds a piece of ant bread, plain or rich (on its way to the queen or a larva). */
+    /**
+     * Whether the ant holds the nurses' food for the queen and the young: a piece of ant bread, plain or rich, or a
+     * termite's fungus nodule (on its way to the queen or a larva or nymph).
+     */
     public boolean isCarryingBread() {
-        return getCarriedSeed().is(ModItems.ANT_BREAD.get()) || isCarryingRichBread();
+        return getCarriedSeed().is(ModItems.ANT_BREAD.get()) || isCarryingRichBread() || getCarriedSeed().is(ModItems.FUNGUS_NODULE.get());
     }
 
     /** Whether the piece of bread the ant holds is rich ant bread. */

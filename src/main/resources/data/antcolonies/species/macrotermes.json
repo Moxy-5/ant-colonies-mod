@@ -1,8 +1,8 @@
 {
-  "_note": "Macrotermes (M7). Used by termites so far: nest (with the foraging holes), queen_body, founding, mound (with how often a walk may use a chimney), food (what they gather, where they keep it and when they go out: at night and in the rain; no bread), and from brood hatch_ticks, larva_meal (pieces a nymph eats) and larva_starve_ticks, and colony max_workers. No nurses yet (they come with the fungus garden, M7 step 5). The other numbers are placeholders until the fungus garden exists.",
+  "_note": "Macrotermes (M7). Used by termites so far: nest (with the foraging holes), queen_body, founding, mound (with how often a walk may use a chimney), food (what they gather, when they go out: at night and in the rain; no bread; the pieces are built into fungus comb in the garden rooms), garden (the garden rooms and how fast the fungus nodules grow), laying (the queen's steady stream of eggs; queen meal = how many nodules she holds), the nurses, and from brood max_young, hatch_ticks, larva_meal (nodules a nymph eats) and larva_starve_ticks, and colony max_workers. The queen's other numbers (rich meal, burst, incubation, starve) and the worker numbers are not used by termites.",
   "colony": {
     "max_workers": 20,
-    "nurses_from_workers": []
+    "nurses_from_workers": [3, 8, 12, 20]
   },
   "worker": {
     "meal_interval_ticks": 24000,
@@ -10,7 +10,7 @@
     "starve_after_ticks": 72000
   },
   "queen": {
-    "meal": 20,
+    "meal": 6,
     "rich_meal": 5,
     "burst_eggs": 5,
     "burst_interval_ticks": 1200,
@@ -34,7 +34,7 @@
       { "block": "minecraft:hay_block", "pieces": 48, "foragers": 4 }
     ],
     "piece": "antcolonies:forage",
-    "pile": "antcolonies:forage_pile",
+    "pile": "antcolonies:fungus_comb",
     "forage_at": ["night", "rain"]
   },
   "refuse": {
@@ -43,7 +43,6 @@
   "nest": {
     "max_levels": 1,
     "seal_while_founding": true,
-    "side_rooms": ["food"],
     "foraging_holes": 2,
     "foraging_hole_distance": 8
   },
@@ -56,6 +55,16 @@
     "eggs": 5,
     "egg_interval_ticks": 400,
     "feed_interval_ticks": 200
+  },
+  "garden": {
+    "rooms": 6,
+    "workers_per_room": 4,
+    "nodule_ticks": 1200
+  },
+  "laying": {
+    "egg_interval_ticks": 2400,
+    "egg_interval_ticks_full_size": 300,
+    "food_per_egg": 2
   },
   "mound": {
     "max_height": 32,

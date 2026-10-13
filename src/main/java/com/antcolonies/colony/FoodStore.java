@@ -86,6 +86,12 @@ public class FoodStore {
         return seedsEaten;
     }
 
+    /** Pieces in the store were used up where they lie (the fungus garden's comb turned into nodules): the count goes down. */
+    void used(int pieces) {
+        food = Math.max(0, food - pieces);
+        richSeeds = Math.min(richSeeds, food);
+    }
+
     /**
      * A spot on the floor of the food store that can take one more seed, or null if the store is not ready or full.
      * Most of the time it is a heap that already exists (so the heaps grow, not a thin layer everywhere).
@@ -102,11 +108,13 @@ public class FoodStore {
                 if (!young.contains(pos)) {
                     empty.add(pos);
                 }
-            } else if (state.is(pile) && state.getValue(SeedPileBlock.LAYERS) < SeedPileBlock.MAX_LAYERS) {
-                growing.add(pos);
+            } else if (state.is(pile) && state.getValue(SeedPileBlock.LAYERS) < pile.maxLayers() && !young.contains(pos)) {
+                growing.add(pos); // (never under an egg or a nymph lying on a fungus comb)
             }
         }
-        List<BlockPos> from = !growing.isEmpty() && (empty.isEmpty() || random.nextFloat() < 0.75F) ? growing : empty;
+        // Fungus comb is always built onto comb that has room first (the fungus only grows where the comb is thick enough).
+        boolean growFirst = pile instanceof com.antcolonies.block.FungusCombBlock || random.nextFloat() < 0.75F;
+        List<BlockPos> from = !growing.isEmpty() && (empty.isEmpty() || growFirst) ? growing : empty;
         return from.isEmpty() ? null : from.get(random.nextInt(from.size()));
     }
 
@@ -289,9 +297,12 @@ public class FoodStore {
     public boolean depositSeed(Level level, BlockPos spot, boolean rich) {
         BlockState state = level.getBlockState(spot);
         SeedPileBlock pile = food().pileBlock();
+        if (colony.brood().getBroodCells(level).contains(spot)) {
+            return false; // an egg or a young one was put there meanwhile: the heap would bury it
+        }
         if (state.isAir()) {
             level.setBlock(spot, pile.defaultBlockState(), 3);
-        } else if (state.is(pile) && state.getValue(SeedPileBlock.LAYERS) < SeedPileBlock.MAX_LAYERS) {
+        } else if (state.is(pile) && state.getValue(SeedPileBlock.LAYERS) < pile.maxLayers()) {
             level.setBlock(spot, state.setValue(SeedPileBlock.LAYERS, state.getValue(SeedPileBlock.LAYERS) + 1), 3);
         } else {
             return false;

@@ -1,6 +1,7 @@
 package com.antcolonies.registry;
 
 import com.antcolonies.AntColoniesMod;
+import com.antcolonies.block.FungusCombBlock;
 import com.antcolonies.block.SeedPileBlock;
 import com.antcolonies.block.TermiteHoleBlock;
 import com.antcolonies.block.TermiteMoundBlock;
@@ -46,6 +47,14 @@ public class ModBlocks {
     public static final DeferredBlock<SeedPileBlock> FORAGE_PILE = BLOCKS.registerBlock("forage_pile", SeedPileBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.SAND).strength(0.2F).sound(SoundType.GRASS)
                     .noCollission().noOcclusion().pushReaction(PushReaction.DESTROY));
+
+    /**
+     * Fungus comb in the termites' garden rooms: built up from forage, one layer per piece, with white fungus nodules
+     * growing on it (see FungusCombBlock). Solid: termites walk on it.
+     */
+    public static final DeferredBlock<FungusCombBlock> FUNGUS_COMB = BLOCKS.registerBlock("fungus_comb", FungusCombBlock::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_WHITE).strength(0.3F).sound(SoundType.WART_BLOCK)
+                    .noOcclusion().pushReaction(PushReaction.DESTROY));
 
     /** Termite mound soil: built up in layers, then dries and hardens with age (see TermiteMoundBlock). */
     public static final DeferredBlock<TermiteMoundBlock> TERMITE_MOUND = BLOCKS.registerBlock("termite_mound", TermiteMoundBlock::new,

@@ -73,6 +73,59 @@ class NestPlanTest {
     }
 
     /**
+     * The termites' garden rooms (six 3x3 rooms round the royal chamber) lie on its level, are dug from their doorway
+     * inward, each opens only into the royal chamber or an earlier garden through its doorway, and never touch another
+     * room, the royal chamber's tunnel, the shaft, a gallery or a foraging tunnel. Checked with the shaft 3 and 2 deep.
+     */
+    @Test
+    void gardenRoomsLieRoundTheRoyalChamberAndOnlyOpenThroughTheirDoorways() {
+        for (int depth = 2; depth <= 3; depth++) {
+            BlockPos entrance = BOTTOM.above(depth);
+            List<BlockPos> galleries = MoundPlan.galleries(3, 13).stream().map(BOTTOM::offset).toList();
+            for (Direction direction : Direction.Plane.HORIZONTAL) {
+                NestPlan.Chamber royal = NestPlan.chambers(BOTTOM, direction, 1).get(0);
+                List<NestPlan.Chamber> gardens = NestPlan.gardens(royal, direction, 10);
+                assertEquals(NestPlan.MAX_GARDENS, gardens.size(), "at most " + NestPlan.MAX_GARDENS + " gardens");
+                assertEquals(2, NestPlan.gardens(royal, direction, 2).size());
+                Set<BlockPos> other = new HashSet<>(royal.cells());
+                for (int k = 1; k <= depth; k++) {
+                    other.add(BOTTOM.above(k - 1));
+                }
+                other.addAll(galleries);
+                for (NestPlan.ForagingTunnel tunnel : NestPlan.foragingTunnels(entrance, direction, 2, 8)) {
+                    other.addAll(tunnel.tunnel());
+                }
+                Set<BlockPos> dug = new HashSet<>(royal.cells());
+                dug.add(BOTTOM);
+                for (int i = 0; i < gardens.size(); i++) {
+                    NestPlan.Chamber garden = gardens.get(i);
+                    BlockPos door = garden.cells().get(0);
+                    assertEquals(10, garden.cells().size(), "a garden is a doorway and a 3x3 room");
+                    assertEquals(9, garden.room().size());
+                    assertEquals(door, garden.tunnelEnd(), "the way in ends at the doorway");
+                    assertTrue(garden.wayIn().containsAll(royal.room()) && garden.wayIn().containsAll(royal.wayIn()), "the way in goes through the royal chamber");
+                    for (BlockPos cell : garden.cells()) {
+                        assertEquals(BOTTOM.getY(), cell.getY(), "a garden lies on the royal chamber's level");
+                        assertTrue(dug.stream().anyMatch(d -> dist(d, cell) == 1), cell + " is dug before anything next to it");
+                        dug.add(cell);
+                    }
+                    for (BlockPos cell : garden.room()) {
+                        for (BlockPos b : other) {
+                            assertTrue(dist(cell, b) > 1, "rooms " + direction + ", shaft " + depth + ": garden " + i + " cell " + cell + " touches " + b);
+                        }
+                    }
+                    // The doorway touches its own room and the room it opens into, nothing else.
+                    for (BlockPos b : other) {
+                        assertTrue(dist(door, b) > 1 || royal.room().contains(b) || gardens.subList(0, i).stream().anyMatch(g -> g.room().contains(b)),
+                                "rooms " + direction + ": garden " + i + "'s doorway " + door + " touches " + b);
+                    }
+                    other.addAll(garden.cells());
+                }
+            }
+        }
+    }
+
+    /**
      * The foraging tunnels (termites: two, 8 blocks out) leave the shaft 2 blocks under the entrance, run straight out
      * just under the surface to the sides the rooms and the food store leave free, never touch a room, its tunnel, a
      * gallery or each other, and end under a hole in the surface beyond the foot of a full-grown mound. Checked with

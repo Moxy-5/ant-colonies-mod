@@ -22,7 +22,8 @@ import net.minecraft.core.Direction;
  * y = 63 and below), a 3-deep shaft at x = 0, z = 0, a tunnel going east from its bottom and a
  * 5x5 room at the end of the tunnel. Everything is a full solid block or open air, except blocks in
  * {@link #noSides}, whose sides are not solid (nothing to climb on them, like a fence), and the straight ramps in
- * {@link #ramps}, rising toward their direction (slopes, as the termite mound's ramp block). Blocks in {@link #channels}
+ * {@link #ramps}, rising toward their direction (slopes, as the termite mound's ramp block), and the flat slopes in
+ * {@link #flats} (a fungus comb on a floor, its height in pixels). Blocks in {@link #channels}
  * have a channel through them (a termite tunnel) open out of the sides in their mask, for an insect that {@link #fits};
  * those in {@link #mouths} are chimney mouths (no top to stand on, the channel's top is the doorway).
  */
@@ -33,19 +34,23 @@ class AntPathFinderTest {
     private final Set<BlockPos> solid = new HashSet<>();
     private final Set<BlockPos> noSides = new HashSet<>();
     private final java.util.Map<BlockPos, Direction> ramps = new java.util.HashMap<>();
+    private final java.util.Map<BlockPos, Integer> flats = new java.util.HashMap<>();
     private final java.util.Map<BlockPos, Integer> channels = new java.util.HashMap<>();
     private final Set<BlockPos> mouths = new HashSet<>();
     private boolean fits = true;
     private final CellMap map = new CellMap() {
         @Override
         public boolean isOpen(BlockPos pos) {
-            return !solid.contains(pos) && !ramps.containsKey(pos);
+            return !solid.contains(pos) && !ramps.containsKey(pos) && !flats.containsKey(pos);
         }
 
         @Override
         public boolean isSolidFace(BlockPos pos, Direction face) {
             if (ramps.containsKey(pos)) {
                 return face == Direction.DOWN || face == ramps.get(pos); // the bottom and the full high side
+            }
+            if (flats.containsKey(pos)) {
+                return face == Direction.DOWN;
             }
             if (face == Direction.UP && mouths.contains(pos)) {
                 return false;
@@ -65,6 +70,9 @@ class AntPathFinderTest {
 
         @Override
         public int slopeHeight(BlockPos cell, int u, int w) {
+            if (flats.containsKey(cell)) {
+                return flats.get(cell);
+            }
             Direction high = ramps.get(cell);
             if (high == null) {
                 return -1;
@@ -375,6 +383,31 @@ class AntPathFinderTest {
         moves.clear();
         AntPathFinder.neighbours(map, wall, (to, kind, cost) -> moves.add(new Route.Step(to, kind)));
         assertFalse(moves.contains(over), "it climbs over onto the ramp's steep high side");
+    }
+
+    /**
+     * A room one block tall with fungus comb (a flat slope) on its floor: half a block high, the insect walks across it
+     * under the ceiling, onto it and off it, only walking; a comb higher than that leaves it no room.
+     */
+    @Test
+    void acrossALowFlatSlopeUnderACeilingButNotAHighOne() {
+        BlockPos roomStart = SHAFT_BOTTOM.east(4);
+        for (int row = 0; row < 3; row++) {
+            for (int side = -2; side <= 2; side++) {
+                flats.put(roomStart.east(row).south(side), 8);
+            }
+        }
+        BlockPos onComb = roomStart.east(1).south(2);
+        BlockPos beyond = SHAFT_BOTTOM.east(8);
+        Route across = route(SHAFT_BOTTOM.east(2), beyond);
+        assertNotNull(across, "no way across the comb");
+        assertLegal(across);
+        assertTrue(onlyWalks(across), "across the comb is walking: " + across);
+        Route onto = route(SHAFT_BOTTOM.east(2), onComb);
+        assertNotNull(onto, "no way onto the comb");
+        assertEquals(Foothold.floor(onComb), onto.step(onto.size() - 1).to());
+        flats.replaceAll((cell, height) -> 10);
+        assertNull(route(SHAFT_BOTTOM.east(2), onComb), "a comb taller than half a block under a ceiling leaves no room");
     }
 
     @Test

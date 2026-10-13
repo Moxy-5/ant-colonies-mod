@@ -33,6 +33,7 @@ public class ModEvents {
             event.accept(ModItems.SEED_PILE);
             event.accept(ModItems.BREAD_PILE);
             event.accept(ModItems.FORAGE_PILE);
+            event.accept(ModItems.FUNGUS_COMB);
             event.accept(ModItems.TERMITE_MOUND);
             event.accept(ModItems.TERMITE_HOLE);
             event.accept(ModItems.TERMITE_SPIRE);
@@ -42,6 +43,7 @@ public class ModEvents {
         }
         if (event.getTabKey() == CreativeModeTabs.INGREDIENTS) {
             event.accept(ModItems.FORAGE);
+            event.accept(ModItems.FUNGUS_NODULE);
         }
         if (event.getTabKey() == CreativeModeTabs.SPAWN_EGGS) {
             event.accept(ModItems.WORKER_ANT_SPAWN_EGG);

@@ -16,6 +16,7 @@ public class ModItems {
     public static final DeferredItem<BlockItem> SEED_PILE = ITEMS.registerSimpleBlockItem(ModBlocks.SEED_PILE);
     public static final DeferredItem<BlockItem> BREAD_PILE = ITEMS.registerSimpleBlockItem(ModBlocks.BREAD_PILE);
     public static final DeferredItem<BlockItem> FORAGE_PILE = ITEMS.registerSimpleBlockItem(ModBlocks.FORAGE_PILE);
+    public static final DeferredItem<BlockItem> FUNGUS_COMB = ITEMS.registerSimpleBlockItem(ModBlocks.FUNGUS_COMB);
     public static final DeferredItem<BlockItem> TERMITE_MOUND = ITEMS.registerSimpleBlockItem(ModBlocks.TERMITE_MOUND);
     public static final DeferredItem<BlockItem> TERMITE_HOLE = ITEMS.registerSimpleBlockItem(ModBlocks.TERMITE_HOLE);
     public static final DeferredItem<BlockItem> TERMITE_SPIRE = ITEMS.registerSimpleBlockItem(ModBlocks.TERMITE_SPIRE);
@@ -31,6 +32,12 @@ public class ModItems {
      * bale). What termites carry home to their food store, and what a broken forage pile drops.
      */
     public static final DeferredItem<Item> FORAGE = ITEMS.registerSimpleItem("forage");
+
+    /**
+     * A fungus nodule: a small white ball of fungus that grows on the termites' fungus comb. What the nurses feed the
+     * termite queen and the nymphs, and what a broken comb with nodules drops.
+     */
+    public static final DeferredItem<Item> FUNGUS_NODULE = ITEMS.registerSimpleItem("fungus_nodule");
 
     /** Rich ant bread, milled from rich seeds (pumpkin): fed to the queen it starts a burst of eggs. */
     public static final DeferredItem<Item> RICH_ANT_BREAD = ITEMS.registerSimpleItem("rich_ant_bread");

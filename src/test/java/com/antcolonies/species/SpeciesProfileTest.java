@@ -1,6 +1,7 @@
 package com.antcolonies.species;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -47,10 +48,20 @@ class SpeciesProfileTest {
         assertTrue(profile.queenBody().isPresent(), "the termite queen should swell");
         assertTrue(profile.queenBody().get().tooBigToWalkAt() > 0 && profile.queenBody().get().tooBigToWalkAt() <= 1);
         assertTrue(profile.founding().isPresent() && profile.founding().get().eggs() > 0, "termites raise a founding batch");
-        // Food: dead plant material into a forage store beside the shaft, no bread.
-        assertEquals(java.util.List.of("food"), profile.nest().sideRooms(), "termites keep their forage in a side room");
+        // Food: dead plant material built into fungus comb in garden rooms round the royal chamber, no bread, no side room.
+        assertEquals(java.util.List.of(), profile.nest().sideRooms(), "termites keep their food in the garden rooms, not a side room");
         assertTrue(!profile.food().makesBread(), "termites mill no bread");
-        assertEquals("antcolonies:forage_pile", profile.food().pile());
+        assertEquals("antcolonies:fungus_comb", profile.food().pile());
+        assertTrue(profile.garden().isPresent(), "termites keep a fungus garden");
+        assertEquals(1, profile.garden().get().roomsFor(1), "the first garden comes with the first worker");
+        assertEquals(0, profile.garden().get().roomsFor(0), "no garden while the colony is founding");
+        assertTrue(profile.garden().get().roomsFor(1000) <= com.antcolonies.colony.NestPlan.MAX_GARDENS);
+        assertFalse(profile.colony().nursesFrom().isEmpty(), "termites have nurses");
+        // The queen lays a steady stream, faster as she swells.
+        assertTrue(profile.laying().isPresent(), "the termite queen lays a steady stream of eggs");
+        SpeciesProfile.Laying laying = profile.laying().get();
+        assertTrue(laying.intervalFor(1.0F) < laying.intervalFor(0.0F), "a bigger queen lays faster");
+        assertTrue(laying.foodPerEgg() <= profile.queen().meal(), "she must be able to hold the food for one egg");
         assertTrue(profile.food().plants().stream().anyMatch(plant -> plant.block().equals("minecraft:hay_block") && plant.foragers() > 1),
                 "a hay bale is a big meal several termites cut at");
         assertTrue(profile.food().plants().stream().anyMatch(plant -> plant.block().equals("#minecraft:leaves") && plant.onlyDecaying()),

@@ -1,0 +1,210 @@
+{
+  "textures": {
+    "particle": "antcolonies:block/fungus_comb_top",
+    "top": "antcolonies:block/fungus_comb_top",
+    "side": "antcolonies:block/fungus_comb_side",
+    "nodule": "antcolonies:block/fungus_nodule"
+  },
+  "elements": [
+    {
+      "from": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        16,
+        10,
+        16
+      ],
+      "faces": {
+        "down": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#top",
+          "cullface": "down"
+        },
+        "up": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#top"
+        },
+        "north": {
+          "uv": [
+            0,
+            6,
+            16,
+            16
+          ],
+          "texture": "#side",
+          "cullface": "north"
+        },
+        "south": {
+          "uv": [
+            0,
+            6,
+            16,
+            16
+          ],
+          "texture": "#side",
+          "cullface": "south"
+        },
+        "west": {
+          "uv": [
+            0,
+            6,
+            16,
+            16
+          ],
+          "texture": "#side",
+          "cullface": "west"
+        },
+        "east": {
+          "uv": [
+            0,
+            6,
+            16,
+            16
+          ],
+          "texture": "#side",
+          "cullface": "east"
+        }
+      }
+    },
+    {
+      "from": [
+        3,
+        10,
+        4
+      ],
+      "to": [
+        6,
+        12,
+        7
+      ],
+      "faces": {
+        "down": {
+          "uv": [
+            3,
+            4,
+            6,
+            7
+          ],
+          "texture": "#nodule"
+        },
+        "up": {
+          "uv": [
+            3,
+            4,
+            6,
+            7
+          ],
+          "texture": "#nodule"
+        },
+        "north": {
+          "uv": [
+            3,
+            4,
+            6,
+            7
+          ],
+          "texture": "#nodule"
+        },
+        "south": {
+          "uv": [
+            3,
+            4,
+            6,
+            7
+          ],
+          "texture": "#nodule"
+        },
+        "west": {
+          "uv": [
+            3,
+            4,
+            6,
+            7
+          ],
+          "texture": "#nodule"
+        },
+        "east": {
+          "uv": [
+            3,
+            4,
+            6,
+            7
+          ],
+          "texture": "#nodule"
+        }
+      }
+    },
+    {
+      "from": [
+        4,
+        12,
+        5
+      ],
+      "to": [
+        5,
+        13,
+        6
+      ],
+      "faces": {
+        "up": {
+          "uv": [
+            4,
+            5,
+            5,
+            6
+          ],
+          "texture": "#nodule"
+        },
+        "north": {
+          "uv": [
+            4,
+            5,
+            5,
+            6
+          ],
+          "texture": "#nodule"
+        },
+        "south": {
+          "uv": [
+            4,
+            5,
+            5,
+            6
+          ],
+          "texture": "#nodule"
+        },
+        "west": {
+          "uv": [
+            4,
+            5,
+            5,
+            6
+          ],
+          "texture": "#nodule"
+        },
+        "east": {
+          "uv": [
+            4,
+            5,
+            5,
+            6
+          ],
+          "texture": "#nodule"
+        }
+      }
+    }
+  ]
+}

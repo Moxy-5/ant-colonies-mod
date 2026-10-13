@@ -14,7 +14,9 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * The queen's side of the colony: how much bread she has been fed, the egg she carries (or the burst of eggs after rich
- * bread), the workers on their way to feed her, and her hunger clock (she starves after days without food).
+ * bread), the workers on their way to feed her, and her hunger clock (she starves after days without food). A queen of
+ * a species with {@code laying} in its profile (the termite queen) carries no egg: she lays a steady stream of them as
+ * long as she is fed (see {@link #layInStream}), and what she has been fed is the food in her (up to the profile's meal).
  */
 public class QueenCare {
     // Her numbers (meal size, rich meal and burst, how long she carries an egg, how long she lasts unfed) come from the
@@ -37,6 +39,8 @@ public class QueenCare {
     private int eggsLaid;
     /** When the next egg of the founding batch comes ({@link Colony#NOT_SET} = not counting yet). Saved. */
     private long nextFoundingEgg = Colony.NOT_SET;
+    /** A queen who lays a steady stream: the game time when her next egg comes ({@link Colony#NOT_SET} = not counting). Saved. */
+    private long nextStreamEgg = Colony.NOT_SET;
     /** The game time of the queen's last piece of bread, or of the last time she needed none. Saved. */
     private long queenLastFed = Colony.NOT_SET;
     /** The workers on their way to feed the queen: ant -> game time when the claim runs out. Not saved. */
@@ -123,6 +127,10 @@ public class QueenCare {
             return false;
         }
         queenLastFed = level.getGameTime();
+        if (colony.profile().laying().isPresent()) {
+            queenBread++; // a queen who lays a steady stream just holds the food (see layInStream)
+            return true;
+        }
         if (rich) {
             // Rich bread: with a rich meal a burst of eggs starts, one every burst interval, and she needs no more food for it.
             if (++queenRich >= numbers.richMeal()) {
@@ -197,6 +205,45 @@ public class QueenCare {
         return changed;
     }
 
+    /**
+     * A queen who lays a steady stream of eggs (the profile's {@code laying}; called by her once a second): while she is
+     * in her room, has the food for an egg in her and the nursery is not full of young, an egg comes every interval
+     * (shorter the more she has swollen: {@code size}, 0 to 1), using up that food. Not while the colony is founding
+     * (that batch is laid from her own fat). True when an egg is due now: the queen then picks the spot behind her and
+     * calls {@link #layStreamEgg}.
+     */
+    public boolean layInStream(ServerLevel level, float size) {
+        SpeciesProfile.Laying laying = colony.profile().laying().orElse(null);
+        if (laying == null) {
+            return false;
+        }
+        boolean canLay = !colony.isFounding() && queenBread >= laying.foodPerEgg() && isQueenHome(level) && !colony.brood().isFull(level);
+        long now = level.getGameTime();
+        if (!canLay) {
+            nextStreamEgg = Colony.NOT_SET; // the clock starts again once she can lay
+            return false;
+        }
+        if (nextStreamEgg == Colony.NOT_SET) {
+            nextStreamEgg = now + laying.intervalFor(size);
+            return false;
+        }
+        return now >= nextStreamEgg;
+    }
+
+    /** The queen lays the egg of her steady stream at this spot (see {@link #layInStream}); it uses up its food. */
+    public void layStreamEgg(ServerLevel level, double x, double y, double z, float size) {
+        SpeciesProfile.Laying laying = colony.profile().laying().orElseThrow();
+        eggsLaid++;
+        queenBread = Math.max(0, queenBread - laying.foodPerEgg());
+        nextStreamEgg = level.getGameTime() + laying.intervalFor(size);
+        colony.brood().spawnEgg(level, x, y, z);
+    }
+
+    /** The game time of the next egg of the steady stream ({@link Colony#NOT_SET} if she cannot lay now). */
+    public long getNextStreamEgg() {
+        return nextStreamEgg;
+    }
+
     /** The egg comes out of the queen at this spot; she starts over with an empty stomach. */
     public void layEgg(ServerLevel level, double x, double y, double z) {
         eggsLaid++;
@@ -237,6 +284,7 @@ public class QueenCare {
         tag.putLong("eggDue", eggDue);
         tag.putInt("eggsLaid", eggsLaid);
         tag.putLong("nextFoundingEgg", nextFoundingEgg);
+        tag.putLong("nextStreamEgg", nextStreamEgg);
     }
 
     void load(CompoundTag tag) {
@@ -247,5 +295,6 @@ public class QueenCare {
         eggDue = tag.contains("eggDue") ? tag.getLong("eggDue") : -1;
         eggsLaid = tag.getInt("eggsLaid");
         nextFoundingEgg = tag.contains("nextFoundingEgg") ? tag.getLong("nextFoundingEgg") : Colony.NOT_SET;
+        nextStreamEgg = tag.contains("nextStreamEgg") ? tag.getLong("nextStreamEgg") : Colony.NOT_SET;
     }
 }

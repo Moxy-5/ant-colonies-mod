@@ -43,13 +43,14 @@ public class Nest {
     /**
      * Where the nest's rooms go. Decided once (see {@link #getLayout}) and saved: worked out again after a reload, the
      * answer could differ, because the ground has changed since (seed and bread heaps lie in the rooms). The side rooms
-     * follow from the rest (the profile says which, the direction where), so they are not saved themselves.
+     * and the garden rooms follow from the rest (the profile says which and how many, the direction where), so they are
+     * not saved themselves.
      */
-    private record Layout(List<NestPlan.Chamber> chambers, List<NestPlan.Chamber> sideRooms, Set<BlockPos> cells, int shaftDepth,
-            Direction direction, @Nullable NestPlan.Chamber founding) {
-        Layout(List<NestPlan.Chamber> chambers, List<NestPlan.Chamber> sideRooms, int shaftDepth, Direction direction,
-                @Nullable NestPlan.Chamber founding) {
-            this(chambers, sideRooms, cellsOf(chambers, sideRooms), shaftDepth, direction, founding);
+    private record Layout(List<NestPlan.Chamber> chambers, List<NestPlan.Chamber> sideRooms, List<NestPlan.Chamber> gardens,
+            Set<BlockPos> cells, int shaftDepth, Direction direction, @Nullable NestPlan.Chamber founding) {
+        Layout(List<NestPlan.Chamber> chambers, List<NestPlan.Chamber> sideRooms, List<NestPlan.Chamber> gardens, int shaftDepth,
+                Direction direction, @Nullable NestPlan.Chamber founding) {
+            this(chambers, sideRooms, gardens, cellsOf(chambers, sideRooms, gardens), shaftDepth, direction, founding);
         }
 
         /** The level or side room used for this purpose (or the founding chamber), or null if the nest has none. */
@@ -71,16 +72,27 @@ public class Nest {
             return null;
         }
 
-        private static Set<BlockPos> cellsOf(List<NestPlan.Chamber> chambers, List<NestPlan.Chamber> sideRooms) {
+        private static Set<BlockPos> cellsOf(List<NestPlan.Chamber> chambers, List<NestPlan.Chamber> sideRooms, List<NestPlan.Chamber> gardens) {
             Set<BlockPos> cells = new HashSet<>();
-            for (NestPlan.Chamber chamber : chambers) {
-                cells.addAll(chamber.cells());
-            }
-            for (NestPlan.Chamber chamber : sideRooms) {
-                cells.addAll(chamber.cells());
+            for (List<NestPlan.Chamber> list : List.of(chambers, sideRooms, gardens)) {
+                for (NestPlan.Chamber chamber : list) {
+                    cells.addAll(chamber.cells());
+                }
             }
             return cells;
         }
+    }
+
+    /**
+     * The garden rooms of a nest with these levels (species with a {@code garden} in their profile, whose nest has one
+     * level: the royal chamber), as many as the profile allows; none otherwise.
+     */
+    private List<NestPlan.Chamber> gardens(List<NestPlan.Chamber> chambers, Direction direction) {
+        var garden = colony.profile().garden();
+        if (garden.isEmpty() || chambers.size() != 1 || chambers.get(0).kind() != NestPlan.Kind.QUEEN) {
+            return List.of();
+        }
+        return NestPlan.gardens(chambers.get(0), direction, garden.get().rooms());
     }
 
     /** The side rooms of a nest whose shaft ends at {@code bottom} and whose rooms lie toward {@code direction} (from the species profile). */
@@ -189,8 +201,22 @@ public class Nest {
                 return next;
             }
         }
+        // The first garden room before the foraging tunnels (the food goes there), the others as the colony grows.
+        List<NestPlan.Chamber> gardens = wantedGardens(layout);
+        if (!gardens.isEmpty()) {
+            next = firstDiggable(level, gardens.get(0).cells());
+            if (next != null) {
+                return next;
+            }
+        }
         for (NestPlan.ForagingTunnel tunnel : getForagingTunnels(level)) {
             next = firstDiggable(level, tunnel.tunnel());
+            if (next != null) {
+                return next;
+            }
+        }
+        for (NestPlan.Chamber chamber : gardens) {
+            next = firstDiggable(level, chamber.cells());
             if (next != null) {
                 return next;
             }
@@ -200,6 +226,16 @@ public class Nest {
             return hole;
         }
         return colony.mound().findDigTarget(level, digger);
+    }
+
+    /** The garden rooms the colony wants dug now: the first, and one more for every few workers (the profile's {@code garden}). */
+    private List<NestPlan.Chamber> wantedGardens(Layout layout) {
+        var garden = colony.profile().garden();
+        if (garden.isEmpty()) {
+            return List.of();
+        }
+        int wanted = garden.get().roomsFor(colony.getCount(com.antcolonies.entity.WorkerAntEntity.CASTE));
+        return layout.gardens().subList(0, Math.min(wanted, layout.gardens().size()));
     }
 
     /**
@@ -285,7 +321,37 @@ public class Nest {
      * already dug counts. Empty until the way in is dug.
      */
     public List<BlockPos> getFoodStoreCells(Level level) {
-        return getRoomCells(level, NestPlan.Kind.FOOD);
+        List<BlockPos> cells = getRoomCells(level, NestPlan.Kind.FOOD);
+        List<BlockPos> gardens = getGardenCells(level);
+        if (gardens.isEmpty()) {
+            return cells;
+        }
+        // Termites keep their food in the gardens, built into fungus comb.
+        List<BlockPos> all = new ArrayList<>(cells);
+        all.addAll(gardens);
+        return all;
+    }
+
+    /**
+     * The floor cells of all the garden rooms (termites' fungus gardens) that are dug out and can be walked to, every
+     * garden counted on its own (see {@link #getRoomCells}). Empty for a species without gardens.
+     */
+    public List<BlockPos> getGardenCells(Level level) {
+        Layout layout = getLayout(level);
+        if (layout == null || layout.gardens().isEmpty()) {
+            return List.of();
+        }
+        List<BlockPos> cells = new ArrayList<>();
+        for (NestPlan.Chamber garden : layout.gardens()) {
+            cells.addAll(getRoomCells(level, layout, garden));
+        }
+        return cells;
+    }
+
+    /** The garden rooms of the plan (empty if the nest has none, or no plan yet). For tests and debugging. */
+    public List<NestPlan.Chamber> getGardens(Level level) {
+        Layout layout = getLayout(level);
+        return layout == null ? List.of() : layout.gardens();
     }
 
     /** The floor cells of the nursery that are dug out and can be walked to (the room does not have to be finished). */
@@ -396,11 +462,12 @@ public class Nest {
      */
     private List<BlockPos> getRoomCells(Level level, NestPlan.Kind kind) {
         Layout layout = getLayout(level);
-        if (layout == null || !isShaftOpen(level, kind == NestPlan.Kind.FOUNDING ? NestPlan.FOUNDING_DEPTH : layout.shaftDepth())) {
-            return List.of();
-        }
-        NestPlan.Chamber chamber = layout.of(kind);
-        if (chamber == null) {
+        NestPlan.Chamber chamber = layout == null ? null : layout.of(kind);
+        return chamber == null ? List.of() : getRoomCells(level, layout, chamber);
+    }
+
+    private List<BlockPos> getRoomCells(Level level, Layout layout, NestPlan.Chamber chamber) {
+        if (!isShaftOpen(level, chamber.kind() == NestPlan.Kind.FOUNDING ? NestPlan.FOUNDING_DEPTH : layout.shaftDepth())) {
             return List.of();
         }
         for (BlockPos pos : chamber.wayIn()) {
@@ -634,7 +701,7 @@ public class Nest {
                     }
                 }
                 if (fits) {
-                    best = new Layout(plan, side, depth, direction, founding);
+                    best = new Layout(plan, side, gardens(plan, direction), depth, direction, founding);
                     bestSideFits = sideFits;
                     break;
                 }
@@ -674,7 +741,8 @@ public class Nest {
         }
         for (Direction side : Direction.Plane.HORIZONTAL) {
             BlockPos pos = target.relative(side);
-            if (level.getBlockState(pos).isAir()) {
+            // Beside it on a heap of food or a fungus comb is fine too (a room partly dug and already in use).
+            if (level.isLoaded(pos) && isDugOut(level, pos)) {
                 spots.add(pos);
             }
         }
@@ -717,8 +785,8 @@ public class Nest {
             // Nests planned before founding chambers existed have none (the key is missing: false).
             NestPlan.Chamber founding = tag.getBoolean("nestFounding")
                     ? NestPlan.foundingChamber(center.below(NestPlan.FOUNDING_DEPTH), direction) : null;
-            layout = new Layout(NestPlan.chambers(center.below(depth), direction, tag.getInt("nestLevels")),
-                    sideRooms(center.below(depth), direction), depth, direction, founding);
+            List<NestPlan.Chamber> chambers = NestPlan.chambers(center.below(depth), direction, tag.getInt("nestLevels"));
+            layout = new Layout(chambers, sideRooms(center.below(depth), direction), gardens(chambers, direction), depth, direction, founding);
         }
     }
 }

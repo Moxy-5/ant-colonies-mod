@@ -28,7 +28,7 @@ import net.minecraft.world.level.block.state.BlockState;
  * Ant bread: the nurses mill seeds from the store into bread (plain, or rich from rich seeds), kept as heaps in the
  * nursery (or the queen's room), and feed it to the queen and the larvae. Counts the bread and who is milling.
  */
-public class Bakery {
+public class Bakery implements NurseFood {
     // How much bread the nurses keep ready for the queen and how long milling takes come from the species profile:
     // colony.profile().food().
     /** How long (in ticks) a worker on its way to mill a seed counts as making bread. */
@@ -152,6 +152,11 @@ public class Bakery {
      * down where it stands, as a bread heap, so the colony never loses it. Only if even that is impossible (no floor, the
      * cell taken) is it lost, and that is logged. Returns true if the piece was put down.
      */
+    @Override
+    public boolean putDownWhereItStands(Level level, AbstractAntEntity ant) {
+        return putDownBreadWhereItStands(level, ant);
+    }
+
     public boolean putDownBreadWhereItStands(Level level, AbstractAntEntity ant) {
         BlockPos here = ant.blockPosition();
         boolean floor = level.getBlockState(here.below()).isFaceSturdy(level, here.below(), Direction.UP);
@@ -217,6 +222,35 @@ public class Bakery {
             richBread--;
         }
         return new ItemStack(rich ? ModItems.RICH_ANT_BREAD.get() : ModItems.ANT_BREAD.get());
+    }
+
+    // As the nurses' food (see NurseFood): bread heaps.
+
+    @Override
+    public int available(Level level) {
+        return bread;
+    }
+
+    @Override
+    @Nullable
+    public BlockPos findFood(Level level, RandomSource random) {
+        return findBreadPile(level, random);
+    }
+
+    @Override
+    public ItemStack takeFoodAt(Level level, BlockPos spot, boolean wantRich) {
+        return takeBreadAt(level, spot, wantRich);
+    }
+
+    @Override
+    @Nullable
+    public BlockPos pickReturnSpot(Level level, RandomSource random) {
+        return pickBreadSpot(level, random);
+    }
+
+    @Override
+    public boolean putBack(Level level, BlockPos spot, boolean rich) {
+        return depositBread(level, spot, rich);
     }
 
     void save(CompoundTag tag) {

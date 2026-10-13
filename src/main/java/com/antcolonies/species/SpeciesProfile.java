@@ -31,7 +31,14 @@ import net.minecraft.world.level.block.state.BlockState;
  */
 public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNumbers queen, BroodNumbers brood,
         FoodNumbers food, RefuseNumbers refuse, NestNumbers nest, Optional<QueenBody> queenBody, Optional<Founding> founding,
-        Optional<MoundNumbers> mound) {
+        Optional<MoundNumbers> mound, Optional<GardenNumbers> garden, Optional<Laying> laying) {
+
+    /** The numbers without a fungus garden and without a steady stream of eggs (the queen lays one egg per meal). */
+    public SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNumbers queen, BroodNumbers brood, FoodNumbers food,
+            RefuseNumbers refuse, NestNumbers nest, Optional<QueenBody> queenBody, Optional<Founding> founding,
+            Optional<MoundNumbers> mound) {
+        this(colony, worker, queen, brood, food, refuse, nest, queenBody, founding, mound, Optional.empty(), Optional.empty());
+    }
 
     /**
      * The whole colony. {@code maxWorkers}: young grow into workers only while there are fewer. {@code nursesFrom}: from
@@ -277,6 +284,49 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
         ).apply(i, MoundNumbers::new));
     }
 
+    /**
+     * A fungus garden (termites): small garden rooms round the royal chamber ({@code NestPlan.gardens}), at most
+     * {@code rooms} of them; the workers dig the first as soon as the colony has workers and one more for every
+     * {@code workersPerRoom} workers. The food the foragers bring in is built into fungus comb there (the profile's food
+     * {@code pile}), and on every comb block a white nodule grows about every {@code noduleTicks} (while it has a layer
+     * to spare and room for one); the nurses feed the nodules to the queen and the young instead of bread.
+     */
+    public record GardenNumbers(int rooms, int workersPerRoom, int noduleTicks) {
+        public static final Codec<GardenNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.INT.fieldOf("rooms").forGetter(GardenNumbers::rooms),
+                Codec.INT.fieldOf("workers_per_room").forGetter(GardenNumbers::workersPerRoom),
+                Codec.INT.fieldOf("nodule_ticks").forGetter(GardenNumbers::noduleTicks)
+        ).apply(i, GardenNumbers::new));
+
+        /** How many garden rooms a colony with this many workers wants (none while it has no workers). */
+        public int roomsFor(int workers) {
+            if (workers <= 0) {
+                return 0;
+            }
+            return Math.min(rooms, 1 + workers / Math.max(1, workersPerRoom));
+        }
+    }
+
+    /**
+     * A queen who lays a steady stream of eggs (termites) instead of one egg per meal: as long as she has at least
+     * {@code foodPerEgg} pieces of food in her (the queen's {@code meal} is how much she holds), she lays an egg every
+     * {@code eggIntervalTicks} while she is small, faster as she swells, every {@code eggIntervalTicksFullSize} once she
+     * is full grown; each egg uses up {@code foodPerEgg}. She stops while the nursery is full of young.
+     */
+    public record Laying(int eggIntervalTicks, int eggIntervalTicksFullSize, int foodPerEgg) {
+        public static final Codec<Laying> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.INT.fieldOf("egg_interval_ticks").forGetter(Laying::eggIntervalTicks),
+                Codec.INT.fieldOf("egg_interval_ticks_full_size").forGetter(Laying::eggIntervalTicksFullSize),
+                Codec.INT.fieldOf("food_per_egg").forGetter(Laying::foodPerEgg)
+        ).apply(i, Laying::new));
+
+        /** How long (in ticks) between two eggs for a queen of this size (0 = just founded, 1 = full grown). */
+        public int intervalFor(float size) {
+            float clamped = Math.max(0.0F, Math.min(1.0F, size));
+            return Math.round(eggIntervalTicks + (eggIntervalTicksFullSize - eggIntervalTicks) * clamped);
+        }
+    }
+
     public static final Codec<SpeciesProfile> CODEC = RecordCodecBuilder.create(i -> i.group(
             ColonyNumbers.CODEC.fieldOf("colony").forGetter(SpeciesProfile::colony),
             WorkerNumbers.CODEC.fieldOf("worker").forGetter(SpeciesProfile::worker),
@@ -287,7 +337,9 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
             NestNumbers.CODEC.fieldOf("nest").forGetter(SpeciesProfile::nest),
             QueenBody.CODEC.optionalFieldOf("queen_body").forGetter(SpeciesProfile::queenBody),
             Founding.CODEC.optionalFieldOf("founding").forGetter(SpeciesProfile::founding),
-            MoundNumbers.CODEC.optionalFieldOf("mound").forGetter(SpeciesProfile::mound)
+            MoundNumbers.CODEC.optionalFieldOf("mound").forGetter(SpeciesProfile::mound),
+            GardenNumbers.CODEC.optionalFieldOf("garden").forGetter(SpeciesProfile::garden),
+            Laying.CODEC.optionalFieldOf("laying").forGetter(SpeciesProfile::laying)
     ).apply(i, SpeciesProfile::new));
 
     /**

@@ -27,19 +27,20 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
-/** Termites gathering food (M7 step 4): dead plant material carried into the food store beside the nest shaft. */
+/** Termites gathering food (M7 step 4): dead plant material carried into the fungus garden and built into comb (step 5). */
 @GameTestHolder(AntColoniesMod.MODID)
 @PrefixGameTestTemplate(false)
 public class TermiteFoodTests {
     /**
-     * A termite colony with workers digs its food store (a side room across the shaft from the royal chamber), then
-     * the foragers cut dead plants round the mound to pieces (a dead bush, tall and short grass, a hay bale) and fetch
-     * a stick, a sapling and wheat off the ground, and carry every piece into the store, where it lies in forage heaps.
-     * Checked: the small plants and the items are all gathered, every piece cut so far is accounted for (in the store,
-     * in a termite's mandibles or dropped on the ground), and all the heaps lie in the food store.
+     * A termite colony with workers digs its first fungus garden room (beside the royal chamber), then the foragers
+     * cut dead plants round the mound to pieces (a dead bush, tall and short grass, a hay bale) and fetch a stick, a
+     * sapling and wheat off the ground, and carry every piece into the garden, where it is built into fungus comb.
+     * Checked: the small plants and the items are all gathered, every piece cut so far is accounted for (in the comb,
+     * grown into a fungus nodule, in a termite's mandibles or dropped on the ground), and all the comb lies in the
+     * garden rooms.
      */
     @GameTest(template = "arena", timeoutTicks = 30000, skyAccess = true)
-    public static void termitesGatherDeadPlantsIntoTheirFoodStore(GameTestHelper helper) {
+    public static void termitesGatherDeadPlantsIntoTheirFungusGarden(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
         TermiteMoundTests.deepGround(helper);
@@ -108,7 +109,7 @@ public class TermiteFoodTests {
             // (Only this colony's termites and food items: the tests next door have ants and seeds of their own.)
             int carried = 0;
             for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds().inflate(16))) {
-                if (c.getId().equals(ant.getColonyId())) {
+                if (c.getId().equals(ant.getColonyId()) && !ant.isCarryingBread()) { // food pieces, not nodules
                     carried += ant.getCarriedSeed().getCount();
                 }
             }
@@ -119,27 +120,25 @@ public class TermiteFoodTests {
                 }
             }
             int stored = c.food().getFood();
-            helper.assertTrue(stored + carried + lying == small + hayCut, "stored " + stored + " + carried " + carried + " + lying " + lying
-                    + " is not the " + small + " small pieces + " + hayCut + " cut off the hay bale");
-            // The heaps lie in the food store, the side room across the shaft from the royal chamber.
-            NestPlan.Chamber store = c.nest().getSideRooms(level).get(0);
-            NestPlan.Chamber royal = c.nest().getPlannedChambers(level).get(0);
-            helper.assertTrue(store.kind() == NestPlan.Kind.FOOD && royal.kind() == NestPlan.Kind.QUEEN, "the nest plan is not royal chamber + food store");
-            BlockPos entrance = c.getCenter();
-            helper.assertTrue((store.center().getX() - entrance.getX()) * (royal.center().getX() - entrance.getX())
-                    + (store.center().getZ() - entrance.getZ()) * (royal.center().getZ() - entrance.getZ()) < 0,
-                    "the food store is not across the shaft from the royal chamber");
+            int grown = c.garden().getNodulesGrown();
+            helper.assertTrue(stored + grown + carried + lying == small + hayCut, "stored " + stored + " + grown into nodules " + grown + " + carried "
+                    + carried + " + lying " + lying + " is not the " + small + " small pieces + " + hayCut + " cut off the hay bale");
+            // The comb lies in the garden rooms round the royal chamber; no side room, no forage or seed heaps.
+            helper.assertTrue(c.nest().getSideRooms(level).isEmpty(), "termites planned a side room");
+            helper.assertTrue(c.nest().getPlannedChambers(level).get(0).kind() == NestPlan.Kind.QUEEN, "the nest plan is not the royal chamber");
+            java.util.Set<BlockPos> gardens = new java.util.HashSet<>();
+            c.nest().getGardens(level).forEach(garden -> gardens.addAll(garden.room()));
             int layers = 0;
             for (BlockPos pos : BlockPos.betweenClosed(helper.absolutePos(new BlockPos(0, 0, 0)), helper.absolutePos(new BlockPos(24, SURFACE + 2, 24)))) {
                 BlockState state = level.getBlockState(pos);
-                if (state.is(ModBlocks.FORAGE_PILE.get())) {
-                    helper.assertTrue(store.room().contains(pos.immutable()), "a forage heap lies outside the food store at " + pos.toShortString());
+                if (state.is(ModBlocks.FUNGUS_COMB.get())) {
+                    helper.assertTrue(gardens.contains(pos.immutable()), "fungus comb lies outside the garden rooms at " + pos.toShortString());
                     layers += state.getValue(SeedPileBlock.LAYERS);
                 } else {
-                    helper.assertTrue(!state.is(ModBlocks.SEED_PILE.get()), "termites made a seed heap");
+                    helper.assertTrue(!state.is(ModBlocks.SEED_PILE.get()) && !state.is(ModBlocks.FORAGE_PILE.get()), "termites made a seed or forage heap");
                 }
             }
-            helper.assertTrue(layers == stored, "the heaps in the store hold " + layers + " pieces, the colony counts " + stored);
+            helper.assertTrue(layers == stored, "the comb holds " + layers + " pieces, the colony counts " + stored);
         });
     }
 }

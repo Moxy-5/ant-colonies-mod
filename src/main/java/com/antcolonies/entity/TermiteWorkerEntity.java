@@ -5,11 +5,15 @@ import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.entity.goal.BuildMoundGoal;
+import com.antcolonies.entity.goal.CarryEggGoal;
 import com.antcolonies.entity.goal.ClipGrassGoal;
+import com.antcolonies.entity.goal.FeedLarvaGoal;
+import com.antcolonies.entity.goal.FeedQueenGoal;
 import com.antcolonies.entity.goal.GatherSeedGoal;
 import com.antcolonies.entity.goal.GoInsideGoal;
 import com.antcolonies.entity.goal.PlugHoleGoal;
 import com.antcolonies.entity.goal.ShapeMoundGoal;
+import com.antcolonies.entity.goal.StandByQueenGoal;
 import com.antcolonies.entity.goal.StoreSeedGoal;
 import com.antcolonies.entity.goal.DigGoal;
 import com.antcolonies.species.Species;
@@ -26,10 +30,11 @@ import net.minecraft.world.level.Level;
 
 /**
  * A termite worker (Macrotermes): pale, soft and blind. It digs (the first workers open the entrance the royal pair
- * sealed, then the food store and galleries under the mound for soil), builds the mound layer by layer and shapes its
- * chimney blocks, gathers dead plant material (forage) into the food store, and wanders near the nest. Half the
- * workers are builders (digging and building) and half foragers, like the ants' roles; one with nothing to do for a
- * few seconds helps with the other job. Foragers go out at night and in the rain, through the foraging holes (which the
+ * sealed, then the fungus garden rooms and galleries under the mound for soil), builds the mound layer by layer and
+ * shapes its pieces, gathers dead plant material (forage) and builds it into fungus comb in the gardens, and wanders
+ * near the nest. Like the ants' workers they share the work out: nurses (from 3 workers on) carry the queen's eggs into
+ * the gardens and feed fungus nodules to her and the nymphs, the rest are half builders (digging and building) and half
+ * foragers; one with nothing to do for a few seconds helps with the other jobs. Foragers go out at night and in the rain, through the foraging holes (which the
  * workers open then and plug again afterwards) or now and then by a chimney; the rest of the time every worker stays
  * inside the nest and the mound, out of the sun. It joins the nearest termite colony when put down with a spawn egg,
  * and is born into its colony when a nymph grows up.
@@ -60,6 +65,10 @@ public class TermiteWorkerEntity extends AbstractAntEntity {
         this.goalSelector.addGoal(1, new StoreSeedGoal(this));
         this.goalSelector.addGoal(1, new BuildMoundGoal(this));
         this.goalSelector.addGoal(2, new ShapeMoundGoal(this));
+        // Nurses carry the queen's eggs into the fungus gardens and feed nodules to the queen and the nymphs.
+        this.goalSelector.addGoal(2, new CarryEggGoal(this));
+        this.goalSelector.addGoal(2, new FeedLarvaGoal(this));
+        this.goalSelector.addGoal(2, new FeedQueenGoal(this));
         this.goalSelector.addGoal(2, new PlugHoleGoal(this));
         // Builders dig, foragers fetch food off the ground and cut it off plants.
         this.goalSelector.addGoal(3, new DigGoal(this, () -> true, () -> mayDo(ColonyRole.BUILDER)));
@@ -67,6 +76,7 @@ public class TermiteWorkerEntity extends AbstractAntEntity {
         this.goalSelector.addGoal(4, new ClipGrassGoal(this));
         // Outside when it is time to stay in: back inside.
         this.goalSelector.addGoal(4, new GoInsideGoal(this));
+        this.goalSelector.addGoal(5, new StandByQueenGoal(this));
         this.goalSelector.addGoal(5, new AntWanderGoal(this, 1.0, 160, 5, () -> true).hangsFromCeilings(0.25F));
         this.goalSelector.addGoal(6, new RandomLookAroundGoal(this));
     }

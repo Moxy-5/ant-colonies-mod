@@ -28,6 +28,15 @@ public interface CellMap {
     }
 
     /**
+     * How high (in pixels) a slope's surface gets at its highest, looked at in its four corners (a ramp is highest
+     * along a side or in a corner; a flat one, like a fungus comb, is the same everywhere). -1 if the cell holds no slope.
+     */
+    default int slopeTop(BlockPos cell) {
+        return Math.max(Math.max(slopeHeight(cell, 0, 0), slopeHeight(cell, Slope.COLUMNS - 1, 0)),
+                Math.max(slopeHeight(cell, 0, Slope.COLUMNS - 1), slopeHeight(cell, Slope.COLUMNS - 1, Slope.COLUMNS - 1)));
+    }
+
+    /**
      * For a cell holding a block with a channel the insect fits through ({@link Channel}, a termite tunnel): the sides
      * the channel opens out of, as a mask (bit {@code Direction.get3DDataValue()}). 0 if there is none (or the insect
      * does not fit). Such a cell is not open ({@link #isOpen}): the insect is only ever in its channel.
