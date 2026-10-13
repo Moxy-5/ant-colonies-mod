@@ -12,7 +12,6 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.block.SeedPileBlock;
-import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.registry.ModTags;
 
 import net.minecraft.core.BlockPos;
@@ -392,7 +391,7 @@ public class Nest {
      */
     public boolean isEntrancePlugged(Level level) {
         return colony.profile().nest().sealWhileFounding() && !colony.isFounding() && level.isLoaded(center)
-                && level.getBlockState(center).is(ModBlocks.BURROWED_DIRT.get());
+                && colony.profile().nest().isPlug(level.getBlockState(center));
     }
 
     /**

@@ -10,8 +10,6 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import com.antcolonies.registry.ModBlocks;
-
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.entity.LivingEntity;
@@ -54,26 +52,52 @@ public class NestWalls {
 
     /**
      * Every opening in the walls of the dug-out nest: any open block (air, water, lava, grass) that touches a dug
-     * nest cell but is not itself part of the nest. Caves, cracks and the gaps between rooms all show up here.
+     * nest cell joined to the shaft but is not itself part of the nest. Caves, cracks and the gaps between rooms all show up here.
      * The entrance hole above the shaft is the one opening that is allowed. For tests, and for {@link #findLeak}.
      */
     public List<Leak> getLeaks(Level level) {
         Set<BlockPos> nest = colony.nest().nestCells(level);
         Set<BlockPos> seen = new HashSet<>();
         List<Leak> leaks = new ArrayList<>();
-        for (BlockPos cell : nest) {
-            if (!Nest.isDugOut(level, cell)) {
-                continue;
-            }
+        for (BlockPos cell : joinedCells(level, nest)) {
             for (Direction direction : Direction.values()) {
                 BlockPos hole = cell.relative(direction);
-                if (nest.contains(hole) || hole.equals(center) || !seen.add(hole) || !isOpen(level, hole)) {
+                // The foraging holes open and close on their own schedule (see ForagingHoles), they are no leak.
+                if (nest.contains(hole) || hole.equals(center) || !seen.add(hole) || !isOpen(level, hole)
+                        || colony.foragingHoles().isHole(level, hole)) {
                     continue;
                 }
                 leaks.add(new Leak(hole, findPlugSpot(level, nest, hole)));
             }
         }
         return leaks;
+    }
+
+    /**
+     * The dug-out nest cells joined to the top of the shaft through other dug-out nest cells. A planned cell that is open
+     * on its own (a cave crossing a gallery nobody has dug yet) is not part of the nest yet, so the caves round it are
+     * not leaks: otherwise the workers would go sealing caves far from where they live.
+     */
+    private Set<BlockPos> joinedCells(Level level, Set<BlockPos> nest) {
+        Set<BlockPos> joined = new HashSet<>();
+        BlockPos start = center.below();
+        if (!nest.contains(start) || !Nest.isDugOut(level, start)) {
+            return joined;
+        }
+        java.util.ArrayDeque<BlockPos> queue = new java.util.ArrayDeque<>();
+        joined.add(start);
+        queue.add(start);
+        while (!queue.isEmpty()) {
+            BlockPos cell = queue.poll();
+            for (Direction direction : Direction.values()) {
+                BlockPos next = cell.relative(direction);
+                if (nest.contains(next) && !joined.contains(next) && level.isLoaded(next) && Nest.isDugOut(level, next)) {
+                    joined.add(next);
+                    queue.add(next);
+                }
+            }
+        }
+        return joined;
     }
 
     /**
@@ -126,7 +150,7 @@ public class NestWalls {
         return isOpen(level, hole);
     }
 
-    /** Fills a leak with burrowed dirt. False if it is already closed or someone is standing in it (try again later). */
+    /** Fills a leak with the species' plug block (Burrowed Dirt, mound soil). False if it is already closed or someone is standing in it (try again later). */
     public boolean plugLeak(Level level, BlockPos hole) {
         if (hole.equals(center) || !isOpen(level, hole)) {
             return false;
@@ -135,7 +159,7 @@ public class NestWalls {
         if (!level.getEntitiesOfClass(LivingEntity.class, new AABB(hole)).isEmpty()) {
             return false;
         }
-        level.setBlock(hole, ModBlocks.BURROWED_DIRT.get().defaultBlockState(), 3);
+        level.setBlock(hole, colony.profile().nest().plugState(), 3);
         claimedLeaks.remove(hole);
         sealProgress.remove(hole);
         return true;

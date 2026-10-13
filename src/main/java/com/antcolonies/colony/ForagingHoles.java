@@ -6,7 +6,6 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.entity.AbstractAntEntity;
-import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.registry.ModTags;
 
 import net.minecraft.core.BlockPos;
@@ -108,7 +107,7 @@ public class ForagingHoles {
 
     /** Whether the hole holds the plug of soil the workers packed into it. */
     public boolean isPlug(Level level, BlockPos pos) {
-        return isHole(level, pos) && level.getBlockState(pos).is(ModBlocks.BURROWED_DIRT.get());
+        return isHole(level, pos) && colony.profile().nest().isPlug(level.getBlockState(pos));
     }
 
     /** Whether a worker may bite this hole open now: it is foraging time and the hole is closed with soil or its plug. */
@@ -117,7 +116,7 @@ public class ForagingHoles {
             return false;
         }
         BlockState state = level.getBlockState(hole);
-        return (state.is(ModTags.DIGGABLE) || state.is(ModBlocks.BURROWED_DIRT.get())) && !touchesFluid(level, hole);
+        return (state.is(ModTags.DIGGABLE) || colony.profile().nest().isPlug(state)) && !touchesFluid(level, hole);
     }
 
     /** A closed hole to open now (its tunnel is dug and it is foraging time), or null. */
@@ -202,7 +201,7 @@ public class ForagingHoles {
     }
 
     /**
-     * Packs the hole shut with soil (Burrowed Dirt). False if a creature (a termite on its way through, a player) is
+     * Packs the hole shut with soil (the species' plug block). False if a creature (a termite on its way through, a player) is
      * in the hole: it must move first, nobody is shut in.
      */
     public boolean plug(Level level, BlockPos hole) {
@@ -212,7 +211,7 @@ public class ForagingHoles {
         if (!level.getEntitiesOfClass(LivingEntity.class, new AABB(hole), LivingEntity::isAlive).isEmpty()) {
             return false;
         }
-        return level.setBlockAndUpdate(hole, ModBlocks.BURROWED_DIRT.get().defaultBlockState());
+        return level.setBlockAndUpdate(hole, colony.profile().nest().plugState());
     }
 
     private static boolean touchesFluid(Level level, BlockPos pos) {

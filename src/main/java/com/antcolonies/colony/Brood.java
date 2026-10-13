@@ -189,6 +189,7 @@ public class Brood {
             }
             worker.moveTo(larva.getX(), larva.getY(), larva.getZ(), larva.getYRot(), 0.0F);
             worker.joinColony(colony);
+            worker.setGrownUpAt(level.getGameTime()); // a young worker: a nurse first
             level.addFreshEntity(worker);
             larva.discard();
             return true;
@@ -199,6 +200,7 @@ public class Brood {
         }
         worker.moveTo(larva.getX(), larva.getY(), larva.getZ(), larva.getYRot(), 0.0F);
         worker.joinColony(colony);
+        worker.setGrownUpAt(level.getGameTime()); // a young worker: a nurse first
         level.addFreshEntity(worker);
         larva.discard();
         return true;

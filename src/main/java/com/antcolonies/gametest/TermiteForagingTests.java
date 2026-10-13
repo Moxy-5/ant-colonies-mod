@@ -64,8 +64,8 @@ public class TermiteForagingTests {
                 }
                 case 1 -> {
                     helper.assertTrue(helper.getBlockState(bush).is(Blocks.DEAD_BUSH), "a termite cut at the dead bush by day");
-                    boolean plugged = holes.tunnels(level).stream().allMatch(t -> level.getBlockState(t.hole()).is(ModBlocks.BURROWED_DIRT.get()))
-                            && (level.getBlockState(colony.nest().getEntrance()).is(ModBlocks.BURROWED_DIRT.get()) || colony.nest().isEntranceCovered(level));
+                    boolean plugged = holes.tunnels(level).stream().allMatch(t -> level.getBlockState(t.hole()).is(ModBlocks.TERMITE_MOUND.get()))
+                            && (level.getBlockState(colony.nest().getEntrance()).is(ModBlocks.TERMITE_MOUND.get()) || colony.nest().isEntranceCovered(level));
                     if (plugged && !holes.isAnyoneOutside(level) && helper.getTick() - dayFrom[0] > 1200) {
                         AntColoniesMod.LOGGER.info("[holes-test] tick {}: both holes plugged, everybody inside, night starts", helper.getTick());
                         colony.setForagingTimeForTests(true);
@@ -83,7 +83,7 @@ public class TermiteForagingTests {
             if (helper.getTick() % 1000 == 0) {
                 AntColoniesMod.LOGGER.info("[holes-test] tick {}: phase {}, tunnels {}, open {}, middle {} (covered {}), anyone outside {}, dig target {}",
                         helper.getTick(), phase[0], tunnels, holes.countOpen(level), level.getBlockState(colony.nest().getEntrance()),
-                        colony.nest().isEntranceCovered(level), holes.isAnyoneOutside(level), colony.nest().findDigTarget(level));
+                        colony.nest().isEntranceCovered(level), holes.isAnyoneOutside(level), colony.nest().findDigTarget(level) + ", leaks " + colony.walls().getLeaks(level).size());
             }
         });
         helper.succeedWhen(() -> {

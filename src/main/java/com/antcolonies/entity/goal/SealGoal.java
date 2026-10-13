@@ -10,7 +10,6 @@ import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.nav.AntPathFinder;
-import com.antcolonies.registry.ModBlocks;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.BlockParticleOption;
@@ -112,7 +111,7 @@ public class SealGoal extends Goal {
             return;
         }
         packCooldown = PACK_INTERVAL;
-        BlockState soil = ModBlocks.BURROWED_DIRT.get().defaultBlockState();
+        BlockState soil = colony.profile().nest().plugState();
         level.playSound(null, hole, soil.getSoundType().getHitSound(), SoundSource.BLOCKS, 0.4F, 1.0F);
         level.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, soil),
                 hole.getX() + 0.5, hole.getY() + 0.5, hole.getZ() + 0.5, 4, 0.2, 0.2, 0.2, 0.05);

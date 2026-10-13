@@ -1,7 +1,10 @@
 package com.antcolonies.colony;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -39,8 +42,14 @@ public class Colony {
     private final BlockPos center;
     private final Map<String, Integer> casteCounts = new LinkedHashMap<>();
 
-    /** The role of each worker: ant -> role. Not saved: after a reload the workers ask again and get a balanced share. */
+    /** The role of each worker: ant -> role, worked out from the ages below. Not saved (the ages are, on the workers). */
     private final Map<UUID, ColonyRole> roles = new HashMap<>();
+    /** When each worker known to the colony grew up (the worker's own saved age). Not saved. */
+    private final Map<UUID, Long> grownUp = new HashMap<>();
+    /** The game time the roles were last worked out. */
+    private long rolesWorkedOutAt = Long.MIN_VALUE;
+    /** How many workers of unknown age (spawn eggs, older saves) were given one, for the next one's age. Not saved. */
+    private int agesGiven;
     /** Whether the workers of this colony get hungry. On, except in some tests. Not saved. */
     private boolean hungerOn = true;
     /** Tests only: forces foraging time on or off (null: the real clock and weather). Not saved. */
@@ -227,37 +236,108 @@ public class Colony {
     }
 
     /**
-     * The role of this worker. Roles are shared out evenly: the nurses (how many depends on the headcount, see the
-     * profile's {@code nurses_from_workers}), the rest half builders and half foragers (builders first). A worker keeps its role until it is one too many for
-     * it, so roles only change when workers are born or die.
+     * The role of this worker. A worker's age decides its usual job (see the profile's {@code worker} numbers): a nurse
+     * while young, then a builder, then a forager. The colony is flexible: when a job is short-handed (fewer nurses than
+     * {@code nurses_from_workers} asks for, or fewer than a third of the others builders or foragers) it moves over the
+     * workers nearest in age, so the jobs stay in age order (the youngest nurse, the oldest forage). Worked out once a
+     * second, or at once when a new worker turns up.
      */
+    public ColonyRole roleOf(ServerLevel level, AbstractAntEntity ant) {
+        long now = level.getGameTime();
+        if (ant.getGrownUpAt() == AbstractAntEntity.AGE_NOT_SET) {
+            ant.setGrownUpAt(now - ageForUnknownWorker());
+        }
+        Long known = grownUp.put(ant.getUUID(), ant.getGrownUpAt());
+        if (known == null || known != ant.getGrownUpAt() || now - rolesWorkedOutAt >= 20 || now < rolesWorkedOutAt) {
+            workOutRoles(level, now);
+        }
+        return roles.getOrDefault(ant.getUUID(), ColonyRole.BUILDER);
+    }
+
+    /** The role of the worker with this id (for tests and the colony list); a builder if it is not loaded. */
     public ColonyRole roleOf(ServerLevel level, UUID ant) {
-        roles.keySet().removeIf(id -> !id.equals(ant) && !(level.getEntity(id) instanceof AbstractAntEntity worker && worker.isAlive()));
-        int[] others = new int[ColonyRole.values().length];
-        int total = 1;
-        for (Map.Entry<UUID, ColonyRole> entry : roles.entrySet()) {
-            if (!entry.getKey().equals(ant)) {
-                others[entry.getValue().ordinal()]++;
-                total++;
+        return level.getEntity(ant) instanceof AbstractAntEntity worker ? roleOf(level, worker) : roles.getOrDefault(ant, ColonyRole.BUILDER);
+    }
+
+    /**
+     * For the colony list: how many workers are young, middle-aged and old, and how many do each job, such as
+     * "ages 2 young, 3 middle, 1 old, jobs 1 nurse, 3 builders, 2 foragers" (only the workers known to the colony).
+     */
+    public String describeJobs(ServerLevel level) {
+        long now = level.getGameTime();
+        workOutRoles(level, now);
+        int[] ages = new int[ColonyRole.values().length];
+        for (long grew : grownUp.values()) {
+            ages[profile().worker().roleForAge(now - grew).ordinal()]++;
+        }
+        int[] jobs = new int[ColonyRole.values().length];
+        for (ColonyRole role : roles.values()) {
+            jobs[role.ordinal()]++;
+        }
+        return "ages " + ages[ColonyRole.NURSE.ordinal()] + " young, " + ages[ColonyRole.BUILDER.ordinal()] + " middle, "
+                + ages[ColonyRole.FORAGER.ordinal()] + " old, jobs " + jobs[ColonyRole.NURSE.ordinal()] + " nurses, "
+                + jobs[ColonyRole.BUILDER.ordinal()] + " builders, " + jobs[ColonyRole.FORAGER.ordinal()] + " foragers";
+    }
+
+    /**
+     * How old a worker that turned up without an age is made (from a spawn egg, or an older save): a grown-up worker,
+     * in the middle of the builder or the forager years, two builders to one forager, so a handful of them shares the
+     * jobs out as before ages existed.
+     */
+    private long ageForUnknownWorker() {
+        var numbers = profile().worker();
+        long builderYears = Math.max(1, numbers.builderUntilTicks() - numbers.nurseUntilTicks());
+        boolean forager = agesGiven++ % 3 == 1;
+        return forager ? numbers.builderUntilTicks() + builderYears / 2 : numbers.nurseUntilTicks() + builderYears / 2;
+    }
+
+    private void workOutRoles(ServerLevel level, long now) {
+        rolesWorkedOutAt = now;
+        grownUp.keySet().removeIf(id -> !(level.getEntity(id) instanceof AbstractAntEntity worker && worker.isAlive()
+                && getId().equals(worker.getColonyId())));
+        List<Map.Entry<UUID, Long>> workers = new ArrayList<>(grownUp.entrySet());
+        // Youngest first (grew up last); same age: by id, so the order does not change from one second to the next.
+        workers.sort(Comparator.comparing((Map.Entry<UUID, Long> entry) -> -entry.getValue()).thenComparing(Map.Entry::getKey));
+        int total = workers.size();
+        int[] natural = new int[ColonyRole.values().length];
+        for (Map.Entry<UUID, Long> entry : workers) {
+            natural[profile().worker().roleForAge(now - entry.getValue()).ordinal()]++;
+        }
+        int[] counts = shareOut(total, profile().colony().nurses(total), natural);
+        roles.clear();
+        int index = 0;
+        for (ColonyRole role : new ColonyRole[] {ColonyRole.NURSE, ColonyRole.BUILDER, ColonyRole.FORAGER}) {
+            for (int i = 0; i < counts[role.ordinal()]; i++) {
+                roles.put(workers.get(index++).getKey(), role);
             }
         }
-        int nurses = profile().colony().nurses(total);
-        int[] target = new int[ColonyRole.values().length];
-        target[ColonyRole.NURSE.ordinal()] = nurses;
-        target[ColonyRole.BUILDER.ordinal()] = (total - nurses + 1) / 2;
-        target[ColonyRole.FORAGER.ordinal()] = (total - nurses) / 2;
-        ColonyRole current = roles.get(ant);
-        if (current == null || others[current.ordinal()] >= target[current.ordinal()]) {
-            current = ColonyRole.BUILDER;
-            for (ColonyRole role : new ColonyRole[] {ColonyRole.NURSE, ColonyRole.FORAGER, ColonyRole.BUILDER}) {
-                if (others[role.ordinal()] < target[role.ordinal()]) {
-                    current = role;
-                    break;
-                }
+    }
+
+    /**
+     * How many workers do each job: as many as their ages say ({@code natural}), but at least {@code nursesWanted}
+     * nurses and a third of the rest builders and a third foragers (rounded up; with too few workers for all of that,
+     * builders come first, then foragers). A short job takes workers from the job with the most to spare.
+     */
+    static int[] shareOut(int total, int nursesWanted, int[] natural) {
+        int nurse = ColonyRole.NURSE.ordinal(), builder = ColonyRole.BUILDER.ordinal(), forager = ColonyRole.FORAGER.ordinal();
+        int minNurses = Math.min(total, nursesWanted);
+        int rest = total - minNurses;
+        int minBuilders = Math.min(rest, (rest + 2) / 3);
+        int minForagers = Math.min(rest - minBuilders, (rest + 2) / 3);
+        int[] counts = new int[ColonyRole.values().length];
+        counts[nurse] = Math.max(natural[nurse], minNurses);
+        counts[forager] = Math.max(natural[forager], minForagers);
+        counts[builder] = total - counts[nurse] - counts[forager];
+        while (counts[builder] < minBuilders) {
+            int spareNurses = counts[nurse] - minNurses;
+            int spareForagers = counts[forager] - minForagers;
+            if (spareNurses <= 0 && spareForagers <= 0) {
+                break;
             }
-            roles.put(ant, current);
+            counts[spareNurses >= spareForagers ? nurse : forager]--;
+            counts[builder]++;
         }
-        return current;
+        return counts;
     }
 
     public int getCount(String caste) {

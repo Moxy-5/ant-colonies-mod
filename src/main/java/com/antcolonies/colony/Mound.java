@@ -672,6 +672,10 @@ public class Mound {
             return false;
         }
         BlockState state = level.getBlockState(pos);
+        // A plug the termites packed into the entrance or a foraging hole is opened on the schedule, not cleared away.
+        if ((pos.equals(center) || colony.foragingHoles().isHole(level, pos)) && colony.profile().nest().isPlug(state)) {
+            return false;
+        }
         return isMoundBlock(state) || state.is(ModTags.DIGGABLE);
     }
 
@@ -837,12 +841,31 @@ public class Mound {
                 open.add(toward); // carved from the nest (or the shaft): it opens toward where the termite came from
             }
             done = level.setBlockAndUpdate(pos, ModBlocks.TERMITE_TUNNEL.get().stateFor(level, pos, age, open));
-        } else if (job == MoundGrowth.Job.RESHAPE && getParts(level).get(pos) == MoundPlan.Part.TUNNEL) {
-            // A piece (the bottom of a spire that moves up) becomes a tunnel block where it stands, joined to the channels round it.
-            done = level.setBlockAndUpdate(pos, ModBlocks.TERMITE_TUNNEL.get().stateFor(level, pos, age, doorsOf(level, pos)));
         } else if (job == MoundGrowth.Job.RESHAPE) {
-            BlockState piece = blockFor(cachedShape, pos.subtract(center)).setValue(MoundSoil.AGE, age);
-            done = level.setBlockAndUpdate(pos, Block.updateFromNeighbourShapes(piece, level, pos));
+            // A piece is filled up where it stands. Insects in it must not be buried: a player or an animal there stops
+            // it (try again later); termites crawling up its channel keep a channel (it becomes a tunnel block instead
+            // of solid soil), and one standing on it outside the channel is lifted out.
+            List<LivingEntity> inCell = level.getEntitiesOfClass(LivingEntity.class, new AABB(pos), LivingEntity::isAlive);
+            if (inCell.stream().anyMatch(living -> !(living instanceof AbstractAntEntity))) {
+                return false;
+            }
+            BlockState filled;
+            if (getParts(level).get(pos) == MoundPlan.Part.TUNNEL || !inCell.isEmpty() && cachedShape != null
+                    && blockFor(cachedShape, pos.subtract(center)).getBlock() instanceof TermiteMoundBlock) {
+                // A piece (the bottom of a spire that moves up) becomes a tunnel block where it stands, joined to the channels round it.
+                filled = ModBlocks.TERMITE_TUNNEL.get().stateFor(level, pos, age, doorsOf(level, pos));
+            } else {
+                filled = Block.updateFromNeighbourShapes(blockFor(cachedShape, pos.subtract(center)).setValue(MoundSoil.AGE, age), level, pos);
+            }
+            done = level.setBlockAndUpdate(pos, filled);
+            if (done) {
+                double top = pos.getY() + filled.getCollisionShape(level, pos).max(Direction.Axis.Y);
+                for (LivingEntity ant : inCell) {
+                    if (!(ant instanceof AbstractAntEntity insect && insect.getNavigator().isInChannel()) && ant.getBoundingBox().minY < top) {
+                        liftOnto(level, ant, pos, top);
+                    }
+                }
+            }
         } else {
             done = level.destroyBlock(pos, false);
         }

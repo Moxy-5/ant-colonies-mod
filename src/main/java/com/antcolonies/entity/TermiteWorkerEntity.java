@@ -12,6 +12,7 @@ import com.antcolonies.entity.goal.FeedQueenGoal;
 import com.antcolonies.entity.goal.GatherSeedGoal;
 import com.antcolonies.entity.goal.GoInsideGoal;
 import com.antcolonies.entity.goal.PlugHoleGoal;
+import com.antcolonies.entity.goal.SealGoal;
 import com.antcolonies.entity.goal.ShapeMoundGoal;
 import com.antcolonies.entity.goal.StandByQueenGoal;
 import com.antcolonies.entity.goal.StoreSeedGoal;
@@ -70,6 +71,8 @@ public class TermiteWorkerEntity extends AbstractAntEntity {
         this.goalSelector.addGoal(2, new FeedLarvaGoal(this));
         this.goalSelector.addGoal(2, new FeedQueenGoal(this));
         this.goalSelector.addGoal(2, new PlugHoleGoal(this));
+        // Builders keep the nest shut: any opening in its walls (a cave, a block a player broke) is packed with mound soil.
+        this.goalSelector.addGoal(2, new SealGoal(this));
         // Builders dig, foragers fetch food off the ground and cut it off plants.
         this.goalSelector.addGoal(3, new DigGoal(this, () -> true, () -> mayDo(ColonyRole.BUILDER)));
         this.goalSelector.addGoal(3, new GatherSeedGoal(this));

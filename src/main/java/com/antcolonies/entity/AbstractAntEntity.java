@@ -77,6 +77,11 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
      */
     private static final EntityDataAccessor<Byte> DATA_POSE_FLAGS =
             SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.BYTE);
+    /** How pale a young worker is drawn, 0 (grown dark) to 100 (just grown up). Synced for the renderer. */
+    private static final EntityDataAccessor<Byte> DATA_YOUTH =
+            SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.BYTE);
+    /** {@link #grownUpAt} before it is known (a worker from a spawn egg or an older save: its colony gives it an age). */
+    public static final long AGE_NOT_SET = Long.MIN_VALUE;
     private static final int PEEKING = 1;
     private static final int TURNING_SLOWLY = 2;
     private static final int IN_CHANNEL = 4;
@@ -104,6 +109,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     /** Which colony this ant belongs to (null = none). Saved with the ant. */
     @Nullable
     private UUID colonyId;
+    /** The game time this worker grew up (came out of its egg or nymph stage); its age decides its usual job. Saved. */
+    private long grownUpAt = AGE_NOT_SET;
 
     private boolean seedForBread;
     /** How many seconds in a row the ant has had nothing to do. Server side only, not saved. */
@@ -140,6 +147,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         builder.define(DATA_SURFACE, (byte) Direction.DOWN.get3DDataValue());
         builder.define(DATA_HEADING, 0.0F);
         builder.define(DATA_POSE_FLAGS, (byte) 0);
+        builder.define(DATA_YOUTH, (byte) 0);
         builder.define(DATA_CARRIED, Optional.empty());
         builder.define(DATA_CARRIED_SEED, ItemStack.EMPTY);
         builder.define(DATA_CARRIED_EGG, false);
@@ -246,13 +254,48 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
                 || ColonyManager.get(serverLevel).getColony(getColonyId()) == null;
     }
 
+    /** The game time this worker grew up, or {@link #AGE_NOT_SET}. */
+    public long getGrownUpAt() {
+        return grownUpAt;
+    }
+
+    /** Sets when this worker grew up: now for one just out of the brood, earlier for one given an age by its colony. */
+    public void setGrownUpAt(long gameTime) {
+        grownUpAt = gameTime;
+        updateYouth();
+    }
+
+    /** How long ago (in ticks) this worker grew up, or 0 if not known yet. */
+    public long getAgeTicks() {
+        return grownUpAt == AGE_NOT_SET ? 0 : Math.max(0, level().getGameTime() - grownUpAt);
+    }
+
+    /** How pale the body is drawn: 1 just grown up, fading to 0 by the end of its time as a nurse. */
+    public float getYouth() {
+        return entityData.get(DATA_YOUTH) / 100.0F;
+    }
+
+    private void updateYouth() {
+        if (level().isClientSide || !hasColonyRole() || grownUpAt == AGE_NOT_SET || getColonyId() == null
+                || !(level() instanceof ServerLevel serverLevel)) {
+            return;
+        }
+        Colony colony = ColonyManager.get(serverLevel).getColony(getColonyId());
+        if (colony == null) {
+            return;
+        }
+        int nurseUntil = Math.max(1, colony.profile().worker().nurseUntilTicks());
+        float youth = 1.0F - (float) getAgeTicks() / nurseUntil;
+        entityData.set(DATA_YOUTH, (byte) Math.round(Math.max(0.0F, Math.min(1.0F, youth)) * 100.0F));
+    }
+
     /** Whether this ant's own role is {@code role}. */
     public boolean hasRole(ColonyRole role) {
         if (!hasColonyRole() || getColonyId() == null || !(level() instanceof ServerLevel serverLevel)) {
             return false;
         }
         Colony colony = ColonyManager.get(serverLevel).getColony(getColonyId());
-        return colony != null && colony.roleOf(serverLevel, getUUID()) == role;
+        return colony != null && colony.roleOf(serverLevel, this) == role;
     }
 
     /** The legs: plans routes (walk, climb, drop) and walks them. Goals only say where to go. */
@@ -316,6 +359,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
                     && !(wrapped.getGoal() instanceof FloatGoal || wrapped.getGoal() instanceof AntWanderGoal
                     || wrapped.getGoal() instanceof RandomLookAroundGoal));
             idleSeconds = busy ? 0 : idleSeconds + 1;
+            updateYouth();
         }
         if (navigator.isAttached()) {
             // Holding a wall or going round an edge: the navigator decides the exact motion along the surface.
@@ -562,6 +606,9 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         if (colonyId != null) {
             tag.putUUID("ColonyId", colonyId);
         }
+        if (grownUpAt != AGE_NOT_SET) {
+            tag.putLong("GrownUpAt", grownUpAt);
+        }
         // What the ant holds in its mandibles, so nothing is lost when the world is saved and loaded again: the job that
         // carries it picks it up again after the reload (each one carries on when the ant already holds its load).
         BlockState pellet = getCarriedBlock();
@@ -590,6 +637,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         if (tag.hasUUID("ColonyId")) {
             colonyId = tag.getUUID("ColonyId");
         }
+        grownUpAt = tag.contains("GrownUpAt") ? tag.getLong("GrownUpAt") : AGE_NOT_SET;
         if (tag.contains("CarriedBlock")) {
             setCarriedBlock(NbtUtils.readBlockState(registryAccess().lookupOrThrow(Registries.BLOCK), tag.getCompound("CarriedBlock")));
         }

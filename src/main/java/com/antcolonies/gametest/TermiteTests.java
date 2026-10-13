@@ -52,7 +52,7 @@ public class TermiteTests {
             helper.assertTrue(colony.nest().getPlannedChambers(level).size() == 1, "the founding nest should have 1 level");
             helper.assertTrue(colony.nest().findDigTarget(level) == null, "still digging: " + airBelowSurface(helper) + " of " + CHAMBER_CELLS);
             helper.assertTrue(airBelowSurface(helper) == CHAMBER_CELLS, airBelowSurface(helper) + " open cells, expected " + CHAMBER_CELLS);
-            helper.assertBlockPresent(ModBlocks.BURROWED_DIRT.get(), new BlockPos(MIDDLE, SURFACE, MIDDLE));
+            helper.assertBlockPresent(ModBlocks.TERMITE_MOUND.get(), new BlockPos(MIDDLE, SURFACE, MIDDLE));
             TermiteQueenEntity queen = (TermiteQueenEntity) colony.getQueen(level);
             BlockPos room = colony.nest().getFinishedRoomCenter(level);
             helper.assertTrue(queen.blockPosition().equals(room), "the queen is not in the middle of the chamber");
@@ -71,7 +71,7 @@ public class TermiteTests {
             ServerLevel level = helper.getLevel();
             Colony colony = colony(helper);
             helper.assertTrue(colony != null && colony.nest().findDigTarget(level) == null, "still digging");
-            helper.assertBlockPresent(ModBlocks.BURROWED_DIRT.get(), new BlockPos(MIDDLE, SURFACE, MIDDLE));
+            helper.assertBlockPresent(ModBlocks.TERMITE_MOUND.get(), new BlockPos(MIDDLE, SURFACE, MIDDLE));
             helper.assertTrue(colony.getQueen(level).blockPosition().equals(colony.nest().getFinishedRoomCenter(level)),
                     "the queen is not in the middle of the chamber");
         });
@@ -87,7 +87,7 @@ public class TermiteTests {
         foundColony(helper, true);
         boolean[] sealed = {false};
         helper.onEachTick(() -> {
-            if (!sealed[0] && helper.getBlockState(new BlockPos(MIDDLE, SURFACE, MIDDLE)).is(ModBlocks.BURROWED_DIRT.get())) {
+            if (!sealed[0] && helper.getBlockState(new BlockPos(MIDDLE, SURFACE, MIDDLE)).is(ModBlocks.TERMITE_MOUND.get())) {
                 sealed[0] = true;
                 AntColoniesMod.LOGGER.info("[termite-test] tick {}: sealed in", helper.getTick());
             }

@@ -8,7 +8,6 @@ import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.TermiteKingEntity;
-import com.antcolonies.registry.ModBlocks;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.BlockParticleOption;
@@ -103,7 +102,7 @@ public class SealEntranceGoal extends Goal {
         }
         // Clinging just under the hole: pack soil into it.
         ant.getNavigator().stop();
-        BlockState soil = ModBlocks.BURROWED_DIRT.get().defaultBlockState();
+        BlockState soil = colony.profile().nest().plugState();
         if (++packed % PACK_INTERVAL == 0) {
             level.playSound(null, hole, soil.getSoundType().getPlaceSound(), SoundSource.BLOCKS, 0.4F, 1.2F);
             level.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, soil),

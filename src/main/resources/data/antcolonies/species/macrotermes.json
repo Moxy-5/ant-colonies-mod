@@ -7,7 +7,9 @@
   "worker": {
     "meal_interval_ticks": 24000,
     "slow_after_ticks": 36000,
-    "starve_after_ticks": 72000
+    "starve_after_ticks": 72000,
+    "nurse_until_ticks": 72000,
+    "builder_until_ticks": 192000
   },
   "queen": {
     "meal": 6,
@@ -44,7 +46,8 @@
     "max_levels": 1,
     "seal_while_founding": true,
     "foraging_holes": 2,
-    "foraging_hole_distance": 8
+    "foraging_hole_distance": 8,
+    "plug_block": "antcolonies:termite_mound"
   },
   "queen_body": {
     "full_size_at_members": 60,
