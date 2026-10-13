@@ -251,30 +251,24 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
     }
 
     /**
-     * A tall mound built of termite mound soil (termites; species without it build the ant hill instead). It grows in
-     * stages, one block taller each ({@code MoundPlan}), up to {@code maxHeight} blocks with a base {@code baseRadius}
-     * blocks wide (from the middle) and {@code sideChimneys} smaller chimneys around the tower, the first of them up to
-     * {@code sideChimneyHeight} blocks above the mound's slope. How big the colony lets it get grows with time: every
-     * day it may have {@code blocksPerDay} more blocks, plus {@code blocksPerDayPerWorker} for each worker (so an old
-     * small colony still adds to it slowly, and a big one builds fast). The soil comes from galleries dug under it:
-     * {@code galleryLevels} levels, reaching up to {@code galleryRadius} blocks out from the shaft.
-     * {@code chimneyTripChance}: the share of walks (0 to 1) on which a termite may come out of or go in by the mouth of a
-     * chimney although there is another way (a foraging hole, an entrance at the foot); on the others it only uses a
-     * chimney's mouth when there is no other way (optional, 1: any walk).
+     * A cathedral mound built of termite mound soil (termites; species without it build the ant hill instead). It grows
+     * in {@code maxHeight} stages ({@code MoundPlan}) and is about {@code maxHeight} blocks tall when full-grown. How big
+     * the colony lets it get grows with time: every day it may have {@code blocksPerDay} more blocks, plus
+     * {@code blocksPerDayPerWorker} for each worker (so an old small colony still adds to it slowly, and a big one builds
+     * fast). The soil comes from galleries dug under it: {@code galleryLevels} levels, reaching up to
+     * {@code galleryRadius} blocks out from the shaft. {@code chimneyTripChance}: the share of walks (0 to 1) on which a
+     * termite may come out of or go in by a chimney mouth although there is another way (a foraging hole); on the
+     * others it only uses a mouth when there is no other way (optional, 1: any walk).
      */
-    public record MoundNumbers(int maxHeight, float baseRadius, int sideChimneys, int sideChimneyHeight, float blocksPerDay,
-            float blocksPerDayPerWorker, int galleryLevels, int galleryRadius, float chimneyTripChance) {
-        /** The numbers without a chimney trip chance (any walk may use a chimney's mouth). */
-        public MoundNumbers(int maxHeight, float baseRadius, int sideChimneys, int sideChimneyHeight, float blocksPerDay,
-                float blocksPerDayPerWorker, int galleryLevels, int galleryRadius) {
-            this(maxHeight, baseRadius, sideChimneys, sideChimneyHeight, blocksPerDay, blocksPerDayPerWorker, galleryLevels, galleryRadius, 1.0F);
+    public record MoundNumbers(int maxHeight, float blocksPerDay, float blocksPerDayPerWorker, int galleryLevels,
+            int galleryRadius, float chimneyTripChance) {
+        /** The numbers without a chimney trip chance (any walk may use a chimney mouth). */
+        public MoundNumbers(int maxHeight, float blocksPerDay, float blocksPerDayPerWorker, int galleryLevels, int galleryRadius) {
+            this(maxHeight, blocksPerDay, blocksPerDayPerWorker, galleryLevels, galleryRadius, 1.0F);
         }
 
         public static final Codec<MoundNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("max_height").forGetter(MoundNumbers::maxHeight),
-                Codec.FLOAT.fieldOf("base_radius").forGetter(MoundNumbers::baseRadius),
-                Codec.INT.fieldOf("side_chimneys").forGetter(MoundNumbers::sideChimneys),
-                Codec.INT.fieldOf("side_chimney_height").forGetter(MoundNumbers::sideChimneyHeight),
                 Codec.FLOAT.fieldOf("blocks_per_day").forGetter(MoundNumbers::blocksPerDay),
                 Codec.FLOAT.fieldOf("blocks_per_day_per_worker").forGetter(MoundNumbers::blocksPerDayPerWorker),
                 Codec.INT.fieldOf("gallery_levels").forGetter(MoundNumbers::galleryLevels),

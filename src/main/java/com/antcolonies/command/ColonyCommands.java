@@ -92,7 +92,7 @@ public class ColonyCommands {
         }
         ColonyManager.get(level).markChanged();
         String done = instant ? "built at once" : "set: the termites build up to it";
-        source.sendSuccess(() -> Component.literal("Mound height " + h + " of " + max + " (" + colony.mound().wallsAt(h) + " blocks) " + done
+        source.sendSuccess(() -> Component.literal("Mound stage " + h + " of " + max + " (" + colony.mound().wallsAt(h) + " blocks) " + done
                 + (colony.isFounding() ? ". The colony has no workers yet, so nobody builds." : ".")), false);
         return 1;
     }
@@ -145,7 +145,7 @@ public class ColonyCommands {
             return "";
         }
         int h = colony.mound().getStage(level);
-        return String.format(" | mound height %d of %d, %d/%d blocks finished, earned %.1f", h, colony.mound().numbers().maxHeight(),
+        return String.format(" | mound stage %d of %d, %d/%d blocks finished, earned %.1f", h, colony.mound().numbers().maxHeight(),
                 colony.mound().countFinished(level), colony.mound().wallsAt(h), colony.mound().getAllowance(level));
     }
 

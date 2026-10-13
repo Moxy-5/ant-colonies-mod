@@ -51,6 +51,11 @@ public class TermiteSpireBlock extends MoundPieceBlock {
         return WIDTHS[thickness][1];
     }
 
+    /** Width (pixels) of the piece's foot. */
+    public static int bottomWidth(int thickness) {
+        return WIDTHS[thickness][0];
+    }
+
     @Nullable
     @Override
     public BlockState getStateForPlacement(BlockPlaceContext context) {

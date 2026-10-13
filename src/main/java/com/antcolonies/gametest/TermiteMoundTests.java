@@ -193,10 +193,10 @@ public class TermiteMoundTests {
     }
 
     /**
-     * A termite colony with workers builds its mound: first the ring round the entrance with a chimney block in it,
-     * then (one stage taller) a second ring on the first, the old chimney block cleared out of the shaft and a new one
-     * on top. The soil comes from digging (the nest, then the galleries). Wet soil is set at once here, as if it had
-     * dried (it takes about 20 minutes in the game).
+     * A termite colony with workers builds the soil of its mound: the first stage (a low dome round the open entrance),
+     * then the second. The soil comes from digging (the nest, then the galleries). Wet soil is set at once here, as if
+     * it had dried (it takes about 20 minutes in the game). Termites do not shape the cathedral's spire pieces, mouths
+     * and ramps yet (that comes with the tunnel block), so only the soil and the hollow entrance are checked.
      */
     @GameTest(template = "arena", timeoutTicks = 30000, skyAccess = true)
     public static void termitesBuildTheFirstTwoStagesOfTheirMound(GameTestHelper helper) {
@@ -245,20 +245,18 @@ public class TermiteMoundTests {
             helper.assertTrue(colony != null && stageOneAt[0] >= 0, "the first stage is not built yet");
             helper.assertTrue(isBuilt(level, colony), "stage 2: " + colony.mound().countFinished(level) + " of "
                     + colony.mound().wallsAt(2) + " blocks finished");
-            BlockPos entrance = colony.getCenter();
-            helper.assertTrue(level.getBlockState(entrance).isAir(), "the old chimney block is still in the entrance");
-            helper.assertTrue(level.getBlockState(entrance.above()).getBlock() instanceof TermiteHoleBlock, "no chimney block on top");
+            helper.assertTrue(level.getBlockState(colony.getCenter()).isAir(), "the entrance is not open");
         });
     }
 
-    /** Every part of the colony's mound at its stage now is there: walls finished, chimney blocks shaped, hollows open. */
+    /** The soil of the colony's mound at its stage now is there: walls finished, hollows open (pieces are not built yet). */
     private static boolean isBuilt(ServerLevel level, Colony colony) {
         for (var entry : colony.mound().getParts(level).entrySet()) {
             BlockState state = level.getBlockState(entry.getKey());
             boolean ok = switch (entry.getValue()) {
                 case WALL -> state.getBlock() instanceof TermiteMoundBlock && TermiteMoundBlock.isFinished(state);
-                case HOLE -> state.getBlock() instanceof TermiteHoleBlock;
                 case OPEN -> state.isAir();
+                case MOUTH, SPIRE, RAMP -> true;
             };
             if (!ok) {
                 return false;

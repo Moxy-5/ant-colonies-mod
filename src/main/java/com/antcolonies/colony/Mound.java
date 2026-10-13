@@ -11,8 +11,13 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import com.antcolonies.block.MoundPieceBlock;
+import com.antcolonies.block.MoundSoil;
 import com.antcolonies.block.TermiteHoleBlock;
 import com.antcolonies.block.TermiteMoundBlock;
+import com.antcolonies.block.TermiteMouthBlock;
+import com.antcolonies.block.TermiteRampBlock;
+import com.antcolonies.block.TermiteSpireBlock;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.TermiteWorkerEntity;
 import com.antcolonies.registry.ModBlocks;
@@ -24,6 +29,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
@@ -72,6 +78,8 @@ public class Mound {
     private int cachedStage;
     private Map<BlockPos, MoundPlan.Part> cachedParts = Map.of();
     @Nullable
+    private MoundPlan.Shape cachedShape;
+    @Nullable
     private List<BlockPos> galleries;
     private BlockPos galleriesHub = BlockPos.ZERO;
     private long spotsTick = Long.MIN_VALUE;
@@ -93,9 +101,9 @@ public class Mound {
         return numbers() != null && !colony.isFounding();
     }
 
-    /** The side the first side chimney stands toward (fixed per colony). */
-    private Direction firstChimney() {
-        return Direction.from2DDataValue(Math.floorMod(colony.getId().hashCode() + 1, 4));
+    /** What makes this colony's mound look a little different from every other one (fixed per colony). */
+    private long seed() {
+        return colony.getId().getMostSignificantBits() ^ colony.getId().getLeastSignificantBits();
     }
 
     private void prepareShapes(MoundNumbers numbers) {
@@ -105,7 +113,7 @@ public class Mound {
         shapesFor = numbers;
         wallsAt = new int[numbers.maxHeight() + 1];
         for (int h = 1; h <= numbers.maxHeight(); h++) {
-            wallsAt[h] = MoundPlan.walls(MoundPlan.stage(h, numbers, firstChimney()));
+            wallsAt[h] = MoundPlan.walls(MoundPlan.stage(h, numbers, seed()));
         }
         cachedStage = 0;
     }
@@ -167,9 +175,11 @@ public class Mound {
         }
         int h = getStage(level);
         if (h != cachedStage) {
+            MoundPlan.Shape shape = MoundPlan.stage(h, numbers, seed());
             Map<BlockPos, MoundPlan.Part> parts = new LinkedHashMap<>();
-            MoundPlan.stage(h, numbers, firstChimney()).forEach((offset, part) -> parts.put(center.offset(offset), part));
+            shape.parts().forEach((offset, part) -> parts.put(center.offset(offset), part));
             cachedParts = parts;
+            cachedShape = shape;
             cachedStage = h;
         }
         return cachedParts;
@@ -449,7 +459,7 @@ public class Mound {
             return false;
         }
         BlockState state = level.getBlockState(pos);
-        return state.getBlock() instanceof TermiteMoundBlock || state.getBlock() instanceof TermiteHoleBlock || state.is(ModTags.DIGGABLE);
+        return isMoundBlock(state) || state.is(ModTags.DIGGABLE);
     }
 
     /** The lowest block that must be cleared out of the mound and can be reached (see {@link Nest#standSpotsFor}). */
@@ -494,11 +504,18 @@ public class Mound {
         pelletsTaken.remove(dug);
     }
 
-    // ---- chimney blocks ----
+    /** Any block of a termite mound: soil, the old chimney crown, a spire piece, a chimney mouth or a ramp. */
+    private static boolean isMoundBlock(BlockState state) {
+        Block block = state.getBlock();
+        return block instanceof TermiteMoundBlock || block instanceof TermiteHoleBlock || block instanceof MoundPieceBlock;
+    }
+
+    // ---- chimney mouths ----
 
     /**
-     * A chimney block (the cap of a shaft, an entrance at the foot of the mound) that can be shaped now, claimed for
-     * this termite, or null. It is shaped once the walls round it are finished and the shaft under it has been cleared.
+     * A chimney mouth (at the tip of a spire) that can be shaped now, claimed for this termite, or null. It is shaped
+     * once the walls beside it are finished and the spire it stands on is there. (Termites do not shape the spire
+     * pieces yet, so on a mound they build the mouths wait; the instant command puts them up.)
      */
     @Nullable
     public BlockPos pickHoleJob(Level level, AbstractAntEntity ant) {
@@ -509,7 +526,7 @@ public class Mound {
         holeClaims.values().removeIf(claim -> claim.until <= now);
         for (Map.Entry<BlockPos, MoundPlan.Part> entry : getParts(level).entrySet()) {
             BlockPos pos = entry.getKey();
-            if (entry.getValue() == MoundPlan.Part.HOLE && !isClaimedByOther(holeClaims, pos, ant.getUUID()) && isHoleJob(level, pos)) {
+            if (entry.getValue() == MoundPlan.Part.MOUTH && !isClaimedByOther(holeClaims, pos, ant.getUUID()) && isHoleJob(level, pos)) {
                 holeClaims.put(ant.getUUID(), new Claim(pos, now + CLAIM_TICKS));
                 return pos;
             }
@@ -521,15 +538,19 @@ public class Mound {
         holeClaims.remove(ant);
     }
 
-    /** Whether a chimney block can be shaped here now. */
+    /** Whether a chimney mouth can be shaped here now. */
     public boolean isHoleJob(Level level, BlockPos pos) {
         Map<BlockPos, MoundPlan.Part> parts = getParts(level);
-        if (parts.get(pos) != MoundPlan.Part.HOLE || !level.isLoaded(pos)) {
+        if (parts.get(pos) != MoundPlan.Part.MOUTH || !level.isLoaded(pos)) {
             return false;
         }
         BlockState state = level.getBlockState(pos);
-        if (state.getBlock() instanceof TermiteHoleBlock || !(state.canBeReplaced() || state.getBlock() instanceof TermiteMoundBlock)) {
+        if (state.getBlock() instanceof TermiteMouthBlock || !(state.canBeReplaced() || state.getBlock() instanceof TermiteMoundBlock)) {
             return false;
+        }
+        BlockPos under = pos.below();
+        if (parts.get(under) != MoundPlan.Part.OPEN && level.getBlockState(under).canBeReplaced()) {
+            return false; // nothing to stand on yet
         }
         for (Direction side : Direction.Plane.HORIZONTAL) {
             BlockPos beside = pos.relative(side);
@@ -545,7 +566,7 @@ public class Mound {
         return true;
     }
 
-    /** Shapes the chimney block. False if it cannot be done now (not a job any more, or a creature other than a termite is in the way). */
+    /** Shapes the chimney mouth. False if it cannot be done now (not a job any more, or a creature other than a termite is in the way). */
     public boolean shapeHole(Level level, BlockPos pos) {
         if (!isHoleJob(level, pos)) {
             return false;
@@ -555,15 +576,16 @@ public class Mound {
                 return false;
             }
         }
-        return level.setBlockAndUpdate(pos, ModBlocks.TERMITE_HOLE.get().defaultBlockState());
+        return level.setBlockAndUpdate(pos, Block.updateFromNeighbourShapes(ModBlocks.TERMITE_MOUTH.get().defaultBlockState(), level, pos));
     }
 
     // ---- for testing ----
 
     /**
-     * Puts the whole mound of stage {@code h} up at once (debug command): finished soil, oldest at the foot and youngest
-     * at the top, the chimney blocks, the hollow shafts and tunnels, and the foot filled down to the ground. Only air,
-     * plants, mound soil and diggable earth are replaced. The colony is set to that stage.
+     * Puts the whole mound of stage {@code h} up at once (debug command): soil, spire pieces, chimney mouths and ramps
+     * of the ages the plan gives them, the hollow shaft, and the foot filled down to the ground. Only air, plants, mound
+     * blocks and diggable earth are replaced. Mound blocks left from a bigger or older mound round it are taken away.
+     * The colony is set to that stage.
      */
     public void buildInstantly(Level level, int h) {
         MoundNumbers numbers = numbers();
@@ -573,34 +595,62 @@ public class Mound {
         setStage(level, h);
         cachedStage = 0;
         Map<BlockPos, MoundPlan.Part> parts = getParts(level);
-        int height = getStage(level);
+        MoundPlan.Shape shape = cachedShape;
+        // Clear what is left of an earlier mound outside the new shape.
+        int reach = MoundPlan.REACH + 1;
+        for (BlockPos pos : BlockPos.betweenClosed(center.offset(-reach, -MAX_FOOTING, -reach),
+                center.offset(reach, numbers.maxHeight() + 8, reach))) {
+            if (!parts.containsKey(pos) && isMoundBlock(level.getBlockState(pos)) && !isFooting(parts, pos)) {
+                level.setBlock(pos, Blocks.AIR.defaultBlockState(), 2);
+            }
+        }
+        List<BlockPos> mouths = new ArrayList<>();
         for (Map.Entry<BlockPos, MoundPlan.Part> entry : parts.entrySet()) {
             BlockPos pos = entry.getKey();
             BlockState state = level.getBlockState(pos);
-            boolean mayReplace = state.canBeReplaced() || state.getBlock() instanceof TermiteMoundBlock
-                    || state.getBlock() instanceof TermiteHoleBlock || state.is(ModTags.DIGGABLE);
-            if (!mayReplace) {
+            if (!(state.canBeReplaced() || isMoundBlock(state) || state.is(ModTags.DIGGABLE))) {
                 continue;
             }
-            int dy = pos.getY() - center.getY();
+            BlockPos offset = pos.subtract(center);
+            int age = shape.age().getOrDefault(offset, 0);
             BlockState placed = switch (entry.getValue()) {
-                case WALL -> soil(dy, height);
-                case HOLE -> ModBlocks.TERMITE_HOLE.get().defaultBlockState();
+                case WALL -> soil(age);
                 case OPEN -> Blocks.AIR.defaultBlockState();
+                case MOUTH -> ModBlocks.TERMITE_MOUTH.get().defaultBlockState().setValue(MoundSoil.AGE, age);
+                case SPIRE -> ModBlocks.TERMITE_SPIRE.get().defaultBlockState().setValue(MoundSoil.AGE, age)
+                        .setValue(TermiteSpireBlock.THICKNESS, shape.thickness().get(offset));
+                case RAMP -> ModBlocks.TERMITE_RAMP.get().defaultBlockState().setValue(MoundSoil.AGE, age)
+                        .setValue(TermiteRampBlock.FACING, shape.facing().get(offset))
+                        .setValue(TermiteRampBlock.SHAPE, shape.corner().get(offset));
             };
             level.setBlock(pos, placed, 2);
-            if (entry.getValue() == MoundPlan.Part.WALL && dy == 0) {
+            if (entry.getValue() == MoundPlan.Part.MOUTH) {
+                mouths.add(pos);
+            }
+            if (entry.getValue() == MoundPlan.Part.WALL && offset.getY() == 0) {
                 for (int i = 1; i <= MAX_FOOTING && level.getBlockState(pos.below(i)).canBeReplaced(); i++) {
-                    level.setBlock(pos.below(i), soil(0, height), 2);
+                    level.setBlock(pos.below(i), soil(3), 2);
                 }
             }
+        }
+        // A mouth is slim on a lone spire and a full block beside soil (all the soil round it is there now).
+        for (BlockPos pos : mouths) {
+            level.setBlock(pos, Block.updateFromNeighbourShapes(level.getBlockState(pos), level, pos), 2);
         }
         spotsTick = Long.MIN_VALUE;
     }
 
-    /** Finished soil of the age a block {@code dy} up a mound {@code height} tall would have (the foot was built first). */
-    private static BlockState soil(int dy, int height) {
-        int age = dy * 3 < height ? 3 : dy * 3 < height * 2 ? 2 : 1;
+    /** Soil under the foot of the mound, filling a dip down to the ground (kept when an old mound is cleared away). */
+    private boolean isFooting(Map<BlockPos, MoundPlan.Part> parts, BlockPos pos) {
+        if (pos.getY() >= center.getY()) {
+            return false;
+        }
+        BlockPos foot = new BlockPos(pos.getX(), center.getY(), pos.getZ());
+        return parts.get(foot) == MoundPlan.Part.WALL;
+    }
+
+    /** Finished mound soil of an age (0 fresh to 3 old). */
+    private static BlockState soil(int age) {
         return ModBlocks.TERMITE_MOUND.get().defaultBlockState()
                 .setValue(TermiteMoundBlock.LAYERS, TermiteMoundBlock.FINISHED).setValue(TermiteMoundBlock.AGE, age);
     }

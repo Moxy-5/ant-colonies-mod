@@ -360,7 +360,7 @@ def render(vox, height, scale=3, elevation=30, turn=0, crop_ground=True):
                 col = colour_of(k, x, y, z, height)
                 depth = (rx + rz) * r2 * ce + y * se
                 for f, n in seen:
-                    ao = occlusion(vox, x, y, z, n) if k in (MOUND, MOUTHK, BAREK) else 1.0
+                    ao = occlusion(vox, x, y, z, n) if k not in (GROUND, PLAYER_LEGS, PLAYER_BODY, PLAYER_HEAD) else 1.0
                     faces.append((depth, rx, y, rz, f, col, k, ao))
     faces.sort(key=lambda f: f[0])
     xs, ys = [], []

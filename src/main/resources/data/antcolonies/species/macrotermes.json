@@ -58,10 +58,7 @@
     "feed_interval_ticks": 200
   },
   "mound": {
-    "max_height": 22,
-    "base_radius": 6.5,
-    "side_chimneys": 3,
-    "side_chimney_height": 9,
+    "max_height": 32,
     "blocks_per_day": 2.0,
     "blocks_per_day_per_worker": 0.5,
     "gallery_levels": 3,

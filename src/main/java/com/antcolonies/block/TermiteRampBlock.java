@@ -2,6 +2,7 @@ package com.antcolonies.block;
 
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.function.Function;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -102,27 +103,31 @@ public class TermiteRampBlock extends MoundPieceBlock {
 
     // Corners join the way stairs do (the same rules as vanilla StairBlock).
     private static StairsShape shapeAt(BlockState state, BlockGetter level, BlockPos pos) {
-        Direction facing = state.getValue(FACING);
-        BlockState ahead = level.getBlockState(pos.relative(facing));
-        if (ahead.getBlock() instanceof TermiteRampBlock) {
-            Direction other = ahead.getValue(FACING);
-            if (other.getAxis() != facing.getAxis() && canTakeShape(state, level, pos, other.getOpposite())) {
-                return other == facing.getCounterClockWise() ? StairsShape.OUTER_LEFT : StairsShape.OUTER_RIGHT;
-            }
+        return shapeFor(state.getValue(FACING), side -> {
+            BlockState beside = level.getBlockState(pos.relative(side));
+            return beside.getBlock() instanceof TermiteRampBlock ? beside.getValue(FACING) : null;
+        });
+    }
+
+    /**
+     * The corner a ramp rising toward {@code facing} takes from the ramps beside it, by the rules of vanilla stairs:
+     * {@code rampBeside} gives the high side of the ramp next to it on a side, or null if there is none. Also used by
+     * the mound's plan ({@code MoundPlan}), so a planned mound has the corners the blocks would take.
+     */
+    public static StairsShape shapeFor(Direction facing, Function<Direction, Direction> rampBeside) {
+        Direction ahead = rampBeside.apply(facing);
+        if (ahead != null && ahead.getAxis() != facing.getAxis() && canTakeShape(facing, rampBeside, ahead.getOpposite())) {
+            return ahead == facing.getCounterClockWise() ? StairsShape.OUTER_LEFT : StairsShape.OUTER_RIGHT;
         }
-        BlockState behind = level.getBlockState(pos.relative(facing.getOpposite()));
-        if (behind.getBlock() instanceof TermiteRampBlock) {
-            Direction other = behind.getValue(FACING);
-            if (other.getAxis() != facing.getAxis() && canTakeShape(state, level, pos, other)) {
-                return other == facing.getCounterClockWise() ? StairsShape.INNER_LEFT : StairsShape.INNER_RIGHT;
-            }
+        Direction behind = rampBeside.apply(facing.getOpposite());
+        if (behind != null && behind.getAxis() != facing.getAxis() && canTakeShape(facing, rampBeside, behind)) {
+            return behind == facing.getCounterClockWise() ? StairsShape.INNER_LEFT : StairsShape.INNER_RIGHT;
         }
         return StairsShape.STRAIGHT;
     }
 
-    private static boolean canTakeShape(BlockState state, BlockGetter level, BlockPos pos, Direction side) {
-        BlockState beside = level.getBlockState(pos.relative(side));
-        return !(beside.getBlock() instanceof TermiteRampBlock) || beside.getValue(FACING) != state.getValue(FACING);
+    private static boolean canTakeShape(Direction facing, Function<Direction, Direction> rampBeside, Direction side) {
+        return rampBeside.apply(side) != facing;
     }
 
     @Override

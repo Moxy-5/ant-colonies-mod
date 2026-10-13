@@ -4,118 +4,83 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 
+import com.antcolonies.block.TermiteRampBlock;
+import com.antcolonies.block.TermiteSpireBlock;
 import com.antcolonies.species.SpeciesProfile.MoundNumbers;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.world.level.block.state.properties.StairsShape;
 
 /**
- * The shape of a termite mound at each stage of its growth, and the galleries under it where the soil comes from.
- * Pure geometry, no world: positions are offsets from the entrance (0, 0, 0 is the entrance cell at ground level, right
+ * The shape of a termite mound at each stage of its growth (the cathedral mound, the user's design from the concept
+ * pictures drawn by {@code tools/mound_concept.py}), and the galleries under it where the soil comes from. Pure
+ * geometry, no world: positions are offsets from the entrance (0, 0, 0 is the entrance cell at ground level, right
  * above the nest shaft).
  *
- * <p>Stage {@code h} is a mound {@code h} blocks tall: a round body that is wide at the bottom and narrows quickly into
- * a tall spire (like a real Macrotermes mound), with a hollow chimney shaft up its middle (the nest shaft goes on up
- * through it) capped by a chimney block (the hole block) at the top. From stage {@link #FIRST_CHIMNEY_AT} on, side
- * chimneys rise from the slope, {@link #CHIMNEY_DISTANCE} blocks out, each with its own shaft and cap; a tunnel at
- * ground level joins every side shaft to the middle one and goes on out to an entrance (a hole block) at the foot of
- * the mound. Each stage is worked out on its own; going from one stage to the next, the termites build what is new,
- * clear what is now hollow (the old cap of a chimney that grew, a tunnel cut through the base) and shape the new caps.
+ * <p>A mound is a heavy dome with buttresses (ridges running from high up down to the foot), a tall main spire with
+ * vertical ridges and grooves (flutes) and a cluster of up to 6 lower spires of different heights, the same sums as the
+ * concept. Every spire ends in a column of spire pieces narrowing to a point; the main spire and the two tallest side
+ * spires end in a chimney mouth instead. Ramps cover the steps of the sides. A hollow shaft runs from the entrance up
+ * the middle of the main spire (the nest shaft goes on up through it), closed at the top like a real mound. Stage
+ * {@code h} of the profile's {@code max_height} stages is the mound grown to {@code h / max_height} (the full mound is
+ * about {@code max_height} blocks tall); a young mound is a low dome with a small, stubby spire.
  *
- * <p>A block over a tunnel has no floor under it: it is built out from the blocks beside it (see
- * {@code TermiteMoundBlock.addLayer}).
+ * <p>Every colony's mound is a little different ({@code seed}): the whole layout is turned, and the spires lean and the
+ * buttresses run a little differently. Each stage is worked out on its own; going from one stage to the next, the
+ * termites build what is new and clear what is now hollow.
  */
 public final class MoundPlan {
-    /** What a cell of the mound is: solid mound soil, a chimney block (open only for termites), or hollow (a shaft or tunnel). */
+    /** What a cell of the mound is: mound soil, hollow (the shaft), a chimney mouth, a spire piece or a ramp. */
     public enum Part {
-        WALL, HOLE, OPEN
+        WALL, OPEN, MOUTH, SPIRE, RAMP
     }
 
-    /** The narrowest the mound gets (from the middle of a shaft): a ring of 8 blocks round it, one block thick. */
-    static final double TOP_RADIUS = 1.5;
-    /** How wide the base of a side chimney is (from its shaft). */
-    static final double CHIMNEY_BASE_RADIUS = 2.5;
-    /** How far (in blocks) a side chimney's shaft is from the middle of the mound. */
-    public static final int CHIMNEY_DISTANCE = 4;
-    /** The stage at which the first side chimney starts; each next one starts {@link #CHIMNEY_EVERY} stages later. */
-    public static final int FIRST_CHIMNEY_AT = 8;
-    static final int CHIMNEY_EVERY = 3;
-    /** How much the base widens with each stage (blocks), until it is as wide as the profile allows. */
-    static final double BASE_GROWTH = 0.25;
+    /**
+     * One stage of the mound: what every cell is, how thick each spire piece is, which way each ramp rises and the
+     * corner it takes, and the age its soil has when the whole mound is put up at once (old and pale low down, in
+     * streaks that run down the mound like rain, with patches of fresh soil).
+     */
+    public record Shape(Map<BlockPos, Part> parts, Map<BlockPos, Integer> thickness, Map<BlockPos, Direction> facing,
+            Map<BlockPos, StairsShape> corner, Map<BlockPos, Integer> age) {
+    }
+
+    /** How far out (blocks) the mound can reach from its middle. */
+    static final int REACH = 13;
+    /** A spire is solid soil where it is at least this wide (from its middle); above that its pieces narrow it to a point. */
+    private static final double SOLID_RADIUS = 0.75;
+    /** The most spire pieces on top of a spire (and on a spire with a mouth: base, thick, then the mouth). */
+    private static final int MOST_PIECES = 5;
+    private static final int MOUTH_PIECES = 3;
+
+    /** The side spires: angle round the middle, distance, height as a share of the mound's, base radius, grows from. */
+    private static final double[][] SIDE_SPIRES = {
+            {0.35, 3.0, 0.74, 2.1, 0.3}, {2.25, 3.3, 0.58, 1.9, 0.45}, {3.95, 2.9, 0.84, 2.2, 0.55},
+            {5.15, 3.6, 0.47, 1.7, 0.7}, {1.35, 4.6, 0.36, 1.5, 0.85}, {2.95, 5.0, 0.3, 1.3, 0.92}};
+    /** Side spires at least this tall (share of the mound) get a chimney mouth: the two tallest. */
+    private static final double MOUTH_SHARE = 0.7;
+    private static final int MOST_BUTTRESSES = 9;
 
     private MoundPlan() {
     }
 
-    /**
-     * The mound at stage {@code h} (1 to the profile's max height). The side chimneys stand toward {@code first}, then
-     * clockwise of it, then opposite it (more than 3 side chimneys are not supported).
-     */
-    public static Map<BlockPos, Part> stage(int h, MoundNumbers numbers, Direction first) {
-        Map<BlockPos, Part> parts = new LinkedHashMap<>();
-        double base = baseRadius(h, numbers);
-        for (int dy = 0; dy < h; dy++) {
-            ring(parts, BlockPos.ZERO, dy, radius(base, dy, h));
-        }
-        List<Direction> sides = chimneyDirections(first, numbers.sideChimneys());
-        List<int[]> chimneys = new ArrayList<>(); // {direction index, height}
-        for (int i = 0; i < sides.size(); i++) {
-            int start = FIRST_CHIMNEY_AT + CHIMNEY_EVERY * i;
-            if (h < start) {
-                continue;
-            }
-            int bodyTop = 0;
-            while (bodyTop < h && radius(base, bodyTop, h) >= CHIMNEY_DISTANCE) {
-                bodyTop++;
-            }
-            int extra = Math.max(1, Math.min(numbers.sideChimneyHeight() - 2 * i, 1 + (int) ((h - start) * 0.6)));
-            int height = Math.max(2, bodyTop + extra);
-            BlockPos shaft = BlockPos.ZERO.relative(sides.get(i), CHIMNEY_DISTANCE);
-            for (int dy = 0; dy < height; dy++) {
-                ring(parts, shaft, dy, radius(CHIMNEY_BASE_RADIUS, dy, height));
-            }
-            chimneys.add(new int[] {i, height});
-        }
-        // The hollow parts go over the walls: the middle shaft and its cap.
-        for (int dy = 0; dy < h - 1; dy++) {
-            parts.put(new BlockPos(0, dy, 0), Part.OPEN);
-        }
-        parts.put(new BlockPos(0, h - 1, 0), Part.HOLE);
-        for (int[] chimney : chimneys) {
-            Direction side = sides.get(chimney[0]);
-            int height = chimney[1];
-            BlockPos shaft = BlockPos.ZERO.relative(side, CHIMNEY_DISTANCE);
-            for (int dy = 0; dy < height - 1; dy++) {
-                parts.put(shaft.above(dy), Part.OPEN);
-            }
-            parts.put(shaft.above(height - 1), Part.HOLE);
-            // The tunnel from the middle shaft to the side shaft, and on out to an entrance at the foot of the mound.
-            for (int k = 1; k < CHIMNEY_DISTANCE; k++) {
-                parts.put(BlockPos.ZERO.relative(side, k), Part.OPEN);
-            }
-            int edge = CHIMNEY_DISTANCE;
-            while (parts.get(BlockPos.ZERO.relative(side, edge + 1)) == Part.WALL) {
-                edge++;
-            }
-            for (int k = CHIMNEY_DISTANCE + 1; k < edge; k++) {
-                parts.put(BlockPos.ZERO.relative(side, k), Part.OPEN);
-            }
-            if (edge > CHIMNEY_DISTANCE) {
-                parts.put(BlockPos.ZERO.relative(side, edge), Part.HOLE);
-            }
-        }
-        return parts;
+    /** The mound at stage {@code h} (1 to the profile's {@code max_height}) of the colony with this {@code seed}. */
+    public static Shape stage(int h, MoundNumbers numbers, long seed) {
+        return new Builder(h, numbers.maxHeight(), seed).build();
     }
 
-    /** How many blocks of mound soil stage {@code h} has. */
-    public static int walls(Map<BlockPos, Part> stage) {
+    /** How many blocks of mound soil a stage has. */
+    public static int walls(Shape stage) {
         int walls = 0;
-        for (Part part : stage.values()) {
+        for (Part part : stage.parts().values()) {
             if (part == Part.WALL) {
                 walls++;
             }
@@ -123,34 +88,404 @@ public final class MoundPlan {
         return walls;
     }
 
-    /** The sides the chimneys stand toward, in the order they are built. */
-    static List<Direction> chimneyDirections(Direction first, int count) {
-        List<Direction> all = List.of(first, first.getClockWise(), first.getOpposite(), first.getCounterClockWise());
-        return all.subList(0, Math.max(0, Math.min(count, all.size())));
+    // ---- the shape ----
+
+    /** A spire: where it stands, how tall and wide, how it leans, and its flutes. */
+    private record Spire(double x, double z, double h, double r, double leanX, double leanZ, double lean, double power,
+            boolean mouth, int flutes, double phase) {
+        /** The middle of the spire at height y (it leans more the higher up). */
+        double[] centre(double y) {
+            double k = lean * Math.pow(Math.max(0, y) / Math.max(h, 1), 1.6) * h;
+            return new double[] {x + leanX * k, z + leanZ * k};
+        }
+
+        double radius(double y) {
+            return y >= h ? 0 : r * Math.pow(1 - y / h, power);
+        }
     }
 
-    /** How wide (from the middle) the base of stage {@code h} is. */
-    static double baseRadius(int h, MoundNumbers numbers) {
-        return Math.min(numbers.baseRadius(), TOP_RADIUS + BASE_GROWTH * h);
+    /** Smooth random bumps (value noise), the same as the concept's. */
+    private static final class Noise {
+        private static final int N = 32;
+        private final double[] v = new double[N * N * N];
+
+        Noise(long seed) {
+            Random random = new Random(seed);
+            for (int i = 0; i < v.length; i++) {
+                v[i] = random.nextDouble();
+            }
+        }
+
+        private double g(int a, int b, int c) {
+            return v[(Math.floorMod(a, N) * N + Math.floorMod(b, N)) * N + Math.floorMod(c, N)];
+        }
+
+        double at(double x, double y, double z) {
+            int xi = (int) Math.floor(x), yi = (int) Math.floor(y), zi = (int) Math.floor(z);
+            double fx = smooth(x - xi), fy = smooth(y - yi), fz = smooth(z - zi);
+            double x0 = g(xi, yi, zi) + (g(xi + 1, yi, zi) - g(xi, yi, zi)) * fx;
+            double x1 = g(xi, yi + 1, zi) + (g(xi + 1, yi + 1, zi) - g(xi, yi + 1, zi)) * fx;
+            double x2 = g(xi, yi, zi + 1) + (g(xi + 1, yi, zi + 1) - g(xi, yi, zi + 1)) * fx;
+            double x3 = g(xi, yi + 1, zi + 1) + (g(xi + 1, yi + 1, zi + 1) - g(xi, yi + 1, zi + 1)) * fx;
+            double y0 = x0 + (x1 - x0) * fy;
+            double y1 = x2 + (x3 - x2) * fy;
+            return y0 + (y1 - y0) * fz;
+        }
+
+        private static double smooth(double t) {
+            return t * t * (3 - 2 * t);
+        }
     }
 
-    /** How wide a body {@code height} tall with this base is at {@code dy} above the ground: wide at the foot, narrowing fast into a spire. */
-    static double radius(double base, int dy, int height) {
-        double rest = 1.0 - (double) dy / height;
-        return TOP_RADIUS + (base - TOP_RADIUS) * Math.pow(rest, 1.5);
-    }
+    private static final class Builder {
+        private final double height;
+        private final int top;
+        private final Noise bumps;
+        private final Noise streaks;
+        private final Noise patches;
+        private final List<Spire> spires = new ArrayList<>();
+        private final double domeRadius;
+        private final double domeHeight;
+        /** Buttresses: {direction x, direction z, length, height at the middle}. */
+        private final List<double[]> buttresses = new ArrayList<>();
 
-    /** Marks every cell within {@code radius} of {@code middle} (sideways) at height {@code dy} as wall. */
-    private static void ring(Map<BlockPos, Part> parts, BlockPos middle, int dy, double radius) {
-        int reach = (int) Math.ceil(radius);
-        for (int dx = -reach; dx <= reach; dx++) {
-            for (int dz = -reach; dz <= reach; dz++) {
-                if (dx * dx + dz * dz <= radius * radius) {
-                    parts.putIfAbsent(new BlockPos(middle.getX() + dx, dy, middle.getZ() + dz), Part.WALL);
+        private final Set<BlockPos> full = new HashSet<>();
+        private final Map<BlockPos, Part> parts = new LinkedHashMap<>();
+        private final Map<BlockPos, Integer> thickness = new HashMap<>();
+        private final Map<BlockPos, Direction> facing = new HashMap<>();
+
+        Builder(int h, int stages, long seed) {
+            double g = Math.max(1.0 / stages, Math.min(1.0, (double) h / stages));
+            double sg = Math.sqrt(g);
+            Random random = new Random(mix(seed));
+            // Everything random is drawn first, the same at every stage, so the mound keeps its look as it grows.
+            double turn = random.nextDouble() * 2 * Math.PI;
+            double mainLean = random.nextDouble() * 2 * Math.PI;
+            double[][] sideRandom = new double[SIDE_SPIRES.length][];
+            for (int i = 0; i < sideRandom.length; i++) {
+                sideRandom[i] = new double[] {uniform(random, -0.4, 0.4), uniform(random, 0, 6.3)};
+            }
+            double[][] buttressRandom = new double[MOST_BUTTRESSES][];
+            for (int i = 0; i < MOST_BUTTRESSES; i++) {
+                buttressRandom[i] = new double[] {uniform(random, -0.15, 0.15), uniform(random, -1, 1.2), uniform(random, 0.38, 0.55)};
+            }
+            bumps = new Noise(random.nextLong());
+            streaks = new Noise(random.nextLong());
+            patches = new Noise(random.nextLong());
+
+            height = 4 + (stages - 4) * g;
+            top = stages + 4;
+            // A young mound's spire is small: a short stub on a low dome, catching up by about half-grown.
+            double mainHeight = height * Math.min(1.0, 0.15 + g * 1.9);
+            spires.add(new Spire(0, 0, mainHeight, 3.6 * sg + 0.6, Math.cos(mainLean), Math.sin(mainLean), 0.04,
+                    g > 0.3 ? 0.8 : 1.4, true, 7, 0));
+            for (int i = 0; i < SIDE_SPIRES.length; i++) {
+                double[] s = SIDE_SPIRES[i];
+                double angle = s[0] + turn;
+                double share = s[2];
+                if (g < s[4]) {
+                    continue;
+                }
+                double grow = Math.min(1.0, (g - s[4]) / 0.25 + 0.35);
+                double d = s[1] * sg;
+                double lean = angle + sideRandom[i][0];
+                spires.add(new Spire(Math.cos(angle) * d, Math.sin(angle) * d, height * share * grow, s[3] * sg * (0.6 + 0.4 * grow),
+                        Math.cos(lean), Math.sin(lean), 0.05, 0.85, share > MOUTH_SHARE, 5, sideRandom[i][1]));
+            }
+            domeRadius = 6.8 * sg + 0.8;
+            domeHeight = 5.5 * sg + 1.0;
+            int count = g > 0.5 ? MOST_BUTTRESSES : g > 0.25 ? 6 : 0;
+            for (int k = 0; k < count; k++) {
+                double angle = k * 2 * Math.PI / count + turn + buttressRandom[k][0];
+                buttresses.add(new double[] {Math.cos(angle), Math.sin(angle), (8.5 + buttressRandom[k][1]) * sg,
+                        height * buttressRandom[k][2]});
+            }
+        }
+
+        /** Spreads out seeds that are close together (java.util.Random starts nearly the same for them). */
+        private static long mix(long seed) {
+            long z = seed + 0x9E3779B97F4A7C15L;
+            z = (z ^ (z >>> 30)) * 0xBF58476D1CE4E5B9L;
+            z = (z ^ (z >>> 27)) * 0x94D049BB133111EBL;
+            return z ^ (z >>> 31);
+        }
+
+        private static double uniform(Random random, double from, double to) {
+            return from + (to - from) * random.nextDouble();
+        }
+
+        /** Is the middle of cell (x, y, z) inside the mound (the spires' thin tops are left to the spire pieces)? */
+        private boolean solid(int x, int y, int z) {
+            double cx = x, cy = y + 0.5, cz = z;
+            double bump = (bumps.at(cx * 0.35, cy * 0.25, cz * 0.35) - 0.5) * 0.9;
+            if (cy < domeHeight) {
+                double r = domeRadius * Math.pow(1 - cy / domeHeight, 1.3);
+                if (Math.hypot(cx, cz) < r + bump) {
+                    return true;
+                }
+            }
+            for (Spire s : spires) {
+                double r = s.radius(cy);
+                if (r < SOLID_RADIUS) {
+                    continue;
+                }
+                double[] c = s.centre(cy);
+                if (r > 1.1) { // vertical flutes: ridges and grooves running up the spire
+                    r *= 1 + 0.24 * Math.cos(s.flutes * Math.atan2(cz - c[1], cx - c[0]) + s.phase);
+                }
+                if (Math.hypot(cx - c[0], cz - c[1]) < r + bump * 0.6) {
+                    return true;
+                }
+            }
+            for (double[] b : buttresses) {
+                double along = cx * b[0] + cz * b[1];
+                if (along < 0 || along > b[2]) {
+                    continue;
+                }
+                double across = Math.abs(-cx * b[1] + cz * b[0]);
+                if (across > 0.62 + 0.25 * (1 - along / b[2])) {
+                    continue;
+                }
+                if (cy < b[3] * Math.pow(1 - along / b[2], 1.5) + bump) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        Shape build() {
+            for (int y = 0; y < top; y++) {
+                for (int x = -REACH; x <= REACH; x++) {
+                    for (int z = -REACH; z <= REACH; z++) {
+                        if (solid(x, y, z)) {
+                            full.add(new BlockPos(x, y, z));
+                        }
+                    }
+                }
+            }
+            addShaft();
+            dropHangingSoil();
+            for (Spire spire : spires) {
+                addSpireTop(spire);
+            }
+            for (BlockPos pos : full) {
+                parts.putIfAbsent(pos, Part.WALL);
+            }
+            addRamps();
+            Map<BlockPos, StairsShape> corners = new HashMap<>();
+            facing.forEach((pos, high) -> corners.put(pos, TermiteRampBlock.shapeFor(high, side -> facing.get(pos.relative(side)))));
+            Map<BlockPos, Integer> ages = new HashMap<>();
+            parts.forEach((pos, part) -> {
+                if (part != Part.OPEN) {
+                    ages.put(pos, ageAt(pos));
+                }
+            });
+            return new Shape(parts, thickness, facing, corners, ages);
+        }
+
+        /** The spire pieces (and mouth) stacked straight up on the spire's top block of soil, narrowing to a point. */
+        private void addSpireTop(Spire spire) {
+            int y = 0;
+            while (y < top && spire.radius(y + 0.5) >= SOLID_RADIUS) {
+                y++;
+            }
+            if (y == 0) {
+                return; // too small to have any soil yet
+            }
+            double[] c = spire.centre(y - 0.5);
+            BlockPos best = null;
+            double bestDistance = 0;
+            for (int bx = (int) Math.round(c[0]) - 1; bx <= Math.round(c[0]) + 1; bx++) {
+                for (int bz = (int) Math.round(c[1]) - 1; bz <= Math.round(c[1]) + 1; bz++) {
+                    if (full.contains(new BlockPos(bx, y - 1, bz))) {
+                        double d = Math.hypot(bx - c[0], bz - c[1]);
+                        if (best == null || d < bestDistance) {
+                            best = new BlockPos(bx, y - 1, bz);
+                            bestDistance = d;
+                        }
+                    }
+                }
+            }
+            if (best == null) {
+                return;
+            }
+            while (full.contains(best.above())) {
+                best = best.above(); // the dome or a bump reaches higher here: the pieces go on top of it
+            }
+            int n = 0;
+            while (spire.radius(y + n) > 0.05 && y + n < top) {
+                n++;
+            }
+            n = Math.max(spire.r < 2 ? 2 : 3, Math.min(6, n + 1));
+            int pieces = spire.mouth ? MOUTH_PIECES : Math.min(n, MOST_PIECES);
+            for (int i = 0; i < pieces; i++) {
+                BlockPos pos = best.above(1 + i);
+                if (full.contains(pos) || parts.containsKey(pos)) {
+                    break;
+                }
+                if (spire.mouth && i == pieces - 1) {
+                    parts.put(pos, Part.MOUTH);
+                } else {
+                    parts.put(pos, Part.SPIRE);
+                    thickness.put(pos, spire.mouth ? i : pieceThickness(i, pieces));
                 }
             }
         }
+
+        /**
+         * How thick piece {@code i} of a column of {@code pieces} is: the piece whose foot is nearest the width the
+         * concept gives it there (narrowing evenly from a full block to a point), the last one the tip.
+         */
+        private static int pieceThickness(int i, int pieces) {
+            if (i == pieces - 1) {
+                return TermiteSpireBlock.TIP;
+            }
+            double wanted = 16 * (1 - 7.0 * i / (8 * pieces));
+            int best = TermiteSpireBlock.BASE;
+            for (int t = TermiteSpireBlock.BASE; t < TermiteSpireBlock.TIP; t++) {
+                if (Math.abs(TermiteSpireBlock.bottomWidth(t) - wanted) < Math.abs(TermiteSpireBlock.bottomWidth(best) - wanted)) {
+                    best = t;
+                }
+            }
+            return best;
+        }
+
+        /**
+         * The hollow shaft from the entrance up the middle of the main spire, following it as it leans (a step sideways
+         * at most one block at a time). It goes up as long as every cell of it has soil on all sides and over it, so it is
+         * always closed at the top. The entrance cell itself is always open.
+         */
+        private void addShaft() {
+            Spire main = spires.get(0);
+            BlockPos at = BlockPos.ZERO;
+            full.remove(at);
+            parts.put(at, Part.OPEN);
+            for (int y = 1; y < top; y++) {
+                List<BlockPos> level = new ArrayList<>();
+                BlockPos up = at.above();
+                level.add(up);
+                double[] c = main.centre(y + 0.5);
+                int dx = (int) Math.round(c[0]) - up.getX();
+                int dz = (int) Math.round(c[1]) - up.getZ();
+                if (dx != 0 || dz != 0) {
+                    BlockPos step = Math.abs(dx) >= Math.abs(dz) ? up.offset(Integer.signum(dx), 0, 0) : up.offset(0, 0, Integer.signum(dz));
+                    level.add(step);
+                }
+                for (BlockPos cell : level) {
+                    if (!enclosed(cell, level)) {
+                        return;
+                    }
+                }
+                for (BlockPos cell : level) {
+                    full.remove(cell);
+                    parts.put(cell, Part.OPEN);
+                }
+                at = level.get(level.size() - 1);
+            }
+        }
+
+        /**
+         * Takes away soil that would hang in the air with nothing under it or beside it (over the open entrance of a
+         * mound too small for a shaft, or a lone bump), from the bottom up.
+         */
+        private void dropHangingSoil() {
+            List<BlockPos> cells = new ArrayList<>(full);
+            cells.sort((a, b) -> a.getY() != b.getY() ? Integer.compare(a.getY(), b.getY()) : a.compareTo(b));
+            for (BlockPos cell : cells) {
+                if (cell.getY() == 0 || full.contains(cell.below())) {
+                    continue;
+                }
+                boolean beside = false;
+                for (Direction side : Direction.Plane.HORIZONTAL) {
+                    beside |= full.contains(cell.relative(side));
+                }
+                if (!beside) {
+                    full.remove(cell);
+                }
+            }
+        }
+
+        /**
+         * A shaft cell must be soil now, with soil on every side (but the rest of the shaft) and over it, and the soil
+         * over it must have soil beside it (a roof can only be built out from the walls round it).
+         */
+        private boolean enclosed(BlockPos cell, List<BlockPos> shaft) {
+            if (!full.contains(cell) || !full.contains(cell.above())) {
+                return false;
+            }
+            boolean roofHeld = false;
+            for (Direction side : Direction.Plane.HORIZONTAL) {
+                BlockPos beside = cell.relative(side);
+                if (!shaft.contains(beside) && !full.contains(beside)) {
+                    return false;
+                }
+                BlockPos roofSide = cell.above().relative(side);
+                roofHeld |= !shaft.contains(roofSide.below()) && full.contains(roofSide);
+            }
+            return roofHeld;
+        }
+
+        /**
+         * Ramps over the steps of the sides: an empty cell on a block of soil, with soil beside it at its own height,
+         * rises toward that soil (or toward the corner, where soil only stands diagonally beside it). Its corner comes
+         * from the ramps beside it, as with stairs. A cell with soil on 3 or 4 sides is a dent: it is filled with soil.
+         */
+        private void addRamps() {
+            List<BlockPos> bases = new ArrayList<>(full);
+            Collections.sort(bases); // the same order every time
+            Direction[] order = {Direction.EAST, Direction.WEST, Direction.SOUTH, Direction.NORTH};
+            for (BlockPos base : bases) {
+                BlockPos cell = base.above();
+                if (parts.containsKey(cell)) {
+                    continue;
+                }
+                List<Direction> sides = new ArrayList<>();
+                for (Direction side : order) {
+                    if (full.contains(cell.relative(side))) {
+                        sides.add(side);
+                    }
+                }
+                if (sides.size() >= 3) {
+                    parts.put(cell, Part.WALL);
+                    continue;
+                }
+                Direction high = sides.isEmpty() ? null : sides.get(0);
+                if (high == null) {
+                    for (int dx : new int[] {1, -1}) {
+                        for (int dz : new int[] {1, -1}) {
+                            if (high == null && full.contains(cell.offset(dx, 0, dz)) && full.contains(base.offset(dx, 0, 0))
+                                    && full.contains(base.offset(0, 0, dz))) {
+                                high = dx > 0 ? Direction.EAST : Direction.WEST;
+                            }
+                        }
+                    }
+                }
+                if (high != null) {
+                    parts.put(cell, Part.RAMP);
+                    facing.put(cell, high);
+                }
+            }
+        }
+
+        /**
+         * The age (0 fresh to 3 old) of the soil in a cell when the whole mound is put up at once: older and paler low
+         * down, but in streaks that run down the mound (rain) and with patches of fresh soil where termites build, as in
+         * the concept pictures.
+         */
+        private int ageAt(BlockPos pos) {
+            double x = pos.getX() * 8 + 4, y = pos.getY() * 8 + 4, z = pos.getZ() * 8 + 4;
+            double t = y / (height * 8);
+            double streak = streaks.at(x / 1.6, y / 40.0, z / 1.6) - 0.5;
+            double patch = patches.at(x / 18.0, y / 14.0, z / 18.0);
+            double a = t + streak * 0.9 - 0.1;
+            if (patch > 0.74) {
+                a += (patch - 0.74) * 3.0;
+            }
+            return a < 0.19 ? 3 : a < 0.54 ? 2 : a < 0.85 ? 1 : 0;
+        }
     }
+
+    // ---- the galleries ----
 
     /**
      * The galleries under the mound, as offsets from the bottom of the nest shaft, in the order they are dug (each one
