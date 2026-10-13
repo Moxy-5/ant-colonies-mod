@@ -228,9 +228,10 @@ public class TermiteMoundTests {
 
     /**
      * A termite climbs up a chimney shaft and comes out of the mouth of the spire on top of the chimney block: up inside
-     * the spire, a look round with its head out, then over the rim and down onto the mound. Then it goes back in the
-     * same way and down the shaft. Checked: it really came up through the middle of the spire to the rim, it stopped
-     * there for a moment, and it ends where it was sent.
+     * the spire until its head is out, a look round (it holds still the whole time, only its head moves, see
+     * DoorwayMotion), then over the rim and down onto the mound. Then it goes back in by the mouth and down the shaft,
+     * without looking round. Checked: it came up through the middle of the spire to the rim, it looked round once for
+     * the whole look round with its head out and without moving, and it ends where it was sent.
      */
     @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
     public static void aTermiteComesOutOfTheChimneyMouthAndGoesBackIn(GameTestHelper helper) {
@@ -255,19 +256,28 @@ public class TermiteMoundTests {
         int[] phase = {0};
         int[] lookingOut = {0};
         double[] highest = {0};
+        net.minecraft.world.phys.Vec3[] peekedAt = {null};
         helper.runAfterDelay(10, () -> helper.assertTrue(termite.getNavigator().moveTo(onTop, 1.0), "no route out of the chimney"));
         helper.onEachTick(() -> {
             // In the spire: near its middle (the hitbox is a little off it, so the drawn body is in the middle).
             boolean inMouth = Math.abs(termite.getX() - (hole.getX() + 0.5)) < 0.2 && Math.abs(termite.getZ() - (hole.getZ() + 0.5)) < 0.2;
             if (inMouth) {
                 highest[0] = Math.max(highest[0], termite.getY());
-                if (termite.getY() > rim - 0.3 && termite.getY() < rim - 0.05) {
-                    lookingOut[0]++;
+            }
+            if (termite.isPeeking()) {
+                helper.assertTrue(phase[0] == 0, "the termite looked round on its way in");
+                helper.assertTrue(inMouth && Math.abs(termite.getY() - (rim - com.antcolonies.nav.DoorwayMotion.PEEK_DEPTH)) < 0.02,
+                        "the termite looks round from " + (termite.getY() - rim) + " below the rim, not with its head just out of the mouth");
+                if (peekedAt[0] == null) {
+                    peekedAt[0] = termite.position();
                 }
+                helper.assertTrue(termite.position().distanceTo(peekedAt[0]) < 0.001, "the termite moved while it looked round");
+                lookingOut[0]++;
             }
             if (phase[0] == 0 && helper.getTick() > 20 && termite.getNavigator().isDone() && termite.blockPosition().equals(onTop)) {
                 helper.assertTrue(highest[0] >= rim, "the termite did not come up through the spire to its rim (highest " + (highest[0] - hole.getY()) + ")");
-                helper.assertTrue(lookingOut[0] >= 20, "the termite did not stop to look out of the mouth (" + lookingOut[0] + " ticks)");
+                helper.assertTrue(Math.abs(lookingOut[0] - com.antcolonies.nav.DoorwayMotion.PEEK_TICKS) <= 1,
+                        "the termite looked round for " + lookingOut[0] + " ticks, not the whole look round");
                 phase[0] = 1;
                 highest[0] = 0;
                 helper.assertTrue(termite.getNavigator().moveTo(bottom, 1.0), "no route back into the chimney");

@@ -41,3 +41,4 @@ repo/
 
 ### Automatic game tests ###
 run-test/
+__pycache__/

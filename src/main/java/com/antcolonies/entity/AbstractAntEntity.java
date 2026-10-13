@@ -46,6 +46,10 @@ import software.bernie.geckolib.util.GeckoLibUtil;
 public abstract class AbstractAntEntity extends PathfinderMob implements GeoEntity {
     private static final RawAnimation IDLE = RawAnimation.begin().thenLoop("idle");
     private static final RawAnimation WALK = RawAnimation.begin().thenLoop("walk");
+    /** The look round with the head out of a chimney's mouth (termites; see DoorwayMotion). */
+    private static final RawAnimation PEEK = RawAnimation.begin().thenPlay("peek");
+    /** How far (blocks a tick) a worker climbs at its normal speed: its legs then step at 1.5 times the walk animation. */
+    private static final double CLIMB_STEP = 0.05;
 
     /**
      * The surface the body is on (a {@link Direction} 3D id in the low 3 bits: 0 = DOWN = a floor, 1 = UP = a ceiling,
@@ -60,6 +64,14 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.FLOAT);
     /** How fast the drawn body turns (degrees per tick) onto a new surface, round a corner or to a new heading. */
     private static final float BODY_TURN_SPEED = 30.0F;
+    /**
+     * What the body is doing besides holding its surface, for the client: bit 0 = looking round with its head out of a
+     * doorway's mouth (plays the "peek" animation), bit 1 = tipping over to its new surface slowly (over a mouth's rim).
+     */
+    private static final EntityDataAccessor<Byte> DATA_POSE_FLAGS =
+            SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.BYTE);
+    private static final int PEEKING = 1;
+    private static final int TURNING_SLOWLY = 2;
 
     /** The soil pellet held in the mandibles (empty = carrying nothing). Synced so the renderer can draw it. */
     private static final EntityDataAccessor<Optional<BlockState>> DATA_CARRIED =
@@ -101,6 +113,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     private float wallYawO;
     private float bodyHeading;
     private float bodyHeadingO;
+    /** The way the body faced when it last lay on a floor (drawn by its body yaw), to tip up onto a wall from. */
+    private float floorYaw;
 
     protected AbstractAntEntity(EntityType<? extends AbstractAntEntity> type, Level level) {
         super(type, level);
@@ -112,6 +126,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         super.defineSynchedData(builder);
         builder.define(DATA_SURFACE, (byte) Direction.DOWN.get3DDataValue());
         builder.define(DATA_HEADING, 0.0F);
+        builder.define(DATA_POSE_FLAGS, (byte) 0);
         builder.define(DATA_CARRIED, Optional.empty());
         builder.define(DATA_CARRIED_SEED, ItemStack.EMPTY);
         builder.define(DATA_CARRIED_EGG, false);
@@ -257,6 +272,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         if (!level().isClientSide) {
             entityData.set(DATA_SURFACE, (byte) (navigator.getSurface().get3DDataValue() | navigator.getCeilingRef().get3DDataValue() << 3));
             entityData.set(DATA_HEADING, navigator.getHeading());
+            entityData.set(DATA_POSE_FLAGS, (byte) ((navigator.isPeeking() ? PEEKING : 0) | (navigator.isTurningSlowly() ? TURNING_SLOWLY : 0)));
         } else {
             turnBody();
         }
@@ -271,6 +287,16 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     private Direction getCeilingRef() {
         Direction ref = Direction.from3DDataValue(entityData.get(DATA_SURFACE) >> 3 & 7);
         return ref.getAxis().isHorizontal() ? ref : Direction.NORTH;
+    }
+
+    /** True while it holds still looking round with its head out of a doorway's mouth (see DoorwayMotion). */
+    public boolean isPeeking() {
+        return (entityData.get(DATA_POSE_FLAGS) & PEEKING) != 0;
+    }
+
+    /** True while the drawn body tips over to its new surface slowly (over the rim of a doorway's mouth). */
+    private boolean isTurningSlowly() {
+        return (entityData.get(DATA_POSE_FLAGS) & TURNING_SLOWLY) != 0;
     }
 
     /** True while the body is on a wall or a ceiling. */
@@ -288,21 +314,25 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
      * Client: turns the drawn body a little toward the synced surface and heading, so it never snaps round. The tilt is
      * 0 on a floor, 90 upright on a wall and 180 upside down on a ceiling: going from a wall onto the ceiling the body
      * just tips on over, so it keeps the yaw of the wall it came up (on a ceiling the yaw and the heading both turn the
-     * body round the vertical, so one can stand in for the other).
+     * body round the vertical, so one can stand in for the other). Onto a wall facing the other way (over the top of a
+     * thin wall, such as a chimney's rim) it first lies flat and then tips up onto the new wall, never spinning round
+     * within the old one.
      */
     private void turnBody() {
         bodyTiltO = bodyTilt;
         wallYawO = wallYaw;
         bodyHeadingO = bodyHeading;
         Direction surface = getSurface();
+        float turn = isTurningSlowly() ? BODY_TURN_SPEED / 2.0F : BODY_TURN_SPEED;
         if (surface != Direction.DOWN) {
             Direction wall = surface == Direction.UP ? getCeilingRef() : surface;
             float targetTilt = surface == Direction.UP ? 180.0F : 90.0F;
             if (!wallPose) {
-                // Tipping up from the floor: start from how the body lies now (facing its body yaw).
+                // Tipping up from the floor: start from how the body lay there (its body yaw of the last tick; this
+                // tick's has already begun to turn toward the wall).
                 wallPose = true;
                 wallYaw = wall.toYRot();
-                bodyHeading = Mth.wrapDegrees(wallYaw - yBodyRot);
+                bodyHeading = Mth.wrapDegrees(wallYaw - floorYaw);
                 bodyTilt = 0.0F;
                 if (tickCount < 3) {
                     // Just loaded (or spawned) already on a wall or a ceiling: no tipping up, it is simply there.
@@ -313,36 +343,54 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
                 bodyHeadingO = bodyHeading;
                 bodyTiltO = bodyTilt;
             }
+            if (surface != Direction.UP && bodyTilt <= 90.0F && Math.abs(Mth.wrapDegrees(wall.toYRot() - wallYaw)) > 90.0F) {
+                // Onto a wall facing the other way: lie flat first. Once it lies flat (this tick and the last), the
+                // same pose is put as lying against the new wall (wall yaw and heading turned by the same amount), and
+                // from the next tick it tips up onto it.
+                if (bodyTilt <= 0.0F && bodyTiltO <= 0.0F) {
+                    float shift = Mth.wrapDegrees(wall.toYRot() - wallYaw);
+                    wallYaw += shift;
+                    wallYawO += shift;
+                    bodyHeading += shift;
+                    bodyHeadingO += shift;
+                } else {
+                    bodyTilt = Math.max(0.0F, bodyTilt - turn);
+                }
+                return;
+            }
             if (surface == Direction.UP) {
                 // Keep the yaw it has; turn the heading so the head points the synced way.
-                bodyHeading = approach(bodyHeading, entityData.get(DATA_HEADING) + Mth.wrapDegrees(wall.toYRot() - wallYaw));
+                bodyHeading = approach(bodyHeading, entityData.get(DATA_HEADING) + Mth.wrapDegrees(wall.toYRot() - wallYaw), turn);
             } else {
                 if (bodyTilt > 90.0F && Mth.wrapDegrees(wall.toYRot() - wallYaw) != 0.0F) {
                     // Coming off the ceiling onto another wall: take that wall's yaw, and turn the heading back by as
                     // much, which looks the same while the body is upside down.
-                    float turn = Mth.wrapDegrees(wall.toYRot() - wallYaw);
-                    wallYaw += turn;
-                    wallYawO += turn;
-                    bodyHeading -= turn;
-                    bodyHeadingO -= turn;
+                    float shift = Mth.wrapDegrees(wall.toYRot() - wallYaw);
+                    wallYaw += shift;
+                    wallYawO += shift;
+                    bodyHeading -= shift;
+                    bodyHeadingO -= shift;
                 }
-                wallYaw = approach(wallYaw, wall.toYRot());
-                bodyHeading = approach(bodyHeading, entityData.get(DATA_HEADING));
+                wallYaw = approach(wallYaw, wall.toYRot(), turn);
+                bodyHeading = approach(bodyHeading, entityData.get(DATA_HEADING), turn);
             }
-            bodyTilt = bodyTilt < targetTilt ? Math.min(targetTilt, bodyTilt + BODY_TURN_SPEED)
-                    : Math.max(targetTilt, bodyTilt - BODY_TURN_SPEED);
+            bodyTilt = bodyTilt < targetTilt ? Math.min(targetTilt, bodyTilt + turn)
+                    : Math.max(targetTilt, bodyTilt - turn);
         } else if (wallPose) {
             // Tipping back onto the floor, ending up facing the body yaw.
-            bodyTilt = Math.max(0.0F, bodyTilt - BODY_TURN_SPEED);
-            bodyHeading = approach(bodyHeading, wallYaw - yBodyRot);
+            bodyTilt = Math.max(0.0F, bodyTilt - turn);
+            bodyHeading = approach(bodyHeading, wallYaw - yBodyRot, turn);
             if (bodyTilt <= 0.0F && Math.abs(Mth.wrapDegrees(bodyHeading - (wallYaw - yBodyRot))) < 1.0F) {
                 wallPose = false;
             }
         }
+        if (!wallPose) {
+            floorYaw = yBodyRot;
+        }
     }
 
-    private static float approach(float from, float to) {
-        return from + Mth.clamp(Mth.wrapDegrees(to - from), -BODY_TURN_SPEED, BODY_TURN_SPEED);
+    private static float approach(float from, float to, float speed) {
+        return from + Mth.clamp(Mth.wrapDegrees(to - from), -speed, speed);
     }
 
     /** Client: whether the body is drawn by the wall angles below (on a wall, or tipping onto or off one). */
@@ -444,12 +492,18 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     }
 
     private PlayState animate(AnimationState<AbstractAntEntity> state) {
+        if (isPeeking()) {
+            state.getController().setAnimationSpeed(1.0);
+            return state.setAndContinue(PEEK);
+        }
         // Moving on a wall isn't "horizontal" movement, so check climbing separately (an ant hanging still does not move its legs).
         double dx = getX() - xo;
         double dy = getY() - yo;
         double dz = getZ() - zo;
-        if (isClimbing() && dx * dx + dy * dy + dz * dz > 1.0E-4) {
-            state.getController().setAnimationSpeed(1.5);
+        double moved = dx * dx + dy * dy + dz * dz;
+        if (isClimbing() && moved > 1.0E-4) {
+            // The legs keep pace with the body: slower when it climbs slowly (poking its head out of a chimney).
+            state.getController().setAnimationSpeed(Mth.clamp(Math.sqrt(moved) / CLIMB_STEP * 1.5, 0.4, 1.5));
             return state.setAndContinue(WALK);
         }
         if (state.isMoving()) {

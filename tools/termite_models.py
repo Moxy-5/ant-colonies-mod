@@ -306,6 +306,39 @@ def walk_legs():
         legs[name] = {'rotation': {f'{t:g}': r for t, r in frames}}
     return legs
 
+# The look round out of a chimney's mouth (AntNavigator holds the body still meanwhile, DoorwayMotion.PEEK_TICKS long).
+# The body stands upright in the mouth, so the head first tips forward until it faces straight out, level (the user's
+# wish), then turns to its left, stops, turns to its right, stops, and tips back up; the antennae follow the look and
+# feel the air; the mandibles open and close at each stop. Key frames ease in and out (GeckoLib's easing), so the head
+# moves like a head and not like a dial. In Blockbench terms a positive X tips the face down toward the belly (with
+# the body upright on the spire's wall: forward, level, out over the rim), and with the head tipped like that a turn
+# round the body's long axis (Z) swings the face left and right.
+PEEK_SECONDS, PEEK_TURN, PEEK_TIP = 2.8, 50.0, 85.0
+
+def peek():
+    def keys(frames):
+        return {'rotation': {f'{t:g}': {'vector': v, 'easing': e} for t, v, e in frames}}
+    io = 'easeInOutSine'
+    L, R = -PEEK_TURN, PEEK_TURN
+    T = PEEK_TIP
+    head = keys([(0, [0, 0, 0], io), (0.45, [T, 0, 0], io), (0.95, [T, 0, L], io),
+                 (1.3, [T, 0, L], io), (1.95, [T, 0, R], io), (2.3, [T, 0, R], io),
+                 (PEEK_SECONDS, [0, 0, 0], io)])
+    def antenna(side):
+        # Both antennae swing the way the head looks, and wave up and down (out of step with each other).
+        wave = 12.0 if side == 'l' else -12.0
+        return keys([(0, [0, 0, 0], io), (0.45, [wave, 0, 0], io), (0.7, [-wave, L * 0.4, 0], io),
+                     (0.95, [wave, L * 0.5, 0], io), (1.15, [-wave * 0.6, L * 0.5, 0], io), (1.3, [wave, L * 0.4, 0], io),
+                     (1.6, [0, 0, 0], io), (1.95, [wave, R * 0.5, 0], io), (2.15, [-wave * 0.6, R * 0.5, 0], io),
+                     (2.3, [wave, R * 0.4, 0], io), (PEEK_SECONDS, [0, 0, 0], io)])
+    def mandible(side):
+        # Open (tips apart) and shut once at each stop: tasting the air.
+        open_ = -15.0 if side == 'l' else 15.0
+        return keys([(0, [0, 0, 0], io), (1.0, [0, 0, 0], io), (1.1, [0, open_, 0], io), (1.2, [0, 0, 0], io),
+                     (2.0, [0, 0, 0], io), (2.1, [0, open_, 0], io), (2.2, [0, 0, 0], io), (PEEK_SECONDS, [0, 0, 0], io)])
+    return {'head': head, 'antenna_l_1': antenna('l'), 'antenna_r_1': antenna('r'),
+            'mandible_l': mandible('l'), 'mandible_r': mandible('r')}
+
 def animations():
     walk = walk_legs()
     wiggle = lambda a: {'0': [0, 0, 0], '0.6': [a, 0, 0], '1.2': [0, 0, 0], '1.8': [-a, 0, 0], '2.4': [0, 0, 0]}
@@ -315,13 +348,14 @@ def animations():
             'head': {'rotation': {'0': [0, 0, 0], '1.2': [0, 5, 0], '2.4': [0, 0, 0]}}}
     return {'format_version': '1.8.0', 'animations': {
         'idle': {'loop': True, 'animation_length': 2.4, 'bones': idle},
-        'walk': {'loop': True, 'animation_length': WALK_SECONDS, 'bones': walk}}}
+        'walk': {'loop': True, 'animation_length': WALK_SECONDS, 'bones': walk},
+        'peek': {'loop': False, 'animation_length': PEEK_SECONDS, 'bones': peek()}}}
 
 def sample(bones_anim, t):
     """The rotation of every bone of an animation at time t (straight lines between the key frames)."""
     out = {}
     for name, channels in bones_anim.items():
-        frames = sorted((float(k), v) for k, v in channels['rotation'].items())
+        frames = sorted((float(k), v['vector'] if isinstance(v, dict) else v) for k, v in channels['rotation'].items())
         for (t0, r0), (t1, r1) in zip(frames, frames[1:]):
             if t0 <= t <= t1:
                 f = 0 if t1 == t0 else (t - t0) / (t1 - t0)

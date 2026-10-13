@@ -43,18 +43,6 @@ public class AntNavigator {
     private static final int STEP_TICKS = 120;
     /** Coming out of a doorway's mouth or going in by it takes longer (up through the spire, a look round, down the outside). */
     private static final int DOORWAY_STEP_TICKS = 400;
-    /** How long (in ticks) an insect coming out of a doorway's mouth stops with its head out, looking round. */
-    private static final int PEEK_TICKS = 30;
-    /** How far below the mouth's rim its feet are while it looks out (so the front half of the body is out). */
-    private static final double PEEK_DEPTH = 0.2;
-    /**
-     * On a wall the body is drawn this far toward the wall from the hitbox's middle (the renderer's push into the wall at
-     * a termite's 3/4 size). In and on a narrow spire the hitbox is moved the other way by as much, so the drawn body is
-     * in the middle of the mouth, and against the spire's outside, not through it.
-     */
-    private static final double DRAWN_INTO_WALL = 0.13;
-    /** Half the thickness of a body lying on a wall, from its feet to its back. */
-    private static final double BODY_THICKNESS = 0.03;
     /** Waiting this long for a falling insect to land is the most. */
     private static final int FALL_TICKS = 200;
     private static final int MAX_REPLANS = 3;
@@ -92,8 +80,14 @@ public class AntNavigator {
     private boolean failed;
     private int replans;
     private int stepTicks;
-    /** Ticks spent in the current part of a step that waits (looking out of a doorway's mouth). */
+    /** Ticks spent staying at a point of a doorway's motion (see {@link DoorwayMotion}). */
     private int legTicks;
+    /** Whether it has reached the point of the doorway's motion it walks to ({@link #leg}) and stays there now. */
+    private boolean holding;
+    /** Whether it holds still looking round, with its head out of a doorway's mouth (the body plays its look round). */
+    private boolean peeking;
+    /** Whether the body tips over to its new surface slowly (going over the rim of a doorway's mouth). */
+    private boolean slowTurn;
     private int arriveTicks;
     /** The foothold the current step starts from; null while the insect drops to where its route starts. */
     @Nullable
@@ -231,6 +225,16 @@ public class AntNavigator {
         return ceilingRef;
     }
 
+    /** Whether the insect holds still with its head out of a doorway's mouth, looking round (the body plays its "peek"). */
+    public boolean isPeeking() {
+        return peeking;
+    }
+
+    /** Whether the body should tip over to its new surface slowly (going over the rim of a doorway's mouth). */
+    public boolean isTurningSlowly() {
+        return slowTurn;
+    }
+
     /**
      * The wall or ceiling the insect holds on to right now, to be saved with it; null on a floor or in the air (then
      * there is nothing to keep: it just stands, or falls).
@@ -300,7 +304,16 @@ public class AntNavigator {
         }
         route = null;
         failed = false;
+        startLeg();
+    }
+
+    /** A step starts from its first part (and a doorway's motion from its first point, not looking round). */
+    private void startLeg() {
         leg = 0;
+        legTicks = 0;
+        holding = false;
+        peeking = false;
+        slowTurn = false;
     }
 
     /** Plans from where the insect is: to the goal cell, or onto the start of a shared route and then along it. */
@@ -343,7 +356,7 @@ public class AntNavigator {
         failed = found == null;
         route = found;
         next = 1;
-        leg = 0;
+        startLeg();
         stepTicks = 0;
         arriveTicks = 0;
         blockedTicks = 0;
@@ -398,7 +411,7 @@ public class AntNavigator {
         if (advance(map, at, step)) {
             at = step.to();
             next++;
-            leg = 0;
+            startLeg();
             stepTicks = 0;
         } else if (isBlocked()) {
             // Pushing along a surface and getting nowhere: something is in the way that the planner can't see.
@@ -614,146 +627,80 @@ public class AntNavigator {
     }
 
     /**
-     * Out of a doorway over its top, by its mouth: from the wall inside the block to its middle, up inside the spire
-     * until the head is out, a look round, up onto the rim, over it and head first down the outside of the spire, and
-     * off onto the top of the block beside (where the route goes on). The body is hidden inside the block until it
-     * comes up the spire.
+     * Out of a doorway over its top, by its mouth (see {@link DoorwayMotion#comeOut}): from the wall inside the block up
+     * the middle of the spire until the head is out, a look round, over the rim and head first down the outside of the
+     * spire, and onto the top of the block beside (where the route goes on). The body is hidden inside the block until
+     * it comes up the spire.
      */
     private boolean comeOutOf(Doorway door, Foothold from, Route.Step step) {
-        BlockPos c = from.cell();
-        Direction w = from.surface();
-        double midX = c.getX() + 0.5 - w.getStepX() * DRAWN_INTO_WALL;
-        double midZ = c.getZ() + 0.5 - w.getStepZ() * DRAWN_INTO_WALL;
-        double rim = c.getY() + door.mouthHeight();
-        switch (leg) {
-            case 0 -> {
-                // Inside the block, to its middle under the mouth.
-                surface = w;
-                if (moveAttached(new Vec3(midX, c.getY() + 0.5, midZ))) {
-                    heading = 0.0F;
-                    leg = 1;
-                }
-                return false;
-            }
-            case 1 -> {
-                // Up inside the spire until the front of the body is out.
-                surface = w;
-                heading = 0.0F;
-                if (moveAttached(new Vec3(midX, rim - PEEK_DEPTH, midZ))) {
-                    legTicks = 0;
-                    leg = 2;
-                }
-                return false;
-            }
-            case 2 -> {
-                // A look round: the head turns from side to side.
-                surface = w;
-                attached = true;
-                motion = Vec3.ZERO;
-                heading = (float) (35.0 * Math.sin(legTicks * 0.35));
-                if (++legTicks >= PEEK_TICKS) {
-                    heading = 0.0F;
-                    leg = 3;
-                }
-                return false;
-            }
-            case 3 -> {
-                // On up until the feet are at the rim.
-                surface = w;
-                if (moveAttached(new Vec3(midX, rim + EPS, midZ))) {
-                    setYaw(w.toYRot() - heading);
-                    leg = 4;
-                }
-                return false;
-            }
-            case 4 -> {
-                // Over the rim toward the block it goes to, until it is over the spire's outside.
-                surface = Direction.DOWN;
-                double out = door.mouthRadius() + DRAWN_INTO_WALL + BODY_THICKNESS;
-                if (moveAttached(new Vec3(c.getX() + 0.5 + w.getStepX() * out, rim + EPS, c.getZ() + 0.5 + w.getStepZ() * out))) {
-                    surface = w.getOpposite();
-                    heading = 180.0F;
-                    leg = 5;
-                }
-                return false;
-            }
-            case 5 -> {
-                // Head first down the outside of the spire to the top of the block.
-                surface = w.getOpposite();
-                if (moveAttached(new Vec3(ant.getX(), c.getY() + 1 + EPS, ant.getZ()))) {
-                    setYaw(w.toYRot());
-                    leg = 6;
-                }
-                return false;
-            }
-            default -> {
-                // Off the spire's foot and onto the block beside, as at the end of any climb over the top.
-                surface = Direction.DOWN;
-                BlockPos block = c.relative(w);
-                double onTop = centerOf(block, w.getAxis()) - w.getAxisDirection().getStep() * (0.5 - half() - OVER_THE_TOP);
-                return moveAttached(with(new Vec3(ant.getX(), c.getY() + 1 + EPS, ant.getZ()), w.getAxis(), onTop));
-            }
-        }
+        return walkDoorway(DoorwayMotion.comeOut(door.mouthHeight(), door.mouthRadius(), half(), OVER_THE_TOP), from.cell(), from.surface());
     }
 
     /**
-     * Into a doorway over its edge, by its mouth: from the top of the block beside onto the doorway's top to the foot of
-     * the spire, up its outside, over the rim and head first down inside it into the block, to the wall the route goes
-     * on from (hidden inside).
+     * Into a doorway over its edge, by its mouth (see {@link DoorwayMotion#goIn}): from the top of the block beside to
+     * the foot of the spire, up its outside, over the rim and head first down inside it into the block, then over to the
+     * wall the route goes on from (hidden inside).
      */
     private boolean goInto(Doorway door, Foothold from, Route.Step step) {
         Foothold to = step.to();
         BlockPos c = to.cell();
-        Direction s = to.surface(); // toward the block the insect comes from
-        Direction in = s.getOpposite(); // the way it goes
-        double midX = c.getX() + 0.5;
-        double midZ = c.getZ() + 0.5;
-        double rim = c.getY() + door.mouthHeight();
-        double foot = door.mouthRadius() + DRAWN_INTO_WALL + BODY_THICKNESS;
-        switch (leg) {
-            case 0 -> {
-                // Along the top to the foot of the spire.
-                surface = Direction.DOWN;
-                if (moveAttached(new Vec3(midX + s.getStepX() * foot, c.getY() + 1 + EPS, midZ + s.getStepZ() * foot))) {
-                    surface = in;
-                    heading = 0.0F;
-                    leg = 1;
-                }
-                return false;
-            }
-            case 1 -> {
-                // Up the outside of the spire to the rim.
-                surface = in;
-                if (moveAttached(new Vec3(ant.getX(), rim + EPS, ant.getZ()))) {
-                    setYaw(in.toYRot() - heading);
-                    leg = 2;
-                }
-                return false;
-            }
-            case 2 -> {
-                // Over the rim to the middle of the mouth.
-                surface = Direction.DOWN;
-                if (moveAttached(new Vec3(midX, rim + EPS, midZ))) {
-                    surface = s;
-                    heading = 180.0F;
-                    leg = 3;
-                }
-                return false;
-            }
-            case 3 -> {
-                // Head first down inside the spire into the block (the body drawn in the middle of the mouth).
-                surface = s;
-                if (moveAttached(new Vec3(midX - s.getStepX() * DRAWN_INTO_WALL, c.getY() + 0.5, midZ - s.getStepZ() * DRAWN_INTO_WALL))) {
-                    leg = 4;
-                }
-                return false;
-            }
-            default -> {
-                // Inside, over to the wall the route goes on from.
-                surface = s;
-                return moveAttached(wallPoint(to, clampY(c, c.getY() + 0.5)));
-            }
+        Direction s = to.surface(); // toward the block the insect comes from: the side it goes in by
+        List<DoorwayMotion.Key> keys = DoorwayMotion.goIn(door.mouthHeight(), door.mouthRadius(), half(), OVER_THE_TOP);
+        if (leg < keys.size()) {
+            walkDoorway(keys, c, s);
+            return false;
         }
+        // Inside, over to the wall the route goes on from.
+        surface = s;
+        slowTurn = false;
+        return moveAttached(wallPoint(to, clampY(c, c.getY() + 0.5)));
+    }
+
+    /**
+     * Walks a doorway's motion one point after the other ({@link #leg} is the point it walks to), on the surface each
+     * point says, at its speed, staying at it as long as it says (looking round if it says so). {@code c}: the doorway
+     * block; {@code side}: the side it leaves by (or comes in by). True once the last point is reached.
+     */
+    private boolean walkDoorway(List<DoorwayMotion.Key> keys, BlockPos c, Direction side) {
+        DoorwayMotion.Key key = keys.get(leg);
+        Direction on = switch (key.on()) {
+            case INSIDE -> side;
+            case OUTSIDE -> side.getOpposite();
+            case TOP -> Direction.DOWN;
+        };
+        if (on == Direction.DOWN && surface.getAxis().isHorizontal()) {
+            setYaw(surface.toYRot() - heading); // from a wall onto a top: the body faces the way its head pointed
+        }
+        surface = on;
+        slowTurn = key.slowTurn();
+        if (!holding) {
+            Vec3 point = new Vec3(c.getX() + 0.5 + side.getStepX() * key.out(), c.getY() + key.y(), c.getZ() + 0.5 + side.getStepZ() * key.out());
+            double walking = speed;
+            speed = walking * key.speed();
+            boolean there = moveAttached(point);
+            speed = walking;
+            if (!there) {
+                return false;
+            }
+            if (key.hold() == 0) {
+                leg++; // on to the next point from the next tick
+                return leg >= keys.size();
+            }
+            holding = true;
+            legTicks = 0;
+            return false;
+        }
+        // At the point: hold still for a while (looking round, if it says so: the whole look round, every tick of it).
+        attached = true;
+        motion = Vec3.ZERO;
+        if (legTicks++ < key.hold()) {
+            peeking = key.peek();
+            return false;
+        }
+        peeking = false;
+        holding = false;
+        leg++;
+        return leg >= keys.size();
     }
 
     private String from(Route.Step step) {
