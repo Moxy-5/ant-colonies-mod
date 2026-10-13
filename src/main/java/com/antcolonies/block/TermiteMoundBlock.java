@@ -78,8 +78,9 @@ public class TermiteMoundBlock extends Block {
 
     /**
      * Whether termites may start a new block in this empty space: on top of something it may be built on (see
-     * {@link #canBuildOn}), or, where there is nothing under it at all (over a tunnel in the mound), built out from a
-     * finished block that has set right beside it, like an arch. Never on wet soil that has not set.
+     * {@link #canBuildOn}), or, where there is nothing solid under it (over a tunnel in the mound, over a ramp or a spire
+     * piece), built out from a finished block that has set right beside it (or a tunnel block), like an arch. Never on
+     * wet soil that has not set.
      */
     public static boolean canStartAt(LevelReader level, BlockPos pos) {
         BlockPos below = pos.below();
@@ -87,17 +88,22 @@ public class TermiteMoundBlock extends Block {
         if (canBuildOn(under, level, below)) {
             return true;
         }
-        if (under.getBlock() instanceof TermiteMoundBlock || !under.getCollisionShape(level, below).isEmpty()) {
+        if (under.getBlock() instanceof TermiteMoundBlock
+                || !under.getCollisionShape(level, below).isEmpty() && !(under.getBlock() instanceof MoundPieceBlock)) {
             return false;
         }
         return besideSetSoil(level, pos);
     }
 
-    /** True if a finished mound block that has set stands right beside this space (sideways). */
+    /**
+     * True if a finished mound block that has set stands right beside this space (sideways), or a tunnel block (soil with
+     * a channel carved through it, as firm as the soil it was).
+     */
     private static boolean besideSetSoil(LevelReader level, BlockPos pos) {
         for (Direction side : Direction.Plane.HORIZONTAL) {
             BlockState beside = level.getBlockState(pos.relative(side));
-            if (beside.getBlock() instanceof TermiteMoundBlock && isFinished(beside) && beside.getValue(AGE) >= 1) {
+            if (beside.getBlock() instanceof TermiteMoundBlock && isFinished(beside) && beside.getValue(AGE) >= 1
+                    || beside.getBlock() instanceof TermiteTunnelBlock) {
                 return true;
             }
         }

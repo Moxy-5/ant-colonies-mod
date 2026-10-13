@@ -9,7 +9,7 @@ import com.antcolonies.entity.goal.ClipGrassGoal;
 import com.antcolonies.entity.goal.GatherSeedGoal;
 import com.antcolonies.entity.goal.GoInsideGoal;
 import com.antcolonies.entity.goal.PlugHoleGoal;
-import com.antcolonies.entity.goal.ShapeHoleGoal;
+import com.antcolonies.entity.goal.ShapeMoundGoal;
 import com.antcolonies.entity.goal.StoreSeedGoal;
 import com.antcolonies.entity.goal.DigGoal;
 import com.antcolonies.species.Species;
@@ -59,7 +59,7 @@ public class TermiteWorkerEntity extends AbstractAntEntity {
         // What a termite holds goes where it belongs first: forage to the food store, soil to the mound.
         this.goalSelector.addGoal(1, new StoreSeedGoal(this));
         this.goalSelector.addGoal(1, new BuildMoundGoal(this));
-        this.goalSelector.addGoal(2, new ShapeHoleGoal(this));
+        this.goalSelector.addGoal(2, new ShapeMoundGoal(this));
         this.goalSelector.addGoal(2, new PlugHoleGoal(this));
         // Builders dig, foragers fetch food off the ground and cut it off plants.
         this.goalSelector.addGoal(3, new DigGoal(this, () -> true, () -> mayDo(ColonyRole.BUILDER)));

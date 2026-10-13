@@ -21,7 +21,7 @@ import net.minecraft.server.MinecraftServer;
 public final class TestFilter {
     /** Every class with game tests (a test's own name does not say its class). */
     private static final Class<?>[] CLASSES = {NestTests.class, NavigationTests.class, TermiteTests.class, TermiteClimbingTests.class,
-            TermiteFoodTests.class, TermiteForagingTests.class, TermiteMoundTests.class, TermiteTunnelTests.class};
+            TermiteFoodTests.class, TermiteForagingTests.class, TermiteMoundTests.class, TermiteTunnelTests.class, TermiteCathedralTests.class};
 
     private TestFilter() {
     }

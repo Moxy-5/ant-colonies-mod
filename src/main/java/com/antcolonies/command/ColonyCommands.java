@@ -91,7 +91,7 @@ public class ColonyCommands {
             colony.mound().setStage(level, h);
         }
         ColonyManager.get(level).markChanged();
-        String done = instant ? "built at once" : "set: the termites build up to it";
+        String done = instant ? "built at once" : "set: the termites build up to it, one stage after the other";
         source.sendSuccess(() -> Component.literal("Mound stage " + h + " of " + max + " (" + colony.mound().wallsAt(h) + " blocks) " + done
                 + (colony.isFounding() ? ". The colony has no workers yet, so nobody builds." : ".")), false);
         return 1;
@@ -139,14 +139,18 @@ public class ColonyCommands {
         return colonies.size();
     }
 
-    /** " | mound height 3 of 22, 30/36 blocks finished, earned 41.2" for colonies that build a mound, otherwise nothing. */
+    /**
+     * " | mound stage 3 (earned 5) of 32, 30/36 blocks finished, earned 41.2 blocks" for colonies that build a mound,
+     * otherwise nothing: the stage the termites build now, and the one the colony has earned (they get there one stage
+     * at a time).
+     */
     private static String mound(Colony colony, ServerLevel level) {
         if (colony.mound().numbers() == null) {
             return "";
         }
         int h = colony.mound().getStage(level);
-        return String.format(" | mound stage %d of %d, %d/%d blocks finished, earned %.1f", h, colony.mound().numbers().maxHeight(),
-                colony.mound().countFinished(level), colony.mound().wallsAt(h), colony.mound().getAllowance(level));
+        return String.format(" | mound stage %d (earned %d) of %d, %d/%d blocks finished, earned %.1f blocks", h, colony.mound().getEarnedStage(level),
+                colony.mound().numbers().maxHeight(), colony.mound().countFinished(level), colony.mound().wallsAt(h), colony.mound().getAllowance(level));
     }
 
     /** " | foraging now (night, rain), holes open 1 of 2" for colonies that keep a schedule or have foraging holes, otherwise nothing. */

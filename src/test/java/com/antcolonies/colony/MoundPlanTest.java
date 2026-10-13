@@ -49,7 +49,7 @@ class MoundPlanTest {
     void everyStageCanBeBuiltAndItsShaftIsClosedIn() {
         for (long seed : SEEDS) {
             for (int h = 1; h <= NUMBERS.maxHeight(); h++) {
-                Map<BlockPos, Part> parts = MoundPlan.stage(h, NUMBERS, seed).parts();
+                Map<BlockPos, Part> parts = MoundPlan.shapeOf(h, NUMBERS, seed).parts();
                 String where = "seed " + seed + ", stage " + h + ": ";
                 for (Map.Entry<BlockPos, Part> entry : parts.entrySet()) {
                     BlockPos pos = entry.getKey();

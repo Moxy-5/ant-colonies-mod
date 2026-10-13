@@ -153,7 +153,7 @@ public class DigGoal extends Goal {
 
         if (progress >= 1.0F) {
             colony.nest().clearDigProgress(target);
-            colony.mound().blockDug(target);
+            colony.mound().blockDug(level, target);
             level.destroyBlockProgress(ant.getId(), target, -1);
             level.destroyBlock(target, false, ant);
         } else {

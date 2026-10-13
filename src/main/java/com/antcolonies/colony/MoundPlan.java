@@ -35,13 +35,20 @@ import net.minecraft.world.level.block.state.properties.StairsShape;
  * about {@code max_height} blocks tall); a young mound is a low dome with a small, stubby spire.
  *
  * <p>Every colony's mound is a little different ({@code seed}): the whole layout is turned, and the spires lean and the
- * buttresses run a little differently. Each stage is worked out on its own; going from one stage to the next, the
- * termites build what is new and clear what is now hollow.
+ * buttresses run a little differently. Each stage's shape is worked out on its own; going from one stage to the next,
+ * the termites build what is new and clear what is now hollow.
+ *
+ * <p>Inside, some of the soil is termite tunnel ({@link Part#TUNNEL}): the network the termites build the mound from
+ * (tunnel plan step 4). It is worked out by growing the mound stage by stage with the termites' own building rules
+ * ({@link MoundGrowth}), so every stage can be built from inside, and kept from stage to stage.
  */
 public final class MoundPlan {
-    /** What a cell of the mound is: mound soil, hollow (the shaft), a chimney mouth, a spire piece or a ramp. */
+    /**
+     * What a cell of the mound is: mound soil, hollow (the shaft), a chimney mouth, a spire piece, a ramp, or mound soil
+     * with a termite tunnel through it (built as soil, then carved).
+     */
     public enum Part {
-        WALL, OPEN, MOUTH, SPIRE, RAMP
+        WALL, OPEN, MOUTH, SPIRE, RAMP, TUNNEL
     }
 
     /**
@@ -72,16 +79,47 @@ public final class MoundPlan {
     private MoundPlan() {
     }
 
-    /** The mound at stage {@code h} (1 to the profile's {@code max_height}) of the colony with this {@code seed}. */
+    /**
+     * The mound at stage {@code h} (1 to the profile's {@code max_height}) of the colony with this {@code seed}, with its
+     * tunnels (see {@link #growth}).
+     */
     public static Shape stage(int h, MoundNumbers numbers, long seed) {
+        List<Shape> stages = growth(numbers, seed);
+        return stages.get(Math.max(1, Math.min(h, stages.size() - 1)));
+    }
+
+    /** The shape alone at stage {@code h}: no tunnels yet (they come from growing it, see {@link #growth}). */
+    public static Shape shapeOf(int h, MoundNumbers numbers, long seed) {
         return new Builder(h, numbers.maxHeight(), seed).build();
     }
 
-    /** How many blocks of mound soil a stage has. */
+    /** The grown mounds of the last few colonies asked for (growing one takes a moment). */
+    private static final Map<String, List<Shape>> GROWN = new LinkedHashMap<>(8, 0.75F, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, List<Shape>> eldest) {
+            return size() > 8;
+        }
+    };
+
+    /**
+     * Every stage of the mound of the colony with this seed, with its tunnels: index {@code h} is stage {@code h}
+     * (index 0 is unused). Grown once with the termites' building rules ({@link MoundGrowth#grow}) and kept.
+     */
+    public static synchronized List<Shape> growth(MoundNumbers numbers, long seed) {
+        String key = numbers.maxHeight() + "/" + seed;
+        List<Shape> stages = GROWN.get(key);
+        if (stages == null) {
+            stages = MoundGrowth.grow(numbers.maxHeight(), h -> shapeOf(h, numbers, seed));
+            GROWN.put(key, stages);
+        }
+        return stages;
+    }
+
+    /** How many blocks of mound soil a stage has (plain soil and soil with a tunnel through it). */
     public static int walls(Shape stage) {
         int walls = 0;
         for (Part part : stage.parts().values()) {
-            if (part == Part.WALL) {
+            if (part == Part.WALL || part == Part.TUNNEL) {
                 walls++;
             }
         }
@@ -265,6 +303,7 @@ public final class MoundPlan {
             }
             addShaft();
             dropHangingSoil();
+            fillDiagonalGaps();
             for (Spire spire : spires) {
                 addSpireTop(spire);
             }
@@ -401,6 +440,33 @@ public final class MoundPlan {
                 }
                 if (!beside) {
                     full.remove(cell);
+                }
+            }
+        }
+
+        /**
+         * Where two blocks of soil in a layer only touch at an edge (a buttress running diagonally), one of the two cells
+         * between them is filled (the one nearer the middle), so the soil is joined side to side: a tunnel can then reach
+         * every block of it from inside (see {@link MoundGrowth}). The buttress becomes a little staircase.
+         */
+        private void fillDiagonalGaps() {
+            List<BlockPos> cells = new ArrayList<>(full);
+            Collections.sort(cells);
+            for (BlockPos cell : cells) {
+                for (int dx : new int[] {1, -1}) {
+                    for (int dz : new int[] {1, -1}) {
+                        BlockPos a = cell.offset(dx, 0, 0);
+                        BlockPos b = cell.offset(0, 0, dz);
+                        if (full.contains(cell.offset(dx, 0, dz)) && !full.contains(a) && !full.contains(b)) {
+                            BlockPos fill = Math.hypot(a.getX(), a.getZ()) <= Math.hypot(b.getX(), b.getZ()) ? a : b;
+                            if (parts.containsKey(fill)) {
+                                fill = fill == a ? b : a; // not into the shaft
+                            }
+                            if (!parts.containsKey(fill)) {
+                                full.add(fill);
+                            }
+                        }
+                    }
                 }
             }
         }

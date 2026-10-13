@@ -18,6 +18,7 @@ import com.antcolonies.block.TermiteMoundBlock;
 import com.antcolonies.block.TermiteMouthBlock;
 import com.antcolonies.block.TermiteRampBlock;
 import com.antcolonies.block.TermiteSpireBlock;
+import com.antcolonies.block.TermiteTunnelBlock;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.TermiteWorkerEntity;
 import com.antcolonies.registry.ModBlocks;
@@ -43,6 +44,10 @@ import net.minecraft.world.phys.AABB;
  * worker, so age and size both count), and the mound's stage ({@link MoundPlan#stage}) is the tallest one whose blocks
  * it has earned. The termites build that stage block by block, layer by layer: one dug block gives the soil for one
  * mound block ({@link TermiteMoundBlock#FINISHED} pellets), and wet soil must set before more is stacked on it.
+ *
+ * <p>The cathedral (tunnel plan step 4): the plan's tunnels ({@link MoundPlan.Part#TUNNEL}) are built as soil and then
+ * carved ({@link #pickCarveJob}); ramps, spire pieces and chimney mouths take one pellet each and go where the plan
+ * puts them once what they stand on is there. The termites work from inside, by the rules of {@link MoundReach}.
  */
 public class Mound {
     /** How long (in ticks) a termite's claim on a spot it carries soil to, or a chimney block it shapes, lasts. */
@@ -51,6 +56,21 @@ public class Mound {
     private static final int SOIL_CLAIM_TICKS = 600;
     /** How far down (in blocks) a wall at the foot of the mound is filled in to reach the ground (a dip, a slope). */
     private static final int MAX_FOOTING = 3;
+    /**
+     * How long (in ticks, 5 minutes) the termites may go without building anything before they move on to the next stage
+     * anyway (my pick): a spot nobody can get to (a player broke the tunnels, odd ground) never stops the mound growing.
+     */
+    private static final int STALL_TICKS = 6000;
+    /** How often (in ticks) they look whether the stage they build is finished. */
+    private static final int STAGE_CHECK_TICKS = 100;
+    /**
+     * After this long (in ticks, a minute) without anything built, the termites may fall back on building from outside
+     * (at night) or from 2 blocks away (my pick): before that a spot they cannot get to from inside just waits for the
+     * tunnel that will lead to it (the plan never needs the fallbacks).
+     */
+    private static final int FALLBACK_AFTER_TICKS = 1200;
+    /** How long (in ticks) a spot nobody found a way to from inside is left alone. */
+    private static final int UNREACHABLE_TICKS = 200;
 
     private final Colony colony;
     private final BlockPos center;
@@ -59,10 +79,17 @@ public class Mound {
     private double allowance;
     /** Game time the allowance was last brought up to date. Saved. */
     private long updatedAt = Colony.NOT_SET;
+    /** The stage the termites build now (see {@link #getStage}). Saved; 0 = not started yet (or an old save). */
+    private int workStage;
+    /** When the termites last built, carved, reshaped or cleared something (not saved: counts from the load). */
+    private long lastProgress = Colony.NOT_SET;
+    private long stageCheckedAt;
 
-    /** Who carries soil to which spot, and who shapes which chimney block (not saved). */
+    /** Who carries soil to which spot, and who carves which tunnel (not saved). */
     private final Map<UUID, Claim> buildClaims = new HashMap<>();
-    private final Map<UUID, Claim> holeClaims = new HashMap<>();
+    private final Map<UUID, Claim> carveClaims = new HashMap<>();
+    /** Spots a termite found no way to from inside, left alone until the game time given (not saved). */
+    private final Map<BlockPos, Long> unreachable = new HashMap<>();
     /** Termites on their way to dig soil (not saved). */
     private final Claims<UUID> soilClaims = new Claims<>();
     /** How many pellets have been taken from each block being dug (not saved: a half-dug block gives a few too many after a reload). */
@@ -147,8 +174,8 @@ public class Mound {
         return allowance;
     }
 
-    /** The stage the mound is built to now: the tallest one whose blocks the colony has earned (at least the first). */
-    public int getStage(Level level) {
+    /** The tallest stage whose blocks the colony has earned (at least the first). */
+    public int getEarnedStage(Level level) {
         MoundNumbers numbers = numbers();
         if (numbers == null) {
             return 0;
@@ -161,10 +188,68 @@ public class Mound {
         return h;
     }
 
-    /** Sets the mound's stage (debug command and tests): the colony has earned exactly the blocks of stage {@code h}. */
+    /**
+     * The stage the termites build now. They finish one stage before they start the next, up to the stage the colony
+     * has earned ({@link #getEarnedStage}): the stages are proven buildable one after the other ({@link MoundGrowth}),
+     * not in jumps. If they have built nothing for {@link #STALL_TICKS} (a spot nobody can get to), they move on anyway.
+     * An old save (no stage saved yet) starts at the first stage and climbs. The pieces of earlier stages where the plan has
+     * nothing any more crumble when a new stage begins (see {@link MoundGrowth#crumblesAway}).
+     */
+    public int getStage(Level level) {
+        MoundNumbers numbers = numbers();
+        if (numbers == null) {
+            return 0;
+        }
+        int earned = getEarnedStage(level);
+        long now = level.getGameTime();
+        if (workStage <= 0) {
+            workStage = 1; // a new colony, or an old save: up from the first stage, one at a time
+        }
+        workStage = Math.min(workStage, earned);
+        if (lastProgress == Colony.NOT_SET || now - stageCheckedAt > 3L * STAGE_CHECK_TICKS) {
+            lastProgress = now; // just loaded (or the chunk was away): the stall clock starts now
+        }
+        if (workStage < earned && now - stageCheckedAt >= STAGE_CHECK_TICKS) {
+            stageCheckedAt = now;
+            if (now - lastProgress >= STALL_TICKS || isStageDone(level)) {
+                workStage++;
+                lastProgress = now;
+            }
+        } else if (now - stageCheckedAt >= STAGE_CHECK_TICKS) {
+            stageCheckedAt = now;
+        }
+        return workStage;
+    }
+
+    /**
+     * Sets the mound's stage (debug command and tests): the colony has earned exactly the blocks of stage {@code h}; the
+     * termites build their way up to it one stage after the other.
+     */
     public void setStage(Level level, int h) {
         allowance = wallsAt(h);
         updatedAt = colony.isFounding() ? Colony.NOT_SET : level.getGameTime();
+        workStage = Math.min(Math.max(workStage, 1), h);
+    }
+
+    /** Sets the stage the termites build now as well (tests, the instant build): stage {@code h} at once. */
+    public void setWorkStage(Level level, int h) {
+        setStage(level, h);
+        workStage = h;
+    }
+
+    /** Something was built, carved, reshaped or cleared: the stage is still going. */
+    private void progressed(Level level) {
+        lastProgress = level.getGameTime();
+    }
+
+    /** Whether every cell of the stage being built is as the plan has it (nothing left to build, carve, reshape or clear). */
+    private boolean isStageDone(Level level) {
+        for (Map.Entry<BlockPos, MoundPlan.Part> entry : getParts(level).entrySet()) {
+            if (level.isLoaded(entry.getKey()) && jobAt(level, entry.getKey(), entry.getValue()) != null) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** Every cell of the mound at its stage now, in world positions. Empty if the colony builds no mound. */
@@ -181,15 +266,76 @@ public class Mound {
             cachedParts = parts;
             cachedShape = shape;
             cachedStage = h;
+            crumbleLeftovers(level, numbers, h);
         }
         return cachedParts;
+    }
+
+    /**
+     * The pieces (ramps, spire pieces, mouths) of earlier stages in cells where stage {@code h} has nothing crumble away
+     * (the termites could not get to them from inside: an old spire top the spire has grown away from).
+     */
+    private void crumbleLeftovers(Level level, MoundNumbers numbers, int h) {
+        java.util.Set<BlockPos> earlier = new java.util.HashSet<>();
+        for (int stage = 1; stage < h; stage++) {
+            MoundPlan.stage(stage, numbers, seed()).parts().forEach((offset, part) -> {
+                if (isPiece(part)) {
+                    earlier.add(offset);
+                }
+            });
+        }
+        for (BlockPos offset : earlier) {
+            BlockPos pos = center.offset(offset);
+            if (MoundGrowth.crumblesAway(cachedParts.get(pos)) && level.isLoaded(pos) && isPieceBlock(level.getBlockState(pos))) {
+                level.destroyBlock(pos, false);
+            }
+        }
+    }
+
+    /** A shaped piece of the mound (a ramp, a spire piece, a mouth), not a tunnel block. */
+    private static boolean isPieceBlock(BlockState state) {
+        return state.getBlock() instanceof MoundPieceBlock && !(state.getBlock() instanceof TermiteTunnelBlock);
+    }
+
+    /**
+     * What the plan still wants done in a cell now, the same as in the pretend mound ({@link MoundGrowth}): soil (or a
+     * layer more of it), a piece, a carved tunnel (or a tunnel's doors into the shaft), a piece reshaped into the
+     * plan's one, a piece cleared away where soil goes, the shaft dug out. Null if nothing (done, or something it does
+     * not change stands there: soil where a piece would go stays).
+     */
+    @Nullable
+    public MoundGrowth.Job jobAt(Level level, BlockPos pos, MoundPlan.Part part) {
+        BlockState state = level.getBlockState(pos);
+        boolean empty = state.canBeReplaced() && state.getFluidState().isEmpty();
+        boolean wet = state.getBlock() instanceof TermiteMoundBlock && !TermiteMoundBlock.isFinished(state);
+        return switch (part) {
+            case OPEN -> isClearJob(level, pos) ? MoundGrowth.Job.CLEAR : null;
+            case WALL -> empty || wet ? MoundGrowth.Job.SOIL : isPieceBlock(state) ? MoundGrowth.Job.CLEAR : null;
+            case TUNNEL -> empty || wet ? MoundGrowth.Job.SOIL : isCarveJob(level, pos) ? MoundGrowth.Job.CARVE
+                    : isPieceBlock(state) ? MoundGrowth.Job.CLEAR : null;
+            case RAMP, SPIRE, MOUTH -> empty ? MoundGrowth.Job.PIECE
+                    : isPieceBlock(state) && !isPlannedPiece(state, pos, part) ? MoundGrowth.Job.RESHAPE : null;
+        };
+    }
+
+    /** Whether the piece standing here is the one the plan wants (a ramp's corner follows the ramps beside it on its own). */
+    private boolean isPlannedPiece(BlockState state, BlockPos pos, MoundPlan.Part part) {
+        BlockPos offset = pos.subtract(center);
+        return switch (part) {
+            case RAMP -> state.getBlock() instanceof TermiteRampBlock && cachedShape != null
+                    && state.getValue(TermiteRampBlock.FACING) == cachedShape.facing().get(offset);
+            case SPIRE -> state.getBlock() instanceof TermiteSpireBlock && cachedShape != null
+                    && state.getValue(TermiteSpireBlock.THICKNESS).equals(cachedShape.thickness().get(offset));
+            case MOUTH -> state.getBlock() instanceof TermiteMouthBlock;
+            default -> true;
+        };
     }
 
     /** How many blocks of the mound are finished (for the colony list). */
     public int countFinished(Level level) {
         int finished = 0;
         for (Map.Entry<BlockPos, MoundPlan.Part> entry : getParts(level).entrySet()) {
-            if (entry.getValue() == MoundPlan.Part.WALL && level.isLoaded(entry.getKey()) && isWallDone(level, entry.getKey())) {
+            if (isSoil(entry.getValue()) && level.isLoaded(entry.getKey()) && isWallDone(level, entry.getKey())) {
                 finished++;
             }
         }
@@ -197,6 +343,16 @@ public class Mound {
     }
 
     // ---- building ----
+
+    /** Whether a part of the plan is built as soil: plain mound soil, or soil a tunnel is carved into afterwards. */
+    private static boolean isSoil(MoundPlan.Part part) {
+        return part == MoundPlan.Part.WALL || part == MoundPlan.Part.TUNNEL;
+    }
+
+    /** Whether a part of the plan is a piece: a ramp, a spire piece or a chimney mouth (one pellet each). */
+    private static boolean isPiece(MoundPlan.Part part) {
+        return part == MoundPlan.Part.RAMP || part == MoundPlan.Part.SPIRE || part == MoundPlan.Part.MOUTH;
+    }
 
     /** A wall cell needs no more soil: a finished mound block, or anything else solid already fills it. */
     private static boolean isWallDone(Level level, BlockPos pos) {
@@ -208,10 +364,10 @@ public class Mound {
     }
 
     /**
-     * Every spot where a layer of soil can go now: walls of the mound still being built, and empty walls whose floor
-     * may be built on (see {@link TermiteMoundBlock#canStartAt}). A wall at the foot of the mound over a dip is filled
-     * in from the ground up. Blocks being built come first (they are finished before new ones are started), then the
-     * lowest. Worked out once a tick.
+     * Every spot where a pellet of soil can go now: soil blocks of the mound still being built, empty ones whose floor
+     * may be built on (see {@link TermiteMoundBlock#canStartAt}), and pieces (ramps, spire pieces, mouths) whose footing
+     * is there. A wall at the foot of the mound over a dip is filled in from the ground up. Blocks being built come first
+     * (they are finished before new ones are started), then the lowest. Worked out once a tick.
      */
     public List<BlockPos> getBuildSpots(Level level) {
         if (!isActive()) {
@@ -224,10 +380,11 @@ public class Mound {
         Set<BlockPos> nestCells = colony.nest().nestCells(level);
         List<BlockPos> found = new ArrayList<>();
         for (Map.Entry<BlockPos, MoundPlan.Part> entry : getParts(level).entrySet()) {
-            if (entry.getValue() != MoundPlan.Part.WALL || !level.isLoaded(entry.getKey())) {
+            if (!level.isLoaded(entry.getKey())) {
                 continue;
             }
-            BlockPos spot = spotIn(level, entry.getKey(), nestCells);
+            BlockPos spot = isSoil(entry.getValue()) ? spotIn(level, entry.getKey(), nestCells)
+                    : isPiece(entry.getValue()) && isPieceSpot(level, entry.getKey(), entry.getValue()) ? entry.getKey() : null;
             if (spot != null) {
                 found.add(spot);
             }
@@ -275,23 +432,47 @@ public class Mound {
         return null;
     }
 
-    /** Whether a layer of soil can go here now. */
+    /**
+     * Whether a piece can go here now: the cell is empty, and what it stands on is there (a ramp: soil that has set or a
+     * tunnel block; a spire piece or a mouth: anything solid that is not wet soil, usually the piece under it).
+     */
+    private boolean isPieceSpot(Level level, BlockPos pos, MoundPlan.Part part) {
+        BlockState here = level.getBlockState(pos);
+        return here.canBeReplaced() && here.getFluidState().isEmpty() && hasPieceSupport(level, pos, part);
+    }
+
+    /** Whether a pellet of soil can go here now. */
     public boolean isBuildSpot(Level level, BlockPos pos) {
         return getBuildSpots(level).contains(pos);
     }
 
+    /** Whether this spot is a piece of the plan (a ramp, a spire piece, a mouth) rather than soil. */
+    public boolean isPieceJob(Level level, BlockPos pos) {
+        MoundPlan.Part part = getParts(level).get(pos);
+        return part != null && isPiece(part);
+    }
+
     /**
-     * Whether termites can work on this spot now: always while they may go out, but while they stay in (by day, see
-     * {@link Colony#isForagingTime}) only from inside: one of the cells round it is inside the nest or the mound.
+     * Whether termites may bite windows in their tunnels now to build outside (the user's rule: at night or after rain,
+     * {@link Colony#isForagingTime}; always for a species that keeps no schedule).
+     */
+    public boolean mayOpenWindows(Level level) {
+        return !colony.keepsASchedule() || colony.isForagingTime(level);
+    }
+
+    /**
+     * Whether termites can work on this spot now: always while they may open windows (at night, in the rain), but by
+     * day only from the shaft or the nest with no window: one of the cells round it is inside and no channel.
      */
     public boolean isWorkableNow(Level level, BlockPos spot) {
-        if (!colony.keepsASchedule() || colony.isForagingTime(level)) {
+        if (mayOpenWindows(level)) {
             return true;
         }
         for (int dx = -1; dx <= 1; dx++) {
             for (int dy = -1; dy <= 1; dy++) {
                 for (int dz = -1; dz <= 1; dz++) {
-                    if ((dx != 0 || dy != 0 || dz != 0) && colony.nest().isInside(level, spot.offset(dx, dy, dz))) {
+                    BlockPos cell = spot.offset(dx, dy, dz);
+                    if ((dx != 0 || dy != 0 || dz != 0) && MoundReach.isHollowInside(level, colony, cell)) {
                         return true;
                     }
                 }
@@ -309,9 +490,10 @@ public class Mound {
     public BlockPos pickBuildSpot(Level level, AbstractAntEntity ant) {
         long now = level.getGameTime();
         buildClaims.values().removeIf(claim -> claim.until <= now);
+        unreachable.values().removeIf(until -> until <= now);
         BlockPos best = null;
         for (BlockPos spot : getBuildSpots(level)) {
-            if (isClaimedByOther(buildClaims, spot, ant.getUUID()) || !isWorkableNow(level, spot)) {
+            if (isClaimedByOther(buildClaims, spot, ant.getUUID()) || !isWorkableNow(level, spot) || unreachable.containsKey(spot)) {
                 continue;
             }
             if (best == null) {
@@ -346,6 +528,20 @@ public class Mound {
         buildClaims.remove(ant);
     }
 
+    /** A termite found no way to this spot from inside: it is left alone for a while (another may carve the way to it). */
+    public void markUnreachable(Level level, BlockPos spot) {
+        unreachable.put(spot.immutable(), level.getGameTime() + UNREACHABLE_TICKS);
+    }
+
+    /**
+     * Whether the termites may fall back on building from outside or from 2 blocks away now: only once nothing has been
+     * built for a while (see {@link #FALLBACK_AFTER_TICKS}).
+     */
+    public boolean mayUseFallbacks(Level level) {
+        getStage(level);
+        return level.getGameTime() - lastProgress >= FALLBACK_AFTER_TICKS;
+    }
+
     /**
      * Adds a layer of soil at {@code spot}. Termites in the way are lifted onto the new layer (or stepped aside); a
      * player or another creature in the cell stops it (false, try again later). False too if the spot is no longer one.
@@ -360,9 +556,16 @@ public class Mound {
                 return false;
             }
         }
-        if (!ModBlocks.TERMITE_MOUND.get().addLayer(level, spot)) {
+        if (isPieceJob(level, spot)) {
+            // A piece: the plan's ramp, spire piece or mouth, fresh (it dries with age like the rest).
+            BlockState piece = blockFor(cachedShape, spot.subtract(center)).setValue(MoundSoil.AGE, 0);
+            if (!level.setBlockAndUpdate(spot, Block.updateFromNeighbourShapes(piece, level, spot))) {
+                return false;
+            }
+        } else if (!ModBlocks.TERMITE_MOUND.get().addLayer(level, spot)) {
             return false;
         }
+        progressed(level);
         spotsTick = Long.MIN_VALUE;
         BlockState now = level.getBlockState(spot);
         double top = spot.getY() + now.getCollisionShape(level, spot).max(Direction.Axis.Y);
@@ -500,8 +703,11 @@ public class Mound {
     }
 
     /** The block is dug out: forget how many pellets it gave. */
-    public void blockDug(BlockPos dug) {
+    public void blockDug(Level level, BlockPos dug) {
         pelletsTaken.remove(dug);
+        if (getParts(level).containsKey(dug)) {
+            progressed(level);
+        }
     }
 
     /** Any block of a termite mound: soil, the old chimney crown, a spire piece, a chimney mouth or a ramp. */
@@ -510,73 +716,127 @@ public class Mound {
         return block instanceof TermiteMoundBlock || block instanceof TermiteHoleBlock || block instanceof MoundPieceBlock;
     }
 
-    // ---- chimney mouths ----
+    // ---- shaping: tunnels, reshaped and cleared pieces ----
 
     /**
-     * A chimney mouth (at the tip of a spire) that can be shaped now, claimed for this termite, or null. It is shaped
-     * once the walls beside it are finished and the spire it stands on is there. (Termites do not shape the spire
-     * pieces yet, so on a mound they build the mouths wait; the instant command puts them up.)
+     * Shaping work of the plan to do now, claimed for this termite, or null (lowest first): a tunnel to carve (finished
+     * soil where the plan has a tunnel, or a tunnel block that does not open yet into the shaft beside it), a piece to
+     * reshape into the plan's one, or a piece to clear away where soil goes. No soil is needed for any of it. Carving is
+     * inside work, so it goes on by day too; the rest only while it can be done now ({@link #isWorkableNow}).
      */
     @Nullable
-    public BlockPos pickHoleJob(Level level, AbstractAntEntity ant) {
+    public BlockPos pickShapeJob(Level level, AbstractAntEntity ant) {
         if (!isActive()) {
             return null;
         }
         long now = level.getGameTime();
-        holeClaims.values().removeIf(claim -> claim.until <= now);
+        carveClaims.values().removeIf(claim -> claim.until <= now);
+        BlockPos best = null;
         for (Map.Entry<BlockPos, MoundPlan.Part> entry : getParts(level).entrySet()) {
             BlockPos pos = entry.getKey();
-            if (entry.getValue() == MoundPlan.Part.MOUTH && !isClaimedByOther(holeClaims, pos, ant.getUUID()) && isHoleJob(level, pos)) {
-                holeClaims.put(ant.getUUID(), new Claim(pos, now + CLAIM_TICKS));
-                return pos;
+            if ((best != null && pos.getY() >= best.getY()) || !level.isLoaded(pos) || isClaimedByOther(carveClaims, pos, ant.getUUID())) {
+                continue;
+            }
+            MoundGrowth.Job job = shapeJobAt(level, pos);
+            if (job != null && (job == MoundGrowth.Job.CARVE || isWorkableNow(level, pos)) && (job != MoundGrowth.Job.RESHAPE || hasPieceSupport(level, pos, entry.getValue()))) {
+                best = pos;
             }
         }
-        return null;
+        if (best != null) {
+            carveClaims.put(ant.getUUID(), new Claim(best, now + CLAIM_TICKS));
+        }
+        return best;
     }
 
-    public void releaseHoleJob(UUID ant) {
-        holeClaims.remove(ant);
+    public void releaseShapeJob(UUID ant) {
+        carveClaims.remove(ant);
     }
 
-    /** Whether a chimney mouth can be shaped here now. */
-    public boolean isHoleJob(Level level, BlockPos pos) {
-        Map<BlockPos, MoundPlan.Part> parts = getParts(level);
-        if (parts.get(pos) != MoundPlan.Part.MOUTH || !level.isLoaded(pos)) {
+    /** The shaping job in a cell now (carving, reshaping, clearing a piece), or null. */
+    @Nullable
+    public MoundGrowth.Job shapeJobAt(Level level, BlockPos pos) {
+        MoundPlan.Part part = getParts(level).get(pos);
+        if (part == null || part == MoundPlan.Part.OPEN) {
+            return null; // the shaft is dug out by the diggers (it gives soil)
+        }
+        MoundGrowth.Job job = jobAt(level, pos, part);
+        return job == MoundGrowth.Job.CARVE || job == MoundGrowth.Job.RESHAPE || job == MoundGrowth.Job.CLEAR ? job : null;
+    }
+
+    /** Whether there is a tunnel to carve here now (or a tunnel's door into the shaft to open). */
+    public boolean isCarveJob(Level level, BlockPos pos) {
+        if (getParts(level).get(pos) != MoundPlan.Part.TUNNEL || !level.isLoaded(pos)) {
             return false;
         }
         BlockState state = level.getBlockState(pos);
-        if (state.getBlock() instanceof TermiteMouthBlock || !(state.canBeReplaced() || state.getBlock() instanceof TermiteMoundBlock)) {
-            return false;
+        if (state.getBlock() instanceof TermiteMoundBlock) {
+            return TermiteMoundBlock.isFinished(state);
         }
-        BlockPos under = pos.below();
-        if (parts.get(under) != MoundPlan.Part.OPEN && level.getBlockState(under).canBeReplaced()) {
-            return false; // nothing to stand on yet
-        }
-        for (Direction side : Direction.Plane.HORIZONTAL) {
-            BlockPos beside = pos.relative(side);
-            if (parts.get(beside) == MoundPlan.Part.WALL && !isWallDone(level, beside)) {
-                return false;
+        if (state.getBlock() instanceof TermiteTunnelBlock) {
+            for (Direction side : doorsOf(level, pos)) {
+                if (!state.getValue(TermiteTunnelBlock.OPEN.get(side))) {
+                    return true;
+                }
             }
         }
-        for (BlockPos below = pos.below(); parts.get(below) == MoundPlan.Part.OPEN; below = below.below()) {
-            if (isClearJob(level, below)) {
-                return false;
-            }
-        }
-        return true;
+        return false;
     }
 
-    /** Shapes the chimney mouth. False if it cannot be done now (not a job any more, or a creature other than a termite is in the way). */
-    public boolean shapeHole(Level level, BlockPos pos) {
-        if (!isHoleJob(level, pos)) {
-            return false;
-        }
-        for (LivingEntity living : level.getEntitiesOfClass(LivingEntity.class, new AABB(pos))) {
-            if (!(living instanceof AbstractAntEntity)) {
-                return false;
+    /** The sides of a tunnel cell that open into the shaft: toward a cell the plan keeps open that is empty now. */
+    private List<Direction> doorsOf(Level level, BlockPos pos) {
+        List<Direction> doors = new ArrayList<>();
+        Map<BlockPos, MoundPlan.Part> parts = getParts(level);
+        for (Direction side : Direction.values()) {
+            BlockPos beside = pos.relative(side);
+            if (parts.get(beside) == MoundPlan.Part.OPEN && level.getBlockState(beside).getCollisionShape(level, beside).isEmpty()) {
+                doors.add(side);
             }
         }
-        return level.setBlockAndUpdate(pos, Block.updateFromNeighbourShapes(ModBlocks.TERMITE_MOUTH.get().defaultBlockState(), level, pos));
+        return doors;
+    }
+
+    /** Whether a piece has what it stands on here (see {@link #isPieceSpot}, without the cell having to be empty). */
+    private boolean hasPieceSupport(Level level, BlockPos pos, MoundPlan.Part part) {
+        BlockPos below = pos.below();
+        BlockState under = level.getBlockState(below);
+        if (part == MoundPlan.Part.RAMP) {
+            return TermiteMoundBlock.canBuildOn(under, level, below);
+        }
+        return !under.getCollisionShape(level, below).isEmpty() && !(under.getBlock() instanceof TermiteMoundBlock && !TermiteMoundBlock.isFinished(under));
+    }
+
+    /**
+     * Does the shaping job here: carves the tunnel (a tunnel block of the soil's age, joined to the channels round it
+     * and open into the shaft beside it, and toward {@code from} where the termite works from if that is the shaft),
+     * reshapes the piece into the plan's one (keeping its age), or clears the piece away. False if there is no such job
+     * any more.
+     */
+    public boolean shape(Level level, BlockPos pos, @Nullable BlockPos from) {
+        MoundGrowth.Job job = shapeJobAt(level, pos);
+        if (job == null) {
+            return false;
+        }
+        BlockState was = level.getBlockState(pos);
+        int age = was.hasProperty(MoundSoil.AGE) ? was.getValue(MoundSoil.AGE) : 0;
+        boolean done;
+        if (job == MoundGrowth.Job.CARVE) {
+            List<Direction> open = doorsOf(level, pos);
+            Direction toward = from == null ? null : MoundGrowth.sideToward(pos, from);
+            if (toward != null && !open.contains(toward) && MoundReach.isHollowInside(level, colony, from)) {
+                open.add(toward); // carved from the nest (or the shaft): it opens toward where the termite came from
+            }
+            done = level.setBlockAndUpdate(pos, ModBlocks.TERMITE_TUNNEL.get().stateFor(level, pos, age, open));
+        } else if (job == MoundGrowth.Job.RESHAPE) {
+            BlockState piece = blockFor(cachedShape, pos.subtract(center)).setValue(MoundSoil.AGE, age);
+            done = level.setBlockAndUpdate(pos, Block.updateFromNeighbourShapes(piece, level, pos));
+        } else {
+            done = level.destroyBlock(pos, false);
+        }
+        if (done) {
+            spotsTick = Long.MIN_VALUE;
+            progressed(level);
+        }
+        return done;
     }
 
     // ---- for testing ----
@@ -592,7 +852,7 @@ public class Mound {
         if (numbers == null) {
             return;
         }
-        setStage(level, h);
+        setWorkStage(level, h);
         cachedStage = 0;
         Map<BlockPos, MoundPlan.Part> parts = getParts(level);
         MoundPlan.Shape shape = cachedShape;
@@ -605,6 +865,7 @@ public class Mound {
             }
         }
         List<BlockPos> mouths = new ArrayList<>();
+        List<BlockPos> tunnels = new ArrayList<>();
         for (Map.Entry<BlockPos, MoundPlan.Part> entry : parts.entrySet()) {
             BlockPos pos = entry.getKey();
             BlockState state = level.getBlockState(pos);
@@ -616,15 +877,25 @@ public class Mound {
             if (entry.getValue() == MoundPlan.Part.MOUTH) {
                 mouths.add(pos);
             }
-            if (entry.getValue() == MoundPlan.Part.WALL && offset.getY() == 0) {
+            if (entry.getValue() == MoundPlan.Part.TUNNEL) {
+                tunnels.add(pos);
+            }
+            if (isSoil(entry.getValue()) && offset.getY() == 0) {
                 for (int i = 1; i <= MAX_FOOTING && level.getBlockState(pos.below(i)).canBeReplaced(); i++) {
                     level.setBlock(pos.below(i), soil(3), 2);
                 }
             }
         }
-        // A mouth is slim on a lone spire and a full block beside soil (all the soil round it is there now).
+        // A mouth is slim on a lone spire and a full block beside soil (all the soil round it is there now); every tunnel
+        // joins up with the channels round it and opens into the shaft beside it.
         for (BlockPos pos : mouths) {
             level.setBlock(pos, Block.updateFromNeighbourShapes(level.getBlockState(pos), level, pos), 2);
+        }
+        for (BlockPos pos : tunnels) {
+            BlockState state = level.getBlockState(pos);
+            if (state.getBlock() instanceof TermiteTunnelBlock tunnel) {
+                level.setBlock(pos, tunnel.stateFor(level, pos, state.getValue(MoundSoil.AGE), doorsOf(level, pos)), 2);
+            }
         }
         spotsTick = Long.MIN_VALUE;
     }
@@ -635,18 +906,20 @@ public class Mound {
             return false;
         }
         BlockPos foot = new BlockPos(pos.getX(), center.getY(), pos.getZ());
-        return parts.get(foot) == MoundPlan.Part.WALL;
+        MoundPlan.Part part = parts.get(foot);
+        return part != null && isSoil(part);
     }
 
     /**
-     * The block a cell of a planned mound gets when the mound is put up at once: soil, a spire piece, a chimney mouth
-     * or a ramp of the age the plan gives it, or air in the shaft. ({@code offset}: the cell's offset from the entrance.)
-     * A mouth is put slim; the blocks beside it set it right once they are there.
+     * The block a cell of a planned mound gets when the mound is put up at once: soil, a tunnel block, a spire piece, a
+     * chimney mouth or a ramp of the age the plan gives it, or air in the shaft. ({@code offset}: the cell's offset from
+     * the entrance.) A mouth is put slim and a tunnel closed; the blocks beside them set them right once they are there.
      */
     public static BlockState blockFor(MoundPlan.Shape shape, BlockPos offset) {
         int age = shape.age().getOrDefault(offset, 0);
         return switch (shape.parts().get(offset)) {
             case WALL -> soil(age);
+            case TUNNEL -> ModBlocks.TERMITE_TUNNEL.get().defaultBlockState().setValue(MoundSoil.AGE, age);
             case OPEN -> Blocks.AIR.defaultBlockState();
             case MOUTH -> ModBlocks.TERMITE_MOUTH.get().defaultBlockState().setValue(MoundSoil.AGE, age);
             case SPIRE -> ModBlocks.TERMITE_SPIRE.get().defaultBlockState().setValue(MoundSoil.AGE, age)
@@ -666,10 +939,12 @@ public class Mound {
     void save(CompoundTag tag) {
         tag.putDouble("moundAllowance", allowance);
         tag.putLong("moundUpdated", updatedAt);
+        tag.putInt("moundWorkStage", workStage);
     }
 
     void load(CompoundTag tag) {
         allowance = tag.getDouble("moundAllowance");
         updatedAt = tag.contains("moundUpdated") ? tag.getLong("moundUpdated") : Colony.NOT_SET;
+        workStage = tag.getInt("moundWorkStage"); // 0 in an old save: climbs up from the first stage
     }
 }

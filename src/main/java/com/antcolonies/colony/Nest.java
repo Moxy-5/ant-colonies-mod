@@ -489,7 +489,8 @@ public class Nest {
 
     /**
      * Whether a cell is inside the colony's home, out of the sun: the entrance, the nest's shaft, rooms, galleries and
-     * foraging tunnels, and the hollow shaft and chimney mouths of the mound. Not the foraging holes
+     * foraging tunnels, and the hollow shaft, the tunnels, the hollow spire pieces and chimney mouths of the mound (a
+     * termite in their channels is inside). Not the foraging holes
      * themselves (the way out) and not the open air round the mound.
      */
     public boolean isInside(Level level, BlockPos cell) {
@@ -498,7 +499,7 @@ public class Nest {
             Set<BlockPos> cells = nestCells(level);
             cells.add(center);
             colony.mound().getParts(level).forEach((pos, part) -> {
-                if (part == MoundPlan.Part.OPEN || part == MoundPlan.Part.MOUTH) {
+                if (part == MoundPlan.Part.OPEN || part == MoundPlan.Part.MOUTH || part == MoundPlan.Part.TUNNEL || part == MoundPlan.Part.SPIRE) {
                     cells.add(pos);
                 }
             });

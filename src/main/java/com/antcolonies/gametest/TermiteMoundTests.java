@@ -331,6 +331,7 @@ public class TermiteMoundTests {
             BlockState state = level.getBlockState(entry.getKey());
             boolean ok = switch (entry.getValue()) {
                 case WALL -> state.getBlock() instanceof TermiteMoundBlock && TermiteMoundBlock.isFinished(state);
+                case TUNNEL -> state.getBlock() instanceof com.antcolonies.block.TermiteTunnelBlock;
                 case OPEN -> state.isAir();
                 case MOUTH, SPIRE, RAMP -> true;
             };
