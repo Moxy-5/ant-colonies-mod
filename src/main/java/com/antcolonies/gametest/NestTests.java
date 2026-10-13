@@ -429,8 +429,10 @@ public class NestTests {
     /**
      * Seeds lying on the ground around a finished nest (two single ones and a pile of three) are fetched one by one:
      * every one ends up on the floor of the food store, the colony counts them, and nothing is left outside.
+     * It runs in a batch of its own: its foragers fetch seeds from up to 24 blocks away, so seeds or grass in a
+     * neighbouring test's arena were brought in too (it once counted 7 or 8 seeds instead of 5).
      */
-    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true, batch = "seeds_alone")
     public static void workersCarrySeedsToTheFoodStore(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);

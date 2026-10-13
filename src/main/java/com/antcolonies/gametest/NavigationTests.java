@@ -747,7 +747,7 @@ public class NavigationTests {
         watch(helper, ant, true);
     }
 
-    private static void watch(GameTestHelper helper, AbstractAntEntity ant, boolean verbose) {
+    static void watch(GameTestHelper helper, AbstractAntEntity ant, boolean verbose) {
         Vec3 origin = Vec3.atLowerCornerOf(helper.absolutePos(BlockPos.ZERO));
         int[] floating = {0};
         int[] leaning = {0};
@@ -759,23 +759,32 @@ public class NavigationTests {
             boolean moved = lastPos[0] != null && ant.position().distanceTo(lastPos[0]) >= 0.01;
             lastPos[0] = ant.position();
             boolean hovers = ant.getNavigator().isClimbing() && !ant.getNavigator().isDone() && !moved
+                    && !ant.getNavigator().isWalkingADoorway() // holding still in a chimney mouth's tube, looking out
                     && helper.getLevel().noCollision(ant, ant.getBoundingBox().move(0.0, -0.05, 0.0))
                     && helper.getLevel().noCollision(ant, ant.getBoundingBox().move(0.0, 0.05, 0.0)); // a ceiling holds it too
             hovering[0] = hovers ? hovering[0] + 1 : 0;
             helper.assertTrue(hovering[0] <= MAX_HOVER_TICKS, "the ant hangs in the air without climbing at "
-                    + ant.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO)).toShortString());
+                    + ant.position().subtract(Vec3.atLowerCornerOf(helper.absolutePos(BlockPos.ZERO))) + ", on " + ant.getNavigator().getFoothold()
+                    + ", step " + ant.getNavigator().getNextWaypoint() + " of route " + ant.getNavigator().getPlannedRoute());
         });
         helper.onEachTick(() -> {
             // An ant standing on the floor away from any wall must walk, not lean against the wall: that looks like hovering.
             boolean leansOnTheFloor = ant.getNavigator().isClimbing() && ant.onGround() && !ant.horizontalCollision;
             leaning[0] = leansOnTheFloor ? leaning[0] + 1 : 0;
-            helper.assertTrue(leaning[0] <= MAX_LEANING_TICKS, "the ant leans against a wall it has not reached");
+            helper.assertTrue(leaning[0] <= MAX_LEANING_TICKS, "the ant leans against a wall it has not reached, at "
+                    + ant.position().subtract(Vec3.atLowerCornerOf(helper.absolutePos(BlockPos.ZERO))) + ", on " + ant.getNavigator().getFoothold()
+                    + ", route " + ant.getNavigator().getPlannedRoute());
         });
         helper.onEachTick(() -> {
-            boolean hanging = ant.getNavigator().isClimbing()
-                    && helper.getLevel().noCollision(ant, ant.getBoundingBox().inflate(0.08));
+            // Holding nothing: no block's shape (as it is drawn) near the body. The drawn shape, not the collision: a
+            // termite climbs the outside of a chimney mouth it could also pass through. Not while it goes in or out by a
+            // chimney mouth's tube: that motion is exact, and the tube sticks up out of the block.
+            boolean hanging = ant.getNavigator().isClimbing() && !ant.getNavigator().isWalkingADoorway()
+                    && !touchesABlock(helper, ant.getBoundingBox().inflate(0.08));
             floating[0] = hanging ? floating[0] + 1 : 0;
-            helper.assertTrue(floating[0] <= MAX_FLOATING_TICKS, "the ant is floating while climbing");
+            helper.assertTrue(floating[0] <= MAX_FLOATING_TICKS, "the ant is floating while climbing, at "
+                    + ant.position().subtract(Vec3.atLowerCornerOf(helper.absolutePos(BlockPos.ZERO))) + ", on " + ant.getNavigator().getFoothold()
+                    + ", route " + ant.getNavigator().getPlannedRoute());
         });
         helper.onEachTick(() -> {
             if (verbose && helper.getTick() % 4 == 0 && helper.getTick() >= 8) {
@@ -790,6 +799,19 @@ public class NavigationTests {
                         ant.getNavigator().isDone(), ant.getNavigator().hasFailed());
             }
         });
+    }
+
+    /** Whether any block's shape (as it is drawn, not its collision for someone) reaches into the box. */
+    static boolean touchesABlock(GameTestHelper helper, net.minecraft.world.phys.AABB box) {
+        net.minecraft.server.level.ServerLevel level = helper.getLevel();
+        for (BlockPos pos : BlockPos.betweenClosed(BlockPos.containing(box.minX, box.minY, box.minZ), BlockPos.containing(box.maxX, box.maxY, box.maxZ))) {
+            for (net.minecraft.world.phys.AABB part : level.getBlockState(pos).getShape(level, pos).toAabbs()) {
+                if (part.move(pos).intersects(box)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static String r(double value) {

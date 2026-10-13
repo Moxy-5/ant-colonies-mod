@@ -21,6 +21,13 @@ final class TestAnts {
         return ant;
     }
 
+    /** A termite worker with no mind of its own and no colony, for a test to walk around by hand (see {@link #loneAnt}). */
+    static com.antcolonies.entity.TermiteWorkerEntity loneTermite(GameTestHelper helper, int x, int y, int z) {
+        com.antcolonies.entity.TermiteWorkerEntity termite = helper.spawnWithNoFreeWill(ModEntities.TERMITE_WORKER.get(), x, y, z);
+        termite.keepOutOfColonies();
+        return termite;
+    }
+
     /** The same at an exact spot (not the middle of a block). */
     static WorkerAntEntity loneAnt(GameTestHelper helper, float x, float y, float z) {
         WorkerAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), x, y, z);

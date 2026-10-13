@@ -34,12 +34,18 @@ public record Foothold(BlockPos cell, Direction surface) {
         return surface == Direction.UP;
     }
 
-    /** Whether an insect can hold on here: the cell is open and the block on that side has a solid face toward it. */
+    /**
+     * Whether an insect can hold on here: the cell is open and the block on that side has a solid face toward it. A
+     * slope's cell has a floor too (its surface), if there is room over it; nothing else in it can be held.
+     */
     public boolean isValid(CellMap map) {
         return isValid(map, cell, surface);
     }
 
     static boolean isValid(CellMap map, BlockPos cell, Direction surface) {
+        if (surface == Direction.DOWN && map.isSlope(cell)) {
+            return map.isOpen(cell.above());
+        }
         return map.isOpen(cell) && map.isSolidFace(cell.relative(surface), surface.getOpposite());
     }
 

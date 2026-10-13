@@ -76,6 +76,14 @@ public class TermiteWorkerEntity extends AbstractAntEntity {
         return true;
     }
 
+    /**
+     * This worker joins no colony (a termite a test walks around by hand): otherwise it would join the nearest termite
+     * colony on its first tick, which may be another test's colony nearby.
+     */
+    public void keepOutOfColonies() {
+        colonyChecked = true;
+    }
+
     /** A worker that grew up from a nymph of this colony belongs to it from the start (and is counted). */
     public void joinColony(Colony colony) {
         setColonyId(colony.getId());

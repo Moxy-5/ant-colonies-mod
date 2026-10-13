@@ -21,7 +21,8 @@ import net.minecraft.core.Direction;
  * Tests the route planner on a pretend nest: flat ground (surface cells at y = 64, ground blocks at
  * y = 63 and below), a 3-deep shaft at x = 0, z = 0, a tunnel going east from its bottom and a
  * 5x5 room at the end of the tunnel. Everything is a full solid block or open air, except blocks in
- * {@link #noSides}, whose sides are not solid (nothing to climb on them, like a fence).
+ * {@link #noSides}, whose sides are not solid (nothing to climb on them, like a fence), and the straight ramps in
+ * {@link #ramps}, rising toward their direction (slopes, as the termite mound's ramp block).
  */
 class AntPathFinderTest {
     private static final BlockPos CENTER = new BlockPos(0, 64, 0);
@@ -29,15 +30,33 @@ class AntPathFinderTest {
 
     private final Set<BlockPos> solid = new HashSet<>();
     private final Set<BlockPos> noSides = new HashSet<>();
+    private final java.util.Map<BlockPos, Direction> ramps = new java.util.HashMap<>();
     private final CellMap map = new CellMap() {
         @Override
         public boolean isOpen(BlockPos pos) {
-            return !solid.contains(pos);
+            return !solid.contains(pos) && !ramps.containsKey(pos);
         }
 
         @Override
         public boolean isSolidFace(BlockPos pos, Direction face) {
+            if (ramps.containsKey(pos)) {
+                return face == Direction.DOWN || face == ramps.get(pos); // the bottom and the full high side
+            }
             return solid.contains(pos) && (face.getAxis().isVertical() || !noSides.contains(pos));
+        }
+
+        @Override
+        public int slopeHeight(BlockPos cell, int u, int w) {
+            Direction high = ramps.get(cell);
+            if (high == null) {
+                return -1;
+            }
+            return 2 * switch (high) {
+                case EAST -> u + 1;
+                case WEST -> 8 - u;
+                case SOUTH -> w + 1;
+                default -> 8 - w;
+            };
         }
     };
 
@@ -265,5 +284,84 @@ class AntPathFinderTest {
         assertEquals(StepKind.START, route.step(0).kind());
         assertEquals(route.size(), route.steps().size());
         assertTrue(route.cost() > 0);
+    }
+
+    // --- Slopes (ramps) ---
+
+    /** A row of ground at z = 5: a step {@code height} blocks tall at x = 6, and a ramp in front of it at x = 5 rising east. */
+    private void stepWithARamp(int height) {
+        for (int y = 0; y < height; y++) {
+            solid.add(new BlockPos(6, 64 + y, 5));
+        }
+        ramps.put(new BlockPos(5, 64, 5), Direction.EAST);
+    }
+
+    private static boolean onlyWalks(Route route) {
+        return route.steps().stream().allMatch(step -> step.kind() == StepKind.START || step.kind() == StepKind.WALK);
+    }
+
+    @Test
+    void upARampOntoAStepAndBackDownWithoutClimbing() {
+        stepWithARamp(1);
+        Route up = route(new BlockPos(2, 64, 5), new BlockPos(6, 65, 5));
+        assertNotNull(up, "no way up the ramp");
+        assertLegal(up);
+        assertTrue(onlyWalks(up), "up a ramp is walking: " + up);
+        assertTrue(up.cells().contains(new BlockPos(5, 64, 5)), "it does not use the ramp: " + up);
+        Route down = route(new BlockPos(6, 65, 5), new BlockPos(2, 64, 5));
+        assertNotNull(down, "no way down the ramp");
+        assertLegal(down);
+        assertTrue(onlyWalks(down), "down a ramp is walking: " + down);
+    }
+
+    @Test
+    void aRampIsNotWalkedOntoFromItsSteepSide() {
+        stepWithARamp(1);
+        List<Route.Step> moves = new ArrayList<>();
+        AntPathFinder.neighbours(map, Foothold.floor(new BlockPos(5, 64, 6)), (to, kind, cost) -> moves.add(new Route.Step(to, kind)));
+        assertFalse(moves.contains(new Route.Step(Foothold.floor(new BlockPos(5, 64, 5)), StepKind.WALK)),
+                "a ramp's side rises a whole block: it is no step to walk onto");
+        moves.clear();
+        AntPathFinder.neighbours(map, Foothold.floor(new BlockPos(4, 64, 5)), (to, kind, cost) -> moves.add(new Route.Step(to, kind)));
+        assertTrue(moves.contains(new Route.Step(Foothold.floor(new BlockPos(5, 64, 5)), StepKind.WALK)), "a ramp's low side is walked onto");
+    }
+
+    @Test
+    void fromARampOntoTheWallAboveItsHighSideAndBack() {
+        stepWithARamp(2);
+        Route up = route(new BlockPos(2, 64, 5), new BlockPos(6, 66, 5));
+        assertNotNull(up, "no way up past the ramp");
+        assertLegal(up);
+        assertTrue(up.steps().contains(new Route.Step(new Foothold(new BlockPos(5, 65, 5), Direction.EAST), StepKind.ONTO_WALL)),
+                "it does not step from the ramp onto the wall above it: " + up);
+        assertFalse(up.hasFall());
+        Route down = route(new BlockPos(6, 66, 5), new BlockPos(2, 64, 5));
+        assertNotNull(down, "no way down onto the ramp");
+        assertLegal(down);
+        assertTrue(down.steps().contains(new Route.Step(Foothold.floor(new BlockPos(5, 64, 5)), StepKind.OFF_WALL)),
+                "it does not step off the wall onto the ramp: " + down);
+        assertFalse(down.hasFall(), "it must climb down onto the ramp, not drop: " + down);
+    }
+
+    @Test
+    void overAWallOntoARampsLowSideButNeverItsHighSide() {
+        solid.add(new BlockPos(5, 64, 5));
+        BlockPos onTop = new BlockPos(5, 65, 5);
+        Foothold wall = new Foothold(new BlockPos(4, 64, 5), Direction.EAST);
+        Route.Step over = new Route.Step(Foothold.floor(onTop), StepKind.OVER_TOP);
+        ramps.put(onTop, Direction.EAST); // low side toward the climber
+        List<Route.Step> moves = new ArrayList<>();
+        AntPathFinder.neighbours(map, wall, (to, kind, cost) -> moves.add(new Route.Step(to, kind)));
+        assertTrue(moves.contains(over), "it does not climb over onto the ramp's low side");
+        ramps.put(onTop, Direction.WEST); // its steep high side toward the climber
+        moves.clear();
+        AntPathFinder.neighbours(map, wall, (to, kind, cost) -> moves.add(new Route.Step(to, kind)));
+        assertFalse(moves.contains(over), "it climbs over onto the ramp's steep high side");
+    }
+
+    @Test
+    void somethingDroppedOnARampLandsOnIt() {
+        stepWithARamp(1);
+        assertEquals(Foothold.floor(new BlockPos(5, 64, 5)), AntPathFinder.landing(map, new BlockPos(5, 67, 5)));
     }
 }

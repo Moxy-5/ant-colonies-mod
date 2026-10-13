@@ -15,6 +15,7 @@ import com.antcolonies.nav.AntPathFinder;
 import com.antcolonies.nav.Doorway;
 import com.antcolonies.species.SpeciesProfile;
 import com.antcolonies.nav.Foothold;
+import com.antcolonies.nav.Slope;
 import com.antcolonies.registry.ModItems;
 
 import net.minecraft.core.BlockPos;
@@ -67,6 +68,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.FLOAT);
     /** How fast the drawn body turns (degrees per tick) onto a new surface, round a corner or to a new heading. */
     private static final float BODY_TURN_SPEED = 30.0F;
+    /** How fast (degrees a tick) the drawn body tilts to the slope it walks on. */
+    private static final float SLOPE_TILT_SPEED = 9.0F;
     /**
      * What the body is doing besides holding its surface, for the client: bit 0 = looking round with its head out of a
      * doorway's mouth (plays the "peek" animation), bit 1 = tipping over to its new surface slowly (over a mouth's rim).
@@ -112,6 +115,11 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     private boolean wallPose;
     private float bodyTilt;
     private float bodyTiltO;
+    /** Client: how the drawn body tilts on a slope (a ramp): head up (pitch) and right side up (roll), in degrees. */
+    private float slopePitch;
+    private float slopePitchO;
+    private float slopeRoll;
+    private float slopeRollO;
     private float wallYaw;
     private float wallYawO;
     private float bodyHeading;
@@ -323,7 +331,68 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             entityData.set(DATA_POSE_FLAGS, (byte) ((navigator.isPeeking() ? PEEKING : 0) | (navigator.isTurningSlowly() ? TURNING_SLOWLY : 0)));
         } else {
             turnBody();
+            tiltOnSlope();
         }
+    }
+
+    /**
+     * Client: tilts the drawn body toward the slope it stands on (a ramp, {@link Slope}): head up walking uphill, head
+     * down walking down, leaning sideways across it; flat anywhere else. The slope is read from the ramp's own surface
+     * under the body's middle, so corners tilt the right way too.
+     */
+    private void tiltOnSlope() {
+        slopePitchO = slopePitch;
+        slopeRollO = slopeRoll;
+        float pitch = 0.0F;
+        float roll = 0.0F;
+        double[] rise = wallPose || getSurface() != Direction.DOWN ? null : slopeUnder();
+        if (rise != null) {
+            double yaw = Math.toRadians(yBodyRot);
+            double forwardX = -Math.sin(yaw);
+            double forwardZ = Math.cos(yaw);
+            pitch = (float) Math.toDegrees(Math.atan(rise[0] * forwardX + rise[1] * forwardZ));
+            roll = (float) Math.toDegrees(Math.atan(-rise[0] * forwardZ + rise[1] * forwardX));
+        }
+        slopePitch = approach(slopePitch, pitch, SLOPE_TILT_SPEED);
+        slopeRoll = approach(slopeRoll, roll, SLOPE_TILT_SPEED);
+    }
+
+    /**
+     * How steeply the slope under the body's middle rises toward east and toward south (height per distance), or null
+     * if it stands on no slope.
+     */
+    @Nullable
+    private double[] slopeUnder() {
+        BlockPos pos = blockPosition();
+        BlockState state = level().getBlockState(pos);
+        if (!(state.getBlock() instanceof Slope) && getY() - pos.getY() < 0.1) {
+            pos = pos.below();
+            state = level().getBlockState(pos);
+        }
+        if (!(state.getBlock() instanceof Slope slope)) {
+            return null;
+        }
+        int last = Slope.COLUMNS - 1;
+        int u = Mth.clamp(Mth.floor((getX() - pos.getX()) * Slope.COLUMNS), 0, last);
+        int w = Mth.clamp(Mth.floor((getZ() - pos.getZ()) * Slope.COLUMNS), 0, last);
+        int u0 = Math.max(0, u - 1);
+        int u1 = Math.min(last, u + 1);
+        int w0 = Math.max(0, w - 1);
+        int w1 = Math.min(last, w + 1);
+        double columnPixels = (double) Slope.PIXELS / Slope.COLUMNS;
+        double east = (slope.surfaceHeight(state, u1, w) - slope.surfaceHeight(state, u0, w)) / ((u1 - u0) * columnPixels);
+        double south = (slope.surfaceHeight(state, u, w1) - slope.surfaceHeight(state, u, w0)) / ((w1 - w0) * columnPixels);
+        return new double[] {east, south};
+    }
+
+    /** Client: how far the drawn body tilts head up on a slope (degrees; negative = head down). */
+    public float getSlopePitch(float partialTick) {
+        return Mth.lerp(partialTick, slopePitchO, slopePitch);
+    }
+
+    /** Client: how far the drawn body leans right side up on a slope (degrees). */
+    public float getSlopeRoll(float partialTick) {
+        return Mth.lerp(partialTick, slopeRollO, slopeRoll);
     }
 
     /** The surface the body is on: {@link Direction#DOWN} = a floor, {@link Direction#UP} = a ceiling, a horizontal direction = the wall on that side. */

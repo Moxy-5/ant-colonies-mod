@@ -37,6 +37,12 @@ import net.minecraft.core.Direction;
  * face and its underside (an overhang)</li>
  * <li>{@link StepKind#FALL} (3 + the height): let go and drop, only where nothing can be climbed down (or off a ceiling)</li>
  * </ul>
+ * A slope ({@link Slope}, a ramp) is a floor in its own cell: an insect walks onto it, along it and off it wherever the
+ * two surfaces meet without a step of more than half a block anywhere along the edge between them (up its high side
+ * onto the block beside it, down onto it from there, across onto a ramp beside it, off its low side). Where a wall
+ * goes on up from its high side the insect steps onto the wall and back ({@link StepKind#ONTO_WALL},
+ * {@link StepKind#OFF_WALL}); it climbs over a wall onto a slope's low side, and goes over a slope's low side down the
+ * block under it, but never over a slope's high side (the ramp's own steep face is there).
  * Turning over onto a ceiling costs a little extra, so a route never flips upside down for a tiny shortcut (like
  * curling from the tunnel ceiling up into the shaft instead of walking the last block).
  * A mind can add its own costs to any step ({@link StepCosts}: later scent trails, avoiding enemies, raids). Nothing
@@ -49,6 +55,18 @@ public final class AntPathFinder {
     public static final int DEFAULT_MAX_EXPANSIONS = 6000;
     /** The deepest drop a route may take (where nothing can be climbed down). */
     public static final int MAX_FALL = 12;
+    /** The tallest step (in pixels) a walk may take between two floors: half a block. */
+    public static final int MAX_STEP_PIXELS = 8;
+    /** A slope's side this low (pixels, at its highest) is an edge to climb over or go over like a floor's edge. */
+    public static final int LOW_EDGE_PIXELS = 4;
+    /** A slope's side this high (pixels, at its lowest) meets a wall going on up from it. */
+    public static final int HIGH_EDGE_PIXELS = 14;
+    /**
+     * Extra cost of a move along a wall (sideways, round a corner or an edge) that ends where there is a floor to stand
+     * on: there the insect steps off the wall and walks, instead of leaning on the wall while standing (an insect told
+     * to hold a wall low down, beside a spire, starts its next walk there).
+     */
+    private static final double FOOT_OF_WALL = 2.0;
 
     private AntPathFinder() {
     }
@@ -139,7 +157,7 @@ public final class AntPathFinder {
     @Nullable
     public static Route find(CellMap map, List<Foothold> starts, BlockPos goal, int maxExpansions, StepCosts costs) {
         final BlockPos target = goal.immutable();
-        if (!map.isOpen(target)) {
+        if (!map.isOpen(target) && !map.isSlope(target)) {
             return null;
         }
         boolean hasFloor = Foothold.isValid(map, target, Direction.DOWN);
@@ -225,6 +243,9 @@ public final class AntPathFinder {
     public static Foothold landing(CellMap map, BlockPos cell) {
         BlockPos at = cell;
         for (int i = 0; i <= MAX_FALL; i++) {
+            if (map.isSlope(at)) {
+                return Foothold.isValid(map, at, Direction.DOWN) ? Foothold.floor(at) : null;
+            }
             if (!map.isOpen(at)) {
                 return null;
             }
@@ -240,18 +261,41 @@ public final class AntPathFinder {
     public static void neighbours(CellMap map, Foothold from, MoveSink out) {
         BlockPos c = from.cell();
         if (from.isFloor()) {
+            boolean onSlope = map.isSlope(c);
             for (Direction d : Direction.Plane.HORIZONTAL) {
                 // The wall at the side of this cell: step up onto it.
                 if (Foothold.isValid(map, c, d)) {
                     out.add(new Foothold(c, d), StepKind.ONTO_WALL, 0.5);
                 }
+                // At the high side of a slope a wall goes on up from it: step onto it.
+                if (onSlope && edgeLowest(map, c, d) >= HIGH_EDGE_PIXELS && Foothold.isValid(map, c.above(), d)) {
+                    out.add(new Foothold(c.above(), d), StepKind.ONTO_WALL, 0.5);
+                }
                 BlockPos n = c.relative(d);
+                if (map.isSlope(n)) {
+                    if (Foothold.isValid(map, n, Direction.DOWN) && edgesMeet(map, c, d, n)) {
+                        out.add(Foothold.floor(n), StepKind.WALK, 1.0);
+                    }
+                    continue;
+                }
                 if (!map.isOpen(n)) {
+                    // Up the high side of a slope onto the block beside it (or onto a slope on that block).
+                    BlockPos up = n.above();
+                    if (onSlope && Foothold.isValid(map, up, Direction.DOWN) && edgesMeet(map, c, d, up)) {
+                        out.add(Foothold.floor(up), StepKind.WALK, 1.0);
+                    }
                     continue;
                 }
                 if (Foothold.isValid(map, n, Direction.DOWN)) {
-                    out.add(Foothold.floor(n), StepKind.WALK, 1.0);
-                } else if (map.isOpen(n.below())) {
+                    if (edgesMeet(map, c, d, n)) {
+                        out.add(Foothold.floor(n), StepKind.WALK, 1.0);
+                    }
+                } else if (map.isSlope(n.below())) {
+                    // Down onto the high side of a slope.
+                    if (Foothold.isValid(map, n.below(), Direction.DOWN) && edgesMeet(map, c, d, n.below())) {
+                        out.add(Foothold.floor(n.below()), StepKind.WALK, 1.0);
+                    }
+                } else if (map.isOpen(n.below()) && (!onSlope || edgeHighest(map, c, d) <= LOW_EDGE_PIXELS)) {
                     // A drop: over the edge and down the side of the block it stands on, head first.
                     if (Foothold.isValid(map, n.below(), d.getOpposite())) {
                         out.add(new Foothold(n.below(), d.getOpposite()), StepKind.OVER_EDGE, 1.5);
@@ -279,24 +323,30 @@ public final class AntPathFinder {
             out.add(Foothold.floor(c), StepKind.OFF_WALL, 0.5);
             climbs = true;
         }
+        // At the foot of the wall a slope rises to it: step off onto its high side.
+        if (map.isSlope(c.below()) && Foothold.isValid(map, c.below(), Direction.DOWN) && edgeLowest(map, c.below(), w) >= HIGH_EDGE_PIXELS) {
+            out.add(Foothold.floor(c.below()), StepKind.OFF_WALL, 0.5);
+            climbs = true;
+        }
         for (Direction side : new Direction[] {w.getClockWise(), w.getCounterClockWise()}) {
             if (Foothold.isValid(map, c, side)) {
-                out.add(new Foothold(c, side), StepKind.TURN_CORNER, 0.6);
+                out.add(new Foothold(c, side), StepKind.TURN_CORNER, 0.6 + footOfWall(map, c));
             }
             BlockPos n = c.relative(side);
             if (!map.isOpen(n)) {
                 continue;
             }
             if (Foothold.isValid(map, n, w)) {
-                out.add(new Foothold(n, w), StepKind.CRAWL_SIDEWAYS, 1.2);
+                out.add(new Foothold(n, w), StepKind.CRAWL_SIDEWAYS, 1.2 + footOfWall(map, n));
             } else if (Foothold.isValid(map, n.relative(w), side.getOpposite())) {
                 // The wall ends beside the insect: round the block's vertical edge onto its side face.
-                out.add(new Foothold(n.relative(w), side.getOpposite()), StepKind.ROUND_EDGE, 1.2);
+                out.add(new Foothold(n.relative(w), side.getOpposite()), StepKind.ROUND_EDGE, 1.2 + footOfWall(map, n.relative(w)));
             }
         }
         // Over the top of the wall onto the block.
         BlockPos top = c.relative(w).above();
-        if (map.isOpen(c.above()) && Foothold.isValid(map, top, Direction.DOWN)) {
+        if (map.isOpen(c.above()) && Foothold.isValid(map, top, Direction.DOWN)
+                && (!map.isSlope(top) || edgeHighest(map, top, w.getOpposite()) <= LOW_EDGE_PIXELS)) {
             out.add(Foothold.floor(top), StepKind.OVER_TOP, 1.5);
         }
         // Up into the corner and onto the ceiling.
@@ -333,6 +383,66 @@ public final class AntPathFinder {
             }
         }
         addFall(map, c, out);
+    }
+
+    /**
+     * The height (in pixels from y = 0) of a floor cell's surface along its edge on {@code side}, at each of the 8
+     * columns along it (in the order of the world axis along the edge): a plain floor is flat at the bottom of the cell,
+     * a slope rises as its surface does.
+     */
+    public static int[] floorEdge(CellMap map, BlockPos cell, Direction side) {
+        int[] edge = new int[Slope.COLUMNS];
+        int base = cell.getY() * Slope.PIXELS;
+        boolean slope = map.isSlope(cell);
+        int last = Slope.COLUMNS - 1;
+        for (int i = 0; i < Slope.COLUMNS; i++) {
+            int height = 0;
+            if (slope) {
+                int u = side == Direction.EAST ? last : side == Direction.WEST ? 0 : i;
+                int w = side == Direction.SOUTH ? last : side == Direction.NORTH ? 0 : i;
+                height = map.slopeHeight(cell, u, w);
+            }
+            edge[i] = base + height;
+        }
+        return edge;
+    }
+
+    /** Whether the floors of two cells side by side meet without a step of more than half a block anywhere along the edge. */
+    static boolean edgesMeet(CellMap map, BlockPos from, Direction side, BlockPos to) {
+        if (!map.isSlope(from) && !map.isSlope(to)) {
+            return from.getY() == to.getY();
+        }
+        int[] a = floorEdge(map, from, side);
+        int[] b = floorEdge(map, to, side.getOpposite());
+        for (int i = 0; i < a.length; i++) {
+            if (Math.abs(a[i] - b[i]) > MAX_STEP_PIXELS) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** The lowest point (pixels above the cell's bottom) of a slope's surface along its edge on {@code side}. */
+    public static int edgeLowest(CellMap map, BlockPos cell, Direction side) {
+        int lowest = Integer.MAX_VALUE;
+        for (int h : floorEdge(map, cell, side)) {
+            lowest = Math.min(lowest, h - cell.getY() * Slope.PIXELS);
+        }
+        return lowest;
+    }
+
+    /** The highest point (pixels above the cell's bottom) of a slope's surface along its edge on {@code side}. */
+    public static int edgeHighest(CellMap map, BlockPos cell, Direction side) {
+        int highest = 0;
+        for (int h : floorEdge(map, cell, side)) {
+            highest = Math.max(highest, h - cell.getY() * Slope.PIXELS);
+        }
+        return highest;
+    }
+
+    /** {@link #FOOT_OF_WALL} where a move along a wall ends in a cell with a floor, else nothing. */
+    private static double footOfWall(CellMap map, BlockPos cell) {
+        return Foothold.isValid(map, cell, Direction.DOWN) ? FOOT_OF_WALL : 0.0;
     }
 
     private static void addFall(CellMap map, BlockPos from, MoveSink out) {

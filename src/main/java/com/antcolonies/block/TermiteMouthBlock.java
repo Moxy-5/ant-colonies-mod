@@ -2,6 +2,7 @@ package com.antcolonies.block;
 
 import org.jetbrains.annotations.Nullable;
 
+import com.antcolonies.nav.ClimbShape;
 import com.antcolonies.nav.Doorway;
 import com.antcolonies.registry.ModTags;
 
@@ -29,7 +30,7 @@ import net.minecraft.world.phys.shapes.VoxelShape;
  * mound) or, standing alone on a spire, a piece narrowing from 10 to 6 pixels that continues the spire up to the tube
  * ({@link #SLIM}, chosen by its neighbours).
  */
-public class TermiteMouthBlock extends MoundPieceBlock implements Doorway {
+public class TermiteMouthBlock extends MoundPieceBlock implements Doorway, ClimbShape {
     /** True when no solid block stands beside it: the lower part narrows like a spire piece instead of filling the block. */
     public static final BooleanProperty SLIM = BooleanProperty.create("slim");
     /** The rim of the tube: 28 pixels above the block's bottom. */
@@ -60,6 +61,21 @@ public class TermiteMouthBlock extends MoundPieceBlock implements Doorway {
             return Shapes.empty();
         }
         return shape(state);
+    }
+
+    /** Insects climb the outside of its lower part (a slim one narrows like a spire piece). */
+    @Override
+    public boolean isClimbable(BlockState state) {
+        return true;
+    }
+
+    @Override
+    public double widthAt(BlockState state, double y) {
+        if (!state.getValue(SLIM)) {
+            return 1.0;
+        }
+        int layer = Math.max(0, Math.min(LAYERS - 1, (int) Math.floor(y * LAYERS)));
+        return taper(10, 6, layer, LAYERS) / 16.0;
     }
 
     @Override

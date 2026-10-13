@@ -612,18 +612,7 @@ public class Mound {
                 continue;
             }
             BlockPos offset = pos.subtract(center);
-            int age = shape.age().getOrDefault(offset, 0);
-            BlockState placed = switch (entry.getValue()) {
-                case WALL -> soil(age);
-                case OPEN -> Blocks.AIR.defaultBlockState();
-                case MOUTH -> ModBlocks.TERMITE_MOUTH.get().defaultBlockState().setValue(MoundSoil.AGE, age);
-                case SPIRE -> ModBlocks.TERMITE_SPIRE.get().defaultBlockState().setValue(MoundSoil.AGE, age)
-                        .setValue(TermiteSpireBlock.THICKNESS, shape.thickness().get(offset));
-                case RAMP -> ModBlocks.TERMITE_RAMP.get().defaultBlockState().setValue(MoundSoil.AGE, age)
-                        .setValue(TermiteRampBlock.FACING, shape.facing().get(offset))
-                        .setValue(TermiteRampBlock.SHAPE, shape.corner().get(offset));
-            };
-            level.setBlock(pos, placed, 2);
+            level.setBlock(pos, blockFor(shape, offset), 2);
             if (entry.getValue() == MoundPlan.Part.MOUTH) {
                 mouths.add(pos);
             }
@@ -647,6 +636,25 @@ public class Mound {
         }
         BlockPos foot = new BlockPos(pos.getX(), center.getY(), pos.getZ());
         return parts.get(foot) == MoundPlan.Part.WALL;
+    }
+
+    /**
+     * The block a cell of a planned mound gets when the mound is put up at once: soil, a spire piece, a chimney mouth
+     * or a ramp of the age the plan gives it, or air in the shaft. ({@code offset}: the cell's offset from the entrance.)
+     * A mouth is put slim; the blocks beside it set it right once they are there.
+     */
+    public static BlockState blockFor(MoundPlan.Shape shape, BlockPos offset) {
+        int age = shape.age().getOrDefault(offset, 0);
+        return switch (shape.parts().get(offset)) {
+            case WALL -> soil(age);
+            case OPEN -> Blocks.AIR.defaultBlockState();
+            case MOUTH -> ModBlocks.TERMITE_MOUTH.get().defaultBlockState().setValue(MoundSoil.AGE, age);
+            case SPIRE -> ModBlocks.TERMITE_SPIRE.get().defaultBlockState().setValue(MoundSoil.AGE, age)
+                    .setValue(TermiteSpireBlock.THICKNESS, shape.thickness().get(offset));
+            case RAMP -> ModBlocks.TERMITE_RAMP.get().defaultBlockState().setValue(MoundSoil.AGE, age)
+                    .setValue(TermiteRampBlock.FACING, shape.facing().get(offset))
+                    .setValue(TermiteRampBlock.SHAPE, shape.corner().get(offset));
+        };
     }
 
     /** Finished mound soil of an age (0 fresh to 3 old). */

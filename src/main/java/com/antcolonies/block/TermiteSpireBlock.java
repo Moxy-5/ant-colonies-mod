@@ -2,6 +2,8 @@ package com.antcolonies.block;
 
 import org.jetbrains.annotations.Nullable;
 
+import com.antcolonies.nav.ClimbShape;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.block.Block;
@@ -16,7 +18,7 @@ import net.minecraft.world.phys.shapes.VoxelShape;
  * (12 to 10), middle (10 to 8), thin (8 to 6) and the tip (6 to a point, 12 pixels tall). Placed by hand on a spire
  * piece it becomes the next thinner one, so placing 5 in a column makes a whole spire top.
  */
-public class TermiteSpireBlock extends MoundPieceBlock {
+public class TermiteSpireBlock extends MoundPieceBlock implements ClimbShape {
     public static final int BASE = 0;
     public static final int TIP = 4;
     public static final IntegerProperty THICKNESS = IntegerProperty.create("thickness", BASE, TIP);
@@ -44,6 +46,19 @@ public class TermiteSpireBlock extends MoundPieceBlock {
     @Override
     protected VoxelShape shape(BlockState state) {
         return SHAPES[state.getValue(THICKNESS)];
+    }
+
+    /** Insects climb every piece but the needle tip (a termite clinging to a point would look wrong). */
+    @Override
+    public boolean isClimbable(BlockState state) {
+        return state.getValue(THICKNESS) < TIP;
+    }
+
+    @Override
+    public double widthAt(BlockState state, double y) {
+        int t = state.getValue(THICKNESS);
+        int layer = Math.max(0, Math.min(LAYERS - 1, (int) Math.floor(y * LAYERS)));
+        return taper(WIDTHS[t][0], WIDTHS[t][1], layer, LAYERS) / 16.0;
     }
 
     /** Width (pixels) of the piece's top: what the next piece up should start from. */

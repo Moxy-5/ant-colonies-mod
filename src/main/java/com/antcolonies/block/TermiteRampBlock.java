@@ -6,6 +6,8 @@ import java.util.function.Function;
 
 import org.jetbrains.annotations.Nullable;
 
+import com.antcolonies.nav.Slope;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.item.context.BlockPlaceContext;
@@ -27,9 +29,9 @@ import net.minecraft.world.phys.shapes.VoxelShape;
  * A ramp of termite mound soil (cathedral mound): it hides the stair steps of the mound's sides, rising in 8 small
  * 2-pixel steps from the low side to a full block at the high side ({@link #FACING}). Like stairs, ramps placed side by
  * side join into outer and inner corners on their own ({@link #SHAPE}; left and right as for stairs). A player walks up
- * one like a slope.
+ * one like a slope, and so do insects ({@link Slope}: the legs walk on its surface).
  */
-public class TermiteRampBlock extends MoundPieceBlock {
+public class TermiteRampBlock extends MoundPieceBlock implements Slope {
     /** The high side of the ramp. */
     public static final DirectionProperty FACING = HorizontalDirectionalBlock.FACING;
     public static final EnumProperty<StairsShape> SHAPE = BlockStateProperties.STAIRS_SHAPE;
@@ -76,6 +78,11 @@ public class TermiteRampBlock extends MoundPieceBlock {
         int toSide = rise(left ? facing.getCounterClockWise() : facing.getClockWise(), u, w);
         boolean outer = shape == StairsShape.OUTER_LEFT || shape == StairsShape.OUTER_RIGHT;
         return outer ? Math.min(toFacing, toSide) : Math.max(toFacing, toSide);
+    }
+
+    @Override
+    public int surfaceHeight(BlockState state, int u, int w) {
+        return height(state.getValue(FACING), state.getValue(SHAPE), u, w) * LAYER_PIXELS;
     }
 
     /** Layers of column (u, w) for a straight ramp rising toward {@code side}. */
