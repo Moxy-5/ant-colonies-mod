@@ -143,13 +143,31 @@ public class Colony {
     /**
      * Whether it is time to forage (the profile's {@code food.forage_at}: termites at night and in the rain, harvester
      * ants at any time). Outside this time the foragers stay home, the foraging holes are plugged, and a species that
-     * keeps to a schedule does no work outside the nest and the mound at all (it stays in, out of the sun).
+     * keeps to a schedule does no work outside the nest and the mound at all (it stays in, out of the sun). The end of the
+     * night already counts as day ({@link #isBeforeDawn}): they head in before the sun is up.
      */
     public boolean isForagingTime(net.minecraft.world.level.Level level) {
         if (foragingTimeForTests != null) {
             return foragingTimeForTests;
         }
-        return profile().food().foragesNow(level.isDay(), level.isRaining());
+        return profile().food().foragesNow(level.isDay() || isBeforeDawn(level), level.isRaining());
+    }
+
+    /**
+     * The time of day (ticks, 0 to 24000) from which the night counts as over: the last in-game hour or so before the sun
+     * comes up (it rises at about 23000; my pick). The user's idea, like real termites: they head in before dawn, so the
+     * holes and windows are plugged and everybody is inside when the sun is up.
+     */
+    public static final long HEAD_IN_FROM = 22000;
+
+    /** Whether it is the end of the night, when a species out at night heads in (see {@link #HEAD_IN_FROM}). */
+    public static boolean isBeforeDawn(net.minecraft.world.level.Level level) {
+        return !level.dimensionType().hasFixedTime() && isBeforeDawn(level.getDayTime());
+    }
+
+    /** Whether this time of day ({@link net.minecraft.world.level.Level#getDayTime}) is the end of the night. */
+    public static boolean isBeforeDawn(long dayTime) {
+        return dayTime % 24000 >= HEAD_IN_FROM;
     }
 
     /** Whether this colony's species goes out at some times only (so it stays inside the rest of the time). */

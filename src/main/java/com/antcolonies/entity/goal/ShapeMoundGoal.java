@@ -25,8 +25,8 @@ import net.minecraft.world.level.block.state.BlockState;
  * A termite shapes its mound where the plan says (see {@link com.antcolonies.colony.Mound#pickShapeJob}): it carves a
  * tunnel into finished soil from a channel or the shaft right beside it (so the new tunnel joins up at once, and opens
  * into the shaft beside it), reshapes a piece into the one the plan has there now (a thicker spire piece, a ramp facing
- * another way, a mouth that is now a spire piece), or clears a piece away where soil goes. It works for a moment and it
- * is done; no soil is needed. Carving is inside work (by day too); the rest from inside by the rules of
+ * another way, a mouth that is now a spire piece), or fills a piece up into the soil or tunnel block the plan has where
+ * it stands. It works for a moment and it is done; no soil is needed. Carving is inside work (by day too); the rest from inside by the rules of
  * {@link MoundReach} (through a window at night, or from the shaft). Builders do it, and anyone with nothing else to do.
  */
 public class ShapeMoundGoal extends Goal {

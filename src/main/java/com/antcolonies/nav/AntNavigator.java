@@ -864,7 +864,9 @@ public class AntNavigator {
      */
     private boolean outOfMouth(BlockPos mouth, Foothold to) {
         exact = true;
-        Doorway door = (Doorway) ant.level().getBlockState(mouth).getBlock();
+        if (!(ant.level().getBlockState(mouth).getBlock() instanceof Doorway door)) {
+            return true; // no mouth any more: the next tick's check plans again
+        }
         BlockPos beside = to.isFloor() ? to.cell().below() : to.cell();
         Direction e = toward(mouth, beside);
         List<DoorwayMotion.Key> keys = DoorwayMotion.comeOut(door.mouthHeight(), door.mouthRadius(), half(), OVER_THE_TOP);
@@ -890,7 +892,9 @@ public class AntNavigator {
      */
     private boolean intoMouth(Foothold from, BlockPos mouth) {
         exact = true;
-        Doorway door = (Doorway) ant.level().getBlockState(mouth).getBlock();
+        if (!(ant.level().getBlockState(mouth).getBlock() instanceof Doorway door)) {
+            return true; // no mouth any more: the next tick's check plans again
+        }
         BlockPos beside = from.isFloor() ? from.cell().below() : from.cell();
         Direction e = toward(mouth, beside);
         List<DoorwayMotion.Key> keys = new ArrayList<>(DoorwayMotion.goIn(door.mouthHeight(), door.mouthRadius(), half(), OVER_THE_TOP));

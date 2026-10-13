@@ -562,8 +562,9 @@ public final class AntPathFinder {
 
     /**
      * Whether a move along a route can still be made in the world as it is now: the footholds it goes from and to are
-     * there, the cells it passes through are open, and between two channels both still open toward each other (a
-     * window closed, a block put in the way). Null if it can, else what changed.
+     * there, the cells it passes through are open, between two channels both still open toward each other (a window
+     * closed, a block put in the way), and a chimney mouth it goes in or out by is still a mouth. Null if it can, else
+     * what changed.
      */
     @Nullable
     public static String whatChanged(CellMap map, @Nullable Foothold from, Foothold to, StepKind kind) {
@@ -578,6 +579,13 @@ public final class AntPathFinder {
         }
         if (passesThrough(from, to, kind).stream().anyMatch(cell -> !map.isOpen(cell))) {
             return "blocked on the way from " + from + " to " + to;
+        }
+        // A mouth reshaped into a spire piece while an insect was going in or coming out of it (the mound growing).
+        if (kind == StepKind.OUT_OF_MOUTH && !map.isMouth(from.cell())) {
+            return "no mouth any more at " + from;
+        }
+        if (kind == StepKind.INTO_MOUTH && !map.isMouth(to.cell())) {
+            return "no mouth any more at " + to;
         }
         if (kind == StepKind.CRAWL_CHANNEL) {
             Direction d = Direction.getNearest(to.cell().getX() - from.cell().getX(), to.cell().getY() - from.cell().getY(),

@@ -5,6 +5,8 @@ import java.util.TreeMap;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.block.TermiteMoundBlock;
+import com.antcolonies.block.TermiteMouthBlock;
+import com.antcolonies.block.TermiteSpireBlock;
 import com.antcolonies.block.TermiteTunnelBlock;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.MoundGrowth;
@@ -135,6 +137,167 @@ public class TermiteCathedralTests {
             Map<String, Integer> left = jobsLeft(level, colony);
             helper.assertTrue(left.isEmpty(), "stage " + YOUNG + " is not finished: " + left);
             helper.assertTrue(openWindows(level, colony) == 0, openWindows(level, colony) + " windows are still open to the outside");
+        });
+    }
+
+    /**
+     * The user's report: a mound put up to stage 13, the colony earns stage 14, and the termites all got stuck at the top
+     * trying to put the bottom piece of a spire in place. A real colony (8 workers) on a stage 13 mound put up at once
+     * must finish stage 14 by itself.
+     */
+    @GameTest(template = "arena", timeoutTicks = 120000, skyAccess = true, batch = "cathedral14")
+    public static void termitesGrowStageThirteenIntoFourteen(GameTestHelper helper) {
+        helper.getLevel().getServer().tickRateManager().setTickRate(2000.0F);
+        TermiteMoundTests.deepGround(helper);
+        helper.spawn(ModEntities.TERMITE_QUEEN.get(), TermiteMoundTests.MIDDLE, TermiteMoundTests.SURFACE, TermiteMoundTests.MIDDLE);
+        helper.runAfterDelay(5, () -> {
+            helper.spawn(ModEntities.TERMITE_KING.get(), TermiteMoundTests.MIDDLE + 2, TermiteMoundTests.SURFACE, TermiteMoundTests.MIDDLE + 1);
+            for (int i = 0; i < 8; i++) {
+                helper.spawn(ModEntities.TERMITE_WORKER.get(), TermiteMoundTests.MIDDLE - 3 + i % 4, TermiteMoundTests.SURFACE,
+                        TermiteMoundTests.MIDDLE - 3 + i / 4);
+            }
+        });
+        int[] lastStage = {0};
+        boolean[] built = {false};
+        helper.onEachTick(() -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            if (colony == null || colony.isFounding()) {
+                return;
+            }
+            ServerLevel level = helper.getLevel();
+            boolean night = (helper.getTick() / 6000) % 2 == 0; // night and day take turns, as in the user's world
+            colony.setForagingTimeForTests(night);
+            if (!built[0]) {
+                if (colony.nest().isEntrancePlugged(level)) {
+                    return;
+                }
+                colony.mound().setSeedForTests(-1005795587942992884L); // the user's mound
+                colony.mound().buildInstantly(level, 13);
+                colony.mound().setStage(level, 14);
+                built[0] = true;
+                AntColoniesMod.LOGGER.info("[cathedral-test] tick {}: stage 13 put up, 14 earned", helper.getTick());
+            }
+            for (var entry : colony.mound().getParts(level).entrySet()) {
+                BlockState state = level.getBlockState(entry.getKey());
+                if (state.getBlock() instanceof TermiteMoundBlock && TermiteMoundBlock.isFinished(state) && state.getValue(TermiteMoundBlock.AGE) == 0) {
+                    level.setBlockAndUpdate(entry.getKey(), state.setValue(TermiteMoundBlock.AGE, 1));
+                }
+            }
+            // The spire moves up a block: its pieces are reshaped where they stand, so none is ever left hanging in the air.
+            for (BlockPos pos : colony.mound().getParts(level).keySet()) {
+                BlockState state = level.getBlockState(pos);
+                if ((state.getBlock() instanceof TermiteSpireBlock || state.getBlock() instanceof TermiteMouthBlock)
+                        && level.getBlockState(pos.below()).getCollisionShape(level, pos.below()).isEmpty()) {
+                    helper.fail("a spire piece hangs in the air at " + pos.subtract(colony.getCenter()) + " (" + state + ")");
+                }
+            }
+            int stage = colony.mound().getStage(level);
+            if (stage != lastStage[0] || helper.getTick() % 2000 == 0) {
+                AntColoniesMod.LOGGER.info("[cathedral-test] tick {} ({}): building stage {}, left {}, windows open {}", helper.getTick(),
+                        night ? "night" : "day", stage, jobsLeft(level, colony), openWindows(level, colony));
+                lastStage[0] = stage;
+                if (helper.getTick() % 6000 == 5000) {
+                    describe(helper, level, colony);
+                }
+            }
+        });
+        helper.succeedWhen(() -> {
+            ServerLevel level = helper.getLevel();
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(built[0], "stage 13 not put up yet");
+            int stage = colony.mound().getStage(level);
+            helper.assertTrue(stage == 14, "still building stage " + stage + " (left " + jobsLeft(level, colony) + ")");
+            Map<String, Integer> left = jobsLeft(level, colony);
+            helper.assertTrue(left.isEmpty(), "stage 14 is not finished: " + left);
+            helper.assertTrue(openWindows(level, colony) == 0, openWindows(level, colony) + " windows are still open to the outside");
+        });
+    }
+
+    /** Puts the user's own half-built stage 14 mound (dumped from their save) round the colony's entrance. */
+    private static void putUpTheUsersMound(ServerLevel level, Colony colony) {
+        try (var in = TermiteCathedralTests.class.getResourceAsStream("/data/antcolonies/gametest_user_mound_14.txt")) {
+            for (String line : new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).split("\\R")) {
+                if (line.isBlank()) {
+                    continue;
+                }
+                String[] f = line.trim().split(" ", 4);
+                BlockPos pos = colony.getCenter().offset(Integer.parseInt(f[0]), Integer.parseInt(f[1]), Integer.parseInt(f[2]));
+                BlockState state = net.minecraft.commands.arguments.blocks.BlockStateParser
+                        .parseForBlock(net.minecraft.core.registries.BuiltInRegistries.BLOCK.asLookup(), f[3], false).blockState();
+                level.setBlock(pos, state, 2);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("could not put up the user's mound", e);
+        }
+    }
+
+    /**
+     * The user's report, with their own mound (stage 14 half built, dumped from their save, same shape seed): the
+     * termites all stood at the top where the bottom of the main spire goes and nothing more was built. Night and day
+     * take turns and wet soil sets at its own pace, as in their world. The termites must finish stage 14.
+     */
+    @GameTest(template = "arena", timeoutTicks = 240000, skyAccess = true, batch = "usermound")
+    public static void termitesFinishTheUsersHalfBuiltStageFourteen(GameTestHelper helper) {
+        helper.getLevel().getServer().tickRateManager().setTickRate(4000.0F);
+        TermiteMoundTests.deepGround(helper);
+        helper.spawn(ModEntities.TERMITE_QUEEN.get(), TermiteMoundTests.MIDDLE, TermiteMoundTests.SURFACE, TermiteMoundTests.MIDDLE);
+        helper.runAfterDelay(5, () -> {
+            helper.spawn(ModEntities.TERMITE_KING.get(), TermiteMoundTests.MIDDLE + 2, TermiteMoundTests.SURFACE, TermiteMoundTests.MIDDLE + 1);
+            for (int i = 0; i < 12; i++) {
+                helper.spawn(ModEntities.TERMITE_WORKER.get(), TermiteMoundTests.MIDDLE - 3 + i % 4, TermiteMoundTests.SURFACE,
+                        TermiteMoundTests.MIDDLE - 3 + i / 4);
+            }
+        });
+        int[] lastLeft = {-1};
+        boolean[] built = {false};
+        helper.onEachTick(() -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            if (colony == null || colony.isFounding()) {
+                return;
+            }
+            ServerLevel level = helper.getLevel();
+            boolean night = (helper.getTick() / 12000) % 2 == 0;
+            colony.setForagingTimeForTests(night);
+            if (!built[0]) {
+                if (colony.nest().isEntrancePlugged(level)) {
+                    return;
+                }
+                colony.mound().setSeedForTests(-1005795587942992884L);
+                colony.mound().setWorkStage(level, 14);
+                putUpTheUsersMound(level, colony);
+                built[0] = true;
+                AntColoniesMod.LOGGER.info("[user-mound-test] tick {}: the user's mound put up", helper.getTick());
+            }
+            // The test world has no random ticks: wet soil sets here at about the game's pace (a finished block in about 20
+            // minutes at normal speed, see TermiteMoundBlock).
+            for (BlockPos pos : colony.mound().getParts(level).keySet()) {
+                BlockState state = level.getBlockState(pos);
+                if (state.hasProperty(com.antcolonies.block.MoundSoil.AGE) && state.getValue(com.antcolonies.block.MoundSoil.AGE) == 0
+                        && (!(state.getBlock() instanceof TermiteMoundBlock) || TermiteMoundBlock.isFinished(state))
+                        && level.getRandom().nextInt(24000) == 0) {
+                    level.setBlockAndUpdate(pos, state.setValue(com.antcolonies.block.MoundSoil.AGE, 1));
+                }
+            }
+            if (helper.getTick() % 3000 == 0) {
+                long outside = level.getEntitiesOfClass(com.antcolonies.entity.TermiteWorkerEntity.class, helper.getBounds().inflate(8)).stream()
+                        .filter(w -> !colony.nest().isInside(level, w.blockPosition())).count();
+                AntColoniesMod.LOGGER.info("[user-mound-test]   workers outside: {}", outside);
+                Map<String, Integer> left = jobsLeft(level, colony);
+                int total = left.values().stream().mapToInt(Integer::intValue).sum();
+                AntColoniesMod.LOGGER.info("[user-mound-test] tick {} ({}): building stage {}, left {}, windows open {}", helper.getTick(),
+                        night ? "night" : "day", colony.mound().getStage(level), left, openWindows(level, colony));
+                if (helper.getTick() % 12000 == 9000) {
+                    describe(helper, level, colony);
+                }
+                lastLeft[0] = total;
+            }
+        });
+        helper.succeedWhen(() -> {
+            ServerLevel level = helper.getLevel();
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(built[0], "the user's mound is not put up yet");
+            Map<String, Integer> left = jobsLeft(level, colony);
+            helper.assertTrue(left.isEmpty(), "stage 14 is not finished: " + left);
         });
     }
 }

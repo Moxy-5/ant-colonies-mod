@@ -22,6 +22,11 @@ import net.minecraft.world.phys.AABB;
  * {@link NestPlan#foragingTunnels}). The workers dig the tunnels like the rest of the nest; the holes are opened when it
  * is time to forage ({@link Colony#isForagingTime}) and plugged with soil from inside when it is over, once everybody is
  * back in (or after a while: a straggler finds another way in, such as a chimney).
+ *
+ * <p>The middle hole: while a young mound is too low to be roofed over, the entrance in its middle (the top of the
+ * nest's shaft) is open to the sky. A colony that keeps to a schedule plugs it by day like the foraging holes (the
+ * user's request: real mounds are closed) and opens it again at night ({@link Nest#mayOpenEntrance}). Once the mound
+ * covers it, it stays open: it is then only the way up into the mound's own shaft.
  */
 public class ForagingHoles {
     /** After the foraging time is over the holes are plugged at the latest this long after (ticks), even with workers still outside. */
@@ -57,6 +62,32 @@ public class ForagingHoles {
             }
         }
         return false;
+    }
+
+    /**
+     * The middle hole as a hole to plug from the top of the shaft under it, or null when it needs no plugging: a species
+     * that keeps no schedule or builds no mound, a colony still founding (the founders seal it themselves), the shaft
+     * not dug, or the mound already covers it.
+     */
+    @Nullable
+    NestPlan.ForagingTunnel middleHole(Level level) {
+        BlockPos entrance = colony.nest().getEntrance();
+        if (!colony.keepsASchedule() || !colony.mound().isActive() || !level.isLoaded(entrance)
+                || !Nest.isDugOut(level, entrance.below()) || colony.nest().isEntranceCovered(level)) {
+            return null;
+        }
+        return new NestPlan.ForagingTunnel(List.of(entrance.below()), entrance, Direction.UP);
+    }
+
+    /** The foraging holes, and the middle hole while it needs plugging by day. */
+    private List<NestPlan.ForagingTunnel> holesToPlug(Level level) {
+        NestPlan.ForagingTunnel middle = middleHole(level);
+        if (middle == null) {
+            return tunnels(level);
+        }
+        List<NestPlan.ForagingTunnel> all = new java.util.ArrayList<>(tunnels(level));
+        all.add(middle);
+        return all;
     }
 
     /** Whether the whole tunnel is dug out, so its hole leads somewhere. */
@@ -148,7 +179,7 @@ public class ForagingHoles {
         long now = level.getGameTime();
         plugClaims.prune(now);
         plugging.keySet().removeIf(id -> !plugClaims.contains(id));
-        for (NestPlan.ForagingTunnel tunnel : tunnels(level)) {
+        for (NestPlan.ForagingTunnel tunnel : holesToPlug(level)) {
             if (!isDug(level, tunnel) || !isOpen(level, tunnel.hole())) {
                 continue;
             }

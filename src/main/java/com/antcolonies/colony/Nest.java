@@ -116,6 +116,8 @@ public class Nest {
     private Layout foragingTunnelsFor;
     /** The cells that count as inside (see {@link #isInside}), worked out at most once a tick. */
     private Set<BlockPos> inside = Set.of();
+    /** The mound's planned channel cells (tunnels, spire pieces, mouths): inside only where the block is built. */
+    private Set<BlockPos> insideChannels = Set.of();
     private long insideTick = Long.MIN_VALUE;
 
     Nest(Colony colony) {
@@ -144,8 +146,9 @@ public class Nest {
      */
     @Nullable
     public BlockPos findDigTarget(Level level, @Nullable java.util.UUID digger) {
-        // A colony that closed itself in while it was founded opens up again once it has workers: the plug first.
-        if (isEntrancePlugged(level)) {
+        // A colony that closed itself in while it was founded opens up again once it has workers: the plug first (a
+        // colony that keeps a schedule only at night, see mayOpenEntrance).
+        if (isEntrancePlugged(level) && mayOpenEntrance(level)) {
             return center;
         }
         // The rooms are planned before the first block is dug, because the plan decides how deep the shaft goes.
@@ -393,6 +396,23 @@ public class Nest {
     }
 
     /**
+     * Whether the workers may bite the plug in the entrance open now: always for a species that keeps no schedule; for
+     * one that does (termites) at foraging time, or once the mound covers the entrance (it is then only the way up into
+     * the mound's shaft). By day the plug of a young, open mound stays (see {@link ForagingHoles}).
+     */
+    public boolean mayOpenEntrance(Level level) {
+        return !colony.keepsASchedule() || colony.isForagingTime(level) || isEntranceCovered(level);
+    }
+
+    /**
+     * Whether something stands over the entrance higher up (the mound's roof over its shaft), so it is no longer open
+     * to the sky. A plug in the entrance itself does not count.
+     */
+    public boolean isEntranceCovered(Level level) {
+        return level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, center.getX(), center.getZ()) > center.getY() + 1;
+    }
+
+    /**
      * Whether a worker may bite this block: soil (the diggable tag), the plug in its own entrance, or the mound's soil
      * where it must be hollow. A foraging hole only at foraging time (soil or its plug).
      */
@@ -400,7 +420,7 @@ public class Nest {
         if (colony.foragingHoles().isHole(level, pos)) {
             return colony.foragingHoles().mayOpen(level, pos);
         }
-        return level.getBlockState(pos).is(ModTags.DIGGABLE) || (pos.equals(center) && isEntrancePlugged(level))
+        return level.getBlockState(pos).is(ModTags.DIGGABLE) || (pos.equals(center) && isEntrancePlugged(level) && mayOpenEntrance(level))
                 || colony.mound().isClearJob(level, pos);
     }
 
@@ -557,23 +577,28 @@ public class Nest {
     /**
      * Whether a cell is inside the colony's home, out of the sun: the entrance, the nest's shaft, rooms, galleries and
      * foraging tunnels, and the hollow shaft, the tunnels, the hollow spire pieces and chimney mouths of the mound (a
-     * termite in their channels is inside). Not the foraging holes
-     * themselves (the way out) and not the open air round the mound.
+     * termite in their channels is inside), but those only once they are built (the plan's empty cell where a tunnel or a
+     * spire piece will go is open air: termites stood there by day thinking they were in, the user's report). Not the
+     * foraging holes themselves (the way out) and not the open air round the mound.
      */
     public boolean isInside(Level level, BlockPos cell) {
         long now = level.getGameTime();
         if (now != insideTick) {
             Set<BlockPos> cells = nestCells(level);
             cells.add(center);
+            Set<BlockPos> channels = new HashSet<>();
             colony.mound().getParts(level).forEach((pos, part) -> {
-                if (part == MoundPlan.Part.OPEN || part == MoundPlan.Part.MOUTH || part == MoundPlan.Part.TUNNEL || part == MoundPlan.Part.SPIRE) {
+                if (part == MoundPlan.Part.OPEN) {
                     cells.add(pos);
+                } else if (part == MoundPlan.Part.MOUTH || part == MoundPlan.Part.TUNNEL || part == MoundPlan.Part.SPIRE) {
+                    channels.add(pos);
                 }
             });
             inside = cells;
+            insideChannels = channels;
             insideTick = now;
         }
-        return inside.contains(cell);
+        return inside.contains(cell) || (insideChannels.contains(cell) && MoundReach.channelKind(level.getBlockState(cell)) != null);
     }
 
     /** The first block in the list that is diggable, has a place to stand next to it (see {@link #standSpotsFor}), and is safe to open. */

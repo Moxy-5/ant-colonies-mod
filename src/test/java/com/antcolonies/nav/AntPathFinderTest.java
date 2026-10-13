@@ -553,6 +553,20 @@ class AntPathFinderTest {
         assertNotNull(AntPathFinder.whatChanged(map, a, b, StepKind.CRAWL_CHANNEL));
     }
 
+    /** Crash found in-game: the builders reshaped a mouth into a spire piece while a termite was going in by it. */
+    @Test
+    void aMouthReshapedIntoASpirePieceIsNoLongerAWayInOrOut() {
+        spireWithAMouth();
+        BlockPos mouth = new BlockPos(10, 66, 0);
+        Foothold side = new Foothold(mouth.east(), Direction.WEST);
+        Foothold inside = Foothold.channel(mouth);
+        assertNull(AntPathFinder.whatChanged(map, side, inside, StepKind.INTO_MOUTH));
+        assertNull(AntPathFinder.whatChanged(map, inside, side, StepKind.OUT_OF_MOUTH));
+        mouths.remove(mouth); // now a hollow spire piece: still a channel, no longer a mouth
+        assertNotNull(AntPathFinder.whatChanged(map, side, inside, StepKind.INTO_MOUTH));
+        assertNotNull(AntPathFinder.whatChanged(map, inside, side, StepKind.OUT_OF_MOUTH));
+    }
+
     private List<Route.Step> moves(Foothold from) {
         List<Route.Step> moves = new ArrayList<>();
         AntPathFinder.neighbours(map, from, (to, kind, cost) -> moves.add(new Route.Step(to, kind)));

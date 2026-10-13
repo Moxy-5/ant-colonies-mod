@@ -37,7 +37,9 @@ import net.minecraft.core.Direction;
  * an arch. A ramp needs solid soil under it; a spire piece or a mouth something under it.</li>
  * <li>A tunnel is carved into soil from a channel or the shaft right beside it, so it joins up at once.</li>
  * <li>As the mound grows its pieces change: a piece that should now be another one (a thicker spire piece, a ramp
- * facing another way, a mouth that is now a spire piece) is reshaped; a piece where soil goes is cleared away; soil
+ * facing another way, a mouth that is now a spire piece) is reshaped; a piece where soil or a tunnel goes is filled up
+ * into it where it stands (the user's request: never cleared first, so nothing above it is left hanging and the
+ * channel up a spire is never cut while it is reshaped into a tunnel); soil
  * where the shaft must now be hollow is dug out. A piece where nothing goes any more (an old spire top the spire has
  * grown away from) crumbles by itself when the mound reaches its next stage ({@link #crumblesAway}).</li>
  * </ul>
@@ -413,12 +415,16 @@ public final class MoundGrowth {
             }
             return switch (part) {
                 case OPEN -> kind != null ? Job.CLEAR : null;
-                case WALL -> isEmpty(pos) ? Job.SOIL : kind != null && kind.isPiece() ? Job.CLEAR : null;
-                case TUNNEL -> isEmpty(pos) ? Job.SOIL : kind == Kind.SOIL ? Job.CARVE : kind != null && kind.isPiece() ? Job.CLEAR : null;
+                case WALL -> isEmpty(pos) ? Job.SOIL : kind != null && kind.isPiece() ? Job.RESHAPE : null;
+                case TUNNEL -> isEmpty(pos) ? Job.SOIL : kind == Kind.SOIL ? Job.CARVE : kind != null && kind.isPiece() ? Job.RESHAPE : null;
                 case RAMP, SPIRE, MOUTH -> isEmpty(pos) ? Job.PIECE
                         : kind != null && kind.isPiece() && (kind != plannedKind(pos, part) || variants.getOrDefault(pos, 0) != plannedVariant(pos, part))
                         ? Job.RESHAPE : null;
             };
+        }
+
+        private static boolean isSoilPart(@Nullable Part part) {
+            return part == Part.WALL || part == Part.TUNNEL;
         }
 
         /** Whether a job has what it needs under it (soil, a piece): see the rules. */
@@ -433,6 +439,9 @@ public final class MoundGrowth {
                     }
                 }
                 return false;
+            }
+            if (job == Job.RESHAPE && isSoilPart(parts.get(pos))) {
+                return true; // a piece filled up into soil or a tunnel block where it stands: it already stands
             }
             if (job == Job.PIECE || job == Job.RESHAPE) {
                 return parts.get(pos) == Part.RAMP ? isSturdy(pos.below()) : !isEmpty(pos.below());
@@ -488,6 +497,11 @@ public final class MoundGrowth {
                 case CARVE -> cells.put(pos, Kind.TUNNEL);
                 case PIECE, RESHAPE -> {
                     Part part = parts.get(pos);
+                    if (part == Part.WALL || part == Part.TUNNEL) {
+                        cells.put(pos, part == Part.WALL ? Kind.SOIL : Kind.TUNNEL); // a piece filled up where it stands
+                        variants.remove(pos);
+                        return;
+                    }
                     cells.put(pos, plannedKind(pos, part));
                     variants.put(pos, plannedVariant(pos, part));
                 }
@@ -540,7 +554,7 @@ public final class MoundGrowth {
                     if (job != null && canDo(pos, job, reachable)) {
                         apply(pos, job);
                         progress = true;
-                        if (job == Job.CARVE || job == Job.CLEAR) {
+                        if (job == Job.CARVE || job == Job.CLEAR || job == Job.RESHAPE) {
                             reachable = reachable();
                         }
                     }

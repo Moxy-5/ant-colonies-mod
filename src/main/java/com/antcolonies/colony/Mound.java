@@ -101,6 +101,8 @@ public class Mound {
     /** Worked out once per profile (it only changes on /reload). */
     @Nullable
     private MoundNumbers shapesFor;
+    @Nullable
+    private Long seedForTests;
     private int[] wallsAt = new int[0];
     private int cachedStage;
     private Map<BlockPos, MoundPlan.Part> cachedParts = Map.of();
@@ -130,7 +132,14 @@ public class Mound {
 
     /** What makes this colony's mound look a little different from every other one (fixed per colony). */
     private long seed() {
-        return colony.getId().getMostSignificantBits() ^ colony.getId().getLeastSignificantBits();
+        return seedForTests != null ? seedForTests : colony.getId().getMostSignificantBits() ^ colony.getId().getLeastSignificantBits();
+    }
+
+    /** Tests only: gives this mound the shape of another colony's (from a save of the user's world). */
+    public void setSeedForTests(long seed) {
+        seedForTests = seed;
+        shapesFor = null;
+        cachedStage = 0;
     }
 
     private void prepareShapes(MoundNumbers numbers) {
@@ -300,7 +309,8 @@ public class Mound {
     /**
      * What the plan still wants done in a cell now, the same as in the pretend mound ({@link MoundGrowth}): soil (or a
      * layer more of it), a piece, a carved tunnel (or a tunnel's doors into the shaft), a piece reshaped into the
-     * plan's one, a piece cleared away where soil goes, the shaft dug out. Null if nothing (done, or something it does
+     * plan's one (or filled up where it stands into the soil or tunnel block the plan has there: never cleared first, so
+     * nothing above it is left hanging and a spire's channel is never cut), the shaft dug out. Null if nothing (done, or something it does
      * not change stands there: soil where a piece would go stays).
      */
     @Nullable
@@ -310,9 +320,9 @@ public class Mound {
         boolean wet = state.getBlock() instanceof TermiteMoundBlock && !TermiteMoundBlock.isFinished(state);
         return switch (part) {
             case OPEN -> isClearJob(level, pos) ? MoundGrowth.Job.CLEAR : null;
-            case WALL -> empty || wet ? MoundGrowth.Job.SOIL : isPieceBlock(state) ? MoundGrowth.Job.CLEAR : null;
+            case WALL -> empty || wet ? MoundGrowth.Job.SOIL : isPieceBlock(state) ? MoundGrowth.Job.RESHAPE : null;
             case TUNNEL -> empty || wet ? MoundGrowth.Job.SOIL : isCarveJob(level, pos) ? MoundGrowth.Job.CARVE
-                    : isPieceBlock(state) ? MoundGrowth.Job.CLEAR : null;
+                    : isPieceBlock(state) ? MoundGrowth.Job.RESHAPE : null;
             case RAMP, SPIRE, MOUTH -> empty ? MoundGrowth.Job.PIECE
                     : isPieceBlock(state) && !isPlannedPiece(state, pos, part) ? MoundGrowth.Job.RESHAPE : null;
         };
@@ -738,7 +748,7 @@ public class Mound {
                 continue;
             }
             MoundGrowth.Job job = shapeJobAt(level, pos);
-            if (job != null && (job == MoundGrowth.Job.CARVE || isWorkableNow(level, pos)) && (job != MoundGrowth.Job.RESHAPE || hasPieceSupport(level, pos, entry.getValue()))) {
+            if (job != null && (job == MoundGrowth.Job.CARVE || isWorkableNow(level, pos)) && (job != MoundGrowth.Job.RESHAPE || isSoil(entry.getValue()) || hasPieceSupport(level, pos, entry.getValue()))) {
                 best = pos;
             }
         }
@@ -808,7 +818,8 @@ public class Mound {
     /**
      * Does the shaping job here: carves the tunnel (a tunnel block of the soil's age, joined to the channels round it
      * and open into the shaft beside it, and toward {@code from} where the termite works from if that is the shaft),
-     * reshapes the piece into the plan's one (keeping its age), or clears the piece away. False if there is no such job
+     * reshapes the piece into the plan's one (keeping its age; into soil or a tunnel block where the plan has one), or
+     * clears the piece away. False if there is no such job
      * any more.
      */
     public boolean shape(Level level, BlockPos pos, @Nullable BlockPos from) {
@@ -826,6 +837,9 @@ public class Mound {
                 open.add(toward); // carved from the nest (or the shaft): it opens toward where the termite came from
             }
             done = level.setBlockAndUpdate(pos, ModBlocks.TERMITE_TUNNEL.get().stateFor(level, pos, age, open));
+        } else if (job == MoundGrowth.Job.RESHAPE && getParts(level).get(pos) == MoundPlan.Part.TUNNEL) {
+            // A piece (the bottom of a spire that moves up) becomes a tunnel block where it stands, joined to the channels round it.
+            done = level.setBlockAndUpdate(pos, ModBlocks.TERMITE_TUNNEL.get().stateFor(level, pos, age, doorsOf(level, pos)));
         } else if (job == MoundGrowth.Job.RESHAPE) {
             BlockState piece = blockFor(cachedShape, pos.subtract(center)).setValue(MoundSoil.AGE, age);
             done = level.setBlockAndUpdate(pos, Block.updateFromNeighbourShapes(piece, level, pos));
