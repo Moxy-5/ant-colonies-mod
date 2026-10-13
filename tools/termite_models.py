@@ -6,7 +6,7 @@ Units are model pixels (16 = 1 block before the renderer's scale); the head poin
 The queen's head, thorax and legs are the king's; her abdomen is six segments (seg_1 .. seg_6), each with a pale
 skin (seg_N_skin), a dark back plate (seg_N_plate) and a lighter belly plate (seg_N_belly). The renderer
 (TermiteQueenModel) stretches the skin as she grows and keeps the plates their size, so they drift apart.
-Keep these bone names: the Java code looks them up.
+'carry' (no boxes) marks where a load is held in the mandibles. Keep these bone names: the Java code looks them up.
 
 The worker (termite_worker) is the king's skeleton made pale, blind and wingless, a little smaller; it uses the
 king's animations. The nymph's texture (termite_nymph.png) is four colour bands for TermiteNymphRenderer.
@@ -115,6 +115,8 @@ def front_half():
     ]))
     bones.append(bone('mandible_l', 'head', [0.4, 1.2, -4.3], [cube([0.1, 1.0, -4.95], [0.45, 0.35, 0.7], 'jaw')]))
     bones.append(bone('mandible_r', 'head', [-0.4, 1.2, -4.3], [cube([-0.55, 1.0, -4.95], [0.45, 0.35, 0.7], 'jaw')]))
+    # No boxes: the spot just in front of the mandible tips where a load is held (PelletLayer).
+    bones.append(bone('carry', 'head', [0, 1.15, -5.35]))
     # Beaded antennae, held forward and a little outward: rising slightly at first, the tips curving down.
     for side, sx in (('l', 1), ('r', -1)):
         start = (0.65 * sx, 2.3, -4.1)

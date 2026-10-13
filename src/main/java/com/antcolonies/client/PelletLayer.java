@@ -24,8 +24,12 @@ import software.bernie.geckolib.renderer.layer.BlockAndItemGeoLayer;
  * nursery shows, lying across the mandibles) or a dead nestmate (the same body the refuse chamber shows, smaller).
  */
 public class PelletLayer<T extends AbstractAntEntity> extends BlockAndItemGeoLayer<T> {
-    /** The bone the pellet follows (so it moves with the head). Must exist in the model. */
-    private static final String HOLD_BONE = "head";
+    /**
+     * The bone that marks where a load is held: an empty bone of the head, just in front of the mandible tips (every
+     * ant and termite model has one, made by tools/ant_models.py and tools/termite_models.py), so the load sits in
+     * each model's own jaws and moves with the head.
+     */
+    private static final String HOLD_BONE = "carry";
     /** Pellet size as a fraction of a full block. */
     private static final float SIZE = 0.12F;
     /** A carried seed is drawn this big (as a fraction of a full item). */
@@ -40,10 +44,6 @@ public class PelletLayer<T extends AbstractAntEntity> extends BlockAndItemGeoLay
     private static final float CORPSE_SIZE = 0.6F;
     private static final ResourceLocation EGG_TEXTURE =
             ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "textures/entity/ant_egg.png");
-    // Where the pellet sits, in model pixels (16 = one block): just in front of the mandible tips.
-    private static final float X = 0.0F;
-    private static final float Y = 2.3F;
-    private static final float Z = -6.8F;
 
     private final ModelPart eggModel;
     private final ModelPart corpseModel;
@@ -57,11 +57,16 @@ public class PelletLayer<T extends AbstractAntEntity> extends BlockAndItemGeoLay
         this.corpseModel = corpseModel;
     }
 
+    /** Moves to the hold bone's pivot (the bones are drawn in the model's own space, in pixels). */
+    private static void toHoldPoint(PoseStack poseStack, GeoBone bone) {
+        poseStack.translate(bone.getPivotX() / 16.0F, bone.getPivotY() / 16.0F, bone.getPivotZ() / 16.0F);
+    }
+
     @Override
     protected void renderStackForBone(PoseStack poseStack, GeoBone bone, ItemStack stack, T ant,
             MultiBufferSource bufferSource, float partialTick, int packedLight, int packedOverlay) {
         poseStack.pushPose();
-        poseStack.translate(X / 16.0F, Y / 16.0F, Z / 16.0F);
+        toHoldPoint(poseStack, bone);
         if (stack == CORPSE_MARKER) {
             // The dead ant hangs from the mandibles by its head and trails out in front of the carrier, legs up.
             poseStack.translate(0.0F, 0.0F, -3.0F / 16.0F);
@@ -86,7 +91,7 @@ public class PelletLayer<T extends AbstractAntEntity> extends BlockAndItemGeoLay
     protected void renderBlockForBone(PoseStack poseStack, GeoBone bone, BlockState state, T ant,
             MultiBufferSource bufferSource, float partialTick, int packedLight, int packedOverlay) {
         poseStack.pushPose();
-        poseStack.translate(X / 16.0F, Y / 16.0F, Z / 16.0F);
+        toHoldPoint(poseStack, bone);
         poseStack.scale(SIZE, SIZE, SIZE);
         poseStack.translate(-0.5F, -0.5F, -0.5F);
         Minecraft.getInstance().getBlockRenderer()

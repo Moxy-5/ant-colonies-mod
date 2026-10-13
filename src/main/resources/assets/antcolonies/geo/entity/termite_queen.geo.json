@@ -584,6 +584,15 @@
      ]
     },
     {
+     "name": "carry",
+     "pivot": [
+      0,
+      1.15,
+      -5.35
+     ],
+     "parent": "head"
+    },
+    {
      "name": "antenna_l_1",
      "pivot": [
       0.65,
