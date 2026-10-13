@@ -23,10 +23,24 @@ public class AntRenderer<T extends AbstractAntEntity> extends GeoEntityRenderer<
     /** The same inside a narrow channel (a termite tunnel): less, so the body stays in the channel's middle. */
     private static final float CHANNEL_INTO_WALL = 0.08F;
 
+    /** This renderer's climbing lift and push into the wall (a bigger body needs more; see {@link #withClimbPose}). */
+    private float climbLift = CLIMB_LIFT;
+    private float climbIntoWall = CLIMB_INTO_WALL;
+
     public AntRenderer(EntityRendererProvider.Context context, GeoModel<T> model) {
         super(context, model);
         addRenderLayer(new YoungPaleLayer<>(this));
         addRenderLayer(new PelletLayer<>(this, context.bakeLayer(AntEggRenderer.LAYER), context.bakeLayer(AntCorpseRenderer.LAYER)));
+    }
+
+    /**
+     * For a bigger body (a major soldier): how far the model is moved up while climbing and toward the wall (in model
+     * units before the renderer's scale), so its feet touch the wall and its tail stays out of the floor.
+     */
+    public AntRenderer<T> withClimbPose(float lift, float intoWall) {
+        this.climbLift = lift;
+        this.climbIntoWall = intoWall;
+        return this;
     }
 
     @Override
@@ -48,12 +62,12 @@ public class AntRenderer<T extends AbstractAntEntity> extends GeoEntityRenderer<
         float tilt = ant.getBodyTilt(partialTick);
         if (tilt <= 90.0F) {
             float share = tilt / 90.0F;
-            poseStack.translate(0.0F, CLIMB_LIFT * share, -(ant.isInChannel() ? CHANNEL_INTO_WALL : CLIMB_INTO_WALL) * share);
+            poseStack.translate(0.0F, climbLift * share, -(ant.isInChannel() ? CHANNEL_INTO_WALL : climbIntoWall) * share);
         } else {
             // From the wall onto the ceiling: the feet go up to the top of the hitbox, against the ceiling.
             float share = (tilt - 90.0F) / 90.0F;
             float ceiling = ant.getBbHeight() / scaleHeight;
-            poseStack.translate(0.0F, CLIMB_LIFT + (ceiling - CLIMB_LIFT) * share, -CLIMB_INTO_WALL * (1.0F - share));
+            poseStack.translate(0.0F, climbLift + (ceiling - climbLift) * share, -climbIntoWall * (1.0F - share));
         }
         poseStack.mulPose(Axis.XP.rotationDegrees(tilt));
         poseStack.mulPose(Axis.YP.rotationDegrees(ant.getBodyHeading(partialTick)));

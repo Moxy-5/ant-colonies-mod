@@ -32,13 +32,13 @@ import net.minecraft.world.level.block.state.BlockState;
  */
 public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNumbers queen, BroodNumbers brood,
         FoodNumbers food, RefuseNumbers refuse, NestNumbers nest, Optional<QueenBody> queenBody, Optional<Founding> founding,
-        Optional<MoundNumbers> mound, Optional<GardenNumbers> garden, Optional<Laying> laying) {
+        Optional<MoundNumbers> mound, Optional<GardenNumbers> garden, Optional<Laying> laying, Optional<SoldierNumbers> soldiers) {
 
-    /** The numbers without a fungus garden and without a steady stream of eggs (the queen lays one egg per meal). */
+    /** The numbers without a fungus garden, without a steady stream of eggs (the queen lays one egg per meal) and without soldiers. */
     public SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNumbers queen, BroodNumbers brood, FoodNumbers food,
             RefuseNumbers refuse, NestNumbers nest, Optional<QueenBody> queenBody, Optional<Founding> founding,
             Optional<MoundNumbers> mound) {
-        this(colony, worker, queen, brood, food, refuse, nest, queenBody, founding, mound, Optional.empty(), Optional.empty());
+        this(colony, worker, queen, brood, food, refuse, nest, queenBody, founding, mound, Optional.empty(), Optional.empty(), Optional.empty());
     }
 
     /**
@@ -380,6 +380,39 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
         }
     }
 
+    /**
+     * Soldiers (termites: minor and major soldiers; a species without them has none). The colony wants about
+     * {@code perWorker} soldiers for every worker (0.1: about 1 termite in 10 is a soldier), {@code minorsPerMajor}
+     * minors to every major. When it has fewer than it wants, a new nymph grows into a soldier instead of a worker:
+     * a minor after {@code minorMeal} pieces of food, a major after {@code majorMeal} (a bigger meal). Soldiers cannot
+     * feed themselves (their jaws are too big): they want a piece from a nurse every {@code mealIntervalTicks}, and one
+     * that has gone {@code slowAfterTicks} without moves at half speed.
+     */
+    public record SoldierNumbers(float perWorker, int minorsPerMajor, int minorMeal, int majorMeal, int mealIntervalTicks, int slowAfterTicks) {
+        public static final Codec<SoldierNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.FLOAT.fieldOf("per_worker").forGetter(SoldierNumbers::perWorker),
+                Codec.INT.fieldOf("minors_per_major").forGetter(SoldierNumbers::minorsPerMajor),
+                Codec.INT.fieldOf("minor_meal").forGetter(SoldierNumbers::minorMeal),
+                Codec.INT.fieldOf("major_meal").forGetter(SoldierNumbers::majorMeal),
+                Codec.INT.optionalFieldOf("meal_interval_ticks", 24000).forGetter(SoldierNumbers::mealIntervalTicks),
+                Codec.INT.optionalFieldOf("slow_after_ticks", 48000).forGetter(SoldierNumbers::slowAfterTicks)
+        ).apply(i, SoldierNumbers::new));
+
+        /** How many minor soldiers a colony with this many workers wants (rounded; 0.5 rounds up). */
+        public int wantedMinors(int workers) {
+            return roundHalfUp(workers * perWorker * minorsPerMajor / (minorsPerMajor + 1.0));
+        }
+
+        /** How many major soldiers a colony with this many workers wants (rounded; 0.5 rounds up). */
+        public int wantedMajors(int workers) {
+            return roundHalfUp(workers * perWorker / (minorsPerMajor + 1.0));
+        }
+
+        private static int roundHalfUp(double value) {
+            return Math.max(0, (int) Math.floor(value + 0.5 + 1.0E-6));
+        }
+    }
+
     public static final Codec<SpeciesProfile> CODEC = RecordCodecBuilder.create(i -> i.group(
             ColonyNumbers.CODEC.fieldOf("colony").forGetter(SpeciesProfile::colony),
             WorkerNumbers.CODEC.fieldOf("worker").forGetter(SpeciesProfile::worker),
@@ -392,7 +425,8 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
             Founding.CODEC.optionalFieldOf("founding").forGetter(SpeciesProfile::founding),
             MoundNumbers.CODEC.optionalFieldOf("mound").forGetter(SpeciesProfile::mound),
             GardenNumbers.CODEC.optionalFieldOf("garden").forGetter(SpeciesProfile::garden),
-            Laying.CODEC.optionalFieldOf("laying").forGetter(SpeciesProfile::laying)
+            Laying.CODEC.optionalFieldOf("laying").forGetter(SpeciesProfile::laying),
+            SoldierNumbers.CODEC.optionalFieldOf("soldiers").forGetter(SpeciesProfile::soldiers)
     ).apply(i, SpeciesProfile::new));
 
     /**

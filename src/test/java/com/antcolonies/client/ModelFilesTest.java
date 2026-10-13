@@ -48,9 +48,33 @@ class ModelFilesTest {
 
     @Test
     void everyModelHoldsItsLoadInItsHead() throws Exception {
-        for (String model : new String[] {"worker_ant", "termite_king", "termite_queen", "termite_worker"}) {
+        for (String model : new String[] {"worker_ant", "termite_king", "termite_queen", "termite_worker", "termite_minor_soldier",
+                "termite_major_soldier"}) {
             assertEquals("head", bones(model).get("carry"), model + " has no carry bone in its head");
         }
+    }
+
+    /**
+     * The soldiers' animations (idle, walk and the head bang) read the way GeckoLib reads them, and only move bones both
+     * soldier models have (and the king's walk and idle bones, the walk is the same).
+     */
+    @Test
+    void theSoldierAnimationsReadAndMoveOnlyBonesTheSoldiersHave() throws Exception {
+        BakedAnimations animations = KeyFramesAdapter.GEO_GSON.fromJson(
+                json("animations/entity/termite_soldier.animation.json").getAsJsonObject("animations"), BakedAnimations.class);
+        for (String model : new String[] {"termite_minor_soldier", "termite_major_soldier"}) {
+            Map<String, String> bones = bones(model);
+            assertEquals("forebody", bones.get("head"), model + ": the head must hang on the forebody");
+            for (String name : new String[] {"idle", "walk", "head_bang"}) {
+                Animation animation = animations.getAnimation(name);
+                assertNotNull(animation, "no " + name + " animation");
+                for (var bone : animation.boneAnimations()) {
+                    assertTrue(bones.containsKey(bone.boneName()), name + " moves a bone " + model + " does not have: " + bone.boneName());
+                }
+            }
+        }
+        Animation drum = animations.getAnimation("head_bang");
+        assertTrue(drum.loopType() == Animation.LoopType.LOOP, "the head bang must loop while the soldier drums");
     }
 
     @Test

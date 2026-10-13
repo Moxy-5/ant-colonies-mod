@@ -71,6 +71,29 @@ class SpeciesProfileTest {
         assertEquals(2, profile.nest().foragingHoles());
         assertTrue(profile.nest().foragingHoleDistance() > 7, "the foraging holes must lie beyond the foot of a full-grown mound");
         assertTrue(profile.mound().isPresent() && profile.mound().get().chimneyTripChance() > 0 && profile.mound().get().chimneyTripChance() < 0.5F);
+        // Soldiers: about 1 in 10, 3 minors to a major; a major needs a bigger meal than a minor, a minor more than a worker.
+        assertTrue(profile.soldiers().isPresent(), "termites have soldiers");
+        SpeciesProfile.SoldierNumbers soldiers = profile.soldiers().get();
+        assertTrue(soldiers.majorMeal() > soldiers.minorMeal() && soldiers.minorMeal() >= profile.brood().larvaMeal());
+        assertTrue(soldiers.mealIntervalTicks() < soldiers.slowAfterTicks(), "a soldier gets hungry before it slows down");
+    }
+
+    /**
+     * How many soldiers a colony wants: none for the founding batch (5 workers), the first minor from 7 workers, and with
+     * the 20 workers a colony may have today 2 minors and 1 major; about 1 in 10 in a big colony, 3 minors to a major.
+     */
+    @Test
+    void aColonyWantsAboutOneSoldierInTenThreeMinorsToAMajor() throws Exception {
+        SpeciesProfile.SoldierNumbers soldiers = read("macrotermes").soldiers().orElseThrow();
+        assertEquals(0, soldiers.wantedMinors(5) + soldiers.wantedMajors(5), "no soldier in the founding batch");
+        assertEquals(0, soldiers.wantedMinors(6));
+        assertEquals(1, soldiers.wantedMinors(7), "the first minor from 7 workers");
+        assertEquals(0, soldiers.wantedMajors(19));
+        assertEquals(2, soldiers.wantedMinors(20));
+        assertEquals(1, soldiers.wantedMajors(20), "the first major at 20 workers");
+        assertEquals(75, soldiers.wantedMinors(1000));
+        assertEquals(25, soldiers.wantedMajors(1000));
+        assertTrue(read("red_harvester_ant").soldiers().isEmpty(), "harvester ants have no soldier caste");
     }
 
     @Test

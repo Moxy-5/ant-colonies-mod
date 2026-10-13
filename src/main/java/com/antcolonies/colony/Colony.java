@@ -30,7 +30,8 @@ import net.minecraft.world.phys.AABB;
  * per subject: {@link #nest()} (the underground plan and digging), {@link #walls()} (sealing the nest), {@link #hill()},
  * {@link #food()} (seeds), {@link #bakery()} (ant bread), {@link #queenCare()} (feeding the queen and her eggs),
  * {@link #brood()} (eggs and larvae), {@link #refuse()} (dead ants), {@link #mound()} (the termite mound),
- * {@link #foragingHoles()} (the termites' ways out to forage) and {@link #garden()} (the termites' fungus garden).
+ * {@link #foragingHoles()} (the termites' ways out to forage), {@link #garden()} (the termites' fungus garden) and
+ * {@link #soldiers()} (the termites' soldiers).
  */
 public class Colony {
     /** "No time saved": a hunger clock that has not started yet. */
@@ -68,6 +69,7 @@ public class Colony {
     private final ForagingHoles foragingHoles;
     private final FungusGarden garden;
     private final Mushrooms mushrooms;
+    private final Soldiers soldiers;
 
     public Colony(UUID id, ResourceLocation species, UUID queenId, BlockPos center) {
         this.id = id;
@@ -86,6 +88,7 @@ public class Colony {
         this.foragingHoles = new ForagingHoles(this);
         this.garden = new FungusGarden(this);
         this.mushrooms = new Mushrooms(this);
+        this.soldiers = new Soldiers(this);
     }
 
     /** The underground nest: its plan, the next block to dig, and the dug-out cells of each room. */
@@ -141,6 +144,11 @@ public class Colony {
     /** The Termitomyces mushrooms a healthy garden sends up round the mound after rain. */
     public Mushrooms mushrooms() {
         return mushrooms;
+    }
+
+    /** The soldiers: how many the colony wants, which nymphs grow into them, where they stand guard (species with soldiers). */
+    public Soldiers soldiers() {
+        return soldiers;
     }
 
     /**

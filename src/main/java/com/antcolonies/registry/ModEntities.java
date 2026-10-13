@@ -7,6 +7,7 @@ import com.antcolonies.entity.AntLarvaEntity;
 import com.antcolonies.entity.QueenAntEntity;
 import com.antcolonies.entity.TermiteKingEntity;
 import com.antcolonies.entity.TermiteQueenEntity;
+import com.antcolonies.entity.TermiteSoldierEntity;
 import com.antcolonies.entity.TermiteWorkerEntity;
 import com.antcolonies.entity.WorkerAntEntity;
 
@@ -81,6 +82,20 @@ public class ModEntities {
                     .of(TermiteWorkerEntity::new, MobCategory.CREATURE)
                     .sized(0.3F, 0.2F)
                     .build("termite_worker"));
+
+    // Termite minor soldier: about a worker's size with a bigger head (a little taller than a worker).
+    public static final DeferredHolder<EntityType<?>, EntityType<TermiteSoldierEntity>> TERMITE_MINOR_SOLDIER =
+            ENTITY_TYPES.register("termite_minor_soldier", () -> EntityType.Builder
+                    .<TermiteSoldierEntity>of((type, level) -> new TermiteSoldierEntity(type, level, TermiteSoldierEntity.Rank.MINOR), MobCategory.CREATURE)
+                    .sized(0.3F, 0.22F)
+                    .build("termite_minor_soldier"));
+
+    // Termite major soldier: about twice a worker's length, with a huge head.
+    public static final DeferredHolder<EntityType<?>, EntityType<TermiteSoldierEntity>> TERMITE_MAJOR_SOLDIER =
+            ENTITY_TYPES.register("termite_major_soldier", () -> EntityType.Builder
+                    .<TermiteSoldierEntity>of((type, level) -> new TermiteSoldierEntity(type, level, TermiteSoldierEntity.Rank.MAJOR), MobCategory.CREATURE)
+                    .sized(0.45F, 0.3F)
+                    .build("termite_major_soldier"));
 
     // A termite nymph: what a termite egg hatches into (the same kind of young as an ant larva, drawn as a small pale termite).
     public static final DeferredHolder<EntityType<?>, EntityType<AntLarvaEntity>> TERMITE_NYMPH =

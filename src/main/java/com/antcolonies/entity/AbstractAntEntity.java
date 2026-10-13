@@ -670,7 +670,18 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         controllers.add(new AnimationController<>(this, "main", 3, this::animate));
     }
 
+    /** An animation this insect plays instead of walking or standing (a soldier's head bang), or null. */
+    @Nullable
+    protected RawAnimation specialAnimation() {
+        return null;
+    }
+
     private PlayState animate(AnimationState<AbstractAntEntity> state) {
+        RawAnimation special = specialAnimation();
+        if (special != null) {
+            state.getController().setAnimationSpeed(1.0);
+            return state.setAndContinue(special);
+        }
         if (isPeeking()) {
             state.getController().setAnimationSpeed(1.0);
             return state.setAndContinue(PEEK);

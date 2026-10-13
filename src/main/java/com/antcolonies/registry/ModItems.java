@@ -73,4 +73,12 @@ public class ModItems {
     public static final DeferredItem<DeferredSpawnEggItem> TERMITE_WORKER_SPAWN_EGG =
             ITEMS.register("termite_worker_spawn_egg",
                     () -> new DeferredSpawnEggItem(ModEntities.TERMITE_WORKER, 0xECE2C8, 0xD4AC60, new Item.Properties()));
+
+    public static final DeferredItem<DeferredSpawnEggItem> TERMITE_MINOR_SOLDIER_SPAWN_EGG =
+            ITEMS.register("termite_minor_soldier_spawn_egg",
+                    () -> new DeferredSpawnEggItem(ModEntities.TERMITE_MINOR_SOLDIER, 0xECE2C8, 0xB25E24, new Item.Properties()));
+
+    public static final DeferredItem<DeferredSpawnEggItem> TERMITE_MAJOR_SOLDIER_SPAWN_EGG =
+            ITEMS.register("termite_major_soldier_spawn_egg",
+                    () -> new DeferredSpawnEggItem(ModEntities.TERMITE_MAJOR_SOLDIER, 0xB25E24, 0x18100B, new Item.Properties()));
 }

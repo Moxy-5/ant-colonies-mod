@@ -9,7 +9,9 @@ skin (seg_N_skin), a dark back plate (seg_N_plate) and a lighter belly plate (se
 'carry' (no boxes) marks where a load is held in the mandibles. Keep these bone names: the Java code looks them up.
 
 The worker (termite_worker) is the king's skeleton made pale, blind and wingless, a little smaller; it uses the
-king's animations. The nymph's texture (termite_nymph.png) is four colour bands for TermiteNymphRenderer.
+king's animations. The soldiers (termite_minor_soldier, termite_major_soldier) are the worker's pale body with a big
+orange-brown armoured head and long black crossing jaws; they share termite_soldier.animation.json (idle, walk and
+head_bang, the drumming). The nymph's texture (termite_nymph.png) is four colour bands for TermiteNymphRenderer.
 
 The model checker: references/termites/preview/ gets one labelled picture per camera angle (front.png looking at
 her face, front_above.png, side.png, top.png), each showing the king, the worker and the queen at 0%, 50%, 75% and
@@ -45,6 +47,16 @@ SWATCH = {
     'w_leg':     (4, 2, (228, 212, 170)),
     'w_antenna': (5, 2, (214, 186, 128)),
     'w_jaw':     (6, 2, (132, 86, 42)),
+    # The soldiers (step 6a): a pale soft body like the worker's, a big shiny orange-brown armoured head, darker at the
+    # front where the long black jaws join. Only the soldiers' texture has these (see make_texture).
+    's_head':    (0, 3, (178, 94, 36)),
+    's_shine':   (1, 3, (218, 138, 64)),   # the light catching the top of the head
+    's_front':   (2, 3, (118, 54, 22)),
+    's_jaw':     (3, 3, (24, 15, 11)),
+    's_body':    (4, 3, (238, 230, 208)),
+    's_belly':   (5, 3, (226, 216, 192)),
+    's_leg':     (6, 3, (232, 218, 182)),
+    's_antenna': (7, 3, (200, 140, 76)),
 }
 
 # The nymph's texture (TermiteNymphRenderer): four colour bands of 8 rows each, 32x32.
@@ -60,10 +72,14 @@ def write_png(path, width, height, pixels):
     with open(path, 'wb') as f:
         f.write(png)
 
-def make_texture(path):
+def make_texture(path, soldier=False):
+    """The 64x64 swatch texture. The soldiers' colours (s_...) are only drawn into the soldiers' texture, so the
+    other textures stay exactly as they were."""
     rnd = random.Random(7)
     pixels = [(0, 0, 0, 0)] * (64 * 64)
     for name, (col, row, rgb) in SWATCH.items():
+        if name.startswith('s_') and not soldier:
+            continue
         for y in range(8):
             for x in range(8):
                 k = rnd.uniform(-0.09, 0.09) if name != 'eye' else rnd.uniform(-0.03, 0.12)
@@ -270,6 +286,148 @@ def worker_model():
         bones.append(nb)
     return bones
 
+# --- the soldiers: the worker's pale body with a big armoured head and long crossing jaws ---------------------
+# Minor: about a worker's size, with a bigger head. Major: about twice a worker's length, with a huge head. Both are
+# blind like the worker. Bones: the worker's (the king's) names, so the walk and idle animations work; the head, jaws,
+# antennae and the carry spot are the soldier's own. The whole model is moved back along its length so its middle
+# sits over the middle of the hitbox (the long head would otherwise stick far out in front of it).
+MINOR_SCALE, MAJOR_SCALE = 0.85, 1.2
+SOLDIER_COLOURS = {'thorax': 's_body', 'back': 's_body', 'belly': 's_belly', 'leg': 's_leg', 'antenna': 's_antenna', 'joint': 's_belly'}
+SOLDIER_ABDOMEN_COLOURS = {'back': 's_body', 'belly': 's_belly', 'joint': 's_belly'}
+HEAD_BONES = ('head', 'mandible_l', 'mandible_r', 'carry', 'antenna_l_1', 'antenna_l_2', 'antenna_r_1', 'antenna_r_2')
+NECK_Z = -2.3  # where the head meets the thorax (the king's head pivot)
+
+def soldier_head(major):
+    """The soldier's head, jaws, antennae and carry spot, in king units: a big rounded capsule, shiny orange-brown,
+    darker at the front where the jaws join; the jaws run straight forward and then curve in, crossing at the tips
+    (real Macrotermes soldiers' jaws cross). The major's head is bigger for its body and its jaws longer."""
+    w, h, l = (3.3, 2.5, 3.9) if major else (2.7, 2.05, 3.1)
+    jaw, tip = (1.9, 1.35) if major else (1.5, 1.1)
+    y0 = 0.8 if major else 0.95
+    front = NECK_Z - l
+    bones = [bone('head', 'forebody', [0, y0 + h / 2, NECK_Z], [
+        cube([-w / 2, y0, front + 0.5], [w, h, l - 0.5], 's_head'),
+        cube([-w / 2 - 0.12, y0 + 0.3, front + 0.8], [w + 0.24, h - 0.6, l - 1.2], 's_head'),   # rounded sides
+        cube([-w / 2 + 0.4, y0 + h, front + 0.9], [w - 0.8, 0.15, l - 1.5], 's_shine'),        # shiny top
+        cube([-w / 2 + 0.3, y0 + 0.15, front], [w - 0.6, h * 0.55, 0.5], 's_front'),           # front, where the jaws join
+        cube([-0.45, y0 + 0.45, front - 0.35], [0.9, 0.35, 0.35], 's_front'),                  # upper lip
+    ])]
+    for side, sx in (('l', 1), ('r', -1)):
+        x = 0.55 * sx
+        y = y0 + 0.32 + (0.0 if side == 'l' else 0.04)  # a hair apart where they cross
+        base = cube([x - 0.25, y, front - jaw], [0.5, 0.36, jaw], 's_jaw')
+        tip_pivot = [x, y + 0.18, front - jaw]
+        tip_cube = cube([x - 0.17, y + 0.02, front - jaw - tip], [0.34, 0.3, tip], 's_jaw', tip_pivot, 40.0 * sx)
+        bones.append(bone(f'mandible_{side}', 'head', [x, y + 0.18, front], [base, tip_cube]))
+    bones.append(bone('carry', 'head', [0, y0 + 0.5, front - jaw]))
+    # Beaded antennae from the sides of the head's front, held forward and out, the tips curving down.
+    for side, sx in (('l', 1), ('r', -1)):
+        start = ((w / 2 - 0.25) * sx, y0 + h * 0.62, front + 0.35)
+        beads1, p = [], list(start)
+        for i in range(3):
+            size = 0.4 if i % 2 == 0 else 0.32
+            beads1.append(centered(p[0], p[1], p[2], size, size, size, 's_antenna'))
+            p = [p[0] + 0.2 * sx, p[1] + 0.12, p[2] - 0.3]
+        mid = list(p)
+        beads2 = []
+        for i in range(6):
+            size = 0.34 if i % 2 == 0 else 0.27
+            beads2.append(centered(p[0], p[1], p[2], size, size, size, 's_antenna'))
+            drop = 0.02 if i < 2 else -0.14
+            p = [p[0] + 0.22 * sx, p[1] + drop, p[2] - 0.26]
+        bones.append(bone(f'antenna_{side}_1', 'head', list(start), beads1))
+        bones.append(bone(f'antenna_{side}_2', f'antenna_{side}_1', mid, beads2))
+    return bones
+
+def soldier_model(major):
+    """A soldier: the king's thorax, legs and abdomen made pale (no eyes, no wing stubs), the soldier's own head, all
+    scaled to its size and moved back so the middle of its length sits over the hitbox's middle."""
+    name_of = {(c * 8 + 1, r * 8 + 1): name for name, (c, r, _) in SWATCH.items()}
+    scale = MAJOR_SCALE if major else MINOR_SCALE
+    raw = [b for b in front_half() + king_abdomen() if b['name'] not in HEAD_BONES and b['name'] != 'wing_stubs']
+    head = soldier_head(major)
+    # The length: from the jaw tips to the end of the abdomen (the jaw tips are turned in, so their corners count).
+    zs = []
+    for corners, _ in model_boxes([b for b in raw if b['name'] in ('body', 'forebody')] + head):
+        zs += [p[2] for p in corners]
+    zs += [c['origin'][2] + c['size'][2] for b in raw for c in b.get('cubes', [])]
+    shift = -(min(zs) + max(zs)) / 2
+    def moved(v):
+        return [v[0] * scale, v[1] * scale, (v[2] + shift) * scale]
+    bones = []
+    for b in raw + head:
+        own = b['name'] in HEAD_BONES
+        colours = {} if own else SOLDIER_ABDOMEN_COLOURS if b['name'] == 'abdomen' else SOLDIER_COLOURS
+        nb = {k: v for k, v in b.items() if k != 'cubes'}
+        nb['pivot'] = [round(v, 3) for v in moved(b['pivot'])]
+        cubes = []
+        for c in b.get('cubes', []):
+            swatch = name_of[tuple(c['uv']['north']['uv'])]
+            if swatch == 'eye':
+                continue
+            cubes.append(cube(moved(c['origin']), [v * scale for v in c['size']], colours.get(swatch, swatch),
+                              moved(c['pivot']) if 'pivot' in c else None, c['rotation'][1] if 'rotation' in c else 0.0))
+        if cubes:
+            nb['cubes'] = cubes
+        bones.append(nb)
+    # In the king's bone order (every parent before its children).
+    order = [b['name'] for b in front_half() + king_abdomen()]
+    bones.sort(key=lambda b: order.index(b['name']))
+    return bones
+
+# The head bang (drumming): a soldier warns the colony by striking the ground with its head in quick bursts (real
+# Macrotermes soldiers about 11 times a second; others feel it through the walls and drum too). One burst of
+# DRUM_STRIKES strikes, DRUM_GAP seconds apart, then a short rest; it loops while the soldier drums. The head tips
+# down hard (positive X: the face toward the belly), the forebody jerks with it, the jaws gape, the antennae are
+# pulled back.
+DRUM_SECONDS, DRUM_STRIKES, DRUM_GAP, DRUM_TIP = 1.0, 6, 0.1, 10.0
+
+def head_bang():
+    head, fore = {}, {}
+    for k in range(DRUM_STRIKES):
+        t = k * DRUM_GAP
+        head[f'{t:g}'] = [0, 0, 0]
+        head[f'{t + 0.04:g}'] = [DRUM_TIP, 0, 0]
+        fore[f'{t:g}'] = [0, 0, 0]
+        fore[f'{t + 0.04:g}'] = [3, 0, 0]
+    end = DRUM_STRIKES * DRUM_GAP
+    for d in (head, fore):
+        d[f'{end:g}'] = [0, 0, 0]
+        d[f'{DRUM_SECONDS:g}'] = [0, 0, 0]
+    def keys(open_):
+        # Open for the burst, shut again for the rest.
+        return {'rotation': {'0': [0, 0, 0], '0.08': open_, f'{end - 0.05:g}': open_, f'{end + 0.1:g}': [0, 0, 0],
+                             f'{DRUM_SECONDS:g}': [0, 0, 0]}}
+    return {'head': {'rotation': head}, 'forebody': {'rotation': fore},
+            'mandible_l': keys([0, -14, 0]), 'mandible_r': keys([0, 14, 0]),
+            'antenna_l_1': keys([-25, -10, 0]), 'antenna_r_1': keys([-25, 10, 0])}
+
+def soldier_animations():
+    """The soldiers' animations: the worker's walk and idle (a slow jaw twitch added), and the head bang."""
+    base = animations()['animations']
+    idle = dict(base['idle']['bones'])
+    idle['mandible_l'] = {'rotation': {'0': [0, 0, 0], '1.6': [0, 0, 0], '1.8': [0, -8, 0], '2.0': [0, 0, 0], '2.4': [0, 0, 0]}}
+    idle['mandible_r'] = {'rotation': {'0': [0, 0, 0], '1.6': [0, 0, 0], '1.8': [0, 8, 0], '2.0': [0, 0, 0], '2.4': [0, 0, 0]}}
+    return {'format_version': '1.8.0', 'animations': {
+        'idle': {'loop': True, 'animation_length': 2.4, 'bones': idle},
+        'walk': base['walk'],
+        'head_bang': {'loop': True, 'animation_length': DRUM_SECONDS, 'bones': head_bang()}}}
+
+def render_head_bang(bones, path, frames=6):
+    """The head bang from the side at a few moments of the burst (strike, rest), so the motion can be checked."""
+    anim = soldier_animations()['animations']['head_bang']['bones']
+    cw, ch = 360, 240
+    canvas = Canvas(cw * frames, TITLE_H + ch + LABEL_H)
+    canvas.text(12, 12, 'HEAD BANG - SIDE, ONE BURST', scale=4)
+    for k in range(frames):
+        t = [0.0, 0.04, 0.07, 0.14, 0.3, 0.8][k]
+        x0 = cw * k
+        canvas.frame(x0, TITLE_H, cw, ch + LABEL_H)
+        canvas.text(x0 + 10, TITLE_H + 8, f'{int(t * 1000)} MS')
+        draw(canvas, model_boxes(bones, anim=sample(anim, t)), (x0 + 1, TITLE_H + LABEL_H, cw - 2, ch - 1), 0.8,
+             math.radians(-90), 0.0, 14.0)
+    canvas.save(path)
+
 def make_nymph_texture(path):
     pixels = []
     for y in range(32):
@@ -433,6 +591,7 @@ FONT = {
     'G': ['01110', '10001', '10000', '10111', '10001', '10001', '01111'],
     'H': ['10001', '10001', '10001', '11111', '10001', '10001', '10001'],
     'I': ['01110', '00100', '00100', '00100', '00100', '00100', '01110'],
+    'J': ['00111', '00010', '00010', '00010', '00010', '10010', '01100'],
     'K': ['10001', '10010', '10100', '11000', '10100', '10010', '10001'],
     'L': ['10000', '10000', '10000', '10000', '10000', '10000', '11111'],
     'M': ['10001', '11011', '10101', '10101', '10001', '10001', '10001'],
@@ -596,7 +755,14 @@ if __name__ == '__main__':
     dump('geo/entity/termite_worker.geo.json', geo('geometry.termite_worker', worker))
     make_texture(os.path.join(ROOT, 'textures', 'entity', 'termite_worker.png'))
     make_nymph_texture(os.path.join(ROOT, 'textures', 'entity', 'termite_nymph.png'))
-    render([('KING', model_boxes(king)), ('WORKER', model_boxes(worker))]
+    minor, major = soldier_model(False), soldier_model(True)
+    for rank, model in (('minor', minor), ('major', major)):
+        dump(f'geo/entity/termite_{rank}_soldier.geo.json', geo(f'geometry.termite_{rank}_soldier', model))
+        make_texture(os.path.join(ROOT, 'textures', 'entity', f'termite_{rank}_soldier.png'), soldier=True)
+    dump('animations/entity/termite_soldier.animation.json', soldier_animations())
+    render([('KING', model_boxes(king)), ('WORKER', model_boxes(worker)), ('MINOR SOLDIER', model_boxes(minor)),
+            ('MAJOR SOLDIER', model_boxes(major))]
            + [(f'QUEEN {int(s * 100)}%', model_boxes(queen, queen_pose(s))) for s in (0.0, 0.5, 0.75, 1.0)])
     render_walk(king)
+    render_head_bang(major, os.path.join(PREVIEW_DIR, 'head_bang.png'))
     print('termite models and preview pictures written')

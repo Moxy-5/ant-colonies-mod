@@ -3,6 +3,7 @@ package com.antcolonies.client;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.entity.QueenAntEntity;
 import com.antcolonies.entity.TermiteKingEntity;
+import com.antcolonies.entity.TermiteSoldierEntity;
 import com.antcolonies.entity.TermiteWorkerEntity;
 import com.antcolonies.entity.WorkerAntEntity;
 import com.antcolonies.registry.ModEntities;
@@ -59,5 +60,19 @@ public class ClientEvents {
                 .withAltAnimations(ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "termite_king")))
                 .withScale(TermiteQueenModel.RENDER_SCALE));
         event.registerEntityRenderer(ModEntities.TERMITE_NYMPH.get(), TermiteNymphRenderer::new);
+        // Soldiers (tools/termite_models.py): both share termite_soldier.animation.json (idle, walk, head_bang). The
+        // major's bigger body is pressed farther toward a wall it climbs, and lifted more so its tail clears the floor.
+        ResourceLocation soldierAnimations = ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "termite_soldier");
+        event.registerEntityRenderer(ModEntities.TERMITE_MINOR_SOLDIER.get(), context -> new AntRenderer<>(
+                context, new DefaultedEntityGeoModel<TermiteSoldierEntity>(
+                        ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "termite_minor_soldier"))
+                .withAltAnimations(soldierAnimations))
+                .withScale(TermiteQueenModel.RENDER_SCALE));
+        event.registerEntityRenderer(ModEntities.TERMITE_MAJOR_SOLDIER.get(), context -> new AntRenderer<>(
+                context, new DefaultedEntityGeoModel<TermiteSoldierEntity>(
+                        ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "termite_major_soldier"))
+                .withAltAnimations(soldierAnimations))
+                .withClimbPose(0.4F, 0.27F)
+                .withScale(TermiteQueenModel.RENDER_SCALE));
     }
 }
