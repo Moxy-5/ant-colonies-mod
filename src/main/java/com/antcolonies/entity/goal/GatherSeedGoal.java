@@ -22,6 +22,7 @@ import net.minecraft.world.item.ItemStack;
  * Walks to a seed lying on the ground near the nest (any item of the species profile's food {@code items}: seeds for
  * the harvester ant, sticks, saplings and wheat for termites) and takes one in its mandibles. {@link StoreSeedGoal}
  * then carries it down to the food store. Only looks for seeds when there is somewhere for them to go: part of the food store is dug out, or the queen wants them.
+ * Only at foraging time (see {@code Colony.isForagingTime}); a forager on its way out when it ends turns back.
  */
 public class GatherSeedGoal extends Goal {
     /** How close (sideways, in blocks) the ant must get to take the seed. */
@@ -53,8 +54,8 @@ public class GatherSeedGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        if (colony == null) {
-            return false;
+        if (colony == null || !colony.isForagingTime(level)) {
+            return false; // foragers only go out at foraging time (termites: at night and in the rain)
         }
         long now = level.getGameTime();
         unreachable.values().removeIf(until -> until <= now);
@@ -69,7 +70,7 @@ public class GatherSeedGoal extends Goal {
     @Override
     public boolean canContinueToUse() {
         return colony != null && seed != null && seed.isAlive() && !seed.getItem().isEmpty()
-                && !ant.hasFullMandibles() && ticks < GIVE_UP_TICKS;
+                && !ant.hasFullMandibles() && ticks < GIVE_UP_TICKS && colony.isForagingTime(ant.level());
     }
 
     @Override

@@ -51,7 +51,7 @@ public class ShapeHoleGoal extends Goal {
             return false;
         }
         spot = colony.mound().pickHoleJob(level, ant);
-        return spot != null && ant.getNavigator().moveTo(BuildMoundGoal.withinReach(spot), spot, 1.0);
+        return spot != null && ant.getNavigator().moveTo(BuildMoundGoal.workFrom(ant, colony, spot), spot, 1.0);
     }
 
     @Override
@@ -89,7 +89,7 @@ public class ShapeHoleGoal extends Goal {
             return;
         }
         if (!BuildMoundGoal.isWithinReach(ant, spot)) {
-            if (!ant.getNavigator().moveTo(BuildMoundGoal.withinReach(spot), spot, 1.0)) {
+            if (!ant.getNavigator().moveTo(BuildMoundGoal.workFrom(ant, colony, spot), spot, 1.0)) {
                 spot = null;
             }
             return;

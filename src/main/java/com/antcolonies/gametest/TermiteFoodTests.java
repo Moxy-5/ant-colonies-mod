@@ -77,6 +77,9 @@ public class TermiteFoodTests {
         helper.onEachTick(() -> {
             if (colony[0] == null) {
                 colony[0] = TermiteMoundTests.colony(helper);
+                if (colony[0] != null) {
+                    colony[0].setForagingTimeForTests(true); // always night here: the foragers go out
+                }
             }
             if (colony[0] != null && helper.getTick() % 500 == 0) {
                 AntColoniesMod.LOGGER.info("[forage-test] tick {}: food {}, store cells {}, hay cut {}, dig target {}", helper.getTick(),

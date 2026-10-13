@@ -72,6 +72,57 @@ class NestPlanTest {
         }
     }
 
+    /**
+     * The foraging tunnels (termites: two, 8 blocks out) leave the shaft 2 blocks under the entrance, run straight out
+     * just under the surface to the sides the rooms and the food store leave free, never touch a room, its tunnel, a
+     * gallery or each other, and end under a hole in the surface beyond the foot of a full-grown mound. Checked with
+     * the shaft 3 and 2 deep.
+     */
+    @Test
+    void foragingTunnelsRunOutUnderTheSurfaceClearOfTheRooms() {
+        int distance = 8;
+        for (int depth = 2; depth <= 3; depth++) {
+            BlockPos entrance = BOTTOM.above(depth);
+            List<BlockPos> galleries = MoundPlan.galleries(3, 13).stream().map(entrance.below(depth)::offset).toList();
+            for (Direction direction : Direction.Plane.HORIZONTAL) {
+                List<NestPlan.Chamber> rooms = new java.util.ArrayList<>(NestPlan.chambers(entrance.below(depth), direction, 1));
+                rooms.addAll(NestPlan.sideRooms(entrance.below(depth), direction, List.of(NestPlan.Kind.FOOD)));
+                List<NestPlan.ForagingTunnel> tunnels = NestPlan.foragingTunnels(entrance, direction, 2, distance);
+                assertEquals(2, tunnels.size());
+                assertEquals(2, NestPlan.foragingTunnels(entrance, direction, 5, distance).size(), "at most two foraging tunnels");
+                for (int i = 0; i < tunnels.size(); i++) {
+                    NestPlan.ForagingTunnel tunnel = tunnels.get(i);
+                    assertEquals(distance, tunnel.tunnel().size());
+                    assertEquals(1, dist(tunnel.tunnel().get(0), entrance.below(NestPlan.FORAGING_TUNNEL_DEPTH)), "the tunnel starts at the shaft");
+                    assertTrue(tunnel.side().getAxis() != direction.getAxis(), "a foraging tunnel runs toward a room or the food store");
+                    assertEquals(tunnel.end().above(), tunnel.hole());
+                    assertEquals(entrance.getY() - 1, tunnel.hole().getY(), "the hole is in the top block of the ground");
+                    assertTrue(Math.abs(tunnel.hole().getX() - entrance.getX()) + Math.abs(tunnel.hole().getZ() - entrance.getZ()) > 6.5 + 1,
+                            "the hole lies under the foot of a full-grown mound");
+                    BlockPos previous = entrance.below(NestPlan.FORAGING_TUNNEL_DEPTH);
+                    for (BlockPos cell : tunnel.tunnel()) {
+                        assertEquals(entrance.getY() - NestPlan.FORAGING_TUNNEL_DEPTH, cell.getY(), "the tunnel runs just under the surface");
+                        assertEquals(1, dist(previous, cell), cell + " is dug before anything next to it");
+                        previous = cell;
+                        for (NestPlan.Chamber room : rooms) {
+                            for (BlockPos b : room.cells()) {
+                                assertTrue(dist(cell, b) > 1, "depth " + depth + ", rooms " + direction + ": tunnel cell " + cell + " touches the " + room.kind() + " cell " + b);
+                            }
+                        }
+                        for (BlockPos b : galleries) {
+                            assertTrue(dist(cell, b) > 1, "depth " + depth + ": tunnel cell " + cell + " touches the gallery cell " + b);
+                        }
+                        for (int k = i + 1; k < tunnels.size(); k++) {
+                            for (BlockPos b : tunnels.get(k).tunnel()) {
+                                assertTrue(dist(cell, b) > 1, "the two foraging tunnels touch at " + cell);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     @Test
     void theFoundingChamberStaysClearOfTheLevels() {
         for (int depth = 2; depth <= 3; depth++) {

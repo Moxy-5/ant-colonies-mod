@@ -148,6 +148,7 @@ public class TermiteMoundTests {
             if (colony == null) {
                 return;
             }
+            colony.setForagingTimeForTests(true); // always night here: the whole mound may be worked on from outside
             ServerLevel level = helper.getLevel();
             if (colony.mound().getStage(level) != stage[0]) {
                 colony.mound().setStage(level, stage[0]);
@@ -288,6 +289,63 @@ public class TermiteMoundTests {
             helper.assertTrue(termite.getNavigator().isDone() && termite.blockPosition().equals(bottom),
                     "the termite is not back down the shaft (at " + termite.blockPosition().subtract(hole) + " from the chimney block)");
             helper.assertTrue(highest[0] >= rim, "the termite did not go in by the mouth of the spire (highest " + (highest[0] - hole.getY()) + ")");
+        });
+    }
+
+    /**
+     * A termite on a walk that keeps away from chimney mouths (most walks, see the profile's chimney_trip_chance) leaves
+     * a chimney by another way when there is one (an opening at the foot of the chimney), without looking out of the
+     * mouth. With that way closed it goes in by the mouth and comes out of it again, looking round: the mouth is still
+     * used when there is no other way.
+     */
+    @GameTest(template = "arena", timeoutTicks = 3000, skyAccess = true)
+    public static void aTermiteOnlyUsesTheChimneyMouthWhenThereIsNoOtherWay(GameTestHelper helper) {
+        ground(helper);
+        BlockState soil = ModBlocks.TERMITE_MOUND.get().defaultBlockState().setValue(TermiteMoundBlock.LAYERS, TermiteMoundBlock.FINISHED);
+        for (int y = 1; y <= 3; y++) {
+            for (int x = 1; x <= 3; x++) {
+                for (int z = 1; z <= 3; z++) {
+                    if (x != 2 || z != 2) {
+                        helper.setBlock(new BlockPos(x, y, z), soil);
+                    }
+                }
+            }
+        }
+        helper.setBlock(new BlockPos(2, 3, 2), ModBlocks.TERMITE_HOLE.get());
+        BlockPos side = new BlockPos(3, 1, 2);
+        helper.setBlock(side, Blocks.AIR); // a way out at the foot of the chimney
+        BlockPos bottom = helper.absolutePos(new BlockPos(2, 1, 2));
+        BlockPos onTop = helper.absolutePos(new BlockPos(3, 4, 2));
+        TermiteWorkerEntity termite = helper.spawnWithNoFreeWill(ModEntities.TERMITE_WORKER.get(), 2, 1, 2);
+        termite.setWalkHabitsForTests(com.antcolonies.nav.Doorway.avoidMouths(helper.getLevel()));
+        int[] phase = {0};
+        int[] peeked = new int[3];
+        helper.runAfterDelay(10, () -> helper.assertTrue(termite.getNavigator().moveTo(onTop, 1.0), "no route out"));
+        helper.onEachTick(() -> {
+            if (helper.getTick() <= 10 || phase[0] > 2) {
+                return;
+            }
+            if (termite.isPeeking()) {
+                peeked[phase[0]]++;
+            }
+            if (!termite.getNavigator().isDone()) {
+                return;
+            }
+            if (phase[0] == 0 && termite.blockPosition().equals(onTop)) {
+                helper.assertTrue(peeked[0] == 0, "the termite came out of the chimney's mouth although there was another way");
+                helper.setBlock(side, soil); // the other way is closed
+                helper.assertTrue(termite.getNavigator().moveTo(bottom, 1.0), "no route back in by the mouth");
+                phase[0] = 1;
+            } else if (phase[0] == 1 && termite.blockPosition().equals(bottom)) {
+                helper.assertTrue(termite.getNavigator().moveTo(onTop, 1.0), "no route out by the mouth");
+                phase[0] = 2;
+            } else if (phase[0] == 2 && termite.blockPosition().equals(onTop)) {
+                phase[0] = 3;
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(phase[0] == 3, "the termite is at " + termite.blockPosition().subtract(bottom) + " from the shaft bottom in phase " + phase[0]);
+            helper.assertTrue(peeked[2] > 0, "with no other way the termite did not come out of the mouth (it never looked out)");
         });
     }
 

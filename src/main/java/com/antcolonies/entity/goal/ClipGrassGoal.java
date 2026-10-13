@@ -28,7 +28,8 @@ import net.minecraft.world.level.block.state.BlockState;
  * for termites (the species profile's food {@code plants}). A plant gives the profile's number of pieces and then
  * breaks; {@link StoreSeedGoal} then carries the piece down to the food store. Only looks for plants when there is
  * somewhere for the food to go: part of the food store is dug out, or the queen wants seeds. The ant works from the
- * plant's own cell (grass can be walked into) or from any spot right next to it (a hay bale is solid).
+ * plant's own cell (grass can be walked into) or from any spot right next to it (a hay bale is solid). Only at
+ * foraging time (see {@code Colony.isForagingTime}); when it ends the forager leaves the plant.
  */
 public class ClipGrassGoal extends Goal {
     /** How long (in ticks) the ant nibbles before the seed comes off. */
@@ -61,8 +62,8 @@ public class ClipGrassGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        if (colony == null) {
-            return false;
+        if (colony == null || !colony.isForagingTime(level)) {
+            return false; // foragers only go out at foraging time (termites: at night and in the rain)
         }
         long now = level.getGameTime();
         unreachable.values().removeIf(until -> until <= now);
@@ -77,7 +78,7 @@ public class ClipGrassGoal extends Goal {
     @Override
     public boolean canContinueToUse() {
         return colony != null && grass != null && colony.food().isFoodPlant(ant.level().getBlockState(grass))
-                && !ant.hasFullMandibles() && ticks < GIVE_UP_TICKS;
+                && !ant.hasFullMandibles() && ticks < GIVE_UP_TICKS && colony.isForagingTime(ant.level());
     }
 
     /** Any foothold from which the ant can nibble at {@code plant}: in its own cell or one of the 26 round it. */

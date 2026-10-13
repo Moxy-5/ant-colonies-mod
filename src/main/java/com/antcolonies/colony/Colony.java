@@ -26,7 +26,8 @@ import net.minecraft.world.phys.AABB;
  * <p>The colony itself holds who it is, its headcount and the workers' roles. Everything else lives in its parts, one
  * per subject: {@link #nest()} (the underground plan and digging), {@link #walls()} (sealing the nest), {@link #hill()},
  * {@link #food()} (seeds), {@link #bakery()} (ant bread), {@link #queenCare()} (feeding the queen and her eggs),
- * {@link #brood()} (eggs and larvae), {@link #refuse()} (dead ants) and {@link #mound()} (the termite mound).
+ * {@link #brood()} (eggs and larvae), {@link #refuse()} (dead ants), {@link #mound()} (the termite mound) and
+ * {@link #foragingHoles()} (the termites' ways out to forage).
  */
 public class Colony {
     /** "No time saved": a hunger clock that has not started yet. */
@@ -42,6 +43,9 @@ public class Colony {
     private final Map<UUID, ColonyRole> roles = new HashMap<>();
     /** Whether the workers of this colony get hungry. On, except in some tests. Not saved. */
     private boolean hungerOn = true;
+    /** Tests only: forces foraging time on or off (null: the real clock and weather). Not saved. */
+    @Nullable
+    private Boolean foragingTimeForTests;
 
     private final Nest nest;
     private final NestWalls walls;
@@ -52,6 +56,7 @@ public class Colony {
     private final Brood brood;
     private final Refuse refuse;
     private final Mound mound;
+    private final ForagingHoles foragingHoles;
 
     public Colony(UUID id, ResourceLocation species, UUID queenId, BlockPos center) {
         this.id = id;
@@ -67,6 +72,7 @@ public class Colony {
         this.brood = new Brood(this);
         this.refuse = new Refuse(this);
         this.mound = new Mound(this);
+        this.foragingHoles = new ForagingHoles(this);
     }
 
     /** The underground nest: its plan, the next block to dig, and the dug-out cells of each room. */
@@ -112,6 +118,33 @@ public class Colony {
     /** The termite mound (only species whose profile has a {@code mound} build one; see {@link Mound#numbers}). */
     public Mound mound() {
         return mound;
+    }
+
+    /** The foraging holes and their tunnels (only species whose profile has {@code nest.foraging_holes}). */
+    public ForagingHoles foragingHoles() {
+        return foragingHoles;
+    }
+
+    /**
+     * Whether it is time to forage (the profile's {@code food.forage_at}: termites at night and in the rain, harvester
+     * ants at any time). Outside this time the foragers stay home, the foraging holes are plugged, and a species that
+     * keeps to a schedule does no work outside the nest and the mound at all (it stays in, out of the sun).
+     */
+    public boolean isForagingTime(net.minecraft.world.level.Level level) {
+        if (foragingTimeForTests != null) {
+            return foragingTimeForTests;
+        }
+        return profile().food().foragesNow(level.isDay(), level.isRaining());
+    }
+
+    /** Whether this colony's species goes out at some times only (so it stays inside the rest of the time). */
+    public boolean keepsASchedule() {
+        return !profile().food().forageAt().containsAll(SpeciesProfile.FoodNumbers.ALWAYS);
+    }
+
+    /** Tests only: forces foraging time on or off (null for the real clock and weather). */
+    public void setForagingTimeForTests(@Nullable Boolean on) {
+        foragingTimeForTests = on;
     }
 
     public UUID getId() {

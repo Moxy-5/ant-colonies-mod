@@ -101,7 +101,7 @@ public class ColonyCommands {
                     + " | queen unfed " + unfedMinutes(colony, level) + " of " + colony.profile().queen().starveTicks() / 1200 + " min"
                     + " | eggs " + colony.brood().countEggs(level) + " | larvae " + colony.brood().countLarvae(level)
                     + " | dead ants " + colony.refuse().getCorpses(level).size() + " (refuse chamber " + colony.refuse().getRefuseCorpses(level).size() + ")"
-                    + mound(colony, level);
+                    + mound(colony, level) + foraging(colony, level);
             source.sendSuccess(() -> Component.literal(line), false);
         }
         return colonies.size();
@@ -115,6 +115,20 @@ public class ColonyCommands {
         int h = colony.mound().getStage(level);
         return String.format(" | mound height %d of %d, %d/%d blocks finished, earned %.1f", h, colony.mound().numbers().maxHeight(),
                 colony.mound().countFinished(level), colony.mound().wallsAt(h), colony.mound().getAllowance(level));
+    }
+
+    /** " | foraging now (night, rain), holes open 1 of 2" for colonies that keep a schedule or have foraging holes, otherwise nothing. */
+    private static String foraging(Colony colony, ServerLevel level) {
+        int holes = colony.profile().nest().foragingHoles();
+        if (!colony.keepsASchedule() && holes == 0) {
+            return "";
+        }
+        String when = String.join(", ", colony.profile().food().forageAt());
+        String line = " | " + (colony.isForagingTime(level) ? "foraging now" : "staying in") + " (out at: " + when + ")";
+        if (holes > 0) {
+            line += ", holes open " + colony.foragingHoles().countOpen(level) + " of " + colony.foragingHoles().tunnels(level).size();
+        }
+        return line;
     }
 
     /** How many minutes the queen has gone without food she wanted (0 while she is satisfied). */

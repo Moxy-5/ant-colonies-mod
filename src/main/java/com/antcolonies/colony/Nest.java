@@ -98,6 +98,13 @@ public class Nest {
 
     @Nullable
     private Layout layout;
+    /** The foraging tunnels of {@link #layout}, worked out once for it. */
+    private List<NestPlan.ForagingTunnel> foragingTunnels = List.of();
+    @Nullable
+    private Layout foragingTunnelsFor;
+    /** The cells that count as inside (see {@link #isInside}), worked out at most once a tick. */
+    private Set<BlockPos> inside = Set.of();
+    private long insideTick = Long.MIN_VALUE;
 
     Nest(Colony colony) {
         this.colony = colony;
@@ -108,7 +115,8 @@ public class Nest {
      * The next block to dig, or null if all the digging is done (or blocked). Order: the founding chamber if the
      * species has one (the shaft down to it, then its tunnel and room: the queen's first home), then the rest of the
      * entrance shaft, then the levels from the top down (the stair, the tunnel and the room of each: seed store,
-     * nursery, queen, refuse chamber), then the side rooms (the termites' food store; only once the colony has workers).
+     * nursery, queen, refuse chamber), then the side rooms (the termites' food store; only once the colony has workers),
+     * then the foraging tunnels, and at foraging time a closed foraging hole at the end of one (see {@link ForagingHoles}).
      * While the colony is still founding (the queen alone), only the founding chamber is dug. The shaft is never
      * widened, so its walls stay solid for the ants to climb.
      */
@@ -180,6 +188,16 @@ public class Nest {
             if (next != null) {
                 return next;
             }
+        }
+        for (NestPlan.ForagingTunnel tunnel : getForagingTunnels(level)) {
+            next = firstDiggable(level, tunnel.tunnel());
+            if (next != null) {
+                return next;
+            }
+        }
+        BlockPos hole = colony.foragingHoles().holeToOpen(level);
+        if (hole != null) {
+            return hole;
         }
         return colony.mound().findDigTarget(level, digger);
     }
@@ -308,8 +326,14 @@ public class Nest {
                 && level.getBlockState(center).is(ModBlocks.BURROWED_DIRT.get());
     }
 
-    /** Whether a worker may bite this block: soil (the diggable tag), or the plug in its own entrance. */
+    /**
+     * Whether a worker may bite this block: soil (the diggable tag), the plug in its own entrance, or the mound's soil
+     * where it must be hollow. A foraging hole only at foraging time (soil or its plug).
+     */
     public boolean canDig(Level level, BlockPos pos) {
+        if (colony.foragingHoles().isHole(level, pos)) {
+            return colony.foragingHoles().mayOpen(level, pos);
+        }
         return level.getBlockState(pos).is(ModTags.DIGGABLE) || (pos.equals(center) && isEntrancePlugged(level))
                 || colony.mound().isClearJob(level, pos);
     }
@@ -333,6 +357,11 @@ public class Nest {
         }
         if (target.equals(center)) {
             spots.add(0, center.below());
+        }
+        // A foraging hole is opened from the end of its tunnel, under it.
+        if (colony.foragingHoles().isHole(level, target) && nestCells.contains(target.below())) {
+            spots.remove(target.below());
+            spots.add(0, target.below());
         }
         // The mound's own soil in a shaft is cleared from below too (the old cap of a chimney that grew).
         if (colony.mound().isClearJob(level, target) && level.getBlockState(target.below()).isAir()) {
@@ -435,7 +464,48 @@ public class Nest {
             }
             cells.addAll(colony.mound().getGalleries(level)); // none for species without a mound
         }
+        for (NestPlan.ForagingTunnel tunnel : getForagingTunnels(level)) {
+            cells.addAll(tunnel.tunnel());
+        }
         return cells;
+    }
+
+    /**
+     * The foraging tunnels of the plan (the profile's {@code nest.foraging_holes}; see {@link NestPlan#foragingTunnels}),
+     * none until the plan is made.
+     */
+    public List<NestPlan.ForagingTunnel> getForagingTunnels(Level level) {
+        Layout planned = getLayout(level);
+        if (planned == null) {
+            return List.of();
+        }
+        if (planned != foragingTunnelsFor) {
+            var numbers = colony.profile().nest();
+            foragingTunnels = NestPlan.foragingTunnels(center, planned.direction(), numbers.foragingHoles(), numbers.foragingHoleDistance());
+            foragingTunnelsFor = planned;
+        }
+        return foragingTunnels;
+    }
+
+    /**
+     * Whether a cell is inside the colony's home, out of the sun: the entrance, the nest's shaft, rooms, galleries and
+     * foraging tunnels, and the hollow shafts, tunnels and chimney blocks of the mound. Not the foraging holes
+     * themselves (the way out) and not the open air round the mound.
+     */
+    public boolean isInside(Level level, BlockPos cell) {
+        long now = level.getGameTime();
+        if (now != insideTick) {
+            Set<BlockPos> cells = nestCells(level);
+            cells.add(center);
+            colony.mound().getParts(level).forEach((pos, part) -> {
+                if (part != MoundPlan.Part.WALL) {
+                    cells.add(pos);
+                }
+            });
+            inside = cells;
+            insideTick = now;
+        }
+        return inside.contains(cell);
     }
 
     /** The first block in the list that is diggable, has a place to stand next to it (see {@link #standSpotsFor}), and is safe to open. */

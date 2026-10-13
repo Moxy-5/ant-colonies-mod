@@ -108,7 +108,7 @@ public class DigGoal extends Goal {
             if (legs.isDone()) {
                 boolean walking = false;
                 for (BlockPos stand : colony.nest().standSpotsFor(level, target)) {
-                    if (legs.moveTo(stand, 1.0)) {
+                    if (ant.mayBeAt(stand) && legs.moveTo(stand, 1.0)) { // by day a termite digs from inside only
                         walking = true;
                         break;
                     }

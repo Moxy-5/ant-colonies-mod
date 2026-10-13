@@ -22,7 +22,8 @@ import net.minecraft.world.level.block.state.BlockState;
 /**
  * A termite holding a soil pellet takes it to the mound and adds it as a layer to the next block being built (see
  * {@link com.antcolonies.colony.Mound#pickBuildSpot}). It works from any spot right next to the block: beside it, under
- * it in the shaft, or clinging to the mound's outside. With no spot free it keeps its pellet until one is.
+ * it in the shaft, or clinging to the mound's outside. With no spot free it keeps its pellet until one is. While the
+ * termites stay in (by day) it only builds where it can work from inside the mound or the nest.
  */
 public class BuildMoundGoal extends Goal {
     /** If the termite has not put its soil down in this many ticks, it tries another spot. */
@@ -56,6 +57,19 @@ public class BuildMoundGoal extends Goal {
             return !cell.equals(block) && Math.abs(cell.getX() - block.getX()) <= 1 && Math.abs(cell.getY() - block.getY()) <= 1
                     && Math.abs(cell.getZ() - block.getZ()) <= 1;
         };
+    }
+
+    /**
+     * Where an insect may work on {@code block} from now: any foothold within reach (see {@link #withinReach}), or, while
+     * it stays in (see {@link AbstractAntEntity#mayGoOut}), only one inside the nest or the mound.
+     */
+    public static Predicate<Foothold> workFrom(AbstractAntEntity ant, Colony colony, BlockPos block) {
+        Predicate<Foothold> reach = withinReach(block);
+        if (ant.mayGoOut()) {
+            return reach;
+        }
+        net.minecraft.world.level.Level level = ant.level();
+        return reach.and(at -> colony.nest().isInside(level, at.cell()));
     }
 
     /** Whether the insect is now in one of the 26 cells round {@code block}. */
@@ -136,7 +150,7 @@ public class BuildMoundGoal extends Goal {
 
     /** Plans the walk to the spot; tries other spots when there is no route, and stops trying after a few. */
     private void walkToSpot() {
-        while (spot != null && !ant.getNavigator().moveTo(withinReach(spot), spot, 1.0)) {
+        while (spot != null && !ant.getNavigator().moveTo(workFrom(ant, colony, spot), spot, 1.0)) {
             if (++failedRoutes >= MAX_FAILED_ROUTES) {
                 AntColoniesMod.LOGGER.info("[mound] termite at {} found no route to mound spots (last: {})", ant.blockPosition().toShortString(), spot.toShortString());
                 spot = null;

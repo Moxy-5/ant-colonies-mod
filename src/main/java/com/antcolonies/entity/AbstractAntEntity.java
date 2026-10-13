@@ -11,6 +11,9 @@ import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.nav.AntNavigator;
+import com.antcolonies.nav.AntPathFinder;
+import com.antcolonies.nav.Doorway;
+import com.antcolonies.species.SpeciesProfile;
 import com.antcolonies.nav.Foothold;
 import com.antcolonies.registry.ModItems;
 
@@ -242,6 +245,51 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     /** The legs: plans routes (walk, climb, drop) and walks them. Goals only say where to go. */
     public AntNavigator getNavigator() {
         return navigator;
+    }
+
+    /** The colony this insect belongs to, if it has one and it still exists (server only). */
+    @Nullable
+    public Colony getColony() {
+        return getColonyId() != null && level() instanceof ServerLevel serverLevel ? ColonyManager.get(serverLevel).getColony(getColonyId()) : null;
+    }
+
+    /**
+     * Whether this insect may work outside its nest and mound now. Always, unless its colony keeps a schedule (termites:
+     * out only at night and in the rain) and it is not foraging time: then it stays inside, out of the sun.
+     */
+    public boolean mayGoOut() {
+        Colony colony = getColony();
+        return colony == null || !colony.keepsASchedule() || colony.isForagingTime(level());
+    }
+
+    /** Whether this cell may be the end of a walk now: anywhere while it may go out (see {@link #mayGoOut}), otherwise only inside. */
+    public boolean mayBeAt(BlockPos cell) {
+        Colony colony = getColony();
+        return mayGoOut() || colony == null || colony.nest().isInside(level(), cell);
+    }
+
+    /** Tests only: the habits every walk gets (null: the usual ones, see {@link #walkHabits}). */
+    @Nullable
+    private AntPathFinder.StepCosts habitsForTests;
+
+    /**
+     * How this insect would like to walk this time (asked by the legs once for each new walk; they give way when no
+     * route keeps to them). A termite comes out of or goes in by a chimney's mouth only on some walks (the profile's
+     * {@code mound.chimney_trip_chance}, about 1 in 10): on the others it takes another way, such as a foraging hole,
+     * if there is one.
+     */
+    public AntPathFinder.StepCosts walkHabits() {
+        if (habitsForTests != null) {
+            return habitsForTests;
+        }
+        Colony colony = getColony();
+        float chance = colony == null ? 1.0F : colony.profile().mound().map(SpeciesProfile.MoundNumbers::chimneyTripChance).orElse(1.0F);
+        return chance >= 1.0F || getRandom().nextFloat() < chance ? AntPathFinder.StepCosts.NONE : Doorway.avoidMouths(level());
+    }
+
+    /** Tests only: gives every walk these habits (null for the usual ones). */
+    public void setWalkHabitsForTests(@Nullable AntPathFinder.StepCosts habits) {
+        habitsForTests = habits;
     }
 
     // Runs every tick, just before the move control: keeps the ant walking its planned route.

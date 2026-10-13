@@ -17,7 +17,8 @@ import net.minecraft.world.entity.ai.goal.Goal;
 /**
  * Idle wandering: now and then walks to a random nearby spot, through tunnels too. Underground some insects now and
  * then pick a spot on the ceiling instead and hang there upside down for a while, like real ants in their nest
- * ({@link #hangsFromCeilings}).
+ * ({@link #hangsFromCeilings}). An insect that stays in (termites by day, see {@link AbstractAntEntity#mayGoOut}) only
+ * strolls inside.
  */
 public class AntWanderGoal extends Goal {
     private final AbstractAntEntity ant;
@@ -55,8 +56,8 @@ public class AntWanderGoal extends Goal {
             int dx = ant.getRandom().nextInt(radius * 2 + 1) - radius;
             int dz = ant.getRandom().nextInt(radius * 2 + 1) - radius;
             BlockPos spot = findFloor(map, here.offset(dx, 0, dz));
-            if (spot == null) {
-                continue;
+            if (spot == null || !ant.mayBeAt(spot)) {
+                continue; // by day a termite only strolls inside
             }
             if (ceilingChance > 0.0F && ant.getRandom().nextFloat() < ceilingChance && !ant.level().canSeeSky(spot)
                     && Foothold.ceiling(spot).isValid(map)

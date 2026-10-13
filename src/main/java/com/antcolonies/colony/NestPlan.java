@@ -194,6 +194,44 @@ public final class NestPlan {
         return List.copyOf(rooms);
     }
 
+    /**
+     * A foraging tunnel: {@code tunnel} its blocks in digging order (each touches the one before; the first touches the
+     * entrance shaft), {@code hole} the block above its far end, the foraging hole in the ground that is opened when
+     * the workers go out to forage and plugged with soil when they stay in, and {@code side} the way it runs.
+     */
+    public record ForagingTunnel(List<BlockPos> tunnel, BlockPos hole, Direction side) {
+        /** The last block of the tunnel, right under the hole: where a worker stands to open or plug it. */
+        public BlockPos end() {
+            return tunnel.get(tunnel.size() - 1);
+        }
+    }
+
+    /** How deep (in blocks under the entrance cell) a foraging tunnel runs: just under the surface, its roof the top block of the ground. */
+    public static final int FORAGING_TUNNEL_DEPTH = 2;
+
+    /**
+     * The foraging tunnels (the profile's {@code nest.foraging_holes}, at most 2) of a nest whose rooms lie toward
+     * {@code direction}: each leaves the entrance shaft {@link #FORAGING_TUNNEL_DEPTH} blocks under the entrance cell
+     * ({@code entrance}) and runs straight out, just under the surface, {@code distance} blocks to the side (to the left
+     * of the rooms, then to the right), and a hole opens from its end up to the surface. Real Macrotermes forage through
+     * such shallow tunnels that open far from the mound. They run to the sides a nest with one level and one side room
+     * (the termites': the rooms ahead, the food store behind) leaves free, one block above the rooms' level, so they
+     * never touch a room or its tunnel; a nest with more side rooms has no room for them.
+     */
+    public static List<ForagingTunnel> foragingTunnels(BlockPos entrance, Direction direction, int count, int distance) {
+        Direction[] sides = {direction.getCounterClockWise(), direction.getClockWise()};
+        BlockPos start = entrance.below(FORAGING_TUNNEL_DEPTH);
+        List<ForagingTunnel> tunnels = new ArrayList<>();
+        for (int i = 0; i < count && i < sides.length && distance > 0; i++) {
+            List<BlockPos> tunnel = new ArrayList<>();
+            for (int k = 1; k <= distance; k++) {
+                tunnel.add(start.relative(sides[i], k));
+            }
+            tunnels.add(new ForagingTunnel(List.copyOf(tunnel), tunnel.get(tunnel.size() - 1).above(), sides[i]));
+        }
+        return List.copyOf(tunnels);
+    }
+
     /** The blocks of a room that lies after a tunnel ({@code tunnelLength} long) leaving {@code start} in direction {@code forward}, in digging order. */
     private static List<BlockPos> room(BlockPos start, Direction forward, RoomSize size, int tunnelLength) {
         List<BlockPos> cells = new ArrayList<>();

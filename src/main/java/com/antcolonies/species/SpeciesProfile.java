@@ -101,9 +101,14 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * piece is a {@code piece} item. The colony keeps its food in the food store as heaps of the {@code pile} block
      * (a {@link SeedPileBlock}), one layer per piece. Bread, for species that mill it: {@code millTicks} to mill one
      * seed into bread, and {@code breadStock} pieces the nurses keep ready for the queen; a species without bread leaves
-     * both out.
+     * both out. {@code forageAt}: when the foragers go out, any of "day", "night" and "rain" (optional, all three:
+     * always); outside those times the workers stay inside (see {@code Colony.isForagingTime}).
      */
-    public record FoodNumbers(int radius, String items, List<PlantFood> plants, String piece, String pile, int millTicks, int breadStock) {
+    public record FoodNumbers(int radius, String items, List<PlantFood> plants, String piece, String pile, int millTicks, int breadStock,
+            List<String> forageAt) {
+        /** Foraging at any time: day, night and in the rain. */
+        public static final List<String> ALWAYS = List.of("day", "night", "rain");
+
         public static final Codec<FoodNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("radius").forGetter(FoodNumbers::radius),
                 Codec.STRING.fieldOf("items").forGetter(FoodNumbers::items),
@@ -111,8 +116,17 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 Codec.STRING.fieldOf("piece").forGetter(FoodNumbers::piece),
                 Codec.STRING.fieldOf("pile").forGetter(FoodNumbers::pile),
                 Codec.INT.optionalFieldOf("mill_ticks", 0).forGetter(FoodNumbers::millTicks),
-                Codec.INT.optionalFieldOf("bread_stock", 0).forGetter(FoodNumbers::breadStock)
+                Codec.INT.optionalFieldOf("bread_stock", 0).forGetter(FoodNumbers::breadStock),
+                Codec.STRING.listOf().optionalFieldOf("forage_at", ALWAYS).forGetter(FoodNumbers::forageAt)
         ).apply(i, FoodNumbers::new));
+
+        /**
+         * Whether the foragers go out now: in the rain if "rain" is listed (in a dry biome such as the savanna no rain
+         * falls, but the sky clouds over: an overcast day), otherwise by day or by night as listed.
+         */
+        public boolean foragesNow(boolean day, boolean raining) {
+            return raining && forageAt.contains("rain") || forageAt.contains(day ? "day" : "night");
+        }
 
         /** Whether the nurses mill the food into bread (the harvester ant's seeds). */
         public boolean makesBread() {
@@ -194,13 +208,19 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * {@code NestPlan.foundingChamber}), her home until the workers have dug her deep room (optional, default false).
      * {@code sideRooms}: more rooms on the top level, beside the shaft's foot, dug by the workers once the colony is
      * founded (see {@code NestPlan.sideRooms}; names of room kinds, such as "food" for a food store; optional, none).
+     * {@code foragingHoles}: how many tunnels run from the shaft out under the ground to a foraging hole, the workers'
+     * way out to forage (see {@code NestPlan.foragingTunnels}; 0 to 2, optional, none), and {@code foragingHoleDistance}
+     * how far out (in blocks) the holes are (optional, 8).
      */
-    public record NestNumbers(int maxLevels, boolean sealWhileFounding, boolean foundingChamber, List<String> sideRooms) {
+    public record NestNumbers(int maxLevels, boolean sealWhileFounding, boolean foundingChamber, List<String> sideRooms,
+            int foragingHoles, int foragingHoleDistance) {
         public static final Codec<NestNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("max_levels").forGetter(NestNumbers::maxLevels),
                 Codec.BOOL.fieldOf("seal_while_founding").forGetter(NestNumbers::sealWhileFounding),
                 Codec.BOOL.optionalFieldOf("founding_chamber", false).forGetter(NestNumbers::foundingChamber),
-                Codec.STRING.listOf().optionalFieldOf("side_rooms", List.of()).forGetter(NestNumbers::sideRooms)
+                Codec.STRING.listOf().optionalFieldOf("side_rooms", List.of()).forGetter(NestNumbers::sideRooms),
+                Codec.INT.optionalFieldOf("foraging_holes", 0).forGetter(NestNumbers::foragingHoles),
+                Codec.INT.optionalFieldOf("foraging_hole_distance", 8).forGetter(NestNumbers::foragingHoleDistance)
         ).apply(i, NestNumbers::new));
     }
 
@@ -238,9 +258,18 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * day it may have {@code blocksPerDay} more blocks, plus {@code blocksPerDayPerWorker} for each worker (so an old
      * small colony still adds to it slowly, and a big one builds fast). The soil comes from galleries dug under it:
      * {@code galleryLevels} levels, reaching up to {@code galleryRadius} blocks out from the shaft.
+     * {@code chimneyTripChance}: the share of walks (0 to 1) on which a termite may come out of or go in by the mouth of a
+     * chimney although there is another way (a foraging hole, an entrance at the foot); on the others it only uses a
+     * chimney's mouth when there is no other way (optional, 1: any walk).
      */
     public record MoundNumbers(int maxHeight, float baseRadius, int sideChimneys, int sideChimneyHeight, float blocksPerDay,
-            float blocksPerDayPerWorker, int galleryLevels, int galleryRadius) {
+            float blocksPerDayPerWorker, int galleryLevels, int galleryRadius, float chimneyTripChance) {
+        /** The numbers without a chimney trip chance (any walk may use a chimney's mouth). */
+        public MoundNumbers(int maxHeight, float baseRadius, int sideChimneys, int sideChimneyHeight, float blocksPerDay,
+                float blocksPerDayPerWorker, int galleryLevels, int galleryRadius) {
+            this(maxHeight, baseRadius, sideChimneys, sideChimneyHeight, blocksPerDay, blocksPerDayPerWorker, galleryLevels, galleryRadius, 1.0F);
+        }
+
         public static final Codec<MoundNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("max_height").forGetter(MoundNumbers::maxHeight),
                 Codec.FLOAT.fieldOf("base_radius").forGetter(MoundNumbers::baseRadius),
@@ -249,7 +278,8 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 Codec.FLOAT.fieldOf("blocks_per_day").forGetter(MoundNumbers::blocksPerDay),
                 Codec.FLOAT.fieldOf("blocks_per_day_per_worker").forGetter(MoundNumbers::blocksPerDayPerWorker),
                 Codec.INT.fieldOf("gallery_levels").forGetter(MoundNumbers::galleryLevels),
-                Codec.INT.fieldOf("gallery_radius").forGetter(MoundNumbers::galleryRadius)
+                Codec.INT.fieldOf("gallery_radius").forGetter(MoundNumbers::galleryRadius),
+                Codec.FLOAT.optionalFieldOf("chimney_trip_chance", 1.0F).forGetter(MoundNumbers::chimneyTripChance)
         ).apply(i, MoundNumbers::new));
     }
 
@@ -276,9 +306,9 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
             new QueenNumbers(20, 5, 5, 1200, 3600, 120000L),
             new BroodNumbers(10, 1200, 5, 48000L),
             new FoodNumbers(24, "antcolonies:seeds", List.of(new PlantFood("minecraft:short_grass", 10, false, 1)),
-                    "minecraft:wheat_seeds", "antcolonies:seed_pile", 60, 20),
+                    "minecraft:wheat_seeds", "antcolonies:seed_pile", 60, 20, FoodNumbers.ALWAYS),
             new RefuseNumbers(6000),
-            new NestNumbers(4, true, true, List.of()),
+            new NestNumbers(4, true, true, List.of(), 0, 8),
             Optional.empty(),
             Optional.of(new Founding(3, 400, 200)),
             Optional.empty());

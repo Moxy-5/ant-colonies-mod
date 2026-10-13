@@ -115,6 +115,11 @@ public class AntNavigator {
     private final Map<Foothold, Long> avoid = new HashMap<>();
     /** The extra costs the mind gave for this walk (see {@link #moveTo(BlockPos, double, AntPathFinder.StepCosts)}). */
     private AntPathFinder.StepCosts mindCosts = AntPathFinder.StepCosts.NONE;
+    /**
+     * The insect's habits for this walk ({@link AbstractAntEntity#walkHabits}, asked once per walk): moves it would
+     * rather not make. Unlike the mind's costs they give way: when no route keeps to them, it is planned without them.
+     */
+    private AntPathFinder.StepCosts habits = AntPathFinder.StepCosts.NONE;
 
     public AntNavigator(AbstractAntEntity ant) {
         this.ant = ant;
@@ -139,6 +144,7 @@ public class AntNavigator {
         this.goalTest = null;
         this.speed = speed;
         this.replans = 0;
+        this.habits = ant.walkHabits();
         this.mindCosts = mindCosts;
         return plan(null);
     }
@@ -153,6 +159,7 @@ public class AntNavigator {
         this.goalTest = null;
         this.speed = speed;
         this.replans = 0;
+        this.habits = ant.walkHabits();
         this.mindCosts = AntPathFinder.StepCosts.NONE;
         return plan(null);
     }
@@ -167,6 +174,7 @@ public class AntNavigator {
         this.goalTest = isGoal;
         this.speed = speed;
         this.replans = 0;
+        this.habits = ant.walkHabits();
         this.mindCosts = AntPathFinder.StepCosts.NONE;
         return plan(null);
     }
@@ -181,6 +189,7 @@ public class AntNavigator {
         this.goalTest = null;
         this.speed = speed;
         this.replans = 0;
+        this.habits = ant.walkHabits();
         this.mindCosts = AntPathFinder.StepCosts.NONE;
         return plan(shared);
     }
@@ -336,21 +345,10 @@ public class AntNavigator {
                 : mindCosts.and((from, to, kind) -> avoid.containsKey(to) ? 50.0 : 0.0);
         Route found = null;
         if (!starts.isEmpty()) {
-            if (shared == null) {
-                found = goalTest != null
-                        ? AntPathFinder.find(map, starts, goalTest, goal, AntPathFinder.DEFAULT_MAX_EXPANSIONS, costs)
-                        : goalFoothold == null
-                        ? AntPathFinder.find(map, starts, goal, AntPathFinder.DEFAULT_MAX_EXPANSIONS, costs)
-                        : AntPathFinder.find(map, starts, goalFoothold::equals, goal, AntPathFinder.DEFAULT_MAX_EXPANSIONS, costs);
-            } else {
-                Foothold join = shared.start();
-                Route onto = AntPathFinder.find(map, starts, join::equals, join.cell(),
-                        AntPathFinder.DEFAULT_MAX_EXPANSIONS, costs);
-                if (onto != null) {
-                    List<Route.Step> steps = new ArrayList<>(onto.steps());
-                    steps.addAll(shared.steps().subList(1, shared.size()));
-                    found = new Route(steps, onto.cost() + shared.cost());
-                }
+            // Keeping to its habits if it can; if no route does, without them.
+            found = habits == AntPathFinder.StepCosts.NONE ? null : search(map, starts, shared, costs.and(habits));
+            if (found == null) {
+                found = search(map, starts, shared, costs);
             }
         }
         failed = found == null;
@@ -363,6 +361,26 @@ public class AntNavigator {
         blockedFrom = ant.position();
         at = start;
         return found != null;
+    }
+
+    /** One search for a route from the starts: to the goal, or onto the start of a shared route and along it. Null if none. */
+    @Nullable
+    private Route search(CellMap map, List<Foothold> starts, @Nullable Route shared, AntPathFinder.StepCosts costs) {
+        if (shared == null) {
+            return goalTest != null
+                    ? AntPathFinder.find(map, starts, goalTest, goal, AntPathFinder.DEFAULT_MAX_EXPANSIONS, costs)
+                    : goalFoothold == null
+                    ? AntPathFinder.find(map, starts, goal, AntPathFinder.DEFAULT_MAX_EXPANSIONS, costs)
+                    : AntPathFinder.find(map, starts, goalFoothold::equals, goal, AntPathFinder.DEFAULT_MAX_EXPANSIONS, costs);
+        }
+        Foothold join = shared.start();
+        Route onto = AntPathFinder.find(map, starts, join::equals, join.cell(), AntPathFinder.DEFAULT_MAX_EXPANSIONS, costs);
+        if (onto == null) {
+            return null;
+        }
+        List<Route.Step> steps = new ArrayList<>(onto.steps());
+        steps.addAll(shared.steps().subList(1, shared.size()));
+        return new Route(steps, onto.cost() + shared.cost());
     }
 
     /** Called every tick from the insect, before it moves. */

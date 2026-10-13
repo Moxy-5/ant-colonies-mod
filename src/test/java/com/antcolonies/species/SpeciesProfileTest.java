@@ -55,6 +55,30 @@ class SpeciesProfileTest {
                 "a hay bale is a big meal several termites cut at");
         assertTrue(profile.food().plants().stream().anyMatch(plant -> plant.block().equals("#minecraft:leaves") && plant.onlyDecaying()),
                 "only dying leaves are food");
+        // Out at night and in the rain, through two foraging holes; a chimney's mouth on about 1 walk in 10.
+        assertEquals(java.util.List.of("night", "rain"), profile.food().forageAt());
+        assertEquals(2, profile.nest().foragingHoles());
+        assertTrue(profile.nest().foragingHoleDistance() > 7, "the foraging holes must lie beyond the foot of a full-grown mound");
+        assertTrue(profile.mound().isPresent() && profile.mound().get().chimneyTripChance() > 0 && profile.mound().get().chimneyTripChance() < 0.5F);
+    }
+
+    @Test
+    void foragersGoOutWhenTheirProfileSays() {
+        SpeciesProfile.FoodNumbers ant = SpeciesProfile.RED_HARVESTER_ANT.food();
+        SpeciesProfile.FoodNumbers termite = new SpeciesProfile.FoodNumbers(24, "x", java.util.List.of(), "x", "x", 0, 0, java.util.List.of("night", "rain"));
+        for (boolean day : new boolean[] {true, false}) {
+            for (boolean rain : new boolean[] {true, false}) {
+                assertTrue(ant.foragesNow(day, rain), "the harvester ant forages at any time");
+                assertEquals(!day || rain, termite.foragesNow(day, rain), "termites forage at night and in the rain (day " + day + ", rain " + rain + ")");
+            }
+        }
+    }
+
+    @Test
+    void theRedHarvesterAntHasNoForagingHolesAndAnyWalkMayUseAChimney() throws Exception {
+        SpeciesProfile profile = read("red_harvester_ant");
+        assertEquals(0, profile.nest().foragingHoles());
+        assertEquals(SpeciesProfile.FoodNumbers.ALWAYS, profile.food().forageAt());
     }
 
     @Test

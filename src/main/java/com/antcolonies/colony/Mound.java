@@ -271,8 +271,29 @@ public class Mound {
     }
 
     /**
+     * Whether termites can work on this spot now: always while they may go out, but while they stay in (by day, see
+     * {@link Colony#isForagingTime}) only from inside: one of the cells round it is inside the nest or the mound.
+     */
+    public boolean isWorkableNow(Level level, BlockPos spot) {
+        if (!colony.keepsASchedule() || colony.isForagingTime(level)) {
+            return true;
+        }
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dy = -1; dy <= 1; dy++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    if ((dx != 0 || dy != 0 || dz != 0) && colony.nest().isInside(level, spot.offset(dx, dy, dz))) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
      * A spot for this termite's soil (claimed for it, one termite to a spot: they do not push each other), or null if
-     * there is none free. Blocks being built first, then the lowest, then the nearest.
+     * there is none free. Blocks being built first, then the lowest, then the nearest. By day only spots that can be
+     * worked on from inside ({@link #isWorkableNow}).
      */
     @Nullable
     public BlockPos pickBuildSpot(Level level, AbstractAntEntity ant) {
@@ -280,7 +301,7 @@ public class Mound {
         buildClaims.values().removeIf(claim -> claim.until <= now);
         BlockPos best = null;
         for (BlockPos spot : getBuildSpots(level)) {
-            if (isClaimedByOther(buildClaims, spot, ant.getUUID())) {
+            if (isClaimedByOther(buildClaims, spot, ant.getUUID()) || !isWorkableNow(level, spot)) {
                 continue;
             }
             if (best == null) {
@@ -365,12 +386,18 @@ public class Mound {
 
     // ---- soil ----
 
-    /** Whether more soil is wanted: more spots ready for a layer than termites already bringing soil. */
+    /** Whether more soil is wanted: more spots ready for a layer (that can be worked on now) than termites already bringing soil. */
     public boolean wantsSoil(Level level) {
         long now = level.getGameTime();
         buildClaims.values().removeIf(claim -> claim.until <= now);
         soilClaims.prune(now);
-        return getBuildSpots(level).size() > buildClaims.size() + soilClaims.size();
+        int spots = 0;
+        for (BlockPos spot : getBuildSpots(level)) {
+            if (isWorkableNow(level, spot)) {
+                spots++;
+            }
+        }
+        return spots > buildClaims.size() + soilClaims.size();
     }
 
     /**
