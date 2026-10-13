@@ -382,8 +382,10 @@ public class TermiteMoundTests {
     }
 
     /**
-     * The same with the cathedral mound's chimney mouth (a tube on top of the block, see TermiteMouthBlock) on top of
-     * the shaft: the termite comes up the tube, looks round, climbs over its rim and down it, and goes back in by it.
+     * The same with the cathedral mound's chimney mouth (a tube on top of the block, see TermiteMouthBlock): its channel
+     * goes down into a tunnel block over the shaft (step 3 of the tunnel plan: a mouth is never walked through, only
+     * crawled through by its channel), so the termite climbs onto the shaft's ceiling, up into the tunnel's hole and the
+     * mouth's tube, looks round, climbs over its rim and down it, and goes back in by it.
      */
     @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
     public static void aTermiteComesOutOfTheSpireMouthAndGoesBackIn(GameTestHelper helper) {
@@ -391,6 +393,7 @@ public class TermiteMoundTests {
     }
 
     private static void comeOutOfTheMouthAndGoBackIn(GameTestHelper helper, BlockState doorway) {
+        boolean channel = doorway.getBlock() instanceof com.antcolonies.nav.Channel;
         ground(helper);
         // A chimney: a ring of soil round a shaft, 3 blocks high, with a chimney block on top of the shaft.
         BlockState soil = ModBlocks.TERMITE_MOUND.get().defaultBlockState().setValue(TermiteMoundBlock.LAYERS, TermiteMoundBlock.FINISHED);
@@ -404,6 +407,12 @@ public class TermiteMoundTests {
             }
         }
         helper.setBlock(new BlockPos(2, 3, 2), doorway);
+        if (channel) {
+            // A tunnel block between the shaft and the mouth, open down into the shaft and up into the mouth.
+            BlockPos tunnel = helper.absolutePos(new BlockPos(2, 2, 2));
+            helper.getLevel().setBlockAndUpdate(tunnel, ModBlocks.TERMITE_TUNNEL.get().stateFor(helper.getLevel(), tunnel, 2,
+                    java.util.List.of(net.minecraft.core.Direction.DOWN)));
+        }
         BlockPos hole = helper.absolutePos(new BlockPos(2, 3, 2));
         BlockPos bottom = helper.absolutePos(new BlockPos(2, 1, 2));
         BlockPos onTop = helper.absolutePos(new BlockPos(3, 4, 2));

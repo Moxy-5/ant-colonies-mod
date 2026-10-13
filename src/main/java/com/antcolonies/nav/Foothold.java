@@ -8,10 +8,17 @@ import net.minecraft.core.Direction;
  * {@code surface} points from the insect to the block it stands on: {@link Direction#DOWN} = the floor (the top of the
  * block below), a horizontal direction = a wall (the side of the block next to it in that direction),
  * {@link Direction#UP} = the ceiling (the underside of the block above: the insect hangs upside down).
+ *
+ * <p>Or the insect is inside a narrow channel through the block in that cell ({@link Channel}, a termite tunnel):
+ * {@code inChannel}, and then the surface is always {@link Direction#DOWN} (the legs work out how the body lies in it).
  */
-public record Foothold(BlockPos cell, Direction surface) {
+public record Foothold(BlockPos cell, Direction surface, boolean inChannel) {
     public Foothold {
         cell = cell.immutable();
+    }
+
+    public Foothold(BlockPos cell, Direction surface) {
+        this(cell, surface, false);
     }
 
     public static Foothold floor(BlockPos cell) {
@@ -22,23 +29,36 @@ public record Foothold(BlockPos cell, Direction surface) {
         return new Foothold(cell, Direction.UP);
     }
 
+    /** Inside the channel of the block in this cell. */
+    public static Foothold channel(BlockPos cell) {
+        return new Foothold(cell, Direction.DOWN, true);
+    }
+
     public boolean isFloor() {
-        return surface == Direction.DOWN;
+        return surface == Direction.DOWN && !inChannel;
     }
 
     public boolean isWall() {
-        return surface.getAxis().isHorizontal();
+        return surface.getAxis().isHorizontal() && !inChannel;
     }
 
     public boolean isCeiling() {
-        return surface == Direction.UP;
+        return surface == Direction.UP && !inChannel;
+    }
+
+    public boolean isChannel() {
+        return inChannel;
     }
 
     /**
      * Whether an insect can hold on here: the cell is open and the block on that side has a solid face toward it. A
-     * slope's cell has a floor too (its surface), if there is room over it; nothing else in it can be held.
+     * slope's cell has a floor too (its surface), if there is room over it; nothing else in it can be held. A channel
+     * foothold: the block in the cell has a channel the insect fits through, open out of at least one side.
      */
     public boolean isValid(CellMap map) {
+        if (inChannel) {
+            return map.channelSides(cell) != 0;
+        }
         return isValid(map, cell, surface);
     }
 
@@ -51,6 +71,6 @@ public record Foothold(BlockPos cell, Direction surface) {
 
     @Override
     public String toString() {
-        return cell.toShortString() + (isFloor() ? " floor" : isCeiling() ? " ceiling" : " " + surface.getSerializedName() + " wall");
+        return cell.toShortString() + (inChannel ? " channel" : isFloor() ? " floor" : isCeiling() ? " ceiling" : " " + surface.getSerializedName() + " wall");
     }
 }

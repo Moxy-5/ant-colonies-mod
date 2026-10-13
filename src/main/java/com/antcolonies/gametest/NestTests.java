@@ -907,9 +907,10 @@ public class NestTests {
 
     /**
      * A larva that goes two days without bread starves and leaves a body; a larva that was just fed lives on, and so does
-     * a full one that waits to grow up.
+     * a full one that waits to grow up. In a batch of its own: once (when new tests moved the arenas) its body was not
+     * found at the end, most likely carried off by a neighbouring test's worker.
      */
-    @GameTest(template = "arena", timeoutTicks = 3000, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 3000, skyAccess = true, batch = "larva_alone")
     public static void aLarvaThatIsNotFedForTwoDaysStarves(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         startColony(helper, 1);

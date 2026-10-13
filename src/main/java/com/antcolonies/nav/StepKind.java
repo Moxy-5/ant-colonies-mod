@@ -38,5 +38,21 @@ public enum StepKind {
     /** Along a ceiling to where it ends and round the block's bottom edge up onto its side face. */
     OUT_FROM_UNDER,
     /** Lets go and drops to the floor below: only where there is nothing to climb down (or off a ceiling). */
-    FALL
+    FALL,
+    /** Along a channel (a termite tunnel, see {@link Channel}) into the channel of the next block, along its middle. */
+    CRAWL_CHANNEL,
+    /**
+     * Into a channel by its opening: from the floor in front of a hole in a block's side, the wall with the hole, the
+     * floor over a hole or the ceiling under one.
+     */
+    INTO_CHANNEL,
+    /** Out of a channel by an opening onto the floor, wall or ceiling beside it. */
+    OUT_OF_CHANNEL,
+    /**
+     * Out of a chimney mouth's channel by its tube on top ({@link Doorway}): up the tube, a look round, over the rim and
+     * head first down the outside, onto the top of the block beside or on down the outside of the mouth's own column.
+     */
+    OUT_OF_MOUTH,
+    /** Into a chimney mouth by its tube: up the outside, over the rim, head first down inside into its channel. */
+    INTO_MOUTH
 }

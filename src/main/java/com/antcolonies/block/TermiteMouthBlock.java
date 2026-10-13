@@ -2,12 +2,14 @@ package com.antcolonies.block;
 
 import org.jetbrains.annotations.Nullable;
 
+import com.antcolonies.nav.Channel;
 import com.antcolonies.nav.ClimbShape;
 import com.antcolonies.nav.Doorway;
 import com.antcolonies.registry.ModTags;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.LevelAccessor;
@@ -29,8 +31,13 @@ import net.minecraft.world.phys.shapes.VoxelShape;
  * <p>Below the tube the block is either a full block (where mound soil stands beside it, so it sits flush in the
  * mound) or, standing alone on a spire, a piece narrowing from 10 to 6 pixels that continues the spire up to the tube
  * ({@link #SLIM}, chosen by its neighbours).
+ *
+ * <p>For termite workers the tube is a channel ({@link Channel}): it goes on down into the hollow spire piece under the
+ * mouth, so a termite crawls up inside the spire, comes out of the mouth with its look round, and goes back in the same
+ * way. The route planner sees the mouth as a channel whose opening on top is the doorway; nobody walks through the
+ * block's sides.
  */
-public class TermiteMouthBlock extends MoundPieceBlock implements Doorway, ClimbShape {
+public class TermiteMouthBlock extends MoundPieceBlock implements Doorway, ClimbShape, Channel {
     /** True when no solid block stands beside it: the lower part narrows like a spire piece instead of filling the block. */
     public static final BooleanProperty SLIM = BooleanProperty.create("slim");
     /** The rim of the tube: 28 pixels above the block's bottom. */
@@ -61,6 +68,27 @@ public class TermiteMouthBlock extends MoundPieceBlock implements Doorway, Climb
             return Shapes.empty();
         }
         return shape(state);
+    }
+
+    @Override
+    public boolean fits(@Nullable Entity insect) {
+        return insect != null && insect.getType().is(ModTags.FITS_TERMITE_TUNNELS);
+    }
+
+    /** The tube joins the channel of the block under it (a hollow spire piece, or a tunnel block). */
+    @Override
+    public boolean canJoin(BlockState state, Direction side) {
+        return side == Direction.DOWN;
+    }
+
+    /** Always open on top (the mouth); down where the block under it has a channel that opens up. */
+    @Override
+    public int openSides(BlockGetter level, BlockPos pos, BlockState state) {
+        int sides = 1 << Direction.UP.get3DDataValue();
+        if (Channel.joinsToward(level, pos.below(), Direction.UP)) {
+            sides |= 1 << Direction.DOWN.get3DDataValue();
+        }
+        return sides;
     }
 
     /** Insects climb the outside of its lower part (a slim one narrows like a spire piece). */

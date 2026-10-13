@@ -26,4 +26,21 @@ public interface CellMap {
     default boolean isSlope(BlockPos cell) {
         return slopeHeight(cell, 0, 0) >= 0;
     }
+
+    /**
+     * For a cell holding a block with a channel the insect fits through ({@link Channel}, a termite tunnel): the sides
+     * the channel opens out of, as a mask (bit {@code Direction.get3DDataValue()}). 0 if there is none (or the insect
+     * does not fit). Such a cell is not open ({@link #isOpen}): the insect is only ever in its channel.
+     */
+    default int channelSides(BlockPos cell) {
+        return 0;
+    }
+
+    /**
+     * Whether the channel in this cell is a doorway's tube (a chimney mouth): its opening on top is the mouth an
+     * insect comes out of and goes in by, with the doorway's own motion ({@link Doorway}, {@link DoorwayMotion}).
+     */
+    default boolean isMouth(BlockPos cell) {
+        return false;
+    }
 }

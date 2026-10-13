@@ -22,7 +22,9 @@ import net.minecraft.core.Direction;
  * y = 63 and below), a 3-deep shaft at x = 0, z = 0, a tunnel going east from its bottom and a
  * 5x5 room at the end of the tunnel. Everything is a full solid block or open air, except blocks in
  * {@link #noSides}, whose sides are not solid (nothing to climb on them, like a fence), and the straight ramps in
- * {@link #ramps}, rising toward their direction (slopes, as the termite mound's ramp block).
+ * {@link #ramps}, rising toward their direction (slopes, as the termite mound's ramp block). Blocks in {@link #channels}
+ * have a channel through them (a termite tunnel) open out of the sides in their mask, for an insect that {@link #fits};
+ * those in {@link #mouths} are chimney mouths (no top to stand on, the channel's top is the doorway).
  */
 class AntPathFinderTest {
     private static final BlockPos CENTER = new BlockPos(0, 64, 0);
@@ -31,6 +33,9 @@ class AntPathFinderTest {
     private final Set<BlockPos> solid = new HashSet<>();
     private final Set<BlockPos> noSides = new HashSet<>();
     private final java.util.Map<BlockPos, Direction> ramps = new java.util.HashMap<>();
+    private final java.util.Map<BlockPos, Integer> channels = new java.util.HashMap<>();
+    private final Set<BlockPos> mouths = new HashSet<>();
+    private boolean fits = true;
     private final CellMap map = new CellMap() {
         @Override
         public boolean isOpen(BlockPos pos) {
@@ -42,7 +47,20 @@ class AntPathFinderTest {
             if (ramps.containsKey(pos)) {
                 return face == Direction.DOWN || face == ramps.get(pos); // the bottom and the full high side
             }
+            if (face == Direction.UP && mouths.contains(pos)) {
+                return false;
+            }
             return solid.contains(pos) && (face.getAxis().isVertical() || !noSides.contains(pos));
+        }
+
+        @Override
+        public int channelSides(BlockPos cell) {
+            return fits ? channels.getOrDefault(cell, 0) : 0;
+        }
+
+        @Override
+        public boolean isMouth(BlockPos cell) {
+            return mouths.contains(cell) && channelSides(cell) != 0;
         }
 
         @Override
@@ -363,5 +381,148 @@ class AntPathFinderTest {
     void somethingDroppedOnARampLandsOnIt() {
         stepWithARamp(1);
         assertEquals(Foothold.floor(new BlockPos(5, 64, 5)), AntPathFinder.landing(map, new BlockPos(5, 67, 5)));
+    }
+
+    // --- Channels (termite tunnels) ---
+
+    private static int sides(Direction... open) {
+        int mask = 0;
+        for (Direction d : open) {
+            mask |= 1 << d.get3DDataValue();
+        }
+        return mask;
+    }
+
+    /** A solid block at {@code pos} with a channel through it, open out of these sides. */
+    private void channel(BlockPos pos, Direction... open) {
+        solid.add(pos);
+        channels.put(pos, sides(open));
+    }
+
+    /** A wall 2 blocks tall across the ground at x = 5 (z = -3 to 3), with a tunnel through it at z = 0. */
+    private void wallWithATunnel() {
+        for (int z = -3; z <= 3; z++) {
+            solid.add(new BlockPos(5, 64, z));
+            solid.add(new BlockPos(5, 65, z));
+        }
+        channel(new BlockPos(5, 64, 0), Direction.EAST, Direction.WEST);
+    }
+
+    private static boolean inAChannel(Route route) {
+        return route.steps().stream().anyMatch(step -> step.to().isChannel());
+    }
+
+    @Test
+    void anInsectThatFitsCrawlsThroughATunnelInsteadOfGoingRound() {
+        wallWithATunnel();
+        Route route = route(new BlockPos(2, 64, 0), new BlockPos(8, 64, 0));
+        assertNotNull(route);
+        assertLegal(route);
+        assertTrue(route.steps().contains(new Route.Step(Foothold.channel(new BlockPos(5, 64, 0)), StepKind.INTO_CHANNEL)), route.toString());
+        assertTrue(route.steps().contains(new Route.Step(Foothold.floor(new BlockPos(6, 64, 0)), StepKind.OUT_OF_CHANNEL)), route.toString());
+        assertFalse(has(route, StepKind.CLIMB_UP), "it climbs over the wall: " + route);
+    }
+
+    @Test
+    void anInsectThatDoesNotFitNeverUsesATunnel() {
+        wallWithATunnel();
+        fits = false;
+        Route route = route(new BlockPos(2, 64, 0), new BlockPos(8, 64, 0));
+        assertNotNull(route, "it can still go over or round the wall");
+        assertLegal(route);
+        assertFalse(inAChannel(route), "it went through a tunnel it does not fit: " + route);
+        assertNull(route(new BlockPos(2, 64, 0), new BlockPos(5, 64, 0)), "the tunnel block is no place for it");
+    }
+
+    @Test
+    void aChannelCellIsAGoalAndAStart() {
+        wallWithATunnel();
+        Route in = route(new BlockPos(2, 64, 0), new BlockPos(5, 64, 0));
+        assertNotNull(in);
+        assertEquals(Foothold.channel(new BlockPos(5, 64, 0)), in.end());
+        Route out = AntPathFinder.find(map, Foothold.channel(new BlockPos(5, 64, 0)), new BlockPos(2, 64, 0), AntPathFinder.DEFAULT_MAX_EXPANSIONS);
+        assertNotNull(out);
+        assertLegal(out);
+        assertEquals(Foothold.floor(new BlockPos(2, 64, 0)), out.end());
+    }
+
+    /**
+     * A lone spire beside the room's wall: a tunnel block at (10, 64, 0) with a hole east onto the ground, a hollow
+     * piece over it and a chimney mouth on top (nothing beside them).
+     */
+    private void spireWithAMouth() {
+        channel(new BlockPos(10, 64, 0), Direction.EAST, Direction.UP);
+        channel(new BlockPos(10, 65, 0), Direction.DOWN, Direction.UP);
+        channel(new BlockPos(10, 66, 0), Direction.DOWN, Direction.UP);
+        mouths.add(new BlockPos(10, 66, 0));
+    }
+
+    @Test
+    void upInsideASpireAndOutOfItsMouthDownTheOutside() {
+        spireWithAMouth();
+        BlockPos mouth = new BlockPos(10, 66, 0);
+        Route up = route(new BlockPos(13, 64, 0), mouth);
+        assertNotNull(up, "no way up inside the spire");
+        assertLegal(up);
+        assertTrue(up.steps().contains(new Route.Step(Foothold.channel(new BlockPos(10, 64, 0)), StepKind.INTO_CHANNEL)), up.toString());
+        assertEquals(2, up.steps().stream().filter(step -> step.kind() == StepKind.CRAWL_CHANNEL).count(), up.toString());
+        List<Route.Step> out = moves(Foothold.channel(mouth));
+        for (Direction e : Direction.Plane.HORIZONTAL) {
+            assertTrue(out.contains(new Route.Step(new Foothold(mouth.relative(e), e.getOpposite()), StepKind.OUT_OF_MOUTH)),
+                    "it cannot come out of the mouth and down its " + e + " side: " + out);
+        }
+        assertTrue(moves(new Foothold(mouth.east(), Direction.WEST)).contains(new Route.Step(Foothold.channel(mouth), StepKind.INTO_MOUTH)),
+                "it cannot go in by the mouth from its side");
+    }
+
+    @Test
+    void aMouthIsNeverWalkedThroughSideways() {
+        spireWithAMouth();
+        solid.add(new BlockPos(11, 66, 0)); // a block beside the mouth: its top is a floor
+        List<Route.Step> out = moves(Foothold.channel(new BlockPos(10, 66, 0)));
+        assertTrue(out.contains(new Route.Step(Foothold.floor(new BlockPos(11, 67, 0)), StepKind.OUT_OF_MOUTH)), "out onto the block beside: " + out);
+        for (Route.Step move : out) {
+            assertTrue(move.kind() == StepKind.OUT_OF_MOUTH || move.to().isChannel(), "out of a mouth any other way: " + move);
+        }
+    }
+
+    @Test
+    void inAndOutOfTheShaftWallAFloorHoleAndACeilingHole() {
+        // From the shaft at y 62 east into a tunnel block, east again and up through a hole in the floor at (2, 64, 0);
+        // and a hole down into the ceiling of the nest's tunnel at (1, 61, 0).
+        channel(new BlockPos(1, 62, 0), Direction.WEST, Direction.EAST, Direction.DOWN);
+        channel(new BlockPos(2, 62, 0), Direction.WEST, Direction.UP);
+        channel(new BlockPos(2, 63, 0), Direction.DOWN, Direction.UP);
+        Foothold shaftWall = new Foothold(new BlockPos(0, 62, 0), Direction.EAST);
+        Foothold tunnel = Foothold.channel(new BlockPos(1, 62, 0));
+        assertTrue(moves(tunnel).contains(new Route.Step(shaftWall, StepKind.OUT_OF_CHANNEL)), "out onto the shaft wall with the hole");
+        assertTrue(moves(shaftWall).contains(new Route.Step(tunnel, StepKind.INTO_CHANNEL)), "in from the shaft wall");
+        Foothold ceiling = Foothold.ceiling(new BlockPos(1, 61, 0));
+        assertTrue(moves(tunnel).contains(new Route.Step(ceiling, StepKind.OUT_OF_CHANNEL)), "down out of a hole in a ceiling");
+        assertTrue(moves(ceiling).contains(new Route.Step(tunnel, StepKind.INTO_CHANNEL)), "up into a hole in a ceiling");
+        Foothold floor = Foothold.floor(new BlockPos(2, 64, 0));
+        Foothold top = Foothold.channel(new BlockPos(2, 63, 0));
+        assertTrue(moves(top).contains(new Route.Step(floor, StepKind.OUT_OF_CHANNEL)), "up out of a hole in a floor");
+        assertTrue(moves(floor).contains(new Route.Step(top, StepKind.INTO_CHANNEL)), "down into a hole in a floor");
+        Route route = AntPathFinder.find(map, List.of(floor), SHAFT_BOTTOM, AntPathFinder.DEFAULT_MAX_EXPANSIONS, AntPathFinder.StepCosts.NONE);
+        assertNotNull(route);
+        assertLegal(route);
+    }
+
+    @Test
+    void aClosedChannelIsNoLongerAWay() {
+        wallWithATunnel();
+        channel(new BlockPos(6, 64, 0), Direction.WEST, Direction.EAST);
+        Foothold a = Foothold.channel(new BlockPos(5, 64, 0));
+        Foothold b = Foothold.channel(new BlockPos(6, 64, 0));
+        assertNull(AntPathFinder.whatChanged(map, a, b, StepKind.CRAWL_CHANNEL));
+        channels.put(new BlockPos(6, 64, 0), sides(Direction.EAST));
+        assertNotNull(AntPathFinder.whatChanged(map, a, b, StepKind.CRAWL_CHANNEL));
+    }
+
+    private List<Route.Step> moves(Foothold from) {
+        List<Route.Step> moves = new ArrayList<>();
+        AntPathFinder.neighbours(map, from, (to, kind, cost) -> moves.add(new Route.Step(to, kind)));
+        return moves;
     }
 }

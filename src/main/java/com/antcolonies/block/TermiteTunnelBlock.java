@@ -4,6 +4,9 @@ import java.util.Map;
 
 import org.jetbrains.annotations.Nullable;
 
+import com.antcolonies.nav.Channel;
+import com.antcolonies.registry.ModTags;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.sounds.SoundEvents;
@@ -11,6 +14,7 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.ItemInteractionResult;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.BlockPlaceContext;
@@ -24,6 +28,8 @@ import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.shapes.BooleanOp;
+import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.EntityCollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
@@ -32,16 +38,18 @@ import net.minecraft.world.phys.shapes.VoxelShape;
  * wide and 6 tall, the way a real mound looks cut open. The channel can open out of any of the 6 sides ({@link #OPEN}),
  * so one block is a straight tunnel, a bend, a T, a crossing or a tunnel turning upward.
  *
- * <p>It joins up on its own, like a fence: a side next to another tunnel block is always open (both blocks open toward
- * each other), a side against any other solid block is always closed. A side toward open air (the mound's shaft, or
+ * <p>It joins up on its own, like a fence: a side next to another tunnel block (or any channel block that can open toward
+ * it, such as a hollow spire piece above it) is always open (both blocks open toward each other), a side against any
+ * other solid block is always closed. A side toward open air (the mound's shaft, or
  * outside) is never opened on its own: it keeps what it was, so only a termite (later) or a player with a shovel opens
  * a window there, and it stays open until it is closed again or something is put against it.
  *
- * <p>For now it is solid for everyone, termites too (they learn to crawl through it in a later step). Light seeps a
- * little way into a channel through its openings. It dries and hardens with age like the rest of the mound
+ * <p>For players and every other creature it is a full block; termite workers (the entity tag
+ * {@code antcolonies:fits_termite_tunnels}) crawl through the channel ({@link Channel}): for them the block is solid
+ * only where its soil is. Light seeps a little way into a channel through its openings. It dries and hardens with age like the rest of the mound
  * ({@link MoundSoil}). The models (a frame and a plug for each closed side) come from {@code tools/termite_blocks.py}.
  */
-public class TermiteTunnelBlock extends MoundPieceBlock {
+public class TermiteTunnelBlock extends MoundPieceBlock implements Channel {
     /** Whether the channel opens out of each side. */
     public static final Map<Direction, BooleanProperty> OPEN = PipeBlock.PROPERTY_BY_DIRECTION;
     /** The channel runs between these pixels across the block (6 pixels wide and tall, in the middle). */
@@ -113,6 +121,30 @@ public class TermiteTunnelBlock extends MoundPieceBlock {
         return Shapes.block();
     }
 
+    /** For an insect that fits through the channel: the soil only, so it can be in the channel. */
+    @Override
+    protected VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
+        if (context instanceof EntityCollisionContext entityContext && fits(entityContext.getEntity())) {
+            return SOIL[openMask(state)];
+        }
+        return shape(state);
+    }
+
+    @Override
+    public boolean fits(@Nullable Entity insect) {
+        return insect != null && insect.getType().is(ModTags.FITS_TERMITE_TUNNELS);
+    }
+
+    @Override
+    public boolean canJoin(BlockState state, Direction side) {
+        return true;
+    }
+
+    @Override
+    public int openSides(BlockGetter level, BlockPos pos, BlockState state) {
+        return openMask(state);
+    }
+
     /** What hides the faces of the blocks beside it and the light: the soil, without the channel. */
     @Override
     protected VoxelShape getOcclusionShape(BlockState state, BlockGetter level, BlockPos pos) {
@@ -130,13 +162,14 @@ public class TermiteTunnelBlock extends MoundPieceBlock {
     }
 
     /**
-     * Whether the side toward {@code side} should be open: always toward another tunnel block, never against any
-     * other solid block, and toward open air as it is now ({@code now}: only a window opens it).
+     * Whether the side toward {@code side} should be open: always toward another tunnel block (or another channel block
+     * that can open toward it), never against any other solid block, and toward open air as it is now ({@code now}:
+     * only a window, or a termite opening it into the mound's shaft, opens it).
      */
     private static boolean opensToward(BlockGetter level, BlockPos pos, Direction side, boolean now) {
         BlockPos beside = pos.relative(side);
         BlockState state = level.getBlockState(beside);
-        if (state.getBlock() instanceof TermiteTunnelBlock) {
+        if (state.getBlock() instanceof Channel channel && channel.canJoin(state, side.getOpposite())) {
             return true;
         }
         if (state.getCollisionShape(level, beside).isEmpty()) {
@@ -160,6 +193,19 @@ public class TermiteTunnelBlock extends MoundPieceBlock {
             BlockPos pos, BlockPos neighborPos) {
         BooleanProperty open = OPEN.get(direction);
         return state.setValue(open, opensToward(level, pos, direction, state.getValue(open)));
+    }
+
+    /**
+     * The tunnel block for {@code pos} as the termites make it (carving soil or putting one up): joined up with the blocks
+     * round it, and also open toward the sides in {@code alsoOpen} where there is open air (where the termite came from
+     * out of the mound's shaft, or the shaft beside it), of age {@code age}.
+     */
+    public BlockState stateFor(BlockGetter level, BlockPos pos, int age, java.util.Collection<Direction> alsoOpen) {
+        BlockState state = defaultBlockState().setValue(MoundSoil.AGE, age);
+        for (Map.Entry<Direction, BooleanProperty> entry : OPEN.entrySet()) {
+            state = state.setValue(entry.getValue(), opensToward(level, pos, entry.getKey(), alsoOpen.contains(entry.getKey())));
+        }
+        return state;
     }
 
     /**

@@ -23,7 +23,8 @@ public interface Doorway {
      * is not affected.
      */
     static AntPathFinder.StepCosts avoidMouths(BlockGetter level) {
-        return (from, to, kind) -> kind == StepKind.OVER_TOP && level.getBlockState(from.cell()).getBlock() instanceof Doorway
+        return (from, to, kind) -> kind == StepKind.OUT_OF_MOUTH || kind == StepKind.INTO_MOUTH
+                || kind == StepKind.OVER_TOP && level.getBlockState(from.cell()).getBlock() instanceof Doorway
                 || kind == StepKind.OVER_EDGE && level.getBlockState(to.cell()).getBlock() instanceof Doorway
                 ? Double.POSITIVE_INFINITY : 0.0;
     }

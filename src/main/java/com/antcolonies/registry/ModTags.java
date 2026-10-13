@@ -22,6 +22,13 @@ public class ModTags {
     public static final TagKey<EntityType<?>> PASSES_TERMITE_HOLES = TagKey.create(Registries.ENTITY_TYPE,
             ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "passes_termite_holes"));
 
+    /**
+     * Creatures small enough to crawl through the 6-pixel channel of a termite tunnel, a hollow spire piece or a chimney
+     * mouth's tube (data/antcolonies/tags/entity_type/fits_termite_tunnels.json): termite workers, not soldiers.
+     */
+    public static final TagKey<EntityType<?>> FITS_TERMITE_TUNNELS = TagKey.create(Registries.ENTITY_TYPE,
+            ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "fits_termite_tunnels"));
+
     /** Rich seeds: bread milled from them is rich ant bread (data/antcolonies/tags/item/rich_seeds.json). */
     public static final TagKey<Item> RICH_SEEDS = TagKey.create(Registries.ITEM,
             ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "rich_seeds"));

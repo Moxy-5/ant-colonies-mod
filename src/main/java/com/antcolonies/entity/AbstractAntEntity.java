@@ -72,12 +72,14 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     private static final float SLOPE_TILT_SPEED = 9.0F;
     /**
      * What the body is doing besides holding its surface, for the client: bit 0 = looking round with its head out of a
-     * doorway's mouth (plays the "peek" animation), bit 1 = tipping over to its new surface slowly (over a mouth's rim).
+     * doorway's mouth (plays the "peek" animation), bit 1 = tipping over to its new surface slowly (over a mouth's rim),
+     * bit 2 = inside a channel (a termite tunnel: drawn in the channel's middle, not pressed against a wall).
      */
     private static final EntityDataAccessor<Byte> DATA_POSE_FLAGS =
             SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.BYTE);
     private static final int PEEKING = 1;
     private static final int TURNING_SLOWLY = 2;
+    private static final int IN_CHANNEL = 4;
 
     /** The soil pellet held in the mandibles (empty = carrying nothing). Synced so the renderer can draw it. */
     private static final EntityDataAccessor<Optional<BlockState>> DATA_CARRIED =
@@ -328,7 +330,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         if (!level().isClientSide) {
             entityData.set(DATA_SURFACE, (byte) (navigator.getSurface().get3DDataValue() | navigator.getCeilingRef().get3DDataValue() << 3));
             entityData.set(DATA_HEADING, navigator.getHeading());
-            entityData.set(DATA_POSE_FLAGS, (byte) ((navigator.isPeeking() ? PEEKING : 0) | (navigator.isTurningSlowly() ? TURNING_SLOWLY : 0)));
+            entityData.set(DATA_POSE_FLAGS, (byte) ((navigator.isPeeking() ? PEEKING : 0) | (navigator.isTurningSlowly() ? TURNING_SLOWLY : 0)
+                    | (navigator.isInChannel() ? IN_CHANNEL : 0)));
         } else {
             turnBody();
             tiltOnSlope();
@@ -409,6 +412,11 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     /** True while it holds still looking round with its head out of a doorway's mouth (see DoorwayMotion). */
     public boolean isPeeking() {
         return (entityData.get(DATA_POSE_FLAGS) & PEEKING) != 0;
+    }
+
+    /** Client: true while it is inside a channel (a termite tunnel): the body is drawn in the channel's middle. */
+    public boolean isInChannel() {
+        return (entityData.get(DATA_POSE_FLAGS) & IN_CHANNEL) != 0;
     }
 
     /** True while the drawn body tips over to its new surface slowly (over the rim of a doorway's mouth). */
@@ -563,11 +571,13 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         tag.putBoolean("CarryingEgg", isCarryingEgg());
         tag.putBoolean("CarryingCorpse", isCarryingCorpse());
         tag.putBoolean("SeedForBread", seedForBread);
-        // The wall or ceiling it holds on to, so after a reload it is still up there instead of dropping to the bottom.
+        // The wall or ceiling it holds on to (or the channel it is in), so after a reload it is still there instead of
+        // dropping to the bottom.
         Foothold hold = navigator.getHold();
         if (hold != null) {
             tag.putLong("HoldCell", hold.cell().asLong());
             tag.putByte("HoldSurface", (byte) hold.surface().get3DDataValue());
+            tag.putBoolean("HoldChannel", hold.isChannel());
         }
     }
 
@@ -587,7 +597,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         setCarryingCorpse(tag.getBoolean("CarryingCorpse"));
         seedForBread = tag.getBoolean("SeedForBread");
         if (tag.contains("HoldCell") && tag.contains("HoldSurface")) {
-            navigator.restoreHold(new Foothold(BlockPos.of(tag.getLong("HoldCell")), Direction.from3DDataValue(tag.getByte("HoldSurface"))));
+            navigator.restoreHold(new Foothold(BlockPos.of(tag.getLong("HoldCell")), Direction.from3DDataValue(tag.getByte("HoldSurface")),
+                    tag.getBoolean("HoldChannel")));
         }
     }
 

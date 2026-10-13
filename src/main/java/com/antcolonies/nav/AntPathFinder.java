@@ -43,12 +43,26 @@ import net.minecraft.core.Direction;
  * goes on up from its high side the insect steps onto the wall and back ({@link StepKind#ONTO_WALL},
  * {@link StepKind#OFF_WALL}); it climbs over a wall onto a slope's low side, and goes over a slope's low side down the
  * block under it, but never over a slope's high side (the ramp's own steep face is there).
+ * A block with a channel through it ({@link Channel}, a termite tunnel) is a channel foothold for an insect that fits:
+ * {@link StepKind#CRAWL_CHANNEL} on into the channel of the block beside where both open toward each other (1, up or
+ * down 1.1), {@link StepKind#INTO_CHANNEL} / {@link StepKind#OUT_OF_CHANNEL} by an opening (1): a hole in a block's
+ * side from the floor in front of it or the wall it is in, a hole in a floor from above, a hole in a ceiling from
+ * below. A chimney mouth's channel ends in the mouth on top: {@link StepKind#OUT_OF_MOUTH} / {@link StepKind#INTO_MOUTH}
+ * are the doorway's own motion, up and down the outside of the tube, onto the top of the block beside or the outside of
+ * the mouth's own column (3).
  * Turning over onto a ceiling costs a little extra, so a route never flips upside down for a tiny shortcut (like
  * curling from the tunnel ceiling up into the shaft instead of walking the last block).
  * A mind can add its own costs to any step ({@link StepCosts}: later scent trails, avoiding enemies, raids). Nothing
  * here is specific to ants, so termites and later species use the same planner.
  */
 public final class AntPathFinder {
+    /** Cost of crawling along a channel to the next block, sideways; up or down a little more. */
+    public static final double CHANNEL_COST = 1.0;
+    private static final double CHANNEL_UP_DOWN_COST = 1.1;
+    /** Cost of going into or out of a channel by an opening. */
+    private static final double CHANNEL_DOOR_COST = 1.0;
+    /** Cost of coming out of a chimney mouth (up the tube, a look round, down the outside) or going in by it. */
+    private static final double MOUTH_COST = 3.0;
     /** Cost of one block upside down along a ceiling. */
     public static final double CEILING_COST = 1.3;
     /** Stops a search that can't find the goal, so an unreachable goal never costs much time. */
@@ -106,8 +120,15 @@ public final class AntPathFinder {
             case ROUND_EDGE -> List.of(to.cell().relative(from.surface().getOpposite()));
             case UNDER_EDGE -> List.of(from.cell().below());
             case OUT_FROM_UNDER -> List.of(to.cell().below());
+            case OUT_OF_MOUTH -> mouthWay(from.cell(), to);
+            case INTO_MOUTH -> mouthWay(to.cell(), from);
             default -> List.of();
         };
+    }
+
+    /** The open cells a move out of (or into) a chimney mouth passes: the space of the tube over it, and over the cell beside. */
+    private static List<BlockPos> mouthWay(BlockPos mouth, Foothold outside) {
+        return outside.cell().getY() == mouth.getY() ? List.of(mouth.above(), outside.cell().above()) : List.of(mouth.above());
     }
 
     private static final class Node {
@@ -157,7 +178,7 @@ public final class AntPathFinder {
     @Nullable
     public static Route find(CellMap map, List<Foothold> starts, BlockPos goal, int maxExpansions, StepCosts costs) {
         final BlockPos target = goal.immutable();
-        if (!map.isOpen(target) && !map.isSlope(target)) {
+        if (!map.isOpen(target) && !map.isSlope(target) && map.channelSides(target) == 0) {
             return null;
         }
         boolean hasFloor = Foothold.isValid(map, target, Direction.DOWN);
@@ -227,6 +248,10 @@ public final class AntPathFinder {
      */
     public static List<Foothold> footholdsIn(CellMap map, BlockPos cell) {
         List<Foothold> found = new ArrayList<>();
+        if (map.channelSides(cell) != 0) {
+            found.add(Foothold.channel(cell));
+            return found;
+        }
         if (Foothold.isValid(map, cell, Direction.DOWN)) {
             found.add(Foothold.floor(cell));
         }
@@ -260,6 +285,11 @@ public final class AntPathFinder {
     /** Every move an insect can make from this foothold. Public so other code (a mind, wandering) can reuse the movement rules. */
     public static void neighbours(CellMap map, Foothold from, MoveSink out) {
         BlockPos c = from.cell();
+        if (from.isChannel()) {
+            channelNeighbours(map, from, out);
+            return;
+        }
+        intoChannels(map, from, out);
         if (from.isFloor()) {
             boolean onSlope = map.isSlope(c);
             for (Direction d : Direction.Plane.HORIZONTAL) {
@@ -364,6 +394,96 @@ public final class AntPathFinder {
         }
     }
 
+    /**
+     * The moves from a channel: on into the channel beside where both open toward each other, or out by an opening onto
+     * the floor or the wall in front of a side hole, the floor over a hole on top, or the ceiling under a hole below. Out
+     * of a chimney mouth's tube: onto the top of a block beside the mouth, or the outside of the mouth's own column.
+     */
+    private static void channelNeighbours(CellMap map, Foothold from, MoveSink out) {
+        BlockPos c = from.cell();
+        int sides = map.channelSides(c);
+        for (Direction d : Direction.values()) {
+            if (!Channel.has(sides, d)) {
+                continue;
+            }
+            BlockPos n = c.relative(d);
+            if (d == Direction.UP && map.isMouth(c)) {
+                if (map.isOpen(n)) {
+                    for (Direction e : Direction.Plane.HORIZONTAL) {
+                        BlockPos beside = c.relative(e);
+                        if (Foothold.isValid(map, beside.above(), Direction.DOWN)) {
+                            out.add(Foothold.floor(beside.above()), StepKind.OUT_OF_MOUTH, MOUTH_COST);
+                        }
+                        if (map.isOpen(beside.above()) && Foothold.isValid(map, beside, e.getOpposite())) {
+                            out.add(new Foothold(beside, e.getOpposite()), StepKind.OUT_OF_MOUTH, MOUTH_COST);
+                        }
+                    }
+                }
+                continue;
+            }
+            if (Channel.has(map.channelSides(n), d.getOpposite())) {
+                out.add(Foothold.channel(n), StepKind.CRAWL_CHANNEL, d.getAxis().isVertical() ? CHANNEL_UP_DOWN_COST : CHANNEL_COST);
+                continue;
+            }
+            if (!map.isOpen(n)) {
+                continue;
+            }
+            if (d.getAxis().isHorizontal()) {
+                if (Foothold.isValid(map, n, Direction.DOWN)) {
+                    out.add(Foothold.floor(n), StepKind.OUT_OF_CHANNEL, CHANNEL_DOOR_COST);
+                }
+                if (Foothold.isValid(map, n, d.getOpposite())) {
+                    out.add(new Foothold(n, d.getOpposite()), StepKind.OUT_OF_CHANNEL, CHANNEL_DOOR_COST);
+                }
+            } else if (d == Direction.UP) {
+                if (Foothold.isValid(map, n, Direction.DOWN)) {
+                    out.add(Foothold.floor(n), StepKind.OUT_OF_CHANNEL, CHANNEL_DOOR_COST);
+                }
+            } else if (Foothold.isValid(map, n, Direction.UP)) {
+                out.add(Foothold.ceiling(n), StepKind.OUT_OF_CHANNEL, CHANNEL_DOOR_COST);
+            }
+        }
+    }
+
+    /**
+     * The ways into a channel from a floor, wall or ceiling: by a hole in the side of a block in front of a floor, in the
+     * wall it holds, in the floor under it or the ceiling over it; and by a chimney mouth's tube from the top of the
+     * block beside the mouth or from the outside of the mouth's own column.
+     */
+    private static void intoChannels(CellMap map, Foothold from, MoveSink out) {
+        BlockPos c = from.cell();
+        if (from.isFloor() && !map.isSlope(c)) {
+            for (Direction d : Direction.Plane.HORIZONTAL) {
+                BlockPos block = c.relative(d);
+                if (!map.isMouth(block) && Channel.has(map.channelSides(block), d.getOpposite())) {
+                    out.add(Foothold.channel(block), StepKind.INTO_CHANNEL, CHANNEL_DOOR_COST);
+                }
+                BlockPos mouth = c.below().relative(d);
+                if (map.isMouth(mouth) && Channel.has(map.channelSides(mouth), Direction.UP) && map.isOpen(mouth.above())) {
+                    out.add(Foothold.channel(mouth), StepKind.INTO_MOUTH, MOUTH_COST);
+                }
+            }
+            BlockPos below = c.below();
+            if (!map.isMouth(below) && Channel.has(map.channelSides(below), Direction.UP)) {
+                out.add(Foothold.channel(below), StepKind.INTO_CHANNEL, CHANNEL_DOOR_COST);
+            }
+        } else if (from.isWall()) {
+            BlockPos block = c.relative(from.surface());
+            if (map.isMouth(block)) {
+                if (Channel.has(map.channelSides(block), Direction.UP) && map.isOpen(block.above()) && map.isOpen(c.above())) {
+                    out.add(Foothold.channel(block), StepKind.INTO_MOUTH, MOUTH_COST);
+                }
+            } else if (Channel.has(map.channelSides(block), from.surface().getOpposite())) {
+                out.add(Foothold.channel(block), StepKind.INTO_CHANNEL, CHANNEL_DOOR_COST);
+            }
+        } else if (from.isCeiling()) {
+            BlockPos above = c.above();
+            if (!map.isMouth(above) && Channel.has(map.channelSides(above), Direction.DOWN)) {
+                out.add(Foothold.channel(above), StepKind.INTO_CHANNEL, CHANNEL_DOOR_COST);
+            }
+        }
+    }
+
     /** The moves from a ceiling: down a wall of the cell, on along the ceiling, out round its edge, or let go. */
     private static void ceilingNeighbours(CellMap map, Foothold from, MoveSink out) {
         BlockPos c = from.cell();
@@ -438,6 +558,35 @@ public final class AntPathFinder {
             highest = Math.max(highest, h - cell.getY() * Slope.PIXELS);
         }
         return highest;
+    }
+
+    /**
+     * Whether a move along a route can still be made in the world as it is now: the footholds it goes from and to are
+     * there, the cells it passes through are open, and between two channels both still open toward each other (a
+     * window closed, a block put in the way). Null if it can, else what changed.
+     */
+    @Nullable
+    public static String whatChanged(CellMap map, @Nullable Foothold from, Foothold to, StepKind kind) {
+        if (!to.isValid(map)) {
+            return "nothing to hold at " + to;
+        }
+        if (from == null) {
+            return null;
+        }
+        if (!from.isValid(map) && kind != StepKind.FALL) {
+            return "lost its hold at " + from;
+        }
+        if (passesThrough(from, to, kind).stream().anyMatch(cell -> !map.isOpen(cell))) {
+            return "blocked on the way from " + from + " to " + to;
+        }
+        if (kind == StepKind.CRAWL_CHANNEL) {
+            Direction d = Direction.getNearest(to.cell().getX() - from.cell().getX(), to.cell().getY() - from.cell().getY(),
+                    to.cell().getZ() - from.cell().getZ());
+            if (!Channel.has(map.channelSides(from.cell()), d) || !Channel.has(map.channelSides(to.cell()), d.getOpposite())) {
+                return "the channel from " + from + " to " + to + " closed";
+            }
+        }
+        return null;
     }
 
     /** {@link #FOOT_OF_WALL} where a move along a wall ends in a cell with a floor, else nothing. */

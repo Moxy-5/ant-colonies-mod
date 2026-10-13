@@ -71,9 +71,12 @@ public class ModBlocks {
     public static final DeferredBlock<TermiteRampBlock> TERMITE_RAMP = BLOCKS.registerBlock("termite_ramp", TermiteRampBlock::new,
             pieceProperties());
 
-    /** Mound soil with a termite-sized channel through it, joining up with the tunnel blocks beside it (see TermiteTunnelBlock). */
+    /**
+     * Mound soil with a termite-sized channel through it, joining up with the tunnel blocks beside it (see
+     * TermiteTunnelBlock). Termite workers crawl inside it, so it must not suffocate them.
+     */
     public static final DeferredBlock<TermiteTunnelBlock> TERMITE_TUNNEL = BLOCKS.registerBlock("termite_tunnel", TermiteTunnelBlock::new,
-            pieceProperties());
+            pieceProperties().isSuffocating((state, level, pos) -> false));
 
     private static BlockBehaviour.Properties pieceProperties() {
         return BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_ORANGE).strength(0.6F, 3.0F).sound(SoundType.MUD)

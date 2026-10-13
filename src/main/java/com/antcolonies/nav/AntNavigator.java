@@ -33,9 +33,11 @@ import net.minecraft.world.phys.Vec3;
  * {@link #getSurface}, {@link #getHeading} and {@link #getCeilingRef} tell the body how to lie. On a column that
  * narrows ({@link ClimbShape}, a termite spire) the body hugs the real column: every point of a move is worked out as
  * for a full block (the "plan" position) and then drawn in onto the column's narrower sides and edges at that height
- * ({@link #toBody}, {@link #pos}). On a slope ({@link Slope}, a ramp) it walks with the normal walking. When a walk ends on a
- * wall (in a shaft) or a ceiling the insect keeps holding on there, also after the world is saved and loaded again
- * ({@link #getHold}, {@link #restoreHold}).
+ * ({@link #toBody}, {@link #pos}). On a slope ({@link Slope}, a ramp) it walks with the normal walking. In a channel
+ * ({@link Channel}, a termite tunnel) the body moves exactly along the channel's middle, its feet on the channel's floor,
+ * and in and out of the openings; a chimney mouth's tube is walked with the doorway's own motion ({@link DoorwayMotion}).
+ * When a walk ends on a wall (in a shaft), a ceiling or in a channel the insect keeps holding on there, also after the
+ * world is saved and loaded again ({@link #getHold}, {@link #restoreHold}).
  */
 public class AntNavigator {
     /** The insect must be this close (in blocks, sideways) to the middle of a floor goal cell to count as arrived. */
@@ -66,6 +68,10 @@ public class AntNavigator {
     private static final double OVER_THE_TOP = 0.05;
     /** Walking up a slope to the wall at its high side: this close (in blocks) to the wall, the body steps onto it. */
     private static final double SLOPE_TO_WALL = 0.06;
+    /** A body this close (in blocks, sideways) to the middle line of a channel it is in counts as in the channel. */
+    private static final double IN_THE_CHANNEL = 0.1;
+    /** Out of a hole in a floor, the body steps this far (in blocks) off the hole's middle, so it stands on the floor round it. */
+    private static final double OFF_THE_HOLE = 0.25;
 
     private final AbstractAntEntity ant;
     @Nullable
@@ -75,8 +81,15 @@ public class AntNavigator {
     private Foothold stepFrom;
     @Nullable
     private Foothold stepTo;
-    /** While a doorway's exact motion is walked: its points are where the body goes, nothing is drawn in. */
+    /** While a doorway's exact motion or a channel is walked: its points are where the body goes, nothing is drawn in. */
     private boolean exact;
+    /** Whether the body is inside a channel now (drawn in the channel's middle, not pressed against a wall). */
+    private boolean inChannel;
+    /**
+     * In a channel: the way the body last crawled sideways. Up a channel it holds the channel's wall on that side, head
+     * up; down a channel the wall on the other side, head first, as if it had gone over the edge of the floor.
+     */
+    private Direction channelFacing = Direction.NORTH;
     /** The step being walked (step 0 is the start). */
     private int next;
     /** The part of the current step (some steps are two moves: up the wall, then over the top). */
@@ -251,9 +264,17 @@ public class AntNavigator {
         return peeking;
     }
 
-    /** Whether it is walking a doorway's exact motion now (up or down the tube of a chimney mouth, see {@link DoorwayMotion}). */
+    /**
+     * Whether it is walking an exact motion now that is not pressed against a surface the usual way: up or down the tube
+     * of a chimney mouth (see {@link DoorwayMotion}), or in a channel.
+     */
     public boolean isWalkingADoorway() {
         return exact;
+    }
+
+    /** Whether the body is inside a channel now (a termite tunnel; the body is drawn in the channel's middle). */
+    public boolean isInChannel() {
+        return inChannel;
     }
 
     /** Whether the body should tip over to its new surface slowly (going over the rim of a doorway's mouth). */
@@ -281,6 +302,7 @@ public class AntNavigator {
         }
         at = hold;
         surface = hold.surface();
+        inChannel = hold.isChannel();
         heading = 0.0F;
         route = null;
     }
@@ -405,6 +427,7 @@ public class AntNavigator {
         CellMap map = new LevelCellMap(ant.level(), ant);
         attached = false;
         exact = false;
+        inChannel = false;
         motion = Vec3.ZERO;
         if (route == null) {
             stepFrom = at;
@@ -436,10 +459,7 @@ public class AntNavigator {
         Route.Step step = route.step(next);
         stepFrom = at;
         stepTo = step.to();
-        String changed = !step.to().isValid(map) ? "nothing to hold at " + step.to()
-                : !at.isValid(map) && step.kind() != StepKind.FALL ? "lost its hold at " + at
-                : AntPathFinder.passesThrough(at, step.to(), step.kind()).stream().anyMatch(cell -> !map.isOpen(cell))
-                        ? "blocked on the way from " + at + " to " + step.to() : null;
+        String changed = AntPathFinder.whatChanged(map, at, step.to(), step.kind());
         if (changed != null) {
             replan("the way changed: " + changed + ", " + step.kind().name().toLowerCase()); // a block put in the way (the hill growing, a hole sealed, a player)
             return;
@@ -660,9 +680,233 @@ public class AntNavigator {
                 surface = to.surface();
                 return moveAttached(wallPoint(to, to.cell().getY()));
             }
+            case CRAWL_CHANNEL:
+                return crawlChannel(c, to.cell());
+            case INTO_CHANNEL:
+                return intoChannel(from, to.cell());
+            case OUT_OF_CHANNEL:
+                return outOfChannel(c, to);
+            case OUT_OF_MOUTH:
+                return outOfMouth(c, to);
+            case INTO_MOUTH:
+                return intoMouth(from, to.cell());
             default:
                 return true;
         }
+    }
+
+    // --- Channels (termite tunnels, see Channel): the body lies in the channel's middle, its feet on its floor ---
+
+    /** Where the body is in the channel of a cell: in the middle, its feet on the channel's floor. */
+    private Vec3 channelPoint(BlockPos cell) {
+        return new Vec3(cell.getX() + 0.5, cell.getY() + Channel.FLOOR + EPS, cell.getZ() + 0.5);
+    }
+
+    /** Just outside the opening of the channel in {@code cell} on the horizontal side {@code d}, feet at {@code y}: the body touches the face. */
+    private Vec3 outsideOpening(BlockPos cell, Direction d, double y) {
+        double out = 0.5 + half() + EPS;
+        return new Vec3(cell.getX() + 0.5 + d.getStepX() * out, y, cell.getZ() + 0.5 + d.getStepZ() * out);
+    }
+
+    /** The side of {@code from} that faces {@code to} (cells side by side). */
+    private static Direction toward(BlockPos from, BlockPos to) {
+        return Direction.getNearest(to.getX() - from.getX(), to.getY() - from.getY(), to.getZ() - from.getZ());
+    }
+
+    /** Along the channel into the next block's: sideways lying on the channel's floor, up or down holding its wall. */
+    private boolean crawlChannel(BlockPos c, BlockPos next) {
+        exact = true;
+        inChannel = true;
+        Direction d = toward(c, next);
+        if (d.getAxis().isHorizontal()) {
+            if (surface != Direction.DOWN) {
+                setYaw(d.toYRot());
+            }
+            surface = Direction.DOWN;
+            channelFacing = d;
+        } else {
+            surface = d == Direction.UP ? channelFacing : channelFacing.getOpposite();
+        }
+        return moveAttached(channelPoint(next));
+    }
+
+    /**
+     * Into a channel by an opening: from the floor in front of a hole in a block's side (to the foot of the wall under
+     * it, up the little step and in), from the wall with the hole (along it to the hole's lower lip, then in), from the
+     * floor over a hole (to its middle, then head first down into it) or from the ceiling under a hole (to its middle,
+     * then up into it).
+     */
+    private boolean intoChannel(Foothold from, BlockPos ch) {
+        exact = true;
+        BlockPos c = from.cell();
+        Direction d = toward(ch, c); // the channel's side it comes in by
+        if (from.isCeiling()) {
+            if (leg == 0) {
+                surface = Direction.UP;
+                if (moveAttached(new Vec3(ch.getX() + 0.5, ceilingY(c), ch.getZ() + 0.5))) {
+                    leg = 1;
+                }
+                return false;
+            }
+            inChannel = true;
+            surface = channelFacing;
+            return moveAttached(channelPoint(ch));
+        }
+        if (d == Direction.UP) {
+            if (leg == 0) {
+                surface = Direction.DOWN;
+                if (moveAttached(new Vec3(ch.getX() + 0.5, c.getY() + EPS, ch.getZ() + 0.5))) {
+                    leg = 1;
+                }
+                return false;
+            }
+            inChannel = true;
+            surface = channelFacing.getOpposite();
+            return moveAttached(channelPoint(ch));
+        }
+        double lip = ch.getY() + Channel.FLOOR + EPS;
+        if (leg == 0) {
+            if (from.isWall()) {
+                surface = from.surface();
+                if (moveAttached(outsideOpening(ch, d, lip))) {
+                    leg = 2;
+                }
+                return false;
+            }
+            surface = Direction.DOWN;
+            if (moveAttached(outsideOpening(ch, d, c.getY() + EPS))) {
+                leg = 1;
+            }
+            return false;
+        }
+        if (leg == 1) {
+            surface = Direction.DOWN;
+            if (moveAttached(outsideOpening(ch, d, lip))) {
+                leg = 2;
+            }
+            return false;
+        }
+        if (surface != Direction.DOWN) {
+            setYaw(d.getOpposite().toYRot()); // from the wall it tips forward into the hole
+        }
+        inChannel = true;
+        surface = Direction.DOWN;
+        channelFacing = d.getOpposite();
+        return moveAttached(channelPoint(ch));
+    }
+
+    /**
+     * Out of a channel by an opening: out of a hole in the block's side onto the floor in front (a little drop) or head
+     * first down the wall it is in, up out of a hole on top onto the floor round it, or down out of a hole underneath
+     * onto the ceiling round it.
+     */
+    private boolean outOfChannel(BlockPos c, Foothold to) {
+        exact = true;
+        Direction d = toward(c, to.cell());
+        if (d == Direction.UP) {
+            if (leg == 0) {
+                inChannel = true;
+                surface = channelFacing;
+                if (moveAttached(new Vec3(c.getX() + 0.5, c.getY() + 1 + EPS, c.getZ() + 0.5))) {
+                    leg = 1;
+                }
+                return false;
+            }
+            if (surface != Direction.DOWN) {
+                setYaw(channelFacing.toYRot());
+            }
+            surface = Direction.DOWN;
+            return moveAttached(new Vec3(c.getX() + 0.5 + channelFacing.getStepX() * OFF_THE_HOLE, c.getY() + 1 + EPS,
+                    c.getZ() + 0.5 + channelFacing.getStepZ() * OFF_THE_HOLE));
+        }
+        if (d == Direction.DOWN) {
+            if (leg == 0) {
+                inChannel = true;
+                surface = channelFacing.getOpposite();
+                if (moveAttached(new Vec3(c.getX() + 0.5, ceilingY(to.cell()), c.getZ() + 0.5))) {
+                    leg = 1;
+                }
+                return false;
+            }
+            surface = Direction.UP;
+            ceilingRef = channelFacing.getAxis().isHorizontal() ? channelFacing : Direction.NORTH;
+            heading = 0.0F;
+            return true;
+        }
+        if (leg == 0) {
+            inChannel = true;
+            if (surface != Direction.DOWN) {
+                setYaw(d.toYRot());
+            }
+            surface = Direction.DOWN;
+            channelFacing = d;
+            if (moveAttached(outsideOpening(c, d, c.getY() + Channel.FLOOR + EPS))) {
+                leg = 1;
+            }
+            return false;
+        }
+        if (to.isWall()) {
+            // Over the hole's lower lip and head first down the wall it is in.
+            surface = to.surface();
+            heading = 180.0F;
+            attached = true;
+            motion = Vec3.ZERO;
+            return true;
+        }
+        surface = Direction.DOWN;
+        return moveAttached(new Vec3(ant.getX(), to.cell().getY() + EPS, ant.getZ()));
+    }
+
+    /**
+     * Out of a chimney mouth by its tube (see {@link DoorwayMotion#comeOut}): from the channel's middle up the tube until
+     * the head is out, a look round, over the rim and head first down the outside of the tube, then onto the top of the
+     * block beside, or on down the outside of the mouth's own column (a mouth alone on a spire) to the wall foothold.
+     */
+    private boolean outOfMouth(BlockPos mouth, Foothold to) {
+        exact = true;
+        Doorway door = (Doorway) ant.level().getBlockState(mouth).getBlock();
+        BlockPos beside = to.isFloor() ? to.cell().below() : to.cell();
+        Direction e = toward(mouth, beside);
+        List<DoorwayMotion.Key> keys = DoorwayMotion.comeOut(door.mouthHeight(), door.mouthRadius(), half(), OVER_THE_TOP);
+        if (to.isFloor()) {
+            return walkDoorway(keys, mouth, e);
+        }
+        List<DoorwayMotion.Key> down = keys.subList(0, keys.size() - 1);
+        if (leg < down.size()) {
+            walkDoorway(down, mouth, e);
+            return false;
+        }
+        // On down the outside of the mouth's own column, hugging it.
+        exact = false;
+        slowTurn = false;
+        surface = to.surface();
+        return moveAttached(wallPoint(to, clampY(to.cell(), to.cell().getY() + 1 - ant.getBbHeight() - EPS)));
+    }
+
+    /**
+     * Into a chimney mouth by its tube (see {@link DoorwayMotion#goIn}): from the top of the block beside to the foot of
+     * the tube (or up the outside of the mouth's own column to it), up the tube's outside, over the rim and head first
+     * down inside, then to the channel's middle.
+     */
+    private boolean intoMouth(Foothold from, BlockPos mouth) {
+        exact = true;
+        Doorway door = (Doorway) ant.level().getBlockState(mouth).getBlock();
+        BlockPos beside = from.isFloor() ? from.cell().below() : from.cell();
+        Direction e = toward(mouth, beside);
+        List<DoorwayMotion.Key> keys = new ArrayList<>(DoorwayMotion.goIn(door.mouthHeight(), door.mouthRadius(), half(), OVER_THE_TOP));
+        if (from.isWall()) {
+            DoorwayMotion.Key first = keys.get(0);
+            keys.set(0, new DoorwayMotion.Key(first.out(), first.y(), DoorwayMotion.On.OUTSIDE, first.speed(), first.hold(), first.peek(), first.slowTurn()));
+        }
+        if (leg < keys.size()) {
+            walkDoorway(keys, mouth, e);
+            return false;
+        }
+        inChannel = true;
+        slowTurn = false;
+        surface = e;
+        channelFacing = e.getOpposite();
+        return moveAttached(channelPoint(mouth));
     }
 
     /** The doorway block in this cell if this insect passes through it (a termite in a chimney block), else null. */
@@ -675,7 +919,8 @@ public class AntNavigator {
 
     /** Whether this step comes out of a doorway's mouth or goes in by it (it takes longer than other steps). */
     private boolean isDoorwayStep(Route.Step step) {
-        return (step.kind() == StepKind.OVER_TOP && at != null && doorwayAt(at.cell()) != null)
+        return step.kind() == StepKind.OUT_OF_MOUTH || step.kind() == StepKind.INTO_MOUTH
+                || (step.kind() == StepKind.OVER_TOP && at != null && doorwayAt(at.cell()) != null)
                 || (step.kind() == StepKind.OVER_EDGE && doorwayAt(step.to().cell()) != null);
     }
 
@@ -794,7 +1039,15 @@ public class AntNavigator {
      * falls to the bottom and has to climb all the way up again; on a floor it just stands.
      */
     private void hold(CellMap map) {
-        if (at != null && !at.isFloor() && at.isValid(map)
+        if (at != null && at.isChannel() && at.isValid(map) && ant.position().distanceToSqr(Vec3.atCenterOf(at.cell())) < 1.5 * 1.5) {
+            // In a channel: lie still in its middle.
+            exact = true;
+            inChannel = true;
+            moveAttached(channelPoint(at.cell()));
+            faceTheWayItGoes();
+            return;
+        }
+        if (at != null && !at.isFloor() && !at.isChannel() && at.isValid(map)
                 && ant.position().distanceToSqr(Vec3.atCenterOf(at.cell())) < 1.5 * 1.5) {
             surface = at.surface();
             moveAttached(at.isCeiling() ? ceilingPoint(at) : wallPoint(at, clampY(at.cell(), ant.getY())));
@@ -815,6 +1068,13 @@ public class AntNavigator {
      */
     @Nullable
     private Foothold currentFoothold(CellMap map) {
+        BlockPos feet = ant.blockPosition();
+        if (map.channelSides(feet) != 0 && Math.abs(ant.getX() - (feet.getX() + 0.5)) < IN_THE_CHANNEL
+                && Math.abs(ant.getZ() - (feet.getZ() + 0.5)) < IN_THE_CHANNEL) {
+            // In a channel (a termite tunnel): it lies in the channel's middle. (A body hugging the outside of a narrow
+            // hollow spire piece can have its feet in the piece's block, but never on the channel's middle line.)
+            return Foothold.channel(feet);
+        }
         BlockPos cell = BlockPos.containing(pos());
         if (surface == Direction.UP && Foothold.isValid(map, cell, Direction.UP)
                 && cell.getY() + 1 - (ant.getY() + ant.getBbHeight()) < CLING_GAP) {
@@ -922,19 +1182,12 @@ public class AntNavigator {
      */
     private boolean moveAttached(Vec3 target) {
         attached = true;
-        Vec3 body = toBody(target);
-        Vec3 delta = body.subtract(ant.position());
+        double step = climbSpeed();
         BlockPos column = huggedColumn();
-        if (column != null && delta.y < 0.0 && delta.horizontalDistanceSqr() > 1.0E-6
-                && outFrom(column, body) > outFrom(column, ant.position()) + 1.0E-4) {
-            // Down along a wall that widens below (a spire's wider step): away from it first, then down, so the body
-            // never comes to sit on the step's edge. (Where it narrows below, it goes down and in together.)
-            Vec3 away = new Vec3(delta.x, 0.0, delta.z);
-            double length = away.length();
-            double step = climbSpeed();
-            motion = length <= step ? away : away.scale(step / length);
-            return false;
+        if (column != null && isNarrowNear(column, target, step)) {
+            return hugAlong(column, target, step);
         }
+        Vec3 delta = target.subtract(ant.position());
         double largest = Math.max(Math.abs(delta.x), Math.max(Math.abs(delta.y), Math.abs(delta.z)));
         if (largest > SQUARE_UP) {
             Vec3 squareUp = new Vec3(small(delta.x), small(delta.y), small(delta.z));
@@ -944,9 +1197,54 @@ public class AntNavigator {
             }
         }
         double distance = delta.length();
-        double step = climbSpeed();
         motion = distance <= step ? delta : delta.scale(step / distance);
         return distance <= step;
+    }
+
+    /** Whether the column is narrower than a full block anywhere the body is, goes next or ends up. */
+    private boolean isNarrowNear(BlockPos column, Vec3 target, double step) {
+        double height = ant.getBbHeight();
+        return widestBetween(column, ant.getY() - step, ant.getY() + height + step) < 1.0
+                || widestBetween(column, target.y - step, target.y + height + step) < 1.0;
+    }
+
+    /**
+     * A move along a column that is narrower than a block (a spire piece, a mouth): along the plan one step at a time,
+     * drawn in onto the column at the height it goes to, so the body follows the column's shape (a taper, a narrow
+     * mouth over a wider piece) instead of cutting across. Sideways along the face it is drawn in by the column's width
+     * level with the body there; out from the face by the widest part within a step above or below too, so the body is
+     * already clear of a wider part it is about to pass. True once it is at the target.
+     */
+    private boolean hugAlong(BlockPos column, Vec3 target, double step) {
+        Vec3 plan = pos();
+        Vec3 planDelta = target.subtract(plan);
+        double planDistance = planDelta.length();
+        boolean reaches = planDistance <= step;
+        Vec3 next = reaches ? target : plan.add(planDelta.scale(step / planDistance));
+        double height = ant.getBbHeight();
+        double along = columnWidth(column, next.y);
+        double across = widestBetween(column, next.y - step, next.y + height + step);
+        Vec3 body = drawIn(next, column, along, across);
+        Vec3 delta = body.subtract(ant.position());
+        double swept = widestBetween(column, Math.min(ant.getY(), next.y), Math.max(ant.getY(), next.y) + height);
+        if (Math.abs(delta.y) > 1.0E-6 && delta.horizontalDistanceSqr() > 1.0E-6
+                && outFrom(column, ant.position()) < hugOut(swept) - 1.0E-4) {
+            // Not yet clear of a wider part of the column it is about to pass (a wider step below, a wider block
+            // above): away from it first, then on, so the body never sits on the step's edge or cuts into it.
+            Vec3 away = new Vec3(delta.x, 0.0, delta.z);
+            double length = away.length();
+            motion = length <= step ? away : away.scale(step / length);
+            return false;
+        }
+        double distance = delta.length();
+        double most = step * 1.5; // drawn in, a step along the plan can be a little longer on the body
+        motion = distance <= most ? delta : delta.scale(most / distance);
+        return reaches && distance <= most;
+    }
+
+    /** How far from a column's middle the body's middle is when it hugs a column this wide. */
+    private double hugOut(double width) {
+        return width / 2.0 + half() + EPS;
     }
 
     /** How far (in blocks) a point is from the middle of a column, across the wall the body holds. */
@@ -1030,16 +1328,20 @@ public class AntNavigator {
      * is narrower than a full block.
      */
     private double columnWidth(BlockPos column, double y) {
-        double top = y + ant.getBbHeight();
+        return widestBetween(column, y, y + ant.getBbHeight());
+    }
+
+    /** The widest part of the column between the heights {@code low} and {@code high} (see {@link #columnWidth}). */
+    private double widestBetween(BlockPos column, double low, double high) {
         double widest = 0.0;
         boolean any = false;
-        for (int by = Mth.floor(y); by <= Mth.floor(top - 1.0E-6); by++) {
+        for (int by = Mth.floor(low); by <= Mth.floor(high - 1.0E-6); by++) {
             BlockPos pos = new BlockPos(column.getX(), by, column.getZ());
             BlockState state = ant.level().getBlockState(pos);
             if (state.getBlock() instanceof ClimbShape shape) {
                 for (int k = 0; k < Slope.COLUMNS; k++) {
-                    double low = by + k / (double) Slope.COLUMNS;
-                    if (low + 1.0 / Slope.COLUMNS > y && low < top) {
+                    double bottom = by + k / (double) Slope.COLUMNS;
+                    if (bottom + 1.0 / Slope.COLUMNS > low && bottom < high) {
                         widest = Math.max(widest, shape.widthAt(state, (k + 0.5) / Slope.COLUMNS));
                         any = true;
                     }
@@ -1050,6 +1352,17 @@ public class AntNavigator {
             }
         }
         return any ? Math.min(1.0, widest) : 1.0;
+    }
+
+    /**
+     * A plan position drawn in onto a column: sideways along the face it holds by the width {@code along}, out from the
+     * face by the width {@code across}.
+     */
+    private Vec3 drawIn(Vec3 plan, BlockPos column, double along, double across) {
+        Direction.Axis out = surface.getAxis();
+        double x = squeeze(plan.x, column.getX() + 0.5, out == Direction.Axis.X ? across : along);
+        double z = squeeze(plan.z, column.getZ() + 0.5, out == Direction.Axis.Z ? across : along);
+        return new Vec3(x, plan.y, z);
     }
 
     /** Where the body really goes for a plan position: drawn in onto the hugged column if it is narrower than a block. */
@@ -1071,11 +1384,17 @@ public class AntNavigator {
         if (column == null) {
             return ant.position();
         }
+        // Sideways along the face: by the column's width level with the body. Out from the face: by the width the body
+        // is hugging (how far out it is), so a body pressed against the column is always pressed against the plan's
+        // full face, whatever the column's width level with it (above the column's top, at a mouth's tube).
+        Direction.Axis out = surface.getAxis();
         double w = columnWidth(column, ant.getY());
-        if (w >= 1.0) {
-            return ant.position();
-        }
-        return new Vec3(unsqueeze(ant.getX(), column.getX() + 0.5, w), ant.getY(), unsqueeze(ant.getZ(), column.getZ() + 0.5, w));
+        double d = coord(ant.position(), out) - centerOf(column, out);
+        double hugged = 2.0 * (Math.abs(d) - half() - EPS);
+        double across = hugged > 0.0 ? Math.min(1.0, hugged) : w;
+        double x = unsqueeze(ant.getX(), column.getX() + 0.5, out == Direction.Axis.X ? across : w);
+        double z = unsqueeze(ant.getZ(), column.getZ() + 0.5, out == Direction.Axis.Z ? across : w);
+        return new Vec3(x, ant.getY(), z);
     }
 
     /** One axis drawn in: within the block's width scaled to the column's, outside it moved in by what the column lacks. */

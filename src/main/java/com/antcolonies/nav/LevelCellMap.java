@@ -15,11 +15,14 @@ import net.minecraft.world.phys.shapes.CollisionContext;
  * The real game world, seen as cells for the route planner. Seen through the eyes of one insect if it is given: a block
  * that lets it through (a termite chimney block for termites) is an open cell for it, a doorway, and nothing to stand
  * or cling on, because it would fall into it (except the sides of a column that can be climbed, {@link ClimbShape}).
- * A slope ({@link Slope}) is a floor in its own cell. Species-neutral: what lets whom through is up to the block.
+ * A slope ({@link Slope}) is a floor in its own cell. A block with a channel ({@link Channel}) is never an open cell: an
+ * insect that fits crawls through its channel. Species-neutral: what lets whom through is up to the block.
  */
 public final class LevelCellMap implements CellMap {
     private final Level level;
     private final CollisionContext context;
+    @Nullable
+    private final Entity insect;
 
     public LevelCellMap(Level level) {
         this(level, null);
@@ -28,6 +31,7 @@ public final class LevelCellMap implements CellMap {
     public LevelCellMap(Level level, @Nullable Entity insect) {
         this.level = level;
         this.context = insect == null ? CollisionContext.empty() : CollisionContext.of(insect);
+        this.insect = insect;
     }
 
     @Override
@@ -36,6 +40,9 @@ public final class LevelCellMap implements CellMap {
             return false;
         }
         BlockState state = level.getBlockState(pos);
+        if (state.getBlock() instanceof Channel) {
+            return false; // only ever crawled through by its channel (see channelSides)
+        }
         return state.getCollisionShape(level, pos, context).isEmpty()
                 && state.getFluidState().isEmpty()
                 && !state.is(BlockTags.FIRE)
@@ -55,6 +62,20 @@ public final class LevelCellMap implements CellMap {
             return shape.isClimbable(state);
         }
         return state.isFaceSturdy(level, pos, face) && !state.getCollisionShape(level, pos, context).isEmpty();
+    }
+
+    @Override
+    public int channelSides(BlockPos cell) {
+        if (!level.isLoaded(cell)) {
+            return 0;
+        }
+        BlockState state = level.getBlockState(cell);
+        return state.getBlock() instanceof Channel channel && channel.fits(insect) ? channel.openSides(level, cell, state) : 0;
+    }
+
+    @Override
+    public boolean isMouth(BlockPos cell) {
+        return level.isLoaded(cell) && level.getBlockState(cell).getBlock() instanceof Doorway && channelSides(cell) != 0;
     }
 
     @Override

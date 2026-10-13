@@ -20,6 +20,8 @@ public class AntRenderer<T extends AbstractAntEntity> extends GeoEntityRenderer<
     private static final float CLIMB_LIFT = 0.25F;
     /** How far the model is moved toward the wall, so the feet touch it. */
     private static final float CLIMB_INTO_WALL = 0.17F;
+    /** The same inside a narrow channel (a termite tunnel): less, so the body stays in the channel's middle. */
+    private static final float CHANNEL_INTO_WALL = 0.08F;
 
     public AntRenderer(EntityRendererProvider.Context context, GeoModel<T> model) {
         super(context, model);
@@ -45,7 +47,7 @@ public class AntRenderer<T extends AbstractAntEntity> extends GeoEntityRenderer<
         float tilt = ant.getBodyTilt(partialTick);
         if (tilt <= 90.0F) {
             float share = tilt / 90.0F;
-            poseStack.translate(0.0F, CLIMB_LIFT * share, -CLIMB_INTO_WALL * share);
+            poseStack.translate(0.0F, CLIMB_LIFT * share, -(ant.isInChannel() ? CHANNEL_INTO_WALL : CLIMB_INTO_WALL) * share);
         } else {
             // From the wall onto the ceiling: the feet go up to the top of the hitbox, against the ceiling.
             float share = (tilt - 90.0F) / 90.0F;

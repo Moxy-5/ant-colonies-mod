@@ -792,11 +792,11 @@ public class NavigationTests {
                 List<BlockPos> route = ant.getNavigator().getRoute();
                 String next = route == null || ant.getNavigator().getNextWaypoint() >= route.size()
                         ? "-" : route.get(ant.getNavigator().getNextWaypoint()).subtract(BlockPos.containing(origin)).toShortString();
-                AntColoniesMod.LOGGER.info("[nav-test] #{} t{} pos {},{},{} cell {} next {} climbing={} collided={} done={} failed={}",
+                AntColoniesMod.LOGGER.info("[nav-test] #{} t{} pos {},{},{} cell {} next {} climbing={} collided={} done={} failed={} attached={} motion={} y={}",
                         ant.getId(), helper.getTick(), r(at.x), r(at.y), r(at.z),
                         ant.blockPosition().subtract(BlockPos.containing(origin)).toShortString(), next,
                         ant.getNavigator().isClimbing(), ant.horizontalCollision,
-                        ant.getNavigator().isDone(), ant.getNavigator().hasFailed());
+                        ant.getNavigator().isDone(), ant.getNavigator().hasFailed(), ant.getNavigator().isAttached(), ant.getNavigator().getClimbMotion(), ant.getY());
             }
         });
     }
