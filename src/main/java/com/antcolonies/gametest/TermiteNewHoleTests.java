@@ -16,6 +16,7 @@ import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
@@ -247,6 +248,92 @@ public class TermiteNewHoleTests {
                 helper.succeed();
             }
             helper.assertTrue(since[0] < 28000, "the tunnel to the tree was not dug and opened: " + colony.foragingHoles().describeNewHoles(level));
+        });
+    }
+    /**
+     * Eating dead wood from below (the user's idea, 2026-10-14): a fallen log lies on level ground 20 blocks east of the
+     * nest. At night the workers dig a tunnel out to it, then a feeding gallery up under it; by day (no foraging) they
+     * still eat the log, from the gallery under it, without going out.
+     */
+    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    public static void aFallenLogIsEatenFromBelowByDay(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        int logStart = MIDDLE + 20;
+        for (int x = 0; x <= logStart + 8; x++) {
+            for (int z = 0; z < 25; z++) {
+                for (int y = 0; y < SURFACE - 1; y++) {
+                    helper.setBlock(x, y, z, Blocks.DIRT);
+                }
+                helper.setBlock(x, SURFACE - 1, z, Blocks.GRASS_BLOCK);
+            }
+        }
+        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        helper.runAfterDelay(5, () -> {
+            for (int i = 0; i < 6; i++) {
+                helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE - 3 + i, SURFACE, MIDDLE - 2);
+            }
+        });
+        java.util.List<BlockPos> log = new java.util.ArrayList<>();
+        for (int x = logStart; x < logStart + 5; x++) {
+            log.add(helper.absolutePos(new BlockPos(x, SURFACE, MIDDLE)));
+        }
+        int[] phase = {0}; // 0 setting up, 1 night: tunnel and gallery dug, 2 day: eaten from below
+        int[] eatenAtDawn = {0};
+        helper.runAfterDelay(10, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
+            long middleAged = level.getGameTime() - colony.profile().worker().nurseUntilTicks() - 1000;
+            for (TermiteWorkerEntity worker : level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds())) {
+                worker.setGrownUpAt(middleAged);
+            }
+            TermiteSoldierTests.digNestAtOnce(level, colony);
+            colony.population().addNewMembers(WorkerAntEntity.CASTE, level.getGameTime() - 1000, 500);
+            colony.setForagingTimeForTests(true);
+            for (BlockPos wood : log) {
+                level.setBlock(wood, com.antcolonies.registry.ModBlocks.DEAD_WOOD.get().defaultBlockState()
+                        .setValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS, net.minecraft.core.Direction.Axis.X), 3);
+            }
+            colony.food().rescanPlantsSoon();
+            colony.foodMap().knowForTests(log.get(0));
+            phase[0] = 1;
+        });
+        helper.onEachTick(() -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            if (colony == null || phase[0] == 0) {
+                return;
+            }
+            int eaten = 0;
+            for (BlockPos wood : log) {
+                BlockState state = level.getBlockState(wood);
+                eaten += state.getBlock() instanceof com.antcolonies.block.DeadWoodBlock ? state.getValue(com.antcolonies.block.DeadWoodBlock.EATEN) * 10
+                        + colony.food().getPiecesCut(wood) : 100;
+            }
+            Nest.NewTunnel tunnel = colony.nest().getNewTunnels().isEmpty() ? null : colony.nest().getNewTunnels().get(0);
+            if (helper.getTick() % 1000 == 0) {
+                AntColoniesMod.LOGGER.info("[new-hole-test] log from below: phase {}, tunnel {}, gallery {}, eaten {}", phase[0],
+                        tunnel == null ? "none" : tunnel.tunnel().tunnel().stream().filter(c -> Nest.isDugOut(level, c)).count() + "/" + tunnel.tunnel().tunnel().size(),
+                        tunnel == null || tunnel.gallery() == null ? "none" : tunnel.gallery().stream().filter(c -> Nest.isDugOut(level, c)).count() + "/" + tunnel.gallery().size(),
+                        eaten);
+            }
+            if (phase[0] == 1) {
+                if (tunnel != null && tunnel.gallery() != null) {
+                    long under = log.stream().filter(wood -> tunnel.gallery().contains(wood.below())).count();
+                    helper.assertTrue(under >= 4, "the feeding gallery runs under only " + under + " of the log's 5 blocks: " + tunnel.gallery());
+                    if (tunnel.gallery().stream().allMatch(c -> Nest.isDugOut(level, c))) {
+                        colony.setForagingTimeForTests(false); // day
+                        eatenAtDawn[0] = eaten;
+                        phase[0] = 2;
+                    }
+                }
+                helper.assertTrue(helper.getTick() < 30000, "the tunnel and the feeding gallery under the log were not dug");
+                return;
+            }
+            if (eaten > eatenAtDawn[0]) {
+                helper.assertTrue(!colony.isForagingTime(level), "foraging time");
+                helper.succeed();
+            }
+            helper.assertTrue(helper.getTick() < 39000, "nothing of the log was eaten by day (eaten " + eaten + ", at dawn " + eatenAtDawn[0] + ")");
         });
     }
 }

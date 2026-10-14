@@ -185,6 +185,15 @@ public class FoodStore {
      */
     @Nullable
     public BlockPos findGrass(Level level, BlockPos near, Set<BlockPos> avoid, @Nullable UUID ant) {
+        return findGrass(level, near, avoid, ant, false);
+    }
+
+    /**
+     * Like {@link #findGrass(Level, BlockPos, Set, UUID)}; {@code fromInside}: only food that can be eaten from inside
+     * the nest (from a feeding gallery under it, see {@link #isFeedableFromInside}), for foragers by day.
+     */
+    @Nullable
+    public BlockPos findGrass(Level level, BlockPos near, Set<BlockPos> avoid, @Nullable UUID ant, boolean fromInside) {
         if (!(level instanceof ServerLevel serverLevel) || !wantsSeeds(serverLevel)) {
             return null;
         }
@@ -197,7 +206,7 @@ public class FoodStore {
         for (BlockPos pos : plants(level)) {
             SpeciesProfile.PlantFood plant = food().plantFor(level.getBlockState(pos));
             if (plant == null || busyGrass.contains(pos) || avoid.contains(pos) || foragersAt(pos) >= Math.max(1, plant.foragers())
-                    || !colony.foodMap().knows(pos, ant)) {
+                    || !colony.foodMap().knows(pos, ant) || fromInside && !isFeedableFromInside(level, pos)) {
                 continue;
             }
             double worth = worth(plant.pieces() - getPiecesCut(pos), tripLength(pos, exits.isEmpty() ? List.of(center) : exits), pos.distSqr(near));
@@ -281,6 +290,20 @@ public class FoodStore {
             }
         }
         return count;
+    }
+
+    /**
+     * Whether food at this spot can be eaten from inside the nest: a dug-out cell of the nest touches it (a feeding
+     * gallery under a fallen log, see {@code FeedingGallery}), so a termite can eat it by day without going out.
+     */
+    public boolean isFeedableFromInside(Level level, BlockPos food) {
+        for (net.minecraft.core.Direction direction : net.minecraft.core.Direction.values()) {
+            BlockPos next = food.relative(direction);
+            if (colony.nest().isInside(level, next) && Nest.isDugOut(level, next)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Whether this block is one of the plants the colony cuts food off. */

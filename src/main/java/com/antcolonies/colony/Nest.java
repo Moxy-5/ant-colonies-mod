@@ -241,6 +241,15 @@ public class Nest {
                 return next;
             }
         }
+        // The feeding galleries up under rich food, once their tunnels are dug (in the order planned: from the tunnel up).
+        for (NewTunnel tunnel : newTunnels) {
+            if (tunnel.gallery() != null && !isSpent(tunnel.tunnel().hole()) && ForagingHoles.isDug(level, tunnel.tunnel())) {
+                next = firstDiggable(level, tunnel.gallery());
+                if (next != null) {
+                    return next;
+                }
+            }
+        }
         // A closed hole is opened before more garden rooms are dug: a big colony wants all its gardens at once (with the
         // brain its headcount is mostly numbers), and its foragers were shut in until every room was dug.
         BlockPos hole = colony.foragingHoles().holeToOpen(level);
@@ -515,13 +524,14 @@ public class Nest {
         return spots;
     }
 
+    /** A cell of a foraging tunnel or of a feeding gallery (both may climb, so they are dug upward too). */
     private boolean isForagingTunnelCell(Level level, BlockPos pos) {
         for (NestPlan.ForagingTunnel tunnel : getForagingTunnels(level)) {
             if (tunnel.tunnel().contains(pos)) {
                 return true;
             }
         }
-        return false;
+        return galleryCells().contains(pos);
     }
 
     /** Whether the entrance hole is open: nothing solid in it (grass or snow do not close it). */
@@ -622,6 +632,7 @@ public class Nest {
         for (NestPlan.ForagingTunnel tunnel : getForagingTunnels(level)) {
             cells.addAll(tunnel.tunnel());
         }
+        cells.addAll(galleryCells());
         return cells;
     }
 
@@ -707,8 +718,37 @@ public class Nest {
     /** A foraging tunnel fitted to the ground is at least this many columns long (shorter: the level plan is kept). */
     private static final int MIN_FITTED_TUNNEL = 4;
 
-    /** A tunnel dug out to rich food after the nest was planned, and the food it leads to. */
-    public record NewTunnel(NestPlan.ForagingTunnel tunnel, BlockPos food) {
+    /**
+     * A tunnel dug out to rich food after the nest was planned, and the food it leads to. {@code gallery}: the feeding
+     * gallery from the tunnel up under the food (see {@link FeedingGallery}), null until it is planned (once the tunnel
+     * is dug), empty if there is none (the food cannot be reached from below).
+     */
+    public record NewTunnel(NestPlan.ForagingTunnel tunnel, BlockPos food, @Nullable List<BlockPos> gallery) {
+        public NewTunnel(NestPlan.ForagingTunnel tunnel, BlockPos food) {
+            this(tunnel, food, null);
+        }
+    }
+
+    /** The feeding gallery of the new tunnel to this food is planned (see {@link NewTunnel#gallery}). */
+    void setGallery(BlockPos food, List<BlockPos> gallery) {
+        for (int i = 0; i < newTunnels.size(); i++) {
+            NewTunnel tunnel = newTunnels.get(i);
+            if (tunnel.food().equals(food)) {
+                newTunnels.set(i, new NewTunnel(tunnel.tunnel(), tunnel.food(), List.copyOf(gallery)));
+            }
+        }
+        insideTick = Long.MIN_VALUE;
+    }
+
+    /** The cells of every feeding gallery planned (dug or not). */
+    List<BlockPos> galleryCells() {
+        List<BlockPos> cells = new ArrayList<>();
+        for (NewTunnel tunnel : newTunnels) {
+            if (tunnel.gallery() != null && !isSpent(tunnel.tunnel().hole())) {
+                cells.addAll(tunnel.gallery());
+            }
+        }
+        return cells;
     }
 
     /** The tunnels dug (or being dug) out to rich food. */
@@ -749,6 +789,13 @@ public class Nest {
         if (now != insideTick) {
             Set<BlockPos> cells = nestCells(level);
             cells.add(center);
+            // A feeding gallery cell is inside only while it has a roof (the food over it): once the wood over it is
+            // eaten away it is open to the sky.
+            for (BlockPos gallery : galleryCells()) {
+                if (level.isLoaded(gallery) && level.getBlockState(gallery.above()).getCollisionShape(level, gallery.above()).isEmpty()) {
+                    cells.remove(gallery);
+                }
+            }
             Set<BlockPos> channels = new HashSet<>();
             colony.mound().getParts(level).forEach((pos, part) -> {
                 if (part == MoundPlan.Part.OPEN) {
@@ -988,6 +1035,9 @@ public class Nest {
             entry.putLong("hole", tunnel.tunnel().hole().asLong());
             entry.putInt("side", tunnel.tunnel().side().get3DDataValue());
             entry.putLong("food", tunnel.food().asLong());
+            if (tunnel.gallery() != null) {
+                entry.putLongArray("gallery", tunnel.gallery().stream().mapToLong(BlockPos::asLong).toArray());
+            }
             tunnels.add(entry);
         }
         tag.put("newTunnels", tunnels);
@@ -1022,8 +1072,15 @@ public class Nest {
                 cells.add(BlockPos.of(cell));
             }
             if (!cells.isEmpty()) {
+                List<BlockPos> gallery = null;
+                if (entry.contains("gallery")) {
+                    gallery = new ArrayList<>();
+                    for (long cell : entry.getLongArray("gallery")) {
+                        gallery.add(BlockPos.of(cell));
+                    }
+                }
                 newTunnels.add(new NewTunnel(new NestPlan.ForagingTunnel(List.copyOf(cells), BlockPos.of(entry.getLong("hole")),
-                        Direction.from3DDataValue(entry.getInt("side"))), BlockPos.of(entry.getLong("food"))));
+                        Direction.from3DDataValue(entry.getInt("side"))), BlockPos.of(entry.getLong("food")), gallery == null ? null : List.copyOf(gallery)));
             }
         }
         fittedTunnels = null;

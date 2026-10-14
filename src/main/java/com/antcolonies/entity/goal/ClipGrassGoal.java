@@ -46,6 +46,8 @@ public class ClipGrassGoal extends Goal {
     private BlockPos grass;
     private int ticks;
     private int clipping;
+    /** Eating from inside the nest (out of foraging time): from a foothold inside only. */
+    private boolean fromInside;
     /** Grass this ant failed to reach: position -> game time until which it leaves it alone. */
     private final Map<BlockPos, Long> unreachable = new HashMap<>();
 
@@ -62,12 +64,18 @@ public class ClipGrassGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        if (colony == null || !colony.isForagingTime(level)) {
-            return false; // foragers only go out at foraging time (termites: at night and in the rain)
+        if (colony == null) {
+            return false;
+        }
+        // Foragers only go out at foraging time (termites: at night and in the rain). Out of it a colony that keeps a
+        // schedule still eats food it can reach from inside (a fallen log over a feeding gallery).
+        fromInside = !colony.isForagingTime(level);
+        if (fromInside && !colony.keepsASchedule()) {
+            return false;
         }
         long now = level.getGameTime();
         unreachable.values().removeIf(until -> until <= now);
-        grass = colony.food().findGrass(level, ant.blockPosition(), unreachable.keySet(), ant.getUUID());
+        grass = colony.food().findGrass(level, ant.blockPosition(), unreachable.keySet(), ant.getUUID(), fromInside);
         if (grass == null) {
             return false;
         }
@@ -78,7 +86,8 @@ public class ClipGrassGoal extends Goal {
     @Override
     public boolean canContinueToUse() {
         return colony != null && grass != null && colony.food().isFoodPlant(ant.level().getBlockState(grass))
-                && !ant.hasFullMandibles() && ticks < GIVE_UP_TICKS && colony.isForagingTime(ant.level());
+                && !ant.hasFullMandibles() && ticks < GIVE_UP_TICKS
+                && (fromInside ? colony.food().isFeedableFromInside(ant.level(), grass) : colony.isForagingTime(ant.level()));
     }
 
     /** Any foothold from which the ant can nibble at {@code plant}: in its own cell or one of the 26 round it. */
@@ -116,7 +125,8 @@ public class ClipGrassGoal extends Goal {
         ant.getLookControl().setLookAt(grass.getX() + 0.5, grass.getY() + 0.3, grass.getZ() + 0.5);
         if (ant.getNavigator().isDone() && isNear(ant.blockPosition(), grass)) {
             clip(level);
-        } else if (ant.getNavigator().isDone() && !ant.getNavigator().moveTo(nearPlant(grass), grass, 1.0)) {
+        } else if (ant.getNavigator().isDone() && !ant.getNavigator().moveTo(fromInside
+                ? nearPlant(grass).and(at -> colony.nest().isInside(level, at.cell())) : nearPlant(grass), grass, 1.0)) {
             unreachable.put(grass.immutable(), level.getGameTime() + UNREACHABLE_TICKS);
             ticks = GIVE_UP_TICKS; // no way to get there: let another ant have a go
         }

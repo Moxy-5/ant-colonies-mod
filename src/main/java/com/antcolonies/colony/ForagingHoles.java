@@ -312,7 +312,17 @@ public class ForagingHoles {
                 continue;
             }
             active++;
-            digging |= !isDug(level, tunnel.tunnel());
+            boolean dug = isDug(level, tunnel.tunnel());
+            digging |= !dug;
+            if (dug && tunnel.gallery() == null && level.isLoaded(tunnel.food())) {
+                // The tunnel has reached the food: a feeding gallery up under it, to eat it from below by day too.
+                List<BlockPos> gallery = FeedingGallery.plan(level, tunnel.tunnel(), tunnel.food(), ground(level),
+                        pos -> isRich(level, pos) && level.getBlockState(pos).isCollisionShapeFullBlock(level, pos));
+                colony.nest().setGallery(tunnel.food(), gallery);
+                ColonyManager.get(level).markChanged();
+                AntColoniesMod.LOGGER.debug("[new-hole] a feeding gallery of {} blocks up under the food at {}", gallery.size(),
+                        tunnel.food().toShortString());
+            }
         }
         if (active >= numbers.max() || digging) {
             return; // one new tunnel at a time
