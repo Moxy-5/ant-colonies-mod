@@ -18,9 +18,11 @@ import net.minecraft.world.level.Level;
  * underneath, covered, so they can feed by day as well as by night. Once a new tunnel to rich food is dug, the workers
  * dig a short gallery from it up under the food: the ground block under each block of the food (a whole fallen tree
  * lying on the ground, its stump, a hay bale), joined to the tunnel underground. A termite in the gallery has the food
- * right over its head and eats it from there; the food is its roof. Species-neutral: any rich food that is a whole block.
+ * right over its head and eats it from there; the food is its roof. Species-neutral: any rich food that is a whole block,
+ * or a branch lying on the ground (the workers case it in mud first, see {@link NestWalls#wallFirst}, so it is a roof
+ * too). A block of food eaten away leaves a mud cast (see {@code MudCastBlock}): the gallery keeps its roof.
  *
- * <p>Where the ground falls away beside the food, the open side is walled up with soil by the workers (see
+ * <p>Where the ground falls away beside the food, the open side is walled up with a crust of mud by the workers (see
  * {@link NestWalls}). A block under the food next to water is left out, and so is food that does not lie on soil.
  */
 final class FeedingGallery {

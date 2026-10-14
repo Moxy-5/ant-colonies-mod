@@ -5,6 +5,7 @@ import com.antcolonies.block.DeadWoodBlock;
 import com.antcolonies.block.DryGrassBlock;
 import com.antcolonies.block.FallenBranchBlock;
 import com.antcolonies.block.FungusCombBlock;
+import com.antcolonies.block.MudCastBlock;
 import com.antcolonies.block.MudCrustBlock;
 import com.antcolonies.block.GiantTermitomycesBlock;
 import com.antcolonies.block.SeedPileBlock;
@@ -120,6 +121,13 @@ public class ModBlocks {
     /** Dead acacia wood: a fallen tree's trunk and stump, eaten by termites in stages (see DeadWoodBlock). */
     public static final DeferredBlock<DeadWoodBlock> DEAD_WOOD = BLOCKS.registerBlock("dead_wood", DeadWoodBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_GRAY).strength(1.5F).sound(SoundType.WOOD).ignitedByLava());
+
+    /**
+     * What is left of a block of dead wood the termites ate away: a tunnel block of mud where the wood was, crumbling
+     * once the log is gone (see MudCastBlock).
+     */
+    public static final DeferredBlock<MudCastBlock> MUD_CAST = BLOCKS.registerBlock("mud_cast", MudCastBlock::new,
+            pieceProperties().isSuffocating((state, level, pos) -> false));
 
     /** A thin crust of termite mud on any face of a block: gallery walls, coated wood, sheeting (see MudCrustBlock). */
     public static final DeferredBlock<MudCrustBlock> MUD_CRUST = BLOCKS.registerBlock("mud_crust", MudCrustBlock::new,

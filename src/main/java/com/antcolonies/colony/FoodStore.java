@@ -10,7 +10,10 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.block.EatenInStages;
+import com.antcolonies.block.MudCastBlock;
+import com.antcolonies.block.MudCrustBlock;
 import com.antcolonies.block.SeedPileBlock;
+import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.species.SpeciesProfile;
 
 import net.minecraft.core.BlockPos;
@@ -242,8 +245,8 @@ public class FoodStore {
 
     /**
      * The food plants within the profile's food radius of the entrance (scanned again at most every few seconds: the top
-     * block of each column, and the block under it for solid plants like a hay bale). The list may hold plants that are
-     * gone since the last scan.
+     * block of each column, or the block under it for solid plants like a hay bale, and the food stacked under that: a
+     * log under a stump). The list may hold plants that are gone since the last scan.
      */
     public List<BlockPos> plants(Level level) {
         long now = level.getGameTime();
@@ -256,14 +259,26 @@ public class FoodStore {
                     if (!level.hasChunkAt(new BlockPos(x, center.getY(), z))) {
                         continue;
                     }
-                    BlockPos top = new BlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z), z);
-                    for (BlockPos pos : List.of(top, top.below())) {
+                    BlockPos top = new BlockPos(x, level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z), z);
+                    // The first air above any block (a thin branch over a gallery dug under it is no surface for MOTION_BLOCKING),
+                    // and mud plastered over food (a branch's casing, a log's top) does not hide it.
+                    while (MudCrustBlock.isCrust(level.getBlockState(top.below()))) {
+                        top = top.below();
+                    }
+                    boolean found = false;
+                    for (int down = 0; down < (found ? STACK_DEPTH : 2); down++) {
+                        BlockPos pos = top.below(down);
                         SpeciesProfile.PlantFood plant = food().plantFor(level.getBlockState(pos));
                         int dy = pos.getY() - center.getY();
                         // Rich food (a fallen tree, a hay bale) counts up or down a slope too (the user's fallen tree on a
                         // terrace above the nest was never seen, 2026-10-14); other plants only near the nest's height.
                         if (plant != null && (dy >= -1 && dy <= 4 || plant.rich() && Math.abs(dy) <= RICH_HEIGHT)) {
                             grassTufts.add(pos);
+                            if (!plant.rich()) {
+                                break; // one plant a column (the two halves of tall grass are one plant)
+                            }
+                            found = true;
+                        } else if (found) {
                             break;
                         }
                     }
@@ -275,6 +290,9 @@ public class FoodStore {
         }
         return grassTufts;
     }
+
+    /** Food stacked under the top food block of a column (a stump on a log, a stump 2 blocks tall) is seen this deep. */
+    private static final int STACK_DEPTH = 4;
 
     /** The food plants round the nest are looked for again on the next ask (a test that has just put one down). */
     public void rescanPlantsSoon() {
@@ -294,17 +312,18 @@ public class FoodStore {
 
     /**
      * Whether food at this spot can be eaten from inside the nest: a dug-out cell of the nest touches it (a feeding
-     * gallery under a fallen log, see {@code FeedingGallery}), so a termite can eat it by day without going out.
+     * gallery under a fallen log, see {@code FeedingGallery}), or a mud cast joined to one (the wood beside it eaten
+     * away), so a termite can eat it by day without going out.
      */
     public boolean isFeedableFromInside(Level level, BlockPos food) {
         Set<BlockPos> nest = null;
         for (net.minecraft.core.Direction direction : net.minecraft.core.Direction.values()) {
             BlockPos next = food.relative(direction);
-            if (colony.nest().isInside(level, next) && Nest.isDugOut(level, next)) {
+            if (colony.nest().isInside(level, next) && (Nest.isDugOut(level, next) || MudCastBlock.isCast(level.getBlockState(next)))) {
                 if (nest == null) {
                     nest = colony.nest().nestCells(level);
                 }
-                if (colony.nest().isGalleryClosed(level, next, nest)) {
+                if (colony.nest().isGalleryClosed(level, colony.nest().galleryFor(level, next), nest)) {
                     return true;
                 }
             }
@@ -347,6 +366,7 @@ public class FoodStore {
             if (after != before) {
                 level.setBlock(pos, after, 3); // it looks more eaten
             }
+            plaster(level, pos, before);
         }
         if (plant == null || clips >= plant.pieces()) {
             grassClips.remove(pos);
@@ -355,11 +375,66 @@ public class FoodStore {
             if (plant != null) {
                 SoundType sound = state.getSoundType();
                 level.playSound(null, pos, sound.getBreakSound(), net.minecraft.sounds.SoundSource.BLOCKS, 0.5F, sound.getPitch() * 1.2F);
-                level.destroyBlock(pos, false);
+                BlockState cast = castFor(level, pos, state);
+                if (cast == null) {
+                    level.destroyBlock(pos, false);
+                } else {
+                    level.levelEvent(net.minecraft.world.level.block.LevelEvent.PARTICLES_DESTROY_BLOCK, pos,
+                            net.minecraft.world.level.block.Block.getId(state));
+                    level.setBlock(pos, cast, 3);
+                }
             }
         } else if (plant.foragers() <= 1) {
             busyGrass.put(pos, level.getGameTime() + GRASS_REST_TICKS);
         }
+    }
+
+    /**
+     * What is left of a food block eaten away by a species that plasters mud over what it eats (the profile's
+     * {@code nest.crust_walls}: termites), or null for nothing: a whole block of wood leaves a mud cast (the user's
+     * choice, 2026-10-14; see {@link MudCastBlock}), and so does a branch cased in mud over a feeding gallery. The cast's
+     * channel opens toward the nest it was eaten from and joins the casts beside it.
+     */
+    @Nullable
+    private BlockState castFor(Level level, BlockPos pos, BlockState food) {
+        if (!colony.profile().nest().crustWalls() || !(food.getBlock() instanceof EatenInStages)) {
+            return null;
+        }
+        List<net.minecraft.core.Direction> open = new java.util.ArrayList<>();
+        for (net.minecraft.core.Direction side : net.minecraft.core.Direction.values()) {
+            BlockPos next = pos.relative(side);
+            if (colony.nest().isInside(level, next) && Nest.isDugOut(level, next)) {
+                open.add(side);
+            }
+        }
+        if (open.isEmpty() && !food.isCollisionShapeFullBlock(level, pos)) {
+            return null; // a branch eaten out in the open leaves nothing
+        }
+        return ModBlocks.MUD_CAST.get().stateFor(level, pos, 0, open);
+    }
+
+    /**
+     * Mud over the top of a block of wood being eaten (a species with {@code nest.crust_walls}): real termites plaster
+     * the wood they eat, so they stay covered. The top gets a crust of mud if it is open air nobody stands in and not
+     * one of the colony's own spaces; it crumbles away once the wood under it is a cast.
+     */
+    private void plaster(Level level, BlockPos wood, BlockState state) {
+        BlockPos top = wood.above();
+        if (!colony.profile().nest().crustWalls() || !state.isCollisionShapeFullBlock(level, wood) || !level.isLoaded(top)) {
+            return;
+        }
+        BlockState above = level.getBlockState(top);
+        if (!above.isAir() && !MudCrustBlock.isCrust(above) || MudCrustBlock.hasFace(above, net.minecraft.core.Direction.DOWN)
+                || colony.nest().nestCells(level).contains(top) || colony.foragingHoles().isHole(level, top)
+                || !level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class, new net.minecraft.world.phys.AABB(top)).isEmpty()) {
+            return;
+        }
+        level.setBlock(top, ModBlocks.MUD_CRUST.get().withFace(above, net.minecraft.core.Direction.DOWN), 3);
+    }
+
+    /** Forgets the cuts made at this plant: it is counted by how eaten it looks again. For tests. */
+    public void forgetCutsForTests(BlockPos plant) {
+        grassClips.remove(plant);
     }
 
     /** How many pieces have been cut off the plant at this spot so far (0 once it is used up and gone). For tests. */

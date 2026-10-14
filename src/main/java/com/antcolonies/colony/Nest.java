@@ -141,6 +141,8 @@ public class Nest {
     private Set<BlockPos> inside = Set.of();
     /** The mound's planned channel cells (tunnels, spire pieces, mouths): inside only where the block is built. */
     private Set<BlockPos> insideChannels = Set.of();
+    /** The mud casts joined to a feeding gallery (see {@link #isInside}), each with the gallery cell it is joined to. */
+    private Map<BlockPos, BlockPos> castGalleries = Map.of();
     private long insideTick = Long.MIN_VALUE;
 
     Nest(Colony colony) {
@@ -828,14 +830,30 @@ public class Nest {
         if (now != insideTick) {
             Set<BlockPos> cells = nestCells(level);
             cells.add(center);
-            // A feeding gallery cell is inside only while it has a roof (the food over it): once the wood over it is
-            // eaten away it is open to the sky.
-            for (BlockPos gallery : galleryCells()) {
-                if (level.isLoaded(gallery) && level.getBlockState(gallery.above()).getCollisionShape(level, gallery.above()).isEmpty()) {
+            // A feeding gallery cell is inside only while it has a roof (the food over it, the mud cast left of it, a
+            // branch cased in mud): once the roof is gone it is open to the sky.
+            List<BlockPos> galleries = galleryCells();
+            for (BlockPos gallery : galleries) {
+                if (level.isLoaded(gallery) && level.getBlockState(gallery.above()).getCollisionShape(level, gallery.above()).isEmpty()
+                        && !NestWalls.isWalkThroughFood(level, gallery.above())) {
                     cells.remove(gallery);
                 }
             }
             Set<BlockPos> channels = new HashSet<>();
+            // The mud casts left of eaten wood, joined by their channels to a gallery: inside too (eaten on from there).
+            Map<BlockPos, BlockPos> casts = new HashMap<>();
+            java.util.ArrayDeque<BlockPos> queue = new java.util.ArrayDeque<>();
+            for (BlockPos gallery : galleries) {
+                if (cells.contains(gallery)) {
+                    joinCasts(level, gallery, gallery, casts, queue);
+                }
+            }
+            while (!queue.isEmpty() && casts.size() < MAX_CASTS) {
+                BlockPos cast = queue.poll();
+                joinCasts(level, cast, casts.get(cast), casts, queue);
+            }
+            channels.addAll(casts.keySet());
+            castGalleries = casts;
             colony.mound().getParts(level).forEach((pos, part) -> {
                 if (part == MoundPlan.Part.OPEN) {
                     // Only once roofed over: a young mound's shaft open to the sky is outside (termites coming home
@@ -852,6 +870,38 @@ public class Nest {
             insideTick = now;
         }
         return inside.contains(cell) || (insideChannels.contains(cell) && MoundReach.channelKind(level.getBlockState(cell)) != null);
+    }
+
+    /** At most this many mud casts are joined to the galleries (a fallen tree is about 8 blocks). */
+    private static final int MAX_CASTS = 256;
+
+    /** Adds the mud casts whose channels join the one at {@code from} (a gallery cell or a cast) to {@code casts}. */
+    private static void joinCasts(Level level, BlockPos from, BlockPos gallery, Map<BlockPos, BlockPos> casts,
+            java.util.ArrayDeque<BlockPos> queue) {
+        BlockState fromState = level.getBlockState(from);
+        boolean fromCast = com.antcolonies.block.MudCastBlock.isCast(fromState);
+        for (Direction side : Direction.values()) {
+            BlockPos next = from.relative(side);
+            if (casts.containsKey(next) || !level.isLoaded(next)) {
+                continue;
+            }
+            BlockState state = level.getBlockState(next);
+            if (com.antcolonies.block.MudCastBlock.isCast(state)
+                    && com.antcolonies.nav.Channel.has(com.antcolonies.block.TermiteTunnelBlock.openMask(state), side.getOpposite())
+                    && (!fromCast || com.antcolonies.nav.Channel.has(com.antcolonies.block.TermiteTunnelBlock.openMask(fromState), side))) {
+                casts.put(next.immutable(), gallery);
+                queue.add(next.immutable());
+            }
+        }
+    }
+
+    /**
+     * The feeding gallery cell this inside cell eats from: a mud cast's gallery cell (see {@link #isInside}), or the
+     * cell itself.
+     */
+    BlockPos galleryFor(Level level, BlockPos cell) {
+        isInside(level, cell); // brings the casts up to date
+        return castGalleries.getOrDefault(cell, cell);
     }
 
     /** The first block in the list that is diggable, has a place to stand next to it (see {@link #standSpotsFor}), and is safe to open. */
@@ -954,7 +1004,7 @@ public class Nest {
             Direction direction = Direction.from2DDataValue((start + i) % 4);
             // The founding chamber (the queen's first home, on the far side of the shaft) has to fit too.
             NestPlan.Chamber founding = withFounding ? NestPlan.foundingChamber(center.below(NestPlan.FOUNDING_DEPTH), direction) : null;
-            if (founding != null && !allSoilOrAir(level, founding.cells())) {
+            if (founding != null && (!allSoilOrAir(level, founding.cells()) || !isCovered(level, founding.cells(), shaft))) {
                 continue;
             }
             // Side rooms (the termites' food store) don't have to fit, but a direction where they do is better.
@@ -989,6 +1039,30 @@ public class Nest {
     }
 
     /** Soil, or already dug out (a heap of seeds or bread on the floor counts as dug: in an old save the plan is worked out again on a nest in use). */
+    /**
+     * Whether these cells lie under cover: no block beside them (but the cells themselves and the shaft) is open air or
+     * a plant under the sky, or water. On a hillside the queen's chamber must not run out under the slope with its roof or a wall open to
+     * the outside (the hill test of 2026-10-14: the side the plan picked changed with each new colony).
+     */
+    private static boolean isCovered(Level level, List<BlockPos> cells, List<BlockPos> shaft) {
+        Set<BlockPos> own = new HashSet<>(cells);
+        own.addAll(shaft);
+        for (BlockPos pos : cells) {
+            for (Direction side : Direction.values()) {
+                BlockPos next = pos.relative(side);
+                if (own.contains(next)) {
+                    continue;
+                }
+                BlockState state = level.getBlockState(next);
+                // Open to the sky (rooms of the nest dug beside it later are underground and fine), or water.
+                if (!state.getFluidState().isEmpty() || (state.isAir() || state.canBeReplaced()) && level.canSeeSky(next)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     private static boolean allSoilOrAir(Level level, List<BlockPos> cells) {
         for (BlockPos pos : cells) {
             BlockState state = level.getBlockState(pos);

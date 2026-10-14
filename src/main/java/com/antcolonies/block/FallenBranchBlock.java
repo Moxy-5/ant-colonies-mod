@@ -26,7 +26,7 @@ import net.minecraft.world.phys.shapes.VoxelShape;
  * they are eating: it goes through 4 {@link #EATEN} stages, thinner and more mud-covered each time, and the last piece
  * leaves nothing. It lies at world generation in savannas and acacias shed new ones now and then (see
  * {@code worldgen.FallenBranchFeature} and {@code worldgen.BranchShedding}). Nothing bumps into it (it is thin, like a
- * twig in the grass); it needs solid ground under it.
+ * twig in the grass); it needs solid ground under it (or a casing of termite mud).
  */
 public class FallenBranchBlock extends Block implements EatenInStages {
     public static final MapCodec<FallenBranchBlock> CODEC = simpleCodec(FallenBranchBlock::new);
@@ -90,10 +90,24 @@ public class FallenBranchBlock extends Block implements EatenInStages {
         return defaultBlockState().setValue(AXIS, context.getHorizontalDirection().getAxis());
     }
 
+    /**
+     * It needs solid ground under it, or a casing of termite mud round it: termites dig a feeding gallery up under a
+     * branch and case it in mud first (see {@code NestWalls#wallFirst}), and the mud holds it up over the gallery.
+     */
     @Override
     protected boolean canSurvive(BlockState state, LevelReader level, BlockPos pos) {
         BlockPos below = pos.below();
-        return level.getBlockState(below).isFaceSturdy(level, below, Direction.UP);
+        return level.getBlockState(below).isFaceSturdy(level, below, Direction.UP) || isHeldInMud(level, pos);
+    }
+
+    /** Whether a crust of mud beside it has a plate against it. */
+    private static boolean isHeldInMud(LevelReader level, BlockPos pos) {
+        for (Direction side : Direction.values()) {
+            if (MudCrustBlock.hasFace(level.getBlockState(pos.relative(side)), side.getOpposite())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

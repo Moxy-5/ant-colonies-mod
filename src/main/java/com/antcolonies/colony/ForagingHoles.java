@@ -351,10 +351,14 @@ public class ForagingHoles {
                 plan.cells().size(), food.toShortString(), plan.hole().toShortString(), gallery.size());
     }
 
-    /** The feeding gallery from this tunnel up under the food (see {@link FeedingGallery}): empty if it cannot be reached from below. */
+    /**
+     * The feeding gallery from this tunnel up under the food (see {@link FeedingGallery}): empty if it cannot be reached
+     * from below. Under whole blocks of food (a fallen tree, hay) and branches lying on the ground (cased in mud first).
+     */
     private List<BlockPos> planGallery(Level level, NestPlan.ForagingTunnel tunnel, BlockPos food) {
         return FeedingGallery.plan(level, tunnel, food, ground(level),
-                pos -> isRich(level, pos) && level.getBlockState(pos).isCollisionShapeFullBlock(level, pos));
+                pos -> isRich(level, pos) && (level.getBlockState(pos).isCollisionShapeFullBlock(level, pos)
+                        || NestWalls.isWalkThroughFood(level, pos)));
     }
 
     /**

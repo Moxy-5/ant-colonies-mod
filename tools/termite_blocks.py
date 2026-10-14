@@ -504,6 +504,8 @@ def tunnel_blockstate():
         for d in TUNNEL_DIRS:
             parts.append({'when': {'age': str(a), d: 'false'}, 'apply': {'model': f'antcolonies:block/termite_tunnel_plug_{d}_{age}'}})
     write_json('blockstates/termite_tunnel.json', {'multipart': parts})
+    # A mud cast (what is left of eaten dead wood) is a tunnel block of mud too, with the same models.
+    write_json('blockstates/mud_cast.json', {'multipart': parts})
     write_json('models/item/termite_tunnel.json', tunnel_state_model({'north', 'south'}, 'setting'))
 
 

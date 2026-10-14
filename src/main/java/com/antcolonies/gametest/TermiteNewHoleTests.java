@@ -257,7 +257,7 @@ public class TermiteNewHoleTests {
      */
     @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
     public static void aFallenLogIsEatenFromBelowByDay(GameTestHelper helper) {
-        logEatenFromBelow(helper, false);
+        eatenFromBelow(helper, false, Food.LOG);
     }
 
     /**
@@ -267,10 +267,32 @@ public class TermiteNewHoleTests {
      */
     @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
     public static void aFallenLogOnTheEdgeOfAStepIsEatenFromBelowByDay(GameTestHelper helper) {
-        logEatenFromBelow(helper, true);
+        eatenFromBelow(helper, true, Food.LOG);
     }
 
-    private static void logEatenFromBelow(GameTestHelper helper, boolean onAStep) {
+    /**
+     * Mud casts (the user's choice, 2026-10-14): a block of the log eaten away leaves a mud cast joined to the feeding
+     * gallery, and the termites eat on from inside it: a block of stump standing on the log, which no gallery cell
+     * touches, is eaten by day from the cast under it, and is a cast itself afterwards.
+     */
+    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    public static void aStumpIsEatenByDayFromTheMudCastUnderIt(GameTestHelper helper) {
+        eatenFromBelow(helper, false, Food.STUMP);
+    }
+
+    /**
+     * A fallen branch lies on the ground, thin (nothing bumps into it), so it is no roof by itself: the workers case it
+     * in mud as they dig the feeding gallery under it (wall first), the mud holds it up over the gallery, and it is
+     * eaten from below by day.
+     */
+    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    public static void aFallenBranchIsCasedInMudAndEatenFromBelowByDay(GameTestHelper helper) {
+        eatenFromBelow(helper, false, Food.BRANCH);
+    }
+
+    private enum Food { LOG, STUMP, BRANCH }
+
+    private static void eatenFromBelow(GameTestHelper helper, boolean onAStep, Food kind) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
         int logStart = MIDDLE + 20;
@@ -293,9 +315,10 @@ public class TermiteNewHoleTests {
             }
         });
         java.util.List<BlockPos> log = new java.util.ArrayList<>();
-        for (int x = logStart; x < logStart + 5; x++) {
+        for (int x = logStart; x < logStart + (kind == Food.BRANCH ? 3 : 5); x++) {
             log.add(helper.absolutePos(new BlockPos(x, SURFACE, MIDDLE)));
         }
+        BlockPos stump = log.get(0).above(); // put on the log at dawn (Food.STUMP)
         int[] phase = {0}; // 0 setting up, 1 night: tunnel and gallery dug, 2 day: eaten from below
         int[] eatenAtDawn = {0};
         helper.runAfterDelay(10, () -> {
@@ -307,10 +330,16 @@ public class TermiteNewHoleTests {
             }
             TermiteSoldierTests.digNestAtOnce(level, colony);
             colony.population().addNewMembers(WorkerAntEntity.CASTE, level.getGameTime() - 1000, 500);
-            colony.setForagingTimeForTests(true);
-            for (BlockPos wood : log) {
-                level.setBlock(wood, com.antcolonies.registry.ModBlocks.DEAD_WOOD.get().defaultBlockState()
-                        .setValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS, net.minecraft.core.Direction.Axis.X), 3);
+            // A branch is small: by night the foragers outside would eat it all before the gallery is dug, so it is day.
+            colony.setForagingTimeForTests(kind != Food.BRANCH);
+            for (int i = 0; i < log.size(); i++) {
+                level.setBlock(log.get(i), kind == Food.BRANCH
+                        ? com.antcolonies.registry.ModBlocks.FALLEN_BRANCH.get().defaultBlockState()
+                                .setValue(com.antcolonies.block.FallenBranchBlock.AXIS, net.minecraft.core.Direction.Axis.X)
+                                .setValue(com.antcolonies.block.FallenBranchBlock.PART, i == 0 ? com.antcolonies.block.FallenBranchBlock.Part.BASE
+                                        : i == log.size() - 1 ? com.antcolonies.block.FallenBranchBlock.Part.TIP : com.antcolonies.block.FallenBranchBlock.Part.MIDDLE)
+                        : com.antcolonies.registry.ModBlocks.DEAD_WOOD.get().defaultBlockState()
+                                .setValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS, net.minecraft.core.Direction.Axis.X), 3);
             }
             colony.food().rescanPlantsSoon();
             colony.foodMap().knowForTests(log.get(0));
@@ -325,6 +354,8 @@ public class TermiteNewHoleTests {
             for (BlockPos wood : log) {
                 BlockState state = level.getBlockState(wood);
                 eaten += state.getBlock() instanceof com.antcolonies.block.DeadWoodBlock ? state.getValue(com.antcolonies.block.DeadWoodBlock.EATEN) * 10
+                        + colony.food().getPiecesCut(wood)
+                        : state.getBlock() instanceof com.antcolonies.block.FallenBranchBlock ? state.getValue(com.antcolonies.block.FallenBranchBlock.EATEN) * 10
                         + colony.food().getPiecesCut(wood) : 100;
             }
             Nest.NewTunnel tunnel = colony.nest().getNewTunnels().isEmpty() ? null : colony.nest().getNewTunnels().get(0);
@@ -337,8 +368,8 @@ public class TermiteNewHoleTests {
             if (tunnel != null) {
                 // Planned with the tunnel, as one job (the user's decision, 2026-10-14), not once the tunnel is dug.
                 helper.assertTrue(tunnel.gallery() != null && !tunnel.gallery().isEmpty(), "the tunnel was planned without its feeding gallery");
-                // Wall first: no side wall or floor of a dug tunnel or gallery block is ever open to the outside, not even
-                // for a tick (the roof of the gallery is the log; a block of it eaten away at night is plastered later).
+                // Wall first: no wall, floor or roof of a dug tunnel or gallery block is ever open to the outside, not even
+                // for a tick (the roof of the gallery is the log, and a block of it eaten away leaves a mud cast).
                 java.util.Set<BlockPos> nest = new java.util.HashSet<>(tunnel.gallery());
                 nest.addAll(tunnel.tunnel().tunnel());
                 nest.add(tunnel.tunnel().hole());
@@ -350,7 +381,7 @@ public class TermiteNewHoleTests {
                     }
                     for (net.minecraft.core.Direction side : net.minecraft.core.Direction.values()) {
                         BlockPos next = cell.relative(side);
-                        helper.assertTrue(side == net.minecraft.core.Direction.UP || nest.contains(next) || colony.nest().nestCells(level).contains(next)
+                        helper.assertTrue(nest.contains(next) || colony.nest().nestCells(level).contains(next)
                                 || !com.antcolonies.colony.NestWalls.isOpenToward(level, next, side.getOpposite()),
                                 "wall first: the dug block " + cell.toShortString() + " is open to the outside at " + next.toShortString());
                     }
@@ -359,11 +390,25 @@ public class TermiteNewHoleTests {
             if (phase[0] == 1) {
                 if (tunnel != null) {
                     long under = log.stream().filter(wood -> tunnel.gallery().contains(wood.below())).count();
-                    helper.assertTrue(under >= 4, "the feeding gallery runs under only " + under + " of the log's 5 blocks: " + tunnel.gallery());
+                    helper.assertTrue(under >= log.size() - 1, "the feeding gallery runs under only " + under + " of the " + log.size() + " blocks of food: " + tunnel.gallery());
                     if (tunnel.gallery().stream().allMatch(c -> Nest.isDugOut(level, c))) {
                         colony.setForagingTimeForTests(false); // day
                         eatenAtDawn[0] = eaten;
                         phase[0] = 2;
+                        if (kind == Food.STUMP) {
+                            // The stump on the log; it and every block of the log nearly eaten (quicker, and alike, so the
+                            // block under the stump, nearest the hole, goes first). The stump only from the log's cast.
+                            BlockState wood = com.antcolonies.registry.ModBlocks.DEAD_WOOD.get().defaultBlockState()
+                                    .setValue(com.antcolonies.block.DeadWoodBlock.EATEN, com.antcolonies.block.DeadWoodBlock.MAX_EATEN);
+                            for (BlockPos block : log) {
+                                if (level.getBlockState(block).getBlock() instanceof com.antcolonies.block.DeadWoodBlock) {
+                                    level.setBlock(block, wood.setValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS, net.minecraft.core.Direction.Axis.X), 3);
+                                    colony.food().forgetCutsForTests(block);
+                                }
+                            }
+                            level.setBlock(stump, wood, 3);
+                            colony.food().rescanPlantsSoon();
+                        }
                     }
                 }
                 helper.assertTrue(helper.getTick() < 30000, "the tunnel and the feeding gallery under the log were not dug");
@@ -376,12 +421,34 @@ public class TermiteNewHoleTests {
                     crusts += com.antcolonies.block.MudCrustBlock.hasFace(level.getBlockState(cell.relative(side)), side.getOpposite()) ? 1 : 0;
                 }
             }
-            if (eaten > eatenAtDawn[0] && (!onAStep || crusts > 0)) {
-                helper.assertTrue(!colony.isForagingTime(level), "foraging time");
+            helper.assertTrue(!colony.isForagingTime(level), "foraging time");
+            BlockState under = level.getBlockState(log.get(0));
+            BlockState top = level.getBlockState(stump);
+            if (kind == Food.STUMP) {
+                // A cast joined to the gallery, and the stump on it eaten from it by day: a cast too.
+                if (com.antcolonies.block.MudCastBlock.isCast(under) && com.antcolonies.block.MudCastBlock.isCast(top)) {
+                    helper.assertTrue(under.getValue(com.antcolonies.block.TermiteTunnelBlock.OPEN.get(net.minecraft.core.Direction.DOWN))
+                            && under.getValue(com.antcolonies.block.TermiteTunnelBlock.OPEN.get(net.minecraft.core.Direction.UP)),
+                            "the cast of the log does not join the gallery and the cast of the stump: " + under);
+                    helper.succeed();
+                }
+            } else if (kind == Food.BRANCH) {
+                // Cased in mud (a plate over each block of it), held up over the gallery, eaten from below.
+                int cased = 0;
+                for (BlockPos wood : log) {
+                    cased += com.antcolonies.block.MudCrustBlock.hasFace(level.getBlockState(wood.above()), net.minecraft.core.Direction.DOWN) ? 1 : 0;
+                }
+                if (eaten > eatenAtDawn[0] && cased > 0) {
+                    helper.succeed();
+                }
+            } else if (eaten > eatenAtDawn[0] && (!onAStep || crusts > 0)) {
                 helper.succeed();
             }
             helper.assertTrue(helper.getTick() < 39000, "by day: eaten " + eaten + " (at dawn " + eatenAtDawn[0] + "), " + crusts
-                    + " crust walls beside the gallery, " + colony.walls().getLeaks(level).size() + " leaks");
+                    + " crust walls beside the gallery, " + colony.walls().getLeaks(level).size() + " leaks, log " + under + ", stump " + top
+                    + ": first log block seen " + colony.food().plants(level).contains(log.get(0)) + ", gallery under it "
+                    + tunnel.gallery().contains(log.get(0).below()) + ", eaten from inside " + colony.food().isFeedableFromInside(level, log.get(0))
+                    + ", cut " + colony.food().getPiecesCut(log.get(0)) + ", hole " + tunnel.tunnel().hole().toShortString() + ", gallery " + tunnel.gallery());
         });
     }
 }

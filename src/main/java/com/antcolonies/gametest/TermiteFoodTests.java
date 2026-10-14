@@ -328,6 +328,50 @@ public class TermiteFoodTests {
     }
 
     /**
+     * Mud casts and crusts once nobody needs them: two casts joined side by side with dead wood beside one of them stay
+     * (the log is still being eaten); once the wood is gone they crumble away. A plate of mud on top of a log stays while
+     * the wood is there and crumbles once the wood under it is a cast. Quick: random ticks are given by hand.
+     */
+    @GameTest(template = "arena", skyAccess = true)
+    public static void mudCastsAndCrustsCrumbleOnceTheWoodIsGone(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        TermiteMoundTests.deepGround(helper);
+        BlockPos first = helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE));
+        BlockPos second = first.east();
+        BlockPos wood = second.east();
+        BlockState cast = ModBlocks.MUD_CAST.get().defaultBlockState();
+        level.setBlock(first, cast, 3);
+        level.setBlock(second, cast, 3);
+        level.setBlock(wood, ModBlocks.DEAD_WOOD.get().defaultBlockState(), 3);
+        level.setBlock(wood.above(), ModBlocks.MUD_CRUST.get().withFace(Blocks.AIR.defaultBlockState(), net.minecraft.core.Direction.DOWN), 3);
+        helper.assertTrue(level.getBlockState(first).getValue(com.antcolonies.block.TermiteTunnelBlock.OPEN.get(net.minecraft.core.Direction.EAST)),
+                "two casts side by side do not join up: " + level.getBlockState(first));
+        RandomSource random = RandomSource.create(1);
+        for (int i = 0; i < 400; i++) {
+            for (BlockPos pos : List.of(first, second, wood.above())) {
+                level.getBlockState(pos).randomTick(level, pos, random);
+            }
+        }
+        helper.assertTrue(com.antcolonies.block.MudCastBlock.isCast(level.getBlockState(first)) && com.antcolonies.block.MudCastBlock.isCast(level.getBlockState(second)),
+                "a cast crumbled while the log beside it is still being eaten");
+        helper.assertTrue(com.antcolonies.block.MudCrustBlock.hasFace(level.getBlockState(wood.above()), net.minecraft.core.Direction.DOWN),
+                "the mud on top of the log crumbled while the wood is still there");
+        level.setBlock(wood, cast, 3); // the last block eaten too
+        for (int i = 0; i < 400; i++) {
+            for (BlockPos pos : List.of(first, second, wood, wood.above())) {
+                BlockState state = level.getBlockState(pos);
+                if (!state.isAir()) {
+                    state.randomTick(level, pos, random);
+                }
+            }
+        }
+        helper.assertTrue(level.getBlockState(first).isAir() && level.getBlockState(second).isAir() && level.getBlockState(wood).isAir(),
+                "the casts did not crumble once the wood was gone");
+        helper.assertTrue(level.getBlockState(wood.above()).isAir(), "the mud on top of the log did not crumble once the wood was a cast");
+        helper.succeed();
+    }
+
+    /**
      * A fallen tree: an upright stump of dead wood, and a trunk of 4 to 6 dead wood blocks lying along the ground beside
      * it; termites count each dead wood block as a big food plant (several foragers at once), and it is eaten in stages.
      */

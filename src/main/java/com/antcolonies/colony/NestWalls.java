@@ -71,6 +71,19 @@ public class NestWalls {
                 }
                 leaks.add(new Leak(hole, findPlugSpot(level, nest, hole)));
             }
+            // Food the insects can walk into over a gallery (a fallen branch) is cased in mud: a gap in its casing is
+            // a hole in the gallery's roof, closed again with a plate of mud.
+            for (Direction direction : Direction.values()) {
+                BlockPos food = cell.relative(direction);
+                if (nest.contains(food) || !isWalkThroughFood(level, food)) {
+                    continue;
+                }
+                for (BlockPos gap : casingGaps(level, food, direction.getOpposite(), nest)) {
+                    if (seen.add(gap)) {
+                        leaks.add(new Leak(gap, findPlugSpot(level, nest, gap)));
+                    }
+                }
+            }
         }
         return leaks;
     }
@@ -158,11 +171,46 @@ public class NestWalls {
         Set<BlockPos> nest = colony.nest().nestCells(level);
         for (Direction side : Direction.values()) {
             BlockPos cell = hole.relative(side);
-            if (nest.contains(cell) && Nest.isDugOut(level, cell) && isOpenToward(level, hole, side)) {
+            if ((nest.contains(cell) && Nest.isDugOut(level, cell) || isWalkThroughFood(level, cell)) && isOpenToward(level, hole, side)) {
                 return true;
             }
         }
         return false;
+    }
+
+    /**
+     * Whether this block is food the insects can walk into (a fallen branch: thin, nothing bumps into it), which the
+     * colony eats in stages. Over a feeding gallery it is cased in mud ({@link #wallFirst}), so the gallery has a roof.
+     */
+    public static boolean isWalkThroughFood(Level level, BlockPos pos) {
+        if (!level.isLoaded(pos)) {
+            return false;
+        }
+        BlockState state = level.getBlockState(pos);
+        return state.getBlock() instanceof com.antcolonies.block.EatenInStages && state.getCollisionShape(level, pos).isEmpty();
+    }
+
+    /** One of the colony's own openings (a foraging hole), or the open air right over one, which is never walled up. */
+    private boolean isColonyOpening(Level level, BlockPos pos) {
+        return colony.foragingHoles().isHole(level, pos) || colony.foragingHoles().isHole(level, pos.below());
+    }
+
+    /**
+     * The gaps in the mud casing of this walk-through food over the gallery on side {@code gallery}: every block beside
+     * it (but the gallery) that leaves it open to the outside. Other food beside it, the nest and the colony's own holes
+     * are no gap.
+     */
+    private List<BlockPos> casingGaps(Level level, BlockPos food, Direction gallery, Set<BlockPos> nest) {
+        List<BlockPos> gaps = new ArrayList<>();
+        for (Direction side : Direction.values()) {
+            BlockPos next = food.relative(side);
+            if (side == gallery || nest.contains(next) || next.equals(center) || !level.isLoaded(next) || isWalkThroughFood(level, next)
+                    || isColonyOpening(level, next) || !level.getFluidState(next).isEmpty() || !isOpenToward(level, next, side.getOpposite())) {
+                continue;
+            }
+            gaps.add(next.immutable());
+        }
+        return gaps;
     }
 
     /**
@@ -184,7 +232,11 @@ public class NestWalls {
     public boolean isClosedRound(Level level, BlockPos cell, Set<BlockPos> nest) {
         for (Direction side : Direction.values()) {
             BlockPos next = cell.relative(side);
-            if (!nest.contains(next) && isOpenToward(level, next, side.getOpposite())) {
+            if (nest.contains(next)) {
+                continue;
+            }
+            if (isWalkThroughFood(level, next) ? !casingGaps(level, next, side.getOpposite(), nest).isEmpty()
+                    : isOpenToward(level, next, side.getOpposite())) {
                 return false;
             }
         }
@@ -217,6 +269,21 @@ public class NestWalls {
             }
             level.setBlock(next, crust().withFace(level.getBlockState(next), side.getOpposite()), 3);
         }
+        // Food over it that the insects could walk into (a fallen branch) is cased in mud on every other side, so the
+        // gallery has a roof (real termites cover a branch in sheeting and eat it from underneath). The mud holds it up
+        // once the soil under it is dug (FallenBranchBlock).
+        for (Direction side : Direction.values()) {
+            BlockPos food = target.relative(side);
+            if (nest.contains(food) || !isWalkThroughFood(level, food)) {
+                continue;
+            }
+            for (BlockPos gap : casingGaps(level, food, side.getOpposite(), nest)) {
+                if (!mound.containsKey(gap)) {
+                    Direction toward = Direction.getNearest(food.getX() - gap.getX(), food.getY() - gap.getY(), food.getZ() - gap.getZ());
+                    level.setBlock(gap, crust().withFace(level.getBlockState(gap), toward), 3);
+                }
+            }
+        }
     }
 
     private static MudCrustBlock crust() {
@@ -230,18 +297,24 @@ public class NestWalls {
      */
     private BlockState wallFor(Level level, BlockPos hole) {
         BlockState state = level.getBlockState(hole);
-        if (!MudCrustBlock.isCrust(state)) {
+        Set<BlockPos> nest = colony.nest().nestCells(level);
+        boolean besideNest = false;
+        for (Direction side : Direction.values()) {
+            BlockPos cell = hole.relative(side);
+            besideNest |= nest.contains(cell) && Nest.isDugOut(level, cell);
+        }
+        if (!MudCrustBlock.isCrust(state) && (besideNest || !colony.profile().nest().crustWalls())) {
             return colony.profile().nest().plugState();
         }
-        Set<BlockPos> nest = colony.nest().nestCells(level);
+        // A crust gets the plates it lacks; a gap in a branch's casing (nothing of the nest right beside it) a new plate.
         BlockState wall = state;
         for (Direction side : Direction.values()) {
             BlockPos cell = hole.relative(side);
-            if (nest.contains(cell) && Nest.isDugOut(level, cell)) {
+            if (nest.contains(cell) && Nest.isDugOut(level, cell) || isWalkThroughFood(level, cell)) {
                 wall = crust().withFace(wall, side);
             }
         }
-        return wall;
+        return MudCrustBlock.isCrust(wall) ? wall : colony.profile().nest().plugState();
     }
 
     /**
