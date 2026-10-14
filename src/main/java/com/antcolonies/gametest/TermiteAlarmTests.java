@@ -162,7 +162,8 @@ public class TermiteAlarmTests {
      * the middle hole is to be plugged; in the game the termites crowded the hole and the plugging went on and on, until
      * the alarm calmed down (2 minutes). The mound is young: its hollow shaft over the hole is not roofed over yet, and
      * the workers coming home stopped in it (it counted as inside), clinging to its walls above the hole. Checked: once the chicken is dead and everybody is in, the middle hole is plugged
-     * soon after (within 20 seconds), while the alarm is still up.
+     * soon after (within 20 seconds), while the alarm is still up, or roofed over: the builders sometimes put the plan's
+     * tunnel block back over it first (it failed 1 run in 3 that way, 2026-10-14), and then it is closed to the sky.
      */
     @GameTest(template = "arena", timeoutTicks = 6000, skyAccess = true)
     public static void theMiddleHoleIsPluggedSoonAfterAChickenAlarm(GameTestHelper helper) {
@@ -235,6 +236,18 @@ public class TermiteAlarmTests {
             if (at[1] >= 0 && at[2] < 0 && !colony.foragingHoles().isAnyoneOutside(level)) {
                 at[2] = tick;
             }
+            if (tick % 500 == 0) {
+                StringBuilder all = new StringBuilder();
+                for (TermiteWorkerEntity worker : level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds())) {
+                    all.append("\n    worker ").append(worker.getId()).append(" at ").append(worker.blockPosition().toShortString())
+                            .append(" ").append(colony.roleOf(level, worker)).append(worker.isIdle() ? " idle" : "")
+                            .append(" ").append(worker.goalSelector.getAvailableGoals().stream().filter(g -> g.isRunning())
+                                    .map(g -> g.getGoal().getClass().getSimpleName()).toList());
+                }
+                AntColoniesMod.LOGGER.info("[middle-hole] tick {} above {} part {} covered {} height {} workers:{}", tick,
+                        level.getBlockState(hole.above()), colony.mound().getParts(level).get(hole.above()), colony.nest().isEntranceCovered(level),
+                        level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, hole.getX(), hole.getZ()) - hole.getY(), all);
+            }
             if (tick % 100 == 0) {
                 StringBuilder near = new StringBuilder();
                 for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, new AABB(hole).inflate(1, 2, 1))) {
@@ -253,7 +266,10 @@ public class TermiteAlarmTests {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(at[1] >= 0, "the chicken is not dead yet");
             helper.assertTrue(at[2] >= 0, "not everybody is in yet");
-            helper.assertTrue(!ForagingHoles.isOpen(level, colony.nest().getEntrance()), "the middle hole is still open");
+            // Plugged, or roofed over: the builders may put the mound's tunnel block back over it first (the plan has one
+            // there), and then it opens only into the mound's tunnels, no longer to the sky (by design it is then not plugged).
+            helper.assertTrue(!ForagingHoles.isOpen(level, colony.nest().getEntrance()) || colony.nest().isEntranceCovered(level),
+                    "the middle hole is still open to the sky");
             helper.assertTrue(colony.alarm().level(level) >= 2 || helper.getTick() - at[2] <= 400,
                     "the middle hole was only plugged " + (helper.getTick() - at[2]) + " ticks after everybody was in");
         });

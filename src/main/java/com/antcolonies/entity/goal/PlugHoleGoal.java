@@ -59,6 +59,8 @@ public class PlugHoleGoal extends Goal {
         }
         // Up to the end of the tunnel from inside: never through the hole it is about to close.
         if (!ant.getNavigator().moveTo(tunnel.end(), 1.0, AntPathFinder.StepCosts.forbid(List.of(tunnel.hole())))) {
+            com.antcolonies.AntColoniesMod.LOGGER.debug("[plug] {} at {} found no way under the hole {} to {}", ant.getId(),
+                    ant.blockPosition().toShortString(), tunnel.hole().toShortString(), tunnel.end().toShortString());
             colony.foragingHoles().releasePlug(ant.getUUID());
             return false;
         }

@@ -45,8 +45,13 @@ public class GoInsideGoal extends Goal {
         }
         // Not to a doorway (the entrance or a foraging hole): one that stops there blocks it from being plugged.
         Colony home = colony;
-        return ant.getNavigator().moveTo(at -> home.nest().isInside(level, at.cell()) && !home.foragingHoles().isDoorway(level, at.cell()),
+        boolean going = ant.getNavigator().moveTo(at -> home.nest().isInside(level, at.cell()) && !home.foragingHoles().isDoorway(level, at.cell()),
                 colony.getCenter().below(), 1.0);
+        if (!going) {
+            com.antcolonies.AntColoniesMod.LOGGER.debug("[go-inside] {} at {} ({}) found no way in", ant.getId(), ant.blockPosition().toShortString(),
+                    ant.position());
+        }
+        return going;
     }
 
     @Override
