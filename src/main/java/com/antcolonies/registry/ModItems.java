@@ -27,6 +27,7 @@ public class ModItems {
     public static final DeferredItem<BlockItem> DRY_GRASS = ITEMS.registerSimpleBlockItem(ModBlocks.DRY_GRASS);
     public static final DeferredItem<BlockItem> TALL_DRY_GRASS = ITEMS.registerSimpleBlockItem(ModBlocks.TALL_DRY_GRASS);
     public static final DeferredItem<BlockItem> FALLEN_BRANCH = ITEMS.registerSimpleBlockItem(ModBlocks.FALLEN_BRANCH);
+    public static final DeferredItem<BlockItem> DEAD_WOOD = ITEMS.registerSimpleBlockItem(ModBlocks.DEAD_WOOD);
 
     /** One piece of ant bread: what the ants carry from the mill to the queen, and what a broken bread pile drops. */
     public static final DeferredItem<Item> ANT_BREAD = ITEMS.registerSimpleItem("ant_bread");

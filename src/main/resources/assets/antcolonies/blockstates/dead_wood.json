@@ -1,0 +1,52 @@
+{
+  "variants": {
+    "axis=x,eaten=0": {
+      "model": "antcolonies:block/dead_wood_0",
+      "x": 90,
+      "y": 90
+    },
+    "axis=x,eaten=1": {
+      "model": "antcolonies:block/dead_wood_1",
+      "x": 90,
+      "y": 90
+    },
+    "axis=x,eaten=2": {
+      "model": "antcolonies:block/dead_wood_2",
+      "x": 90,
+      "y": 90
+    },
+    "axis=x,eaten=3": {
+      "model": "antcolonies:block/dead_wood_3",
+      "x": 90,
+      "y": 90
+    },
+    "axis=y,eaten=0": {
+      "model": "antcolonies:block/dead_wood_0"
+    },
+    "axis=y,eaten=1": {
+      "model": "antcolonies:block/dead_wood_1"
+    },
+    "axis=y,eaten=2": {
+      "model": "antcolonies:block/dead_wood_2"
+    },
+    "axis=y,eaten=3": {
+      "model": "antcolonies:block/dead_wood_3"
+    },
+    "axis=z,eaten=0": {
+      "model": "antcolonies:block/dead_wood_0",
+      "x": 90
+    },
+    "axis=z,eaten=1": {
+      "model": "antcolonies:block/dead_wood_1",
+      "x": 90
+    },
+    "axis=z,eaten=2": {
+      "model": "antcolonies:block/dead_wood_2",
+      "x": 90
+    },
+    "axis=z,eaten=3": {
+      "model": "antcolonies:block/dead_wood_3",
+      "x": 90
+    }
+  }
+}

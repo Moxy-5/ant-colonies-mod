@@ -1,6 +1,7 @@
 package com.antcolonies.registry;
 
 import com.antcolonies.AntColoniesMod;
+import com.antcolonies.block.DeadWoodBlock;
 import com.antcolonies.block.DryGrassBlock;
 import com.antcolonies.block.FallenBranchBlock;
 import com.antcolonies.block.FungusCombBlock;
@@ -114,6 +115,10 @@ public class ModBlocks {
     public static final DeferredBlock<FallenBranchBlock> FALLEN_BRANCH = BLOCKS.registerBlock("fallen_branch", FallenBranchBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GRAY).strength(0.5F).sound(SoundType.WOOD).noCollission()
                     .noOcclusion().ignitedByLava().pushReaction(PushReaction.DESTROY));
+
+    /** Dead acacia wood: a fallen tree's trunk and stump, eaten by termites in stages (see DeadWoodBlock). */
+    public static final DeferredBlock<DeadWoodBlock> DEAD_WOOD = BLOCKS.registerBlock("dead_wood", DeadWoodBlock::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_GRAY).strength(1.5F).sound(SoundType.WOOD).ignitedByLava());
 
     private static BlockBehaviour.Properties grassProperties() {
         return BlockBehaviour.Properties.of().mapColor(MapColor.SAND).replaceable().noCollission().instabreak().sound(SoundType.GRASS)

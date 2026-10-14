@@ -35,6 +35,7 @@
       { "block": "minecraft:dead_bush", "pieces": 6 },
       { "block": "#minecraft:leaves", "pieces": 2, "only_decaying": true },
       { "block": "antcolonies:fallen_branch", "pieces": 8 },
+      { "block": "antcolonies:dead_wood", "pieces": 32, "foragers": 2 },
       { "block": "minecraft:hay_block", "pieces": 48, "foragers": 4 }
     ],
     "piece": "antcolonies:forage",

@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.antcolonies.AntColoniesMod;
+import com.antcolonies.block.DeadWoodBlock;
 import com.antcolonies.block.DryGrassBlock;
 import com.antcolonies.block.FallenBranchBlock;
 import com.antcolonies.block.SeedPileBlock;
@@ -20,6 +21,7 @@ import com.antcolonies.species.SpeciesProfile;
 import com.antcolonies.species.SpeciesProfiles;
 import com.antcolonies.worldgen.BranchShedding;
 import com.antcolonies.worldgen.FallenBranchFeature;
+import com.antcolonies.worldgen.FallenTreeFeature;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
@@ -318,6 +320,37 @@ public class TermiteFoodTests {
             helper.assertTrue(shed, "a natural acacia shed no branch");
             helper.succeed();
         });
+    }
+
+    /**
+     * A fallen tree: an upright stump of dead wood, and a trunk of 4 to 6 dead wood blocks lying along the ground beside
+     * it; termites count each dead wood block as a big food plant (several foragers at once), and it is eaten in stages.
+     */
+    @GameTest(template = "arena", skyAccess = true)
+    public static void aFallenTreeLiesBesideItsStumpAndIsTermiteFood(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        TermiteMoundTests.deepGround(helper);
+        BlockPos stump = helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE));
+        helper.assertTrue(FallenTreeFeature.placeTree(level, stump, level.getRandom(), 3), "no fallen tree fitted on flat ground");
+        BlockState stumpState = level.getBlockState(stump);
+        helper.assertTrue(stumpState.is(ModBlocks.DEAD_WOOD.get())
+                && stumpState.getValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS) == net.minecraft.core.Direction.Axis.Y,
+                "no upright stump: " + stumpState);
+        int lying = 0;
+        for (BlockPos pos : BlockPos.betweenClosed(stump.offset(-8, 0, -8), stump.offset(8, 0, 8))) {
+            BlockState state = level.getBlockState(pos);
+            if (state.is(ModBlocks.DEAD_WOOD.get()) && state.getValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS).isHorizontal()) {
+                lying++;
+            }
+        }
+        helper.assertTrue(lying >= FallenTreeFeature.MIN_LENGTH && lying <= FallenTreeFeature.MAX_LENGTH, "the trunk is " + lying + " blocks long");
+        SpeciesProfile.FoodNumbers food = SpeciesProfiles.get(Species.MACROTERMES).food();
+        SpeciesProfile.PlantFood wood = food.plantFor(ModBlocks.DEAD_WOOD.get().defaultBlockState());
+        helper.assertTrue(wood != null && wood.pieces() > food.plantFor(ModBlocks.FALLEN_BRANCH.get().defaultBlockState()).pieces()
+                && wood.foragers() > 1, "dead wood is not a big termite food");
+        BlockState eaten = ModBlocks.DEAD_WOOD.get().eatenTo(stumpState, wood.pieces() - 1, wood.pieces());
+        helper.assertTrue(eaten.getValue(DeadWoodBlock.EATEN) == DeadWoodBlock.MAX_EATEN, "nearly eaten dead wood is at stage " + eaten);
+        helper.succeed();
     }
 
     /** An item lying still on the ground at this spot (x, z) of the arena surface, never despawning. */

@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column",
+  "textures": {
+    "side": "antcolonies:block/dead_wood_2",
+    "end": "antcolonies:block/dead_wood_top_2"
+  }
+}

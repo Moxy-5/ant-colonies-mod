@@ -122,6 +122,7 @@ public class ModEvents {
             event.accept(ModItems.TALL_DRY_GRASS);
             event.accept(greenGrass(ModItems.TALL_DRY_GRASS.toStack(), "block.antcolonies.tall_dry_grass.green"));
             event.accept(ModItems.FALLEN_BRANCH);
+            event.accept(ModItems.DEAD_WOOD);
         }
         if (event.getTabKey() == CreativeModeTabs.INGREDIENTS) {
             event.accept(ModItems.FORAGE);
