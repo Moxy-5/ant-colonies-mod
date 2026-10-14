@@ -91,7 +91,7 @@ public class TermiteAlarmTests {
             for (NestPlan.ForagingTunnel tunnel : tunnels) {
                 level.setBlock(tunnel.hole(), Blocks.AIR.defaultBlockState(), 3);
             }
-            hay[0] = tunnels.get(0).hole().above().relative(tunnels.get(0).side().getClockWise(), 11);
+            hay[0] = tunnels.get(0).hole().above().relative(TermiteSoldierTests.intoArena(tunnels.get(0).side().getClockWise()), 11);
             colony.foodMap().knowForTests(hay[0]); // (finding it is tested in TermiteFoodTests)
             level.setBlock(hay[0], Blocks.HAY_BLOCK.defaultBlockState(), 3);
             List<BlockPos> room = colony.nest().getHomeChamber(level).room();

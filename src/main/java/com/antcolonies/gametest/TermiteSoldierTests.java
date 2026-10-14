@@ -237,6 +237,15 @@ public class TermiteSoldierTests {
     }
 
     /** Digs the termite colony's shaft, royal chamber, first garden room and foraging tunnels out at once. */
+    /**
+     * This way, or the opposite one if it points north or west: toward the open middle of the 65 x 65 arena (the old
+     * arena is its north-west corner). Food put 11 blocks out from a hole the other way lay outside the arena (a finder
+     * put down there suffocated in the arena's barrier wall, the test failing now and then, 2026-10-14).
+     */
+    static net.minecraft.core.Direction intoArena(net.minecraft.core.Direction way) {
+        return way == net.minecraft.core.Direction.NORTH || way == net.minecraft.core.Direction.WEST ? way.getOpposite() : way;
+    }
+
     static void digNestAtOnce(ServerLevel level, Colony colony) {
         BlockPos bottom = colony.nest().getShaftBottom(level);
         for (BlockPos pos = colony.getCenter().below(); pos.getY() >= bottom.getY(); pos = pos.below()) {
@@ -295,7 +304,7 @@ public class TermiteSoldierTests {
                 level.setBlock(tunnel.hole(), Blocks.AIR.defaultBlockState(), 3);
             }
             trail[0] = tunnels.get(0).hole().above();
-            trail[1] = trail[0].relative(tunnels.get(0).side().getClockWise(), 11);
+            trail[1] = trail[0].relative(intoArena(tunnels.get(0).side().getClockWise()), 11);
             colony.foodMap().knowForTests(trail[1]); // (finding it is tested in TermiteFoodTests)
             level.setBlock(trail[1], Blocks.HAY_BLOCK.defaultBlockState(), 3);
             List<BlockPos> room = colony.nest().getHomeChamber(level).room();

@@ -193,14 +193,16 @@ public class TermiteFoodTests {
             level.setBlock(colony.nest().getEntrance(), Blocks.STONE.defaultBlockState(), 3);
             List<NestPlan.ForagingTunnel> tunnels = colony.nest().getForagingTunnels(level);
             helper.assertTrue(tunnels.size() == 2, "the nest has " + tunnels.size() + " foraging tunnels");
+            // The hay lies out from the first hole at a right angle to its tunnel, toward the open middle of the arena.
+            net.minecraft.core.Direction toHay = TermiteSoldierTests.intoArena(tunnels.get(0).side().getClockWise());
             for (int i = 0; i < 2; i++) {
                 NestPlan.ForagingTunnel tunnel = tunnels.get(i);
                 level.setBlock(tunnel.hole(), Blocks.AIR.defaultBlockState(), 3);
                 // A tuft of grass right beside the hole, on the side away from the hay.
-                spots[1 + i] = tunnel.hole().above().relative(tunnel.side().getCounterClockWise(), 2);
+                spots[1 + i] = tunnel.hole().above().relative(toHay.getOpposite(), 2);
                 level.setBlock(spots[1 + i], ModBlocks.DRY_GRASS.get().defaultBlockState(), 3);
             }
-            spots[0] = tunnels.get(0).hole().above().relative(tunnels.get(0).side().getClockWise(), 11);
+            spots[0] = tunnels.get(0).hole().above().relative(toHay, 11);
             level.setBlock(spots[0], Blocks.HAY_BLOCK.defaultBlockState(), 3);
             // (The colony looks for food plants every 5 seconds: the finder walked home before the hay was on the list,
             // and the test failed now and then in full runs, 2026-10-14.)
@@ -208,7 +210,7 @@ public class TermiteFoodTests {
             helper.assertTrue(!colony.foodMap().isKnown(spots[0]) && !colony.foodMap().isFoundButUntold(spots[0]),
                     "the colony knew of the hay before anyone went near it");
             // (Put down now, while the holes are still open: by day they are plugged once everybody is in.)
-            BlockPos beside = spots[0].relative(net.minecraft.core.Direction.NORTH, 2);
+            BlockPos beside = spots[0].relative(tunnels.get(0).side().getOpposite(), 2); // (toward the middle: over the ground)
             finder[0] = ModEntities.TERMITE_WORKER.get().create(level);
             finder[0].moveTo(beside.getX() + 0.5, beside.getY(), beside.getZ() + 0.5, 0.0F, 0.0F);
             finder[0].joinColony(colony); // (on its own it joins the nearest colony, which can be a neighbouring test's)
