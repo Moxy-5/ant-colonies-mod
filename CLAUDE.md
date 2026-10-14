@@ -223,6 +223,12 @@ Goal: a mature colony can hold 1,000+ ants or termites without lag.
 - Later: desert wildflower, dry savanna grass (green → dry; termites only take dry), fallen acacia branches termites eat, refuse-pile gardens (ant trash piles sprout plants), optional dung.
 - Plants regrow but do not spread (except near refuse piles). Growth speed is a config option. Bone meal works on them.
 
+### Hills and uneven ground (user's decisions, 2026-10-14, after hill bugs in the savanna)
+- **One shared ground reader:** a species-neutral piece that tells every planner where the real surface is in each column (skipping plants, fallen wood, the mound) and how the land slopes. Every planner uses it instead of assuming flat ground (nest plan, foraging tunnels and holes, new holes near food, the food search, the mound, the ant hill).
+- **Side foraging tunnels follow the ground:** they rise and fall with the surface, always just under it (like real Macrotermes galleries and like the new holes near food), so the hole always opens at the real surface.
+- **Hill test arenas:** game tests on a slope, a terrace, a valley and a cliff edge that every planner must pass (termite nest, mound, holes, food, the ant nest and hill); fix whatever they find.
+- **Nest on a hillside, each species its own way:** termites build where they land and the mound fills in round the slope; harvester ants walk a little to find flatter ground before digging (a number in each species file).
+
 ### Ants vs termites
 - Ant colonies and termite colonies are hostile. Territories overlap where savanna meets plains and desert.
 - Version 1: defenders attack intruders near their territory. Later: organized raids.
