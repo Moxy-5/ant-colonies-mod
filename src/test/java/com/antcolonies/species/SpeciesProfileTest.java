@@ -156,8 +156,11 @@ class SpeciesProfileTest {
         assertEquals(4, ant.levelsFor(20, 30));
         assertEquals(4, ant.levelsFor(60, 200));
         assertEquals(1, read("macrotermes").nest().levelsFor(0, 0), "termites have no nest stages");
-        assertEquals(60, read("red_harvester_ant").colony().maxWorkers());
-        assertEquals(60, read("macrotermes").colony().maxWorkers());
+        // The brain, part 1 (user, 2026-10-14): scaled-down caps, most of them numbers inside the nest.
+        assertEquals(3000, read("red_harvester_ant").colony().maxWorkers());
+        assertEquals(50000, read("macrotermes").colony().maxWorkers());
+        assertEquals(50, read("macrotermes").colony().realCap());
+        assertEquals(10, read("red_harvester_ant").colony().crew());
         SpeciesProfile.RefuseNumbers termiteDead = read("macrotermes").refuse();
         assertTrue(termiteDead.eatsOrBuries() && termiteDead.eatFreshTicks().get() < termiteDead.corpseDecayTicks(),
                 "termites eat their fresh dead and bury the old ones before they crumble");

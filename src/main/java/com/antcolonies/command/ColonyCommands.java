@@ -36,6 +36,11 @@ public class ColonyCommands {
         event.getDispatcher().register(Commands.literal("antcolonies")
                 .requires(source -> source.hasPermission(2))
                 .then(Commands.literal("list").executes(context -> list(context.getSource())))
+                // Adds that many workers to the nearest colony, as numbers inside its nest, of every age (and, for a
+                // species with soldiers, as many soldiers as so many workers want), to see a big colony at once.
+                .then(Commands.literal("population")
+                        .then(Commands.argument("workers", IntegerArgumentType.integer(1, 1000000))
+                                .executes(context -> population(context.getSource(), IntegerArgumentType.getInteger(context, "workers")))))
                 // Sets how far the nearest termite queen has swollen (0 = just founded, 100 = full grown), to see her
                 // grow without waiting for a big colony. She never shrinks by herself, so the size stays.
                 .then(Commands.literal("queensize")
@@ -197,6 +202,44 @@ public class ColonyCommands {
         return 1;
     }
 
+    private static int population(CommandSourceStack source, int workers) {
+        ServerLevel level = source.getLevel();
+        BlockPos at = BlockPos.containing(source.getPosition());
+        Colony colony = ColonyManager.get(level).getColonies().stream()
+                .filter(c -> c.getCenter().distSqr(at) <= 64 * 64)
+                .min(Comparator.comparingDouble(c -> c.getCenter().distSqr(at))).orElse(null);
+        if (colony == null) {
+            source.sendFailure(Component.literal("No colony within 64 blocks."));
+            return 0;
+        }
+        String caste = com.antcolonies.entity.WorkerAntEntity.CASTE;
+        int room = colony.profile().colony().maxWorkers() - colony.getCount(caste);
+        int added = Math.max(0, Math.min(workers, room));
+        // Every age from just grown up to old (not about to die), spread evenly.
+        long now = level.getGameTime();
+        long oldest = Math.max(1, Math.round(colony.profile().worker().lifespanTicks() * 0.8));
+        for (int i = 0; i < added; i++) {
+            colony.population().addNewMembers(caste, now - oldest * i / Math.max(1, added), 1);
+        }
+        StringBuilder soldiers = new StringBuilder();
+        var numbers = colony.soldiers().numbers();
+        if (numbers != null) {
+            int total = colony.getCount(caste);
+            for (TermiteSoldierEntity.Rank rank : TermiteSoldierEntity.Rank.values()) {
+                int want = rank == TermiteSoldierEntity.Rank.MINOR ? numbers.wantedMinors(total) : numbers.wantedMajors(total);
+                int more = Math.max(0, want - colony.getCount(rank.caste()));
+                colony.population().addNewMembers(rank.caste(), now, more);
+                soldiers.append(", ").append(more).append(" ").append(rank == TermiteSoldierEntity.Rank.MINOR ? "minor" : "major").append(" soldiers");
+            }
+        }
+        ColonyManager.get(level).markChanged();
+        String done = added + " workers" + soldiers + " added to the colony at " + colony.getCenter().toShortString()
+                + " (inside the nest; they come out a few a second where you can't see)"
+                + (added < workers ? ". The colony is full: " + colony.profile().colony().maxWorkers() + " workers at most." : ".");
+        source.sendSuccess(() -> Component.literal(done), false);
+        return added;
+    }
+
     private static int queenSize(CommandSourceStack source, int percent) {
         Vec3 at = source.getPosition();
         TermiteQueenEntity queen = source.getLevel().getEntitiesOfClass(TermiteQueenEntity.class, new AABB(BlockPos.containing(at)).inflate(32))
@@ -225,7 +268,7 @@ public class ColonyCommands {
                     + (colony.isQueenless() ? " | QUEENLESS: no new eggs, dwindling" : " | queen " + colony.getQueenId().toString().substring(0, 8))
                     + (colony.profile().nest().levelUnlocks().isEmpty() ? ""
                             : " | nest levels open " + Math.min(colony.nest().levelsUnlocked(level), colony.profile().nest().maxLevels()) + " of " + colony.profile().nest().maxLevels())
-                    + " | members " + colony.getMemberCount()
+                    + " | members " + colony.getMemberCount() + colony.population().describe(level)
                     + " | " + colony.describeJobs(level)
                     + (colony.profile().food().makesBread()
                             ? " | food " + colony.food().getFood() + " (rich " + colony.food().getRichSeeds() + ", eaten " + colony.food().getSeedsEaten() + ")"

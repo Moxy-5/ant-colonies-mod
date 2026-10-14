@@ -151,4 +151,15 @@ public class TermiteWorkerEntity extends AbstractAntEntity {
     protected net.minecraft.world.entity.EntityType<AntCorpseEntity> bodyType() {
         return com.antcolonies.registry.ModEntities.TERMITE_CORPSE.get();
     }
+
+    @Override
+    public String nestCaste() {
+        return CASTE;
+    }
+
+    @Override
+    public void comeOutOfNest(Colony colony, long grownUpAt) {
+        super.comeOutOfNest(colony, grownUpAt);
+        colonyChecked = true;
+    }
 }

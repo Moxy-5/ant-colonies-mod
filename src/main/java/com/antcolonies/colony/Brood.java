@@ -160,7 +160,8 @@ public class Brood {
 
     /**
      * The larva has eaten enough: a new worker (or the soldier it was growing into) takes its place and joins the
-     * colony. False (the larva stays) while the colony has as many workers as it may (the profile's max_workers); a
+     * colony (as one of the numbers inside the nest, see {@link Population#hatchesIntoNumbers}, when no more real ones are
+     * wanted and nobody can see it). False (the larva stays) while the colony has as many workers as it may (the profile's max_workers); a
      * termite nymph waiting for that turns into one growing into a soldier if the colony is short of soldiers (it then
      * eats the soldier's bigger meal first). Soldiers are not held back by the workers' cap.
      */
@@ -176,6 +177,12 @@ public class Brood {
                 larva.setMeal(colony.soldiers().mealFor(wanted));
             }
             return false;
+        }
+        if (colony.population().hatchesIntoNumbers(level, WorkerAntEntity.CASTE, larva.position())) {
+            // The colony has all the real workers it wants and nobody sees it: the new worker is one of the numbers.
+            colony.population().addNewMembers(WorkerAntEntity.CASTE, level.getGameTime(), 1);
+            larva.discard();
+            return true;
         }
         if (colony.getSpecies().equals(Species.MACROTERMES)) {
             TermiteWorkerEntity worker = ModEntities.TERMITE_WORKER.get().create(level);
@@ -203,6 +210,11 @@ public class Brood {
 
     /** The nymph has eaten a soldier's meal: a soldier of this kind takes its place and joins the colony. */
     private boolean hatchSoldier(ServerLevel level, AntLarvaEntity larva, TermiteSoldierEntity.Rank rank) {
+        if (colony.population().hatchesIntoNumbers(level, rank.caste(), larva.position())) {
+            colony.population().addNewMembers(rank.caste(), level.getGameTime(), 1);
+            larva.discard();
+            return true;
+        }
         TermiteSoldierEntity soldier = (rank == TermiteSoldierEntity.Rank.MAJOR ? ModEntities.TERMITE_MAJOR_SOLDIER : ModEntities.TERMITE_MINOR_SOLDIER)
                 .get().create(level);
         if (soldier == null) {

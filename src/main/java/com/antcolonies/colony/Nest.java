@@ -356,6 +356,28 @@ public class Nest {
         return cells;
     }
 
+    /**
+     * The dug-out floor cells of every room the nest has (the levels' rooms, side rooms, gardens, the founding chamber),
+     * where the colony's insects that are only numbers come out as real mobs (see {@link Population}).
+     */
+    public List<BlockPos> getAllRoomCells(Level level) {
+        Layout layout = getLayout(level);
+        if (layout == null) {
+            return List.of();
+        }
+        Set<BlockPos> cells = new java.util.LinkedHashSet<>();
+        List<NestPlan.Chamber> rooms = new ArrayList<>(layout.chambers());
+        rooms.addAll(layout.sideRooms());
+        rooms.addAll(layout.gardens());
+        if (layout.founding() != null) {
+            rooms.add(layout.founding());
+        }
+        for (NestPlan.Chamber room : rooms) {
+            cells.addAll(getRoomCells(level, layout, room));
+        }
+        return new ArrayList<>(cells);
+    }
+
     /** The garden rooms of the plan (empty if the nest has none, or no plan yet). For tests and debugging. */
     public List<NestPlan.Chamber> getGardens(Level level) {
         Layout layout = getLayout(level);

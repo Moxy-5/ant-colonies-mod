@@ -225,4 +225,16 @@ public class WorkerAntEntity extends AbstractAntEntity {
             }
         }
     }
+
+    @Override
+    public String nestCaste() {
+        return CASTE;
+    }
+
+    @Override
+    public void comeOutOfNest(Colony colony, long grownUpAt) {
+        super.comeOutOfNest(colony, grownUpAt);
+        colonyChecked = true;
+        lastAte = level().getGameTime();
+    }
 }

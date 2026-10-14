@@ -49,11 +49,25 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * The whole colony. {@code maxWorkers}: young grow into workers only while there are fewer. {@code nursesFrom}: from
      * how many workers on there is one nurse, two nurses, and so on (one number per nurse, smallest first).
      */
-    public record ColonyNumbers(int maxWorkers, List<Integer> nursesFrom) {
+    public record ColonyNumbers(int maxWorkers, List<Integer> nursesFrom, int realCap, int crew, int watchRadius, int swapsPerSecond) {
         public static final Codec<ColonyNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("max_workers").forGetter(ColonyNumbers::maxWorkers),
-                Codec.INT.listOf().fieldOf("nurses_from_workers").forGetter(ColonyNumbers::nursesFrom)
+                Codec.INT.listOf().fieldOf("nurses_from_workers").forGetter(ColonyNumbers::nursesFrom),
+                Codec.INT.optionalFieldOf("real_cap", 50).forGetter(ColonyNumbers::realCap),
+                Codec.INT.optionalFieldOf("crew", 10).forGetter(ColonyNumbers::crew),
+                Codec.INT.optionalFieldOf("watch_radius", 48).forGetter(ColonyNumbers::watchRadius),
+                Codec.INT.optionalFieldOf("swaps_per_second", 2).forGetter(ColonyNumbers::swapsPerSecond)
         ).apply(i, ColonyNumbers::new));
+
+        /**
+         * With the brain's numbers at their defaults (see {@code Population}): at most {@code realCap} real mobs while a
+         * player is near, a crew of {@code crew} real workers otherwise, a player counts as near within
+         * {@code watchRadius} blocks of the nest, and {@code swapsPerSecond} insects come out of or go back into the
+         * numbers each second.
+         */
+        public ColonyNumbers(int maxWorkers, List<Integer> nursesFrom) {
+            this(maxWorkers, nursesFrom, 50, 10, 48, 2);
+        }
 
         /** How many of {@code workers} workers are nurses. */
         public int nurses(int workers) {

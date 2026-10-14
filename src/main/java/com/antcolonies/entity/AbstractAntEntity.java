@@ -259,6 +259,29 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         super.remove(reason);
     }
 
+    /**
+     * The caste this insect is counted under in its colony, when it is one the colony may turn into numbers inside the
+     * nest and back (workers and soldiers, see {@code colony.Population}); null for the queen and king, who are always real.
+     */
+    @Nullable
+    public String nestCaste() {
+        return null;
+    }
+
+    /**
+     * It comes out of its colony's numbers as a real mob (it is counted already, so the headcount stays): it belongs to
+     * the colony at once, at this age ({@link #getGrownUpAt}), fed (it ate inside).
+     */
+    public void comeOutOfNest(Colony colony, long grownUpAt) {
+        setColonyId(colony.getId());
+        setGrownUpAt(grownUpAt);
+    }
+
+    /** Whether it may go back into its colony's numbers now: not while it holds anything or is after an enemy. */
+    public boolean mayGoIntoNest() {
+        return isAlive() && !hasFullMandibles() && getTarget() == null && !isPassenger();
+    }
+
     /** The kind of body this insect leaves (a dead ant; termites override it). */
     protected net.minecraft.world.entity.EntityType<AntCorpseEntity> bodyType() {
         return com.antcolonies.registry.ModEntities.ANT_CORPSE.get();

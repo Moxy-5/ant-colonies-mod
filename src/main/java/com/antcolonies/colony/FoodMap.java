@@ -132,6 +132,14 @@ public class FoodMap {
         found.keySet().retainAll(seen);
     }
 
+    /** A worker went into the colony's numbers (it is home, see {@link Population}): it tells the colony of what it found. */
+    void wentHome(UUID worker) {
+        Set<BlockPos> news = found.remove(worker);
+        if (news != null) {
+            known.addAll(news);
+        }
+    }
+
     /** Whether a scout may go to this spot (always, except in a game test: only in its arena). */
     public boolean mayScout(BlockPos spot) {
         return testArea == null || testArea.contains(spot.getCenter());

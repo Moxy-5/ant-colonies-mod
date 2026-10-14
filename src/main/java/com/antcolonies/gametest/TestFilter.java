@@ -23,7 +23,7 @@ public final class TestFilter {
     private static final Class<?>[] CLASSES = {NestTests.class, NavigationTests.class, TermiteTests.class, TermiteClimbingTests.class,
             TermiteFoodTests.class, TermiteGardenTests.class, TermiteForagingTests.class, TermiteMoundTests.class, TermiteTunnelTests.class, TermiteCathedralTests.class,
             TermiteRepairTests.class, JobsByAgeTests.class, TermitomycesTests.class, TermiteSoldierTests.class,
-            TermiteAlarmTests.class};
+            TermiteAlarmTests.class, PopulationTests.class};
 
     private TestFilter() {
     }

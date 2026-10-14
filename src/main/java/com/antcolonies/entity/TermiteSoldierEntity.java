@@ -415,4 +415,16 @@ public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurs
     protected net.minecraft.world.entity.EntityType<AntCorpseEntity> bodyType() {
         return com.antcolonies.registry.ModEntities.TERMITE_CORPSE.get();
     }
+
+    @Override
+    public String nestCaste() {
+        return rank.caste();
+    }
+
+    @Override
+    public void comeOutOfNest(Colony colony, long grownUpAt) {
+        super.comeOutOfNest(colony, grownUpAt);
+        colonyChecked = true;
+        lastFed = level().getGameTime();
+    }
 }

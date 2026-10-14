@@ -31,7 +31,8 @@ import net.minecraft.world.phys.AABB;
  * {@link #food()} (seeds), {@link #bakery()} (ant bread), {@link #queenCare()} (feeding the queen and her eggs),
  * {@link #brood()} (eggs and larvae), {@link #refuse()} (dead ants), {@link #mound()} (the termite mound),
  * {@link #foragingHoles()} (the termites' ways out to forage), {@link #garden()} (the termites' fungus garden) and
- * {@link #soldiers()} (the termites' soldiers) and {@link #alarm()} (their alarm).
+ * {@link #soldiers()} (the termites' soldiers), {@link #alarm()} (their alarm) and {@link #population()} (the members that
+ * are numbers inside the nest, and which are real mobs).
  */
 public class Colony {
     /** "No time saved": a hunger clock that has not started yet. */
@@ -75,6 +76,7 @@ public class Colony {
     private final Mushrooms mushrooms;
     private final Soldiers soldiers;
     private final Alarm alarm;
+    private final Population population;
 
     public Colony(UUID id, ResourceLocation species, UUID queenId, BlockPos center) {
         this.id = id;
@@ -97,6 +99,7 @@ public class Colony {
         this.mushrooms = new Mushrooms(this);
         this.soldiers = new Soldiers(this);
         this.alarm = new Alarm(this);
+        this.population = new Population(this);
     }
 
     /** The underground nest: its plan, the next block to dig, and the dug-out cells of each room. */
@@ -172,6 +175,11 @@ public class Colony {
     /** The alarm: its level, where the trouble is, and what each soldier does about it (species with an {@code alarm}). */
     public Alarm alarm() {
         return alarm;
+    }
+
+    /** The members that are numbers inside the nest, and which ones are real mobs (the brain, part 1). */
+    public Population population() {
+        return population;
     }
 
     /**
@@ -284,8 +292,8 @@ public class Colony {
 
     /**
      * Once a second for every colony whose middle is loaded (called from {@code ModEvents}, not by the queen, so a
-     * colony's own clock keeps going without her): the fungus garden, the mound's leftovers, the mushrooms, the alarm
-     * and the food map. A queenless colony with nobody left is abandoned: it ends, and its nest stays in the ground.
+     * colony's own clock keeps going without her): the fungus garden, the mound's leftovers, the mushrooms, the alarm,
+     * the food map and the members that are numbers. A queenless colony with nobody left is abandoned: it ends, and its nest stays in the ground.
      * Returns false once the colony has ended.
      */
     public boolean tick(ServerLevel level) {
@@ -297,6 +305,7 @@ public class Colony {
         mushrooms.tick(level);
         alarm.tick(level);
         foodMap.tick(level);
+        population.tick(level);
         return true;
     }
 
@@ -464,6 +473,7 @@ public class Colony {
         mound.save(tag);
         alarm.save(tag);
         foodMap.save(tag);
+        population.save(tag);
         return tag;
     }
 
@@ -487,6 +497,7 @@ public class Colony {
         colony.mound.load(tag);
         colony.alarm.load(tag);
         colony.foodMap.load(tag);
+        colony.population.load(tag);
         return colony;
     }
 }
