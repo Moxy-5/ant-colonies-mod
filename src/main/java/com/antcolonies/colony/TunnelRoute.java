@@ -152,7 +152,9 @@ public final class TunnelRoute {
             if (Math.abs(next.getY() - at.getY()) > MAX_STEP) {
                 break;
             }
-            List<BlockPos> step = step(at, next);
+            // Downhill right at the start, the tunnel leaves the shaft (which carries on down) lower down, as real
+            // galleries leave it at different depths: the shaft is the nest's own and is not dug as part of the tunnel.
+            List<BlockPos> step = k == 1 && next.getY() < at.getY() ? List.of(next) : step(at, next);
             boolean diggable = true;
             for (BlockPos cell : step) {
                 diggable &= ground.mayDig(cell) || ground.isDug(cell);

@@ -52,14 +52,34 @@ public class HillTests {
      */
     @GameTest(template = "arena", timeoutTicks = 20000, skyAccess = true)
     public static void termiteSideHolesInAHollowFollowTheGroundUpAndOpenAtTheSurface(GameTestHelper helper) {
+        sideHolesOpenAtTheSurface(helper, (x, z) -> Math.min(4, Math.max(0, Math.max(Math.abs(x - MIDDLE), Math.abs(z - MIDDLE)) - 4)));
+    }
+
+    /**
+     * A termite nest on a hillside: the ground slopes down to the north-west and up to the south-east (a block every 3
+     * columns, along both x and z, so whichever way the foraging tunnels run, one runs uphill and the other downhill).
+     * The downhill hole of a level tunnel would be in the open air, the uphill one under the soil: both follow the
+     * ground and open at the surface.
+     */
+    @GameTest(template = "arena", timeoutTicks = 20000, skyAccess = true)
+    public static void termiteSideHolesOnAHillsideOpenAtTheSurfaceUphillAndDownhill(GameTestHelper helper) {
+        sideHolesOpenAtTheSurface(helper, (x, z) -> Math.max(-6, Math.min(3, Math.floorDiv(x + z - 2 * MIDDLE, 3))));
+    }
+
+    /**
+     * A termite colony in an arena shaped by {@code rise} (see {@link #shapeGround}): its two foraging holes are planned
+     * at the surface, the workers dig both tunnels and open both holes.
+     */
+    private static void sideHolesOpenAtTheSurface(GameTestHelper helper, IntBinaryOperator rise) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
-        IntBinaryOperator rise = (x, z) -> Math.min(4, Math.max(0, Math.max(Math.abs(x - MIDDLE), Math.abs(z - MIDDLE)) - 4));
         shapeGround(helper, 25, rise);
-        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        int middleTop = SURFACE + rise.applyAsInt(MIDDLE, MIDDLE);
+        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, middleTop, MIDDLE);
         helper.runAfterDelay(5, () -> {
             for (int i = 0; i < 6; i++) {
-                helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE - 3 + i, SURFACE, MIDDLE - 2);
+                int x = MIDDLE - 3 + i;
+                helper.spawn(ModEntities.TERMITE_WORKER.get(), x, SURFACE + rise.applyAsInt(x, MIDDLE - 2), MIDDLE - 2);
             }
         });
         boolean[] ready = {false};
@@ -73,9 +93,11 @@ public class HillTests {
             List<NestPlan.ForagingTunnel> tunnels = colony.nest().getForagingTunnels(level);
             helper.assertTrue(tunnels.size() == 2, "the nest has " + tunnels.size() + " foraging tunnels");
             for (NestPlan.ForagingTunnel tunnel : tunnels) {
-                BlockPos hole = helper.relativePos(tunnel.hole());
-                int top = SURFACE - 1 + rise.applyAsInt(hole.getX(), hole.getZ());
-                helper.assertTrue(hole.getY() == top, "the hole " + hole.toShortString() + " is not at the surface (" + top + ")");
+                // (Checked on the blocks themselves: the arena may be turned, so the shape's x and z are not the world's.)
+                BlockPos hole = tunnel.hole();
+                helper.assertTrue(level.getBlockState(hole).is(Blocks.GRASS_BLOCK) && level.getBlockState(hole.above()).isAir(),
+                        "the " + tunnel.side() + " hole " + hole.toShortString() + " is not at the surface: " + level.getBlockState(hole)
+                                + " with " + level.getBlockState(hole.above()) + " over it");
             }
             // The shaft and rooms dug at once; the foraging tunnels are left for the workers.
             BlockPos bottom = colony.nest().getShaftBottom(level);
@@ -106,7 +128,7 @@ public class HillTests {
             if (allOpen && colony.foragingHoles().waysOut(level).size() >= 2) {
                 helper.succeed();
             }
-            helper.assertTrue(helper.getTick() < 19000, "the foraging tunnels up the hollow's sides were not dug and opened");
+            helper.assertTrue(helper.getTick() < 19000, "the foraging tunnels were not dug and opened");
         });
     }
 }

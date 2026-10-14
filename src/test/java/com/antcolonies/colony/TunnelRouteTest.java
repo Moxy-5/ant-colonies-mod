@@ -145,6 +145,20 @@ class TunnelRouteTest {
     }
 
     @Test
+    void aStraightTunnelDownhillLeavesTheShaftLowerDown() {
+        // The ground falls a block a column from the entrance: the tunnel leaves the shaft a block lower, never digging
+        // in the shaft's own column.
+        IntBinaryOperator downhill = (x, z) -> 64 - Math.max(0, x);
+        BlockPos start = new BlockPos(0, 62, 0);
+        TunnelRoute.Plan plan = TunnelRoute.straight(start, net.minecraft.core.Direction.EAST, 2, 2, ground(downhill, Set.of()));
+        assertNotNull(plan);
+        assertEquals(new BlockPos(1, 62, 0), plan.cells().get(0), "first block beside the shaft, a block lower (the shaft carries on down)");
+        assertTrue(plan.cells().stream().noneMatch(cell -> cell.getX() == 0), "nothing dug in the shaft's column");
+        assertJoinedAndUnderground(plan.cells().get(0), new TunnelRoute.Plan(plan.cells().subList(1, plan.cells().size()), plan.hole()), downhill);
+        assertEquals(new BlockPos(2, 62, 0), plan.hole());
+    }
+
+    @Test
     void aStepIsDugUnderground() {
         assertEquals(List.of(new BlockPos(1, 63, 0), new BlockPos(1, 64, 0)), TunnelRoute.step(new BlockPos(0, 63, 0), new BlockPos(1, 64, 0)));
         assertEquals(List.of(new BlockPos(0, 62, 0), new BlockPos(1, 62, 0)), TunnelRoute.step(new BlockPos(0, 63, 0), new BlockPos(1, 62, 0)));

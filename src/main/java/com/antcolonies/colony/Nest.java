@@ -680,8 +680,13 @@ public class Nest {
                 fitted.add(tunnel);
                 continue;
             }
-            BlockState above = level.getBlockState(hole.above());
-            boolean atSurface = level.getBlockState(hole).canBeReplaced() || above.canBeReplaced() && above.getFluidState().isEmpty();
+            // At the surface: the hole is the top ground block of its column, or it was opened there already (open, the
+            // tunnel's end under it dug, solid ground under that). Not on a hillside: soil over it (uphill) or air
+            // under it (downhill, the tunnel would run out in the open).
+            Integer top = ground.groundTop(hole.getX(), hole.getZ());
+            boolean opened = Nest.isDugOut(level, hole) && Nest.isDugOut(level, hole.below())
+                    && !level.getBlockState(hole.below(2)).getCollisionShape(level, hole.below(2)).isEmpty();
+            boolean atSurface = top == null || top == hole.getY() || opened;
             TunnelRoute.Plan plan = atSurface ? null
                     : TunnelRoute.straight(center.below(NestPlan.FORAGING_TUNNEL_DEPTH), tunnel.side(), tunnel.tunnel().size(), MIN_FITTED_TUNNEL, ground);
             if (plan != null) {
