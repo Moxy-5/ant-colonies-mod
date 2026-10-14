@@ -162,4 +162,91 @@ public class TermiteNewHoleTests {
             }
         });
     }
+
+    /**
+     * The user's bugs (2026-10-14): a 5-block fallen tree lying up a slope, 5 to 7 blocks higher than the nest. The
+     * colony must see it and plan a tunnel to its lowest block; then that block is eaten away (taken out here), but the
+     * rest of the tree is still there, so the hole must not be given up; and the tunnel, climbing the slope, is dug to
+     * its last block (dug upward) and the hole beside the tree opened.
+     */
+    @GameTest(template = "arena", timeoutTicks = 30000, skyAccess = true)
+    public static void aFallenTreeUpASlopeKeepsItsHoleWhenItsLowestBlockIsEaten(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        int treeStart = MIDDLE + 20;
+        // The ground rises east of the nest, a block a step: 5 blocks up at the tree's foot (higher than the plants the colony
+        // sees round the nest; the user's tree on a terrace was never seen), 7 under its far end.
+        java.util.function.IntUnaryOperator rise = x -> x <= treeStart ? Math.max(0, x - (treeStart - 5)) : Math.min(7, 5 + (x - treeStart));
+        for (int x = 0; x <= treeStart + 8; x++) {
+            for (int z = 0; z < 25; z++) {
+                int top = SURFACE - 1 + rise.applyAsInt(x);
+                for (int y = 0; y < top; y++) {
+                    helper.setBlock(x, y, z, Blocks.DIRT);
+                }
+                helper.setBlock(x, top, z, Blocks.GRASS_BLOCK);
+            }
+        }
+        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        helper.runAfterDelay(5, () -> {
+            for (int i = 0; i < 6; i++) {
+                helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE - 3 + i, SURFACE, MIDDLE - 2);
+            }
+        });
+        java.util.List<BlockPos> tree = new java.util.ArrayList<>();
+        for (int x = treeStart; x < treeStart + 5; x++) {
+            tree.add(helper.absolutePos(new BlockPos(x, SURFACE + rise.applyAsInt(x), MIDDLE)));
+        }
+        int[] phase = {0}; // 0 setting up, 1 waiting for the plan, 2 digging and opening
+        Nest.NewTunnel[] tunnel = {null};
+        int[] since = {0};
+        helper.runAfterDelay(10, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
+            long middleAged = level.getGameTime() - colony.profile().worker().nurseUntilTicks() - 1000;
+            for (TermiteWorkerEntity worker : level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds())) {
+                worker.setGrownUpAt(middleAged);
+            }
+            TermiteSoldierTests.digNestAtOnce(level, colony);
+            colony.population().addNewMembers(WorkerAntEntity.CASTE, level.getGameTime() - 1000, 500);
+            colony.setForagingTimeForTests(true);
+            for (BlockPos wood : tree) {
+                level.setBlock(wood, com.antcolonies.registry.ModBlocks.DEAD_WOOD.get().defaultBlockState()
+                        .setValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS, net.minecraft.core.Direction.Axis.X), 3);
+            }
+            colony.food().rescanPlantsSoon();
+            colony.foodMap().knowForTests(tree.get(0));
+            phase[0] = 1;
+        });
+        helper.onEachTick(() -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            if (colony == null || phase[0] == 0) {
+                return;
+            }
+            since[0]++;
+            if (phase[0] == 1) {
+                if (colony.nest().getNewTunnels().isEmpty()) {
+                    helper.assertTrue(since[0] < 600, "no tunnel was planned to the tree: " + colony.foragingHoles().describeNewHoles(level)
+                            + ", tree seen " + colony.food().plants(level).contains(tree.get(0)) + ", known " + colony.foodMap().knows(tree.get(0), null) + ", tree " + (tree.get(0).getY() - colony.getCenter().getY()) + " above the nest middle, " + level.getBlockState(tree.get(0)));
+                    return;
+                }
+                tunnel[0] = colony.nest().getNewTunnels().get(0);
+                helper.assertTrue(tunnel[0].food().equals(tree.get(0)), "the tunnel is for " + tunnel[0].food() + ", not the tree's lowest block");
+                level.setBlock(tree.get(0), Blocks.AIR.defaultBlockState(), 3); // eaten away
+                colony.food().rescanPlantsSoon();
+                phase[0] = 2;
+                since[0] = 0;
+                return;
+            }
+            BlockPos hole = tunnel[0].tunnel().hole();
+            if (since[0] % 1000 == 0) {
+                AntColoniesMod.LOGGER.info("[new-hole-test] slope: dug {} of {}, hole {}", tunnel[0].tunnel().tunnel().stream().filter(c -> Nest.isDugOut(level, c)).count(),
+                        tunnel[0].tunnel().tunnel().size(), level.getBlockState(hole));
+            }
+            helper.assertTrue(!colony.nest().isSpent(hole), "the hole was given up while the rest of the tree is still there");
+            if (ForagingHoles.isDug(level, tunnel[0].tunnel()) && ForagingHoles.isOpen(level, hole)) {
+                helper.succeed();
+            }
+            helper.assertTrue(since[0] < 28000, "the tunnel to the tree was not dug and opened: " + colony.foragingHoles().describeNewHoles(level));
+        });
+    }
 }

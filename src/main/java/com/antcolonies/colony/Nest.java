@@ -497,11 +497,25 @@ public class Nest {
             spots.remove(target.below());
             spots.add(0, target.below());
         }
+        // A foraging tunnel climbing a slope is dug upward too, from the tunnel block under it (the stand spots above only
+        // look sideways and on top: the last block of a new tunnel up a slope was never dug, the user's bug, 2026-10-14).
+        if (nestCells.contains(target.below()) && !spots.contains(target.below()) && isForagingTunnelCell(level, target)) {
+            spots.add(target.below());
+        }
         // The mound's own soil in a shaft is cleared from below too (the old cap of a chimney that grew).
         if (colony.mound().isClearJob(level, target) && level.getBlockState(target.below()).isAir()) {
             spots.add(target.below());
         }
         return spots;
+    }
+
+    private boolean isForagingTunnelCell(Level level, BlockPos pos) {
+        for (NestPlan.ForagingTunnel tunnel : getForagingTunnels(level)) {
+            if (tunnel.tunnel().contains(pos)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Whether the entrance hole is open: nothing solid in it (grass or snow do not close it). */

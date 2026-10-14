@@ -44,6 +44,8 @@ public class FoodStore {
     private static final int GRASS_REST_TICKS = 200;
     /** The plants around the nest are looked up again after this many ticks (a scan of the whole area). */
     private static final int GRASS_SCAN_TICKS = 100;
+    /** How far above or below the nest rich food (a fallen tree, a hay bale) is still seen (other plants: 4 up, 1 down). */
+    private static final int RICH_HEIGHT = 12;
 
     private final Colony colony;
     private final BlockPos center;
@@ -247,7 +249,11 @@ public class FoodStore {
                     }
                     BlockPos top = new BlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z), z);
                     for (BlockPos pos : List.of(top, top.below())) {
-                        if (pos.getY() >= center.getY() - 1 && pos.getY() <= center.getY() + 4 && food().plantFor(level.getBlockState(pos)) != null) {
+                        SpeciesProfile.PlantFood plant = food().plantFor(level.getBlockState(pos));
+                        int dy = pos.getY() - center.getY();
+                        // Rich food (a fallen tree, a hay bale) counts up or down a slope too (the user's fallen tree on a
+                        // terrace above the nest was never seen, 2026-10-14); other plants only near the nest's height.
+                        if (plant != null && (dy >= -1 && dy <= 4 || plant.rich() && Math.abs(dy) <= RICH_HEIGHT)) {
                             grassTufts.add(pos);
                             break;
                         }

@@ -52,7 +52,7 @@ public class TermiteMoundTests {
         if (found != null) {
             // Both still needed on the 65 x 65 arenas (tried 2026-10-14: without either, the hay test failed in full runs
             // and passed alone): scouts and foragers stay in this test's arena, and only this test's enemies raise its alarm.
-            found.foodMap().setTestArea(area);
+            found.foodMap().setTestArea(area.expandTowards(0, 16, 0)); // (taller: food up a slope may stand above the arena)
             found.alarm().setTestArea(area);
         }
         return found;
