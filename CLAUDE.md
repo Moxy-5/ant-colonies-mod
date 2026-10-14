@@ -271,6 +271,11 @@ Goal: a mature colony can hold 1,000+ ants or termites without lag.
 - [ ] Later: alarm level + hazards, Matabele ants, leafcutters, army ants, ant farm, field journal.
 
 ## Testing tips
+- **When to run which game tests (user's rule, 2026-10-13):** a full run of every game test takes 20 to 30 minutes, so do NOT run it after every change.
+  - **After each change:** run only the game tests for what changed (with `ANTCOLONIES_TESTS`, see below), plus `./gradlew build`; this takes minutes.
+  - **Full run only:** before merging a branch into master; after changing shared systems everything uses (`AntNavigator`, `AntPathFinder`, the colony brain and its parts, digging); and once to check the 65 x 65 arenas.
+  - A quick test that fails gets fixed right away. If a full run finds something the quick tests missed, add a quick test for it.
+  - Never start a full run while the user is gaming.
 - Automatic tests Claude runs before asking the user to test:
   - `./gradlew test`: route planner on a pretend nest (part of `./gradlew build`).
   - Only some game tests (much quicker while working): set the environment variable `ANTCOLONIES_TESTS` to a comma-separated list of test class names (such as `termiteclimbingtests`) or parts of test names, for example `ANTCOLONIES_TESTS=termiteclimbingtests ./gradlew runGameTestServer` in Git Bash (`gametest/TestFilter`; the log then says `ONLY running n of m game tests`). Without it every test runs.
