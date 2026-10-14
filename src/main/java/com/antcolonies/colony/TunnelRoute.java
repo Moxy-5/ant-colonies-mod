@@ -51,23 +51,35 @@ public final class TunnelRoute {
     public record Plan(List<BlockPos> cells, BlockPos hole) {
     }
 
-    /**
-     * A tunnel from {@code start} (a block of a dug tunnel) to a hole within {@link #HOLE_REACH} of {@code food}
-     * (sideways), at most {@code maxLength} blocks long; null if there is none. The shortest one is taken (each block a
-     * step, climbing and dropping included).
-     */
+    /** {@link #plan(List, BlockPos, Ground, int)} from one block. */
     @Nullable
     public static Plan plan(BlockPos start, BlockPos food, Ground ground, int maxLength) {
+        return plan(List.of(start), food, ground, maxLength);
+    }
+
+    /**
+     * A tunnel from one of {@code starts} (blocks of dug tunnels) to a hole within {@link #HOLE_REACH} of {@code food}
+     * (sideways), at most {@code maxLength} blocks long; null if there is none. The shortest one is taken (each block a
+     * step, climbing and dropping included), from whichever start gives it: the start nearest the food can be boxed in
+     * (beside the mound, which is not dug through).
+     */
+    @Nullable
+    public static Plan plan(List<BlockPos> starts, BlockPos food, Ground ground, int maxLength) {
         record Node(long column, int y, int cost, int guess) {
         }
         Map<Long, Integer> best = new HashMap<>();
         Map<Long, Long> cameFrom = new HashMap<>();
         Map<Long, Integer> heightOf = new HashMap<>();
         PriorityQueue<Node> open = new PriorityQueue<>((a, b) -> Integer.compare(a.cost + a.guess, b.cost + b.guess));
-        long first = column(start.getX(), start.getZ());
-        best.put(first, 0);
-        heightOf.put(first, start.getY());
-        open.add(new Node(first, start.getY(), 0, guess(start.getX(), start.getZ(), food)));
+        java.util.Set<Long> firsts = new java.util.HashSet<>();
+        for (BlockPos start : starts) {
+            long first = column(start.getX(), start.getZ());
+            if (firsts.add(first)) {
+                best.put(first, 0);
+                heightOf.put(first, start.getY());
+                open.add(new Node(first, start.getY(), 0, guess(start.getX(), start.getZ(), food)));
+            }
+        }
         int looked = 0;
         while (!open.isEmpty() && looked++ < MAX_COLUMNS) {
             Node node = open.poll();
@@ -76,10 +88,10 @@ public final class TunnelRoute {
             }
             int x = columnX(node.column);
             int z = columnZ(node.column);
-            if (node.column != first && isBesideFood(x, z, food)) {
+            if (!firsts.contains(node.column) && isBesideFood(x, z, food)) {
                 BlockPos hole = new BlockPos(x, node.y + 1, z);
                 if (ground.mayOpenHole(hole)) {
-                    return new Plan(route(first, node.column, cameFrom, heightOf), hole);
+                    return new Plan(route(firsts, node.column, cameFrom, heightOf), hole);
                 }
             }
             for (Direction side : Direction.Plane.HORIZONTAL) {
@@ -103,7 +115,7 @@ public final class TunnelRoute {
                 }
                 int cost = node.cost + step.size();
                 long next = column(nx, nz);
-                if (!diggable || cost > maxLength || cost >= best.getOrDefault(next, Integer.MAX_VALUE)) {
+                if (!diggable || cost > maxLength || cost >= best.getOrDefault(next, Integer.MAX_VALUE) || firsts.contains(next)) {
                     continue;
                 }
                 best.put(next, cost);
@@ -135,12 +147,14 @@ public final class TunnelRoute {
         return cells;
     }
 
-    private static List<BlockPos> route(long first, long last, Map<Long, Long> cameFrom, Map<Long, Integer> heightOf) {
+    private static List<BlockPos> route(java.util.Set<Long> firsts, long last, Map<Long, Long> cameFrom, Map<Long, Integer> heightOf) {
         List<Long> columns = new ArrayList<>();
-        for (Long at = last; at != null && at != first; at = cameFrom.get(at)) {
+        long at = last;
+        while (!firsts.contains(at)) {
             columns.add(0, at);
+            at = cameFrom.get(at);
         }
-        columns.add(0, first);
+        columns.add(0, at);
         List<BlockPos> cells = new ArrayList<>();
         for (int i = 1; i < columns.size(); i++) {
             long a = columns.get(i - 1);

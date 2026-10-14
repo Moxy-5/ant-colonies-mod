@@ -96,6 +96,26 @@ class TunnelRouteTest {
     }
 
     @Test
+    void aBoxedInStartIsPassedOverForAnotherOne() {
+        IntBinaryOperator flat = (x, z) -> 64;
+        Set<Long> stone = new HashSet<>();
+        for (int x = -2; x <= 2; x++) {
+            for (int z = -2; z <= 2; z++) {
+                if (x != 0 || z != 0) {
+                    stone.add(column(x, z)); // (like the mound round the shaft)
+                }
+            }
+        }
+        BlockPos boxedIn = new BlockPos(0, 63, 0);
+        BlockPos free = new BlockPos(0, 63, 8);
+        BlockPos food = new BlockPos(20, 65, 0);
+        assertNull(TunnelRoute.plan(boxedIn, food, ground(flat, stone), 60));
+        TunnelRoute.Plan plan = TunnelRoute.plan(List.of(boxedIn, free), food, ground(flat, stone), 60);
+        assertNotNull(plan);
+        assertJoinedAndUnderground(free, plan, flat);
+    }
+
+    @Test
     void aCliffTooHighIsNotDugUp() {
         IntBinaryOperator cliff = (x, z) -> x >= 10 ? 70 : 64;
         BlockPos start = new BlockPos(0, 63, 0);

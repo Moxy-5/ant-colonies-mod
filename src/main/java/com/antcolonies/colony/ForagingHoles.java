@@ -316,11 +316,11 @@ public class ForagingHoles {
         if (food == null) {
             return;
         }
-        BlockPos start = startFor(level, food);
-        TunnelRoute.Plan plan = start == null ? null : TunnelRoute.plan(start, food, ground(level), numbers.reachMax() + 16);
+        List<BlockPos> starts = startsFor(level);
+        TunnelRoute.Plan plan = starts.isEmpty() ? null : TunnelRoute.plan(starts, food, ground(level), numbers.reachMax() + 16);
         if (plan == null) {
             noRouteUntil.put(food.immutable(), now + NO_ROUTE_TICKS);
-            AntColoniesMod.LOGGER.debug("[new-hole] no tunnel route to the food at {}", food.toShortString());
+            AntColoniesMod.LOGGER.debug("[new-hole] no tunnel route to the food at {} from {} dug tunnel blocks", food.toShortString(), starts.size());
             return;
         }
         BlockPos center = colony.getCenter();
@@ -365,24 +365,15 @@ public class ForagingHoles {
         return best;
     }
 
-    /** The block of a dug foraging tunnel nearest the food (sideways), where a new tunnel starts; null if none is dug. */
-    @Nullable
-    private BlockPos startFor(Level level, BlockPos food) {
-        BlockPos best = null;
-        double bestDistance = Double.MAX_VALUE;
+    /** The blocks of the dug foraging tunnels, where a new tunnel may start (the route planner picks the best). */
+    private List<BlockPos> startsFor(Level level) {
+        List<BlockPos> starts = new java.util.ArrayList<>();
         for (NestPlan.ForagingTunnel tunnel : tunnels(level)) {
-            if (!isDug(level, tunnel)) {
-                continue;
-            }
-            for (BlockPos cell : tunnel.tunnel()) {
-                double distance = sideways(cell, food);
-                if (distance < bestDistance) {
-                    best = cell;
-                    bestDistance = distance;
-                }
+            if (isDug(level, tunnel)) {
+                starts.addAll(tunnel.tunnel());
             }
         }
-        return best;
+        return starts;
     }
 
     /** The world as the tunnel route planner sees it: the ground, where a tunnel may be dug and a hole opened. */
