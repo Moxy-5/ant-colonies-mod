@@ -132,7 +132,7 @@ def lichen(rng, img, spots):
 
 
 def option(name, variant):
-    rng = random.Random(hash((name, variant)) & 0xFFFFFFFF)
+    rng = random.Random(f"{name}{variant}")  # (a string seed gives the same picture every run)
     if name == "A":
         return wood(rng, (162, 157, 146), (186, 181, 170), (70, 64, 58), 3, variant == 2)
     if name == "B":

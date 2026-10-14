@@ -1,0 +1,138 @@
+"""Planning only: builds a 3D viewer page of a fallen tree (stump, trunk, crown branches) to compare looks for the
+untouched Dead Wood, with the termite-eaten mud stages on top. Textures are drawn here (A, B, C from
+dead_wood_concepts.py; D the user's reference picture, a darker Minecraft-style dead log with bark strips; E a mix:
+D's strips in A's sun-bleached silver) and put into the page as data. Writes the page to the path given (default
+build/dead_wood_viewer.html). Run from the project folder:  python tools/dead_wood_viewer.py [out.html]
+"""
+import base64
+import json
+import random
+import struct
+import sys
+import zlib
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import dead_wood_concepts as concepts  # noqa: E402
+
+ROOT = Path(__file__).resolve().parent.parent
+TEXTURES = ROOT / "src/main/resources/assets/antcolonies/textures/block"
+S = 16
+MUD = (138, 78, 50)
+MUD_DARK = (104, 58, 38)
+MUD_COVER = [0.0, 0.25, 0.5, 0.75]
+
+
+def clamp(c):
+    return max(0, min(255, round(c)))
+
+
+def png(rows):
+    height, width = len(rows), len(rows[0])
+    raw = b"".join(b"\x00" + bytes(c for px in row for c in (px if len(px) == 4 else px + (255,))) for row in rows)
+
+    def chunk(kind, data):
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+
+    header = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b"")
+
+
+def uri(data):
+    return "data:image/png;base64," + base64.b64encode(data).decode()
+
+
+def strips(name, variant):
+    """D and E: bark in long strips along the trunk, like the user's reference (a Minecraft-style dead log)."""
+    rng = random.Random(f"{name}{variant}")
+    if name == "D":
+        tones = [(62, 56, 48), (84, 77, 67), (104, 95, 83), (122, 112, 98)]
+    else:
+        tones = [(96, 90, 82), (138, 132, 121), (162, 156, 145), (184, 178, 167)]
+    img = [[None] * S for _ in range(S)]
+    for y in range(S):
+        tone = rng.randrange(1, 4)
+        x = 0
+        while x < S:
+            run = rng.randint(3, 9)
+            for i in range(run):
+                if x + i < S:
+                    img[y][x + i] = tuple(clamp(c * rng.uniform(0.95, 1.05)) for c in tones[tone])
+            x += run
+            tone = max(0, min(3, tone + rng.choice([-2, -1, 1, 2])))
+    if name == "E":
+        # A's long cracks, lined up across block edges.
+        for start, end, rows, width in concepts.fissures(rng, 2):
+            for x in range(start, end):
+                img[int(round(rows[x])) % S][x] = (70, 64, 58)
+    return img
+
+
+def side(name, variant):
+    return concepts.option(name, variant) if name in "ABC" else strips(name, variant)
+
+
+def with_mud(img, stage):
+    """The eaten stages' mud, as on the real Dead Wood (tools/dead_wood_art.py)."""
+    img = [list(row) for row in img]
+    mrng = random.Random(9)
+    blobs = [(mrng.uniform(0, 16), mrng.uniform(0, 16), mrng.uniform(1.8, 3.6)) for _ in range(24)]
+    cover = MUD_COVER[stage]
+    if cover > 0:
+        for y in range(S):
+            for x in range(S):
+                d = min(((min(abs(x - bx), 16 - abs(x - bx))) ** 2 + (min(abs(y - by), 16 - abs(y - by))) ** 2) ** 0.5 / r
+                        for bx, by, r in blobs)
+                if d < cover * 1.25:
+                    shade = MUD_DARK if d > cover or mrng.random() < 0.15 else MUD
+                    img[y][x] = tuple(clamp(c + mrng.randint(-6, 6)) for c in shade)
+    return img
+
+
+def turned(img):
+    """The same texture with the grain running up and down (for the upright stump)."""
+    return [[img[x][S - 1 - y] for x in range(S)] for y in range(S)]
+
+
+def d_end():
+    """The reference picture's end: brown rings, dark bark rim."""
+    rows = []
+    for y in range(S):
+        row = []
+        for x in range(S):
+            ring = max(abs(x - 7.5), abs(y - 7.5))
+            color = (70, 62, 52) if ring > 7 else [(132, 116, 96), (112, 98, 82)][int(ring) % 2]
+            row.append(color)
+        rows.append(row)
+    return rows
+
+
+def grass():
+    rng = random.Random(1)
+    return [[tuple(clamp(c * rng.uniform(0.85, 1.12)) for c in (150, 160, 82)) for _ in range(S)] for _ in range(S)]
+
+
+def file_uri(name):
+    return uri((TEXTURES / name).read_bytes())
+
+
+def main():
+    out = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "build/dead_wood_viewer.html"
+    data = {"looks": {}, "branch": [file_uri(f"fallen_branch_bark_{s}.png") for s in range(4)],
+            "branchEnd": file_uri("fallen_branch_end.png"), "grass": uri(png(grass()))}
+    for name in "ABCDE":
+        look = {"side": [], "stump": []}
+        for stage in range(4):
+            sides = [with_mud(side(name, v), stage) for v in range(3)]
+            look["side"].append([uri(png(t)) for t in sides])
+            look["stump"].append([uri(png(turned(t))) for t in sides])
+        look["end"] = [uri(png(d_end())) if name == "D" and s == 0 else file_uri(f"dead_wood_top_{s}.png") for s in range(4)]
+        data["looks"][name] = look
+    template = (Path(__file__).resolve().parent / "dead_wood_viewer.template.html").read_text(encoding="utf-8")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")
+    print("wrote", out)
+
+
+if __name__ == "__main__":
+    main()
