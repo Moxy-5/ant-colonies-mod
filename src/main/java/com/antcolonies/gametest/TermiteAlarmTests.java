@@ -179,7 +179,7 @@ public class TermiteAlarmTests {
         List<TermiteSoldierEntity> minors = new ArrayList<>();
         BlockPos[] bush = new BlockPos[1];
         Chicken[] chicken = new Chicken[1];
-        long[] at = {-1, -1, -1}; // the chicken came, the chicken died, everybody was in
+        long[] at = {-1, -1, -1}; // the chicken came, the fight was over (chicken dead or the minors back in), everybody was in
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
@@ -230,7 +230,9 @@ public class TermiteAlarmTests {
                 }
                 return;
             }
-            if (at[1] < 0 && !chicken[0].isAlive()) {
+            // Over when the chicken is dead, or when the minors have gone in behind the workers and left it outside
+            // (real soldiers guard the foragers, then go in last and the hole is sealed).
+            if (at[1] < 0 && (!chicken[0].isAlive() || !colony.soldiers().minorsOut(level))) {
                 at[1] = tick;
             }
             if (at[1] >= 0 && at[2] < 0 && !colony.foragingHoles().isAnyoneOutside(level)) {
@@ -265,7 +267,7 @@ public class TermiteAlarmTests {
         helper.succeedWhen(() -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(chicken[0] != null, "no chicken yet: no forager reached the bush while a minor was outside");
-            helper.assertTrue(at[1] >= 0, "the chicken is not dead yet (it came at tick " + at[0] + ")");
+            helper.assertTrue(at[1] >= 0, "the chicken is alive and the minors are still out (it came at tick " + at[0] + ")");
             helper.assertTrue(at[2] >= 0, "not everybody is in yet");
             // Plugged, or roofed over: the builders may put the mound's tunnel block back over it first (the plan has one
             // there), and then it opens only into the mound's tunnels, no longer to the sky (by design it is then not plugged).

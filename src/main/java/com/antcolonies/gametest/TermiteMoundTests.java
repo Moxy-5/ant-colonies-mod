@@ -50,8 +50,10 @@ public class TermiteMoundTests {
                         && colony.getQueen(helper.getLevel()) != null && colony.getSpecies().equals(Species.MACROTERMES))
                 .findFirst().orElse(null);
         if (found != null) {
-            found.foodMap().setTestArea(area); // scouts and foragers stay in this test's arena
-            found.alarm().setTestArea(area); // and only this test's enemies raise its alarm
+            // Both still needed on the 65 x 65 arenas (tried 2026-10-14: without either, the hay test failed in full runs
+            // and passed alone): scouts and foragers stay in this test's arena, and only this test's enemies raise its alarm.
+            found.foodMap().setTestArea(area);
+            found.alarm().setTestArea(area);
         }
         return found;
     }
