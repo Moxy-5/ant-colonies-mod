@@ -9,7 +9,8 @@
     "slow_after_ticks": 36000,
     "starve_after_ticks": 72000,
     "nurse_until_ticks": 72000,
-    "builder_until_ticks": 192000
+    "builder_until_ticks": 192000,
+    "lifespan_ticks": 360000
   },
   "queen": {
     "meal": 6,

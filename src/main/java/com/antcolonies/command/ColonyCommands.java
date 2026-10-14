@@ -222,7 +222,9 @@ public class ColonyCommands {
             String line = "- " + colony.getId().toString().substring(0, 8)
                     + " | " + colony.getSpecies()
                     + " | center " + colony.getCenter().toShortString()
-                    + " | queen " + colony.getQueenId().toString().substring(0, 8)
+                    + (colony.isQueenless() ? " | QUEENLESS: no new eggs, dwindling" : " | queen " + colony.getQueenId().toString().substring(0, 8))
+                    + (colony.profile().nest().levelUnlocks().isEmpty() ? ""
+                            : " | nest levels open " + Math.min(colony.nest().levelsUnlocked(level), colony.profile().nest().maxLevels()) + " of " + colony.profile().nest().maxLevels())
                     + " | members " + colony.getMemberCount()
                     + " | " + colony.describeJobs(level)
                     + (colony.profile().food().makesBread()

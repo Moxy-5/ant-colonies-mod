@@ -40,6 +40,37 @@ public class ColonyManager extends SavedData {
         return colony;
     }
 
+    /**
+     * A colony's queen has died. The colony carries on without her and dwindles (see {@link Colony#isQueenless}); if
+     * nobody is left it ends at once.
+     */
+    public static void queenDied(ServerLevel level, UUID colonyId) {
+        ColonyManager manager = get(level);
+        Colony colony = manager.getColony(colonyId);
+        if (colony == null) {
+            return;
+        }
+        if (colony.queenDied(level)) {
+            manager.markChanged();
+        } else {
+            manager.removeColony(colonyId);
+        }
+    }
+
+    /** Once a second: every colony whose middle is loaded runs its own clock; a queenless one with nobody left is abandoned. */
+    public void tickColonies(ServerLevel level) {
+        for (Colony colony : java.util.List.copyOf(colonies.values())) {
+            if (!colony.isQueenless() && colony.getQueen(level) == null) {
+                continue; // her part of the world is not loaded (or a game test has cleared her away)
+            }
+            if (level.isLoaded(colony.getCenter()) && !colony.tick(level)) {
+                com.antcolonies.AntColoniesMod.LOGGER.info("[colony] queenless colony {} at {} has died out; its nest is abandoned",
+                        colony.getId(), colony.getCenter().toShortString());
+                removeColony(colony.getId());
+            }
+        }
+    }
+
     public void removeColony(UUID id) {
         if (colonies.remove(id) != null) {
             setDirty();
@@ -57,8 +88,8 @@ public class ColonyManager extends SavedData {
         Colony best = null;
         double bestDist = maxDistance * maxDistance;
         for (Colony colony : colonies.values()) {
-            if (!colony.getSpecies().equals(species)) {
-                continue;
+            if (!colony.getSpecies().equals(species) || colony.isQueenless()) {
+                continue; // a new worker never joins a colony whose queen has died
             }
             double dist = colony.getCenter().distSqr(pos);
             if (dist <= bestDist) {

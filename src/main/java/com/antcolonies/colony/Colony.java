@@ -53,6 +53,8 @@ public class Colony {
     private int agesGiven;
     /** Whether the workers of this colony get hungry. On, except in some tests. Not saved. */
     private boolean hungerOn = true;
+    /** When the queen died (a queenless colony carries on without her and dwindles), or NOT_SET while she lives. Saved. */
+    private long queenDiedAt = NOT_SET;
     /** Tests only: forces foraging time on or off (null: the real clock and weather). Not saved. */
     @Nullable
     private Boolean foragingTimeForTests;
@@ -253,7 +255,49 @@ public class Colony {
     /** The queen (of whatever species), if she is loaded and alive. */
     @Nullable
     public AbstractAntEntity getQueen(ServerLevel level) {
+        if (isQueenless()) {
+            return null;
+        }
         return level.getEntity(queenId) instanceof AbstractAntEntity queen && queen.isAlive() ? queen : null;
+    }
+
+    /**
+     * Whether the queen has died. Like a real queenless colony, it carries on without her: the workers keep working and
+     * raise the eggs and young already there, but no new eggs come, so it dwindles as its workers die of old age, until
+     * the nest is empty and abandoned (see {@link #tick}).
+     */
+    public boolean isQueenless() {
+        return queenDiedAt != NOT_SET;
+    }
+
+    /** The queen has died. Returns true if the colony carries on without her, false if nobody is left (it is gone). */
+    public boolean queenDied(ServerLevel level) {
+        queenDiedAt = level.getGameTime();
+        return !isEmpty(level);
+    }
+
+    /** Nobody left: no workers or soldiers, no eggs or young. */
+    private boolean isEmpty(ServerLevel level) {
+        return getMemberCount() - getCount(com.antcolonies.entity.TermiteKingEntity.CASTE) <= 0 && brood().getEggs(level).isEmpty()
+                && brood().getLarvae(level).isEmpty();
+    }
+
+    /**
+     * Once a second for every colony whose middle is loaded (called from {@code ModEvents}, not by the queen, so a
+     * colony's own clock keeps going without her): the fungus garden, the mound's leftovers, the mushrooms, the alarm
+     * and the food map. A queenless colony with nobody left is abandoned: it ends, and its nest stays in the ground.
+     * Returns false once the colony has ended.
+     */
+    public boolean tick(ServerLevel level) {
+        if (isQueenless() && isEmpty(level)) {
+            return false;
+        }
+        garden.grow(level);
+        mound.tick(level);
+        mushrooms.tick(level);
+        alarm.tick(level);
+        foodMap.tick(level);
+        return true;
     }
 
     /** The area (around the nest, down to the refuse chamber) where the colony's eggs, larvae and dead ants are looked for. */
@@ -264,7 +308,7 @@ public class Colony {
 
     /** Whether the colony is still being founded: nobody yet but the queen (and her king, for termites). */
     public boolean isFounding() {
-        return getMemberCount() - getCount(TermiteKingEntity.CASTE) == 0;
+        return !isQueenless() && getMemberCount() - getCount(TermiteKingEntity.CASTE) == 0;
     }
 
     public boolean isHungerOn() {
@@ -407,6 +451,9 @@ public class Colony {
         tag.putString("species", species.toString());
         tag.putUUID("queen", queenId);
         tag.putLong("center", center.asLong());
+        if (isQueenless()) {
+            tag.putLong("queenDiedAt", queenDiedAt);
+        }
         CompoundTag castes = new CompoundTag();
         casteCounts.forEach(castes::putInt);
         tag.put("castes", castes);
@@ -429,6 +476,9 @@ public class Colony {
         CompoundTag castes = tag.getCompound("castes");
         for (String key : castes.getAllKeys()) {
             colony.casteCounts.put(key, castes.getInt(key));
+        }
+        if (tag.contains("queenDiedAt")) {
+            colony.queenDiedAt = tag.getLong("queenDiedAt");
         }
         colony.food.load(tag);
         colony.bakery.load(tag);

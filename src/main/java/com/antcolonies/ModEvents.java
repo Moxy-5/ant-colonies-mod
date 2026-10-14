@@ -47,6 +47,14 @@ public class ModEvents {
     }
 
     /** A player jumping on a termite mound: footsteps, the alarm's first level (see {@code colony.Alarm}). */
+    // Every colony's own clock, once a second, whether or not its queen is loaded (or alive).
+    @SubscribeEvent
+    public static void onLevelTick(net.neoforged.neoforge.event.tick.LevelTickEvent.Post event) {
+        if (event.getLevel() instanceof ServerLevel level && level.getGameTime() % 20 == 0) {
+            ColonyManager.get(level).tickColonies(level);
+        }
+    }
+
     @SubscribeEvent
     public static void onJump(LivingEvent.LivingJumpEvent event) {
         if (event.getEntity() instanceof Player player && player.level() instanceof ServerLevel level) {

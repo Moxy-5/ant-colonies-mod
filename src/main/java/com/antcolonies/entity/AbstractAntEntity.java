@@ -336,6 +336,12 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         int nurseUntil = Math.max(1, colony.profile().worker().nurseUntilTicks());
         float youth = 1.0F - (float) getAgeTicks() / nurseUntil;
         entityData.set(DATA_YOUTH, (byte) Math.round(Math.max(0.0F, Math.min(1.0F, youth)) * 100.0F));
+        // Old age: a worker lives the profile's lifespan (a little more or less for each), then dies and leaves its body.
+        // In a living colony the queen's eggs replace it; in a queenless one nobody does, so the colony dwindles.
+        long lifespan = colony.profile().worker().lifespanFor((getUUID().getLeastSignificantBits() >>> 11) * 0x1.0p-53);
+        if (lifespan > 0 && getAgeTicks() >= lifespan && isAlive()) {
+            kill();
+        }
     }
 
     /** Whether this ant's own role is {@code role}. */

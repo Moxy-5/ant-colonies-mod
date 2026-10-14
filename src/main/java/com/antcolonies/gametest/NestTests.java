@@ -984,26 +984,41 @@ public class NestTests {
     }
 
     /**
-     * A queen who gets no food for five days starves, and the colony ends with her: the nest itself stays behind.
+     * A queen who gets no food for five days starves. Her colony carries on without her, queenless (no new eggs), until
+     * its last worker dies of old age: then it ends, and the nest itself stays behind.
      */
     @GameTest(template = "arena", timeoutTicks = 3000, skyAccess = true)
-    public static void aQueenThatIsNotFedForFiveDaysStarves(GameTestHelper helper) {
+    public static void aQueenThatIsNotFedForFiveDaysStarvesAndHerColonyDwindles(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         startColony(helper, 1);
 
         com.antcolonies.entity.AbstractAntEntity[] queen = {null};
-        boolean[] started = {false};
+        Colony[] colony = {null};
+        int[] phase = {0};
         helper.runAfterDelay(30, () -> {
-            Colony colony = colony(helper);
-            colony.setHungerOn(true);
-            queen[0] = colony.getQueen(level);
-            colony.queenCare().setQueenLastFed(level.getGameTime() - colony.profile().queen().starveTicks() + 60); // three seconds from starving
-            started[0] = true;
+            colony[0] = colony(helper);
+            helper.assertTrue(colony[0] != null, "no colony");
+            colony[0].setHungerOn(true);
+            queen[0] = colony[0].getQueen(level);
+            colony[0].queenCare().setQueenLastFed(level.getGameTime() - colony[0].profile().queen().starveTicks() + 60); // three seconds from starving
+            phase[0] = 1;
         });
-        helper.succeedWhen(() -> {
-            helper.assertTrue(started[0], "not started yet");
-            helper.assertTrue(!queen[0].isAlive(), "the queen has not starved yet");
-            helper.assertTrue(colony(helper) == null, "the colony is still there");
+        helper.onEachTick(() -> {
+            if (phase[0] == 1 && !queen[0].isAlive()) {
+                ColonyManager manager = ColonyManager.get(level);
+                helper.assertTrue(manager.getColony(colony[0].getId()) == colony[0] && colony[0].isQueenless(),
+                        "the colony should carry on without its queen");
+                List<WorkerAntEntity> workers = level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds(),
+                        worker -> colony[0].getId().equals(worker.getColonyId()));
+                helper.assertTrue(workers.size() == 1, "expected the one worker, found " + workers.size());
+                // No young left to grow up (this test is about the workers), and the worker is at the end of its life.
+                colony[0].brood().getEggs(level).forEach(net.minecraft.world.entity.Entity::discard);
+                colony[0].brood().getLarvae(level).forEach(net.minecraft.world.entity.Entity::discard);
+                workers.get(0).setGrownUpAt(level.getGameTime() - colony[0].profile().worker().lifespanTicks() * 2L);
+                phase[0] = 2;
+            } else if (phase[0] == 2 && ColonyManager.get(level).getColony(colony[0].getId()) == null) {
+                helper.succeed(); // the last worker died of old age: the colony has died out
+            }
         });
     }
 

@@ -144,11 +144,6 @@ public class TermiteQueenEntity extends AbstractAntEntity {
                 if (colony.queenCare().raiseFoundingBatch(serverLevel, this)) {
                     manager.markChanged();
                 }
-                colony.garden().grow(serverLevel);
-                colony.mound().tick(serverLevel);
-                colony.mushrooms().tick(serverLevel);
-                colony.alarm().tick(serverLevel);
-                colony.foodMap().tick(serverLevel);
                 if (colony.queenCare().layInStream(serverLevel, getSize())) {
                     Vec3 at = position().subtract(Vec3.directionFromRotation(0.0F, getYRot()).scale(EGG_BEHIND + 0.4 * getSize()));
                     BlockPos cell = BlockPos.containing(at.x, getY() + 0.1, at.z);
@@ -187,7 +182,7 @@ public class TermiteQueenEntity extends AbstractAntEntity {
     public void die(DamageSource source) {
         super.die(source);
         if (getColonyId() != null && level() instanceof ServerLevel serverLevel) {
-            ColonyManager.get(serverLevel).removeColony(getColonyId());
+            ColonyManager.queenDied(serverLevel, getColonyId());
         }
     }
 }

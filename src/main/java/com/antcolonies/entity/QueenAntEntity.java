@@ -80,7 +80,6 @@ public class QueenAntEntity extends AbstractAntEntity {
         if (colony.queenCare().raiseFoundingBatch(serverLevel, this)) {
             manager.markChanged();
         }
-        colony.foodMap().tick(serverLevel); // (nothing for a species that knows every plant, as the harvester ant does)
         if (!colony.queenCare().isEggDue(serverLevel) || !colony.queenCare().isQueenHome(serverLevel)) {
             return;
         }
@@ -120,7 +119,7 @@ public class QueenAntEntity extends AbstractAntEntity {
     public void die(DamageSource source) {
         super.die(source);
         if (getColonyId() != null && level() instanceof ServerLevel serverLevel) {
-            ColonyManager.get(serverLevel).removeColony(getColonyId());
+            ColonyManager.queenDied(serverLevel, getColonyId());
         }
     }
 }

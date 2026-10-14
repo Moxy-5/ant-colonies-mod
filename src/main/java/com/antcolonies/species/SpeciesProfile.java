@@ -66,14 +66,29 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
     }
 
     /** A worker eats once every {@code mealIntervalTicks}; without food it slows down, then starves. */
-    public record WorkerNumbers(int mealIntervalTicks, int slowAfterTicks, int starveAfterTicks, int nurseUntilTicks, int builderUntilTicks) {
+    public record WorkerNumbers(int mealIntervalTicks, int slowAfterTicks, int starveAfterTicks, int nurseUntilTicks, int builderUntilTicks,
+            int lifespanTicks) {
         public static final Codec<WorkerNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("meal_interval_ticks").forGetter(WorkerNumbers::mealIntervalTicks),
                 Codec.INT.fieldOf("slow_after_ticks").forGetter(WorkerNumbers::slowAfterTicks),
                 Codec.INT.fieldOf("starve_after_ticks").forGetter(WorkerNumbers::starveAfterTicks),
                 Codec.INT.optionalFieldOf("nurse_until_ticks", 72000).forGetter(WorkerNumbers::nurseUntilTicks),
-                Codec.INT.optionalFieldOf("builder_until_ticks", 192000).forGetter(WorkerNumbers::builderUntilTicks)
+                Codec.INT.optionalFieldOf("builder_until_ticks", 192000).forGetter(WorkerNumbers::builderUntilTicks),
+                Codec.INT.optionalFieldOf("lifespan_ticks", 0).forGetter(WorkerNumbers::lifespanTicks)
         ).apply(i, WorkerNumbers::new));
+
+        public WorkerNumbers(int mealIntervalTicks, int slowAfterTicks, int starveAfterTicks, int nurseUntilTicks, int builderUntilTicks) {
+            this(mealIntervalTicks, slowAfterTicks, starveAfterTicks, nurseUntilTicks, builderUntilTicks, 0);
+        }
+
+        /**
+         * How long (in ticks since it grew up) this worker lives before it dies of old age: the profile's
+         * {@code lifespan_ticks}, 10% more or less for each worker ({@code share} 0 to 1, fixed per worker), so they do not
+         * all die on the same day. 0: workers do not die of old age.
+         */
+        public long lifespanFor(double share) {
+            return lifespanTicks <= 0 ? 0 : Math.round(lifespanTicks * (0.9 + 0.2 * share));
+        }
 
         /** The job a worker of this age (in ticks since it grew up) usually does: nurse, then builder, then forager. */
         public com.antcolonies.colony.ColonyRole roleForAge(long age) {
@@ -523,7 +538,7 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      */
     public static final SpeciesProfile RED_HARVESTER_ANT = new SpeciesProfile(
             new ColonyNumbers(60, List.of(3, 8, 12, 20)),
-            new WorkerNumbers(24000, 36000, 72000, 72000, 192000),
+            new WorkerNumbers(24000, 36000, 72000, 72000, 192000, 480000),
             new QueenNumbers(20, 5, 5, 1200, 3600, 120000L),
             new BroodNumbers(10, 1200, 5, 48000L),
             new FoodNumbers(24, "antcolonies:seeds", List.of(new PlantFood("minecraft:short_grass", 10, false, 1)),
