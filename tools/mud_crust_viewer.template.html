@@ -1,0 +1,219 @@
+<title>Mud Crust Looks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+  /* Layout: a field-notebook bench. The 3D scene takes the main stage; the choices sit beside it like a specimen label. */
+  :root {
+    --bg: #eceee6;
+    --panel: #f7f8f3;
+    --fg: #1d221d;
+    --muted: #5a6157;
+    --line: #c9cdc0;
+    --mud: #8a4a2c;
+    --sky: #b9d3e4;
+    --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+    --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #151915; --panel: #1d221d; --fg: #e5e8df; --muted: #a3ab9d; --line: #353c34; --mud: #d68a5e; --sky: #2b3b46;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #151915; --panel: #1d221d; --fg: #e5e8df; --muted: #a3ab9d; --line: #353c34; --mud: #d68a5e; --sky: #2b3b46;
+    color-scheme: dark;
+  }
+  html, body { height: 100%; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.5; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 28px; display: grid; gap: 16px; }
+  header h1 { font-family: var(--display); font-weight: 800; font-size: clamp(1.6rem, 3vw, 2.2rem); line-height: 1.1; margin: 0; text-wrap: balance; }
+  header p { margin: 6px 0 0; color: var(--muted); max-width: 65ch; }
+  .bench { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
+  @media (max-width: 820px) { .bench { grid-template-columns: minmax(0, 1fr); } }
+  .stage { position: relative; background: var(--sky); border-radius: 10px; overflow: hidden; aspect-ratio: 4 / 3; max-width: 100%; }
+  .stage canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+  .stage canvas:active { cursor: grabbing; }
+  .hint { position: absolute; left: 12px; bottom: 10px; font-size: 12px; color: var(--fg); background: color-mix(in srgb, var(--panel) 80%, transparent); padding: 3px 8px; border-radius: 6px; }
+  .label { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 18px; min-width: 0; }
+  .label h2 { font-family: var(--display); font-weight: 600; font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+  .looks { display: grid; gap: 6px; }
+  .look { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; align-items: start; text-align: left; font: inherit; color: inherit;
+          background: transparent; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; cursor: pointer; }
+  .look b { font-family: var(--display); font-size: 1.1rem; line-height: 1.2; }
+  .look span { display: block; }
+  .look small { color: var(--muted); font-size: 0.82rem; line-height: 1.35; display: block; }
+  .look[aria-pressed="true"] { border-color: var(--fg); box-shadow: inset 0 0 0 1px var(--fg); }
+  .look:focus-visible, .stages button:focus-visible { outline: 2px solid var(--mud); outline-offset: 2px; }
+  .stages { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+  .stages button { font: inherit; font-size: 0.82rem; color: inherit; background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 6px 2px; cursor: pointer; }
+  .stages button[aria-pressed="true"] { background: var(--mud); border-color: var(--mud); color: var(--panel); }
+  .note { color: var(--muted); font-size: 0.85rem; margin: 0; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Mud Crust Looks</h1>
+    <p>A fallen log on the edge of a step, as in your savanna. The thin termite mud crust in every job it will have: the wall under the log where the gallery meets the step, plaster on the log's top, a branch cased in mud, and a strip of sheeting over a runway. Pick a look, then see it fresh and dried.</p>
+  </header>
+  <div class="bench">
+    <div class="stage">
+      <canvas id="view" aria-label="3D view of the log with mud crust"></canvas>
+      <div class="hint">Drag to turn, scroll or pinch to zoom</div>
+    </div>
+    <aside class="label">
+      <div>
+        <h2>Crust look</h2>
+        <div class="looks" id="looks"></div>
+      </div>
+      <div>
+        <h2>Age</h2>
+        <div class="stages" id="stages"></div>
+      </div>
+      <p class="note">Fresh crust is dark damp mud; it dries through the same colours as the mound blocks. Each crust face picks one of three versions so a long wall never repeats.</p>
+    </aside>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const DATA = /*DATA*/null;
+const LOOKS = [
+  { id: "A", name: "Smooth plaster", text: "Smeared on in strokes, smooth, with hairline cracks once it dries." },
+  { id: "B", name: "Soil pellets", text: "Built bead by bead like real sheeting: round pellets with dark seams. A touch thicker." },
+  { id: "C", name: "Crumbly with pores", text: "Rough and grainy, with the tiny pinholes real sheeting has." },
+];
+const AGES = ["fresh", "setting", "dry", "old"];
+const AGE_NAMES = ["Fresh", "Setting", "Dry", "Old"];
+let look = "B", age = 0;
+try { look = localStorage.getItem("crust-look") || "B"; } catch (e) {}
+
+const canvas = document.getElementById("view");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, 4 / 3, 0.1, 100);
+camera.position.set(1.0, 4.2, 8.0);
+const controls = new THREE.OrbitControls(camera, canvas);
+controls.target.set(3.5, 0.8, 0.5);
+controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI * 0.55;
+controls.minDistance = 2; controls.maxDistance = 18;
+
+const loader = new THREE.TextureLoader();
+const cache = {};
+function tex(src, rx, ry) {
+  const key = src + (rx || "") + "x" + (ry || "");
+  if (!cache[key]) {
+    const t = loader.load(src, () => draw());
+    t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.encoding = THREE.sRGBEncoding;
+    if (rx) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry || rx); }
+    cache[key] = t;
+  }
+  return cache[key];
+}
+// Minecraft's flat face shading: top full, north/south 0.8, east/west 0.6, bottom 0.5. Box face order: +x -x +y -y +z -z.
+const SHADE = [0.6, 0.6, 1.0, 0.5, 0.8, 0.8];
+function mats(textures) {
+  return textures.map((t, i) => new THREE.MeshBasicMaterial({ map: t, color: new THREE.Color(SHADE[i], SHADE[i], SHADE[i]) }));
+}
+function box(w, h, d, x, y, z, textures, group) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mats(textures));
+  m.position.set(x, y, z);
+  group.add(m);
+  return m;
+}
+
+// The land: low ground to the south (z > 1), a terrace one block higher to the north, its edge at z = 1.
+const land = new THREE.Group();
+scene.add(land);
+const lowGround = new THREE.Mesh(new THREE.PlaneGeometry(14, 9), new THREE.MeshBasicMaterial({ map: tex(DATA.grass, 14, 9), color: 0xeeeeee }));
+lowGround.rotation.x = -Math.PI / 2; lowGround.position.set(3.5, 0, 5.5);
+land.add(lowGround);
+const g = tex(DATA.grass), gs = tex(DATA.grassSide), dirtT = tex(DATA.dirt);
+for (let x = -3; x < 10; x++) {
+  for (let z = -4; z < 1; z++) {
+    if (z === 0 && x >= 1 && x <= 5) continue; // dug out under the log: the feeding gallery
+    box(1, 1, 1, x + 0.5, 0.5, z + 0.5, [gs, gs, g, dirtT, gs, gs], land);
+  }
+}
+// The gallery behind the crust wall: dark dug soil.
+const back = new THREE.Mesh(new THREE.PlaneGeometry(5, 1), new THREE.MeshBasicMaterial({ map: tex(DATA.dug, 5, 1), color: 0x999999 }));
+back.position.set(3.5, 0.5, 0.02); land.add(back);
+
+// The fallen log on the terrace edge and its stump.
+const woodEnd = tex(DATA.woodEnd);
+const VARIANT = [0, 1, 2, 1, 0];
+for (let i = 0; i < 5; i++) {
+  const side = tex(DATA.wood[VARIANT[i]]);
+  box(1, 1, 1, 1 + i + 0.5, 1.5, 0.5, [woodEnd, woodEnd, side, side, side, side], land);
+}
+box(1, 1, 1, 0.5, 1.5, -0.5, [tex(DATA.wood[1]), tex(DATA.wood[2]), woodEnd, woodEnd, tex(DATA.wood[0]), tex(DATA.wood[1])], land);
+const bark = tex(DATA.branch), bend = tex(DATA.branchEnd);
+
+const crust = new THREE.Group();
+scene.add(crust);
+function build() {
+  while (crust.children.length) crust.remove(crust.children[0]);
+  const T = DATA.thickness[look] / 16;
+  const faces = DATA.crust[look][AGES[age]];
+  const c = (i) => tex(faces[((i % 3) + 3) % 3]);
+  const all = (i) => [c(i), c(i + 1), c(i + 2), c(i), c(i + 1), c(i + 2)];
+  // 1. The wall: a crust over the open side of each gallery block under the log, facing the low ground.
+  for (let x = 1; x <= 5; x++) box(1, 1, T, x + 0.5, 0.5, 1 + T / 2, all(x), crust);
+  // 2. Plaster on the log's top, creeping down the last block's side.
+  for (let x = 4; x <= 5; x++) box(1, T, 1, x + 0.5, 2 + T / 2, 0.5, all(x + 3), crust);
+  box(1, 0.6, T, 5.5, 1.7, 1 + T / 2, all(9), crust);
+  // 3. Two dead branches on the terrace, the second cased in a tube of mud.
+  [[5, -1.5], [3, -2.5]].forEach(([px, z], k) => {
+    const t = px / 16;
+    if (k === 0) box(t, t, 1, 7.5, 1 + t / 2, z, [bark, bark, bark, bark, bend, bend], crust);
+    else box(t + 2 * T, t + T, 1, 7.5, 1 + (t + T) / 2, z, all(k + 5), crust);
+  });
+  // 4. Sheeting: a strip of crust over a runway on the low ground, leading away from the step.
+  for (let z = 1; z < 7; z++) box(1, T, 1, 2.5 + (z > 4 ? 1 : 0), T / 2, z + 0.5, all(z), crust);
+  draw();
+}
+
+function resize() {
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (!w || !h) return;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+  draw();
+}
+let pending = false;
+function draw() {
+  if (pending) return;
+  pending = true;
+  requestAnimationFrame(() => { pending = false; controls.update(); renderer.render(scene, camera); });
+}
+controls.addEventListener("change", draw);
+new ResizeObserver(resize).observe(canvas);
+
+const looksEl = document.getElementById("looks");
+for (const l of LOOKS) {
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "look"; b.id = "look-" + l.id;
+  b.innerHTML = `<b>${l.id}</b><span>${l.name}<small>${l.text}</small></span>`;
+  b.addEventListener("click", () => { look = l.id; try { localStorage.setItem("crust-look", look); } catch (e) {} sync(); build(); });
+  looksEl.appendChild(b);
+}
+const stagesEl = document.getElementById("stages");
+AGE_NAMES.forEach((name, i) => {
+  const b = document.createElement("button");
+  b.type = "button"; b.id = "stage-" + i; b.textContent = name;
+  b.addEventListener("click", () => { age = i; sync(); build(); });
+  stagesEl.appendChild(b);
+});
+function sync() {
+  for (const l of LOOKS) document.getElementById("look-" + l.id).setAttribute("aria-pressed", String(l.id === look));
+  AGE_NAMES.forEach((_, i) => document.getElementById("stage-" + i).setAttribute("aria-pressed", String(i === age)));
+}
+if (!DATA.crust[look]) look = "B";
+sync(); build(); resize();
+</script>
