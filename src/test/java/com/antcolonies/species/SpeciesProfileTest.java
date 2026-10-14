@@ -105,12 +105,14 @@ class SpeciesProfileTest {
         assertEquals(25, soldiers.wantedMajors(1000));
         assertTrue(read("red_harvester_ant").soldiers().isEmpty(), "harvester ants have no soldier caste");
         assertTrue(read("red_harvester_ant").alarm().isEmpty(), "harvester ants raise no alarm yet (their workers are unchanged)");
+        assertTrue(read("macrotermes").food().findRadius() > 0, "termites find their food by looking");
+        assertTrue(read("red_harvester_ant").food().findRadius() == 0, "harvester ants know every plant round the nest (unchanged)");
     }
 
     @Test
     void foragersGoOutWhenTheirProfileSays() {
         SpeciesProfile.FoodNumbers ant = SpeciesProfile.RED_HARVESTER_ANT.food();
-        SpeciesProfile.FoodNumbers termite = new SpeciesProfile.FoodNumbers(24, "x", java.util.List.of(), "x", "x", 0, 0, java.util.List.of("night", "rain"));
+        SpeciesProfile.FoodNumbers termite = new SpeciesProfile.FoodNumbers(24, "x", java.util.List.of(), "x", "x", 0, 0, java.util.List.of("night", "rain"), 0);
         for (boolean day : new boolean[] {true, false}) {
             for (boolean rain : new boolean[] {true, false}) {
                 assertTrue(ant.foragesNow(day, rain), "the harvester ant forages at any time");

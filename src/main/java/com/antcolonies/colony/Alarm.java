@@ -86,6 +86,9 @@ public class Alarm {
     private BlockPos spot;
     @Nullable
     private UUID enemy;
+    /** In a game test: its arena (see {@link #ofThisTest}). */
+    @Nullable
+    private AABB testArea;
     /** When the break-ins of late happened (for level 4). */
     private final List<Long> breakIns = new ArrayList<>();
     /** When the current wave of drumming started, and who has felt it (where and when it started drumming). */
@@ -295,6 +298,9 @@ public class Alarm {
                 ant -> ant.isAlive() && ant.isColonyWorker() && colony.getId().equals(ant.getColonyId())
                         && !colony.nest().isInside(world, ant.blockPosition()));
         for (LivingEntity foe : enemies) {
+            if (!ofThisTest(world, foe)) {
+                continue;
+            }
             boolean near = ways.stream().anyMatch(way -> way.distSqr(foe.blockPosition()) <= ENEMY_NEAR_WAY_OUT * ENEMY_NEAR_WAY_OUT)
                     || outside.stream().anyMatch(ant -> ant.distanceToSqr(foe) <= ENEMY_NEAR_FORAGER * ENEMY_NEAR_FORAGER);
             if (near) {
@@ -302,6 +308,29 @@ public class Alarm {
                 return;
             }
         }
+    }
+
+    /**
+     * Always, except in a game test: only an enemy inside the test's arena, and an ant or termite only if its own colony
+     * lives in the same arena (workers of the tests next door wandered over and kept a colony from foraging).
+     */
+    private boolean ofThisTest(ServerLevel world, LivingEntity foe) {
+        if (testArea == null) {
+            return true;
+        }
+        if (!testArea.contains(foe.position())) {
+            return false;
+        }
+        if (foe instanceof AbstractAntEntity ant && ant.getColonyId() != null) {
+            Colony other = ColonyManager.get(world).getColony(ant.getColonyId());
+            return other != null && testArea.contains(other.getCenter().getCenter());
+        }
+        return true;
+    }
+
+    /** Only enemies in this box count (see {@link #ofThisTest}). For the game tests. */
+    public void setTestArea(@Nullable AABB area) {
+        testArea = area;
     }
 
     /** An enemy of the colony: a chicken (they eat termites), or an ant or termite of another colony. */

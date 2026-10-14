@@ -236,7 +236,7 @@ public class ColonyCommands {
                                     + colony.profile().queen().richMeal() + incubation(colony, level))
                     + " | queen unfed " + unfedMinutes(colony, level) + " of " + colony.profile().queen().starveTicks() / 1200 + " min"
                     + " | eggs " + colony.brood().countEggs(level) + " | larvae " + colony.brood().countLarvae(level)
-                    + colony.soldiers().describe(level) + colony.alarm().describe(level)
+                    + colony.soldiers().describe(level) + colony.alarm().describe(level) + colony.foodMap().describe()
                     + " | dead ants " + colony.refuse().getCorpses(level).size() + " (refuse chamber " + colony.refuse().getRefuseCorpses(level).size() + ")"
                     + mound(colony, level) + foraging(colony, level);
             source.sendSuccess(() -> Component.literal(line), false);

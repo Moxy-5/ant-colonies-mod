@@ -90,6 +90,7 @@ public class TermiteAlarmTests {
                 level.setBlock(tunnel.hole(), Blocks.AIR.defaultBlockState(), 3);
             }
             hay[0] = tunnels.get(0).hole().above().relative(tunnels.get(0).side().getClockWise(), 11);
+            colony.foodMap().knowForTests(hay[0]); // (finding it is tested in TermiteFoodTests)
             level.setBlock(hay[0], Blocks.HAY_BLOCK.defaultBlockState(), 3);
             List<BlockPos> room = colony.nest().getHomeChamber(level).room();
             for (int i = 0; i < 3; i++) {
@@ -124,7 +125,9 @@ public class TermiteAlarmTests {
                         colony.alarm().describe(level));
             }
             if (at[1] >= 0) {
-                helper.assertFalse(colony.isForagingTime(level), "still foraging time with the alarm up");
+                if (colony.alarm().level(level) >= 2) { // (it calms down again after 30 seconds, and foraging starts again)
+                    helper.assertFalse(colony.isForagingTime(level), "still foraging time with the alarm up");
+                }
             }
             for (TermiteSoldierEntity minor : minors) {
                 if (minor.isBiting()) {

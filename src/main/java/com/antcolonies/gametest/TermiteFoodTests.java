@@ -80,12 +80,16 @@ public class TermiteFoodTests {
                 colony[0] = TermiteMoundTests.colony(helper);
                 if (colony[0] != null) {
                     colony[0].setForagingTimeForTests(true); // always night here: the foragers go out
+                    for (BlockPos plant : List.of(bush, tallGrass, grassA, grassB, hay)) {
+                        colony[0].foodMap().knowForTests(helper.absolutePos(plant)); // (finding them is the next test)
+                    }
                 }
             }
             if (colony[0] != null && helper.getTick() % 500 == 0) {
-                AntColoniesMod.LOGGER.info("[forage-test] tick {}: food {}, store cells {}, hay cut {}, dig target {}", helper.getTick(),
+                AntColoniesMod.LOGGER.info("[forage-test] tick {}: food {}, store cells {}, hay cut {}, bush cut {}, dig target {}{}{}", helper.getTick(),
                         colony[0].food().getFood(), colony[0].nest().getFoodStoreCells(level).size(),
-                        colony[0].food().getPiecesCut(helper.absolutePos(hay)), colony[0].nest().findDigTarget(level));
+                        colony[0].food().getPiecesCut(helper.absolutePos(hay)), colony[0].food().getPiecesCut(helper.absolutePos(bush)),
+                        colony[0].nest().findDigTarget(level), colony[0].alarm().describe(level), colony[0].foodMap().describe());
             }
         });
 
@@ -140,5 +144,105 @@ public class TermiteFoodTests {
             }
             helper.assertTrue(layers == stored, "the comb holds " + layers + " pieces, the colony counts " + stored);
         });
+    }
+
+    /**
+     * Finding food (the colony's food map): an old colony with its nest dug out and both foraging holes open, a tuft of
+     * short grass right beside each hole and a hay bale 11 blocks out from the first. By "day" nobody knows the hay. A
+     * worker is put down beside it (as the user tests it): it finds the hay and, once it is back inside, tells the
+     * colony. Then "night": the foragers go for the hay (worth far more) rather than the grass by the holes. Checked:
+     * the hay is unknown at first, found and then known only once the finder is inside, and by the time 8 pieces are cut
+     * off the hay at most half as many have been cut off the grass.
+     */
+    @GameTest(template = "arena", timeoutTicks = 8000, skyAccess = true)
+    public static void aWorkerFindsAHayBaleAndTheForagersGoForItRatherThanTheGrass(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        TermiteMoundTests.deepGround(helper);
+        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        helper.runAfterDelay(5, () -> {
+            for (int i = 0; i < 5; i++) {
+                helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE - 2 + i, SURFACE, MIDDLE - 2);
+            }
+        });
+        BlockPos[] spots = new BlockPos[3]; // the hay, the grass by the first hole, the grass by the second
+        int[] phase = {0}; // 0 setting up, 1 day: the finder, 2 night
+        com.antcolonies.entity.TermiteWorkerEntity[] finder = {null};
+        helper.runAfterDelay(10, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
+            colony.setForagingTimeForTests(false);
+            long old = level.getGameTime() - colony.profile().worker().builderUntilTicks() - 1000;
+            for (com.antcolonies.entity.TermiteWorkerEntity worker : level.getEntitiesOfClass(com.antcolonies.entity.TermiteWorkerEntity.class, helper.getBounds())) {
+                worker.setGrownUpAt(old); // old workers: foragers first
+            }
+            TermiteSoldierTests.digNestAtOnce(level, colony);
+            level.setBlock(colony.nest().getEntrance(), Blocks.STONE.defaultBlockState(), 3);
+            List<NestPlan.ForagingTunnel> tunnels = colony.nest().getForagingTunnels(level);
+            helper.assertTrue(tunnels.size() == 2, "the nest has " + tunnels.size() + " foraging tunnels");
+            for (int i = 0; i < 2; i++) {
+                NestPlan.ForagingTunnel tunnel = tunnels.get(i);
+                level.setBlock(tunnel.hole(), Blocks.AIR.defaultBlockState(), 3);
+                // A tuft of grass right beside the hole, on the side away from the hay.
+                spots[1 + i] = tunnel.hole().above().relative(tunnel.side().getCounterClockWise(), 2);
+                level.setBlock(spots[1 + i], Blocks.SHORT_GRASS.defaultBlockState(), 3);
+            }
+            spots[0] = tunnels.get(0).hole().above().relative(tunnels.get(0).side().getClockWise(), 11);
+            level.setBlock(spots[0], Blocks.HAY_BLOCK.defaultBlockState(), 3);
+            helper.assertTrue(!colony.foodMap().isKnown(spots[0]) && !colony.foodMap().isFoundButUntold(spots[0]),
+                    "the colony knew of the hay before anyone went near it");
+            // (Put down now, while the holes are still open: by day they are plugged once everybody is in.)
+            BlockPos beside = spots[0].relative(net.minecraft.core.Direction.NORTH, 2);
+            finder[0] = ModEntities.TERMITE_WORKER.get().create(level);
+            finder[0].moveTo(beside.getX() + 0.5, beside.getY(), beside.getZ() + 0.5, 0.0F, 0.0F);
+            finder[0].joinColony(colony); // (on its own it joins the nearest colony, which can be a neighbouring test's)
+            level.addFreshEntity(finder[0]);
+            phase[0] = 1;
+        });
+        boolean[] sawUntold = {false};
+        helper.onEachTick(() -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            if (colony == null || phase[0] == 0 || finder[0] == null) {
+                return;
+            }
+            if (phase[0] == 1) {
+                if (helper.getTick() % 200 == 0) {
+                    com.antcolonies.entity.TermiteWorkerEntity f = finder[0];
+                    AntColoniesMod.LOGGER.info("[find-test] tick {}: finder alive {} at {} (inside {}, colony ours {}, last hurt by {}), found {}, holes {}{}",
+                            helper.getTick(), f.isAlive(), f.blockPosition().toShortString(), colony.nest().isInside(level, f.blockPosition()),
+                            colony.getId().equals(f.getColonyId()), f.getLastHurtByMob(), colony.foodMap().isFoundButUntold(spots[0]),
+                            colony.foragingHoles().waysOut(level).size(), colony.alarm().describe(level));
+                }
+                if (colony.foodMap().isFoundButUntold(spots[0])) {
+                    sawUntold[0] = true;
+                    helper.assertTrue(!colony.foodMap().isKnown(spots[0]), "the hay is known before its finder is back inside");
+                }
+                if (colony.foodMap().isKnown(spots[0])) {
+                    helper.assertTrue(sawUntold[0], "the colony knew of the hay without anyone finding it first");
+                    helper.assertTrue(colony.nest().isInside(level, finder[0].blockPosition()), "the hay is known while its finder is still outside");
+                    colony.setForagingTimeForTests(true);
+                    phase[0] = 2;
+                    AntColoniesMod.LOGGER.info("[find-test] tick {}: the hay is known, night", helper.getTick());
+                }
+            } else if (helper.getTick() % 500 == 0) {
+                AntColoniesMod.LOGGER.info("[find-test] tick {}: hay cut {}, grass cut {} and {}; {}", helper.getTick(),
+                        colony.food().getPiecesCut(spots[0]), grassCut(level, colony, spots[1]), grassCut(level, colony, spots[2]),
+                        colony.foodMap().describe());
+            }
+        });
+        helper.succeedWhen(() -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(phase[0] == 2, "the hay is not known yet");
+            int hay = colony.food().getPiecesCut(spots[0]);
+            int grass = grassCut(level, colony, spots[1]) + grassCut(level, colony, spots[2]);
+            helper.assertTrue(hay >= 8, "only " + hay + " pieces cut off the hay (grass " + grass + ")");
+            helper.assertTrue(grass * 2 <= hay, grass + " pieces cut off the grass by the holes, " + hay + " off the hay");
+        });
+    }
+
+    /** How many pieces were cut off the tuft at this spot (all of them if it is gone). */
+    private static int grassCut(ServerLevel level, Colony colony, BlockPos tuft) {
+        return level.getBlockState(tuft).is(Blocks.SHORT_GRASS) ? colony.food().getPiecesCut(tuft)
+                : colony.food().piecesOf(Blocks.SHORT_GRASS.defaultBlockState());
     }
 }

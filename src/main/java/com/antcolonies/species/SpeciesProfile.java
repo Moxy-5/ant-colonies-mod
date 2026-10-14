@@ -120,10 +120,13 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * (a {@link SeedPileBlock}), one layer per piece. Bread, for species that mill it: {@code millTicks} to mill one
      * seed into bread, and {@code breadStock} pieces the nurses keep ready for the queen; a species without bread leaves
      * both out. {@code forageAt}: when the foragers go out, any of "day", "night" and "rain" (optional, all three:
-     * always); outside those times the workers stay inside (see {@code Colony.isForagingTime}).
+     * always); outside those times the workers stay inside (see {@code Colony.isForagingTime}). {@code findRadius}
+     * (optional, 0: the colony knows every plant in its area at once): a plant is only gone for once a worker has
+     * been within this many blocks of it and brought the news home, and foragers with nothing good to go for scout
+     * the area (see {@code FoodMap}).
      */
     public record FoodNumbers(int radius, String items, List<PlantFood> plants, String piece, String pile, int millTicks, int breadStock,
-            List<String> forageAt) {
+            List<String> forageAt, int findRadius) {
         /** Foraging at any time: day, night and in the rain. */
         public static final List<String> ALWAYS = List.of("day", "night", "rain");
 
@@ -135,7 +138,8 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 Codec.STRING.fieldOf("pile").forGetter(FoodNumbers::pile),
                 Codec.INT.optionalFieldOf("mill_ticks", 0).forGetter(FoodNumbers::millTicks),
                 Codec.INT.optionalFieldOf("bread_stock", 0).forGetter(FoodNumbers::breadStock),
-                Codec.STRING.listOf().optionalFieldOf("forage_at", ALWAYS).forGetter(FoodNumbers::forageAt)
+                Codec.STRING.listOf().optionalFieldOf("forage_at", ALWAYS).forGetter(FoodNumbers::forageAt),
+                Codec.INT.optionalFieldOf("find_radius", 0).forGetter(FoodNumbers::findRadius)
         ).apply(i, FoodNumbers::new));
 
         /**
@@ -475,7 +479,7 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
             new QueenNumbers(20, 5, 5, 1200, 3600, 120000L),
             new BroodNumbers(10, 1200, 5, 48000L),
             new FoodNumbers(24, "antcolonies:seeds", List.of(new PlantFood("minecraft:short_grass", 10, false, 1)),
-                    "minecraft:wheat_seeds", "antcolonies:seed_pile", 60, 20, FoodNumbers.ALWAYS),
+                    "minecraft:wheat_seeds", "antcolonies:seed_pile", 60, 20, FoodNumbers.ALWAYS, 0),
             new RefuseNumbers(6000),
             new NestNumbers(4, true, true, List.of(), 0, 8, "antcolonies:burrowed_dirt"),
             Optional.empty(),

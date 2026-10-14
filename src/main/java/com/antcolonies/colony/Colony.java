@@ -61,6 +61,7 @@ public class Colony {
     private final NestWalls walls;
     private final Hill hill;
     private final FoodStore food;
+    private final FoodMap foodMap;
     private final Bakery bakery;
     private final QueenCare queenCare;
     private final Brood brood;
@@ -82,6 +83,7 @@ public class Colony {
         this.walls = new NestWalls(this);
         this.hill = new Hill(this);
         this.food = new FoodStore(this);
+        this.foodMap = new FoodMap(this);
         this.bakery = new Bakery(this);
         this.queenCare = new QueenCare(this);
         this.brood = new Brood(this);
@@ -113,6 +115,11 @@ public class Colony {
     /** Seeds: fetching, clipping, storing and taking them. */
     public FoodStore food() {
         return food;
+    }
+
+    /** The food plants the colony knows of (found by its workers) and which ones a worker has found but not yet told of. */
+    public FoodMap foodMap() {
+        return foodMap;
     }
 
     /** Ant bread: milling, storing and taking it. */
@@ -409,6 +416,7 @@ public class Colony {
         nest.save(tag);
         mound.save(tag);
         alarm.save(tag);
+        foodMap.save(tag);
         return tag;
     }
 
@@ -428,6 +436,7 @@ public class Colony {
         colony.nest.load(tag);
         colony.mound.load(tag);
         colony.alarm.load(tag);
+        colony.foodMap.load(tag);
         return colony;
     }
 }

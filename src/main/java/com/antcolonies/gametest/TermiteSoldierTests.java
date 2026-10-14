@@ -298,6 +298,7 @@ public class TermiteSoldierTests {
             }
             trail[0] = tunnels.get(0).hole().above();
             trail[1] = trail[0].relative(tunnels.get(0).side().getClockWise(), 11);
+            colony.foodMap().knowForTests(trail[1]); // (finding it is tested in TermiteFoodTests)
             level.setBlock(trail[1], Blocks.HAY_BLOCK.defaultBlockState(), 3);
             List<BlockPos> room = colony.nest().getHomeChamber(level).room();
             for (int i = 0; i < 5; i++) {

@@ -67,7 +67,7 @@ public class ClipGrassGoal extends Goal {
         }
         long now = level.getGameTime();
         unreachable.values().removeIf(until -> until <= now);
-        grass = colony.food().findGrass(level, ant.blockPosition(), unreachable.keySet());
+        grass = colony.food().findGrass(level, ant.blockPosition(), unreachable.keySet(), ant.getUUID());
         if (grass == null) {
             return false;
         }

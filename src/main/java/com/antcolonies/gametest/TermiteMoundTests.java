@@ -45,10 +45,15 @@ public class TermiteMoundTests {
     /** The termite colony in this test area (one with a living queen). */
     static Colony colony(GameTestHelper helper) {
         net.minecraft.world.phys.AABB area = helper.getBounds();
-        return ColonyManager.get(helper.getLevel()).getColonies().stream()
+        Colony found = ColonyManager.get(helper.getLevel()).getColonies().stream()
                 .filter(colony -> area.contains(net.minecraft.world.phys.Vec3.atCenterOf(colony.getCenter()))
                         && colony.getQueen(helper.getLevel()) != null && colony.getSpecies().equals(Species.MACROTERMES))
                 .findFirst().orElse(null);
+        if (found != null) {
+            found.foodMap().setTestArea(area); // scouts and foragers stay in this test's arena
+            found.alarm().setTestArea(area); // and only this test's enemies raise its alarm
+        }
+        return found;
     }
 
     private static void ground(GameTestHelper helper) {

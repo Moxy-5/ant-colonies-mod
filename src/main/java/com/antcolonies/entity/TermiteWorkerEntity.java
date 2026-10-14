@@ -12,6 +12,7 @@ import com.antcolonies.entity.goal.FeedQueenGoal;
 import com.antcolonies.entity.goal.GatherSeedGoal;
 import com.antcolonies.entity.goal.GoInsideGoal;
 import com.antcolonies.entity.goal.PlugHoleGoal;
+import com.antcolonies.entity.goal.ScoutGoal;
 import com.antcolonies.entity.goal.SealGoal;
 import com.antcolonies.entity.goal.ShapeMoundGoal;
 import com.antcolonies.entity.goal.StandByQueenGoal;
@@ -77,6 +78,7 @@ public class TermiteWorkerEntity extends AbstractAntEntity {
         this.goalSelector.addGoal(3, new DigGoal(this, () -> true, () -> mayDo(ColonyRole.BUILDER)));
         this.goalSelector.addGoal(3, new GatherSeedGoal(this));
         this.goalSelector.addGoal(4, new ClipGrassGoal(this));
+        this.goalSelector.addGoal(4, new ScoutGoal(this));
         // Outside when it is time to stay in: back inside.
         this.goalSelector.addGoal(4, new GoInsideGoal(this));
         this.goalSelector.addGoal(5, new StandByQueenGoal(this));

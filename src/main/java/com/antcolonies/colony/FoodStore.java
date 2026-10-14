@@ -174,20 +174,68 @@ public class FoodStore {
     /**
      * A food plant near the nest (the profile's {@code plants}: a tuft of short grass for the harvester ant, dead bushes,
      * dry grass, dying leaves and hay bales for termites) that an ant could cut a piece off, or null: only once the food
-     * store is ready and not full. Scans the area within the profile's food radius of the entrance (at most every few
-     * seconds; the top block of each column, and the block under it for solid plants like a hay bale) and takes the
-     * plant nearest to {@code near}. A plant with as many ants on their way to it as may cut at it at once, or one
-     * resting after a cut, is skipped, and so is one in {@code avoid} (this ant found no way to it).
+     * store is ready and not full. Only plants the colony knows of, or this ant found itself (see {@link FoodMap}; a
+     * species without a find radius knows them all). The plant worth the most is taken ({@link #worth}: how much food
+     * is left on it against how far it is from the way out), so a hay bale beats a tuft of grass nearer by. A plant
+     * with as many ants on their way to it as may cut at it at once, or one resting after a cut, is skipped, and so is
+     * one in {@code avoid} (this ant found no way to it).
      */
     @Nullable
-    public BlockPos findGrass(Level level, BlockPos near, Set<BlockPos> avoid) {
+    public BlockPos findGrass(Level level, BlockPos near, Set<BlockPos> avoid, @Nullable UUID ant) {
         if (!(level instanceof ServerLevel serverLevel) || !wantsSeeds(serverLevel)) {
             return null;
         }
         long now = level.getGameTime();
         busyGrass.prune(now);
         plantClaims.values().removeIf(claim -> claim.until() <= now);
-        if (now >= grassScanTime) {
+        List<BlockPos> exits = colony.foragingHoles().waysOut(level).stream().map(ForagingHoles.WayOut::mouth).toList();
+        BlockPos best = null;
+        double bestWorth = -1;
+        for (BlockPos pos : plants(level)) {
+            SpeciesProfile.PlantFood plant = food().plantFor(level.getBlockState(pos));
+            if (plant == null || busyGrass.contains(pos) || avoid.contains(pos) || foragersAt(pos) >= Math.max(1, plant.foragers())
+                    || !colony.foodMap().knows(pos, ant)) {
+                continue;
+            }
+            double worth = worth(plant.pieces() - getPiecesCut(pos), tripLength(pos, exits.isEmpty() ? List.of(center) : exits), pos.distSqr(near));
+            if (worth > bestWorth) {
+                best = pos;
+                bestWorth = worth;
+            }
+        }
+        return best;
+    }
+
+    /**
+     * What a plant is worth going for: the food left on it (to the power 0.75: twice the food is worth a bit less than
+     * twice the walk) against the walk from the way out, plus a few blocks every trip costs anyway. A full hay bale (48
+     * pieces) is worth going about 28 blocks for rather than a tuft of grass (4 pieces) right by the hole, so within a
+     * colony's food radius a hay bale always draws them; a hay bale nearly used up is worth no more than grass. On a tie
+     * the plant nearer the ant ({@code fromAnt}, squared) wins. My pick.
+     */
+    static double worth(int piecesLeft, double trip, double fromAnt) {
+        return Math.pow(Math.max(1, piecesLeft), 0.75) / (trip + 4.0) - fromAnt * 1.0E-7;
+    }
+
+    /** How far (blocks, sideways) the plant is from the nearest of these ways out. */
+    private static double tripLength(BlockPos plant, List<BlockPos> exits) {
+        double best = Double.MAX_VALUE;
+        for (BlockPos exit : exits) {
+            double dx = exit.getX() - plant.getX();
+            double dz = exit.getZ() - plant.getZ();
+            best = Math.min(best, Math.sqrt(dx * dx + dz * dz));
+        }
+        return best;
+    }
+
+    /**
+     * The food plants within the profile's food radius of the entrance (scanned again at most every few seconds: the top
+     * block of each column, and the block under it for solid plants like a hay bale). The list may hold plants that are
+     * gone since the last scan.
+     */
+    public List<BlockPos> plants(Level level) {
+        long now = level.getGameTime();
+        if (now >= grassScanTime || now + GRASS_SCAN_TICKS < grassScanTime) {
             grassScanTime = now + GRASS_SCAN_TICKS;
             grassTufts.clear();
             int radius = food().radius();
@@ -206,20 +254,7 @@ public class FoodStore {
                 }
             }
         }
-        BlockPos best = null;
-        double bestDistance = Double.MAX_VALUE;
-        for (BlockPos pos : grassTufts) {
-            SpeciesProfile.PlantFood plant = food().plantFor(level.getBlockState(pos));
-            if (plant == null || busyGrass.contains(pos) || avoid.contains(pos) || foragersAt(pos) >= Math.max(1, plant.foragers())) {
-                continue;
-            }
-            double distance = pos.distSqr(near);
-            if (distance < bestDistance) {
-                best = pos;
-                bestDistance = distance;
-            }
-        }
-        return best;
+        return grassTufts;
     }
 
     /** How many ants are on their way to this plant or cutting at it. */
