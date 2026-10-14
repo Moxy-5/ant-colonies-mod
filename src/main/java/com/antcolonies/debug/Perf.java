@@ -125,19 +125,14 @@ public final class Perf {
         long ours = nanos.values().stream().mapToLong(Long::longValue).sum();
         double insects = (double) insectTicks / ticks;
         StringBuilder out = new StringBuilder();
-        out.append(String.format("Last 5 s: %.0f insects ticking (real mobs, all colonies)
-", insects));
-        out.append(String.format("Whole server: %.2f ms a tick (worst %.1f), out of 50
-", ms(serverNanos) / ticks, ms(worstServerNanos)));
-        out.append(String.format("Our mod: %.2f ms a tick (worst tick %.1f ms)
-", ms(ours) / ticks, ms(worstTickNanos)));
+        out.append(String.format("Last 5 s: %.0f insects ticking (real mobs, all colonies)\n", insects));
+        out.append(String.format("Whole server: %.2f ms a tick (worst %.1f), out of 50\n", ms(serverNanos) / ticks, ms(worstServerNanos)));
+        out.append(String.format("Our mod: %.2f ms a tick (worst tick %.1f ms)\n", ms(ours) / ticks, ms(worstTickNanos)));
         for (Part part : Part.values()) {
-            out.append(String.format("  %s: %.2f ms
-", part.label, ms(nanos.getOrDefault(part, 0L)) / ticks));
+            out.append(String.format("  %s: %.2f ms\n", part.label, ms(nanos.getOrDefault(part, 0L)) / ticks));
         }
         if (insects > 0) {
-            out.append(String.format("  per insect: %.3f ms
-", ms(ours - nanos.getOrDefault(Part.BRAIN, 0L)) / ticks / insects));
+            out.append(String.format("  per insect: %.3f ms\n", ms(ours - nanos.getOrDefault(Part.BRAIN, 0L)) / ticks / insects));
         }
         out.append(String.format("Route searches: %.1f a second, %d failed, %.0f steps each, longest %.1f ms",
                 searches / (ticks / 20.0), failedSearches, searches == 0 ? 0.0 : (double) expansions / searches, ms(longestSearchNanos)));
