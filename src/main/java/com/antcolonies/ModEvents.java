@@ -11,6 +11,7 @@ import com.antcolonies.registry.ModItems;
 
 import com.antcolonies.block.DryGrassBlock;
 import com.antcolonies.colony.Colony;
+import com.antcolonies.worldgen.BranchShedding;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.goal.HuntTermitesGoal;
 
@@ -55,8 +56,11 @@ public class ModEvents {
     // Every colony's own clock, once a second, whether or not its queen is loaded (or alive).
     @SubscribeEvent
     public static void onLevelTick(net.neoforged.neoforge.event.tick.LevelTickEvent.Post event) {
-        if (event.getLevel() instanceof ServerLevel level && level.getGameTime() % 20 == 0) {
-            ColonyManager.get(level).tickColonies(level);
+        if (event.getLevel() instanceof ServerLevel level) {
+            if (level.getGameTime() % 20 == 0) {
+                ColonyManager.get(level).tickColonies(level);
+            }
+            BranchShedding.tick(level);
         }
     }
 
@@ -117,6 +121,7 @@ public class ModEvents {
             event.accept(greenGrass(ModItems.DRY_GRASS.toStack(), "block.antcolonies.dry_grass.green"));
             event.accept(ModItems.TALL_DRY_GRASS);
             event.accept(greenGrass(ModItems.TALL_DRY_GRASS.toStack(), "block.antcolonies.tall_dry_grass.green"));
+            event.accept(ModItems.FALLEN_BRANCH);
         }
         if (event.getTabKey() == CreativeModeTabs.INGREDIENTS) {
             event.accept(ModItems.FORAGE);

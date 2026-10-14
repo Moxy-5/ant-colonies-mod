@@ -8,6 +8,7 @@ import java.util.List;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.block.DryGrassBlock;
+import com.antcolonies.block.FallenBranchBlock;
 import com.antcolonies.block.SeedPileBlock;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.NestPlan;
@@ -17,6 +18,8 @@ import com.antcolonies.registry.ModEntities;
 import com.antcolonies.species.Species;
 import com.antcolonies.species.SpeciesProfile;
 import com.antcolonies.species.SpeciesProfiles;
+import com.antcolonies.worldgen.BranchShedding;
+import com.antcolonies.worldgen.FallenBranchFeature;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
@@ -252,6 +255,69 @@ public class TermiteFoodTests {
     private static int grassCut(ServerLevel level, Colony colony, BlockPos tuft) {
         return level.getBlockState(tuft).is(ModBlocks.DRY_GRASS.get()) ? colony.food().getPiecesCut(tuft)
                 : colony.food().piecesOf(ModBlocks.DRY_GRASS.get().defaultBlockState());
+    }
+
+    /**
+     * Fallen branches: a branch laid on the ground is 2 or 3 blocks long, thick end first; termites count each block as
+     * food and it looks more eaten (mud-covered and thinner) with every quarter cut off, until the last piece leaves
+     * nothing. A block someone else already gnawed half away counts as half eaten. An acacia's natural leaves above the
+     * ground shed a branch, leaves a player placed do not. Quick: the cuts are made by hand.
+     */
+    @GameTest(template = "arena", timeoutTicks = 200, skyAccess = true)
+    public static void aFallenBranchIsEatenInStagesAndAcaciasShedThem(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        TermiteMoundTests.deepGround(helper);
+        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        helper.runAfterDelay(5, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(colony != null, "no termite colony");
+            BlockPos start = helper.absolutePos(new BlockPos(MIDDLE + 6, SURFACE, MIDDLE - 6));
+            helper.assertTrue(FallenBranchFeature.placeBranch(level, start, level.getRandom(), 3), "no branch fitted");
+            BlockState base = level.getBlockState(start);
+            helper.assertTrue(base.is(ModBlocks.FALLEN_BRANCH.get()) && base.getValue(FallenBranchBlock.PART) == FallenBranchBlock.Part.BASE,
+                    "the branch does not start with its thick end: " + base);
+            int pieces = colony.food().piecesOf(base);
+            helper.assertTrue(pieces == 8, "a branch block is worth " + pieces + " pieces");
+
+            // Cut it piece by piece: the stage never goes back, ends at the last stage, and the last piece leaves nothing.
+            java.util.UUID ant = java.util.UUID.randomUUID();
+            int stage = 0;
+            for (int cut = 1; cut <= pieces; cut++) {
+                colony.food().clippedGrass(level, start, ant);
+                BlockState now = level.getBlockState(start);
+                if (cut < pieces) {
+                    int eaten = now.getValue(FallenBranchBlock.EATEN);
+                    helper.assertTrue(eaten >= stage, "the branch got less eaten after cut " + cut);
+                    stage = eaten;
+                } else {
+                    helper.assertTrue(now.isAir(), "the branch is still there after its last piece: " + now);
+                }
+            }
+            helper.assertTrue(stage == FallenBranchBlock.MAX_EATEN, "the branch only got to stage " + stage);
+
+            // A block gnawed half away by someone else counts as half eaten.
+            BlockPos half = helper.absolutePos(new BlockPos(MIDDLE - 6, SURFACE, MIDDLE + 6));
+            level.setBlock(half, ModBlocks.FALLEN_BRANCH.get().defaultBlockState().setValue(FallenBranchBlock.EATEN, 2), 3);
+            colony.food().clippedGrass(level, half, ant);
+            helper.assertTrue(colony.food().getPiecesCut(half) == pieces / 2 + 1, "a half-eaten branch counts "
+                    + colony.food().getPiecesCut(half) + " pieces cut after one more");
+
+            // Acacias shed branches from natural leaves, not from leaves a player placed.
+            BlockPos under = helper.absolutePos(new BlockPos(MIDDLE - 6, SURFACE, MIDDLE - 6));
+            for (BlockPos pos : BlockPos.betweenClosed(under.offset(-3, 4, -3), under.offset(3, 4, 3))) {
+                level.setBlock(pos, Blocks.ACACIA_LEAVES.defaultBlockState().setValue(net.minecraft.world.level.block.LeavesBlock.PERSISTENT, true), 2);
+            }
+            helper.assertTrue(!BranchShedding.tryShed(level, under.getX(), under.getZ(), level.getRandom()), "placed leaves shed a branch");
+            for (BlockPos pos : BlockPos.betweenClosed(under.offset(-3, 4, -3), under.offset(3, 4, 3))) {
+                level.setBlock(pos, Blocks.ACACIA_LEAVES.defaultBlockState(), 2); // natural (distance 7, would decay: not ticked here)
+            }
+            boolean shed = false;
+            for (int i = 0; i < 20 && !shed; i++) {
+                shed = BranchShedding.tryShed(level, under.getX(), under.getZ(), level.getRandom());
+            }
+            helper.assertTrue(shed, "a natural acacia shed no branch");
+            helper.succeed();
+        });
     }
 
     /** An item lying still on the ground at this spot (x, z) of the arena surface, never despawning. */

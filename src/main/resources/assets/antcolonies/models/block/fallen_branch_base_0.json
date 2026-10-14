@@ -1,0 +1,147 @@
+{
+  "parent": "minecraft:block/block",
+  "ambientocclusion": false,
+  "textures": {
+    "particle": "antcolonies:block/fallen_branch_bark_0",
+    "bark": "antcolonies:block/fallen_branch_bark_0",
+    "end": "antcolonies:block/fallen_branch_end"
+  },
+  "elements": [
+    {
+      "from": [
+        0,
+        0,
+        5.5
+      ],
+      "to": [
+        16,
+        5,
+        10.5
+      ],
+      "faces": {
+        "north": {
+          "texture": "#bark",
+          "uv": [
+            0,
+            5.5,
+            16,
+            10.5
+          ]
+        },
+        "south": {
+          "texture": "#bark",
+          "uv": [
+            0,
+            5.5,
+            16,
+            10.5
+          ]
+        },
+        "up": {
+          "texture": "#bark",
+          "uv": [
+            0,
+            5.5,
+            16,
+            10.5
+          ]
+        },
+        "down": {
+          "texture": "#bark",
+          "uv": [
+            0,
+            5.5,
+            16,
+            10.5
+          ]
+        },
+        "east": {
+          "texture": "#end",
+          "uv": [
+            5.5,
+            11,
+            10.5,
+            16
+          ]
+        },
+        "west": {
+          "texture": "#end",
+          "uv": [
+            5.5,
+            11,
+            10.5,
+            16
+          ]
+        }
+      }
+    },
+    {
+      "from": [
+        5,
+        1,
+        10.5
+      ],
+      "to": [
+        7,
+        3,
+        13.5
+      ],
+      "faces": {
+        "north": {
+          "texture": "#bark",
+          "uv": [
+            0,
+            6,
+            2,
+            9
+          ]
+        },
+        "south": {
+          "texture": "#bark",
+          "uv": [
+            0,
+            6,
+            2,
+            9
+          ]
+        },
+        "east": {
+          "texture": "#bark",
+          "uv": [
+            0,
+            6,
+            2,
+            9
+          ]
+        },
+        "west": {
+          "texture": "#bark",
+          "uv": [
+            0,
+            6,
+            2,
+            9
+          ]
+        },
+        "up": {
+          "texture": "#bark",
+          "uv": [
+            0,
+            6,
+            2,
+            9
+          ]
+        },
+        "down": {
+          "texture": "#bark",
+          "uv": [
+            0,
+            6,
+            2,
+            9
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -2,6 +2,7 @@ package com.antcolonies.registry;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.block.DryGrassBlock;
+import com.antcolonies.block.FallenBranchBlock;
 import com.antcolonies.block.FungusCombBlock;
 import com.antcolonies.block.GiantTermitomycesBlock;
 import com.antcolonies.block.SeedPileBlock;
@@ -108,6 +109,11 @@ public class ModBlocks {
     /** Savanna grass two blocks tall with seed heads; dries like the short tuft (see TallDryGrassBlock). */
     public static final DeferredBlock<TallDryGrassBlock> TALL_DRY_GRASS = BLOCKS.registerBlock("tall_dry_grass", TallDryGrassBlock::new,
             grassProperties());
+
+    /** A block of a dead branch lying on the ground, eaten by termites in stages (see FallenBranchBlock). */
+    public static final DeferredBlock<FallenBranchBlock> FALLEN_BRANCH = BLOCKS.registerBlock("fallen_branch", FallenBranchBlock::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GRAY).strength(0.5F).sound(SoundType.WOOD).noCollission()
+                    .noOcclusion().ignitedByLava().pushReaction(PushReaction.DESTROY));
 
     private static BlockBehaviour.Properties grassProperties() {
         return BlockBehaviour.Properties.of().mapColor(MapColor.SAND).replaceable().noCollission().instabreak().sound(SoundType.GRASS)

@@ -1,0 +1,88 @@
+{
+  "variants": {
+    "axis=x,eaten=0,part=base": {
+      "model": "antcolonies:block/fallen_branch_base_0"
+    },
+    "axis=x,eaten=0,part=middle": {
+      "model": "antcolonies:block/fallen_branch_middle_0"
+    },
+    "axis=x,eaten=0,part=tip": {
+      "model": "antcolonies:block/fallen_branch_tip_0"
+    },
+    "axis=x,eaten=1,part=base": {
+      "model": "antcolonies:block/fallen_branch_base_1"
+    },
+    "axis=x,eaten=1,part=middle": {
+      "model": "antcolonies:block/fallen_branch_middle_1"
+    },
+    "axis=x,eaten=1,part=tip": {
+      "model": "antcolonies:block/fallen_branch_tip_1"
+    },
+    "axis=x,eaten=2,part=base": {
+      "model": "antcolonies:block/fallen_branch_base_2"
+    },
+    "axis=x,eaten=2,part=middle": {
+      "model": "antcolonies:block/fallen_branch_middle_2"
+    },
+    "axis=x,eaten=2,part=tip": {
+      "model": "antcolonies:block/fallen_branch_tip_2"
+    },
+    "axis=x,eaten=3,part=base": {
+      "model": "antcolonies:block/fallen_branch_base_3"
+    },
+    "axis=x,eaten=3,part=middle": {
+      "model": "antcolonies:block/fallen_branch_middle_3"
+    },
+    "axis=x,eaten=3,part=tip": {
+      "model": "antcolonies:block/fallen_branch_tip_3"
+    },
+    "axis=z,eaten=0,part=base": {
+      "model": "antcolonies:block/fallen_branch_base_0",
+      "y": 90
+    },
+    "axis=z,eaten=0,part=middle": {
+      "model": "antcolonies:block/fallen_branch_middle_0",
+      "y": 90
+    },
+    "axis=z,eaten=0,part=tip": {
+      "model": "antcolonies:block/fallen_branch_tip_0",
+      "y": 90
+    },
+    "axis=z,eaten=1,part=base": {
+      "model": "antcolonies:block/fallen_branch_base_1",
+      "y": 90
+    },
+    "axis=z,eaten=1,part=middle": {
+      "model": "antcolonies:block/fallen_branch_middle_1",
+      "y": 90
+    },
+    "axis=z,eaten=1,part=tip": {
+      "model": "antcolonies:block/fallen_branch_tip_1",
+      "y": 90
+    },
+    "axis=z,eaten=2,part=base": {
+      "model": "antcolonies:block/fallen_branch_base_2",
+      "y": 90
+    },
+    "axis=z,eaten=2,part=middle": {
+      "model": "antcolonies:block/fallen_branch_middle_2",
+      "y": 90
+    },
+    "axis=z,eaten=2,part=tip": {
+      "model": "antcolonies:block/fallen_branch_tip_2",
+      "y": 90
+    },
+    "axis=z,eaten=3,part=base": {
+      "model": "antcolonies:block/fallen_branch_base_3",
+      "y": 90
+    },
+    "axis=z,eaten=3,part=middle": {
+      "model": "antcolonies:block/fallen_branch_middle_3",
+      "y": 90
+    },
+    "axis=z,eaten=3,part=tip": {
+      "model": "antcolonies:block/fallen_branch_tip_3",
+      "y": 90
+    }
+  }
+}

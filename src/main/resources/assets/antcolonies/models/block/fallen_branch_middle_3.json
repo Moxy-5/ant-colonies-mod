@@ -1,0 +1,79 @@
+{
+  "parent": "minecraft:block/block",
+  "ambientocclusion": false,
+  "textures": {
+    "particle": "antcolonies:block/fallen_branch_bark_3",
+    "bark": "antcolonies:block/fallen_branch_bark_3",
+    "end": "antcolonies:block/fallen_branch_end"
+  },
+  "elements": [
+    {
+      "from": [
+        0,
+        0,
+        7.0
+      ],
+      "to": [
+        16,
+        2,
+        9.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#bark",
+          "uv": [
+            0,
+            7.0,
+            16,
+            9.0
+          ]
+        },
+        "south": {
+          "texture": "#bark",
+          "uv": [
+            0,
+            7.0,
+            16,
+            9.0
+          ]
+        },
+        "up": {
+          "texture": "#bark",
+          "uv": [
+            0,
+            7.0,
+            16,
+            9.0
+          ]
+        },
+        "down": {
+          "texture": "#bark",
+          "uv": [
+            0,
+            7.0,
+            16,
+            9.0
+          ]
+        },
+        "east": {
+          "texture": "#end",
+          "uv": [
+            7.0,
+            14,
+            9.0,
+            16
+          ]
+        },
+        "west": {
+          "texture": "#end",
+          "uv": [
+            7.0,
+            14,
+            9.0,
+            16
+          ]
+        }
+      }
+    }
+  ]
+}

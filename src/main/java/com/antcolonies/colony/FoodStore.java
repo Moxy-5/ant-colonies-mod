@@ -9,6 +9,7 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import com.antcolonies.block.EatenInStages;
 import com.antcolonies.block.SeedPileBlock;
 import com.antcolonies.species.SpeciesProfile;
 
@@ -295,8 +296,18 @@ public class FoodStore {
         BlockPos pos = grass.immutable();
         plantClaims.remove(ant);
         colony.trails().visited(level, pos, ant);
-        SpeciesProfile.PlantFood plant = food().plantFor(level.getBlockState(pos));
+        BlockState before = level.getBlockState(pos);
+        SpeciesProfile.PlantFood plant = food().plantFor(before);
+        if (plant != null && before.getBlock() instanceof EatenInStages eaten) {
+            grassClips.putIfAbsent(pos, eaten.eatenAlready(before, plant.pieces())); // already gnawed by someone else
+        }
         int clips = grassClips.merge(pos, 1, Integer::sum);
+        if (plant != null && clips < plant.pieces() && before.getBlock() instanceof EatenInStages eaten) {
+            BlockState after = eaten.eatenTo(before, clips, plant.pieces());
+            if (after != before) {
+                level.setBlock(pos, after, 3); // it looks more eaten
+            }
+        }
         if (plant == null || clips >= plant.pieces()) {
             grassClips.remove(pos);
             busyGrass.remove(pos);
