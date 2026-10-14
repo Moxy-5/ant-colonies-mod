@@ -11,6 +11,7 @@ import com.antcolonies.registry.ModItems;
 
 import com.antcolonies.block.DryGrassBlock;
 import com.antcolonies.colony.Colony;
+import com.antcolonies.debug.Perf;
 import com.antcolonies.worldgen.BranchShedding;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.goal.HuntTermitesGoal;
@@ -58,10 +59,23 @@ public class ModEvents {
     public static void onLevelTick(net.neoforged.neoforge.event.tick.LevelTickEvent.Post event) {
         if (event.getLevel() instanceof ServerLevel level) {
             if (level.getGameTime() % 20 == 0) {
-                ColonyManager.get(level).tickColonies(level);
+                boolean timed = Perf.begin(Perf.Part.BRAIN);
+                try {
+                    ColonyManager.get(level).tickColonies(level);
+                } finally {
+                    if (timed) {
+                        Perf.end();
+                    }
+                }
             }
             BranchShedding.tick(level);
         }
+    }
+
+    /** The stopwatch closes each server tick (see {@link Perf}). */
+    @SubscribeEvent
+    public static void onServerTick(net.neoforged.neoforge.event.tick.ServerTickEvent.Post event) {
+        Perf.endOfTick(event.getServer());
     }
 
     @SubscribeEvent

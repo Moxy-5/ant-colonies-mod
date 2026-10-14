@@ -9,6 +9,7 @@ import com.antcolonies.nav.AntMoveControl;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.ColonyRole;
+import com.antcolonies.debug.Perf;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.nav.AntNavigator;
 import com.antcolonies.nav.AntPathFinder;
@@ -458,7 +459,14 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     @Override
     protected void customServerAiStep() {
         super.customServerAiStep();
-        navigator.tick();
+        boolean timed = Perf.begin(Perf.Part.WALKING);
+        try {
+            navigator.tick();
+        } finally {
+            if (timed) {
+                Perf.end();
+            }
+        }
         // Once a second (staggered): is the ant doing anything, or only wandering and looking around?
         if (tickCount % 20 == getId() % 20) {
             boolean busy = goalSelector.getAvailableGoals().stream().anyMatch(wrapped -> wrapped.isRunning()
@@ -478,6 +486,17 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
 
     @Override
     public void tick() {
+        boolean timed = !level().isClientSide && Perf.begin(Perf.Part.INSECTS);
+        try {
+            tickBody();
+        } finally {
+            if (timed) {
+                Perf.end();
+            }
+        }
+    }
+
+    private void tickBody() {
         super.tick();
         // Only the route's climbing stretches make the ant climb, so ants never wander up walls by themselves.
         if (!level().isClientSide) {

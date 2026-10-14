@@ -77,6 +77,11 @@ public class Population {
     /** From the last second: how many real mobs of each caste there were and how many were wanted. Not saved. */
     private final Map<String, Integer> lastReal = new HashMap<>();
     private final Map<String, Integer> lastWanted = new HashMap<>();
+    /** The stress test's real cap (null: none running). Not saved. */
+    @Nullable
+    private Integer stressCap;
+    /** How many a second come out during a stress test. */
+    private static final int STRESS_SWAPS = 10;
 
     Population(Colony colony) {
         this.colony = colony;
@@ -88,7 +93,33 @@ public class Population {
 
     /** How many real workers keep working while nobody is near. */
     private int crew() {
+        if (stressCap != null) {
+            return stressCap;
+        }
         return crewForTests != null ? crewForTests : numbers().crew();
+    }
+
+    /** The most real mobs at once (the stress test's number while it runs). */
+    private int realCap() {
+        return stressCap != null ? stressCap : numbers().realCap();
+    }
+
+    /** How many come out of the numbers or go back in each second (faster during a stress test, to fill up quickly). */
+    private int swapsPerSecond() {
+        return stressCap != null ? Math.max(numbers().swapsPerSecond(), STRESS_SWAPS) : numbers().swapsPerSecond();
+    }
+
+    /**
+     * The stress test (performance step 1, {@code /antcolonies stress}): this many real mobs at once instead of the
+     * profile's cap, whether a player is near or not; null ends it. Not saved: a restart ends it too.
+     */
+    public void setStress(@Nullable Integer cap) {
+        stressCap = cap;
+    }
+
+    @Nullable
+    public Integer getStress() {
+        return stressCap;
     }
 
     // --- the numbers --------------------------------------------------------------------------------------------
@@ -223,7 +254,7 @@ public class Population {
      */
     Map<String, Integer> targets(ServerLevel level, boolean watched) {
         Map<String, Integer> wanted = new LinkedHashMap<>();
-        int cap = numbers().realCap();
+        int cap = realCap();
         watched = watched || crew() >= cap;
         int soldiers = 0;
         if (colony.soldiers().numbers() != null) {
@@ -307,7 +338,7 @@ public class Population {
         lastWanted.putAll(wanted);
         lastReal.clear();
         byCaste.forEach((caste, mobs) -> lastReal.put(caste, mobs.size()));
-        int swaps = numbers().swapsPerSecond();
+        int swaps = swapsPerSecond();
         List<BlockPos> rooms = null;
         boolean changed = false;
         for (Map.Entry<String, Integer> entry : wanted.entrySet()) {

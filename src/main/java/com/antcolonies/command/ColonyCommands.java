@@ -8,6 +8,7 @@ import com.antcolonies.block.TermiteMoundBlock;
 import com.antcolonies.block.TermitomycesBlock;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.debug.Perf;
 import com.antcolonies.entity.TermiteQueenEntity;
 import com.antcolonies.entity.TermiteSoldierEntity;
 import com.antcolonies.registry.ModBlocks;
@@ -41,6 +42,16 @@ public class ColonyCommands {
                 .then(Commands.literal("population")
                         .then(Commands.argument("workers", IntegerArgumentType.integer(1, 1000000))
                                 .executes(context -> population(context.getSource(), IntegerArgumentType.getInteger(context, "workers")))))
+                // The stress test (performance step 1): the nearest colony keeps this many real mobs out at once (adding
+                // workers to its numbers if it has too few), until "stress off" or a restart. "perf" shows the stopwatch.
+                .then(Commands.literal("stress")
+                        .then(Commands.literal("off").executes(context -> stress(context.getSource(), 0)))
+                        .then(Commands.argument("count", IntegerArgumentType.integer(1, 500))
+                                .executes(context -> stress(context.getSource(), IntegerArgumentType.getInteger(context, "count")))))
+                .then(Commands.literal("perf").executes(context -> {
+                    context.getSource().sendSuccess(() -> Component.literal(Perf.report()), false);
+                    return 1;
+                }))
                 // Sets how far the nearest termite queen has swollen (0 = just founded, 100 = full grown), to see her
                 // grow without waiting for a big colony. She never shrinks by herself, so the size stays.
                 .then(Commands.literal("queensize")
@@ -238,6 +249,35 @@ public class ColonyCommands {
                 + (added < workers ? ". The colony is full: " + colony.profile().colony().maxWorkers() + " workers at most." : ".");
         source.sendSuccess(() -> Component.literal(done), false);
         return added;
+    }
+
+    private static int stress(CommandSourceStack source, int count) {
+        ServerLevel level = source.getLevel();
+        BlockPos at = BlockPos.containing(source.getPosition());
+        Colony colony = ColonyManager.get(level).getColonies().stream()
+                .filter(c -> c.getCenter().distSqr(at) <= 64 * 64)
+                .min(Comparator.comparingDouble(c -> c.getCenter().distSqr(at))).orElse(null);
+        if (colony == null) {
+            source.sendFailure(Component.literal("No colony within 64 blocks."));
+            return 0;
+        }
+        if (count == 0) {
+            colony.population().setStress(null);
+            source.sendSuccess(() -> Component.literal("Stress test off: the colony goes back to "
+                    + colony.profile().colony().realCap() + " real mobs at most (the extra ones go back in where you can't see)."), false);
+            return 1;
+        }
+        // Enough in the numbers to fill the cap (the soldiers come with the workers).
+        String caste = com.antcolonies.entity.WorkerAntEntity.CASTE;
+        int short_ = count - colony.getCount(caste);
+        if (short_ > 0) {
+            population(source, short_);
+        }
+        colony.population().setStress(count);
+        source.sendSuccess(() -> Component.literal("Stress test: " + count + " real mobs at most for the colony at "
+                + colony.getCenter().toShortString() + ". They come out 10 a second where you can't see. "
+                + "Use /antcolonies perf for the stopwatch (it reports every 5 seconds), /antcolonies stress off to end."), false);
+        return 1;
     }
 
     private static int queenSize(CommandSourceStack source, int percent) {

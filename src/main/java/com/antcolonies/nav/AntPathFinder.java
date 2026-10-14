@@ -1,5 +1,7 @@
 package com.antcolonies.nav;
 
+import com.antcolonies.debug.Perf;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -193,6 +195,24 @@ public final class AntPathFinder {
     @Nullable
     public static Route find(CellMap map, List<Foothold> starts, Predicate<Foothold> isGoal, BlockPos towards,
             int maxExpansions, StepCosts costs) {
+        boolean timed = Perf.begin(Perf.Part.ROUTES);
+        long started = System.nanoTime();
+        int[] steps = new int[1];
+        Route route = null;
+        try {
+            route = search(map, starts, isGoal, towards, maxExpansions, costs, steps);
+            return route;
+        } finally {
+            if (timed) {
+                Perf.end();
+                Perf.search(steps[0], route != null, System.nanoTime() - started);
+            }
+        }
+    }
+
+    @Nullable
+    private static Route search(CellMap map, List<Foothold> starts, Predicate<Foothold> isGoal, BlockPos towards,
+            int maxExpansions, StepCosts costs, int[] steps) {
         PriorityQueue<Node> open = new PriorityQueue<>((a, b) -> Double.compare(a.estimate, b.estimate));
         Map<Foothold, Double> bestCost = new HashMap<>();
         Set<Foothold> closed = new HashSet<>();
@@ -207,6 +227,7 @@ public final class AntPathFinder {
                 continue; // an older, worse entry for a foothold that was already finished
             }
             if (isGoal.test(current.at)) {
+                steps[0] = expansions;
                 return buildRoute(current);
             }
             expansions++;
@@ -226,6 +247,7 @@ public final class AntPathFinder {
                 }
             });
         }
+        steps[0] = expansions;
         return null;
     }
 

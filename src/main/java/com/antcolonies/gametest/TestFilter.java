@@ -23,16 +23,35 @@ public final class TestFilter {
     private static final Class<?>[] CLASSES = {NestTests.class, NavigationTests.class, TermiteTests.class, TermiteClimbingTests.class,
             TermiteFoodTests.class, TermiteGardenTests.class, TermiteForagingTests.class, TermiteMoundTests.class, TermiteTunnelTests.class, TermiteCathedralTests.class,
             TermiteRepairTests.class, JobsByAgeTests.class, TermitomycesTests.class, TermiteSoldierTests.class,
-            TermiteAlarmTests.class, PopulationTests.class, TermiteNewHoleTests.class};
+            TermiteAlarmTests.class, PopulationTests.class, TermiteNewHoleTests.class, StressTests.class};
 
     private TestFilter() {
+    }
+
+    /**
+     * The stress tests (performance, {@link StressTests}) are long and only measure: they run only when named, never in
+     * a full run.
+     */
+    @SuppressWarnings("unchecked")
+    private static void skipStressTests(MinecraftServer server) {
+        try {
+            Field field = GameTestServer.class.getDeclaredField("testFunctions");
+            field.setAccessible(true);
+            ((Collection<TestFunction>) field.get(server)).removeIf(test -> test.testName().startsWith("stress"));
+        } catch (ReflectiveOperationException e) {
+            AntColoniesMod.LOGGER.error("[test-filter] could not leave out the stress tests", e);
+        }
     }
 
     /** Called when the server is about to start, before the test server groups its tests into batches. */
     @SuppressWarnings("unchecked")
     public static void apply(MinecraftServer server) {
         String only = System.getenv("ANTCOLONIES_TESTS");
-        if (only == null || only.isBlank() || !(server instanceof GameTestServer)) {
+        if (!(server instanceof GameTestServer)) {
+            return;
+        }
+        if (only == null || only.isBlank()) {
+            skipStressTests(server);
             return;
         }
         List<String> words = Arrays.stream(only.toLowerCase(Locale.ROOT).split(",")).map(String::trim).filter(w -> !w.isEmpty()).toList();
