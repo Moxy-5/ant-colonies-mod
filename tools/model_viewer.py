@@ -1,8 +1,15 @@
-"""Planning only: builds a 3D viewer page of a fallen tree (stump, trunk, crown branches) to compare looks for the
-untouched Dead Wood, with the termite-eaten mud stages on top. Textures are drawn here (A, B, C from
-dead_wood_concepts.py; D the user's reference picture, a darker Minecraft-style dead log with bark strips; E a mix:
-D's strips in A's sun-bleached silver) and put into the page as data. Writes the page to the path given (default
-build/dead_wood_viewer.html). Run from the project folder:  python tools/dead_wood_viewer.py [out.html]
+"""The model viewer (the user asked to keep it for future use, 2026-10-14): builds a web page with a 3D scene you can
+turn and zoom, the blocks drawn with Minecraft's flat face shading, to compare looks before anything goes into the game.
+Now set up for the fallen tree (stump, trunk, crown branches) and the looks for the untouched Dead Wood (A, B, C from
+dead_wood_concepts.py; D the user's reference, a darker Minecraft-style dead log with bark strips, the one picked and
+now in the game, see dead_wood_art.py; E a mix: D's strips in A's sun-bleached silver), with the termite-eaten mud
+stages on top. Textures are drawn here and put into the page as data, so the page is one file.
+
+To show something else, change what main() puts into DATA and the build() function in model_viewer.template.html
+(three.js boxes: one per block, 6 textures each). The page needs the internet for three.js (from cdnjs/jsdelivr).
+
+Writes the page to the path given (default references/model_viewer.html; open it in a web browser).
+Run from the project folder:  python tools/model_viewer.py [out.html]
 """
 import base64
 import json
@@ -117,7 +124,7 @@ def file_uri(name):
 
 
 def main():
-    out = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "build/dead_wood_viewer.html"
+    out = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "references/model_viewer.html"
     data = {"looks": {}, "branch": [file_uri(f"fallen_branch_bark_{s}.png") for s in range(4)],
             "branchEnd": file_uri("fallen_branch_end.png"), "grass": uri(png(grass()))}
     for name in "ABCDE":
@@ -128,7 +135,7 @@ def main():
             look["stump"].append([uri(png(turned(t))) for t in sides])
         look["end"] = [uri(png(d_end())) if name == "D" and s == 0 else file_uri(f"dead_wood_top_{s}.png") for s in range(4)]
         data["looks"][name] = look
-    template = (Path(__file__).resolve().parent / "dead_wood_viewer.template.html").read_text(encoding="utf-8")
+    template = (Path(__file__).resolve().parent / "model_viewer.template.html").read_text(encoding="utf-8")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")
     print("wrote", out)
