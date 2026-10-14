@@ -57,6 +57,8 @@ Every one of these was found by the user in-game or by a game test, and has a re
 
 21. **Dead termites left no body in-game** (user's report 2026-10-14, punched in creative) though the game test passed: the body code needed a colony, and a termite of no colony (spawn egg far from a queen) died like a vanilla mob. Now every dead worker and soldier leaves a body. Lesson: a test spawns its insects next to a queen, the user often does not; test the colonyless case too.
 
+22. **`theMiddleHoleIsPluggedSoonAfterAChickenAlarm` failed 1 run in 3** (first full run on the 65 x 65 arenas, 2026-10-14): not the termites but the test. It clears the plan's tunnel block over the middle hole to make a young open mound, and the builders sometimes put it back before the plug; a covered middle hole leads only into the mound's tunnels and by design is not plugged. Now the test accepts plugged or roofed over. Still a rare flake (1 in 13 alone): `the chicken is not dead yet`; the message now says whether the chicken ever came. Lesson: a test that undoes part of the plan must expect the builders to redo it.
+
 **How to find the next one fast**
 - Ask the user for F3 coordinates and `run\logs\latest.log`; add a one-line `[tag]` log where an ant gives up, with the spot, the ant's cell, the navigator state and what is in the spot. That found the hill jam in one round.
 - Most pathing bugs come from one of: the start cell is in the air, the goal cell is where traffic passes, the route has one step, or "done" is decided from a cell instead of from real progress.

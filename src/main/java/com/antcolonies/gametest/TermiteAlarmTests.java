@@ -264,7 +264,8 @@ public class TermiteAlarmTests {
         });
         helper.succeedWhen(() -> {
             Colony colony = TermiteMoundTests.colony(helper);
-            helper.assertTrue(at[1] >= 0, "the chicken is not dead yet");
+            helper.assertTrue(chicken[0] != null, "no chicken yet: no forager reached the bush while a minor was outside");
+            helper.assertTrue(at[1] >= 0, "the chicken is not dead yet (it came at tick " + at[0] + ")");
             helper.assertTrue(at[2] >= 0, "not everybody is in yet");
             // Plugged, or roofed over: the builders may put the mound's tunnel block back over it first (the plan has one
             // there), and then it opens only into the mound's tunnels, no longer to the sky (by design it is then not plugged).
