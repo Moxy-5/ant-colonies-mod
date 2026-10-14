@@ -654,6 +654,10 @@ public class Nest {
         spentHoles.add(hole.immutable());
     }
 
+    void unmarkSpent(BlockPos hole) {
+        spentHoles.remove(hole);
+    }
+
     /**
      * Whether a cell is inside the colony's home, out of the sun: the entrance, the nest's shaft, rooms, galleries and
      * foraging tunnels, and the hollow shaft, the tunnels, the hollow spire pieces and chimney mouths of the mound (a

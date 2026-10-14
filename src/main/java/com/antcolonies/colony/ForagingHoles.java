@@ -296,9 +296,17 @@ public class ForagingHoles {
         for (Nest.NewTunnel tunnel : colony.nest().getNewTunnels()) {
             BlockPos hole = tunnel.tunnel().hole();
             if (colony.nest().isSpent(hole)) {
-                continue;
+                // Spent by mistake (the bug below) while the food is still there: back in use.
+                if (level.isLoaded(tunnel.food()) && richBlockNear(level, tunnel.food(), FOOD_STILL_THERE) != null) {
+                    colony.nest().unmarkSpent(hole);
+                    ColonyManager.get(level).markChanged();
+                } else {
+                    continue;
+                }
             }
-            if (level.isLoaded(tunnel.food()) && nearestRich(level, plants, tunnel.food(), FOOD_STILL_THERE) == null) {
+            // The real blocks round the food, not the food list: the list only holds plants near the nest's height, so a
+            // fallen tree up a slope with one block eaten away counted as gone (the user's bug, 2026-10-14).
+            if (level.isLoaded(tunnel.food()) && richBlockNear(level, tunnel.food(), FOOD_STILL_THERE) == null) {
                 colony.nest().markSpent(hole);
                 ColonyManager.get(level).markChanged();
                 AntColoniesMod.LOGGER.debug("[new-hole] the food at {} is gone: the hole at {} is plugged for good",
@@ -415,15 +423,15 @@ public class ForagingHoles {
         return plant != null && plant.rich();
     }
 
-    /** A rich plant among these within {@code within} blocks of the spot (or the spot itself), or null. */
+    /** A rich plant block within {@code within} blocks of the spot (the spot itself first), looking at the blocks themselves, or null. */
     @Nullable
-    private BlockPos nearestRich(Level level, List<BlockPos> plants, BlockPos spot, int within) {
+    private BlockPos richBlockNear(Level level, BlockPos spot, int within) {
         if (isRich(level, spot)) {
             return spot;
         }
-        for (BlockPos plant : plants) {
-            if (sideways(plant, spot) <= within && Math.abs(plant.getY() - spot.getY()) <= within && isRich(level, plant)) {
-                return plant;
+        for (BlockPos pos : BlockPos.betweenClosed(spot.offset(-within, -within, -within), spot.offset(within, within, within))) {
+            if (level.isLoaded(pos) && isRich(level, pos)) {
+                return pos.immutable();
             }
         }
         return null;
