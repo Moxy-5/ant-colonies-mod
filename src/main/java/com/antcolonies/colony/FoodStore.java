@@ -45,7 +45,7 @@ public class FoodStore {
     /** The plants around the nest are looked up again after this many ticks (a scan of the whole area). */
     private static final int GRASS_SCAN_TICKS = 100;
     /** How far above or below the nest rich food (a fallen tree, a hay bale) is still seen (other plants: 4 up, 1 down). */
-    private static final int RICH_HEIGHT = 12;
+    private static final int RICH_HEIGHT = 24;
 
     private final Colony colony;
     private final BlockPos center;
