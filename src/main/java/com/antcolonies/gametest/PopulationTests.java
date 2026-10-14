@@ -92,20 +92,24 @@ public class PopulationTests {
     }
 
     /**
-     * With nobody near, a crew of 10 real workers comes out of the 40 in the numbers, two a second, and the headcount
-     * stays 40. A player near (eyes 20 blocks off, above ground): all 40 come out (fewer than the cap of 50). The player
-     * gone: they go back in down to the crew again. Nothing is lost on the way.
+     * With a small crew (10, set for the test) and nobody near, 10 real workers come out of the 40 in the numbers, two a
+     * second, and the headcount stays 40. A player near (eyes 20 blocks off, above ground): all 40 come out (fewer than
+     * the cap of 50). The player gone: they go back in down to the crew again. Then the species' own crew (the whole cap,
+     * the user's decision: a loaded colony works as before the brain): all 40 come out with nobody near. Nothing is lost.
      */
-    @GameTest(template = "arena", timeoutTicks = 2400)
+    @GameTest(template = "arena", timeoutTicks = 2900)
     public static void aCrewWorksWhileNobodyIsNearAndMoreComeOutWhenAPlayerIs(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         startAntColony(helper);
-        helper.runAfterDelay(15, () -> antColony(helper).population().addNewMembers(WorkerAntEntity.CASTE, level.getGameTime(), 40));
+        helper.runAfterDelay(15, () -> {
+            antColony(helper).population().setCrewForTests(10);
+            antColony(helper).population().addNewMembers(WorkerAntEntity.CASTE, level.getGameTime(), 40);
+        });
         helper.runAfterDelay(260, () -> {
             Colony colony = antColony(helper);
             int real = real(helper, colony).size();
             AntColoniesMod.LOGGER.info("[population-test] nobody near: {}", colony.population().describe(level));
-            helper.assertTrue(real == colony.profile().colony().crew(), "with nobody near the crew should be out: " + real + " real, "
+            helper.assertTrue(real == 10, "with nobody near the crew should be out: " + real + " real, "
                     + colony.population().describe(level));
             helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == 40 && colony.population().inside(WorkerAntEntity.CASTE) == 30,
                     "40 workers, 30 inside expected: " + colony.getCount(WorkerAntEntity.CASTE) + ", " + colony.population().inside(WorkerAntEntity.CASTE));
@@ -123,11 +127,19 @@ public class PopulationTests {
             Colony colony = antColony(helper);
             int real = real(helper, colony).size();
             AntColoniesMod.LOGGER.info("[population-test] the player gone: {}", colony.population().describe(level));
-            helper.assertTrue(real == colony.profile().colony().crew(), "the player gone, back to the crew expected: " + real + " real, "
+            helper.assertTrue(real == 10, "the player gone, back to the crew expected: " + real + " real, "
                     + colony.population().describe(level));
             helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == 40
                     && colony.population().inside(WorkerAntEntity.CASTE) + real == 40, "nobody should be lost: " + colony.getCount(WorkerAntEntity.CASTE)
                     + " counted, " + colony.population().inside(WorkerAntEntity.CASTE) + " inside, " + real + " real");
+            colony.population().setCrewForTests(null);
+        });
+        helper.runAfterDelay(2800, () -> {
+            Colony colony = antColony(helper);
+            int real = real(helper, colony).size();
+            AntColoniesMod.LOGGER.info("[population-test] the species' crew, nobody near: {}", colony.population().describe(level));
+            helper.assertTrue(real == 40 && colony.population().inside(WorkerAntEntity.CASTE) == 0 && colony.getCount(WorkerAntEntity.CASTE) == 40,
+                    "with the species' crew all 40 should be out with nobody near: " + real + " real, " + colony.population().describe(level));
             helper.succeed();
         });
     }
@@ -202,16 +214,19 @@ public class PopulationTests {
 
     /**
      * A larva that has eaten its fill grows into a worker in the numbers when the colony has all the real workers it
-     * wants (the crew, nobody near) and nobody can see it; with the brain off it comes out as a real worker as before.
+     * wants (a crew of 10, set for the test, nobody near) and nobody can see it; with the brain off it comes out as a real worker as before.
      */
     @GameTest(template = "arena", timeoutTicks = 600)
     public static void aYoungOneGrowsUpIntoTheNumbersWhenNoMoreRealOnesAreWanted(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         startAntColony(helper);
-        helper.runAfterDelay(15, () -> antColony(helper).population().addNewMembers(WorkerAntEntity.CASTE, level.getGameTime(), 12));
+        helper.runAfterDelay(15, () -> {
+            antColony(helper).population().setCrewForTests(10);
+            antColony(helper).population().addNewMembers(WorkerAntEntity.CASTE, level.getGameTime(), 12);
+        });
         helper.runAfterDelay(300, () -> {
             Colony colony = antColony(helper);
-            helper.assertTrue(real(helper, colony).size() == colony.profile().colony().crew(), "the crew is not out: " + colony.population().describe(level));
+            helper.assertTrue(real(helper, colony).size() == 10, "the crew is not out: " + colony.population().describe(level));
             BlockPos spot = colony.nest().getNurseryCells(level).get(0);
             AntLarvaEntity larva = colony.brood().spawnLarva(level, spot.getX() + 0.5, spot.getY(), spot.getZ() + 0.5);
             int before = real(helper, colony).size();

@@ -160,7 +160,7 @@ class SpeciesProfileTest {
         assertEquals(3000, read("red_harvester_ant").colony().maxWorkers());
         assertEquals(50000, read("macrotermes").colony().maxWorkers());
         assertEquals(50, read("macrotermes").colony().realCap());
-        assertEquals(10, read("red_harvester_ant").colony().crew());
+        assertEquals(50, read("red_harvester_ant").colony().crew());
         SpeciesProfile.RefuseNumbers termiteDead = read("macrotermes").refuse();
         assertTrue(termiteDead.eatsOrBuries() && termiteDead.eatFreshTicks().get() < termiteDead.corpseDecayTicks(),
                 "termites eat their fresh dead and bury the old ones before they crumble");

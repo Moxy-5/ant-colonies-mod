@@ -2,7 +2,7 @@
   "colony": {
     "max_workers": 3000,
     "real_cap": 50,
-    "crew": 10,
+    "crew": 50,
     "watch_radius": 48,
     "swaps_per_second": 2,
     "nurses_from_workers": [3, 8, 12, 20]

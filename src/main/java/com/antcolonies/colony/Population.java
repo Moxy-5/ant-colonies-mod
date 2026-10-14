@@ -39,8 +39,9 @@ import net.minecraft.world.phys.shapes.CollisionContext;
  *
  * <p>Once a second the colony decides how many of them should be real ({@link #targets}): while a player is near the
  * nest (the profile's {@code watch_radius}) up to {@code real_cap} real mobs (soldiers as many as have a post to guard,
- * the rest workers); with nobody near, a small crew of {@code crew} workers keeps working (the user's decision, so the
- * digging, building and foraging never stall before part 2, when the numbers will do the work themselves). Then a few
+ * the rest workers); with nobody near, a crew of {@code crew} workers keeps working. The user's decision (2026-10-14):
+ * the crew is the whole real cap, so a loaded colony works just as before the brain whether a player is near or not
+ * (soldiers keep their posts too); a smaller crew in the species file would save work on the server. Then a few
  * a second ({@code swaps_per_second}) come out of the numbers, in a room of the nest no player can see, or go back into
  * them: only one that holds nothing, is after no enemy, is out of every player's sight and is inside the nest or far from
  * every player. So nothing pops in or out in front of the player.
@@ -70,6 +71,9 @@ public class Population {
     /** Tests only: whether the colony swaps real mobs and numbers (null: always, except on the game test server). */
     @Nullable
     private Boolean onForTests;
+    /** Tests only: the crew while nobody is near (null: the profile's). Not saved. */
+    @Nullable
+    private Integer crewForTests;
     /** From the last second: how many real mobs of each caste there were and how many were wanted. Not saved. */
     private final Map<String, Integer> lastReal = new HashMap<>();
     private final Map<String, Integer> lastWanted = new HashMap<>();
@@ -80,6 +84,11 @@ public class Population {
 
     private SpeciesProfile.ColonyNumbers numbers() {
         return colony.profile().colony();
+    }
+
+    /** How many real workers keep working while nobody is near. */
+    private int crew() {
+        return crewForTests != null ? crewForTests : numbers().crew();
     }
 
     // --- the numbers --------------------------------------------------------------------------------------------
@@ -209,11 +218,13 @@ public class Population {
     /**
      * How many real mobs of each caste the colony wants now. Watched (a player near): soldiers as many as there are posts
      * for them (a few more minors at a break-in), up to a quarter of the real cap; the rest of the cap workers. Not
-     * watched: the crew of workers, and soldiers only while the alarm is up (2 or more: an enemy at the foragers).
+     * watched: the crew of workers, and soldiers only while the alarm is up (2 or more: an enemy at the foragers); a crew
+     * as big as the cap is the same as watched.
      */
     Map<String, Integer> targets(ServerLevel level, boolean watched) {
         Map<String, Integer> wanted = new LinkedHashMap<>();
         int cap = numbers().realCap();
+        watched = watched || crew() >= cap;
         int soldiers = 0;
         if (colony.soldiers().numbers() != null) {
             int alarm = colony.alarm().level(level);
@@ -229,7 +240,7 @@ public class Population {
                 soldiers += Math.max(0, want);
             }
         }
-        wanted.put(WorkerAntEntity.CASTE, watched ? Math.max(0, cap - soldiers) : Math.min(numbers().crew(), cap));
+        wanted.put(WorkerAntEntity.CASTE, watched ? Math.max(0, cap - soldiers) : Math.min(crew(), cap));
         return wanted;
     }
 
@@ -481,7 +492,7 @@ public class Population {
         int real = colony.getMemberCount() - colony.getCount(com.antcolonies.entity.TermiteKingEntity.CASTE) - insideTotal();
         int wanted = lastWanted.values().stream().mapToInt(Integer::intValue).sum();
         int[] ages = insideByAge(level.getGameTime());
-        return " | real " + real + (isOn(level) ? " (wants " + wanted + (viewers(level).isEmpty() ? ", nobody near: the crew" : "") + ")" : "")
+        return " | real " + real + (isOn(level) ? " (wants " + wanted + (viewers(level).isEmpty() && crew() < numbers().realCap() ? ", nobody near: the crew" : "") + ")" : "")
                 + ", in the nest " + insideTotal() + " (workers young " + ages[ColonyRole.NURSE.ordinal()] + ", middle "
                 + ages[ColonyRole.BUILDER.ordinal()] + ", old " + ages[ColonyRole.FORAGER.ordinal()] + soldiersInside() + ")";
     }
@@ -501,6 +512,10 @@ public class Population {
     }
 
     /** Tests only: swap real mobs and numbers or not (null: as in a game). */
+    public void setCrewForTests(@Nullable Integer crew) {
+        crewForTests = crew;
+    }
+
     public void setOnForTests(@Nullable Boolean on) {
         onForTests = on;
     }
