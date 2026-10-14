@@ -7,14 +7,20 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.antcolonies.AntColoniesMod;
+import com.antcolonies.block.DryGrassBlock;
 import com.antcolonies.block.SeedPileBlock;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.NestPlan;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.registry.ModEntities;
+import com.antcolonies.species.Species;
+import com.antcolonies.species.SpeciesProfile;
+import com.antcolonies.species.SpeciesProfiles;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.item.BoneMealItem;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
@@ -33,10 +39,11 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 public class TermiteFoodTests {
     /**
      * A termite colony with workers digs its first fungus garden room (beside the royal chamber), then the foragers
-     * cut dead plants round the mound to pieces (a dead bush, tall and short grass, a hay bale) and fetch a stick, a
-     * sapling and wheat off the ground, and carry every piece into the garden, where it is built into fungus comb.
-     * Checked: the small plants and the items are all gathered, every piece cut so far is accounted for (in the comb,
-     * grown into a fungus nodule, in a termite's mandibles or dropped on the ground), and all the comb lies in the
+     * cut dead plants round the mound to pieces (a dead bush, tall and short Dry Grass, a hay bale) and fetch a stick
+     * and wheat off the ground, and carry every piece into the garden, where it is built into fungus comb. Living plants
+     * are left alone: a tuft of green grass and a sapling lying on the ground. Checked: the dead plants and the items
+     * are all gathered, the green grass and the sapling are still there, every piece cut so far is accounted for (in the
+     * comb, grown into a fungus nodule, in a termite's mandibles or dropped on the ground), and all the comb lies in the
      * garden rooms.
      */
     @GameTest(template = "arena", timeoutTicks = 30000, skyAccess = true)
@@ -57,22 +64,20 @@ public class TermiteFoodTests {
         BlockPos grassA = new BlockPos(MIDDLE + 2, SURFACE, MIDDLE + 7);
         BlockPos grassB = new BlockPos(MIDDLE - 3, SURFACE, MIDDLE - 7);
         BlockPos hay = new BlockPos(MIDDLE + 6, SURFACE, MIDDLE - 6);
+        BlockPos greenGrass = new BlockPos(MIDDLE + 7, SURFACE, MIDDLE + 3);
         helper.setBlock(bush, Blocks.DEAD_BUSH);
-        DoublePlantBlock.placeAt(level, Blocks.TALL_GRASS.defaultBlockState(), helper.absolutePos(tallGrass), 3);
-        helper.setBlock(grassA, Blocks.SHORT_GRASS);
-        helper.setBlock(grassB, Blocks.SHORT_GRASS);
+        DoublePlantBlock.placeAt(level, ModBlocks.TALL_DRY_GRASS.get().defaultBlockState(), helper.absolutePos(tallGrass), 3);
+        helper.setBlock(grassA, ModBlocks.DRY_GRASS.get());
+        helper.setBlock(grassB, ModBlocks.DRY_GRASS.get());
         helper.setBlock(hay, Blocks.HAY_BLOCK);
+        helper.setBlock(greenGrass, Blocks.SHORT_GRASS);
         List<ItemEntity> items = new ArrayList<>();
-        int[][] itemSpots = {{MIDDLE - 6, MIDDLE - 3}, {MIDDLE + 4, MIDDLE + 6}, {MIDDLE - 5, MIDDLE + 6}};
-        ItemStack[] stacks = {new ItemStack(Items.STICK), new ItemStack(Items.OAK_SAPLING), new ItemStack(Items.WHEAT)};
+        int[][] itemSpots = {{MIDDLE - 6, MIDDLE - 3}, {MIDDLE - 5, MIDDLE + 6}, {MIDDLE + 4, MIDDLE + 6}};
+        ItemStack[] stacks = {new ItemStack(Items.STICK), new ItemStack(Items.WHEAT)};
         for (int i = 0; i < stacks.length; i++) {
-            BlockPos at = helper.absolutePos(new BlockPos(itemSpots[i][0], SURFACE, itemSpots[i][1]));
-            ItemEntity item = new ItemEntity(level, at.getX() + 0.5, at.getY() + 0.05, at.getZ() + 0.5, stacks[i]);
-            item.setDeltaMovement(0, 0, 0);
-            item.setUnlimitedLifetime();
-            level.addFreshEntity(item);
-            items.add(item);
+            items.add(lay(helper, itemSpots[i], stacks[i]));
         }
+        ItemEntity sapling = lay(helper, itemSpots[2], new ItemStack(Items.OAK_SAPLING)); // alive: not termite food
 
         Colony[] colony = {null};
         helper.onEachTick(() -> {
@@ -104,10 +109,13 @@ public class TermiteFoodTests {
             for (ItemEntity item : items) {
                 helper.assertTrue(!item.isAlive(), "the " + item.getItem().getHoverName().getString() + " is still lying on the ground");
             }
+            // Living plants are left alone.
+            helper.assertTrue(helper.getBlockState(greenGrass).is(Blocks.SHORT_GRASS), "the termites took the green grass");
+            helper.assertTrue(sapling.isAlive(), "the termites took the sapling");
             // Every piece cut so far is somewhere: in the store, in a termite's mandibles, or dropped on the ground.
             BlockPos hayAt = helper.absolutePos(hay);
-            int small = c.food().piecesOf(Blocks.DEAD_BUSH.defaultBlockState()) + c.food().piecesOf(Blocks.TALL_GRASS.defaultBlockState())
-                    + 2 * c.food().piecesOf(Blocks.SHORT_GRASS.defaultBlockState()) + stacks.length;
+            int small = c.food().piecesOf(Blocks.DEAD_BUSH.defaultBlockState()) + c.food().piecesOf(ModBlocks.TALL_DRY_GRASS.get().defaultBlockState())
+                    + 2 * c.food().piecesOf(ModBlocks.DRY_GRASS.get().defaultBlockState()) + stacks.length;
             int hayCut = level.getBlockState(hayAt).is(Blocks.HAY_BLOCK) ? c.food().getPiecesCut(hayAt)
                     : c.food().piecesOf(Blocks.HAY_BLOCK.defaultBlockState());
             // (Only this colony's termites and food items: the tests next door have ants and seeds of their own.)
@@ -148,7 +156,7 @@ public class TermiteFoodTests {
 
     /**
      * Finding food (the colony's food map): an old colony with its nest dug out and both foraging holes open, a tuft of
-     * short grass right beside each hole and a hay bale 11 blocks out from the first. By "day" nobody knows the hay. A
+     * Dry Grass right beside each hole and a hay bale 11 blocks out from the first. By "day" nobody knows the hay. A
      * worker is put down beside it (as the user tests it): it finds the hay and, once it is back inside, tells the
      * colony. Then "night": the foragers go for the hay (worth far more) rather than the grass by the holes. Checked:
      * the hay is unknown at first, found and then known only once the finder is inside, and by the time 8 pieces are cut
@@ -185,7 +193,7 @@ public class TermiteFoodTests {
                 level.setBlock(tunnel.hole(), Blocks.AIR.defaultBlockState(), 3);
                 // A tuft of grass right beside the hole, on the side away from the hay.
                 spots[1 + i] = tunnel.hole().above().relative(tunnel.side().getCounterClockWise(), 2);
-                level.setBlock(spots[1 + i], Blocks.SHORT_GRASS.defaultBlockState(), 3);
+                level.setBlock(spots[1 + i], ModBlocks.DRY_GRASS.get().defaultBlockState(), 3);
             }
             spots[0] = tunnels.get(0).hole().above().relative(tunnels.get(0).side().getClockWise(), 11);
             level.setBlock(spots[0], Blocks.HAY_BLOCK.defaultBlockState(), 3);
@@ -242,7 +250,75 @@ public class TermiteFoodTests {
 
     /** How many pieces were cut off the tuft at this spot (all of them if it is gone). */
     private static int grassCut(ServerLevel level, Colony colony, BlockPos tuft) {
-        return level.getBlockState(tuft).is(Blocks.SHORT_GRASS) ? colony.food().getPiecesCut(tuft)
-                : colony.food().piecesOf(Blocks.SHORT_GRASS.defaultBlockState());
+        return level.getBlockState(tuft).is(ModBlocks.DRY_GRASS.get()) ? colony.food().getPiecesCut(tuft)
+                : colony.food().piecesOf(ModBlocks.DRY_GRASS.get().defaultBlockState());
+    }
+
+    /** An item lying still on the ground at this spot (x, z) of the arena surface, never despawning. */
+    private static ItemEntity lay(GameTestHelper helper, int[] spot, ItemStack stack) {
+        BlockPos at = helper.absolutePos(new BlockPos(spot[0], SURFACE, spot[1]));
+        ItemEntity item = new ItemEntity(helper.getLevel(), at.getX() + 0.5, at.getY() + 0.05, at.getZ() + 0.5, stack);
+        item.setDeltaMovement(0, 0, 0);
+        item.setUnlimitedLifetime();
+        helper.getLevel().addFreshEntity(item);
+        return item;
+    }
+
+    /**
+     * Dry Grass: a green tuft dries step by step (green, drying, dry) on random ticks and then stays dry; a tall plant
+     * dries both halves together; bone meal grows a short tuft tall, as green as it was. Termites only count it as food
+     * once it is dry (green vanilla grass never). Quick: the random ticks are given by hand.
+     */
+    @GameTest(template = "arena")
+    public static void dryGrassDriesOutAndTermitesOnlyEatItDry(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        for (int x = MIDDLE - 1; x <= MIDDLE + 5; x++) {
+            helper.setBlock(x, SURFACE - 1, MIDDLE, Blocks.GRASS_BLOCK); // grass grows on soil
+        }
+        BlockState green = ModBlocks.DRY_GRASS.get().defaultBlockState().setValue(DryGrassBlock.GROWTH, DryGrassBlock.Growth.GREEN);
+        BlockPos shortAt = new BlockPos(MIDDLE, SURFACE, MIDDLE);
+        BlockPos tallAt = new BlockPos(MIDDLE + 2, SURFACE, MIDDLE);
+        BlockPos bonemealAt = new BlockPos(MIDDLE + 4, SURFACE, MIDDLE);
+        helper.setBlock(shortAt, green);
+        helper.setBlock(bonemealAt, green);
+        DoublePlantBlock.placeAt(level, ModBlocks.TALL_DRY_GRASS.get().defaultBlockState().setValue(DryGrassBlock.GROWTH, DryGrassBlock.Growth.GREEN),
+                helper.absolutePos(tallAt), 3);
+
+        SpeciesProfile.FoodNumbers food = SpeciesProfiles.get(Species.MACROTERMES).food();
+        helper.assertTrue(food.plantFor(green) == null, "termites eat green Dry Grass");
+        helper.assertTrue(food.plantFor(Blocks.SHORT_GRASS.defaultBlockState()) == null, "termites eat green vanilla grass");
+        helper.assertTrue(food.plantFor(Blocks.TALL_GRASS.defaultBlockState()) == null, "termites eat green vanilla tall grass");
+
+        // Bone meal: the green tuft grows into a green tall plant.
+        BlockPos bonemeal = helper.absolutePos(bonemealAt);
+        helper.assertTrue(BoneMealItem.growCrop(new ItemStack(Items.BONE_MEAL), level, bonemeal), "bone meal did nothing");
+        helper.assertTrue(level.getBlockState(bonemeal).is(ModBlocks.TALL_DRY_GRASS.get())
+                && level.getBlockState(bonemeal).getValue(DryGrassBlock.GROWTH) == DryGrassBlock.Growth.GREEN
+                && level.getBlockState(bonemeal.above()).getValue(DryGrassBlock.GROWTH) == DryGrassBlock.Growth.GREEN,
+                "bone meal did not grow a green tall plant: " + level.getBlockState(bonemeal) + " / " + level.getBlockState(bonemeal.above()));
+
+        RandomSource random = level.getRandom();
+        for (BlockPos at : List.of(shortAt, tallAt)) {
+            BlockPos pos = helper.absolutePos(at);
+            List<DryGrassBlock.Growth> seen = new ArrayList<>(List.of(DryGrassBlock.Growth.GREEN));
+            for (int i = 0; i < 5000 && level.getBlockState(pos).getValue(DryGrassBlock.GROWTH) != DryGrassBlock.Growth.DRY; i++) {
+                BlockState state = level.getBlockState(pos);
+                if (state.isRandomlyTicking()) {
+                    state.randomTick(level, pos, random);
+                }
+                DryGrassBlock.Growth now = level.getBlockState(pos).getValue(DryGrassBlock.GROWTH);
+                if (now != seen.get(seen.size() - 1)) {
+                    seen.add(now);
+                }
+                if (at == tallAt) {
+                    helper.assertTrue(level.getBlockState(pos.above()).getValue(DryGrassBlock.GROWTH) == now, "the tall plant's halves dried apart");
+                }
+            }
+            helper.assertTrue(seen.equals(List.of(DryGrassBlock.Growth.GREEN, DryGrassBlock.Growth.DRYING, DryGrassBlock.Growth.DRY)),
+                    "the grass at " + at.toShortString() + " went " + seen);
+            helper.assertTrue(!level.getBlockState(pos).isRandomlyTicking(), "dry grass keeps changing");
+            helper.assertTrue(food.plantFor(level.getBlockState(pos)) != null, "termites do not eat dry grass at " + at.toShortString());
+        }
+        helper.succeed();
     }
 }

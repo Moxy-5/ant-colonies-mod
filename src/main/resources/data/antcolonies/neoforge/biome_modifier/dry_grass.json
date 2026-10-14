@@ -1,0 +1,9 @@
+{
+  "type": "neoforge:add_features",
+  "biomes": "#minecraft:is_savanna",
+  "features": [
+    "antcolonies:patch_dry_grass",
+    "antcolonies:patch_tall_dry_grass"
+  ],
+  "step": "vegetal_decoration"
+}

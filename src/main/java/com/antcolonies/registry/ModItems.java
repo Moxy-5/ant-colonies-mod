@@ -24,6 +24,8 @@ public class ModItems {
     public static final DeferredItem<BlockItem> TERMITE_MOUTH = ITEMS.registerSimpleBlockItem(ModBlocks.TERMITE_MOUTH);
     public static final DeferredItem<BlockItem> TERMITE_RAMP = ITEMS.registerSimpleBlockItem(ModBlocks.TERMITE_RAMP);
     public static final DeferredItem<BlockItem> TERMITE_TUNNEL = ITEMS.registerSimpleBlockItem(ModBlocks.TERMITE_TUNNEL);
+    public static final DeferredItem<BlockItem> DRY_GRASS = ITEMS.registerSimpleBlockItem(ModBlocks.DRY_GRASS);
+    public static final DeferredItem<BlockItem> TALL_DRY_GRASS = ITEMS.registerSimpleBlockItem(ModBlocks.TALL_DRY_GRASS);
 
     /** One piece of ant bread: what the ants carry from the mill to the queen, and what a broken bread pile drops. */
     public static final DeferredItem<Item> ANT_BREAD = ITEMS.registerSimpleItem("ant_bread");

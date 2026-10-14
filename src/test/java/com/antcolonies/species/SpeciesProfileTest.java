@@ -109,6 +109,21 @@ class SpeciesProfileTest {
         assertTrue(read("red_harvester_ant").food().findRadius() == 0, "harvester ants know every plant round the nest (unchanged)");
     }
 
+    /** Termites eat dead plant material only: Dry Grass once it is dry, never green grass. */
+    @Test
+    void termitesOnlyEatDryGrass() throws Exception {
+        java.util.List<SpeciesProfile.PlantFood> plants = read("macrotermes").food().plants();
+        for (SpeciesProfile.PlantFood plant : plants) {
+            assertTrue(!plant.block().equals("minecraft:short_grass") && !plant.block().equals("minecraft:tall_grass"),
+                    "termites eat green grass: " + plant.block());
+        }
+        for (String grass : java.util.List.of("antcolonies:dry_grass", "antcolonies:tall_dry_grass")) {
+            SpeciesProfile.PlantFood plant = plants.stream().filter(p -> p.block().equals(grass)).findFirst().orElseThrow();
+            assertEquals(java.util.Map.of("growth", "dry"), plant.state(), grass + " is eaten before it is dry");
+        }
+        assertEquals(java.util.Map.of(), read("red_harvester_ant").food().plants().get(0).state(), "the ants' grass has no state to match");
+    }
+
     @Test
     void foragersGoOutWhenTheirProfileSays() {
         SpeciesProfile.FoodNumbers ant = SpeciesProfile.RED_HARVESTER_ANT.food();

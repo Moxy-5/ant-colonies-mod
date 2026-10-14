@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "growth=green": {
+      "model": "antcolonies:block/dry_grass_green"
+    },
+    "growth=drying": {
+      "model": "antcolonies:block/dry_grass_drying"
+    },
+    "growth=dry": {
+      "model": "antcolonies:block/dry_grass_dry"
+    }
+  }
+}

@@ -1,6 +1,7 @@
 package com.antcolonies.species;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.jetbrains.annotations.Nullable;
@@ -20,6 +21,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.Property;
 
 /**
  * A species profile: the numbers one species' colony runs on, read from {@code data/<namespace>/species/<name>.json}
@@ -207,19 +209,29 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * ("#minecraft:leaves"). One plant gives {@code pieces} pieces and is then used up (it breaks and drops nothing).
      * {@code onlyDecaying}: only dying leaves count (cut off from their tree, about to fall), never living ones.
      * {@code foragers}: how many workers may cut at it at the same time (a big plant like a hay bale feeds several).
+     * {@code state} (optional): block state values the plant must have, for example {@code {"growth": "dry"}} so
+     * termites only take Dry Grass once it has dried; a block without one of these properties never matches.
      */
-    public record PlantFood(String block, int pieces, boolean onlyDecaying, int foragers) {
+    public record PlantFood(String block, int pieces, boolean onlyDecaying, int foragers, Map<String, String> state) {
         public static final Codec<PlantFood> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.STRING.fieldOf("block").forGetter(PlantFood::block),
                 Codec.INT.fieldOf("pieces").forGetter(PlantFood::pieces),
                 Codec.BOOL.optionalFieldOf("only_decaying", false).forGetter(PlantFood::onlyDecaying),
-                Codec.INT.optionalFieldOf("foragers", 1).forGetter(PlantFood::foragers)
+                Codec.INT.optionalFieldOf("foragers", 1).forGetter(PlantFood::foragers),
+                Codec.unboundedMap(Codec.STRING, Codec.STRING).optionalFieldOf("state", Map.of()).forGetter(PlantFood::state)
         ).apply(i, PlantFood::new));
 
-        /** Whether this block is this plant (and, for dying leaves only, is dying). */
+        public PlantFood(String block, int pieces, boolean onlyDecaying, int foragers) {
+            this(block, pieces, onlyDecaying, foragers, Map.of());
+        }
+
+        /** Whether this block is this plant (for dying leaves only, is dying; with {@code state}, has those values). */
         public boolean matches(BlockState state) {
             if (onlyDecaying && !(state.hasProperty(LeavesBlock.PERSISTENT) && state.hasProperty(LeavesBlock.DISTANCE)
                     && !state.getValue(LeavesBlock.PERSISTENT) && state.getValue(LeavesBlock.DISTANCE) >= LeavesBlock.DECAY_DISTANCE)) {
+                return false;
+            }
+            if (!hasValues(state)) {
                 return false;
             }
             if (block.startsWith("#")) {
@@ -228,6 +240,21 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
             }
             ResourceLocation id = ResourceLocation.tryParse(block);
             return id != null && BuiltInRegistries.BLOCK.getOptional(id).map(state::is).orElse(false);
+        }
+
+        /** Whether the block has every value named in {@code state} ("growth" = "dry"). */
+        private boolean hasValues(BlockState blockState) {
+            for (Map.Entry<String, String> wanted : state.entrySet()) {
+                Property<?> property = blockState.getBlock().getStateDefinition().getProperty(wanted.getKey());
+                if (property == null || !valueName(blockState, property).equals(wanted.getValue())) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static <T extends Comparable<T>> String valueName(BlockState blockState, Property<T> property) {
+            return property.getName(blockState.getValue(property));
         }
     }
 

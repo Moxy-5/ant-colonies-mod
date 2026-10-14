@@ -1,9 +1,11 @@
 package com.antcolonies.registry;
 
 import com.antcolonies.AntColoniesMod;
+import com.antcolonies.block.DryGrassBlock;
 import com.antcolonies.block.FungusCombBlock;
 import com.antcolonies.block.GiantTermitomycesBlock;
 import com.antcolonies.block.SeedPileBlock;
+import com.antcolonies.block.TallDryGrassBlock;
 import com.antcolonies.block.TermiteHoleBlock;
 import com.antcolonies.block.TermiteMoundBlock;
 import com.antcolonies.block.TermiteMouthBlock;
@@ -98,6 +100,19 @@ public class ModBlocks {
     public static final DeferredBlock<GiantTermitomycesBlock> GIANT_TERMITOMYCES = BLOCKS.registerBlock("giant_termitomyces",
             GiantTermitomycesBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_WHITE).strength(0.4F)
                     .sound(SoundType.FUNGUS).noOcclusion().pushReaction(PushReaction.DESTROY).randomTicks());
+
+    /** A tuft of savanna grass that grows green, then dries; termites only eat it dry (see DryGrassBlock). */
+    public static final DeferredBlock<DryGrassBlock> DRY_GRASS = BLOCKS.registerBlock("dry_grass", DryGrassBlock::new,
+            grassProperties());
+
+    /** Savanna grass two blocks tall with seed heads; dries like the short tuft (see TallDryGrassBlock). */
+    public static final DeferredBlock<TallDryGrassBlock> TALL_DRY_GRASS = BLOCKS.registerBlock("tall_dry_grass", TallDryGrassBlock::new,
+            grassProperties());
+
+    private static BlockBehaviour.Properties grassProperties() {
+        return BlockBehaviour.Properties.of().mapColor(MapColor.SAND).replaceable().noCollission().instabreak().sound(SoundType.GRASS)
+                .offsetType(BlockBehaviour.OffsetType.XZ).ignitedByLava().pushReaction(PushReaction.DESTROY).randomTicks();
+    }
 
     private static BlockBehaviour.Properties pieceProperties() {
         return BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_ORANGE).strength(0.6F, 3.0F).sound(SoundType.MUD)

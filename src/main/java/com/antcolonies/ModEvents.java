@@ -9,14 +9,19 @@ import com.antcolonies.entity.WorkerAntEntity;
 import com.antcolonies.registry.ModEntities;
 import com.antcolonies.registry.ModItems;
 
+import com.antcolonies.block.DryGrassBlock;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.goal.HuntTermitesGoal;
 
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.animal.Chicken;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.CreativeModeTabs;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.BlockItemStateProperties;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
@@ -85,6 +90,13 @@ public class ModEvents {
                 .toList();
     }
 
+    /** A Dry Grass item that places the grass green (it dries out over a few days), named so it can be told apart. */
+    private static ItemStack greenGrass(ItemStack stack, String name) {
+        stack.set(DataComponents.BLOCK_STATE, BlockItemStateProperties.EMPTY.with(DryGrassBlock.GROWTH, DryGrassBlock.Growth.GREEN));
+        stack.set(DataComponents.ITEM_NAME, Component.translatable(name));
+        return stack;
+    }
+
     @SubscribeEvent
     public static void onCreativeTab(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey() == CreativeModeTabs.NATURAL_BLOCKS) {
@@ -100,6 +112,11 @@ public class ModEvents {
             event.accept(ModItems.TERMITE_MOUTH);
             event.accept(ModItems.TERMITE_RAMP);
             event.accept(ModItems.TERMITE_TUNNEL);
+            // Dry Grass placed by hand is dry; the green ones are for watching it dry out.
+            event.accept(ModItems.DRY_GRASS);
+            event.accept(greenGrass(ModItems.DRY_GRASS.toStack(), "block.antcolonies.dry_grass.green"));
+            event.accept(ModItems.TALL_DRY_GRASS);
+            event.accept(greenGrass(ModItems.TALL_DRY_GRASS.toStack(), "block.antcolonies.tall_dry_grass.green"));
         }
         if (event.getTabKey() == CreativeModeTabs.INGREDIENTS) {
             event.accept(ModItems.FORAGE);

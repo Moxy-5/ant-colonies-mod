@@ -1,0 +1,22 @@
+{
+  "variants": {
+    "growth=green,half=lower": {
+      "model": "antcolonies:block/tall_dry_grass_bottom_green"
+    },
+    "growth=green,half=upper": {
+      "model": "antcolonies:block/tall_dry_grass_top_green"
+    },
+    "growth=drying,half=lower": {
+      "model": "antcolonies:block/tall_dry_grass_bottom_drying"
+    },
+    "growth=drying,half=upper": {
+      "model": "antcolonies:block/tall_dry_grass_top_drying"
+    },
+    "growth=dry,half=lower": {
+      "model": "antcolonies:block/tall_dry_grass_bottom_dry"
+    },
+    "growth=dry,half=upper": {
+      "model": "antcolonies:block/tall_dry_grass_top_dry"
+    }
+  }
+}

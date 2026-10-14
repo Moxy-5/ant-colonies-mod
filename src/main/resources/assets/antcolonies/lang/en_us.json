@@ -36,6 +36,10 @@
   "block.antcolonies.termite_tunnel": "Termite Tunnel",
   "block.antcolonies.termitomyces": "Termitomyces",
   "block.antcolonies.giant_termitomyces": "Giant Termitomyces",
+  "block.antcolonies.dry_grass": "Dry Grass",
+  "block.antcolonies.dry_grass.green": "Dry Grass (green)",
+  "block.antcolonies.tall_dry_grass": "Tall Dry Grass",
+  "block.antcolonies.tall_dry_grass.green": "Tall Dry Grass (green)",
   "item.antcolonies.termitomyces": "Termitomyces",
   "item.antcolonies.cooked_termitomyces": "Cooked Termitomyces"
 }

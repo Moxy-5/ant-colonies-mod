@@ -30,8 +30,8 @@
     "radius": 24,
     "items": "antcolonies:termite_food",
     "plants": [
-      { "block": "minecraft:short_grass", "pieces": 4 },
-      { "block": "minecraft:tall_grass", "pieces": 8 },
+      { "block": "antcolonies:dry_grass", "pieces": 4, "state": { "growth": "dry" } },
+      { "block": "antcolonies:tall_dry_grass", "pieces": 8, "state": { "growth": "dry" } },
       { "block": "minecraft:dead_bush", "pieces": 6 },
       { "block": "#minecraft:leaves", "pieces": 2, "only_decaying": true },
       { "block": "minecraft:hay_block", "pieces": 48, "foragers": 4 }
