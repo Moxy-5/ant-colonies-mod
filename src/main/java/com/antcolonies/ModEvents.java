@@ -3,6 +3,7 @@ package com.antcolonies;
 import com.antcolonies.entity.QueenAntEntity;
 import com.antcolonies.entity.TermiteKingEntity;
 import com.antcolonies.entity.TermiteQueenEntity;
+import com.antcolonies.entity.TermiteSoldierEntity;
 import com.antcolonies.entity.TermiteWorkerEntity;
 import com.antcolonies.entity.WorkerAntEntity;
 import com.antcolonies.registry.ModEntities;
@@ -23,6 +24,8 @@ public class ModEvents {
         event.put(ModEntities.TERMITE_KING.get(), TermiteKingEntity.createAttributes().build());
         event.put(ModEntities.TERMITE_QUEEN.get(), TermiteQueenEntity.createAttributes().build());
         event.put(ModEntities.TERMITE_WORKER.get(), TermiteWorkerEntity.createAttributes().build());
+        event.put(ModEntities.TERMITE_MINOR_SOLDIER.get(), TermiteSoldierEntity.createMinorAttributes().build());
+        event.put(ModEntities.TERMITE_MAJOR_SOLDIER.get(), TermiteSoldierEntity.createMajorAttributes().build());
     }
 
     @SubscribeEvent
@@ -55,6 +58,8 @@ public class ModEvents {
             event.accept(ModItems.TERMITE_QUEEN_SPAWN_EGG);
             event.accept(ModItems.TERMITE_KING_SPAWN_EGG);
             event.accept(ModItems.TERMITE_WORKER_SPAWN_EGG);
+            event.accept(ModItems.TERMITE_MINOR_SOLDIER_SPAWN_EGG);
+            event.accept(ModItems.TERMITE_MAJOR_SOLDIER_SPAWN_EGG);
         }
     }
 }

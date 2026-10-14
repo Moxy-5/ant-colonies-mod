@@ -37,7 +37,7 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 @PrefixGameTestTemplate(false)
 public class TermiteTunnelTests {
     /** The tunnel blocks, from the window in the lump's west side to the one under the spire. */
-    private static final List<BlockPos> TUNNEL = List.of(new BlockPos(8, 1, 10), new BlockPos(9, 1, 10), new BlockPos(10, 1, 10),
+    static final List<BlockPos> TUNNEL = List.of(new BlockPos(8, 1, 10), new BlockPos(9, 1, 10), new BlockPos(10, 1, 10),
             new BlockPos(10, 2, 10));
     private static final BlockPos BASE = new BlockPos(10, 3, 10);
     private static final BlockPos THICK = new BlockPos(10, 4, 10);

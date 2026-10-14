@@ -63,7 +63,7 @@ public class GatherSeedGoal extends Goal {
         if (seed == null) {
             return false;
         }
-        colony.food().claimSeed(level, seed);
+        colony.food().claimSeed(level, seed, ant.getUUID());
         return true;
     }
 

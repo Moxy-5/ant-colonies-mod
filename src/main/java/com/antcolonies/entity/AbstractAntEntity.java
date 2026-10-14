@@ -245,6 +245,11 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return false;
     }
 
+    /** Whether this insect is one of the colony's workers (one that gets a role: not a queen, king or soldier). */
+    public final boolean isColonyWorker() {
+        return hasColonyRole();
+    }
+
     /**
      * Whether this ant takes up work of this role now: its own role's work always, the others' only when it is idle.
      * Everything goes for insects without roles, and for a worker without a colony.
@@ -670,7 +675,18 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         controllers.add(new AnimationController<>(this, "main", 3, this::animate));
     }
 
+    /** An animation this insect plays instead of walking or standing (a soldier's head bang), or null. */
+    @Nullable
+    protected RawAnimation specialAnimation() {
+        return null;
+    }
+
     private PlayState animate(AnimationState<AbstractAntEntity> state) {
+        RawAnimation special = specialAnimation();
+        if (special != null) {
+            state.getController().setAnimationSpeed(1.0);
+            return state.setAndContinue(special);
+        }
         if (isPeeking()) {
             state.getController().setAnimationSpeed(1.0);
             return state.setAndContinue(PEEK);

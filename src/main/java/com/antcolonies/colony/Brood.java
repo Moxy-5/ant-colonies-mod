@@ -11,6 +11,7 @@ import org.jetbrains.annotations.Nullable;
 import com.antcolonies.block.FungusCombBlock;
 import com.antcolonies.entity.AntEggEntity;
 import com.antcolonies.entity.AntLarvaEntity;
+import com.antcolonies.entity.TermiteSoldierEntity;
 import com.antcolonies.entity.TermiteWorkerEntity;
 import com.antcolonies.entity.WorkerAntEntity;
 import com.antcolonies.registry.ModBlocks;
@@ -91,11 +92,16 @@ public class Brood {
         return colony.getSpecies().equals(Species.MACROTERMES) ? ModEntities.TERMITE_NYMPH.get() : ModEntities.ANT_LARVA.get();
     }
 
-    /** The egg hatches: a larva (or nymph) takes its place (in the same spot). */
+    /**
+     * The egg hatches: a larva (or nymph) takes its place (in the same spot). A termite colony short of soldiers makes
+     * the nymph one that grows into a soldier (see {@link Soldiers#rankForNewNymph}).
+     */
     public boolean hatchEgg(ServerLevel level, AntEggEntity egg) {
+        TermiteSoldierEntity.Rank rank = colony.soldiers().rankForNewNymph(level);
         AntLarvaEntity larva = new AntLarvaEntity(youngType(), level);
         larva.setColonyId(id);
-        larva.setMeal(colony.profile().brood().larvaMeal());
+        larva.setSoldierRank(rank);
+        larva.setMeal(colony.soldiers().mealFor(rank));
         larva.moveTo(egg.getX(), egg.getY(), egg.getZ(), egg.getYRot(), 0.0F);
         level.addFreshEntity(larva);
         egg.discard();
@@ -106,7 +112,7 @@ public class Brood {
     public AntLarvaEntity spawnLarva(Level level, double x, double y, double z) {
         AntLarvaEntity larva = new AntLarvaEntity(youngType(), level);
         larva.setColonyId(id);
-        larva.setMeal(colony.profile().brood().larvaMeal());
+        larva.setMeal(colony.soldiers().mealFor(null));
         larva.moveTo(x, y, z, level.getRandom().nextFloat() * 360.0F, 0.0F);
         level.addFreshEntity(larva);
         return larva;
@@ -146,40 +152,29 @@ public class Brood {
     /** How many more pieces of bread all the larvae together still have to eat. */
     public int larvaHunger(Level level) {
         int hunger = 0;
-        int meal = colony.profile().brood().larvaMeal();
         for (AntLarvaEntity larva : getLarvae(level)) {
-            hunger += Math.max(0, meal - larva.getFed());
+            hunger += Math.max(0, larva.getMeal() - larva.getFed());
         }
         return hunger;
     }
 
     /**
-     * A larva that still has to eat and that no other nurse is on its way to, or null. The nurse {@code ant} is entered
-     * as its feeder.
-     */
-    @Nullable
-    public AntLarvaEntity claimHungryLarva(ServerLevel level, UUID ant) {
-        long now = level.getGameTime();
-        List<AntLarvaEntity> hungry = new ArrayList<>();
-        for (AntLarvaEntity larva : getLarvae(level)) {
-            if (!larva.isFull() && !larva.hasFeeder(now)) {
-                hungry.add(larva);
-            }
-        }
-        if (hungry.isEmpty()) {
-            return null;
-        }
-        AntLarvaEntity larva = hungry.get(level.getRandom().nextInt(hungry.size()));
-        larva.claim(ant, now + LARVA_CLAIM_TICKS);
-        return larva;
-    }
-
-    /**
-     * The larva has eaten enough: a new worker takes its place and joins the colony. False (the larva stays) while the
-     * colony has as many workers as it may (the profile's max_workers).
+     * The larva has eaten enough: a new worker (or the soldier it was growing into) takes its place and joins the
+     * colony. False (the larva stays) while the colony has as many workers as it may (the profile's max_workers); a
+     * termite nymph waiting for that turns into one growing into a soldier if the colony is short of soldiers (it then
+     * eats the soldier's bigger meal first). Soldiers are not held back by the workers' cap.
      */
     public boolean hatchLarva(ServerLevel level, AntLarvaEntity larva) {
+        TermiteSoldierEntity.Rank rank = larva.getSoldierRank();
+        if (rank != null) {
+            return hatchSoldier(level, larva, rank);
+        }
         if (colony.getCount(WorkerAntEntity.CASTE) >= colony.profile().colony().maxWorkers()) {
+            TermiteSoldierEntity.Rank wanted = colony.soldiers().rankForNewNymph(level);
+            if (wanted != null) {
+                larva.setSoldierRank(wanted);
+                larva.setMeal(colony.soldiers().mealFor(wanted));
+            }
             return false;
         }
         if (colony.getSpecies().equals(Species.MACROTERMES)) {
@@ -202,6 +197,22 @@ public class Brood {
         worker.joinColony(colony);
         worker.setGrownUpAt(level.getGameTime()); // a young worker: a nurse first
         level.addFreshEntity(worker);
+        larva.discard();
+        return true;
+    }
+
+    /** The nymph has eaten a soldier's meal: a soldier of this kind takes its place and joins the colony. */
+    private boolean hatchSoldier(ServerLevel level, AntLarvaEntity larva, TermiteSoldierEntity.Rank rank) {
+        TermiteSoldierEntity soldier = (rank == TermiteSoldierEntity.Rank.MAJOR ? ModEntities.TERMITE_MAJOR_SOLDIER : ModEntities.TERMITE_MINOR_SOLDIER)
+                .get().create(level);
+        if (soldier == null) {
+            return false;
+        }
+        soldier.moveTo(larva.getX(), larva.getY(), larva.getZ(), larva.getYRot(), 0.0F);
+        soldier.joinColony(colony);
+        soldier.setGrownUpAt(level.getGameTime());
+        soldier.setLastFed(level.getGameTime()); // just had its last meal as a nymph
+        level.addFreshEntity(soldier);
         larva.discard();
         return true;
     }

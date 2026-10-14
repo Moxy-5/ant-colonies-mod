@@ -1,6 +1,8 @@
 package com.antcolonies.entity.goal;
 
+import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.List;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -9,6 +11,9 @@ import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.AntLarvaEntity;
+import com.antcolonies.entity.FedByNurses;
+import com.antcolonies.entity.TermiteSoldierEntity;
+import com.antcolonies.colony.Brood;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ItemParticleOption;
@@ -16,6 +21,7 @@ import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.item.ItemStack;
 
@@ -24,7 +30,9 @@ import net.minecraft.world.item.ItemStack;
  * {@code Colony.nurseFood}), carries it to a hungry larva (or nymph) and gives it to it.
  * After the species profile's larva_meal pieces the larva grows into a worker. If the larva needs no more by the time the nurse
  * arrives, the bread goes back on a heap. (An ant that is interrupted while carrying bread is picked up by
- * {@link FeedQueenGoal}, which takes it to the queen.)
+ * {@link FeedQueenGoal}, which takes it to the queen.) Termite nurses feed the soldiers the same way (their jaws are
+ * too big to feed themselves, see {@link FedByNurses}): a hungry soldier is picked like a hungry nymph, and the nurse
+ * follows it if it moves.
  */
 public class FeedLarvaGoal extends Goal {
     /** How close (sideways, in blocks) the ant must get to a heap or to the larva. */
@@ -40,8 +48,12 @@ public class FeedLarvaGoal extends Goal {
     @Nullable
     private Colony colony;
     private Leg leg = Leg.TO_PILE;
+    /** The larva, nymph or soldier this nurse feeds (always a {@link FedByNurses}). */
     @Nullable
-    private AntLarvaEntity larva;
+    private Entity larva;
+    /** Where the nurse last planned to walk to reach it (a soldier may move). */
+    @Nullable
+    private BlockPos larvaCell;
     /** The heap to take bread from, or to put it back on. */
     @Nullable
     private BlockPos pile;
@@ -68,18 +80,48 @@ public class FeedLarvaGoal extends Goal {
         if (colony == null || colony.nurseFood().available(level) <= 0) {
             return false;
         }
-        larva = colony.brood().claimHungryLarva(level, ant.getUUID());
+        larva = claimHungry(level);
         if (larva == null) {
             return false;
         }
         pile = colony.nurseFood().findFood(level, ant.getRandom());
         if (pile == null || !ant.getNavigator().moveTo(pile, 1.0)) {
-            larva.release(ant.getUUID());
+            fed().releaseFeeder(ant.getUUID());
             nextTry = level.getGameTime() + RETRY_TICKS; // no bread, or no way to it
             return false;
         }
         leg = Leg.TO_PILE;
         return true;
+    }
+
+    /**
+     * A larva or soldier that wants food and that no other nurse is on its way to, picked at random (so neither the
+     * young nor the soldiers are always last), or null. This nurse is entered as its feeder.
+     */
+    @Nullable
+    private Entity claimHungry(ServerLevel level) {
+        long now = level.getGameTime();
+        List<Entity> hungry = new ArrayList<>();
+        for (AntLarvaEntity young : colony.brood().getLarvae(level)) {
+            if (young.wantsFood() && !young.hasFeeder(now)) {
+                hungry.add(young);
+            }
+        }
+        for (TermiteSoldierEntity soldier : colony.soldiers().getSoldiers(level)) {
+            if (soldier.wantsFood() && !soldier.hasFeeder(now)) {
+                hungry.add(soldier);
+            }
+        }
+        if (hungry.isEmpty()) {
+            return null;
+        }
+        Entity chosen = hungry.get(level.getRandom().nextInt(hungry.size()));
+        ((FedByNurses) chosen).claimFeeder(ant.getUUID(), now + Brood.LARVA_CLAIM_TICKS);
+        return chosen;
+    }
+
+    private FedByNurses fed() {
+        return (FedByNurses) larva;
     }
 
     @Override
@@ -97,9 +139,10 @@ public class FeedLarvaGoal extends Goal {
     public void stop() {
         ant.getNavigator().stop();
         if (larva != null) {
-            larva.release(ant.getUUID());
+            fed().releaseFeeder(ant.getUUID());
         }
         larva = null;
+        larvaCell = null;
         pile = null;
         colony = null;
     }
@@ -139,24 +182,33 @@ public class FeedLarvaGoal extends Goal {
 
     /** Second leg: to the larva, which eats the bread. */
     private void walkToLarva(ServerLevel level) {
-        if (larva == null || !larva.isAlive() || larva.isFull()) {
+        if (larva == null || !larva.isAlive() || !fed().wantsFood()) {
             putBack(level);
             return;
         }
         ant.getLookControl().setLookAt(larva);
         double dx = ant.getX() - larva.getX();
         double dz = ant.getZ() - larva.getZ();
-        if (dx * dx + dz * dz <= REACH * REACH && Math.abs(ant.getY() - larva.getY()) < 1.5) {
-            larva.feed();
+        // A big soldier is reached a little farther from its middle.
+        double reach = REACH + Math.max(0.0, larva.getBbWidth() / 2.0 - 0.15);
+        if (dx * dx + dz * dz <= reach * reach && Math.abs(ant.getY() - larva.getY()) < 1.5) {
+            fed().takeFood();
             level.sendParticles(new ItemParticleOption(ParticleTypes.ITEM, ant.getCarriedSeed().copy()), larva.getX(),
                     larva.getY() + 0.1, larva.getZ(), 3, 0.05, 0.03, 0.05, 0.02);
             level.playSound(null, ant.blockPosition(), SoundEvents.GENERIC_EAT, SoundSource.NEUTRAL, 0.15F, 1.8F);
             ant.setCarriedSeed(ItemStack.EMPTY);
             ColonyManager.get(level).markChanged();
             done = true;
-        } else if (ant.getNavigator().isDone() && !ant.getNavigator().moveTo(larva.blockPosition(), 1.0)) {
+        } else if ((ant.getNavigator().isDone() || !larva.blockPosition().equals(larvaCell) && ticks % 20 == 0)
+                && !walkToLarva()) {
             putBack(level);
         }
+    }
+
+    /** Plans the walk to where the larva (or soldier) is now. */
+    private boolean walkToLarva() {
+        larvaCell = larva.blockPosition();
+        return ant.getNavigator().moveTo(larvaCell, 1.0);
     }
 
     /** The larva is gone or full: the bread goes back on a heap. */

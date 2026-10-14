@@ -22,15 +22,20 @@ import net.minecraft.world.phys.Vec3;
 /**
  * A larva of one colony: what an egg turns into. It lies in the nursery, cannot move, and is fed ant bread by the
  * nurses. After its meal (the species profile's larva_meal) it grows into a worker (as soon as the colony has room for one).
- * Saved with the world; disappears when its colony is gone.
+ * A termite nymph may instead be growing into a soldier ({@link #getSoldierRank}, decided by the colony when it hatches,
+ * see {@code Soldiers.rankForNewNymph}): it then eats the soldier's bigger meal and grows into a minor or a major
+ * soldier. Saved with the world; disappears when its colony is gone.
  */
-public class AntLarvaEntity extends Entity {
+public class AntLarvaEntity extends Entity implements FedByNurses {
     /** How many pieces of bread this larva has eaten (drawn bigger the more it has eaten). Synced to the client. */
     private static final EntityDataAccessor<Integer> DATA_FED =
             SynchedEntityData.defineId(AntLarvaEntity.class, EntityDataSerializers.INT);
     /** How many pieces of bread it needs to grow up (from its colony's species profile). Synced, so the client can draw its size. */
     private static final EntityDataAccessor<Integer> DATA_MEAL =
             SynchedEntityData.defineId(AntLarvaEntity.class, EntityDataSerializers.INT);
+    /** What it grows into: 0 a worker, else a soldier ({@link TermiteSoldierEntity.Rank#id}). Synced (a nymph growing into a soldier gets a big head), saved. */
+    private static final EntityDataAccessor<Byte> DATA_SOLDIER =
+            SynchedEntityData.defineId(AntLarvaEntity.class, EntityDataSerializers.BYTE);
 
     @Nullable
     private UUID colonyId;
@@ -90,7 +95,38 @@ public class AntLarvaEntity extends Entity {
         return getFed() >= getMeal();
     }
 
+    /** The kind of soldier this nymph grows into, or null if it grows into a worker. */
+    @Nullable
+    public TermiteSoldierEntity.Rank getSoldierRank() {
+        return TermiteSoldierEntity.Rank.byId(entityData.get(DATA_SOLDIER));
+    }
+
+    public void setSoldierRank(@Nullable TermiteSoldierEntity.Rank rank) {
+        entityData.set(DATA_SOLDIER, rank == null ? 0 : rank.id());
+    }
+
+    @Override
+    public boolean wantsFood() {
+        return !isFull();
+    }
+
+    @Override
+    public void takeFood() {
+        feed();
+    }
+
+    @Override
+    public void claimFeeder(UUID nurse, long until) {
+        claim(nurse, until);
+    }
+
+    @Override
+    public void releaseFeeder(UUID nurse) {
+        release(nurse);
+    }
+
     /** Whether a nurse is already on its way with bread for this larva. */
+    @Override
     public boolean hasFeeder(long now) {
         return feeder != null && feederUntil > now;
     }
@@ -110,6 +146,7 @@ public class AntLarvaEntity extends Entity {
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         builder.define(DATA_FED, 0);
         builder.define(DATA_MEAL, SpeciesProfile.RED_HARVESTER_ANT.brood().larvaMeal());
+        builder.define(DATA_SOLDIER, (byte) 0);
     }
 
     @Override
@@ -117,6 +154,7 @@ public class AntLarvaEntity extends Entity {
         colonyId = tag.hasUUID("colony") ? tag.getUUID("colony") : null;
         setFed(tag.getInt("fed"));
         lastFed = tag.contains("lastFed") ? tag.getLong("lastFed") : Colony.NOT_SET;
+        entityData.set(DATA_SOLDIER, tag.getByte("soldier"));
     }
 
     @Override
@@ -126,6 +164,7 @@ public class AntLarvaEntity extends Entity {
         }
         tag.putInt("fed", getFed());
         tag.putLong("lastFed", lastFed);
+        tag.putByte("soldier", entityData.get(DATA_SOLDIER));
     }
 
     @Override
@@ -144,7 +183,7 @@ public class AntLarvaEntity extends Entity {
             discard(); // the queen died
             return;
         }
-        setMeal(colony.profile().brood().larvaMeal()); // (the profile can change with /reload)
+        setMeal(colony.soldiers().mealFor(getSoldierRank())); // (the profile can change with /reload)
         // The hunger clock only runs for a larva that still has to eat; a full one waiting to grow up has been fed.
         long now = level.getGameTime();
         if (lastFed == Colony.NOT_SET || isFull() || !colony.isHungerOn()) {

@@ -385,6 +385,13 @@ public class Nest {
         return center;
     }
 
+    /** The bottom block of the entrance shaft (where the first level's tunnel leaves it), or null while there is no plan yet. */
+    @Nullable
+    public BlockPos getShaftBottom(Level level) {
+        Layout planned = getLayout(level);
+        return planned == null ? null : center.below(planned.shaftDepth());
+    }
+
     /**
      * Whether the entrance is closed with the soil the founders packed into it while the colony has members to open
      * it again (species with {@code seal_while_founding}).

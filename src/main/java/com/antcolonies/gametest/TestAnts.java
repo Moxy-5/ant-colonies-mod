@@ -28,6 +28,14 @@ final class TestAnts {
         return termite;
     }
 
+    /** A termite soldier of this kind with no colony, with its own mind (it wanders, drums when told), for a test to watch. */
+    static com.antcolonies.entity.TermiteSoldierEntity loneSoldier(GameTestHelper helper, boolean major, int x, int y, int z) {
+        com.antcolonies.entity.TermiteSoldierEntity soldier = helper.spawn(major ? ModEntities.TERMITE_MAJOR_SOLDIER.get()
+                : ModEntities.TERMITE_MINOR_SOLDIER.get(), x, y, z);
+        soldier.keepOutOfColonies();
+        return soldier;
+    }
+
     /** The same at an exact spot (not the middle of a block). */
     static WorkerAntEntity loneAnt(GameTestHelper helper, float x, float y, float z) {
         WorkerAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), x, y, z);
