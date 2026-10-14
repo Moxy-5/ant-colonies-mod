@@ -76,6 +76,9 @@ class SpeciesProfileTest {
         SpeciesProfile.SoldierNumbers soldiers = profile.soldiers().get();
         assertTrue(soldiers.majorMeal() > soldiers.minorMeal() && soldiers.minorMeal() >= profile.brood().larvaMeal());
         assertTrue(soldiers.mealIntervalTicks() < soldiers.slowAfterTicks(), "a soldier gets hungry before it slows down");
+        // The minors line the trail every few blocks, and wait for the workers well before the holes are plugged (30 seconds after the foraging).
+        assertEquals(3, soldiers.sentrySpacing());
+        assertTrue(soldiers.escortHomeTicks() > 0 && soldiers.escortHomeTicks() <= 300, "the minors must have time to get in before the holes are plugged");
     }
 
     /**

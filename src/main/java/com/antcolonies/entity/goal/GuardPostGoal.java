@@ -17,9 +17,10 @@ import net.minecraft.world.entity.ai.goal.Goal;
 
 /**
  * A soldier stands guard: it takes a post from its colony (see {@link Soldiers#posts}: majors at the royal chamber's
- * doorway, the way into its tunnel from the shaft and the garden doorways; minors in the foraging tunnels), walks there, and stands in
- * it facing the way trouble would come from, for as long as it holds the post. Each post has one soldier; one it finds
- * no way to is left alone for a minute.
+ * doorway, the way into its tunnel from the shaft and the garden doorways; minors at foraging time beside the ways out
+ * and along the foragers' trails, otherwise in the foraging tunnels), walks there, and stands in it facing the way
+ * trouble would come from, for as long as it holds the post. Each post has one soldier; when a more important post
+ * comes free the soldier moves up to it; one it finds no way to is left alone for a minute.
  */
 public class GuardPostGoal extends Goal {
     /** How long (ticks) a soldier with no post waits before it asks again. */
@@ -101,7 +102,7 @@ public class GuardPostGoal extends Goal {
             return;
         }
         // Once a second: is it still a post, and still its own?
-        if (soldier.tickCount % 20 == soldier.getId() % 20 && !colony.soldiers().holds(level, soldier, post)) {
+        if (soldier.tickCount % 20 == soldier.getId() % 20 && !colony.soldiers().holds(level, soldier, post, avoid.keySet())) {
             lost = true;
             return;
         }

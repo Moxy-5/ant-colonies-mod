@@ -43,10 +43,12 @@ import software.bernie.geckolib.animation.RawAnimation;
  * brings it to them ({@code FeedLarvaGoal}); a soldier a nurse is on its way to holds still. One that has gone without
  * for long (the profile's {@code soldiers.slow_after_ticks}) moves at half speed (it does not starve to death).
  * <p>
- * Step 6a: they guard the nest from inside (see {@link GuardPostGoal}): majors at the royal chamber's doorway, the way
- * into its tunnel from the shaft and the garden doorways, minors in the foraging tunnels just inside the holes. They stay inside for now
- * (step 6b lets the minors out at foraging time). They drum (the head bang) when told to ({@link #drum}; the alarm
- * comes with step 6c). They do not fit the termite tunnel blocks (only workers do), and they do not fight yet (M8).
+ * They stand guard (see {@link GuardPostGoal}): the majors inside, at the royal chamber's doorway, the way into its
+ * tunnel from the shaft and the garden doorways. The minors go out at foraging time: one beside each open way out and
+ * the others in a sentry line along the foragers' trail, facing out; when the foraging is over they wait at their posts
+ * until the workers are in, then go in last, and by day they wait in the foraging tunnels just inside the holes (see
+ * {@code colony.Soldiers}). They drum (the head bang) when told to ({@link #drum}; the alarm comes with step 6c). They
+ * do not fit the termite tunnel blocks (only workers do), and they do not fight yet (M8).
  */
 public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurses {
     /** The two kinds of soldier. Each is counted in the colony under its own caste name. */
@@ -78,7 +80,7 @@ public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurs
     /** How close (in blocks) a termite colony must be for a soldier put down with a spawn egg to join it. */
     private static final double JOIN_RADIUS = 32.0;
     /** The soldiers' numbers when the colony has none in its profile (or there is no colony): the termite file's own. */
-    private static final SpeciesProfile.SoldierNumbers DEFAULT_NUMBERS = new SpeciesProfile.SoldierNumbers(0.1F, 3, 6, 10, 24000, 48000);
+    private static final SpeciesProfile.SoldierNumbers DEFAULT_NUMBERS = new SpeciesProfile.SoldierNumbers(0.1F, 3, 6, 10, 24000, 48000, 3, 300);
     private static final ResourceLocation HUNGRY_SLOWDOWN = ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "soldier_hungry");
     private static final RawAnimation HEAD_BANG = RawAnimation.begin().thenLoop("head_bang");
     /** True while the soldier drums (the head bang). Synced so the client plays the animation. */
@@ -101,7 +103,7 @@ public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurs
         this.rank = rank;
     }
 
-    /** A minor soldier: quick and agile (it will escort the foragers, step 6b). */
+    /** A minor soldier: quick and agile (it guards the foragers outside). */
     public static AttributeSupplier.Builder createMinorAttributes() {
         return PathfinderMob.createMobAttributes()
                 .add(Attributes.MAX_HEALTH, 6.0)
@@ -123,10 +125,10 @@ public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurs
         // Drumming, it stands still; with a nurse on her way with food, it waits for her.
         this.goalSelector.addGoal(1, new HoldStillGoal(() -> drumTicks > 0));
         this.goalSelector.addGoal(2, new HoldStillGoal(() -> wantsFood() && hasFeeder(level().getGameTime())));
-        // Outside (put down with a spawn egg, say): back inside.
+        // Outside when it should be in (a major put down with a spawn egg, the minors once the workers are in): back inside.
         this.goalSelector.addGoal(3, new GoInsideGoal(this));
         this.goalSelector.addGoal(4, new GuardPostGoal(this));
-        // No post to guard (the nest is not dug that far yet): it strolls about inside.
+        // No post to guard (the nest is not dug that far yet, every post taken): it strolls about (inside unless it may be out).
         this.goalSelector.addGoal(5, new AntWanderGoal(this, 0.8, 200, 4, () -> true));
         this.goalSelector.addGoal(6, new RandomLookAroundGoal(this));
     }
@@ -166,10 +168,11 @@ public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurs
         return rank;
     }
 
-    // Soldiers stay inside for now (step 6b lets the minors out at foraging time, to guard the holes and the foragers).
+    // The majors always stay inside; the minors are out while their colony sends them out (see Soldiers.minorsOut).
     @Override
     public boolean mayGoOut() {
-        return false;
+        Colony colony = getColony();
+        return rank == Rank.MINOR && colony != null && colony.soldiers().minorsOut(level());
     }
 
     // Soldiers dig nothing and carry nothing.

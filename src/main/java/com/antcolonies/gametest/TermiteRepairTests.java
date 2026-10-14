@@ -73,7 +73,9 @@ public class TermiteRepairTests {
             for (NestPlan.Chamber chamber : colony.nest().getPlannedChambers(level)) {
                 planned.addAll(chamber.cells());
             }
-            planned.addAll(colony.nest().getGardenCells(level));
+            for (NestPlan.Chamber room : gardens) {
+                planned.addAll(room.cells()); // every garden the plan may ever dig, with its doorway: the cut wall must stay a wall
+            }
             for (NestPlan.Chamber chamber : List.of(royal, garden)) {
                 BlockPos top = chamber.center().above();
                 holes.add(top);
@@ -81,12 +83,17 @@ public class TermiteRepairTests {
                     level.setBlock(new BlockPos(top.getX(), y, top.getZ()), Blocks.AIR.defaultBlockState(), 3);
                 }
             }
+            // A side wall of the garden, beside one of its corner cells (the middles of the walls may be doorways to later
+            // gardens). It may lie between two rooms: the walls between rooms must be whole too.
+            cut:
             for (Direction side : Direction.Plane.HORIZONTAL) {
-                BlockPos wall = garden.center().relative(side, 2);
-                if (!planned.contains(wall) && !planned.contains(wall.relative(side))) {
-                    holes.add(wall);
-                    level.setBlock(wall, Blocks.AIR.defaultBlockState(), 3);
-                    break;
+                for (int along : new int[] {-1, 1}) {
+                    BlockPos wall = garden.center().relative(side, 2).relative(side.getClockWise(), along);
+                    if (!planned.contains(wall)) {
+                        holes.add(wall);
+                        level.setBlock(wall, Blocks.AIR.defaultBlockState(), 3);
+                        break cut;
+                    }
                 }
             }
             AntColoniesMod.LOGGER.info("[repair-test] tick {}: cut {} holes: {}", helper.getTick(), holes.size(), holes);

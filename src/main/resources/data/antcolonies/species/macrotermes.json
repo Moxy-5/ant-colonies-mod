@@ -1,5 +1,5 @@
 {
-  "_note": "Macrotermes (M7). Used by termites so far: nest (with the foraging holes), queen_body, founding, mound (with how often a walk may use a chimney), food (what they gather, when they go out: at night and in the rain; no bread; the pieces are built into fungus comb in the garden rooms), garden (the garden rooms and how fast the fungus nodules grow, and the Termitomyces mushrooms that come up after rain round a colony with a healthy garden), laying (the queen's steady stream of eggs; queen meal = how many nodules she holds), the nurses, and from brood max_young, hatch_ticks, larva_meal (nodules a nymph eats) and larva_starve_ticks, and colony max_workers; soldiers (how many the colony wants per worker, minors to a major, the nodules a nymph eats to grow into a minor or a major, and how often a soldier wants a nodule from a nurse). The queen's other numbers (rich meal, burst, incubation, starve) and the worker numbers are not used by termites.",
+  "_note": "Macrotermes (M7). Used by termites so far: nest (with the foraging holes), queen_body, founding, mound (with how often a walk may use a chimney), food (what they gather, when they go out: at night and in the rain; no bread; the pieces are built into fungus comb in the garden rooms), garden (the garden rooms and how fast the fungus nodules grow, and the Termitomyces mushrooms that come up after rain round a colony with a healthy garden), laying (the queen's steady stream of eggs; queen meal = how many nodules she holds), the nurses, and from brood max_young, hatch_ticks, larva_meal (nodules a nymph eats) and larva_starve_ticks, and colony max_workers; soldiers (how many the colony wants per worker, minors to a major, the nodules a nymph eats to grow into a minor or a major, how often a soldier wants a nodule from a nurse, how far apart the minors stand along the foragers' trail, and how long at most they wait outside for the workers to come in when the foraging is over). The queen's other numbers (rich meal, burst, incubation, starve) and the worker numbers are not used by termites.",
   "colony": {
     "max_workers": 20,
     "nurses_from_workers": [3, 8, 12, 20]
@@ -80,7 +80,9 @@
     "minor_meal": 6,
     "major_meal": 10,
     "meal_interval_ticks": 24000,
-    "slow_after_ticks": 48000
+    "slow_after_ticks": 48000,
+    "sentry_spacing": 3,
+    "escort_home_ticks": 300
   },
   "mound": {
     "max_height": 32,

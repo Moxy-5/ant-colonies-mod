@@ -386,16 +386,22 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * minors to every major. When it has fewer than it wants, a new nymph grows into a soldier instead of a worker:
      * a minor after {@code minorMeal} pieces of food, a major after {@code majorMeal} (a bigger meal). Soldiers cannot
      * feed themselves (their jaws are too big): they want a piece from a nurse every {@code mealIntervalTicks}, and one
-     * that has gone {@code slowAfterTicks} without moves at half speed.
+     * that has gone {@code slowAfterTicks} without moves at half speed. At foraging time the minors go out: one beside
+     * each open way out, and a sentry line along the foragers' trail, one every {@code sentrySpacing} blocks on
+     * alternate sides; when the foraging is over they wait at their posts until the workers are in, at most
+     * {@code escortHomeTicks}, then go in last.
      */
-    public record SoldierNumbers(float perWorker, int minorsPerMajor, int minorMeal, int majorMeal, int mealIntervalTicks, int slowAfterTicks) {
+    public record SoldierNumbers(float perWorker, int minorsPerMajor, int minorMeal, int majorMeal, int mealIntervalTicks, int slowAfterTicks,
+            int sentrySpacing, int escortHomeTicks) {
         public static final Codec<SoldierNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.FLOAT.fieldOf("per_worker").forGetter(SoldierNumbers::perWorker),
                 Codec.INT.fieldOf("minors_per_major").forGetter(SoldierNumbers::minorsPerMajor),
                 Codec.INT.fieldOf("minor_meal").forGetter(SoldierNumbers::minorMeal),
                 Codec.INT.fieldOf("major_meal").forGetter(SoldierNumbers::majorMeal),
                 Codec.INT.optionalFieldOf("meal_interval_ticks", 24000).forGetter(SoldierNumbers::mealIntervalTicks),
-                Codec.INT.optionalFieldOf("slow_after_ticks", 48000).forGetter(SoldierNumbers::slowAfterTicks)
+                Codec.INT.optionalFieldOf("slow_after_ticks", 48000).forGetter(SoldierNumbers::slowAfterTicks),
+                Codec.INT.optionalFieldOf("sentry_spacing", 3).forGetter(SoldierNumbers::sentrySpacing),
+                Codec.INT.optionalFieldOf("escort_home_ticks", 300).forGetter(SoldierNumbers::escortHomeTicks)
         ).apply(i, SoldierNumbers::new));
 
         /** How many minor soldiers a colony with this many workers wants (rounded; 0.5 rounds up). */

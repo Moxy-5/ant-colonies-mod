@@ -161,8 +161,10 @@ public class FoodStore {
         return best;
     }
 
-    public void claimSeed(Level level, ItemEntity seed) {
+    /** This ant is on its way to this item: no other ant goes for it for a while. */
+    public void claimSeed(Level level, ItemEntity seed, UUID ant) {
         claimedSeeds.put(seed.getId(), level.getGameTime() + SEED_CLAIM_TICKS);
+        colony.trails().visited(level, seed.blockPosition(), ant);
     }
 
     public void releaseSeed(ItemEntity seed) {
@@ -239,6 +241,7 @@ public class FoodStore {
     /** This ant is on its way to this plant: no more ants than may cut at it at once go there for a while. */
     public void claimGrass(Level level, BlockPos grass, UUID ant) {
         plantClaims.put(ant, new PlantClaim(grass.immutable(), level.getGameTime() + SEED_CLAIM_TICKS));
+        colony.trails().visited(level, grass, ant);
     }
 
     /** The ant gave up on its plant, or is done with it. */
@@ -253,6 +256,7 @@ public class FoodStore {
     public void clippedGrass(Level level, BlockPos grass, UUID ant) {
         BlockPos pos = grass.immutable();
         plantClaims.remove(ant);
+        colony.trails().visited(level, pos, ant);
         SpeciesProfile.PlantFood plant = food().plantFor(level.getBlockState(pos));
         int clips = grassClips.merge(pos, 1, Integer::sum);
         if (plant == null || clips >= plant.pieces()) {

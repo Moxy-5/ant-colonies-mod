@@ -67,6 +67,7 @@ public class Colony {
     private final Refuse refuse;
     private final Mound mound;
     private final ForagingHoles foragingHoles;
+    private final ForagingTrails trails;
     private final FungusGarden garden;
     private final Mushrooms mushrooms;
     private final Soldiers soldiers;
@@ -86,6 +87,7 @@ public class Colony {
         this.refuse = new Refuse(this);
         this.mound = new Mound(this);
         this.foragingHoles = new ForagingHoles(this);
+        this.trails = new ForagingTrails(this);
         this.garden = new FungusGarden(this);
         this.mushrooms = new Mushrooms(this);
         this.soldiers = new Soldiers(this);
@@ -144,6 +146,11 @@ public class Colony {
     /** The Termitomyces mushrooms a healthy garden sends up round the mound after rain. */
     public Mushrooms mushrooms() {
         return mushrooms;
+    }
+
+    /** Where the foragers have been finding food lately and by which way out they went (the trails the minor soldiers line). */
+    public ForagingTrails trails() {
+        return trails;
     }
 
     /** The soldiers: how many the colony wants, which nymphs grow into them, where they stand guard (species with soldiers). */

@@ -48,6 +48,32 @@ public class ForagingHoles {
         this.colony = colony;
     }
 
+    /**
+     * A way out of the nest that is open now: {@code mouth} is the cell an insect steps out into (the one above a
+     * foraging hole, or the open entrance itself), {@code outward} the way out from the nest there (the way a foraging
+     * tunnel runs; null for the entrance, which lies in the middle).
+     */
+    public record WayOut(BlockPos mouth, @Nullable Direction outward) {
+    }
+
+    /**
+     * The colony's ways out that are open now: every open foraging hole whose tunnel is dug, and the entrance while it
+     * is open to the sky (a young mound has no roof over it yet; an ant nest's hole is always one).
+     */
+    public List<WayOut> waysOut(Level level) {
+        List<WayOut> ways = new java.util.ArrayList<>();
+        for (NestPlan.ForagingTunnel tunnel : tunnels(level)) {
+            if (isDug(level, tunnel) && isOpen(level, tunnel.hole())) {
+                ways.add(new WayOut(tunnel.hole().above(), tunnel.side()));
+            }
+        }
+        BlockPos entrance = colony.nest().getEntrance();
+        if (isOpen(level, entrance) && Nest.isDugOut(level, entrance.below()) && !colony.nest().isEntranceCovered(level)) {
+            ways.add(new WayOut(entrance, null));
+        }
+        return ways;
+    }
+
     /** The foraging tunnels of the nest's plan (none until the plan is made, or if the species has none). */
     public List<NestPlan.ForagingTunnel> tunnels(Level level) {
         return colony.nest().getForagingTunnels(level);
@@ -160,7 +186,7 @@ public class ForagingHoles {
     /** Whether any member of the colony is outside the nest and the mound (checked once a second). */
     public boolean isAnyoneOutside(Level level) {
         long now = level.getGameTime();
-        if (now - outsideCheckedAt >= OUTSIDE_CHECK_TICKS || now < outsideCheckedAt) {
+        if (outsideCheckedAt == Long.MIN_VALUE || now - outsideCheckedAt >= OUTSIDE_CHECK_TICKS || now < outsideCheckedAt) {
             outsideCheckedAt = now;
             AABB area = colony.nestArea().inflate(8);
             anyoneOutside = !level.getEntitiesOfClass(AbstractAntEntity.class, area,

@@ -31,6 +31,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.AABB;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
@@ -254,6 +255,150 @@ public class TermiteSoldierTests {
         for (BlockPos pos : cells) {
             level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
         }
+    }
+
+    /**
+     * The minors out at foraging time (step 6b). A colony with its royal chamber, a garden and both foraging tunnels dug
+     * out, both holes open, and the entrance in the middle closed with stone (so the foragers go out by the holes). Five
+     * old workers (mostly foragers) and five minors. A hay bale lies 11 blocks from the first hole, along the ground at a
+     * right angle to its tunnel. At "night" the foragers cut at the hay; the minors come out: one stands beside the
+     * first hole, three line the trail from it to the hay (every 3 blocks, on both sides, right beside it), and one
+     * stands beside the second hole (nobody's trail), each facing out. Then "day": the minors stay at their posts while
+     * any worker is still outside, and go in only after the last one; once everybody is in, both holes are plugged.
+     */
+    @GameTest(template = "arena", timeoutTicks = 8000, skyAccess = true)
+    public static void minorsGuardTheHolesAndLineTheForagersTrailThenGoInLast(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        TermiteMoundTests.deepGround(helper);
+        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        helper.runAfterDelay(5, () -> {
+            for (int i = 0; i < 5; i++) {
+                helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE - 2 + i, SURFACE, MIDDLE - 2);
+            }
+        });
+        List<TermiteSoldierEntity> minors = new ArrayList<>();
+        BlockPos[] trail = new BlockPos[2]; // the first hole's mouth, the hay
+        int[] phase = {0}; // 0 setting up, 1 night, 2 day, 3 everybody in
+        long[] at = {0, -1, -1, -1}; // since when all guard outside, when the day began, last tick a worker was out, first tick a minor was in
+        helper.runAfterDelay(10, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
+            colony.setForagingTimeForTests(false);
+            long old = level.getGameTime() - colony.profile().worker().builderUntilTicks() - 1000;
+            for (TermiteWorkerEntity worker : level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds())) {
+                worker.setGrownUpAt(old); // old workers: foragers first
+            }
+            digNestAtOnce(level, colony);
+            level.setBlock(colony.nest().getEntrance(), Blocks.STONE.defaultBlockState(), 3);
+            List<NestPlan.ForagingTunnel> tunnels = colony.nest().getForagingTunnels(level);
+            helper.assertTrue(tunnels.size() == 2, "the nest has " + tunnels.size() + " foraging tunnels");
+            for (NestPlan.ForagingTunnel tunnel : tunnels) {
+                level.setBlock(tunnel.hole(), Blocks.AIR.defaultBlockState(), 3);
+            }
+            trail[0] = tunnels.get(0).hole().above();
+            trail[1] = trail[0].relative(tunnels.get(0).side().getClockWise(), 11);
+            level.setBlock(trail[1], Blocks.HAY_BLOCK.defaultBlockState(), 3);
+            List<BlockPos> room = colony.nest().getHomeChamber(level).room();
+            for (int i = 0; i < 5; i++) {
+                minors.add(put(level, ModEntities.TERMITE_MINOR_SOLDIER.get(), room.get(i)));
+            }
+        });
+        helper.runAfterDelay(40, () -> {
+            TermiteMoundTests.colony(helper).setForagingTimeForTests(true);
+            phase[0] = 1;
+        });
+        helper.onEachTick(() -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            if (colony == null || phase[0] == 0) {
+                return;
+            }
+            long tick = helper.getTick();
+            if (phase[0] == 1) {
+                String wrong = minorsOnTheirPostsOutside(level, colony, minors, trail);
+                at[0] = wrong == null ? (at[0] == 0 ? tick : at[0]) : 0;
+                if (tick % 500 == 0) {
+                    AntColoniesMod.LOGGER.info("[sentry-test] tick {}: {}; {}", tick, wrong, colony.soldiers().describe(level));
+                }
+                // The day begins once they have stood guard a while, while a forager is out at the hay.
+                boolean foragerAtTheHay = !level.getEntitiesOfClass(TermiteWorkerEntity.class, new AABB(trail[1]).inflate(2),
+                        worker -> colony.getId().equals(worker.getColonyId())).isEmpty();
+                if (wrong == null && tick - at[0] >= 40 && foragerAtTheHay) {
+                    AntColoniesMod.LOGGER.info("[sentry-test] tick {}: the minors stand guard outside {}; {}", tick,
+                            minors.stream().map(m -> m.blockPosition().toShortString()).toList(), colony.soldiers().describe(level));
+                    colony.setForagingTimeForTests(false);
+                    at[1] = tick;
+                    phase[0] = 2;
+                }
+                return;
+            }
+            boolean workerOut = !level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds().inflate(8),
+                    worker -> colony.getId().equals(worker.getColonyId()) && !colony.nest().isInside(level, worker.blockPosition())).isEmpty();
+            boolean minorIn = minors.stream().anyMatch(minor -> colony.nest().isInside(level, minor.blockPosition()));
+            if (workerOut) {
+                at[2] = tick;
+            }
+            if (minorIn && at[3] < 0) {
+                at[3] = tick;
+                AntColoniesMod.LOGGER.info("[sentry-test] tick {}: the first minor is in, {} ticks into the day (the last worker came in {} ticks into it)",
+                        tick, tick - at[1], at[2] - at[1]);
+            }
+            if (phase[0] == 2 && tick - at[1] < colony.profile().soldiers().orElseThrow().escortHomeTicks() - 20) {
+                helper.assertFalse(workerOut && minorIn, "a minor went in while a worker was still outside");
+            }
+            boolean everybodyIn = !workerOut && minors.stream().allMatch(minor -> colony.nest().isInside(level, minor.blockPosition()));
+            if (everybodyIn && phase[0] == 2) {
+                AntColoniesMod.LOGGER.info("[sentry-test] tick {}: everybody is in, {} ticks into the day; {}", tick, tick - at[1],
+                        colony.soldiers().describe(level));
+                phase[0] = 3;
+            }
+        });
+        helper.succeedWhen(() -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(colony != null && phase[0] > 0, "not started");
+            helper.assertTrue(phase[0] == 3, phase[0] == 1 ? "the minors did not all stand guard outside: "
+                    + minorsOnTheirPostsOutside(level, colony, minors, trail) : "not everybody went in by day (" + colony.soldiers().describe(level) + ")");
+            helper.assertTrue(at[2] >= at[1], "no worker was outside when the day began");
+            helper.assertTrue(at[3] > at[2], "a minor went in (tick " + at[3] + ") before the last worker (tick " + at[2] + ")");
+            for (NestPlan.ForagingTunnel tunnel : colony.nest().getForagingTunnels(level)) {
+                helper.assertTrue(colony.profile().nest().isPlug(level.getBlockState(tunnel.hole())), "a foraging hole was not plugged");
+            }
+        });
+    }
+
+    /**
+     * Null if the five minors stand at posts outside, facing out: one beside each hole and three on the trail from the
+     * first hole to the hay, on both sides of it; otherwise what is wrong.
+     */
+    private static String minorsOnTheirPostsOutside(ServerLevel level, Colony colony, List<TermiteSoldierEntity> minors, BlockPos[] trail) {
+        List<Soldiers.Post> outside = colony.soldiers().posts(level, Rank.MINOR).stream().filter(post -> post.kind() != Soldiers.Kind.INSIDE).toList();
+        if (outside.size() < 5 || outside.get(0).kind() != Soldiers.Kind.WAY_OUT || !outside.get(0).cell().closerThan(trail[0], 1.5)
+                || outside.stream().filter(post -> post.kind() == Soldiers.Kind.TRAIL).count() != 3) {
+            return "the posts outside should be the first hole's, three on its trail and the second hole's: " + outside;
+        }
+        Set<Integer> sides = new HashSet<>();
+        for (TermiteSoldierEntity minor : minors) {
+            Soldiers.Post post = outside.stream().filter(p -> p.cell().equals(minor.blockPosition())).findFirst().orElse(null);
+            if (post == null || minor.isClimbing()) {
+                return "minor at " + minor.blockPosition().toShortString() + " is not at a post outside " + outside.stream()
+                        .map(p -> p.kind() + " " + p.cell().toShortString()).toList();
+            }
+            float facing = (float) (Mth.atan2(post.facing().getZ() - post.cell().getZ(), post.facing().getX() - post.cell().getX())
+                    * Mth.RAD_TO_DEG) - 90.0F;
+            if (Math.abs(Mth.wrapDegrees(minor.getYRot() - facing)) > 20.0F) {
+                return "minor at " + minor.blockPosition().toShortString() + " faces " + minor.getYRot() + ", not out (" + facing + ")";
+            }
+            if (post.kind() == Soldiers.Kind.TRAIL) {
+                // The trail runs straight from the first hole's mouth to the hay: which side of it is this sentry on?
+                int side = Integer.signum((minor.getBlockX() - trail[0].getX()) * (trail[1].getZ() - trail[0].getZ())
+                        - (minor.getBlockZ() - trail[0].getZ()) * (trail[1].getX() - trail[0].getX()));
+                if (side == 0) {
+                    return "a sentry stands on the trail itself at " + minor.blockPosition().toShortString();
+                }
+                sides.add(side);
+            }
+        }
+        return sides.size() == 2 ? null : "the sentries stand on one side of the trail only";
     }
 
     /** A soldier told to drum stands still drumming for that long, then stops. */

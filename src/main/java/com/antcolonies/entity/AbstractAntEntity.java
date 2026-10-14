@@ -245,6 +245,11 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return false;
     }
 
+    /** Whether this insect is one of the colony's workers (one that gets a role: not a queen, king or soldier). */
+    public final boolean isColonyWorker() {
+        return hasColonyRole();
+    }
+
     /**
      * Whether this ant takes up work of this role now: its own role's work always, the others' only when it is idle.
      * Everything goes for insects without roles, and for a worker without a colony.
