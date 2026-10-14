@@ -261,6 +261,11 @@ public class FoodStore {
         return grassTufts;
     }
 
+    /** The food plants round the nest are looked for again on the next ask (a test that has just put one down). */
+    public void rescanPlantsSoon() {
+        grassScanTime = Long.MIN_VALUE;
+    }
+
     /** How many ants are on their way to this plant or cutting at it. */
     private int foragersAt(BlockPos plant) {
         int count = 0;

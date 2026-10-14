@@ -202,6 +202,9 @@ public class TermiteFoodTests {
             }
             spots[0] = tunnels.get(0).hole().above().relative(tunnels.get(0).side().getClockWise(), 11);
             level.setBlock(spots[0], Blocks.HAY_BLOCK.defaultBlockState(), 3);
+            // (The colony looks for food plants every 5 seconds: the finder walked home before the hay was on the list,
+            // and the test failed now and then in full runs, 2026-10-14.)
+            colony.food().rescanPlantsSoon();
             helper.assertTrue(!colony.foodMap().isKnown(spots[0]) && !colony.foodMap().isFoundButUntold(spots[0]),
                     "the colony knew of the hay before anyone went near it");
             // (Put down now, while the holes are still open: by day they are plugged once everybody is in.)

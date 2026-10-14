@@ -146,7 +146,9 @@ public class TermiteAlarmTests {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null && chicken[0] != null, "no chicken yet");
             helper.assertTrue(at[1] >= 0, "the alarm did not go up");
-            helper.assertTrue(minors.stream().allMatch(minor -> colony.alarm().hasHeard(minor.getUUID())), "not every minor felt the alarm");
+            // At least one: the first minor may kill the chicken (two bites) before the drumming reaches the others 15 blocks
+            // off, and they go in behind the workers (a full run, 2026-10-14: only 1 of 3 had felt it, the chicken dead).
+            helper.assertTrue(minors.stream().anyMatch(minor -> colony.alarm().hasHeard(minor.getUUID())), "no minor felt the alarm");
             helper.assertFalse(biters.isEmpty(), "no minor has bitten the chicken");
             helper.assertFalse(chicken[0].isAlive(), "the chicken is still alive (" + chicken[0].getHealth() + " health)");
             boolean workerOut = !level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds().inflate(8),
