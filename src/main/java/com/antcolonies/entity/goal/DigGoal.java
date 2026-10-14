@@ -100,9 +100,11 @@ public class DigGoal extends Goal {
         Vec3 blockCenter = Vec3.atCenterOf(target);
         ant.getLookControl().setLookAt(blockCenter);
 
-        // Clinging right under the block (biting an entrance plug from the shaft) counts as within reach too.
-        boolean underIt = ant.blockPosition().equals(target.below());
-        if (!underIt && ant.distanceToSqr(blockCenter) > REACH * REACH) {
+        // In a block touching it counts as within reach too, wherever the ant clings in it: right under the block
+        // (biting an entrance plug from the shaft), or on the far wall of a tunnel's step up a slope, where there is no
+        // floor (the hill tunnels' workers stood just out of reach there and never bit, 2026-10-14).
+        boolean touching = ant.blockPosition().distManhattan(target) == 1;
+        if (!touching && ant.distanceToSqr(blockCenter) > REACH * REACH) {
             // Walk to the open space next to the block (above it in the shaft, beside it in the tunnel).
             AntNavigator legs = ant.getNavigator();
             if (legs.isDone()) {

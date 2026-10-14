@@ -15,9 +15,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.FallingBlock;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
 
 /**
@@ -386,35 +384,7 @@ public class ForagingHoles {
 
     /** The world as the tunnel route planner sees it: the ground, where a tunnel may be dug and a hole opened. */
     private TunnelRoute.Ground ground(Level level) {
-        java.util.Map<BlockPos, MoundPlan.Part> mound = colony.mound().getParts(level);
-        java.util.Set<BlockPos> nest = colony.nest().nestCells(level);
-        return new TunnelRoute.Ground() {
-            @Override
-            public Integer groundTop(int x, int z) {
-                if (!level.hasChunkAt(new BlockPos(x, colony.getCenter().getY(), z))) {
-                    return null;
-                }
-                BlockPos top = new BlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1, z);
-                // Down through plants, fallen branches and logs lying on the ground (food is not ground).
-                for (int i = 0; i < 4 && (level.getBlockState(top).canBeReplaced() || colony.food().isFoodPlant(level.getBlockState(top))); i++) {
-                    top = top.below();
-                }
-                return mound.containsKey(top) || mound.containsKey(top.above()) ? null : top.getY();
-            }
-
-            @Override
-            public boolean mayDig(BlockPos cell) {
-                return level.isLoaded(cell) && level.getBlockState(cell).is(ModTags.DIGGABLE) && !touchesFluid(level, cell)
-                        && !(level.getBlockState(cell.above()).getBlock() instanceof FallingBlock)
-                        && !mound.containsKey(cell) && !nest.contains(cell);
-            }
-
-            @Override
-            public boolean mayOpenHole(BlockPos hole) {
-                BlockState above = level.getBlockState(hole.above());
-                return mayDig(hole) && above.canBeReplaced() && above.getFluidState().isEmpty();
-            }
-        };
+        return new GroundReader(level, colony, colony.nest().nestCells(level));
     }
 
     /** Whether the plant at this spot is a rich one (its profile entry says {@code rich}). */

@@ -118,6 +118,12 @@ public class Nest {
     private int levelsUnlocked;
     /** The foraging tunnels of {@link #layout}, worked out once for it. */
     private List<NestPlan.ForagingTunnel> foragingTunnels = List.of();
+    /**
+     * The planned foraging tunnels as fitted to the ground (see {@link #fitToGround}), saved so they never move once
+     * worked out (the mound growing over the land later must not change them). Null until worked out.
+     */
+    @Nullable
+    private List<NestPlan.ForagingTunnel> fittedTunnels;
     @Nullable
     private Layout foragingTunnelsFor;
     /** The planned foraging tunnels and the new ones together, worked out again when either changes. */
@@ -629,8 +635,13 @@ public class Nest {
             return List.of();
         }
         if (planned != foragingTunnelsFor) {
-            var numbers = colony.profile().nest();
-            foragingTunnels = NestPlan.foragingTunnels(center, planned.direction(), numbers.foragingHoles(), numbers.foragingHoleDistance());
+            if (fittedTunnels != null) {
+                foragingTunnels = fittedTunnels;
+            } else {
+                var numbers = colony.profile().nest();
+                List<NestPlan.ForagingTunnel> flat = NestPlan.foragingTunnels(center, planned.direction(), numbers.foragingHoles(), numbers.foragingHoleDistance());
+                foragingTunnels = fitToGround(level, planned, flat);
+            }
             foragingTunnelsFor = planned;
             allForagingTunnelsStale = true;
         }
@@ -642,6 +653,54 @@ public class Nest {
         }
         return allForagingTunnels;
     }
+
+    /**
+     * The planned foraging tunnels run straight and level out from the shaft. On a hillside the ground over the far end
+     * is higher or lower than the plan expects, and the hole was never at the surface (the user's bug of 2026-10-14:
+     * workers opened the one block over the tunnel's end, and the soil above it still closed the way out). A tunnel
+     * whose hole is not at the surface is planned again to follow the ground ({@link TunnelRoute#straight}, real galleries
+     * follow the lie of the land); one that is kept as it is (flat ground, and nests whose holes already work). Kept and
+     * saved once every column of them is loaded.
+     */
+    private List<NestPlan.ForagingTunnel> fitToGround(Level level, Layout planned, List<NestPlan.ForagingTunnel> flat) {
+        Set<BlockPos> rooms = new HashSet<>(planned.cells());
+        for (int i = 1; i <= planned.shaftDepth(); i++) {
+            rooms.add(center.below(i));
+        }
+        if (planned.founding() != null) {
+            rooms.addAll(planned.founding().cells());
+        }
+        GroundReader ground = new GroundReader(level, colony, rooms);
+        List<NestPlan.ForagingTunnel> fitted = new ArrayList<>();
+        boolean allLoaded = true;
+        for (NestPlan.ForagingTunnel tunnel : flat) {
+            BlockPos hole = tunnel.hole();
+            if (!level.isLoaded(hole) || !level.isLoaded(hole.relative(tunnel.side(), 2))) {
+                allLoaded = false;
+                fitted.add(tunnel);
+                continue;
+            }
+            BlockState above = level.getBlockState(hole.above());
+            boolean atSurface = level.getBlockState(hole).canBeReplaced() || above.canBeReplaced() && above.getFluidState().isEmpty();
+            TunnelRoute.Plan plan = atSurface ? null
+                    : TunnelRoute.straight(center.below(NestPlan.FORAGING_TUNNEL_DEPTH), tunnel.side(), tunnel.tunnel().size(), MIN_FITTED_TUNNEL, ground);
+            if (plan != null) {
+                AntColoniesMod.LOGGER.debug("[ground] the foraging tunnel to the {} follows the ground: {} blocks, hole at {} (was {})",
+                        tunnel.side(), plan.cells().size(), plan.hole().toShortString(), hole.toShortString());
+            }
+            fitted.add(plan == null ? tunnel : new NestPlan.ForagingTunnel(plan.cells(), plan.hole(), tunnel.side()));
+        }
+        if (allLoaded) {
+            fittedTunnels = List.copyOf(fitted);
+            if (level instanceof net.minecraft.server.level.ServerLevel server) {
+                ColonyManager.get(server).markChanged();
+            }
+        }
+        return List.copyOf(fitted);
+    }
+
+    /** A foraging tunnel fitted to the ground is at least this many columns long (shorter: the level plan is kept). */
+    private static final int MIN_FITTED_TUNNEL = 4;
 
     /** A tunnel dug out to rich food after the nest was planned, and the food it leads to. */
     public record NewTunnel(NestPlan.ForagingTunnel tunnel, BlockPos food) {
@@ -927,6 +986,17 @@ public class Nest {
             tunnels.add(entry);
         }
         tag.put("newTunnels", tunnels);
+        if (fittedTunnels != null) {
+            ListTag fitted = new ListTag();
+            for (NestPlan.ForagingTunnel tunnel : fittedTunnels) {
+                CompoundTag entry = new CompoundTag();
+                entry.putLongArray("cells", tunnel.tunnel().stream().mapToLong(BlockPos::asLong).toArray());
+                entry.putLong("hole", tunnel.hole().asLong());
+                entry.putInt("side", tunnel.side().get3DDataValue());
+                fitted.add(entry);
+            }
+            tag.put("fittedTunnels", fitted);
+        }
         tag.putLongArray("spentHoles", spentHoles.stream().mapToLong(BlockPos::asLong).toArray());
         if (layout != null) {
             tag.putInt("nestDepth", layout.shaftDepth());
@@ -951,6 +1021,22 @@ public class Nest {
                         Direction.from3DDataValue(entry.getInt("side"))), BlockPos.of(entry.getLong("food"))));
             }
         }
+        fittedTunnels = null;
+        if (tag.contains("fittedTunnels")) {
+            List<NestPlan.ForagingTunnel> fitted = new ArrayList<>();
+            for (Tag element : tag.getList("fittedTunnels", Tag.TAG_COMPOUND)) {
+                CompoundTag entry = (CompoundTag) element;
+                List<BlockPos> cells = new ArrayList<>();
+                for (long cell : entry.getLongArray("cells")) {
+                    cells.add(BlockPos.of(cell));
+                }
+                if (!cells.isEmpty()) {
+                    fitted.add(new NestPlan.ForagingTunnel(List.copyOf(cells), BlockPos.of(entry.getLong("hole")), Direction.from3DDataValue(entry.getInt("side"))));
+                }
+            }
+            fittedTunnels = List.copyOf(fitted);
+        }
+        foragingTunnelsFor = null;
         spentHoles.clear();
         for (long hole : tag.getLongArray("spentHoles")) {
             spentHoles.add(BlockPos.of(hole));

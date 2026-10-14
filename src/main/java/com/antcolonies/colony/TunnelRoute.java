@@ -45,6 +45,11 @@ public final class TunnelRoute {
 
         /** Whether a hole may be opened here (the top ground block of a column: soil, open air above it). */
         boolean mayOpenHole(BlockPos hole);
+
+        /** Whether this block is already dug out under a roof (a tunnel dug before): a route may run through it. */
+        default boolean isDug(BlockPos cell) {
+            return false;
+        }
     }
 
     /** A planned tunnel: its blocks in digging order (the first touches {@code start}) and the hole over its end. */
@@ -125,6 +130,43 @@ public final class TunnelRoute {
             }
         }
         return null;
+    }
+
+    /**
+     * A tunnel running straight out from {@code start} toward {@code side}, {@code distance} columns, following the
+     * ground up and down like {@link #plan} (the nest's own foraging tunnels on a hillside, the user's decision of
+     * 2026-10-14: real galleries follow the lie of the land). Under a column whose ground is not known (the mound) it
+     * stays level. It stops early before a column it cannot reach (stone, a step of more than {@link #MAX_STEP}, water),
+     * and its hole is over the last column where one may open; null if that leaves fewer than {@code minLength} columns.
+     */
+    @Nullable
+    public static Plan straight(BlockPos start, Direction side, int distance, int minLength, Ground ground) {
+        List<BlockPos> cells = new ArrayList<>();
+        BlockPos at = start;
+        Plan best = null;
+        for (int k = 1; k <= distance; k++) {
+            int x = start.getX() + side.getStepX() * k;
+            int z = start.getZ() + side.getStepZ() * k;
+            Integer top = ground.groundTop(x, z);
+            BlockPos next = new BlockPos(x, top == null ? at.getY() : top - 1, z);
+            if (Math.abs(next.getY() - at.getY()) > MAX_STEP) {
+                break;
+            }
+            List<BlockPos> step = step(at, next);
+            boolean diggable = true;
+            for (BlockPos cell : step) {
+                diggable &= ground.mayDig(cell) || ground.isDug(cell);
+            }
+            if (!diggable) {
+                break;
+            }
+            cells.addAll(step);
+            at = next;
+            if (k >= minLength && top != null && ground.mayOpenHole(next.above())) {
+                best = new Plan(List.copyOf(cells), next.above());
+            }
+        }
+        return best;
     }
 
     /**

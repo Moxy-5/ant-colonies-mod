@@ -123,6 +123,28 @@ class TunnelRouteTest {
     }
 
     @Test
+    void aStraightTunnelFollowsAHillsideUpToTheSurface() {
+        // The ground rises a block a column from x = 4 (the user's side holes on a hill, 2026-10-14).
+        IntBinaryOperator hillside = (x, z) -> 64 + Math.max(0, x - 3);
+        BlockPos start = new BlockPos(0, 62, 0); // 2 under the entrance, as the nest's foraging tunnels
+        TunnelRoute.Plan plan = TunnelRoute.straight(start, net.minecraft.core.Direction.EAST, 8, 4, ground(hillside, Set.of()));
+        assertNotNull(plan);
+        assertJoinedAndUnderground(start, plan, hillside);
+        assertEquals(new BlockPos(8, hillside.applyAsInt(8, 0), 0), plan.hole(), "the hole is at the surface of the last column");
+    }
+
+    @Test
+    void aStraightTunnelStopsBeforeStoneAndOpensItsHoleBefore() {
+        IntBinaryOperator flat = (x, z) -> 64;
+        Set<Long> stone = Set.of(column(6, 0));
+        BlockPos start = new BlockPos(0, 63, 0);
+        TunnelRoute.Plan plan = TunnelRoute.straight(start, net.minecraft.core.Direction.EAST, 8, 4, ground(flat, stone));
+        assertNotNull(plan);
+        assertEquals(new BlockPos(5, 64, 0), plan.hole());
+        assertNull(TunnelRoute.straight(start, net.minecraft.core.Direction.EAST, 8, 6, ground(flat, stone)), "shorter than the least length");
+    }
+
+    @Test
     void aStepIsDugUnderground() {
         assertEquals(List.of(new BlockPos(1, 63, 0), new BlockPos(1, 64, 0)), TunnelRoute.step(new BlockPos(0, 63, 0), new BlockPos(1, 64, 0)));
         assertEquals(List.of(new BlockPos(0, 62, 0), new BlockPos(1, 62, 0)), TunnelRoute.step(new BlockPos(0, 63, 0), new BlockPos(1, 62, 0)));
