@@ -226,17 +226,18 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * {@code state} (optional): block state values the plant must have, for example {@code {"growth": "dry"}} so
      * termites only take Dry Grass once it has dried; a block without one of these properties never matches.
      */
-    public record PlantFood(String block, int pieces, boolean onlyDecaying, int foragers, Map<String, String> state) {
+    public record PlantFood(String block, int pieces, boolean onlyDecaying, int foragers, Map<String, String> state, boolean rich) {
         public static final Codec<PlantFood> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.STRING.fieldOf("block").forGetter(PlantFood::block),
                 Codec.INT.fieldOf("pieces").forGetter(PlantFood::pieces),
                 Codec.BOOL.optionalFieldOf("only_decaying", false).forGetter(PlantFood::onlyDecaying),
                 Codec.INT.optionalFieldOf("foragers", 1).forGetter(PlantFood::foragers),
-                Codec.unboundedMap(Codec.STRING, Codec.STRING).optionalFieldOf("state", Map.of()).forGetter(PlantFood::state)
+                Codec.unboundedMap(Codec.STRING, Codec.STRING).optionalFieldOf("state", Map.of()).forGetter(PlantFood::state),
+                Codec.BOOL.optionalFieldOf("rich", false).forGetter(PlantFood::rich)
         ).apply(i, PlantFood::new));
 
         public PlantFood(String block, int pieces, boolean onlyDecaying, int foragers) {
-            this(block, pieces, onlyDecaying, foragers, Map.of());
+            this(block, pieces, onlyDecaying, foragers, Map.of(), false);
         }
 
         /** Whether this block is this plant (for dying leaves only, is dying; with {@code state}, has those values). */
@@ -319,7 +320,7 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * close it (the entrance, a foraging hole, an opening in the nest walls; optional, Burrowed Dirt).
      */
     public record NestNumbers(int maxLevels, boolean sealWhileFounding, boolean foundingChamber, List<String> sideRooms,
-            int foragingHoles, int foragingHoleDistance, String plugBlock, List<LevelUnlock> levelUnlocks) {
+            int foragingHoles, int foragingHoleDistance, String plugBlock, List<LevelUnlock> levelUnlocks, Optional<NewHoles> newHoles) {
         public static final Codec<NestNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("max_levels").forGetter(NestNumbers::maxLevels),
                 Codec.BOOL.fieldOf("seal_while_founding").forGetter(NestNumbers::sealWhileFounding),
@@ -328,12 +329,18 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 Codec.INT.optionalFieldOf("foraging_holes", 0).forGetter(NestNumbers::foragingHoles),
                 Codec.INT.optionalFieldOf("foraging_hole_distance", 8).forGetter(NestNumbers::foragingHoleDistance),
                 Codec.STRING.optionalFieldOf("plug_block", "antcolonies:burrowed_dirt").forGetter(NestNumbers::plugBlock),
-                LevelUnlock.CODEC.listOf().optionalFieldOf("level_unlocks", List.of()).forGetter(NestNumbers::levelUnlocks)
+                LevelUnlock.CODEC.listOf().optionalFieldOf("level_unlocks", List.of()).forGetter(NestNumbers::levelUnlocks),
+                NewHoles.CODEC.optionalFieldOf("new_holes").forGetter(NestNumbers::newHoles)
         ).apply(i, NestNumbers::new));
 
         public NestNumbers(int maxLevels, boolean sealWhileFounding, boolean foundingChamber, List<String> sideRooms,
                 int foragingHoles, int foragingHoleDistance, String plugBlock) {
-            this(maxLevels, sealWhileFounding, foundingChamber, sideRooms, foragingHoles, foragingHoleDistance, plugBlock, List.of());
+            this(maxLevels, sealWhileFounding, foundingChamber, sideRooms, foragingHoles, foragingHoleDistance, plugBlock, List.of(), Optional.empty());
+        }
+
+        public NestNumbers(int maxLevels, boolean sealWhileFounding, boolean foundingChamber, List<String> sideRooms,
+                int foragingHoles, int foragingHoleDistance, String plugBlock, List<LevelUnlock> levelUnlocks) {
+            this(maxLevels, sealWhileFounding, foundingChamber, sideRooms, foragingHoles, foragingHoleDistance, plugBlock, levelUnlocks, Optional.empty());
         }
 
         /**
@@ -367,6 +374,31 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
         /** Whether this block is a plug the workers packed: the plug block, or Burrowed Dirt (the plug of older saves). */
         public boolean isPlug(BlockState state) {
             return state.is(plugState().getBlock()) || state.is(ModBlocks.BURROWED_DIRT.get());
+        }
+    }
+
+    /**
+     * New foraging holes near rich food (termites; the user's decision, 2026-10-14): when the colony knows a rich plant
+     * (a plant whose entry says {@code rich}) more than {@code minDistance} blocks from every hole, the workers dig a
+     * tunnel underground out to it and open a hole beside it. The tunnels reach out from the nest up to
+     * {@link #reach} blocks, growing with the colony from {@code reachMin} (a young colony) to {@code reachMax} (at
+     * {@code reachFullAtWorkers} workers); at most {@code max} new holes at a time (my picks).
+     */
+    public record NewHoles(int reachMin, int reachMax, int reachFullAtWorkers, int minDistance, int max) {
+        public static final Codec<NewHoles> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.INT.optionalFieldOf("reach_min", 10).forGetter(NewHoles::reachMin),
+                Codec.INT.optionalFieldOf("reach_max", 40).forGetter(NewHoles::reachMax),
+                Codec.INT.optionalFieldOf("reach_full_at_workers", 500).forGetter(NewHoles::reachFullAtWorkers),
+                Codec.INT.optionalFieldOf("min_distance", 8).forGetter(NewHoles::minDistance),
+                Codec.INT.optionalFieldOf("max", 6).forGetter(NewHoles::max)
+        ).apply(i, NewHoles::new));
+
+        /** How far (blocks, sideways from the nest's middle) the tunnels reach with this many workers. */
+        public int reach(int workers) {
+            if (reachFullAtWorkers <= 0 || workers >= reachFullAtWorkers) {
+                return reachMax;
+            }
+            return reachMin + (int) Math.round((reachMax - reachMin) * (double) Math.max(0, workers) / reachFullAtWorkers);
         }
     }
 

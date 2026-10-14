@@ -67,7 +67,7 @@ public class ScoutGoal extends Goal {
     @Nullable
     private BlockPos pickSpot(ServerLevel level, Colony colony) {
         BlockPos center = colony.getCenter();
-        int radius = colony.profile().food().radius();
+        int radius = colony.foragingRadius();
         for (int tries = 0; tries < 8; tries++) {
             float angle = ant.getRandom().nextFloat() * Mth.TWO_PI;
             double distance = radius / 3.0 + ant.getRandom().nextDouble() * radius * 2.0 / 3.0;

@@ -246,7 +246,7 @@ public class Population {
 
     /** The real mobs of this colony that may go into the numbers, around the nest (loaded and alive). */
     private List<AbstractAntEntity> realMembers(ServerLevel level) {
-        int radius = colony.profile().food().radius() + 16;
+        int radius = colony.foragingRadius() + 16;
         AABB area = new AABB(colony.getCenter()).inflate(radius, 32, radius);
         return level.getEntitiesOfClass(AbstractAntEntity.class, area,
                 mob -> mob.isAlive() && colony.getId().equals(mob.getColonyId()) && mob.nestCaste() != null);

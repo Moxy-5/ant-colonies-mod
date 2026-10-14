@@ -343,7 +343,7 @@ public class ColonyCommands {
         String when = String.join(", ", colony.profile().food().forageAt());
         String line = " | " + (colony.isForagingTime(level) ? "foraging now" : "staying in") + " (out at: " + when + ")";
         if (holes > 0) {
-            line += ", holes open " + colony.foragingHoles().countOpen(level) + " of " + colony.foragingHoles().tunnels(level).size();
+            line += ", holes open " + colony.foragingHoles().countOpen(level) + " of " + colony.foragingHoles().tunnels(level).size(); line += colony.foragingHoles().describeNewHoles(level);
         }
         return line;
     }

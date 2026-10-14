@@ -295,7 +295,7 @@ public class Alarm {
                 player -> player.isSprinting() && player.onGround())) {
             footsteps(world, player);
         }
-        double reach = colony.profile().food().radius() + 8.0;
+        double reach = colony.foragingRadius() + 8.0;
         AABB area = new AABB(center).inflate(reach, 24.0, reach);
         List<LivingEntity> enemies = world.getEntitiesOfClass(LivingEntity.class, area, this::isEnemy);
         if (enemies.isEmpty()) {
@@ -439,7 +439,7 @@ public class Alarm {
         }
         if (now == 2) {
             LivingEntity foe = enemy != null && world.getEntity(enemy) instanceof LivingEntity living && living.isAlive() ? living : null;
-            double reach = colony.profile().food().radius() + 8.0;
+            double reach = colony.foragingRadius() + 8.0;
             if (foe == null || foe.blockPosition().distSqr(colony.getCenter()) > reach * reach) {
                 return Map.of(); // gone, or beyond the colony's ground: the soldiers stay near home
             }

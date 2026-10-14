@@ -94,7 +94,7 @@ public class ForagingTrails {
         }
         lookedAt = now;
         List<ForagingHoles.WayOut> ways = colony.foragingHoles().waysOut(level);
-        double reach = colony.profile().food().radius() + 8.0;
+        double reach = colony.foragingRadius() + 8.0;
         AABB area = new AABB(colony.getCenter()).inflate(reach, 24.0, reach);
         Set<UUID> seen = new HashSet<>();
         for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, area,

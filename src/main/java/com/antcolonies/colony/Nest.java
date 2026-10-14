@@ -17,6 +17,8 @@ import com.antcolonies.registry.ModTags;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -118,6 +120,16 @@ public class Nest {
     private List<NestPlan.ForagingTunnel> foragingTunnels = List.of();
     @Nullable
     private Layout foragingTunnelsFor;
+    /** The planned foraging tunnels and the new ones together, worked out again when either changes. */
+    private List<NestPlan.ForagingTunnel> allForagingTunnels = List.of();
+    private boolean allForagingTunnelsStale = true;
+    /**
+     * Tunnels dug out to rich food after the nest was planned (new holes near food, see {@link ForagingHoles}), each
+     * with the food it was dug for. Saved.
+     */
+    private final List<NewTunnel> newTunnels = new ArrayList<>();
+    /** The holes of new tunnels whose food is gone: plugged for good, never opened again (the tunnel stays). Saved. */
+    private final Set<BlockPos> spentHoles = new HashSet<>();
     /** The cells that count as inside (see {@link #isInside}), worked out at most once a tick. */
     private Set<BlockPos> inside = Set.of();
     /** The mound's planned channel cells (tunnels, spire pieces, mouths): inside only where the block is built. */
@@ -223,15 +235,17 @@ public class Nest {
                 return next;
             }
         }
+        // A closed hole is opened before more garden rooms are dug: a big colony wants all its gardens at once (with the
+        // brain its headcount is mostly numbers), and its foragers were shut in until every room was dug.
+        BlockPos hole = colony.foragingHoles().holeToOpen(level);
+        if (hole != null) {
+            return hole;
+        }
         for (NestPlan.Chamber chamber : gardens) {
             next = firstDiggable(level, chamber.cells());
             if (next != null) {
                 return next;
             }
-        }
-        BlockPos hole = colony.foragingHoles().holeToOpen(level);
-        if (hole != null) {
-            return hole;
         }
         return colony.mound().findDigTarget(level, digger);
     }
@@ -604,8 +618,40 @@ public class Nest {
             var numbers = colony.profile().nest();
             foragingTunnels = NestPlan.foragingTunnels(center, planned.direction(), numbers.foragingHoles(), numbers.foragingHoleDistance());
             foragingTunnelsFor = planned;
+            allForagingTunnelsStale = true;
         }
-        return foragingTunnels;
+        if (allForagingTunnelsStale) {
+            List<NestPlan.ForagingTunnel> all = new ArrayList<>(foragingTunnels);
+            newTunnels.forEach(tunnel -> all.add(tunnel.tunnel()));
+            allForagingTunnels = List.copyOf(all);
+            allForagingTunnelsStale = false;
+        }
+        return allForagingTunnels;
+    }
+
+    /** A tunnel dug out to rich food after the nest was planned, and the food it leads to. */
+    public record NewTunnel(NestPlan.ForagingTunnel tunnel, BlockPos food) {
+    }
+
+    /** The tunnels dug (or being dug) out to rich food. */
+    public List<NewTunnel> getNewTunnels() {
+        return List.copyOf(newTunnels);
+    }
+
+    /** A new tunnel out to rich food: the workers dig it like the other foraging tunnels. */
+    void addNewTunnel(NewTunnel tunnel) {
+        newTunnels.add(tunnel);
+        allForagingTunnelsStale = true;
+        insideTick = Long.MIN_VALUE;
+    }
+
+    /** Whether this hole's food is gone: it is plugged for good and never opened again. */
+    public boolean isSpent(BlockPos hole) {
+        return spentHoles.contains(hole);
+    }
+
+    void markSpent(BlockPos hole) {
+        spentHoles.add(hole.immutable());
     }
 
     /**
@@ -853,6 +899,17 @@ public class Nest {
 
     void save(CompoundTag tag) {
         tag.putInt("nestLevelsUnlocked", levelsUnlocked);
+        ListTag tunnels = new ListTag();
+        for (NewTunnel tunnel : newTunnels) {
+            CompoundTag entry = new CompoundTag();
+            entry.putLongArray("cells", tunnel.tunnel().tunnel().stream().mapToLong(BlockPos::asLong).toArray());
+            entry.putLong("hole", tunnel.tunnel().hole().asLong());
+            entry.putInt("side", tunnel.tunnel().side().get3DDataValue());
+            entry.putLong("food", tunnel.food().asLong());
+            tunnels.add(entry);
+        }
+        tag.put("newTunnels", tunnels);
+        tag.putLongArray("spentHoles", spentHoles.stream().mapToLong(BlockPos::asLong).toArray());
         if (layout != null) {
             tag.putInt("nestDepth", layout.shaftDepth());
             tag.putInt("nestDirection", layout.direction().get2DDataValue());
@@ -864,6 +921,23 @@ public class Nest {
     void load(CompoundTag tag) {
         // A nest saved before nest stages existed digs all its levels, as it did then.
         levelsUnlocked = tag.contains("nestLevelsUnlocked") ? tag.getInt("nestLevelsUnlocked") : Integer.MAX_VALUE;
+        newTunnels.clear();
+        for (Tag element : tag.getList("newTunnels", Tag.TAG_COMPOUND)) {
+            CompoundTag entry = (CompoundTag) element;
+            List<BlockPos> cells = new ArrayList<>();
+            for (long cell : entry.getLongArray("cells")) {
+                cells.add(BlockPos.of(cell));
+            }
+            if (!cells.isEmpty()) {
+                newTunnels.add(new NewTunnel(new NestPlan.ForagingTunnel(List.copyOf(cells), BlockPos.of(entry.getLong("hole")),
+                        Direction.from3DDataValue(entry.getInt("side"))), BlockPos.of(entry.getLong("food"))));
+            }
+        }
+        spentHoles.clear();
+        for (long hole : tag.getLongArray("spentHoles")) {
+            spentHoles.add(BlockPos.of(hole));
+        }
+        allForagingTunnelsStale = true;
         // The nest plan it was digging (old saves have none: it is worked out again from the ground).
         if (tag.contains("nestLevels")) {
             int depth = tag.getInt("nestDepth");

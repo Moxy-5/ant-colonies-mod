@@ -5,14 +5,19 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import com.antcolonies.AntColoniesMod;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.registry.ModTags;
+import com.antcolonies.species.SpeciesProfile;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.FallingBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
 
 /**
@@ -26,6 +31,13 @@ import net.minecraft.world.phys.AABB;
  * nest's shaft) is open to the sky. A colony that keeps to a schedule plugs it by day like the foraging holes (the
  * user's request: real mounds are closed) and opens it again at night ({@link Nest#mayOpenEntrance}). Once the mound
  * covers it, it stays open: it is then only the way up into the mound's own shaft.
+ *
+ * <p>New holes near food (the user's decision, 2026-10-14; species whose profile has {@code nest.new_holes}): when the
+ * colony knows a rich plant (a fallen branch, a fallen tree, a hay bale) more than {@code min_distance} blocks from
+ * every way out and within its tunnels' reach (growing with the colony), the workers dig a tunnel underground out to
+ * it ({@link TunnelRoute}), one at a time, and open a hole beside the food, so the foragers need not cross the open
+ * ground (real Macrotermes forage from holes opened near the food at the end of long galleries). The soil goes into
+ * the mound like all digging. Once the food is gone the hole is plugged for good; the tunnel stays, as real galleries do.
  */
 public class ForagingHoles {
     /** After the foraging time is over the holes are plugged at the latest this long after (ticks), even with workers still outside. */
@@ -43,6 +55,15 @@ public class ForagingHoles {
     private long closedSince = Colony.NOT_SET;
     private long outsideCheckedAt = Long.MIN_VALUE;
     private boolean anyoneOutside;
+    /** How often (ticks) the colony looks for rich food to dig a new tunnel to, and for new holes whose food is gone. */
+    private static final int NEW_HOLE_CHECK_TICKS = 200;
+    /** How long (ticks) the colony leaves a plant it found no tunnel route to before it tries again. */
+    private static final int NO_ROUTE_TICKS = 6000;
+    /** How near (blocks) a rich plant must still be to the food a new tunnel was dug for, or its hole is spent. */
+    private static final int FOOD_STILL_THERE = 4;
+    private long newHolesCheckedAt = Long.MIN_VALUE;
+    /** Plants the colony found no tunnel route to, and until when it leaves them. Not saved. */
+    private final java.util.Map<BlockPos, Long> noRouteUntil = new java.util.HashMap<>();
 
     ForagingHoles(Colony colony) {
         this.colony = colony;
@@ -63,7 +84,7 @@ public class ForagingHoles {
     public List<WayOut> waysOut(Level level) {
         List<WayOut> ways = new java.util.ArrayList<>();
         for (NestPlan.ForagingTunnel tunnel : tunnels(level)) {
-            if (isDug(level, tunnel) && isOpen(level, tunnel.hole())) {
+            if (isDug(level, tunnel) && isOpen(level, tunnel.hole()) && !colony.nest().isSpent(tunnel.hole())) {
                 ways.add(new WayOut(tunnel.hole().above(), tunnel.side()));
             }
         }
@@ -149,7 +170,7 @@ public class ForagingHoles {
     @Nullable
     BlockPos holeToOpen(Level level) {
         for (NestPlan.ForagingTunnel tunnel : tunnels(level)) {
-            if (isDug(level, tunnel) && !isOpen(level, tunnel.hole()) && mayOpen(level, tunnel.hole())) {
+            if (isDug(level, tunnel) && !isOpen(level, tunnel.hole()) && !colony.nest().isSpent(tunnel.hole()) && mayOpen(level, tunnel.hole())) {
                 return tunnel.hole();
             }
         }
@@ -252,6 +273,202 @@ public class ForagingHoles {
             ((AbstractAntEntity) ant).getNavigator().stop();
         }
         return level.setBlockAndUpdate(hole, colony.profile().nest().plugState());
+    }
+
+    // --- new holes near food ----------------------------------------------------------------------------------
+
+    /**
+     * Every few seconds (from {@link Colony#tick}): a new hole whose food is gone is spent (plugged for good), and if
+     * every new tunnel is dug and there may be more, a new tunnel is planned out to the nearest rich plant the colony
+     * knows that is far from every way out.
+     */
+    void tick(ServerLevel level) {
+        SpeciesProfile.NewHoles numbers = colony.profile().nest().newHoles().orElse(null);
+        long now = level.getGameTime();
+        if (numbers == null || colony.isFounding() || tunnels(level).isEmpty()
+                || (newHolesCheckedAt != Long.MIN_VALUE && now - newHolesCheckedAt < NEW_HOLE_CHECK_TICKS && now >= newHolesCheckedAt)) {
+            return;
+        }
+        newHolesCheckedAt = now;
+        List<BlockPos> plants = colony.food().plants(level);
+        int active = 0;
+        boolean digging = false;
+        for (Nest.NewTunnel tunnel : colony.nest().getNewTunnels()) {
+            BlockPos hole = tunnel.tunnel().hole();
+            if (colony.nest().isSpent(hole)) {
+                continue;
+            }
+            if (level.isLoaded(tunnel.food()) && nearestRich(level, plants, tunnel.food(), FOOD_STILL_THERE) == null) {
+                colony.nest().markSpent(hole);
+                ColonyManager.get(level).markChanged();
+                AntColoniesMod.LOGGER.debug("[new-hole] the food at {} is gone: the hole at {} is plugged for good",
+                        tunnel.food().toShortString(), hole.toShortString());
+                continue;
+            }
+            active++;
+            digging |= !isDug(level, tunnel.tunnel());
+        }
+        if (active >= numbers.max() || digging) {
+            return; // one new tunnel at a time
+        }
+        noRouteUntil.values().removeIf(until -> until <= now || until > now + NO_ROUTE_TICKS);
+        BlockPos food = pickFood(level, plants, numbers);
+        if (food == null) {
+            return;
+        }
+        BlockPos start = startFor(level, food);
+        TunnelRoute.Plan plan = start == null ? null : TunnelRoute.plan(start, food, ground(level), numbers.reachMax() + 16);
+        if (plan == null) {
+            noRouteUntil.put(food.immutable(), now + NO_ROUTE_TICKS);
+            AntColoniesMod.LOGGER.debug("[new-hole] no tunnel route to the food at {}", food.toShortString());
+            return;
+        }
+        BlockPos center = colony.getCenter();
+        Direction side = Direction.getNearest(plan.hole().getX() - center.getX(), 0, plan.hole().getZ() - center.getZ());
+        colony.nest().addNewTunnel(new Nest.NewTunnel(new NestPlan.ForagingTunnel(plan.cells(), plan.hole(), side), food.immutable()));
+        ColonyManager.get(level).markChanged();
+        AntColoniesMod.LOGGER.debug("[new-hole] a tunnel of {} blocks to the food at {}, hole at {}",
+                plan.cells().size(), food.toShortString(), plan.hole().toShortString());
+    }
+
+    /**
+     * The rich plant to dig a new tunnel to, or null: one the colony knows, within its tunnels' reach of the nest's
+     * middle, more than {@code min_distance} blocks from every way out (planned or open) and from the food of every new
+     * tunnel; the nearest to the nest first.
+     */
+    @Nullable
+    private BlockPos pickFood(Level level, List<BlockPos> plants, SpeciesProfile.NewHoles numbers) {
+        BlockPos center = colony.getCenter();
+        int reach = numbers.reach(colony.getCount(com.antcolonies.entity.WorkerAntEntity.CASTE));
+        List<BlockPos> holes = new java.util.ArrayList<>();
+        holes.add(colony.nest().getEntrance());
+        for (NestPlan.ForagingTunnel tunnel : tunnels(level)) {
+            if (!colony.nest().isSpent(tunnel.hole())) {
+                holes.add(tunnel.hole());
+            }
+        }
+        List<BlockPos> dugFor = colony.nest().getNewTunnels().stream().map(Nest.NewTunnel::food).toList();
+        BlockPos best = null;
+        double bestDistance = Double.MAX_VALUE;
+        for (BlockPos plant : plants) {
+            if (!isRich(level, plant) || !colony.foodMap().knows(plant, null) || noRouteUntil.containsKey(plant)) {
+                continue;
+            }
+            double fromNest = sideways(plant, center);
+            if (fromNest > reach || fromNest >= bestDistance || nearAny(plant, holes, numbers.minDistance())
+                    || nearAny(plant, dugFor, FOOD_STILL_THERE)) {
+                continue;
+            }
+            best = plant;
+            bestDistance = fromNest;
+        }
+        return best;
+    }
+
+    /** The block of a dug foraging tunnel nearest the food (sideways), where a new tunnel starts; null if none is dug. */
+    @Nullable
+    private BlockPos startFor(Level level, BlockPos food) {
+        BlockPos best = null;
+        double bestDistance = Double.MAX_VALUE;
+        for (NestPlan.ForagingTunnel tunnel : tunnels(level)) {
+            if (!isDug(level, tunnel)) {
+                continue;
+            }
+            for (BlockPos cell : tunnel.tunnel()) {
+                double distance = sideways(cell, food);
+                if (distance < bestDistance) {
+                    best = cell;
+                    bestDistance = distance;
+                }
+            }
+        }
+        return best;
+    }
+
+    /** The world as the tunnel route planner sees it: the ground, where a tunnel may be dug and a hole opened. */
+    private TunnelRoute.Ground ground(Level level) {
+        java.util.Map<BlockPos, MoundPlan.Part> mound = colony.mound().getParts(level);
+        java.util.Set<BlockPos> nest = colony.nest().nestCells(level);
+        return new TunnelRoute.Ground() {
+            @Override
+            public Integer groundTop(int x, int z) {
+                if (!level.hasChunkAt(new BlockPos(x, colony.getCenter().getY(), z))) {
+                    return null;
+                }
+                BlockPos top = new BlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1, z);
+                // Down through plants, fallen branches and logs lying on the ground (food is not ground).
+                for (int i = 0; i < 4 && (level.getBlockState(top).canBeReplaced() || colony.food().isFoodPlant(level.getBlockState(top))); i++) {
+                    top = top.below();
+                }
+                return mound.containsKey(top) || mound.containsKey(top.above()) ? null : top.getY();
+            }
+
+            @Override
+            public boolean mayDig(BlockPos cell) {
+                return level.isLoaded(cell) && level.getBlockState(cell).is(ModTags.DIGGABLE) && !touchesFluid(level, cell)
+                        && !(level.getBlockState(cell.above()).getBlock() instanceof FallingBlock)
+                        && !mound.containsKey(cell) && !nest.contains(cell);
+            }
+
+            @Override
+            public boolean mayOpenHole(BlockPos hole) {
+                BlockState above = level.getBlockState(hole.above());
+                return mayDig(hole) && above.canBeReplaced() && above.getFluidState().isEmpty();
+            }
+        };
+    }
+
+    /** Whether the plant at this spot is a rich one (its profile entry says {@code rich}). */
+    private boolean isRich(Level level, BlockPos pos) {
+        SpeciesProfile.PlantFood plant = colony.profile().food().plantFor(level.getBlockState(pos));
+        return plant != null && plant.rich();
+    }
+
+    /** A rich plant among these within {@code within} blocks of the spot (or the spot itself), or null. */
+    @Nullable
+    private BlockPos nearestRich(Level level, List<BlockPos> plants, BlockPos spot, int within) {
+        if (isRich(level, spot)) {
+            return spot;
+        }
+        for (BlockPos plant : plants) {
+            if (sideways(plant, spot) <= within && Math.abs(plant.getY() - spot.getY()) <= within && isRich(level, plant)) {
+                return plant;
+            }
+        }
+        return null;
+    }
+
+    private static boolean nearAny(BlockPos pos, List<BlockPos> others, double within) {
+        for (BlockPos other : others) {
+            if (sideways(pos, other) <= within) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static double sideways(BlockPos a, BlockPos b) {
+        double dx = a.getX() - b.getX();
+        double dz = a.getZ() - b.getZ();
+        return Math.sqrt(dx * dx + dz * dz);
+    }
+
+    /** For the colony list: " | new holes 2 (1 spent, 1 being dug), reach 24". Empty for species without new holes. */
+    public String describeNewHoles(Level level) {
+        if (colony.profile().nest().newHoles().isEmpty()) {
+            return "";
+        }
+        int spent = 0;
+        int digging = 0;
+        List<Nest.NewTunnel> tunnels = colony.nest().getNewTunnels();
+        for (Nest.NewTunnel tunnel : tunnels) {
+            if (colony.nest().isSpent(tunnel.tunnel().hole())) {
+                spent++;
+            } else if (!isDug(level, tunnel.tunnel())) {
+                digging++;
+            }
+        }
+        return " | new holes " + tunnels.size() + " (" + spent + " spent, " + digging + " being dug), reach " + colony.foragingRadius();
     }
 
     /** Whether this cell is a way in or out of the nest (a foraging hole, or the entrance): not a place to stop in. */

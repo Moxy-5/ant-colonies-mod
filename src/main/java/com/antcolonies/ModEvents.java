@@ -88,7 +88,7 @@ public class ModEvents {
         return ColonyManager.get(level).getColonies().stream()
                 .filter(colony -> colony.alarm().numbers() != null)
                 .filter(colony -> {
-                    double reach = colony.profile().food().radius() + 8.0;
+                    double reach = colony.foragingRadius() + 8.0;
                     return colony.getCenter().distSqr(pos) <= reach * reach;
                 })
                 .toList();

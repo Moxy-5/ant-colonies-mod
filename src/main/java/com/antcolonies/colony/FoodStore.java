@@ -239,7 +239,7 @@ public class FoodStore {
         if (now >= grassScanTime || now + GRASS_SCAN_TICKS < grassScanTime) {
             grassScanTime = now + GRASS_SCAN_TICKS;
             grassTufts.clear();
-            int radius = food().radius();
+            int radius = colony.foragingRadius();
             for (int x = center.getX() - radius; x <= center.getX() + radius; x++) {
                 for (int z = center.getZ() - radius; z <= center.getZ() + radius; z++) {
                     if (!level.hasChunkAt(new BlockPos(x, center.getY(), z))) {

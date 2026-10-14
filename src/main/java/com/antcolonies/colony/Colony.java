@@ -305,8 +305,18 @@ public class Colony {
         mushrooms.tick(level);
         alarm.tick(level);
         foodMap.tick(level);
+        foragingHoles.tick(level);
         population.tick(level);
         return true;
+    }
+
+    /**
+     * How far (blocks, sideways from the nest's middle) the colony forages: the profile's food radius, or farther once
+     * its tunnels reach farther (new holes near food: the reach grows with the colony, see {@code nest.new_holes}).
+     */
+    public int foragingRadius() {
+        int radius = profile().food().radius();
+        return profile().nest().newHoles().map(holes -> Math.max(radius, holes.reach(getCount(com.antcolonies.entity.WorkerAntEntity.CASTE)))).orElse(radius);
     }
 
     /** The area (around the nest, down to the refuse chamber) where the colony's eggs, larvae and dead ants are looked for. */

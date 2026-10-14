@@ -104,7 +104,7 @@ public class FoodMap {
         Set<BlockPos> stillPlants = new HashSet<>(plants);
         known.removeIf(plant -> level.isLoaded(plant) && !stillPlants.contains(plant) && !colony.food().isFoodPlant(level.getBlockState(plant)));
         double see = food().findRadius();
-        double reach = food().radius() + 8.0;
+        double reach = colony.foragingRadius() + 8.0;
         AABB area = new AABB(colony.getCenter()).inflate(reach, 24.0, reach);
         Set<UUID> seen = new HashSet<>();
         for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, area,
