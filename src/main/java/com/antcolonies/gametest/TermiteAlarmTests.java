@@ -12,7 +12,9 @@ import java.util.UUID;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Alarm;
 import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.ForagingHoles;
 import com.antcolonies.colony.NestPlan;
+import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.TermiteSoldierEntity;
 import com.antcolonies.entity.TermiteSoldierEntity.Rank;
 import com.antcolonies.entity.TermiteWorkerEntity;
@@ -151,6 +153,109 @@ public class TermiteAlarmTests {
                     worker -> colony.getId().equals(worker.getColonyId()) && !colony.nest().isInside(level, worker.blockPosition())).isEmpty();
             helper.assertFalse(workerOut, "a worker is still outside");
             AntColoniesMod.LOGGER.info("[alarm-test] tick {}: the chicken is dead, bitten by {} minors, the workers are in", helper.getTick(), biters.size());
+        });
+    }
+
+    /**
+     * The user's bug (2026-10-13): a young colony at night whose only way out is the open hole in the middle of the mound;
+     * eight foragers out at a dead bush, minors out on guard. A chicken comes: the alarm goes to 2 and the colony stays in, so
+     * the middle hole is to be plugged; in the game the termites crowded the hole and the plugging went on and on, until
+     * the alarm calmed down (2 minutes). The mound is young: its hollow shaft over the hole is not roofed over yet, and
+     * the workers coming home stopped in it (it counted as inside), clinging to its walls above the hole. Checked: once the chicken is dead and everybody is in, the middle hole is plugged
+     * soon after (within 20 seconds), while the alarm is still up.
+     */
+    @GameTest(template = "arena", timeoutTicks = 6000, skyAccess = true)
+    public static void theMiddleHoleIsPluggedSoonAfterAChickenAlarm(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        TermiteMoundTests.deepGround(helper);
+        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        helper.runAfterDelay(5, () -> {
+            for (int i = 0; i < 10; i++) {
+                helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE - 2 + i % 4, SURFACE, MIDDLE - 2 + i / 4);
+            }
+        });
+        List<TermiteSoldierEntity> minors = new ArrayList<>();
+        BlockPos[] bush = new BlockPos[1];
+        Chicken[] chicken = new Chicken[1];
+        long[] at = {-1, -1, -1}; // the chicken came, the chicken died, everybody was in
+        helper.runAfterDelay(10, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
+            long old = level.getGameTime() - colony.profile().worker().builderUntilTicks() - 1000;
+            List<TermiteWorkerEntity> workers = level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds());
+            for (int i = 0; i < workers.size(); i++) {
+                workers.get(i).setGrownUpAt(i < 8 ? old : level.getGameTime()); // 8 foragers (a crowd at the hole), 2 young ones inside
+            }
+            TermiteSoldierTests.digNestAtOnce(level, colony);
+            for (NestPlan.ForagingTunnel tunnel : colony.nest().getForagingTunnels(level)) {
+                level.setBlock(tunnel.hole(), Blocks.STONE.defaultBlockState(), 3); // no foraging holes yet: only the middle one
+            }
+            // A young mound still being built: its hollow shaft over the hole is not roofed over yet (open to the sky).
+            colony.mound().buildInstantly(level, 3);
+            for (java.util.Map.Entry<BlockPos, com.antcolonies.colony.MoundPlan.Part> part : colony.mound().getParts(level).entrySet()) {
+                if (part.getValue() == com.antcolonies.colony.MoundPlan.Part.OPEN) {
+                    for (BlockPos above = part.getKey().above(); above.getY() < part.getKey().getY() + 12; above = above.above()) {
+                        level.setBlock(above, Blocks.AIR.defaultBlockState(), 3);
+                    }
+                }
+            }
+            level.setBlock(colony.nest().getEntrance(), Blocks.AIR.defaultBlockState(), 3);
+            helper.assertTrue(!colony.nest().isEntranceCovered(level), "the mound's shaft is roofed over");
+            bush[0] = colony.nest().getEntrance().offset(9, 0, 1); // (clear of the mound)
+            level.setBlock(bush[0], Blocks.DEAD_BUSH.defaultBlockState(), 3);
+            colony.foodMap().knowForTests(bush[0]);
+            List<BlockPos> room = colony.nest().getHomeChamber(level).room();
+            for (int i = 0; i < 2; i++) {
+                minors.add(TermiteSoldierTests.put(level, ModEntities.TERMITE_MINOR_SOLDIER.get(), room.get(i)));
+            }
+            colony.setForagingTimeForTests(true);
+        });
+        helper.onEachTick(() -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            if (colony == null || bush[0] == null) {
+                return;
+            }
+            long tick = helper.getTick();
+            BlockPos hole = colony.nest().getEntrance();
+            if (chicken[0] == null) {
+                boolean workerOut = !level.getEntitiesOfClass(TermiteWorkerEntity.class, new AABB(bush[0]).inflate(3),
+                        worker -> colony.getId().equals(worker.getColonyId())).isEmpty();
+                if (workerOut && minors.stream().anyMatch(minor -> !colony.nest().isInside(level, minor.blockPosition()))) {
+                    chicken[0] = EntityType.CHICKEN.create(level);
+                    chicken[0].moveTo(bush[0].getX() + 0.5, bush[0].getY(), bush[0].getZ() + 1.5, 0.0F, 0.0F);
+                    level.addFreshEntity(chicken[0]);
+                    at[0] = tick;
+                }
+                return;
+            }
+            if (at[1] < 0 && !chicken[0].isAlive()) {
+                at[1] = tick;
+            }
+            if (at[1] >= 0 && at[2] < 0 && !colony.foragingHoles().isAnyoneOutside(level)) {
+                at[2] = tick;
+            }
+            if (tick % 100 == 0) {
+                StringBuilder near = new StringBuilder();
+                for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, new AABB(hole).inflate(1, 2, 1))) {
+                    near.append("\n    ").append(ant.getClass().getSimpleName()).append(" at ").append(ant.blockPosition().toShortString())
+                            .append(" ").append(ant.goalSelector.getAvailableGoals().stream().filter(g -> g.isRunning())
+                                    .map(g -> g.getGoal().getClass().getSimpleName()).toList());
+                }
+                AntColoniesMod.LOGGER.info("[middle-hole] tick {}: chicken {}, alarm {}, foraging {}, hole {} ({}), wants plugging {}, anyone outside {}, minors out {}{}",
+                        tick, chicken[0].isAlive() ? "alive" : "dead", colony.alarm().level(level), colony.isForagingTime(level),
+                        ForagingHoles.isOpen(level, hole) ? "open" : "shut", level.getBlockState(hole).getBlock().getName().getString(),
+                        colony.foragingHoles().wantsPlugging(level), colony.foragingHoles().isAnyoneOutside(level),
+                        colony.soldiers().minorsOut(level), near);
+            }
+        });
+        helper.succeedWhen(() -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(at[1] >= 0, "the chicken is not dead yet");
+            helper.assertTrue(at[2] >= 0, "not everybody is in yet");
+            helper.assertTrue(!ForagingHoles.isOpen(level, colony.nest().getEntrance()), "the middle hole is still open");
+            helper.assertTrue(colony.alarm().level(level) >= 2 || helper.getTick() - at[2] <= 400,
+                    "the middle hole was only plugged " + (helper.getTick() - at[2]) + " ticks after everybody was in");
         });
     }
 

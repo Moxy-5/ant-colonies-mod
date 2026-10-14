@@ -227,17 +227,36 @@ public class ForagingHoles {
     }
 
     /**
-     * Packs the hole shut with soil (the species' plug block). False if a creature (a termite on its way through, a player) is
-     * in the hole: it must move first, nobody is shut in.
+     * Packs the hole shut with soil (the species' plug block), from {@code inside} (the cell under it, in the nest).
+     * Nestmates standing in the hole are nudged down into {@code inside} first (they do not push each other, and the
+     * hole is where everybody coming home passes: with a few idling in it, it was never plugged, the user's bug of
+     * 2026-10-13, like bug 8, the hill jam). False if anything else is in the hole (a player, a chicken, an insect of
+     * another colony): nobody is buried.
      */
-    public boolean plug(Level level, BlockPos hole) {
+    public boolean plug(Level level, BlockPos hole, BlockPos inside) {
         if (!isOpen(level, hole)) {
             return false;
         }
-        if (!level.getEntitiesOfClass(LivingEntity.class, new AABB(hole), LivingEntity::isAlive).isEmpty()) {
-            return false;
+        List<LivingEntity> inHole = level.getEntitiesOfClass(LivingEntity.class, new AABB(hole), LivingEntity::isAlive);
+        for (LivingEntity living : inHole) {
+            if (!(living instanceof AbstractAntEntity ant) || !colony.getId().equals(ant.getColonyId())) {
+                return false;
+            }
+        }
+        if (!inHole.isEmpty() && !level.getBlockState(inside).getCollisionShape(level, inside).isEmpty()) {
+            return false; // nowhere to nudge them to
+        }
+        for (LivingEntity ant : inHole) {
+            ant.moveTo(inside.getX() + 0.5, inside.getY(), inside.getZ() + 0.5);
+            ant.setDeltaMovement(0, 0, 0);
+            ((AbstractAntEntity) ant).getNavigator().stop();
         }
         return level.setBlockAndUpdate(hole, colony.profile().nest().plugState());
+    }
+
+    /** Whether this cell is a way in or out of the nest (a foraging hole, or the entrance): not a place to stop in. */
+    public boolean isDoorway(Level level, BlockPos cell) {
+        return cell.equals(colony.nest().getEntrance()) || isHole(level, cell);
     }
 
     private static boolean touchesFluid(Level level, BlockPos pos) {

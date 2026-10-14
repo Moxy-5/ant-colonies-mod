@@ -110,8 +110,8 @@ public class PlugHoleGoal extends Goal {
             level.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, soil),
                     hole.getX() + 0.5, hole.getY() + 0.1, hole.getZ() + 0.5, 4, 0.2, 0.05, 0.2, 0.05);
         }
-        if (packed >= PACK_TICKS && !colony.foragingHoles().plug(level, hole)) {
-            packed = PACK_TICKS - PACK_INTERVAL; // someone is in the hole: wait for them to pass
+        if (packed >= PACK_TICKS && !colony.foragingHoles().plug(level, hole, tunnel.end())) {
+            packed = PACK_TICKS - PACK_INTERVAL; // something not of the colony is in the hole: wait for it to go
         }
     }
 }

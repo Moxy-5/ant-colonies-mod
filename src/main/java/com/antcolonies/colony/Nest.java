@@ -591,7 +591,8 @@ public class Nest {
      * foraging tunnels, and the hollow shaft, the tunnels, the hollow spire pieces and chimney mouths of the mound (a
      * termite in their channels is inside), but those only once they are built (the plan's empty cell where a tunnel or a
      * spire piece will go is open air: termites stood there by day thinking they were in, the user's report). Not the
-     * foraging holes themselves (the way out) and not the open air round the mound.
+     * foraging holes themselves (the way out), not the open air round the mound, and not the mound's hollow shaft while it
+     * is still open to the sky (a young mound without its roof).
      */
     public boolean isInside(Level level, BlockPos cell) {
         long now = level.getGameTime();
@@ -601,7 +602,11 @@ public class Nest {
             Set<BlockPos> channels = new HashSet<>();
             colony.mound().getParts(level).forEach((pos, part) -> {
                 if (part == MoundPlan.Part.OPEN) {
-                    cells.add(pos);
+                    // Only once roofed over: a young mound's shaft open to the sky is outside (termites coming home
+                    // stopped in it, clinging to its walls above the plug, the user's bug of 2026-10-13).
+                    if (level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, pos.getX(), pos.getZ()) > pos.getY() + 1) {
+                        cells.add(pos);
+                    }
                 } else if (part == MoundPlan.Part.MOUTH || part == MoundPlan.Part.TUNNEL || part == MoundPlan.Part.SPIRE) {
                     channels.add(pos);
                 }

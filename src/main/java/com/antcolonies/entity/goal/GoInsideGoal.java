@@ -13,8 +13,8 @@ import net.minecraft.world.level.Level;
 
 /**
  * An insect whose colony keeps a schedule (termites: out only at night and in the rain) and that is still outside when
- * it is time to stay in goes back inside: to the nearest spot inside the nest or the mound (through a foraging hole
- * while one is open, otherwise any way in there is, such as a chimney).
+ * it is time to stay in goes back inside: to the nearest spot inside the nest or the mound past the doorway (through a
+ * foraging hole while one is open, otherwise any way in there is, such as a chimney), never stopping in the doorway itself.
  */
 public class GoInsideGoal extends Goal {
     /** If it is not inside after this long (ticks) it stops trying for now (it tries again a little later). */
@@ -43,8 +43,10 @@ public class GoInsideGoal extends Goal {
         if (colony.nest().isInside(level, ant.blockPosition())) {
             return false;
         }
-        BlockPos home = colony.getCenter().below();
-        return ant.getNavigator().moveTo(at -> colony.nest().isInside(level, at.cell()), home, 1.0);
+        // Not to a doorway (the entrance or a foraging hole): one that stops there blocks it from being plugged.
+        Colony home = colony;
+        return ant.getNavigator().moveTo(at -> home.nest().isInside(level, at.cell()) && !home.foragingHoles().isDoorway(level, at.cell()),
+                colony.getCenter().below(), 1.0);
     }
 
     @Override
