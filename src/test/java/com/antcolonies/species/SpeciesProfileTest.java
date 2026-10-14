@@ -79,6 +79,13 @@ class SpeciesProfileTest {
         // The minors line the trail every few blocks, and wait for the workers well before the holes are plugged (30 seconds after the foraging).
         assertEquals(3, soldiers.sentrySpacing());
         assertTrue(soldiers.escortHomeTicks() > 0 && soldiers.escortHomeTicks() <= 300, "the minors must have time to get in before the holes are plugged");
+        // The alarm: four levels, each calming down later than the one below; level 4 keeps everyone in for a whole day.
+        SpeciesProfile.AlarmNumbers alarm = profile.alarm().orElseThrow();
+        for (int level = 1; level < 4; level++) {
+            assertTrue(alarm.calmTicksFor(level) < alarm.calmTicksFor(level + 1), "level " + (level + 1) + " lasts longer than " + level);
+        }
+        assertEquals(24000, alarm.calmTicksFor(4));
+        assertTrue(alarm.breakInsForLevel4() >= 2 && alarm.soldierBoost() > 1.0F);
     }
 
     /**
@@ -97,6 +104,7 @@ class SpeciesProfileTest {
         assertEquals(75, soldiers.wantedMinors(1000));
         assertEquals(25, soldiers.wantedMajors(1000));
         assertTrue(read("red_harvester_ant").soldiers().isEmpty(), "harvester ants have no soldier caste");
+        assertTrue(read("red_harvester_ant").alarm().isEmpty(), "harvester ants raise no alarm yet (their workers are unchanged)");
     }
 
     @Test

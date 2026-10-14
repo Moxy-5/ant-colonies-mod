@@ -22,7 +22,8 @@ public final class TestFilter {
     /** Every class with game tests (a test's own name does not say its class). */
     private static final Class<?>[] CLASSES = {NestTests.class, NavigationTests.class, TermiteTests.class, TermiteClimbingTests.class,
             TermiteFoodTests.class, TermiteGardenTests.class, TermiteForagingTests.class, TermiteMoundTests.class, TermiteTunnelTests.class, TermiteCathedralTests.class,
-            TermiteRepairTests.class, JobsByAgeTests.class, TermitomycesTests.class, TermiteSoldierTests.class};
+            TermiteRepairTests.class, JobsByAgeTests.class, TermitomycesTests.class, TermiteSoldierTests.class,
+            TermiteAlarmTests.class};
 
     private TestFilter() {
     }

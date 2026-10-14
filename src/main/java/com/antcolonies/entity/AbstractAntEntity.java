@@ -303,6 +303,23 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return colony != null && colony.roleOf(serverLevel, this) == role;
     }
 
+    /**
+     * Hurt by something that is not of its own colony (a chicken pecking, a player, an ant of another colony): the
+     * colony's alarm goes up (level 2 at the attacker; only species that raise one, see {@code colony.Alarm}).
+     */
+    @Override
+    public boolean hurt(DamageSource source, float amount) {
+        boolean hurt = super.hurt(source, amount);
+        if (hurt && level() instanceof ServerLevel serverLevel && source.getEntity() instanceof net.minecraft.world.entity.LivingEntity attacker
+                && !(attacker instanceof AbstractAntEntity insect && getColonyId() != null && getColonyId().equals(insect.getColonyId()))) {
+            Colony colony = getColony();
+            if (colony != null) {
+                colony.alarm().memberHurt(serverLevel, attacker);
+            }
+        }
+        return hurt;
+    }
+
     /** The legs: plans routes (walk, climb, drop) and walks them. Goals only say where to go. */
     public AntNavigator getNavigator() {
         return navigator;

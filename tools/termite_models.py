@@ -402,6 +402,16 @@ def head_bang():
             'mandible_l': keys([0, -14, 0]), 'mandible_r': keys([0, 14, 0]),
             'antenna_l_1': keys([-25, -10, 0]), 'antenna_r_1': keys([-25, 10, 0])}
 
+# The bite (step 6c, a simple first version to be refined later): the head pulls back a little while the jaws open
+# wide, then lunges forward and down as the jaws snap shut past each other, and settles. Played once per bite.
+BITE_SECONDS = 0.35
+
+def bite():
+    def keys(back, lunge):
+        return {'rotation': {'0': [0, 0, 0], '0.12': back, '0.2': lunge, f'{BITE_SECONDS:g}': [0, 0, 0]}}
+    return {'head': keys([-8, 0, 0], [8, 0, 0]), 'forebody': keys([-2, 0, 0], [3, 0, 0]),
+            'mandible_l': keys([0, -30, 0], [0, 6, 0]), 'mandible_r': keys([0, 30, 0], [0, -6, 0])}
+
 def soldier_animations():
     """The soldiers' animations: the worker's walk and idle (a slow jaw twitch added), and the head bang."""
     base = animations()['animations']
@@ -411,7 +421,8 @@ def soldier_animations():
     return {'format_version': '1.8.0', 'animations': {
         'idle': {'loop': True, 'animation_length': 2.4, 'bones': idle},
         'walk': base['walk'],
-        'head_bang': {'loop': True, 'animation_length': DRUM_SECONDS, 'bones': head_bang()}}}
+        'head_bang': {'loop': True, 'animation_length': DRUM_SECONDS, 'bones': head_bang()},
+        'bite': {'loop': False, 'animation_length': BITE_SECONDS, 'bones': bite()}}}
 
 def render_head_bang(bones, path, frames=6):
     """The head bang from the side at a few moments of the burst (strike, rest), so the motion can be checked."""

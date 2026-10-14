@@ -62,12 +62,15 @@ public class ColonyCommands {
                                 .executes(context -> mushrooms(context.getSource(), IntegerArgumentType.getInteger(context, "count"), false))
                                 .then(Commands.literal("giant")
                                         .executes(context -> mushrooms(context.getSource(), IntegerArgumentType.getInteger(context, "count"), true)))))
-                // Every termite soldier within 16 blocks drums (the head bang) for that many seconds (default 3), to
-                // see the drumming before the alarm (step 6c) sets it off by itself.
+                // Every termite soldier within 16 blocks drums (the head bang) for that many seconds (default 3).
+                // The nearest termite colony's alarm goes up to that level where the player stands (step 6c), or calms down (0).
                 .then(Commands.literal("drum")
                         .executes(context -> drum(context.getSource(), 3))
                         .then(Commands.argument("seconds", IntegerArgumentType.integer(1, 60))
                                 .executes(context -> drum(context.getSource(), IntegerArgumentType.getInteger(context, "seconds")))))
+                .then(Commands.literal("alarm")
+                        .then(Commands.argument("level", IntegerArgumentType.integer(0, 4))
+                                .executes(context -> alarm(context.getSource(), IntegerArgumentType.getInteger(context, "level")))))
                 .then(Commands.literal("age")
                         .then(Commands.argument("age", IntegerArgumentType.integer(0, MoundSoil.OLDEST))
                                 .executes(context -> age(context.getSource(), IntegerArgumentType.getInteger(context, "age"), 8))
@@ -86,6 +89,23 @@ public class ColonyCommands {
         source.sendSuccess(() -> Component.literal(count == 0 ? "No termite soldier within 16 blocks."
                 : count + " termite soldier" + (count == 1 ? "" : "s") + " drumming for " + seconds + " seconds."), false);
         return count;
+    }
+
+    private static int alarm(CommandSourceStack source, int to) {
+        ServerLevel level = source.getLevel();
+        BlockPos at = BlockPos.containing(source.getPosition());
+        Colony colony = nearestTermiteColony(level, at);
+        if (colony == null || colony.alarm().numbers() == null) {
+            source.sendFailure(Component.literal("No termite colony within 64 blocks."));
+            return 0;
+        }
+        if (to == 0) {
+            colony.alarm().calmForTests();
+        } else {
+            colony.alarm().raise(level, to, at, source.getEntity());
+        }
+        source.sendSuccess(() -> Component.literal("Alarm now" + colony.alarm().describe(level).replace(" | ", " ")), false);
+        return 1;
     }
 
     private static int age(CommandSourceStack source, int age, int radius) {
@@ -216,7 +236,7 @@ public class ColonyCommands {
                                     + colony.profile().queen().richMeal() + incubation(colony, level))
                     + " | queen unfed " + unfedMinutes(colony, level) + " of " + colony.profile().queen().starveTicks() / 1200 + " min"
                     + " | eggs " + colony.brood().countEggs(level) + " | larvae " + colony.brood().countLarvae(level)
-                    + colony.soldiers().describe(level)
+                    + colony.soldiers().describe(level) + colony.alarm().describe(level)
                     + " | dead ants " + colony.refuse().getCorpses(level).size() + " (refuse chamber " + colony.refuse().getRefuseCorpses(level).size() + ")"
                     + mound(colony, level) + foraging(colony, level);
             source.sendSuccess(() -> Component.literal(line), false);

@@ -9,6 +9,7 @@ import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.goal.AntWanderGoal;
+import com.antcolonies.entity.goal.DefendGoal;
 import com.antcolonies.entity.goal.GoInsideGoal;
 import com.antcolonies.entity.goal.GuardPostGoal;
 import com.antcolonies.species.Species;
@@ -23,6 +24,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
@@ -47,8 +49,10 @@ import software.bernie.geckolib.animation.RawAnimation;
  * tunnel from the shaft and the garden doorways. The minors go out at foraging time: one beside each open way out and
  * the others in a sentry line along the foragers' trail, facing out; when the foraging is over they wait at their posts
  * until the workers are in, then go in last, and by day they wait in the foraging tunnels just inside the holes (see
- * {@code colony.Soldiers}). They drum (the head bang) when told to ({@link #drum}; the alarm comes with step 6c). They
- * do not fit the termite tunnel blocks (only workers do), and they do not fight yet (M8).
+ * {@code colony.Soldiers}). They answer the alarm ({@code colony.Alarm}, {@link DefendGoal}): they drum (the head bang,
+ * {@link #drum}) when they feel it, the drumming spreading soldier to soldier, then go at an enemy or to the breach.
+ * For now they only bite chickens ({@link #bite}, a simple first version; fighting players and ants comes with M8).
+ * They do not fit the termite tunnel blocks (only workers do).
  */
 public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurses {
     /** The two kinds of soldier. Each is counted in the colony under its own caste name. */
@@ -83,6 +87,12 @@ public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurs
     private static final SpeciesProfile.SoldierNumbers DEFAULT_NUMBERS = new SpeciesProfile.SoldierNumbers(0.1F, 3, 6, 10, 24000, 48000, 3, 300);
     private static final ResourceLocation HUNGRY_SLOWDOWN = ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "soldier_hungry");
     private static final RawAnimation HEAD_BANG = RawAnimation.begin().thenLoop("head_bang");
+    private static final RawAnimation BITE = RawAnimation.begin().thenPlay("bite");
+    /** How long (ticks) the bite is shown (the animation is 0.35 seconds). */
+    private static final int BITE_TICKS = 7;
+    /** True while the soldier bites. Synced so the client plays the bite. */
+    private static final EntityDataAccessor<Boolean> DATA_BITING =
+            SynchedEntityData.defineId(TermiteSoldierEntity.class, EntityDataSerializers.BOOLEAN);
     /** True while the soldier drums (the head bang). Synced so the client plays the animation. */
     private static final EntityDataAccessor<Boolean> DATA_DRUMMING =
             SynchedEntityData.defineId(TermiteSoldierEntity.class, EntityDataSerializers.BOOLEAN);
@@ -97,6 +107,8 @@ public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurs
     private long feederUntil;
     /** How many more ticks it drums. Server only, not saved. */
     private int drumTicks;
+    /** How many more ticks the bite is shown. Server only, not saved. */
+    private int biteTicks;
 
     public TermiteSoldierEntity(EntityType<? extends TermiteSoldierEntity> type, Level level, Rank rank) {
         super(type, level);
@@ -108,7 +120,7 @@ public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurs
         return PathfinderMob.createMobAttributes()
                 .add(Attributes.MAX_HEALTH, 6.0)
                 .add(Attributes.MOVEMENT_SPEED, 0.24)
-                .add(Attributes.ATTACK_DAMAGE, 2.0);
+                .add(Attributes.ATTACK_DAMAGE, 3.0);
     }
 
     /** A major soldier: big, tough and slow. */
@@ -122,15 +134,17 @@ public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurs
     @Override
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));
-        // Drumming, it stands still; with a nurse on her way with food, it waits for her.
+        // Drumming, it stands still; with a nurse on her way with food, it waits for her (not during an alarm).
         this.goalSelector.addGoal(1, new HoldStillGoal(() -> drumTicks > 0));
-        this.goalSelector.addGoal(2, new HoldStillGoal(() -> wantsFood() && hasFeeder(level().getGameTime())));
+        this.goalSelector.addGoal(2, new HoldStillGoal(() -> wantsFood() && hasFeeder(level().getGameTime()) && !isAlarmed()));
+        // The alarm: at an enemy, or to the breach.
+        this.goalSelector.addGoal(3, new DefendGoal(this));
         // Outside when it should be in (a major put down with a spawn egg, the minors once the workers are in): back inside.
-        this.goalSelector.addGoal(3, new GoInsideGoal(this));
-        this.goalSelector.addGoal(4, new GuardPostGoal(this));
+        this.goalSelector.addGoal(4, new GoInsideGoal(this));
+        this.goalSelector.addGoal(5, new GuardPostGoal(this));
         // No post to guard (the nest is not dug that far yet, every post taken): it strolls about (inside unless it may be out).
-        this.goalSelector.addGoal(5, new AntWanderGoal(this, 0.8, 200, 4, () -> true));
-        this.goalSelector.addGoal(6, new RandomLookAroundGoal(this));
+        this.goalSelector.addGoal(6, new AntWanderGoal(this, 0.8, 200, 4, () -> true));
+        this.goalSelector.addGoal(7, new RandomLookAroundGoal(this));
     }
 
     /** Holds the soldier still (no walking) while {@code when} is true. */
@@ -162,17 +176,31 @@ public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurs
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         super.defineSynchedData(builder);
         builder.define(DATA_DRUMMING, false);
+        builder.define(DATA_BITING, false);
     }
 
     public Rank getRank() {
         return rank;
     }
 
-    // The majors always stay inside; the minors are out while their colony sends them out (see Soldiers.minorsOut).
+    // The majors stay inside; the minors are out while their colony sends them out (see Soldiers.minorsOut), and any
+    // soldier the alarm sends somewhere may go there (a minor at an enemy, at a breach).
     @Override
     public boolean mayGoOut() {
         Colony colony = getColony();
-        return rank == Rank.MINOR && colony != null && colony.soldiers().minorsOut(level());
+        if (colony == null) {
+            return false;
+        }
+        if (level() instanceof ServerLevel serverLevel && colony.alarm().isBusy(serverLevel, this)) {
+            return true;
+        }
+        return rank == Rank.MINOR && colony.soldiers().minorsOut(level());
+    }
+
+    /** Whether its colony's alarm is up (it then has no time to wait for a nurse). */
+    private boolean isAlarmed() {
+        Colony colony = getColony();
+        return colony != null && colony.alarm().level(level()) >= 2;
     }
 
     // Soldiers dig nothing and carry nothing.
@@ -248,8 +276,8 @@ public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurs
 
     /**
      * Drums (the head bang) for {@code ticks} ticks, standing still: real soldiers strike the ground with their heads in
-     * quick bursts to raise the alarm, and the others feel it through the walls. For now only the command
-     * {@code /antcolonies drum} starts it; the alarm comes with step 6c.
+     * quick bursts to raise the alarm, and the others feel it through the walls ({@code colony.Alarm}); also the command
+     * {@code /antcolonies drum}.
      */
     public void drum(int ticks) {
         drumTicks = Math.max(drumTicks, ticks);
@@ -260,10 +288,26 @@ public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurs
         return entityData.get(DATA_DRUMMING);
     }
 
+    /**
+     * Bites the enemy: its jaws snap shut on it (the bite animation) for the soldier's attack damage (a minor 3). A
+     * simple first version (the user's "something simple for now"; M8 refines the fighting).
+     */
+    public void bite(LivingEntity enemy) {
+        biteTicks = BITE_TICKS;
+        swing(net.minecraft.world.InteractionHand.MAIN_HAND);
+        enemy.hurt(damageSources().mobAttack(this), (float) getAttributeValue(Attributes.ATTACK_DAMAGE));
+        playSound(SoundEvents.TURTLE_EGG_CRACK, 0.5F, 1.8F + getRandom().nextFloat() * 0.2F);
+    }
+
+    /** Whether it is biting now (synced: the client plays the bite). */
+    public boolean isBiting() {
+        return entityData.get(DATA_BITING);
+    }
+
     @Override
     @Nullable
     protected RawAnimation specialAnimation() {
-        return isDrumming() ? HEAD_BANG : null;
+        return isDrumming() ? HEAD_BANG : isBiting() ? BITE : null;
     }
 
     // --- the colony ---------------------------------------------------------------------------------------------
@@ -307,6 +351,17 @@ public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurs
             }
         }
         entityData.set(DATA_DRUMMING, drumTicks > 0);
+        if (biteTicks > 0) {
+            biteTicks--;
+        }
+        entityData.set(DATA_BITING, biteTicks > 0);
+        // Now and then: does it feel the alarm drumming through the walls?
+        if ((tickCount + getId()) % 5 == 0 && getColonyId() != null) {
+            Colony colony = ColonyManager.get(serverLevel).getColony(getColonyId());
+            if (colony != null) {
+                colony.alarm().listen(serverLevel, this);
+            }
+        }
     }
 
     // Once a second: the hunger clock (it only runs in a colony whose members get hungry).

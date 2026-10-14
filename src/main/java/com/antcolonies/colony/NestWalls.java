@@ -78,7 +78,7 @@ public class NestWalls {
      * on its own (a cave crossing a gallery nobody has dug yet) is not part of the nest yet, so the caves round it are
      * not leaks: otherwise the workers would go sealing caves far from where they live.
      */
-    private Set<BlockPos> joinedCells(Level level, Set<BlockPos> nest) {
+    Set<BlockPos> joinedCells(Level level, Set<BlockPos> nest) {
         Set<BlockPos> joined = new HashSet<>();
         BlockPos start = center.below();
         if (!nest.contains(start) || !Nest.isDugOut(level, start)) {
@@ -150,19 +150,64 @@ public class NestWalls {
         return isOpen(level, hole);
     }
 
-    /** Fills a leak with the species' plug block (Burrowed Dirt, mound soil). False if it is already closed or someone is standing in it (try again later). */
+    /**
+     * Fills a leak with the species' plug block (Burrowed Dirt, mound soil). False if it is already closed or someone is
+     * standing in it (try again later). A soldier of the colony standing in it (guarding the breach) does not stop it: it
+     * is pushed out to the far side, shut outside, like real termites sealing a breach behind their soldiers (it comes
+     * back in later by a foraging hole); if the hole leads nowhere open, it is pushed back into the nest.
+     */
     public boolean plugLeak(Level level, BlockPos hole) {
         if (hole.equals(center) || !isOpen(level, hole)) {
             return false;
         }
         // Never bury anyone, same as with the hill.
-        if (!level.getEntitiesOfClass(LivingEntity.class, new AABB(hole)).isEmpty()) {
-            return false;
+        List<LivingEntity> inside = level.getEntitiesOfClass(LivingEntity.class, new AABB(hole));
+        if (!inside.isEmpty()) {
+            BlockPos out = inside.stream().allMatch(this::isOwnSoldier) ? outsideOf(level, hole) : null;
+            if (out == null) {
+                return false;
+            }
+            for (LivingEntity soldier : inside) {
+                soldier.teleportTo(out.getX() + 0.5, out.getY(), out.getZ() + 0.5);
+                if (soldier instanceof com.antcolonies.entity.AbstractAntEntity insect) {
+                    insect.getNavigator().stop();
+                }
+            }
         }
         level.setBlock(hole, colony.profile().nest().plugState(), 3);
         claimedLeaks.remove(hole);
         sealProgress.remove(hole);
         return true;
+    }
+
+    private boolean isOwnSoldier(LivingEntity entity) {
+        return entity instanceof com.antcolonies.entity.TermiteSoldierEntity soldier && colony.getId().equals(soldier.getColonyId());
+    }
+
+    /** Where a soldier in the hole is pushed to: an open cell beside it away from the nest (one to stand on first), else back into the nest. */
+    @Nullable
+    private BlockPos outsideOf(Level level, BlockPos hole) {
+        Set<BlockPos> nest = colony.nest().nestCells(level);
+        for (Direction side : Direction.values()) {
+            BlockPos cell = hole.relative(side);
+            BlockPos floor = cell.below();
+            // First straight through the hole: the nest on one side, out on the other.
+            if (nest.contains(hole.relative(side.getOpposite())) && !nest.contains(cell) && level.isLoaded(cell) && level.getBlockState(cell).getCollisionShape(level, cell).isEmpty()
+                    && level.getBlockState(cell).getFluidState().isEmpty() && level.getBlockState(floor).isFaceSturdy(level, floor, Direction.UP)) {
+                return cell;
+            }
+        }
+        // Then any open cell outside; and if the hole leads nowhere (a cut wall with soil behind it), back into the nest.
+        for (boolean intoTheNest : new boolean[] {false, true}) {
+            for (Direction side : Direction.values()) {
+                BlockPos cell = hole.relative(side);
+                if (nest.contains(cell) == intoTheNest && level.isLoaded(cell) && level.getBlockState(cell).getCollisionShape(level, cell).isEmpty()
+                        && level.getBlockState(cell).getFluidState().isEmpty()) {
+                    return cell;
+                }
+            }
+        }
+        return null;
     }
 
     /**

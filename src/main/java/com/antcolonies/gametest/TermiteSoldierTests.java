@@ -199,7 +199,7 @@ public class TermiteSoldierTests {
     }
 
     /** A soldier of this kind put at the middle of this cell (it joins the nearest termite colony). */
-    private static TermiteSoldierEntity put(ServerLevel level, EntityType<TermiteSoldierEntity> type, BlockPos cell) {
+    static TermiteSoldierEntity put(ServerLevel level, EntityType<TermiteSoldierEntity> type, BlockPos cell) {
         TermiteSoldierEntity soldier = type.create(level);
         soldier.moveTo(cell.getX() + 0.5, cell.getY(), cell.getZ() + 0.5, 0.0F, 0.0F);
         level.addFreshEntity(soldier);
@@ -239,7 +239,7 @@ public class TermiteSoldierTests {
     }
 
     /** Digs the termite colony's shaft, royal chamber, first garden room and foraging tunnels out at once. */
-    private static void digNestAtOnce(ServerLevel level, Colony colony) {
+    static void digNestAtOnce(ServerLevel level, Colony colony) {
         BlockPos bottom = colony.nest().getShaftBottom(level);
         for (BlockPos pos = colony.getCenter().below(); pos.getY() >= bottom.getY(); pos = pos.below()) {
             level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);

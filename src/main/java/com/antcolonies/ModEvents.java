@@ -9,11 +9,21 @@ import com.antcolonies.entity.WorkerAntEntity;
 import com.antcolonies.registry.ModEntities;
 import com.antcolonies.registry.ModItems;
 
+import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.entity.goal.HuntTermitesGoal;
+
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.animal.Chicken;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent;
+import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
+import net.neoforged.neoforge.event.entity.living.LivingEvent;
+import net.neoforged.neoforge.event.level.BlockEvent;
 
 @EventBusSubscriber(modid = AntColoniesMod.MODID)
 public class ModEvents {
@@ -26,6 +36,45 @@ public class ModEvents {
         event.put(ModEntities.TERMITE_WORKER.get(), TermiteWorkerEntity.createAttributes().build());
         event.put(ModEntities.TERMITE_MINOR_SOLDIER.get(), TermiteSoldierEntity.createMinorAttributes().build());
         event.put(ModEntities.TERMITE_MAJOR_SOLDIER.get(), TermiteSoldierEntity.createMajorAttributes().build());
+    }
+
+    /** Chickens hunt termite workers out on the surface (step 6c; see {@link HuntTermitesGoal}). */
+    @SubscribeEvent
+    public static void onJoinLevel(EntityJoinLevelEvent event) {
+        if (!event.getLevel().isClientSide() && event.getEntity() instanceof Chicken chicken) {
+            chicken.goalSelector.addGoal(3, new HuntTermitesGoal(chicken));
+        }
+    }
+
+    /** A player jumping on a termite mound: footsteps, the alarm's first level (see {@code colony.Alarm}). */
+    @SubscribeEvent
+    public static void onJump(LivingEvent.LivingJumpEvent event) {
+        if (event.getEntity() instanceof Player player && player.level() instanceof ServerLevel level) {
+            for (Colony colony : coloniesNear(level, player.blockPosition())) {
+                colony.alarm().footsteps(level, player);
+            }
+        }
+    }
+
+    /** A player breaking into a termite mound or nest: a break-in, the alarm's third level (see {@code colony.Alarm}). */
+    @SubscribeEvent
+    public static void onBreak(BlockEvent.BreakEvent event) {
+        if (event.getLevel() instanceof ServerLevel level) {
+            for (Colony colony : coloniesNear(level, event.getPos())) {
+                colony.alarm().blockBroken(level, event.getPos(), event.getPlayer());
+            }
+        }
+    }
+
+    /** The colonies with an alarm whose ground (the food radius and a bit) this spot is in. */
+    private static java.util.List<Colony> coloniesNear(ServerLevel level, net.minecraft.core.BlockPos pos) {
+        return ColonyManager.get(level).getColonies().stream()
+                .filter(colony -> colony.alarm().numbers() != null)
+                .filter(colony -> {
+                    double reach = colony.profile().food().radius() + 8.0;
+                    return colony.getCenter().distSqr(pos) <= reach * reach;
+                })
+                .toList();
     }
 
     @SubscribeEvent

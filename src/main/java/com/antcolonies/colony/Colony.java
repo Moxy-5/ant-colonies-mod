@@ -31,7 +31,7 @@ import net.minecraft.world.phys.AABB;
  * {@link #food()} (seeds), {@link #bakery()} (ant bread), {@link #queenCare()} (feeding the queen and her eggs),
  * {@link #brood()} (eggs and larvae), {@link #refuse()} (dead ants), {@link #mound()} (the termite mound),
  * {@link #foragingHoles()} (the termites' ways out to forage), {@link #garden()} (the termites' fungus garden) and
- * {@link #soldiers()} (the termites' soldiers).
+ * {@link #soldiers()} (the termites' soldiers) and {@link #alarm()} (their alarm).
  */
 public class Colony {
     /** "No time saved": a hunger clock that has not started yet. */
@@ -71,6 +71,7 @@ public class Colony {
     private final FungusGarden garden;
     private final Mushrooms mushrooms;
     private final Soldiers soldiers;
+    private final Alarm alarm;
 
     public Colony(UUID id, ResourceLocation species, UUID queenId, BlockPos center) {
         this.id = id;
@@ -91,6 +92,7 @@ public class Colony {
         this.garden = new FungusGarden(this);
         this.mushrooms = new Mushrooms(this);
         this.soldiers = new Soldiers(this);
+        this.alarm = new Alarm(this);
     }
 
     /** The underground nest: its plan, the next block to dig, and the dug-out cells of each room. */
@@ -158,6 +160,11 @@ public class Colony {
         return soldiers;
     }
 
+    /** The alarm: its level, where the trouble is, and what each soldier does about it (species with an {@code alarm}). */
+    public Alarm alarm() {
+        return alarm;
+    }
+
     /**
      * What the nurses feed the queen and the young: fungus nodules for a species with a fungus garden, ant bread
      * otherwise.
@@ -175,9 +182,13 @@ public class Colony {
      * Whether it is time to forage (the profile's {@code food.forage_at}: termites at night and in the rain, harvester
      * ants at any time). Outside this time the foragers stay home, the foraging holes are plugged, and a species that
      * keeps to a schedule does no work outside the nest and the mound at all (it stays in, out of the sun). The end of the
-     * night already counts as day ({@link #isBeforeDawn}): they head in before the sun is up.
+     * night already counts as day ({@link #isBeforeDawn}): they head in before the sun is up. Never while the alarm is at
+     * 2 or more ({@link Alarm#keepsEveryoneIn}): the foragers hurry home.
      */
     public boolean isForagingTime(net.minecraft.world.level.Level level) {
+        if (alarm.keepsEveryoneIn(level)) {
+            return false;
+        }
         if (foragingTimeForTests != null) {
             return foragingTimeForTests;
         }
@@ -397,6 +408,7 @@ public class Colony {
         queenCare.save(tag);
         nest.save(tag);
         mound.save(tag);
+        alarm.save(tag);
         return tag;
     }
 
@@ -415,6 +427,7 @@ public class Colony {
         colony.queenCare.load(tag);
         colony.nest.load(tag);
         colony.mound.load(tag);
+        colony.alarm.load(tag);
         return colony;
     }
 }

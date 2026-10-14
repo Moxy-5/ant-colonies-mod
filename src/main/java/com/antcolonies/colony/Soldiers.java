@@ -72,13 +72,14 @@ public class Soldiers {
         return colony.getCount(rank.caste());
     }
 
-    /** How many soldiers of this kind the colony wants now (from how many workers it has; none for a species without soldiers). */
-    public int wanted(Rank rank) {
+    /** How many soldiers of this kind the colony wants now (from how many workers it has, more after a level 4 alarm; none for a species without soldiers). */
+    public int wanted(Level level, Rank rank) {
         SpeciesProfile.SoldierNumbers numbers = numbers();
         if (numbers == null) {
             return 0;
         }
-        int workers = colony.getCount(WorkerAntEntity.CASTE);
+        // After repeated break-ins (alarm level 4) the colony raises more soldiers for a while.
+        int workers = Math.round(colony.getCount(WorkerAntEntity.CASTE) * colony.alarm().soldierBoost(level));
         return rank == Rank.MINOR ? numbers.wantedMinors(workers) : numbers.wantedMajors(workers);
     }
 
@@ -100,7 +101,7 @@ public class Soldiers {
     @Nullable
     public Rank rankForNewNymph(Level level) {
         for (Rank rank : Rank.values()) {
-            if (count(rank) + nymphsToBe(level, rank) < wanted(rank)) {
+            if (count(rank) + nymphsToBe(level, rank) < wanted(level, rank)) {
                 return rank;
             }
         }
@@ -380,8 +381,8 @@ public class Soldiers {
                 holding += held.containsKey(post.cell()) ? 1 : 0;
             }
         }
-        String line = " | soldiers " + count(Rank.MINOR) + " minor (wants " + wanted(Rank.MINOR) + "), " + count(Rank.MAJOR) + " major (wants "
-                + wanted(Rank.MAJOR) + "), nymphs growing into soldiers " + toBe + ", posts held " + holding;
+        String line = " | soldiers " + count(Rank.MINOR) + " minor (wants " + wanted(level, Rank.MINOR) + "), " + count(Rank.MAJOR) + " major (wants "
+                + wanted(level, Rank.MAJOR) + "), nymphs growing into soldiers " + toBe + ", posts held " + holding;
         if (!minorsOut(level)) {
             return line + ", minors in";
         }
