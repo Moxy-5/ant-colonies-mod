@@ -57,6 +57,8 @@
   "founding": {
     "eggs": 3,
     "egg_interval_ticks": 400,
-    "feed_interval_ticks": 200
+    "feed_interval_ticks": 200,
+    "site_search_radius": 8,
+    "max_unevenness": 1
   }
 }

@@ -419,13 +419,23 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * A founding batch: after the founders have sealed themselves in, the queen lays {@code eggs} eggs, one every
      * {@code eggIntervalTicks}, and the founders (the queen, and the king if the species has one) feed the young on
      * their own body fat (one piece every {@code feedIntervalTicks}), so the first workers need no food from outside.
+     * {@code siteSearchRadius}: a founding queen landed on uneven ground first walks up to this many blocks to the most
+     * level spot near her (real harvester ant queens look for flat open ground); 0, she founds where she lands (the
+     * termites' royal pair, whose mound fills in round the slope). {@code maxUnevenness}: how many blocks higher or
+     * lower than her spot the ground round it may be for it to count as level (both optional, default 0 and 1).
      */
-    public record Founding(int eggs, int eggIntervalTicks, int feedIntervalTicks) {
+    public record Founding(int eggs, int eggIntervalTicks, int feedIntervalTicks, int siteSearchRadius, int maxUnevenness) {
         public static final Codec<Founding> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("eggs").forGetter(Founding::eggs),
                 Codec.INT.fieldOf("egg_interval_ticks").forGetter(Founding::eggIntervalTicks),
-                Codec.INT.fieldOf("feed_interval_ticks").forGetter(Founding::feedIntervalTicks)
+                Codec.INT.fieldOf("feed_interval_ticks").forGetter(Founding::feedIntervalTicks),
+                Codec.INT.optionalFieldOf("site_search_radius", 0).forGetter(Founding::siteSearchRadius),
+                Codec.INT.optionalFieldOf("max_unevenness", 1).forGetter(Founding::maxUnevenness)
         ).apply(i, Founding::new));
+
+        public Founding(int eggs, int eggIntervalTicks, int feedIntervalTicks) {
+            this(eggs, eggIntervalTicks, feedIntervalTicks, 0, 1);
+        }
     }
 
     /**
@@ -620,6 +630,6 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
             new NestNumbers(4, true, true, List.of(), 0, 8, "antcolonies:burrowed_dirt",
                     List.of(new LevelUnlock(1, 0), new LevelUnlock(6, 10), new LevelUnlock(12, 30), new LevelUnlock(20, 30))),
             Optional.empty(),
-            Optional.of(new Founding(3, 400, 200)),
+            Optional.of(new Founding(3, 400, 200, 8, 1)),
             Optional.empty());
 }

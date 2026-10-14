@@ -50,11 +50,24 @@ public final class GroundReader implements TunnelRoute.Ground {
         if (!level.hasChunkAt(new BlockPos(x, colony.getCenter().getY(), z))) {
             return null;
         }
+        BlockPos top = surface(level, x, z, this::isCover);
+        return mound.containsKey(top) || mound.containsKey(top.above()) ? null : top.getY();
+    }
+
+    /**
+     * The top ground block of a loaded column with no colony yet (a founding queen looking for a site): through plants
+     * and snow only.
+     */
+    public static BlockPos surface(Level level, int x, int z) {
+        return surface(level, x, z, BlockState::canBeReplaced);
+    }
+
+    private static BlockPos surface(Level level, int x, int z, java.util.function.Predicate<BlockState> cover) {
         BlockPos top = new BlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1, z);
-        for (int i = 0; i < MAX_COVER && isCover(level.getBlockState(top)); i++) {
+        for (int i = 0; i < MAX_COVER && cover.test(level.getBlockState(top)); i++) {
             top = top.below();
         }
-        return mound.containsKey(top) || mound.containsKey(top.above()) ? null : top.getY();
+        return top;
     }
 
     /** Lies on the ground but is not ground: plants, snow layers, the colony's food (fallen wood). */

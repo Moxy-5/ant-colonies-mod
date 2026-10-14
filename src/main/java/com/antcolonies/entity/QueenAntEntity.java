@@ -4,11 +4,16 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.colony.GroundReader;
+import com.antcolonies.colony.NestSite;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.entity.goal.DigGoal;
+import com.antcolonies.entity.goal.FindNestSiteGoal;
 import com.antcolonies.entity.goal.QueenToRoomGoal;
 import com.antcolonies.entity.goal.SealEntranceGoal;
 import com.antcolonies.species.Species;
+import com.antcolonies.species.SpeciesProfile;
+import com.antcolonies.species.SpeciesProfiles;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -27,12 +32,16 @@ import net.minecraft.world.phys.Vec3;
  * real harvester ant queen: she digs a small founding chamber just under the surface, seals the entrance from inside,
  * and raises her founding batch on her own body fat (species profile {@code nest.founding_chamber}, {@code founding};
  * see {@code QueenCare.raiseFoundingBatch}); the first workers open the entrance and dig the rest of the nest.
+ * Landed on uneven ground, she first walks a little to a level spot (profile {@code founding.site_search_radius}).
  */
 public class QueenAntEntity extends AbstractAntEntity {
     /** How far (in blocks) behind the queen her egg comes out. */
     private static final double EGG_BEHIND = 0.7;
 
     private boolean colonyChecked;
+    /** The level spot she is walking to before founding her colony (not saved: after a reload she looks again). */
+    @Nullable
+    private BlockPos siteTarget;
 
     public QueenAntEntity(EntityType<? extends QueenAntEntity> type, Level level) {
         super(type, level);
@@ -48,6 +57,8 @@ public class QueenAntEntity extends AbstractAntEntity {
     @Override
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));
+        // Landed on uneven ground with no colony yet: she walks to a level spot near her first, then founds it there.
+        this.goalSelector.addGoal(1, new FindNestSiteGoal(this, () -> siteTarget, this::foundColony));
         // Alone (no workers yet), once her founding chamber is dug she closes the entrance from inside.
         this.goalSelector.addGoal(1, new SealEntranceGoal(this));
         // She helps dig the shaft and her own room; when the room is finished she goes down and sits in its middle.
@@ -108,9 +119,40 @@ public class QueenAntEntity extends AbstractAntEntity {
             ColonyManager manager = ColonyManager.get(serverLevel);
             @Nullable var existing = getColonyId() == null ? null : manager.getColony(getColonyId());
             if (existing == null) {
-                Colony colony = manager.createColony(Species.RED_HARVESTER_ANT, getUUID(), blockPosition());
-                setColonyId(colony.getId());
+                siteTarget = levelSpotToWalkTo(serverLevel);
+                if (siteTarget == null) {
+                    foundColony();
+                }
             }
+        }
+    }
+
+    /**
+     * Where she should walk before founding, or null to found right here: her spot is level, no spot near her is more
+     * level, or she is not standing on open ground (spawned into a nest in a test, or with no free will).
+     */
+    @Nullable
+    private BlockPos levelSpotToWalkTo(ServerLevel level) {
+        SpeciesProfile.Founding founding = SpeciesProfiles.get(Species.RED_HARVESTER_ANT).founding().orElse(null);
+        BlockPos feet = blockPosition();
+        if (founding == null || founding.siteSearchRadius() <= 0 || isNoAi()
+                || !GroundReader.surface(level, feet.getX(), feet.getZ()).equals(feet.below())) {
+            return null;
+        }
+        BlockPos spot = NestSite.findLevelSpot(level, feet, founding.siteSearchRadius(), founding.maxUnevenness());
+        if (spot != null) {
+            com.antcolonies.AntColoniesMod.LOGGER.debug("[nest-site] a queen at {} on uneven ground walks to {} to found her nest",
+                    feet.toShortString(), spot.toShortString());
+        }
+        return spot;
+    }
+
+    /** Founds her colony where she stands. */
+    private void foundColony() {
+        siteTarget = null;
+        if (getColonyId() == null && level() instanceof ServerLevel serverLevel) {
+            Colony colony = ColonyManager.get(serverLevel).createColony(Species.RED_HARVESTER_ANT, getUUID(), blockPosition());
+            setColonyId(colony.getId());
         }
     }
 

@@ -10,6 +10,8 @@ import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ForagingHoles;
 import com.antcolonies.colony.NestPlan;
+import com.antcolonies.colony.NestSite;
+import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.entity.TermiteWorkerEntity;
 import com.antcolonies.registry.ModEntities;
 
@@ -91,6 +93,65 @@ public class HillTests {
     @GameTest(template = "arena", timeoutTicks = 20000, skyAccess = true)
     public static void termiteSideHolesOffARidgeOpenDownTheSlopes(GameTestHelper helper) {
         sideHolesOpenAtTheSurface(helper, (x, z) -> -Math.min(4, Math.max(0, chebyshev(x, z) - 3)));
+    }
+
+    /**
+     * A harvester ant queen landed on a hillside (the ground rises a block a column toward the east, from 8 blocks
+     * lower in the west up to a level shelf 4 blocks higher from 4 blocks east of her): real harvester ant queens look
+     * for level open ground, so she walks up onto the shelf, founds her nest on level ground there, digs her founding
+     * chamber and seals herself in, with no room or shaft open to the slope.
+     */
+    @GameTest(template = "arena", timeoutTicks = 30000, skyAccess = true)
+    public static void antQueenOnAHillsideWalksToLevelGroundAndFoundsThere(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        IntBinaryOperator rise = (x, z) -> Math.max(-8, Math.min(4, x - MIDDLE));
+        shapeGround(helper, 25, rise);
+        helper.spawn(ModEntities.QUEEN_ANT.get(), MIDDLE, SURFACE + rise.applyAsInt(MIDDLE, MIDDLE), MIDDLE);
+        BlockPos landed = helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE));
+        boolean[] checked = {false};
+        helper.onEachTick(() -> {
+            Colony colony = antColony(helper);
+            if (colony == null) {
+                helper.assertTrue(helper.getTick() < 2000, "she has not founded a colony after 2000 ticks");
+                return;
+            }
+            BlockPos entrance = colony.getCenter();
+            if (!checked[0]) {
+                checked[0] = true;
+                AntColoniesMod.LOGGER.info("[hill-test] the queen landed at {} and founded her colony at {} (tick {})",
+                        landed.toShortString(), entrance.toShortString(), helper.getTick());
+                helper.assertTrue(NestSite.isLevel(level, entrance.below(), 1), "she founded on uneven ground at " + entrance.toShortString());
+                helper.assertTrue(entrance.distManhattan(new BlockPos(landed.getX(), entrance.getY(), landed.getZ())) >= 3,
+                        "she founded where she landed, on the slope");
+            }
+            NestPlan.Chamber founding = colony.nest().getFoundingChamber(level);
+            if (founding == null || !level.getBlockState(entrance).is(ModBlocks.BURROWED_DIRT.get())) {
+                helper.assertTrue(helper.getTick() < 28000, "she has not dug her founding chamber and sealed herself in");
+                return;
+            }
+            // Sealed in: the shaft and her chamber are dug, and closed all round (soil, or the plug).
+            java.util.Set<BlockPos> nest = new java.util.HashSet<>(founding.cells());
+            for (int i = 1; i <= NestPlan.FOUNDING_DEPTH; i++) {
+                nest.add(entrance.below(i));
+            }
+            for (BlockPos cell : nest) {
+                helper.assertTrue(level.getBlockState(cell).isAir(), "the nest block " + cell.toShortString() + " is not dug");
+                for (net.minecraft.core.Direction side : net.minecraft.core.Direction.values()) {
+                    BlockPos next = cell.relative(side);
+                    helper.assertTrue(nest.contains(next) || !level.getBlockState(next).isAir(),
+                            "the nest is open to the outside at " + next.toShortString());
+                }
+            }
+            helper.succeed();
+        });
+    }
+
+    private static Colony antColony(GameTestHelper helper) {
+        return com.antcolonies.colony.ColonyManager.get(helper.getLevel()).getColonies().stream()
+                .filter(c -> helper.getBounds().contains(net.minecraft.world.phys.Vec3.atCenterOf(c.getCenter()))
+                        && c.getQueen(helper.getLevel()) instanceof com.antcolonies.entity.QueenAntEntity)
+                .findFirst().orElse(null);
     }
 
     /** How far the column (x, z) is from the arena's middle, the larger of the two distances (a square ring). */
