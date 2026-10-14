@@ -105,6 +105,7 @@ public class Mound {
     private Long seedForTests;
     private int[] wallsAt = new int[0];
     private int cachedStage;
+    private boolean crumbleDue; // the stage changed: leftovers of earlier stages still to crumble
     private Map<BlockPos, MoundPlan.Part> cachedParts = Map.of();
     @Nullable
     private MoundPlan.Shape cachedShape;
@@ -275,9 +276,22 @@ public class Mound {
             cachedParts = parts;
             cachedShape = shape;
             cachedStage = h;
-            crumbleLeftovers(level, numbers, h);
+            crumbleDue = true; // done on the colony's next tick, not here: this is only a lookup
         }
         return cachedParts;
+    }
+
+    /**
+     * Called once a second for the colony (by the queen): the pieces of earlier stages where the stage now being built
+     * has nothing crumble away, once after the stage has changed (see {@link #crumbleLeftovers}).
+     */
+    public void tick(Level level) {
+        Map<BlockPos, MoundPlan.Part> parts = getParts(level);
+        MoundNumbers numbers = numbers();
+        if (crumbleDue && numbers != null && !parts.isEmpty()) {
+            crumbleDue = false;
+            crumbleLeftovers(level, numbers, cachedStage);
+        }
     }
 
     /**

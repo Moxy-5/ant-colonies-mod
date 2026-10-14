@@ -124,7 +124,7 @@ public class TermiteWorkerEntity extends AbstractAntEntity {
         }
     }
 
-    // A dead worker leaves the colony's headcount.
+    // A dead worker leaves the colony's headcount, and what it carried is left for another worker to pick up.
     @Override
     public void die(DamageSource source) {
         super.die(source);
@@ -132,6 +132,7 @@ public class TermiteWorkerEntity extends AbstractAntEntity {
             ColonyManager manager = ColonyManager.get(serverLevel);
             Colony colony = manager.getColony(getColonyId());
             if (colony != null) {
+                dropLoadOnDeath(serverLevel, colony);
                 colony.setCount(CASTE, colony.getCount(CASTE) - 1);
                 manager.markChanged();
             }

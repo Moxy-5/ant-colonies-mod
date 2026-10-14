@@ -166,6 +166,7 @@ public class TermiteSoldierTests {
         helper.runAfterDelay(40, () -> {
             // Joined, and the first major has gone without food for longer than a day.
             Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(colony != null, "no termite colony");
             for (TermiteSoldierEntity soldier : soldiers) {
                 helper.assertTrue(colony.getId().equals(soldier.getColonyId()), "a soldier did not join the colony");
             }
@@ -306,7 +307,9 @@ public class TermiteSoldierTests {
             }
         });
         helper.runAfterDelay(40, () -> {
-            TermiteMoundTests.colony(helper).setForagingTimeForTests(true);
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(colony != null, "no termite colony");
+            colony.setForagingTimeForTests(true);
             phase[0] = 1;
         });
         helper.onEachTick(() -> {

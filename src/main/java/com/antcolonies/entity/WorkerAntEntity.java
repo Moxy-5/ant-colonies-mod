@@ -217,7 +217,7 @@ public class WorkerAntEntity extends AbstractAntEntity {
         super.remove(reason);
     }
 
-    // A dead worker leaves the colony's headcount, and the egg or body it carried falls to the ground for another worker to pick up.
+    // A dead worker leaves the colony's headcount, and what it carried is left for another worker to pick up.
     @Override
     public void die(DamageSource source) {
         super.die(source);
@@ -225,14 +225,7 @@ public class WorkerAntEntity extends AbstractAntEntity {
             ColonyManager manager = ColonyManager.get(serverLevel);
             Colony colony = manager.getColony(getColonyId());
             if (colony != null) {
-                if (isCarryingEgg()) {
-                    setCarryingEgg(false);
-                    colony.brood().spawnEgg(serverLevel, getX(), getY(), getZ());
-                }
-                if (isCarryingCorpse()) {
-                    setCarryingCorpse(false);
-                    colony.refuse().spawnCorpse(serverLevel, getX(), getY(), getZ());
-                }
+                dropLoadOnDeath(serverLevel, colony);
                 colony.setCount(CASTE, colony.getCount(CASTE) - 1);
                 manager.markChanged();
             }

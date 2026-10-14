@@ -253,6 +253,9 @@ public class FoodStore {
                     }
                 }
             }
+            // Forget the cuts of plants that are gone (eaten by something else, broken by a player), so a new tuft
+            // growing in the same spot starts whole.
+            grassClips.keySet().removeIf(pos -> level.hasChunkAt(pos) && food().plantFor(level.getBlockState(pos)) == null);
         }
         return grassTufts;
     }

@@ -145,6 +145,7 @@ public class TermiteQueenEntity extends AbstractAntEntity {
                     manager.markChanged();
                 }
                 colony.garden().grow(serverLevel);
+                colony.mound().tick(serverLevel);
                 colony.mushrooms().tick(serverLevel);
                 colony.alarm().tick(serverLevel);
                 colony.foodMap().tick(serverLevel);

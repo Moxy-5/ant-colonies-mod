@@ -236,7 +236,15 @@ public class Alarm {
         if (colony.mound().getParts(world).containsKey(pos)) {
             return true;
         }
-        Set<BlockPos> joined = colony.walls().joinedCells(world, colony.nest().nestCells(world));
+        Set<BlockPos> planned = colony.nest().nestCells(world);
+        boolean nearNest = planned.contains(pos);
+        for (Direction side : Direction.values()) {
+            nearNest |= planned.contains(pos.relative(side));
+        }
+        if (!nearNest) {
+            return false; // nowhere near the nest: no need to look through the whole of it
+        }
+        Set<BlockPos> joined = colony.walls().joinedCells(world, planned);
         if (joined.contains(pos)) {
             return false; // already open: nothing is broken into
         }

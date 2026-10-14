@@ -232,6 +232,29 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return isCarrying() || !getCarriedSeed().isEmpty() || isCarryingEgg() || isCarryingCorpse();
     }
 
+    /**
+     * A dying ant lets go of what it holds, so another can pick it up: an egg or a dead ant falls where it died, a
+     * piece of nurse food (bread, a fungus nodule) is put down as a heap if there is a floor, a seed or a piece of forage
+     * drops as an item. A soil pellet is just lost.
+     */
+    protected void dropLoadOnDeath(ServerLevel level, Colony colony) {
+        if (isCarryingEgg()) {
+            setCarryingEgg(false);
+            colony.brood().spawnEgg(level, getX(), getY(), getZ());
+        }
+        if (isCarryingCorpse()) {
+            setCarryingCorpse(false);
+            colony.refuse().spawnCorpse(level, getX(), getY(), getZ());
+        }
+        if (isCarryingBread()) {
+            colony.nurseFood().putDownWhereItStands(level, this);
+            setCarriedSeed(ItemStack.EMPTY);
+        } else if (!getCarriedSeed().isEmpty()) {
+            spawnAtLocation(getCarriedSeed());
+            setCarriedSeed(ItemStack.EMPTY);
+        }
+    }
+
     /** How long (in seconds) an ant must have nothing to do before it helps with work that is not its role's. */
     public static final int IDLE_SECONDS = 5;
 

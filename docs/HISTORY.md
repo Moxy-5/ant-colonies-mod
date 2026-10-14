@@ -203,3 +203,9 @@ Moved here from CLAUDE.md on 2026-10-13 (it was loaded into every chat and took 
   - Debug logging: `[pellet] ... gave up` lines in `CarryPelletGoal` are intentional (kept for bug reports); the test code has `[..-test]` log lines.
 
 
+- Tidy-up, part 1 (branch `tidy-up`, made from `m7-food-finding`; build and all 88 unit tests pass, game tests NOT run yet, nothing to see in-game except the first point):
+  - **A dying worker lets go of its load** (ant and termite alike, `AbstractAntEntity.dropLoadOnDeath`): an egg or a dead ant falls where it died (as before for the ant; termites used to lose an egg), bread or a fungus nodule is put down as a heap if there is a floor (else lost and logged), a seed or a piece of forage drops as an item. A soil pellet is just lost.
+  - **Plants that are gone are forgotten** (`FoodStore.plants`): when the food plants are scanned again, the cut counts of spots that hold no food plant any more are dropped, so a new tuft in the same spot starts whole (they used to pile up in the save for ever).
+  - **The mound lookup no longer breaks blocks** (`Mound.getParts`): crumbling the leftover pieces of earlier stages is now done once a second by the queen's tick (`Mound.tick`), not inside the lookup that the alarm, the route planning and the block-break event call.
+  - **Breaking a block far from the nest is cheap** (`Alarm.isBreakIn`): the whole nest is only looked through when the broken block is in or next to a planned nest cell.
+  - The `macrotermes.json` note now says the worker ages are used (jobs by age); a test step in `TermiteSoldierTests` fails with a message instead of crashing when its colony is missing.
