@@ -67,6 +67,38 @@ public class HillTests {
     }
 
     /**
+     * A termite nest on a low flat with a terrace 2 blocks high from 7 blocks out (the user's exact bug: the ground 2
+     * blocks above a side hole instead of 1). The tunnels climb the terrace in one step and open on top of it.
+     */
+    @GameTest(template = "arena", timeoutTicks = 20000, skyAccess = true)
+    public static void termiteSideHolesUpATerraceOpenOnTopOfIt(GameTestHelper helper) {
+        sideHolesOpenAtTheSurface(helper, (x, z) -> chebyshev(x, z) >= 7 ? 2 : 0);
+    }
+
+    /**
+     * A termite nest at the foot of a cliff 5 blocks high from 7 blocks out, too high to tunnel up: the tunnels stop
+     * short of it and open their holes at the cliff's foot.
+     */
+    @GameTest(template = "arena", timeoutTicks = 20000, skyAccess = true)
+    public static void termiteSideHolesBelowACliffOpenAtItsFoot(GameTestHelper helper) {
+        sideHolesOpenAtTheSurface(helper, (x, z) -> chebyshev(x, z) >= 7 ? 5 : 0);
+    }
+
+    /**
+     * A termite nest on a ridge: the ground falls away on every side from 4 blocks out, a block a column, 4 blocks down.
+     * Both tunnels run downhill and open at the surface below.
+     */
+    @GameTest(template = "arena", timeoutTicks = 20000, skyAccess = true)
+    public static void termiteSideHolesOffARidgeOpenDownTheSlopes(GameTestHelper helper) {
+        sideHolesOpenAtTheSurface(helper, (x, z) -> -Math.min(4, Math.max(0, chebyshev(x, z) - 3)));
+    }
+
+    /** How far the column (x, z) is from the arena's middle, the larger of the two distances (a square ring). */
+    private static int chebyshev(int x, int z) {
+        return Math.max(Math.abs(x - MIDDLE), Math.abs(z - MIDDLE));
+    }
+
+    /**
      * A termite colony in an arena shaped by {@code rise} (see {@link #shapeGround}): its two foraging holes are planned
      * at the surface, the workers dig both tunnels and open both holes.
      */
