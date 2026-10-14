@@ -142,6 +142,7 @@ Goal: a mature colony can hold 1,000+ ants or termites without lag.
 - **No pushing.** Colony members don't collide with each other.
 - **Distance detail.** Ants beyond a set distance skip animations.
 - **Later:** visual-only crowds drawn on the client (for marching columns and packed chambers) that cost almost nothing on the server.
+- **Brain part 1 decisions (user, 2026-10-14, before the overnight build):** colony size caps are **scaled down** from the real numbers: ants up to **3,000** workers, termites up to **50,000** (numbers in the species files; real colonies are about 10,000 and 1 to 2 million). When no player is near a loaded nest, a **small crew of up to about 10 real workers keeps working** (digging, building, foraging), so nothing stalls before part 2 (colonies living offline, where the numbers do the work themselves).
 
 ### Picking a nest site
 - The queen scores spots within a radius and picks the best. Scoring weights come from the species profile:

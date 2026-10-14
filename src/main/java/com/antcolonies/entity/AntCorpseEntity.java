@@ -24,6 +24,8 @@ import net.minecraft.world.phys.Vec3;
  * Saved with the world; disappears when its colony is gone.
  */
 public class AntCorpseEntity extends Entity {
+    /** How long the body of an insect that belonged to no colony lies before it crumbles (as long as the species' bodies). */
+    private static final int LONER_DECAY_TICKS = 6000;
     @Nullable
     private UUID colonyId;
     /** True once a worker has set the body down in the refuse chamber. Saved. */
@@ -84,7 +86,13 @@ public class AntCorpseEntity extends Entity {
         move(MoverType.SELF, getDeltaMovement());
         age++;
         // Once a second: is the colony still there, has the body lain about too long?
-        if (level().isClientSide || tickCount % 20 != 0 || colonyId == null || !(level() instanceof ServerLevel level)) {
+        if (level().isClientSide || tickCount % 20 != 0 || !(level() instanceof ServerLevel level)) {
+            return;
+        }
+        if (colonyId == null) {
+            if (age >= LONER_DECAY_TICKS) {
+                discard(); // an insect of no colony: nobody deals with it, it crumbles to dust
+            }
             return;
         }
         Colony colony = ColonyManager.get(level).getColony(colonyId);

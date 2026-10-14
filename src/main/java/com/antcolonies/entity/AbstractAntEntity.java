@@ -244,13 +244,24 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     @Override
     public void remove(net.minecraft.world.entity.Entity.RemovalReason reason) {
         if (reason == net.minecraft.world.entity.Entity.RemovalReason.KILLED && leavesBody() && !(getLastHurtByMob() instanceof net.minecraft.world.entity.animal.Chicken)
-                && getColonyId() != null && level() instanceof ServerLevel serverLevel) {
-            Colony colony = ColonyManager.get(serverLevel).getColony(getColonyId());
+                && level() instanceof ServerLevel serverLevel) {
+            Colony colony = getColonyId() == null ? null : ColonyManager.get(serverLevel).getColony(getColonyId());
             if (colony != null) {
                 colony.refuse().spawnCorpse(serverLevel, getX(), getY(), getZ());
+            } else {
+                // One that belongs to no colony (put down with a spawn egg far from a queen) still leaves a body; with
+                // no nestmates to deal with it, it crumbles to dust after a while.
+                AntCorpseEntity corpse = new AntCorpseEntity(bodyType(), serverLevel);
+                corpse.moveTo(getX(), getY(), getZ(), getRandom().nextFloat() * 360.0F, 0.0F);
+                serverLevel.addFreshEntity(corpse);
             }
         }
         super.remove(reason);
+    }
+
+    /** The kind of body this insect leaves (a dead ant; termites override it). */
+    protected net.minecraft.world.entity.EntityType<AntCorpseEntity> bodyType() {
+        return com.antcolonies.registry.ModEntities.ANT_CORPSE.get();
     }
 
     /**

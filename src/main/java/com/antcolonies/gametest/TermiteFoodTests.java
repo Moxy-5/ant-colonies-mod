@@ -365,19 +365,24 @@ public class TermiteFoodTests {
         helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
         com.antcolonies.entity.TermiteWorkerEntity[] worker = {null};
         com.antcolonies.entity.TermiteSoldierEntity[] minor = {null};
+        com.antcolonies.entity.TermiteWorkerEntity[] loner = {null};
         helper.runAfterDelay(5, () -> {
             worker[0] = helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE + 5, SURFACE, MIDDLE);
             minor[0] = helper.spawn(ModEntities.TERMITE_MINOR_SOLDIER.get(), MIDDLE - 5, SURFACE, MIDDLE);
+            loner[0] = helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE, SURFACE, MIDDLE + 5);
+            loner[0].keepOutOfColonies(); // a worker of no colony leaves a body too
         });
         helper.runAfterDelay(30, () -> {
             helper.assertTrue(worker[0].getColonyId() != null, "the worker joined no colony");
             helper.assertTrue(minor[0].getColonyId() != null, "the soldier joined no colony");
             net.minecraft.world.entity.player.Player player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
-            worker[0].hurt(level.damageSources().playerAttack(player), 100.0F);
+            net.minecraft.world.entity.player.Player creative = helper.makeMockPlayer(net.minecraft.world.level.GameType.CREATIVE);
+            worker[0].hurt(level.damageSources().playerAttack(creative), 100.0F);
             minor[0].hurt(level.damageSources().playerAttack(player), 100.0F);
+            loner[0].hurt(level.damageSources().playerAttack(creative), 100.0F);
         });
         helper.runAfterDelay(80, () -> {
-            for (net.minecraft.world.entity.LivingEntity dead : List.<net.minecraft.world.entity.LivingEntity>of(worker[0], minor[0])) {
+            for (net.minecraft.world.entity.LivingEntity dead : List.<net.minecraft.world.entity.LivingEntity>of(worker[0], minor[0], loner[0])) {
                 helper.assertTrue(dead.isRemoved(), "the " + dead.getType().getDescription().getString() + " is not dead");
                 List<com.antcolonies.entity.AntCorpseEntity> bodies = level.getEntitiesOfClass(com.antcolonies.entity.AntCorpseEntity.class,
                         new net.minecraft.world.phys.AABB(dead.blockPosition()).inflate(2), body -> body.getType() == ModEntities.TERMITE_CORPSE.get());

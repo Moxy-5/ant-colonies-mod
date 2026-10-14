@@ -146,4 +146,9 @@ public class TermiteWorkerEntity extends AbstractAntEntity {
     protected boolean leavesBody() {
         return true;
     }
+
+    @Override
+    protected net.minecraft.world.entity.EntityType<AntCorpseEntity> bodyType() {
+        return com.antcolonies.registry.ModEntities.TERMITE_CORPSE.get();
+    }
 }
