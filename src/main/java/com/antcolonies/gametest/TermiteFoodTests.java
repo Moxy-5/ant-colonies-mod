@@ -353,6 +353,40 @@ public class TermiteFoodTests {
         helper.succeed();
     }
 
+    /**
+     * Dead termites leave bodies (user's decision; the user saw none in the game, 2026-10-14): a worker killed by a
+     * player and a minor soldier killed by a player each leave a termite body where they died, once the death animation
+     * is over.
+     */
+    @GameTest(template = "arena", timeoutTicks = 300)
+    public static void aTermiteKilledByAPlayerLeavesABody(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        TermiteMoundTests.deepGround(helper);
+        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        com.antcolonies.entity.TermiteWorkerEntity[] worker = {null};
+        com.antcolonies.entity.TermiteSoldierEntity[] minor = {null};
+        helper.runAfterDelay(5, () -> {
+            worker[0] = helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE + 5, SURFACE, MIDDLE);
+            minor[0] = helper.spawn(ModEntities.TERMITE_MINOR_SOLDIER.get(), MIDDLE - 5, SURFACE, MIDDLE);
+        });
+        helper.runAfterDelay(30, () -> {
+            helper.assertTrue(worker[0].getColonyId() != null, "the worker joined no colony");
+            helper.assertTrue(minor[0].getColonyId() != null, "the soldier joined no colony");
+            net.minecraft.world.entity.player.Player player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+            worker[0].hurt(level.damageSources().playerAttack(player), 100.0F);
+            minor[0].hurt(level.damageSources().playerAttack(player), 100.0F);
+        });
+        helper.runAfterDelay(80, () -> {
+            for (net.minecraft.world.entity.LivingEntity dead : List.<net.minecraft.world.entity.LivingEntity>of(worker[0], minor[0])) {
+                helper.assertTrue(dead.isRemoved(), "the " + dead.getType().getDescription().getString() + " is not dead");
+                List<com.antcolonies.entity.AntCorpseEntity> bodies = level.getEntitiesOfClass(com.antcolonies.entity.AntCorpseEntity.class,
+                        new net.minecraft.world.phys.AABB(dead.blockPosition()).inflate(2), body -> body.getType() == ModEntities.TERMITE_CORPSE.get());
+                helper.assertTrue(!bodies.isEmpty(), "no termite body where the " + dead.getType().getDescription().getString() + " died");
+            }
+            helper.succeed();
+        });
+    }
+
     /** An item lying still on the ground at this spot (x, z) of the arena surface, never despawning. */
     private static ItemEntity lay(GameTestHelper helper, int[] spot, ItemStack stack) {
         BlockPos at = helper.absolutePos(new BlockPos(spot[0], SURFACE, spot[1]));
