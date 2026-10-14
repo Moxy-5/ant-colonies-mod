@@ -232,6 +232,27 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return isCarrying() || !getCarriedSeed().isEmpty() || isCarryingEgg() || isCarryingCorpse();
     }
 
+    /** Whether this caste leaves a body when it dies (workers and soldiers; not the queen and king, whose colony ends with them). */
+    protected boolean leavesBody() {
+        return false;
+    }
+
+    /**
+     * A dead worker or soldier leaves its body where it died (once the death animation is over, so also after
+     * {@code /kill}), for its nestmates to deal with. Not when a chicken killed it: the chicken has eaten it.
+     */
+    @Override
+    public void remove(net.minecraft.world.entity.Entity.RemovalReason reason) {
+        if (reason == net.minecraft.world.entity.Entity.RemovalReason.KILLED && leavesBody() && !(getLastHurtByMob() instanceof net.minecraft.world.entity.animal.Chicken)
+                && getColonyId() != null && level() instanceof ServerLevel serverLevel) {
+            Colony colony = ColonyManager.get(serverLevel).getColony(getColonyId());
+            if (colony != null) {
+                colony.refuse().spawnCorpse(serverLevel, getX(), getY(), getZ());
+            }
+        }
+        super.remove(reason);
+    }
+
     /**
      * A dying ant lets go of what it holds, so another can pick it up: an egg or a dead ant falls where it died, a
      * piece of nurse food (bread, a fungus nodule) is put down as a heap if there is a floor, a seed or a piece of forage

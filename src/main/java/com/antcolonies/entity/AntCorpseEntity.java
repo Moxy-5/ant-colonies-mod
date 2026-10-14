@@ -17,8 +17,9 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * The body of a dead ant of one colony. It lies where the ant died (it falls if the floor goes away) until a worker
- * carries it to the refuse chamber and sets it down there; a corpse in the refuse chamber stays for good. A corpse that
+ * The body of a dead ant or termite of one colony. It lies where it died (it falls if the floor goes away) until a worker
+ * deals with it: ants carry it to the refuse chamber and set it down there (a corpse in the refuse chamber stays for
+ * good); termites eat a fresh one in their fungus garden and wall an old one up with soil (see {@code Refuse}). A corpse that
  * nobody brings there crumbles to dust after a while (the species profile's corpse_decay_ticks), so nothing is left lying about for ever.
  * Saved with the world; disappears when its colony is gone.
  */
@@ -27,6 +28,8 @@ public class AntCorpseEntity extends Entity {
     private UUID colonyId;
     /** True once a worker has set the body down in the refuse chamber. Saved. */
     private boolean placed;
+    /** How long (in ticks) the body has lain where it is (termites eat a fresh body, bury an old one). Saved. */
+    private int age;
 
     public AntCorpseEntity(EntityType<? extends AntCorpseEntity> type, Level level) {
         super(type, level);
@@ -49,6 +52,10 @@ public class AntCorpseEntity extends Entity {
         this.placed = placed;
     }
 
+    public int getAge() {
+        return age;
+    }
+
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
     }
@@ -57,6 +64,7 @@ public class AntCorpseEntity extends Entity {
     protected void readAdditionalSaveData(CompoundTag tag) {
         colonyId = tag.hasUUID("colony") ? tag.getUUID("colony") : null;
         placed = tag.getBoolean("placed");
+        age = tag.getInt("age");
     }
 
     @Override
@@ -65,6 +73,7 @@ public class AntCorpseEntity extends Entity {
             tag.putUUID("colony", colonyId);
         }
         tag.putBoolean("placed", placed);
+        tag.putInt("age", age);
     }
 
     @Override
@@ -73,6 +82,7 @@ public class AntCorpseEntity extends Entity {
         Vec3 motion = getDeltaMovement();
         setDeltaMovement(0, onGround() ? 0 : (motion.y - 0.04) * 0.98, 0);
         move(MoverType.SELF, getDeltaMovement());
+        age++;
         // Once a second: is the colony still there, has the body lain about too long?
         if (level().isClientSide || tickCount % 20 != 0 || colonyId == null || !(level() instanceof ServerLevel level)) {
             return;
@@ -82,7 +92,7 @@ public class AntCorpseEntity extends Entity {
             discard(); // the queen died
         } else if (!placed && colony.refuse().isInRefuseChamber(level, blockPosition())) {
             placed = true; // it lies where it belongs: it stays
-        } else if (!placed && tickCount >= colony.profile().refuse().corpseDecayTicks()) {
+        } else if (!placed && age >= colony.profile().refuse().corpseDecayTicks()) {
             discard(); // nobody carried it away: it crumbles to dust
         }
     }

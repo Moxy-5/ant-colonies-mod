@@ -88,6 +88,52 @@ public class NestTests {
     }
 
     /**
+     * Nest stages: six workers with no stored food dig only the first level (the seed store); the nursery, the queen's
+     * deep room and the refuse chamber wait. Once the store holds 10 seeds (with 6 workers) the second level, the
+     * nursery, is dug too, and the third still waits (it needs 12 workers).
+     */
+    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    public static void theNestGrowsDeeperOnlyAsTheColonyGrows(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        startColony(helper, 6, false);
+        int[] phase = {0};
+        helper.onEachTick(() -> {
+            Colony colony = colony(helper);
+            if (colony == null || helper.getTick() < 20) {
+                return;
+            }
+            List<NestPlan.Chamber> levels = colony.nest().getPlannedChambers(level);
+            if (levels.size() < 3) {
+                helper.fail("expected the full nest plan, but it has " + levels.size() + " levels");
+            }
+            if (phase[0] == 0 && colony.nest().findDigTarget(level) == null && dugOut(level, levels.get(0))) {
+                helper.assertTrue(colony.nest().levelsUnlocked(level) == 1, "with 6 workers and no food only 1 level should be open, not "
+                        + colony.nest().levelsUnlocked(level));
+                helper.assertTrue(noneDug(level, levels.get(1)), "the nursery was dug before the colony had the food for it");
+                // Ten seeds in the store.
+                List<BlockPos> store = colony.nest().getFoodStoreCells(level);
+                for (int i = 0; i < 10; i++) {
+                    helper.assertTrue(colony.food().depositSeed(level, store.get(i % store.size())), "could not put a seed in the store");
+                }
+                phase[0] = 1;
+            } else if (phase[0] == 1 && colony.nest().findDigTarget(level) == null && dugOut(level, levels.get(1))) {
+                helper.assertTrue(noneDug(level, levels.get(2)), "the queen's deep room was dug with only 6 workers");
+                helper.succeed();
+            }
+        });
+    }
+
+    private static boolean dugOut(ServerLevel level, NestPlan.Chamber chamber) {
+        return chamber.cells().stream().allMatch(pos -> Nest.isDugOut(level, pos));
+    }
+
+    private static boolean noneDug(ServerLevel level, NestPlan.Chamber chamber) {
+        // Only its room: the stair down to it starts in the level above.
+        return chamber.room().stream().noneMatch(pos -> Nest.isDugOut(level, pos));
+    }
+
+    /**
      * The nest has holes in its walls: cave pockets next to the shaft and the rooms, a crack from the queen's room
      * up to the open air, a pit under a corner of the nursery, and a gap that links the nursery with the
      * queen's room under it. The ants must close every one of them with soil, so that the only way in is the entrance hole and
@@ -1464,6 +1510,11 @@ public class NestTests {
     }
 
     private static void startColony(GameTestHelper helper, int workers) {
+        startColony(helper, workers, true);
+    }
+
+    /** {@code unlockAllLevels}: dig the whole nest at once, whatever the colony's size (false: nest stages as in the game). */
+    private static void startColony(GameTestHelper helper, int workers, boolean unlockAllLevels) {
         // Ground: dirt with a grass top, SURFACE blocks deep, across the whole test area.
         for (int x = 0; x < 25; x++) {
             for (int z = 0; z < 25; z++) {
@@ -1476,10 +1527,14 @@ public class NestTests {
 
         helper.spawn(ModEntities.QUEEN_ANT.get(), MIDDLE, SURFACE, MIDDLE);
         // The tests run far faster than a day: the workers of their colonies do not get hungry (the hunger tests turn it back on).
+        // And they dig the whole nest at once, whatever the colony's size (nest stages have their own test).
         helper.runAfterDelay(10, () -> {
             Colony colony = colony(helper);
             if (colony != null) {
                 colony.setHungerOn(false);
+                if (unlockAllLevels) {
+                    colony.nest().unlockAllLevelsForTests();
+                }
             }
         });
         helper.runAfterDelay(5, () -> {

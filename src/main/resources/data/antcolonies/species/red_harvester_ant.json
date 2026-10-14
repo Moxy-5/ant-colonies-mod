@@ -1,6 +1,6 @@
 {
   "colony": {
-    "max_workers": 20,
+    "max_workers": 60,
     "nurses_from_workers": [3, 8, 12, 20]
   },
   "worker": {
@@ -41,7 +41,13 @@
   "nest": {
     "max_levels": 4,
     "seal_while_founding": true,
-    "founding_chamber": true
+    "founding_chamber": true,
+    "level_unlocks": [
+      {"workers": 1, "food": 0},
+      {"workers": 6, "food": 10},
+      {"workers": 12, "food": 30},
+      {"workers": 20, "food": 30}
+    ]
   },
   "founding": {
     "eggs": 3,

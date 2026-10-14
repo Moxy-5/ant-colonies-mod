@@ -216,11 +216,38 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
         }
     }
 
-    /** Dead nestmates: a body nobody carries to the refuse chamber crumbles after {@code corpseDecayTicks}. */
-    public record RefuseNumbers(int corpseDecayTicks) {
+    /**
+     * Dead nestmates: a body nobody deals with crumbles after {@code corpseDecayTicks}. Ants carry their dead to the
+     * refuse chamber. With {@code eatFreshTicks} (termites) there is no refuse chamber: a body younger than that is carried
+     * into the fungus garden and eaten (it becomes a layer of comb, like a piece of forage), an older one is walled up with
+     * soil where it lies, as real termites do.
+     */
+    public record RefuseNumbers(int corpseDecayTicks, Optional<Integer> eatFreshTicks) {
         public static final Codec<RefuseNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
-                Codec.INT.fieldOf("corpse_decay_ticks").forGetter(RefuseNumbers::corpseDecayTicks)
+                Codec.INT.fieldOf("corpse_decay_ticks").forGetter(RefuseNumbers::corpseDecayTicks),
+                Codec.INT.optionalFieldOf("eat_fresh_ticks").forGetter(RefuseNumbers::eatFreshTicks)
         ).apply(i, RefuseNumbers::new));
+
+        public RefuseNumbers(int corpseDecayTicks) {
+            this(corpseDecayTicks, Optional.empty());
+        }
+
+        /** Whether this species eats its fresh dead and buries the old ones (instead of using a refuse chamber). */
+        public boolean eatsOrBuries() {
+            return eatFreshTicks.isPresent();
+        }
+    }
+
+    /**
+     * When a level of the nest (a room with its stair and tunnel, top to bottom) may be dug: once the colony has at least
+     * {@code workers} workers and {@code food} pieces of stored food (nest stages: a young colony has a small nest that
+     * grows deeper as the colony grows, like a real one).
+     */
+    public record LevelUnlock(int workers, int food) {
+        public static final Codec<LevelUnlock> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.INT.fieldOf("workers").forGetter(LevelUnlock::workers),
+                Codec.INT.optionalFieldOf("food", 0).forGetter(LevelUnlock::food)
+        ).apply(i, LevelUnlock::new));
     }
 
     /**
@@ -236,7 +263,7 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * close it (the entrance, a foraging hole, an opening in the nest walls; optional, Burrowed Dirt).
      */
     public record NestNumbers(int maxLevels, boolean sealWhileFounding, boolean foundingChamber, List<String> sideRooms,
-            int foragingHoles, int foragingHoleDistance, String plugBlock) {
+            int foragingHoles, int foragingHoleDistance, String plugBlock, List<LevelUnlock> levelUnlocks) {
         public static final Codec<NestNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("max_levels").forGetter(NestNumbers::maxLevels),
                 Codec.BOOL.fieldOf("seal_while_founding").forGetter(NestNumbers::sealWhileFounding),
@@ -244,8 +271,29 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 Codec.STRING.listOf().optionalFieldOf("side_rooms", List.of()).forGetter(NestNumbers::sideRooms),
                 Codec.INT.optionalFieldOf("foraging_holes", 0).forGetter(NestNumbers::foragingHoles),
                 Codec.INT.optionalFieldOf("foraging_hole_distance", 8).forGetter(NestNumbers::foragingHoleDistance),
-                Codec.STRING.optionalFieldOf("plug_block", "antcolonies:burrowed_dirt").forGetter(NestNumbers::plugBlock)
+                Codec.STRING.optionalFieldOf("plug_block", "antcolonies:burrowed_dirt").forGetter(NestNumbers::plugBlock),
+                LevelUnlock.CODEC.listOf().optionalFieldOf("level_unlocks", List.of()).forGetter(NestNumbers::levelUnlocks)
         ).apply(i, NestNumbers::new));
+
+        public NestNumbers(int maxLevels, boolean sealWhileFounding, boolean foundingChamber, List<String> sideRooms,
+                int foragingHoles, int foragingHoleDistance, String plugBlock) {
+            this(maxLevels, sealWhileFounding, foundingChamber, sideRooms, foragingHoles, foragingHoleDistance, plugBlock, List.of());
+        }
+
+        /**
+         * How many levels of the nest the workers may dig with this many workers and this much stored food: the levels
+         * whose {@code level_unlocks} entry (and every one before it) the colony has reached. Without the list, all of them.
+         */
+        public int levelsFor(int workers, int food) {
+            if (levelUnlocks.isEmpty()) {
+                return maxLevels;
+            }
+            int levels = 0;
+            while (levels < levelUnlocks.size() && workers >= levelUnlocks.get(levels).workers() && food >= levelUnlocks.get(levels).food()) {
+                levels++;
+            }
+            return levels;
+        }
 
         /**
          * What a hole is packed with: the plug block (Burrowed Dirt if the name is unknown). Mound soil goes in finished
@@ -474,14 +522,15 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * logged then). The real numbers are in {@code data/antcolonies/species/red_harvester_ant.json}.
      */
     public static final SpeciesProfile RED_HARVESTER_ANT = new SpeciesProfile(
-            new ColonyNumbers(20, List.of(3, 8, 12, 20)),
+            new ColonyNumbers(60, List.of(3, 8, 12, 20)),
             new WorkerNumbers(24000, 36000, 72000, 72000, 192000),
             new QueenNumbers(20, 5, 5, 1200, 3600, 120000L),
             new BroodNumbers(10, 1200, 5, 48000L),
             new FoodNumbers(24, "antcolonies:seeds", List.of(new PlantFood("minecraft:short_grass", 10, false, 1)),
                     "minecraft:wheat_seeds", "antcolonies:seed_pile", 60, 20, FoodNumbers.ALWAYS, 0),
             new RefuseNumbers(6000),
-            new NestNumbers(4, true, true, List.of(), 0, 8, "antcolonies:burrowed_dirt"),
+            new NestNumbers(4, true, true, List.of(), 0, 8, "antcolonies:burrowed_dirt",
+                    List.of(new LevelUnlock(1, 0), new LevelUnlock(6, 10), new LevelUnlock(12, 30), new LevelUnlock(20, 30))),
             Optional.empty(),
             Optional.of(new Founding(3, 400, 200)),
             Optional.empty());

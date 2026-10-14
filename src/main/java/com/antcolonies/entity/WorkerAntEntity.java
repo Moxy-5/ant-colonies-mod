@@ -205,16 +205,10 @@ public class WorkerAntEntity extends AbstractAntEntity {
         }
     }
 
-    // A dead worker leaves a body behind where it died (once the death animation is over), for the workers to carry to the refuse chamber.
+    // A dead worker leaves a body behind where it died (see AbstractAntEntity.remove).
     @Override
-    public void remove(Entity.RemovalReason reason) {
-        if (reason == Entity.RemovalReason.KILLED && getColonyId() != null && level() instanceof ServerLevel serverLevel) {
-            Colony colony = ColonyManager.get(serverLevel).getColony(getColonyId());
-            if (colony != null) {
-                colony.refuse().spawnCorpse(serverLevel, getX(), getY(), getZ());
-            }
-        }
-        super.remove(reason);
+    protected boolean leavesBody() {
+        return true;
     }
 
     // A dead worker leaves the colony's headcount, and what it carried is left for another worker to pick up.

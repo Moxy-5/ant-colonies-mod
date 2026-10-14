@@ -16,8 +16,10 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
 
 /**
- * Dead ants and the refuse chamber: bodies left where an ant died, carried by the workers to the refuse chamber (one to
- * a cell), and crumbling to dust when nobody can carry them away.
+ * The colony's dead: bodies left where an ant or termite died. Ants carry them to the refuse chamber (one to a cell).
+ * Species whose profile has {@code refuse.eat_fresh_ticks} (termites, which have no refuse chamber) carry a fresh body
+ * into the fungus garden, where it is eaten and becomes a layer of comb, and wall an older one up with soil where it
+ * lies. A body nobody deals with crumbles to dust.
  */
 public class Refuse {
     // A dead ant that no worker brings to the refuse chamber crumbles to dust after the profile's
@@ -38,7 +40,8 @@ public class Refuse {
 
     /** Puts the body of a dead ant of this colony into the world, where it lies until a worker carries it away. */
     public AntCorpseEntity spawnCorpse(Level level, double x, double y, double z) {
-        AntCorpseEntity corpse = new AntCorpseEntity(ModEntities.ANT_CORPSE.get(), level);
+        AntCorpseEntity corpse = new AntCorpseEntity(colony.getSpecies().equals(com.antcolonies.species.Species.MACROTERMES)
+                ? ModEntities.TERMITE_CORPSE.get() : ModEntities.ANT_CORPSE.get(), level);
         corpse.setColonyId(id);
         corpse.moveTo(x, y, z, level.getRandom().nextFloat() * 360.0F, 0.0F);
         level.addFreshEntity(corpse);
@@ -91,23 +94,71 @@ public class Refuse {
         return true;
     }
 
+    /** Whether this colony eats its fresh dead and buries the old ones (termites) instead of using a refuse chamber. */
+    public boolean eatsOrBuries() {
+        return colony.profile().refuse().eatsOrBuries();
+    }
+
+    /** Whether the body is still fresh enough to be eaten (only for species that eat their dead). */
+    public boolean isFresh(AntCorpseEntity corpse) {
+        return colony.profile().refuse().eatFreshTicks().map(ticks -> corpse.getAge() < ticks).orElse(false);
+    }
+
     /**
-     * The dead ant nearest to {@code near} that a worker should carry to the refuse chamber, or null: only when there is
-     * a free spot for it, not one that lies in the chamber already, not one another worker is on its way to.
-     * {@code avoid}: bodies this worker found no way to.
+     * Where a worker carrying a body takes it: a free cell of the refuse chamber, or for species that eat their dead a
+     * spot on the fungus comb in a garden. Null if there is none.
      */
     @Nullable
-    public AntCorpseEntity findLooseCorpse(Level level, BlockPos near, Set<UUID> avoid) {
-        if (pickCorpseSpot(level, level.getRandom()) == null) {
+    public BlockPos pickDestination(Level level, RandomSource random) {
+        return eatsOrBuries() ? colony.food().pickFoodSpot(level, random) : pickCorpseSpot(level, random);
+    }
+
+    /**
+     * The worker carrying a body sets it down at {@code spot}: in the refuse chamber, or it is eaten on the comb there
+     * (one more layer of comb, like a piece of forage). False if that spot cannot take it (the worker looks for another).
+     */
+    public boolean setDown(Level level, BlockPos spot) {
+        if (!eatsOrBuries()) {
+            return placeCorpse(level, spot);
+        }
+        if (!colony.food().depositSeed(level, spot)) {
+            return false;
+        }
+        level.playSound(null, spot, net.minecraft.sounds.SoundEvents.GENERIC_EAT, net.minecraft.sounds.SoundSource.NEUTRAL, 0.2F, 1.6F);
+        return true;
+    }
+
+    /** A worker walls an old body up with soil where it lies: the body is gone under a thin layer of earth. */
+    public void bury(Level level, AntCorpseEntity corpse) {
+        if (level instanceof net.minecraft.server.level.ServerLevel server) {
+            server.sendParticles(new net.minecraft.core.particles.BlockParticleOption(net.minecraft.core.particles.ParticleTypes.BLOCK,
+                    net.minecraft.world.level.block.Blocks.DIRT.defaultBlockState()), corpse.getX(), corpse.getY() + 0.1, corpse.getZ(), 8, 0.1, 0.05, 0.1, 0.0);
+        }
+        level.playSound(null, corpse.blockPosition(), net.minecraft.sounds.SoundEvents.GRAVEL_PLACE, net.minecraft.sounds.SoundSource.BLOCKS, 0.3F, 1.4F);
+        releaseCorpse(corpse);
+        corpse.discard();
+    }
+
+    /**
+     * The dead nestmate nearest to {@code near} that a worker should deal with, or null: not one that lies in the refuse
+     * chamber already, not one another worker is on its way to, not one at a spot {@code canGo} rules out (a termite stays
+     * in by day). Ants only take one while there is a free spot in the refuse chamber; termites only take a fresh one
+     * while there is room on the comb (an old one they bury where it lies). {@code avoid}: bodies this worker found no way to.
+     */
+    @Nullable
+    public AntCorpseEntity findLooseCorpse(Level level, BlockPos near, Set<UUID> avoid, java.util.function.Predicate<BlockPos> canGo) {
+        boolean eats = eatsOrBuries();
+        if (!eats && pickCorpseSpot(level, level.getRandom()) == null) {
             return null;
         }
+        boolean roomToEat = eats && colony.food().pickFoodSpot(level, level.getRandom()) != null;
         claimedCorpses.prune(level.getGameTime());
         Set<BlockPos> chamber = new HashSet<>(colony.nest().getRefuseCells(level));
         AntCorpseEntity best = null;
         double bestDistance = Double.MAX_VALUE;
         for (AntCorpseEntity corpse : getCorpses(level)) {
             if (corpse.isPlaced() || chamber.contains(corpse.blockPosition()) || claimedCorpses.contains(corpse.getUUID())
-                    || avoid.contains(corpse.getUUID())) {
+                    || avoid.contains(corpse.getUUID()) || !canGo.test(corpse.blockPosition()) || eats && isFresh(corpse) && !roomToEat) {
                 continue;
             }
             double distance = corpse.distanceToSqr(near.getX() + 0.5, near.getY() + 0.5, near.getZ() + 0.5);

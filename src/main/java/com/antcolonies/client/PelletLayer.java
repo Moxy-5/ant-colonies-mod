@@ -71,7 +71,8 @@ public class PelletLayer<T extends AbstractAntEntity> extends BlockAndItemGeoLay
             // The dead ant hangs from the mandibles by its head and trails out in front of the carrier, legs up.
             poseStack.translate(0.0F, 0.0F, -3.0F / 16.0F);
             poseStack.scale(CORPSE_SIZE, CORPSE_SIZE, CORPSE_SIZE);
-            AntCorpseRenderer.renderModel(corpseModel, poseStack, bufferSource, packedLight);
+            AntCorpseRenderer.renderModel(corpseModel, poseStack, bufferSource, packedLight,
+                    ant instanceof com.antcolonies.entity.TermiteWorkerEntity ? AntCorpseRenderer.TERMITE_TEXTURE : AntCorpseRenderer.TEXTURE);
         } else if (stack == EGG_MARKER) {
             // The egg model stands on its foot point and is 6 pixels tall: lay it along the ant and centre it.
             poseStack.scale(EGG_SIZE, EGG_SIZE, EGG_SIZE);

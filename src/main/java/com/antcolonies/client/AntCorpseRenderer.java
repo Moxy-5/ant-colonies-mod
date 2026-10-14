@@ -29,15 +29,29 @@ public class AntCorpseRenderer extends EntityRenderer<AntCorpseEntity> {
             new ModelLayerLocation(ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "ant_corpse"), "main");
     public static final ResourceLocation TEXTURE =
             ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "textures/entity/ant_corpse.png");
+    /** A dead termite: the same shape, pale and dull (drawn by {@code tools/corpse_textures.py}). */
+    public static final ResourceLocation TERMITE_TEXTURE =
+            ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "textures/entity/termite_corpse.png");
     /** The corpse is drawn at the size of a living worker (the worker model is drawn at 0.65). */
     private static final float SIZE = 0.65F;
 
     private final ModelPart model;
+    private final ResourceLocation texture;
 
     public AntCorpseRenderer(EntityRendererProvider.Context context) {
+        this(context, TEXTURE);
+    }
+
+    public AntCorpseRenderer(EntityRendererProvider.Context context, ResourceLocation texture) {
         super(context);
         this.model = context.bakeLayer(LAYER);
+        this.texture = texture;
         this.shadowRadius = 0.0F;
+    }
+
+    /** The renderer for a dead termite. */
+    public static AntCorpseRenderer termite(EntityRendererProvider.Context context) {
+        return new AntCorpseRenderer(context, TERMITE_TEXTURE);
     }
 
     /** The body lies on its back, the head toward -z, like the worker model; the feet of the legs point to the sky. */
@@ -61,7 +75,12 @@ public class AntCorpseRenderer extends EntityRenderer<AntCorpseEntity> {
 
     /** Draws the corpse model with the pose already set (also used for the one a worker carries). */
     public static void renderModel(ModelPart model, PoseStack pose, MultiBufferSource buffers, int light) {
-        VertexConsumer consumer = buffers.getBuffer(RenderType.entityCutoutNoCull(TEXTURE));
+        renderModel(model, pose, buffers, light, TEXTURE);
+    }
+
+    /** As above, with the texture of the species. */
+    public static void renderModel(ModelPart model, PoseStack pose, MultiBufferSource buffers, int light, ResourceLocation texture) {
+        VertexConsumer consumer = buffers.getBuffer(RenderType.entityCutoutNoCull(texture));
         model.render(pose, consumer, light, OverlayTexture.NO_OVERLAY);
     }
 
@@ -70,13 +89,13 @@ public class AntCorpseRenderer extends EntityRenderer<AntCorpseEntity> {
         pose.pushPose();
         pose.mulPose(Axis.YP.rotationDegrees(180.0F - corpse.getYRot()));
         pose.scale(SIZE, SIZE, SIZE);
-        renderModel(model, pose, buffers, light);
+        renderModel(model, pose, buffers, light, texture);
         pose.popPose();
         super.render(corpse, yaw, partialTick, pose, buffers, light);
     }
 
     @Override
     public ResourceLocation getTextureLocation(AntCorpseEntity corpse) {
-        return TEXTURE;
+        return texture;
     }
 }

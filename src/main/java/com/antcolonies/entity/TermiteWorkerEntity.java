@@ -5,6 +5,7 @@ import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.entity.goal.BuildMoundGoal;
+import com.antcolonies.entity.goal.CarryCorpseGoal;
 import com.antcolonies.entity.goal.CarryEggGoal;
 import com.antcolonies.entity.goal.ClipGrassGoal;
 import com.antcolonies.entity.goal.FeedLarvaGoal;
@@ -77,6 +78,7 @@ public class TermiteWorkerEntity extends AbstractAntEntity {
         // Builders dig, foragers fetch food off the ground and cut it off plants.
         this.goalSelector.addGoal(3, new DigGoal(this, () -> true, () -> mayDo(ColonyRole.BUILDER)));
         this.goalSelector.addGoal(3, new GatherSeedGoal(this));
+        this.goalSelector.addGoal(3, new CarryCorpseGoal(this));
         this.goalSelector.addGoal(4, new ClipGrassGoal(this));
         this.goalSelector.addGoal(4, new ScoutGoal(this));
         // Outside when it is time to stay in: back inside.
@@ -137,5 +139,11 @@ public class TermiteWorkerEntity extends AbstractAntEntity {
                 manager.markChanged();
             }
         }
+    }
+
+    // A dead worker leaves a body behind where it died (see AbstractAntEntity.remove).
+    @Override
+    protected boolean leavesBody() {
+        return true;
     }
 }

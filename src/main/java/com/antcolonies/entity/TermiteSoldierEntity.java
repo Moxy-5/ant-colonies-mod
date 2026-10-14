@@ -404,4 +404,10 @@ public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurs
         super.readAdditionalSaveData(tag);
         lastFed = tag.contains("LastFed") ? tag.getLong("LastFed") : Colony.NOT_SET;
     }
+
+    // A dead soldier leaves a body behind where it died (see AbstractAntEntity.remove).
+    @Override
+    protected boolean leavesBody() {
+        return true;
+    }
 }

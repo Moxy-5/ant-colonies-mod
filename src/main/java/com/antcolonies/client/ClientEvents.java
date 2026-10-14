@@ -37,6 +37,7 @@ public class ClientEvents {
         event.registerEntityRenderer(ModEntities.ANT_EGG.get(), AntEggRenderer::new);
         event.registerEntityRenderer(ModEntities.ANT_LARVA.get(), AntLarvaRenderer::new);
         event.registerEntityRenderer(ModEntities.ANT_CORPSE.get(), AntCorpseRenderer::new);
+        event.registerEntityRenderer(ModEntities.TERMITE_CORPSE.get(), AntCorpseRenderer::termite);
 
         // Placeholder: the queen reuses the worker model and animations, just bigger and with her own texture.
         ResourceLocation workerAsset = ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "worker_ant");

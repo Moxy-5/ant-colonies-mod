@@ -128,6 +128,27 @@ class SpeciesProfileTest {
         assertEquals(SpeciesProfile.FoodNumbers.ALWAYS, profile.food().forageAt());
     }
 
+    /** Nest stages: the harvester ant's nest grows a level at a time with its workers and stored food; termites dig their one level at once. */
+    @Test
+    void theNestOpensLevelsAsTheColonyGrows() throws Exception {
+        SpeciesProfile.NestNumbers ant = read("red_harvester_ant").nest();
+        assertEquals(0, ant.levelsFor(0, 0), "the founding queen alone digs only her founding chamber");
+        assertEquals(1, ant.levelsFor(3, 0), "the first workers dig the seed store");
+        assertEquals(1, ant.levelsFor(6, 9));
+        assertEquals(2, ant.levelsFor(6, 10), "the nursery with 6 workers and 10 seeds");
+        assertEquals(2, ant.levelsFor(11, 100));
+        assertEquals(3, ant.levelsFor(12, 30));
+        assertEquals(4, ant.levelsFor(20, 30));
+        assertEquals(4, ant.levelsFor(60, 200));
+        assertEquals(1, read("macrotermes").nest().levelsFor(0, 0), "termites have no nest stages");
+        assertEquals(60, read("red_harvester_ant").colony().maxWorkers());
+        assertEquals(60, read("macrotermes").colony().maxWorkers());
+        SpeciesProfile.RefuseNumbers termiteDead = read("macrotermes").refuse();
+        assertTrue(termiteDead.eatsOrBuries() && termiteDead.eatFreshTicks().get() < termiteDead.corpseDecayTicks(),
+                "termites eat their fresh dead and bury the old ones before they crumble");
+        assertTrue(!read("red_harvester_ant").refuse().eatsOrBuries(), "ants carry their dead to the refuse chamber");
+    }
+
     @Test
     void nursesAreCountedFromTheHeadcount() {
         SpeciesProfile.ColonyNumbers colony = SpeciesProfile.RED_HARVESTER_ANT.colony();

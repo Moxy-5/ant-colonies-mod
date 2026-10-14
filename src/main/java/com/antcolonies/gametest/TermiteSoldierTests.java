@@ -70,7 +70,7 @@ public class TermiteSoldierTests {
                     + nymphs[0].getSoldierRank());
             helper.assertTrue(nymphs[0].getMeal() == numbers.minorMeal(), "the minor nymph's meal is " + nymphs[0].getMeal());
             helper.assertTrue(nymphs[1].getSoldierRank() == null && nymphs[1].getMeal() == workerMeal, "the second nymph should grow into a worker");
-            colony.setCount(WorkerAntEntity.CASTE, colony.profile().colony().maxWorkers());
+            colony.setCount(WorkerAntEntity.CASTE, 20); // 2 minors and 1 major wanted
             nymphs[2] = hatch(helper, colony, 2);
             nymphs[3] = hatch(helper, colony, 3);
             nymphs[4] = hatch(helper, colony, 4);
@@ -95,17 +95,14 @@ public class TermiteSoldierTests {
                     + soldiers.stream().map(TermiteSoldierEntity::getRank).toList());
             helper.assertTrue(colony.soldiers().count(Rank.MINOR) == 1 && colony.soldiers().count(Rank.MAJOR) == 1,
                     "the colony counts " + colony.soldiers().describe(level));
-            // The worker nymph eats its fill, but the colony has all its workers: it waits (the second minor is on its way).
+            // The colony now has all the workers it may have (and wants more soldiers at that size): the worker nymph
+            // that has eaten its fill cannot grow into a worker, so it grows into a soldier instead.
+            colony.setCount(WorkerAntEntity.CASTE, colony.profile().colony().maxWorkers());
             nymphs[1].setFed(nymphs[1].getMeal());
         });
         helper.runAfterDelay(100, () -> {
-            helper.assertTrue(nymphs[1].isAlive() && nymphs[1].getSoldierRank() == null, "the full worker nymph should wait as a worker nymph");
-            // The second minor nymph is gone (as if it had died): now the colony is short of a minor.
-            nymphs[2].discard();
-        });
-        helper.runAfterDelay(140, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
-            helper.assertTrue(nymphs[1].isAlive() && nymphs[1].getSoldierRank() == Rank.MINOR, "the waiting worker nymph should now grow into a minor: "
+            helper.assertTrue(nymphs[1].isAlive() && nymphs[1].getSoldierRank() == Rank.MINOR, "the full worker nymph at the worker limit should now grow into a minor: "
                     + nymphs[1].getSoldierRank());
             helper.assertTrue(!nymphs[1].isFull() && nymphs[1].getMeal() == colony.profile().soldiers().orElseThrow().minorMeal(),
                     "it should eat the minor's meal first");

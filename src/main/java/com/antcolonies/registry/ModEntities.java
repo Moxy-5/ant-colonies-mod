@@ -55,6 +55,15 @@ public class ModEntities {
                     .updateInterval(20)
                     .build("ant_corpse"));
 
+    // The body of a dead termite (the same kind of body as a dead ant, drawn pale).
+    public static final DeferredHolder<EntityType<?>, EntityType<AntCorpseEntity>> TERMITE_CORPSE =
+            ENTITY_TYPES.register("termite_corpse", () -> EntityType.Builder
+                    .of(AntCorpseEntity::new, MobCategory.MISC)
+                    .sized(0.25F, 0.15F)
+                    .clientTrackingRange(6)
+                    .updateInterval(20)
+                    .build("termite_corpse"));
+
     // Queen is about twice the worker's size.
     public static final DeferredHolder<EntityType<?>, EntityType<QueenAntEntity>> QUEEN_ANT =
             ENTITY_TYPES.register("queen_ant", () -> EntityType.Builder

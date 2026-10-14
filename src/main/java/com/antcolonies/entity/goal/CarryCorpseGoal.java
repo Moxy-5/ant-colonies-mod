@@ -21,8 +21,10 @@ import net.minecraft.world.entity.ai.goal.Goal;
 
 /**
  * Clears away the dead: picks up the body of a dead nestmate in its mandibles, carries it down to the refuse chamber and
- * sets it down on a free spot there. Only once the refuse chamber is dug out. An ant that cannot finish the job puts the
- * body down where it stands, and another ant takes over. The job of the builders (and of any ant with nothing to do).
+ * sets it down on a free spot there (ants, once the refuse chamber is dug out). Termites, which have no refuse chamber,
+ * carry a fresh body into a fungus garden, where it is eaten (a layer of comb), and wall an old one up with soil where it
+ * lies (see {@code Refuse}). An insect that cannot finish the job puts the body down where it stands, and another takes
+ * over. The job of the builders (and of any worker with nothing to do).
  */
 public class CarryCorpseGoal extends Goal {
     /** How close (sideways, in blocks) the ant must get to a body or to its spot. */
@@ -33,6 +35,8 @@ public class CarryCorpseGoal extends Goal {
     private static final int UNREACHABLE_TICKS = 400;
     /** After this many chamber spots with no route to them, the ant puts the body down. */
     private static final int MAX_FAILED_ROUTES = 4;
+    /** How long (in ticks) a termite scrapes soil over an old body to bury it. */
+    private static final int BURY_TICKS = 60;
 
     private final AbstractAntEntity ant;
     @Nullable
@@ -45,6 +49,8 @@ public class CarryCorpseGoal extends Goal {
     private BlockPos spot;
     private int ticks;
     private int failedRoutes;
+    /** Ticks spent burying the body (0: not burying). */
+    private int burying;
     private boolean done;
     /** Bodies this ant failed to reach: corpse id -> game time until which it leaves them alone. */
     private final Map<UUID, Long> unreachable = new HashMap<>();
@@ -62,7 +68,7 @@ public class CarryCorpseGoal extends Goal {
         if (ant.isCarryingCorpse()) {
             // Carrying a body (something else interrupted the walk): carry on to the refuse chamber.
             colony = ColonyManager.get(level).getColony(ant.getColonyId());
-            spot = colony == null ? null : colony.refuse().pickCorpseSpot(level, ant.getRandom());
+            spot = colony == null ? null : colony.refuse().pickDestination(level, ant.getRandom());
             corpse = null;
             if (spot == null) {
                 putDown(level);
@@ -80,7 +86,7 @@ public class CarryCorpseGoal extends Goal {
         }
         long now = level.getGameTime();
         unreachable.values().removeIf(until -> until <= now);
-        corpse = colony.refuse().findLooseCorpse(level, ant.blockPosition(), unreachable.keySet());
+        corpse = colony.refuse().findLooseCorpse(level, ant.blockPosition(), unreachable.keySet(), ant::mayBeAt);
         if (corpse == null) {
             return false;
         }
@@ -97,6 +103,7 @@ public class CarryCorpseGoal extends Goal {
     public void start() {
         ticks = 0;
         failedRoutes = 0;
+        burying = 0;
         done = false;
         if (corpse != null) {
             ant.getNavigator().moveTo(corpse.blockPosition(), 1.0);
@@ -142,15 +149,27 @@ public class CarryCorpseGoal extends Goal {
         ant.getLookControl().setLookAt(corpse);
         double dx = ant.getX() - corpse.getX();
         double dz = ant.getZ() - corpse.getZ();
-        if (dx * dx + dz * dz <= REACH * REACH && Math.abs(ant.getY() - corpse.getY()) < 1.5) {
+        if (dx * dx + dz * dz <= REACH * REACH && Math.abs(ant.getY() - corpse.getY()) < 1.5
+                && colony.refuse().eatsOrBuries() && (burying > 0 || !colony.refuse().isFresh(corpse))) {
+            // An old body: scraped over with soil where it lies.
+            ant.getNavigator().stop();
+            if (++burying % 15 == 0) {
+                level.playSound(null, corpse.blockPosition(), SoundEvents.GRAVEL_HIT, SoundSource.BLOCKS, 0.2F, 1.5F);
+            }
+            if (burying >= BURY_TICKS) {
+                colony.refuse().bury(level, corpse);
+                corpse = null;
+                done = true;
+            }
+        } else if (dx * dx + dz * dz <= REACH * REACH && Math.abs(ant.getY() - corpse.getY()) < 1.5) {
             colony.refuse().releaseCorpse(corpse);
             corpse.discard();
             corpse = null;
             ant.setCarryingCorpse(true);
             level.playSound(null, ant.blockPosition(), SoundEvents.ITEM_PICKUP, SoundSource.NEUTRAL, 0.15F, 0.8F);
-            spot = colony.refuse().pickCorpseSpot(level, ant.getRandom());
+            spot = colony.refuse().pickDestination(level, ant.getRandom());
             if (spot == null) {
-                done = true; // no room in the refuse chamber after all: stop() puts the body down
+                done = true; // no room after all: stop() puts the body down
             } else {
                 walkToSpot();
             }
@@ -160,16 +179,16 @@ public class CarryCorpseGoal extends Goal {
         }
     }
 
-    /** Second leg: down to a free spot in the refuse chamber, where the ant puts the body down. */
+    /** Second leg: down to a free spot in the refuse chamber, where the ant puts the body down (termites: onto the comb, where it is eaten). */
     private void bringCorpse(ServerLevel level) {
         double dx = ant.getX() - (spot.getX() + 0.5);
         double dz = ant.getZ() - (spot.getZ() + 0.5);
         if (dx * dx + dz * dz <= REACH * REACH && Math.abs(ant.getY() - spot.getY()) < 1.5) {
-            if (colony.refuse().placeCorpse(level, spot)) {
+            if (colony.refuse().setDown(level, spot)) {
                 ant.setCarryingCorpse(false);
                 done = true;
             } else {
-                spot = colony.refuse().pickCorpseSpot(level, ant.getRandom()); // another body lies there now
+                spot = colony.refuse().pickDestination(level, ant.getRandom()); // another body lies there now (or the comb is full)
                 if (spot == null) {
                     done = true;
                 } else {
@@ -188,7 +207,7 @@ public class CarryCorpseGoal extends Goal {
                 done = true;
                 return;
             }
-            spot = colony.refuse().pickCorpseSpot(ant.level(), ant.getRandom());
+            spot = colony.refuse().pickDestination(ant.level(), ant.getRandom());
         }
         if (spot == null) {
             done = true;

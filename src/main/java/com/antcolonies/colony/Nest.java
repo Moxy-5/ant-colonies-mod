@@ -109,6 +109,11 @@ public class Nest {
 
     @Nullable
     private Layout layout;
+    /**
+     * How many levels of the nest the workers may dig (nest stages, see {@link #levelsUnlocked}): it only ever goes up.
+     * Saved; nests from before nest stages may dig them all.
+     */
+    private int levelsUnlocked;
     /** The foraging tunnels of {@link #layout}, worked out once for it. */
     private List<NestPlan.ForagingTunnel> foragingTunnels = List.of();
     @Nullable
@@ -188,8 +193,9 @@ public class Nest {
         if (layout == null) {
             return null;
         }
-        for (NestPlan.Chamber chamber : layout.chambers()) {
-            next = firstDiggable(level, chamber.cells());
+        int allowed = levelsUnlocked(level);
+        for (int i = 0; i < layout.chambers().size() && i < allowed; i++) {
+            next = firstDiggable(level, layout.chambers().get(i).cells());
             if (next != null) {
                 return next;
             }
@@ -469,7 +475,7 @@ public class Nest {
     }
 
     /** Open, or only a heap of seeds, bread or forage on the floor: the block is dug out. A chunk that is not loaded counts as not dug. */
-    static boolean isDugOut(Level level, BlockPos pos) {
+    public static boolean isDugOut(Level level, BlockPos pos) {
         if (!level.isLoaded(pos)) {
             return false;
         }
@@ -799,7 +805,27 @@ public class Nest {
         digProgress.remove(pos);
     }
 
+    /**
+     * Nest stages: how many levels (top to bottom: each a stair, a tunnel and a room) the workers may dig now. A level
+     * opens once the colony has the workers and the stored food its species profile asks for ({@code nest.level_unlocks}),
+     * so a young colony has a small, shallow nest that grows deeper as the colony grows. Once open a level stays open,
+     * even if the colony shrinks again.
+     */
+    public int levelsUnlocked(Level level) {
+        int now = colony.profile().nest().levelsFor(colony.getCount(com.antcolonies.entity.WorkerAntEntity.CASTE), colony.food().getFood());
+        if (now > levelsUnlocked) {
+            levelsUnlocked = now;
+        }
+        return levelsUnlocked;
+    }
+
+    /** Tests only: every level may be dug at once (for tests about the digging itself, not about nest stages). */
+    public void unlockAllLevelsForTests() {
+        levelsUnlocked = Integer.MAX_VALUE;
+    }
+
     void save(CompoundTag tag) {
+        tag.putInt("nestLevelsUnlocked", levelsUnlocked);
         if (layout != null) {
             tag.putInt("nestDepth", layout.shaftDepth());
             tag.putInt("nestDirection", layout.direction().get2DDataValue());
@@ -809,6 +835,8 @@ public class Nest {
     }
 
     void load(CompoundTag tag) {
+        // A nest saved before nest stages existed digs all its levels, as it did then.
+        levelsUnlocked = tag.contains("nestLevelsUnlocked") ? tag.getInt("nestLevelsUnlocked") : Integer.MAX_VALUE;
         // The nest plan it was digging (old saves have none: it is worked out again from the ground).
         if (tag.contains("nestLevels")) {
             int depth = tag.getInt("nestDepth");
