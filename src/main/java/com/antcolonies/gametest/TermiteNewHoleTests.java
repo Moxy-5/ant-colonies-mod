@@ -257,15 +257,33 @@ public class TermiteNewHoleTests {
      */
     @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
     public static void aFallenLogIsEatenFromBelowByDay(GameTestHelper helper) {
+        logEatenFromBelow(helper, false);
+    }
+
+    /**
+     * Like {@link #aFallenLogIsEatenFromBelowByDay}, with the log lying on the edge of a step: the ground beside it on
+     * one side is 2 blocks lower (the user's tree in the savanna, whose gallery was left out, 2026-10-14). The open side
+     * of the gallery is walled up with soil, and the log is eaten from below by day.
+     */
+    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    public static void aFallenLogOnTheEdgeOfAStepIsEatenFromBelowByDay(GameTestHelper helper) {
+        logEatenFromBelow(helper, true);
+    }
+
+    private static void logEatenFromBelow(GameTestHelper helper, boolean onAStep) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
         int logStart = MIDDLE + 20;
         for (int x = 0; x <= logStart + 8; x++) {
             for (int z = 0; z < 25; z++) {
-                for (int y = 0; y < SURFACE - 1; y++) {
+                int top = onAStep && x >= logStart - 3 && z > MIDDLE ? SURFACE - 3 : SURFACE - 1;
+                for (int y = 0; y < top; y++) {
                     helper.setBlock(x, y, z, Blocks.DIRT);
                 }
-                helper.setBlock(x, SURFACE - 1, z, Blocks.GRASS_BLOCK);
+                helper.setBlock(x, top, z, Blocks.GRASS_BLOCK);
+                for (int y = top + 1; y < SURFACE; y++) {
+                    helper.setBlock(x, y, z, Blocks.AIR);
+                }
             }
         }
         helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
@@ -329,11 +347,24 @@ public class TermiteNewHoleTests {
                 helper.assertTrue(helper.getTick() < 30000, "the tunnel and the feeding gallery under the log were not dug");
                 return;
             }
-            if (eaten > eatenAtDawn[0]) {
+            // Every dug gallery cell closed round (soil, the log, or the gallery and its tunnel).
+            java.util.Set<BlockPos> nest = new java.util.HashSet<>(tunnel.gallery());
+            nest.addAll(tunnel.tunnel().tunnel());
+            BlockPos open = null;
+            for (BlockPos cell : tunnel.gallery()) {
+                for (net.minecraft.core.Direction side : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+                    BlockPos next = cell.relative(side);
+                    if (!nest.contains(next) && level.getBlockState(next).getCollisionShape(level, next).isEmpty()) {
+                        open = next;
+                    }
+                }
+            }
+            if (eaten > eatenAtDawn[0] && open == null) {
                 helper.assertTrue(!colony.isForagingTime(level), "foraging time");
                 helper.succeed();
             }
-            helper.assertTrue(helper.getTick() < 39000, "nothing of the log was eaten by day (eaten " + eaten + ", at dawn " + eatenAtDawn[0] + ")");
+            helper.assertTrue(helper.getTick() < 39000, "by day: eaten " + eaten + " (at dawn " + eatenAtDawn[0] + "), the gallery "
+                    + (open == null ? "closed" : "still open at " + open.toShortString() + ", " + colony.walls().getLeaks(level).size() + " leaks"));
         });
     }
 }

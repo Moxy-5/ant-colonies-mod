@@ -12,7 +12,6 @@ import java.util.Set;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.state.BlockState;
 
 /**
  * A feeding gallery (the user's idea of 2026-10-14): real termites reach a fallen log through the soil and eat it from
@@ -21,8 +20,8 @@ import net.minecraft.world.level.block.state.BlockState;
  * lying on the ground, its stump, a hay bale), joined to the tunnel underground. A termite in the gallery has the food
  * right over its head and eats it from there; the food is its roof. Species-neutral: any rich food that is a whole block.
  *
- * <p>A block under the food is left out if digging it would open the gallery to the outside (the food spans a dip, or
- * the ground falls away beside it), and so is food that does not lie on soil.
+ * <p>Where the ground falls away beside the food, the open side is walled up with soil by the workers (see
+ * {@link NestWalls}). A block under the food next to water is left out, and so is food that does not lie on soil.
  */
 final class FeedingGallery {
     /** The food blocks looked at: within this many blocks of the food the tunnel was dug for. */
@@ -54,16 +53,16 @@ final class FeedingGallery {
                 under.add(cell);
             }
         }
-        // Left out: a cell with open air beside it (it would open the gallery to the outside).
+        // A cell with open air beside it (the food lies on the edge of a step) is dug too: the opening is then a hole in
+        // the nest walls, and the workers pack it with soil (NestWalls), a wall of mud like real termites plaster over an
+        // open side. Only a cell beside water is left out.
         Set<BlockPos> wanted = new LinkedHashSet<>();
         for (BlockPos cell : under) {
-            boolean closed = true;
+            boolean dry = true;
             for (Direction side : Direction.Plane.HORIZONTAL) {
-                BlockPos next = cell.relative(side);
-                BlockState state = level.getBlockState(next);
-                closed &= under.contains(next) || !state.getCollisionShape(level, next).isEmpty() && state.getFluidState().isEmpty();
+                dry &= level.getFluidState(cell.relative(side)).isEmpty();
             }
-            if (closed) {
+            if (dry) {
                 wanted.add(cell);
             }
         }
