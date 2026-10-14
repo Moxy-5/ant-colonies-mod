@@ -315,9 +315,8 @@ public class ForagingHoles {
             boolean dug = isDug(level, tunnel.tunnel());
             digging |= !dug;
             if (dug && tunnel.gallery() == null && level.isLoaded(tunnel.food())) {
-                // The tunnel has reached the food: a feeding gallery up under it, to eat it from below by day too.
-                List<BlockPos> gallery = FeedingGallery.plan(level, tunnel.tunnel(), tunnel.food(), ground(level),
-                        pos -> isRich(level, pos) && level.getBlockState(pos).isCollisionShapeFullBlock(level, pos));
+                // A tunnel of an older save, planned without its gallery: the gallery up under the food now.
+                List<BlockPos> gallery = planGallery(level, tunnel.tunnel(), tunnel.food());
                 colony.nest().setGallery(tunnel.food(), gallery);
                 ColonyManager.get(level).markChanged();
                 AntColoniesMod.LOGGER.debug("[new-hole] a feeding gallery of {} blocks up under the food at {}", gallery.size(),
@@ -341,10 +340,21 @@ public class ForagingHoles {
         }
         BlockPos center = colony.getCenter();
         Direction side = Direction.getNearest(plan.hole().getX() - center.getX(), 0, plan.hole().getZ() - center.getZ());
-        colony.nest().addNewTunnel(new Nest.NewTunnel(new NestPlan.ForagingTunnel(plan.cells(), plan.hole(), side), food.immutable()));
+        // The feeding gallery up under the food is planned with the tunnel, as one job (the user's decision, 2026-10-14:
+        // real termites tunnel for the food from below from the start; the foragers outside carry on by the old holes
+        // meanwhile). The workers dig the tunnel, then the gallery, then open the hole beside the food.
+        NestPlan.ForagingTunnel tunnel = new NestPlan.ForagingTunnel(plan.cells(), plan.hole(), side);
+        List<BlockPos> gallery = planGallery(level, tunnel, food);
+        colony.nest().addNewTunnel(new Nest.NewTunnel(tunnel, food.immutable(), gallery));
         ColonyManager.get(level).markChanged();
-        AntColoniesMod.LOGGER.debug("[new-hole] a tunnel of {} blocks to the food at {}, hole at {}",
-                plan.cells().size(), food.toShortString(), plan.hole().toShortString());
+        AntColoniesMod.LOGGER.debug("[new-hole] a tunnel of {} blocks to the food at {}, hole at {}, with a feeding gallery of {} blocks",
+                plan.cells().size(), food.toShortString(), plan.hole().toShortString(), gallery.size());
+    }
+
+    /** The feeding gallery from this tunnel up under the food (see {@link FeedingGallery}): empty if it cannot be reached from below. */
+    private List<BlockPos> planGallery(Level level, NestPlan.ForagingTunnel tunnel, BlockPos food) {
+        return FeedingGallery.plan(level, tunnel, food, ground(level),
+                pos -> isRich(level, pos) && level.getBlockState(pos).isCollisionShapeFullBlock(level, pos));
     }
 
     /**

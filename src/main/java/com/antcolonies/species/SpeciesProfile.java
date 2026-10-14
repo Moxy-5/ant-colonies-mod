@@ -318,9 +318,13 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * way out to forage (see {@code NestPlan.foragingTunnels}; 0 to 2, optional, none), and {@code foragingHoleDistance}
      * how far out (in blocks) the holes are (optional, 8). {@code plugBlock}: the block the workers pack into a hole to
      * close it (the entrance, a foraging hole, an opening in the nest walls; optional, Burrowed Dirt).
+     * {@code crustWalls}: the walls of the nest's galleries are thin crusts of mud ({@code MudCrustBlock}) plastered over
+     * every side that would open to the outside, before it is dug through ("wall first"; termites; optional, false). A
+     * whole missing block is still packed full with the plug block.
      */
     public record NestNumbers(int maxLevels, boolean sealWhileFounding, boolean foundingChamber, List<String> sideRooms,
-            int foragingHoles, int foragingHoleDistance, String plugBlock, List<LevelUnlock> levelUnlocks, Optional<NewHoles> newHoles) {
+            int foragingHoles, int foragingHoleDistance, String plugBlock, List<LevelUnlock> levelUnlocks, Optional<NewHoles> newHoles,
+            boolean crustWalls) {
         public static final Codec<NestNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("max_levels").forGetter(NestNumbers::maxLevels),
                 Codec.BOOL.fieldOf("seal_while_founding").forGetter(NestNumbers::sealWhileFounding),
@@ -330,8 +334,14 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 Codec.INT.optionalFieldOf("foraging_hole_distance", 8).forGetter(NestNumbers::foragingHoleDistance),
                 Codec.STRING.optionalFieldOf("plug_block", "antcolonies:burrowed_dirt").forGetter(NestNumbers::plugBlock),
                 LevelUnlock.CODEC.listOf().optionalFieldOf("level_unlocks", List.of()).forGetter(NestNumbers::levelUnlocks),
-                NewHoles.CODEC.optionalFieldOf("new_holes").forGetter(NestNumbers::newHoles)
+                NewHoles.CODEC.optionalFieldOf("new_holes").forGetter(NestNumbers::newHoles),
+                Codec.BOOL.optionalFieldOf("crust_walls", false).forGetter(NestNumbers::crustWalls)
         ).apply(i, NestNumbers::new));
+
+        public NestNumbers(int maxLevels, boolean sealWhileFounding, boolean foundingChamber, List<String> sideRooms,
+                int foragingHoles, int foragingHoleDistance, String plugBlock, List<LevelUnlock> levelUnlocks, Optional<NewHoles> newHoles) {
+            this(maxLevels, sealWhileFounding, foundingChamber, sideRooms, foragingHoles, foragingHoleDistance, plugBlock, levelUnlocks, newHoles, false);
+        }
 
         public NestNumbers(int maxLevels, boolean sealWhileFounding, boolean foundingChamber, List<String> sideRooms,
                 int foragingHoles, int foragingHoleDistance, String plugBlock) {

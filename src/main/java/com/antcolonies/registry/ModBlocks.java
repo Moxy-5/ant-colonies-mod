@@ -5,6 +5,7 @@ import com.antcolonies.block.DeadWoodBlock;
 import com.antcolonies.block.DryGrassBlock;
 import com.antcolonies.block.FallenBranchBlock;
 import com.antcolonies.block.FungusCombBlock;
+import com.antcolonies.block.MudCrustBlock;
 import com.antcolonies.block.GiantTermitomycesBlock;
 import com.antcolonies.block.SeedPileBlock;
 import com.antcolonies.block.TallDryGrassBlock;
@@ -119,6 +120,12 @@ public class ModBlocks {
     /** Dead acacia wood: a fallen tree's trunk and stump, eaten by termites in stages (see DeadWoodBlock). */
     public static final DeferredBlock<DeadWoodBlock> DEAD_WOOD = BLOCKS.registerBlock("dead_wood", DeadWoodBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_GRAY).strength(1.5F).sound(SoundType.WOOD).ignitedByLava());
+
+    /** A thin crust of termite mud on any face of a block: gallery walls, coated wood, sheeting (see MudCrustBlock). */
+    public static final DeferredBlock<MudCrustBlock> MUD_CRUST = BLOCKS.registerBlock("mud_crust", MudCrustBlock::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_ORANGE).strength(0.2F).sound(SoundType.MUD).noOcclusion()
+                    .isSuffocating((state, level, pos) -> false).isViewBlocking((state, level, pos) -> false)
+                    .pushReaction(PushReaction.DESTROY).randomTicks());
 
     private static BlockBehaviour.Properties grassProperties() {
         return BlockBehaviour.Properties.of().mapColor(MapColor.SAND).replaceable().noCollission().instabreak().sound(SoundType.GRASS)

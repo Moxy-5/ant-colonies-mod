@@ -297,10 +297,16 @@ public class FoodStore {
      * gallery under a fallen log, see {@code FeedingGallery}), so a termite can eat it by day without going out.
      */
     public boolean isFeedableFromInside(Level level, BlockPos food) {
+        Set<BlockPos> nest = null;
         for (net.minecraft.core.Direction direction : net.minecraft.core.Direction.values()) {
             BlockPos next = food.relative(direction);
             if (colony.nest().isInside(level, next) && Nest.isDugOut(level, next)) {
-                return true;
+                if (nest == null) {
+                    nest = colony.nest().nestCells(level);
+                }
+                if (colony.nest().isGalleryClosed(level, next, nest)) {
+                    return true;
+                }
             }
         }
         return false;

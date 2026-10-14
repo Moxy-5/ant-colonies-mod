@@ -1,0 +1,544 @@
+{
+  "multipart": [
+    {
+      "when": {
+        "north": "true",
+        "age": "0"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/mud_crust_fresh_0",
+          "uvlock": true
+        },
+        {
+          "model": "antcolonies:block/mud_crust_fresh_1",
+          "uvlock": true
+        },
+        {
+          "model": "antcolonies:block/mud_crust_fresh_2",
+          "uvlock": true
+        }
+      ]
+    },
+    {
+      "when": {
+        "south": "true",
+        "age": "0"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/mud_crust_fresh_0",
+          "uvlock": true,
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/mud_crust_fresh_1",
+          "uvlock": true,
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/mud_crust_fresh_2",
+          "uvlock": true,
+          "y": 180
+        }
+      ]
+    },
+    {
+      "when": {
+        "east": "true",
+        "age": "0"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/mud_crust_fresh_0",
+          "uvlock": true,
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/mud_crust_fresh_1",
+          "uvlock": true,
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/mud_crust_fresh_2",
+          "uvlock": true,
+          "y": 90
+        }
+      ]
+    },
+    {
+      "when": {
+        "west": "true",
+        "age": "0"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/mud_crust_fresh_0",
+          "uvlock": true,
+          "y": 270
+        },
+        {
+          "model": "antcolonies:block/mud_crust_fresh_1",
+          "uvlock": true,
+          "y": 270
+        },
+        {
+          "model": "antcolonies:block/mud_crust_fresh_2",
+          "uvlock": true,
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "up": "true",
+        "age": "0"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/mud_crust_fresh_0",
+          "uvlock": true,
+          "x": 270
+        },
+        {
+          "model": "antcolonies:block/mud_crust_fresh_1",
+          "uvlock": true,
+          "x": 270
+        },
+        {
+          "model": "antcolonies:block/mud_crust_fresh_2",
+          "uvlock": true,
+          "x": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "down": "true",
+        "age": "0"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/mud_crust_fresh_0",
+          "uvlock": true,
+          "x": 90
+        },
+        {
+          "model": "antcolonies:block/mud_crust_fresh_1",
+          "uvlock": true,
+          "x": 90
+        },
+        {
+          "model": "antcolonies:block/mud_crust_fresh_2",
+          "uvlock": true,
+          "x": 90
+        }
+      ]
+    },
+    {
+      "when": {
+        "north": "true",
+        "age": "1"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/mud_crust_setting_0",
+          "uvlock": true
+        },
+        {
+          "model": "antcolonies:block/mud_crust_setting_1",
+          "uvlock": true
+        },
+        {
+          "model": "antcolonies:block/mud_crust_setting_2",
+          "uvlock": true
+        }
+      ]
+    },
+    {
+      "when": {
+        "south": "true",
+        "age": "1"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/mud_crust_setting_0",
+          "uvlock": true,
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/mud_crust_setting_1",
+          "uvlock": true,
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/mud_crust_setting_2",
+          "uvlock": true,
+          "y": 180
+        }
+      ]
+    },
+    {
+      "when": {
+        "east": "true",
+        "age": "1"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/mud_crust_setting_0",
+          "uvlock": true,
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/mud_crust_setting_1",
+          "uvlock": true,
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/mud_crust_setting_2",
+          "uvlock": true,
+          "y": 90
+        }
+      ]
+    },
+    {
+      "when": {
+        "west": "true",
+        "age": "1"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/mud_crust_setting_0",
+          "uvlock": true,
+          "y": 270
+        },
+        {
+          "model": "antcolonies:block/mud_crust_setting_1",
+          "uvlock": true,
+          "y": 270
+        },
+        {
+          "model": "antcolonies:block/mud_crust_setting_2",
+          "uvlock": true,
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "up": "true",
+        "age": "1"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/mud_crust_setting_0",
+          "uvlock": true,
+          "x": 270
+        },
+        {
+          "model": "antcolonies:block/mud_crust_setting_1",
+          "uvlock": true,
+          "x": 270
+        },
+        {
+          "model": "antcolonies:block/mud_crust_setting_2",
+          "uvlock": true,
+          "x": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "down": "true",
+        "age": "1"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/mud_crust_setting_0",
+          "uvlock": true,
+          "x": 90
+        },
+        {
+          "model": "antcolonies:block/mud_crust_setting_1",
+          "uvlock": true,
+          "x": 90
+        },
+        {
+          "model": "antcolonies:block/mud_crust_setting_2",
+          "uvlock": true,
+          "x": 90
+        }
+      ]
+    },
+    {
+      "when": {
+        "north": "true",
+        "age": "2"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/mud_crust_dry_0",
+          "uvlock": true
+        },
+        {
+          "model": "antcolonies:block/mud_crust_dry_1",
+          "uvlock": true
+        },
+        {
+          "model": "antcolonies:block/mud_crust_dry_2",
+          "uvlock": true
+        }
+      ]
+    },
+    {
+      "when": {
+        "south": "true",
+        "age": "2"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/mud_crust_dry_0",
+          "uvlock": true,
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/mud_crust_dry_1",
+          "uvlock": true,
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/mud_crust_dry_2",
+          "uvlock": true,
+          "y": 180
+        }
+      ]
+    },
+    {
+      "when": {
+        "east": "true",
+        "age": "2"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/mud_crust_dry_0",
+          "uvlock": true,
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/mud_crust_dry_1",
+          "uvlock": true,
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/mud_crust_dry_2",
+          "uvlock": true,
+          "y": 90
+        }
+      ]
+    },
+    {
+      "when": {
+        "west": "true",
+        "age": "2"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/mud_crust_dry_0",
+          "uvlock": true,
+          "y": 270
+        },
+        {
+          "model": "antcolonies:block/mud_crust_dry_1",
+          "uvlock": true,
+          "y": 270
+        },
+        {
+          "model": "antcolonies:block/mud_crust_dry_2",
+          "uvlock": true,
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "up": "true",
+        "age": "2"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/mud_crust_dry_0",
+          "uvlock": true,
+          "x": 270
+        },
+        {
+          "model": "antcolonies:block/mud_crust_dry_1",
+          "uvlock": true,
+          "x": 270
+        },
+        {
+          "model": "antcolonies:block/mud_crust_dry_2",
+          "uvlock": true,
+          "x": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "down": "true",
+        "age": "2"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/mud_crust_dry_0",
+          "uvlock": true,
+          "x": 90
+        },
+        {
+          "model": "antcolonies:block/mud_crust_dry_1",
+          "uvlock": true,
+          "x": 90
+        },
+        {
+          "model": "antcolonies:block/mud_crust_dry_2",
+          "uvlock": true,
+          "x": 90
+        }
+      ]
+    },
+    {
+      "when": {
+        "north": "true",
+        "age": "3"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/mud_crust_old_0",
+          "uvlock": true
+        },
+        {
+          "model": "antcolonies:block/mud_crust_old_1",
+          "uvlock": true
+        },
+        {
+          "model": "antcolonies:block/mud_crust_old_2",
+          "uvlock": true
+        }
+      ]
+    },
+    {
+      "when": {
+        "south": "true",
+        "age": "3"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/mud_crust_old_0",
+          "uvlock": true,
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/mud_crust_old_1",
+          "uvlock": true,
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/mud_crust_old_2",
+          "uvlock": true,
+          "y": 180
+        }
+      ]
+    },
+    {
+      "when": {
+        "east": "true",
+        "age": "3"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/mud_crust_old_0",
+          "uvlock": true,
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/mud_crust_old_1",
+          "uvlock": true,
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/mud_crust_old_2",
+          "uvlock": true,
+          "y": 90
+        }
+      ]
+    },
+    {
+      "when": {
+        "west": "true",
+        "age": "3"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/mud_crust_old_0",
+          "uvlock": true,
+          "y": 270
+        },
+        {
+          "model": "antcolonies:block/mud_crust_old_1",
+          "uvlock": true,
+          "y": 270
+        },
+        {
+          "model": "antcolonies:block/mud_crust_old_2",
+          "uvlock": true,
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "up": "true",
+        "age": "3"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/mud_crust_old_0",
+          "uvlock": true,
+          "x": 270
+        },
+        {
+          "model": "antcolonies:block/mud_crust_old_1",
+          "uvlock": true,
+          "x": 270
+        },
+        {
+          "model": "antcolonies:block/mud_crust_old_2",
+          "uvlock": true,
+          "x": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "down": "true",
+        "age": "3"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/mud_crust_old_0",
+          "uvlock": true,
+          "x": 90
+        },
+        {
+          "model": "antcolonies:block/mud_crust_old_1",
+          "uvlock": true,
+          "x": 90
+        },
+        {
+          "model": "antcolonies:block/mud_crust_old_2",
+          "uvlock": true,
+          "x": 90
+        }
+      ]
+    }
+  ]
+}

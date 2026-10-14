@@ -10,6 +10,8 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import com.antcolonies.block.MudCrustBlock;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.entity.LivingEntity;
@@ -63,8 +65,8 @@ public class NestWalls {
             for (Direction direction : Direction.values()) {
                 BlockPos hole = cell.relative(direction);
                 // The foraging holes open and close on their own schedule (see ForagingHoles), they are no leak.
-                if (nest.contains(hole) || hole.equals(center) || !seen.add(hole) || !isOpen(level, hole)
-                        || colony.foragingHoles().isHole(level, hole)) {
+                if (nest.contains(hole) || hole.equals(center) || !isOpenToward(level, hole, direction.getOpposite())
+                        || colony.foragingHoles().isHole(level, hole) || !seen.add(hole)) {
                     continue;
                 }
                 leaks.add(new Leak(hole, findPlugSpot(level, nest, hole)));
@@ -145,9 +147,101 @@ public class NestWalls {
         return sealProgress.merge(hole.immutable(), amount, Float::sum);
     }
 
-    /** True while this block is still open space (so the leak is still there). */
+    /**
+     * True while the leak is still there: the block is still open space, or a crust of mud without a plate toward one
+     * of the dug-out nest cells beside it.
+     */
     public boolean isLeakOpen(Level level, BlockPos hole) {
-        return isOpen(level, hole);
+        if (!level.isLoaded(hole) || !MudCrustBlock.isCrust(level.getBlockState(hole))) {
+            return isOpen(level, hole);
+        }
+        Set<BlockPos> nest = colony.nest().nestCells(level);
+        for (Direction side : Direction.values()) {
+            BlockPos cell = hole.relative(side);
+            if (nest.contains(cell) && Nest.isDugOut(level, cell) && isOpenToward(level, hole, side)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether this block leaves the cell on side {@code toward} of it open: open space (see {@link #isOpen}), or a crust
+     * of mud with no plate on that side.
+     */
+    public static boolean isOpenToward(Level level, BlockPos hole, Direction toward) {
+        if (!level.isLoaded(hole)) {
+            return false;
+        }
+        BlockState state = level.getBlockState(hole);
+        return MudCrustBlock.isCrust(state) ? !MudCrustBlock.hasFace(state, toward) : isOpen(level, hole);
+    }
+
+    /**
+     * Whether the dug-out cell is closed all round: every block beside it that is not part of the nest walls it off
+     * (soil, wood, a crust of mud with a plate toward it). A feeding gallery is only fed from once it is closed round.
+     */
+    public boolean isClosedRound(Level level, BlockPos cell, Set<BlockPos> nest) {
+        for (Direction side : Direction.values()) {
+            BlockPos next = cell.relative(side);
+            if (!nest.contains(next) && isOpenToward(level, next, side.getOpposite())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Wall first (the user's decision, 2026-10-14; species whose profile has {@code nest.crust_walls}: termites): just
+     * before the last bite opens this nest cell, a crust of mud is plastered over every side of it that would open to
+     * the outside (open air, a cave, grass), so the gallery is never open, not even for a moment, as real termites
+     * plaster over any side of a gallery that breaks through. The colony's own spaces (the nest, the holes, the
+     * entrance, the mound) are left open, and so is water (no gallery is planned beside it).
+     */
+    public void wallFirst(Level level, BlockPos target) {
+        if (!colony.profile().nest().crustWalls()) {
+            return;
+        }
+        Set<BlockPos> nest = colony.nest().nestCells(level);
+        Map<BlockPos, ?> mound = colony.mound().getParts(level);
+        if (!nest.contains(target) || target.equals(center) || mound.containsKey(target) || colony.foragingHoles().isHole(level, target)
+                || colony.mound().getGalleries(level).contains(target)) {
+            return;
+        }
+        for (Direction side : Direction.values()) {
+            BlockPos next = target.relative(side);
+            if (nest.contains(next) || next.equals(center) || mound.containsKey(next) || !level.isLoaded(next)
+                    || colony.foragingHoles().isHole(level, next) || !level.getFluidState(next).isEmpty()
+                    || !isOpenToward(level, next, side.getOpposite())) {
+                continue;
+            }
+            level.setBlock(next, crust().withFace(level.getBlockState(next), side.getOpposite()), 3);
+        }
+    }
+
+    private static MudCrustBlock crust() {
+        return com.antcolonies.registry.ModBlocks.MUD_CRUST.get();
+    }
+
+    /**
+     * What a leak is closed with: the plug block, packed full (a whole missing block is rebuilt whole, the user's
+     * decision of 2026-10-14). A crust of mud missing a plate toward a dug-out nest cell beside it (a gallery dug on
+     * past an older wall) only gets the plates it lacks.
+     */
+    private BlockState wallFor(Level level, BlockPos hole) {
+        BlockState state = level.getBlockState(hole);
+        if (!MudCrustBlock.isCrust(state)) {
+            return colony.profile().nest().plugState();
+        }
+        Set<BlockPos> nest = colony.nest().nestCells(level);
+        BlockState wall = state;
+        for (Direction side : Direction.values()) {
+            BlockPos cell = hole.relative(side);
+            if (nest.contains(cell) && Nest.isDugOut(level, cell)) {
+                wall = crust().withFace(wall, side);
+            }
+        }
+        return wall;
     }
 
     /**
@@ -157,7 +251,7 @@ public class NestWalls {
      * back in later by a foraging hole); if the hole leads nowhere open, it is pushed back into the nest.
      */
     public boolean plugLeak(Level level, BlockPos hole) {
-        if (hole.equals(center) || !isOpen(level, hole)) {
+        if (hole.equals(center) || !isLeakOpen(level, hole)) {
             return false;
         }
         // Never bury anyone, same as with the hill.
@@ -174,7 +268,7 @@ public class NestWalls {
                 }
             }
         }
-        level.setBlock(hole, colony.profile().nest().plugState(), 3);
+        level.setBlock(hole, wallFor(level, hole), 3);
         claimedLeaks.remove(hole);
         sealProgress.remove(hole);
         return true;

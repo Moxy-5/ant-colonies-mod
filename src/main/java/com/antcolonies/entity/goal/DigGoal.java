@@ -146,6 +146,7 @@ public class DigGoal extends Goal {
         if (ant.canPlaceBlocks() && (mound ? colony.mound().takePellet(level, target, ant.getUUID()) : colony.hill().hasMoundRoom(level))) {
             ant.setCarriedBlock(state.is(Blocks.GRASS_BLOCK) || state.is(Blocks.ROOTED_DIRT) ? Blocks.DIRT.defaultBlockState()
                     : state.getBlock() instanceof TermiteMoundBlock || state.getBlock() instanceof TermiteHoleBlock
+                            || state.getBlock() instanceof com.antcolonies.block.MudCrustBlock
                             ? ModBlocks.TERMITE_MOUND.get().defaultBlockState() : state);
         }
 
@@ -154,6 +155,8 @@ public class DigGoal extends Goal {
                 blockCenter.x, target.getY() + 1.0, blockCenter.z, 4, 0.15, 0.05, 0.15, 0.05);
 
         if (progress >= 1.0F) {
+            // Wall first: the sides this bite would open to the outside are plastered with mud before it goes through.
+            colony.walls().wallFirst(level, target);
             colony.nest().clearDigProgress(target);
             colony.mound().blockDug(level, target);
             level.destroyBlockProgress(ant.getId(), target, -1);

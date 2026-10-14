@@ -11,6 +11,7 @@ import java.util.Set;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.AntColoniesMod;
+import com.antcolonies.block.MudCrustBlock;
 import com.antcolonies.block.SeedPileBlock;
 import com.antcolonies.registry.ModTags;
 
@@ -483,7 +484,7 @@ public class Nest {
         if (colony.foragingHoles().isHole(level, pos)) {
             return colony.foragingHoles().mayOpen(level, pos);
         }
-        return level.getBlockState(pos).is(ModTags.DIGGABLE) || (pos.equals(center) && isEntrancePlugged(level) && mayOpenEntrance(level))
+        return isSoil(level.getBlockState(pos)) || (pos.equals(center) && isEntrancePlugged(level) && mayOpenEntrance(level))
                 || colony.mound().isClearJob(level, pos);
     }
 
@@ -538,6 +539,14 @@ public class Nest {
     public boolean isEntranceOpen(Level level) {
         BlockState state = level.getBlockState(center);
         return level.isLoaded(center) && state.canBeReplaced() && state.getFluidState().isEmpty();
+    }
+
+    /**
+     * Soil a worker may bite: the diggable blocks, and a crust of mud standing where the nest wants open space (the wall of
+     * an older gallery in the way of a new one).
+     */
+    static boolean isSoil(BlockState state) {
+        return state.is(ModTags.DIGGABLE) || MudCrustBlock.isCrust(state);
     }
 
     /** Open, or only a heap of seeds, bread or forage on the floor: the block is dug out. A chunk that is not loaded counts as not dug. */
@@ -610,7 +619,7 @@ public class Nest {
     }
 
     /** Every block that is part of the nest plan: the shaft, and the rooms once their layout is decided. */
-    Set<BlockPos> nestCells(Level level) {
+    public Set<BlockPos> nestCells(Level level) {
         Set<BlockPos> cells = new HashSet<>();
         int depth = shaftDepth(level);
         for (int i = 1; i <= depth; i++) {
@@ -740,6 +749,36 @@ public class Nest {
         insideTick = Long.MIN_VALUE;
     }
 
+    /**
+     * Whether the feeding gallery this cell is part of is finished and hidden (the user's decision, 2026-10-14): every
+     * block of it dug out and closed all round (see {@link NestWalls#isClosedRound}), so the termites eat the food over
+     * it from inside, unseen. A cell of no gallery (a tunnel beside the food) only needs to be closed round itself.
+     */
+    boolean isGalleryClosed(Level level, BlockPos cell, Set<BlockPos> nest) {
+        List<BlockPos> gallery = List.of(cell);
+        for (NewTunnel tunnel : newTunnels) {
+            if (tunnel.gallery() != null && tunnel.gallery().contains(cell)) {
+                gallery = tunnel.gallery();
+                break;
+            }
+        }
+        for (BlockPos part : gallery) {
+            if (!level.isLoaded(part)) {
+                return false;
+            }
+            if (!isDugOut(level, part)) {
+                if (isSoil(level.getBlockState(part))) {
+                    return false; // still being dug
+                }
+                continue; // never to be dug (a stone found its way in): not part of it
+            }
+            if (!colony.walls().isClosedRound(level, part, nest)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /** The cells of every feeding gallery planned (dug or not). */
     List<BlockPos> galleryCells() {
         List<BlockPos> cells = new ArrayList<>();
@@ -823,7 +862,7 @@ public class Nest {
             if (!level.isLoaded(pos)) {
                 return null;
             }
-            if (!level.getBlockState(pos).is(ModTags.DIGGABLE)) {
+            if (!isSoil(level.getBlockState(pos))) {
                 continue;
             }
             if (nestCells == null) {

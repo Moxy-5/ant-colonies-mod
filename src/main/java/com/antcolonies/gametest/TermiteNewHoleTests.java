@@ -263,7 +263,7 @@ public class TermiteNewHoleTests {
     /**
      * Like {@link #aFallenLogIsEatenFromBelowByDay}, with the log lying on the edge of a step: the ground beside it on
      * one side is 2 blocks lower (the user's tree in the savanna, whose gallery was left out, 2026-10-14). The open side
-     * of the gallery is walled up with soil, and the log is eaten from below by day.
+     * of the gallery is walled with a mud crust as it is dug (wall first), and the log is eaten from below by day.
      */
     @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
     public static void aFallenLogOnTheEdgeOfAStepIsEatenFromBelowByDay(GameTestHelper helper) {
@@ -334,8 +334,30 @@ public class TermiteNewHoleTests {
                         tunnel == null || tunnel.gallery() == null ? "none" : tunnel.gallery().stream().filter(c -> Nest.isDugOut(level, c)).count() + "/" + tunnel.gallery().size(),
                         eaten);
             }
+            if (tunnel != null) {
+                // Planned with the tunnel, as one job (the user's decision, 2026-10-14), not once the tunnel is dug.
+                helper.assertTrue(tunnel.gallery() != null && !tunnel.gallery().isEmpty(), "the tunnel was planned without its feeding gallery");
+                // Wall first: no side wall or floor of a dug tunnel or gallery block is ever open to the outside, not even
+                // for a tick (the roof of the gallery is the log; a block of it eaten away at night is plastered later).
+                java.util.Set<BlockPos> nest = new java.util.HashSet<>(tunnel.gallery());
+                nest.addAll(tunnel.tunnel().tunnel());
+                nest.add(tunnel.tunnel().hole());
+                java.util.List<BlockPos> dug = new java.util.ArrayList<>(tunnel.tunnel().tunnel());
+                dug.addAll(tunnel.gallery());
+                for (BlockPos cell : dug) {
+                    if (!Nest.isDugOut(level, cell)) {
+                        continue;
+                    }
+                    for (net.minecraft.core.Direction side : net.minecraft.core.Direction.values()) {
+                        BlockPos next = cell.relative(side);
+                        helper.assertTrue(side == net.minecraft.core.Direction.UP || nest.contains(next) || colony.nest().nestCells(level).contains(next)
+                                || !com.antcolonies.colony.NestWalls.isOpenToward(level, next, side.getOpposite()),
+                                "wall first: the dug block " + cell.toShortString() + " is open to the outside at " + next.toShortString());
+                    }
+                }
+            }
             if (phase[0] == 1) {
-                if (tunnel != null && tunnel.gallery() != null) {
+                if (tunnel != null) {
                     long under = log.stream().filter(wood -> tunnel.gallery().contains(wood.below())).count();
                     helper.assertTrue(under >= 4, "the feeding gallery runs under only " + under + " of the log's 5 blocks: " + tunnel.gallery());
                     if (tunnel.gallery().stream().allMatch(c -> Nest.isDugOut(level, c))) {
@@ -347,24 +369,19 @@ public class TermiteNewHoleTests {
                 helper.assertTrue(helper.getTick() < 30000, "the tunnel and the feeding gallery under the log were not dug");
                 return;
             }
-            // Every dug gallery cell closed round (soil, the log, or the gallery and its tunnel).
-            java.util.Set<BlockPos> nest = new java.util.HashSet<>(tunnel.gallery());
-            nest.addAll(tunnel.tunnel().tunnel());
-            BlockPos open = null;
+            // By day: eaten from below, and on the step the gallery's open side is a wall of mud crust.
+            int crusts = 0;
             for (BlockPos cell : tunnel.gallery()) {
                 for (net.minecraft.core.Direction side : net.minecraft.core.Direction.Plane.HORIZONTAL) {
-                    BlockPos next = cell.relative(side);
-                    if (!nest.contains(next) && level.getBlockState(next).getCollisionShape(level, next).isEmpty()) {
-                        open = next;
-                    }
+                    crusts += com.antcolonies.block.MudCrustBlock.hasFace(level.getBlockState(cell.relative(side)), side.getOpposite()) ? 1 : 0;
                 }
             }
-            if (eaten > eatenAtDawn[0] && open == null) {
+            if (eaten > eatenAtDawn[0] && (!onAStep || crusts > 0)) {
                 helper.assertTrue(!colony.isForagingTime(level), "foraging time");
                 helper.succeed();
             }
-            helper.assertTrue(helper.getTick() < 39000, "by day: eaten " + eaten + " (at dawn " + eatenAtDawn[0] + "), the gallery "
-                    + (open == null ? "closed" : "still open at " + open.toShortString() + ", " + colony.walls().getLeaks(level).size() + " leaks"));
+            helper.assertTrue(helper.getTick() < 39000, "by day: eaten " + eaten + " (at dawn " + eatenAtDawn[0] + "), " + crusts
+                    + " crust walls beside the gallery, " + colony.walls().getLeaks(level).size() + " leaks");
         });
     }
 }
