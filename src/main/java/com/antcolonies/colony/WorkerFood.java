@@ -90,8 +90,14 @@ public class WorkerFood {
             mealsLeft[kind]--;
             return look(meal.food());
         }
+        net.minecraft.world.level.block.state.BlockState before = level.getBlockState(meal.spot());
         ItemStack piece = meal.food() == MealFood.STORE ? colony.food().eatSeedAt(level, meal.spot(), worker.getUUID())
                 : colony.nurseFood().takeFoodAt(level, meal.spot(), false);
+        if (!piece.isEmpty() && meal.food() == MealFood.STORE && before.getBlock() instanceof com.antcolonies.block.FungusCombBlock) {
+            // Old comb is dry and crumbly: crumbs fall where it is chewed off.
+            level.sendParticles(new net.minecraft.core.particles.BlockParticleOption(net.minecraft.core.particles.ParticleTypes.BLOCK, before),
+                    meal.spot().getX() + 0.5, meal.spot().getY() + 0.05, meal.spot().getZ() + 0.5, 6, 0.25, 0.02, 0.25, 0.0);
+        }
         if (!piece.isEmpty()) {
             mealsLeft[kind] = Math.max(1, diet().workersPerPiece()) - 1;
             piecesEaten[kind]++;
@@ -118,7 +124,7 @@ public class WorkerFood {
                 mealsLeft[kind.ordinal()]--;
                 return true;
             }
-            boolean took = kind == MealFood.STORE ? colony.food().eatForNumbers() : colony.life().takeNurseFood(level);
+            boolean took = kind == MealFood.STORE ? oldCombKnown() && colony.food().eatForNumbers() : colony.life().takeNurseFood(level);
             if (took) {
                 mealsLeft[kind.ordinal()] = Math.max(1, diet().workersPerPiece()) - 1;
                 piecesEaten[kind.ordinal()]++;
@@ -131,6 +137,11 @@ public class WorkerFood {
     /** How many pieces of this kind the workers (real and numbers) have started on since the colony was loaded (for tests). */
     public int getPiecesEaten(MealFood food) {
         return piecesEaten[food.ordinal()];
+    }
+
+    /** Whether the store has a piece the workers eat: any seed; for fungus comb, an old layer as far as the brain knows. */
+    private boolean oldCombKnown() {
+        return !colony.garden().exists() || colony.garden().oldKnown() > 0;
     }
 
     void save(CompoundTag tag) {

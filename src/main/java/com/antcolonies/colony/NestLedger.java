@@ -1,5 +1,7 @@
 package com.antcolonies.colony;
 
+import com.antcolonies.block.FungusCombBlock;
+
 import java.util.List;
 
 import net.minecraft.core.BlockPos;
@@ -15,7 +17,9 @@ import net.minecraft.world.phys.Vec3;
  * out of sight, and never in unloaded land.
  *
  * <p>Species-neutral: the food store (seed heaps or fungus comb), the nurses' food (bread heaps or fungus nodules, see
- * {@link NurseFood}) and the bodies of the dead.
+ * {@link NurseFood}) and the bodies of the dead; and for fungus comb, its layers' ages (layers that ripened and layers
+ * that went old while away, see {@link FungusCombBlock}). Fungus comb: a layer put down goes on top, fresh; a layer
+ * taken off comes off the bottom, an old one.
  */
 public class NestLedger {
     /** At most this many changes of one kind a second (a long time away can owe a lot; the rest comes the next second). */
@@ -28,6 +32,9 @@ public class NestLedger {
     private int nurseFood;
     /** Bodies still to lay in the refuse chamber (termites eat theirs). Saved. */
     private int bodies;
+    /** Fungus comb: fresh layers that ripened, and ripe layers that went old, still to change on the blocks. Saved. */
+    private int ripened;
+    private int aged;
 
     NestLedger(Colony colony) {
         this.colony = colony;
@@ -45,6 +52,24 @@ public class NestLedger {
         bodies += count;
     }
 
+    void addRipened(int layers) {
+        ripened += layers;
+    }
+
+    void addAged(int layers) {
+        aged += layers;
+    }
+
+    /** Fungus comb: fresh layers that ripened while the blocks could not change. */
+    public int ripened() {
+        return ripened;
+    }
+
+    /** Fungus comb: ripe layers that went old while the blocks could not change. */
+    public int aged() {
+        return aged;
+    }
+
     /** Layers of the food store owed: above 0 to put down, below 0 to take away. */
     public int store() {
         return store;
@@ -60,7 +85,7 @@ public class NestLedger {
     }
 
     public boolean isEmpty() {
-        return store == 0 && nurseFood == 0 && bodies == 0;
+        return store == 0 && nurseFood == 0 && bodies == 0 && ripened == 0 && aged == 0;
     }
 
     /**
@@ -72,7 +97,54 @@ public class NestLedger {
         boolean changed = applyBodies(level, eyes);
         changed |= applyStore(level, eyes);
         changed |= applyNurseFood(level, eyes);
+        changed |= applyAges(level, eyes);
         return changed;
+    }
+
+    /** Fungus comb: the layers that ripened and went old meanwhile, on combs out of sight (none left to change: dropped). */
+    private boolean applyAges(ServerLevel level, List<Vec3> eyes) {
+        if (ripened == 0 && aged == 0) {
+            return false;
+        }
+        boolean changed = false;
+        List<BlockPos> combs = colony.garden().getCombs(level);
+        for (int tries = 0; ripened > 0 && tries < PER_SECOND; tries++) {
+            BlockPos spot = pick(level, combs, eyes, state -> FungusCombBlock.fresh(state) > 0);
+            if (spot == null) {
+                ripened = combs.stream().anyMatch(pos -> FungusCombBlock.fresh(level.getBlockState(pos)) > 0) ? ripened : 0;
+                break;
+            }
+            level.setBlock(spot, FungusCombBlock.ripenOne(level.getBlockState(spot)), 3);
+            ripened--;
+            changed = true;
+        }
+        for (int tries = 0; aged > 0 && tries < PER_SECOND; tries++) {
+            BlockPos spot = pick(level, combs, eyes, state -> FungusCombBlock.ripe(state) > 0);
+            if (spot == null) {
+                aged = combs.stream().anyMatch(pos -> FungusCombBlock.ripe(level.getBlockState(pos)) > 0) ? aged : 0;
+                break;
+            }
+            level.setBlock(spot, FungusCombBlock.ageOne(level.getBlockState(spot)), 3);
+            aged--;
+            changed = true;
+        }
+        ripened = Math.max(0, ripened);
+        aged = Math.max(0, aged);
+        return changed;
+    }
+
+    /** A comb out of every player's sight whose state passes {@code test}, or null. */
+    @org.jetbrains.annotations.Nullable
+    private static BlockPos pick(ServerLevel level, List<BlockPos> combs, List<Vec3> eyes,
+            java.util.function.Predicate<net.minecraft.world.level.block.state.BlockState> test) {
+        List<BlockPos> fits = new java.util.ArrayList<>();
+        for (BlockPos pos : combs) {
+            var state = level.getBlockState(pos);
+            if (state.getBlock() instanceof FungusCombBlock && test.test(state) && Population.outOfSight(level, Vec3.atCenterOf(pos), eyes)) {
+                fits.add(pos);
+            }
+        }
+        return fits.isEmpty() ? null : fits.get(level.getRandom().nextInt(fits.size()));
     }
 
     private boolean applyBodies(ServerLevel level, List<Vec3> eyes) {
@@ -186,6 +258,9 @@ public class NestLedger {
         if (nurseFood != 0) {
             owed.add((nurseFood > 0 ? "+" : "") + nurseFood + " nurse food");
         }
+        if (ripened != 0 || aged != 0) {
+            owed.add(ripened + " comb ripened, " + aged + " gone old");
+        }
         return String.join(", ", owed);
     }
 
@@ -194,6 +269,8 @@ public class NestLedger {
         ledger.putInt("store", store);
         ledger.putInt("nurseFood", nurseFood);
         ledger.putInt("bodies", bodies);
+        ledger.putInt("ripened", ripened);
+        ledger.putInt("aged", aged);
         tag.put("ledger", ledger);
     }
 
@@ -202,6 +279,8 @@ public class NestLedger {
         store = ledger.getInt("store");
         nurseFood = ledger.getInt("nurseFood");
         bodies = ledger.getInt("bodies");
+        ripened = ledger.getInt("ripened");
+        aged = ledger.getInt("aged");
         if (tag.contains("away")) {
             // An older save (step 2a) kept what was owed with the going away; those seeds and bread were not counted yet.
             CompoundTag away = tag.getCompound("away");

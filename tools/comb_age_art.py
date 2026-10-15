@@ -181,3 +181,125 @@ def room_wall():
     """Damp termite-built soil for the garden room's walls and floor."""
     rng = random.Random(5)
     return [[jitter(rng, (112, 66, 44), 0.1) for _ in range(S)] for _ in range(S)]
+
+
+# --- the game's files (the look the user picked, 2026-10-15: A, Field photo) ----------------------------------------
+
+GAME_LOOK = "A"
+MAX_LAYERS = 8  # the block's layers property goes to 8 (shared with the seed heaps); the comb uses 1 to 4
+MAX_AGE = 4  # old and fresh: 0 to 4 layers
+MAX_NODULES = 3
+NODULE_SPOTS = [(3, 4), (10, 9), (5, 11)]
+
+
+def png(rows):
+    import struct
+    import zlib
+    height, width = len(rows), len(rows[0])
+    raw = b"".join(b"\x00" + bytes(c for px in row for c in (px if len(px) == 4 else px + (255,))) for row in rows)
+
+    def chunk(kind, data):
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+
+    header = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b"")
+
+
+def face(uv, texture, cull=None):
+    f = {"uv": uv, "texture": texture}
+    if cull:
+        f["cullface"] = cull
+    return f
+
+
+def clamped(layers, old, fresh):
+    """The ages a block state really has (the block clamps them the same way, FungusCombBlock.old/fresh)."""
+    old = min(old, layers)
+    fresh = min(fresh, layers - old)
+    return old, fresh
+
+
+def band_model(layers, old, fresh):
+    """The comb's layers in bands, from the bottom: old, ripe, fresh; each band its own age's texture."""
+    bands = [("old", 0, old), ("ripe", old, layers - fresh), ("fresh", layers - fresh, layers)]
+    bands = [(age, a, b) for age, a, b in bands if b > a]
+    elements = []
+    for k, (age, a, b) in enumerate(bands):
+        y0, y1 = a * 2, b * 2
+        faces = {side: face([0, 16 - y1, 16, 16 - y0], f"#{age}_side", side) for side in ["north", "south", "west", "east"]}
+        if k == len(bands) - 1:
+            faces["up"] = face([0, 0, 16, 16], f"#{age}_top")
+        if k == 0:
+            faces["down"] = face([0, 0, 16, 16], f"#{age}_top", "down")
+        elements.append({"from": [0, y0, 0], "to": [16, y1, 16], "faces": faces})
+    return {"textures": textures(), "elements": elements}
+
+
+def textures():
+    t = {f"{age}_{f}": f"antcolonies:block/fungus_comb_{age}_{f}" for age in AGES for f in ("top", "side")}
+    t["particle"] = "antcolonies:block/fungus_comb_old_top"  # crumbs of old comb
+    t["nodule"] = "antcolonies:block/fungus_nodule"
+    return t
+
+
+def nodule_elements(layers, nodules):
+    h = layers * 2
+    elements = []
+    for x, z in NODULE_SPOTS[:nodules]:
+        all_faces = {side: face([x, z, x + 3, z + 3], "#nodule") for side in ["down", "up", "north", "south", "west", "east"]}
+        elements.append({"from": [x, h, z], "to": [x + 3, h + 2, z + 3], "faces": all_faces})
+        cap = {side: face([x + 1, z + 1, x + 2, z + 2], "#nodule") for side in ["up", "north", "south", "west", "east"]}
+        elements.append({"from": [x + 1, h + 2, z + 1], "to": [x + 2, h + 3, z + 2], "faces": cap})
+    return elements
+
+
+def write_game_files(root):
+    """Textures, models, the multipart blockstate and the item model of the fungus comb, in the picked look."""
+    import json
+    assets = root / "src/main/resources/assets/antcolonies"
+    blocks = assets / "textures/block"
+    models = assets / "models/block"
+
+    def write_json(path, value):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
+
+    for age in AGES:
+        for f in ("top", "side"):
+            (blocks / f"fungus_comb_{age}_{f}.png").write_bytes(png(texture(GAME_LOOK, age, f)))
+    # The old flat comb (before the ages): its models and textures go.
+    for old_file in list(models.glob("fungus_comb_*.json")):
+        old_file.unlink()
+    for name in ("fungus_comb_top.png", "fungus_comb_side.png"):
+        if (blocks / name).exists():
+            (blocks / name).unlink()
+    parts = []
+    written = set()
+    for layers in range(1, MAX_LAYERS + 1):
+        for old in range(MAX_AGE + 1):
+            for fresh in range(MAX_AGE + 1):
+                o, f = clamped(layers, old, fresh)
+                name = f"fungus_comb_{layers}_{o}_{f}"
+                if name not in written:
+                    write_json(models / f"{name}.json", band_model(layers, o, f))
+                    written.add(name)
+                parts.append({"when": {"layers": str(layers), "old": str(old), "fresh": str(fresh)},
+                              "apply": {"model": f"antcolonies:block/{name}"}})
+        for nodules in range(1, MAX_NODULES + 1):
+            name = f"fungus_comb_nodules_{layers}_{nodules}"
+            write_json(models / f"{name}.json", {"textures": {"particle": "antcolonies:block/fungus_comb_old_top",
+                                                              "nodule": "antcolonies:block/fungus_nodule"},
+                                                 "elements": nodule_elements(layers, nodules)})
+            parts.append({"when": {"layers": str(layers), "nodules": str(nodules)}, "apply": {"model": f"antcolonies:block/{name}"}})
+    write_json(assets / "blockstates/fungus_comb.json", {"multipart": parts})
+    # The item: a comb of 4 layers (old, two ripe, fresh) with 2 nodules.
+    item = band_model(4, 1, 1)
+    item["elements"] += nodule_elements(4, 2)
+    write_json(models / "fungus_comb_item.json", item)
+    write_json(assets / "models/item/fungus_comb.json", {"parent": "antcolonies:block/fungus_comb_item"})
+    print(f"wrote the fungus comb in look {GAME_LOOK}: 6 textures, {len(written)} band models, the blockstate and the item")
+
+
+if __name__ == "__main__":
+    from pathlib import Path
+    write_game_files(Path(__file__).resolve().parent.parent)

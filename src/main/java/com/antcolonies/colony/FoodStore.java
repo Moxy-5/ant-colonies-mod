@@ -1,5 +1,7 @@
 package com.antcolonies.colony;
 
+import com.antcolonies.block.FungusCombBlock;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -134,7 +136,7 @@ public class FoodStore {
             }
         }
         // Fungus comb is always built onto comb that has room first (the fungus only grows where the comb is thick enough).
-        boolean growFirst = pile instanceof com.antcolonies.block.FungusCombBlock || random.nextFloat() < 0.75F;
+        boolean growFirst = pile instanceof FungusCombBlock || random.nextFloat() < 0.75F;
         List<BlockPos> from = !growing.isEmpty() && (empty.isEmpty() || growFirst) ? growing : empty;
         return from.isEmpty() ? null : from.get(random.nextInt(from.size()));
     }
@@ -532,7 +534,29 @@ public class FoodStore {
             return false;
         }
         countIn(rich);
+        if (level instanceof net.minecraft.server.level.ServerLevel server && isComb()) {
+            // Fresh comb laid: a soft wet squelch and a few dark specks.
+            server.playSound(null, spot, net.minecraft.sounds.SoundEvents.MUD_PLACE, net.minecraft.sounds.SoundSource.BLOCKS, 0.25F, 1.6F);
+            server.sendParticles(new net.minecraft.core.particles.BlockParticleOption(net.minecraft.core.particles.ParticleTypes.BLOCK,
+                    level.getBlockState(spot)), spot.getX() + 0.5, spot.getY() + FungusCombBlock.topOf(level.getBlockState(spot)),
+                    spot.getZ() + 0.5, 4, 0.2, 0.02, 0.2, 0.0);
+        }
         return true;
+    }
+
+    /** Whether the store is fungus comb (it ages: see {@link FungusCombBlock}). */
+    private boolean isComb() {
+        return food().pileBlock() instanceof FungusCombBlock;
+    }
+
+    /** The heap with one layer less (fungus comb: off its bottom, an old one first), or air if it was the last. */
+    private BlockState oneLayerLess(BlockState state) {
+        if (state.getBlock() instanceof FungusCombBlock) {
+            BlockState less = FungusCombBlock.withoutBottomLayer(state);
+            return less == null ? Blocks.AIR.defaultBlockState() : less;
+        }
+        int layers = state.getValue(SeedPileBlock.LAYERS);
+        return layers <= 1 ? Blocks.AIR.defaultBlockState() : state.setValue(SeedPileBlock.LAYERS, layers - 1);
     }
 
     /**
@@ -546,9 +570,11 @@ public class FoodStore {
             return false; // an egg or a young one was put there meanwhile: the heap would bury it
         }
         if (state.isAir()) {
-            level.setBlock(spot, pile.defaultBlockState(), 3);
+            level.setBlock(spot, isComb() ? FungusCombBlock.newComb(pile.defaultBlockState()) : pile.defaultBlockState(), 3);
         } else if (state.is(pile) && state.getValue(SeedPileBlock.LAYERS) < pile.maxLayers()) {
-            level.setBlock(spot, state.setValue(SeedPileBlock.LAYERS, state.getValue(SeedPileBlock.LAYERS) + 1), 3);
+            // (fungus comb: the new layer goes on top, fresh)
+            level.setBlock(spot, isComb() ? FungusCombBlock.withLayerOnTop(state)
+                    : state.setValue(SeedPileBlock.LAYERS, state.getValue(SeedPileBlock.LAYERS) + 1), 3);
         } else {
             return false;
         }
@@ -566,15 +592,17 @@ public class FoodStore {
 
     /**
      * The heaps a layer can be taken off without counting it (for a piece already taken out of the count, see
-     * {@link NestLedger}): every seed heap; fungus comb only where it has a layer over its bed (as the fungus uses it).
+     * {@link NestLedger}): every seed heap; fungus comb only where it has an old layer (the old workers eat old comb,
+     * from the bottom), and never under an egg or a nymph lying on it.
      */
     List<BlockPos> layersToTake(Level level) {
         List<BlockPos> heaps = new ArrayList<>();
         SeedPileBlock pile = food().pileBlock();
-        int keep = pile instanceof com.antcolonies.block.FungusCombBlock ? 1 : 0;
+        boolean comb = isComb();
+        Set<BlockPos> young = comb ? colony.brood().getBroodCells(level) : Set.of();
         for (BlockPos pos : colony.nest().getFoodStoreCells(level)) {
             BlockState state = level.getBlockState(pos);
-            if (state.is(pile) && state.getValue(SeedPileBlock.LAYERS) > keep) {
+            if (state.is(pile) && (!comb || FungusCombBlock.old(state) > 0 && !young.contains(pos))) {
                 heaps.add(pos);
             }
         }
@@ -587,8 +615,7 @@ public class FoodStore {
         if (!state.is(food().pileBlock())) {
             return false;
         }
-        int layers = state.getValue(SeedPileBlock.LAYERS);
-        level.setBlock(pile, layers <= 1 ? Blocks.AIR.defaultBlockState() : state.setValue(SeedPileBlock.LAYERS, layers - 1), 3);
+        level.setBlock(pile, oneLayerLess(state), 3);
         return true;
     }
 
@@ -641,8 +668,7 @@ public class FoodStore {
         if (!state.is(food().pileBlock())) {
             return ItemStack.EMPTY;
         }
-        int layers = state.getValue(SeedPileBlock.LAYERS);
-        level.setBlock(pile, layers <= 1 ? Blocks.AIR.defaultBlockState() : state.setValue(SeedPileBlock.LAYERS, layers - 1), 3);
+        level.setBlock(pile, oneLayerLess(state), 3);
         richSeeds = Math.min(richSeeds, food);
         boolean rich = richSeeds > 0 && (wantRich || food <= richSeeds);
         food = Math.max(0, food - 1);
@@ -655,7 +681,7 @@ public class FoodStore {
 
     /**
      * A heap a hungry worker can eat a piece of, or null if there is none: any seed heap; fungus comb only where it has
-     * a layer over its bed (the old comb under the fresh, see {@link #layersToTake}; the bed stays for the fungus).
+     * an old layer (see {@link #layersToTake}).
      */
     @Nullable
     public BlockPos findMealPile(Level level, RandomSource random) {
@@ -665,12 +691,12 @@ public class FoodStore {
 
     /**
      * A hungry worker takes one raw seed off the heap at {@code pile} to eat it: plain seeds first (a rich one only if
-     * nothing else is left); or a layer of old comb (never the comb's bed). Returns the seed or piece, or an empty stack
-     * if the heap is gone (or only its bed is left).
+     * nothing else is left); or a layer of old comb off the bottom of a comb. Returns the seed or piece, or an empty
+     * stack if the heap is gone (or the comb has no old layer left).
      */
     public ItemStack eatSeedAt(Level level, BlockPos pile, UUID ant) {
         BlockState state = level.getBlockState(pile);
-        if (state.getBlock() instanceof com.antcolonies.block.FungusCombBlock && state.getValue(SeedPileBlock.LAYERS) <= 1) {
+        if (state.getBlock() instanceof FungusCombBlock && FungusCombBlock.old(state) <= 0) {
             return ItemStack.EMPTY;
         }
         ItemStack seed = takeSeedAt(level, pile, ant, false);

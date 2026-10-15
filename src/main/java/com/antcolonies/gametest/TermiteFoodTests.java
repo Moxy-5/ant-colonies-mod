@@ -178,10 +178,15 @@ public class TermiteFoodTests {
                     lying += item.getItem().getCount();
                 }
             }
+            // (Since the comb ages, 2026-10-15, a nodule no longer uses a piece up: it turns a ripe layer old. A piece
+            // leaves the store when a worker eats old comb or an old layer crumbles away.)
             int stored = c.food().getFood();
-            int grown = c.garden().getNodulesGrown();
-            helper.assertTrue(stored + grown + carried + lying == small + hayCut, "stored " + stored + " + grown into nodules " + grown + " + carried "
-                    + carried + " + lying " + lying + " is not the " + small + " small pieces + " + hayCut + " cut off the hay bale");
+            int eaten = c.food().getSeedsEaten();
+            int crumbled = c.garden().getLayersCrumbled();
+            helper.assertTrue(stored + eaten + crumbled + carried + lying == small + hayCut, "stored " + stored + " + eaten " + eaten
+                    + " + crumbled " + crumbled + " + carried " + carried + " + lying " + lying + " is not the " + small + " small pieces + "
+                    + hayCut + " cut off the hay bale (nodules grown " + c.garden().getNodulesGrown() + ")");
+            helper.assertTrue(c.garden().getNodulesGrown() > 0, "no nodules grew on the comb");
             // The comb lies in the garden rooms round the royal chamber; no side room, no forage or seed heaps.
             helper.assertTrue(c.nest().getSideRooms(level).isEmpty(), "termites planned a side room");
             helper.assertTrue(c.nest().getPlannedChambers(level).get(0).kind() == NestPlan.Kind.QUEEN, "the nest plan is not the royal chamber");

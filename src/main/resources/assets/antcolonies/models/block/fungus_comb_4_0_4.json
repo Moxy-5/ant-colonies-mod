@@ -1,0 +1,87 @@
+{
+  "textures": {
+    "fresh_top": "antcolonies:block/fungus_comb_fresh_top",
+    "fresh_side": "antcolonies:block/fungus_comb_fresh_side",
+    "ripe_top": "antcolonies:block/fungus_comb_ripe_top",
+    "ripe_side": "antcolonies:block/fungus_comb_ripe_side",
+    "old_top": "antcolonies:block/fungus_comb_old_top",
+    "old_side": "antcolonies:block/fungus_comb_old_side",
+    "particle": "antcolonies:block/fungus_comb_old_top",
+    "nodule": "antcolonies:block/fungus_nodule"
+  },
+  "elements": [
+    {
+      "from": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        16,
+        8,
+        16
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0,
+            8,
+            16,
+            16
+          ],
+          "texture": "#fresh_side",
+          "cullface": "north"
+        },
+        "south": {
+          "uv": [
+            0,
+            8,
+            16,
+            16
+          ],
+          "texture": "#fresh_side",
+          "cullface": "south"
+        },
+        "west": {
+          "uv": [
+            0,
+            8,
+            16,
+            16
+          ],
+          "texture": "#fresh_side",
+          "cullface": "west"
+        },
+        "east": {
+          "uv": [
+            0,
+            8,
+            16,
+            16
+          ],
+          "texture": "#fresh_side",
+          "cullface": "east"
+        },
+        "up": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#fresh_top"
+        },
+        "down": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#fresh_top",
+          "cullface": "down"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,135 @@
+{
+  "textures": {
+    "particle": "antcolonies:block/fungus_comb_old_top",
+    "nodule": "antcolonies:block/fungus_nodule"
+  },
+  "elements": [
+    {
+      "from": [
+        3,
+        14,
+        4
+      ],
+      "to": [
+        6,
+        16,
+        7
+      ],
+      "faces": {
+        "down": {
+          "uv": [
+            3,
+            4,
+            6,
+            7
+          ],
+          "texture": "#nodule"
+        },
+        "up": {
+          "uv": [
+            3,
+            4,
+            6,
+            7
+          ],
+          "texture": "#nodule"
+        },
+        "north": {
+          "uv": [
+            3,
+            4,
+            6,
+            7
+          ],
+          "texture": "#nodule"
+        },
+        "south": {
+          "uv": [
+            3,
+            4,
+            6,
+            7
+          ],
+          "texture": "#nodule"
+        },
+        "west": {
+          "uv": [
+            3,
+            4,
+            6,
+            7
+          ],
+          "texture": "#nodule"
+        },
+        "east": {
+          "uv": [
+            3,
+            4,
+            6,
+            7
+          ],
+          "texture": "#nodule"
+        }
+      }
+    },
+    {
+      "from": [
+        4,
+        16,
+        5
+      ],
+      "to": [
+        5,
+        17,
+        6
+      ],
+      "faces": {
+        "up": {
+          "uv": [
+            4,
+            5,
+            5,
+            6
+          ],
+          "texture": "#nodule"
+        },
+        "north": {
+          "uv": [
+            4,
+            5,
+            5,
+            6
+          ],
+          "texture": "#nodule"
+        },
+        "south": {
+          "uv": [
+            4,
+            5,
+            5,
+            6
+          ],
+          "texture": "#nodule"
+        },
+        "west": {
+          "uv": [
+            4,
+            5,
+            5,
+            6
+          ],
+          "texture": "#nodule"
+        },
+        "east": {
+          "uv": [
+            4,
+            5,
+            5,
+            6
+          ],
+          "texture": "#nodule"
+        }
+      }
+    }
+  ]
+}

@@ -621,8 +621,12 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * A fungus garden (termites): small garden rooms round the royal chamber ({@code NestPlan.gardens}), at most
      * {@code rooms} of them; the workers dig the first as soon as the colony has workers and one more for every
      * {@code workersPerRoom} workers. The food the foragers bring in is built into fungus comb there (the profile's food
-     * {@code pile}), and on every comb block a white nodule grows about every {@code noduleTicks} (while it has a layer
-     * to spare and room for one); the nurses feed the nodules to the queen and the young instead of bread.
+     * {@code pile}), and on every comb block a white nodule grows about every {@code noduleTicks} (while it has a ripe
+     * layer and room for one); the nurses feed the nodules to the queen and the young instead of bread.
+     * <p>
+     * The comb ages like the real conveyor: a layer goes on top fresh, ripens after about {@code ripenTicks}, turns old
+     * when a nodule grows from it or after about {@code oldTicks} by itself, and an old layer nobody eats crumbles away
+     * after about {@code crumbleTicks} (see {@code block.FungusCombBlock}).
      * <p>
      * Termitomyces mushrooms (step 5c): when a rain ends, a colony whose gardens hold at least {@code mushroomCombLayers}
      * layers of comb (a healthy garden) sends up one mushroom for every {@code combLayersPerMushroom} layers, at most
@@ -630,10 +634,10 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * entrance; each one is a rare giant with the chance {@code giantMushroomChance} (see {@code colony.Mushrooms}).
      */
     public record GardenNumbers(int rooms, int workersPerRoom, int noduleTicks, int mushroomCombLayers, int combLayersPerMushroom,
-            int maxMushrooms, int mushroomRadius, float giantMushroomChance) {
-        /** The numbers with the default mushrooms. */
+            int maxMushrooms, int mushroomRadius, float giantMushroomChance, int ripenTicks, int oldTicks, int crumbleTicks) {
+        /** The numbers with the default mushrooms and comb ages. */
         public GardenNumbers(int rooms, int workersPerRoom, int noduleTicks) {
-            this(rooms, workersPerRoom, noduleTicks, 8, 6, 8, 12, 0.04F);
+            this(rooms, workersPerRoom, noduleTicks, 8, 6, 8, 12, 0.04F, 12000, 48000, 72000);
         }
 
         public static final Codec<GardenNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
@@ -644,7 +648,10 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 Codec.INT.optionalFieldOf("comb_layers_per_mushroom", 6).forGetter(GardenNumbers::combLayersPerMushroom),
                 Codec.INT.optionalFieldOf("max_mushrooms", 8).forGetter(GardenNumbers::maxMushrooms),
                 Codec.INT.optionalFieldOf("mushroom_radius", 12).forGetter(GardenNumbers::mushroomRadius),
-                Codec.FLOAT.optionalFieldOf("giant_mushroom_chance", 0.04F).forGetter(GardenNumbers::giantMushroomChance)
+                Codec.FLOAT.optionalFieldOf("giant_mushroom_chance", 0.04F).forGetter(GardenNumbers::giantMushroomChance),
+                Codec.INT.optionalFieldOf("ripen_ticks", 12000).forGetter(GardenNumbers::ripenTicks),
+                Codec.INT.optionalFieldOf("old_ticks", 48000).forGetter(GardenNumbers::oldTicks),
+                Codec.INT.optionalFieldOf("crumble_ticks", 72000).forGetter(GardenNumbers::crumbleTicks)
         ).apply(i, GardenNumbers::new));
 
         /** How many mushrooms come up after a rain from gardens holding this many layers of comb (none below a healthy garden). */

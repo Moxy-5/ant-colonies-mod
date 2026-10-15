@@ -1,5 +1,6 @@
-"""Draws the fungus garden's art and writes its block files: the fungus comb block (textures, a model for every number of
-layers and nodules, the blockstate, the item model, the loot table) and the fungus nodule item.
+"""Draws the fungus garden's art and writes its block files: the fungus nodule (block texture and item) and the fungus
+comb's loot table. Since the comb ages (2026-10-15) its textures, models, blockstate and item model are written by
+tools/comb_age_art.py instead (comb_top, comb_side and comb_model here are the old flat comb, kept for reference).
 
 Real Macrotermes fungus comb is a light brown, brain-like sponge of winding ridges and holes, built from chewed plant
 material; small white balls of fungus (nodules) sprout on it. The comb here is a flat mat, 2 pixels per layer, with up
@@ -155,22 +156,14 @@ def write_json(path, value):
 
 def main():
     rng = random.Random(11)
-    comb_top(rng).save(BLOCKS / "fungus_comb_top.png")
-    comb_side(rng).save(BLOCKS / "fungus_comb_side.png")
+    comb_top(rng)  # (drawn and thrown away, so the nodules keep their random numbers)
+    comb_side(rng)
     nodule_texture(rng).save(BLOCKS / "fungus_nodule.png")
     nodule_item(rng).save(ITEMS / "fungus_nodule.png")
-    variants = {}
-    for layers in range(1, MAX_LAYERS + 1):
-        for nodules in range(MAX_NODULES + 1):
-            name = f"fungus_comb_{layers}_{nodules}"
-            write_json(ASSETS / f"models/block/{name}.json", comb_model(layers, nodules))
-            variants[f"layers={layers},nodules={nodules}"] = {"model": f"antcolonies:block/{name}"}
-    write_json(ASSETS / "blockstates/fungus_comb.json", {"variants": variants})
-    write_json(ASSETS / "models/item/fungus_comb.json", {"parent": "antcolonies:block/fungus_comb_4_2"})
     write_json(ASSETS / "models/item/fungus_nodule.json",
                {"parent": "minecraft:item/generated", "textures": {"layer0": "antcolonies:item/fungus_nodule"}})
     write_json(DATA / "loot_table/blocks/fungus_comb.json", loot_table())
-    print("wrote the fungus comb and nodule textures, models, blockstate and loot table")
+    print("wrote the fungus nodule textures, the nodule item model and the comb's loot table")
 
 
 if __name__ == "__main__":

@@ -283,7 +283,7 @@ public class Brood {
     }
 
     /** The cells that eggs and larvae lie in (nothing else is put there). */
-    Set<BlockPos> getBroodCells(Level level) {
+    public Set<BlockPos> getBroodCells(Level level) {
         Set<BlockPos> cells = new HashSet<>();
         for (AntEggEntity egg : getEggs(level)) {
             cells.add(egg.blockPosition());

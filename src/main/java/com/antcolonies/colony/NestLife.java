@@ -40,6 +40,10 @@ public class NestLife {
     private double nurseWork;
     /** Nodule growth not come yet (a fraction of one carried over). Not saved. */
     private double noduleGrowth;
+    /** The comb's ageing while away not come yet (fractions carried over): ripening, going old, crumbling. Not saved. */
+    private double ripening;
+    private double ageing;
+    private double crumbling;
     /** What the brain last saw of the queen while the nest was loaded: in her room, sealed in with the founders, how swollen. Saved. */
     private boolean queenHome;
     private boolean sealedIn;
@@ -239,9 +243,9 @@ public class NestLife {
     // --- the fungus garden, while away --------------------------------------------------------------------------
 
     /**
-     * The fungus grows nodules on the comb while away, as in {@link FungusGarden#grow}: each comb block with a layer over
-     * its bed and room for another nodule grows one about every {@code nodule_ticks}, using up that layer (the garden as
-     * last seen, with what is owed to it since).
+     * The fungus garden while away, as in {@link FungusGarden#grow}, from the garden as last seen with what is owed to
+     * it since: fresh layers ripen, each comb block with a ripe layer and room for another nodule grows one about every
+     * {@code nodule_ticks} (that layer goes old), other ripe layers go old by themselves, and old layers crumble away.
      */
     private boolean growNodules(ServerLevel level) {
         SpeciesProfile.GardenNumbers numbers = colony.profile().garden().orElse(null);
@@ -250,22 +254,42 @@ public class NestLife {
             return false;
         }
         NestLedger ledger = colony.ledger();
-        int spare = garden.seenSpareLayers() + ledger.store();
+        boolean changed = false;
+        ripening += garden.freshKnown() * 20.0 / Math.max(20, numbers.ripenTicks());
+        while (ripening >= 1 && garden.freshKnown() > 0) {
+            ripening--;
+            ledger.addRipened(1);
+            changed = true;
+        }
+        ripening = garden.freshKnown() > 0 ? ripening : 0;
         int room = garden.seenCombs() * FungusCombBlock.MAX_NODULES - (garden.seenNodules() + ledger.nurseFood());
-        int canGrow = Math.min(garden.seenCombs(), Math.min(spare, room));
+        int canGrow = Math.min(garden.seenCombs(), Math.min(garden.ripeKnown(), room));
         if (canGrow <= 0) {
             noduleGrowth = 0;
-            return false;
+        } else {
+            noduleGrowth += canGrow * FungusGarden.chancePerSecond(numbers);
+            while (noduleGrowth >= 1 && canGrow-- > 0) {
+                noduleGrowth--;
+                ledger.addAged(1);
+                ledger.addNurseFood(1);
+                changed = true;
+            }
         }
-        noduleGrowth += canGrow * FungusGarden.chancePerSecond(numbers);
-        boolean changed = false;
-        while (noduleGrowth >= 1 && canGrow-- > 0) {
-            noduleGrowth--;
+        ageing += garden.ripeKnown() * 20.0 / Math.max(20, numbers.oldTicks());
+        while (ageing >= 1 && garden.ripeKnown() > 0) {
+            ageing--;
+            ledger.addAged(1);
+            changed = true;
+        }
+        ageing = garden.ripeKnown() > 0 ? ageing : 0;
+        crumbling += garden.oldKnown() * 20.0 / Math.max(20, numbers.crumbleTicks());
+        while (crumbling >= 1 && garden.oldKnown() > 0) {
+            crumbling--;
             ledger.addStore(-1);
-            ledger.addNurseFood(1);
             colony.food().used(1);
             changed = true;
         }
+        crumbling = garden.oldKnown() > 0 ? crumbling : 0;
         return changed;
     }
 

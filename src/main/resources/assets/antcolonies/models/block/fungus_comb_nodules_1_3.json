@@ -1,0 +1,389 @@
+{
+  "textures": {
+    "particle": "antcolonies:block/fungus_comb_old_top",
+    "nodule": "antcolonies:block/fungus_nodule"
+  },
+  "elements": [
+    {
+      "from": [
+        3,
+        2,
+        4
+      ],
+      "to": [
+        6,
+        4,
+        7
+      ],
+      "faces": {
+        "down": {
+          "uv": [
+            3,
+            4,
+            6,
+            7
+          ],
+          "texture": "#nodule"
+        },
+        "up": {
+          "uv": [
+            3,
+            4,
+            6,
+            7
+          ],
+          "texture": "#nodule"
+        },
+        "north": {
+          "uv": [
+            3,
+            4,
+            6,
+            7
+          ],
+          "texture": "#nodule"
+        },
+        "south": {
+          "uv": [
+            3,
+            4,
+            6,
+            7
+          ],
+          "texture": "#nodule"
+        },
+        "west": {
+          "uv": [
+            3,
+            4,
+            6,
+            7
+          ],
+          "texture": "#nodule"
+        },
+        "east": {
+          "uv": [
+            3,
+            4,
+            6,
+            7
+          ],
+          "texture": "#nodule"
+        }
+      }
+    },
+    {
+      "from": [
+        4,
+        4,
+        5
+      ],
+      "to": [
+        5,
+        5,
+        6
+      ],
+      "faces": {
+        "up": {
+          "uv": [
+            4,
+            5,
+            5,
+            6
+          ],
+          "texture": "#nodule"
+        },
+        "north": {
+          "uv": [
+            4,
+            5,
+            5,
+            6
+          ],
+          "texture": "#nodule"
+        },
+        "south": {
+          "uv": [
+            4,
+            5,
+            5,
+            6
+          ],
+          "texture": "#nodule"
+        },
+        "west": {
+          "uv": [
+            4,
+            5,
+            5,
+            6
+          ],
+          "texture": "#nodule"
+        },
+        "east": {
+          "uv": [
+            4,
+            5,
+            5,
+            6
+          ],
+          "texture": "#nodule"
+        }
+      }
+    },
+    {
+      "from": [
+        10,
+        2,
+        9
+      ],
+      "to": [
+        13,
+        4,
+        12
+      ],
+      "faces": {
+        "down": {
+          "uv": [
+            10,
+            9,
+            13,
+            12
+          ],
+          "texture": "#nodule"
+        },
+        "up": {
+          "uv": [
+            10,
+            9,
+            13,
+            12
+          ],
+          "texture": "#nodule"
+        },
+        "north": {
+          "uv": [
+            10,
+            9,
+            13,
+            12
+          ],
+          "texture": "#nodule"
+        },
+        "south": {
+          "uv": [
+            10,
+            9,
+            13,
+            12
+          ],
+          "texture": "#nodule"
+        },
+        "west": {
+          "uv": [
+            10,
+            9,
+            13,
+            12
+          ],
+          "texture": "#nodule"
+        },
+        "east": {
+          "uv": [
+            10,
+            9,
+            13,
+            12
+          ],
+          "texture": "#nodule"
+        }
+      }
+    },
+    {
+      "from": [
+        11,
+        4,
+        10
+      ],
+      "to": [
+        12,
+        5,
+        11
+      ],
+      "faces": {
+        "up": {
+          "uv": [
+            11,
+            10,
+            12,
+            11
+          ],
+          "texture": "#nodule"
+        },
+        "north": {
+          "uv": [
+            11,
+            10,
+            12,
+            11
+          ],
+          "texture": "#nodule"
+        },
+        "south": {
+          "uv": [
+            11,
+            10,
+            12,
+            11
+          ],
+          "texture": "#nodule"
+        },
+        "west": {
+          "uv": [
+            11,
+            10,
+            12,
+            11
+          ],
+          "texture": "#nodule"
+        },
+        "east": {
+          "uv": [
+            11,
+            10,
+            12,
+            11
+          ],
+          "texture": "#nodule"
+        }
+      }
+    },
+    {
+      "from": [
+        5,
+        2,
+        11
+      ],
+      "to": [
+        8,
+        4,
+        14
+      ],
+      "faces": {
+        "down": {
+          "uv": [
+            5,
+            11,
+            8,
+            14
+          ],
+          "texture": "#nodule"
+        },
+        "up": {
+          "uv": [
+            5,
+            11,
+            8,
+            14
+          ],
+          "texture": "#nodule"
+        },
+        "north": {
+          "uv": [
+            5,
+            11,
+            8,
+            14
+          ],
+          "texture": "#nodule"
+        },
+        "south": {
+          "uv": [
+            5,
+            11,
+            8,
+            14
+          ],
+          "texture": "#nodule"
+        },
+        "west": {
+          "uv": [
+            5,
+            11,
+            8,
+            14
+          ],
+          "texture": "#nodule"
+        },
+        "east": {
+          "uv": [
+            5,
+            11,
+            8,
+            14
+          ],
+          "texture": "#nodule"
+        }
+      }
+    },
+    {
+      "from": [
+        6,
+        4,
+        12
+      ],
+      "to": [
+        7,
+        5,
+        13
+      ],
+      "faces": {
+        "up": {
+          "uv": [
+            6,
+            12,
+            7,
+            13
+          ],
+          "texture": "#nodule"
+        },
+        "north": {
+          "uv": [
+            6,
+            12,
+            7,
+            13
+          ],
+          "texture": "#nodule"
+        },
+        "south": {
+          "uv": [
+            6,
+            12,
+            7,
+            13
+          ],
+          "texture": "#nodule"
+        },
+        "west": {
+          "uv": [
+            6,
+            12,
+            7,
+            13
+          ],
+          "texture": "#nodule"
+        },
+        "east": {
+          "uv": [
+            6,
+            12,
+            7,
+            13
+          ],
+          "texture": "#nodule"
+        }
+      }
+    }
+  ]
+}

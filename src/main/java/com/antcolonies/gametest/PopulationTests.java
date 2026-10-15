@@ -546,6 +546,8 @@ public class PopulationTests {
      * 100 worker numbers (40 young, 60 old) whose meal is due: the young share eat nodules, the old ones comb, one piece
      * making 4 meals, so about 10 nodules and 15 layers, and nobody starves. Then mouth to mouth: a hungry king; a nurse
      * eats a nodule at the comb and carries it in its crop (nothing in its jaws), walks to him and feeds him head to head.
+     * Then the comb's ages (the conveyor), sped up: forage put on an aged comb goes on top as a fresh layer; a comb of 4
+     * fresh layers ripens, goes old (nodules grow from its ripe layers) and crumbles away from the bottom.
      */
     @GameTest(template = "arena", timeoutTicks = 4800)
     public static void termiteWorkersEatNodulesWhenYoungAndOldCombWhenOlder(GameTestHelper helper) {
@@ -559,6 +561,9 @@ public class PopulationTests {
         com.antcolonies.entity.TermiteKingEntity[] king = new com.antcolonies.entity.TermiteKingEntity[1];
         boolean[] sawCrop = {false};
         long[] kingHungrySince = {0};
+        BlockPos[] ageing = new BlockPos[1];
+        boolean[] sawRipe = {false};
+        boolean[] sawOld = {false};
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null, "no termite colony");
@@ -607,7 +612,9 @@ public class PopulationTests {
                     colony.food().depositSeed(level, spot);
                 }
                 for (BlockPos comb : colony.garden().getCombs(level)) {
-                    level.setBlock(comb, level.getBlockState(comb).setValue(com.antcolonies.block.FungusCombBlock.NODULES, 3), 3);
+                    // Aged comb: 2 old layers at the bottom, a ripe one, a fresh one on top; 3 nodules.
+                    level.setBlock(comb, level.getBlockState(comb).setValue(com.antcolonies.block.FungusCombBlock.NODULES, 3)
+                            .setValue(com.antcolonies.block.FungusCombBlock.OLD, 2).setValue(com.antcolonies.block.FungusCombBlock.FRESH, 1), 3);
                 }
                 helper.assertTrue(colony.food().getFood() >= 24, "only " + colony.food().getFood() + " layers of comb could be put down");
                 for (TermiteWorkerEntity worker : workers) {
@@ -624,7 +631,8 @@ public class PopulationTests {
                 helper.assertTrue(combEaten == 1 && nodulesEaten == 1, "one nodule and one layer of comb should have been started on: "
                         + nodulesEaten + " nodules, " + combEaten + " comb");
                 for (BlockPos comb : colony.garden().getCombs(level)) {
-                    helper.assertTrue(level.getBlockState(comb).getValue(com.antcolonies.block.SeedPileBlock.LAYERS) >= 1, "a comb's bed was eaten");
+                    helper.assertTrue(com.antcolonies.block.FungusCombBlock.fresh(level.getBlockState(comb)) >= 1,
+                            "a comb lost its fresh top (old comb is eaten from the bottom): " + level.getBlockState(comb));
                 }
                 // The worker numbers: 40 young, 60 old, all due a meal.
                 colony.population().addNewMembers(WorkerAntEntity.CASTE, now, 40);
@@ -673,6 +681,44 @@ public class PopulationTests {
                         nearest = Math.min(nearest, worker.headPoint().distanceTo(king[0].headPoint()));
                     }
                     helper.assertTrue(nearest < 0.9, "the nurse fed the king, but not head to head: its head was " + nearest + " from his");
+                    // The conveyor: forage on an aged comb goes on top, fresh.
+                    com.antcolonies.block.FungusCombBlock combBlock = com.antcolonies.registry.ModBlocks.FUNGUS_COMB.get();
+                    BlockPos aged = colony.garden().getCombs(level).stream()
+                            .filter(pos -> level.getBlockState(pos).getValue(com.antcolonies.block.SeedPileBlock.LAYERS) < 4
+                                    && com.antcolonies.block.FungusCombBlock.old(level.getBlockState(pos)) > 0
+                                    && !colony.brood().getBroodCells(level).contains(pos))
+                            .findFirst().orElse(null);
+                    if (aged != null) {
+                        var was = level.getBlockState(aged);
+                        helper.assertTrue(colony.food().depositSeed(level, aged), "could not put forage on the comb at " + aged);
+                        var now2 = level.getBlockState(aged);
+                        helper.assertTrue(com.antcolonies.block.FungusCombBlock.fresh(now2) == com.antcolonies.block.FungusCombBlock.fresh(was) + 1
+                                && com.antcolonies.block.FungusCombBlock.old(now2) == com.antcolonies.block.FungusCombBlock.old(was),
+                                "new forage should go on top as a fresh layer: " + was + " -> " + now2);
+                    }
+                    // A comb of 4 fresh layers, ageing fast.
+                    ageing[0] = colony.garden().getCombs(level).stream().filter(pos -> !colony.brood().getBroodCells(level).contains(pos))
+                            .findFirst().orElseThrow();
+                    level.setBlock(ageing[0], combBlock.defaultBlockState().setValue(com.antcolonies.block.SeedPileBlock.LAYERS, 4)
+                            .setValue(com.antcolonies.block.FungusCombBlock.FRESH, 4), 3);
+                    colony.garden().setAgeingSpeedForTests(400.0F);
+                    phase[0] = 6;
+                    phaseAt[0] = now;
+                }
+            } else if (phase[0] == 6) {
+                var state = level.getBlockState(ageing[0]);
+                boolean comb = state.getBlock() instanceof com.antcolonies.block.FungusCombBlock;
+                if (comb) {
+                    sawRipe[0] |= com.antcolonies.block.FungusCombBlock.ripe(state) > 0;
+                    sawOld[0] |= com.antcolonies.block.FungusCombBlock.old(state) > 0;
+                    // The bands stay in order: old at the bottom, fresh on top (never more than the layers).
+                    helper.assertTrue(com.antcolonies.block.FungusCombBlock.old(state) + com.antcolonies.block.FungusCombBlock.fresh(state)
+                            <= com.antcolonies.block.FungusCombBlock.layers(state), "a comb with more ages than layers: " + state);
+                }
+                if (!comb || com.antcolonies.block.FungusCombBlock.layers(state) < 4) {
+                    helper.assertTrue(sawRipe[0], "the fresh comb never ripened before it crumbled");
+                    helper.assertTrue(sawOld[0], "the comb never went old before it crumbled");
+                    colony.garden().setAgeingSpeedForTests(1.0F);
                     helper.succeed();
                 }
             }

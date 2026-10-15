@@ -1,100 +1,2220 @@
 {
-  "variants": {
-    "layers=1,nodules=0": {
-      "model": "antcolonies:block/fungus_comb_1_0"
+  "multipart": [
+    {
+      "when": {
+        "layers": "1",
+        "old": "0",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_1_0_0"
+      }
     },
-    "layers=1,nodules=1": {
-      "model": "antcolonies:block/fungus_comb_1_1"
+    {
+      "when": {
+        "layers": "1",
+        "old": "0",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_1_0_1"
+      }
     },
-    "layers=1,nodules=2": {
-      "model": "antcolonies:block/fungus_comb_1_2"
+    {
+      "when": {
+        "layers": "1",
+        "old": "0",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_1_0_1"
+      }
     },
-    "layers=1,nodules=3": {
-      "model": "antcolonies:block/fungus_comb_1_3"
+    {
+      "when": {
+        "layers": "1",
+        "old": "0",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_1_0_1"
+      }
     },
-    "layers=2,nodules=0": {
-      "model": "antcolonies:block/fungus_comb_2_0"
+    {
+      "when": {
+        "layers": "1",
+        "old": "0",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_1_0_1"
+      }
     },
-    "layers=2,nodules=1": {
-      "model": "antcolonies:block/fungus_comb_2_1"
+    {
+      "when": {
+        "layers": "1",
+        "old": "1",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_1_1_0"
+      }
     },
-    "layers=2,nodules=2": {
-      "model": "antcolonies:block/fungus_comb_2_2"
+    {
+      "when": {
+        "layers": "1",
+        "old": "1",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_1_1_0"
+      }
     },
-    "layers=2,nodules=3": {
-      "model": "antcolonies:block/fungus_comb_2_3"
+    {
+      "when": {
+        "layers": "1",
+        "old": "1",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_1_1_0"
+      }
     },
-    "layers=3,nodules=0": {
-      "model": "antcolonies:block/fungus_comb_3_0"
+    {
+      "when": {
+        "layers": "1",
+        "old": "1",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_1_1_0"
+      }
     },
-    "layers=3,nodules=1": {
-      "model": "antcolonies:block/fungus_comb_3_1"
+    {
+      "when": {
+        "layers": "1",
+        "old": "1",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_1_1_0"
+      }
     },
-    "layers=3,nodules=2": {
-      "model": "antcolonies:block/fungus_comb_3_2"
+    {
+      "when": {
+        "layers": "1",
+        "old": "2",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_1_1_0"
+      }
     },
-    "layers=3,nodules=3": {
-      "model": "antcolonies:block/fungus_comb_3_3"
+    {
+      "when": {
+        "layers": "1",
+        "old": "2",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_1_1_0"
+      }
     },
-    "layers=4,nodules=0": {
-      "model": "antcolonies:block/fungus_comb_4_0"
+    {
+      "when": {
+        "layers": "1",
+        "old": "2",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_1_1_0"
+      }
     },
-    "layers=4,nodules=1": {
-      "model": "antcolonies:block/fungus_comb_4_1"
+    {
+      "when": {
+        "layers": "1",
+        "old": "2",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_1_1_0"
+      }
     },
-    "layers=4,nodules=2": {
-      "model": "antcolonies:block/fungus_comb_4_2"
+    {
+      "when": {
+        "layers": "1",
+        "old": "2",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_1_1_0"
+      }
     },
-    "layers=4,nodules=3": {
-      "model": "antcolonies:block/fungus_comb_4_3"
+    {
+      "when": {
+        "layers": "1",
+        "old": "3",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_1_1_0"
+      }
     },
-    "layers=5,nodules=0": {
-      "model": "antcolonies:block/fungus_comb_5_0"
+    {
+      "when": {
+        "layers": "1",
+        "old": "3",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_1_1_0"
+      }
     },
-    "layers=5,nodules=1": {
-      "model": "antcolonies:block/fungus_comb_5_1"
+    {
+      "when": {
+        "layers": "1",
+        "old": "3",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_1_1_0"
+      }
     },
-    "layers=5,nodules=2": {
-      "model": "antcolonies:block/fungus_comb_5_2"
+    {
+      "when": {
+        "layers": "1",
+        "old": "3",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_1_1_0"
+      }
     },
-    "layers=5,nodules=3": {
-      "model": "antcolonies:block/fungus_comb_5_3"
+    {
+      "when": {
+        "layers": "1",
+        "old": "3",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_1_1_0"
+      }
     },
-    "layers=6,nodules=0": {
-      "model": "antcolonies:block/fungus_comb_6_0"
+    {
+      "when": {
+        "layers": "1",
+        "old": "4",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_1_1_0"
+      }
     },
-    "layers=6,nodules=1": {
-      "model": "antcolonies:block/fungus_comb_6_1"
+    {
+      "when": {
+        "layers": "1",
+        "old": "4",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_1_1_0"
+      }
     },
-    "layers=6,nodules=2": {
-      "model": "antcolonies:block/fungus_comb_6_2"
+    {
+      "when": {
+        "layers": "1",
+        "old": "4",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_1_1_0"
+      }
     },
-    "layers=6,nodules=3": {
-      "model": "antcolonies:block/fungus_comb_6_3"
+    {
+      "when": {
+        "layers": "1",
+        "old": "4",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_1_1_0"
+      }
     },
-    "layers=7,nodules=0": {
-      "model": "antcolonies:block/fungus_comb_7_0"
+    {
+      "when": {
+        "layers": "1",
+        "old": "4",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_1_1_0"
+      }
     },
-    "layers=7,nodules=1": {
-      "model": "antcolonies:block/fungus_comb_7_1"
+    {
+      "when": {
+        "layers": "1",
+        "nodules": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_nodules_1_1"
+      }
     },
-    "layers=7,nodules=2": {
-      "model": "antcolonies:block/fungus_comb_7_2"
+    {
+      "when": {
+        "layers": "1",
+        "nodules": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_nodules_1_2"
+      }
     },
-    "layers=7,nodules=3": {
-      "model": "antcolonies:block/fungus_comb_7_3"
+    {
+      "when": {
+        "layers": "1",
+        "nodules": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_nodules_1_3"
+      }
     },
-    "layers=8,nodules=0": {
-      "model": "antcolonies:block/fungus_comb_8_0"
+    {
+      "when": {
+        "layers": "2",
+        "old": "0",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_2_0_0"
+      }
     },
-    "layers=8,nodules=1": {
-      "model": "antcolonies:block/fungus_comb_8_1"
+    {
+      "when": {
+        "layers": "2",
+        "old": "0",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_2_0_1"
+      }
     },
-    "layers=8,nodules=2": {
-      "model": "antcolonies:block/fungus_comb_8_2"
+    {
+      "when": {
+        "layers": "2",
+        "old": "0",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_2_0_2"
+      }
     },
-    "layers=8,nodules=3": {
-      "model": "antcolonies:block/fungus_comb_8_3"
+    {
+      "when": {
+        "layers": "2",
+        "old": "0",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_2_0_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "2",
+        "old": "0",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_2_0_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "2",
+        "old": "1",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_2_1_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "2",
+        "old": "1",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_2_1_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "2",
+        "old": "1",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_2_1_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "2",
+        "old": "1",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_2_1_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "2",
+        "old": "1",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_2_1_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "2",
+        "old": "2",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_2_2_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "2",
+        "old": "2",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_2_2_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "2",
+        "old": "2",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_2_2_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "2",
+        "old": "2",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_2_2_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "2",
+        "old": "2",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_2_2_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "2",
+        "old": "3",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_2_2_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "2",
+        "old": "3",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_2_2_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "2",
+        "old": "3",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_2_2_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "2",
+        "old": "3",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_2_2_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "2",
+        "old": "3",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_2_2_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "2",
+        "old": "4",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_2_2_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "2",
+        "old": "4",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_2_2_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "2",
+        "old": "4",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_2_2_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "2",
+        "old": "4",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_2_2_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "2",
+        "old": "4",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_2_2_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "2",
+        "nodules": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_nodules_2_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "2",
+        "nodules": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_nodules_2_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "2",
+        "nodules": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_nodules_2_3"
+      }
+    },
+    {
+      "when": {
+        "layers": "3",
+        "old": "0",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_3_0_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "3",
+        "old": "0",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_3_0_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "3",
+        "old": "0",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_3_0_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "3",
+        "old": "0",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_3_0_3"
+      }
+    },
+    {
+      "when": {
+        "layers": "3",
+        "old": "0",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_3_0_3"
+      }
+    },
+    {
+      "when": {
+        "layers": "3",
+        "old": "1",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_3_1_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "3",
+        "old": "1",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_3_1_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "3",
+        "old": "1",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_3_1_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "3",
+        "old": "1",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_3_1_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "3",
+        "old": "1",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_3_1_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "3",
+        "old": "2",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_3_2_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "3",
+        "old": "2",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_3_2_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "3",
+        "old": "2",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_3_2_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "3",
+        "old": "2",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_3_2_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "3",
+        "old": "2",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_3_2_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "3",
+        "old": "3",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_3_3_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "3",
+        "old": "3",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_3_3_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "3",
+        "old": "3",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_3_3_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "3",
+        "old": "3",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_3_3_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "3",
+        "old": "3",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_3_3_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "3",
+        "old": "4",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_3_3_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "3",
+        "old": "4",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_3_3_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "3",
+        "old": "4",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_3_3_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "3",
+        "old": "4",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_3_3_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "3",
+        "old": "4",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_3_3_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "3",
+        "nodules": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_nodules_3_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "3",
+        "nodules": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_nodules_3_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "3",
+        "nodules": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_nodules_3_3"
+      }
+    },
+    {
+      "when": {
+        "layers": "4",
+        "old": "0",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_4_0_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "4",
+        "old": "0",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_4_0_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "4",
+        "old": "0",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_4_0_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "4",
+        "old": "0",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_4_0_3"
+      }
+    },
+    {
+      "when": {
+        "layers": "4",
+        "old": "0",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_4_0_4"
+      }
+    },
+    {
+      "when": {
+        "layers": "4",
+        "old": "1",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_4_1_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "4",
+        "old": "1",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_4_1_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "4",
+        "old": "1",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_4_1_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "4",
+        "old": "1",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_4_1_3"
+      }
+    },
+    {
+      "when": {
+        "layers": "4",
+        "old": "1",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_4_1_3"
+      }
+    },
+    {
+      "when": {
+        "layers": "4",
+        "old": "2",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_4_2_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "4",
+        "old": "2",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_4_2_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "4",
+        "old": "2",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_4_2_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "4",
+        "old": "2",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_4_2_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "4",
+        "old": "2",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_4_2_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "4",
+        "old": "3",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_4_3_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "4",
+        "old": "3",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_4_3_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "4",
+        "old": "3",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_4_3_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "4",
+        "old": "3",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_4_3_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "4",
+        "old": "3",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_4_3_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "4",
+        "old": "4",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_4_4_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "4",
+        "old": "4",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_4_4_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "4",
+        "old": "4",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_4_4_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "4",
+        "old": "4",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_4_4_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "4",
+        "old": "4",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_4_4_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "4",
+        "nodules": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_nodules_4_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "4",
+        "nodules": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_nodules_4_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "4",
+        "nodules": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_nodules_4_3"
+      }
+    },
+    {
+      "when": {
+        "layers": "5",
+        "old": "0",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_5_0_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "5",
+        "old": "0",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_5_0_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "5",
+        "old": "0",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_5_0_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "5",
+        "old": "0",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_5_0_3"
+      }
+    },
+    {
+      "when": {
+        "layers": "5",
+        "old": "0",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_5_0_4"
+      }
+    },
+    {
+      "when": {
+        "layers": "5",
+        "old": "1",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_5_1_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "5",
+        "old": "1",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_5_1_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "5",
+        "old": "1",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_5_1_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "5",
+        "old": "1",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_5_1_3"
+      }
+    },
+    {
+      "when": {
+        "layers": "5",
+        "old": "1",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_5_1_4"
+      }
+    },
+    {
+      "when": {
+        "layers": "5",
+        "old": "2",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_5_2_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "5",
+        "old": "2",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_5_2_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "5",
+        "old": "2",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_5_2_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "5",
+        "old": "2",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_5_2_3"
+      }
+    },
+    {
+      "when": {
+        "layers": "5",
+        "old": "2",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_5_2_3"
+      }
+    },
+    {
+      "when": {
+        "layers": "5",
+        "old": "3",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_5_3_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "5",
+        "old": "3",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_5_3_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "5",
+        "old": "3",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_5_3_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "5",
+        "old": "3",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_5_3_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "5",
+        "old": "3",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_5_3_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "5",
+        "old": "4",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_5_4_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "5",
+        "old": "4",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_5_4_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "5",
+        "old": "4",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_5_4_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "5",
+        "old": "4",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_5_4_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "5",
+        "old": "4",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_5_4_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "5",
+        "nodules": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_nodules_5_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "5",
+        "nodules": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_nodules_5_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "5",
+        "nodules": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_nodules_5_3"
+      }
+    },
+    {
+      "when": {
+        "layers": "6",
+        "old": "0",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_6_0_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "6",
+        "old": "0",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_6_0_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "6",
+        "old": "0",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_6_0_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "6",
+        "old": "0",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_6_0_3"
+      }
+    },
+    {
+      "when": {
+        "layers": "6",
+        "old": "0",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_6_0_4"
+      }
+    },
+    {
+      "when": {
+        "layers": "6",
+        "old": "1",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_6_1_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "6",
+        "old": "1",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_6_1_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "6",
+        "old": "1",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_6_1_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "6",
+        "old": "1",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_6_1_3"
+      }
+    },
+    {
+      "when": {
+        "layers": "6",
+        "old": "1",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_6_1_4"
+      }
+    },
+    {
+      "when": {
+        "layers": "6",
+        "old": "2",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_6_2_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "6",
+        "old": "2",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_6_2_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "6",
+        "old": "2",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_6_2_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "6",
+        "old": "2",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_6_2_3"
+      }
+    },
+    {
+      "when": {
+        "layers": "6",
+        "old": "2",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_6_2_4"
+      }
+    },
+    {
+      "when": {
+        "layers": "6",
+        "old": "3",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_6_3_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "6",
+        "old": "3",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_6_3_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "6",
+        "old": "3",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_6_3_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "6",
+        "old": "3",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_6_3_3"
+      }
+    },
+    {
+      "when": {
+        "layers": "6",
+        "old": "3",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_6_3_3"
+      }
+    },
+    {
+      "when": {
+        "layers": "6",
+        "old": "4",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_6_4_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "6",
+        "old": "4",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_6_4_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "6",
+        "old": "4",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_6_4_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "6",
+        "old": "4",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_6_4_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "6",
+        "old": "4",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_6_4_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "6",
+        "nodules": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_nodules_6_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "6",
+        "nodules": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_nodules_6_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "6",
+        "nodules": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_nodules_6_3"
+      }
+    },
+    {
+      "when": {
+        "layers": "7",
+        "old": "0",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_7_0_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "7",
+        "old": "0",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_7_0_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "7",
+        "old": "0",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_7_0_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "7",
+        "old": "0",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_7_0_3"
+      }
+    },
+    {
+      "when": {
+        "layers": "7",
+        "old": "0",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_7_0_4"
+      }
+    },
+    {
+      "when": {
+        "layers": "7",
+        "old": "1",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_7_1_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "7",
+        "old": "1",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_7_1_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "7",
+        "old": "1",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_7_1_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "7",
+        "old": "1",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_7_1_3"
+      }
+    },
+    {
+      "when": {
+        "layers": "7",
+        "old": "1",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_7_1_4"
+      }
+    },
+    {
+      "when": {
+        "layers": "7",
+        "old": "2",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_7_2_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "7",
+        "old": "2",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_7_2_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "7",
+        "old": "2",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_7_2_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "7",
+        "old": "2",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_7_2_3"
+      }
+    },
+    {
+      "when": {
+        "layers": "7",
+        "old": "2",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_7_2_4"
+      }
+    },
+    {
+      "when": {
+        "layers": "7",
+        "old": "3",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_7_3_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "7",
+        "old": "3",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_7_3_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "7",
+        "old": "3",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_7_3_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "7",
+        "old": "3",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_7_3_3"
+      }
+    },
+    {
+      "when": {
+        "layers": "7",
+        "old": "3",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_7_3_4"
+      }
+    },
+    {
+      "when": {
+        "layers": "7",
+        "old": "4",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_7_4_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "7",
+        "old": "4",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_7_4_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "7",
+        "old": "4",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_7_4_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "7",
+        "old": "4",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_7_4_3"
+      }
+    },
+    {
+      "when": {
+        "layers": "7",
+        "old": "4",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_7_4_3"
+      }
+    },
+    {
+      "when": {
+        "layers": "7",
+        "nodules": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_nodules_7_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "7",
+        "nodules": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_nodules_7_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "7",
+        "nodules": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_nodules_7_3"
+      }
+    },
+    {
+      "when": {
+        "layers": "8",
+        "old": "0",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_8_0_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "8",
+        "old": "0",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_8_0_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "8",
+        "old": "0",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_8_0_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "8",
+        "old": "0",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_8_0_3"
+      }
+    },
+    {
+      "when": {
+        "layers": "8",
+        "old": "0",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_8_0_4"
+      }
+    },
+    {
+      "when": {
+        "layers": "8",
+        "old": "1",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_8_1_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "8",
+        "old": "1",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_8_1_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "8",
+        "old": "1",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_8_1_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "8",
+        "old": "1",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_8_1_3"
+      }
+    },
+    {
+      "when": {
+        "layers": "8",
+        "old": "1",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_8_1_4"
+      }
+    },
+    {
+      "when": {
+        "layers": "8",
+        "old": "2",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_8_2_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "8",
+        "old": "2",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_8_2_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "8",
+        "old": "2",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_8_2_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "8",
+        "old": "2",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_8_2_3"
+      }
+    },
+    {
+      "when": {
+        "layers": "8",
+        "old": "2",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_8_2_4"
+      }
+    },
+    {
+      "when": {
+        "layers": "8",
+        "old": "3",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_8_3_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "8",
+        "old": "3",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_8_3_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "8",
+        "old": "3",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_8_3_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "8",
+        "old": "3",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_8_3_3"
+      }
+    },
+    {
+      "when": {
+        "layers": "8",
+        "old": "3",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_8_3_4"
+      }
+    },
+    {
+      "when": {
+        "layers": "8",
+        "old": "4",
+        "fresh": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_8_4_0"
+      }
+    },
+    {
+      "when": {
+        "layers": "8",
+        "old": "4",
+        "fresh": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_8_4_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "8",
+        "old": "4",
+        "fresh": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_8_4_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "8",
+        "old": "4",
+        "fresh": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_8_4_3"
+      }
+    },
+    {
+      "when": {
+        "layers": "8",
+        "old": "4",
+        "fresh": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_8_4_4"
+      }
+    },
+    {
+      "when": {
+        "layers": "8",
+        "nodules": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_nodules_8_1"
+      }
+    },
+    {
+      "when": {
+        "layers": "8",
+        "nodules": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_nodules_8_2"
+      }
+    },
+    {
+      "when": {
+        "layers": "8",
+        "nodules": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/fungus_comb_nodules_8_3"
+      }
     }
-  }
+  ]
 }
