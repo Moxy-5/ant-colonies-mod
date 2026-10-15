@@ -275,6 +275,23 @@ public class Mound {
         workStage = h;
     }
 
+    /**
+     * The brain, step 2d ({@link BuildLife}): if the stage being built is finished (or {@code stalled}: nothing more of
+     * it can be built, see {@link #STALL_TICKS}) and the colony has earned a taller one, the next stage starts now (the
+     * real termites look every few seconds, {@link #getStage}). True if it did.
+     */
+    boolean nextStage(Level level, boolean stalled) {
+        int stage = getStage(level);
+        if (stage >= getEarnedStage(level) || !stalled && !isStageDone(level)) {
+            return false;
+        }
+        workStage = stage + 1;
+        stageCheckedAt = level.getGameTime();
+        progressed(level);
+        spotsTick = Long.MIN_VALUE;
+        return true;
+    }
+
     /** Something was built, carved, reshaped or cleared: the stage is still going. */
     private void progressed(Level level) {
         lastProgress = level.getGameTime();
@@ -403,7 +420,7 @@ public class Mound {
     }
 
     /** Whether a part of the plan is a piece: a ramp, a spire piece or a chimney mouth (one pellet each). */
-    private static boolean isPiece(MoundPlan.Part part) {
+    static boolean isPiece(MoundPlan.Part part) {
         return part == MoundPlan.Part.RAMP || part == MoundPlan.Part.SPIRE || part == MoundPlan.Part.MOUTH;
     }
 
@@ -451,7 +468,7 @@ public class Mound {
 
     /** Where the next layer for this wall goes: the wall itself, a cell under it at the foot of the mound, or nowhere yet. */
     @Nullable
-    private BlockPos spotIn(Level level, BlockPos wall, Set<BlockPos> nestCells) {
+    BlockPos spotIn(Level level, BlockPos wall, Set<BlockPos> nestCells) {
         BlockState state = level.getBlockState(wall);
         if (state.getBlock() instanceof TermiteMoundBlock) {
             return TermiteMoundBlock.isFinished(state) ? null : wall;
@@ -489,7 +506,7 @@ public class Mound {
      * Whether a piece can go here now: the cell is empty, and what it stands on is there (a ramp: soil that has set or a
      * tunnel block; a spire piece or a mouth: anything solid that is not wet soil, usually the piece under it).
      */
-    private boolean isPieceSpot(Level level, BlockPos pos, MoundPlan.Part part) {
+    boolean isPieceSpot(Level level, BlockPos pos, MoundPlan.Part part) {
         BlockState here = level.getBlockState(pos);
         return here.canBeReplaced() && here.getFluidState().isEmpty() && hasPieceSupport(level, pos, part);
     }
@@ -875,7 +892,7 @@ public class Mound {
     }
 
     /** Finished mound soil of an age (0 fresh to 3 old). */
-    private static BlockState soil(int age) {
+    static BlockState soil(int age) {
         return ModBlocks.TERMITE_MOUND.get().defaultBlockState()
                 .setValue(TermiteMoundBlock.LAYERS, TermiteMoundBlock.FINISHED).setValue(TermiteMoundBlock.AGE, age);
     }

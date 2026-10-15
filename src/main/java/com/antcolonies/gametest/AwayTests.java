@@ -295,6 +295,98 @@ public class AwayTests {
         });
     }
 
+    /** How many blocks of the hill (burrowed dirt) stand round the entrance. */
+    static int hillBlocks(ServerLevel level, Colony colony) {
+        int count = 0;
+        int r = com.antcolonies.colony.Hill.MOUND_RADIUS;
+        for (BlockPos pos : BlockPos.betweenClosed(colony.getCenter().offset(-r, 0, -r), colony.getCenter().offset(r, 4, r))) {
+            if (level.getBlockState(pos).is(com.antcolonies.registry.ModBlocks.BURROWED_DIRT.get())) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /**
+     * Step 2d (the user's decision: building while away is applied when the player returns). A harvester ant colony with
+     * its last two rooms (the queen's and the refuse chamber) not dug yet and no hill, and 40 middle-aged workers in
+     * the numbers (about 26 of them builders). While away nothing changes in the ground (its land is not loaded); the brain counts the
+     * builders' time. Back in range with a pretend player looking at the hill: nothing is dug yet (the soil would have to
+     * go up onto the hill in plain sight). The player gone: the two rooms are dug, the soil is heaped on the hill, the
+     * away report counts both, and the time left over is dropped (nothing more may be dug).
+     */
+    @GameTest(template = "arena", timeoutTicks = 900, skyAccess = true)
+    public static void anAntColonyAwayDigsItsRoomsAndHeapsItsHillOutOfSightOnReturn(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        startAntColony(helper);
+        List<BlockPos> undug = new ArrayList<>();
+        UUID[] queen = new UUID[1];
+        CompoundTag[] queenOnDisk = new CompoundTag[1];
+        helper.runAfterDelay(15, () -> {
+            Colony colony = antColony(helper);
+            colony.population().setOnForTests(false); // no swapping: the numbers stay numbers
+            List<NestPlan.Chamber> rooms = colony.nest().getPlannedChambers(level);
+            helper.assertTrue(rooms.size() >= 3, "the nest should have at least 3 levels: " + rooms.size());
+            for (NestPlan.Chamber room : rooms.subList(rooms.size() - 2, rooms.size())) {
+                for (BlockPos cell : room.cells()) {
+                    level.setBlock(cell, Blocks.DIRT.defaultBlockState(), 3);
+                    undug.add(cell);
+                }
+            }
+            colony.population().addNewMembers(WorkerAntEntity.CASTE, level.getGameTime() - 100000, 40); // middle-aged: builders
+            helper.assertTrue(hillBlocks(level, colony) == 0, "no hill yet");
+        });
+        helper.runAfterDelay(40, () -> {
+            Colony colony = antColony(helper);
+            queen[0] = colony.getQueen(level).getUUID();
+            colony.queenCare().setQueenLastFed(level.getGameTime());
+            colony.away().setOnForTests(true);
+            colony.away().setGraceForTests(20L);
+            queenOnDisk[0] = freezeAndUnload(colony, level, colony.getQueen(level));
+            colony.away().setAwayForTests(true);
+        });
+        helper.runAfterDelay(400, () -> {
+            Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
+            AntColoniesMod.LOGGER.info("[away-test] 2d ants away: {}{}", colony.population().describe(level), colony.away().describe(level));
+            helper.assertTrue(colony.away().isAway(level), "the colony should be away");
+            helper.assertTrue(undug.stream().allMatch(cell -> level.getBlockState(cell).is(Blocks.DIRT)) && hillBlocks(level, colony) == 0,
+                    "nothing should be dug while away: the land is not loaded");
+            int builders = colony.building().buildersInside(level);
+            long seconds = (400 - 40 - 20) / 20; // (away once the grace is over)
+            // (the colony shares out its jobs: a third of the 40 go foraging, see Colony.shareOut)
+            helper.assertTrue(builders >= 20 && colony.building().work() >= builders * 20L * (seconds - 2),
+                    "the builders' time should be counted while away: " + builders + " builders, " + colony.building().work() + " ticks");
+            colony.building().setWorkForTests(colony.building().work() + 50000); // (longer away than the test waits)
+            // Back in range, with a pretend player looking at the hill from 5 blocks off.
+            colony.population().setViewersForTests(List.of(Vec3.atCenterOf(colony.getCenter().offset(5, 2, 0))));
+            colony.away().setAwayForTests(false);
+            loadAgain(level, queenOnDisk[0]);
+        });
+        helper.runAfterDelay(480, () -> {
+            Colony colony = antColony(helper);
+            helper.assertTrue(colony != null, "the queen should be back and alive");
+            AntColoniesMod.LOGGER.info("[away-test] 2d ants back, watched: {}", colony.away().describe(level));
+            helper.assertTrue(undug.stream().allMatch(cell -> level.getBlockState(cell).is(Blocks.DIRT)) && hillBlocks(level, colony) == 0
+                    && colony.building().hasWork(), "nothing should be dug while a player looks at the hill: its soil goes up in plain sight");
+            colony.population().setViewersForTests(List.of());
+        });
+        helper.runAfterDelay(640, () -> {
+            Colony colony = antColony(helper);
+            AwayReport report = colony.away().report();
+            int hill = hillBlocks(level, colony);
+            AntColoniesMod.LOGGER.info("[away-test] 2d ants back: hill {}, {}", hill, colony.away().describe(level));
+            List<BlockPos> left = undug.stream().filter(cell -> !level.getBlockState(cell).isAir()).toList();
+            helper.assertTrue(left.isEmpty(), "both rooms should be dug: " + left.size() + " of " + undug.size() + " left, " + left);
+            helper.assertTrue(hill > 0 && report.get(AwayReport.What.HILL) == hill, "the soil should be heaped on the hill: " + hill
+                    + " blocks, report " + report.describe());
+            helper.assertTrue(report.get(AwayReport.What.DUG) == undug.size(), "the report should count the " + undug.size() + " blocks dug: "
+                    + report.describe());
+            helper.assertTrue(!colony.building().hasWork(), "the time left over should be dropped once nothing more may be dug: "
+                    + colony.building().work());
+            helper.succeed();
+        });
+    }
+
     /** Every real worker of the test's colonies leaves the world: only the numbers may forage in these tests. */
     static void noRealWorkers(GameTestHelper helper) {
         for (AbstractAntEntity worker : helper.getLevel().getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds(),
@@ -491,8 +583,12 @@ public class AwayTests {
      * workers' and soldiers' meals come due: the young share eat nodules, the old ones old comb (4 meals a piece), the
      * soldiers a nodule each, and nobody is left hungry. Back in range, the blocks catch up: the ledger empties and the
      * comb blocks hold just the ages and nodules the brain counted.
+     * <p>Step 2d in the same scene: the colony has earned the mound's second stage and nothing of it is built. While away
+     * nothing is built (the land is not loaded), the builders' time is counted. Back in range a pretend player looks at the
+     * mound's place: nothing goes up while it is seen. The player gone: the mound goes up out of sight, every block of it
+     * finished and set (it had time to dry), its soil dug from the galleries under it, and the report counts it.
      */
-    @GameTest(template = "arena", timeoutTicks = 1000)
+    @GameTest(template = "arena", timeoutTicks = 1600)
     public static void aTermiteColonyAwayAgesItsCombFeedsItsQueenAndEatsAsNumbers(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         TermiteMoundTests.deepGround(helper);
@@ -507,6 +603,7 @@ public class AwayTests {
         int[] eatenBefore = new int[2];
         int[] expected = new int[5]; // fresh, ripe, old, nodules, layers: what the brain counted when the colony came back
         boolean[] back = {false};
+        long[] phase = {0, 0}; // step 2d after the comb: 1 watched, 2 the player gone; when it started
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null, "no termite colony");
@@ -559,6 +656,8 @@ public class AwayTests {
             foodBefore[0] = colony.food().getFood();
             grownBefore[0] = colony.garden().getNodulesGrown();
             colony.garden().setAgeingSpeedForTests(100.0F);
+            colony.mound().setStage(level, 2);
+            helper.assertTrue(colony.mound().countFinished(level) == 0, "no mound built yet");
             colony.away().setOnForTests(true);
             colony.away().setGraceForTests(20L);
             queenOnDisk[0] = freezeAndUnload(colony, level, theQueen);
@@ -611,6 +710,11 @@ public class AwayTests {
                     + colony.food().getFood() + " counted");
             // Back in range: what the brain counted is what the blocks must show once they have caught up.
             helper.assertTrue(!colony.ledger().isEmpty(), "the blocks should owe something");
+            helper.assertTrue(colony.mound().countFinished(level) == 0 && colony.building().hasWork(),
+                    "nothing of the mound should be built while away, but the builders' time counted: " + colony.building().work());
+            colony.building().setWorkForTests(colony.building().work() + 100000); // (longer away than the test waits)
+            // A pretend player looks at the mound's place from 7 blocks off.
+            colony.population().setViewersForTests(List.of(Vec3.atCenterOf(colony.getCenter().offset(7, 2, 0))));
             expected[0] = colony.garden().freshKnown();
             expected[1] = colony.garden().ripeKnown();
             expected[2] = colony.garden().oldKnown();
@@ -631,6 +735,10 @@ public class AwayTests {
             if (colony == null || !colony.ledger().isEmpty()) {
                 return;
             }
+            if (phase[0] > 0) {
+                moundOnReturn(helper, colony, phase);
+                return;
+            }
             int[] blocks = combTotals(level, colony);
             int grown = colony.garden().getNodulesGrown() - grownBefore[0]; // (each turned a ripe layer old)
             int lost = colony.garden().getNodulesLost() - lostBefore[0]; // (on comb eaten or crumbled right away)
@@ -644,7 +752,41 @@ public class AwayTests {
             helper.assertTrue(blocks[3] == expected[3] + grown - lost, "the nodules should be as counted: blocks " + java.util.Arrays.toString(blocks)
                     + ", counted " + java.util.Arrays.toString(expected) + ", " + grown + " grown since, " + lost + " lost with used-up comb");
             colony.garden().setAgeingSpeedForTests(1.0F);
-            helper.succeed();
+            phase[0] = 1;
+            phase[1] = level.getGameTime();
         });
+    }
+
+    /** Step 2d in the termite scene (see above): nothing while the player looks, then the mound out of sight. */
+    private static void moundOnReturn(GameTestHelper helper, Colony colony, long[] phase) {
+        ServerLevel level = helper.getLevel();
+        long since = level.getGameTime() - phase[1];
+        AwayReport report = colony.away().report();
+        if (phase[0] == 1 && since >= 60) {
+            AntColoniesMod.LOGGER.info("[away-test] 2d termites back, watched: mound {}, {}", colony.mound().countFinished(level),
+                    colony.away().describe(level));
+            helper.assertTrue(colony.mound().countFinished(level) == 0 && report.get(AwayReport.What.MOUND_BUILT) == 0,
+                    "nothing of the mound should go up while a player looks: " + colony.mound().countFinished(level) + " built");
+            colony.population().setViewersForTests(List.of());
+            phase[0] = 2;
+            phase[1] = level.getGameTime();
+        } else if (phase[0] == 2 && (!colony.building().hasWork() || since >= 300)) {
+            int finished = colony.mound().countFinished(level);
+            AntColoniesMod.LOGGER.info("[away-test] 2d termites back: mound {} blocks, stage {}, {}", finished, colony.mound().getStage(level),
+                    colony.away().describe(level));
+            helper.assertTrue(finished > 0 && report.get(AwayReport.What.MOUND_BUILT) > 0, "the mound should have gone up out of sight: "
+                    + finished + " blocks, " + report.describe());
+            for (BlockPos pos : colony.mound().getParts(level).keySet()) {
+                var state = level.getBlockState(pos);
+                if (state.getBlock() instanceof com.antcolonies.block.TermiteMoundBlock) {
+                    helper.assertTrue(com.antcolonies.block.TermiteMoundBlock.isFinished(state)
+                            && state.getValue(com.antcolonies.block.TermiteMoundBlock.AGE) >= 1, "a mound block built while away should be finished and set: "
+                                    + pos + " " + state);
+                }
+            }
+            helper.assertTrue(report.get(AwayReport.What.DUG) >= finished, "its soil should have been dug (the galleries under it): "
+                    + report.describe());
+            helper.succeed();
+        }
     }
 }

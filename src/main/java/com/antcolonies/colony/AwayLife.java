@@ -46,7 +46,8 @@ import net.minecraft.world.phys.Vec3;
  *
  * <p>Step 2b: while away the colony lives on as numbers ({@link NestLife}, {@link Meals}): the numbers eat and starve,
  * the nurses mill bread and feed the queen and the young, the queen lays, the young grow up, the fungus grows, and the
- * numbers grow old. The clocks of the frozen young go on while they wait to be folded in.
+ * numbers grow old. The clocks of the frozen young go on while they wait to be folded in. Step 2d: the builder numbers'
+ * time is counted while away and spent on return, before anything else is put back ({@link BuildLife}).
  *
  * <p>Species-neutral: any insect with a colony and a nest caste, and every egg and larva (or nymph).
  */
@@ -207,6 +208,7 @@ public class AwayLife {
             colony.population().tickAway(level);
             colony.life().tick(level, true);
             colony.field().tick(level, true);
+            colony.building().tickAway(level);
             ColonyManager.get(level).markChanged();
         }
     }
@@ -298,11 +300,13 @@ public class AwayLife {
             ColonyManager.get(level).markChanged();
         }
         colony.life().watch(level);
-        if (colony.ledger().isEmpty() && colony.brood().insideCount() == 0 || !nestLoaded(level)) {
+        if (colony.ledger().isEmpty() && colony.brood().insideCount() == 0 && !colony.building().hasWork() || !nestLoaded(level)) {
             return;
         }
         List<Vec3> eyes = colony.population().viewersInSight(level);
-        boolean changed = colony.brood().comeOut(level, eyes);
+        // The rooms first (step 2d): the young, the seeds and the bodies owed then have the rooms dug while away to go to.
+        boolean changed = colony.building().catchUp(level, eyes);
+        changed |= colony.brood().comeOut(level, eyes);
         changed |= colony.ledger().apply(level, eyes);
         if (changed) {
             ColonyManager.get(level).markChanged();
@@ -336,6 +340,9 @@ public class AwayLife {
         }
         if (colony.brood().insideCount() > 0) {
             owed.add(colony.brood().insideCount() + " young");
+        }
+        if (colony.building().hasWork()) {
+            owed.add(colony.building().describe());
         }
         if (!owed.isEmpty()) {
             text.append(" | owed to the nest: ").append(String.join(", ", owed));

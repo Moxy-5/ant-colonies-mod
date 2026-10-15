@@ -107,9 +107,25 @@ public class Nest {
      */
     @Nullable
     public BlockPos findDigTarget(Level level, @Nullable java.util.UUID digger) {
+        return findDigTarget(level, digger, true);
+    }
+
+    /**
+     * The next block of the nest's plan the builder numbers dig while the colony is away (the brain, step 2d, see
+     * {@link BuildLife}): the same order as the real diggers, without what only the real ones do on the spot (opening
+     * the plug or a foraging hole at foraging time, cutting grass on a runway) and without the mound's own digging
+     * ({@link BuildLife} builds the mound itself).
+     */
+    @Nullable
+    BlockPos findPlannedDigTarget(Level level) {
+        return findDigTarget(level, null, false);
+    }
+
+    @Nullable
+    private BlockPos findDigTarget(Level level, @Nullable java.util.UUID digger, boolean live) {
         // A colony that closed itself in while it was founded opens up again once it has workers: the plug first (a
         // colony that keeps a schedule only at night, see mayOpenEntrance).
-        if (isEntrancePlugged(level) && mayOpenEntrance(level)) {
+        if (live && isEntrancePlugged(level) && mayOpenEntrance(level)) {
             return center;
         }
         // The rooms are planned before the first block is dug, because the plan decides how deep the shaft goes.
@@ -190,13 +206,13 @@ public class Nest {
             }
         }
         // Grass growing where a runway of sheeting runs is cut away.
-        BlockPos plant = foodWays.runwayPlant(level);
+        BlockPos plant = live ? foodWays.runwayPlant(level) : null;
         if (plant != null) {
             return plant;
         }
         // A closed hole is opened before more garden rooms are dug: a big colony wants all its gardens at once (with the
         // brain its headcount is mostly numbers), and its foragers were shut in until every room was dug.
-        BlockPos hole = colony.foragingHoles().holeToOpen(level);
+        BlockPos hole = live ? colony.foragingHoles().holeToOpen(level) : null;
         if (hole != null) {
             return hole;
         }
@@ -206,7 +222,7 @@ public class Nest {
                 return next;
             }
         }
-        return colony.mound().findDigTarget(level, digger);
+        return live ? colony.mound().findDigTarget(level, digger) : null;
     }
 
     /** The garden rooms the colony wants dug now: the first, and one more for every few workers (the profile's {@code garden}). */

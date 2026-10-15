@@ -27,6 +27,9 @@ public class AwayReport {
         NODULES_GROWN("nodules grown"),
         COMB_RIPENED("comb layers ripened"),
         COMB_AGED("comb layers gone old"),
+        DUG("blocks dug"),
+        HILL("pellets of soil heaped on the hill"),
+        MOUND_BUILT("mound blocks built"),
         OLD_AGE("died of old age"),
         STARVED("starved"),
         YOUNG_STARVED("young starved");
