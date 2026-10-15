@@ -95,9 +95,12 @@ public class NestLedger {
      */
     boolean apply(ServerLevel level, List<Vec3> eyes) {
         boolean changed = applyBodies(level, eyes);
-        changed |= applyStore(level, eyes);
+        // Fungus comb, in the order it happened: layers put on top (fresh), then ripened and gone old, and only then the
+        // old layers eaten or crumbled taken off the bottom (most of them went old while away: see docs/BUGS.md 26).
+        changed |= addToStore(level, eyes);
         changed |= applyNurseFood(level, eyes);
         changed |= applyAges(level, eyes);
+        changed |= takeFromStore(level, eyes);
         return changed;
     }
 
@@ -170,7 +173,7 @@ public class NestLedger {
         return changed;
     }
 
-    private boolean applyStore(ServerLevel level, List<Vec3> eyes) {
+    private boolean addToStore(ServerLevel level, List<Vec3> eyes) {
         FoodStore food = colony.food();
         boolean changed = false;
         for (int tries = 0; store > 0 && tries < PER_SECOND; tries++) {
@@ -189,6 +192,12 @@ public class NestLedger {
                 changed = true;
             }
         }
+        return changed;
+    }
+
+    private boolean takeFromStore(ServerLevel level, List<Vec3> eyes) {
+        FoodStore food = colony.food();
+        boolean changed = false;
         for (int tries = 0; store < 0 && tries < PER_SECOND; tries++) {
             List<BlockPos> heaps = food.layersToTake(level);
             if (heaps.isEmpty()) {

@@ -126,6 +126,7 @@ public class FungusGarden implements NurseFood {
                     state = FungusCombBlock.ageOne(state);
                 }
             }
+            nodules = state.getValue(FungusCombBlock.NODULES);
             for (int i = FungusCombBlock.old(state); i > 0 && !young.contains(pos); i--) {
                 if (random.nextFloat() < crumble) {
                     BlockState less = FungusCombBlock.withoutBottomLayer(state);
@@ -142,6 +143,9 @@ public class FungusGarden implements NurseFood {
             }
             if (state != was) {
                 level.setBlock(pos, state, 3);
+                if (state.isAir()) {
+                    moveNodulesOff(level, pos, nodules);
+                }
                 changed = true;
             }
             if (state.is(ModBlocks.FUNGUS_COMB.get())) {
@@ -160,9 +164,38 @@ public class FungusGarden implements NurseFood {
         return changed;
     }
 
-    /** Tests only: the comb ripens, goes old and crumbles this many times faster. */
+    /**
+     * A comb block is gone (its last layer eaten or crumbled away) with {@code nodules} still on it: the nurses pick
+     * them off onto other comb with room for them, so no food the colony counts vanishes with the block (found by the
+     * termite away test, docs/BUGS.md 26; where they go is my pick, to confirm). Any that fit nowhere are lost.
+     */
+    void moveNodulesOff(Level level, BlockPos from, int nodules) {
+        int lost = 0;
+        for (int i = 0; i < nodules; i++) {
+            BlockPos spot = pickReturnSpot(level, level.getRandom());
+            if (spot == null || spot.equals(from) || !putBack(level, spot, false)) {
+                lost++;
+            }
+        }
+        if (lost > 0) {
+            AntColoniesMod.LOGGER.info("[garden] colony {}: a comb at {} was used up, {} of its nodules had nowhere to go", colony.getId(),
+                    from.toShortString(), lost);
+        }
+    }
+
+    /** Tests only: the comb ripens, goes old and crumbles this many times faster (here and while away). */
     public void setAgeingSpeedForTests(float speed) {
         ageingSpeedForTests = speed;
+    }
+
+    /** How many times faster than the profile says the comb ages (1 except in tests). */
+    float ageingSpeed() {
+        return ageingSpeedForTests;
+    }
+
+    /** A nodule grew while the colony was away ({@link NestLife}): counted with the ones grown here (for tests). */
+    void grewAway() {
+        nodulesGrown++;
     }
 
     /** The chance each second that a comb block with room for it grows a nodule. */
@@ -180,17 +213,17 @@ public class FungusGarden implements NurseFood {
      * have changed since and the blocks have not caught up with ({@link NestLedger}: layers added on top are fresh,
      * layers taken off the bottom old; layers ripened and gone old).
      */
-    int freshKnown() {
+    public int freshKnown() {
         NestLedger ledger = colony.ledger();
         return Math.max(0, seenFresh + Math.max(0, ledger.store()) - ledger.ripened());
     }
 
-    int ripeKnown() {
+    public int ripeKnown() {
         NestLedger ledger = colony.ledger();
         return Math.max(0, seenRipe + ledger.ripened() - ledger.aged());
     }
 
-    int oldKnown() {
+    public int oldKnown() {
         NestLedger ledger = colony.ledger();
         return Math.max(0, seenOld + ledger.aged() + Math.min(0, ledger.store()));
     }
@@ -224,7 +257,7 @@ public class FungusGarden implements NurseFood {
         return layersCrumbled;
     }
 
-    /** How many nodules have grown since the colony was loaded (for tests: each turned a ripe layer old). */
+    /** How many nodules have grown since the colony was loaded, here or away (for tests: each turned a ripe layer old). */
     public int getNodulesGrown() {
         return nodulesGrown;
     }

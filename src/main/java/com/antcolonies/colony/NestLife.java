@@ -210,7 +210,7 @@ public class NestLife {
      * How many pieces of the nurses' food there are as far as the brain knows: the bread counted; or the nodules on the
      * comb (in the world while the nest is loaded, as last seen while away) and what the ledger still owes the world.
      */
-    int nurseFoodLeft(ServerLevel level) {
+    public int nurseFoodLeft(ServerLevel level) {
         if (colony.profile().food().makesBread()) {
             return colony.bakery().getBread();
         }
@@ -255,7 +255,8 @@ public class NestLife {
         }
         NestLedger ledger = colony.ledger();
         boolean changed = false;
-        ripening += garden.freshKnown() * 20.0 / Math.max(20, numbers.ripenTicks());
+        float speed = garden.ageingSpeed();
+        ripening += garden.freshKnown() * speed * 20.0 / Math.max(20, numbers.ripenTicks());
         while (ripening >= 1 && garden.freshKnown() > 0) {
             ripening--;
             ledger.addRipened(1);
@@ -272,17 +273,18 @@ public class NestLife {
                 noduleGrowth--;
                 ledger.addAged(1);
                 ledger.addNurseFood(1);
+                garden.grewAway();
                 changed = true;
             }
         }
-        ageing += garden.ripeKnown() * 20.0 / Math.max(20, numbers.oldTicks());
+        ageing += garden.ripeKnown() * speed * 20.0 / Math.max(20, numbers.oldTicks());
         while (ageing >= 1 && garden.ripeKnown() > 0) {
             ageing--;
             ledger.addAged(1);
             changed = true;
         }
         ageing = garden.ripeKnown() > 0 ? ageing : 0;
-        crumbling += garden.oldKnown() * 20.0 / Math.max(20, numbers.crumbleTicks());
+        crumbling += garden.oldKnown() * speed * 20.0 / Math.max(20, numbers.crumbleTicks());
         while (crumbling >= 1 && garden.oldKnown() > 0) {
             crumbling--;
             ledger.addStore(-1);

@@ -537,6 +537,184 @@ public class PopulationTests {
         });
     }
 
+    /** The comb blocks' layers by age and their nodules, added up: fresh, ripe, old, nodules, layers. */
+    private static int[] combTotals(ServerLevel level, Colony colony) {
+        int[] totals = new int[5];
+        for (BlockPos pos : colony.garden().getCombs(level)) {
+            var state = level.getBlockState(pos);
+            totals[0] += com.antcolonies.block.FungusCombBlock.fresh(state);
+            totals[1] += com.antcolonies.block.FungusCombBlock.ripe(state);
+            totals[2] += com.antcolonies.block.FungusCombBlock.old(state);
+            totals[3] += state.getValue(com.antcolonies.block.FungusCombBlock.NODULES);
+            totals[4] += com.antcolonies.block.FungusCombBlock.layers(state);
+        }
+        return totals;
+    }
+
+    /**
+     * Step 2b, the termite side. A Macrotermes colony with its nest dug, 100 worker numbers (40 young, 60 old), 2 minor
+     * and 1 major soldier numbers, all just fed, and a garden of aged comb (each block: 2 old layers, a ripe one, a fresh
+     * one, 3 nodules). The queen, full-grown, lies in the royal chamber; she is frozen and the colony goes away. While
+     * away (the ageing sped up 100 times): the fresh layers ripen, ripe layers go old (by themselves and when a nodule
+     * grows from them), nodules grow, old layers crumble (out of the food count), all as counts owed to the blocks; the
+     * known ages still add up to the layers counted; the nurses feed the queen nodules and she lays her stream. Then the
+     * workers' and soldiers' meals come due: the young share eat nodules, the old ones old comb (4 meals a piece), the
+     * soldiers a nodule each, and nobody is left hungry. Back in range, the blocks catch up: the ledger empties and the
+     * comb blocks hold just the ages and nodules the brain counted.
+     */
+    @GameTest(template = "arena", timeoutTicks = 1000)
+    public static void aTermiteColonyAwayAgesItsCombFeedsItsQueenAndEatsAsNumbers(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        TermiteMoundTests.deepGround(helper);
+        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        var foods = com.antcolonies.species.SpeciesProfile.MealFood.values();
+        UUID[] queen = new UUID[1];
+        CompoundTag[] queenOnDisk = new CompoundTag[1];
+        int[] eggsLaid = new int[1];
+        int[] foodBefore = new int[1];
+        int[] grownBefore = new int[1];
+        int[] eatenBefore = new int[2];
+        int[] expected = new int[5]; // fresh, ripe, old, nodules, layers: what the brain counted when the colony came back
+        boolean[] back = {false};
+        helper.runAfterDelay(10, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(colony != null, "no termite colony");
+            colony.setForagingTimeForTests(false);
+            colony.setHungerOn(true);
+            colony.population().setOnForTests(false); // no swapping: the numbers stay numbers
+            colony.population().setViewersForTests(List.of());
+            TermiteSoldierTests.digNestAtOnce(level, colony);
+            BlockPos room = colony.nest().getFinishedRoomCenter(level);
+            helper.assertTrue(room != null, "the royal chamber should be dug");
+            AbstractAntEntity theQueen = colony.getQueen(level);
+            theQueen.teleportTo(room.getX() + 0.5, room.getY(), room.getZ() + 0.5);
+            ((com.antcolonies.entity.TermiteQueenEntity) theQueen).setSize(1.0F); // full-grown: an egg every 15 seconds
+            long now = level.getGameTime();
+            colony.population().addNewMembers(WorkerAntEntity.CASTE, now, 40);
+            colony.population().addNewMembers(WorkerAntEntity.CASTE, now - 250000, 60);
+            colony.population().addNewMembers(TermiteSoldierEntity.Rank.MINOR.caste(), now, 2);
+            colony.population().addNewMembers(TermiteSoldierEntity.Rank.MAJOR.caste(), now, 1);
+            for (int i = 0; i < 40; i++) {
+                BlockPos spot = colony.food().pickFoodSpot(level, level.getRandom());
+                if (spot == null) {
+                    break;
+                }
+                colony.food().depositSeed(level, spot);
+            }
+            for (BlockPos comb : colony.garden().getCombs(level)) {
+                if (com.antcolonies.block.FungusCombBlock.layers(level.getBlockState(comb)) < 4) {
+                    continue; // (a comb not full yet stays all fresh)
+                }
+                // Aged comb: 2 old layers at the bottom, a ripe one, a fresh one on top; 3 nodules.
+                level.setBlock(comb, level.getBlockState(comb).setValue(com.antcolonies.block.FungusCombBlock.NODULES, 3)
+                        .setValue(com.antcolonies.block.FungusCombBlock.OLD, 2).setValue(com.antcolonies.block.FungusCombBlock.FRESH, 1), 3);
+            }
+            helper.assertTrue(colony.garden().getCombs(level).size() >= 5, "only " + colony.garden().getCombs(level).size() + " comb blocks");
+            helper.assertTrue(colony.food().getFood() == combTotals(level, colony)[4], "the food count " + colony.food().getFood()
+                    + " is not the " + combTotals(level, colony)[4] + " layers of comb");
+        });
+        helper.runAfterDelay(40, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(colony.queenCare().isQueenHome(level), "the queen should be in the royal chamber");
+            helper.assertTrue(!colony.isFounding(), "the colony should have workers");
+            AbstractAntEntity theQueen = colony.getQueen(level);
+            queen[0] = theQueen.getUUID();
+            eggsLaid[0] = colony.queenCare().getEggsLaid();
+            colony.queenCare().setQueenLastFed(level.getGameTime());
+            int[] blocks = combTotals(level, colony);
+            helper.assertTrue(colony.garden().freshKnown() == blocks[0] && colony.garden().ripeKnown() == blocks[1]
+                    && colony.garden().oldKnown() == blocks[2], "the brain should have seen the comb as it is: " + java.util.Arrays.toString(blocks)
+                            + " vs " + colony.garden().freshKnown() + "/" + colony.garden().ripeKnown() + "/" + colony.garden().oldKnown());
+            foodBefore[0] = colony.food().getFood();
+            grownBefore[0] = colony.garden().getNodulesGrown();
+            colony.garden().setAgeingSpeedForTests(100.0F);
+            colony.away().setOnForTests(true);
+            colony.away().setGraceForTests(20L);
+            queenOnDisk[0] = freezeAndUnload(colony, level, theQueen);
+            colony.away().setAwayForTests(true);
+        });
+        helper.runAfterDelay(400, () -> {
+            Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
+            AntColoniesMod.LOGGER.info("[away-test] termites away: {}{} | known comb {}/{}/{}, nodules {}, food {}, queen food {}",
+                    colony.population().describe(level), colony.away().describe(level), colony.garden().freshKnown(), colony.garden().ripeKnown(),
+                    colony.garden().oldKnown(), colony.life().nurseFoodLeft(level), colony.food().getFood(), colony.queenCare().getQueenBread());
+            helper.assertTrue(colony.away().isAway(level), "the colony should be away");
+            var ledger = colony.ledger();
+            helper.assertTrue(ledger.ripened() > 0, "fresh comb should have ripened while away: " + ledger.describe());
+            helper.assertTrue(ledger.aged() > 0, "ripe comb should have gone old while away: " + ledger.describe());
+            helper.assertTrue(colony.garden().getNodulesGrown() > grownBefore[0], "nodules should have grown while away");
+            helper.assertTrue(ledger.store() < 0 && colony.food().getFood() == foodBefore[0] + ledger.store(),
+                    "old comb should have crumbled, out of the food count: " + colony.food().getFood() + " food, was " + foodBefore[0] + "; "
+                            + ledger.describe());
+            int known = colony.garden().freshKnown() + colony.garden().ripeKnown() + colony.garden().oldKnown();
+            helper.assertTrue(known == colony.food().getFood(), "the known ages (" + known + " layers) should add up to the "
+                    + colony.food().getFood() + " counted");
+            helper.assertTrue(ledger.nurseFood() < 0 && colony.queenCare().getQueenBread() + 2 * (colony.queenCare().getEggsLaid() - eggsLaid[0]) > 0,
+                    "the nurses should have fed the queen nodules: " + ledger.describe() + ", she holds " + colony.queenCare().getQueenBread());
+            // The meals come due: the workers' and the soldiers'.
+            long due = level.getGameTime() - colony.profile().worker().mealIntervalTicks() - 30;
+            colony.population().setLastAteForTests(level, WorkerAntEntity.CASTE, due);
+            for (TermiteSoldierEntity.Rank rank : TermiteSoldierEntity.Rank.values()) {
+                colony.population().setLastAteForTests(level, rank.caste(), due);
+            }
+            eatenBefore[0] = colony.workerFood().getPiecesEaten(foods[0]);
+            eatenBefore[1] = colony.workerFood().getPiecesEaten(foods[1]);
+        });
+        helper.runAfterDelay(460, () -> {
+            Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
+            int comb = colony.workerFood().getPiecesEaten(com.antcolonies.species.SpeciesProfile.MealFood.STORE) - eatenBefore[0];
+            int nodules = colony.workerFood().getPiecesEaten(com.antcolonies.species.SpeciesProfile.MealFood.NURSE_FOOD) - eatenBefore[1];
+            AntColoniesMod.LOGGER.info("[away-test] termites away ate {} layers of comb and {} nodules: {}{}", comb, nodules,
+                    colony.population().describe(level), colony.away().describe(level));
+            helper.assertTrue(comb >= 13 && comb <= 16, "the 60 old worker numbers should eat about 15 layers of old comb, ate " + comb);
+            helper.assertTrue(nodules >= 8 && nodules <= 11, "the 40 young worker numbers should eat about 10 nodules, ate " + nodules);
+            helper.assertTrue(colony.population().hungry(level) == 0, "every number should have eaten, the soldiers too: "
+                    + colony.population().describe(level));
+            helper.assertTrue(colony.population().inside(WorkerAntEntity.CASTE) == 100, "a worker number died: "
+                    + colony.population().inside(WorkerAntEntity.CASTE));
+            helper.assertTrue(colony.queenCare().getEggsLaid() > eggsLaid[0], "the queen should have laid her stream while away");
+            helper.assertTrue(colony.brood().youngInsideForTests().stream().anyMatch(Brood.Young::isEgg), "her eggs should be numbers: "
+                    + colony.brood().youngInsideForTests());
+            int known = colony.garden().freshKnown() + colony.garden().ripeKnown() + colony.garden().oldKnown();
+            helper.assertTrue(known == colony.food().getFood(), "after the meals the known ages (" + known + " layers) should still add up to the "
+                    + colony.food().getFood() + " counted");
+            // Back in range: what the brain counted is what the blocks must show once they have caught up.
+            helper.assertTrue(!colony.ledger().isEmpty(), "the blocks should owe something");
+            expected[0] = colony.garden().freshKnown();
+            expected[1] = colony.garden().ripeKnown();
+            expected[2] = colony.garden().oldKnown();
+            expected[3] = colony.life().nurseFoodLeft(level);
+            expected[4] = colony.food().getFood();
+            grownBefore[0] = colony.garden().getNodulesGrown();
+            colony.garden().setAgeingSpeedForTests(0.0F); // (only nodules may still grow: counted below)
+            colony.away().setAwayForTests(false);
+            loadAgain(level, queenOnDisk[0]);
+            back[0] = true;
+        });
+        helper.onEachTick(() -> {
+            if (!back[0]) {
+                return;
+            }
+            Colony colony = TermiteMoundTests.colony(helper);
+            if (colony == null || !colony.ledger().isEmpty()) {
+                return;
+            }
+            int[] blocks = combTotals(level, colony);
+            int grown = colony.garden().getNodulesGrown() - grownBefore[0]; // (each turned a ripe layer old)
+            AntColoniesMod.LOGGER.info("[away-test] termites back: blocks {} (fresh, ripe, old, nodules, layers), counted {}, {} nodules grown since",
+                    java.util.Arrays.toString(blocks), java.util.Arrays.toString(expected), grown);
+            helper.assertTrue(blocks[4] == expected[4] && blocks[4] == colony.food().getFood(), "the comb should have " + expected[4]
+                    + " layers as counted: " + java.util.Arrays.toString(blocks) + ", food " + colony.food().getFood());
+            helper.assertTrue(blocks[0] == expected[0] && blocks[1] == expected[1] - grown && blocks[2] == expected[2] + grown,
+                    "the comb's ages should be as counted: blocks " + java.util.Arrays.toString(blocks) + ", counted " + java.util.Arrays.toString(expected)
+                            + ", " + grown + " nodules grown since");
+            helper.assertTrue(blocks[3] == expected[3] + grown, "the nodules should be as counted: blocks " + java.util.Arrays.toString(blocks)
+                    + ", counted " + java.util.Arrays.toString(expected) + ", " + grown + " grown since");
+            colony.garden().setAgeingSpeedForTests(1.0F);
+            helper.succeed();
+        });
+    }
+
     // --- termite workers eating (the step after 2b) -----------------------------------------------------------------
 
     /**

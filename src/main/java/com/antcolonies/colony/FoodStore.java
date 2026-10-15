@@ -549,6 +549,18 @@ public class FoodStore {
         return food().pileBlock() instanceof FungusCombBlock;
     }
 
+    /**
+     * One layer off the heap at {@code pile} (whose state is {@code state}). A fungus comb eaten right down leaves no
+     * block: its nodules are moved onto other comb ({@link FungusGarden#moveNodulesOff}).
+     */
+    private void takeOneLayer(Level level, BlockPos pile, BlockState state) {
+        BlockState less = oneLayerLess(state);
+        level.setBlock(pile, less, 3);
+        if (less.isAir() && state.getBlock() instanceof FungusCombBlock) {
+            colony.garden().moveNodulesOff(level, pile, state.getValue(FungusCombBlock.NODULES));
+        }
+    }
+
     /** The heap with one layer less (fungus comb: off its bottom, an old one first), or air if it was the last. */
     private BlockState oneLayerLess(BlockState state) {
         if (state.getBlock() instanceof FungusCombBlock) {
@@ -615,7 +627,7 @@ public class FoodStore {
         if (!state.is(food().pileBlock())) {
             return false;
         }
-        level.setBlock(pile, oneLayerLess(state), 3);
+        takeOneLayer(level, pile, state);
         return true;
     }
 
@@ -668,7 +680,7 @@ public class FoodStore {
         if (!state.is(food().pileBlock())) {
             return ItemStack.EMPTY;
         }
-        level.setBlock(pile, oneLayerLess(state), 3);
+        takeOneLayer(level, pile, state);
         richSeeds = Math.min(richSeeds, food);
         boolean rich = richSeeds > 0 && (wantRich || food <= richSeeds);
         food = Math.max(0, food - 1);

@@ -626,6 +626,11 @@ public class Population {
         onForTests = on;
     }
 
+    /** How many numbers of all castes have gone longer than a meal without one. */
+    public int hungry(ServerLevel level) {
+        return meals.hungry(level.getGameTime());
+    }
+
     /** Tests only: every number of this caste last ate at this game time. */
     public void setLastAteForTests(ServerLevel level, String caste, long time) {
         meals.keepUp(level, this); // (the meal list catches up with the numbers first)
