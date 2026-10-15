@@ -295,6 +295,178 @@ public class AwayTests {
         });
     }
 
+    /** Every real worker of the test's colonies leaves the world: only the numbers may forage in these tests. */
+    static void noRealWorkers(GameTestHelper helper) {
+        for (AbstractAntEntity worker : helper.getLevel().getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds(),
+                mob -> mob instanceof WorkerAntEntity || mob instanceof TermiteWorkerEntity)) {
+            worker.discard();
+        }
+    }
+
+    /**
+     * Step 2c, the harvester ant (the user's decision: the numbers forage always, but only out of every player's sight).
+     * 60 old workers (foragers) in the numbers, no real workers, and 8 tufts of short grass, each with 8 of its 10 seeds
+     * cut already: 4 in the west corner more than 64 blocks from the pretend player's eyes, 4 in the east corner in plain
+     * sight. While here the numbers eat the hidden tufts up (they vanish, out of sight; 8 seeds in the store) and leave
+     * the seen ones alone. Then the colony goes away (nobody near): from what the brain remembers they eat the other 4 up
+     * too, but not a tuft that grew after the brain last looked; the away report counts it all.
+     */
+    @GameTest(template = "arena", timeoutTicks = 2400, skyAccess = true)
+    public static void antNumbersForageOnlyOutOfSightAndFromWhatTheyRemember(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        startAntColony(helper);
+        List<BlockPos> hidden = new ArrayList<>();
+        List<BlockPos> seen = new ArrayList<>();
+        BlockPos late = helper.absolutePos(new BlockPos(7, SURFACE, 1));
+        UUID[] queen = new UUID[1];
+        CompoundTag[] queenOnDisk = new CompoundTag[1];
+        int[] foodBefore = new int[1];
+        helper.onEachTick(() -> noRealWorkers(helper));
+        helper.runAfterDelay(15, () -> {
+            Colony colony = antColony(helper);
+            colony.population().setOnForTests(false); // no swapping: the numbers stay numbers
+            long old = level.getGameTime() - colony.profile().worker().builderUntilTicks() - 1200;
+            colony.population().addNewMembers(WorkerAntEntity.CASTE, old, 60);
+            for (int i = 0; i < 4; i++) {
+                hidden.add(helper.absolutePos(new BlockPos(1 + 2 * (i % 2), SURFACE, 1 + 2 * (i / 2))));
+                seen.add(helper.absolutePos(new BlockPos(21 + 2 * (i % 2), SURFACE, 21 + 2 * (i / 2))));
+            }
+            List<BlockPos> all = new ArrayList<>(hidden);
+            all.addAll(seen);
+            for (BlockPos tuft : all) {
+                level.setBlock(tuft, Blocks.SHORT_GRASS.defaultBlockState(), 3);
+                colony.food().setPiecesCutForTests(tuft, 8);
+            }
+            // The pretend player stands far to the south-east: the east tufts are 54 blocks off in plain sight, the west ones 82.
+            colony.population().setViewersForTests(List.of(Vec3.atCenterOf(helper.absolutePos(new BlockPos(60, SURFACE + 2, 60)))));
+            colony.food().rescanPlantsSoon();
+            foodBefore[0] = colony.food().getFood();
+            colony.field().setOnForTests(true);
+        });
+        helper.runAfterDelay(1000, () -> {
+            Colony colony = antColony(helper);
+            AntColoniesMod.LOGGER.info("[away-test] 2c ants here: food {}{}{}", colony.food().getFood(), colony.population().describe(level),
+                    colony.field().describe());
+            for (BlockPos tuft : hidden) {
+                helper.assertTrue(level.getBlockState(tuft).isAir(), "a tuft out of sight should be eaten up and gone: " + tuft);
+                helper.assertTrue(!colony.field().remembers(tuft), "an eaten-up tuft should be forgotten: " + tuft);
+            }
+            for (BlockPos tuft : seen) {
+                helper.assertTrue(level.getBlockState(tuft).is(Blocks.SHORT_GRASS) && colony.food().getPiecesCut(tuft) == 8,
+                        "a tuft in the player's sight should be left alone: " + tuft + " cut " + colony.food().getPiecesCut(tuft));
+                helper.assertTrue(colony.field().remembers(tuft), "the brain should remember the tuft in sight: " + tuft);
+            }
+            helper.assertTrue(colony.food().getFood() == foodBefore[0] + 8, "the 8 seeds should be in the store: " + colony.food().getFood()
+                    + ", was " + foodBefore[0]);
+            helper.assertTrue(colony.away().report().isEmpty(), "nothing counts as away while the colony is here: " + colony.away().report().describe());
+            // Away, nobody near; a new tuft grows meanwhile, which the brain never saw.
+            queen[0] = colony.getQueen(level).getUUID();
+            colony.away().setOnForTests(true);
+            colony.away().setGraceForTests(20L);
+            queenOnDisk[0] = freezeAndUnload(colony, level, colony.getQueen(level));
+            colony.away().setAwayForTests(true);
+            colony.population().setViewersForTests(List.of());
+            level.setBlock(late, Blocks.SHORT_GRASS.defaultBlockState(), 3);
+            colony.food().setPiecesCutForTests(late, 8);
+        });
+        helper.runAfterDelay(2000, () -> {
+            Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
+            AntColoniesMod.LOGGER.info("[away-test] 2c ants away: food {}{}{}", colony.food().getFood(), colony.away().describe(level),
+                    colony.field().describe());
+            helper.assertTrue(colony.away().isAway(level), "the colony should be away");
+            for (BlockPos tuft : seen) {
+                helper.assertTrue(colony.food().getPiecesCut(tuft) == 0 && !colony.field().remembers(tuft),
+                        "while away the remembered tuft should be eaten up: " + tuft + " cut " + colony.food().getPiecesCut(tuft));
+            }
+            helper.assertTrue(colony.food().getPiecesCut(late) == 8 && level.getBlockState(late).is(Blocks.SHORT_GRASS),
+                    "a tuft the brain never saw should not be foraged while away: cut " + colony.food().getPiecesCut(late));
+            AwayReport report = colony.away().report();
+            int milled = report.get(AwayReport.What.BREAD_MADE); // (the nurses mill some into bread for the queen)
+            helper.assertTrue(colony.food().getFood() + milled == foodBefore[0] + 16, "16 seeds in all should have come in: " + colony.food().getFood()
+                    + " in the store and " + milled + " milled, was " + foodBefore[0]);
+            helper.assertTrue(report.get(AwayReport.What.FORAGED) == 8 && report.get(AwayReport.What.PLANTS_USED_UP) == 4,
+                    "the away report should count the food brought in and the tufts eaten up: " + report.describe());
+            colony.away().setAwayForTests(false);
+            loadAgain(level, queenOnDisk[0]);
+        });
+        helper.runAfterDelay(2060, () -> {
+            helper.assertTrue(antColony(helper) != null, "the queen should be back and alive");
+            helper.succeed();
+        });
+    }
+
+    /**
+     * Step 2c, the termites. 60 old workers in the numbers, no real workers, and 4 tufts of dry grass round the mound,
+     * each with 2 of its 4 pieces cut already; the colony knows 3 of them (the 4th nobody has found). By day nothing is
+     * foraged (dry grass cannot be eaten from inside). At night the numbers eat the 3 known tufts up (6 pieces into the
+     * comb's count); they vanish out of sight and are remembered to grow back 3 days after they were eaten; the unknown
+     * tuft is left.
+     */
+    @GameTest(template = "arena", timeoutTicks = 1800, skyAccess = true)
+    public static void termiteNumbersForageKnownDryGrassOnlyAtNight(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        TermiteMoundTests.deepGround(helper);
+        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        List<BlockPos> tufts = new ArrayList<>();
+        int[] foodBefore = new int[1];
+        long[] nightFrom = new long[1];
+        helper.onEachTick(() -> noRealWorkers(helper));
+        helper.runAfterDelay(10, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(colony != null, "no termite colony");
+            colony.setForagingTimeForTests(false); // day
+            colony.population().setOnForTests(false); // no swapping: the numbers stay numbers
+            colony.population().setViewersForTests(List.of());
+            TermiteSoldierTests.digNestAtOnce(level, colony);
+            colony.population().addNewMembers(WorkerAntEntity.CASTE, level.getGameTime() - 250000, 60);
+            int[][] spots = {{MIDDLE + 6, MIDDLE}, {MIDDLE - 6, MIDDLE}, {MIDDLE, MIDDLE + 6}, {MIDDLE, MIDDLE - 6}};
+            for (int[] spot : spots) {
+                BlockPos tuft = helper.absolutePos(new BlockPos(spot[0], SURFACE, spot[1]));
+                level.setBlock(tuft.below(), Blocks.GRASS_BLOCK.defaultBlockState(), 3);
+                level.setBlock(tuft, com.antcolonies.registry.ModBlocks.DRY_GRASS.get().defaultBlockState(), 3);
+                colony.food().setPiecesCutForTests(tuft, 2);
+                tufts.add(tuft);
+            }
+            for (int i = 0; i < 3; i++) {
+                colony.foodMap().knowForTests(tufts.get(i));
+            }
+            colony.food().rescanPlantsSoon();
+            foodBefore[0] = colony.food().getFood();
+            colony.field().setOnForTests(true);
+        });
+        helper.runAfterDelay(500, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            AntColoniesMod.LOGGER.info("[away-test] 2c termites by day: food {}{}", colony.food().getFood(), colony.field().describe());
+            for (BlockPos tuft : tufts) {
+                helper.assertTrue(colony.food().getPiecesCut(tuft) == 2, "nothing should be foraged by day: " + tuft + " cut "
+                        + colony.food().getPiecesCut(tuft));
+            }
+            helper.assertTrue(colony.field().remembers(tufts.get(0)) && !colony.field().remembers(tufts.get(3)),
+                    "the brain should remember the known tufts only");
+            helper.assertTrue(colony.food().getFood() == foodBefore[0], "no food by day: " + colony.food().getFood());
+            colony.setForagingTimeForTests(true); // night
+            nightFrom[0] = level.getGameTime();
+        });
+        helper.runAfterDelay(1500, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            AntColoniesMod.LOGGER.info("[away-test] 2c termites at night: food {}{}", colony.food().getFood(), colony.field().describe());
+            long regrowth = colony.profile().food().regrowth().orElseThrow().ticks();
+            for (int i = 0; i < 3; i++) {
+                BlockPos tuft = tufts.get(i);
+                helper.assertTrue(level.getBlockState(tuft).isAir(), "a known tuft should be eaten up at night and gone: " + tuft);
+                long growsAt = colony.food().barePatches().growsAtForTests(tuft);
+                helper.assertTrue(growsAt > nightFrom[0] + regrowth && growsAt <= level.getGameTime() + regrowth,
+                        "the tuft should grow back 3 days after it was eaten: " + growsAt);
+                helper.assertTrue(!colony.foodMap().isKnown(tuft), "an eaten-up tuft should be forgotten: " + tuft);
+            }
+            helper.assertTrue(level.getBlockState(tufts.get(3)).is(com.antcolonies.registry.ModBlocks.DRY_GRASS.get())
+                    && colony.food().getPiecesCut(tufts.get(3)) == 2, "the tuft nobody found should be left: cut " + colony.food().getPiecesCut(tufts.get(3)));
+            helper.assertTrue(colony.food().getFood() == foodBefore[0] + 6, "6 pieces should have come in: " + colony.food().getFood()
+                    + ", was " + foodBefore[0]);
+            helper.succeed();
+        });
+    }
+
     /** The comb blocks' layers by age and their nodules, added up: fresh, ripe, old, nodules, layers. */
     static int[] combTotals(ServerLevel level, Colony colony) {
         int[] totals = new int[5];

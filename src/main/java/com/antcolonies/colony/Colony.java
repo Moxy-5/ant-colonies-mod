@@ -80,6 +80,7 @@ public class Colony {
     private final AwayLife away;
     private final NestLedger ledger;
     private final NestLife life;
+    private final FieldLife field;
     private final WorkerFood workerFood;
 
     public Colony(UUID id, ResourceLocation species, UUID queenId, BlockPos center) {
@@ -107,6 +108,7 @@ public class Colony {
         this.away = new AwayLife(this);
         this.ledger = new NestLedger(this);
         this.life = new NestLife(this);
+        this.field = new FieldLife(this);
         this.workerFood = new WorkerFood(this);
     }
 
@@ -203,6 +205,11 @@ public class Colony {
     /** Life in the nest as numbers: the young that are numbers, and while away the queen, the nurses and the fungus. */
     public NestLife life() {
         return life;
+    }
+
+    /** The foragers among the numbers: what they gather from the plants the colony knows, out of every player's sight. */
+    public FieldLife field() {
+        return field;
     }
 
     /** Where the workers' own meals come from (the real ones and the numbers). */
@@ -351,6 +358,7 @@ public class Colony {
         food.barePatches().tick(level);
         population.tick(level);
         life.tick(level, false);
+        field.tick(level, false);
         return true;
     }
 
@@ -532,6 +540,7 @@ public class Colony {
         away.save(tag);
         ledger.save(tag);
         life.save(tag);
+        field.save(tag);
         garden.save(tag);
         workerFood.save(tag);
         return tag;
@@ -562,6 +571,7 @@ public class Colony {
         colony.away.load(tag);
         colony.ledger.load(tag); // (after the food and the bread: an older save's owed food is counted in)
         colony.life.load(tag);
+        colony.field.load(tag);
         colony.garden.load(tag);
         colony.workerFood.load(tag);
         return colony;

@@ -140,6 +140,11 @@ public class FoodMap {
         }
     }
 
+    /** The plant is used up (by the numbers, maybe in unloaded land): the colony forgets it. */
+    void forget(BlockPos plant) {
+        known.remove(plant);
+    }
+
     /** Whether a scout may go to this spot (always, except in a game test: only in its arena). */
     public boolean mayScout(BlockPos spot) {
         return testArea == null || testArea.contains(spot.getCenter());

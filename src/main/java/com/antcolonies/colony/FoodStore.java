@@ -66,6 +66,8 @@ public class FoodStore {
     private final Map<BlockPos, Integer> grassClips = new HashMap<>();
     /** Whether the store has ever held a piece (a young termite colony's workers only get hungry once it has). Saved. */
     private boolean hadFood;
+    /** How many more layers the store's heaps could take the last second the nest was loaded (see {@link #watchRoom}). Saved. */
+    private int seenRoom;
 
     private record PlantClaim(BlockPos plant, long until) {
     }
@@ -225,7 +227,8 @@ public class FoodStore {
         double bestWorth = -1;
         for (BlockPos pos : plants(level)) {
             SpeciesProfile.PlantFood plant = food().plantFor(level.getBlockState(pos));
-            if (plant == null || busyGrass.contains(pos) || avoid.contains(pos) || foragersAt(pos) >= Math.max(1, plant.foragers())
+            // (a plant the numbers have used up out of sight still stands until it is out of every player's sight: skipped)
+            if (plant == null || plant.pieces() - getPiecesCut(pos) <= 0 || busyGrass.contains(pos) || avoid.contains(pos) || foragersAt(pos) >= Math.max(1, plant.foragers())
                     || !colony.foodMap().knows(pos, ant) || fromInside && !isFeedableFromInside(level, pos)) {
                 continue;
             }
@@ -317,7 +320,7 @@ public class FoodStore {
     }
 
     /** How many ants are on their way to this plant or cutting at it. */
-    private int foragersAt(BlockPos plant) {
+    int foragersAt(BlockPos plant) {
         int count = 0;
         for (PlantClaim claim : plantClaims.values()) {
             if (claim.plant().equals(plant)) {
@@ -392,19 +395,109 @@ public class FoodStore {
             if (plant != null) {
                 SoundType sound = state.getSoundType();
                 level.playSound(null, pos, sound.getBreakSound(), net.minecraft.sounds.SoundSource.BLOCKS, 0.5F, sound.getPitch() * 1.2F);
-                BlockState cast = castFor(level, pos, state);
-                if (cast == null) {
-                    level.destroyBlock(pos, false);
-                    barePatches.eatenAway(level, pos, state);
-                } else {
-                    level.levelEvent(net.minecraft.world.level.block.LevelEvent.PARTICLES_DESTROY_BLOCK, pos,
-                            net.minecraft.world.level.block.Block.getId(state));
-                    level.setBlock(pos, cast, 3);
-                }
+                eatAway(level, pos, state, level.getGameTime(), true);
             }
         } else if (plant.foragers() <= 1) {
             busyGrass.put(pos, level.getGameTime() + GRASS_REST_TICKS);
         }
+    }
+
+    /**
+     * A plant eaten right down ({@code eatenAt}: when its last piece was cut): it leaves a mud cast where it touched
+     * the nest (see {@link #castFor}), otherwise nothing, and grass grows back counted from {@code eatenAt}.
+     * {@code loud}: with the crumbs of the last bite (a real forager); without, out of sight (the numbers, see {@link FieldLife}).
+     */
+    private void eatAway(Level level, BlockPos pos, BlockState state, long eatenAt, boolean loud) {
+        BlockState cast = castFor(level, pos, state);
+        if (cast == null) {
+            if (loud) {
+                level.destroyBlock(pos, false);
+            } else {
+                level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+            }
+            barePatches.eatenAway(level, pos, state, eatenAt);
+        } else {
+            if (loud) {
+                level.levelEvent(net.minecraft.world.level.block.LevelEvent.PARTICLES_DESTROY_BLOCK, pos,
+                        net.minecraft.world.level.block.Block.getId(state));
+            }
+            level.setBlock(pos, cast, 3);
+        }
+    }
+
+    // --- the numbers out foraging (see FieldLife) -------------------------------------------------------------------
+
+    /**
+     * One of the numbers cut a piece off this plant (maybe in unloaded land, so its block is not read unless loaded): one
+     * more piece cut, the block catches up later, out of sight ({@link #showCuts}). Returns the pieces cut so far.
+     */
+    int cutByNumbers(Level level, BlockPos plant, SpeciesProfile.PlantFood food) {
+        BlockPos pos = plant.immutable();
+        if (!grassClips.containsKey(pos) && level.isLoaded(pos) && level.getBlockState(pos).getBlock() instanceof EatenInStages eaten) {
+            grassClips.put(pos, eaten.eatenAlready(level.getBlockState(pos), food.pieces())); // already gnawed by someone else
+        }
+        return grassClips.merge(pos, 1, Integer::sum);
+    }
+
+    /**
+     * The plant at {@code pos} (loaded, out of every player's sight) is made to look as eaten as its pieces cut say: a
+     * plant eaten in stages to its stage, a used-up one gone ({@code eatenAt}: when its last piece was cut).
+     */
+    void showCuts(Level level, BlockPos pos, long eatenAt) {
+        BlockState state = level.getBlockState(pos);
+        SpeciesProfile.PlantFood plant = food().plantFor(state);
+        if (plant == null) {
+            grassClips.remove(pos); // gone meanwhile (a player broke it, a real forager finished it)
+            return;
+        }
+        int cut = grassClips.getOrDefault(pos, 0);
+        if (state.getBlock() instanceof EatenInStages eaten) {
+            cut = Math.max(cut, eaten.eatenAlready(state, plant.pieces()));
+        }
+        if (cut >= plant.pieces()) {
+            grassClips.remove(pos);
+            busyGrass.remove(pos);
+            eatAway(level, pos, state, eatenAt, false);
+        } else if (cut > 0) {
+            grassClips.put(pos, cut);
+            if (state.getBlock() instanceof EatenInStages eaten) {
+                BlockState after = eaten.eatenTo(state, cut, plant.pieces());
+                if (after != state) {
+                    level.setBlock(pos, after, 3);
+                }
+            }
+        }
+    }
+
+    /**
+     * Once a second while the whole nest is loaded: the brain notes how many more layers the food store's heaps can
+     * take (the empty floor and the heaps not full, not where a young one lies), for when it cannot look ({@link #roomKnown}).
+     */
+    void watchRoom(Level level) {
+        List<BlockPos> cells = colony.nest().getFoodStoreCells(level);
+        SeedPileBlock pile = food().pileBlock();
+        Set<BlockPos> young = colony.brood().getBroodCells(level);
+        int room = 0;
+        for (BlockPos pos : cells) {
+            if (!level.isLoaded(pos)) {
+                return; // (keep what was seen last)
+            }
+            BlockState state = level.getBlockState(pos);
+            if (young.contains(pos)) {
+                continue;
+            }
+            if (state.isAir()) {
+                room += pile.maxLayers();
+            } else if (state.is(pile)) {
+                room += Math.max(0, pile.maxLayers() - state.getValue(SeedPileBlock.LAYERS));
+            }
+        }
+        seenRoom = room;
+    }
+
+    /** How many more pieces the food store can take as far as the brain knows: the room it last saw, less what is owed to it. */
+    int roomKnown() {
+        return seenRoom - colony.ledger().store();
     }
 
     /**
@@ -502,6 +595,11 @@ public class FoodStore {
     /** Forgets the cuts made at this plant: it is counted by how eaten it looks again. For tests. */
     public void forgetCutsForTests(BlockPos plant) {
         grassClips.remove(plant);
+    }
+
+    /** Pretends this many pieces have been cut off the plant at this spot already. For tests. */
+    public void setPiecesCutForTests(BlockPos plant, int pieces) {
+        grassClips.put(plant.immutable(), pieces);
     }
 
     /** How many pieces have been cut off the plant at this spot so far (0 once it is used up and gone). For tests. */
@@ -724,6 +822,7 @@ public class FoodStore {
         tag.putInt("seedsEaten", seedsEaten);
         tag.putInt("richSeeds", richSeeds);
         tag.putBoolean("hadFood", hasHadFood());
+        tag.putInt("seenRoom", seenRoom);
         CompoundTag clips = new CompoundTag();
         grassClips.forEach((pos, count) -> clips.putInt(Long.toString(pos.asLong()), count));
         tag.put("grassClips", clips);
@@ -735,6 +834,7 @@ public class FoodStore {
         seedsEaten = tag.getInt("seedsEaten");
         richSeeds = tag.getInt("richSeeds");
         hadFood = tag.contains("hadFood") ? tag.getBoolean("hadFood") : food > 0 || seedsEaten > 0; // (older saves)
+        seenRoom = tag.getInt("seenRoom");
         CompoundTag clips = tag.getCompound("grassClips");
         for (String key : clips.getAllKeys()) {
             grassClips.put(BlockPos.of(Long.parseLong(key)), clips.getInt(key));

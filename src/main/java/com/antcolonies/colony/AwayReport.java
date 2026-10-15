@@ -22,6 +22,8 @@ public class AwayReport {
         YOUNG_FED("pieces fed to the young"),
         BREAD_MADE("seeds milled into bread"),
         MEALS("meals eaten"),
+        FORAGED("pieces of food brought in"),
+        PLANTS_USED_UP("plants eaten up"),
         NODULES_GROWN("nodules grown"),
         COMB_RIPENED("comb layers ripened"),
         COMB_AGED("comb layers gone old"),

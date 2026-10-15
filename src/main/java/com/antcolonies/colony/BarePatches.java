@@ -53,6 +53,11 @@ public class BarePatches {
      * remembered, and if it stood near a foraging hole the grass block under it turns bare.
      */
     void eatenAway(Level level, BlockPos pos, BlockState eaten) {
+        eatenAway(level, pos, eaten, level.getGameTime());
+    }
+
+    /** As above; {@code eatenAt}: when it was eaten (the numbers may have eaten it while its land was not loaded). */
+    void eatenAway(Level level, BlockPos pos, BlockState eaten, long eatenAt) {
         SpeciesProfile.Regrowth numbers = colony.profile().food().regrowth().orElse(null);
         if (numbers == null || !numbers.regrows(eaten)) {
             return;
@@ -72,7 +77,7 @@ public class BarePatches {
         if (tufts.size() >= MAX_TUFTS) {
             tufts.remove(0);
         }
-        tufts.add(new Tuft(spot.immutable(), level.getGameTime() + numbers.ticks(), bare));
+        tufts.add(new Tuft(spot.immutable(), eatenAt + numbers.ticks(), bare));
     }
 
     /** Whether the spot is within {@code radius} blocks (sideways, a few up or down) of one of the colony's holes. */
@@ -161,6 +166,11 @@ public class BarePatches {
     }
 
     /** Every eaten tuft grows back on the next look (for tests). */
+    /** When the tuft eaten away at this spot grows back, or -1 if none is remembered there. For tests. */
+    public long growsAtForTests(BlockPos spot) {
+        return tufts.stream().filter(tuft -> tuft.spot().equals(spot)).mapToLong(Tuft::growsAt).findFirst().orElse(-1);
+    }
+
     public void growBackSoonForTests(Level level) {
         tufts.replaceAll(tuft -> new Tuft(tuft.spot(), level.getGameTime(), tuft.madeBare()));
         nextCheck = 0;

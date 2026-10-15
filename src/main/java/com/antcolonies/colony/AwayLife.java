@@ -206,6 +206,7 @@ public class AwayLife {
         if (isAway(level)) {
             colony.population().tickAway(level);
             colony.life().tick(level, true);
+            colony.field().tick(level, true);
             ColonyManager.get(level).markChanged();
         }
     }
@@ -309,7 +310,7 @@ public class AwayLife {
     }
 
     /** Whether the chunks of the whole nest (its middle and every room) are loaded. */
-    private boolean nestLoaded(ServerLevel level) {
+    boolean nestLoaded(ServerLevel level) {
         if (awayForTests != null) {
             return !awayForTests;
         }

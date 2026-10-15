@@ -397,6 +397,25 @@ public class Population {
         return true;
     }
 
+    /**
+     * Whether no player can see the block at {@code pos} (loaded): too far, or another block is in the way. Unlike the
+     * point above, a solid block (a hay bale, a log) that the look runs into is seen.
+     */
+    public static boolean outOfSight(Level level, BlockPos pos, List<Vec3> eyes) {
+        Vec3 point = Vec3.atCenterOf(pos);
+        for (Vec3 eye : eyes) {
+            if (eye.distanceToSqr(point) > SIGHT * SIGHT) {
+                continue;
+            }
+            HitResult hit = level.clip(new ClipContext(eye, point, ClipContext.Block.VISUAL, ClipContext.Fluid.NONE, CollisionContext.empty()));
+            if (hit.getType() != HitResult.Type.BLOCK || ((net.minecraft.world.phys.BlockHitResult) hit).getBlockPos().equals(pos)
+                    || hit.getLocation().distanceToSqr(point) < 0.5 * 0.5) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private void direct(ServerLevel level) {
         List<Vec3> eyes = viewers(level, numbers().watchRadius() + (int) SIGHT);
         Map<String, Integer> wanted = targets(level, !viewers(level).isEmpty());
