@@ -39,7 +39,7 @@ import net.minecraft.world.phys.AABB;
  *
  * <p>Mud sheeting (the user's plan of 2026-10-14; species whose profile has {@code nest.sheeting}): rich food the colony
  * knows near one of its holes (no new hole is dug for it) gets a runway of sheeting from the hole to it ({@link
- * Nest.Runway}, {@link RunwayRoute}): the workers plaster mud over it at night, and once it is closed all round its hole
+ * FoodWays.Runway}, {@link RunwayRoute}): the workers plaster mud over it at night, and once it is closed all round its hole
  * stays open by day too and the food at its end is eaten from under it, unseen. A hole with a runway is no way out for
  * the foragers outside (it leads into the runway), so one hole is always left without. Once the food is gone the
  * runway's mud crumbles away bit by bit.
@@ -90,8 +90,8 @@ public class ForagingHoles {
         List<WayOut> ways = new java.util.ArrayList<>();
         for (NestPlan.ForagingTunnel tunnel : tunnels(level)) {
             // A hole with a runway of sheeting over it leads into the runway, not outside.
-            if (isDug(level, tunnel) && isOpen(level, tunnel.hole()) && !colony.nest().isSpent(tunnel.hole())
-                    && colony.nest().runwayAt(tunnel.hole()) == null) {
+            if (isDug(level, tunnel) && isOpen(level, tunnel.hole()) && !colony.nest().foodWays().isSpent(tunnel.hole())
+                    && colony.nest().foodWays().runwayAt(tunnel.hole()) == null) {
                 ways.add(new WayOut(tunnel.hole().above(), tunnel.side()));
             }
         }
@@ -152,8 +152,8 @@ public class ForagingHoles {
 
     /** Whether a runway of sheeting leaves from this hole and is finished (closed all round). */
     public boolean hasFinishedRunway(Level level, BlockPos hole) {
-        Nest.Runway runway = colony.nest().runwayAt(hole);
-        return runway != null && colony.nest().isRunwayClosed(level, runway);
+        FoodWays.Runway runway = colony.nest().foodWays().runwayAt(hole);
+        return runway != null && colony.nest().foodWays().isRunwayClosed(level, runway);
     }
 
     /** Whether the whole tunnel is dug out, so its hole leads somewhere. */
@@ -190,7 +190,7 @@ public class ForagingHoles {
     @Nullable
     BlockPos holeToOpen(Level level) {
         for (NestPlan.ForagingTunnel tunnel : tunnels(level)) {
-            if (isDug(level, tunnel) && !isOpen(level, tunnel.hole()) && !colony.nest().isSpent(tunnel.hole()) && mayOpen(level, tunnel.hole())) {
+            if (isDug(level, tunnel) && !isOpen(level, tunnel.hole()) && !colony.nest().foodWays().isSpent(tunnel.hole()) && mayOpen(level, tunnel.hole())) {
                 return tunnel.hole();
             }
         }
@@ -314,12 +314,12 @@ public class ForagingHoles {
         tickRunways(level, plants, numbers);
         int active = 0;
         boolean digging = false;
-        for (Nest.NewTunnel tunnel : colony.nest().getNewTunnels()) {
+        for (FoodWays.NewTunnel tunnel : colony.nest().foodWays().getNewTunnels()) {
             BlockPos hole = tunnel.tunnel().hole();
-            if (colony.nest().isSpent(hole)) {
+            if (colony.nest().foodWays().isSpent(hole)) {
                 // Spent by mistake (the bug below) while the food is still there: back in use.
                 if (level.isLoaded(tunnel.food()) && richBlockNear(level, tunnel.food(), FOOD_STILL_THERE) != null) {
-                    colony.nest().unmarkSpent(hole);
+                    colony.nest().foodWays().unmarkSpent(hole);
                     ColonyManager.get(level).markChanged();
                 } else {
                     continue;
@@ -328,7 +328,7 @@ public class ForagingHoles {
             // The real blocks round the food, not the food list: the list only holds plants near the nest's height, so a
             // fallen tree up a slope with one block eaten away counted as gone (the user's bug, 2026-10-14).
             if (level.isLoaded(tunnel.food()) && richBlockNear(level, tunnel.food(), FOOD_STILL_THERE) == null) {
-                colony.nest().markSpent(hole);
+                colony.nest().foodWays().markSpent(hole);
                 ColonyManager.get(level).markChanged();
                 AntColoniesMod.LOGGER.debug("[new-hole] the food at {} is gone: the hole at {} is plugged for good",
                         tunnel.food().toShortString(), hole.toShortString());
@@ -340,7 +340,7 @@ public class ForagingHoles {
             if (dug && tunnel.gallery() == null && level.isLoaded(tunnel.food())) {
                 // A tunnel of an older save, planned without its gallery: the gallery up under the food now.
                 List<BlockPos> gallery = planGallery(level, tunnel.tunnel(), tunnel.food());
-                colony.nest().setGallery(tunnel.food(), gallery);
+                colony.nest().foodWays().setGallery(tunnel.food(), gallery);
                 ColonyManager.get(level).markChanged();
                 AntColoniesMod.LOGGER.debug("[new-hole] a feeding gallery of {} blocks up under the food at {}", gallery.size(),
                         tunnel.food().toShortString());
@@ -368,7 +368,7 @@ public class ForagingHoles {
         // meanwhile). The workers dig the tunnel, then the gallery, then open the hole beside the food.
         NestPlan.ForagingTunnel tunnel = new NestPlan.ForagingTunnel(plan.cells(), plan.hole(), side);
         List<BlockPos> gallery = planGallery(level, tunnel, food);
-        colony.nest().addNewTunnel(new Nest.NewTunnel(tunnel, food.immutable(), gallery));
+        colony.nest().foodWays().addNewTunnel(new FoodWays.NewTunnel(tunnel, food.immutable(), gallery));
         ColonyManager.get(level).markChanged();
         AntColoniesMod.LOGGER.debug("[new-hole] a tunnel of {} blocks to the food at {}, hole at {}, with a feeding gallery of {} blocks",
                 plan.cells().size(), food.toShortString(), plan.hole().toShortString(), gallery.size());
@@ -389,17 +389,17 @@ public class ForagingHoles {
         if (sheeting == null) {
             return;
         }
-        for (Nest.Runway runway : colony.nest().getRunways()) {
-            boolean spent = colony.nest().isSpent(runway.hole());
+        for (FoodWays.Runway runway : colony.nest().foodWays().getRunways()) {
+            boolean spent = colony.nest().foodWays().isSpent(runway.hole());
             if (spent || level.isLoaded(runway.food()) && richBlockNear(level, runway.food(), FOOD_STILL_THERE) == null) {
-                colony.nest().dropRunway(runway);
+                colony.nest().foodWays().dropRunway(runway);
                 ColonyManager.get(level).markChanged();
                 AntColoniesMod.LOGGER.debug("[runway] {}: the runway from {} to the food at {} crumbles",
                         spent ? "its hole is plugged for good" : "the food is gone", runway.hole().toShortString(), runway.food().toShortString());
             }
         }
         crumble(level);
-        List<Nest.Runway> runways = colony.nest().getRunways();
+        List<FoodWays.Runway> runways = colony.nest().foodWays().getRunways();
         if (runways.size() >= sheeting.max()) {
             return;
         }
@@ -407,7 +407,7 @@ public class ForagingHoles {
         // foragers outside (a hole with a runway leads into it).
         List<BlockPos> free = new java.util.ArrayList<>();
         for (NestPlan.ForagingTunnel tunnel : tunnels(level)) {
-            if (isDug(level, tunnel) && !colony.nest().isSpent(tunnel.hole()) && colony.nest().runwayAt(tunnel.hole()) == null
+            if (isDug(level, tunnel) && !colony.nest().foodWays().isSpent(tunnel.hole()) && colony.nest().foodWays().runwayAt(tunnel.hole()) == null
                     && level.isLoaded(tunnel.hole().above())) {
                 free.add(tunnel.hole());
             }
@@ -416,8 +416,8 @@ public class ForagingHoles {
             return;
         }
         long now = level.getGameTime();
-        List<BlockPos> taken = new java.util.ArrayList<>(runways.stream().map(Nest.Runway::food).toList());
-        colony.nest().getNewTunnels().forEach(tunnel -> taken.add(tunnel.food()));
+        List<BlockPos> taken = new java.util.ArrayList<>(runways.stream().map(FoodWays.Runway::food).toList());
+        colony.nest().foodWays().getNewTunnels().forEach(tunnel -> taken.add(tunnel.food()));
         BlockPos center = colony.getCenter();
         int reach = numbers.reach(colony.getCount(com.antcolonies.entity.WorkerAntEntity.CASTE));
         BlockPos food = null;
@@ -447,7 +447,7 @@ public class ForagingHoles {
         for (BlockPos hole : free) {
             List<BlockPos> cells = RunwayRoute.plan(hole.above(), foodBlocks, runwayGround(level, hole), sheeting.maxLength());
             if (cells != null) {
-                colony.nest().addRunway(new Nest.Runway(hole.immutable(), food.immutable(), List.copyOf(cells)));
+                colony.nest().foodWays().addRunway(new FoodWays.Runway(hole.immutable(), food.immutable(), List.copyOf(cells)));
                 ColonyManager.get(level).markChanged();
                 AntColoniesMod.LOGGER.debug("[runway] a runway of {} blocks from the hole at {} to the food at {}", cells.size(),
                         hole.toShortString(), food.toShortString());
@@ -468,7 +468,7 @@ public class ForagingHoles {
         java.util.Set<BlockPos> nest = colony.nest().nestCells(level);
         java.util.Map<BlockPos, ?> mound = colony.mound().getParts(level);
         java.util.Set<BlockPos> used = new java.util.HashSet<>();
-        for (Nest.Runway runway : colony.nest().getRunways()) {
+        for (FoodWays.Runway runway : colony.nest().foodWays().getRunways()) {
             for (BlockPos cell : runway.cells()) {
                 used.add(cell);
                 for (Direction side : Direction.values()) {
@@ -515,7 +515,7 @@ public class ForagingHoles {
 
     /** The mud of the crumbling runways falls away, a plate at a time; a runway with no mud left is forgotten. */
     private void crumble(ServerLevel level) {
-        java.util.Iterator<List<BlockPos>> it = colony.nest().getCrumblingRunways().iterator();
+        java.util.Iterator<List<BlockPos>> it = colony.nest().foodWays().getCrumblingRunways().iterator();
         boolean changed = false;
         while (it.hasNext()) {
             List<BlockPos> cells = it.next();
@@ -564,8 +564,8 @@ public class ForagingHoles {
         if (colony.profile().nest().sheeting().isEmpty()) {
             return "";
         }
-        List<Nest.Runway> runways = colony.nest().getRunways();
-        long finished = runways.stream().filter(runway -> colony.nest().isRunwayClosed(level, runway)).count();
+        List<FoodWays.Runway> runways = colony.nest().foodWays().getRunways();
+        long finished = runways.stream().filter(runway -> colony.nest().foodWays().isRunwayClosed(level, runway)).count();
         return " | runways " + runways.size() + " (" + finished + " finished)";
     }
 
@@ -591,11 +591,11 @@ public class ForagingHoles {
         List<BlockPos> holes = new java.util.ArrayList<>();
         holes.add(colony.nest().getEntrance());
         for (NestPlan.ForagingTunnel tunnel : tunnels(level)) {
-            if (!colony.nest().isSpent(tunnel.hole())) {
+            if (!colony.nest().foodWays().isSpent(tunnel.hole())) {
                 holes.add(tunnel.hole());
             }
         }
-        List<BlockPos> dugFor = colony.nest().getNewTunnels().stream().map(Nest.NewTunnel::food).toList();
+        List<BlockPos> dugFor = colony.nest().foodWays().getNewTunnels().stream().map(FoodWays.NewTunnel::food).toList();
         BlockPos best = null;
         double bestDistance = Double.MAX_VALUE;
         for (BlockPos plant : plants) {
@@ -671,9 +671,9 @@ public class ForagingHoles {
         }
         int spent = 0;
         int digging = 0;
-        List<Nest.NewTunnel> tunnels = colony.nest().getNewTunnels();
-        for (Nest.NewTunnel tunnel : tunnels) {
-            if (colony.nest().isSpent(tunnel.tunnel().hole())) {
+        List<FoodWays.NewTunnel> tunnels = colony.nest().foodWays().getNewTunnels();
+        for (FoodWays.NewTunnel tunnel : tunnels) {
+            if (colony.nest().foodWays().isSpent(tunnel.tunnel().hole())) {
                 spent++;
             } else if (!isDug(level, tunnel.tunnel())) {
                 digging++;

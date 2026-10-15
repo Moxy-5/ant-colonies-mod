@@ -5,6 +5,7 @@ import static com.antcolonies.gametest.TermiteMoundTests.SURFACE;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.FoodWays;
 import com.antcolonies.colony.ForagingHoles;
 import com.antcolonies.colony.Nest;
 import com.antcolonies.entity.TermiteWorkerEntity;
@@ -60,7 +61,7 @@ public class TermiteNewHoleTests {
         int[] phase = {0}; // 0 setting up, 1 waiting for the plan, 2 digging, 5 foraging by the new hole, 3 hay gone, 4 plugged
         int[] cutWhenOpened = {0};
         boolean[] usedTheHole = {false};
-        Nest.NewTunnel[] tunnel = {null};
+        FoodWays.NewTunnel[] tunnel = {null};
         int[] since = {0};
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
@@ -91,8 +92,8 @@ public class TermiteNewHoleTests {
             }
             switch (phase[0]) {
                 case 1 -> {
-                    if (!colony.nest().getNewTunnels().isEmpty()) {
-                        tunnel[0] = colony.nest().getNewTunnels().get(0);
+                    if (!colony.nest().foodWays().getNewTunnels().isEmpty()) {
+                        tunnel[0] = colony.nest().foodWays().getNewTunnels().get(0);
                         BlockPos hole = tunnel[0].tunnel().hole();
                         helper.assertTrue(tunnel[0].food().equals(hay), "the tunnel is for " + tunnel[0].food() + ", not the hay");
                         helper.assertTrue(Math.max(Math.abs(hole.getX() - hay.getX()), Math.abs(hole.getZ() - hay.getZ())) <= 2,
@@ -137,7 +138,7 @@ public class TermiteNewHoleTests {
                 }
                 case 3 -> {
                     BlockPos hole = tunnel[0].tunnel().hole();
-                    if (colony.nest().isSpent(hole)) {
+                    if (colony.nest().foodWays().isSpent(hole)) {
                         colony.setForagingTimeForTests(false); // the foraging is over: the holes are plugged
                         if (!ForagingHoles.isOpen(level, hole)) {
                             colony.setForagingTimeForTests(true); // and a new night: the spent one stays shut
@@ -146,7 +147,7 @@ public class TermiteNewHoleTests {
                         }
                     }
                     helper.assertTrue(since[0] < 6000, "the hole beside the gone hay was not spent and plugged: spent "
-                            + colony.nest().isSpent(hole) + ", " + level.getBlockState(hole));
+                            + colony.nest().foodWays().isSpent(hole) + ", " + level.getBlockState(hole));
                 }
                 case 4 -> {
                     BlockPos hole = tunnel[0].tunnel().hole();
@@ -198,7 +199,7 @@ public class TermiteNewHoleTests {
             tree.add(helper.absolutePos(new BlockPos(x, SURFACE + rise.applyAsInt(x), MIDDLE)));
         }
         int[] phase = {0}; // 0 setting up, 1 waiting for the plan, 2 digging and opening
-        Nest.NewTunnel[] tunnel = {null};
+        FoodWays.NewTunnel[] tunnel = {null};
         int[] since = {0};
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
@@ -225,12 +226,12 @@ public class TermiteNewHoleTests {
             }
             since[0]++;
             if (phase[0] == 1) {
-                if (colony.nest().getNewTunnels().isEmpty()) {
+                if (colony.nest().foodWays().getNewTunnels().isEmpty()) {
                     helper.assertTrue(since[0] < 600, "no tunnel was planned to the tree: " + colony.foragingHoles().describeNewHoles(level)
                             + ", tree seen " + colony.food().plants(level).contains(tree.get(0)) + ", known " + colony.foodMap().knows(tree.get(0), null) + ", tree " + (tree.get(0).getY() - colony.getCenter().getY()) + " above the nest middle, " + level.getBlockState(tree.get(0)));
                     return;
                 }
-                tunnel[0] = colony.nest().getNewTunnels().get(0);
+                tunnel[0] = colony.nest().foodWays().getNewTunnels().get(0);
                 helper.assertTrue(tunnel[0].food().equals(tree.get(0)), "the tunnel is for " + tunnel[0].food() + ", not the tree's lowest block");
                 level.setBlock(tree.get(0), Blocks.AIR.defaultBlockState(), 3); // eaten away
                 colony.food().rescanPlantsSoon();
@@ -243,7 +244,7 @@ public class TermiteNewHoleTests {
                 AntColoniesMod.LOGGER.info("[new-hole-test] slope: dug {} of {}, hole {}", tunnel[0].tunnel().tunnel().stream().filter(c -> Nest.isDugOut(level, c)).count(),
                         tunnel[0].tunnel().tunnel().size(), level.getBlockState(hole));
             }
-            helper.assertTrue(!colony.nest().isSpent(hole), "the hole was given up while the rest of the tree is still there");
+            helper.assertTrue(!colony.nest().foodWays().isSpent(hole), "the hole was given up while the rest of the tree is still there");
             if (ForagingHoles.isDug(level, tunnel[0].tunnel()) && ForagingHoles.isOpen(level, hole)) {
                 helper.succeed();
             }
@@ -366,7 +367,7 @@ public class TermiteNewHoleTests {
                         : state.getBlock() instanceof com.antcolonies.block.FallenBranchBlock ? state.getValue(com.antcolonies.block.FallenBranchBlock.EATEN) * 10
                         + colony.food().getPiecesCut(wood) : 100;
             }
-            Nest.NewTunnel tunnel = colony.nest().getNewTunnels().isEmpty() ? null : colony.nest().getNewTunnels().get(0);
+            FoodWays.NewTunnel tunnel = colony.nest().foodWays().getNewTunnels().isEmpty() ? null : colony.nest().foodWays().getNewTunnels().get(0);
             if (helper.getTick() % 1000 == 0) {
                 AntColoniesMod.LOGGER.info("[new-hole-test] log from below: phase {}, tunnel {}, gallery {}, eaten {}", phase[0],
                         tunnel == null ? "none" : tunnel.tunnel().tunnel().stream().filter(c -> Nest.isDugOut(level, c)).count() + "/" + tunnel.tunnel().tunnel().size(),

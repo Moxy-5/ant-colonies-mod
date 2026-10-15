@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -42,76 +41,9 @@ public class Nest {
     /** Bite progress per block (0..1). Not saved: a half-dug block just restarts after a reload. */
     private final Map<BlockPos, Float> digProgress = new HashMap<>();
 
-    /**
-     * Where the nest's rooms go. Decided once (see {@link #getLayout}) and saved: worked out again after a reload, the
-     * answer could differ, because the ground has changed since (seed and bread heaps lie in the rooms). The side rooms
-     * and the garden rooms follow from the rest (the profile says which and how many, the direction where), so they are
-     * not saved themselves.
-     */
-    private record Layout(List<NestPlan.Chamber> chambers, List<NestPlan.Chamber> sideRooms, List<NestPlan.Chamber> gardens,
-            Set<BlockPos> cells, int shaftDepth, Direction direction, @Nullable NestPlan.Chamber founding) {
-        Layout(List<NestPlan.Chamber> chambers, List<NestPlan.Chamber> sideRooms, List<NestPlan.Chamber> gardens, int shaftDepth,
-                Direction direction, @Nullable NestPlan.Chamber founding) {
-            this(chambers, sideRooms, gardens, cellsOf(chambers, sideRooms, gardens), shaftDepth, direction, founding);
-        }
-
-        /** The level or side room used for this purpose (or the founding chamber), or null if the nest has none. */
-        @Nullable
-        NestPlan.Chamber of(NestPlan.Kind kind) {
-            if (kind == NestPlan.Kind.FOUNDING) {
-                return founding;
-            }
-            for (NestPlan.Chamber chamber : chambers) {
-                if (chamber.kind() == kind) {
-                    return chamber;
-                }
-            }
-            for (NestPlan.Chamber chamber : sideRooms) {
-                if (chamber.kind() == kind) {
-                    return chamber;
-                }
-            }
-            return null;
-        }
-
-        private static Set<BlockPos> cellsOf(List<NestPlan.Chamber> chambers, List<NestPlan.Chamber> sideRooms, List<NestPlan.Chamber> gardens) {
-            Set<BlockPos> cells = new HashSet<>();
-            for (List<NestPlan.Chamber> list : List.of(chambers, sideRooms, gardens)) {
-                for (NestPlan.Chamber chamber : list) {
-                    cells.addAll(chamber.cells());
-                }
-            }
-            return cells;
-        }
-    }
-
-    /**
-     * The garden rooms of a nest with these levels (species with a {@code garden} in their profile, whose nest has one
-     * level: the royal chamber), as many as the profile allows; none otherwise.
-     */
-    private List<NestPlan.Chamber> gardens(List<NestPlan.Chamber> chambers, Direction direction) {
-        var garden = colony.profile().garden();
-        if (garden.isEmpty() || chambers.size() != 1 || chambers.get(0).kind() != NestPlan.Kind.QUEEN) {
-            return List.of();
-        }
-        return NestPlan.gardens(chambers.get(0), direction, garden.get().rooms());
-    }
-
-    /** The side rooms of a nest whose shaft ends at {@code bottom} and whose rooms lie toward {@code direction} (from the species profile). */
-    private List<NestPlan.Chamber> sideRooms(BlockPos bottom, Direction direction) {
-        List<NestPlan.Kind> kinds = new ArrayList<>();
-        for (String name : colony.profile().nest().sideRooms()) {
-            try {
-                kinds.add(NestPlan.Kind.valueOf(name.toUpperCase(Locale.ROOT)));
-            } catch (IllegalArgumentException e) {
-                AntColoniesMod.LOGGER.warn("Unknown side room kind '{}' in the species profile of {}", name, colony.getSpecies());
-            }
-        }
-        return NestPlan.sideRooms(bottom, direction, kinds);
-    }
-
+    /** Where the rooms go (see {@link #getLayout}); null until worked out. */
     @Nullable
-    private Layout layout;
+    private NestLayout layout;
     /**
      * How many levels of the nest the workers may dig (nest stages, see {@link #levelsUnlocked}): it only ever goes up.
      * Saved; nests from before nest stages may dig them all.
@@ -126,21 +58,12 @@ public class Nest {
     @Nullable
     private List<NestPlan.ForagingTunnel> fittedTunnels;
     @Nullable
-    private Layout foragingTunnelsFor;
+    private NestLayout foragingTunnelsFor;
     /** The planned foraging tunnels and the new ones together, worked out again when either changes. */
     private List<NestPlan.ForagingTunnel> allForagingTunnels = List.of();
     private boolean allForagingTunnelsStale = true;
-    /**
-     * Tunnels dug out to rich food after the nest was planned (new holes near food, see {@link ForagingHoles}), each
-     * with the food it was dug for. Saved.
-     */
-    private final List<NewTunnel> newTunnels = new ArrayList<>();
-    /** The holes of new tunnels whose food is gone: plugged for good, never opened again (the tunnel stays). Saved. */
-    private final Set<BlockPos> spentHoles = new HashSet<>();
-    /** Runways of mud sheeting from a hole to food near it (see {@link Runway}). Saved. */
-    private final List<Runway> runways = new ArrayList<>();
-    /** The cells of runways whose food is gone: their mud crumbles away bit by bit (see {@link ForagingHoles}). Saved. */
-    private final List<List<BlockPos>> crumblingRunways = new ArrayList<>();
+    /** The tunnels out to rich food, their feeding galleries and the runways of mud sheeting. Saved with the nest. */
+    private final FoodWays foodWays;
     /** The cells that count as inside (see {@link #isInside}), worked out at most once a tick. */
     private Set<BlockPos> inside = Set.of();
     /** The mound's planned channel cells (tunnels, spire pieces, mouths): inside only where the block is built. */
@@ -152,6 +75,15 @@ public class Nest {
     Nest(Colony colony) {
         this.colony = colony;
         this.center = colony.getCenter();
+        this.foodWays = new FoodWays(colony, () -> {
+            allForagingTunnelsStale = true;
+            insideTick = Long.MIN_VALUE;
+        });
+    }
+
+    /** The tunnels out to rich food, their feeding galleries and the runways of mud sheeting (see {@link FoodWays}). */
+    public FoodWays foodWays() {
+        return foodWays;
     }
 
     /**
@@ -181,7 +113,7 @@ public class Nest {
             return center;
         }
         // The rooms are planned before the first block is dug, because the plan decides how deep the shaft goes.
-        Layout planned = getLayout(level);
+        NestLayout planned = getLayout(level);
         if (planned != null && planned.founding() != null) {
             List<BlockPos> top = new ArrayList<>();
             for (int i = 1; i <= NestPlan.FOUNDING_DEPTH; i++) {
@@ -214,7 +146,7 @@ public class Nest {
         if (!level.isLoaded(bottom) || !level.getBlockState(bottom).isAir()) {
             return null;
         }
-        Layout layout = getLayout(level);
+        NestLayout layout = getLayout(level);
         if (layout == null) {
             return null;
         }
@@ -249,8 +181,8 @@ public class Nest {
             }
         }
         // The feeding galleries up under rich food, once their tunnels are dug (in the order planned: from the tunnel up).
-        for (NewTunnel tunnel : newTunnels) {
-            if (tunnel.gallery() != null && !isSpent(tunnel.tunnel().hole()) && ForagingHoles.isDug(level, tunnel.tunnel())) {
+        for (FoodWays.NewTunnel tunnel : foodWays.getNewTunnels()) {
+            if (tunnel.gallery() != null && !foodWays.isSpent(tunnel.tunnel().hole()) && ForagingHoles.isDug(level, tunnel.tunnel())) {
                 next = firstDiggable(level, tunnel.gallery());
                 if (next != null) {
                     return next;
@@ -258,7 +190,7 @@ public class Nest {
             }
         }
         // Grass growing where a runway of sheeting runs is cut away.
-        BlockPos plant = runwayPlant(level);
+        BlockPos plant = foodWays.runwayPlant(level);
         if (plant != null) {
             return plant;
         }
@@ -278,7 +210,7 @@ public class Nest {
     }
 
     /** The garden rooms the colony wants dug now: the first, and one more for every few workers (the profile's {@code garden}). */
-    private List<NestPlan.Chamber> wantedGardens(Layout layout) {
+    private List<NestPlan.Chamber> wantedGardens(NestLayout layout) {
         var garden = colony.profile().garden();
         if (garden.isEmpty()) {
             return List.of();
@@ -308,7 +240,7 @@ public class Nest {
      */
     @Nullable
     public NestPlan.Chamber getHomeChamber(Level level) {
-        Layout layout = getLayout(level);
+        NestLayout layout = getLayout(level);
         if (layout == null) {
             return null;
         }
@@ -350,7 +282,7 @@ public class Nest {
     }
 
     /** True when the whole entrance shaft is dug out. */
-    private boolean isShaftOpen(Level level, Layout layout) {
+    private boolean isShaftOpen(Level level, NestLayout layout) {
         return isShaftOpen(level, layout.shaftDepth());
     }
 
@@ -386,7 +318,7 @@ public class Nest {
      * garden counted on its own (see {@link #getRoomCells}). Empty for a species without gardens.
      */
     public List<BlockPos> getGardenCells(Level level) {
-        Layout layout = getLayout(level);
+        NestLayout layout = getLayout(level);
         if (layout == null || layout.gardens().isEmpty()) {
             return List.of();
         }
@@ -402,7 +334,7 @@ public class Nest {
      * where the colony's insects that are only numbers come out as real mobs (see {@link Population}).
      */
     public List<BlockPos> getAllRoomCells(Level level) {
-        Layout layout = getLayout(level);
+        NestLayout layout = getLayout(level);
         if (layout == null) {
             return List.of();
         }
@@ -421,7 +353,7 @@ public class Nest {
 
     /** The garden rooms of the plan (empty if the nest has none, or no plan yet). For tests and debugging. */
     public List<NestPlan.Chamber> getGardens(Level level) {
-        Layout layout = getLayout(level);
+        NestLayout layout = getLayout(level);
         return layout == null ? List.of() : layout.gardens();
     }
 
@@ -457,7 +389,7 @@ public class Nest {
     /** The bottom block of the entrance shaft (where the first level's tunnel leaves it), or null while there is no plan yet. */
     @Nullable
     public BlockPos getShaftBottom(Level level) {
-        Layout planned = getLayout(level);
+        NestLayout planned = getLayout(level);
         return planned == null ? null : center.below(planned.shaftDepth());
     }
 
@@ -496,7 +428,7 @@ public class Nest {
             return colony.foragingHoles().mayOpen(level, pos);
         }
         return isSoil(level.getBlockState(pos)) || (pos.equals(center) && isEntrancePlugged(level) && mayOpenEntrance(level))
-                || colony.mound().isClearJob(level, pos) || isRunwayPlant(level, pos);
+                || colony.mound().isClearJob(level, pos) || foodWays.isRunwayPlant(level, pos);
     }
 
     /**
@@ -543,7 +475,7 @@ public class Nest {
                 return true;
             }
         }
-        return galleryCells().contains(pos);
+        return foodWays.galleryCells().contains(pos);
     }
 
     /** Whether the entrance hole is open: nothing solid in it (grass or snow do not close it). */
@@ -579,12 +511,12 @@ public class Nest {
      * is in.
      */
     private List<BlockPos> getRoomCells(Level level, NestPlan.Kind kind) {
-        Layout layout = getLayout(level);
+        NestLayout layout = getLayout(level);
         NestPlan.Chamber chamber = layout == null ? null : layout.of(kind);
         return chamber == null ? List.of() : getRoomCells(level, layout, chamber);
     }
 
-    private List<BlockPos> getRoomCells(Level level, Layout layout, NestPlan.Chamber chamber) {
+    private List<BlockPos> getRoomCells(Level level, NestLayout layout, NestPlan.Chamber chamber) {
         if (!isShaftOpen(level, chamber.kind() == NestPlan.Kind.FOUNDING ? NestPlan.FOUNDING_DEPTH : layout.shaftDepth())) {
             return List.of();
         }
@@ -612,20 +544,20 @@ public class Nest {
 
     /** The rooms this nest is being dug with (empty until the layout is decided). For tests and debugging. */
     public List<NestPlan.Chamber> getPlannedChambers(Level level) {
-        Layout layout = getLayout(level);
+        NestLayout layout = getLayout(level);
         return layout == null ? List.of() : layout.chambers();
     }
 
     /** The side rooms of the plan (empty if the nest has none, or no plan yet). For tests and debugging. */
     public List<NestPlan.Chamber> getSideRooms(Level level) {
-        Layout layout = getLayout(level);
+        NestLayout layout = getLayout(level);
         return layout == null ? List.of() : layout.sideRooms();
     }
 
     /** The founding chamber of the plan, or null if the nest has none (or no plan yet). For tests and debugging. */
     @Nullable
     public NestPlan.Chamber getFoundingChamber(Level level) {
-        Layout layout = getLayout(level);
+        NestLayout layout = getLayout(level);
         return layout == null ? null : layout.founding();
     }
 
@@ -643,7 +575,7 @@ public class Nest {
         }
         BlockPos bottom = center.below(depth);
         if (level.isLoaded(bottom) && level.getBlockState(bottom).isAir()) {
-            Layout layout = getLayout(level);
+            NestLayout layout = getLayout(level);
             if (layout != null) {
                 cells.addAll(layout.cells());
             }
@@ -652,7 +584,7 @@ public class Nest {
         for (NestPlan.ForagingTunnel tunnel : getForagingTunnels(level)) {
             cells.addAll(tunnel.tunnel());
         }
-        cells.addAll(galleryCells());
+        cells.addAll(foodWays.galleryCells());
         return cells;
     }
 
@@ -661,7 +593,7 @@ public class Nest {
      * none until the plan is made.
      */
     public List<NestPlan.ForagingTunnel> getForagingTunnels(Level level) {
-        Layout planned = getLayout(level);
+        NestLayout planned = getLayout(level);
         if (planned == null) {
             return List.of();
         }
@@ -678,7 +610,7 @@ public class Nest {
         }
         if (allForagingTunnelsStale) {
             List<NestPlan.ForagingTunnel> all = new ArrayList<>(foragingTunnels);
-            newTunnels.forEach(tunnel -> all.add(tunnel.tunnel()));
+            foodWays.getNewTunnels().forEach(tunnel -> all.add(tunnel.tunnel()));
             allForagingTunnels = List.copyOf(all);
             allForagingTunnelsStale = false;
         }
@@ -693,7 +625,7 @@ public class Nest {
      * follow the lie of the land); one that is kept as it is (flat ground, and nests whose holes already work). Kept and
      * saved once every column of them is loaded.
      */
-    private List<NestPlan.ForagingTunnel> fitToGround(Level level, Layout planned, List<NestPlan.ForagingTunnel> flat) {
+    private List<NestPlan.ForagingTunnel> fitToGround(Level level, NestLayout planned, List<NestPlan.ForagingTunnel> flat) {
         Set<BlockPos> rooms = new HashSet<>(planned.cells());
         for (int i = 1; i <= planned.shaftDepth(); i++) {
             rooms.add(center.below(i));
@@ -738,197 +670,6 @@ public class Nest {
     /** A foraging tunnel fitted to the ground is at least this many columns long (shorter: the level plan is kept). */
     private static final int MIN_FITTED_TUNNEL = 4;
 
-    /**
-     * A tunnel dug out to rich food after the nest was planned, and the food it leads to. {@code gallery}: the feeding
-     * gallery from the tunnel up under the food (see {@link FeedingGallery}), null until it is planned (once the tunnel
-     * is dug), empty if there is none (the food cannot be reached from below).
-     */
-    public record NewTunnel(NestPlan.ForagingTunnel tunnel, BlockPos food, @Nullable List<BlockPos> gallery) {
-        public NewTunnel(NestPlan.ForagingTunnel tunnel, BlockPos food) {
-            this(tunnel, food, null);
-        }
-    }
-
-    /** The feeding gallery of the new tunnel to this food is planned (see {@link NewTunnel#gallery}). */
-    void setGallery(BlockPos food, List<BlockPos> gallery) {
-        for (int i = 0; i < newTunnels.size(); i++) {
-            NewTunnel tunnel = newTunnels.get(i);
-            if (tunnel.food().equals(food)) {
-                newTunnels.set(i, new NewTunnel(tunnel.tunnel(), tunnel.food(), List.copyOf(gallery)));
-            }
-        }
-        insideTick = Long.MIN_VALUE;
-    }
-
-    /**
-     * Whether the feeding gallery this cell is part of is finished and hidden (the user's decision, 2026-10-14): every
-     * block of it dug out and closed all round (see {@link NestWalls#isClosedRound}), so the termites eat the food over
-     * it from inside, unseen. A cell of no gallery (a tunnel beside the food) only needs to be closed round itself.
-     */
-    boolean isGalleryClosed(Level level, BlockPos cell, Set<BlockPos> nest) {
-        List<BlockPos> gallery = List.of(cell);
-        for (NewTunnel tunnel : newTunnels) {
-            if (tunnel.gallery() != null && tunnel.gallery().contains(cell)) {
-                gallery = tunnel.gallery();
-                break;
-            }
-        }
-        Runway runway = runwayOf(cell);
-        if (runway != null) {
-            gallery = runway.cells();
-        }
-        for (BlockPos part : gallery) {
-            if (!level.isLoaded(part)) {
-                return false;
-            }
-            if (runway != null && !isDugOut(level, part)) {
-                return false; // grass still growing in it, or something put in its way
-            }
-            if (!isDugOut(level, part)) {
-                if (isSoil(level.getBlockState(part))) {
-                    return false; // still being dug
-                }
-                continue; // never to be dug (a stone found its way in): not part of it
-            }
-            if (!colony.walls().isClosedRound(level, part, nest)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /** The cells of every feeding gallery planned (dug or not), and of every runway of mud sheeting. */
-    List<BlockPos> galleryCells() {
-        List<BlockPos> cells = new ArrayList<>();
-        for (NewTunnel tunnel : newTunnels) {
-            if (tunnel.gallery() != null && !isSpent(tunnel.tunnel().hole())) {
-                cells.addAll(tunnel.gallery());
-            }
-        }
-        for (Runway runway : runways) {
-            cells.addAll(runway.cells());
-        }
-        return cells;
-    }
-
-    /**
-     * A runway of mud sheeting (the user's plan of 2026-10-14): real Macrotermes plaster a covered runway of soil over the
-     * ground from a hole out to food near it, and forage under it, unseen, by day too. {@code cells}: the cells a termite
-     * walks in, from the one over the {@code hole} to one beside the {@code food} (see {@link RunwayRoute}). They are
-     * part of the nest like a feeding gallery: the workers plaster a crust of mud over every open side of them (the
-     * leaks, see {@link NestWalls}); once it is closed all round the runway is inside, its hole stays open, and the food
-     * at its end is eaten from inside it.
-     */
-    public record Runway(BlockPos hole, BlockPos food, List<BlockPos> cells) {
-    }
-
-    /** The runways of mud sheeting. */
-    public List<Runway> getRunways() {
-        return List.copyOf(runways);
-    }
-
-    void addRunway(Runway runway) {
-        runways.add(runway);
-        insideTick = Long.MIN_VALUE;
-    }
-
-    /** The runway leaving from this hole, or null. */
-    @Nullable
-    public Runway runwayAt(BlockPos hole) {
-        for (Runway runway : runways) {
-            if (runway.hole().equals(hole)) {
-                return runway;
-            }
-        }
-        return null;
-    }
-
-    /** The runway this cell is part of, or null. */
-    @Nullable
-    Runway runwayOf(BlockPos cell) {
-        for (Runway runway : runways) {
-            if (runway.cells().contains(cell)) {
-                return runway;
-            }
-        }
-        return null;
-    }
-
-    /** Whether the runway is finished: every cell of it open and closed all round (see {@link #isGalleryClosed}). */
-    public boolean isRunwayClosed(Level level, Runway runway) {
-        return isGalleryClosed(level, runway.cells().get(0), nestCells(level));
-    }
-
-    /** The runway's food is gone: its mud is left to crumble away (see {@link ForagingHoles}). */
-    void dropRunway(Runway runway) {
-        runways.remove(runway);
-        crumblingRunways.add(new ArrayList<>(runway.cells()));
-        insideTick = Long.MIN_VALUE;
-    }
-
-    /** The cells of the runways whose mud is crumbling away. */
-    List<List<BlockPos>> getCrumblingRunways() {
-        return crumblingRunways;
-    }
-
-    /**
-     * A cell of a runway holding a plant (grass growing where the runway runs): the workers bite it away like soil (real
-     * termites cut the grass under their sheeting), at foraging time, once the runway's hole is open. Null if none.
-     */
-    @Nullable
-    private BlockPos runwayPlant(Level level) {
-        if (!colony.isForagingTime(level)) {
-            return null;
-        }
-        for (Runway runway : runways) {
-            if (!ForagingHoles.isOpen(level, runway.hole())) {
-                continue;
-            }
-            for (BlockPos cell : runway.cells()) {
-                if (isRunwayPlant(level, cell)) {
-                    return cell;
-                }
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Whether this cell of a runway holds a plant to be cut away. Food (dry grass, a dead bush) is cut too, but its
-     * pieces are left lying for the foragers ({@code FoodStore.cutAwayForTheForagers}), so no food is thrown away.
-     */
-    public boolean isRunwayPlant(Level level, BlockPos cell) {
-        if (!level.isLoaded(cell)) {
-            return false;
-        }
-        BlockState state = level.getBlockState(cell);
-        return !state.isAir() && state.canBeReplaced() && state.getFluidState().isEmpty() && runwayOf(cell) != null;
-    }
-
-    /** The tunnels dug (or being dug) out to rich food. */
-    public List<NewTunnel> getNewTunnels() {
-        return List.copyOf(newTunnels);
-    }
-
-    /** A new tunnel out to rich food: the workers dig it like the other foraging tunnels. */
-    void addNewTunnel(NewTunnel tunnel) {
-        newTunnels.add(tunnel);
-        allForagingTunnelsStale = true;
-        insideTick = Long.MIN_VALUE;
-    }
-
-    /** Whether this hole's food is gone: it is plugged for good and never opened again. */
-    public boolean isSpent(BlockPos hole) {
-        return spentHoles.contains(hole);
-    }
-
-    void markSpent(BlockPos hole) {
-        spentHoles.add(hole.immutable());
-    }
-
-    void unmarkSpent(BlockPos hole) {
-        spentHoles.remove(hole);
-    }
 
     /**
      * Whether a cell is inside the colony's home, out of the sun: the entrance, the nest's shaft, rooms, galleries and
@@ -945,7 +686,7 @@ public class Nest {
             cells.add(center);
             // A feeding gallery cell is inside only while it has a roof (the food over it, the mud cast left of it, a
             // branch cased in mud): once the roof is gone it is open to the sky.
-            List<BlockPos> galleries = galleryCells();
+            List<BlockPos> galleries = foodWays.galleryCells();
             for (BlockPos gallery : galleries) {
                 if (level.isLoaded(gallery) && level.getBlockState(gallery.above()).getCollisionShape(level, gallery.above()).isEmpty()
                         && !NestWalls.isWalkThroughFood(level, gallery.above())) {
@@ -954,8 +695,8 @@ public class Nest {
             }
             // A runway is inside only once it is finished, closed all round, and then its hole too (the way into it from
             // the tunnel under it): its builders out on it at night were outside.
-            for (Runway runway : runways) {
-                if (isRunwayClosed(level, runway)) {
+            for (FoodWays.Runway runway : foodWays.getRunways()) {
+                if (foodWays.isRunwayClosed(level, runway)) {
                     cells.add(runway.hole());
                 } else {
                     runway.cells().forEach(cells::remove);
@@ -1048,152 +789,25 @@ public class Nest {
         return null;
     }
 
-    /** The layout of the rooms: worked out the first time it is needed, then kept. Null = wait (chunk not loaded) or no room. */
+    /**
+     * The layout of the rooms (see {@link NestLayout}): worked out the first time it is needed, then kept and saved
+     * (worked out again after a reload the answer could differ: the ground has changed since, seed and bread heaps lie
+     * in the rooms). Null = wait (chunk not loaded) or no room.
+     */
     @Nullable
-    private Layout getLayout(Level level) {
+    private NestLayout getLayout(Level level) {
         if (layout == null) {
-            layout = chooseLayout(level);
+            layout = new NestLayout.Planner(colony, center, NestLayout.sizesFor(colony)).choose(level);
         }
         return layout;
     }
 
     /** How deep the entrance shaft goes for this nest: the depth of the room plan (the normal depth until it is known). */
     int shaftDepth(Level level) {
-        Layout planned = getLayout(level);
+        NestLayout planned = getLayout(level);
         return planned == null ? SHAFT_DEPTH : planned.shaftDepth();
     }
 
-    /**
-     * Picks how deep the nest sits, which side the rooms lie toward and how many levels it has, by looking at the
-     * ground: a depth only counts if the whole shaft is soil, and a nest only counts if every stair, tunnel and
-     * room of its plan is soil (no stone or water in the way). The nest with the most levels wins, the deeper one on
-     * a tie. Null while chunks are missing, or when there is no room at all.
-     */
-    @Nullable
-    private Layout chooseLayout(Level level) {
-        // Everything the plan could touch must be loaded, or the answer would change later.
-        for (int depth = SHAFT_DEPTH; depth >= MIN_SHAFT_DEPTH; depth--) {
-            for (Direction direction : Direction.Plane.HORIZONTAL) {
-                List<NestPlan.Chamber> all = new ArrayList<>(NestPlan.chambers(center.below(depth), direction, NestPlan.MAX_LEVELS));
-                all.add(NestPlan.foundingChamber(center.below(NestPlan.FOUNDING_DEPTH), direction));
-                all.addAll(sideRooms(center.below(depth), direction));
-                for (NestPlan.Chamber chamber : all) {
-                    for (BlockPos pos : chamber.cells()) {
-                        if (!level.isLoaded(pos)) {
-                            return null;
-                        }
-                    }
-                }
-            }
-        }
-        Layout best = null;
-        for (int depth = SHAFT_DEPTH; depth >= MIN_SHAFT_DEPTH; depth--) {
-            Layout found = chooseLayout(level, center.below(depth), depth);
-            // The depth with the most levels wins, then the one where the side rooms fit too; on a tie the deeper one (it is tried first).
-            if (found != null && (best == null || found.chambers().size() > best.chambers().size()
-                    || found.chambers().size() == best.chambers().size() && sideRoomsFit(level, found) && !sideRoomsFit(level, best))) {
-                best = found;
-            }
-        }
-        return best;
-    }
-
-    /** Whether the side rooms of this layout are all soil (or already dug). A nest is still planned where they don't fit; they are then dug as far as the soil goes. */
-    private static boolean sideRoomsFit(Level level, Layout layout) {
-        for (NestPlan.Chamber chamber : layout.sideRooms()) {
-            if (!allSoilOrAir(level, chamber.cells())) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /** The best layout with the shaft {@code depth} blocks deep (all the chunks involved are loaded), or null if the shaft or the first level does not fit. */
-    @Nullable
-    private Layout chooseLayout(Level level, BlockPos bottom, int depth) {
-        List<BlockPos> shaft = new ArrayList<>();
-        for (int i = 1; i <= depth; i++) {
-            shaft.add(center.below(i));
-        }
-        if (!allSoilOrAir(level, shaft)) {
-            return null; // stone in the way of the shaft itself
-        }
-        int start = Math.floorMod(colony.getId().hashCode(), 4);
-        boolean withFounding = colony.profile().nest().foundingChamber();
-        Layout best = null;
-        boolean bestSideFits = false;
-        for (int i = 0; i < 4; i++) {
-            Direction direction = Direction.from2DDataValue((start + i) % 4);
-            // The founding chamber (the queen's first home, on the far side of the shaft) has to fit too.
-            NestPlan.Chamber founding = withFounding ? NestPlan.foundingChamber(center.below(NestPlan.FOUNDING_DEPTH), direction) : null;
-            if (founding != null && (!allSoilOrAir(level, founding.cells()) || !isCovered(level, founding.cells(), shaft))) {
-                continue;
-            }
-            // Side rooms (the termites' food store) don't have to fit, but a direction where they do is better.
-            List<NestPlan.Chamber> side = sideRooms(bottom, direction);
-            boolean sideFits = true;
-            for (NestPlan.Chamber chamber : side) {
-                sideFits &= allSoilOrAir(level, chamber.cells());
-            }
-            // The most levels whose whole plan is soil. A shorter nest uses its levels differently (and its last one is
-            // always the small queen's room), so each length is checked as the plan it really is.
-            int maxLevels = Math.min(NestPlan.MAX_LEVELS, Math.max(1, colony.profile().nest().maxLevels())); // from the species profile
-            for (int levels = maxLevels; levels >= 1; levels--) {
-                List<NestPlan.Chamber> plan = NestPlan.chambers(bottom, direction, levels);
-                if (best != null && (levels < best.chambers().size() || levels == best.chambers().size() && (bestSideFits || !sideFits))) {
-                    break; // not better than what is already found
-                }
-                boolean fits = true;
-                for (NestPlan.Chamber chamber : plan) {
-                    if (!allSoilOrAir(level, chamber.cells())) {
-                        fits = false;
-                        break;
-                    }
-                }
-                if (fits) {
-                    best = new Layout(plan, side, gardens(plan, direction), depth, direction, founding);
-                    bestSideFits = sideFits;
-                    break;
-                }
-            }
-        }
-        return best;
-    }
-
-    /** Soil, or already dug out (a heap of seeds or bread on the floor counts as dug: in an old save the plan is worked out again on a nest in use). */
-    /**
-     * Whether these cells lie under cover: no block beside them (but the cells themselves and the shaft) is open air or
-     * a plant under the sky, or water. On a hillside the queen's chamber must not run out under the slope with its roof or a wall open to
-     * the outside (the hill test of 2026-10-14: the side the plan picked changed with each new colony).
-     */
-    private static boolean isCovered(Level level, List<BlockPos> cells, List<BlockPos> shaft) {
-        Set<BlockPos> own = new HashSet<>(cells);
-        own.addAll(shaft);
-        for (BlockPos pos : cells) {
-            for (Direction side : Direction.values()) {
-                BlockPos next = pos.relative(side);
-                if (own.contains(next)) {
-                    continue;
-                }
-                BlockState state = level.getBlockState(next);
-                // Open to the sky (rooms of the nest dug beside it later are underground and fine), or water.
-                if (!state.getFluidState().isEmpty() || (state.isAir() || state.canBeReplaced()) && level.canSeeSky(next)) {
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
-
-    private static boolean allSoilOrAir(Level level, List<BlockPos> cells) {
-        for (BlockPos pos : cells) {
-            BlockState state = level.getBlockState(pos);
-            if (!(state.is(ModTags.DIGGABLE) || isDugOut(level, pos)) || touchesFluid(level, pos)) {
-                return false;
-            }
-        }
-        return true;
-    }
 
     /** Open space next to a block where an ant can stand to bite it: above first, then the four sides. */
     @Nullable
@@ -1224,7 +838,7 @@ public class Nest {
     }
 
     /** Ants never open a block that touches water or lava (it would flood the nest). */
-    private static boolean touchesFluid(Level level, BlockPos pos) {
+    static boolean touchesFluid(Level level, BlockPos pos) {
         for (Direction direction : Direction.values()) {
             if (!level.getFluidState(pos.relative(direction)).isEmpty()) {
                 return true;
@@ -1263,19 +877,7 @@ public class Nest {
 
     void save(CompoundTag tag) {
         tag.putInt("nestLevelsUnlocked", levelsUnlocked);
-        ListTag tunnels = new ListTag();
-        for (NewTunnel tunnel : newTunnels) {
-            CompoundTag entry = new CompoundTag();
-            entry.putLongArray("cells", tunnel.tunnel().tunnel().stream().mapToLong(BlockPos::asLong).toArray());
-            entry.putLong("hole", tunnel.tunnel().hole().asLong());
-            entry.putInt("side", tunnel.tunnel().side().get3DDataValue());
-            entry.putLong("food", tunnel.food().asLong());
-            if (tunnel.gallery() != null) {
-                entry.putLongArray("gallery", tunnel.gallery().stream().mapToLong(BlockPos::asLong).toArray());
-            }
-            tunnels.add(entry);
-        }
-        tag.put("newTunnels", tunnels);
+        foodWays.save(tag);
         if (fittedTunnels != null) {
             ListTag fitted = new ListTag();
             for (NestPlan.ForagingTunnel tunnel : fittedTunnels) {
@@ -1287,53 +889,19 @@ public class Nest {
             }
             tag.put("fittedTunnels", fitted);
         }
-        tag.putLongArray("spentHoles", spentHoles.stream().mapToLong(BlockPos::asLong).toArray());
-        ListTag runwayList = new ListTag();
-        for (Runway runway : runways) {
-            CompoundTag entry = new CompoundTag();
-            entry.putLong("hole", runway.hole().asLong());
-            entry.putLong("food", runway.food().asLong());
-            entry.putLongArray("cells", runway.cells().stream().mapToLong(BlockPos::asLong).toArray());
-            runwayList.add(entry);
-        }
-        tag.put("runways", runwayList);
-        ListTag crumbling = new ListTag();
-        for (List<BlockPos> cells : crumblingRunways) {
-            CompoundTag entry = new CompoundTag();
-            entry.putLongArray("cells", cells.stream().mapToLong(BlockPos::asLong).toArray());
-            crumbling.add(entry);
-        }
-        tag.put("crumblingRunways", crumbling);
         if (layout != null) {
             tag.putInt("nestDepth", layout.shaftDepth());
             tag.putInt("nestDirection", layout.direction().get2DDataValue());
             tag.putInt("nestLevels", layout.chambers().size());
             tag.putBoolean("nestFounding", layout.founding() != null);
+            tag.putIntArray("nestRoomSizes", layout.sizes().toArray());
         }
     }
 
     void load(CompoundTag tag) {
         // A nest saved before nest stages existed digs all its levels, as it did then.
         levelsUnlocked = tag.contains("nestLevelsUnlocked") ? tag.getInt("nestLevelsUnlocked") : Integer.MAX_VALUE;
-        newTunnels.clear();
-        for (Tag element : tag.getList("newTunnels", Tag.TAG_COMPOUND)) {
-            CompoundTag entry = (CompoundTag) element;
-            List<BlockPos> cells = new ArrayList<>();
-            for (long cell : entry.getLongArray("cells")) {
-                cells.add(BlockPos.of(cell));
-            }
-            if (!cells.isEmpty()) {
-                List<BlockPos> gallery = null;
-                if (entry.contains("gallery")) {
-                    gallery = new ArrayList<>();
-                    for (long cell : entry.getLongArray("gallery")) {
-                        gallery.add(BlockPos.of(cell));
-                    }
-                }
-                newTunnels.add(new NewTunnel(new NestPlan.ForagingTunnel(List.copyOf(cells), BlockPos.of(entry.getLong("hole")),
-                        Direction.from3DDataValue(entry.getInt("side"))), BlockPos.of(entry.getLong("food")), gallery == null ? null : List.copyOf(gallery)));
-            }
-        }
+        foodWays.load(tag);
         fittedTunnels = null;
         if (tag.contains("fittedTunnels")) {
             List<NestPlan.ForagingTunnel> fitted = new ArrayList<>();
@@ -1350,39 +918,15 @@ public class Nest {
             fittedTunnels = List.copyOf(fitted);
         }
         foragingTunnelsFor = null;
-        spentHoles.clear();
-        for (long hole : tag.getLongArray("spentHoles")) {
-            spentHoles.add(BlockPos.of(hole));
-        }
         allForagingTunnelsStale = true;
-        runways.clear();
-        for (Tag element : tag.getList("runways", Tag.TAG_COMPOUND)) {
-            CompoundTag entry = (CompoundTag) element;
-            List<BlockPos> cells = new ArrayList<>();
-            for (long cell : entry.getLongArray("cells")) {
-                cells.add(BlockPos.of(cell));
-            }
-            if (!cells.isEmpty()) {
-                runways.add(new Runway(BlockPos.of(entry.getLong("hole")), BlockPos.of(entry.getLong("food")), List.copyOf(cells)));
-            }
-        }
-        crumblingRunways.clear();
-        for (Tag element : tag.getList("crumblingRunways", Tag.TAG_COMPOUND)) {
-            List<BlockPos> cells = new ArrayList<>();
-            for (long cell : ((CompoundTag) element).getLongArray("cells")) {
-                cells.add(BlockPos.of(cell));
-            }
-            crumblingRunways.add(cells);
-        }
         // The nest plan it was digging (old saves have none: it is worked out again from the ground).
         if (tag.contains("nestLevels")) {
             int depth = tag.getInt("nestDepth");
             Direction direction = Direction.from2DDataValue(tag.getInt("nestDirection"));
-            // Nests planned before founding chambers existed have none (the key is missing: false).
-            NestPlan.Chamber founding = tag.getBoolean("nestFounding")
-                    ? NestPlan.foundingChamber(center.below(NestPlan.FOUNDING_DEPTH), direction) : null;
-            List<NestPlan.Chamber> chambers = NestPlan.chambers(center.below(depth), direction, tag.getInt("nestLevels"));
-            layout = new Layout(chambers, sideRooms(center.below(depth), direction), gardens(chambers, direction), depth, direction, founding);
+            // Nests planned before founding chambers existed have none (the key is missing: false), and nests planned
+            // before the room sizes came from the species profile have the default sizes (no sizes saved).
+            NestPlan.RoomSizes sizes = NestPlan.RoomSizes.fromArray(tag.getIntArray("nestRoomSizes"));
+            layout = new NestLayout.Planner(colony, center, sizes).rebuild(depth, direction, tag.getInt("nestLevels"), tag.getBoolean("nestFounding"));
         }
     }
 }

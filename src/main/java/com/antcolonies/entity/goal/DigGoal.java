@@ -144,7 +144,7 @@ public class DigGoal extends Goal {
         // takes one pellet per layer of a mound block from each dug block (one dug block builds one mound block).
         boolean mound = colony.mound().numbers() != null;
         // Grass cut away where a runway of sheeting runs gives no soil.
-        if (ant.canPlaceBlocks() && !colony.nest().isRunwayPlant(level, target)
+        if (ant.canPlaceBlocks() && !colony.nest().foodWays().isRunwayPlant(level, target)
                 && (mound ? colony.mound().takePellet(level, target, ant.getUUID()) : colony.hill().hasMoundRoom(level))) {
             ant.setCarriedBlock(state.is(Blocks.GRASS_BLOCK) || state.is(Blocks.ROOTED_DIRT) ? Blocks.DIRT.defaultBlockState()
                     : state.getBlock() instanceof TermiteMoundBlock || state.getBlock() instanceof TermiteHoleBlock
@@ -164,7 +164,7 @@ public class DigGoal extends Goal {
             colony.nest().clearDigProgress(target);
             colony.mound().blockDug(level, target);
             level.destroyBlockProgress(ant.getId(), target, -1);
-            if (colony.nest().isRunwayPlant(level, target) && colony.profile().food().plantFor(state) != null) {
+            if (colony.nest().foodWays().isRunwayPlant(level, target) && colony.profile().food().plantFor(state) != null) {
                 colony.food().cutAwayForTheForagers(level, target); // food in the way of a runway: left for the foragers
             } else {
                 level.destroyBlock(target, false, ant);

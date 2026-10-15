@@ -331,7 +331,7 @@ public class FoodStore {
                 if (nest == null) {
                     nest = colony.nest().nestCells(level);
                 }
-                if (colony.nest().isGalleryClosed(level, colony.nest().galleryFor(level, next), nest)) {
+                if (colony.nest().foodWays().isGalleryClosed(level, colony.nest().galleryFor(level, next), nest)) {
                     return true;
                 }
             }
@@ -435,7 +435,7 @@ public class FoodStore {
         Set<BlockPos> nest = colony.nest().nestCells(level);
         for (net.minecraft.core.Direction side : net.minecraft.core.Direction.Plane.HORIZONTAL) {
             BlockPos next = pos.relative(side);
-            if (!level.isLoaded(next) || nest.contains(next) || colony.nest().getRunways().stream().anyMatch(r -> r.cells().contains(next))) {
+            if (!level.isLoaded(next) || nest.contains(next) || colony.nest().foodWays().getRunways().stream().anyMatch(r -> r.cells().contains(next))) {
                 continue;
             }
             BlockState state = level.getBlockState(next);

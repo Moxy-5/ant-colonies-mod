@@ -47,6 +47,13 @@
     "max_levels": 4,
     "seal_while_founding": true,
     "founding_chamber": true,
+    "room_sizes": {
+      "food": {"length": 5, "width": 5},
+      "nursery": {"length": 5, "width": 5},
+      "queen": {"length": 3, "width": 3},
+      "refuse": {"length": 5, "width": 5},
+      "founding": {"length": 3, "width": 3}
+    },
     "level_unlocks": [
       {"workers": 1, "food": 0},
       {"workers": 6, "food": 10},

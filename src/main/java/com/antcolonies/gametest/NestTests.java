@@ -847,8 +847,8 @@ public class NestTests {
 
     /**
      * A larva that goes two days without bread starves and leaves a body; a larva that was just fed lives on, and so does
-     * a full one that waits to grow up. In a batch of its own: once (when new tests moved the arenas) its body was not
-     * found at the end, most likely carried off by a neighbouring test's worker.
+     * a full one that waits to grow up. In a batch of its own. A body a worker is carrying to the refuse chamber counts
+     * too (it failed in full runs with "0 bodies": the colony's own worker had picked it up).
      */
     @GameTest(template = "arena", timeoutTicks = 3000, skyAccess = true, batch = "larva_alone")
     public static void aLarvaThatIsNotFedForTwoDaysStarves(GameTestHelper helper) {
@@ -873,7 +873,12 @@ public class NestTests {
             helper.assertTrue(larvae[0] != null && !larvae[0].isAlive(), "the unfed larva has not starved yet");
             helper.assertTrue(larvae[1].isAlive(), "the larva that was just fed starved");
             helper.assertTrue(!larvae[2].isAlive() || larvae[2].isFull(), "the full larva is not full");
-            helper.assertTrue(colony.refuse().getCorpses(level).size() == 1, colony.refuse().getCorpses(level).size() + " bodies, expected 1");
+            // The body lies where the larva died, or the worker has already picked it up to take it to the refuse
+            // chamber (in full runs it sometimes got there first, and a carried body is not one lying about).
+            int carried = level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds(),
+                    worker -> colony.getId().equals(worker.getColonyId()) && worker.isCarryingCorpse()).size();
+            int bodies = colony.refuse().getCorpses(level).size() + carried;
+            helper.assertTrue(bodies == 1, bodies + " bodies (" + carried + " carried), expected 1");
         });
     }
 

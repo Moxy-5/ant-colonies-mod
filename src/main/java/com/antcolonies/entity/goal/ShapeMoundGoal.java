@@ -22,7 +22,7 @@ import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
- * A termite shapes its mound where the plan says (see {@link com.antcolonies.colony.Mound#pickShapeJob}): it carves a
+ * A termite shapes its mound where the plan says (see {@link com.antcolonies.colony.MoundShaping#pickShapeJob}): it carves a
  * tunnel into finished soil from a channel or the shaft right beside it (so the new tunnel joins up at once, and opens
  * into the shaft beside it), reshapes a piece into the one the plan has there now (a thicker spire piece, a ramp facing
  * another way, a mouth that is now a spire piece), or fills a piece up into the soil or tunnel block the plan has where
@@ -57,9 +57,9 @@ public class ShapeMoundGoal extends Goal {
         if (colony == null || !colony.mound().isActive()) {
             return false;
         }
-        spot = colony.mound().pickShapeJob(level, ant);
+        spot = colony.mound().shaping().pickShapeJob(level, ant);
         if (spot != null && !walkThere()) {
-            colony.mound().releaseShapeJob(ant.getUUID());
+            colony.mound().shaping().releaseShapeJob(ant.getUUID());
             spot = null;
         }
         return spot != null;
@@ -67,7 +67,7 @@ public class ShapeMoundGoal extends Goal {
 
     /** Where it can do the job from: beside the soil for carving, else by the building rules. */
     private Predicate<Foothold> workFrom(ServerLevel level, BlockPos target) {
-        if (colony.mound().shapeJobAt(level, target) == MoundGrowth.Job.CARVE) {
+        if (colony.mound().shaping().shapeJobAt(level, target) == MoundGrowth.Job.CARVE) {
             return at -> MoundReach.canCarveFrom(level, colony, at, target);
         }
         boolean windows = colony.mound().mayOpenWindows(level);
@@ -94,7 +94,7 @@ public class ShapeMoundGoal extends Goal {
     public void stop() {
         ant.getNavigator().stop();
         if (colony != null) {
-            colony.mound().releaseShapeJob(ant.getUUID());
+            colony.mound().shaping().releaseShapeJob(ant.getUUID());
         }
         spot = null;
         colony = null;
@@ -106,7 +106,7 @@ public class ShapeMoundGoal extends Goal {
             return;
         }
         ticks++;
-        if (colony.mound().shapeJobAt(level, spot) == null) {
+        if (colony.mound().shaping().shapeJobAt(level, spot) == null) {
             spot = null; // done by someone else, or not wanted any more
             return;
         }
@@ -127,7 +127,7 @@ public class ShapeMoundGoal extends Goal {
                     spot.getX() + 0.5, spot.getY() + 0.5, spot.getZ() + 0.5, 3, 0.2, 0.2, 0.2, 0.05);
             level.playSound(null, spot, here.getSoundType().getHitSound(), SoundSource.BLOCKS, 0.3F, 1.3F);
         }
-        if (work >= WORK_TICKS && colony.mound().shape(level, spot, at.cell())) {
+        if (work >= WORK_TICKS && colony.mound().shaping().shape(level, spot, at.cell())) {
             ColonyManager.get(level).markChanged();
             spot = null;
         }

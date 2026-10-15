@@ -383,7 +383,7 @@ public class NestWalls {
         boolean besideNest = false;
         for (Direction side : Direction.values()) {
             BlockPos cell = hole.relative(side);
-            besideNest |= nest.contains(cell) && Nest.isDugOut(level, cell) && colony.nest().runwayOf(cell) == null;
+            besideNest |= nest.contains(cell) && Nest.isDugOut(level, cell) && colony.nest().foodWays().runwayOf(cell) == null;
         }
         if (!MudCrustBlock.isCrust(state) && (besideNest || !colony.profile().nest().crustWalls())) {
             return colony.profile().nest().plugState();

@@ -8,6 +8,7 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.block.SeedPileBlock;
 import com.antcolonies.block.TermiteMoundBlock;
+import com.antcolonies.colony.NestPlan;
 import com.antcolonies.registry.ModBlocks;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
@@ -380,11 +381,14 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * {@code crustWalls}: the walls of the nest's galleries are thin crusts of mud ({@code MudCrustBlock}) plastered over
      * every side that would open to the outside, before it is dug through ("wall first"; termites; optional, false). A
      * whole missing block is still packed full with the plug block. {@code sheeting}: covered runways of mud over the
-     * ground from a hole to rich food near it (termites; optional, none; see {@link Sheeting}).
+     * ground from a hole to rich food near it (termites; optional, none; see {@link Sheeting}). {@code roomSizes}: how
+     * big each kind of room is ({@code room_sizes}: {@code queen}, {@code nursery}, {@code food}, {@code refuse},
+     * {@code founding}, each {@code {"length": n, "width": n}}, 1 to 7; optional, see {@link NestPlan.RoomSizes#DEFAULT});
+     * only new nests use a change, a nest keeps the sizes it was planned with.
      */
     public record NestNumbers(int maxLevels, boolean sealWhileFounding, boolean foundingChamber, List<String> sideRooms,
             int foragingHoles, int foragingHoleDistance, String plugBlock, List<LevelUnlock> levelUnlocks, Optional<NewHoles> newHoles,
-            boolean crustWalls, Optional<Sheeting> sheeting) {
+            boolean crustWalls, Optional<Sheeting> sheeting, NestPlan.RoomSizes roomSizes) {
         public static final Codec<NestNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("max_levels").forGetter(NestNumbers::maxLevels),
                 Codec.BOOL.fieldOf("seal_while_founding").forGetter(NestNumbers::sealWhileFounding),
@@ -396,8 +400,16 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 LevelUnlock.CODEC.listOf().optionalFieldOf("level_unlocks", List.of()).forGetter(NestNumbers::levelUnlocks),
                 NewHoles.CODEC.optionalFieldOf("new_holes").forGetter(NestNumbers::newHoles),
                 Codec.BOOL.optionalFieldOf("crust_walls", false).forGetter(NestNumbers::crustWalls),
-                Sheeting.CODEC.optionalFieldOf("sheeting").forGetter(NestNumbers::sheeting)
+                Sheeting.CODEC.optionalFieldOf("sheeting").forGetter(NestNumbers::sheeting),
+                NestPlan.RoomSizes.CODEC.optionalFieldOf("room_sizes", NestPlan.RoomSizes.DEFAULT).forGetter(NestNumbers::roomSizes)
         ).apply(i, NestNumbers::new));
+
+        public NestNumbers(int maxLevels, boolean sealWhileFounding, boolean foundingChamber, List<String> sideRooms,
+                int foragingHoles, int foragingHoleDistance, String plugBlock, List<LevelUnlock> levelUnlocks, Optional<NewHoles> newHoles,
+                boolean crustWalls, Optional<Sheeting> sheeting) {
+            this(maxLevels, sealWhileFounding, foundingChamber, sideRooms, foragingHoles, foragingHoleDistance, plugBlock, levelUnlocks, newHoles,
+                    crustWalls, sheeting, NestPlan.RoomSizes.DEFAULT);
+        }
 
         public NestNumbers(int maxLevels, boolean sealWhileFounding, boolean foundingChamber, List<String> sideRooms,
                 int foragingHoles, int foragingHoleDistance, String plugBlock, List<LevelUnlock> levelUnlocks, Optional<NewHoles> newHoles,

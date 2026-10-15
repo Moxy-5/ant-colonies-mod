@@ -3,16 +3,20 @@ package com.antcolonies.colony;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 
 /**
- * The shape of the underground nest as a list of rooms (it will come from the species profile later).
+ * The shape of the underground nest as a list of rooms. How big each room is comes from the species profile
+ * ({@code nest.room_sizes}, see {@link RoomSizes}); the rest of the shape is fixed here.
  *
  * <p>The nest is a stack of up to four levels, joined by a spiral staircase. Each level has one room, 1 block tall,
  * and the levels are {@link #LEVEL_SPACING} blocks apart (the room, then a 1-block wall of soil under it). From top
  * to bottom: the seed store (5x5), the nursery and the bread (5x5), the queen's room (3x3), the refuse chamber
- * (dead ants, 5x5). See {@link #roomSize}.
+ * (dead ants, 5x5), with the default sizes ({@link RoomSizes#DEFAULT}).
  *
  * <p>Seen from above, with {@code R} the direction the rooms lie in (hub = where a level's tunnel starts; hub 1 is
  * the bottom of the entrance shaft). The hubs sit on a 2x2 square and the stairs wind round it, a quarter turn each:
@@ -61,11 +65,79 @@ public final class NestPlan {
         }
     }
 
-    /** How big a room is: {@code length} blocks along its tunnel and {@code width} blocks across. */
+    /** How big a room is: {@code length} blocks along its tunnel and {@code width} blocks across (each 1 to {@link #MAX_ROOM_SIDE}). */
     public record RoomSize(int length, int width) {
+        public static final Codec<RoomSize> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.INT.fieldOf("length").forGetter(RoomSize::length),
+                Codec.INT.fieldOf("width").forGetter(RoomSize::width)
+        ).apply(i, RoomSize::new));
+
+        public RoomSize {
+            // A number out of range in a species file is brought into range, never a broken nest.
+            length = Math.max(1, Math.min(MAX_ROOM_SIDE, length));
+            width = Math.max(1, Math.min(MAX_ROOM_SIDE, width));
+        }
+
         /** How many blocks the room has. */
         public int cells() {
             return length * width;
+        }
+    }
+
+    /** The longest or widest a room may be (the rooms of the levels lie one above the other, the stairs never reach them). */
+    public static final int MAX_ROOM_SIDE = 7;
+    /** The garden rooms are always this big: their places round the royal chamber are laid out for it (see {@link #gardens}). */
+    public static final RoomSize GARDEN_SIZE = new RoomSize(3, 3);
+
+    /**
+     * How big each kind of room is, from the species profile ({@code nest.room_sizes}; each one optional, the default
+     * below). A nest keeps the sizes it was planned with (they are saved with it), so changing the file only changes new
+     * nests. Garden rooms are always {@link #GARDEN_SIZE}, and a species with a garden keeps its royal chamber (the
+     * queen's room) 3x3 too, because the gardens are laid out round it.
+     */
+    public record RoomSizes(RoomSize queen, RoomSize nursery, RoomSize food, RoomSize refuse, RoomSize founding) {
+        /** The sizes every nest had before they came from the species profile (old saves still use them). */
+        public static final RoomSizes DEFAULT = new RoomSizes(new RoomSize(3, 3), new RoomSize(5, 5), new RoomSize(5, 5),
+                new RoomSize(5, 5), new RoomSize(3, 3));
+
+        public static final Codec<RoomSizes> CODEC = RecordCodecBuilder.create(i -> i.group(
+                RoomSize.CODEC.optionalFieldOf("queen", DEFAULT.queen()).forGetter(RoomSizes::queen),
+                RoomSize.CODEC.optionalFieldOf("nursery", DEFAULT.nursery()).forGetter(RoomSizes::nursery),
+                RoomSize.CODEC.optionalFieldOf("food", DEFAULT.food()).forGetter(RoomSizes::food),
+                RoomSize.CODEC.optionalFieldOf("refuse", DEFAULT.refuse()).forGetter(RoomSizes::refuse),
+                RoomSize.CODEC.optionalFieldOf("founding", DEFAULT.founding()).forGetter(RoomSizes::founding)
+        ).apply(i, RoomSizes::new));
+
+        /** How big the room of this kind is. */
+        public RoomSize of(Kind kind) {
+            return switch (kind) {
+                case QUEEN -> queen;
+                case NURSERY -> nursery;
+                case FOOD -> food;
+                case REFUSE -> refuse;
+                case FOUNDING -> founding;
+                case GARDEN -> GARDEN_SIZE;
+            };
+        }
+
+        /** The same sizes with another queen's room. */
+        public RoomSizes withQueen(RoomSize size) {
+            return new RoomSizes(size, nursery, food, refuse, founding);
+        }
+
+        /** The sizes as numbers, for saving with a nest (see {@link #fromArray}). */
+        public int[] toArray() {
+            return new int[] {queen.length(), queen.width(), nursery.length(), nursery.width(), food.length(), food.width(),
+                    refuse.length(), refuse.width(), founding.length(), founding.width()};
+        }
+
+        /** Sizes saved with {@link #toArray}; anything else (an old save has none) gives the {@link #DEFAULT}. */
+        public static RoomSizes fromArray(int[] numbers) {
+            if (numbers.length != 10) {
+                return DEFAULT;
+            }
+            return new RoomSizes(new RoomSize(numbers[0], numbers[1]), new RoomSize(numbers[2], numbers[3]),
+                    new RoomSize(numbers[4], numbers[5]), new RoomSize(numbers[6], numbers[7]), new RoomSize(numbers[8], numbers[9]));
         }
     }
 
@@ -89,16 +161,9 @@ public final class NestPlan {
     private NestPlan() {
     }
 
-    /** How big the room of this kind is (it will come from the species profile later). */
+    /** How big the room of this kind is with the default sizes ({@link RoomSizes#DEFAULT}). */
     public static RoomSize roomSize(Kind kind) {
-        return switch (kind) {
-            case QUEEN -> new RoomSize(3, 3);
-            case NURSERY -> new RoomSize(5, 5);
-            case FOOD -> new RoomSize(5, 5);
-            case REFUSE -> new RoomSize(5, 5);
-            case FOUNDING -> new RoomSize(3, 3);
-            case GARDEN -> new RoomSize(3, 3);
-        };
+        return RoomSizes.DEFAULT.of(kind);
     }
 
     /** What the levels are used for, top to bottom, when the nest has this many of them. */
@@ -116,6 +181,11 @@ public final class NestPlan {
      * whose rooms lie toward {@code direction}, top level first, which is also the order they are dug.
      */
     public static List<Chamber> chambers(BlockPos bottom, Direction direction, int levels) {
+        return chambers(bottom, direction, levels, RoomSizes.DEFAULT);
+    }
+
+    /** Like {@link #chambers(BlockPos, Direction, int)}, with the rooms as big as {@code sizes} says. */
+    public static List<Chamber> chambers(BlockPos bottom, Direction direction, int levels, RoomSizes sizes) {
         List<Kind> kinds = kindsFor(levels);
         List<Chamber> chambers = new ArrayList<>();
         List<BlockPos> stairs = new ArrayList<>();
@@ -136,7 +206,7 @@ public final class NestPlan {
             for (int i = 1; i <= TUNNEL_LENGTH; i++) {
                 tunnel.add(hub.relative(direction, i));
             }
-            RoomSize size = roomSize(kinds.get(level));
+            RoomSize size = sizes.of(kinds.get(level));
             List<BlockPos> room = room(hub, direction, size, TUNNEL_LENGTH);
             cells.addAll(tunnel);
             cells.addAll(room);
@@ -156,12 +226,17 @@ public final class NestPlan {
      * is not part of a chamber).
      */
     public static Chamber foundingChamber(BlockPos shaftCell, Direction direction) {
+        return foundingChamber(shaftCell, direction, RoomSizes.DEFAULT);
+    }
+
+    /** Like {@link #foundingChamber(BlockPos, Direction)}, as big as {@code sizes} says. */
+    public static Chamber foundingChamber(BlockPos shaftCell, Direction direction, RoomSizes sizes) {
         Direction away = direction.getOpposite();
         List<BlockPos> tunnel = new ArrayList<>();
         for (int i = 1; i <= FOUNDING_TUNNEL_LENGTH; i++) {
             tunnel.add(shaftCell.relative(away, i));
         }
-        RoomSize size = roomSize(Kind.FOUNDING);
+        RoomSize size = sizes.of(Kind.FOUNDING);
         List<BlockPos> room = room(shaftCell, away, size, FOUNDING_TUNNEL_LENGTH);
         List<BlockPos> cells = new ArrayList<>(tunnel);
         cells.addAll(room);
@@ -173,12 +248,17 @@ public final class NestPlan {
      * Side rooms (the profile's {@code nest.side_rooms}, such as the termites' food store): more rooms on the top level,
      * each at the end of its own {@link #TUNNEL_LENGTH}-block tunnel leaving the foot of the shaft ({@code hub}) toward
      * another side than the levels' rooms ({@code direction}): the first straight across from them, the next to their
-     * left, the third to their right (at most three). They are as big as their kind says ({@link #roomSize}), and two
-     * of them never touch (a 5x5 room across and one to the left keep two blocks of soil between their corners). Only
+     * left, the third to their right (at most three). They are as big as their kind says ({@link RoomSizes}), and with
+     * the default sizes two of them never touch (a 5x5 room across and one to the left keep two blocks of soil between their corners). Only
      * for nests with one level and no founding chamber, like the termites': the first stair steps off to the right,
      * and a founding chamber lies across from the rooms one block higher.
      */
     public static List<Chamber> sideRooms(BlockPos hub, Direction direction, List<Kind> kinds) {
+        return sideRooms(hub, direction, kinds, RoomSizes.DEFAULT);
+    }
+
+    /** Like {@link #sideRooms(BlockPos, Direction, List)}, with the rooms as big as {@code sizes} says. */
+    public static List<Chamber> sideRooms(BlockPos hub, Direction direction, List<Kind> kinds, RoomSizes sizes) {
         Direction[] sides = {direction.getOpposite(), direction.getCounterClockWise(), direction.getClockWise()};
         List<Chamber> rooms = new ArrayList<>();
         for (int i = 0; i < kinds.size() && i < sides.length; i++) {
@@ -187,7 +267,7 @@ public final class NestPlan {
             for (int k = 1; k <= TUNNEL_LENGTH; k++) {
                 tunnel.add(hub.relative(side, k));
             }
-            RoomSize size = roomSize(kinds.get(i));
+            RoomSize size = sizes.of(kinds.get(i));
             List<BlockPos> room = room(hub, side, size, TUNNEL_LENGTH);
             List<BlockPos> cells = new ArrayList<>(tunnel);
             cells.addAll(room);

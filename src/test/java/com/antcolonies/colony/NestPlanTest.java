@@ -252,6 +252,30 @@ class NestPlanTest {
     }
 
     @Test
+    void roomSizesFromTheSpeciesFileShapeTheRoomsAndAreKeptInRange() {
+        NestPlan.RoomSizes sizes = new NestPlan.RoomSizes(new NestPlan.RoomSize(4, 2), new NestPlan.RoomSize(7, 6),
+                new NestPlan.RoomSize(3, 3), new NestPlan.RoomSize(1, 1), new NestPlan.RoomSize(2, 4));
+        for (Direction direction : Direction.Plane.HORIZONTAL) {
+            List<NestPlan.Chamber> chambers = NestPlan.chambers(BOTTOM, direction, NestPlan.MAX_LEVELS, sizes);
+            Set<BlockPos> all = new HashSet<>();
+            for (NestPlan.Chamber chamber : chambers) {
+                assertEquals(sizes.of(chamber.kind()).cells(), chamber.room().size(), chamber.kind() + " room");
+                for (BlockPos cell : chamber.cells()) {
+                    assertTrue(all.add(cell), "no two parts of the nest share a block: " + cell);
+                }
+            }
+            NestPlan.Chamber founding = NestPlan.foundingChamber(BOTTOM.above(1), direction, sizes);
+            assertEquals(8, founding.room().size(), "a 2 by 4 founding chamber");
+        }
+        // Numbers out of range are brought into range; a garden room is always 3x3.
+        assertEquals(new NestPlan.RoomSize(1, NestPlan.MAX_ROOM_SIDE), new NestPlan.RoomSize(0, 40));
+        assertEquals(NestPlan.GARDEN_SIZE, sizes.of(NestPlan.Kind.GARDEN));
+        // Saved with the nest and read back the same; an old save without sizes has the default ones.
+        assertEquals(sizes, NestPlan.RoomSizes.fromArray(sizes.toArray()));
+        assertEquals(NestPlan.RoomSizes.DEFAULT, NestPlan.RoomSizes.fromArray(new int[0]));
+    }
+
+    @Test
     void everyLevelIsOneFlatRoomOfItsOwnSizeTwoBlocksUnderTheLevelAbove() {
         for (Direction direction : Direction.Plane.HORIZONTAL) {
             Set<BlockPos> all = new HashSet<>();

@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 
 import org.junit.jupiter.api.Test;
 
+import com.antcolonies.colony.NestPlan;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import com.mojang.serialization.JsonOps;
@@ -37,12 +38,14 @@ class SpeciesProfileTest {
         assertTrue(profile.queenBody().isEmpty(), "the ant queen does not swell");
         assertTrue(profile.founding().isPresent() && profile.founding().get().eggs() == 3, "the ant queen raises 3 eggs on her own fat");
         assertTrue(profile.nest().sealWhileFounding() && profile.nest().foundingChamber(), "the ant queen seals herself into a founding chamber");
+        assertEquals(NestPlan.RoomSizes.DEFAULT, profile.nest().roomSizes(), "the file lists the room sizes nests have always had");
     }
 
     @Test
     void theMacrotermesFileReadsWithAOneLevelSealedNestAndASwellingQueen() throws Exception {
         SpeciesProfile profile = read("macrotermes");
         assertEquals(1, profile.nest().maxLevels());
+        assertEquals(NestPlan.RoomSizes.DEFAULT, profile.nest().roomSizes(), "no room sizes in the file: the default ones");
         assertTrue(profile.nest().sealWhileFounding());
         assertTrue(!profile.nest().foundingChamber(), "the termites' royal chamber is their founding nest");
         assertTrue(profile.queenBody().isPresent(), "the termite queen should swell");

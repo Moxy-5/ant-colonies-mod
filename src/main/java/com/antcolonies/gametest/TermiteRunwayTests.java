@@ -8,8 +8,8 @@ import java.util.List;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.block.MudCrustBlock;
 import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.FoodWays;
 import com.antcolonies.colony.ForagingHoles;
-import com.antcolonies.colony.Nest;
 import com.antcolonies.colony.NestPlan;
 import com.antcolonies.entity.TermiteWorkerEntity;
 import com.antcolonies.entity.WorkerAntEntity;
@@ -26,7 +26,7 @@ import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
- * Runways of mud sheeting (the user's plan of 2026-10-14; {@link Nest.Runway}, {@link com.antcolonies.colony.RunwayRoute}):
+ * Runways of mud sheeting (the user's plan of 2026-10-14; {@link FoodWays.Runway}, {@link com.antcolonies.colony.RunwayRoute}):
  * rich food near one of the colony's holes gets a covered runway of mud from the hole to it, built at night; once it is
  * closed the hole stays open by day and the food is eaten from under the sheeting; once the food is gone the mud
  * crumbles away.
@@ -69,7 +69,7 @@ public class TermiteRunwayTests {
         });
         int[] phase = {0}; // 0 setting up, 1 waiting for the plan, 2 building it, 3 by day, 4 hay gone, 5 crumbled
         BlockPos[] hay = {null};
-        Nest.Runway[] runway = {null};
+        FoodWays.Runway[] runway = {null};
         int[] cutWhenFinished = {0};
         boolean[] seenInside = {false};
         int[] since = {0};
@@ -119,10 +119,10 @@ public class TermiteRunwayTests {
             }
             switch (phase[0]) {
                 case 1 -> {
-                    if (!colony.nest().getRunways().isEmpty()) {
-                        runway[0] = colony.nest().getRunways().get(0);
+                    if (!colony.nest().foodWays().getRunways().isEmpty()) {
+                        runway[0] = colony.nest().foodWays().getRunways().get(0);
                         helper.assertTrue(runway[0].food().equals(hay[0]), "the runway is for " + runway[0].food() + ", not the hay");
-                        helper.assertTrue(colony.nest().getNewTunnels().isEmpty(), "a new hole was planned for food near a hole");
+                        helper.assertTrue(colony.nest().foodWays().getNewTunnels().isEmpty(), "a new hole was planned for food near a hole");
                         AntColoniesMod.LOGGER.info("[runway-test] planned: {} blocks from {}", runway[0].cells().size(),
                                 runway[0].hole().toShortString());
                         phase[0] = 2;
@@ -132,7 +132,7 @@ public class TermiteRunwayTests {
                     }
                 }
                 case 2 -> {
-                    if (colony.nest().isRunwayClosed(level, runway[0])) {
+                    if (colony.nest().foodWays().isRunwayClosed(level, runway[0])) {
                         for (BlockPos cell : runway[0].cells()) {
                             helper.assertTrue(level.getBlockState(cell).isAir(), "the runway is not clear at " + cell.toShortString());
                             helper.assertTrue(level.getBlockState(cell.above()).getBlock() instanceof MudCrustBlock
@@ -168,7 +168,7 @@ public class TermiteRunwayTests {
                 }
                 case 4 -> {
                     BlockPos hole = runway[0].hole();
-                    boolean gone = colony.nest().runwayAt(hole) == null;
+                    boolean gone = colony.nest().foodWays().runwayAt(hole) == null;
                     if (gone && !ForagingHoles.isOpen(level, hole) && mudPlates(level, runway[0]) == 0) {
                         AntColoniesMod.LOGGER.info("[runway-test] crumbled away at tick {}", helper.getTick());
                         helper.succeed();
@@ -183,7 +183,7 @@ public class TermiteRunwayTests {
     }
 
     /** For messages: how many sides of the runway are still open to the air and how many mud plates it has. */
-    private static String openSides(ServerLevel level, Colony colony, Nest.Runway runway) {
+    private static String openSides(ServerLevel level, Colony colony, FoodWays.Runway runway) {
         int open = 0;
         for (BlockPos cell : runway.cells()) {
             for (Direction side : Direction.values()) {
@@ -198,7 +198,7 @@ public class TermiteRunwayTests {
     }
 
     /** How many mud plates face into the runway. */
-    private static int mudPlates(ServerLevel level, Nest.Runway runway) {
+    private static int mudPlates(ServerLevel level, FoodWays.Runway runway) {
         int mud = 0;
         for (BlockPos cell : runway.cells()) {
             for (Direction side : Direction.values()) {

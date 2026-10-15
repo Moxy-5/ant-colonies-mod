@@ -130,7 +130,7 @@ public class BarePatches {
                 || colony.nest().nestCells(level).contains(spot)) {
             return true;
         }
-        for (Nest.Runway runway : colony.nest().getRunways()) {
+        for (FoodWays.Runway runway : colony.nest().foodWays().getRunways()) {
             if (runway.cells().contains(spot)) {
                 return true;
             }

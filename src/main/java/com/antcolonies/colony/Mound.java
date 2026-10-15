@@ -47,12 +47,12 @@ import net.minecraft.world.phys.AABB;
  * mound block ({@link TermiteMoundBlock#FINISHED} pellets), and wet soil must set before more is stacked on it.
  *
  * <p>The cathedral (tunnel plan step 4): the plan's tunnels ({@link MoundPlan.Part#TUNNEL}) are built as soil and then
- * carved ({@link #pickCarveJob}); ramps, spire pieces and chimney mouths take one pellet each and go where the plan
+ * carved ({@link MoundShaping}); ramps, spire pieces and chimney mouths take one pellet each and go where the plan
  * puts them once what they stand on is there. The termites work from inside, by the rules of {@link MoundReach}.
  */
 public class Mound {
     /** How long (in ticks) a termite's claim on a spot it carries soil to, or a chimney block it shapes, lasts. */
-    private static final int CLAIM_TICKS = 600;
+    static final int CLAIM_TICKS = 600;
     /** How long (in ticks) a termite that set out to dig soil counts as bringing some. */
     private static final int SOIL_CLAIM_TICKS = 600;
     /** How far down (in blocks) a wall at the foot of the mound is filled in to reach the ground (a dip, a slope). */
@@ -88,7 +88,8 @@ public class Mound {
 
     /** Who carries soil to which spot, and who carves which tunnel (not saved). */
     private final Map<UUID, Claim> buildClaims = new HashMap<>();
-    private final Map<UUID, Claim> carveClaims = new HashMap<>();
+    /** The shaping work: tunnels to carve, pieces to reshape or clear (see {@link MoundShaping}). */
+    private final MoundShaping shaping = new MoundShaping(this);
     /** Spots a termite found no way to from inside, left alone until the game time given (not saved). */
     private final Map<BlockPos, Long> unreachable = new HashMap<>();
     /** Termites on their way to dig soil (not saved). */
@@ -96,7 +97,7 @@ public class Mound {
     /** How many pellets have been taken from each block being dug (not saved: a half-dug block gives a few too many after a reload). */
     private final Map<BlockPos, Integer> pelletsTaken = new HashMap<>();
 
-    private record Claim(BlockPos spot, long until) {
+    record Claim(BlockPos spot, long until) {
     }
 
     /** Worked out once per profile (it only changes on /reload). */
@@ -119,6 +120,32 @@ public class Mound {
     Mound(Colony colony) {
         this.colony = colony;
         this.center = colony.getCenter();
+    }
+
+    /** The shaping work of the plan: tunnels to carve, pieces to reshape or clear away. */
+    public MoundShaping shaping() {
+        return shaping;
+    }
+
+    Colony colony() {
+        return colony;
+    }
+
+    /** The entrance of the nest, where the mound stands (the plan's offsets are from it). */
+    BlockPos center() {
+        return center;
+    }
+
+    /** The plan of the stage now being built (worked out by {@link #getParts}), or null before it is. */
+    @Nullable
+    MoundPlan.Shape shape() {
+        return cachedShape;
+    }
+
+    /** Something of the mound was shaped: the build spots are worked out again, and the stage is still going. */
+    void shaped(Level level) {
+        spotsTick = Long.MIN_VALUE;
+        progressed(level);
     }
 
     /** The mound numbers of the colony's species, or null if it builds no mound. */
@@ -337,7 +364,7 @@ public class Mound {
         return switch (part) {
             case OPEN -> isClearJob(level, pos) ? MoundGrowth.Job.CLEAR : null;
             case WALL -> empty || wet || crust ? MoundGrowth.Job.SOIL : isPieceBlock(state) ? MoundGrowth.Job.RESHAPE : null;
-            case TUNNEL -> empty || wet || crust ? MoundGrowth.Job.SOIL : isCarveJob(level, pos) ? MoundGrowth.Job.CARVE
+            case TUNNEL -> empty || wet || crust ? MoundGrowth.Job.SOIL : shaping.isCarveJob(level, pos) ? MoundGrowth.Job.CARVE
                     : isPieceBlock(state) ? MoundGrowth.Job.RESHAPE : null;
             case RAMP, SPIRE, MOUTH -> empty ? MoundGrowth.Job.PIECE
                     : isPieceBlock(state) && !isPlannedPiece(state, pos, part) ? MoundGrowth.Job.RESHAPE : null;
@@ -371,7 +398,7 @@ public class Mound {
     // ---- building ----
 
     /** Whether a part of the plan is built as soil: plain mound soil, or soil a tunnel is carved into afterwards. */
-    private static boolean isSoil(MoundPlan.Part part) {
+    static boolean isSoil(MoundPlan.Part part) {
         return part == MoundPlan.Part.WALL || part == MoundPlan.Part.TUNNEL;
     }
 
@@ -467,6 +494,16 @@ public class Mound {
         return here.canBeReplaced() && here.getFluidState().isEmpty() && hasPieceSupport(level, pos, part);
     }
 
+    /** Whether a piece has what it stands on here (see {@link #isPieceSpot}, without the cell having to be empty). */
+    boolean hasPieceSupport(Level level, BlockPos pos, MoundPlan.Part part) {
+        BlockPos below = pos.below();
+        BlockState under = level.getBlockState(below);
+        if (part == MoundPlan.Part.RAMP) {
+            return TermiteMoundBlock.canBuildOn(under, level, below);
+        }
+        return !under.getCollisionShape(level, below).isEmpty() && !(under.getBlock() instanceof TermiteMoundBlock && !TermiteMoundBlock.isFinished(under));
+    }
+
     /** Whether a pellet of soil can go here now. */
     public boolean isBuildSpot(Level level, BlockPos pos) {
         return getBuildSpots(level).contains(pos);
@@ -541,7 +578,7 @@ public class Mound {
         return best;
     }
 
-    private static boolean isClaimedByOther(Map<UUID, Claim> claims, BlockPos spot, UUID ant) {
+    static boolean isClaimedByOther(Map<UUID, Claim> claims, BlockPos spot, UUID ant) {
         for (Map.Entry<UUID, Claim> entry : claims.entrySet()) {
             if (!entry.getKey().equals(ant) && entry.getValue().spot.equals(spot)) {
                 return true;
@@ -604,7 +641,7 @@ public class Mound {
     }
 
     /** Puts an insect in a cell that was just filled up on top of the new soil, or beside it if there is no room on top. */
-    private static void liftOnto(Level level, LivingEntity ant, BlockPos spot, double top) {
+    static void liftOnto(Level level, LivingEntity ant, BlockPos spot, double top) {
         BlockPos above = BlockPos.containing(ant.getX(), top, ant.getZ());
         if (top < spot.getY() + 1.0 || level.getBlockState(above).getCollisionShape(level, above).isEmpty()) {
             ant.setPos(ant.getX(), top, ant.getZ());
@@ -746,152 +783,6 @@ public class Mound {
         return block instanceof TermiteMoundBlock || block instanceof TermiteHoleBlock || block instanceof MoundPieceBlock;
     }
 
-    // ---- shaping: tunnels, reshaped and cleared pieces ----
-
-    /**
-     * Shaping work of the plan to do now, claimed for this termite, or null (lowest first): a tunnel to carve (finished
-     * soil where the plan has a tunnel, or a tunnel block that does not open yet into the shaft beside it), a piece to
-     * reshape into the plan's one, or a piece to clear away where soil goes. No soil is needed for any of it. Carving is
-     * inside work, so it goes on by day too; the rest only while it can be done now ({@link #isWorkableNow}).
-     */
-    @Nullable
-    public BlockPos pickShapeJob(Level level, AbstractAntEntity ant) {
-        if (!isActive()) {
-            return null;
-        }
-        long now = level.getGameTime();
-        carveClaims.values().removeIf(claim -> claim.until <= now);
-        BlockPos best = null;
-        for (Map.Entry<BlockPos, MoundPlan.Part> entry : getParts(level).entrySet()) {
-            BlockPos pos = entry.getKey();
-            if ((best != null && pos.getY() >= best.getY()) || !level.isLoaded(pos) || isClaimedByOther(carveClaims, pos, ant.getUUID())) {
-                continue;
-            }
-            MoundGrowth.Job job = shapeJobAt(level, pos);
-            if (job != null && (job == MoundGrowth.Job.CARVE || isWorkableNow(level, pos)) && (job != MoundGrowth.Job.RESHAPE || isSoil(entry.getValue()) || hasPieceSupport(level, pos, entry.getValue()))) {
-                best = pos;
-            }
-        }
-        if (best != null) {
-            carveClaims.put(ant.getUUID(), new Claim(best, now + CLAIM_TICKS));
-        }
-        return best;
-    }
-
-    public void releaseShapeJob(UUID ant) {
-        carveClaims.remove(ant);
-    }
-
-    /** The shaping job in a cell now (carving, reshaping, clearing a piece), or null. */
-    @Nullable
-    public MoundGrowth.Job shapeJobAt(Level level, BlockPos pos) {
-        MoundPlan.Part part = getParts(level).get(pos);
-        if (part == null || part == MoundPlan.Part.OPEN) {
-            return null; // the shaft is dug out by the diggers (it gives soil)
-        }
-        MoundGrowth.Job job = jobAt(level, pos, part);
-        return job == MoundGrowth.Job.CARVE || job == MoundGrowth.Job.RESHAPE || job == MoundGrowth.Job.CLEAR ? job : null;
-    }
-
-    /** Whether there is a tunnel to carve here now (or a tunnel's door into the shaft to open). */
-    public boolean isCarveJob(Level level, BlockPos pos) {
-        if (getParts(level).get(pos) != MoundPlan.Part.TUNNEL || !level.isLoaded(pos)) {
-            return false;
-        }
-        BlockState state = level.getBlockState(pos);
-        if (state.getBlock() instanceof TermiteMoundBlock) {
-            return TermiteMoundBlock.isFinished(state);
-        }
-        if (state.getBlock() instanceof TermiteTunnelBlock) {
-            for (Direction side : doorsOf(level, pos)) {
-                if (!state.getValue(TermiteTunnelBlock.OPEN.get(side))) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    /** The sides of a tunnel cell that open into the shaft: toward a cell the plan keeps open that is empty now. */
-    private List<Direction> doorsOf(Level level, BlockPos pos) {
-        List<Direction> doors = new ArrayList<>();
-        Map<BlockPos, MoundPlan.Part> parts = getParts(level);
-        for (Direction side : Direction.values()) {
-            BlockPos beside = pos.relative(side);
-            if (parts.get(beside) == MoundPlan.Part.OPEN && level.getBlockState(beside).getCollisionShape(level, beside).isEmpty()) {
-                doors.add(side);
-            }
-        }
-        return doors;
-    }
-
-    /** Whether a piece has what it stands on here (see {@link #isPieceSpot}, without the cell having to be empty). */
-    private boolean hasPieceSupport(Level level, BlockPos pos, MoundPlan.Part part) {
-        BlockPos below = pos.below();
-        BlockState under = level.getBlockState(below);
-        if (part == MoundPlan.Part.RAMP) {
-            return TermiteMoundBlock.canBuildOn(under, level, below);
-        }
-        return !under.getCollisionShape(level, below).isEmpty() && !(under.getBlock() instanceof TermiteMoundBlock && !TermiteMoundBlock.isFinished(under));
-    }
-
-    /**
-     * Does the shaping job here: carves the tunnel (a tunnel block of the soil's age, joined to the channels round it
-     * and open into the shaft beside it, and toward {@code from} where the termite works from if that is the shaft),
-     * reshapes the piece into the plan's one (keeping its age; into soil or a tunnel block where the plan has one), or
-     * clears the piece away. False if there is no such job
-     * any more.
-     */
-    public boolean shape(Level level, BlockPos pos, @Nullable BlockPos from) {
-        MoundGrowth.Job job = shapeJobAt(level, pos);
-        if (job == null) {
-            return false;
-        }
-        BlockState was = level.getBlockState(pos);
-        int age = was.hasProperty(MoundSoil.AGE) ? was.getValue(MoundSoil.AGE) : 0;
-        boolean done;
-        if (job == MoundGrowth.Job.CARVE) {
-            List<Direction> open = doorsOf(level, pos);
-            Direction toward = from == null ? null : MoundGrowth.sideToward(pos, from);
-            if (toward != null && !open.contains(toward) && MoundReach.isHollowInside(level, colony, from)) {
-                open.add(toward); // carved from the nest (or the shaft): it opens toward where the termite came from
-            }
-            done = level.setBlockAndUpdate(pos, ModBlocks.TERMITE_TUNNEL.get().stateFor(level, pos, age, open));
-        } else if (job == MoundGrowth.Job.RESHAPE) {
-            // A piece is filled up where it stands. Insects in it must not be buried: a player or an animal there stops
-            // it (try again later); termites crawling up its channel keep a channel (it becomes a tunnel block instead
-            // of solid soil), and one standing on it outside the channel is lifted out.
-            List<LivingEntity> inCell = level.getEntitiesOfClass(LivingEntity.class, new AABB(pos), LivingEntity::isAlive);
-            if (inCell.stream().anyMatch(living -> !(living instanceof AbstractAntEntity))) {
-                return false;
-            }
-            BlockState filled;
-            if (getParts(level).get(pos) == MoundPlan.Part.TUNNEL || !inCell.isEmpty() && cachedShape != null
-                    && blockFor(cachedShape, pos.subtract(center)).getBlock() instanceof TermiteMoundBlock) {
-                // A piece (the bottom of a spire that moves up) becomes a tunnel block where it stands, joined to the channels round it.
-                filled = ModBlocks.TERMITE_TUNNEL.get().stateFor(level, pos, age, doorsOf(level, pos));
-            } else {
-                filled = Block.updateFromNeighbourShapes(blockFor(cachedShape, pos.subtract(center)).setValue(MoundSoil.AGE, age), level, pos);
-            }
-            done = level.setBlockAndUpdate(pos, filled);
-            if (done) {
-                double top = pos.getY() + filled.getCollisionShape(level, pos).max(Direction.Axis.Y);
-                for (LivingEntity ant : inCell) {
-                    if (!(ant instanceof AbstractAntEntity insect && insect.getNavigator().isInChannel()) && ant.getBoundingBox().minY < top) {
-                        liftOnto(level, ant, pos, top);
-                    }
-                }
-            }
-        } else {
-            done = level.destroyBlock(pos, false);
-        }
-        if (done) {
-            spotsTick = Long.MIN_VALUE;
-            progressed(level);
-        }
-        return done;
-    }
-
     // ---- for testing ----
 
     /**
@@ -947,7 +838,7 @@ public class Mound {
         for (BlockPos pos : tunnels) {
             BlockState state = level.getBlockState(pos);
             if (state.getBlock() instanceof TermiteTunnelBlock tunnel) {
-                level.setBlock(pos, tunnel.stateFor(level, pos, state.getValue(MoundSoil.AGE), doorsOf(level, pos)), 2);
+                level.setBlock(pos, tunnel.stateFor(level, pos, state.getValue(MoundSoil.AGE), shaping.doorsOf(level, pos)), 2);
             }
         }
         spotsTick = Long.MIN_VALUE;
