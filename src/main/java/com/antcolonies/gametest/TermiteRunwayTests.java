@@ -85,7 +85,16 @@ public class TermiteRunwayTests {
             }
             TermiteSoldierTests.digNestAtOnce(level, colony);
             colony.population().addNewMembers(WorkerAntEntity.CASTE, now - 1000, 500);
-            NestPlan.ForagingTunnel first = colony.nest().getForagingTunnels(level).get(0);
+            // The hole whose way out leads into the arena: the nest is in the arena's middle and its holes face a side
+            // picked by the colony, so the hay past a hole facing north or west lay outside the arena, under its barrier
+            // wall, unseen (the test failed now and then: 2026-10-14).
+            NestPlan.ForagingTunnel first = null;
+            for (NestPlan.ForagingTunnel tunnel : colony.nest().getForagingTunnels(level)) {
+                if (first == null && helper.getBounds().deflate(1).contains(tunnel.hole().relative(tunnel.side(), HAY_OUT + 3).getCenter())) {
+                    first = tunnel;
+                }
+            }
+            helper.assertTrue(first != null, "no foraging hole faces into the arena");
             Direction out = first.side();
             // A step one block up from 3 blocks out on, in a strip round the way to the hay.
             Direction across = out.getClockWise();
@@ -128,7 +137,9 @@ public class TermiteRunwayTests {
                         phase[0] = 2;
                         since[0] = 0;
                     } else {
-                        helper.assertTrue(since[0] < 600, "no runway was planned to the hay" + colony.foragingHoles().describeRunways(level));
+                        helper.assertTrue(since[0] < 600, "no runway was planned to the hay" + colony.foragingHoles().describeRunways(level)
+                                + colony.foragingHoles().whyNoRunway(level, hay[0]) + " | hay at " + hay[0].toShortString()
+                                + ", in the arena " + helper.getBounds().contains(hay[0].getCenter()));
                     }
                 }
                 case 2 -> {

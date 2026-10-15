@@ -570,6 +570,48 @@ public class ForagingHoles {
     }
 
     /**
+     * Tests and debugging: which of the checks of {@link #tickRunways} stop a runway being planned to {@code food} now,
+     * for example " | why no runway: not in the plant scan, 1 free hole".
+     */
+    public String whyNoRunway(ServerLevel level, BlockPos food) {
+        List<String> why = new java.util.ArrayList<>();
+        SpeciesProfile.NewHoles numbers = colony.profile().nest().newHoles().orElse(null);
+        if (numbers == null || colony.profile().nest().sheeting().isEmpty()) {
+            return " | why no runway: the species has no runways";
+        }
+        if (colony.isFounding()) {
+            why.add("still founding");
+        }
+        if (!colony.food().plants(level).contains(food)) {
+            why.add("not in the plant scan");
+        }
+        if (!isRich(level, food)) {
+            why.add("not rich food");
+        }
+        if (!colony.foodMap().knows(food, null)) {
+            why.add("the colony does not know it");
+        }
+        if (noRouteUntil.containsKey(food)) {
+            why.add("no route found earlier");
+        }
+        if (sideways(food, colony.getCenter()) > numbers.reach(colony.getCount(com.antcolonies.entity.WorkerAntEntity.CASTE))) {
+            why.add("out of reach");
+        }
+        if (colony.food().isFeedableFromInside(level, food)) {
+            why.add("eaten from inside already");
+        }
+        int free = 0;
+        for (NestPlan.ForagingTunnel tunnel : tunnels(level)) {
+            if (isDug(level, tunnel) && !colony.nest().foodWays().isSpent(tunnel.hole()) && colony.nest().foodWays().runwayAt(tunnel.hole()) == null
+                    && level.isLoaded(tunnel.hole().above())) {
+                free++;
+            }
+        }
+        why.add(free + " free holes (needs 2)");
+        return " | why no runway: " + String.join(", ", why);
+    }
+
+    /**
      * The feeding gallery from this tunnel up under the food (see {@link FeedingGallery}): empty if it cannot be reached
      * from below. Under whole blocks of food (a fallen tree, hay) and branches lying on the ground (cased in mud first).
      */

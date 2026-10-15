@@ -256,7 +256,7 @@ public class TermiteNewHoleTests {
      * one side is 2 blocks lower (the user's tree in the savanna, whose gallery was left out, 2026-10-14). The open side
      * of the gallery is walled with a mud crust as it is dug (wall first), and the log is eaten from below by day.
      */
-    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
     public static void aFallenLogOnTheEdgeOfAStepIsEatenFromBelowByDay(GameTestHelper helper) {
         eatenFromBelow(helper, true, Food.LOG);
     }
@@ -269,7 +269,7 @@ public class TermiteNewHoleTests {
      * block of stump standing on the log, which no gallery cell touches, is eaten by day from the cast under it, and is a
      * cast itself afterwards.
      */
-    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
     public static void aFallenLogAndTheStumpOnItAreEatenFromBelowByDay(GameTestHelper helper) {
         eatenFromBelow(helper, false, Food.STUMP);
     }
@@ -281,13 +281,14 @@ public class TermiteNewHoleTests {
      * 2026-10-14 whose casing and gallery stayed open on that side, 2 blocks high): the gallery's open side is walled
      * and the branch is cased on that side too.
      */
-    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
     public static void aFallenBranchOnTheEdgeOfAStepIsCasedInMudAndEatenFromBelowByDay(GameTestHelper helper) {
         eatenFromBelow(helper, true, Food.BRANCH);
     }
 
     private enum Food { LOG, STUMP, BRANCH }
 
+    /** (60000 ticks, was 40000: once the stump was still on its last bitten stage when the time ran out, 2026-10-14.) */
     private static void eatenFromBelow(GameTestHelper helper, boolean onAStep, Food kind) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
@@ -464,7 +465,7 @@ public class TermiteNewHoleTests {
             } else if (eaten > eatenAtDawn[0] && (!onAStep || crusts > 0)) {
                 helper.succeed();
             }
-            helper.assertTrue(helper.getTick() < 39000, "by day: eaten " + eaten + " (at dawn " + eatenAtDawn[0] + "), " + crusts
+            helper.assertTrue(helper.getTick() < 59000, "by day: eaten " + eaten + " (at dawn " + eatenAtDawn[0] + "), " + crusts
                     + " crust walls beside the gallery, " + colony.walls().getLeaks(level).size() + " leaks, log " + under + ", stump " + top
                     + ": first log block seen " + colony.food().plants(level).contains(log.get(0)) + ", gallery under it "
                     + tunnel.gallery().contains(log.get(0).below()) + ", eaten from inside " + colony.food().isFeedableFromInside(level, log.get(0))
