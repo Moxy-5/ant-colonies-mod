@@ -77,6 +77,7 @@ public class Colony {
     private final Soldiers soldiers;
     private final Alarm alarm;
     private final Population population;
+    private final AwayLife away;
 
     public Colony(UUID id, ResourceLocation species, UUID queenId, BlockPos center) {
         this.id = id;
@@ -100,6 +101,7 @@ public class Colony {
         this.soldiers = new Soldiers(this);
         this.alarm = new Alarm(this);
         this.population = new Population(this);
+        this.away = new AwayLife(this);
     }
 
     /** The underground nest: its plan, the next block to dig, and the dug-out cells of each room. */
@@ -180,6 +182,11 @@ public class Colony {
     /** The members that are numbers inside the nest, and which ones are real mobs (the brain, part 1). */
     public Population population() {
         return population;
+    }
+
+    /** Going away and coming back: the insects frozen in unloaded land, and what is owed to the nest (the brain, part 2). */
+    public AwayLife away() {
+        return away;
     }
 
     /**
@@ -287,7 +294,7 @@ public class Colony {
     /** Nobody left: no workers or soldiers, no eggs or young. */
     private boolean isEmpty(ServerLevel level) {
         return getMemberCount() - getCount(com.antcolonies.entity.TermiteKingEntity.CASTE) <= 0 && brood().getEggs(level).isEmpty()
-                && brood().getLarvae(level).isEmpty();
+                && brood().getLarvae(level).isEmpty() && brood().insideCount() == 0;
     }
 
     /**
@@ -300,6 +307,7 @@ public class Colony {
         if (isQueenless() && isEmpty(level)) {
             return false;
         }
+        away.settle(level);
         garden.grow(level);
         mound.tick(level);
         mushrooms.tick(level);
@@ -485,6 +493,8 @@ public class Colony {
         alarm.save(tag);
         foodMap.save(tag);
         population.save(tag);
+        brood.save(tag);
+        away.save(tag);
         return tag;
     }
 
@@ -509,6 +519,8 @@ public class Colony {
         colony.alarm.load(tag);
         colony.foodMap.load(tag);
         colony.population.load(tag);
+        colony.brood.load(tag);
+        colony.away.load(tag);
         return colony;
     }
 }

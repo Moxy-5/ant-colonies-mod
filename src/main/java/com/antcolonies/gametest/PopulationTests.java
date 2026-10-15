@@ -4,7 +4,9 @@ import static com.antcolonies.gametest.TermiteMoundTests.MIDDLE;
 import static com.antcolonies.gametest.TermiteMoundTests.SURFACE;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -24,6 +26,11 @@ import com.antcolonies.species.Species;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Blocks;
@@ -287,6 +294,153 @@ public class PopulationTests {
             int inside = colony.population().inside(WorkerAntEntity.CASTE);
             helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == inside + workers, "the headcount " + colony.getCount(WorkerAntEntity.CASTE)
                     + " is not the " + inside + " inside and the " + workers + " real workers");
+            helper.succeed();
+        });
+    }
+
+    // --- the brain, part 2: going away and coming back (AwayLife) ---------------------------------------------------
+
+    /** What a frozen insect looked like on disk: saved before it leaves the world, so it can be loaded again. */
+    private static CompoundTag freezeAndUnload(Colony colony, ServerLevel level, Entity entity) {
+        colony.away().freeze(level, entity); // what the game does when the insect's chunk goes out of range
+        CompoundTag tag = new CompoundTag();
+        entity.save(tag);
+        entity.discard();
+        return tag;
+    }
+
+    /** The insect's chunk is loaded again: the same insect (same id) is back in the world. */
+    private static void loadAgain(ServerLevel level, CompoundTag tag) {
+        Entity entity = EntityType.loadEntityRecursive(tag, level, loaded -> loaded);
+        if (entity != null) {
+            level.addFreshEntity(entity);
+        }
+    }
+
+    /**
+     * Step 2a. The nest goes out of range with 3 real workers (one carrying a seed), an egg and 2 larvae (one fed 3
+     * pieces), and 4 old workers in the numbers about to die; the queen 100 ticks from starving. After the grace minute
+     * (shortened for the test) the colony is away: the 3 workers are numbers (headcount still 3), the young are numbers,
+     * the old ones have died (4 bodies owed), the seed is owed. Back in range, the frozen insects load again and leave
+     * the world on their first tick; the queen does not starve (her clock stood still while she was frozen); the egg and
+     * the larvae are real again in the nursery (the fed one still fed 3), the 4 bodies lie in the refuse chamber and the
+     * seed is in the store. Then two stragglers frozen at the edge while the colony is here: one back after a moment
+     * carries on, one back after more than the grace has walked home (it is one of the numbers).
+     */
+    @GameTest(template = "arena", timeoutTicks = 900)
+    public static void aColonyAwayFoldsItsFrozenInsectsIntoTheNumbersAndPutsThingsBackOnReturn(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        startAntColony(helper);
+        List<UUID> workers = new ArrayList<>();
+        List<UUID> stragglers = new ArrayList<>();
+        Map<UUID, CompoundTag> unloaded = new HashMap<>();
+        UUID[] queen = new UUID[1];
+        int[] foodBefore = new int[1];
+        helper.runAfterDelay(15, () -> {
+            Colony colony = antColony(helper);
+            colony.population().setOnForTests(false); // no swapping: the numbers stay where the test puts them
+            colony.setHungerOn(true);
+            for (int i = 0; i < 3; i++) {
+                WorkerAntEntity worker = helper.spawn(ModEntities.WORKER_ANT.get(), MIDDLE + 2 + i, SURFACE, MIDDLE + 2);
+                workers.add(worker.getUUID());
+            }
+            BlockPos eggSpot = colony.brood().pickEggSpot(level, level.getRandom());
+            helper.assertTrue(eggSpot != null && colony.brood().placeEgg(level, eggSpot), "no room for the egg");
+            for (int i = 0; i < 2; i++) {
+                BlockPos spot = colony.brood().pickEggSpot(level, level.getRandom());
+                helper.assertTrue(spot != null, "no room for a larva");
+                AntLarvaEntity larva = colony.brood().spawnLarva(level, spot.getX() + 0.5, spot.getY(), spot.getZ() + 0.5);
+                if (i == 0) {
+                    larva.setFed(3);
+                }
+            }
+        });
+        helper.runAfterDelay(40, () -> {
+            Colony colony = antColony(helper);
+            helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == 3, "3 workers expected, " + colony.getCount(WorkerAntEntity.CASTE));
+            AbstractAntEntity theQueen = colony.getQueen(level);
+            queen[0] = theQueen.getUUID();
+            colony.away().setOnForTests(true);
+            colony.away().setGraceForTests(100L);
+            colony.queenCare().setQueenLastFed(level.getGameTime() - (colony.profile().queen().starveTicks() - 100));
+            ((WorkerAntEntity) level.getEntity(workers.get(0))).setCarriedSeed(new ItemStack(Items.WHEAT_SEEDS));
+            foodBefore[0] = colony.food().getFood();
+            // Out of range: every insect of the colony is frozen and unloaded (the queen too: she is no number).
+            List<Entity> all = new ArrayList<>();
+            for (UUID id : workers) {
+                all.add(level.getEntity(id));
+            }
+            all.addAll(colony.brood().getEggs(level));
+            all.addAll(colony.brood().getLarvae(level));
+            all.add(theQueen);
+            for (Entity entity : all) {
+                unloaded.put(entity.getUUID(), freezeAndUnload(colony, level, entity));
+            }
+            colony.away().setAwayForTests(true);
+            long lifespan = colony.profile().worker().lifespanTicks();
+            colony.population().addNewMembers(WorkerAntEntity.CASTE, level.getGameTime() - lifespan * 12 / 10, 4);
+        });
+        helper.runAfterDelay(200, () -> {
+            Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
+            AntColoniesMod.LOGGER.info("[away-test] away: {}{}", colony.population().describe(level), colony.away().describe(level));
+            helper.assertTrue(colony.away().isAway(level), "the colony should be away");
+            for (UUID id : unloaded.keySet()) {
+                helper.assertTrue(id.equals(queen[0]) != colony.away().isFoldedIn(id), "every frozen insect but the queen should be folded in: " + id);
+            }
+            helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == 3 && colony.population().inside(WorkerAntEntity.CASTE) == 3,
+                    "the 3 frozen workers should be numbers and the 4 old ones dead: " + colony.getCount(WorkerAntEntity.CASTE) + " counted, "
+                            + colony.population().inside(WorkerAntEntity.CASTE) + " inside");
+            helper.assertTrue(colony.brood().insideCount() == 3, "the egg and 2 larvae should be numbers: " + colony.brood().insideCount());
+            helper.assertTrue(colony.away().getBodiesOwed() == 4 && colony.away().getFoodOwed() == 1,
+                    "4 bodies and 1 seed owed expected: " + colony.away().describe(level));
+            // Back in range: the chunks load again, with everything that was frozen in them.
+            colony.away().setAwayForTests(false);
+            unloaded.values().forEach(tag -> loadAgain(level, tag));
+        });
+        helper.runAfterDelay(240, () -> {
+            Colony colony = antColony(helper);
+            helper.assertTrue(colony != null, "the queen should be back and alive");
+            long hungry = level.getGameTime() - colony.queenCare().getQueenLastFed();
+            helper.assertTrue(hungry < colony.profile().queen().starveTicks(), "the queen's clock should have stood still: hungry " + hungry);
+            colony.queenCare().setQueenLastFed(level.getGameTime()); // (fed: the rest of the test is not about her)
+            for (UUID id : unloaded.keySet()) {
+                if (!id.equals(queen[0])) {
+                    helper.assertTrue(level.getEntity(id) == null, "a folded insect should leave the world when it loads: " + level.getEntity(id));
+                }
+            }
+            AntColoniesMod.LOGGER.info("[away-test] back: {}{}", colony.population().describe(level), colony.away().describe(level));
+            helper.assertTrue(colony.brood().countEggs(level) == 1 && colony.brood().countLarvae(level) == 2 && colony.brood().insideCount() == 0,
+                    "the egg and the 2 larvae should be real again: " + colony.brood().countEggs(level) + " eggs, " + colony.brood().countLarvae(level)
+                            + " larvae, " + colony.brood().insideCount() + " inside");
+            helper.assertTrue(colony.brood().getLarvae(level).stream().anyMatch(larva -> larva.getFed() == 3), "the fed larva should still be fed 3");
+            helper.assertTrue(colony.refuse().getRefuseCorpses(level).size() == 4, "4 bodies expected in the refuse chamber: "
+                    + colony.refuse().getRefuseCorpses(level).size());
+            helper.assertTrue(colony.food().getFood() == foodBefore[0] + 1, "the carried seed should be in the store: " + colony.food().getFood()
+                    + " food, was " + foodBefore[0]);
+            helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == 3 && colony.population().inside(WorkerAntEntity.CASTE) == 3,
+                    "still 3 workers, all numbers: " + colony.getCount(WorkerAntEntity.CASTE) + ", " + colony.population().inside(WorkerAntEntity.CASTE));
+            // Two stragglers at the edge of the loaded land while the colony is here.
+            for (int i = 0; i < 2; i++) {
+                stragglers.add(helper.spawn(ModEntities.WORKER_ANT.get(), MIDDLE + 6 + i, SURFACE, MIDDLE - 4).getUUID());
+            }
+        });
+        helper.runAfterDelay(260, () -> {
+            Colony colony = antColony(helper);
+            helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == 5, "5 workers expected: " + colony.getCount(WorkerAntEntity.CASTE));
+            for (UUID id : stragglers) {
+                unloaded.put(id, freezeAndUnload(colony, level, level.getEntity(id)));
+            }
+        });
+        helper.runAfterDelay(280, () -> loadAgain(level, unloaded.get(stragglers.get(0)))); // back after a moment
+        helper.runAfterDelay(400, () -> loadAgain(level, unloaded.get(stragglers.get(1)))); // back after more than the grace
+        helper.runAfterDelay(440, () -> {
+            Colony colony = antColony(helper);
+            Entity first = level.getEntity(stragglers.get(0));
+            helper.assertTrue(first != null && first.isAlive() && !colony.away().isFrozen(stragglers.get(0)),
+                    "the straggler back after a moment should carry on");
+            helper.assertTrue(level.getEntity(stragglers.get(1)) == null, "the straggler back after the grace should have walked home");
+            helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == 5 && colony.population().inside(WorkerAntEntity.CASTE) == 4,
+                    "5 workers, 4 of them numbers expected: " + colony.getCount(WorkerAntEntity.CASTE) + ", " + colony.population().inside(WorkerAntEntity.CASTE));
             helper.succeed();
         });
     }

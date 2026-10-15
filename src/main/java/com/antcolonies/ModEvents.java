@@ -53,6 +53,30 @@ public class ModEvents {
         }
     }
 
+    /**
+     * One of a colony's insects goes out of range (its chunk stops being tracked, before Minecraft unloads it; one that
+     * is killed or put away has a removal reason already): its colony writes down what it is (the brain, part 2, see
+     * {@link com.antcolonies.colony.AwayLife#freeze}).
+     */
+    @SubscribeEvent
+    public static void onLeaveLevel(net.neoforged.neoforge.event.entity.EntityLeaveLevelEvent event) {
+        if (!(event.getLevel() instanceof ServerLevel level)) {
+            return;
+        }
+        net.minecraft.world.entity.Entity entity = event.getEntity();
+        var reason = entity.getRemovalReason();
+        if (reason != null && reason != net.minecraft.world.entity.Entity.RemovalReason.UNLOADED_TO_CHUNK) {
+            return;
+        }
+        java.util.UUID colonyId = entity instanceof com.antcolonies.entity.AbstractAntEntity mob ? mob.getColonyId()
+                : entity instanceof com.antcolonies.entity.AntEggEntity egg ? egg.getColonyId()
+                : entity instanceof com.antcolonies.entity.AntLarvaEntity larva ? larva.getColonyId() : null;
+        Colony colony = colonyId == null ? null : ColonyManager.get(level).getColony(colonyId);
+        if (colony != null) {
+            colony.away().freeze(level, entity);
+        }
+    }
+
     /** A player jumping on a termite mound: footsteps, the alarm's first level (see {@code colony.Alarm}). */
     // Every colony's own clock, once a second, whether or not its queen is loaded (or alive).
     @SubscribeEvent

@@ -190,6 +190,9 @@ public class WorkerAntEntity extends AbstractAntEntity {
     @Override
     public void tick() {
         super.tick();
+        if (isRemoved()) {
+            return; // back from being frozen, it went into its colony's numbers (see colony.AwayLife)
+        }
         // Once, on the first tick: a worker with no colony joins the nearest one.
         if (!colonyChecked && level() instanceof ServerLevel serverLevel) {
             colonyChecked = true;

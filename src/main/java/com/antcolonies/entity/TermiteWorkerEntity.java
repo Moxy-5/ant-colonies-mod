@@ -111,6 +111,9 @@ public class TermiteWorkerEntity extends AbstractAntEntity {
     @Override
     public void tick() {
         super.tick();
+        if (isRemoved()) {
+            return; // back from being frozen, it went into its colony's numbers (see colony.AwayLife)
+        }
         // Once, on the first tick: a worker put down with a spawn egg joins the nearest termite colony.
         if (!colonyChecked && level() instanceof ServerLevel serverLevel) {
             colonyChecked = true;

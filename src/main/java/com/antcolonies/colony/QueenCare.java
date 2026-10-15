@@ -266,6 +266,9 @@ public class QueenCare {
     public boolean queenStarves(ServerLevel level) {
         long now = level.getGameTime();
         SpeciesProfile.QueenNumbers numbers = colony.profile().queen();
+        if (colony.away().isComingBack()) {
+            return false; // back in range: her clocks are moved on by the time away first (AwayLife.settle)
+        }
         // A founding queen lives on her own body fat (nobody could feed her yet).
         boolean satisfied = !colony.isHungerOn() || eggDue >= 0 || queenBread >= numbers.meal()
                 || colony.brood().isFull(level) || colony.isFounding();
@@ -274,6 +277,29 @@ public class QueenCare {
             return false;
         }
         return now - queenLastFed >= numbers.starveTicks();
+    }
+
+    /**
+     * The colony comes back after being away for this many ticks (see {@link AwayLife}): the queen was frozen in her
+     * room, so her clocks (hunger, the egg she carries, the next egg of her stream or founding batch) go on from where
+     * they stopped. Step 2a: until the colony eats while away (2b), this is what keeps her from starving on the way back.
+     */
+    void pause(long ticks) {
+        if (ticks <= 0) {
+            return;
+        }
+        if (queenLastFed != Colony.NOT_SET) {
+            queenLastFed += ticks;
+        }
+        if (eggDue >= 0) {
+            eggDue += ticks;
+        }
+        if (nextFoundingEgg != Colony.NOT_SET) {
+            nextFoundingEgg += ticks;
+        }
+        if (nextStreamEgg != Colony.NOT_SET) {
+            nextStreamEgg += ticks;
+        }
     }
 
     void save(CompoundTag tag) {

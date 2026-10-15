@@ -41,6 +41,15 @@ public class AntEggEntity extends Entity {
         this.colonyId = colonyId;
     }
 
+    /** The game time when the egg hatches; -1 until it lies in its place (the clock starts there). */
+    public long getHatchAt() {
+        return hatchAt;
+    }
+
+    public void setHatchAt(long gameTime) {
+        hatchAt = gameTime;
+    }
+
     public boolean isPlaced() {
         return placed;
     }
@@ -69,8 +78,20 @@ public class AntEggEntity extends Entity {
         tag.putBoolean("placed", placed);
     }
 
+    /** The game time of this one's last server tick (not saved: after a load it has always just come back). */
+    private long lastServerTick = Long.MIN_VALUE;
+
     @Override
     public void tick() {
+        if (level() instanceof ServerLevel serverLevel) {
+            // Back from being frozen in unloaded land while its colony was away: it is one of the colony's numbers now.
+            long now = serverLevel.getGameTime();
+            boolean gap = now != lastServerTick + 1;
+            lastServerTick = now;
+            if ((gap || tickCount % 20 == 0) && com.antcolonies.colony.AwayLife.backFromFrozen(serverLevel, this, colonyId)) {
+                return;
+            }
+        }
         super.tick();
         Vec3 motion = getDeltaMovement();
         setDeltaMovement(0, onGround() ? 0 : (motion.y - 0.04) * 0.98, 0);

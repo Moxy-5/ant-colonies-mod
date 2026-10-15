@@ -169,6 +169,14 @@ public class Population {
         putInside(caste, grownUpAt, count);
     }
 
+    /**
+     * A real mob frozen in unloaded land is folded into the numbers (see {@link AwayLife}): it is counted already, so
+     * only where it is changes, not the headcount.
+     */
+    void foldIn(String caste, long grownUpAt) {
+        putInside(caste, grownUpAt, 1);
+    }
+
     /** How many of this caste's numbers are of each job by age (young, middle-aged, old), for the colony list. */
     int[] insideByAge(long now) {
         int[] ages = new int[ColonyRole.values().length];
@@ -202,7 +210,7 @@ public class Population {
      * for each): the ones of each minute die off one by one between 90% and 110% of the lifespan. A dead ant is laid in
      * the refuse chamber if there is room (its nestmates carried it there); termites eat their dead in the garden.
      */
-    private void growOld(ServerLevel level) {
+    void growOld(ServerLevel level) {
         TreeMap<Long, Integer> workers = inside.get(WorkerAntEntity.CASTE);
         long lifespan = colony.profile().worker().lifespanTicks();
         if (workers == null || lifespan <= 0) {
@@ -235,7 +243,9 @@ public class Population {
             return;
         }
         colony.setCount(WorkerAntEntity.CASTE, colony.getCount(WorkerAntEntity.CASTE) - died);
-        if (!colony.refuse().eatsOrBuries()) {
+        if (!colony.away().isHere(level)) {
+            colony.away().oweBodies(died); // laid in the refuse chamber when the nest is loaded again (never touch unloaded land)
+        } else if (!colony.refuse().eatsOrBuries()) {
             for (int i = 0; i < died; i++) {
                 BlockPos spot = colony.refuse().pickCorpseSpot(level, level.getRandom());
                 if (spot == null || !colony.refuse().placeCorpse(level, spot)) {
@@ -310,6 +320,11 @@ public class Population {
             }
         }
         return eyes;
+    }
+
+    /** Where the eyes are of every player who could see into the nest (the watch radius and the sight together). */
+    List<Vec3> viewersInSight(ServerLevel level) {
+        return viewers(level, numbers().watchRadius() + (int) SIGHT);
     }
 
     /** Whether no player can see this point: too far, or a block is in the way. */

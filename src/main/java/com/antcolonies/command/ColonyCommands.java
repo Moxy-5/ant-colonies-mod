@@ -308,7 +308,7 @@ public class ColonyCommands {
                     + (colony.isQueenless() ? " | QUEENLESS: no new eggs, dwindling" : " | queen " + colony.getQueenId().toString().substring(0, 8))
                     + (colony.profile().nest().levelUnlocks().isEmpty() ? ""
                             : " | nest levels open " + Math.min(colony.nest().levelsUnlocked(level), colony.profile().nest().maxLevels()) + " of " + colony.profile().nest().maxLevels())
-                    + " | members " + colony.getMemberCount() + colony.population().describe(level)
+                    + " | members " + colony.getMemberCount() + colony.population().describe(level) + colony.away().describe(level)
                     + " | " + colony.describeJobs(level)
                     + (colony.profile().food().makesBread()
                             ? " | food " + colony.food().getFood() + " (rich " + colony.food().getRichSeeds() + ", eaten " + colony.food().getSeedsEaten() + ")"

@@ -327,6 +327,9 @@ public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurs
     @Override
     public void tick() {
         super.tick();
+        if (isRemoved()) {
+            return; // back from being frozen, it went into its colony's numbers (see colony.AwayLife)
+        }
         if (!(level() instanceof ServerLevel serverLevel)) {
             return;
         }

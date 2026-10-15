@@ -57,13 +57,20 @@ public class ColonyManager extends SavedData {
         }
     }
 
-    /** Once a second: every colony whose middle is loaded runs its own clock; a queenless one with nobody left is abandoned. */
+    /**
+     * Once a second: every colony whose middle is loaded runs its own clock; a queenless one with nobody left is
+     * abandoned. A colony whose middle is out of range lives on as numbers (the brain, part 2: {@link AwayLife#tickAway}).
+     */
     public void tickColonies(ServerLevel level) {
         for (Colony colony : java.util.List.copyOf(colonies.values())) {
-            if (!colony.isQueenless() && colony.getQueen(level) == null) {
-                continue; // her part of the world is not loaded (or a game test has cleared her away)
+            if (!colony.away().isHere(level)) {
+                colony.away().tickAway(level);
+                continue;
             }
-            if (level.isLoaded(colony.getCenter()) && !colony.tick(level)) {
+            if (!colony.isQueenless() && colony.getQueen(level) == null) {
+                continue; // her part of the world is not loaded yet (or a game test has cleared her away)
+            }
+            if (!colony.tick(level)) {
                 com.antcolonies.AntColoniesMod.LOGGER.info("[colony] queenless colony {} at {} has died out; its nest is abandoned",
                         colony.getId(), colony.getCenter().toShortString());
                 removeColony(colony.getId());

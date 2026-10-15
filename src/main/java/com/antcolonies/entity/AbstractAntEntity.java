@@ -484,8 +484,14 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         wasAttached = navigator.isAttached();
     }
 
+    /** The game time of this insect's last server tick (not saved: after a load it has always just come back). */
+    private long lastServerTick = Long.MIN_VALUE;
+
     @Override
     public void tick() {
+        if (level() instanceof ServerLevel serverLevel && nestCaste() != null && backFromFrozen(serverLevel)) {
+            return; // it was frozen in unloaded land and is one of its colony's numbers now: it has left the world
+        }
         boolean timed = !level().isClientSide && Perf.begin(Perf.Part.INSECTS);
         try {
             tickBody();
@@ -494,6 +500,18 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
                 Perf.end();
             }
         }
+    }
+
+    /**
+     * Whether this insect has just come back from being frozen (its chunk went out of range) and has left the world
+     * because its colony counts it among the numbers now ({@code colony.AwayLife}). Asked on the first tick after any gap,
+     * and once a second besides.
+     */
+    private boolean backFromFrozen(ServerLevel level) {
+        long now = level.getGameTime();
+        boolean gap = now != lastServerTick + 1;
+        lastServerTick = now;
+        return (gap || tickCount % 20 == 0) && com.antcolonies.colony.AwayLife.backFromFrozen(level, this, getColonyId());
     }
 
     private void tickBody() {

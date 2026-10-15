@@ -45,6 +45,26 @@ public class Brood {
 
     /** The eggs a worker is on its way to: egg -> game time when the claim runs out. Not saved. */
     private final Claims<UUID> claimedEggs = new Claims<>();
+    /**
+     * Young that are numbers, not real entities: eggs and larvae that were frozen while the colony was away (see
+     * {@link AwayLife}). They come back into the nursery as real ones once the nest is loaded and nobody can see. Saved.
+     */
+    private final List<Young> inside = new ArrayList<>();
+
+    /**
+     * One young as a number. An egg: {@code left} = ticks until it hatches ({@code -1}: not put in its place yet, the
+     * clock starts in the nursery). A larva (or nymph): {@code fed} pieces eaten so far, {@code left} = how long it had
+     * gone hungry, and the soldier it grows into (null: a worker). Step 2a: their clocks stop while they are numbers.
+     */
+    public record Young(boolean isEgg, long left, int fed, @Nullable TermiteSoldierEntity.Rank rank) {
+        public static Young egg(long hatchLeft) {
+            return new Young(true, hatchLeft, 0, null);
+        }
+
+        public static Young larva(int fed, long hungry, @Nullable TermiteSoldierEntity.Rank rank) {
+            return new Young(false, hungry, fed, rank);
+        }
+    }
 
     Brood(Colony colony) {
         this.colony = colony;
@@ -127,9 +147,82 @@ public class Brood {
         return getLarvae(level).size();
     }
 
-    /** Eggs and larvae together. */
+    /** Eggs and larvae together (the real ones and the ones that are numbers). */
     public int countBrood(Level level) {
-        return countEggs(level) + countLarvae(level);
+        return countEggs(level) + countLarvae(level) + inside.size();
+    }
+
+    // --- young as numbers (the brain, part 2) ----------------------------------------------------------------------
+
+    /** A young one becomes a number (it was frozen while the colony went away). */
+    void addInside(Young young) {
+        inside.add(young);
+    }
+
+    /** How many young are numbers now. */
+    public int insideCount() {
+        return inside.size();
+    }
+
+    /**
+     * The young that are numbers come back as real eggs and larvae, each on a free spot of the nursery (or a garden, or
+     * the queen's room) that no player can see, the clocks going on from where they stopped. Those with no such spot yet
+     * wait. True if any came back.
+     */
+    boolean comeOut(ServerLevel level, List<net.minecraft.world.phys.Vec3> eyes) {
+        boolean changed = false;
+        for (java.util.Iterator<Young> it = inside.iterator(); it.hasNext(); ) {
+            Young young = it.next();
+            BlockPos spot = pickEggSpot(level, level.getRandom());
+            if (spot == null) {
+                break; // no room: later
+            }
+            double height = restingHeight(level, spot);
+            net.minecraft.world.phys.Vec3 at = net.minecraft.world.phys.Vec3.atBottomCenterOf(spot).add(0, Math.max(0, height), 0);
+            if (height < 0 || !Population.outOfSight(level, at.add(0, 0.1, 0), eyes)) {
+                continue; // a player can see that spot (or something lies there): try the next one, the rest later
+            }
+            long now = level.getGameTime();
+            if (young.isEgg()) {
+                AntEggEntity egg = spawnEgg(level, at.x, at.y, at.z);
+                egg.setPlaced(true);
+                egg.setHatchAt(now + (young.left() < 0 ? colony.profile().brood().hatchTicks() : young.left()));
+            } else {
+                AntLarvaEntity larva = spawnLarva(level, at.x, at.y, at.z);
+                larva.setSoldierRank(young.rank());
+                larva.setMeal(colony.soldiers().mealFor(young.rank()));
+                larva.setFed(young.fed());
+                larva.setLastFed(now - young.left());
+            }
+            it.remove();
+            changed = true;
+        }
+        return changed;
+    }
+
+    void save(net.minecraft.nbt.CompoundTag tag) {
+        net.minecraft.nbt.ListTag list = new net.minecraft.nbt.ListTag();
+        for (Young young : inside) {
+            net.minecraft.nbt.CompoundTag entry = new net.minecraft.nbt.CompoundTag();
+            entry.putBoolean("egg", young.isEgg());
+            entry.putLong("left", young.left());
+            entry.putInt("fed", young.fed());
+            if (young.rank() != null) {
+                entry.putString("rank", young.rank().name());
+            }
+            list.add(entry);
+        }
+        tag.put("youngInside", list);
+    }
+
+    void load(net.minecraft.nbt.CompoundTag tag) {
+        inside.clear();
+        net.minecraft.nbt.ListTag list = tag.getList("youngInside", net.minecraft.nbt.Tag.TAG_COMPOUND);
+        for (int i = 0; i < list.size(); i++) {
+            net.minecraft.nbt.CompoundTag entry = list.getCompound(i);
+            TermiteSoldierEntity.Rank rank = entry.contains("rank") ? TermiteSoldierEntity.Rank.valueOf(entry.getString("rank")) : null;
+            inside.add(new Young(entry.getBoolean("egg"), entry.getLong("left"), entry.getInt("fed"), rank));
+        }
     }
 
     /** Whether there are as many young (eggs and larvae, in the nursery or lying about) as there may be: the queen is not fed then. */
