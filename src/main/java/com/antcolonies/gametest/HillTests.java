@@ -147,6 +147,154 @@ public class HillTests {
         });
     }
 
+    /**
+     * A termite colony on a hillside (the ground rises a block every 3 blocks to the east, 3 blocks up and down from the
+     * nest): termites build where they land, and the mound fills in round the slope (the user's decision of
+     * 2026-10-14). The workers build the first two stages of the mound: on the low side its foot is filled down to the
+     * ground, on the high side the hillside itself stands in for the mound's soil, and its hollows (the shaft, the
+     * tunnels) are open there too. Wet soil sets at once, as in the flat test.
+     */
+    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    public static void termitesBuildTheirMoundRoundAHillside(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        IntBinaryOperator rise = (x, z) -> Math.max(-3, Math.min(3, Math.floorDiv(x - MIDDLE, 3)));
+        shapeGround(helper, 25, rise);
+        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        helper.runAfterDelay(5, () -> {
+            helper.spawn(ModEntities.TERMITE_KING.get(), MIDDLE + 1, SURFACE, MIDDLE + 1);
+            for (int i = 0; i < 8; i++) {
+                helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE - 2 + i % 4, SURFACE, MIDDLE - 3 + i / 4);
+            }
+        });
+        int[] stage = {1};
+        int[] stageOneParts = {0};
+        helper.onEachTick(() -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            if (colony == null) {
+                return;
+            }
+            colony.setForagingTimeForTests(true);
+            if (colony.mound().getStage(level) != stage[0]) {
+                colony.mound().setStage(level, stage[0]);
+            }
+            // Wet soil sets at once, the mound's and the footing under it.
+            if (helper.getTick() % 20 == 0) {
+                for (BlockPos pos : BlockPos.betweenClosed(colony.getCenter().offset(-8, -4, -8), colony.getCenter().offset(8, 8, 8))) {
+                    net.minecraft.world.level.block.state.BlockState state = level.getBlockState(pos);
+                    if (state.getBlock() instanceof com.antcolonies.block.TermiteMoundBlock && com.antcolonies.block.TermiteMoundBlock.isFinished(state)
+                            && state.getValue(com.antcolonies.block.TermiteMoundBlock.AGE) == 0) {
+                        level.setBlockAndUpdate(pos, state.setValue(com.antcolonies.block.TermiteMoundBlock.AGE, 1));
+                    }
+                }
+            }
+            String missing = unbuilt(level, colony);
+            if (stage[0] == 1 && missing.isEmpty()) {
+                stage[0] = 2;
+                stageOneParts[0] = colony.mound().getParts(level).size();
+                AntColoniesMod.LOGGER.info("[hill-mound] tick {}: stage 1 built", helper.getTick());
+            } else if (stage[0] == 2 && missing.isEmpty() && colony.mound().getStage(level) == 2
+                    && colony.mound().getParts(level).size() > stageOneParts[0]) {
+                helper.assertTrue(level.getBlockState(colony.getCenter()).isAir(), "the entrance is not open");
+                AntColoniesMod.LOGGER.info("[hill-mound] tick {}: stage 2 built", helper.getTick());
+                helper.succeed();
+                return;
+            }
+            if (helper.getTick() % 1000 == 0) {
+                AntColoniesMod.LOGGER.info("[hill-mound] tick {}: stage {}, not built: {}", helper.getTick(), stage[0], missing);
+            }
+            helper.assertTrue(helper.getTick() < 38000, "stage " + stage[0] + " of the mound on the hillside is not built: " + missing);
+        });
+    }
+
+    /**
+     * The parts of the mound at its stage now that are not there yet (empty if it is built): a wall is finished mound
+     * soil or the natural earth of the hillside, a tunnel is a tunnel block, an open part is air. Pieces are not checked.
+     */
+    private static String unbuilt(ServerLevel level, Colony colony) {
+        StringBuilder missing = new StringBuilder();
+        int count = 0;
+        for (var entry : colony.mound().getParts(level).entrySet()) {
+            BlockPos pos = entry.getKey();
+            net.minecraft.world.level.block.state.BlockState state = level.getBlockState(pos);
+            boolean ok = switch (entry.getValue()) {
+                case WALL -> state.getBlock() instanceof com.antcolonies.block.TermiteMoundBlock && com.antcolonies.block.TermiteMoundBlock.isFinished(state)
+                        || state.is(com.antcolonies.registry.ModTags.DIGGABLE);
+                case TUNNEL -> state.getBlock() instanceof com.antcolonies.block.TermiteTunnelBlock;
+                case OPEN -> state.isAir();
+                case MOUTH, SPIRE, RAMP -> true;
+            };
+            if (!ok) {
+                if (count++ < 8) {
+                    missing.append(entry.getValue()).append(' ').append(pos.subtract(colony.getCenter()).toShortString())
+                            .append(" is ").append(state.getBlock().getName().getString()).append("; ");
+                }
+            }
+        }
+        return count == 0 ? "" : count + " parts: " + missing;
+    }
+
+    /**
+     * A harvester ant hill on ground with a step: the ground is a block higher from 2 blocks east of the entrance (a spot
+     * level enough for the queen to found on). The workers dig the nest and pile the soil into the hill round the hole;
+     * the hill's top follows its planned round shape from the hole, so on the higher side fewer pellets make it up and
+     * no column is left lower or piled higher than planned.
+     */
+    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
+    public static void antHillOnAStepKeepsItsRoundShape(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        IntBinaryOperator rise = (x, z) -> x >= MIDDLE + 2 ? 1 : 0;
+        shapeGround(helper, 25, rise);
+        helper.spawn(ModEntities.QUEEN_ANT.get(), MIDDLE, SURFACE, MIDDLE);
+        helper.runAfterDelay(5, () -> {
+            for (int i = 0; i < 6; i++) {
+                helper.spawn(ModEntities.WORKER_ANT.get(), MIDDLE - 2 + i % 3 * 2, SURFACE, MIDDLE - 3 + i / 3 * 6);
+            }
+        });
+        helper.runAfterDelay(10, () -> {
+            Colony colony = antColony(helper);
+            helper.assertTrue(colony != null, "no ant colony");
+            colony.setHungerOn(false);
+            colony.nest().unlockAllLevelsForTests();
+        });
+        helper.onEachTick(() -> {
+            Colony colony = antColony(helper);
+            if (colony == null || helper.getTick() < 20) {
+                return;
+            }
+            BlockPos entrance = colony.getCenter();
+            StringBuilder problems = new StringBuilder();
+            for (int dx = -4; dx <= 4; dx++) {
+                for (int dz = -4; dz <= 4; dz++) {
+                    int planned = com.antcolonies.colony.Hill.moundHeightAt(dx, dz);
+                    if (planned == 0) {
+                        continue;
+                    }
+                    int x = entrance.getX() + dx;
+                    int z = entrance.getZ() + dz;
+                    int top = entrance.getY() + 6;
+                    while (top > entrance.getY() - 4 && level.getBlockState(new BlockPos(x, top, z)).getCollisionShape(level, new BlockPos(x, top, z)).isEmpty()) {
+                        top--;
+                    }
+                    int want = entrance.getY() - 1 + planned; // the top block of the hill in this column
+                    if (top != want) {
+                        problems.append(String.format("(%d,%d) top %d not %d; ", dx, dz, top - entrance.getY(), want - entrance.getY()));
+                    }
+                }
+            }
+            if (problems.length() == 0 && colony.nest().findDigTarget(level) == null) {
+                AntColoniesMod.LOGGER.info("[hill-ant] tick {}: the hill is built at {}", helper.getTick(), entrance.toShortString());
+                helper.succeed();
+                return;
+            }
+            if (helper.getTick() % 2000 == 0) {
+                AntColoniesMod.LOGGER.info("[hill-ant] tick {}: {}", helper.getTick(), problems);
+            }
+            helper.assertTrue(helper.getTick() < 58000, "the hill is not its planned shape: " + problems);
+        });
+    }
+
     private static Colony antColony(GameTestHelper helper) {
         return com.antcolonies.colony.ColonyManager.get(helper.getLevel()).getColonies().stream()
                 .filter(c -> helper.getBounds().contains(net.minecraft.world.phys.Vec3.atCenterOf(c.getCenter()))

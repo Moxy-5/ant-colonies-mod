@@ -418,10 +418,33 @@ public class FoodStore {
         if (left > 0) {
             ItemStack pieces = cutPiece();
             pieces.setCount(left);
-            ItemEntity item = new ItemEntity(level, pos.getX() + 0.5, pos.getY() + 0.1, pos.getZ() + 0.5, pieces);
+            BlockPos drop = dropSpotBeside(level, pos);
+            ItemEntity item = new ItemEntity(level, drop.getX() + 0.5, drop.getY() + 0.1, drop.getZ() + 0.5, pieces);
             item.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
+            item.setUnlimitedLifetime(); // cut grass does not vanish: it lies until a forager carries it in
             level.addFreshEntity(item);
         }
+    }
+
+    /**
+     * Where the pieces of a plant cut out of a wall's or a runway's way are left: an open spot beside it on the ground,
+     * outside the nest and the runways (the plant's own spot gets the wall, and pieces in it could not be reached),
+     * else the spot itself.
+     */
+    private BlockPos dropSpotBeside(Level level, BlockPos pos) {
+        Set<BlockPos> nest = colony.nest().nestCells(level);
+        for (net.minecraft.core.Direction side : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+            BlockPos next = pos.relative(side);
+            if (!level.isLoaded(next) || nest.contains(next) || colony.nest().getRunways().stream().anyMatch(r -> r.cells().contains(next))) {
+                continue;
+            }
+            BlockState state = level.getBlockState(next);
+            if (state.getCollisionShape(level, next).isEmpty() && state.getFluidState().isEmpty()
+                    && level.getBlockState(next.below()).isFaceSturdy(level, next.below(), net.minecraft.core.Direction.UP)) {
+                return next;
+            }
+        }
+        return pos;
     }
 
     /**

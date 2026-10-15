@@ -12,6 +12,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.block.MoundPieceBlock;
+import com.antcolonies.block.MudCrustBlock;
 import com.antcolonies.block.MoundSoil;
 import com.antcolonies.block.TermiteHoleBlock;
 import com.antcolonies.block.TermiteMoundBlock;
@@ -332,10 +333,11 @@ public class Mound {
         BlockState state = level.getBlockState(pos);
         boolean empty = state.canBeReplaced() && state.getFluidState().isEmpty();
         boolean wet = state.getBlock() instanceof TermiteMoundBlock && !TermiteMoundBlock.isFinished(state);
+        boolean crust = MudCrustBlock.isCrust(state); // a thin wall of mud, packed full with soil
         return switch (part) {
             case OPEN -> isClearJob(level, pos) ? MoundGrowth.Job.CLEAR : null;
-            case WALL -> empty || wet ? MoundGrowth.Job.SOIL : isPieceBlock(state) ? MoundGrowth.Job.RESHAPE : null;
-            case TUNNEL -> empty || wet ? MoundGrowth.Job.SOIL : isCarveJob(level, pos) ? MoundGrowth.Job.CARVE
+            case WALL -> empty || wet || crust ? MoundGrowth.Job.SOIL : isPieceBlock(state) ? MoundGrowth.Job.RESHAPE : null;
+            case TUNNEL -> empty || wet || crust ? MoundGrowth.Job.SOIL : isCarveJob(level, pos) ? MoundGrowth.Job.CARVE
                     : isPieceBlock(state) ? MoundGrowth.Job.RESHAPE : null;
             case RAMP, SPIRE, MOUTH -> empty ? MoundGrowth.Job.PIECE
                     : isPieceBlock(state) && !isPlannedPiece(state, pos, part) ? MoundGrowth.Job.RESHAPE : null;
@@ -384,7 +386,7 @@ public class Mound {
         if (state.getBlock() instanceof TermiteMoundBlock) {
             return TermiteMoundBlock.isFinished(state);
         }
-        return !state.canBeReplaced();
+        return !TermiteMoundBlock.isRoomForSoil(state);
     }
 
     /**
@@ -427,7 +429,7 @@ public class Mound {
         if (state.getBlock() instanceof TermiteMoundBlock) {
             return TermiteMoundBlock.isFinished(state) ? null : wall;
         }
-        if (!state.canBeReplaced()) {
+        if (!TermiteMoundBlock.isRoomForSoil(state)) {
             return null;
         }
         if (TermiteMoundBlock.canStartAt(level, wall)) {
@@ -446,7 +448,7 @@ public class Mound {
             if (under.getBlock() instanceof TermiteMoundBlock) {
                 return TermiteMoundBlock.isFinished(under) ? null : below;
             }
-            if (!under.canBeReplaced()) {
+            if (!TermiteMoundBlock.isRoomForSoil(under)) {
                 return null;
             }
             if (TermiteMoundBlock.canStartAt(level, below)) {
@@ -932,7 +934,7 @@ public class Mound {
                 tunnels.add(pos);
             }
             if (isSoil(entry.getValue()) && offset.getY() == 0) {
-                for (int i = 1; i <= MAX_FOOTING && level.getBlockState(pos.below(i)).canBeReplaced(); i++) {
+                for (int i = 1; i <= MAX_FOOTING && TermiteMoundBlock.isRoomForSoil(level.getBlockState(pos.below(i))); i++) {
                     level.setBlock(pos.below(i), soil(3), 2);
                 }
             }

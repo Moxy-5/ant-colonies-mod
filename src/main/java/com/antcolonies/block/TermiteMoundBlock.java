@@ -114,6 +114,14 @@ public class TermiteMoundBlock extends Block {
      * Adds one layer of soil at {@code pos}: starts a new block in an empty space (only where {@link #canStartAt}
      * allows) or adds to a block still being built. False if nothing was added. For the termites' building job.
      */
+    /**
+     * Whether soil can go into a cell holding this: open space (air, grass) or a thin crust of mud (a wall of the nest
+     * that a whole block of soil walls off as well: the termites pack it full, e.g. under the foot of a mound on a slope).
+     */
+    public static boolean isRoomForSoil(BlockState state) {
+        return state.canBeReplaced() || MudCrustBlock.isCrust(state);
+    }
+
     public boolean addLayer(Level level, BlockPos pos) {
         BlockState here = level.getBlockState(pos);
         if (here.is(this)) {
@@ -122,7 +130,7 @@ public class TermiteMoundBlock extends Block {
             }
             return level.setBlockAndUpdate(pos, here.setValue(LAYERS, here.getValue(LAYERS) + 1));
         }
-        if (!here.canBeReplaced() || !canStartAt(level, pos)) {
+        if (!isRoomForSoil(here) || !canStartAt(level, pos)) {
             return false;
         }
         return level.setBlockAndUpdate(pos, defaultBlockState());
