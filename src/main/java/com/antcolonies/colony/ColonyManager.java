@@ -78,6 +78,15 @@ public class ColonyManager extends SavedData {
         }
     }
 
+    /**
+     * Tests only: the game was saved and loaded again (the player quit and came back): this copy, loaded from the
+     * colony's save, takes the place of the colony with its id.
+     */
+    public void replaceForTests(Colony copy) {
+        colonies.put(copy.getId(), copy);
+        setDirty();
+    }
+
     public void removeColony(UUID id) {
         if (colonies.remove(id) != null) {
             setDirty();

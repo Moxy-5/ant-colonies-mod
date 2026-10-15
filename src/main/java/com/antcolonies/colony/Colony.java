@@ -59,6 +59,11 @@ public class Colony {
     /** Tests only: forces foraging time on or off (null: the real clock and weather). Not saved. */
     @Nullable
     private Boolean foragingTimeForTests;
+    /** Tests only: pretend it is day or night, raining or not (null: the real clock and weather). Not saved. */
+    @Nullable
+    private Boolean dayForTests;
+    @Nullable
+    private Boolean rainForTests;
 
     private final Nest nest;
     private final NestWalls walls;
@@ -251,7 +256,8 @@ public class Colony {
         if (foragingTimeForTests != null) {
             return foragingTimeForTests;
         }
-        return profile().food().foragesNow(level.isDay() || isBeforeDawn(level), level.isRaining());
+        boolean day = dayForTests != null ? dayForTests : level.isDay() || isBeforeDawn(level);
+        return profile().food().foragesNow(day, rainForTests != null ? rainForTests : level.isRaining());
     }
 
     /**
@@ -279,6 +285,16 @@ public class Colony {
     /** Tests only: forces foraging time on or off (null for the real clock and weather). */
     public void setForagingTimeForTests(@Nullable Boolean on) {
         foragingTimeForTests = on;
+    }
+
+    /**
+     * Tests only: pretend it is day or night and raining or not, for the foraging time (null: the real clock and
+     * weather). Unlike {@link #setForagingTimeForTests} the species' own rule decides, and only this colony sees it (the
+     * test world's real rain would reach every test running beside it).
+     */
+    public void setSkyForTests(@Nullable Boolean day, @Nullable Boolean raining) {
+        dayForTests = day;
+        rainForTests = raining;
     }
 
     public UUID getId() {

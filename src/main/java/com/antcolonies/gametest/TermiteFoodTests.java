@@ -239,7 +239,9 @@ public class TermiteFoodTests {
      * worker is put down beside it (as the user tests it): it finds the hay and, once it is back inside, tells the
      * colony. Then "night": the foragers go for the hay (worth far more) rather than the grass by the holes. Checked:
      * the hay is unknown at first, found and then known only once the finder is inside, and by the time 8 pieces are cut
-     * off the hay at most half as many have been cut off the grass.
+     * off the hay at most half as many have been cut off the grass. Brain part 3: the brain (the foraging numbers' memory)
+     * never remembers the hay before the colony knows of it, and once it does it remembers the walk to it by the nearest
+     * way out, and that it lies out in the open (not to be eaten from inside by day).
      */
     @GameTest(template = "arena", timeoutTicks = 8000, skyAccess = true)
     public static void aWorkerFindsAHayBaleAndTheForagersGoForItRatherThanTheGrass(GameTestHelper helper) {
@@ -289,9 +291,11 @@ public class TermiteFoodTests {
             finder[0].moveTo(beside.getX() + 0.5, beside.getY(), beside.getZ() + 0.5, 0.0F, 0.0F);
             finder[0].joinColony(colony); // (on its own it joins the nearest colony, which can be a neighbouring test's)
             level.addFreshEntity(finder[0]);
+            colony.field().setOnForTests(true); // (brain part 3: the brain looks at the food; the colony has no numbers to forage)
             phase[0] = 1;
         });
         boolean[] sawUntold = {false};
+        long[] knownAt = {-1};
         helper.onEachTick(() -> {
             Colony colony = TermiteMoundTests.colony(helper);
             if (colony == null || phase[0] == 0 || finder[0] == null) {
@@ -305,6 +309,9 @@ public class TermiteFoodTests {
                             colony.getId().equals(f.getColonyId()), f.getLastHurtByMob(), colony.foodMap().isFoundButUntold(spots[0]),
                             colony.foragingHoles().waysOut(level).size(), colony.alarm().describe(level));
                 }
+                // Brain part 3: the brain never remembers food nobody has found and told of.
+                helper.assertTrue(colony.foodMap().isKnown(spots[0]) || !colony.field().remembers(spots[0]),
+                        "the brain remembers the hay before the colony knows of it");
                 if (colony.foodMap().isFoundButUntold(spots[0])) {
                     sawUntold[0] = true;
                     helper.assertTrue(!colony.foodMap().isKnown(spots[0]), "the hay is known before its finder is back inside");
@@ -313,9 +320,22 @@ public class TermiteFoodTests {
                     helper.assertTrue(sawUntold[0], "the colony knew of the hay without anyone finding it first");
                     helper.assertTrue(colony.nest().isInside(level, finder[0].blockPosition()), "the hay is known while its finder is still outside");
                     colony.setForagingTimeForTests(true);
+                    knownAt[0] = helper.getTick();
                     phase[0] = 2;
                     AntColoniesMod.LOGGER.info("[find-test] tick {}: the hay is known, night", helper.getTick());
                 }
+            } else if (knownAt[0] >= 0 && helper.getTick() == knownAt[0] + 140) {
+                // Brain part 3: once known, the brain remembers the hay (its look comes every 5 seconds) with the walk
+                // there and back to the nest's middle by the nearest way out: at most the 11 blocks out from the first
+                // hole and from that hole to the middle, at least the straight line.
+                BlockPos hole = colony.nest().getForagingTunnels(level).get(0).hole();
+                BlockPos center = colony.getCenter();
+                double viaHole = flat(spots[0], hole) + flat(hole, center);
+                float walk = colony.field().walkTo(spots[0]);
+                helper.assertTrue(colony.field().remembers(spots[0]) && walk <= viaHole + 0.01 && walk >= flat(spots[0], center) - 0.01,
+                        "the brain should remember the hay with its walk: " + walk + " (by the first hole " + viaHole + ", straight "
+                                + flat(spots[0], center) + ")");
+                helper.assertTrue(!colony.field().remembersFromInside(spots[0]), "hay out in the open cannot be eaten from inside");
             } else if (helper.getTick() % 500 == 0) {
                 AntColoniesMod.LOGGER.info("[find-test] tick {}: hay cut {}, grass cut {} and {}; {}", helper.getTick(),
                         colony.food().getPiecesCut(spots[0]), grassCut(level, colony, spots[1]), grassCut(level, colony, spots[2]),
@@ -330,6 +350,11 @@ public class TermiteFoodTests {
             helper.assertTrue(hay >= 8, "only " + hay + " pieces cut off the hay (grass " + grass + ")");
             helper.assertTrue(grass * 2 <= hay, grass + " pieces cut off the grass by the holes, " + hay + " off the hay");
         });
+    }
+
+    /** The distance (blocks) between two spots, sideways. */
+    private static double flat(BlockPos a, BlockPos b) {
+        return Math.sqrt(Math.pow(a.getX() - b.getX(), 2) + Math.pow(a.getZ() - b.getZ(), 2));
     }
 
     /** How many pieces were cut off the tuft at this spot (all of them if it is gone). */

@@ -255,6 +255,8 @@ public class TermiteNewHoleTests {
      * Like {@link #aFallenLogAndTheStumpOnItAreEatenFromBelowByDay}, with the log lying on the edge of a step: the ground beside it on
      * one side is 2 blocks lower (the user's tree in the savanna, whose gallery was left out, 2026-10-14). The open side
      * of the gallery is walled with a mud crust as it is dug (wall first), and the log is eaten from below by day.
+     * Brain part 3: by day the brain remembers the log as food that can be eaten from inside, and the forager numbers go
+     * to it then too (they forage by day only what they can eat from inside).
      */
     @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
     public static void aFallenLogOnTheEdgeOfAStepIsEatenFromBelowByDay(GameTestHelper helper) {
@@ -318,6 +320,7 @@ public class TermiteNewHoleTests {
         BlockPos stump = log.get(0).above(); // put on the log at dawn (Food.STUMP)
         int[] phase = {0}; // 0 setting up, 1 night: tunnel and gallery dug, 2 day: eaten from below
         int[] eatenAtDawn = {0};
+        boolean[] numbersAte = {kind != Food.LOG}; // (brain part 3, the log test only)
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
@@ -415,6 +418,9 @@ public class TermiteNewHoleTests {
                     if (tunnel.gallery().stream().allMatch(c -> Nest.isDugOut(level, c))) {
                         colony.setForagingTimeForTests(false); // day
                         eatenAtDawn[0] = eaten;
+                        if (kind == Food.LOG) {
+                            colony.field().setOnForTests(true); // (brain part 3: the 500 numbers forage too, by day only from inside)
+                        }
                         phase[0] = 2;
                         if (kind == Food.STUMP) {
                             // The stump on the log; it and every block of the log nearly eaten (quicker, and alike, so the
@@ -443,6 +449,11 @@ public class TermiteNewHoleTests {
                 }
             }
             helper.assertTrue(!colony.isForagingTime(level), "foraging time");
+            if (!numbersAte[0] && colony.field().foragersOut() > 0) {
+                helper.assertTrue(log.stream().anyMatch(colony.field()::remembersFromInside),
+                        "by day the numbers should only go to food they can eat from inside");
+                numbersAte[0] = true;
+            }
             BlockState under = level.getBlockState(log.get(0));
             BlockState top = level.getBlockState(stump);
             if (kind == Food.STUMP) {
@@ -462,10 +473,11 @@ public class TermiteNewHoleTests {
                 if (eaten > eatenAtDawn[0] && cased > 0) {
                     helper.succeed();
                 }
-            } else if (eaten > eatenAtDawn[0] && (!onAStep || crusts > 0)) {
+            } else if (eaten > eatenAtDawn[0] && (!onAStep || crusts > 0) && numbersAte[0]) {
                 helper.succeed();
             }
-            helper.assertTrue(helper.getTick() < 59000, "by day: eaten " + eaten + " (at dawn " + eatenAtDawn[0] + "), " + crusts
+            helper.assertTrue(helper.getTick() < 59000, "by day: eaten " + eaten + " (at dawn " + eatenAtDawn[0] + "), numbers ate " + numbersAte[0]
+                    + " (" + colony.field().describe() + ", from inside " + log.stream().filter(colony.field()::remembersFromInside).count() + "), " + crusts
                     + " crust walls beside the gallery, " + colony.walls().getLeaks(level).size() + " leaks, log " + under + ", stump " + top
                     + ": first log block seen " + colony.food().plants(level).contains(log.get(0)) + ", gallery under it "
                     + tunnel.gallery().contains(log.get(0).below()) + ", eaten from inside " + colony.food().isFeedableFromInside(level, log.get(0))

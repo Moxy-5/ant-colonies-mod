@@ -321,6 +321,18 @@ public class FieldLife {
         return known.containsKey(plant);
     }
 
+    /** The walk (blocks) the brain remembers to this plant, by the way out that makes it shortest; -1 if it does not remember it. For tests. */
+    public float walkTo(BlockPos plant) {
+        Plant known = this.known.get(plant);
+        return known == null ? -1 : known.trip();
+    }
+
+    /** Whether the brain remembers this plant as one that can be eaten from inside the nest (by day too). For tests. */
+    public boolean remembersFromInside(BlockPos plant) {
+        Plant known = this.known.get(plant);
+        return known != null && known.fromInside();
+    }
+
     /** How many plants the numbers have cut at whose blocks do not show it yet. For tests. */
     public int owedCount() {
         return owed.size();

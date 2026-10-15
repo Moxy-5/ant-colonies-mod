@@ -493,15 +493,20 @@ public class AwayTests {
      * foraged (dry grass cannot be eaten from inside). At night the numbers eat the 3 known tufts up (6 pieces into the
      * comb's count); they vanish out of sight and are remembered to grow back 3 days after they were eaten; the unknown
      * tuft is left.
+     * <p>Brain part 3, in the same scene: then the species' own rule decides (the profile's {@code forage_at}, with a
+     * pretend sky): on a dry day 2 more known tufts are left; in the rain by day they are eaten (real Macrotermes forage
+     * in the wet); on a dry night with the alarm at 2 nothing is foraged; the alarm calmed but the store full (as the
+     * brain last saw it), nothing either; with room again, 2 more tufts are eaten up.
      */
-    @GameTest(template = "arena", timeoutTicks = 1800, skyAccess = true)
-    public static void termiteNumbersForageKnownDryGrassOnlyAtNight(GameTestHelper helper) {
+    @GameTest(template = "arena", timeoutTicks = 4900, skyAccess = true)
+    public static void termiteNumbersForageKnownDryGrassOnlyAtNightOrInTheRain(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         TermiteMoundTests.deepGround(helper);
         helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
         List<BlockPos> tufts = new ArrayList<>();
         int[] foodBefore = new int[1];
         long[] nightFrom = new long[1];
+        List<BlockPos> more = new ArrayList<>(); // (brain part 3: the tufts of the later phases)
         helper.onEachTick(() -> noRealWorkers(helper));
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
@@ -555,8 +560,80 @@ public class AwayTests {
                     && colony.food().getPiecesCut(tufts.get(3)) == 2, "the tuft nobody found should be left: cut " + colony.food().getPiecesCut(tufts.get(3)));
             helper.assertTrue(colony.food().getFood() == foodBefore[0] + 6, "6 pieces should have come in: " + colony.food().getFood()
                     + ", was " + foodBefore[0]);
+            // Brain part 3: by the species' own rule now (not forced): a dry day first, 2 more known tufts.
+            colony.setForagingTimeForTests(null);
+            colony.setSkyForTests(true, false);
+            more.add(knownDryTuft(helper, colony, MIDDLE + 6, MIDDLE + 6));
+            more.add(knownDryTuft(helper, colony, MIDDLE - 6, MIDDLE - 6));
+        });
+        helper.runAfterDelay(1800, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(!colony.isForagingTime(level), "a dry day should be no foraging time for termites");
+            for (BlockPos tuft : more) {
+                helper.assertTrue(colony.field().remembers(tuft) && colony.food().getPiecesCut(tuft) == 2,
+                        "a known tuft should be remembered and left on a dry day: " + tuft + " cut " + colony.food().getPiecesCut(tuft));
+            }
+            colony.setSkyForTests(true, true); // rain by day: real Macrotermes forage in the wet too
+            foodBefore[0] = colony.food().getFood();
+        });
+        helper.runAfterDelay(2900, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            AntColoniesMod.LOGGER.info("[away-test] part 3 termites in the rain: food {}{}", colony.food().getFood(), colony.field().describe());
+            helper.assertTrue(colony.isForagingTime(level), "rain should be foraging time for termites, by day too");
+            for (BlockPos tuft : more) {
+                helper.assertTrue(level.getBlockState(tuft).isAir(), "a known tuft should be eaten up in the rain: " + tuft);
+            }
+            helper.assertTrue(colony.food().getFood() == foodBefore[0] + 4, "4 pieces should have come in during the rain: "
+                    + colony.food().getFood() + ", was " + foodBefore[0]);
+            // A dry night, but an enemy at the foragers: the alarm at 2 keeps everyone in.
+            more.clear();
+            more.add(knownDryTuft(helper, colony, MIDDLE + 6, MIDDLE - 6));
+            more.add(knownDryTuft(helper, colony, MIDDLE - 6, MIDDLE + 6));
+            colony.setSkyForTests(false, false);
+            colony.alarm().raise(level, 2, colony.getCenter(), null);
+            foodBefore[0] = colony.food().getFood();
+        });
+        helper.runAfterDelay(3200, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(colony.alarm().keepsEveryoneIn(level), "the alarm should still keep everyone in");
+            for (BlockPos tuft : more) {
+                helper.assertTrue(colony.field().remembers(tuft) && colony.food().getPiecesCut(tuft) == 2,
+                        "nothing should be foraged while the alarm keeps everyone in: " + tuft + " cut " + colony.food().getPiecesCut(tuft));
+            }
+            // The alarm calms, but the food store is full (as the brain last saw it).
+            colony.alarm().calmForTests();
+            colony.food().setRoomForTests(0);
+        });
+        helper.runAfterDelay(3500, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(colony.isForagingTime(level), "a calm night should be foraging time");
+            for (BlockPos tuft : more) {
+                helper.assertTrue(colony.food().getPiecesCut(tuft) == 2, "nothing should be foraged while the store has no room: " + tuft
+                        + " cut " + colony.food().getPiecesCut(tuft));
+            }
+            helper.assertTrue(colony.food().getFood() == foodBefore[0], "no food with the store full: " + colony.food().getFood());
+            colony.food().setRoomForTests(null); // room again
+        });
+        helper.runAfterDelay(4600, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            for (BlockPos tuft : more) {
+                helper.assertTrue(level.getBlockState(tuft).isAir(), "with room again the tuft should be eaten up: " + tuft);
+            }
+            helper.assertTrue(colony.food().getFood() == foodBefore[0] + 4, "4 pieces should have come in: " + colony.food().getFood()
+                    + ", was " + foodBefore[0]);
             helper.succeed();
         });
+    }
+
+    /** A tuft of dry grass (on a grass block) with 2 of its 4 pieces cut already, which the colony knows. */
+    static BlockPos knownDryTuft(GameTestHelper helper, Colony colony, int x, int z) {
+        BlockPos tuft = helper.absolutePos(new BlockPos(x, SURFACE, z));
+        helper.getLevel().setBlock(tuft.below(), Blocks.GRASS_BLOCK.defaultBlockState(), 3);
+        helper.getLevel().setBlock(tuft, com.antcolonies.registry.ModBlocks.DRY_GRASS.get().defaultBlockState(), 3);
+        colony.food().setPiecesCutForTests(tuft, 2);
+        colony.foodMap().knowForTests(tuft);
+        colony.food().rescanPlantsSoon();
+        return tuft;
     }
 
     /** The comb blocks' layers by age and their nodules, added up: fresh, ripe, old, nodules, layers. */
@@ -581,8 +658,9 @@ public class AwayTests {
      * grows from them), nodules grow, old layers crumble (out of the food count), all as counts owed to the blocks; the
      * known ages still add up to the layers counted; the nurses feed the queen nodules and she lays her stream. Then the
      * workers' and soldiers' meals come due: the young share eat nodules, the old ones old comb (4 meals a piece), the
-     * soldiers a nodule each, and nobody is left hungry. Back in range, the blocks catch up: the ledger empties and the
-     * comb blocks hold just the ages and nodules the brain counted.
+     * soldiers a nodule each, and nobody is left hungry. Then (brain part 3) the game is saved and loaded again while
+     * away, and the loaded copy carries on. Back in range, the blocks catch up: the ledger empties and the comb blocks
+     * hold just the ages and nodules the brain counted.
      * <p>Step 2d in the same scene: the colony has earned the mound's second stage and nothing of it is built. While away
      * nothing is built (the land is not loaded), the builders' time is counted. Back in range a pretend player looks at the
      * mound's place: nothing goes up while it is seen. The player gone: the mound goes up out of sight, every block of it
@@ -708,6 +786,23 @@ public class AwayTests {
             int known = colony.garden().freshKnown() + colony.garden().ripeKnown() + colony.garden().oldKnown();
             helper.assertTrue(known == colony.food().getFood(), "after the meals the known ages (" + known + " layers) should still add up to the "
                     + colony.food().getFood() + " counted");
+            // Brain part 3: the game is saved and loaded again while away; the loaded colony comes back below (the comb
+            // blocks must then show what the copy counted, and the mound must go up from the copy's building time).
+            Colony original = colony;
+            colony = saveAndLoad(helper, colony);
+            colony.setForagingTimeForTests(false);
+            colony.setHungerOn(true);
+            colony.population().setOnForTests(false);
+            colony.population().setViewersForTests(List.of());
+            colony.away().setOnForTests(true);
+            colony.away().setGraceForTests(20L);
+            colony.away().setAwayForTests(true);
+            helper.assertTrue(colony.garden().freshKnown() == original.garden().freshKnown() && colony.garden().ripeKnown() == original.garden().ripeKnown()
+                    && colony.garden().oldKnown() == original.garden().oldKnown() && colony.life().nurseFoodLeft(level) == original.life().nurseFoodLeft(level)
+                    && colony.food().getFood() == original.food().getFood() && colony.building().work() == original.building().work()
+                    && colony.queenCare().getEggsLaid() == original.queenCare().getEggsLaid()
+                    && colony.brood().insideCount() == original.brood().insideCount() && colony.population().hungry(level) == 0,
+                    "the loaded colony should know its comb, nodules, food, eggs, young, meals and building time as before the save");
             // Back in range: what the brain counted is what the blocks must show once they have caught up.
             helper.assertTrue(!colony.ledger().isEmpty(), "the blocks should owe something");
             helper.assertTrue(colony.mound().countFinished(level) == 0 && colony.building().hasWork(),
@@ -788,5 +883,398 @@ public class AwayTests {
                     + report.describe());
             helper.succeed();
         }
+    }
+
+    // --- brain part 3: the brain's own tests (the user's plan, 2026-10-15) ----------------------------------------
+
+    /** The save as text with every list sorted and every key in order, so two saves of the same colony read the same. */
+    static String canon(net.minecraft.nbt.Tag tag) {
+        if (tag instanceof CompoundTag compound) {
+            List<String> keys = new ArrayList<>(compound.getAllKeys());
+            java.util.Collections.sort(keys);
+            StringBuilder text = new StringBuilder("{");
+            for (String key : keys) {
+                text.append(key).append(':').append(canon(compound.get(key))).append(',');
+            }
+            return text.append('}').toString();
+        }
+        if (tag instanceof net.minecraft.nbt.ListTag list) {
+            List<String> items = new ArrayList<>();
+            list.forEach(item -> items.add(canon(item)));
+            java.util.Collections.sort(items); // (a map saved as a list: its order may change from one load to the next)
+            return items.toString();
+        }
+        return tag.toString();
+    }
+
+    /**
+     * The game is saved and loaded again while the colony is away (the player quit far from it and came back another
+     * day): the colony is written to the save, read back as a new copy, and the copy takes its place. Checked: the copy
+     * writes exactly the same save (nothing saved is lost or read back wrong); the parts that differ are named. The test
+     * switches (never saved) must be set again on the copy by the caller.
+     */
+    static Colony saveAndLoad(GameTestHelper helper, Colony colony) {
+        CompoundTag saved = colony.save();
+        Colony copy = Colony.load(saved);
+        CompoundTag again = copy.save();
+        List<String> differ = new ArrayList<>();
+        Set<String> keys = new HashSet<>(saved.getAllKeys());
+        keys.addAll(again.getAllKeys());
+        for (String key : keys) {
+            net.minecraft.nbt.Tag before = saved.get(key);
+            net.minecraft.nbt.Tag after = again.get(key);
+            if (before == null || after == null || !canon(before).equals(canon(after))) {
+                differ.add(key + ": " + before + " -> " + after);
+            }
+        }
+        helper.assertTrue(differ.isEmpty(), "the colony loaded from its save should save the same: " + differ);
+        ColonyManager.get(helper.getLevel()).replaceForTests(copy);
+        return copy;
+    }
+
+    /** The colony with this id (also while its queen is frozen, or dead). */
+    static Colony byId(GameTestHelper helper, UUID id) {
+        Colony colony = ColonyManager.get(helper.getLevel()).getColony(id);
+        helper.assertTrue(colony != null, "the colony is gone");
+        return colony;
+    }
+
+    /**
+     * Brain part 3, the ant colony away: everything at once, through a save and load. A harvester ant colony with 300
+     * worker numbers of every age (nurses, builders, foragers, as the real division of labour), 48 seeds in the store,
+     * its refuse chamber not dug yet, the queen in her room about to lay; 4 tufts of grass (2 seeds left on each) the
+     * brain remembers, seen by a pretend player while the colony is here. It goes away (an egg and 2 hungry larvae as
+     * numbers too). Partway the game is saved and loaded again, and the loaded colony lives on: the nurses mill seeds
+     * into bread and feed the queen and the young, the queen's egg comes out, the 3 young grow up into workers (and hers too, in time),
+     * the foragers bring in the 8 seeds from the remembered tufts (none were cut while the player watched), and the
+     * builders' time is counted (nothing dug while away); the away report counts all of it, from before the save and
+     * after. Back in range, out of sight: the refuse chamber is dug, its soil heaped on the hill, the eaten tufts are
+     * gone, the young not grown up yet lie in the nursery, and the blocks have caught up with the counts.
+     */
+    @GameTest(template = "arena", timeoutTicks = 2200, skyAccess = true)
+    public static void anAntColonyAwayLivesOnThroughASaveAndLoadAndCatchesUpOnReturn(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        startAntColony(helper);
+        List<BlockPos> undug = new ArrayList<>();
+        List<BlockPos> tufts = new ArrayList<>();
+        UUID[] id = new UUID[1];
+        CompoundTag[] queenOnDisk = new CompoundTag[1];
+        int[] foodBefore = new int[1];
+        int[] eggsLaid = new int[1];
+        helper.onEachTick(() -> noRealWorkers(helper));
+        helper.runAfterDelay(15, () -> {
+            Colony colony = antColony(helper);
+            id[0] = colony.getId();
+            colony.population().setOnForTests(false); // no swapping: the numbers stay numbers
+            colony.setHungerOn(true);
+            BlockPos room = colony.nest().getFinishedRoomCenter(level);
+            helper.assertTrue(room != null, "the queen's room should be dug");
+            colony.getQueen(level).teleportTo(room.getX() + 0.5, room.getY(), room.getZ() + 0.5);
+            colony.queenCare().setQueenLastFed(level.getGameTime());
+            NestPlan.Chamber refuse = colony.nest().getPlannedChambers(level).stream().filter(c -> c.kind() == NestPlan.Kind.REFUSE)
+                    .findFirst().orElse(null);
+            helper.assertTrue(refuse != null, "the nest should plan a refuse chamber");
+            for (BlockPos cell : refuse.room()) {
+                level.setBlock(cell, Blocks.DIRT.defaultBlockState(), 3);
+                undug.add(cell);
+            }
+            long now = level.getGameTime();
+            var worker = colony.profile().worker();
+            colony.population().addNewMembers(WorkerAntEntity.CASTE, now, 100); // young: nurses
+            colony.population().addNewMembers(WorkerAntEntity.CASTE, now - worker.nurseUntilTicks() - 1200, 100); // builders
+            colony.population().addNewMembers(WorkerAntEntity.CASTE, now - worker.builderUntilTicks() - 1200, 100); // foragers
+            List<BlockPos> store = colony.nest().getFoodStoreCells(level);
+            for (int i = 0; i < 48; i++) {
+                helper.assertTrue(colony.food().depositSeed(level, store.get(i % store.size())), "could not put a seed in the store");
+            }
+            for (int i = 0; i < 4; i++) {
+                BlockPos tuft = helper.absolutePos(new BlockPos(1 + 2 * (i % 2), SURFACE, 1 + 2 * (i / 2)));
+                level.setBlock(tuft, Blocks.SHORT_GRASS.defaultBlockState(), 3);
+                colony.food().setPiecesCutForTests(tuft, 8);
+                tufts.add(tuft);
+            }
+            // A pretend player looks at the tufts while the colony is here: the numbers leave them to the real foragers.
+            colony.population().setViewersForTests(List.of(Vec3.atCenterOf(helper.absolutePos(new BlockPos(3, SURFACE + 2, 6)))));
+            colony.food().rescanPlantsSoon();
+            colony.field().setOnForTests(true);
+        });
+        helper.runAfterDelay(160, () -> {
+            Colony colony = byId(helper, id[0]);
+            for (BlockPos tuft : tufts) {
+                helper.assertTrue(colony.field().remembers(tuft) && colony.food().getPiecesCut(tuft) == 8,
+                        "the brain should remember the tuft and leave it while it is seen: " + tuft + " cut " + colony.food().getPiecesCut(tuft));
+            }
+            helper.assertTrue(colony.queenCare().isQueenHome(level), "the queen should be in her room");
+            eggsLaid[0] = colony.queenCare().getEggsLaid();
+            foodBefore[0] = colony.food().getFood();
+            colony.queenCare().setEggDueForTests(level.getGameTime() + 60);
+            colony.away().setOnForTests(true);
+            colony.away().setGraceForTests(20L);
+            queenOnDisk[0] = freezeAndUnload(colony, level, colony.getQueen(level));
+            colony.away().setAwayForTests(true);
+            colony.population().setViewersForTests(List.of()); // the player has gone far away
+            colony.brood().addInsideForTests(Brood.Young.egg(100));
+            colony.brood().addInsideForTests(Brood.Young.larva(0, 0, null));
+            colony.brood().addInsideForTests(Brood.Young.larva(0, 0, null));
+        });
+        helper.runAfterDelay(400, () -> {
+            Colony colony = byId(helper, id[0]);
+            AntColoniesMod.LOGGER.info("[away-test] part 3 ants, before the save: {}{}{}", colony.population().describe(level),
+                    colony.away().describe(level), colony.field().describe());
+            helper.assertTrue(colony.away().isAway(level), "the colony should be away");
+            helper.assertTrue(!colony.away().report().isEmpty() && colony.building().hasWork(),
+                    "something should have happened before the save: " + colony.away().report().describe() + ", building " + colony.building().work());
+            // The game is saved and loaded again: the loaded colony takes over (the test switches are set again).
+            Colony copy = saveAndLoad(helper, colony);
+            copy.away().setOnForTests(true);
+            copy.away().setGraceForTests(20L);
+            copy.away().setAwayForTests(true);
+            copy.population().setOnForTests(false);
+            copy.population().setViewersForTests(List.of());
+            copy.field().setOnForTests(true);
+            copy.setHungerOn(true);
+            helper.assertTrue(copy.getCount(WorkerAntEntity.CASTE) == colony.getCount(WorkerAntEntity.CASTE)
+                    && copy.brood().insideCount() == colony.brood().insideCount() && copy.building().work() == colony.building().work()
+                    && copy.away().report().describe().equals(colony.away().report().describe())
+                    && copy.ledger().describe().equals(colony.ledger().describe()),
+                    "the loaded colony should be the same: " + copy.population().describe(level) + copy.away().describe(level));
+        });
+        helper.runAfterDelay(1600, () -> {
+            Colony colony = byId(helper, id[0]);
+            AntColoniesMod.LOGGER.info("[away-test] part 3 ants, after the save: food {}{}{}{}", colony.food().getFood(),
+                    colony.population().describe(level), colony.away().describe(level), colony.field().describe());
+            helper.assertTrue(colony.away().isAway(level), "the colony should still be away");
+            AwayReport report = colony.away().report();
+            // (the queen's own egg may have grown up too by now)
+            int grew = report.get(AwayReport.What.GREW_UP);
+            helper.assertTrue(grew >= 3 && colony.getCount(WorkerAntEntity.CASTE) == 300 + grew && colony.population().inside(WorkerAntEntity.CASTE) == 300 + grew,
+                    "the egg and the 2 larvae should have grown up into workers (300 and those grown up): "
+                            + colony.getCount(WorkerAntEntity.CASTE) + ", " + report.describe());
+            helper.assertTrue(colony.queenCare().getEggsLaid() == eggsLaid[0] + 1 && report.get(AwayReport.What.EGGS_LAID) == 1,
+                    "the queen's egg should have come out while away (before the save) and be counted: " + report.describe());
+            helper.assertTrue(report.get(AwayReport.What.QUEEN_FED) > 0 && report.get(AwayReport.What.YOUNG_FED) > 0
+                    && report.get(AwayReport.What.BREAD_MADE) > 0, "the nurses should mill bread and feed the queen and the young: " + report.describe());
+            helper.assertTrue(report.get(AwayReport.What.FORAGED) == 8 && report.get(AwayReport.What.PLANTS_USED_UP) == 4,
+                    "the foragers should bring in the 8 seeds left on the remembered tufts: " + report.describe());
+            helper.assertTrue(colony.food().getFood() + report.get(AwayReport.What.BREAD_MADE) == foodBefore[0] + 8,
+                    "every seed brought in should be in the store or milled: " + colony.food().getFood() + " food, " + report.describe()
+                            + ", was " + foodBefore[0]);
+            helper.assertTrue(undug.stream().allMatch(cell -> level.getBlockState(cell).is(Blocks.DIRT)) && hillBlocks(level, colony) == 0
+                    && colony.building().work() > 0, "nothing should be dug while away, but the builders' time counted: " + colony.building().work());
+            colony.building().setWorkForTests(colony.building().work() + 50000); // (longer away than the test waits)
+            // Back in range, nobody near.
+            colony.away().setAwayForTests(false);
+            loadAgain(level, queenOnDisk[0]);
+        });
+        helper.runAfterDelay(1900, () -> {
+            Colony colony = byId(helper, id[0]);
+            AwayReport report = colony.away().report();
+            AntColoniesMod.LOGGER.info("[away-test] part 3 ants back: hill {}, {}", hillBlocks(level, colony), colony.away().describe(level));
+            helper.assertTrue(colony.getQueen(level) != null, "the queen should be back and alive");
+            List<BlockPos> left = undug.stream().filter(cell -> !level.getBlockState(cell).isAir()).toList();
+            helper.assertTrue(left.isEmpty() && report.get(AwayReport.What.DUG) == undug.size(), "the refuse chamber should be dug: "
+                    + left.size() + " of " + undug.size() + " left, " + report.describe());
+            helper.assertTrue(hillBlocks(level, colony) > 0 && report.get(AwayReport.What.HILL) == hillBlocks(level, colony),
+                    "its soil should be heaped on the hill: " + hillBlocks(level, colony) + " blocks, " + report.describe());
+            for (BlockPos tuft : tufts) {
+                helper.assertTrue(level.getBlockState(tuft).isAir(), "an eaten-up tuft should be gone once out of sight: " + tuft);
+            }
+            int young = 4 - report.get(AwayReport.What.GREW_UP); // (the 3 put in and the queen's egg, less those grown up)
+            int real = colony.brood().countEggs(level) + colony.brood().countLarvae(level);
+            helper.assertTrue(colony.brood().insideCount() == 0 && real == young, "the young not grown up yet (" + young
+                    + ") should lie in the nursery: " + real + " real, " + colony.brood().insideCount() + " inside");
+            helper.assertTrue(colony.ledger().isEmpty(), "the blocks should have caught up with the counts: " + colony.ledger().describe());
+            helper.succeed();
+        });
+    }
+
+    /**
+     * Brain part 3, starving while away by the real rules. A harvester ant colony with 30 worker numbers (just fed), no
+     * seeds and no bread at all, 3 hungry larvae as numbers (2 of them have gone almost their whole starve time without
+     * food), and the queen in her room, long unfed and wanting food. While away the nurses have nothing to give: the 2
+     * long-hungry larvae starve and leave bodies, the third lives on; the queen's hunger clock runs out and she starves
+     * frozen in her room; the workers live. The report says so. Back in range she dies as her land loads, the colony
+     * carries on without her (queenless), and the young's bodies lie in the refuse chamber.
+     */
+    @GameTest(template = "arena", timeoutTicks = 900)
+    public static void aStarvingAntColonyAwayLosesItsYoungAndItsQueen(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        startAntColony(helper);
+        UUID[] id = new UUID[1];
+        UUID[] queen = new UUID[1];
+        CompoundTag[] queenOnDisk = new CompoundTag[1];
+        helper.runAfterDelay(15, () -> {
+            Colony colony = antColony(helper);
+            id[0] = colony.getId();
+            colony.population().setOnForTests(false);
+            colony.setHungerOn(true);
+            BlockPos room = colony.nest().getFinishedRoomCenter(level);
+            helper.assertTrue(room != null, "the queen's room should be dug");
+            colony.getQueen(level).teleportTo(room.getX() + 0.5, room.getY(), room.getZ() + 0.5);
+            colony.population().addNewMembers(WorkerAntEntity.CASTE, level.getGameTime(), 30);
+            helper.assertTrue(colony.food().getFood() == 0 && colony.bakery().getBread() == 0, "the colony should have no food");
+        });
+        helper.runAfterDelay(40, () -> {
+            Colony colony = byId(helper, id[0]);
+            helper.assertTrue(colony.queenCare().isQueenHome(level), "the queen should be in her room");
+            queen[0] = colony.getQueenId();
+            colony.queenCare().setEggDueForTests(-1); // (she carries no egg: she wants food)
+            colony.queenCare().setQueenLastFed(level.getGameTime() - colony.profile().queen().starveTicks() + 200);
+            colony.away().setOnForTests(true);
+            colony.away().setGraceForTests(20L);
+            queenOnDisk[0] = freezeAndUnload(colony, level, colony.getQueen(level));
+            colony.away().setAwayForTests(true);
+            long starve = colony.profile().brood().larvaStarveTicks();
+            colony.brood().addInsideForTests(Brood.Young.larva(0, starve - 100, null));
+            colony.brood().addInsideForTests(Brood.Young.larva(0, starve - 100, null));
+            colony.brood().addInsideForTests(Brood.Young.larva(0, 0, null));
+        });
+        helper.runAfterDelay(500, () -> {
+            Colony colony = byId(helper, id[0]);
+            AwayReport report = colony.away().report();
+            AntColoniesMod.LOGGER.info("[away-test] part 3 starving: {}{}", colony.population().describe(level), colony.away().describe(level));
+            helper.assertTrue(colony.away().isAway(level), "the colony should be away");
+            helper.assertTrue(report.get(AwayReport.What.YOUNG_STARVED) == 2 && colony.ledger().bodies() == 2,
+                    "the 2 long-hungry larvae should starve and leave bodies: " + report.describe() + ", " + colony.ledger().describe());
+            List<Brood.Young> young = colony.brood().youngInsideForTests();
+            helper.assertTrue(young.size() == 1 && !young.get(0).isEgg(), "the third larva should live on: " + young);
+            helper.assertTrue(report.describe().contains("the queen starved"), "the queen should starve while away: " + report.describe());
+            helper.assertTrue(report.get(AwayReport.What.QUEEN_FED) == 0 && report.get(AwayReport.What.YOUNG_FED) == 0,
+                    "there was nothing to feed anyone: " + report.describe());
+            helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == 30 && report.get(AwayReport.What.STARVED) == 0,
+                    "the workers, just fed, should live: " + colony.getCount(WorkerAntEntity.CASTE));
+            colony.away().setAwayForTests(false);
+            loadAgain(level, queenOnDisk[0]);
+        });
+        helper.runAfterDelay(650, () -> {
+            Colony colony = byId(helper, id[0]);
+            Entity theQueen = level.getEntity(queen[0]);
+            AntColoniesMod.LOGGER.info("[away-test] part 3 starving, back: queen {}, {}{}", theQueen, colony.population().describe(level),
+                    colony.away().describe(level));
+            helper.assertTrue(theQueen == null || !theQueen.isAlive(), "the queen who starved while away should die as her land loads");
+            helper.assertTrue(colony.isQueenless(), "the colony should carry on without her");
+            helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == 30, "the workers should carry on: " + colony.getCount(WorkerAntEntity.CASTE));
+            helper.assertTrue(colony.refuse().getRefuseCorpses(level).size() >= 2, "the young's bodies should lie in the refuse chamber: "
+                    + colony.refuse().getRefuseCorpses(level).size() + ", " + colony.ledger().describe());
+            helper.assertTrue(colony.away().report().describe().contains("the queen starved"), "the report should still say so after coming back");
+            helper.succeed();
+        });
+    }
+
+    /**
+     * Brain part 3, founding while away (species-neutral): a lone harvester ant queen, or a termite royal pair, digs the
+     * founding chamber and closes the entrance (real insects, as in the founding tests). Then the colony goes away: the
+     * queen lays the rest of her founding batch as numbers, the founders feed the young from their own fat, and they
+     * grow up into the first workers, all while away; the queen does not starve (she lives on her fat). Back in range the
+     * first workers come out as real ones and dig the entrance open, as in a real claustral founding.
+     */
+    private static void foundsWhileAway(GameTestHelper helper, boolean termites) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        TermiteMoundTests.deepGround(helper);
+        if (termites) {
+            helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        } else {
+            helper.spawn(ModEntities.QUEEN_ANT.get(), MIDDLE, SURFACE, MIDDLE);
+        }
+        if (termites) {
+            helper.runAfterDelay(5, () -> helper.spawn(ModEntities.TERMITE_KING.get(), MIDDLE + 2, SURFACE, MIDDLE + 1));
+        }
+        UUID[] id = new UUID[1];
+        long[] at = {0, 0}; // when sealed in; when away (or back)
+        int[] phase = {0}; // 0 founding (here), 1 away, 2 back
+        int[] eggsBefore = new int[1];
+        Map<UUID, CompoundTag> unloaded = new HashMap<>();
+        helper.onEachTick(() -> {
+            if (id[0] == null) {
+                Colony colony = colony(helper, termites ? Species.MACROTERMES : Species.RED_HARVESTER_ANT);
+                if (colony == null) {
+                    return;
+                }
+                id[0] = colony.getId();
+                colony.away().setOnForTests(true); // (here: the nest's chunks are loaded)
+                colony.population().setOnForTests(true);
+                colony.population().setViewersForTests(List.of());
+            }
+            Colony colony = byId(helper, id[0]);
+            int eggs = colony.profile().founding().orElseThrow().eggs();
+            if (phase[0] == 0) {
+                boolean sealed = !colony.nest().isEntranceOpen(level) && colony.queenCare().isQueenHome(level);
+                if (!sealed) {
+                    at[0] = 0;
+                    return;
+                }
+                if (at[0] == 0) {
+                    at[0] = helper.getTick();
+                    AntColoniesMod.LOGGER.info("[away-test] founding: sealed in at tick {}", helper.getTick());
+                }
+                if (helper.getTick() - at[0] < 60) {
+                    return; // (the brain notes once a second that she is sealed in her room)
+                }
+                helper.assertTrue(colony.queenCare().getEggsLaid() < eggs, "the whole batch was laid before the colony went away");
+                // Out of range: the founders and any eggs or young already laid are frozen.
+                eggsBefore[0] = colony.queenCare().getEggsLaid();
+                List<Entity> all = new ArrayList<>();
+                all.add(colony.getQueen(level));
+                all.addAll(level.getEntitiesOfClass(com.antcolonies.entity.TermiteKingEntity.class, helper.getBounds(),
+                        king -> colony.getId().equals(king.getColonyId())));
+                all.addAll(colony.brood().getEggs(level));
+                all.addAll(colony.brood().getLarvae(level));
+                for (Entity entity : all) {
+                    unloaded.put(entity.getUUID(), freezeAndUnload(colony, level, entity));
+                }
+                colony.away().setGraceForTests(20L);
+                colony.away().setAwayForTests(true);
+                at[1] = helper.getTick();
+                phase[0] = 1;
+                return;
+            }
+            if (phase[0] == 1) {
+                AwayReport report = colony.away().report();
+                if (helper.getTick() % 400 == 0) {
+                    AntColoniesMod.LOGGER.info("[away-test] founding away: eggs laid {}, {}{}", colony.queenCare().getEggsLaid(),
+                            colony.population().describe(level), colony.away().describe(level));
+                }
+                helper.assertTrue(helper.getTick() - at[1] < 15000, "the founding batch should grow up while away: eggs laid "
+                        + colony.queenCare().getEggsLaid() + ", " + colony.population().describe(level) + colony.away().describe(level));
+                if (colony.getCount(WorkerAntEntity.CASTE) < eggs || colony.brood().insideCount() > 0) {
+                    return;
+                }
+                helper.assertTrue(colony.queenCare().getEggsLaid() == eggs && report.get(AwayReport.What.EGGS_LAID) == eggs - eggsBefore[0],
+                        "the queen should lay the rest of her batch while away: " + colony.queenCare().getEggsLaid() + " laid, " + report.describe());
+                helper.assertTrue(report.get(AwayReport.What.GREW_UP) == eggs && report.get(AwayReport.What.YOUNG_FED) > 0,
+                        "the founders should feed the young from their fat until they grow up: " + report.describe());
+                helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == eggs && colony.population().inside(WorkerAntEntity.CASTE) == eggs,
+                        "the first " + eggs + " workers should be numbers: " + colony.population().describe(level));
+                helper.assertTrue(!report.describe().contains("the queen starved") && !colony.isFounding(), "the queen should live on her fat: "
+                        + report.describe());
+                colony.away().setAwayForTests(false);
+                unloaded.values().forEach(tag -> loadAgain(level, tag));
+                at[1] = helper.getTick();
+                phase[0] = 2;
+                return;
+            }
+            // Back: the first workers come out as real ones and open the entrance.
+            int real = level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds(),
+                    mob -> mob.isAlive() && colony.getId().equals(mob.getColonyId()) && WorkerAntEntity.CASTE.equals(mob.nestCaste())).size();
+            if (colony.getQueen(level) != null && real == eggs && colony.nest().isEntranceOpen(level)) {
+                helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == eggs, "still " + eggs + " workers: " + colony.getCount(WorkerAntEntity.CASTE));
+                helper.succeed();
+            }
+            helper.assertTrue(helper.getTick() - at[1] < 15000, "back: " + real + " real workers, entrance open " + colony.nest().isEntranceOpen(level)
+                    + ", queen " + colony.getQueen(level) + colony.population().describe(level));
+        });
+    }
+
+    /** Brain part 3: a lone harvester ant queen raises her first workers while away (see {@link #foundsWhileAway}). */
+    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
+    public static void aFoundingAntQueenRaisesHerFirstWorkersWhileAway(GameTestHelper helper) {
+        foundsWhileAway(helper, false);
+    }
+
+    /** Brain part 3: a termite royal pair raise their first workers while away (see {@link #foundsWhileAway}). */
+    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
+    public static void aFoundingTermitePairRaiseTheirFirstWorkersWhileAway(GameTestHelper helper) {
+        foundsWhileAway(helper, true);
     }
 }

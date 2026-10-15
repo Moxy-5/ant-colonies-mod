@@ -68,6 +68,9 @@ public class FoodStore {
     private boolean hadFood;
     /** How many more layers the store's heaps could take the last second the nest was loaded (see {@link #watchRoom}). Saved. */
     private int seenRoom;
+    /** Tests only: pretend the store has this much room (null: as seen). Not saved. */
+    @org.jetbrains.annotations.Nullable
+    private Integer roomForTests;
 
     private record PlantClaim(BlockPos plant, long until) {
     }
@@ -497,7 +500,12 @@ public class FoodStore {
 
     /** How many more pieces the food store can take as far as the brain knows: the room it last saw, less what is owed to it. */
     int roomKnown() {
-        return seenRoom - colony.ledger().store();
+        return (roomForTests != null ? roomForTests : seenRoom) - colony.ledger().store();
+    }
+
+    /** Tests only: pretend the store had this much room the last time the brain looked (null: as seen). */
+    public void setRoomForTests(@org.jetbrains.annotations.Nullable Integer room) {
+        roomForTests = room;
     }
 
     /**
