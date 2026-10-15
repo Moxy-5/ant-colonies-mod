@@ -87,7 +87,7 @@ final class FeedingGallery {
     }
 
     /** The food blocks joined to {@code food} (face to face), near it. */
-    private static Set<BlockPos> foodBlocks(Level level, BlockPos food, java.util.function.Predicate<BlockPos> isFood) {
+    static Set<BlockPos> foodBlocks(Level level, BlockPos food, java.util.function.Predicate<BlockPos> isFood) {
         Set<BlockPos> pieces = new LinkedHashSet<>();
         if (!level.isLoaded(food) || !isFood.test(food)) {
             return pieces;

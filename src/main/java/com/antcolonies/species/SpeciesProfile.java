@@ -320,11 +320,12 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * close it (the entrance, a foraging hole, an opening in the nest walls; optional, Burrowed Dirt).
      * {@code crustWalls}: the walls of the nest's galleries are thin crusts of mud ({@code MudCrustBlock}) plastered over
      * every side that would open to the outside, before it is dug through ("wall first"; termites; optional, false). A
-     * whole missing block is still packed full with the plug block.
+     * whole missing block is still packed full with the plug block. {@code sheeting}: covered runways of mud over the
+     * ground from a hole to rich food near it (termites; optional, none; see {@link Sheeting}).
      */
     public record NestNumbers(int maxLevels, boolean sealWhileFounding, boolean foundingChamber, List<String> sideRooms,
             int foragingHoles, int foragingHoleDistance, String plugBlock, List<LevelUnlock> levelUnlocks, Optional<NewHoles> newHoles,
-            boolean crustWalls) {
+            boolean crustWalls, Optional<Sheeting> sheeting) {
         public static final Codec<NestNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("max_levels").forGetter(NestNumbers::maxLevels),
                 Codec.BOOL.fieldOf("seal_while_founding").forGetter(NestNumbers::sealWhileFounding),
@@ -335,8 +336,16 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 Codec.STRING.optionalFieldOf("plug_block", "antcolonies:burrowed_dirt").forGetter(NestNumbers::plugBlock),
                 LevelUnlock.CODEC.listOf().optionalFieldOf("level_unlocks", List.of()).forGetter(NestNumbers::levelUnlocks),
                 NewHoles.CODEC.optionalFieldOf("new_holes").forGetter(NestNumbers::newHoles),
-                Codec.BOOL.optionalFieldOf("crust_walls", false).forGetter(NestNumbers::crustWalls)
+                Codec.BOOL.optionalFieldOf("crust_walls", false).forGetter(NestNumbers::crustWalls),
+                Sheeting.CODEC.optionalFieldOf("sheeting").forGetter(NestNumbers::sheeting)
         ).apply(i, NestNumbers::new));
+
+        public NestNumbers(int maxLevels, boolean sealWhileFounding, boolean foundingChamber, List<String> sideRooms,
+                int foragingHoles, int foragingHoleDistance, String plugBlock, List<LevelUnlock> levelUnlocks, Optional<NewHoles> newHoles,
+                boolean crustWalls) {
+            this(maxLevels, sealWhileFounding, foundingChamber, sideRooms, foragingHoles, foragingHoleDistance, plugBlock, levelUnlocks, newHoles,
+                    crustWalls, Optional.empty());
+        }
 
         public NestNumbers(int maxLevels, boolean sealWhileFounding, boolean foundingChamber, List<String> sideRooms,
                 int foragingHoles, int foragingHoleDistance, String plugBlock, List<LevelUnlock> levelUnlocks, Optional<NewHoles> newHoles) {
@@ -385,6 +394,20 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
         public boolean isPlug(BlockState state) {
             return state.is(plugState().getBlock()) || state.is(ModBlocks.BURROWED_DIRT.get());
         }
+    }
+
+    /**
+     * Mud sheeting (termites; the user's plan of 2026-10-14, my picks for the numbers, to confirm): real Macrotermes
+     * plaster a covered runway of soil over the ground from a hole to food near it and over the food, and forage under
+     * it unseen, by day too. When the colony knows rich food (a fallen branch, a fallen tree, a hay bale) that is near a
+     * hole (no new hole is dug for it), the workers build a runway of mud crust from the hole to it, at most
+     * {@code maxLength} blocks long; at most {@code max} runways at a time. Far food gets a new hole instead.
+     */
+    public record Sheeting(int max, int maxLength) {
+        public static final Codec<Sheeting> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.INT.optionalFieldOf("max", 3).forGetter(Sheeting::max),
+                Codec.INT.optionalFieldOf("max_length", 12).forGetter(Sheeting::maxLength)
+        ).apply(i, Sheeting::new));
     }
 
     /**

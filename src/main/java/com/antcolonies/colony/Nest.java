@@ -137,6 +137,10 @@ public class Nest {
     private final List<NewTunnel> newTunnels = new ArrayList<>();
     /** The holes of new tunnels whose food is gone: plugged for good, never opened again (the tunnel stays). Saved. */
     private final Set<BlockPos> spentHoles = new HashSet<>();
+    /** Runways of mud sheeting from a hole to food near it (see {@link Runway}). Saved. */
+    private final List<Runway> runways = new ArrayList<>();
+    /** The cells of runways whose food is gone: their mud crumbles away bit by bit (see {@link ForagingHoles}). Saved. */
+    private final List<List<BlockPos>> crumblingRunways = new ArrayList<>();
     /** The cells that count as inside (see {@link #isInside}), worked out at most once a tick. */
     private Set<BlockPos> inside = Set.of();
     /** The mound's planned channel cells (tunnels, spire pieces, mouths): inside only where the block is built. */
@@ -252,6 +256,11 @@ public class Nest {
                     return next;
                 }
             }
+        }
+        // Grass growing where a runway of sheeting runs is cut away.
+        BlockPos plant = runwayPlant(level);
+        if (plant != null) {
+            return plant;
         }
         // A closed hole is opened before more garden rooms are dug: a big colony wants all its gardens at once (with the
         // brain its headcount is mostly numbers), and its foragers were shut in until every room was dug.
@@ -487,7 +496,7 @@ public class Nest {
             return colony.foragingHoles().mayOpen(level, pos);
         }
         return isSoil(level.getBlockState(pos)) || (pos.equals(center) && isEntrancePlugged(level) && mayOpenEntrance(level))
-                || colony.mound().isClearJob(level, pos);
+                || colony.mound().isClearJob(level, pos) || isRunwayPlant(level, pos);
     }
 
     /**
@@ -764,9 +773,16 @@ public class Nest {
                 break;
             }
         }
+        Runway runway = runwayOf(cell);
+        if (runway != null) {
+            gallery = runway.cells();
+        }
         for (BlockPos part : gallery) {
             if (!level.isLoaded(part)) {
                 return false;
+            }
+            if (runway != null && !isDugOut(level, part)) {
+                return false; // grass still growing in it, or something put in its way
             }
             if (!isDugOut(level, part)) {
                 if (isSoil(level.getBlockState(part))) {
@@ -781,7 +797,7 @@ public class Nest {
         return true;
     }
 
-    /** The cells of every feeding gallery planned (dug or not). */
+    /** The cells of every feeding gallery planned (dug or not), and of every runway of mud sheeting. */
     List<BlockPos> galleryCells() {
         List<BlockPos> cells = new ArrayList<>();
         for (NewTunnel tunnel : newTunnels) {
@@ -789,7 +805,101 @@ public class Nest {
                 cells.addAll(tunnel.gallery());
             }
         }
+        for (Runway runway : runways) {
+            cells.addAll(runway.cells());
+        }
         return cells;
+    }
+
+    /**
+     * A runway of mud sheeting (the user's plan of 2026-10-14): real Macrotermes plaster a covered runway of soil over the
+     * ground from a hole out to food near it, and forage under it, unseen, by day too. {@code cells}: the cells a termite
+     * walks in, from the one over the {@code hole} to one beside the {@code food} (see {@link RunwayRoute}). They are
+     * part of the nest like a feeding gallery: the workers plaster a crust of mud over every open side of them (the
+     * leaks, see {@link NestWalls}); once it is closed all round the runway is inside, its hole stays open, and the food
+     * at its end is eaten from inside it.
+     */
+    public record Runway(BlockPos hole, BlockPos food, List<BlockPos> cells) {
+    }
+
+    /** The runways of mud sheeting. */
+    public List<Runway> getRunways() {
+        return List.copyOf(runways);
+    }
+
+    void addRunway(Runway runway) {
+        runways.add(runway);
+        insideTick = Long.MIN_VALUE;
+    }
+
+    /** The runway leaving from this hole, or null. */
+    @Nullable
+    public Runway runwayAt(BlockPos hole) {
+        for (Runway runway : runways) {
+            if (runway.hole().equals(hole)) {
+                return runway;
+            }
+        }
+        return null;
+    }
+
+    /** The runway this cell is part of, or null. */
+    @Nullable
+    Runway runwayOf(BlockPos cell) {
+        for (Runway runway : runways) {
+            if (runway.cells().contains(cell)) {
+                return runway;
+            }
+        }
+        return null;
+    }
+
+    /** Whether the runway is finished: every cell of it open and closed all round (see {@link #isGalleryClosed}). */
+    public boolean isRunwayClosed(Level level, Runway runway) {
+        return isGalleryClosed(level, runway.cells().get(0), nestCells(level));
+    }
+
+    /** The runway's food is gone: its mud is left to crumble away (see {@link ForagingHoles}). */
+    void dropRunway(Runway runway) {
+        runways.remove(runway);
+        crumblingRunways.add(new ArrayList<>(runway.cells()));
+        insideTick = Long.MIN_VALUE;
+    }
+
+    /** The cells of the runways whose mud is crumbling away. */
+    List<List<BlockPos>> getCrumblingRunways() {
+        return crumblingRunways;
+    }
+
+    /**
+     * A cell of a runway holding a plant (grass growing where the runway runs): the workers bite it away like soil (real
+     * termites cut the grass under their sheeting), at foraging time, once the runway's hole is open. Null if none.
+     */
+    @Nullable
+    private BlockPos runwayPlant(Level level) {
+        if (!colony.isForagingTime(level)) {
+            return null;
+        }
+        for (Runway runway : runways) {
+            if (!ForagingHoles.isOpen(level, runway.hole())) {
+                continue;
+            }
+            for (BlockPos cell : runway.cells()) {
+                if (isRunwayPlant(level, cell)) {
+                    return cell;
+                }
+            }
+        }
+        return null;
+    }
+
+    /** Whether this cell of a runway holds a plant (grass) to be cut away. */
+    public boolean isRunwayPlant(Level level, BlockPos cell) {
+        if (!level.isLoaded(cell)) {
+            return false;
+        }
+        BlockState state = level.getBlockState(cell);
+        return !state.isAir() && state.canBeReplaced() && state.getFluidState().isEmpty() && runwayOf(cell) != null;
     }
 
     /** The tunnels dug (or being dug) out to rich food. */
@@ -837,6 +947,15 @@ public class Nest {
                 if (level.isLoaded(gallery) && level.getBlockState(gallery.above()).getCollisionShape(level, gallery.above()).isEmpty()
                         && !NestWalls.isWalkThroughFood(level, gallery.above())) {
                     cells.remove(gallery);
+                }
+            }
+            // A runway is inside only once it is finished, closed all round, and then its hole too (the way into it from
+            // the tunnel under it): its builders out on it at night were outside.
+            for (Runway runway : runways) {
+                if (isRunwayClosed(level, runway)) {
+                    cells.add(runway.hole());
+                } else {
+                    runway.cells().forEach(cells::remove);
                 }
             }
             Set<BlockPos> channels = new HashSet<>();
@@ -1166,6 +1285,22 @@ public class Nest {
             tag.put("fittedTunnels", fitted);
         }
         tag.putLongArray("spentHoles", spentHoles.stream().mapToLong(BlockPos::asLong).toArray());
+        ListTag runwayList = new ListTag();
+        for (Runway runway : runways) {
+            CompoundTag entry = new CompoundTag();
+            entry.putLong("hole", runway.hole().asLong());
+            entry.putLong("food", runway.food().asLong());
+            entry.putLongArray("cells", runway.cells().stream().mapToLong(BlockPos::asLong).toArray());
+            runwayList.add(entry);
+        }
+        tag.put("runways", runwayList);
+        ListTag crumbling = new ListTag();
+        for (List<BlockPos> cells : crumblingRunways) {
+            CompoundTag entry = new CompoundTag();
+            entry.putLongArray("cells", cells.stream().mapToLong(BlockPos::asLong).toArray());
+            crumbling.add(entry);
+        }
+        tag.put("crumblingRunways", crumbling);
         if (layout != null) {
             tag.putInt("nestDepth", layout.shaftDepth());
             tag.putInt("nestDirection", layout.direction().get2DDataValue());
@@ -1217,6 +1352,25 @@ public class Nest {
             spentHoles.add(BlockPos.of(hole));
         }
         allForagingTunnelsStale = true;
+        runways.clear();
+        for (Tag element : tag.getList("runways", Tag.TAG_COMPOUND)) {
+            CompoundTag entry = (CompoundTag) element;
+            List<BlockPos> cells = new ArrayList<>();
+            for (long cell : entry.getLongArray("cells")) {
+                cells.add(BlockPos.of(cell));
+            }
+            if (!cells.isEmpty()) {
+                runways.add(new Runway(BlockPos.of(entry.getLong("hole")), BlockPos.of(entry.getLong("food")), List.copyOf(cells)));
+            }
+        }
+        crumblingRunways.clear();
+        for (Tag element : tag.getList("crumblingRunways", Tag.TAG_COMPOUND)) {
+            List<BlockPos> cells = new ArrayList<>();
+            for (long cell : ((CompoundTag) element).getLongArray("cells")) {
+                cells.add(BlockPos.of(cell));
+            }
+            crumblingRunways.add(cells);
+        }
         // The nest plan it was digging (old saves have none: it is worked out again from the ground).
         if (tag.contains("nestLevels")) {
             int depth = tag.getInt("nestDepth");

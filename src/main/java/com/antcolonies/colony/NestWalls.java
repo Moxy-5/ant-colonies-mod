@@ -106,6 +106,10 @@ public class NestWalls {
             BlockPos cell = queue.poll();
             for (Direction direction : Direction.values()) {
                 BlockPos next = cell.relative(direction);
+                // Up through an open foraging hole into a runway of sheeting over it (the hole is the runway's way in).
+                if (direction == Direction.UP && colony.foragingHoles().isHole(level, next) && ForagingHoles.isOpen(level, next)) {
+                    next = next.above();
+                }
                 if (nest.contains(next) && !joined.contains(next) && level.isLoaded(next) && Nest.isDugOut(level, next)) {
                     joined.add(next);
                     queue.add(next);
@@ -232,8 +236,8 @@ public class NestWalls {
     public boolean isClosedRound(Level level, BlockPos cell, Set<BlockPos> nest) {
         for (Direction side : Direction.values()) {
             BlockPos next = cell.relative(side);
-            if (nest.contains(next)) {
-                continue;
+            if (nest.contains(next) || colony.foragingHoles().isHole(level, next)) {
+                continue; // the nest, or one of its holes (the way into a runway of sheeting from under it)
             }
             if (isWalkThroughFood(level, next) ? !casingGaps(level, next, side.getOpposite(), nest).isEmpty()
                     : isOpenToward(level, next, side.getOpposite())) {
@@ -298,10 +302,11 @@ public class NestWalls {
     private BlockState wallFor(Level level, BlockPos hole) {
         BlockState state = level.getBlockState(hole);
         Set<BlockPos> nest = colony.nest().nestCells(level);
+        // Beside a dug block of the nest underground: packed full. Beside a runway of sheeting only: a crust of mud.
         boolean besideNest = false;
         for (Direction side : Direction.values()) {
             BlockPos cell = hole.relative(side);
-            besideNest |= nest.contains(cell) && Nest.isDugOut(level, cell);
+            besideNest |= nest.contains(cell) && Nest.isDugOut(level, cell) && colony.nest().runwayOf(cell) == null;
         }
         if (!MudCrustBlock.isCrust(state) && (besideNest || !colony.profile().nest().crustWalls())) {
             return colony.profile().nest().plugState();

@@ -36,6 +36,13 @@ import net.minecraft.world.phys.AABB;
  * it ({@link TunnelRoute}), one at a time, and open a hole beside the food, so the foragers need not cross the open
  * ground (real Macrotermes forage from holes opened near the food at the end of long galleries). The soil goes into
  * the mound like all digging. Once the food is gone the hole is plugged for good; the tunnel stays, as real galleries do.
+ *
+ * <p>Mud sheeting (the user's plan of 2026-10-14; species whose profile has {@code nest.sheeting}): rich food the colony
+ * knows near one of its holes (no new hole is dug for it) gets a runway of sheeting from the hole to it ({@link
+ * Nest.Runway}, {@link RunwayRoute}): the workers plaster mud over it at night, and once it is closed all round its hole
+ * stays open by day too and the food at its end is eaten from under it, unseen. A hole with a runway is no way out for
+ * the foragers outside (it leads into the runway), so one hole is always left without. Once the food is gone the
+ * runway's mud crumbles away bit by bit.
  */
 public class ForagingHoles {
     /** After the foraging time is over the holes are plugged at the latest this long after (ticks), even with workers still outside. */
@@ -82,7 +89,9 @@ public class ForagingHoles {
     public List<WayOut> waysOut(Level level) {
         List<WayOut> ways = new java.util.ArrayList<>();
         for (NestPlan.ForagingTunnel tunnel : tunnels(level)) {
-            if (isDug(level, tunnel) && isOpen(level, tunnel.hole()) && !colony.nest().isSpent(tunnel.hole())) {
+            // A hole with a runway of sheeting over it leads into the runway, not outside.
+            if (isDug(level, tunnel) && isOpen(level, tunnel.hole()) && !colony.nest().isSpent(tunnel.hole())
+                    && colony.nest().runwayAt(tunnel.hole()) == null) {
                 ways.add(new WayOut(tunnel.hole().above(), tunnel.side()));
             }
         }
@@ -123,15 +132,28 @@ public class ForagingHoles {
         return new NestPlan.ForagingTunnel(List.of(entrance.below()), entrance, Direction.UP);
     }
 
-    /** The foraging holes, and the middle hole while it needs plugging by day. */
+    /**
+     * The foraging holes, and the middle hole while it needs plugging by day. Not a hole under a finished runway of
+     * sheeting: it stays open (the runway covers it).
+     */
     private List<NestPlan.ForagingTunnel> holesToPlug(Level level) {
-        NestPlan.ForagingTunnel middle = middleHole(level);
-        if (middle == null) {
-            return tunnels(level);
+        List<NestPlan.ForagingTunnel> all = new java.util.ArrayList<>();
+        for (NestPlan.ForagingTunnel tunnel : tunnels(level)) {
+            if (!hasFinishedRunway(level, tunnel.hole())) {
+                all.add(tunnel);
+            }
         }
-        List<NestPlan.ForagingTunnel> all = new java.util.ArrayList<>(tunnels(level));
-        all.add(middle);
+        NestPlan.ForagingTunnel middle = middleHole(level);
+        if (middle != null) {
+            all.add(middle);
+        }
         return all;
+    }
+
+    /** Whether a runway of sheeting leaves from this hole and is finished (closed all round). */
+    public boolean hasFinishedRunway(Level level, BlockPos hole) {
+        Nest.Runway runway = colony.nest().runwayAt(hole);
+        return runway != null && colony.nest().isRunwayClosed(level, runway);
     }
 
     /** Whether the whole tunnel is dug out, so its hole leads somewhere. */
@@ -157,7 +179,7 @@ public class ForagingHoles {
 
     /** Whether a worker may bite this hole open now: it is foraging time and the hole is closed with soil or its plug. */
     public boolean mayOpen(Level level, BlockPos hole) {
-        if (!colony.isForagingTime(level) || !level.isLoaded(hole)) {
+        if (!(colony.isForagingTime(level) || hasFinishedRunway(level, hole)) || !level.isLoaded(hole)) {
             return false;
         }
         BlockState state = level.getBlockState(hole);
@@ -289,6 +311,7 @@ public class ForagingHoles {
         }
         newHolesCheckedAt = now;
         List<BlockPos> plants = colony.food().plants(level);
+        tickRunways(level, plants, numbers);
         int active = 0;
         boolean digging = false;
         for (Nest.NewTunnel tunnel : colony.nest().getNewTunnels()) {
@@ -349,6 +372,201 @@ public class ForagingHoles {
         ColonyManager.get(level).markChanged();
         AntColoniesMod.LOGGER.debug("[new-hole] a tunnel of {} blocks to the food at {}, hole at {}, with a feeding gallery of {} blocks",
                 plan.cells().size(), food.toShortString(), plan.hole().toShortString(), gallery.size());
+    }
+
+    // --- mud sheeting ------------------------------------------------------------------------------------------
+
+    /** On each check a plate of a crumbling runway falls away with a chance of 1 in this (my pick: about half a day). */
+    private static final int CRUMBLE_CHANCE = 8;
+
+    /**
+     * Runways of mud sheeting (with the new holes' check): a runway whose food is gone (or whose hole is spent) is left
+     * to crumble; the mud of the crumbling ones falls away bit by bit; and while there may be more, a runway is planned
+     * from a hole to the nearest rich food the colony knows near one of its holes.
+     */
+    private void tickRunways(ServerLevel level, List<BlockPos> plants, SpeciesProfile.NewHoles numbers) {
+        SpeciesProfile.Sheeting sheeting = colony.profile().nest().sheeting().orElse(null);
+        if (sheeting == null) {
+            return;
+        }
+        for (Nest.Runway runway : colony.nest().getRunways()) {
+            if (colony.nest().isSpent(runway.hole())
+                    || level.isLoaded(runway.food()) && richBlockNear(level, runway.food(), FOOD_STILL_THERE) == null) {
+                colony.nest().dropRunway(runway);
+                ColonyManager.get(level).markChanged();
+                AntColoniesMod.LOGGER.debug("[runway] the food at {} is gone: the runway from {} crumbles", runway.food().toShortString(),
+                        runway.hole().toShortString());
+            }
+        }
+        crumble(level);
+        List<Nest.Runway> runways = colony.nest().getRunways();
+        if (runways.size() >= sheeting.max()) {
+            return;
+        }
+        // The holes a runway may leave from: dug, open for use, without a runway yet. One is always left for the
+        // foragers outside (a hole with a runway leads into it).
+        List<BlockPos> free = new java.util.ArrayList<>();
+        for (NestPlan.ForagingTunnel tunnel : tunnels(level)) {
+            if (isDug(level, tunnel) && !colony.nest().isSpent(tunnel.hole()) && colony.nest().runwayAt(tunnel.hole()) == null
+                    && level.isLoaded(tunnel.hole().above())) {
+                free.add(tunnel.hole());
+            }
+        }
+        if (free.size() <= 1) {
+            return;
+        }
+        long now = level.getGameTime();
+        List<BlockPos> taken = new java.util.ArrayList<>(runways.stream().map(Nest.Runway::food).toList());
+        colony.nest().getNewTunnels().forEach(tunnel -> taken.add(tunnel.food()));
+        BlockPos center = colony.getCenter();
+        int reach = numbers.reach(colony.getCount(com.antcolonies.entity.WorkerAntEntity.CASTE));
+        BlockPos food = null;
+        double bestDistance = Double.MAX_VALUE;
+        for (BlockPos plant : plants) {
+            if (!isRich(level, plant) || !colony.foodMap().knows(plant, null) || noRouteUntil.containsKey(plant)
+                    || sideways(plant, center) > reach || nearAny(plant, taken, FOOD_STILL_THERE)
+                    || colony.food().isFeedableFromInside(level, plant)) {
+                continue;
+            }
+            double distance = Double.MAX_VALUE;
+            for (BlockPos hole : free) {
+                distance = Math.min(distance, sideways(plant, hole));
+            }
+            // Near a hole: far food gets a new hole instead.
+            if (distance <= numbers.minDistance() && distance < bestDistance) {
+                food = plant;
+                bestDistance = distance;
+            }
+        }
+        if (food == null) {
+            return;
+        }
+        java.util.Set<BlockPos> foodBlocks = FeedingGallery.foodBlocks(level, food, pos -> isRich(level, pos));
+        BlockPos target = food;
+        free.sort(java.util.Comparator.comparingDouble(hole -> sideways(hole, target)));
+        for (BlockPos hole : free) {
+            List<BlockPos> cells = RunwayRoute.plan(hole.above(), foodBlocks, runwayGround(level, hole), sheeting.maxLength());
+            if (cells != null) {
+                colony.nest().addRunway(new Nest.Runway(hole.immutable(), food.immutable(), List.copyOf(cells)));
+                ColonyManager.get(level).markChanged();
+                AntColoniesMod.LOGGER.debug("[runway] a runway of {} blocks from the hole at {} to the food at {}", cells.size(),
+                        hole.toShortString(), food.toShortString());
+                return;
+            }
+        }
+        noRouteUntil.put(food.immutable(), now + NO_ROUTE_TICKS);
+        AntColoniesMod.LOGGER.debug("[runway] no runway to the food at {}", food.toShortString());
+    }
+
+    /**
+     * The ground as the runway planner sees it: the real ground of each column, and where a runway may run (open air or
+     * grass, no water beside it, not the colony's own space, its mound or another runway, and clear of its other holes,
+     * so no wall goes up over one: only the cell over its own {@code hole} may be beside it).
+     */
+    private RunwayRoute.Ground runwayGround(Level level, BlockPos hole) {
+        GroundReader reader = new GroundReader(level, colony, colony.nest().nestCells(level));
+        java.util.Set<BlockPos> nest = colony.nest().nestCells(level);
+        java.util.Map<BlockPos, ?> mound = colony.mound().getParts(level);
+        java.util.Set<BlockPos> used = new java.util.HashSet<>();
+        for (Nest.Runway runway : colony.nest().getRunways()) {
+            for (BlockPos cell : runway.cells()) {
+                used.add(cell);
+                for (Direction side : Direction.values()) {
+                    used.add(cell.relative(side));
+                }
+            }
+        }
+        java.util.Set<BlockPos> mouths = new java.util.HashSet<>();
+        for (NestPlan.ForagingTunnel tunnel : tunnels(level)) {
+            mouths.add(tunnel.hole().above());
+        }
+        mouths.add(colony.nest().getEntrance());
+        mouths.add(colony.nest().getEntrance().above());
+        return new RunwayRoute.Ground() {
+            @Override
+            public Integer groundTop(int x, int z) {
+                return reader.groundTop(x, z);
+            }
+
+            @Override
+            public boolean isFree(BlockPos cell) {
+                if (!level.isLoaded(cell) || nest.contains(cell) || mound.containsKey(cell) || used.contains(cell)
+                        || isHole(level, cell) || isHole(level, cell.below())) {
+                    return false;
+                }
+                BlockState state = level.getBlockState(cell);
+                if (!(state.isAir() || state.canBeReplaced()) || !state.getFluidState().isEmpty() || touchesFluid(level, cell)) {
+                    return false;
+                }
+                // No wall of it beside another hole's mouth (only its own, the cell right over its hole).
+                if (mouths.contains(cell)) {
+                    return false;
+                }
+                for (Direction side : Direction.values()) {
+                    BlockPos next = cell.relative(side);
+                    if (mouths.contains(next) && !next.equals(hole.above())) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+        };
+    }
+
+    /** The mud of the crumbling runways falls away, a plate at a time; a runway with no mud left is forgotten. */
+    private void crumble(ServerLevel level) {
+        java.util.Iterator<List<BlockPos>> it = colony.nest().getCrumblingRunways().iterator();
+        boolean changed = false;
+        while (it.hasNext()) {
+            List<BlockPos> cells = it.next();
+            boolean any = false;
+            boolean loaded = true;
+            for (BlockPos cell : cells) {
+                for (Direction side : Direction.values()) {
+                    BlockPos wall = cell.relative(side);
+                    if (cells.contains(wall)) {
+                        continue;
+                    }
+                    if (!level.isLoaded(wall)) {
+                        loaded = false;
+                        continue;
+                    }
+                    BlockState state = level.getBlockState(wall);
+                    if (!com.antcolonies.block.MudCrustBlock.hasFace(state, side.getOpposite())) {
+                        continue;
+                    }
+                    any = true;
+                    if (level.getRandom().nextInt(CRUMBLE_CHANCE) == 0) {
+                        BlockState less = state.setValue(com.antcolonies.block.MudCrustBlock.FACES.get(side.getOpposite()), false);
+                        boolean empty = com.antcolonies.block.MudCrustBlock.FACES.values().stream().noneMatch(less::getValue);
+                        level.levelEvent(net.minecraft.world.level.block.LevelEvent.PARTICLES_DESTROY_BLOCK, wall,
+                                net.minecraft.world.level.block.Block.getId(state));
+                        if (empty) {
+                            level.removeBlock(wall, false);
+                        } else {
+                            level.setBlock(wall, less, net.minecraft.world.level.block.Block.UPDATE_ALL);
+                        }
+                    }
+                }
+            }
+            if (!any && loaded) {
+                it.remove();
+                changed = true;
+            }
+        }
+        if (changed) {
+            ColonyManager.get(level).markChanged();
+        }
+    }
+
+    /** For the colony list: " | runways 2 (1 finished)". Empty for species without sheeting. */
+    public String describeRunways(Level level) {
+        if (colony.profile().nest().sheeting().isEmpty()) {
+            return "";
+        }
+        List<Nest.Runway> runways = colony.nest().getRunways();
+        long finished = runways.stream().filter(runway -> colony.nest().isRunwayClosed(level, runway)).count();
+        return " | runways " + runways.size() + " (" + finished + " finished)";
     }
 
     /**

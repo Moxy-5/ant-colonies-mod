@@ -143,7 +143,9 @@ public class DigGoal extends Goal {
         // the hill still has room for it. Once the hill is complete the soil is simply left behind. A termite mound
         // takes one pellet per layer of a mound block from each dug block (one dug block builds one mound block).
         boolean mound = colony.mound().numbers() != null;
-        if (ant.canPlaceBlocks() && (mound ? colony.mound().takePellet(level, target, ant.getUUID()) : colony.hill().hasMoundRoom(level))) {
+        // Grass cut away where a runway of sheeting runs gives no soil.
+        if (ant.canPlaceBlocks() && !colony.nest().isRunwayPlant(level, target)
+                && (mound ? colony.mound().takePellet(level, target, ant.getUUID()) : colony.hill().hasMoundRoom(level))) {
             ant.setCarriedBlock(state.is(Blocks.GRASS_BLOCK) || state.is(Blocks.ROOTED_DIRT) ? Blocks.DIRT.defaultBlockState()
                     : state.getBlock() instanceof TermiteMoundBlock || state.getBlock() instanceof TermiteHoleBlock
                             || state.getBlock() instanceof com.antcolonies.block.MudCrustBlock
