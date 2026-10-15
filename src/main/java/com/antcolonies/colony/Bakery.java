@@ -169,6 +169,14 @@ public class Bakery implements NurseFood {
     }
 
     public boolean depositBread(Level level, BlockPos spot, boolean rich) {
+        if (!addBreadAt(level, spot)) {
+            return false;
+        }
+        countIn(rich);
+        return true;
+    }
+
+    private boolean addBreadAt(Level level, BlockPos spot) {
         BlockState state = level.getBlockState(spot);
         if (state.isAir()) {
             level.setBlock(spot, ModBlocks.BREAD_PILE.get().defaultBlockState(), 3);
@@ -177,11 +185,64 @@ public class Bakery implements NurseFood {
         } else {
             return false;
         }
+        return true;
+    }
+
+    /** One more piece of bread, counted now; its heap layer is put down later (see {@link NestLedger}). */
+    void countIn(boolean rich) {
         bread++;
         if (rich) {
             richBread++;
         }
+    }
+
+    /**
+     * A piece of bread is taken out of the count (by the numbers: for the queen or a larva); its layer comes off a heap
+     * later, out of sight. Rich if {@code wantRich} and there is some, or if all of it is rich. Returns whether it was
+     * rich. Call only while {@link #getBread} is above 0.
+     */
+    boolean takeCounted(boolean wantRich) {
+        richBread = Math.min(richBread, bread);
+        boolean rich = richBread > 0 && (wantRich || bread <= richBread);
+        bread = Math.max(0, bread - 1);
+        if (rich) {
+            richBread--;
+        }
+        return rich;
+    }
+
+    /**
+     * Whether the numbers should mill more bread while the colony is away (nobody real does it then): less bread than
+     * one meal for the queen (while she has room for more young) plus what the hungry young still have to eat.
+     */
+    boolean needsBreadAway(ServerLevel level) {
+        if (!colony.profile().food().makesBread()) {
+            return false;
+        }
+        Brood brood = colony.brood();
+        return bread < (brood.isFull(level) ? 0 : colony.profile().food().breadStock()) + brood.larvaHunger(level);
+    }
+
+    @Override
+    public boolean addPieceAt(Level level, BlockPos spot) {
+        return !colony.brood().getBroodCells(level).contains(spot) && addBreadAt(level, spot);
+    }
+
+    @Override
+    public boolean removePieceAt(Level level, BlockPos spot) {
+        BlockState state = level.getBlockState(spot);
+        if (!state.is(ModBlocks.BREAD_PILE.get())) {
+            return false;
+        }
+        int layers = state.getValue(SeedPileBlock.LAYERS);
+        level.setBlock(spot, layers <= 1 ? Blocks.AIR.defaultBlockState() : state.setValue(SeedPileBlock.LAYERS, layers - 1), 3);
         return true;
+    }
+
+    @Override
+    public void forget(int pieces) {
+        bread = Math.max(0, bread - pieces);
+        richBread = Math.min(richBread, bread);
     }
 
     /**

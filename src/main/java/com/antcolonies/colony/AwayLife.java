@@ -41,10 +41,12 @@ import net.minecraft.world.phys.Vec3;
  * comes out of the nest instead. One frozen for less than a minute just carries on. One frozen longer while the colony
  * was here (a forager left at the edge of the loaded land) has walked home meanwhile: it is folded in then. Once the
  * nest is loaded again, what is owed is put in its place, out of every player's sight ({@link #settle}): the young into
- * the nursery, the bodies of the old into the refuse chamber, carried seeds into the store and bread to the nurses' food.
+ * the nursery, and through the {@link NestLedger} the bodies into the refuse chamber, carried seeds into the store and
+ * bread to the nurses' food (what was carried is counted as soon as it is folded in).
  *
- * <p>Not yet (step 2b): while away, nobody eats and the young do not grow; the queen's and the young's clocks stop (the
- * queen's are moved on by the time away when the colony comes back). Old age goes on in the numbers.
+ * <p>Step 2b: while away the colony lives on as numbers ({@link NestLife}, {@link Meals}): the numbers eat and starve,
+ * the nurses mill bread and feed the queen and the young, the queen lays, the young grow up, the fungus grows, and the
+ * numbers grow old. The clocks of the frozen young go on while they wait to be folded in.
  *
  * <p>Species-neutral: any insect with a colony and a nest caste, and every egg and larva (or nymph).
  */
@@ -57,12 +59,6 @@ public class AwayLife {
     private long awaySince = Colony.NOT_SET;
     /** The colony's insects frozen in unloaded land: id -> what it was. Saved. */
     private final Map<UUID, Frozen> frozen = new LinkedHashMap<>();
-    /** What is owed to the nest when it is loaded again (bodies for the refuse chamber, carried food). Saved. */
-    private int bodiesOwed;
-    private int seedsOwed;
-    private int richSeedsOwed;
-    private int nurseFoodOwed;
-    private int richNurseFoodOwed;
     /** Tests only: whether this runs at all (null: always, except on the game test server). Not saved. */
     @Nullable
     private Boolean onForTests;
@@ -84,13 +80,14 @@ public class AwayLife {
     }
 
     /**
-     * One frozen insect. Adult: its caste and when it grew up, and what it held. Egg: ticks left to hatch ({@code -1}:
-     * not put in its place yet). Larva: its meals so far, how long it had gone hungry, and the soldier it grows into.
+     * One frozen insect. Adult: its caste and when it grew up, what it held and when it last ate ({@link Colony#NOT_SET}:
+     * it does not eat). Egg: ticks left to hatch ({@code -1}: not put in its place yet). Larva: its meals so far, how long
+     * it had gone hungry, and the soldier it grows into. All as when it was frozen.
      */
     record Frozen(Kind kind, String caste, long grownUpAt, Load load, long left, int fed, @Nullable TermiteSoldierEntity.Rank rank,
-            long frozenAt, boolean folded) {
+            long frozenAt, boolean folded, long lastMeal) {
         Frozen fold() {
-            return new Frozen(kind, caste, grownUpAt, load, left, fed, rank, frozenAt, true);
+            return new Frozen(kind, caste, grownUpAt, load, left, fed, rank, frozenAt, true, lastMeal);
         }
     }
 
@@ -142,13 +139,13 @@ public class AwayLife {
         Frozen what = null;
         if (entity instanceof AbstractAntEntity mob && mob.nestCaste() != null && mob.isAlive()) {
             long grownUpAt = mob.getGrownUpAt() == AbstractAntEntity.AGE_NOT_SET ? now : mob.getGrownUpAt();
-            what = new Frozen(Kind.ADULT, mob.nestCaste(), grownUpAt, loadOf(mob), 0, 0, null, now, false);
+            what = new Frozen(Kind.ADULT, mob.nestCaste(), grownUpAt, loadOf(mob), 0, 0, null, now, false, mob.getLastMeal());
         } else if (entity instanceof AntEggEntity egg && egg.isAlive()) {
             long left = egg.getHatchAt() < 0 ? -1 : Math.max(0, egg.getHatchAt() - now);
-            what = new Frozen(Kind.EGG, "", 0, Load.NONE, left, 0, null, now, false);
+            what = new Frozen(Kind.EGG, "", 0, Load.NONE, left, 0, null, now, false, Colony.NOT_SET);
         } else if (entity instanceof AntLarvaEntity larva && larva.isAlive()) {
             long hungry = larva.getLastFed() == Colony.NOT_SET ? 0 : Math.max(0, now - larva.getLastFed());
-            what = new Frozen(Kind.LARVA, "", 0, Load.NONE, hungry, larva.getFed(), larva.getSoldierRank(), now, false);
+            what = new Frozen(Kind.LARVA, "", 0, Load.NONE, hungry, larva.getFed(), larva.getSoldierRank(), now, false, Colony.NOT_SET);
         }
         if (what != null) {
             frozen.put(entity.getUUID(), what);
@@ -174,7 +171,8 @@ public class AwayLife {
 
     /**
      * Once a second while the nest's middle is out of range (from {@link ColonyManager#tickColonies}). After the grace
-     * minute every frozen insect is folded into the numbers; the numbers grow old. Never touches the world.
+     * minute every frozen insect is folded into the numbers, and the colony lives on as numbers: they grow old and eat,
+     * and the nest's life goes on ({@link NestLife}). Never touches the world.
      */
     void tickAway(ServerLevel level) {
         if (!isOn(level)) {
@@ -189,7 +187,7 @@ public class AwayLife {
             boolean changed = false;
             for (Map.Entry<UUID, Frozen> entry : frozen.entrySet()) {
                 if (!entry.getValue().folded()) {
-                    foldIn(entry.getKey(), entry.getValue());
+                    foldIn(level, entry.getKey(), entry.getValue());
                     entry.setValue(entry.getValue().fold());
                     changed = true;
                 }
@@ -199,34 +197,48 @@ public class AwayLife {
                 ColonyManager.get(level).markChanged();
             }
         }
-        colony.population().growOld(level);
+        if (isAway(level)) {
+            colony.population().tickAway(level);
+            colony.life().tick(level, true);
+            ColonyManager.get(level).markChanged();
+        }
     }
 
-    /** A frozen insect becomes one of the numbers (it is counted already, so the headcount stays), and what it held is owed. */
-    private void foldIn(UUID id, Frozen what) {
+    /**
+     * A frozen insect becomes one of the numbers (it is counted already, so the headcount stays). What it held is
+     * counted at once (it walked home with it) and its block owed to the nest. A young one's clocks went on while it was
+     * frozen: an egg is that much nearer hatching, a larva that still had to eat that much hungrier.
+     */
+    private void foldIn(ServerLevel level, UUID id, Frozen what) {
+        long frozenFor = Math.max(0, level.getGameTime() - what.frozenAt());
         switch (what.kind()) {
             case ADULT -> {
-                colony.population().foldIn(what.caste(), what.grownUpAt());
+                colony.population().foldIn(level, what.caste(), what.grownUpAt(), what.lastMeal());
                 colony.foodMap().wentHome(id);
                 switch (what.load()) {
-                    case SEED -> seedsOwed++;
-                    case RICH_SEED -> richSeedsOwed++;
-                    case NURSE_FOOD -> nurseFoodOwed++;
-                    case RICH_NURSE_FOOD -> richNurseFoodOwed++;
+                    case SEED, RICH_SEED -> {
+                        colony.food().countIn(what.load() == Load.RICH_SEED);
+                        colony.ledger().addStore(1);
+                    }
+                    case NURSE_FOOD, RICH_NURSE_FOOD -> {
+                        if (colony.profile().food().makesBread()) {
+                            colony.bakery().countIn(what.load() == Load.RICH_NURSE_FOOD);
+                        }
+                        colony.ledger().addNurseFood(1);
+                    }
                     case EGG -> colony.brood().addInside(Brood.Young.egg(-1));
-                    case BODY -> bodiesOwed++;
+                    case BODY -> colony.ledger().addBodies(1);
                     case NONE -> {
                     }
                 }
             }
-            case EGG -> colony.brood().addInside(Brood.Young.egg(what.left()));
-            case LARVA -> colony.brood().addInside(Brood.Young.larva(what.fed(), what.left(), what.rank()));
+            case EGG -> colony.brood().addInside(Brood.Young.egg(what.left() < 0 ? -1 : Math.max(1, what.left() - frozenFor)));
+            case LARVA -> {
+                boolean full = what.fed() >= colony.soldiers().mealFor(what.rank());
+                long hungry = full || !colony.isHungerOn() ? what.left() : what.left() + frozenFor;
+                colony.brood().addInside(Brood.Young.larva(what.fed(), hungry, what.rank()));
+            }
         }
-    }
-
-    /** Old workers of the numbers died while away: their bodies are laid in the refuse chamber when the nest is loaded again. */
-    void oweBodies(int count) {
-        bodiesOwed += count;
     }
 
     // --- coming back ----------------------------------------------------------------------------------------------
@@ -258,7 +270,7 @@ public class AwayLife {
             if (level.getGameTime() - what.frozenAt() < grace()) {
                 return false; // only out of range for a moment: it carries on where it was
             }
-            foldIn(entity.getUUID(), what); // left at the edge of the loaded land: it has walked home
+            foldIn(level, entity.getUUID(), what); // left at the edge of the loaded land: it has walked home
         }
         entity.discard();
         return true;
@@ -266,53 +278,27 @@ public class AwayLife {
 
     /**
      * Once a second while the nest's middle is loaded (from {@link Colony#tick}): the first time after being away, the
-     * colony comes back (the queen's clocks are moved on by the time away: she was frozen too). Then, while the whole nest
-     * is loaded, what is owed is put in its place, out of every player's sight.
+     * colony comes back. Then, while the whole nest is loaded, the young that are numbers come out into the nursery and
+     * the blocks catch up with the counts ({@link NestLedger}), out of every player's sight; and the brain notes where
+     * the queen sits, for the next time away.
      */
     void settle(ServerLevel level) {
         if (awaySince != Colony.NOT_SET) {
             long away = level.getGameTime() - awaySince;
             awaySince = Colony.NOT_SET;
-            colony.queenCare().pause(away);
             AntColoniesMod.LOGGER.info("[away] colony {} is back after {} ticks: {}", colony.getId(), away, describe(level));
             ColonyManager.get(level).markChanged();
         }
-        if (!owesAnything() || !isOn(level) || !nestLoaded(level)) {
+        colony.life().watch(level);
+        if (colony.ledger().isEmpty() && colony.brood().insideCount() == 0 || !nestLoaded(level)) {
             return;
         }
         List<Vec3> eyes = colony.population().viewersInSight(level);
         boolean changed = colony.brood().comeOut(level, eyes);
-        for (int tries = 0; bodiesOwed > 0 && tries < 200; tries++) {
-            if (colony.refuse().eatsOrBuries()) {
-                bodiesOwed = 0; // termites ate their dead in the garden
-                changed = true;
-                break;
-            }
-            BlockPos spot = colony.refuse().pickCorpseSpot(level, level.getRandom());
-            if (spot == null) {
-                bodiesOwed = 0; // the refuse chamber is full (or not dug): the rest were carried out of the nest
-                changed = true;
-                break;
-            }
-            if (!Population.outOfSight(level, Vec3.atBottomCenterOf(spot).add(0, 0.2, 0), eyes)) {
-                break; // a player can see in: later
-            }
-            if (colony.refuse().placeCorpse(level, spot)) {
-                bodiesOwed--;
-                changed = true;
-            }
-        }
-        changed |= storeSeeds(level, eyes, false);
-        changed |= storeSeeds(level, eyes, true);
-        changed |= storeNurseFood(level, eyes, false);
-        changed |= storeNurseFood(level, eyes, true);
+        changed |= colony.ledger().apply(level, eyes);
         if (changed) {
             ColonyManager.get(level).markChanged();
         }
-    }
-
-    private boolean owesAnything() {
-        return bodiesOwed + seedsOwed + richSeedsOwed + nurseFoodOwed + richNurseFoodOwed > 0 || colony.brood().insideCount() > 0;
     }
 
     /** Whether the chunks of the whole nest (its middle and every room) are loaded. */
@@ -322,49 +308,6 @@ public class AwayLife {
         }
         AABB area = colony.nestArea();
         return level.hasChunksAt(BlockPos.containing(area.minX, 0, area.minZ), BlockPos.containing(area.maxX, 0, area.maxZ));
-    }
-
-    /** Carried seeds owed go into the store (the species' food store: seeds, or forage built into fungus comb). */
-    private boolean storeSeeds(ServerLevel level, List<Vec3> eyes, boolean rich) {
-        boolean changed = false;
-        for (int tries = 0; (rich ? richSeedsOwed > 0 : seedsOwed > 0) && tries < 200; tries++) {
-            BlockPos spot = colony.food().pickFoodSpot(level, level.getRandom());
-            if (spot != null && !Population.outOfSight(level, Vec3.atCenterOf(spot), eyes)) {
-                break; // a player can see in: later
-            }
-            if (spot != null && !colony.food().depositSeed(level, spot, rich)) {
-                continue;
-            }
-            // Stored, or the store is full (or not dug): it was eaten or put somewhere else.
-            if (rich) {
-                richSeedsOwed--;
-            } else {
-                seedsOwed--;
-            }
-            changed = true;
-        }
-        return changed;
-    }
-
-    /** Carried nurse food owed (a piece of ant bread, a fungus nodule) is put back where the nurses keep it. */
-    private boolean storeNurseFood(ServerLevel level, List<Vec3> eyes, boolean rich) {
-        boolean changed = false;
-        for (int tries = 0; (rich ? richNurseFoodOwed > 0 : nurseFoodOwed > 0) && tries < 200; tries++) {
-            BlockPos spot = colony.nurseFood().pickReturnSpot(level, level.getRandom());
-            if (spot != null && !Population.outOfSight(level, Vec3.atCenterOf(spot), eyes)) {
-                break;
-            }
-            if (spot != null && !colony.nurseFood().putBack(level, spot, rich)) {
-                continue;
-            }
-            if (rich) {
-                richNurseFoodOwed--;
-            } else {
-                nurseFoodOwed--;
-            }
-            changed = true;
-        }
-        return changed;
     }
 
     // --- the colony list ------------------------------------------------------------------------------------------
@@ -380,14 +323,8 @@ public class AwayLife {
             text.append(" | frozen ").append(frozen.size()).append(" (folded in ").append(folded).append(")");
         }
         List<String> owed = new ArrayList<>();
-        if (bodiesOwed > 0) {
-            owed.add(bodiesOwed + " bodies");
-        }
-        if (seedsOwed + richSeedsOwed > 0) {
-            owed.add((seedsOwed + richSeedsOwed) + " food");
-        }
-        if (nurseFoodOwed + richNurseFoodOwed > 0) {
-            owed.add((nurseFoodOwed + richNurseFoodOwed) + " nurse food");
+        if (!colony.ledger().isEmpty()) {
+            owed.add(colony.ledger().describe());
         }
         if (colony.brood().insideCount() > 0) {
             owed.add(colony.brood().insideCount() + " young");
@@ -424,11 +361,12 @@ public class AwayLife {
     }
 
     public int getBodiesOwed() {
-        return bodiesOwed;
+        return colony.ledger().bodies();
     }
 
+    /** Layers of the food store owed to the nest (above 0: to put down). */
     public int getFoodOwed() {
-        return seedsOwed + richSeedsOwed;
+        return colony.ledger().store();
     }
 
     // --- saving -----------------------------------------------------------------------------------------------------
@@ -436,11 +374,6 @@ public class AwayLife {
     void save(CompoundTag tag) {
         CompoundTag away = new CompoundTag();
         away.putLong("since", awaySince);
-        away.putInt("bodies", bodiesOwed);
-        away.putInt("seeds", seedsOwed);
-        away.putInt("richSeeds", richSeedsOwed);
-        away.putInt("nurseFood", nurseFoodOwed);
-        away.putInt("richNurseFood", richNurseFoodOwed);
         ListTag list = new ListTag();
         frozen.forEach((id, what) -> {
             CompoundTag entry = new CompoundTag();
@@ -456,6 +389,7 @@ public class AwayLife {
             }
             entry.putLong("frozenAt", what.frozenAt());
             entry.putBoolean("folded", what.folded());
+            entry.putLong("lastMeal", what.lastMeal());
             list.add(entry);
         });
         away.put("frozen", list);
@@ -468,19 +402,15 @@ public class AwayLife {
             return; // an older save: nothing frozen known
         }
         CompoundTag away = tag.getCompound("away");
-        awaySince = away.getLong("since");
-        bodiesOwed = away.getInt("bodies");
-        seedsOwed = away.getInt("seeds");
-        richSeedsOwed = away.getInt("richSeeds");
-        nurseFoodOwed = away.getInt("nurseFood");
-        richNurseFoodOwed = away.getInt("richNurseFood");
+        awaySince = away.getLong("since"); // (what an older save owed is read by the NestLedger)
         ListTag list = away.getList("frozen", Tag.TAG_COMPOUND);
         for (int i = 0; i < list.size(); i++) {
             CompoundTag entry = list.getCompound(i);
             TermiteSoldierEntity.Rank rank = entry.contains("rank") ? TermiteSoldierEntity.Rank.valueOf(entry.getString("rank")) : null;
             frozen.put(entry.getUUID("id"), new Frozen(Kind.valueOf(entry.getString("kind")), entry.getString("caste"),
                     entry.getLong("grownUpAt"), Load.valueOf(entry.getString("load")), entry.getLong("left"), entry.getInt("fed"),
-                    rank, entry.getLong("frozenAt"), entry.getBoolean("folded")));
+                    rank, entry.getLong("frozenAt"), entry.getBoolean("folded"),
+                    entry.contains("lastMeal") ? entry.getLong("lastMeal") : Colony.NOT_SET));
         }
     }
 }

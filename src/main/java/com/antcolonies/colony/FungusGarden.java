@@ -32,6 +32,13 @@ public class FungusGarden implements NurseFood {
     private final Colony colony;
     /** How many nodules have grown since the colony was loaded (each used up a piece of comb). Not saved: for tests. */
     private int nodulesGrown;
+    /**
+     * What the garden looked like the last second it was loaded (for the brain while the colony is away, when no block
+     * may be read): how many comb blocks, how many layers they have over their beds, how many nodules. Saved.
+     */
+    private int seenCombs;
+    private int seenSpareLayers;
+    private int seenNodules;
 
     FungusGarden(Colony colony) {
         this.colony = colony;
@@ -72,8 +79,11 @@ public class FungusGarden implements NurseFood {
         if (numbers == null) {
             return false;
         }
-        float chance = 20.0F / Math.max(20, numbers.noduleTicks());
+        float chance = chancePerSecond(numbers);
         boolean grew = false;
+        int combs = 0;
+        int spare = 0;
+        int allNodules = 0;
         for (BlockPos pos : getCombs(level)) {
             BlockState state = level.getBlockState(pos);
             int layers = state.getValue(SeedPileBlock.LAYERS);
@@ -85,9 +95,52 @@ public class FungusGarden implements NurseFood {
                 level.sendParticles(ParticleTypes.WHITE_ASH, pos.getX() + 0.5, pos.getY() + FungusCombBlock.topOf(state), pos.getZ() + 0.5,
                         4, 0.25, 0.05, 0.25, 0.0);
                 grew = true;
+                layers--;
+                nodules++;
             }
+            combs++;
+            spare += layers - 1;
+            allNodules += nodules;
         }
+        seenCombs = combs;
+        seenSpareLayers = spare;
+        seenNodules = allNodules;
         return grew;
+    }
+
+    /** The chance each second that a comb block with room for it grows a nodule. */
+    static float chancePerSecond(SpeciesProfile.GardenNumbers numbers) {
+        return 20.0F / Math.max(20, numbers.noduleTicks());
+    }
+
+    /** How many comb blocks the garden had the last second it was loaded. */
+    int seenCombs() {
+        return seenCombs;
+    }
+
+    /** How many layers the comb had over its beds the last second the garden was loaded. */
+    int seenSpareLayers() {
+        return seenSpareLayers;
+    }
+
+    /** How many nodules there were the last second the garden was loaded. */
+    int seenNodules() {
+        return seenNodules;
+    }
+
+    void save(net.minecraft.nbt.CompoundTag tag) {
+        net.minecraft.nbt.CompoundTag seen = new net.minecraft.nbt.CompoundTag();
+        seen.putInt("combs", seenCombs);
+        seen.putInt("spare", seenSpareLayers);
+        seen.putInt("nodules", seenNodules);
+        tag.put("gardenSeen", seen);
+    }
+
+    void load(net.minecraft.nbt.CompoundTag tag) {
+        net.minecraft.nbt.CompoundTag seen = tag.getCompound("gardenSeen");
+        seenCombs = seen.getInt("combs");
+        seenSpareLayers = seen.getInt("spare");
+        seenNodules = seen.getInt("nodules");
     }
 
     /** How many nodules have grown since the colony was loaded (for tests: each used up one stored piece). */
@@ -148,6 +201,21 @@ public class FungusGarden implements NurseFood {
         }
         level.setBlock(spot, state.setValue(FungusCombBlock.NODULES, state.getValue(FungusCombBlock.NODULES) + 1), 3);
         return true;
+    }
+
+    @Override
+    public boolean addPieceAt(Level level, BlockPos spot) {
+        return putBack(level, spot, false);
+    }
+
+    @Override
+    public boolean removePieceAt(Level level, BlockPos spot) {
+        return !takeFoodAt(level, spot, false).isEmpty();
+    }
+
+    @Override
+    public void forget(int pieces) {
+        // nodules are not counted: nothing to take out of a count
     }
 
     @Override

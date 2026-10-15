@@ -78,6 +78,8 @@ public class Colony {
     private final Alarm alarm;
     private final Population population;
     private final AwayLife away;
+    private final NestLedger ledger;
+    private final NestLife life;
 
     public Colony(UUID id, ResourceLocation species, UUID queenId, BlockPos center) {
         this.id = id;
@@ -102,6 +104,8 @@ public class Colony {
         this.alarm = new Alarm(this);
         this.population = new Population(this);
         this.away = new AwayLife(this);
+        this.ledger = new NestLedger(this);
+        this.life = new NestLife(this);
     }
 
     /** The underground nest: its plan, the next block to dig, and the dug-out cells of each room. */
@@ -187,6 +191,16 @@ public class Colony {
     /** Going away and coming back: the insects frozen in unloaded land, and what is owed to the nest (the brain, part 2). */
     public AwayLife away() {
         return away;
+    }
+
+    /** What the counts have changed and the nest's blocks have not caught up with yet (put right out of sight). */
+    public NestLedger ledger() {
+        return ledger;
+    }
+
+    /** Life in the nest as numbers: the young that are numbers, and while away the queen, the nurses and the fungus. */
+    public NestLife life() {
+        return life;
     }
 
     /**
@@ -316,6 +330,7 @@ public class Colony {
         foragingHoles.tick(level);
         food.barePatches().tick(level);
         population.tick(level);
+        life.tick(level, false);
         return true;
     }
 
@@ -495,6 +510,9 @@ public class Colony {
         population.save(tag);
         brood.save(tag);
         away.save(tag);
+        ledger.save(tag);
+        life.save(tag);
+        garden.save(tag);
         return tag;
     }
 
@@ -521,6 +539,9 @@ public class Colony {
         colony.population.load(tag);
         colony.brood.load(tag);
         colony.away.load(tag);
+        colony.ledger.load(tag); // (after the food and the bread: an older save's owed food is counted in)
+        colony.life.load(tag);
+        colony.garden.load(tag);
         return colony;
     }
 }

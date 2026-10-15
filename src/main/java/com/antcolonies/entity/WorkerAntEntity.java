@@ -134,6 +134,16 @@ public class WorkerAntEntity extends AbstractAntEntity {
         lastAte = gameTime;
     }
 
+    @Override
+    public long getLastMeal() {
+        return lastAte;
+    }
+
+    @Override
+    public void setLastMeal(long gameTime) {
+        lastAte = gameTime;
+    }
+
     // Once a second: hungry for a day and a half = slower, for three days = dead.
     @Override
     protected void customServerAiStep() {

@@ -278,6 +278,18 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         setGrownUpAt(grownUpAt);
     }
 
+    /**
+     * The game time of its last meal, for the colony's numbers when it goes into them ({@code Colony.NOT_SET}: it does
+     * not eat, or has not started its clock yet). Overridden by the insects that eat.
+     */
+    public long getLastMeal() {
+        return com.antcolonies.colony.Colony.NOT_SET;
+    }
+
+    /** Coming out of the numbers: when it last ate inside (only for the insects that eat). */
+    public void setLastMeal(long gameTime) {
+    }
+
     /** Whether it may go back into its colony's numbers now: not while it holds anything or is after an enemy. */
     public boolean mayGoIntoNest() {
         return isAlive() && !hasFullMandibles() && getTarget() == null && !isPassenger();

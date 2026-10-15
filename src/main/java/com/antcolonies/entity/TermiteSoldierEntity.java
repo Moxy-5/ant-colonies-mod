@@ -242,6 +242,16 @@ public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurs
     }
 
     @Override
+    public long getLastMeal() {
+        return lastFed;
+    }
+
+    @Override
+    public void setLastMeal(long gameTime) {
+        lastFed = gameTime;
+    }
+
+    @Override
     public boolean hasFeeder(long now) {
         return feeder != null && feederUntil > now;
     }

@@ -521,6 +521,18 @@ public class FoodStore {
 
     /** As above; {@code rich}: the seed is a rich one (pumpkin), which the mill keeps for the queen's rich bread. */
     public boolean depositSeed(Level level, BlockPos spot, boolean rich) {
+        if (!addLayerAt(level, spot)) {
+            return false;
+        }
+        countIn(rich);
+        return true;
+    }
+
+    /**
+     * The heap at {@code spot} grows by one layer (or a new one starts), without counting it: for a piece already
+     * counted (see {@link NestLedger}). False if that spot is full, or an egg or a young one lies there.
+     */
+    boolean addLayerAt(Level level, BlockPos spot) {
         BlockState state = level.getBlockState(spot);
         SeedPileBlock pile = food().pileBlock();
         if (colony.brood().getBroodCells(level).contains(spot)) {
@@ -533,10 +545,68 @@ public class FoodStore {
         } else {
             return false;
         }
+        return true;
+    }
+
+    /** One more piece in the store, counted now; its layer is put down later (see {@link NestLedger}). */
+    void countIn(boolean rich) {
         food++;
         if (rich) {
             richSeeds++;
         }
+    }
+
+    /**
+     * The heaps a layer can be taken off without counting it (for a piece already taken out of the count, see
+     * {@link NestLedger}): every seed heap; fungus comb only where it has a layer over its bed (as the fungus uses it).
+     */
+    List<BlockPos> layersToTake(Level level) {
+        List<BlockPos> heaps = new ArrayList<>();
+        SeedPileBlock pile = food().pileBlock();
+        int keep = pile instanceof com.antcolonies.block.FungusCombBlock ? 1 : 0;
+        for (BlockPos pos : colony.nest().getFoodStoreCells(level)) {
+            BlockState state = level.getBlockState(pos);
+            if (state.is(pile) && state.getValue(SeedPileBlock.LAYERS) > keep) {
+                heaps.add(pos);
+            }
+        }
+        return heaps;
+    }
+
+    /** One layer comes off the heap at {@code pile}, without counting it (see {@link #layersToTake}). */
+    boolean removeLayerAt(Level level, BlockPos pile) {
+        BlockState state = level.getBlockState(pile);
+        if (!state.is(food().pileBlock())) {
+            return false;
+        }
+        int layers = state.getValue(SeedPileBlock.LAYERS);
+        level.setBlock(pile, layers <= 1 ? Blocks.AIR.defaultBlockState() : state.setValue(SeedPileBlock.LAYERS, layers - 1), 3);
+        return true;
+    }
+
+    /**
+     * A piece is taken out of the count (by the numbers: a meal, or a seed for the mill); its layer comes off a heap
+     * later, out of sight ({@link NestLedger}). A rich seed if {@code wantRich} and there is one, or if only rich ones are
+     * left. Returns whether it was a rich one. Call only while {@link #getFood} is above 0.
+     */
+    boolean takeCounted(boolean wantRich) {
+        richSeeds = Math.min(richSeeds, food);
+        boolean rich = richSeeds > 0 && (wantRich || food <= richSeeds);
+        food = Math.max(0, food - 1);
+        if (rich) {
+            richSeeds--;
+        }
+        colony.ledger().addStore(-1);
+        return rich;
+    }
+
+    /** One of the colony's numbers eats a piece from the store (plain seeds first). False if the store is empty. */
+    boolean eatForNumbers() {
+        if (food <= 0) {
+            return false;
+        }
+        takeCounted(false);
+        seedsEaten++;
         return true;
     }
 

@@ -2,6 +2,7 @@ package com.antcolonies.colony;
 
 import java.util.UUID;
 
+import com.antcolonies.AntColoniesMod;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.WorkerAntEntity;
 import com.antcolonies.species.SpeciesProfile;
@@ -43,6 +44,11 @@ public class QueenCare {
     private long nextStreamEgg = Colony.NOT_SET;
     /** The game time of the queen's last piece of bread, or of the last time she needed none. Saved. */
     private long queenLastFed = Colony.NOT_SET;
+    /**
+     * The queen starved while the colony was away (she was frozen in her room, so she dies when it is loaded again, see
+     * {@link #queenStarves}). Saved.
+     */
+    private boolean starvedAway;
     /** The workers on their way to feed the queen: ant -> game time when the claim runs out. Not saved. */
     private final Claims<UUID> feeders = new Claims<>();
 
@@ -83,6 +89,11 @@ public class QueenCare {
 
     public void setQueenLastFed(long time) {
         queenLastFed = time;
+    }
+
+    /** Tests only: she carries an egg that comes out at this game time. */
+    public void setEggDueForTests(long time) {
+        eggDue = time;
     }
 
     /** True when the queen sits in her finished room (the workers feed her there, and her egg comes out there). */
@@ -246,6 +257,11 @@ public class QueenCare {
 
     /** The egg comes out of the queen at this spot; she starts over with an empty stomach. */
     public void layEgg(ServerLevel level, double x, double y, double z) {
+        eggCameOut(level);
+        colony.brood().spawnEgg(level, x, y, z);
+    }
+
+    private void eggCameOut(ServerLevel level) {
         eggsLaid++;
         if (burstLeft > 0) {
             // A burst egg: the next one is due a minute later, until the burst is over.
@@ -255,7 +271,84 @@ public class QueenCare {
             queenBread = 0;
             eggDue = -1;
         }
-        colony.brood().spawnEgg(level, x, y, z);
+    }
+
+    // --- while the colony is away (the brain, part 2, step 2b) ------------------------------------------------------
+
+    /** Whether the queen is alive as far as the brain knows (she may be frozen in unloaded land, or starved there). */
+    boolean isAlive() {
+        return !colony.isQueenless() && !starvedAway;
+    }
+
+    /**
+     * Whether the nurses (numbers, while the colony is away) should bring the queen food: she is home ({@code home}: she
+     * was in her room when the colony went away), does not carry an egg, has room for more, and the nursery is not full.
+     */
+    boolean wantsFoodAway(ServerLevel level, boolean home) {
+        return isAlive() && home && eggDue < 0 && queenBread < colony.profile().queen().meal() && !colony.brood().isFull(level);
+    }
+
+    /**
+     * Once a second while the colony is away: the queen lives on in her room as the brain's numbers. Frozen there, she
+     * lays as she would ({@code home}: she was in her room; {@code sealedIn}: and the founders had closed the entrance;
+     * {@code size}: how swollen a termite queen is): the founding batch from her own fat (and the founders feed the young
+     * on theirs), the steady stream of a termite queen, or the egg she carries. Her eggs are numbers (see {@link Brood#young},
+     * put in the nursery by the nurses at once). Her hunger clock runs as always; she starves if nobody feeds her (she dies
+     * when the colony is loaded again). True if anything changed.
+     */
+    boolean liveAway(ServerLevel level, boolean home, boolean sealedIn, float size) {
+        if (!isAlive()) {
+            return false;
+        }
+        long now = level.getGameTime();
+        int hatch = colony.profile().brood().hatchTicks();
+        boolean changed = false;
+        SpeciesProfile.Founding founding = colony.profile().founding().orElse(null);
+        if (founding != null) {
+            if (sealedIn && colony.isFounding() && eggsLaid < founding.eggs()) {
+                if (nextFoundingEgg == Colony.NOT_SET) {
+                    nextFoundingEgg = now + founding.eggIntervalTicks();
+                } else if (now >= nextFoundingEgg) {
+                    eggsLaid++;
+                    colony.brood().addInside(Brood.Young.egg(hatch));
+                    nextFoundingEgg = now + founding.eggIntervalTicks();
+                }
+                changed = true;
+            }
+            boolean raising = eggsLaid <= founding.eggs() && colony.getCount(WorkerAntEntity.CASTE) < founding.eggs();
+            if (raising && now % founding.feedIntervalTicks() < 20) {
+                int young = colony.brood().hungriestInside();
+                if (young >= 0) {
+                    colony.brood().feedInside(young); // from the founders' own fat
+                    changed = true;
+                }
+            }
+        }
+        SpeciesProfile.Laying laying = colony.profile().laying().orElse(null);
+        if (laying != null) {
+            boolean canLay = !colony.isFounding() && queenBread >= laying.foodPerEgg() && home && !colony.brood().isFull(level);
+            if (!canLay) {
+                nextStreamEgg = Colony.NOT_SET;
+            } else if (nextStreamEgg == Colony.NOT_SET) {
+                nextStreamEgg = now + laying.intervalFor(size);
+            } else if (now >= nextStreamEgg) {
+                eggsLaid++;
+                queenBread = Math.max(0, queenBread - laying.foodPerEgg());
+                nextStreamEgg = now + laying.intervalFor(size);
+                colony.brood().addInside(Brood.Young.egg(hatch));
+                changed = true;
+            }
+        } else if (home && isEggDue(level)) {
+            eggCameOut(level);
+            colony.brood().addInside(Brood.Young.egg(hatch));
+            changed = true;
+        }
+        if (hungerRunsOut(level)) {
+            starvedAway = true;
+            AntColoniesMod.LOGGER.info("[away] colony {}: the queen starved while the colony was away", colony.getId());
+            changed = true;
+        }
+        return changed;
     }
 
     /**
@@ -264,11 +357,19 @@ public class QueenCare {
      * nursery is full of young). Returns true when she has gone the profile's starve time without it.
      */
     public boolean queenStarves(ServerLevel level) {
+        if (starvedAway) {
+            return true; // she starved while the colony was away, frozen in her room
+        }
+        if (colony.away().isComingBack()) {
+            return false; // back in range: the brain looked after her while away (AwayLife.settle ends that first)
+        }
+        return hungerRunsOut(level);
+    }
+
+    /** Her hunger clock (here or away): true when she has gone the profile's starve time without food while she wanted some. */
+    private boolean hungerRunsOut(ServerLevel level) {
         long now = level.getGameTime();
         SpeciesProfile.QueenNumbers numbers = colony.profile().queen();
-        if (colony.away().isComingBack()) {
-            return false; // back in range: her clocks are moved on by the time away first (AwayLife.settle)
-        }
         // A founding queen lives on her own body fat (nobody could feed her yet).
         boolean satisfied = !colony.isHungerOn() || eggDue >= 0 || queenBread >= numbers.meal()
                 || colony.brood().isFull(level) || colony.isFounding();
@@ -277,29 +378,6 @@ public class QueenCare {
             return false;
         }
         return now - queenLastFed >= numbers.starveTicks();
-    }
-
-    /**
-     * The colony comes back after being away for this many ticks (see {@link AwayLife}): the queen was frozen in her
-     * room, so her clocks (hunger, the egg she carries, the next egg of her stream or founding batch) go on from where
-     * they stopped. Step 2a: until the colony eats while away (2b), this is what keeps her from starving on the way back.
-     */
-    void pause(long ticks) {
-        if (ticks <= 0) {
-            return;
-        }
-        if (queenLastFed != Colony.NOT_SET) {
-            queenLastFed += ticks;
-        }
-        if (eggDue >= 0) {
-            eggDue += ticks;
-        }
-        if (nextFoundingEgg != Colony.NOT_SET) {
-            nextFoundingEgg += ticks;
-        }
-        if (nextStreamEgg != Colony.NOT_SET) {
-            nextStreamEgg += ticks;
-        }
     }
 
     void save(CompoundTag tag) {
@@ -311,6 +389,7 @@ public class QueenCare {
         tag.putInt("eggsLaid", eggsLaid);
         tag.putLong("nextFoundingEgg", nextFoundingEgg);
         tag.putLong("nextStreamEgg", nextStreamEgg);
+        tag.putBoolean("queenStarvedAway", starvedAway);
     }
 
     void load(CompoundTag tag) {
@@ -322,5 +401,6 @@ public class QueenCare {
         eggsLaid = tag.getInt("eggsLaid");
         nextFoundingEgg = tag.contains("nextFoundingEgg") ? tag.getLong("nextFoundingEgg") : Colony.NOT_SET;
         nextStreamEgg = tag.contains("nextStreamEgg") ? tag.getLong("nextStreamEgg") : Colony.NOT_SET;
+        starvedAway = tag.getBoolean("queenStarvedAway");
     }
 }

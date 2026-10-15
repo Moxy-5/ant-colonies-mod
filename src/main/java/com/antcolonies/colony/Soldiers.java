@@ -83,7 +83,7 @@ public class Soldiers {
         return rank == Rank.MINOR ? numbers.wantedMinors(workers) : numbers.wantedMajors(workers);
     }
 
-    /** The nymphs that are growing into soldiers of this kind. */
+    /** The nymphs that are growing into soldiers of this kind (the real ones and the numbers). */
     public int nymphsToBe(Level level, Rank rank) {
         int count = 0;
         for (AntLarvaEntity nymph : colony.brood().getLarvae(level)) {
@@ -91,7 +91,7 @@ public class Soldiers {
                 count++;
             }
         }
-        return count;
+        return count + colony.brood().insideGrowingInto(rank);
     }
 
     /**

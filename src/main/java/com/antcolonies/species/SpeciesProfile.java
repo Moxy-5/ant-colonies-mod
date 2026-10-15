@@ -82,20 +82,29 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
         }
     }
 
-    /** A worker eats once every {@code mealIntervalTicks}; without food it slows down, then starves. */
+    /**
+     * A worker eats once every {@code mealIntervalTicks}; without food it slows down, then starves. {@code eats}: whether
+     * the workers eat at all (false for termites so far: their real eating of nodules and old comb is a step of its own).
+     */
     public record WorkerNumbers(int mealIntervalTicks, int slowAfterTicks, int starveAfterTicks, int nurseUntilTicks, int builderUntilTicks,
-            int lifespanTicks) {
+            int lifespanTicks, boolean eats) {
         public static final Codec<WorkerNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("meal_interval_ticks").forGetter(WorkerNumbers::mealIntervalTicks),
                 Codec.INT.fieldOf("slow_after_ticks").forGetter(WorkerNumbers::slowAfterTicks),
                 Codec.INT.fieldOf("starve_after_ticks").forGetter(WorkerNumbers::starveAfterTicks),
                 Codec.INT.optionalFieldOf("nurse_until_ticks", 72000).forGetter(WorkerNumbers::nurseUntilTicks),
                 Codec.INT.optionalFieldOf("builder_until_ticks", 192000).forGetter(WorkerNumbers::builderUntilTicks),
-                Codec.INT.optionalFieldOf("lifespan_ticks", 0).forGetter(WorkerNumbers::lifespanTicks)
+                Codec.INT.optionalFieldOf("lifespan_ticks", 0).forGetter(WorkerNumbers::lifespanTicks),
+                Codec.BOOL.optionalFieldOf("eats", true).forGetter(WorkerNumbers::eats)
         ).apply(i, WorkerNumbers::new));
 
         public WorkerNumbers(int mealIntervalTicks, int slowAfterTicks, int starveAfterTicks, int nurseUntilTicks, int builderUntilTicks) {
             this(mealIntervalTicks, slowAfterTicks, starveAfterTicks, nurseUntilTicks, builderUntilTicks, 0);
+        }
+
+        public WorkerNumbers(int mealIntervalTicks, int slowAfterTicks, int starveAfterTicks, int nurseUntilTicks, int builderUntilTicks,
+                int lifespanTicks) {
+            this(mealIntervalTicks, slowAfterTicks, starveAfterTicks, nurseUntilTicks, builderUntilTicks, lifespanTicks, true);
         }
 
         /**

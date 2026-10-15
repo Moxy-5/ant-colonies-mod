@@ -54,7 +54,8 @@ public class Brood {
     /**
      * One young as a number. An egg: {@code left} = ticks until it hatches ({@code -1}: not put in its place yet, the
      * clock starts in the nursery). A larva (or nymph): {@code fed} pieces eaten so far, {@code left} = how long it had
-     * gone hungry, and the soldier it grows into (null: a worker). Step 2a: their clocks stop while they are numbers.
+     * gone hungry, and the soldier it grows into (null: a worker). Their clocks go on while they are numbers (step 2b,
+     * {@link NestLife}): eggs hatch, larvae are fed by the nurses that are numbers, grow up or starve.
      */
     public record Young(boolean isEgg, long left, int fed, @Nullable TermiteSoldierEntity.Rank rank) {
         public static Young egg(long hatchLeft) {
@@ -154,14 +155,65 @@ public class Brood {
 
     // --- young as numbers (the brain, part 2) ----------------------------------------------------------------------
 
-    /** A young one becomes a number (it was frozen while the colony went away). */
+    /** A young one becomes a number (it was frozen while the colony went away, or laid while away). */
     void addInside(Young young) {
         inside.add(young);
+    }
+
+    /** Tests only: a young one that is a number, as if it had been frozen. */
+    public void addInsideForTests(Young young) {
+        addInside(young);
+    }
+
+    /** Tests only: the young that are numbers now (a copy). */
+    public List<Young> youngInsideForTests() {
+        return List.copyOf(inside);
     }
 
     /** How many young are numbers now. */
     public int insideCount() {
         return inside.size();
+    }
+
+    /** The young that are numbers (the list itself: {@link NestLife} moves their clocks on). */
+    List<Young> young() {
+        return inside;
+    }
+
+    /** How many of the larvae (nymphs) that are numbers grow into this soldier (null: a worker). */
+    int insideGrowingInto(@Nullable TermiteSoldierEntity.Rank rank) {
+        int count = 0;
+        for (Young young : inside) {
+            if (!young.isEgg() && young.rank() == rank) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /**
+     * The larva that is a number and has eaten least so far, and is not full yet (index in {@link #young}), or -1: the
+     * hungriest is fed first.
+     */
+    int hungriestInside() {
+        int best = -1;
+        for (int i = 0; i < inside.size(); i++) {
+            Young young = inside.get(i);
+            if (young.isEgg() || young.fed() >= colony.soldiers().mealFor(young.rank())) {
+                continue;
+            }
+            if (best < 0 || young.fed() < inside.get(best).fed()
+                    || young.fed() == inside.get(best).fed() && young.left() > inside.get(best).left()) {
+                best = i;
+            }
+        }
+        return best;
+    }
+
+    /** The larva that is a number at this index gets a piece of food: its hunger clock starts over. */
+    void feedInside(int index) {
+        Young young = inside.get(index);
+        inside.set(index, Young.larva(young.fed() + 1, 0, young.rank()));
     }
 
     /**
@@ -242,11 +294,16 @@ public class Brood {
         return cells;
     }
 
-    /** How many more pieces of bread all the larvae together still have to eat. */
+    /** How many more pieces of bread all the larvae together (the real ones and the numbers) still have to eat. */
     public int larvaHunger(Level level) {
         int hunger = 0;
         for (AntLarvaEntity larva : getLarvae(level)) {
             hunger += Math.max(0, larva.getMeal() - larva.getFed());
+        }
+        for (Young young : inside) {
+            if (!young.isEgg()) {
+                hunger += Math.max(0, colony.soldiers().mealFor(young.rank()) - young.fed());
+            }
         }
         return hunger;
     }

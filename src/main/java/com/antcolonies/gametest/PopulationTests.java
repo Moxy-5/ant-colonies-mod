@@ -12,6 +12,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import com.antcolonies.AntColoniesMod;
+import com.antcolonies.colony.Brood;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.NestPlan;
@@ -319,10 +320,10 @@ public class PopulationTests {
 
     /**
      * Step 2a. The nest goes out of range with 3 real workers (one carrying a seed), an egg and 2 larvae (one fed 3
-     * pieces), and 4 old workers in the numbers about to die; the queen 100 ticks from starving. After the grace minute
+     * pieces), and 4 old workers in the numbers about to die; the queen just fed. After the grace minute
      * (shortened for the test) the colony is away: the 3 workers are numbers (headcount still 3), the young are numbers,
      * the old ones have died (4 bodies owed), the seed is owed. Back in range, the frozen insects load again and leave
-     * the world on their first tick; the queen does not starve (her clock stood still while she was frozen); the egg and
+     * the world on their first tick; the queen is alive (the brain looked after her while away, step 2b); the egg and
      * the larvae are real again in the nursery (the fed one still fed 3), the 4 bodies lie in the refuse chamber and the
      * seed is in the store. Then two stragglers frozen at the edge while the colony is here: one back after a moment
      * carries on, one back after more than the grace has walked home (it is one of the numbers).
@@ -362,7 +363,7 @@ public class PopulationTests {
             queen[0] = theQueen.getUUID();
             colony.away().setOnForTests(true);
             colony.away().setGraceForTests(100L);
-            colony.queenCare().setQueenLastFed(level.getGameTime() - (colony.profile().queen().starveTicks() - 100));
+            colony.queenCare().setQueenLastFed(level.getGameTime());
             ((WorkerAntEntity) level.getEntity(workers.get(0))).setCarriedSeed(new ItemStack(Items.WHEAT_SEEDS));
             foodBefore[0] = colony.food().getFood();
             // Out of range: every insect of the colony is frozen and unloaded (the queen too: she is no number).
@@ -400,8 +401,6 @@ public class PopulationTests {
         helper.runAfterDelay(240, () -> {
             Colony colony = antColony(helper);
             helper.assertTrue(colony != null, "the queen should be back and alive");
-            long hungry = level.getGameTime() - colony.queenCare().getQueenLastFed();
-            helper.assertTrue(hungry < colony.profile().queen().starveTicks(), "the queen's clock should have stood still: hungry " + hungry);
             colony.queenCare().setQueenLastFed(level.getGameTime()); // (fed: the rest of the test is not about her)
             for (UUID id : unloaded.keySet()) {
                 if (!id.equals(queen[0])) {
@@ -441,6 +440,99 @@ public class PopulationTests {
             helper.assertTrue(level.getEntity(stragglers.get(1)) == null, "the straggler back after the grace should have walked home");
             helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == 5 && colony.population().inside(WorkerAntEntity.CASTE) == 4,
                     "5 workers, 4 of them numbers expected: " + colony.getCount(WorkerAntEntity.CASTE) + ", " + colony.population().inside(WorkerAntEntity.CASTE));
+            helper.succeed();
+        });
+    }
+
+    /**
+     * Step 2b. A colony away lives on as numbers: 300 young workers (102 of them nurses), 48 seeds in the store, an egg
+     * and 2 hungry larvae as numbers, and the queen in her room carrying an egg (all as if frozen). While away the
+     * nurses mill seeds into bread and feed the larvae; the egg hatches and is fed; all 3 grow up into workers (303);
+     * the queen's egg comes out as a number and the nurses feed her bread. Then, with 10 seeds left in the store, the
+     * workers have gone almost their whole starve time without food: the ones the store can feed eat, the rest starve
+     * and leave bodies. Back in range the
+     * queen is alive, her egg comes out into the nursery, bodies lie in the refuse chamber, and the blocks have caught up
+     * with the counts (nothing owed).
+     */
+    @GameTest(template = "arena", timeoutTicks = 1200)
+    public static void aColonyAwayEatsMillsBreadAndRaisesItsYoungAsNumbers(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        startAntColony(helper);
+        UUID[] queen = new UUID[1];
+        CompoundTag[] queenOnDisk = new CompoundTag[1];
+        int[] eggsLaid = new int[1];
+        int[] foodLeft = new int[1];
+        helper.runAfterDelay(15, () -> {
+            Colony colony = antColony(helper);
+            colony.population().setOnForTests(false); // no swapping: the numbers stay numbers
+            colony.setHungerOn(true);
+            BlockPos room = colony.nest().getFinishedRoomCenter(level);
+            helper.assertTrue(room != null, "the queen's room should be dug");
+            colony.getQueen(level).teleportTo(room.getX() + 0.5, room.getY(), room.getZ() + 0.5);
+            colony.queenCare().setQueenLastFed(level.getGameTime());
+            colony.population().addNewMembers(WorkerAntEntity.CASTE, level.getGameTime(), 300);
+            List<BlockPos> store = colony.nest().getFoodStoreCells(level);
+            for (int i = 0; i < 48; i++) {
+                helper.assertTrue(colony.food().depositSeed(level, store.get(i % store.size())), "could not put a seed in the store");
+            }
+        });
+        helper.runAfterDelay(40, () -> {
+            Colony colony = antColony(helper);
+            helper.assertTrue(colony.queenCare().isQueenHome(level), "the queen should be in her room");
+            queen[0] = colony.getQueen(level).getUUID();
+            eggsLaid[0] = colony.queenCare().getEggsLaid();
+            colony.queenCare().setEggDueForTests(level.getGameTime() + 60);
+            colony.away().setOnForTests(true);
+            colony.away().setGraceForTests(20L);
+            queenOnDisk[0] = freezeAndUnload(colony, level, colony.getQueen(level));
+            colony.away().setAwayForTests(true);
+            colony.brood().addInsideForTests(Brood.Young.egg(100)); // (frozen young: here they would come out at once)
+            colony.brood().addInsideForTests(Brood.Young.larva(0, 0, null));
+            colony.brood().addInsideForTests(Brood.Young.larva(0, 0, null));
+        });
+        helper.runAfterDelay(500, () -> {
+            Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
+            AntColoniesMod.LOGGER.info("[away-test] 2b away: {}{} | food {}, bread {}, queen bread {}", colony.population().describe(level),
+                    colony.away().describe(level), colony.food().getFood(), colony.bakery().getBread(), colony.queenCare().getQueenBread());
+            helper.assertTrue(colony.away().isAway(level), "the colony should be away");
+            helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == 303 && colony.population().inside(WorkerAntEntity.CASTE) == 303,
+                    "the egg and the 2 larvae should have grown up into workers (303): " + colony.getCount(WorkerAntEntity.CASTE));
+            helper.assertTrue(colony.queenCare().getEggsLaid() == eggsLaid[0] + 1, "the queen's egg should have come out while away");
+            List<Brood.Young> young = colony.brood().youngInsideForTests();
+            helper.assertTrue(young.size() == 1 && young.get(0).isEgg(), "her egg should be a number: " + young);
+            helper.assertTrue(colony.queenCare().getQueenBread() > 0 || colony.queenCare().isIncubating(),
+                    "the nurses should have fed the queen: " + colony.queenCare().getQueenBread());
+            helper.assertTrue(colony.food().getFood() < 48 && colony.ledger().store() < 0,
+                    "the nurses should have milled seeds into bread: " + colony.food().getFood() + " food, " + colony.ledger().describe());
+            List<BlockPos> store = colony.nest().getFoodStoreCells(level);
+            for (int i = 0; i < 10; i++) {
+                colony.food().depositSeed(level, store.get(i % store.size())); // (a few seeds left in the store)
+            }
+            foodLeft[0] = colony.food().getFood();
+            // The workers last ate long ago: nearly their whole starve time.
+            var worker = colony.profile().worker();
+            colony.population().setLastAteForTests(level, WorkerAntEntity.CASTE, level.getGameTime() - worker.starveAfterTicks() + 60);
+        });
+        helper.runAfterDelay(600, () -> {
+            Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
+            int workers = colony.getCount(WorkerAntEntity.CASTE);
+            AntColoniesMod.LOGGER.info("[away-test] 2b starving: {}{}", colony.population().describe(level), colony.away().describe(level));
+            helper.assertTrue(workers > 0 && workers <= foodLeft[0] && workers == colony.population().inside(WorkerAntEntity.CASTE),
+                    "only the workers the store could feed (" + foodLeft[0] + ") should be alive: " + workers);
+            helper.assertTrue(colony.food().getFood() == 0 || workers == 0, "the store should be eaten empty: " + colony.food().getFood());
+            helper.assertTrue(colony.ledger().bodies() >= 303 - foodLeft[0], "the starved workers should leave bodies: " + colony.ledger().describe());
+            // Back in range: the queen's chunk loads again.
+            colony.away().setAwayForTests(false);
+            loadAgain(level, queenOnDisk[0]);
+        });
+        helper.runAfterDelay(700, () -> {
+            Colony colony = antColony(helper);
+            helper.assertTrue(colony != null, "the queen should be back and alive");
+            AntColoniesMod.LOGGER.info("[away-test] 2b back: {}{}", colony.population().describe(level), colony.away().describe(level));
+            helper.assertTrue(colony.brood().insideCount() == 0 && colony.brood().countEggs(level) == 1,
+                    "her egg should be real in the nursery: " + colony.brood().countEggs(level) + " eggs, " + colony.brood().insideCount() + " inside");
+            helper.assertTrue(colony.ledger().isEmpty(), "the blocks should have caught up with the counts: " + colony.ledger().describe());
+            helper.assertTrue(!colony.refuse().getRefuseCorpses(level).isEmpty(), "the starved workers' bodies should be in the refuse chamber");
             helper.succeed();
         });
     }

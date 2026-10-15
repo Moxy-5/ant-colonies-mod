@@ -47,8 +47,9 @@ import net.minecraft.world.phys.shapes.CollisionContext;
  * every player. So nothing pops in or out in front of the player.
  *
  * <p>Inside, the numbers grow old and die (workers, at the profile's lifespan; an ant's body is laid in the refuse
- * chamber), and a young one hatches straight into them when no more real mobs are wanted and nobody can see it. They do
- * not eat yet (my pick, to confirm: they would need to forage as numbers too, which is part 2).
+ * chamber), and a young one hatches straight into them when no more real mobs are wanted and nobody can see it. They
+ * eat by the same rules as the real ones, whether a player is near or not (the user's decision, part 2 step 2b; see
+ * {@link Meals}), and starve without food.
  *
  * <p>Species-neutral: any caste a mob names in {@link AbstractAntEntity#nestCaste} can go into the numbers.
  */
@@ -65,6 +66,8 @@ public class Population {
     private final Colony colony;
     /** Caste -> (the minute they grew up -> how many). Saved. */
     private final Map<String, TreeMap<Long, Integer>> inside = new LinkedHashMap<>();
+    /** When the numbers last ate. Saved. */
+    private final Meals meals;
     /** Tests only: where players' eyes are (null: the real players). Not saved. */
     @Nullable
     private List<Vec3> viewersForTests;
@@ -85,6 +88,7 @@ public class Population {
 
     Population(Colony colony) {
         this.colony = colony;
+        this.meals = new Meals(colony);
     }
 
     private SpeciesProfile.ColonyNumbers numbers() {
@@ -130,6 +134,11 @@ public class Population {
         return ages == null ? 0 : ages.values().stream().mapToInt(Integer::intValue).sum();
     }
 
+    /** The castes that have numbers in the nest (some may be 0). */
+    java.util.Set<String> castesInside() {
+        return inside.keySet();
+    }
+
     /** How many of all castes are in the nest as numbers. */
     public int insideTotal() {
         int total = 0;
@@ -173,8 +182,9 @@ public class Population {
      * A real mob frozen in unloaded land is folded into the numbers (see {@link AwayLife}): it is counted already, so
      * only where it is changes, not the headcount.
      */
-    void foldIn(String caste, long grownUpAt) {
+    void foldIn(ServerLevel level, String caste, long grownUpAt, long lastMeal) {
         putInside(caste, grownUpAt, 1);
+        meals.add(caste, lastMeal, level.getGameTime());
     }
 
     /** How many of this caste's numbers are of each job by age (young, middle-aged, old), for the colony list. */
@@ -189,12 +199,19 @@ public class Population {
 
     // --- once a second ------------------------------------------------------------------------------------------
 
-    /** Once a second (from {@link Colony#tick}): the numbers grow old, and real mobs and numbers are swapped. */
+    /** Once a second (from {@link Colony#tick}): the numbers grow old and eat, and real mobs and numbers are swapped. */
     void tick(ServerLevel level) {
         growOld(level);
+        meals.tick(level, this);
         if (isOn(level)) {
             direct(level);
         }
+    }
+
+    /** Once a second while the colony is away (from {@link AwayLife#tickAway}): the numbers grow old and eat. */
+    void tickAway(ServerLevel level) {
+        growOld(level);
+        meals.tick(level, this);
     }
 
     /** Whether this colony swaps real mobs and numbers (always in a game; the game tests turn it on where they test it). */
@@ -243,8 +260,45 @@ public class Population {
             return;
         }
         colony.setCount(WorkerAntEntity.CASTE, colony.getCount(WorkerAntEntity.CASTE) - died);
+        buried(level, died);
+    }
+
+    /**
+     * This many worker numbers have starved (see {@link Meals}): they die, any age, and leave their bodies. The meal
+     * list has taken them off already.
+     */
+    void starved(ServerLevel level, String caste, int count) {
+        TreeMap<Long, Integer> ages = inside.get(caste);
+        int died = 0;
+        while (ages != null && !ages.isEmpty() && died < count) {
+            int total = ages.values().stream().mapToInt(Integer::intValue).sum();
+            int pick = level.getRandom().nextInt(total);
+            for (Map.Entry<Long, Integer> entry : ages.entrySet()) {
+                pick -= entry.getValue();
+                if (pick < 0) {
+                    takeInside(caste, entry.getKey(), 1);
+                    break;
+                }
+            }
+            died++;
+        }
+        if (died == 0) {
+            return;
+        }
+        colony.setCount(caste, colony.getCount(caste) - died);
+        com.antcolonies.AntColoniesMod.LOGGER.info("[meals] colony {}: {} {} numbers starved", colony.getId(), died, caste);
+        if (WorkerAntEntity.CASTE.equals(caste)) {
+            buried(level, died);
+        }
+    }
+
+    /**
+     * Bodies of numbers that died in the nest: laid in the refuse chamber (termites eat theirs), out of sight, now or
+     * when the nest is loaded again (never touch unloaded land; see {@link NestLedger}).
+     */
+    private void buried(ServerLevel level, int died) {
         if (!colony.away().isHere(level)) {
-            colony.away().oweBodies(died); // laid in the refuse chamber when the nest is loaded again (never touch unloaded land)
+            colony.ledger().addBodies(died);
         } else if (!colony.refuse().eatsOrBuries()) {
             for (int i = 0; i < died; i++) {
                 BlockPos spot = colony.refuse().pickCorpseSpot(level, level.getRandom());
@@ -426,6 +480,7 @@ public class Population {
     private void goIn(ServerLevel level, AbstractAntEntity mob) {
         long grownUpAt = mob.getGrownUpAt() == AbstractAntEntity.AGE_NOT_SET ? level.getGameTime() : mob.getGrownUpAt();
         putInside(mob.nestCaste(), grownUpAt, 1);
+        meals.add(mob.nestCaste(), mob.getLastMeal(), level.getGameTime());
         colony.foodMap().wentHome(mob.getUUID());
         mob.discard();
     }
@@ -463,6 +518,9 @@ public class Population {
         mob.moveTo(cell.getX() + 0.5, cell.getY(), cell.getZ() + 0.5, level.getRandom().nextFloat() * 360.0F, 0.0F);
         // Somewhere in the minute it grew up, so the ones of the same minute are not all exactly the same age.
         mob.comeOutOfNest(colony, minute + level.getRandom().nextInt((int) AGE_STEP));
+        if (meals.dietOf(caste) != null) {
+            mob.setLastMeal(Math.min(level.getGameTime(), meals.take(caste, level.getRandom(), level.getGameTime())));
+        }
         takeInside(caste, minute, 1);
         level.addFreshEntity(mob);
         return true;
@@ -538,9 +596,11 @@ public class Population {
         int real = colony.getMemberCount() - colony.getCount(com.antcolonies.entity.TermiteKingEntity.CASTE) - insideTotal();
         int wanted = lastWanted.values().stream().mapToInt(Integer::intValue).sum();
         int[] ages = insideByAge(level.getGameTime());
+        int hungry = meals.hungry(level.getGameTime());
         return " | real " + real + (isOn(level) ? " (wants " + wanted + (viewers(level).isEmpty() && crew() < numbers().realCap() ? ", nobody near: the crew" : "") + ")" : "")
                 + ", in the nest " + insideTotal() + " (workers young " + ages[ColonyRole.NURSE.ordinal()] + ", middle "
-                + ages[ColonyRole.BUILDER.ordinal()] + ", old " + ages[ColonyRole.FORAGER.ordinal()] + soldiersInside() + ")";
+                + ages[ColonyRole.BUILDER.ordinal()] + ", old " + ages[ColonyRole.FORAGER.ordinal()] + soldiersInside()
+                + (hungry > 0 ? "; hungry " + hungry : "") + ")";
     }
 
     private String soldiersInside() {
@@ -566,6 +626,12 @@ public class Population {
         onForTests = on;
     }
 
+    /** Tests only: every number of this caste last ate at this game time. */
+    public void setLastAteForTests(ServerLevel level, String caste, long time) {
+        meals.keepUp(level, this); // (the meal list catches up with the numbers first)
+        meals.setLastAteForTests(caste, time);
+    }
+
     // --- saving -----------------------------------------------------------------------------------------------------
 
     void save(CompoundTag tag) {
@@ -578,6 +644,7 @@ public class Population {
             list.add(entry);
         }));
         tag.put("insideNest", list);
+        meals.save(tag);
     }
 
     void load(CompoundTag tag) {
@@ -587,5 +654,6 @@ public class Population {
             CompoundTag entry = list.getCompound(i);
             putInside(entry.getString("caste"), entry.getLong("grownUpAt"), entry.getInt("count"));
         }
+        meals.load(tag);
     }
 }

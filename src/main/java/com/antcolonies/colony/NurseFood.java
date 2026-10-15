@@ -36,6 +36,18 @@ public interface NurseFood {
     boolean putBack(Level level, BlockPos spot, boolean rich);
 
     /**
+     * The world catches up with the count (see {@link NestLedger}): one piece is put down at {@code spot} (a heap layer,
+     * a nodule) without counting it. False if there is no room there.
+     */
+    boolean addPieceAt(Level level, BlockPos spot);
+
+    /** The world catches up with the count: one piece is taken away at {@code spot} without counting it. False if none lies there. */
+    boolean removePieceAt(Level level, BlockPos spot);
+
+    /** Pieces counted that could be put down nowhere: they are taken out of the count (where there is a count). */
+    void forget(int pieces);
+
+    /**
      * Last resort for a nurse holding a piece it can take nowhere: it puts it down where it stands, if it can. Returns
      * true if the piece was put down (otherwise it is lost, and that is logged).
      */
