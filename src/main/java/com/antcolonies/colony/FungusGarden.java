@@ -87,7 +87,10 @@ public class FungusGarden implements NurseFood {
      * ripens about once every {@code ripenTicks}; with a ripe layer and room for another nodule, a nodule sprouts about
      * once every {@code noduleTicks} and that ripe layer goes old; each other ripe layer goes old by itself about once
      * every {@code oldTicks}; and the bottom old layer crumbles away about once every {@code crumbleTicks} (taken out of
-     * the food count). Not under an egg or a nymph lying on the comb (it would sink). Returns true if anything changed.
+     * the food count). Not under an egg or a nymph lying on the comb (it would sink). A layer goes at most one step a
+     * second (only the layers that were ripe when the second began can go old, only those that were old can crumble):
+     * each stage takes time, so no layer ripens, goes old and crumbles all at once (docs/BUGS.md 27). Returns true if
+     * anything changed.
      */
     public boolean grow(ServerLevel level) {
         SpeciesProfile.GardenNumbers numbers = colony.profile().garden().orElse(null);
@@ -109,6 +112,8 @@ public class FungusGarden implements NurseFood {
         for (BlockPos pos : getCombs(level)) {
             BlockState state = level.getBlockState(pos);
             BlockState was = state;
+            int ripeBefore = FungusCombBlock.ripe(state);
+            int oldBefore = FungusCombBlock.old(state);
             for (int i = FungusCombBlock.fresh(state); i > 0; i--) {
                 if (random.nextFloat() < ripen) {
                     state = FungusCombBlock.ripenOne(state);
@@ -117,19 +122,20 @@ public class FungusGarden implements NurseFood {
                 }
             }
             int nodules = state.getValue(FungusCombBlock.NODULES);
-            if (FungusCombBlock.ripe(state) > 0 && nodules < FungusCombBlock.MAX_NODULES && random.nextFloat() < chance) {
+            if (ripeBefore > 0 && nodules < FungusCombBlock.MAX_NODULES && random.nextFloat() < chance) {
                 state = FungusCombBlock.ageOne(state).setValue(FungusCombBlock.NODULES, nodules + 1);
+                ripeBefore--;
                 nodulesGrown++;
                 level.sendParticles(ParticleTypes.WHITE_ASH, pos.getX() + 0.5, pos.getY() + FungusCombBlock.topOf(state), pos.getZ() + 0.5,
                         4, 0.25, 0.05, 0.25, 0.0);
             }
-            for (int i = FungusCombBlock.ripe(state); i > 0; i--) {
+            for (int i = ripeBefore; i > 0; i--) {
                 if (random.nextFloat() < age) {
                     state = FungusCombBlock.ageOne(state);
                 }
             }
             nodules = state.getValue(FungusCombBlock.NODULES);
-            for (int i = FungusCombBlock.old(state); i > 0 && !young.contains(pos); i--) {
+            for (int i = oldBefore; i > 0 && !young.contains(pos); i--) {
                 if (random.nextFloat() < crumble) {
                     BlockState less = FungusCombBlock.withoutBottomLayer(state);
                     colony.food().used(1);

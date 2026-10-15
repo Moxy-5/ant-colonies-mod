@@ -304,7 +304,8 @@ public class PopulationTests {
     /**
      * Real Macrotermes worker eating. A young termite worker (nurse age) and an old one, both near starving: while the
      * colony has had no comb their hunger clocks do not run, so neither starves. Then comb with nodules in the garden
-     * and both hungry: the young one eats a fungus nodule, the old one a layer of old comb (never the comb's bed). Then
+     * and both hungry (the comb's ageing standing still meanwhile): the young one eats a fungus nodule, the old one a
+     * layer of old comb off the bottom (never the fresh top or the comb's bed). Then
      * 100 worker numbers (40 young, 60 old) whose meal is due: the young share eat nodules, the old ones comb, one piece
      * making 4 meals, so about 10 nodules and 15 layers, and nobody starves. Then mouth to mouth: a hungry king; a nurse
      * eats a nodule at the comb and carries it in its crop (nothing in its jaws), walks to him and feeds him head to head.
@@ -379,6 +380,9 @@ public class PopulationTests {
                             .setValue(com.antcolonies.block.FungusCombBlock.OLD, 2).setValue(com.antcolonies.block.FungusCombBlock.FRESH, 1), 3);
                 }
                 helper.assertTrue(colony.food().getFood() >= 24, "only " + colony.food().getFood() + " layers of comb could be put down");
+                // The comb's ageing stands still while the eating is checked: in the 10 to 20 seconds the two take to eat,
+                // a fresh top sometimes ripened by itself, as real comb does (docs/BUGS.md 27). The ageing is checked below.
+                colony.garden().setAgeingSpeedForTests(0.0F);
                 for (TermiteWorkerEntity worker : workers) {
                     worker.setLastAte(now - colony.profile().worker().mealIntervalTicks() - 5);
                 }
@@ -396,6 +400,7 @@ public class PopulationTests {
                     helper.assertTrue(com.antcolonies.block.FungusCombBlock.fresh(level.getBlockState(comb)) >= 1,
                             "a comb lost its fresh top (old comb is eaten from the bottom): " + level.getBlockState(comb));
                 }
+                colony.garden().setAgeingSpeedForTests(1.0F);
                 // The worker numbers: 40 young, 60 old, all due a meal.
                 colony.population().addNewMembers(WorkerAntEntity.CASTE, now, 40);
                 colony.population().addNewMembers(WorkerAntEntity.CASTE, now - 250000, 60);
