@@ -41,6 +41,9 @@ public final class TestFilter {
         CATEGORIES.put("soldiers", List.of(TermiteSoldierTests.class, TermiteAlarmTests.class));
         // The colony: founding, jobs by age, the virtual population.
         CATEGORIES.put("colony", List.of(TermiteTests.class, JobsByAgeTests.class, PopulationTests.class));
+        // Colonies that live while the player is away (the brain, part 2 on): going away and coming back, eating and
+        // raising the young as numbers, the termites' life while away.
+        CATEGORIES.put("away", List.of(AwayTests.class));
         // Hills and uneven ground, for every planner.
         CATEGORIES.put("hills", List.of(HillTests.class));
         // Performance (only when named, never in a full run).
