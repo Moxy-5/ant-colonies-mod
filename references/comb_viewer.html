@@ -1,0 +1,320 @@
+<title>Fungus Comb Ages</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+  /* Layout: the same field-notebook bench as the model viewer: the 3D garden on the stage, the choices on a label. */
+  :root {
+    --bg: #ede9e1;
+    --panel: #f8f6f1;
+    --fg: #231d17;
+    --muted: #64594d;
+    --line: #d2c8b9;
+    --accent: #6b4426;
+    --stage: #2a1d14;
+    --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+    --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #17130f; --panel: #211b16; --fg: #ece5da; --muted: #b0a495; --line: #3d342b; --accent: #d39a68; --stage: #120c08;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #17130f; --panel: #211b16; --fg: #ece5da; --muted: #b0a495; --line: #3d342b; --accent: #d39a68; --stage: #120c08;
+    color-scheme: dark;
+  }
+  html, body { height: 100%; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.5; margin: 0; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 28px; display: grid; gap: 16px; }
+  header h1 { font-family: var(--display); font-weight: 800; font-size: clamp(1.6rem, 3vw, 2.2rem); line-height: 1.1; margin: 0; text-wrap: balance; }
+  header p { margin: 6px 0 0; color: var(--muted); max-width: 70ch; }
+  .bench { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 16px; align-items: start; }
+  @media (max-width: 820px) { .bench { grid-template-columns: minmax(0, 1fr); } }
+  .stage { position: relative; background: var(--stage); border-radius: 10px; overflow: hidden; aspect-ratio: 4 / 3; max-width: 100%; }
+  .stage canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+  .stage canvas:active { cursor: grabbing; }
+  .hint { position: absolute; left: 12px; bottom: 10px; font-size: 12px; color: #f3ece2; background: rgba(0, 0, 0, 0.45); padding: 3px 8px; border-radius: 6px; }
+  .label { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 18px; min-width: 0; }
+  .label h2 { font-family: var(--display); font-weight: 600; font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+  .looks, .scenes { display: grid; gap: 6px; }
+  .choice { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; align-items: start; text-align: left; font: inherit; color: inherit;
+            background: transparent; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; cursor: pointer; }
+  .choice b { font-family: var(--display); font-size: 1.1rem; line-height: 1.2; }
+  .choice span { display: block; }
+  .choice small { color: var(--muted); font-size: 0.82rem; line-height: 1.35; display: block; }
+  .choice[aria-pressed="true"] { border-color: var(--fg); box-shadow: inset 0 0 0 1px var(--fg); }
+  .choice:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .swatches { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .swatch { display: grid; gap: 4px; justify-items: center; font-size: 0.8rem; color: var(--muted); }
+  .swatch img { width: 100%; max-width: 72px; aspect-ratio: 1; image-rendering: pixelated; border-radius: 4px; border: 1px solid var(--line); }
+  .note { color: var(--muted); font-size: 0.85rem; margin: 0; }
+  ol.row { margin: 0; padding-left: 1.2em; color: var(--muted); font-size: 0.85rem; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Fungus Comb Ages</h1>
+    <p>Real comb is a conveyor belt: fresh dark pellets go on top, the fungus ripens the middle and sprouts its white nodules there, and the bottom turns pale and crumbly for the old workers to eat. Each layer of a comb block shows its own age, so a thick comb is dark on top and pale underneath. Pick the look you like.</p>
+  </header>
+  <div class="bench">
+    <div class="stage">
+      <canvas id="view" aria-label="3D view of fungus comb in a garden room"></canvas>
+      <div class="hint">Drag to turn, scroll or pinch to zoom</div>
+    </div>
+    <aside class="label">
+      <div>
+        <h2>Look</h2>
+        <div class="looks" id="looks"></div>
+      </div>
+      <div>
+        <h2>Fresh, ripe, old</h2>
+        <div class="swatches" id="swatches"></div>
+      </div>
+      <div>
+        <h2>Scene</h2>
+        <div class="scenes" id="scenes"></div>
+      </div>
+      <div id="explain"></div>
+    </aside>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const DATA = {"looks": {"A": {"fresh": {"top": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABwElEQVR42k2TyVYCQQxF6xdcM7hgHgR3Mggi0NJy3DLIZIMbv8WfjrlVFWRRpyvp5L2Xody0mZNsXJfdsCKnUU2mrZy8d4vy+/MhX+OanF/q0szdydtDwfvOk7p8Dio+JmnnxS0f72Wul/2wKotO4Rp8eK7Ktl/2d4I5R/WRvNNDXKo+BwtOQGDIlJHAWSsvaafole3VJmHaCjHEH6LPwYAKjNVTSY6xDGxYUUYwcQDOFQSbO8dZvRyYLpOGT150gv+kCje98lUh7PTKlwDAUgGoHYaLNgj2pB1sgmnashsUUhY+DnHYjroowSsYhrpgQ+b3a8MDWZ8AMrUo5b8zZCSjxtem31WvpID/3bbSfC/UPsSJeIDjKIwsjXUTnMTxYa+1B2sFTCOJ3wedFjkOFBJudwBpYWw5D05pNimWB0DKgsBZEsuRxa0jgE5vB2XPlsQthOh2X4hxOGZxtvwAFTBGR5D5vD/2hBx2hnIcLARu+mHWNhEAbP8pwxaNE/Yk/HMmmx2w7aNBqMKmVoBpIP+weYDYfg+sJhSwQPYKScZnd4jsjopM7yh0IG3iCK2hHNA5PHWYaRg9QDr9Yho8pj8p4KsAy+OhDAAAAABJRU5ErkJggg==", "side": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABt0lEQVR42lWTyVYCQQxF6xdcA82CQSbBnQqiMiPHLYNgC8LGb/GnY2660kcXRSeVVPLeSwg/32/yObyWcbso2F/PDVnfV2Sq/u6hKls9+ONWweLnl4a89hKzN3ofWoUr+XisC18CJy1wGNTMn2iR935NUm2AP+0U5fiU2RTFDif9oROdPYkgqCiMT7c02rObkt2Ts+wmEuiw147ru4ohWHRLQlHu8Sl6jL6jxHbUYRn5AJ3EcbtgRUybCNe1WfXK//hTxDQ4DOp6UTWB8OcKcwbcTskORU+RoiFU+zJqGk2jwGOCfElwBA4T+/LSzG34Y1sBkigCCkbmCIDKFBAKmzEy2oX6HucEf3TQQvBcaJAEOu3+CIe/V59JeJymgSAX8GdEPn+4Mx3ooMFZKXBP3FEZBaBN4hZuIjfsTJuKITLeOuZ9XDDTZJRpEpwnyZxZ5MdI5xERPg9YJtBQCPhoEthCuNGRoPNDXJ8GOtGIFU+H9ZwmqMI5jofHPgFG5lsIT7cpiA1KRx5YGAw6OWwE3OpO0HF1Wzbld/1q/kfyXKYWXFWoUCzrlOjaJrnqFKAzXw73afyz/QKLnqiG4L9MbQAAAABJRU5ErkJggg=="}, "ripe": {"top": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACFUlEQVR42j2TaTJDURCF76IsgYhQVpAYgxDTEgyRl1EGFiCmIkhsBmWoogqVKEKxgdZf573349V9997u0+f06eu8+SHZmRuS3EJE9tfH5Kv7II2NuOwkB6WyHJPC4rCcZCbsvJAa1thBqa7EJKP3tdVRcanxAQO4yM0I/6WlqBxuJuySwLwmnXtTktVC5fSI3Vf0nML1NR/Am4/IWXZKWoVZaReT0nm90aRpZTBioCSz7vkMWetaAJauuBiVvNIHpLEZl9/es/x9v0j3/U6KSp9KMAEEiQDt+sB7a2Pi0MgGEPpAICBI4IzkstImrpyOSk33yOCeWHeZn1HNcWG9LiVNQlvXK5VzXZ6To62ENFXObrpfFcCAxWlmUhzoHKDJs0ZFraFUgJGnH25An84jGQZ8NNhl1QGCQUQTumFARaOtgXQbugDAgOYCDogjGfR8KmJMaqsxOd6esGSCYMY5LEo+mPUs1e9PaCPBJP19P5sbvY8HY0QCRbAu0H+ggwZwOEgGogB4zFCxQhlZTB9ag8mDIQ0nBkccgVxQmSroa6kTgc9Yak1WJj+fT8aUIcOZcBI/O/ehNSA3c9Phu8AqVj4kII8eMd7MiblA52kSFvYfz6RRhjoPizGv+gPU+3g0pjTRJpFAqvNQsAyKXFR8NpwzYIAT13m9tbeCZLORlxV0d99/JOyDQeJjGit+DKDdtzsbKPb/n81qLFtOUxAAAAAASUVORK5CYII=", "side": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACEklEQVR42j2TaTJDURCF76IswRCibMCQIDELOyBkTiSCBcQ8h8UgSinKPBQKG2j9dd7149V7997uc/qce57bSUXk4/VKliZDUk10yW46IrnRdhnraZFMvE02kv1CzeZCv6wn+6Q0EZJtXaf1jH1XmeqS1ZluyY60SXE8JPmgeSURVtBOWZvttjWgP5+3RvbycC6/X7eyMhMW9/V+LW9PDeFd1SaYTktxY6sXh+WoMBw0Xcj3x428P18ayetjQ14eL8StKgNjwbI8zTRhKU81mdPxVtunBnnpWHOdsWk7DMjtZaJS0YZjZdpaHJBtffazg1Z4UozZGcXoRQbfgNfmeq3GobOgm6DCXBjrMEN5s49HMKWUnSkAQDvNBlCbbyIxgfchr82wI41Gbqau5yZHDWeak1LMTHUYhCEYxIg2gTYCwndZJ/S38Hx/ZiY+3Z3ZN+abB4AwLqOzRiPub+hNwM45N+JllAPP1uf7xNGI+7AwBcUUUYxWmLkNPPJ1rJFHVtxBbvDfkJoikgFAeAAhjYe5IQsaZExFLTdGVhxaffJgWAo0YybJZAr2cB8DqQOUvuyI5gAd6DzKD+k7qlpjBkSz148vANAIQNWIQpYFRzGj+tzzTgWJg4EgVbSGZsC8H0ii1nGn3lFYyAWH7PHATg1xtkTqVGRkyxIbFUe+YUSfTyFr/xfy8M0ETMsNcQNIZP8PvFN2um4bcfMAAAAASUVORK5CYII="}, "old": {"top": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABvUlEQVR42lWTSVoCQQyF62CuvYA3cOXWrQsPwdhMLlx4AkVmEL4PaUAZuuEAXiTmT3UcFqGLVL33kpeq8FS6FSJ/a1t8DOsaidxdX8pu3LDc13kkh2lTls8lOS064pjPUSJhO6jJefFgid7jveTzjuwVeJg05aRrAjLbUzK+7y9l22cdjtOWHUIZEtRYs0msXiuSKXCjQqmuEVz3qkpSigQAjLVbtgOoEVQFEWXmhQBt8J/WUiWBNHAY1k2/ZiQ3VxcW7gkABCDfjRM7w39IqCQAhOA4a8l+0vgpHSCK5GnTW4GU87SwUrKw7lcN4IYxAdqCgNgO6hZLBQCkCvND1WkzUArAtFcxICXSFuzZrG1lIkB1uA8ZxJBQTaA02Ak30Ag1z6gAoEalmIkARHzBhsj630BzWTcBse9G4gcXyb2yKTAen8BJeyK5n0TzUKfPVffXQMAQc8Y8cLOMUTdQ/5uz3pXcQUwGwayYWoDFr2hWfH3GmLouLgy++HQwGJxVwA/lYkhazJovs/c3QAB2kyH0uxK4//gAEBI2UM3n7ViqvdD4Ot1k8k5sY3RD4muMRChiIqWTdzCCVIw662+CwgJFqVWM8wAAAABJRU5ErkJggg==", "side": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABuklEQVR42k2TSVoCMRCFczDXXsAbuHLr1oWHYB4aFy68AQoytfB9NtAiU8MBvEiZv5JqWBSdVFLvvXop3PK9Kqd5T5YfNfk7j6Xw68Hrs/yOW5L5s8OsK4e0K2+Vx3JffCV65+i/buULT4uebp7ubzU4BPTns6Ffis+LlzIPETWsHUzG+nB3owHoftqRrF8pQfJhQ+/spm0lQfHG17pwqSm0grT1oC65L6KA9THKhXU9rMt+1lE1EJN3IO4mbfmOQCQtAODidhJYN6OWFiM/61cDAMYYmxoU22GPdBhhP6bBPJQCwh5SBYCFhDqbJrLVfWiHFzBzYSVH/5DRklOz4lMiFQMxDgCUwW7mst77QvIo3Yya4mC1QuQRsK4GNVUGM6yAmhKkZ9F0t/KHJACggCBnnnBmeVNiZlPjTD6vQTuoMYeJIg6UTuQsTOR1OH7ojcs4nntjCEABggVQCMwDVNEmOZfH3uidoeEAuRzSI3J1Vry6MAsX+byGmggIRTDwxoDQmrWCMuTjjU6uB4EMNa6YJ2W/MDADOs5x9s1QCOxfSXCuJmKQMvhD5BZX88DoUsgdpFNoz8qa+/+hMAMljAciWgAAAABJRU5ErkJggg=="}}, "B": {"fresh": {"top": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABtElEQVR42kWTS1oCQQyE+wgu/QS3Mi9uIDP0gHgDFyIoIi/XnsXrtvlrOriYj3S6UqlUmvD785J2sUxv7STNipH9Foofbm8Sd5fnaYr1fXos7tKmK9J+USnXW25ejVPoynE6rRpdUHS2+PjUpLYciWhrReQhb+37WtYqJAdpoMt6NhErRajZL2oBAQFGFd2djJpNO8RBrFbwPi+V4HywYhR1RojUz76SGuK+udddrMf6wuvsf97zaio1fgbIOIzJaIy6MAI84Z4v0JkE7GI2ycQAkX7Io6CCMYnBf9ioJyMPAGFiDDoA6HMH1CATBRdTB4b7bd7G2sYKJAAiFcMAQ7qLlX7dSFcZszpM1Aje3YGMhLRvkwvwuGxE5utjUyi4bgFGzAMMgI810k1boWBeXM+8B9SCoSa423QB3BkBBZjG/NxjmG8HDDFNpWCYt1ShAyBz9/fZfbyhO28j5mcMNvBAdv1gGJfqaD64L5zxBRUysxpU8TLBaAso8P0CggBCOvKAMCxmD8hDyArlAbtHCklYmR255DDLR6ErMfMTo1bvwJmdAOO8U5cN878u5qIWckahwR9Cg649eZ4+AgAAAABJRU5ErkJggg==", "side": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABs0lEQVR42j2TS3rCMAyEdYQu+xXKsuTFDUogCaU36AZIoaE8uu5Zel1Xv2J54S+WI41mRra8PD6E700Zhq4ITTkN/ToL/SoL+3oe2vI5/P1+hIPGy2xi+8tbpXnj+VdbBBm6Mh0Ctq+z8PO+CHddxOtimvaf69xi9pzV+SQIAWi37cIQPT41hcWw8O59ZNJWIwOaCQmrXLsowKkdZYA+spomFmeVSR5xozGyyBf0c3hq8tS9jz+hCNBRqfNd5ZPUmdzLpgrSVTOjhQedUqPrdVtZB5JguFvOzWTiozaiKazwRFzfTl0nAQO9wPXSvY+ANjFlh2fE5gFmbZQJDNz1Y5QEI3I4RzvF5A/RYAG5i67S3SdBd0YMkNPHRLsX6gHFTErcPAq4RD5floNgFnsWEvia8UwBJFj4zDHmpiby0/05d2WaECzdYKYi0Hezxps4TyDOjBwWuimGHZ4gSZipOwz9qzpex3mzRyex+wSIX21iYRw4jTHI6CKTexynx8hjcWO5WNwf/BN/bXRhlOM7yK2YgtfsKb08GDkYMpmOuE43heLBmMzsDAaA0RU5FNMMY/n3D4T4r/hzIyedAAAAAElFTkSuQmCC"}, "ripe": {"top": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACEUlEQVR42k2TZ1JDMQyEfSTOECCUM9Ahhf4zQGiB0Hs5Ar2EehDawNBbaBkmVxD69J5n+OHYsaXV7krP1URLpL+hXIaaosL58+1KMi2VsjEVl6OVTlmfjMlwS4WkG8pkJFZpsamaiOzOtdq966krlaHmqAwqQPHnXr7z1/L+fC67821yuNQh+wvtklts15gKGdbVV19mhU5WuyStZ8cfEEmk8uvjmRwtd1owVXKLHRIUCVhwhgnAPbWlAQD0uSRpNF5lFbZmkrI5nVApCckmqgx8oLHcknjnLVUbEccjSezoIwAw/sMMGbwDDgC6kbGm3sDG9eoPSCRzHktWW0A2UW2JyEgbcESyITvvBcsRZBrDLnAGCCa8basUtI8pID4gBRbsb0/n2oUw0LtrIFqNBHw4UBORxN3H66X8ft/Jz8eNLbrlBrSy184OAB2hrVD1lEnMv1yYDAoSs6PyXCYcDqqQhB8kEMCOF6y1iZhVtbaHMXTCHa90WTC794DgYuFBtmeTdoe8369b2dPh8jJZB9ohm4OMmuIZMF0A0A0oQxcw3vMvl5bY3xgwZjnM+Y8KCABeJ3fFwr3NReHzRpDMvR84N66VoE1rfJ8ZUz+u3J+udgczol7wn2+HOEAdgWikryz/oTCFfInQzSkQxtl81AWjDEvzAErMOybSln01iq8PA5mB9cm4nfGEbjDOAMEK8D9+xF5LZT62GwAAAABJRU5ErkJggg==", "side": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACF0lEQVR42k2T61aSURCG9yV5DaCgXoMUKspByJ+giGTqslJSsu6gDCsVDxdikadcupTwgGa3MM0zfNv6Mevbe8/MO++8M5+rV3OytZKVrWpWdt+Ny0CkS25bh3J3fSztqyO5umzIn/ap1NW/sTxm/smn3TLxJCxTgz3ifMLsaJ98qaQtgeSN5YzMJHqlEAtJSQPvb07k5teBlIYiBkD8nJr79DrZYRBYUZ3l4Yh8XkpbxWlNIPDjy1F7W3ul30raCnxYGBFH9flkv1UhaPttzhz+DFXPhMoAFqAf75EXI73ing9HrS8eAMOJ4eQdAL7cMUDonbey5rpCLPxIGXo4MHqsK4P1pZQBN8/3TYfWRUOumz/sjibO0yJ5LtlnZ6pyri2mbDo7qzn5+iZjbRbj3dYSzEuDEXG/b09sXM3zbx3BVA+CAGDE6wqCYHvvx40VMTCkzdbFd3FF7Z02oHt5tm90N1V9EqkKEBVJohAjJoY2MMcDyCj+oAsDKg6CEG0iUBxWtAAY1PHBxlEBcR7aP01dNg5dvEgATP+3PDD2us2n+nWMiagtD+gsDL3ZWzBWm3ss/DgddgZG/u7KgSh+RWHhKcIOEL80CAxAXpfK74Ix4EBFquUHQpYAXb6d/v+Nz2IUALbWwpRNIWQVCPDIGMGzwX+ws/pMavrf+HfiyHV+6zDOMJgJ1tizoDUWrbaYtMr4Oxsclb9cn3HbxfrLEQAAAABJRU5ErkJggg=="}, "old": {"top": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAB8UlEQVR42l2TyTIDURSG76vZewCPYOMd7AgxVnkFVWaCZJOE7ujMNqaiypAgyqzwAMf9/u67sTh9hzP9/39Pu05xwcZHh626Nmn1woxd1Jdlyc6MVVYndNc7q8je7uo2uIqMnBDj4s0pBSY7eV0+Xx9ZtDElZ7w5rTuKsH+5SezroW2d0oKKxFvT5nCScLiR0woarL0/nyb7QhRj//3YUXLNJ9KQ1dH9aDuvzlyMjQzJmrtzSuKO9fEysq/7tpqUVyas4u3A03Z0au3NqSuFvgdduzstyz77LfvJziSjAVQO1nOKZe/ogHFRy5BQubE76wMndcaHiHEWG3nd0CAqLJnjg8FTAmZnqGEgQye6Q+P36TgV0hfoej0c3egAFRKDiKEQcGtbeXWFKkXRBC14QYmIYE3vZBb+i6hCPjg8Mc0QkdeBpuYABwFAgjf7dnFeSrMHLjRABiL2IMfneM8wiY3CrDqDigJh4qAXENEVww8yl2RQWj4IeCAYXMX23muIM0ms3dKiOCu+kBYBiUSs+wtmnEmDTv+8qjVMIAmsTKu0Wk3hH3o6DmfVQ06fZVHdXm8TFSEAmMAHXRCSuHB2BCCMfg4PkYIMC2+dDlPOPnpN++g3lRyemXghABKO8DOFn4gCjCr3tydl0YFzeGY0o/gfXf4QRk18lh0AAAAASUVORK5CYII=", "side": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAB/UlEQVR42k2TSVICQRBF62ruPYBHcOMdXCkqgxrhFYzACQGHhdg0U0OLbjREUUFRnIdwOEBaL+kiWFR0d9XPn///rDYvN1Vp7i3J0e6itIJVqWUTcrg2K8X1mPw9nUg9l5TpyXEBV92Oi2fPfu1+/9KXej4phkMKPVvA83h/WcKdlJQzC/JxVxd/Y06mJsaU5KffVNLeuSdPV2WpZOJiYC1vLUghPavs4c6iPF9XFEQXSFHIWWDVvXUDVQI5ak1pc94SzCsQQMN2L+VWxN+cUyuAWHSDiP3Q2u21PFVtKlYqGxS5RTcsKJG1ADkLzzT01mJKRq0ppGekaEED+SllrWXjAyL73sinVLIjAQceAqwb0ofp0GZwFElUJbYT3Z09rDEJziksRqGbz7uGfNt0328DDY8iAgUIgCcZQMgkWI5YM7hvFXWDHAgNRbUoTL7xi0L2GSerc3ogDxe+fPVCMd2zwtAjEmENcgntEEaXCwKXQSmyBJalF4l0KeBdVewNCunKGUA3Rqxw5uwYJDEJgnFXmmlwJ0jcgbHl67RiOgW+qTWP7bJ2pQvFzjO23CXCM1NivG4iPFFtuDCMhC7H+0v68/AkCwAsmrBHNmCb4Kw1vcp0dqzhCDMKGC+j7bdLqop9RoxVcJANQyQHQBC58F47NS1wvzyqRifCRfoHi3QMT/etEEgAAAAASUVORK5CYII="}}, "C": {"fresh": {"top": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABpUlEQVR42k2TSVLDQAxFe82Sqjg7quKJIyR224ThEhQhhiSQEM7AcbhnoydLwYuutn5LX1+DwxDz1FXzdH6s01tXpM/7Kr33hWLLfJb2d2X6WFf6BharLBGDz2ubp7AV4+b6SoHTQ51emoU+gPX1XA+kkIF1Yv/+PKejYJCHtswUOEgWggFxJGBrmSBwEnzBdv3oFwCjkABu2oU6NEWmztio4caHABJChrJVMTMCqcuzfz/dXjIh80t6g+1K6cW0xLCSRxyon2Z5rThhN5Y5SgMhOazLS3bsQHYMZ0fJUcgIUhXyDTkElAY2xEJxLYEHQO7BxhhNLgo2Qgg+rZ+y3Cd4LWShB9zIdAWQ+Kj/Jzb6sTthzJ5prTizJGRBrmZnlKKAjGAkQQE378HrYq4EemZGR09O1o/G+rRpx90A0x6wnpydMPIACBmBTAL5S5sUvcDWHlTjrgRk4AzIt0qVg6MTeZ98UuyKKw04IBfAxwc7ZKiK9lNxCKR2VPoCagkw7a2EaTNRwbcvkm8nvfLR6h4gFYKzSWNMXj9/H41WVdZA/Dhs4h9x4qvqzbi/hwAAAABJRU5ErkJggg==", "side": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABrklEQVR42k3TTVLbQBAF4FlnSRViR5Vt2RwBZIsQyCUofgIOf0nOwHG452S+lppiodL0TPd7r9/0lLfLTd2fr+rrj3V9GFf19/e+Hh98i/+fq011Lv57dRLx/W5Zny76ero8rB/v17VIOFsdRtLtdlG3fRexT4Hk881RHddHUfzSiMTy942kOBhWXSte1l/jpGS3ngr+/TyJImcKkhVIKi0Yh8b2fDFtSnKQ+1TEOuIugB+1fNmI2l5JeVC14AOA6XZYNH/68GG37qLgqRE9NqVAtglggZkCPevf/k0DEFMBNImodRYtCLh/1/oE4rPG6s+DcfYEKzAgqbJwUrKebJJKATOx72ez7GENk5tiqplbJEkAkmyQA/QLkzOKqMjb4FERQCLrbr4ujitwxgskAB9m83JmxEUxHxRIclXQX2NC+/ioEqdKzFoCXDBDNTSQp7GdEjHkEMV6WERs0OypLQ7SRHKTHXrK1VL03IqBq/m8BSj5YHyKJGHT2tnsQ84JcOvtfBOFGV4ayQBShdjbGOYhswfwJd5K95lXDEY+XYh5x8Z1nHsFoDivMN+K9X9VqKZZuoGJiwAAAABJRU5ErkJggg=="}, "ripe": {"top": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACD0lEQVR42k2T7VaSURCFzwV5CYEI/uwWElPE1NTyNswXUEAIomuotFWWn11Ly1V+IAs/MpdrnGfDsX6cBWfOnpm998wbSrMpW3o6YrWFjJVfpPWfsz6Xtnevcx5LWftV1sA1lsas4pjG4phVF0YtKaYsENiYH3VQTsBYbK34REAK8U488Rhx7rxdX55a4NJcHgCb3mFzMSPAXq1gbWfwvTpt+/UZncrcP4a8gQ0EqaSgM6ADhUjcTibt7rZn71fGH2XxC2sk1VxGQCeU3y5nRREpscvtTdd63WPpJRkMzVreiDyOCqCn3/tt3bOfMiYy2nUZH1af6X5/17eOM4nFeMf0ABUSAW0nebvqn4g2sd1qwb5WpuywUZQkikG/9jKjIkgO6MC0m6szjYzK/D/yJNjADrNI5A6rL+XnKsDRFOjOBQ86KzkZWfcucZxRErGjZtF+NGdlLG/ag79/LpSM+xhFUbTy1hmaVZ0fLA4Gfi5N2s76lHICwTiiyIbRsnWDBctqXBRk9jTBTDyRB9FZivxPFzAF6A4rEinK26c3E/KCvNAaPgICgG5MQivAaGzZpwWGjWTBvm1My6+Ay4xysFkZad1ay/vIJgROPA5LRksDun70wvgDNuzXC3agqnnt/5b/Mnf0wSxuYL/3S2ZzYhxmAd2lIT3Maw2/h7Y+5bRWW8vj7C7Ojx992XTmsH8ALKZ1bbC/s4YAAAAASUVORK5CYII=", "side": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACDUlEQVR42j2TV1ZCQQyGZ0EuQYrio1sQGyD2sg1F6aCgrsF2rFj3Yi+AvZ2YLzA+zJm5M8lfkly3uRCVt5d7WRoJCGf23fSArkHZXuyXVKJTsqNB2dNv1sp0txzmhmWqt0PW5nrEpZMByWhAbixkl2kF+PqoS3EibN+rsxGpzHTbd7Ydt6igvAHuylNdcpAdksbTlTTr1/L6fCcnxbj8fDUlPx6y5KqC5ElUcFRVZyKmIpMMigMRC6CDikRASEAJCrhnFcbDbQUBi69orCtNhk3KuvoB6LQUN/QdZYKNM0nbqX4DR/5ZKaH+I6o0Jo5LAqhDOhn8Z8NzebLL7gkmEQUQFvQNdt7deTlhByRTC5gIpA5b2pVaftjOqDsuxGQ/0+oE7Nhzy1pE2gEIFy2mkDFl2nWhtdxVtaC+M1654wJkWPFNZVEBAEH1x0urSy0fE9Ry3kpFrWvvrw/i8IJfEmkb6OwAvzRvDeTnsyG/302z8dy4sR3l7O5IPdISWEk60qpTfc7ssELAwB3mhuS0GLed+lwsj7QUUEAWQEhnUPwAtVoXsN1PH/WiLiyHf3q9Md9n7FQdadSDycPvnlbetxbwzfmokdU01+GdDx5LikyP/X+BT1g4A+o74GcFW44Hk6XBsMOMT5TtLg0YOEnUiglkDjhjgxjnfxi8E8w3Yw067LxV2v1fUyDU+RjWHzcxe4PLb1yUAAAAAElFTkSuQmCC"}, "old": {"top": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABx0lEQVR42j2TyVWCQRCEJySPZmACng3BiwmYh+8BsoMeDAJcQBaBxyIgO3o0g7G/YtrDMPP3Ul1d3YRluxDX3XKcPGfjopWP+49qnL7k4s7up7sbvRuPt/H3ZxQ3vXI8Dutx9nofZ2afNLMx8EHAcVSX0xM515fnuinAm0MR4gGev+UNwB7fo4c4bmZOyAlwaox4w+jrvRivLs508K27JSVjD9teRYEw4L3rVwywLqdaGlSVtOqUUnJZ92cqFPiZt05oC9Nj0SoIfWtA6EJbAO4HNdn5BuwwrKloAHGaAklAg12/qtvpA3ZqK6fesVMMoMAUMBIEoisulQ2QbxKI4xvfqlNUQbVAIkbo+QhdcZghLskHa2HcyMjOONGHdgMUMXJrNOZwxbFRFTsgFFH/BrY0nxi4k+qurO8BCS4WTBBzY5MinhZhEUgkSb0aMolUobpv4saEJpEWJKBRB1gteDIHaqwn99pAqOpr/V8kASAiTAQg5LQwVDsM6xIKJsf0hh2Ul+2iWmUb/xdJqialfVW5qcyUSIAZWworZ8b0go+FQA5vnF5Ze2KT8P2HvrdDbmBcviS+SD4VgmlvmbaONnayn/6R5P4BvzkqW+iBY64AAAAASUVORK5CYII=", "side": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAByUlEQVR42k2TSVICQRBF60guvYEXcO0R3HgB72EE8xwuPAQggwwCCg2NTA269AZpvqRTXVRUV3Vm/p//Z4Xb60tZdQuyHVZk2c3LcVqX/bgqh9eaRJ28LJ5z0ny8t7t5OyvHSd3Oie7rflGCH9i52I+qshtV7PzeyshmUJaPl5KdfQHoBa3A56whTw93xoLkRNHnraws2jn73g7LhkwcDCNldRjXDCCQyCIRuqdpQ04aSCKMNoOS7aCRyE48sexh3S8ZmvcW94qy1N4NVdFo4a2ZsTbiXsFiojSZu0AwQTAgiQKcQaDP76+Zna09XYhLLEzXFIDSr2iKxJlgFm3gEkUMuZOze74BZg9Yl0zOgvATVFSmb1AIogjrvzPkmI0uoi+o0xuBIGPxzdWFLbcaYd3SAE3s8ktagBXCOjJJViy1lOLMC3oFEFHZplDRfGgIcmTXgpZsPjTnLHpFwkqtYWRjRUFE0OiPWXA23GEdg+QOAULBQEWfa2jyE5rL9B2QQDFnBUt3gKJh4bZpoPdsgdO/dvjP94FHlo6wWx/cb6zznhkWRwExSbWBDYyh7nYHaFPNXqEW4zJKrdzpHRqgNloZWy0CAK6x/wDnPiqeL9NJKwAAAABJRU5ErkJggg=="}}}, "nodule": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAArUlEQVR42n1RsQ3DMAzj/+f0hgwZekCnHNChyFh0caAANGiW9iBIEWlKYvD7nu3zPhoza+1XHK+948pDFQ7OxBjkV4YDFXzkk124MlyRQZL3tN8FlKggpyjmm0DV/aHf72fdHiR3k2GzGsmcdI77xG3gBqWNHNchmD2cfbsYVkQne6//hWTec3sMdfHYq8waqry6n1nFKsBGuo+hHBUZPEgr6qqK/5mYQJ2mIh4XaMuf2ld1zl4AAAAASUVORK5CYII=", "wall": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABs0lEQVR42k2T7VrCMAyFezkwYPBfQRAEvRA2mJMPHTDcxde8acLjjz5p05Oc5DQNP6tRvLzl8bYex9/3ie7vYrfPvXh8HaoPzH0zieW0r77qJYvn5TB+L0cxAKxmWfwUJ6DrOo+7WV8T7iSAYOz2qRfbzTju5a6S1UlizoFAWMjYrHIFcG6kEuxdQGC+5gO9I1khpLX4UgWSmcBaADhhPkmZ9TxTS0sEdNbWVc4w616wgcxkwgHQK8BerQoWONZZktImenAfYCQjwQDLaU+rISlisvcWqYpF8lLwtBMov/uYqHBeKiyHxUDVJhEkx0XygUFsLC2G1tS+WLmoTm/6ZBLAXWtCkgQyzhBxDi4UFtDBgui3s/5JmoQdaIvg0EGfESCMOHi6hgrE4icx4JMJ19jZkz4GCYHoFz2YNHoGgCXR/2nlDDMLfPAyYUE8FG5trEkG68WWPq1UAjOV0m5IouUPFiriRRAQH2MOE/vC/ge+wp/R33VvzwhAy16mHiv7I0wsjC40r3TzSSSQABROA5MGiTYAEeC6gIeZ+zMi+qji4JLPAxsMAPw3pi+dRNQhsx/8ByCt3bV0drHDAAAAAElFTkSuQmCC"};
+const LOOKS = [
+  { id: "A", name: "Field photo", text: "The real colours: dark chocolate pellets, mid-brown with white threads, pale buff full of holes." },
+  { id: "B", name: "Brain sponge", text: "The real comb's winding brain-like ridges kept at every age; only colour and wear change." },
+  { id: "C", name: "Bold pixels", text: "The same story in chunkier pixels and stronger contrast, closer to vanilla blocks." },
+];
+// A comb block: its layers from the bottom up ("f" fresh, "r" ripe, "o" old), its nodules, and crumbs beside it.
+const LIFE = [
+  { layers: "ffff", nodules: 0, text: "Just built: four layers of fresh comb from new forage." },
+  { layers: "rrrf", nodules: 1, text: "Half a day on: the lower layers ripen and the first nodule sprouts." },
+  { layers: "orrf", nodules: 3, text: "A day on: nodules all over; the bottom layer has gone old." },
+  { layers: "oor", nodules: 2, text: "No new forage: old workers have eaten a layer from below; more has gone old." },
+  { layers: "o", nodules: 0, crumbs: true, text: "Nearly spent: the last old layer, crumbs where an old worker chews it. Then the spot gets fresh comb again." },
+];
+const SCENES = [
+  { id: "life", name: "Life of a comb", text: "Five combs in a row, from just built (left) to nearly spent (right)." },
+  { id: "fed", name: "Garden, well fed", text: "A garden room while foragers bring plenty: dark tops, ripe middles, many nodules." },
+  { id: "hungry", name: "Garden, going hungry", text: "The same room after days with no forage: low, pale combs, few nodules." },
+];
+let look = "A", sceneId = "life";
+try { look = localStorage.getItem("comb-look") || "A"; sceneId = localStorage.getItem("comb-scene") || "life"; } catch (e) {}
+
+const canvas = document.getElementById("view");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, 4 / 3, 0.05, 100);
+camera.position.set(2.5, 3.4, 5.6);
+const controls = new THREE.OrbitControls(camera, canvas);
+controls.target.set(2.5, 0.2, 0.5);
+controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI * 0.49;
+controls.minDistance = 0.8; controls.maxDistance = 14;
+
+// Every picture is loaded before anything is built (a slice cut from a picture not loaded yet stays blank).
+const images = {};
+function allSources() {
+  const out = [DATA.nodule, DATA.wall];
+  for (const l of Object.values(DATA.looks)) for (const a of Object.values(l)) out.push(a.top, a.side);
+  return out;
+}
+const loaded = Promise.all(allSources().map(src => new Promise(done => {
+  const img = new Image();
+  img.onload = img.onerror = () => done();
+  img.src = src;
+  images[src] = img;
+})));
+const base = {};
+function tex(src) {
+  if (!base[src]) {
+    const t = new THREE.Texture(images[src]);
+    t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.encoding = THREE.sRGBEncoding;
+    t.needsUpdate = true;
+    base[src] = t;
+  }
+  return base[src];
+}
+// A slice of a texture: rows [from, from + rows) of 16, the whole width (for one 2-pixel layer of a side).
+const slices = {};
+function slice(src, from, rows, cols) {
+  const key = src + "|" + from + "|" + rows + "|" + (cols || 16);
+  if (!slices[key]) {
+    const t = tex(src).clone();
+    t.needsUpdate = true;
+    t.repeat.set((cols || 16) / 16, rows / 16);
+    t.offset.set(0, from / 16);
+    slices[key] = t;
+  }
+  return slices[key];
+}
+// Minecraft's flat face shading: top full, north/south 0.8, east/west 0.6, bottom 0.5. Box face order: +x -x +y -y +z -z.
+const SHADE = [0.6, 0.6, 1.0, 0.5, 0.8, 0.8];
+function mats(textures) {
+  return textures.map((t, i) => new THREE.MeshBasicMaterial({ map: t, color: new THREE.Color(SHADE[i], SHADE[i], SHADE[i]) }));
+}
+const AGE = { f: "fresh", r: "ripe", o: "old" };
+const NODULE_SPOTS = [[3, 4], [10, 9], [5, 11]];
+
+const garden = new THREE.Group();
+scene.add(garden);
+
+function comb(x, z, spec) {
+  const L = DATA.looks[look];
+  spec.layers.split("").forEach((a, i) => {
+    const age = L[AGE[a]];
+    const side = slice(age.side, i * 2, 2);
+    const top = tex(age.top);
+    const box = new THREE.Mesh(new THREE.BoxGeometry(1, 2 / 16, 1), mats([side, side, top, top, side, side]));
+    box.position.set(x + 0.5, (i * 2 + 1) / 16, z + 0.5);
+    garden.add(box);
+  });
+  const h = spec.layers.length * 2 / 16;
+  const nod = tex(DATA.nodule);
+  NODULE_SPOTS.slice(0, spec.nodules).forEach(([nx, nz]) => {
+    const ball = new THREE.Mesh(new THREE.BoxGeometry(3 / 16, 2 / 16, 3 / 16), mats(Array(6).fill(nod)));
+    ball.position.set(x + (nx + 1.5) / 16, h + 1 / 16, z + (nz + 1.5) / 16);
+    garden.add(ball);
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(1 / 16, 1 / 16, 1 / 16), mats(Array(6).fill(nod)));
+    cap.position.set(x + (nx + 1.5) / 16, h + 2.5 / 16, z + (nz + 1.5) / 16);
+    garden.add(cap);
+  });
+  if (spec.crumbs) {
+    const dust = tex(DATA.looks[look].old.top);
+    [[-0.08, 0.3], [-0.12, 0.62], [1.06, 0.45], [0.4, 1.08], [0.7, -0.06]].forEach(([cx, cz]) => {
+      const crumb = new THREE.Mesh(new THREE.BoxGeometry(1 / 16, 1 / 16, 1 / 16), mats(Array(6).fill(dust)));
+      crumb.position.set(x + cx, 0.5 / 16, z + cz);
+      garden.add(crumb);
+    });
+  }
+}
+
+function room(w, d) {
+  const wall = tex(DATA.wall);
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(w + 2, 1, d + 2), mats(Array(6).fill(wall)));
+  floor.position.set(w / 2, -0.5, d / 2);
+  garden.add(floor);
+  // A low back wall and side walls (cut down so the room can be seen into).
+  [[w / 2, -0.5, w + 2, 1], [-0.5, d / 2, 1, d], [w + 0.5, d / 2, 1, d]].forEach(([cx, cz, sx, sz]) => {
+    const block = new THREE.Mesh(new THREE.BoxGeometry(sx, 1, sz), mats(Array(6).fill(wall)));
+    block.position.set(cx, 0.5, cz);
+    garden.add(block);
+  });
+}
+
+// A garden room: 5 x 3 combs. Well fed: mostly fresh on top, ripe in the middle, a little old at the bottom.
+function gardenRoom(hungry) {
+  room(5, 3);
+  const rng = mulberry(hungry ? 7 : 3);
+  for (let x = 0; x < 5; x++) {
+    for (let z = 0; z < 3; z++) {
+      let layers, nodules;
+      if (!hungry) {
+        const n = 3 + Math.floor(rng() * 2);
+        layers = "o" + "r".repeat(n - 2) + "f";
+        if (rng() < 0.3) layers = "r".repeat(n - 1) + "f";
+        nodules = 1 + Math.floor(rng() * 3);
+      } else {
+        const n = 1 + Math.floor(rng() * 2);
+        layers = "o".repeat(n);
+        if (rng() < 0.25) layers = "o" + "r".repeat(n);
+        nodules = rng() < 0.2 ? 1 : 0;
+      }
+      if (hungry && rng() < 0.15) continue; // eaten right down: bare floor
+      comb(x, z, { layers, nodules, crumbs: hungry && rng() < 0.2 });
+    }
+  }
+}
+function mulberry(a) {
+  return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+
+// Where the camera starts for each scene.
+const VIEWS = { life: [[4.1, 2.3, 6.6], [4.1, 0.1, 1]], fed: [[2.5, 2.6, 5.4], [2.5, 0.2, 1.5]], hungry: [[2.5, 2.6, 5.4], [2.5, 0.2, 1.5]] };
+function aim() {
+  const [eye, at] = VIEWS[sceneId];
+  camera.position.set(...eye); controls.target.set(...at); controls.update();
+}
+
+function build() {
+  garden.clear();
+  if (sceneId === "life") {
+    room(8, 2);
+    LIFE.forEach((spec, i) => comb(i * 1.6 + 0.3, 0.5, spec));
+  } else {
+    gardenRoom(sceneId === "hungry");
+  }
+  explain();
+  draw();
+}
+
+function explain() {
+  const el = document.getElementById("explain");
+  const s = SCENES.find(s => s.id === sceneId);
+  el.innerHTML = "";
+  const h = document.createElement("h2"); h.textContent = s.name; el.appendChild(h);
+  if (sceneId === "life") {
+    const ol = document.createElement("ol"); ol.className = "row";
+    LIFE.forEach(l => { const li = document.createElement("li"); li.textContent = l.text; ol.appendChild(li); });
+    el.appendChild(ol);
+  } else {
+    const p = document.createElement("p"); p.className = "note"; p.textContent = s.text; el.appendChild(p);
+  }
+}
+
+function resize() {
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (!w || !h) return;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+  draw();
+}
+let pending = false;
+function draw() {
+  if (pending) return;
+  pending = true;
+  requestAnimationFrame(() => { pending = false; controls.update(); renderer.render(scene, camera); });
+}
+controls.addEventListener("change", draw);
+new ResizeObserver(resize).observe(canvas);
+
+function button(parent, id, letter, name, text, onClick) {
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "choice"; b.id = id;
+  b.innerHTML = `<b>${letter}</b><span>${name}<small>${text}</small></span>`;
+  b.addEventListener("click", onClick);
+  parent.appendChild(b);
+}
+const looksEl = document.getElementById("looks");
+for (const l of LOOKS) {
+  button(looksEl, "look-" + l.id, l.id, l.name, l.text, () => { look = l.id; try { localStorage.setItem("comb-look", look); } catch (e) {} sync(); build(); });
+}
+const scenesEl = document.getElementById("scenes");
+SCENES.forEach((s, i) => {
+  button(scenesEl, "scene-" + s.id, String(i + 1), s.name, s.text, () => { sceneId = s.id; try { localStorage.setItem("comb-scene", sceneId); } catch (e) {} sync(); aim(); build(); });
+});
+function sync() {
+  for (const l of LOOKS) document.getElementById("look-" + l.id).setAttribute("aria-pressed", String(l.id === look));
+  for (const s of SCENES) document.getElementById("scene-" + s.id).setAttribute("aria-pressed", String(s.id === sceneId));
+  const sw = document.getElementById("swatches");
+  sw.innerHTML = "";
+  for (const age of ["fresh", "ripe", "old"]) {
+    const d = document.createElement("div"); d.className = "swatch";
+    const img = document.createElement("img"); img.src = DATA.looks[look][age].side; img.alt = age + " comb, side";
+    d.appendChild(img); d.appendChild(document.createTextNode(age));
+    sw.appendChild(d);
+  }
+}
+if (!DATA.looks[look]) look = "A";
+if (!SCENES.some(s => s.id === sceneId)) sceneId = "life";
+sync(); resize();
+loaded.then(() => { aim(); build(); resize(); });
+</script>

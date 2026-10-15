@@ -51,7 +51,8 @@ public class PelletLayer<T extends AbstractAntEntity> extends BlockAndItemGeoLay
     public PelletLayer(GeoRenderer<T> renderer, ModelPart eggModel, ModelPart corpseModel) {
         super(renderer,
                 (bone, ant) -> !HOLD_BONE.equals(bone.getName()) ? null
-                        : ant.isCarryingCorpse() ? CORPSE_MARKER : ant.isCarryingEgg() ? EGG_MARKER : !ant.getCarriedSeed().isEmpty() ? ant.getCarriedSeed() : null,
+                        : ant.isCarryingCorpse() ? CORPSE_MARKER : ant.isCarryingEgg() ? EGG_MARKER
+                        : !ant.getCarriedSeed().isEmpty() && !ant.isFoodInCrop() ? ant.getCarriedSeed() : null,
                 (bone, ant) -> HOLD_BONE.equals(bone.getName()) ? ant.getCarriedBlock() : null);
         this.eggModel = eggModel;
         this.corpseModel = corpseModel;

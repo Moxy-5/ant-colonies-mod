@@ -95,6 +95,13 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     private static final EntityDataAccessor<ItemStack> DATA_CARRIED_SEED =
             SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.ITEM_STACK);
 
+    /**
+     * True while the nurse food it carries is in its crop, not its jaws (it ate it to pass it on mouth to mouth): the
+     * renderer draws nothing in the jaws. Synced. Saved.
+     */
+    private static final EntityDataAccessor<Boolean> DATA_IN_CROP =
+            SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.BOOLEAN);
+
     /** True while the ant holds an egg in its mandibles (carrying it to the nursery). Synced so the renderer can draw it. Saved. */
     private static final EntityDataAccessor<Boolean> DATA_CARRIED_EGG =
             SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.BOOLEAN);
@@ -152,6 +159,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         builder.define(DATA_CARRIED, Optional.empty());
         builder.define(DATA_CARRIED_SEED, ItemStack.EMPTY);
         builder.define(DATA_CARRIED_EGG, false);
+        builder.define(DATA_IN_CROP, false);
         builder.define(DATA_CARRIED_CORPSE, false);
     }
 
@@ -199,6 +207,32 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
 
     public void setCarriedSeed(ItemStack seed) {
         entityData.set(DATA_CARRIED_SEED, seed);
+        if (seed.isEmpty()) {
+            entityData.set(DATA_IN_CROP, false);
+        }
+    }
+
+    /**
+     * The nurse ate this piece of nurse food to pass it on mouth to mouth: it counts as carried (the same jobs follow it
+     * through), but it is in the crop, so nothing shows in the jaws.
+     */
+    public void swallowToPassOn(ItemStack food) {
+        entityData.set(DATA_CARRIED_SEED, food);
+        entityData.set(DATA_IN_CROP, !food.isEmpty());
+    }
+
+    /** Whether what it carries is in its crop (to pass on mouth to mouth), not in its jaws. */
+    public boolean isFoodInCrop() {
+        return entityData.get(DATA_IN_CROP) && !getCarriedSeed().isEmpty();
+    }
+
+    /**
+     * Where its head is (its mouth, for mouth-to-mouth feeding): half its body length in front of its middle. A swollen
+     * termite queen's head is well in front of her middle.
+     */
+    public net.minecraft.world.phys.Vec3 headPoint() {
+        net.minecraft.world.phys.Vec3 forward = net.minecraft.world.phys.Vec3.directionFromRotation(0.0F, yBodyRot);
+        return position().add(forward.scale(getBbWidth() * 0.5));
     }
 
     /** Whether this ant holds an egg in its mandibles (a worker bringing it to the nursery). */
@@ -314,7 +348,9 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             setCarryingCorpse(false);
             colony.refuse().spawnCorpse(level, getX(), getY(), getZ());
         }
-        if (isCarryingBread()) {
+        if (isFoodInCrop()) {
+            setCarriedSeed(ItemStack.EMPTY); // (eaten: it dies with it)
+        } else if (isCarryingBread()) {
             colony.nurseFood().putDownWhereItStands(level, this);
             setCarriedSeed(ItemStack.EMPTY);
         } else if (!getCarriedSeed().isEmpty()) {
@@ -774,6 +810,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             tag.put("CarriedSeed", getCarriedSeed().save(registryAccess()));
         }
         tag.putBoolean("CarryingEgg", isCarryingEgg());
+        tag.putBoolean("FoodInCrop", isFoodInCrop());
         tag.putBoolean("CarryingCorpse", isCarryingCorpse());
         tag.putBoolean("SeedForBread", seedForBread);
         // The wall or ceiling it holds on to (or the channel it is in), so after a reload it is still there instead of
@@ -800,6 +837,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             setCarriedSeed(ItemStack.parse(registryAccess(), tag.getCompound("CarriedSeed")).orElse(ItemStack.EMPTY));
         }
         setCarryingEgg(tag.getBoolean("CarryingEgg"));
+        entityData.set(DATA_IN_CROP, tag.getBoolean("FoodInCrop") && !getCarriedSeed().isEmpty());
         setCarryingCorpse(tag.getBoolean("CarryingCorpse"));
         seedForBread = tag.getBoolean("SeedForBread");
         if (tag.contains("HoldCell") && tag.contains("HoldSurface")) {

@@ -22,11 +22,20 @@ import net.minecraft.world.level.Level;
 /**
  * The termite king: founds the colony together with the queen (a royal pair), helps her dig the royal chamber, closes
  * the entrance from inside, and then lives beside her for good. He joins the nearest termite queen that has no king yet.
+ * Like the queen he is fed by the nurses, mouth to mouth (a nodule a day, the workers' meal interval; my pick, to
+ * confirm); unfed he does not starve (not decided yet).
  */
-public class TermiteKingEntity extends AbstractAntEntity {
+public class TermiteKingEntity extends AbstractAntEntity implements FedByNurses {
     public static final String CASTE = "king";
     /** How close (in blocks) a queen without a king must be for him to join her. */
     private static final double JOIN_RADIUS = 32.0;
+
+    /** The game time of his last meal ({@link Colony#NOT_SET}: his clock has not started). Saved. */
+    private long lastFed = Colony.NOT_SET;
+    /** The nurse on its way to feed him, and until when. Not saved. */
+    @org.jetbrains.annotations.Nullable
+    private java.util.UUID feeder;
+    private long feederUntil;
 
     public TermiteKingEntity(EntityType<? extends TermiteKingEntity> type, Level level) {
         super(type, level);
@@ -56,9 +65,74 @@ public class TermiteKingEntity extends AbstractAntEntity {
         return false;
     }
 
+    // --- food: the nurses bring it, mouth to mouth -------------------------------------------------------------
+
+    @org.jetbrains.annotations.Nullable
+    private Colony colony() {
+        return getColonyId() == null || !(level() instanceof ServerLevel serverLevel) ? null : ColonyManager.get(serverLevel).getColony(getColonyId());
+    }
+
+    /** Whether he wants a nodule: in a colony whose members get hungry, a day (the workers' meal interval) after the last. */
+    @Override
+    public boolean wantsFood() {
+        Colony colony = colony();
+        return colony != null && colony.isHungerOn() && lastFed != Colony.NOT_SET
+                && level().getGameTime() - lastFed >= colony.profile().worker().mealIntervalTicks();
+    }
+
+    @Override
+    public void takeFood() {
+        lastFed = level().getGameTime();
+    }
+
+    public long getLastFed() {
+        return lastFed;
+    }
+
+    /** For the tests: pretend his last meal was at this game time. */
+    public void setLastFed(long gameTime) {
+        lastFed = gameTime;
+    }
+
+    @Override
+    public boolean hasFeeder(long now) {
+        return feeder != null && feederUntil > now;
+    }
+
+    @Override
+    public void claimFeeder(java.util.UUID nurse, long until) {
+        feeder = nurse;
+        feederUntil = until;
+    }
+
+    @Override
+    public void releaseFeeder(java.util.UUID nurse) {
+        if (nurse.equals(feeder)) {
+            feeder = null;
+        }
+    }
+
+    @Override
+    public void addAdditionalSaveData(net.minecraft.nbt.CompoundTag tag) {
+        super.addAdditionalSaveData(tag);
+        tag.putLong("LastFed", lastFed);
+    }
+
+    @Override
+    public void readAdditionalSaveData(net.minecraft.nbt.CompoundTag tag) {
+        super.readAdditionalSaveData(tag);
+        lastFed = tag.contains("LastFed") ? tag.getLong("LastFed") : Colony.NOT_SET;
+    }
+
     @Override
     public void tick() {
         super.tick();
+        if (tickCount % 20 == 0 && level() instanceof ServerLevel) {
+            Colony colony = colony();
+            if (lastFed == Colony.NOT_SET || colony == null || !colony.isHungerOn()) {
+                lastFed = level().getGameTime(); // his clock only runs in a colony that gets hungry
+            }
+        }
         // Every two seconds while he has no queen: look for a termite queen nearby that has no king yet.
         if (tickCount % 40 != 0 || !(level() instanceof ServerLevel serverLevel)) {
             return;

@@ -297,6 +297,19 @@ public class Colony {
         return level.getEntity(queenId) instanceof AbstractAntEntity queen && queen.isAlive() ? queen : null;
     }
 
+    /** The king (termites), if he is loaded and alive: he stays beside the queen, so he is looked for round her. */
+    @Nullable
+    public AbstractAntEntity getKing(ServerLevel level) {
+        if (getCount(TermiteKingEntity.CASTE) <= 0) {
+            return null;
+        }
+        AbstractAntEntity queen = getQueen(level);
+        net.minecraft.world.phys.AABB around = queen != null ? queen.getBoundingBox().inflate(16)
+                : new net.minecraft.world.phys.AABB(center).inflate(32);
+        return level.getEntitiesOfClass(TermiteKingEntity.class, around, king -> king.isAlive() && id.equals(king.getColonyId()))
+                .stream().findFirst().orElse(null);
+    }
+
     /**
      * Whether the queen has died. Like a real queenless colony, it carries on without her: the workers keep working and
      * raise the eggs and young already there, but no new eggs come, so it dwindles as its workers die of old age, until

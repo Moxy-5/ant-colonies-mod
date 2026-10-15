@@ -1,5 +1,8 @@
 package com.antcolonies.entity.goal;
 
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.Vec3;
+
 import java.util.EnumSet;
 
 import org.jetbrains.annotations.Nullable;
@@ -15,11 +18,16 @@ import net.minecraft.world.entity.ai.goal.Goal;
 /**
  * The nurse waits by the queen: walks to her room and stays near her. It keeps going while the queen sits in her room
  * (so the nurse neither wanders off nor takes other work), and the jobs that matter to her (carrying an egg, bringing the
- * queen a meal) come first because they have higher priority.
+ * queen a meal) come first because they have higher priority. Where the nurses feed mouth to mouth (termites), they wait
+ * in a court round her head end, each in its own place in a half ring in front of her (real Macrotermes queens have a
+ * court of workers at the head, feeding her, and others along her body); the ants stand anywhere near her.
  */
 public class StandByQueenGoal extends Goal {
     /** The nurse tries to stay within this many blocks (sideways) of the queen. */
     private static final double NEAR = 1.6;
+    /** The court round the queen's head (mouth to mouth): how many places, and how far from her mouth. */
+    private static final int COURT_PLACES = 5;
+    private static final double COURT_RADIUS = 0.45;
 
     private final AbstractAntEntity ant;
     @Nullable
@@ -69,6 +77,10 @@ public class StandByQueenGoal extends Goal {
         if (queen == null) {
             return;
         }
+        if (MouthToMouth.on(colony)) {
+            standInTheCourt(queen);
+            return;
+        }
         ant.getLookControl().setLookAt(queen);
         double dx = ant.getX() - queen.getX();
         double dz = ant.getZ() - queen.getZ();
@@ -77,6 +89,32 @@ public class StandByQueenGoal extends Goal {
             ant.getNavigator().stop();
         } else if (ant.getNavigator().isDone() && --repath <= 0) {
             ant.getNavigator().moveTo(queen.blockPosition(), 1.0);
+            repath = 40; // not every tick if there is no way
+        }
+    }
+
+    /**
+     * The nurse's own place in the court: on a half ring round the queen's head (5 places, from her left through her
+     * front to her right, picked by the nurse's id), facing her mouth. Where its place cannot be reached, anywhere near her.
+     */
+    private void standInTheCourt(AbstractAntEntity queen) {
+        Vec3 mouth = queen.headPoint();
+        int place = Math.floorMod(ant.getUUID().hashCode(), COURT_PLACES) - COURT_PLACES / 2;
+        Vec3 out = Vec3.directionFromRotation(0.0F, queen.yBodyRot + place * 40.0F).scale(COURT_RADIUS);
+        Vec3 spot = mouth.add(out);
+        ant.getLookControl().setLookAt(mouth.x, mouth.y, mouth.z);
+        double dx = ant.getX() - spot.x;
+        double dz = ant.getZ() - spot.z;
+        double qx = ant.getX() - queen.getX();
+        double qz = ant.getZ() - queen.getZ();
+        boolean there = dx * dx + dz * dz <= 0.3 * 0.3 && Math.abs(ant.getY() - queen.getY()) < 1.5;
+        boolean nearEnough = ant.getNavigator().isDone() && qx * qx + qz * qz <= NEAR * NEAR && Math.abs(ant.getY() - queen.getY()) < 1.5;
+        if (there || nearEnough && repath > 0) {
+            ant.getNavigator().stop();
+        } else if (ant.getNavigator().isDone() && --repath <= 0) {
+            if (!ant.getNavigator().moveTo(BlockPos.containing(spot.add(0, 0.1, 0)), 1.0)) {
+                ant.getNavigator().moveTo(queen.blockPosition(), 1.0);
+            }
             repath = 40; // not every tick if there is no way
         }
     }

@@ -544,9 +544,10 @@ public class PopulationTests {
      * colony has had no comb their hunger clocks do not run, so neither starves. Then comb with nodules in the garden
      * and both hungry: the young one eats a fungus nodule, the old one a layer of old comb (never the comb's bed). Then
      * 100 worker numbers (40 young, 60 old) whose meal is due: the young share eat nodules, the old ones comb, one piece
-     * making 4 meals, so about 10 nodules and 15 layers, and nobody starves.
+     * making 4 meals, so about 10 nodules and 15 layers, and nobody starves. Then mouth to mouth: a hungry king; a nurse
+     * eats a nodule at the comb and carries it in its crop (nothing in its jaws), walks to him and feeds him head to head.
      */
-    @GameTest(template = "arena", timeoutTicks = 2400)
+    @GameTest(template = "arena", timeoutTicks = 4800)
     public static void termiteWorkersEatNodulesWhenYoungAndOldCombWhenOlder(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         TermiteMoundTests.deepGround(helper);
@@ -555,6 +556,9 @@ public class PopulationTests {
         int[] phase = {0};
         long[] phaseAt = {0};
         int[] before = new int[2];
+        com.antcolonies.entity.TermiteKingEntity[] king = new com.antcolonies.entity.TermiteKingEntity[1];
+        boolean[] sawCrop = {false};
+        long[] kingHungrySince = {0};
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null, "no termite colony");
@@ -639,7 +643,38 @@ public class PopulationTests {
                 helper.assertTrue(nodules >= 8 && nodules <= 11, "the 40 young worker numbers should eat about 10 nodules, ate " + nodules);
                 helper.assertTrue(colony.population().inside(WorkerAntEntity.CASTE) == 100, "a worker number starved: "
                         + colony.population().inside(WorkerAntEntity.CASTE));
-                helper.succeed();
+                // Mouth to mouth: the king comes and joins the queen.
+                AbstractAntEntity queen = colony.getQueen(level);
+                king[0] = ModEntities.TERMITE_KING.get().create(level);
+                king[0].moveTo(queen.getX(), queen.getY(), queen.getZ(), 0.0F, 0.0F);
+                level.addFreshEntity(king[0]);
+                phase[0] = 4;
+                phaseAt[0] = now;
+            } else if (phase[0] == 4 && colony.getId().equals(king[0].getColonyId()) && now - phaseAt[0] >= 40) {
+                for (TermiteWorkerEntity worker : workers) {
+                    worker.setLastAte(now); // (they ate: so nothing but the feeding goes on)
+                }
+                kingHungrySince[0] = now - colony.profile().worker().mealIntervalTicks() - 5;
+                king[0].setLastFed(kingHungrySince[0]);
+                phase[0] = 5;
+                phaseAt[0] = now;
+            } else if (phase[0] == 5) {
+                for (TermiteWorkerEntity worker : workers) {
+                    if (worker.isFoodInCrop()) {
+                        sawCrop[0] = true;
+                        helper.assertTrue(worker.getCarriedSeed().is(com.antcolonies.registry.ModItems.FUNGUS_NODULE.get()),
+                                "a nurse has something else than a nodule in its crop: " + worker.getCarriedSeed());
+                    }
+                }
+                if (king[0].getLastFed() > kingHungrySince[0]) {
+                    helper.assertTrue(sawCrop[0], "the king was fed, but no nurse carried a nodule in its crop");
+                    double nearest = Double.MAX_VALUE;
+                    for (TermiteWorkerEntity worker : workers) {
+                        nearest = Math.min(nearest, worker.headPoint().distanceTo(king[0].headPoint()));
+                    }
+                    helper.assertTrue(nearest < 0.9, "the nurse fed the king, but not head to head: its head was " + nearest + " from his");
+                    helper.succeed();
+                }
             }
         });
     }

@@ -142,15 +142,18 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * seed from the store). A worker whose own food is not there eats the other kind. {@code workersPerPiece}: how many
      * meals one piece makes (a layer of comb feeds 4 termites, a seed one ant). {@code hungryFromFirstFood}: the workers'
      * hunger clocks only start once the colony's store has held its first piece (a young termite colony has no garden
-     * yet: its first workers live on what the royal pair gave them).
+     * yet: its first workers live on what the royal pair gave them). {@code mouthToMouth}: the nurses pass the nurses'
+     * food on mouth to mouth (trophallaxis: Macrotermes nurses eat the nodules and feed the queen, king, soldiers and
+     * nymphs from their crop, head to head) instead of carrying it in their jaws (the harvester ant lays bread on a larva).
      */
-    public record WorkerDiet(MealFood young, MealFood older, int workersPerPiece, boolean hungryFromFirstFood) {
-        public static final WorkerDiet STORE_ONLY = new WorkerDiet(MealFood.STORE, MealFood.STORE, 1, false);
+    public record WorkerDiet(MealFood young, MealFood older, int workersPerPiece, boolean hungryFromFirstFood, boolean mouthToMouth) {
+        public static final WorkerDiet STORE_ONLY = new WorkerDiet(MealFood.STORE, MealFood.STORE, 1, false, false);
         public static final Codec<WorkerDiet> CODEC = RecordCodecBuilder.create(i -> i.group(
                 MealFood.CODEC.optionalFieldOf("young", MealFood.STORE).forGetter(WorkerDiet::young),
                 MealFood.CODEC.optionalFieldOf("older", MealFood.STORE).forGetter(WorkerDiet::older),
                 Codec.INT.optionalFieldOf("workers_per_piece", 1).forGetter(WorkerDiet::workersPerPiece),
-                Codec.BOOL.optionalFieldOf("hungry_from_first_food", false).forGetter(WorkerDiet::hungryFromFirstFood)
+                Codec.BOOL.optionalFieldOf("hungry_from_first_food", false).forGetter(WorkerDiet::hungryFromFirstFood),
+                Codec.BOOL.optionalFieldOf("mouth_to_mouth", false).forGetter(WorkerDiet::mouthToMouth)
         ).apply(i, WorkerDiet::new));
 
         /** What a worker usually eats in this job by age. */

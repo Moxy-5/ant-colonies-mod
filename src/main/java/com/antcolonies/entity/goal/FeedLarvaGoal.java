@@ -32,7 +32,8 @@ import net.minecraft.world.item.ItemStack;
  * arrives, the bread goes back on a heap. (An ant that is interrupted while carrying bread is picked up by
  * {@link FeedQueenGoal}, which takes it to the queen.) Termite nurses feed the soldiers the same way (their jaws are
  * too big to feed themselves, see {@link FedByNurses}): a hungry soldier is picked like a hungry nymph, and the nurse
- * follows it if it moves.
+ * follows it if it moves; and the king. Termite nurses feed mouth to mouth (see {@link MouthToMouth}): they eat the
+ * nodule at the comb and pass it on head to head.
  */
 public class FeedLarvaGoal extends Goal {
     /** How close (sideways, in blocks) the ant must get to a heap or to the larva. */
@@ -42,7 +43,7 @@ public class FeedLarvaGoal extends Goal {
     /** Time (in ticks) before this ant looks for a hungry larva again after finding none, or no way to it. */
     private static final int RETRY_TICKS = 200;
 
-    private enum Leg { TO_PILE, TO_LARVA, BACK_TO_PILE }
+    private enum Leg { TO_PILE, SWALLOW, TO_LARVA, PASS, BACK_TO_PILE }
 
     private final AbstractAntEntity ant;
     @Nullable
@@ -58,6 +59,8 @@ public class FeedLarvaGoal extends Goal {
     @Nullable
     private BlockPos pile;
     private int ticks;
+    /** Ticks into eating the nodule, or into passing it head to head (mouth to mouth). */
+    private int moment;
     private boolean done;
     private long nextTry;
 
@@ -112,6 +115,9 @@ public class FeedLarvaGoal extends Goal {
                 hungry.add(soldier);
             }
         }
+        if (colony.getKing(level) instanceof FedByNurses king && king.wantsFood() && !king.hasFeeder(now)) {
+            hungry.add((Entity) king);
+        }
         if (hungry.isEmpty()) {
             return null;
         }
@@ -155,7 +161,9 @@ public class FeedLarvaGoal extends Goal {
         ticks++;
         switch (leg) {
             case TO_PILE -> walkToPile(level);
+            case SWALLOW -> swallow(level);
             case TO_LARVA -> walkToLarva(level);
+            case PASS -> passOn(level);
             case BACK_TO_PILE -> walkBack(level);
         }
     }
@@ -165,10 +173,16 @@ public class FeedLarvaGoal extends Goal {
         if (near(pile)) {
             ItemStack taken = colony.nurseFood().takeFoodAt(level, pile, false); // plain bread; rich only if nothing else is left
             if (!taken.isEmpty()) {
-                ant.setCarriedSeed(taken);
                 ColonyManager.get(level).markChanged();
-                leg = Leg.TO_LARVA;
                 ant.getNavigator().stop();
+                if (MouthToMouth.on(colony)) {
+                    ant.swallowToPassOn(taken); // it eats the nodule here and carries it in its crop
+                    leg = Leg.SWALLOW;
+                    moment = 0;
+                } else {
+                    ant.setCarriedSeed(taken);
+                    leg = Leg.TO_LARVA;
+                }
             } else {
                 pile = colony.nurseFood().findFood(level, ant.getRandom()); // somebody else took the last piece there
                 if (pile == null || !ant.getNavigator().moveTo(pile, 1.0)) {
@@ -180,17 +194,67 @@ public class FeedLarvaGoal extends Goal {
         }
     }
 
-    /** Second leg: to the larva, which eats the bread. */
+    /** Mouth to mouth: the nurse eats the nodule at the comb before it goes to the one it feeds. */
+    private void swallow(ServerLevel level) {
+        if (pile != null) {
+            ant.getLookControl().setLookAt(pile.getX() + 0.5, pile.getY(), pile.getZ() + 0.5);
+        }
+        MouthToMouth.swallowing(level, ant, moment);
+        if (++moment >= MouthToMouth.SWALLOW_TICKS) {
+            leg = Leg.TO_LARVA;
+        }
+    }
+
+    /** A big soldier (or the king) is reached a little farther from its middle. */
+    private double reach() {
+        return REACH + Math.max(0.0, larva.getBbWidth() / 2.0 - 0.15);
+    }
+
+    /** Mouth to mouth: head to head for a moment, then the food is passed. If it walked off, the nurse follows. */
+    private void passOn(ServerLevel level) {
+        if (larva == null || !larva.isAlive() || !fed().wantsFood()) {
+            putBack(level);
+            return;
+        }
+        double dx = ant.getX() - larva.getX();
+        double dz = ant.getZ() - larva.getZ();
+        double away = reach() + 0.6;
+        if (dx * dx + dz * dz > away * away) {
+            leg = Leg.TO_LARVA;
+            walkToLarva();
+            return;
+        }
+        MouthToMouth.faceEachOther(ant, larva);
+        MouthToMouth.passing(level, ant, larva, ant.getCarriedSeed(), moment);
+        if (++moment >= MouthToMouth.FEED_TICKS) {
+            fed().takeFood();
+            ant.setCarriedSeed(ItemStack.EMPTY);
+            ColonyManager.get(level).markChanged();
+            done = true;
+        }
+    }
+
+    /** Second leg: to the larva, which eats the bread (mouth to mouth: to its head). */
     private void walkToLarva(ServerLevel level) {
         if (larva == null || !larva.isAlive() || !fed().wantsFood()) {
             putBack(level);
             return;
         }
+        if (ant.isFoodInCrop()) {
+            if (MouthToMouth.atMouth(ant, larva, reach())) {
+                ant.getNavigator().stop();
+                leg = Leg.PASS;
+                moment = 0;
+            } else if ((ant.getNavigator().isDone() || !larva.blockPosition().equals(larvaCell) && ticks % 20 == 0)
+                    && !walkToLarva()) {
+                putBack(level);
+            }
+            return;
+        }
         ant.getLookControl().setLookAt(larva);
         double dx = ant.getX() - larva.getX();
         double dz = ant.getZ() - larva.getZ();
-        // A big soldier is reached a little farther from its middle.
-        double reach = REACH + Math.max(0.0, larva.getBbWidth() / 2.0 - 0.15);
+        double reach = reach();
         if (dx * dx + dz * dz <= reach * reach && Math.abs(ant.getY() - larva.getY()) < 1.5) {
             fed().takeFood();
             level.sendParticles(new ItemParticleOption(ParticleTypes.ITEM, ant.getCarriedSeed().copy()), larva.getX(),
@@ -205,9 +269,12 @@ public class FeedLarvaGoal extends Goal {
         }
     }
 
-    /** Plans the walk to where the larva (or soldier) is now. */
+    /** Plans the walk to where the larva (or soldier) is now (mouth to mouth: to its head, else beside it). */
     private boolean walkToLarva() {
         larvaCell = larva.blockPosition();
+        if (ant.isFoodInCrop() && ant.getNavigator().moveTo(MouthToMouth.cellAtMouth(larva), 1.0)) {
+            return true;
+        }
         return ant.getNavigator().moveTo(larvaCell, 1.0);
     }
 

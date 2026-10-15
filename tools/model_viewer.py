@@ -10,6 +10,9 @@ To show something else, change what main() puts into DATA and the build() functi
 
 Writes the page to the path given (default references/model_viewer.html; open it in a web browser).
 Run from the project folder:  python tools/model_viewer.py [out.html]
+
+Second scene, the fungus comb as it ages (2026-10-15, comb_age_art.py; its own page template, comb_viewer.template.html):
+python tools/model_viewer.py comb [out.html]   (default references/comb_viewer.html)
 """
 import base64
 import json
@@ -123,7 +126,23 @@ def file_uri(name):
     return uri((TEXTURES / name).read_bytes())
 
 
+def comb_page(out):
+    """The comb looks: for each look (A, B, C) and age (fresh, ripe, old) a top and a side texture."""
+    import comb_age_art as comb
+    data = {"looks": {}, "nodule": uri(png(comb.nodule())), "wall": uri(png(comb.room_wall()))}
+    for look in comb.LOOKS:
+        data["looks"][look] = {age: {face: uri(png(comb.texture(look, age, face))) for face in ("top", "side")}
+                               for age in comb.AGES}
+    template = (Path(__file__).resolve().parent / "comb_viewer.template.html").read_text(encoding="utf-8")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")
+    print("wrote", out)
+
+
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "comb":
+        comb_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/comb_viewer.html")
+        return
     out = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "references/model_viewer.html"
     data = {"looks": {}, "branch": [file_uri(f"fallen_branch_bark_{s}.png") for s in range(4)],
             "branchEnd": file_uri("fallen_branch_end.png"), "grass": uri(png(grass()))}
