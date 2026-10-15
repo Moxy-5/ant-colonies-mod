@@ -156,9 +156,11 @@ public class DigGoal extends Goal {
         level.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, state),
                 blockCenter.x, target.getY() + 1.0, blockCenter.z, 4, 0.15, 0.05, 0.15, 0.05);
 
-        if (progress >= 1.0F) {
-            // Wall first: the sides this bite would open to the outside are plastered with mud before it goes through.
-            colony.walls().wallFirst(level, target);
+        if (progress >= 1.0F && !colony.walls().wallFirst(level, target)) {
+            // Wall first: the sides this bite would open to the outside are plastered with mud before it goes through;
+            // a plate that cannot go in yet (something in the way) holds the last bite until it can.
+            level.destroyBlockProgress(ant.getId(), target, 9);
+        } else if (progress >= 1.0F) {
             colony.nest().clearDigProgress(target);
             colony.mound().blockDug(level, target);
             level.destroyBlockProgress(ant.getId(), target, -1);

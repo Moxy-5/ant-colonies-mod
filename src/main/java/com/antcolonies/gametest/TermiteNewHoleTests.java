@@ -276,11 +276,13 @@ public class TermiteNewHoleTests {
     /**
      * A fallen branch lies on the ground, thin (nothing bumps into it), so it is no roof by itself: the workers case it
      * in mud as they dig the feeding gallery under it (wall first), the mud holds it up over the gallery, and it is
-     * eaten from below by day.
+     * eaten from below by day. It lies on the edge of a step (the ground beside it 2 blocks lower, the user's branch of
+     * 2026-10-14 whose casing and gallery stayed open on that side, 2 blocks high): the gallery's open side is walled
+     * and the branch is cased on that side too.
      */
     @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
-    public static void aFallenBranchIsCasedInMudAndEatenFromBelowByDay(GameTestHelper helper) {
-        eatenFromBelow(helper, false, Food.BRANCH);
+    public static void aFallenBranchOnTheEdgeOfAStepIsCasedInMudAndEatenFromBelowByDay(GameTestHelper helper) {
+        eatenFromBelow(helper, true, Food.BRANCH);
     }
 
     private enum Food { LOG, STUMP, BRANCH }
@@ -334,6 +336,19 @@ public class TermiteNewHoleTests {
                         : com.antcolonies.registry.ModBlocks.DEAD_WOOD.get().defaultBlockState()
                                 .setValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS, net.minecraft.core.Direction.Axis.X), 3);
             }
+            if (kind == Food.BRANCH) {
+                // Tall grass round the branch, 2 blocks high, green and dry by turns (the savanna, the user's question of
+                // 2026-10-14): on both sides of it and down on the step.
+                for (int x = logStart - 2; x <= logStart + 3; x++) {
+                    for (int z : new int[] {MIDDLE - 1, MIDDLE + 1}) {
+                        BlockPos foot = helper.absolutePos(new BlockPos(x, (onAStep && x >= logStart - 3 && z > MIDDLE ? SURFACE - 2 : SURFACE), z));
+                        if (level.getBlockState(foot).isAir() && level.getBlockState(foot.above()).isAir()) {
+                            net.minecraft.world.level.block.DoublePlantBlock.placeAt(level, x % 2 == 0 ? Blocks.TALL_GRASS.defaultBlockState()
+                                    : com.antcolonies.registry.ModBlocks.TALL_DRY_GRASS.get().defaultBlockState(), foot, 3);
+                        }
+                    }
+                }
+            }
             colony.food().rescanPlantsSoon();
             colony.foodMap().knowForTests(log.get(0));
             phase[0] = 1;
@@ -376,7 +391,18 @@ public class TermiteNewHoleTests {
                         BlockPos next = cell.relative(side);
                         helper.assertTrue(nest.contains(next) || colony.nest().nestCells(level).contains(next)
                                 || !com.antcolonies.colony.NestWalls.isOpenToward(level, next, side.getOpposite()),
-                                "wall first: the dug block " + cell.toShortString() + " is open to the outside at " + next.toShortString());
+                                "wall first: the dug block " + cell.toShortString() + " is open to the outside at " + next.toShortString() + " (" + level.getBlockState(next) + ")");
+                        // A branch over it (no roof by itself) is cased in mud all round.
+                        if (com.antcolonies.colony.NestWalls.isWalkThroughFood(level, next)) {
+                            for (net.minecraft.core.Direction round : net.minecraft.core.Direction.values()) {
+                                BlockPos beside = next.relative(round);
+                                helper.assertTrue(beside.equals(cell) || nest.contains(beside) || colony.nest().nestCells(level).contains(beside)
+                                        || com.antcolonies.colony.NestWalls.isWalkThroughFood(level, beside)
+                                        || !com.antcolonies.colony.NestWalls.isOpenToward(level, beside, round.getOpposite()),
+                                        "wall first: the branch " + next.toShortString() + " over the dug block " + cell.toShortString()
+                                                + " is not cased in mud at " + beside.toShortString());
+                            }
+                        }
                     }
                 }
             }

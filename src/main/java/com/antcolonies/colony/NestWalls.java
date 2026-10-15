@@ -253,17 +253,22 @@ public class NestWalls {
      * the outside (open air, a cave, grass), so the gallery is never open, not even for a moment, as real termites
      * plaster over any side of a gallery that breaks through. The colony's own spaces (the nest, the holes, the
      * entrance, the mound) are left open, and so is water (no gallery is planned beside it).
+     * <p>
+     * False if a plate could not go in yet (a creature in the way that cannot be nudged aside): the digger then holds
+     * its last bite and tries again, so the cell never opens without its walls (the user's branch on a step at night,
+     * 2026-10-14: a refused plate was left as a leak "patched later", and the gallery stood open to the air).
      */
-    public void wallFirst(Level level, BlockPos target) {
+    public boolean wallFirst(Level level, BlockPos target) {
         if (!colony.profile().nest().crustWalls()) {
-            return;
+            return true;
         }
         Set<BlockPos> nest = colony.nest().nestCells(level);
         Map<BlockPos, ?> mound = colony.mound().getParts(level);
         if (!nest.contains(target) || target.equals(center) || mound.containsKey(target) || colony.foragingHoles().isHole(level, target)
                 || colony.mound().getGalleries(level).contains(target)) {
-            return;
+            return true;
         }
+        boolean allIn = true;
         for (Direction side : Direction.values()) {
             BlockPos next = target.relative(side);
             if (nest.contains(next) || next.equals(center) || mound.containsKey(next) || !level.isLoaded(next)
@@ -271,7 +276,7 @@ public class NestWalls {
                     || !isOpenToward(level, next, side.getOpposite())) {
                 continue;
             }
-            plate(level, next, side.getOpposite());
+            allIn &= plate(level, next, side.getOpposite());
         }
         // Food over it that the insects could walk into (a fallen branch) is cased in mud on every other side, so the
         // gallery has a roof (real termites cover a branch in sheeting and eat it from underneath). The mud holds it up
@@ -284,10 +289,11 @@ public class NestWalls {
             for (BlockPos gap : casingGaps(level, food, side.getOpposite(), nest)) {
                 if (!mound.containsKey(gap)) {
                     Direction toward = Direction.getNearest(food.getX() - gap.getX(), food.getY() - gap.getY(), food.getZ() - gap.getZ());
-                    plate(level, gap, toward);
+                    allIn &= plate(level, gap, toward);
                 }
             }
         }
+        return allIn;
     }
 
     /**
@@ -301,6 +307,8 @@ public class NestWalls {
     public boolean plate(Level level, BlockPos cell, Direction face) {
         BlockState wall = crust().withFace(level.getBlockState(cell), face);
         if (!nudgeOut(level, cell, wall)) {
+            com.antcolonies.AntColoniesMod.LOGGER.debug("[walls] no plate yet at {} ({}): {} in the way", cell.toShortString(), face,
+                    level.getEntitiesOfClass(LivingEntity.class, new AABB(cell), LivingEntity::isAlive));
             return false;
         }
         cutFood(level, cell);

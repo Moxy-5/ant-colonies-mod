@@ -36,11 +36,14 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 public class TermiteRunwayTests {
     /** How far out past the first foraging hole the hay lies (nearer than a new hole is dug for). */
     private static final int HAY_OUT = 5;
+    /** The ground is a block higher from this far out past the hole on. */
+    private static final int STEP_OUT = 3;
 
     /**
      * A colony (500 workers in the numbers, the brain off) with its nest dug out, both foraging holes dug, four
      * middle-aged workers (builders) and four old ones (foragers). The colony knows of a hay bale 5 blocks past its
-     * first hole, with short grass growing on the way. It plans a runway from the hole to the hay; at "night" the grass
+     * first hole, up a step one block high (the runway climbs it, so it is 2 blocks high at the foot of the step: the
+     * user's runway on a hill of 2026-10-14 stayed open on its sides there), with short grass growing on the way. It plans a runway from the hole to the hay; at "night" the grass
      * on it is cut and the workers plaster mud over it until it is closed all round. Then "day": the hole under the
      * runway stays open, the other is plugged, and the hay is eaten from under the sheeting. Then the hay is taken away:
      * the runway is given up, its hole plugged by day, and its mud crumbles away.
@@ -84,10 +87,19 @@ public class TermiteRunwayTests {
             colony.population().addNewMembers(WorkerAntEntity.CASTE, now - 1000, 500);
             NestPlan.ForagingTunnel first = colony.nest().getForagingTunnels(level).get(0);
             Direction out = first.side();
-            hay[0] = first.hole().above().relative(out, HAY_OUT);
+            // A step one block up from 3 blocks out on, in a strip round the way to the hay.
+            Direction across = out.getClockWise();
+            for (int i = STEP_OUT; i <= HAY_OUT + 3; i++) {
+                for (int j = -3; j <= 3; j++) {
+                    BlockPos ground = first.hole().relative(out, i).relative(across, j);
+                    level.setBlock(ground, Blocks.DIRT.defaultBlockState(), 3);
+                    level.setBlock(ground.above(), Blocks.GRASS_BLOCK.defaultBlockState(), 3);
+                }
+            }
+            hay[0] = first.hole().above().relative(out, HAY_OUT).above();
             // Short grass on the way (it is cut away under the runway).
             for (int i = 2; i < HAY_OUT; i++) {
-                level.setBlock(first.hole().above().relative(out, i), Blocks.SHORT_GRASS.defaultBlockState(), 3);
+                level.setBlock(first.hole().above().relative(out, i).above(i >= STEP_OUT ? 1 : 0), Blocks.SHORT_GRASS.defaultBlockState(), 3);
             }
             level.setBlock(hay[0], Blocks.HAY_BLOCK.defaultBlockState(), 3);
             colony.setForagingTimeForTests(true);

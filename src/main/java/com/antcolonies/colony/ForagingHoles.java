@@ -390,12 +390,12 @@ public class ForagingHoles {
             return;
         }
         for (Nest.Runway runway : colony.nest().getRunways()) {
-            if (colony.nest().isSpent(runway.hole())
-                    || level.isLoaded(runway.food()) && richBlockNear(level, runway.food(), FOOD_STILL_THERE) == null) {
+            boolean spent = colony.nest().isSpent(runway.hole());
+            if (spent || level.isLoaded(runway.food()) && richBlockNear(level, runway.food(), FOOD_STILL_THERE) == null) {
                 colony.nest().dropRunway(runway);
                 ColonyManager.get(level).markChanged();
-                AntColoniesMod.LOGGER.debug("[runway] the food at {} is gone: the runway from {} crumbles", runway.food().toShortString(),
-                        runway.hole().toShortString());
+                AntColoniesMod.LOGGER.debug("[runway] {}: the runway from {} to the food at {} crumbles",
+                        spent ? "its hole is plugged for good" : "the food is gone", runway.hole().toShortString(), runway.food().toShortString());
             }
         }
         crumble(level);
