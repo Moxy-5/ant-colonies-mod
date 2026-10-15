@@ -10,6 +10,7 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.entity.TermiteSoldierEntity;
 import com.antcolonies.entity.WorkerAntEntity;
+import com.antcolonies.species.SpeciesProfile;
 
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -22,9 +23,11 @@ import net.minecraft.util.RandomSource;
  * they eat whether a player is near or not, by the same rules as the real ones. Kept as counts by when they last ate (to
  * the minute), next to their ages in {@link Population} (a number's age and its hunger are kept apart: two lists, not
  * one per insect). Once a second, the ones whose meal is due eat, the hungriest first, as long as there is food:
- * workers a piece from the food store (a seed: they eat their seeds raw, like the real workers), soldiers a piece of
- * the nurses' food (a fungus nodule). A worker number gone the profile's starve time without a meal dies and leaves its
- * body; a soldier only gets slow without food, so as a number nothing happens to it.
+ * workers by their diet ({@link WorkerFood}: a seed from the store, eaten raw like the real ants; for termites the young
+ * share a fungus nodule, the older ones old comb), soldiers a piece of the nurses' food (a fungus nodule). Which worker
+ * numbers are young is not kept per meal: their share of the meals is the young share of the worker numbers. A worker
+ * number gone the profile's starve time without a meal dies and leaves its body; a soldier only gets slow without food,
+ * so as a number nothing happens to it.
  *
  * <p>Species-neutral: any caste with a meal in its profile (the workers when {@code worker.eats}, the soldiers).
  */
@@ -32,16 +35,18 @@ class Meals {
     private final Colony colony;
     /** Caste -> (the minute they last ate -> how many). Saved. */
     private final Map<String, TreeMap<Long, Integer>> lastAte = new LinkedHashMap<>();
+    /** The young workers' share of the meals not given out yet (a fraction carried over). Not saved. */
+    private double youngMeals;
 
-    /** What one caste eats: how often, how long until it starves (0: never), and whether from the store or the nurses' food. */
-    record Diet(long interval, long starveAfter, boolean fromStore) {
+    /** What one caste eats: how often, how long until it starves (0: never), and whether by the workers' diet or the nurses' food. */
+    record Diet(long interval, long starveAfter, boolean workers) {
     }
 
     Meals(Colony colony) {
         this.colony = colony;
     }
 
-    /** What this caste eats, or null if it does not eat (termite workers, so far). */
+    /** What this caste eats, or null if it does not eat (workers whose profile says {@code eats: false}). */
     @Nullable
     Diet dietOf(String caste) {
         if (WorkerAntEntity.CASTE.equals(caste)) {
@@ -144,6 +149,7 @@ class Meals {
     void tick(ServerLevel level, Population population) {
         keepUp(level, population);
         long now = level.getGameTime();
+        double youngShare = youngShare(population, now);
         for (Map.Entry<String, TreeMap<Long, Integer>> entry : lastAte.entrySet()) {
             String caste = entry.getKey();
             TreeMap<Long, Integer> times = entry.getValue();
@@ -151,7 +157,7 @@ class Meals {
             if (diet == null || times.isEmpty()) {
                 continue;
             }
-            if (!colony.isHungerOn()) {
+            if (!colony.isHungerOn() || diet.workers() && !colony.workerFood().hungerRuns()) {
                 int all = total(times);
                 times.clear();
                 times.put(minute(now), all);
@@ -166,7 +172,8 @@ class Meals {
                 int count = times.get(minute);
                 int ate = 0;
                 while (food && ate < count) {
-                    food = diet.fromStore() ? colony.food().eatForNumbers() : colony.life().takeNurseFood(level);
+                    food = diet.workers() ? colony.workerFood().eatForNumbers(level, nextWorkerFood(youngShare))
+                            : colony.life().takeNurseFood(level);
                     if (food) {
                         ate++;
                     }
@@ -193,6 +200,27 @@ class Meals {
                 }
             }
         }
+    }
+
+    /** The share of the worker numbers that are young (of nurse age), who eat the young workers' food. */
+    private static double youngShare(Population population, long now) {
+        int[] ages = population.insideByAge(now);
+        int all = 0;
+        for (int count : ages) {
+            all += count;
+        }
+        return all == 0 ? 0 : (double) ages[ColonyRole.NURSE.ordinal()] / all;
+    }
+
+    /** What the next worker number to eat usually eats: the young ones get their share of the meals. */
+    private SpeciesProfile.MealFood nextWorkerFood(double youngShare) {
+        var diet = colony.profile().worker().diet();
+        youngMeals += youngShare;
+        if (youngMeals >= 1) {
+            youngMeals--;
+            return diet.young();
+        }
+        return diet.older();
     }
 
     /** How many numbers of all castes have gone longer than a meal without one (for the colony list). */

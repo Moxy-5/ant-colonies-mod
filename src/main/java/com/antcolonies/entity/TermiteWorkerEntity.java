@@ -19,6 +19,7 @@ import com.antcolonies.entity.goal.ShapeMoundGoal;
 import com.antcolonies.entity.goal.StandByQueenGoal;
 import com.antcolonies.entity.goal.StoreSeedGoal;
 import com.antcolonies.entity.goal.DigGoal;
+import com.antcolonies.entity.goal.EatGoal;
 import com.antcolonies.species.Species;
 
 import net.minecraft.server.level.ServerLevel;
@@ -49,6 +50,19 @@ public class TermiteWorkerEntity extends AbstractAntEntity {
     private static final double JOIN_RADIUS = 32.0;
 
     private boolean colonyChecked;
+    /**
+     * Its own meals (once its colony has comb): a young worker eats a fungus nodule, an older one a bite of old comb,
+     * once a day; without it slows down and then starves. The numbers are in the species profile ({@code worker}).
+     */
+    @org.jetbrains.annotations.Nullable
+    private WorkerHunger hunger; // (made on first use: the goals are set up before the fields, in the mob's constructor)
+
+    private WorkerHunger hunger() {
+        if (hunger == null) {
+            hunger = new WorkerHunger(this);
+        }
+        return hunger;
+    }
 
     public TermiteWorkerEntity(EntityType<? extends TermiteWorkerEntity> type, Level level) {
         super(type, level);
@@ -64,6 +78,8 @@ public class TermiteWorkerEntity extends AbstractAntEntity {
     @Override
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));
+        // A hungry worker eats before anything else: a nodule (young) or old comb (older) in the fungus garden.
+        this.goalSelector.addGoal(1, new EatGoal(this, hunger()));
         // What a termite holds goes where it belongs first: forage to the food store, soil to the mound.
         this.goalSelector.addGoal(1, new StoreSeedGoal(this));
         this.goalSelector.addGoal(1, new BuildMoundGoal(this));
@@ -106,6 +122,47 @@ public class TermiteWorkerEntity extends AbstractAntEntity {
         setColonyId(colony.getId());
         colonyChecked = true;
         colony.setCount(CASTE, colony.getCount(CASTE) + 1);
+    }
+
+    /** Whether this worker has gone a day without a meal. */
+    public boolean isHungry() {
+        return hunger().isHungry();
+    }
+
+    /** For the tests: pretend the last meal was at this game time. */
+    public void setLastAte(long gameTime) {
+        hunger().setLastAte(gameTime);
+    }
+
+    @Override
+    public long getLastMeal() {
+        return hunger().getLastAte();
+    }
+
+    @Override
+    public void setLastMeal(long gameTime) {
+        hunger().setLastAte(gameTime);
+    }
+
+    // Once a second: hungry for a day and a half = slower, for three days = dead.
+    @Override
+    protected void customServerAiStep() {
+        super.customServerAiStep();
+        if (tickCount % 20 == 0 && level() instanceof ServerLevel serverLevel) {
+            hunger().tick(serverLevel);
+        }
+    }
+
+    @Override
+    public void addAdditionalSaveData(net.minecraft.nbt.CompoundTag tag) {
+        super.addAdditionalSaveData(tag);
+        hunger().save(tag);
+    }
+
+    @Override
+    public void readAdditionalSaveData(net.minecraft.nbt.CompoundTag tag) {
+        super.readAdditionalSaveData(tag);
+        hunger().load(tag);
     }
 
     @Override
@@ -164,5 +221,6 @@ public class TermiteWorkerEntity extends AbstractAntEntity {
     public void comeOutOfNest(Colony colony, long grownUpAt) {
         super.comeOutOfNest(colony, grownUpAt);
         colonyChecked = true;
+        hunger().eat();
     }
 }

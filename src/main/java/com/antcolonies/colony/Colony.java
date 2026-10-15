@@ -80,6 +80,7 @@ public class Colony {
     private final AwayLife away;
     private final NestLedger ledger;
     private final NestLife life;
+    private final WorkerFood workerFood;
 
     public Colony(UUID id, ResourceLocation species, UUID queenId, BlockPos center) {
         this.id = id;
@@ -106,6 +107,7 @@ public class Colony {
         this.away = new AwayLife(this);
         this.ledger = new NestLedger(this);
         this.life = new NestLife(this);
+        this.workerFood = new WorkerFood(this);
     }
 
     /** The underground nest: its plan, the next block to dig, and the dug-out cells of each room. */
@@ -201,6 +203,11 @@ public class Colony {
     /** Life in the nest as numbers: the young that are numbers, and while away the queen, the nurses and the fungus. */
     public NestLife life() {
         return life;
+    }
+
+    /** Where the workers' own meals come from (the real ones and the numbers). */
+    public WorkerFood workerFood() {
+        return workerFood;
     }
 
     /**
@@ -513,6 +520,7 @@ public class Colony {
         ledger.save(tag);
         life.save(tag);
         garden.save(tag);
+        workerFood.save(tag);
         return tag;
     }
 
@@ -542,6 +550,7 @@ public class Colony {
         colony.ledger.load(tag); // (after the food and the bread: an older save's owed food is counted in)
         colony.life.load(tag);
         colony.garden.load(tag);
+        colony.workerFood.load(tag);
         return colony;
     }
 }

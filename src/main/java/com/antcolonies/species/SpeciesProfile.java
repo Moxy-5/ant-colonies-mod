@@ -84,10 +84,10 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
 
     /**
      * A worker eats once every {@code mealIntervalTicks}; without food it slows down, then starves. {@code eats}: whether
-     * the workers eat at all (false for termites so far: their real eating of nodules and old comb is a step of its own).
+     * the workers eat at all. {@code diet}: what they eat by age (see {@link WorkerDiet}).
      */
     public record WorkerNumbers(int mealIntervalTicks, int slowAfterTicks, int starveAfterTicks, int nurseUntilTicks, int builderUntilTicks,
-            int lifespanTicks, boolean eats) {
+            int lifespanTicks, boolean eats, WorkerDiet diet) {
         public static final Codec<WorkerNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("meal_interval_ticks").forGetter(WorkerNumbers::mealIntervalTicks),
                 Codec.INT.fieldOf("slow_after_ticks").forGetter(WorkerNumbers::slowAfterTicks),
@@ -95,7 +95,8 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 Codec.INT.optionalFieldOf("nurse_until_ticks", 72000).forGetter(WorkerNumbers::nurseUntilTicks),
                 Codec.INT.optionalFieldOf("builder_until_ticks", 192000).forGetter(WorkerNumbers::builderUntilTicks),
                 Codec.INT.optionalFieldOf("lifespan_ticks", 0).forGetter(WorkerNumbers::lifespanTicks),
-                Codec.BOOL.optionalFieldOf("eats", true).forGetter(WorkerNumbers::eats)
+                Codec.BOOL.optionalFieldOf("eats", true).forGetter(WorkerNumbers::eats),
+                WorkerDiet.CODEC.optionalFieldOf("diet", WorkerDiet.STORE_ONLY).forGetter(WorkerNumbers::diet)
         ).apply(i, WorkerNumbers::new));
 
         public WorkerNumbers(int mealIntervalTicks, int slowAfterTicks, int starveAfterTicks, int nurseUntilTicks, int builderUntilTicks) {
@@ -104,7 +105,7 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
 
         public WorkerNumbers(int mealIntervalTicks, int slowAfterTicks, int starveAfterTicks, int nurseUntilTicks, int builderUntilTicks,
                 int lifespanTicks) {
-            this(mealIntervalTicks, slowAfterTicks, starveAfterTicks, nurseUntilTicks, builderUntilTicks, lifespanTicks, true);
+            this(mealIntervalTicks, slowAfterTicks, starveAfterTicks, nurseUntilTicks, builderUntilTicks, lifespanTicks, true, WorkerDiet.STORE_ONLY);
         }
 
         /**
@@ -120,6 +121,41 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
         public com.antcolonies.colony.ColonyRole roleForAge(long age) {
             return age < nurseUntilTicks ? com.antcolonies.colony.ColonyRole.NURSE
                     : age < builderUntilTicks ? com.antcolonies.colony.ColonyRole.BUILDER : com.antcolonies.colony.ColonyRole.FORAGER;
+        }
+    }
+
+    /** Where a worker's meal comes from: a piece of the food store (a seed, a layer of comb) or of the nurses' food (bread, a nodule). */
+    public enum MealFood {
+        STORE, NURSE_FOOD;
+
+        public static final Codec<MealFood> CODEC = Codec.STRING.xmap(name -> "nurse_food".equals(name) ? NURSE_FOOD : STORE,
+                food -> food == NURSE_FOOD ? "nurse_food" : "store");
+
+        public MealFood other() {
+            return this == STORE ? NURSE_FOOD : STORE;
+        }
+    }
+
+    /**
+     * What the workers eat (species-neutral). {@code young}: the meal of a worker of nurse age, {@code older}: of the
+     * builders and foragers (Macrotermes: the young eat fungus nodules, the older ones old comb; the harvester ant: all a
+     * seed from the store). A worker whose own food is not there eats the other kind. {@code workersPerPiece}: how many
+     * meals one piece makes (a layer of comb feeds 4 termites, a seed one ant). {@code hungryFromFirstFood}: the workers'
+     * hunger clocks only start once the colony's store has held its first piece (a young termite colony has no garden
+     * yet: its first workers live on what the royal pair gave them).
+     */
+    public record WorkerDiet(MealFood young, MealFood older, int workersPerPiece, boolean hungryFromFirstFood) {
+        public static final WorkerDiet STORE_ONLY = new WorkerDiet(MealFood.STORE, MealFood.STORE, 1, false);
+        public static final Codec<WorkerDiet> CODEC = RecordCodecBuilder.create(i -> i.group(
+                MealFood.CODEC.optionalFieldOf("young", MealFood.STORE).forGetter(WorkerDiet::young),
+                MealFood.CODEC.optionalFieldOf("older", MealFood.STORE).forGetter(WorkerDiet::older),
+                Codec.INT.optionalFieldOf("workers_per_piece", 1).forGetter(WorkerDiet::workersPerPiece),
+                Codec.BOOL.optionalFieldOf("hungry_from_first_food", false).forGetter(WorkerDiet::hungryFromFirstFood)
+        ).apply(i, WorkerDiet::new));
+
+        /** What a worker usually eats in this job by age. */
+        public MealFood forRole(com.antcolonies.colony.ColonyRole role) {
+            return role == com.antcolonies.colony.ColonyRole.NURSE ? young : older;
         }
     }
 

@@ -62,6 +62,8 @@ public class FoodStore {
     private long grassScanTime;
     /** How many pieces have been cut off each plant so far (only plants that were cut at least once). Saved. */
     private final Map<BlockPos, Integer> grassClips = new HashMap<>();
+    /** Whether the store has ever held a piece (a young termite colony's workers only get hungry once it has). Saved. */
+    private boolean hadFood;
 
     private record PlantClaim(BlockPos plant, long until) {
     }
@@ -98,6 +100,11 @@ public class FoodStore {
 
     public int getSeedsEaten() {
         return seedsEaten;
+    }
+
+    /** Whether the store has ever held a piece of food (for a termite colony: its first comb). */
+    public boolean hasHadFood() {
+        return hadFood || food > 0;
     }
 
     /** Pieces in the store were used up where they lie (the fungus garden's comb turned into nodules): the count goes down. */
@@ -551,6 +558,7 @@ public class FoodStore {
     /** One more piece in the store, counted now; its layer is put down later (see {@link NestLedger}). */
     void countIn(boolean rich) {
         food++;
+        hadFood = true;
         if (rich) {
             richSeeds++;
         }
@@ -646,10 +654,25 @@ public class FoodStore {
     }
 
     /**
+     * A heap a hungry worker can eat a piece of, or null if there is none: any seed heap; fungus comb only where it has
+     * a layer over its bed (the old comb under the fresh, see {@link #layersToTake}; the bed stays for the fungus).
+     */
+    @Nullable
+    public BlockPos findMealPile(Level level, RandomSource random) {
+        List<BlockPos> piles = layersToTake(level);
+        return piles.isEmpty() ? null : piles.get(random.nextInt(piles.size()));
+    }
+
+    /**
      * A hungry worker takes one raw seed off the heap at {@code pile} to eat it: plain seeds first (a rich one only if
-     * nothing else is left). Returns the seed, or an empty stack if the heap is gone.
+     * nothing else is left); or a layer of old comb (never the comb's bed). Returns the seed or piece, or an empty stack
+     * if the heap is gone (or only its bed is left).
      */
     public ItemStack eatSeedAt(Level level, BlockPos pile, UUID ant) {
+        BlockState state = level.getBlockState(pile);
+        if (state.getBlock() instanceof com.antcolonies.block.FungusCombBlock && state.getValue(SeedPileBlock.LAYERS) <= 1) {
+            return ItemStack.EMPTY;
+        }
         ItemStack seed = takeSeedAt(level, pile, ant, false);
         colony.bakery().removeRichMiller(ant); // eaten, not milled
         if (!seed.isEmpty()) {
@@ -662,6 +685,7 @@ public class FoodStore {
         tag.putInt("food", food);
         tag.putInt("seedsEaten", seedsEaten);
         tag.putInt("richSeeds", richSeeds);
+        tag.putBoolean("hadFood", hasHadFood());
         CompoundTag clips = new CompoundTag();
         grassClips.forEach((pos, count) -> clips.putInt(Long.toString(pos.asLong()), count));
         tag.put("grassClips", clips);
@@ -672,6 +696,7 @@ public class FoodStore {
         food = tag.getInt("food");
         seedsEaten = tag.getInt("seedsEaten");
         richSeeds = tag.getInt("richSeeds");
+        hadFood = tag.contains("hadFood") ? tag.getBoolean("hadFood") : food > 0 || seedsEaten > 0; // (older saves)
         CompoundTag clips = tag.getCompound("grassClips");
         for (String key : clips.getAllKeys()) {
             grassClips.put(BlockPos.of(Long.parseLong(key)), clips.getInt(key));

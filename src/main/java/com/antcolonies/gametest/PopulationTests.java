@@ -536,4 +536,111 @@ public class PopulationTests {
             helper.succeed();
         });
     }
+
+    // --- termite workers eating (the step after 2b) -----------------------------------------------------------------
+
+    /**
+     * Real Macrotermes worker eating. A young termite worker (nurse age) and an old one, both near starving: while the
+     * colony has had no comb their hunger clocks do not run, so neither starves. Then comb with nodules in the garden
+     * and both hungry: the young one eats a fungus nodule, the old one a layer of old comb (never the comb's bed). Then
+     * 100 worker numbers (40 young, 60 old) whose meal is due: the young share eat nodules, the old ones comb, one piece
+     * making 4 meals, so about 10 nodules and 15 layers, and nobody starves.
+     */
+    @GameTest(template = "arena", timeoutTicks = 2400)
+    public static void termiteWorkersEatNodulesWhenYoungAndOldCombWhenOlder(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        TermiteMoundTests.deepGround(helper);
+        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        TermiteWorkerEntity[] workers = new TermiteWorkerEntity[2]; // young, old
+        int[] phase = {0};
+        long[] phaseAt = {0};
+        int[] before = new int[2];
+        helper.runAfterDelay(10, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(colony != null, "no termite colony");
+            colony.setForagingTimeForTests(false);
+            colony.setHungerOn(true);
+            TermiteSoldierTests.digNestAtOnce(level, colony);
+            List<BlockPos> room = colony.nest().getHomeChamber(level).room();
+            for (int i = 0; i < 2; i++) {
+                TermiteWorkerEntity worker = ModEntities.TERMITE_WORKER.get().create(level);
+                BlockPos cell = room.get(room.size() - 1 - i);
+                worker.moveTo(cell.getX() + 0.5, cell.getY(), cell.getZ() + 0.5, 0.0F, 0.0F);
+                level.addFreshEntity(worker);
+                workers[i] = worker;
+            }
+        });
+        helper.runAfterDelay(15, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            long now = level.getGameTime();
+            workers[0].setGrownUpAt(now);
+            workers[1].setGrownUpAt(now - 250000);
+            for (TermiteWorkerEntity worker : workers) {
+                helper.assertTrue(colony.getId().equals(worker.getColonyId()), "a worker did not join the colony");
+                worker.setLastAte(now - colony.profile().worker().starveAfterTicks() + 40); // two seconds from starving
+            }
+            helper.assertTrue(!colony.food().hasHadFood(), "the new colony should have had no comb yet");
+            phase[0] = 1;
+            phaseAt[0] = now;
+        });
+        helper.onEachTick(() -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            if (colony == null || phase[0] == 0) {
+                return;
+            }
+            long now = level.getGameTime();
+            var food = com.antcolonies.species.SpeciesProfile.MealFood.values();
+            if (phase[0] == 1 && now - phaseAt[0] >= 80) {
+                for (TermiteWorkerEntity worker : workers) {
+                    helper.assertTrue(worker.isAlive() && !worker.isHungry(), "with no comb yet the workers should not get hungry");
+                }
+                // The garden gets comb (4 layers a block) with 3 nodules on each.
+                for (int i = 0; i < 40; i++) {
+                    BlockPos spot = colony.food().pickFoodSpot(level, level.getRandom());
+                    if (spot == null) {
+                        break;
+                    }
+                    colony.food().depositSeed(level, spot);
+                }
+                for (BlockPos comb : colony.garden().getCombs(level)) {
+                    level.setBlock(comb, level.getBlockState(comb).setValue(com.antcolonies.block.FungusCombBlock.NODULES, 3), 3);
+                }
+                helper.assertTrue(colony.food().getFood() >= 24, "only " + colony.food().getFood() + " layers of comb could be put down");
+                for (TermiteWorkerEntity worker : workers) {
+                    worker.setLastAte(now - colony.profile().worker().mealIntervalTicks() - 5);
+                }
+                before[0] = colony.workerFood().getPiecesEaten(food[0]);
+                before[1] = colony.workerFood().getPiecesEaten(food[1]);
+                phase[0] = 2;
+                phaseAt[0] = now;
+            } else if (phase[0] == 2 && !workers[0].isHungry() && !workers[1].isHungry()) {
+                helper.assertTrue(workers[0].isAlive() && workers[1].isAlive(), "a worker died");
+                int combEaten = colony.workerFood().getPiecesEaten(food[0]) - before[0];
+                int nodulesEaten = colony.workerFood().getPiecesEaten(food[1]) - before[1];
+                helper.assertTrue(combEaten == 1 && nodulesEaten == 1, "one nodule and one layer of comb should have been started on: "
+                        + nodulesEaten + " nodules, " + combEaten + " comb");
+                for (BlockPos comb : colony.garden().getCombs(level)) {
+                    helper.assertTrue(level.getBlockState(comb).getValue(com.antcolonies.block.SeedPileBlock.LAYERS) >= 1, "a comb's bed was eaten");
+                }
+                // The worker numbers: 40 young, 60 old, all due a meal.
+                colony.population().addNewMembers(WorkerAntEntity.CASTE, now, 40);
+                colony.population().addNewMembers(WorkerAntEntity.CASTE, now - 250000, 60);
+                colony.population().setLastAteForTests(level, WorkerAntEntity.CASTE, now - colony.profile().worker().mealIntervalTicks() - 30);
+                before[0] = colony.workerFood().getPiecesEaten(food[0]);
+                before[1] = colony.workerFood().getPiecesEaten(food[1]);
+                phase[0] = 3;
+                phaseAt[0] = now;
+            } else if (phase[0] == 3 && now - phaseAt[0] >= 60) {
+                int comb = colony.workerFood().getPiecesEaten(com.antcolonies.species.SpeciesProfile.MealFood.STORE) - before[0];
+                int nodules = colony.workerFood().getPiecesEaten(com.antcolonies.species.SpeciesProfile.MealFood.NURSE_FOOD) - before[1];
+                AntColoniesMod.LOGGER.info("[eat-test] 100 worker numbers ate {} layers of comb and {} nodules; {}", comb, nodules,
+                        colony.population().describe(level));
+                helper.assertTrue(comb >= 13 && comb <= 16, "the 60 old worker numbers should eat about 15 layers of comb, ate " + comb);
+                helper.assertTrue(nodules >= 8 && nodules <= 11, "the 40 young worker numbers should eat about 10 nodules, ate " + nodules);
+                helper.assertTrue(colony.population().inside(WorkerAntEntity.CASTE) == 100, "a worker number starved: "
+                        + colony.population().inside(WorkerAntEntity.CASTE));
+                helper.succeed();
+            }
+        });
+    }
 }
