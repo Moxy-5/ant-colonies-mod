@@ -251,17 +251,7 @@ public class TermiteNewHoleTests {
         });
     }
     /**
-     * Eating dead wood from below (the user's idea, 2026-10-14): a fallen log lies on level ground 20 blocks east of the
-     * nest. At night the workers dig a tunnel out to it, then a feeding gallery up under it; by day (no foraging) they
-     * still eat the log, from the gallery under it, without going out.
-     */
-    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
-    public static void aFallenLogIsEatenFromBelowByDay(GameTestHelper helper) {
-        eatenFromBelow(helper, false, Food.LOG);
-    }
-
-    /**
-     * Like {@link #aFallenLogIsEatenFromBelowByDay}, with the log lying on the edge of a step: the ground beside it on
+     * Like {@link #aFallenLogAndTheStumpOnItAreEatenFromBelowByDay}, with the log lying on the edge of a step: the ground beside it on
      * one side is 2 blocks lower (the user's tree in the savanna, whose gallery was left out, 2026-10-14). The open side
      * of the gallery is walled with a mud crust as it is dug (wall first), and the log is eaten from below by day.
      */
@@ -271,12 +261,15 @@ public class TermiteNewHoleTests {
     }
 
     /**
-     * Mud casts (the user's choice, 2026-10-14): a block of the log eaten away leaves a mud cast joined to the feeding
-     * gallery, and the termites eat on from inside it: a block of stump standing on the log, which no gallery cell
-     * touches, is eaten by day from the cast under it, and is a cast itself afterwards.
+     * Eating dead wood from below (the user's idea, 2026-10-14): a fallen log lies on level ground 20 blocks east of the
+     * nest. At night the workers dig a tunnel out to it, then a feeding gallery up under it; by day (no foraging) they
+     * still eat the log, from the gallery under it, without going out. Mud casts (the user's choice, 2026-10-14): a block
+     * of the log eaten away leaves a mud cast joined to the feeding gallery, and the termites eat on from inside it: a
+     * block of stump standing on the log, which no gallery cell touches, is eaten by day from the cast under it, and is a
+     * cast itself afterwards.
      */
     @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
-    public static void aStumpIsEatenByDayFromTheMudCastUnderIt(GameTestHelper helper) {
+    public static void aFallenLogAndTheStumpOnItAreEatenFromBelowByDay(GameTestHelper helper) {
         eatenFromBelow(helper, false, Food.STUMP);
     }
 

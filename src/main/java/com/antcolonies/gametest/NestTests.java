@@ -138,9 +138,15 @@ public class NestTests {
      * up to the open air, a pit under a corner of the nursery, and a gap that links the nursery with the
      * queen's room under it. The ants must close every one of them with soil, so that the only way in is the entrance hole and
      * the rooms are joined only by their own tunnels.
+     * <p>
+     * Then damage to the finished nest: nine blocks of the hill are knocked out (a top block, a block from the middle of a
+     * column with the top still hanging over the gap, whole columns, the single block of the outer ring), and the nest
+     * walls are opened in five places (three beside the top and the middle of the shaft, one next to the nursery, and
+     * one between the nursery and the queen's room). The workers must mend all of it: the hill is the planned hill again,
+     * and the nest has no opening but the entrance hole.
      */
-    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
-    public static void workersCloseEveryHoleInTheNestWalls(GameTestHelper helper) {
+    @GameTest(template = "arena", timeoutTicks = 100000, skyAccess = true)
+    public static void workersCloseEveryHoleInTheNestWallsAndMendDamage(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
         startColony(helper);
@@ -180,40 +186,16 @@ public class NestTests {
             }
         });
 
-        helper.succeedWhen(() -> {
-            Colony colony = colony(helper);
-            helper.assertTrue(colony != null && !holes.isEmpty(), "no colony or holes yet");
-            helper.assertTrue(colony.nest().findDigTarget(level) == null, "something is still left to dig");
-            var leaks = colony.walls().getLeaks(level);
-            helper.assertTrue(leaks.isEmpty(), "the nest still has openings: " + leaks);
-            String reach = openSpaceProblems(helper, colony);
-            helper.assertTrue(reach.isEmpty(), "open space joined to the nest that is not part of it: " + reach);
-            AntColoniesMod.LOGGER.info("[seal-test] finished at tick {}", helper.getTick());
-        });
-    }
-
-    /**
-     * Damage to a finished nest: nine blocks of the hill are knocked out (a top block, a block from the middle of a
-     * column with the top still hanging over the gap, whole columns, the single block of the outer ring), and the nest
-     * walls are opened in five places (three beside the top and the middle of the shaft, one next to the nursery, and
-     * one between the nursery and the queen's room). The workers must mend all of it: the hill is the planned hill again,
-     * and the nest has no opening but the entrance hole.
-     */
-    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
-    public static void workersMendTheHillAndTheNestWallsAfterDamage(GameTestHelper helper) {
-        ServerLevel level = helper.getLevel();
-        level.getServer().tickRateManager().setTickRate(2000.0F);
-        startColony(helper);
-
         boolean[] damaged = {false};
         logStalls(helper);
         helper.onEachTick(() -> {
             Colony colony = colony(helper);
-            if (damaged[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.nest().findDigTarget(level) != null
-                    || !hillProblems(helper).isEmpty() || !colony.walls().getLeaks(level).isEmpty()) {
+            if (damaged[0] || colony == null || holes.isEmpty() || colony.nest().findDigTarget(level) != null
+                    || !hillProblems(helper).isEmpty() || !colony.walls().getLeaks(level).isEmpty() || !openSpaceProblems(helper, colony).isEmpty()) {
                 return;
             }
             damaged[0] = true;
+            AntColoniesMod.LOGGER.info("[seal-test] every hole closed at tick {}", helper.getTick());
             // The hill: {column dx, column dz, first layer, last layer} of the blocks that are knocked out.
             int[][] hill = {{1, 0, 2, 2}, {0, -1, 1, 1}, {-1, -1, 0, 2}, {2, 1, 1, 1}, {3, 0, 0, 0}, {-2, 0, 0, 1}};
             for (int[] column : hill) {
@@ -226,17 +208,17 @@ public class NestTests {
             BlockPos bottom = colony.getCenter().below(Nest.SHAFT_DEPTH);
             Direction tunnel = Direction.fromDelta(
                     rooms.get(0).cells().get(0).getX() - bottom.getX(), 0, rooms.get(0).cells().get(0).getZ() - bottom.getZ());
-            List<BlockPos> holes = List.of(
+            List<BlockPos> damage = List.of(
                     colony.getCenter().below(1).east(),
                     colony.getCenter().below(2).west(),
                     rooms.get(1).center().relative(tunnel.getClockWise(), 3),
                     rooms.get(2).center().above(),
                     colony.getCenter().below(1).north());
-            for (BlockPos hole : holes) {
+            for (BlockPos hole : damage) {
                 level.setBlock(hole, Blocks.AIR.defaultBlockState(), 3);
             }
             AntColoniesMod.LOGGER.info("[mend-test] tick {}: hill and walls damaged, {} nest openings: {}",
-                    helper.getTick(), colony.walls().getLeaks(level).size(), holes);
+                    helper.getTick(), colony.walls().getLeaks(level).size(), damage);
         });
         helper.onEachTick(() -> {
             if (damaged[0] && helper.getTick() % 200 == 0) {
@@ -248,9 +230,10 @@ public class NestTests {
 
         helper.succeedWhen(() -> {
             Colony colony = colony(helper);
-            helper.assertTrue(damaged[0] && colony != null, "the nest has not been damaged yet");
+            helper.assertTrue(damaged[0] && colony != null, "the holes are not all closed yet (so the nest has not been damaged yet)");
             String hill = hillProblems(helper);
             helper.assertTrue(hill.isEmpty(), "the hill is not mended yet: " + hill);
+            helper.assertTrue(colony.nest().findDigTarget(level) == null, "something is still left to dig");
             var leaks = colony.walls().getLeaks(level);
             helper.assertTrue(leaks.isEmpty(), "the nest still has openings: " + leaks);
             String reach = openSpaceProblems(helper, colony);
@@ -260,8 +243,12 @@ public class NestTests {
     }
 
     /**
-     * Many ants with a soil pellet each and only ONE gap left in the hill (the user saw them jam in the shaft): the first
-     * pellet fills the gap, all the others must let go of theirs, and nobody may stay stuck with soil in the mandibles.
+     * Many ants with a soil pellet each    /**
+     * Two jams the user saw in the hill. First: a gap in the hill where the whole traffic of the hole passes, so ants
+     * always stood in it and the pellet could never be set. Now the pellet goes in and the ants standing there are nudged
+     * out onto the new block; a player or an animal in the spot still stops it. Then: many ants with a soil pellet each
+     * and only ONE gap left in the hill (they jammed in the shaft): the first pellet fills the gap, all the others must
+     * let go of theirs, and nobody may stay stuck with soil in the mandibles.
      */
     @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
     public static void manyAntsWithPelletsAndOneGapDoNotJam(GameTestHelper helper) {
@@ -279,6 +266,7 @@ public class NestTests {
             }
             stage[0] = 1;
             startedAt[0] = helper.getTick();
+            pelletGoesInAmongAnts(helper, level, colony);
             // One gap in the first ring of the hill: the top two layers of one column (the user's picture), so the spot is one block up.
             helper.setBlock(MIDDLE + 1, SURFACE + 1, MIDDLE, Blocks.AIR);
             helper.setBlock(MIDDLE + 1, SURFACE + 2, MIDDLE, Blocks.AIR);
@@ -308,52 +296,37 @@ public class NestTests {
     }
 
     /**
-     * The user's jam: the gap in the hill lies where the whole traffic of the hole passes, so ants always stood in it and
-     * the pellet could never be set. Now the pellet goes in and the ants standing there are nudged out onto the new block;
-     * a player or an animal in the spot still stops it.
+     * The first jam of {@link #manyAntsWithPelletsAndOneGapDoNotJam}: a pellet set in a gap of the hill with five frozen
+     * ants standing in it goes in (they are nudged out on top), one with a sheep in the gap does not.
      */
-    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
-    public static void aPelletIsSetEvenWhenAntsStandInTheGap(GameTestHelper helper) {
-        ServerLevel level = helper.getLevel();
-        level.getServer().tickRateManager().setTickRate(2000.0F);
-        startColony(helper);
-
-        boolean[] done = {false};
-        helper.onEachTick(() -> {
-            Colony colony = colony(helper);
-            if (done[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.nest().findDigTarget(level) != null
-                    || !hillProblems(helper).isEmpty() || !colony.walls().getLeaks(level).isEmpty()) {
-                return;
-            }
-            done[0] = true;
-            helper.setBlock(MIDDLE + 1, SURFACE + 2, MIDDLE, Blocks.AIR);
-            BlockPos gap = helper.absolutePos(new BlockPos(MIDDLE + 1, SURFACE + 2, MIDDLE));
-            // Freeze the ants so they stay in the gap, and put a sheep in as well: the sheep must stop the pellet.
-            var crowd = new java.util.ArrayList<WorkerAntEntity>();
-            for (int i = 0; i < 5; i++) {
-                WorkerAntEntity ant = ModEntities.WORKER_ANT.get().create(level);
-                ant.moveTo(gap.getX() + 0.5, gap.getY(), gap.getZ() + 0.5);
-                ant.setNoAi(true);
-                level.addFreshEntity(ant);
-                crowd.add(ant);
-            }
-            var sheep = net.minecraft.world.entity.EntityType.SHEEP.create(level);
-            sheep.moveTo(gap.getX() + 0.5, gap.getY(), gap.getZ() + 0.5);
-            sheep.setNoAi(true);
-            level.addFreshEntity(sheep);
-            helper.assertTrue(!colony.hill().placePellet(level, gap), "the pellet was set on top of a sheep");
-            sheep.discard();
-            helper.assertTrue(colony.hill().placePellet(level, gap), "the pellet was not set with ants standing in the gap");
-            helper.assertTrue(level.getBlockState(gap).is(ModBlocks.BURROWED_DIRT.get()), "no block was placed");
-            for (WorkerAntEntity ant : crowd) {
-                helper.assertTrue(ant.getY() >= gap.getY() + 1 - 0.01, "an ant is still inside the new block (y " + ant.getY() + ")");
-                ant.discard();
-            }
-            helper.succeed();
-        });
+    private static void pelletGoesInAmongAnts(GameTestHelper helper, ServerLevel level, Colony colony) {
+        helper.setBlock(MIDDLE + 1, SURFACE + 2, MIDDLE, Blocks.AIR);
+        BlockPos gap = helper.absolutePos(new BlockPos(MIDDLE + 1, SURFACE + 2, MIDDLE));
+        // Freeze the ants so they stay in the gap, and put a sheep in as well: the sheep must stop the pellet.
+        var crowd = new java.util.ArrayList<WorkerAntEntity>();
+        for (int i = 0; i < 5; i++) {
+            WorkerAntEntity ant = ModEntities.WORKER_ANT.get().create(level);
+            ant.moveTo(gap.getX() + 0.5, gap.getY(), gap.getZ() + 0.5);
+            ant.setNoAi(true);
+            level.addFreshEntity(ant);
+            crowd.add(ant);
+        }
+        var sheep = net.minecraft.world.entity.EntityType.SHEEP.create(level);
+        sheep.moveTo(gap.getX() + 0.5, gap.getY(), gap.getZ() + 0.5);
+        sheep.setNoAi(true);
+        level.addFreshEntity(sheep);
+        helper.assertTrue(!colony.hill().placePellet(level, gap), "the pellet was set on top of a sheep");
+        sheep.discard();
+        helper.assertTrue(colony.hill().placePellet(level, gap), "the pellet was not set with ants standing in the gap");
+        helper.assertTrue(level.getBlockState(gap).is(ModBlocks.BURROWED_DIRT.get()), "no block was placed");
+        for (WorkerAntEntity ant : crowd) {
+            helper.assertTrue(ant.getY() >= gap.getY() + 1 - 0.01, "an ant is still inside the new block (y " + ant.getY() + ")");
+            ant.discard();
+        }
     }
 
     /**
+     * Thin soil: stone starts right under    /**
      * Thin soil: stone starts right under the third level. The rooms do not fit at the usual depth (only two levels
      * would), so the whole nest must sit one block higher and have three levels (seed store, nursery, queen), and the
      * ants must still dig all of it and never touch the stone.
@@ -473,16 +446,18 @@ public class NestTests {
     }
 
     /**
-     * Seeds lying on the ground around a finished nest (two single ones and a pile of three) are fetched one by one:
-     * every one ends up on the floor of the food store, the colony counts them, and nothing is left outside.
+     * Seeds lying on the ground around a finished nest (two single ones and a pile of three) are fetched one by one,
+     * and three tufts of short grass are clipped (ten seeds off each, then the tuft breaks): every seed ends up on the
+     * floor of the food store, the colony counts them, and nothing is left outside.
      * It runs in a batch of its own: its foragers fetch seeds from up to 24 blocks away, so seeds or grass in a
      * neighbouring test's arena were brought in too (it once counted 7 or 8 seeds instead of 5).
      */
     @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true, batch = "seeds_alone")
-    public static void workersCarrySeedsToTheFoodStore(GameTestHelper helper) {
+    public static void workersCarrySeedsAndClipGrassIntoTheFoodStore(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
         startColony(helper);
+        int[][] tufts = {{MIDDLE + 5, MIDDLE + 6}, {MIDDLE - 6, MIDDLE - 4}, {MIDDLE - 2, MIDDLE + 7}};
 
         boolean[] dropped = {false};
         helper.onEachTick(() -> {
@@ -495,7 +470,10 @@ public class NestTests {
             dropSeeds(helper, MIDDLE + 6, MIDDLE, 1);
             dropSeeds(helper, MIDDLE - 6, MIDDLE + 2, 1);
             dropSeeds(helper, MIDDLE + 1, MIDDLE - 7, 3);
-            AntColoniesMod.LOGGER.info("[seed-test] tick {}: 5 seeds dropped around the hill", helper.getTick());
+            for (int[] tuft : tufts) {
+                helper.setBlock(tuft[0], SURFACE, tuft[1], Blocks.SHORT_GRASS);
+            }
+            AntColoniesMod.LOGGER.info("[seed-test] tick {}: 5 seeds dropped and 3 tufts of grass planted around the hill", helper.getTick());
         });
         helper.onEachTick(() -> {
             if (dropped[0] && helper.getTick() % 200 == 0) {
@@ -508,56 +486,16 @@ public class NestTests {
         helper.succeedWhen(() -> {
             Colony colony = colony(helper);
             helper.assertTrue(dropped[0] && colony != null, "no seeds have been dropped yet");
-            // The workers also feed the queen from the store: count what she has eaten too.
-            int total = seedsAccountedFor(colony);
-            helper.assertTrue(total == 5, "the colony has " + colony.food().getFood() + " food and the queen ate " + colony.queenCare().getQueenBread()
-                    + " (+ " + colony.queenCare().getEggsLaid() + " eggs laid), expected 5 seeds in all; holding: " + carriers(helper));
-            helper.assertTrue(seedsIn(level, storeBox(level, colony)) == colony.food().getFood(), "only " + seedsIn(level, storeBox(level, colony)) + " seeds are in the food store");
-            helper.assertTrue(seedsIn(level, helper.getBounds()) == colony.food().getFood(), "some seeds are still lying around outside the store");
-            for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
-                helper.assertTrue(!ant.isCarryingSeed(), "an ant is still carrying a seed");
-            }
-        });
-    }
-
-    /**
-     * Three tufts of short grass around a finished nest: the workers clip ten seeds off each (then the tuft breaks),
-     * carry every seed to the food store, and what the colony counts is exactly what lies in the store.
-     */
-    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
-    public static void workersClipSeedsFromGrass(GameTestHelper helper) {
-        ServerLevel level = helper.getLevel();
-        level.getServer().tickRateManager().setTickRate(2000.0F);
-        startColony(helper);
-        int[][] tufts = {{MIDDLE + 6, MIDDLE}, {MIDDLE - 6, MIDDLE + 2}, {MIDDLE + 1, MIDDLE - 7}};
-
-        boolean[] planted = {false};
-        helper.onEachTick(() -> {
-            Colony colony = colony(helper);
-            if (planted[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.nest().findDigTarget(level) != null
-                    || !hillProblems(helper).isEmpty()) {
-                return;
-            }
-            planted[0] = true;
-            for (int[] tuft : tufts) {
-                helper.setBlock(tuft[0], SURFACE, tuft[1], Blocks.SHORT_GRASS);
-            }
-            AntColoniesMod.LOGGER.info("[grass-test] tick {}: 3 tufts of grass planted", helper.getTick());
-        });
-
-        helper.succeedWhen(() -> {
-            Colony colony = colony(helper);
-            helper.assertTrue(planted[0] && colony != null, "no grass has been planted yet");
-            int expected = tufts.length * colony.food().piecesOf(Blocks.SHORT_GRASS.defaultBlockState());
             for (int[] tuft : tufts) {
                 helper.assertBlock(new BlockPos(tuft[0], SURFACE, tuft[1]), block -> block == Blocks.AIR, "a tuft of grass is still there");
             }
+            int expected = 5 + tufts.length * colony.food().piecesOf(Blocks.SHORT_GRASS.defaultBlockState());
             // The workers also feed the queen from the store: count what she has eaten too.
             int total = seedsAccountedFor(colony);
             helper.assertTrue(total == expected, "the colony has " + colony.food().getFood() + " food and the queen ate " + colony.queenCare().getQueenBread()
-                    + " (+ " + colony.queenCare().getEggsLaid() + " eggs laid), expected " + expected + " seeds in all");
-            helper.assertTrue(seedsIn(level, storeBox(level, colony)) == colony.food().getFood(),
-                    "only " + seedsIn(level, storeBox(level, colony)) + " seeds are in the store");
+                    + " (+ " + colony.queenCare().getEggsLaid() + " eggs laid), expected " + expected + " seeds in all; holding: " + carriers(helper));
+            helper.assertTrue(seedsIn(level, storeBox(level, colony)) == colony.food().getFood(), "only " + seedsIn(level, storeBox(level, colony)) + " seeds are in the food store");
+            helper.assertTrue(seedsIn(level, helper.getBounds()) == colony.food().getFood(), "some seeds are still lying around outside the store");
             for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
                 helper.assertTrue(!ant.isCarryingSeed(), "an ant is still carrying a seed");
             }
@@ -568,6 +506,8 @@ public class NestTests {
      * In a finished nest with 25 seeds in the food store the nurse mills them into ant bread in the nursery and the
      * workers feed the queen 20 pieces. She then carries an egg for 3 minutes (3600 ticks), the egg comes out behind her
      * in her room, and a worker carries it into the nursery. After that she is fed the 5 pieces that are left.
+     * Milling: the first seed is gone from the store as the nurse takes it, and only becomes bread (on the nursery floor)
+     * after the milling time.
      */
     @GameTest(template = "arena", timeoutTicks = 90000, skyAccess = true)
     public static void queenIsFedAndHerEggGoesToTheNursery(GameTestHelper helper) {
@@ -580,6 +520,8 @@ public class NestTests {
         long[] laidAt = {-1};
         boolean[] cameOutBehindHer = {false};
         boolean[] breadInNursery = {false};
+        long[] seedTakenAt = {-1};
+        long[] breadAt = {-1};
         helper.onEachTick(() -> {
             Colony colony = colony(helper);
             if (stocked[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.nest().findDigTarget(level) != null
@@ -597,6 +539,14 @@ public class NestTests {
             Colony colony = colony(helper);
             if (!stocked[0] || colony == null) {
                 return;
+            }
+            if (seedTakenAt[0] < 0 && colony.food().getFood() < 25) {
+                seedTakenAt[0] = level.getGameTime();
+            }
+            if (breadAt[0] < 0 && colony.bakery().getBread() + colony.queenCare().getQueenBread() >= 1) {
+                breadAt[0] = level.getGameTime();
+                AntColoniesMod.LOGGER.info("[egg-test] tick {}: the first bread ({} seconds after the first seed was taken)", helper.getTick(),
+                        (breadAt[0] - seedTakenAt[0]) / 20.0);
             }
             if (!breadInNursery[0] && colony.bakery().getBread() > 0) {
                 for (BlockPos pos : colony.nest().getNurseryCells(level)) {
@@ -635,6 +585,10 @@ public class NestTests {
         helper.succeedWhen(() -> {
             Colony colony = colony(helper);
             helper.assertTrue(stocked[0] && colony != null, "the store has not been stocked yet");
+            long milling = breadAt[0] - seedTakenAt[0];
+            helper.assertTrue(breadAt[0] >= 0 && milling >= colony.profile().food().millTicks(),
+                    "the first bread was ready " + milling + " ticks after the first seed was taken, milling takes " + colony.profile().food().millTicks());
+            helper.assertTrue(milling <= colony.profile().food().millTicks() + 600, "milling took " + milling + " ticks, far longer than " + colony.profile().food().millTicks());
             helper.assertTrue(colony.queenCare().getEggsLaid() == 1, "the queen has laid " + colony.queenCare().getEggsLaid() + " eggs, expected 1");
             long carried = laidAt[0] - incubationStart[0];
             helper.assertTrue(carried >= colony.profile().queen().incubationTicks() && carried <= colony.profile().queen().incubationTicks() + 100,
@@ -649,66 +603,6 @@ public class NestTests {
             helper.assertTrue(colony.queenCare().getQueenBread() == 5, "the queen was fed " + colony.queenCare().getQueenBread() + " pieces of bread for the next egg, expected the 5 that were left");
             helper.assertTrue(colony.food().getFood() == 0 && seedsIn(level, storeBox(level, colony)) == 0, "seeds are left in the store");
             helper.assertTrue(colony.bakery().getBread() == 0 && breadIn(level, helper.getBounds()) == 0, "bread is left in the nursery");
-            for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
-                helper.assertTrue(!ant.hasFullMandibles(), "an ant is still carrying something");
-            }
-        });
-    }
-
-    /**
-     * One seed in the food store of a finished nest: the nurse carries it to the nursery, mills it for 3 seconds (it is
-     * gone from the store but not yet bread until then), and it becomes one piece of bread on the nursery floor, which
-     * then goes to the queen.
-     */
-    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
-    public static void nurseMillsASeedIntoBreadInTheNursery(GameTestHelper helper) {
-        ServerLevel level = helper.getLevel();
-        level.getServer().tickRateManager().setTickRate(2000.0F);
-        startColony(helper);
-
-        boolean[] stocked = {false};
-        long[] seedTakenAt = {-1};
-        long[] breadAt = {-1};
-        boolean[] pileInNursery = {false};
-        helper.onEachTick(() -> {
-            Colony colony = colony(helper);
-            if (colony == null) {
-                return;
-            }
-            if (!stocked[0]) {
-                if (airBelowSurface(helper) == NEST_CELLS && colony.nest().findDigTarget(level) == null && hillProblems(helper).isEmpty()) {
-                    stocked[0] = true;
-                    colony.food().depositSeed(level, colony.nest().getFoodStoreCells(level).get(0));
-                    AntColoniesMod.LOGGER.info("[bread-test] tick {}: one seed put in the food store", helper.getTick());
-                }
-                return;
-            }
-            if (seedTakenAt[0] < 0 && colony.food().getFood() == 0) {
-                seedTakenAt[0] = level.getGameTime();
-                AntColoniesMod.LOGGER.info("[bread-test] tick {}: the nurse took the seed", helper.getTick());
-            }
-            if (breadAt[0] < 0 && colony.bakery().getBread() + colony.queenCare().getQueenBread() >= 1) {
-                breadAt[0] = level.getGameTime();
-                AntColoniesMod.LOGGER.info("[bread-test] tick {}: there is bread ({} seconds after the seed was taken)", helper.getTick(),
-                        (breadAt[0] - seedTakenAt[0]) / 20.0);
-            }
-            if (!pileInNursery[0] && colony.bakery().getBread() > 0) {
-                for (BlockPos pos : colony.nest().getNurseryCells(level)) {
-                    pileInNursery[0] |= level.getBlockState(pos).is(ModBlocks.BREAD_PILE.get());
-                }
-            }
-        });
-
-        helper.succeedWhen(() -> {
-            Colony colony = colony(helper);
-            helper.assertTrue(stocked[0] && colony != null && breadAt[0] >= 0, "no bread has been made yet");
-            long milling = breadAt[0] - seedTakenAt[0];
-            helper.assertTrue(milling >= colony.profile().food().millTicks(), "the bread was ready " + milling + " ticks after the seed was taken, milling takes " + colony.profile().food().millTicks());
-            helper.assertTrue(milling <= colony.profile().food().millTicks() + 600, "milling took " + milling + " ticks, far longer than " + colony.profile().food().millTicks());
-            helper.assertTrue(pileInNursery[0], "the bread never lay on the nursery floor");
-            helper.assertTrue(colony.queenCare().getQueenBread() == 1 && colony.bakery().getBread() == 0 && colony.food().getFood() == 0,
-                    "the queen has " + colony.queenCare().getQueenBread() + " bread, " + colony.bakery().getBread() + " in the nursery, " + colony.food().getFood() + " seeds in the store; expected 1, 0, 0");
-            helper.assertTrue(breadIn(level, helper.getBounds()) == 0 && seedsIn(level, helper.getBounds()) == 0, "something is left lying around");
             for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
                 helper.assertTrue(!ant.hasFullMandibles(), "an ant is still carrying something");
             }

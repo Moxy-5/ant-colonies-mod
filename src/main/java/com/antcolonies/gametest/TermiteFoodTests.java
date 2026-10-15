@@ -4,16 +4,23 @@ import static com.antcolonies.gametest.TermiteMoundTests.MIDDLE;
 import static com.antcolonies.gametest.TermiteMoundTests.SURFACE;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.block.DeadWoodBlock;
 import com.antcolonies.block.DryGrassBlock;
 import com.antcolonies.block.FallenBranchBlock;
+import com.antcolonies.block.FungusCombBlock;
 import com.antcolonies.block.SeedPileBlock;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.NestPlan;
 import com.antcolonies.entity.AbstractAntEntity;
+import com.antcolonies.entity.AntEggEntity;
+import com.antcolonies.entity.AntLarvaEntity;
+import com.antcolonies.entity.TermiteQueenEntity;
+import com.antcolonies.entity.WorkerAntEntity;
 import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.registry.ModEntities;
 import com.antcolonies.species.Species;
@@ -29,6 +36,7 @@ import net.minecraft.world.item.BoneMealItem;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -38,7 +46,11 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
-/** Termites gathering food (M7 step 4): dead plant material carried into the fungus garden and built into comb (step 5). */
+/**
+ * Termites gathering food (M7 step 4): dead plant material carried into the fungus garden and built into comb, and the
+ * garden itself (step 5a): nodules growing on the comb, the nurses feeding them to the queen (who lays a steady stream
+ * of eggs) and to the nymphs, the eggs carried into the gardens and laid on the comb.
+ */
 @GameTestHolder(AntColoniesMod.MODID)
 @PrefixGameTestTemplate(false)
 public class TermiteFoodTests {
@@ -50,9 +62,14 @@ public class TermiteFoodTests {
      * are all gathered, the green grass and the sapling are still there, every piece cut so far is accounted for (in the
      * comb, grown into a fungus nodule, in a termite's mandibles or dropped on the ground), and all the comb lies in the
      * garden rooms.
+     * <p>
+     * The garden at work: nodules grow on the comb, the nurses feed the queen (full grown here, so she lays fast), she
+     * lays eggs behind her, the nurses carry them into the garden and lay them on the comb, they hatch into nymphs, the
+     * nurses feed the nymphs nodules, and a nymph grows into a new worker. All along: no egg or nymph ever lies inside
+     * the comb, and every egg that a nurse put down lies in a garden room. In a batch of its own (a whole colony at work).
      */
-    @GameTest(template = "arena", timeoutTicks = 30000, skyAccess = true)
-    public static void termitesGatherDeadPlantsIntoTheirFungusGarden(GameTestHelper helper) {
+    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true, batch = "garden")
+    public static void termitesGatherDeadPlantsIntoTheirFungusGardenAndRaiseTheQueensEggsOnIt(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
         TermiteMoundTests.deepGround(helper);
@@ -85,6 +102,8 @@ public class TermiteFoodTests {
         ItemEntity sapling = lay(helper, itemSpots[2], new ItemStack(Items.OAK_SAPLING)); // alive: not termite food
 
         Colony[] colony = {null};
+        int[] firstWorkers = {-1};
+        boolean[] sawEggOnComb = {false};
         helper.onEachTick(() -> {
             if (colony[0] == null) {
                 colony[0] = TermiteMoundTests.colony(helper);
@@ -92,6 +111,29 @@ public class TermiteFoodTests {
                     colony[0].setForagingTimeForTests(true); // always night here: the foragers go out
                     for (BlockPos plant : List.of(bush, tallGrass, grassA, grassB, hay)) {
                         colony[0].foodMap().knowForTests(helper.absolutePos(plant)); // (finding them is the next test)
+                    }
+                }
+            }
+            Colony c = colony[0];
+            if (c != null && !c.isFounding()) {
+                if (helper.getTick() > 20 && firstWorkers[0] < 0) {
+                    firstWorkers[0] = c.getCount(WorkerAntEntity.CASTE);
+                }
+                // Once she lies in her room she is full grown, so she lays fast.
+                if (c.getQueen(level) instanceof TermiteQueenEntity queen && queen.getSize() < 1.0F && c.queenCare().isQueenHome(level)) {
+                    queen.setSize(1.0F);
+                }
+                // No egg or young one lies inside the comb.
+                for (Entity young : youngOf(level, helper, c)) {
+                    BlockPos cell = young.blockPosition();
+                    BlockState state = level.getBlockState(cell);
+                    if (state.is(ModBlocks.FUNGUS_COMB.get())) {
+                        double top = cell.getY() + FungusCombBlock.topOf(state);
+                        helper.assertTrue(young.getY() >= top - 0.01, young.getType().toShortString() + " lies inside the comb at " + cell.toShortString()
+                                + " (y " + young.getY() + ", comb top " + top + ")");
+                        if (young instanceof AntEggEntity) {
+                            sawEggOnComb[0] = true;
+                        }
                     }
                 }
             }
@@ -156,7 +198,34 @@ public class TermiteFoodTests {
                 }
             }
             helper.assertTrue(layers == stored, "the comb holds " + layers + " pieces, the colony counts " + stored);
+            // The garden at work.
+            helper.assertTrue(c.garden().getNodulesGrown() > 0, "no nodule has grown yet");
+            helper.assertTrue(c.queenCare().getEggsLaid() > 0, "the queen has laid no egg yet (she holds " + c.queenCare().getQueenBread() + " nodules)");
+            helper.assertTrue(sawEggOnComb[0], "no egg was laid on the comb yet");
+            Set<BlockPos> gardenCells = new HashSet<>(c.nest().getGardenCells(level));
+            for (AntEggEntity egg : c.brood().getEggs(level)) {
+                helper.assertTrue(!egg.isPlaced() || gardenCells.contains(egg.blockPosition()), "an egg was put down outside the gardens at "
+                        + egg.blockPosition().toShortString());
+            }
+            helper.assertTrue(firstWorkers[0] >= 0 && c.getCount(WorkerAntEntity.CASTE) > firstWorkers[0], "no nymph has grown into a worker yet (workers "
+                    + c.getCount(WorkerAntEntity.CASTE) + ", nymphs " + c.brood().countLarvae(level) + ", eggs " + c.brood().countEggs(level) + ")");
         });
+    }
+
+    /** This colony's eggs and nymphs round the test area. */
+    private static List<Entity> youngOf(ServerLevel level, GameTestHelper helper, Colony colony) {
+        List<Entity> young = new ArrayList<>();
+        for (AntEggEntity egg : level.getEntitiesOfClass(AntEggEntity.class, helper.getBounds().inflate(4))) {
+            if (colony.getId().equals(egg.getColonyId())) {
+                young.add(egg);
+            }
+        }
+        for (AntLarvaEntity nymph : level.getEntitiesOfClass(AntLarvaEntity.class, helper.getBounds().inflate(4))) {
+            if (colony.getId().equals(nymph.getColonyId())) {
+                young.add(nymph);
+            }
+        }
+        return young;
     }
 
     /**

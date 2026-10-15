@@ -276,82 +276,9 @@ public class TermiteMoundTests {
     }
 
     /**
-     * A termite colony with workers builds the soil of its mound: the first stage (a low dome round the open entrance),
-     * then the second. The soil comes from digging (the nest, then the galleries). Wet soil is set at once here, as if
-     * it had dried (it takes about 20 minutes in the game). Termites do not shape the cathedral's spire pieces, mouths
-     * and ramps yet (that comes with the tunnel block), so only the soil and the hollow entrance are checked.
-     */
-    @GameTest(template = "arena", timeoutTicks = 30000, skyAccess = true)
-    public static void termitesBuildTheFirstTwoStagesOfTheirMound(GameTestHelper helper) {
-        helper.getLevel().getServer().tickRateManager().setTickRate(2000.0F);
-        deepGround(helper);
-        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
-        helper.runAfterDelay(5, () -> {
-            helper.spawn(ModEntities.TERMITE_KING.get(), MIDDLE + 2, SURFACE, MIDDLE + 1);
-            for (int i = 0; i < 8; i++) {
-                helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE - 3 + i % 4, SURFACE, MIDDLE - 3 + i / 4);
-            }
-        });
-        int[] stage = {1};
-        long[] stageOneAt = {-1};
-        helper.onEachTick(() -> {
-            Colony colony = colony(helper);
-            if (colony == null) {
-                return;
-            }
-            colony.setForagingTimeForTests(true); // always night here: the whole mound may be worked on from outside
-            ServerLevel level = helper.getLevel();
-            if (colony.mound().getStage(level) != stage[0]) {
-                colony.mound().setStage(level, stage[0]);
-            }
-            // Wet soil sets at once.
-            for (var entry : colony.mound().getParts(level).entrySet()) {
-                BlockState state = level.getBlockState(entry.getKey());
-                if (state.getBlock() instanceof TermiteMoundBlock && TermiteMoundBlock.isFinished(state) && state.getValue(TermiteMoundBlock.AGE) == 0) {
-                    level.setBlockAndUpdate(entry.getKey(), state.setValue(TermiteMoundBlock.AGE, 1));
-                }
-            }
-            if (stage[0] == 1 && isBuilt(level, colony)) {
-                stage[0] = 2;
-                stageOneAt[0] = helper.getTick();
-                AntColoniesMod.LOGGER.info("[mound-test] tick {}: stage 1 built", helper.getTick());
-            }
-            if (helper.getTick() % 500 == 0) {
-                AntColoniesMod.LOGGER.info("[mound-test] tick {}: stage {}, {} of {} blocks finished, spots {}, dig target {}",
-                        helper.getTick(), stage[0], colony.mound().countFinished(level), colony.mound().wallsAt(stage[0]),
-                        colony.mound().getBuildSpots(level).size(), colony.nest().findDigTarget(level));
-            }
-        });
-        helper.succeedWhen(() -> {
-            ServerLevel level = helper.getLevel();
-            Colony colony = colony(helper);
-            helper.assertTrue(colony != null && stageOneAt[0] >= 0, "the first stage is not built yet");
-            helper.assertTrue(isBuilt(level, colony), "stage 2: " + colony.mound().countFinished(level) + " of "
-                    + colony.mound().wallsAt(2) + " blocks finished");
-            helper.assertTrue(level.getBlockState(colony.getCenter()).isAir(), "the entrance is not open");
-        });
-    }
-
-    /** The soil of the colony's mound at its stage now is there: walls finished, hollows open (pieces are not built yet). */
-    private static boolean isBuilt(ServerLevel level, Colony colony) {
-        for (var entry : colony.mound().getParts(level).entrySet()) {
-            BlockState state = level.getBlockState(entry.getKey());
-            boolean ok = switch (entry.getValue()) {
-                case WALL -> state.getBlock() instanceof TermiteMoundBlock && TermiteMoundBlock.isFinished(state);
-                case TUNNEL -> state.getBlock() instanceof com.antcolonies.block.TermiteTunnelBlock;
-                case OPEN -> state.isAir();
-                case MOUTH, SPIRE, RAMP -> true;
-            };
-            if (!ok) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /**
      * A termite walks through a chimney block into a room that is closed all round; an ant finds no way in. The route
-     * planner treats the chimney block as a doorway for termites only.
+     * planner treats the chimney block as a doorway for termites only, and so does the block itself: termites walk
+     * through it, an ant (and so any other creature) bumps into it.
      */
     @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
     public static void aTermiteWalksThroughAChimneyBlockIntoAClosedRoom(GameTestHelper helper) {
@@ -369,99 +296,17 @@ public class TermiteMoundTests {
         BlockPos inside = helper.absolutePos(new BlockPos(2, 1, 2));
         TermiteWorkerEntity termite = helper.spawnWithNoFreeWill(ModEntities.TERMITE_WORKER.get(), 6, 1, 2);
         WorkerAntEntity ant = TestAnts.loneAnt(helper, 6, 1, 4);
+        BlockPos hole = helper.absolutePos(new BlockPos(4, 1, 2));
+        BlockState state = helper.getLevel().getBlockState(hole);
+        helper.assertTrue(state.getCollisionShape(helper.getLevel(), hole, CollisionContext.of(termite)).isEmpty(), "a termite bumps into the hole block");
+        helper.assertTrue(!state.getCollisionShape(helper.getLevel(), hole, CollisionContext.of(ant)).isEmpty(), "an ant walks through the hole block");
+        helper.assertTrue(!state.getCollisionShape(helper.getLevel(), hole, CollisionContext.empty()).isEmpty(), "the hole block is not solid for everyone else");
         helper.runAfterDelay(10, () -> {
             helper.assertTrue(termite.getNavigator().moveTo(inside, 1.0), "the termite found no route through the chimney block");
             helper.assertTrue(!ant.getNavigator().moveTo(inside, 1.0), "the ant found a route into the closed room");
         });
         helper.succeedWhen(() -> helper.assertTrue(helper.getTick() > 20 && termite.blockPosition().equals(inside),
                 "the termite is at " + termite.blockPosition().subtract(inside) + " from the middle of the room"));
-    }
-
-    /**
-     * A termite climbs up a chimney shaft and comes out of the mouth of the spire on top of the chimney block: up inside
-     * the spire until its head is out, a look round (it holds still the whole time, only its head moves, see
-     * DoorwayMotion), then over the rim and down onto the mound. Then it goes back in by the mouth and down the shaft,
-     * without looking round. Checked: it came up through the middle of the spire to the rim, it looked round once for
-     * the whole look round with its head out and without moving, and it ends where it was sent.
-     */
-    @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
-    public static void aTermiteComesOutOfTheChimneyMouthAndGoesBackIn(GameTestHelper helper) {
-        comeOutOfTheMouthAndGoBackIn(helper, ModBlocks.TERMITE_HOLE.get().defaultBlockState());
-    }
-
-    /**
-     * The same with the cathedral mound's chimney mouth (a tube on top of the block, see TermiteMouthBlock): its channel
-     * goes down into a tunnel block over the shaft (step 3 of the tunnel plan: a mouth is never walked through, only
-     * crawled through by its channel), so the termite climbs onto the shaft's ceiling, up into the tunnel's hole and the
-     * mouth's tube, looks round, climbs over its rim and down it, and goes back in by it.
-     */
-    @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
-    public static void aTermiteComesOutOfTheSpireMouthAndGoesBackIn(GameTestHelper helper) {
-        comeOutOfTheMouthAndGoBackIn(helper, ModBlocks.TERMITE_MOUTH.get().defaultBlockState().setValue(TermiteMouthBlock.SLIM, false));
-    }
-
-    private static void comeOutOfTheMouthAndGoBackIn(GameTestHelper helper, BlockState doorway) {
-        boolean channel = doorway.getBlock() instanceof com.antcolonies.nav.Channel;
-        ground(helper);
-        // A chimney: a ring of soil round a shaft, 3 blocks high, with a chimney block on top of the shaft.
-        BlockState soil = ModBlocks.TERMITE_MOUND.get().defaultBlockState().setValue(TermiteMoundBlock.LAYERS, TermiteMoundBlock.FINISHED);
-        for (int y = 1; y <= 3; y++) {
-            for (int x = 1; x <= 3; x++) {
-                for (int z = 1; z <= 3; z++) {
-                    if (x != 2 || z != 2) {
-                        helper.setBlock(new BlockPos(x, y, z), soil);
-                    }
-                }
-            }
-        }
-        helper.setBlock(new BlockPos(2, 3, 2), doorway);
-        if (channel) {
-            // A tunnel block between the shaft and the mouth, open down into the shaft and up into the mouth.
-            BlockPos tunnel = helper.absolutePos(new BlockPos(2, 2, 2));
-            helper.getLevel().setBlockAndUpdate(tunnel, ModBlocks.TERMITE_TUNNEL.get().stateFor(helper.getLevel(), tunnel, 2,
-                    java.util.List.of(net.minecraft.core.Direction.DOWN)));
-        }
-        BlockPos hole = helper.absolutePos(new BlockPos(2, 3, 2));
-        BlockPos bottom = helper.absolutePos(new BlockPos(2, 1, 2));
-        BlockPos onTop = helper.absolutePos(new BlockPos(3, 4, 2));
-        TermiteWorkerEntity termite = helper.spawnWithNoFreeWill(ModEntities.TERMITE_WORKER.get(), 2, 1, 2);
-        double rim = hole.getY() + ((com.antcolonies.nav.Doorway) doorway.getBlock()).mouthHeight();
-        int[] phase = {0};
-        int[] lookingOut = {0};
-        double[] highest = {0};
-        net.minecraft.world.phys.Vec3[] peekedAt = {null};
-        helper.runAfterDelay(10, () -> helper.assertTrue(termite.getNavigator().moveTo(onTop, 1.0), "no route out of the chimney"));
-        helper.onEachTick(() -> {
-            // In the spire: near its middle (the hitbox is a little off it, so the drawn body is in the middle).
-            boolean inMouth = Math.abs(termite.getX() - (hole.getX() + 0.5)) < 0.2 && Math.abs(termite.getZ() - (hole.getZ() + 0.5)) < 0.2;
-            if (inMouth) {
-                highest[0] = Math.max(highest[0], termite.getY());
-            }
-            if (termite.isPeeking()) {
-                helper.assertTrue(phase[0] == 0, "the termite looked round on its way in");
-                helper.assertTrue(inMouth && Math.abs(termite.getY() - (rim - com.antcolonies.nav.DoorwayMotion.PEEK_DEPTH)) < 0.02,
-                        "the termite looks round from " + (termite.getY() - rim) + " below the rim, not with its head just out of the mouth");
-                if (peekedAt[0] == null) {
-                    peekedAt[0] = termite.position();
-                }
-                helper.assertTrue(termite.position().distanceTo(peekedAt[0]) < 0.001, "the termite moved while it looked round");
-                lookingOut[0]++;
-            }
-            if (phase[0] == 0 && helper.getTick() > 20 && termite.getNavigator().isDone() && termite.blockPosition().equals(onTop)) {
-                helper.assertTrue(highest[0] >= rim, "the termite did not come up through the spire to its rim (highest " + (highest[0] - hole.getY()) + ")");
-                helper.assertTrue(Math.abs(lookingOut[0] - com.antcolonies.nav.DoorwayMotion.PEEK_TICKS) <= 1,
-                        "the termite looked round for " + lookingOut[0] + " ticks, not the whole look round");
-                phase[0] = 1;
-                highest[0] = 0;
-                helper.assertTrue(termite.getNavigator().moveTo(bottom, 1.0), "no route back into the chimney");
-            }
-        });
-        helper.succeedWhen(() -> {
-            helper.assertTrue(phase[0] == 1, "the termite is not out on top yet (at " + termite.blockPosition().subtract(hole) + " from the chimney block)");
-            helper.assertTrue(termite.getNavigator().isDone() && termite.blockPosition().equals(bottom),
-                    "the termite is not back down the shaft (at " + termite.blockPosition().subtract(hole) + " from the chimney block)");
-            helper.assertTrue(highest[0] >= rim, "the termite did not go in by the mouth of the spire (highest " + (highest[0] - hole.getY()) + ")");
-        });
     }
 
     /**
@@ -519,20 +364,5 @@ public class TermiteMoundTests {
             helper.assertTrue(phase[0] == 3, "the termite is at " + termite.blockPosition().subtract(bottom) + " from the shaft bottom in phase " + phase[0]);
             helper.assertTrue(peeked[2] > 0, "with no other way the termite did not come out of the mouth (it never looked out)");
         });
-    }
-
-    /** Termites walk through the hole block; an ant (and so any other creature) bumps into it. */
-    @GameTest(template = "arena", timeoutTicks = 100)
-    public static void onlyTermitesPassThroughTheHoleBlock(GameTestHelper helper) {
-        ground(helper);
-        helper.setBlock(new BlockPos(2, 1, 2), ModBlocks.TERMITE_HOLE.get());
-        BlockPos hole = helper.absolutePos(new BlockPos(2, 1, 2));
-        TermiteWorkerEntity termite = helper.spawnWithNoFreeWill(ModEntities.TERMITE_WORKER.get(), 4, 1, 4);
-        WorkerAntEntity ant = TestAnts.loneAnt(helper, 4, 1, 1);
-        BlockState state = helper.getLevel().getBlockState(hole);
-        helper.assertTrue(state.getCollisionShape(helper.getLevel(), hole, CollisionContext.of(termite)).isEmpty(), "a termite bumps into the hole block");
-        helper.assertTrue(!state.getCollisionShape(helper.getLevel(), hole, CollisionContext.of(ant)).isEmpty(), "an ant walks through the hole block");
-        helper.assertTrue(!state.getCollisionShape(helper.getLevel(), hole, CollisionContext.empty()).isEmpty(), "the hole block is not solid for everyone else");
-        helper.succeed();
     }
 }

@@ -89,24 +89,40 @@ public class TermiteTunnelTests {
 
     /**
      * A termite walks in at the window, along the tunnel and up inside the spire into its mouth (hidden in the channel
-     * on the way); then, with the window shut behind it, the only way out is the mouth: it comes out with its look round,
-     * climbs down the outside of the spire and walks off the lump to the ground on its far side.
+     * on the way); then, with the window shut behind it, the only way out is the mouth: it comes out with its look round
+     * (it holds still the whole time with its head just out of the mouth, only its head moves, see DoorwayMotion, for the
+     * whole look round), climbs down the outside of the spire and walks off the lump to the ground on its far side. Then
+     * it goes back in by the mouth, without looking round, and down the channel to the window.
      */
-    @GameTest(template = "arena", timeoutTicks = 2400, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 3600, skyAccess = true)
     public static void aTermiteCrawlsUpInsideASpireAndComesOutOfItsMouth(GameTestHelper helper) {
         lumpWithATunnel(helper);
         TermiteWorkerEntity termite = TestAnts.loneTermite(helper, 3, 1, 10);
         NavigationTests.watch(helper, termite, false);
         BlockPos mouth = helper.absolutePos(MOUTH);
         BlockPos ground = helper.absolutePos(new BlockPos(16, 1, 10));
+        BlockPos window = helper.absolutePos(TUNNEL.get(0));
+        double rim = mouth.getY() + ((com.antcolonies.nav.Doorway) helper.getLevel().getBlockState(mouth).getBlock()).mouthHeight();
         int[] phase = {0};
         boolean[] seen = new boolean[3]; // in a channel, crawling with the route through the tunnel, looking round
+        int[] lookingOut = {0};
+        net.minecraft.world.phys.Vec3[] peekedAt = {null};
         helper.onEachTick(() -> {
             if (termite.getNavigator().isInChannel()) {
                 seen[0] = true;
             }
             if (termite.getNavigator().isPeeking()) {
-                seen[2] = true;
+                seen[2] |= phase[0] == 2;
+                helper.assertTrue(phase[0] != 3, "the termite looked round on its way back in by the mouth");
+            }
+            if (termite.getNavigator().isPeeking() && phase[0] == 2) {
+                helper.assertTrue(Math.abs(termite.getY() - (rim - com.antcolonies.nav.DoorwayMotion.PEEK_DEPTH)) < 0.02,
+                        "the termite looks round from " + (termite.getY() - rim) + " below the rim, not with its head just out of the mouth");
+                if (peekedAt[0] == null) {
+                    peekedAt[0] = termite.position();
+                }
+                helper.assertTrue(termite.position().distanceTo(peekedAt[0]) < 0.001, "the termite moved while it looked round");
+                lookingOut[0]++;
             }
             switch (phase[0]) {
                 case 0 -> {
@@ -136,7 +152,21 @@ public class TermiteTunnelTests {
                     if (termite.getNavigator().isDone()) {
                         helper.assertFalse(termite.getNavigator().hasFailed(), "it got stuck on its way out of the mouth and down, at "
                                 + termite.position() + "; see the debug log");
+                        helper.assertTrue(termite.blockPosition().equals(ground), "it ended at " + termite.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO))
+                                + " instead of on the ground beyond the lump");
+                        helper.assertTrue(Math.abs(lookingOut[0] - com.antcolonies.nav.DoorwayMotion.PEEK_TICKS) <= 1,
+                                "the termite looked round for " + lookingOut[0] + " ticks, not the whole look round");
+                        helper.assertTrue(termite.getNavigator().moveTo(window, 1.0), "no way back in by the mouth");
+                        Route route = termite.getNavigator().getPlannedRoute();
+                        helper.assertTrue(has(route, StepKind.INTO_CHANNEL) || has(route, StepKind.CRAWL_CHANNEL), "it does not go back in by the mouth: " + route);
                         phase[0] = 3;
+                    }
+                }
+                case 3 -> {
+                    if (termite.getNavigator().isDone()) {
+                        helper.assertFalse(termite.getNavigator().hasFailed(), "it got stuck on its way back in by the mouth, at "
+                                + termite.position() + "; see the debug log");
+                        phase[0] = 4;
                     }
                 }
                 default -> {
@@ -144,22 +174,33 @@ public class TermiteTunnelTests {
             }
         });
         helper.succeedWhen(() -> {
-            helper.assertTrue(phase[0] == 3, "still walking (part " + phase[0] + ")");
+            helper.assertTrue(phase[0] == 4, "still walking (part " + phase[0] + ")");
             helper.assertTrue(seen[2], "it never looked round out of the mouth");
-            helper.assertTrue(termite.blockPosition().equals(ground), "it ended at " + termite.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO))
-                    + " instead of on the ground beyond the lump");
+            helper.assertTrue(termite.blockPosition().equals(window), "it ended at " + termite.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO))
+                    + " instead of back at the window");
         });
     }
 
-    /** An ant (and so anything that does not fit) finds no way into a termite tunnel or a mouth. */
+    /**
+     * An ant (and so anything that does not fit) finds no way into a termite tunnel or a mouth; nor do soldiers, too big
+     * for the tunnel blocks (a major and a minor), while a worker does crawl in.
+     */
     @GameTest(template = "arena", timeoutTicks = 200, skyAccess = true)
-    public static void antsFindNoWayIntoTermiteTunnels(GameTestHelper helper) {
+    public static void antsAndSoldiersFindNoWayIntoTermiteTunnels(GameTestHelper helper) {
         lumpWithATunnel(helper);
         WorkerAntEntity ant = TestAnts.loneAnt(helper, 3, 1, 10);
+        com.antcolonies.entity.TermiteSoldierEntity major = TestAnts.loneSoldier(helper, true, 3, 1, 12);
+        com.antcolonies.entity.TermiteSoldierEntity minor = TestAnts.loneSoldier(helper, false, 3, 1, 14);
+        TermiteWorkerEntity worker = TestAnts.loneTermite(helper, 3, 1, 8);
         helper.runAfterDelay(10, () -> {
             for (BlockPos cell : List.of(TUNNEL.get(1), TUNNEL.get(3), THICK, MOUTH)) {
                 helper.assertFalse(ant.getNavigator().moveTo(helper.absolutePos(cell), 1.0), "an ant found a way into " + cell);
             }
+            for (BlockPos cell : List.of(TUNNEL.get(1), TUNNEL.get(3))) {
+                helper.assertFalse(major.getNavigator().moveTo(helper.absolutePos(cell), 1.0), "a major found a way into " + cell);
+                helper.assertFalse(minor.getNavigator().moveTo(helper.absolutePos(cell), 1.0), "a minor found a way into " + cell);
+            }
+            helper.assertTrue(worker.getNavigator().moveTo(helper.absolutePos(TUNNEL.get(3)), 1.0), "a worker found no way in");
             helper.succeed();
         });
     }

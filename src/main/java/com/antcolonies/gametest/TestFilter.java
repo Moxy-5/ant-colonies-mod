@@ -3,8 +3,10 @@ package com.antcolonies.gametest;
 import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import com.antcolonies.AntColoniesMod;
 
@@ -14,16 +16,36 @@ import net.minecraft.server.MinecraftServer;
 
 /**
  * Runs only some of the game tests, for quick checks while working: start the test server with the environment
- * variable {@code ANTCOLONIES_TESTS} set to a comma-separated list of words, and only the tests whose name (the
- * method's name in lower case, such as {@code termitesroamalloveracathedralmound}) contains one of them, or whose class
- * is named by one of them (such as {@code termiteclimbingtests}), are run. Without it every test runs, as always.
+ * variable {@code ANTCOLONIES_TESTS} set to a comma-separated list of words. A word can be a category (see
+ * {@link #CATEGORIES}, such as {@code termitefood}): every test of it runs. Otherwise the tests whose name (the method's
+ * name in lower case, such as {@code termitesroamalloveracathedralmound}) contains the word, or whose class is named by
+ * it (such as {@code termiteclimbingtests}), are run. Without it every test runs, as always.
  */
 public final class TestFilter {
-    /** Every class with game tests (a test's own name does not say its class). */
-    private static final Class<?>[] CLASSES = {NestTests.class, NavigationTests.class, TermiteTests.class, TermiteClimbingTests.class,
-            TermiteFoodTests.class, TermiteGardenTests.class, TermiteForagingTests.class, TermiteMoundTests.class, TermiteTunnelTests.class, TermiteCathedralTests.class,
-            TermiteRepairTests.class, JobsByAgeTests.class, TermitomycesTests.class, TermiteSoldierTests.class,
-            TermiteAlarmTests.class, PopulationTests.class, TermiteNewHoleTests.class, StressTests.class, HillTests.class, TermiteRunwayTests.class, TermiteBarePatchTests.class};
+    /**
+     * The categories (the user's idea, 2026-10-14): every test class belongs to exactly one, so a change can be checked
+     * by running the category it touches. A new test class must be added to one of them.
+     */
+    static final Map<String, List<Class<?>>> CATEGORIES = new LinkedHashMap<>();
+    static {
+        // The legs: walking, climbing, ceilings, crawling through termite tunnels, reloads of climbing insects.
+        CATEGORIES.put("legs", List.of(NavigationTests.class, TermiteClimbingTests.class, TermiteTunnelTests.class));
+        // The harvester ant's nest: digging, the hill, seeds, bread, eggs and larvae, hunger, the dead.
+        CATEGORIES.put("antnest", List.of(NestTests.class));
+        // The termite mound: its blocks, the cathedral, doorways and chimney mouths, mending the nest.
+        CATEGORIES.put("mound", List.of(TermiteMoundTests.class, TermiteCathedralTests.class, TermiteRepairTests.class));
+        // Termite food: foraging and its holes, the garden, new holes, dead wood, runways, bare patches, mushrooms.
+        CATEGORIES.put("termitefood", List.of(TermiteFoodTests.class, TermiteForagingTests.class, TermiteNewHoleTests.class,
+                TermiteRunwayTests.class, TermiteBarePatchTests.class, TermitomycesTests.class));
+        // Soldiers and the alarm.
+        CATEGORIES.put("soldiers", List.of(TermiteSoldierTests.class, TermiteAlarmTests.class));
+        // The colony: founding, jobs by age, the virtual population.
+        CATEGORIES.put("colony", List.of(TermiteTests.class, JobsByAgeTests.class, PopulationTests.class));
+        // Hills and uneven ground, for every planner.
+        CATEGORIES.put("hills", List.of(HillTests.class));
+        // Performance (only when named, never in a full run).
+        CATEGORIES.put("stress", List.of(StressTests.class));
+    }
 
     private TestFilter() {
     }
@@ -61,14 +83,26 @@ public final class TestFilter {
             Collection<TestFunction> tests = (Collection<TestFunction>) field.get(server);
             int before = tests.size();
             java.util.Set<String> named = new java.util.HashSet<>();
-            for (Class<?> testClass : CLASSES) {
-                if (words.contains(testClass.getSimpleName().toLowerCase(Locale.ROOT))) {
+            List<String> plainWords = new java.util.ArrayList<>();
+            for (String word : words) {
+                List<Class<?>> classes = new java.util.ArrayList<>(CATEGORIES.getOrDefault(word, List.of()));
+                for (List<Class<?>> category : CATEGORIES.values()) {
+                    for (Class<?> testClass : category) {
+                        if (word.equals(testClass.getSimpleName().toLowerCase(Locale.ROOT))) {
+                            classes.add(testClass);
+                        }
+                    }
+                }
+                if (classes.isEmpty()) {
+                    plainWords.add(word); // part of a test's name
+                }
+                for (Class<?> testClass : classes) {
                     for (java.lang.reflect.Method method : testClass.getDeclaredMethods()) {
                         named.add(method.getName().toLowerCase(Locale.ROOT));
                     }
                 }
             }
-            tests.removeIf(test -> !named.contains(test.testName()) && words.stream().noneMatch(test.testName().toLowerCase(Locale.ROOT)::contains));
+            tests.removeIf(test -> !named.contains(test.testName()) && plainWords.stream().noneMatch(test.testName().toLowerCase(Locale.ROOT)::contains));
             AntColoniesMod.LOGGER.warn("[test-filter] ONLY running {} of {} game tests (ANTCOLONIES_TESTS={})", tests.size(), before, only);
         } catch (ReflectiveOperationException e) {
             AntColoniesMod.LOGGER.error("[test-filter] could not filter the game tests, running them all", e);

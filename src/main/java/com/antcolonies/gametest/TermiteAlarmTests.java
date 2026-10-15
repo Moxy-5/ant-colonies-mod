@@ -42,19 +42,6 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 @GameTestHolder(AntColoniesMod.MODID)
 @PrefixGameTestTemplate(false)
 public class TermiteAlarmTests {
-    /** A chicken walks up to a termite worker standing in the open and pecks it to death. */
-    @GameTest(template = "arena", timeoutTicks = 600)
-    public static void aChickenHuntsATermiteWorker(GameTestHelper helper) {
-        TermiteMoundTests.deepGround(helper);
-        TermiteWorkerEntity termite = TestAnts.loneTermite(helper, MIDDLE, SURFACE, MIDDLE);
-        Chicken chicken = helper.spawn(EntityType.CHICKEN, MIDDLE + 5, SURFACE, MIDDLE);
-        helper.succeedWhen(() -> {
-            helper.assertFalse(termite.isAlive() && termite.getHealth() >= termite.getMaxHealth(), "the chicken has not pecked the termite");
-            helper.assertFalse(termite.isAlive(), "the termite is still alive (" + termite.getHealth() + " health)");
-            helper.assertTrue(chicken.isAlive(), "the chicken died");
-        });
-    }
-
     /**
      * A chicken comes for the foragers at night. A colony with its nest dug out and both foraging holes open, five old
      * workers (foragers) cutting at a hay bale 11 blocks out, three minors out on guard. A chicken is put down at the

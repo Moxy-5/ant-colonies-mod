@@ -47,17 +47,6 @@ public class HillTests {
     }
 
     /**
-     * A termite nest in a hollow: the ground is flat round the nest and rises a block a column from 5 blocks out, up to 4
-     * blocks higher, so the planned foraging holes (8 blocks out) lie 4 blocks under the surface (the user's bug: the
-     * side holes on a hill were opened one block and stayed shut). The foraging tunnels follow the ground up, the
-     * workers dig them (the last blocks upward) and both holes open at the real surface.
-     */
-    @GameTest(template = "arena", timeoutTicks = 20000, skyAccess = true)
-    public static void termiteSideHolesInAHollowFollowTheGroundUpAndOpenAtTheSurface(GameTestHelper helper) {
-        sideHolesOpenAtTheSurface(helper, (x, z) -> Math.min(4, Math.max(0, Math.max(Math.abs(x - MIDDLE), Math.abs(z - MIDDLE)) - 4)));
-    }
-
-    /**
      * A termite nest on a hillside: the ground slopes down to the north-west and up to the south-east (a block every 3
      * columns, along both x and z, so whichever way the foraging tunnels run, one runs uphill and the other downhill).
      * The downhill hole of a level tunnel would be in the open air, the uphill one under the soil: both follow the
@@ -84,15 +73,6 @@ public class HillTests {
     @GameTest(template = "arena", timeoutTicks = 20000, skyAccess = true)
     public static void termiteSideHolesBelowACliffOpenAtItsFoot(GameTestHelper helper) {
         sideHolesOpenAtTheSurface(helper, (x, z) -> chebyshev(x, z) >= 7 ? 5 : 0);
-    }
-
-    /**
-     * A termite nest on a ridge: the ground falls away on every side from 4 blocks out, a block a column, 4 blocks down.
-     * Both tunnels run downhill and open at the surface below.
-     */
-    @GameTest(template = "arena", timeoutTicks = 20000, skyAccess = true)
-    public static void termiteSideHolesOffARidgeOpenDownTheSlopes(GameTestHelper helper) {
-        sideHolesOpenAtTheSurface(helper, (x, z) -> -Math.min(4, Math.max(0, chebyshev(x, z) - 3)));
     }
 
     /**

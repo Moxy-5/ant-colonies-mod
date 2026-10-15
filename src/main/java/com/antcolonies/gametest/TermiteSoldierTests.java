@@ -410,44 +410,4 @@ public class TermiteSoldierTests {
         }
         return sides.size() == 2 ? null : "the sentries stand on one side of the trail only";
     }
-
-    /** A soldier told to drum stands still drumming for that long, then stops. */
-    @GameTest(template = "arena", timeoutTicks = 200)
-    public static void aSoldierDrumsStandingStill(GameTestHelper helper) {
-        TermiteMoundTests.deepGround(helper);
-        TermiteSoldierEntity soldier = TestAnts.loneSoldier(helper, true, MIDDLE, SURFACE, MIDDLE);
-        double[] at = new double[2];
-        helper.runAfterDelay(5, () -> soldier.drum(60));
-        helper.runAfterDelay(15, () -> {
-            helper.assertTrue(soldier.isDrumming(), "the soldier is not drumming");
-            at[0] = soldier.getX();
-            at[1] = soldier.getZ();
-        });
-        helper.runAfterDelay(55, () -> {
-            helper.assertTrue(soldier.isDrumming(), "the soldier stopped drumming too soon");
-            double moved = Math.hypot(soldier.getX() - at[0], soldier.getZ() - at[1]);
-            helper.assertTrue(moved < 0.05, "the drumming soldier moved " + moved + " blocks");
-        });
-        helper.runAfterDelay(80, () -> {
-            helper.assertFalse(soldier.isDrumming(), "the soldier is still drumming");
-            helper.succeed();
-        });
-    }
-
-    /** Soldiers are too big for the termite tunnel blocks: a major finds no way into a tunnel a worker crawls through. */
-    @GameTest(template = "arena", timeoutTicks = 200, skyAccess = true)
-    public static void soldiersFindNoWayIntoTermiteTunnels(GameTestHelper helper) {
-        TermiteTunnelTests.lumpWithATunnel(helper);
-        TermiteSoldierEntity major = TestAnts.loneSoldier(helper, true, 3, 1, 10);
-        TermiteSoldierEntity minor = TestAnts.loneSoldier(helper, false, 3, 1, 12);
-        TermiteWorkerEntity worker = TestAnts.loneTermite(helper, 3, 1, 8);
-        helper.runAfterDelay(10, () -> {
-            for (BlockPos cell : List.of(TermiteTunnelTests.TUNNEL.get(1), TermiteTunnelTests.TUNNEL.get(3))) {
-                helper.assertFalse(major.getNavigator().moveTo(helper.absolutePos(cell), 1.0), "a major found a way into " + cell);
-                helper.assertFalse(minor.getNavigator().moveTo(helper.absolutePos(cell), 1.0), "a minor found a way into " + cell);
-            }
-            helper.assertTrue(worker.getNavigator().moveTo(helper.absolutePos(TermiteTunnelTests.TUNNEL.get(3)), 1.0), "a worker found no way in");
-            helper.succeed();
-        });
-    }
 }

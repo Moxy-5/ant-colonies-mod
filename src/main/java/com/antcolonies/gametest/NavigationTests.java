@@ -34,62 +34,25 @@ public class NavigationTests {
     private static final int SURFACE = 12;
     private static final int MIDDLE = 12;
 
-    @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
-    public static void antWalksFromTheRoomUpTheShaftToTheSurface(GameTestHelper helper) {
-        buildNest(helper);
-        WorkerAntEntity ant = TestAnts.loneAnt(helper, MIDDLE + 8, SURFACE - 3, MIDDLE + 2);
-        BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE + 3, SURFACE, MIDDLE + 2));
-        helper.runAfterDelay(10, () -> {
-            boolean found = ant.getNavigator().moveTo(goal, 1.0);
-            AntColoniesMod.LOGGER.info("[nav-test] #{} route found: {} -> {}", ant.getId(), found,
-                    ant.getNavigator().getRoute() == null ? "none" : relative(helper, ant.getNavigator().getRoute()));
-        });
-        watch(helper, ant);
-        helper.succeedWhen(() -> helper.assertTrue(
-                ant.getNavigator().isDone() && !ant.getNavigator().hasFailed()
-                        && ant.blockPosition().equals(goal) && helper.getTick() > 20,
-                "the ant has not reached the surface yet"));
-    }
-
-    @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
-    public static void antWalksFromTheSurfaceDownToTheRoom(GameTestHelper helper) {
-        buildNest(helper);
-        WorkerAntEntity ant = TestAnts.loneAnt(helper, MIDDLE + 2, SURFACE, MIDDLE - 3);
-        BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE + 8, SURFACE - 3, MIDDLE - 2));
-        helper.runAfterDelay(10, () -> {
-            boolean found = ant.getNavigator().moveTo(goal, 1.0);
-            AntColoniesMod.LOGGER.info("[nav-test] #{} route found: {} -> {}", ant.getId(), found,
-                    ant.getNavigator().getRoute() == null ? "none" : relative(helper, ant.getNavigator().getRoute()));
-        });
-        watch(helper, ant);
-        helper.succeedWhen(() -> helper.assertTrue(
-                ant.getNavigator().isDone() && !ant.getNavigator().hasFailed()
-                        && ant.blockPosition().equals(goal) && helper.getTick() > 20,
-                "the ant has not reached the room yet"));
-    }
-
-    @GameTest(template = "arena", timeoutTicks = 3000, skyAccess = true)
-    public static void queenWalksFromTheRoomUpTheShaftToTheSurface(GameTestHelper helper) {
+    /** The queen (bigger and slower than a worker) walks from the seed store up the shaft to the surface and back down. */
+    @GameTest(template = "arena", timeoutTicks = 5000, skyAccess = true)
+    public static void queenWalksFromTheRoomUpToTheSurfaceAndBackDown(GameTestHelper helper) {
         buildNest(helper);
         QueenAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.QUEEN_ANT.get(), MIDDLE + 8, SURFACE - 3, MIDDLE + 2);
-        BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE + 3, SURFACE, MIDDLE + 2));
-        helper.runAfterDelay(10, () -> ant.getNavigator().moveTo(goal, 1.0));
+        BlockPos up = helper.absolutePos(new BlockPos(MIDDLE + 3, SURFACE, MIDDLE + 2));
+        BlockPos down = helper.absolutePos(new BlockPos(MIDDLE + 8, SURFACE - 3, MIDDLE - 2));
+        boolean[] wentUp = {false};
+        helper.runAfterDelay(10, () -> ant.getNavigator().moveTo(up, 1.0));
         watch(helper, ant);
-        helper.succeedWhen(() -> helper.assertTrue(
-                ant.getNavigator().isDone() && !ant.getNavigator().hasFailed() && ant.blockPosition().equals(goal) && helper.getTick() > 20,
-                "the queen has not reached the surface yet"));
-    }
-
-    @GameTest(template = "arena", timeoutTicks = 3000, skyAccess = true)
-    public static void queenWalksFromTheSurfaceDownToTheRoom(GameTestHelper helper) {
-        buildNest(helper);
-        QueenAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.QUEEN_ANT.get(), MIDDLE + 2, SURFACE, MIDDLE - 3);
-        BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE + 8, SURFACE - 3, MIDDLE - 2));
-        helper.runAfterDelay(10, () -> ant.getNavigator().moveTo(goal, 1.0));
-        watch(helper, ant);
-        helper.succeedWhen(() -> helper.assertTrue(
-                ant.getNavigator().isDone() && !ant.getNavigator().hasFailed() && ant.blockPosition().equals(goal) && helper.getTick() > 20,
-                "the queen has not reached the room yet"));
+        helper.succeedWhen(() -> {
+            if (!wentUp[0] && helper.getTick() > 20 && ant.getNavigator().isDone() && !ant.getNavigator().hasFailed() && ant.blockPosition().equals(up)) {
+                wentUp[0] = true;
+                ant.getNavigator().moveTo(down, 1.0);
+            }
+            helper.assertTrue(wentUp[0], "the queen has not reached the surface yet");
+            helper.assertTrue(ant.getNavigator().isDone() && !ant.getNavigator().hasFailed() && ant.blockPosition().equals(down),
+                    "the queen has not gone back down to the room yet");
+        });
     }
 
     /** Regression test for a crash: the route was only the cell the ant already stood in, and the ant then left that cell. */
@@ -107,96 +70,49 @@ public class NavigationTests {
                 "the ant has not walked back to its cell yet"));
     }
 
-    /** With the finished hill around the entrance the hole is a funnel 3 blocks deeper: the ant must still climb out of it. */
-    @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
-    public static void antClimbsOutOfTheHoleThroughTheFinishedHill(GameTestHelper helper) {
-        buildNest(helper);
-        buildHill(helper);
-        WorkerAntEntity ant = TestAnts.loneAnt(helper, MIDDLE + 8, SURFACE - 3, MIDDLE + 2);
-        BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE - 5, SURFACE, MIDDLE - 2));
-        helper.runAfterDelay(10, () -> {
-            boolean found = ant.getNavigator().moveTo(goal, 1.0);
-            AntColoniesMod.LOGGER.info("[nav-test] #{} route found: {} -> {}", ant.getId(), found,
-                    ant.getNavigator().getRoute() == null ? "none" : relative(helper, ant.getNavigator().getRoute()));
-        });
-        watch(helper, ant);
-        helper.succeedWhen(() -> helper.assertTrue(
-                ant.getNavigator().isDone() && !ant.getNavigator().hasFailed()
-                        && ant.blockPosition().equals(goal) && helper.getTick() > 20,
-                "the ant has not climbed out over the hill yet"));
-    }
-
-    @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
-    public static void antWalksDownIntoTheHoleThroughTheFinishedHill(GameTestHelper helper) {
-        buildNest(helper);
-        buildHill(helper);
-        WorkerAntEntity ant = TestAnts.loneAnt(helper, MIDDLE - 5, SURFACE, MIDDLE - 2);
-        BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE + 8, SURFACE - 3, MIDDLE - 2));
-        helper.runAfterDelay(10, () -> {
-            boolean found = ant.getNavigator().moveTo(goal, 1.0);
-            AntColoniesMod.LOGGER.info("[nav-test] #{} route found: {} -> {}", ant.getId(), found,
-                    ant.getNavigator().getRoute() == null ? "none" : relative(helper, ant.getNavigator().getRoute()));
-        });
-        watch(helper, ant);
-        helper.succeedWhen(() -> helper.assertTrue(
-                ant.getNavigator().isDone() && !ant.getNavigator().hasFailed()
-                        && ant.blockPosition().equals(goal) && helper.getTick() > 20,
-                "the ant has not gone down into the room yet"));
-    }
-
-    /** A one-block pit in the ground: an ant at the bottom must climb out over its wall. */
+    /**
+     * Two one-block pits in the ground: an ant at the bottom of one must climb out over its wall, and an ant that plans
+     * its route while still in the air above the other falls in on its way and climbs out too.
+     */
     @GameTest(template = "arena", timeoutTicks = 600, skyAccess = true)
-    public static void antClimbsOutOfAOneBlockPit(GameTestHelper helper) {
+    public static void antsClimbOutOfAOneBlockPit(GameTestHelper helper) {
         buildNest(helper);
         helper.setBlock(MIDDLE + 6, SURFACE - 1, MIDDLE + 9, Blocks.AIR);
-        WorkerAntEntity ant = TestAnts.loneAnt(helper, MIDDLE + 6.5F, (float) (SURFACE - 1), MIDDLE + 9.5F);
+        helper.setBlock(MIDDLE - 6, SURFACE - 1, MIDDLE + 9, Blocks.AIR);
+        WorkerAntEntity inPit = TestAnts.loneAnt(helper, MIDDLE + 6.5F, (float) (SURFACE - 1), MIDDLE + 9.5F);
+        WorkerAntEntity abovePit = TestAnts.loneAnt(helper, MIDDLE - 5.5F, (float) SURFACE, MIDDLE + 9.5F);
         BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE + 3, SURFACE, MIDDLE + 9));
-        helper.runAfterDelay(10, () -> ant.getNavigator().moveTo(goal, 1.0));
-        watch(helper, ant);
-        helper.succeedWhen(() -> helper.assertTrue(
-                ant.getNavigator().isDone() && !ant.getNavigator().hasFailed() && ant.blockPosition().equals(goal) && helper.getTick() > 20,
-                "the ant has not climbed out of the pit yet"));
-    }
-
-    /** The same, but the route is planned while the ant is still in the air above the pit (it falls in on its way). */
-    @GameTest(template = "arena", timeoutTicks = 600, skyAccess = true)
-    public static void antPlanningAboveAPitFallsInAndClimbsOut(GameTestHelper helper) {
-        buildNest(helper);
-        helper.setBlock(MIDDLE + 6, SURFACE - 1, MIDDLE + 9, Blocks.AIR);
-        WorkerAntEntity ant = TestAnts.loneAnt(helper, MIDDLE + 6.5F, (float) SURFACE, MIDDLE + 9.5F);
-        BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE + 3, SURFACE, MIDDLE + 9));
-        helper.runAfterDelay(1, () -> ant.getNavigator().moveTo(goal, 1.0));
-        watch(helper, ant);
-        helper.succeedWhen(() -> helper.assertTrue(
-                ant.getNavigator().isDone() && !ant.getNavigator().hasFailed() && ant.blockPosition().equals(goal) && helper.getTick() > 20,
-                "the ant has not climbed out of the pit yet"));
+        BlockPos otherGoal = helper.absolutePos(new BlockPos(MIDDLE - 3, SURFACE, MIDDLE + 9));
+        helper.runAfterDelay(1, () -> abovePit.getNavigator().moveTo(otherGoal, 1.0));
+        helper.runAfterDelay(10, () -> inPit.getNavigator().moveTo(goal, 1.0));
+        watch(helper, inPit);
+        watch(helper, abovePit, false);
+        helper.succeedWhen(() -> {
+            helper.assertTrue(helper.getTick() > 20, "not started yet");
+            helper.assertTrue(inPit.getNavigator().isDone() && !inPit.getNavigator().hasFailed() && inPit.blockPosition().equals(goal),
+                    "the ant has not climbed out of the pit yet");
+            helper.assertTrue(abovePit.getNavigator().isDone() && !abovePit.getNavigator().hasFailed() && abovePit.blockPosition().equals(otherGoal),
+                    "the ant that fell in has not climbed out of the pit yet");
+        });
     }
 
     /**
-     * One ant on every surface cell (flat ground and every step of the hill) around the finished hill, all sent into the
-     * food store at the same time: every one of them must get there, and none may take much longer than the others.
+     * One ant on every surface cell (flat ground and every step of the hill) around the finished hill, each somewhere
+     * inside its cell, all sent into the food store at the same time: every one of them must get there, and none may
+     * take much longer than the others.
      */
     @GameTest(template = "arena", timeoutTicks = 4000, skyAccess = true)
     public static void antsFromAllAroundTheHillReachTheFoodStore(GameTestHelper helper) {
-        scan(helper, 1L, false, false, false);
-    }
-
-    /** The same, but every ant starts somewhere inside its cell instead of in the middle. */
-    @GameTest(template = "arena", timeoutTicks = 4000, skyAccess = true)
-    public static void antsStartingAnywhereInTheirCellReachTheFoodStore(GameTestHelper helper) {
         scan(helper, 2L, true, false, false);
     }
 
-    /** The same on bumpy ground: single blocks piled on the grass and single grass blocks missing. */
+    /**
+     * The same on bumpy ground (single blocks piled on the grass and single grass blocks missing) with a hill that is
+     * only partly built (some blocks of its top layers are missing).
+     */
     @GameTest(template = "arena", timeoutTicks = 4000, skyAccess = true)
-    public static void antsOnBumpyGroundReachTheFoodStore(GameTestHelper helper) {
-        scan(helper, 3L, true, true, false);
-    }
-
-    /** The same with a hill that is only partly built: some blocks of its top layers are missing. */
-    @GameTest(template = "arena", timeoutTicks = 4000, skyAccess = true)
-    public static void antsOverAHalfBuiltHillReachTheFoodStore(GameTestHelper helper) {
-        scan(helper, 4L, true, false, true);
+    public static void antsOnBumpyGroundOverAHalfBuiltHillReachTheFoodStore(GameTestHelper helper) {
+        scan(helper, 3L, true, true, true);
     }
 
     /** The cell an ant stands in on top of the highest solid block in this column. */
@@ -331,18 +247,6 @@ public class NavigationTests {
     }
 
     @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
-    public static void antWalksFromTheSurfaceDownToTheNursery(GameTestHelper helper) {
-        buildNest(helper);
-        WorkerAntEntity ant = TestAnts.loneAnt(helper, MIDDLE - 3, SURFACE, MIDDLE + 3);
-        BlockPos goal = chambers(helper).get(1).center();
-        helper.runAfterDelay(10, () -> ant.getNavigator().moveTo(goal, 1.0));
-        watch(helper, ant);
-        helper.succeedWhen(() -> helper.assertTrue(
-                ant.getNavigator().isDone() && !ant.getNavigator().hasFailed() && ant.blockPosition().equals(goal) && helper.getTick() > 20,
-                "the ant has not reached the nursery yet"));
-    }
-
-    @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
     public static void antWalksFromTheSurfaceDownToTheDeepestRoom(GameTestHelper helper) {
         buildNest(helper);
         WorkerAntEntity ant = TestAnts.loneAnt(helper, MIDDLE - 3, SURFACE, MIDDLE + 3);
@@ -388,40 +292,25 @@ public class NavigationTests {
     }
 
     /**
-     * Climbs from the middle of each room out through the finished hill, four ants at once, each to a place on another
-     * side of it (so every side the hill can be left over is tried): the whole way up must be steady, with no stalls
-     * and no hanging in mid-air.
+     * Climbs from the middle of every room out through the finished hill, four ants from each room at once, each to a
+     * place on another side of it (so every side the hill can be left over is tried): the whole way up must be steady,
+     * with no stalls and no hanging in mid-air.
      */
-    @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
-    public static void antsClimbFromTheSeedStoreThroughTheFinishedHill(GameTestHelper helper) {
-        climbOutThroughTheHill(helper, 0);
-    }
-
-    @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
-    public static void antsClimbFromTheNurseryThroughTheFinishedHill(GameTestHelper helper) {
-        climbOutThroughTheHill(helper, 1);
-    }
-
-    @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
-    public static void antsClimbFromTheQueensRoomThroughTheFinishedHill(GameTestHelper helper) {
-        climbOutThroughTheHill(helper, 2);
-    }
-
-    @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
-    public static void antsClimbFromTheRefuseChamberThroughTheFinishedHill(GameTestHelper helper) {
-        climbOutThroughTheHill(helper, 3);
-    }
-
-    private static void climbOutThroughTheHill(GameTestHelper helper, int level) {
+    @GameTest(template = "arena", timeoutTicks = 2000, skyAccess = true)
+    public static void antsClimbFromEveryRoomThroughTheFinishedHill(GameTestHelper helper) {
         buildNest(helper);
         buildHill(helper);
-        BlockPos start = chambers(helper).get(level).center().subtract(helper.absolutePos(BlockPos.ZERO));
         int[][] goals = {{5, 0}, {-5, 0}, {0, 5}, {0, -5}};
         List<WorkerAntEntity> ants = new java.util.ArrayList<>();
         List<BlockPos> targets = new java.util.ArrayList<>();
-        for (int[] goal : goals) {
-            ants.add(TestAnts.loneAnt(helper, start.getX(), start.getY(), start.getZ()));
-            targets.add(helper.absolutePos(new BlockPos(MIDDLE + goal[0], SURFACE, MIDDLE + goal[1])));
+        List<String> rooms = new java.util.ArrayList<>();
+        for (int level = 0; level < NestPlan.MAX_LEVELS; level++) {
+            BlockPos start = chambers(helper).get(level).center().subtract(helper.absolutePos(BlockPos.ZERO));
+            for (int[] goal : goals) {
+                ants.add(TestAnts.loneAnt(helper, start.getX(), start.getY(), start.getZ()));
+                targets.add(helper.absolutePos(new BlockPos(MIDDLE + goal[0], SURFACE, MIDDLE + goal[1])));
+                rooms.add("room " + level);
+            }
         }
         helper.runAfterDelay(10, () -> {
             for (int i = 0; i < ants.size(); i++) {
@@ -438,103 +327,105 @@ public class NavigationTests {
             for (int i = 0; i < ants.size(); i++) {
                 helper.assertTrue(ants.get(i).getNavigator().isDone() && !ants.get(i).getNavigator().hasFailed()
                         && ants.get(i).blockPosition().equals(targets.get(i)) && helper.getTick() > 20,
-                        "ant " + i + " has not climbed out of the room yet");
+                        "ant " + i + " (from " + rooms.get(i) + ") has not climbed out yet");
             }
-        });
-    }
-
-    /** An ant whose walk ends in the shaft (no floor there) hangs on to the wall where it is: it must not fall to the bottom. */
-    @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
-    public static void antStaysOnTheShaftWallWhenItsWalkEndsInTheShaft(GameTestHelper helper) {
-        buildNest(helper);
-        buildHill(helper);
-        BlockPos start = chambers(helper).get(1).center().subtract(helper.absolutePos(BlockPos.ZERO));
-        WorkerAntEntity ant = TestAnts.loneAnt(helper, start.getX(), start.getY(), start.getZ());
-        BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE, SURFACE - 1, MIDDLE));
-        long[] arrived = {-1};
-        helper.runAfterDelay(10, () -> ant.getNavigator().moveTo(goal, 1.0));
-        watch(helper, ant, false);
-        helper.succeedWhen(() -> {
-            if (arrived[0] < 0 && ant.getNavigator().isDone() && ant.blockPosition().equals(goal)) {
-                arrived[0] = helper.getTick();
-            }
-            helper.assertTrue(arrived[0] >= 0, "the ant has not reached the top of the shaft yet");
-            helper.assertTrue(ant.getY() >= goal.getY() - 0.01, "the ant fell out of its cell (y " + ant.getY() + ")");
-            helper.assertTrue(helper.getTick() >= arrived[0] + 80, "waiting to see whether the ant stays up");
-            helper.assertTrue(ant.getNavigator().isClimbing(), "the ant is not clinging to the wall");
-        });
-    }
-
-    /** An ant that is stopped half way up the shaft (another goal takes over) keeps clinging to the wall. */
-    @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
-    public static void antStoppedHalfWayUpTheShaftStaysOnTheWall(GameTestHelper helper) {
-        buildNest(helper);
-        buildHill(helper);
-        BlockPos start = chambers(helper).get(1).center().subtract(helper.absolutePos(BlockPos.ZERO));
-        WorkerAntEntity ant = TestAnts.loneAnt(helper, start.getX(), start.getY(), start.getZ());
-        BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE - 5, SURFACE, MIDDLE - 2));
-        double[] stoppedAt = {Double.NaN};
-        long[] stoppedTick = {0};
-        helper.runAfterDelay(10, () -> ant.getNavigator().moveTo(goal, 1.0));
-        watch(helper, ant, false);
-        helper.succeedWhen(() -> {
-            if (Double.isNaN(stoppedAt[0]) && ant.getNavigator().isClimbing() && ant.getY() - helper.absolutePos(BlockPos.ZERO).getY() > SURFACE - 1.5
-                    && ant.getY() - helper.absolutePos(BlockPos.ZERO).getY() < SURFACE + 1) {
-                ant.getNavigator().stop();
-                stoppedAt[0] = ant.getY();
-                stoppedTick[0] = helper.getTick();
-            }
-            helper.assertTrue(!Double.isNaN(stoppedAt[0]), "the ant has not climbed up the shaft yet");
-            helper.assertTrue(ant.getY() >= stoppedAt[0] - 0.05, "the ant fell after it was stopped (from " + stoppedAt[0] + " to " + ant.getY() + ")");
-            helper.assertTrue(helper.getTick() >= stoppedTick[0] + 80, "waiting to see whether the ant stays up");
         });
     }
 
     /**
-     * An ant hanging on one wall of the shaft that gets a new job on the far side (it has to climb out over the opposite
-     * wall) crawls over the walls and round the corners to it, and never lets go to drift across the open shaft.
-     * The walk ends at the top of the shaft, or one cell lower (then the way out starts with a straight climb).
+     * Two ants from the nursery that stay on the shaft wall: one whose walk ends in the shaft (no floor there) hangs on
+     * to the wall where it is and must not fall to the bottom; one that is stopped half way up the shaft on its way out
+     * (another goal takes over) keeps clinging to the wall.
      */
     @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
-    public static void antHangingAtTheTopOfTheShaftCrawlsRoundToTheOtherWall(GameTestHelper helper) {
-        crawlRoundTheShaft(helper, 1);
-    }
-
-    @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
-    public static void antHangingHalfWayUpTheShaftCrawlsRoundToTheOtherWall(GameTestHelper helper) {
-        crawlRoundTheShaft(helper, 2);
-    }
-
-    private static void crawlRoundTheShaft(GameTestHelper helper, int depth) {
+    public static void antsStayOnTheShaftWallWhenTheirWalkEndsOrIsStopped(GameTestHelper helper) {
         buildNest(helper);
+        buildHill(helper);
         BlockPos start = chambers(helper).get(1).center().subtract(helper.absolutePos(BlockPos.ZERO));
         WorkerAntEntity ant = TestAnts.loneAnt(helper, start.getX(), start.getY(), start.getZ());
-        BlockPos hang = helper.absolutePos(new BlockPos(MIDDLE, SURFACE - depth, MIDDLE));
-        BlockPos[] goal = {null};
-        Direction[] clung = {null};
+        WorkerAntEntity stopped = TestAnts.loneAnt(helper, start.getX(), start.getY(), start.getZ());
+        BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE, SURFACE - 1, MIDDLE));
+        BlockPos out = helper.absolutePos(new BlockPos(MIDDLE - 5, SURFACE, MIDDLE - 2));
         long[] arrived = {-1};
-        helper.runAfterDelay(10, () -> ant.getNavigator().moveTo(hang, 1.0));
+        double[] stoppedAt = {Double.NaN};
+        long[] stoppedTick = {0};
+        helper.runAfterDelay(10, () -> ant.getNavigator().moveTo(goal, 1.0));
+        helper.runAfterDelay(10, () -> stopped.getNavigator().moveTo(out, 1.0));
+        watch(helper, ant, false);
+        watch(helper, stopped, false);
         helper.onEachTick(() -> {
-            if (arrived[0] < 0 && helper.getTick() > 12 && ant.getNavigator().isDone() && ant.blockPosition().equals(hang)) {
+            double y = stopped.getY() - helper.absolutePos(BlockPos.ZERO).getY();
+            if (Double.isNaN(stoppedAt[0]) && stopped.getNavigator().isClimbing() && y > SURFACE - 1.5 && y < SURFACE + 1) {
+                stopped.getNavigator().stop();
+                stoppedAt[0] = stopped.getY();
+                stoppedTick[0] = helper.getTick();
+            }
+            if (arrived[0] < 0 && ant.getNavigator().isDone() && ant.blockPosition().equals(goal)) {
                 arrived[0] = helper.getTick();
             }
-            if (goal[0] == null && arrived[0] >= 0 && helper.getTick() >= arrived[0] + 30) {
-                // The wall it hangs on is the side its body is pushed furthest toward; send it out over the opposite one.
-                double dx = ant.getX() - (hang.getX() + 0.5);
-                double dz = ant.getZ() - (hang.getZ() + 0.5);
-                clung[0] = Math.abs(dx) > Math.abs(dz) ? (dx > 0 ? Direction.EAST : Direction.WEST) : (dz > 0 ? Direction.SOUTH : Direction.NORTH);
-                Direction out = clung[0].getOpposite();
-                goal[0] = helper.absolutePos(new BlockPos(MIDDLE + out.getStepX() * 4, SURFACE, MIDDLE + out.getStepZ() * 4));
-                boolean found = ant.getNavigator().moveTo(goal[0], 1.0);
-                AntColoniesMod.LOGGER.info("[nav-test] #{} hangs on the {} wall, sent out to the {}: route found {} -> {}", ant.getId(),
-                        clung[0], out, found, ant.getNavigator().getRoute() == null ? "none" : relative(helper, ant.getNavigator().getRoute()));
+            if (!Double.isNaN(stoppedAt[0])) {
+                helper.assertTrue(stopped.getY() >= stoppedAt[0] - 0.05, "the stopped ant fell (from " + stoppedAt[0] + " to " + stopped.getY() + ")");
+            }
+            if (arrived[0] >= 0) {
+                helper.assertTrue(ant.getY() >= goal.getY() - 0.01, "the ant fell out of its cell (y " + ant.getY() + ")");
             }
         });
-        watch(helper, ant);
         helper.succeedWhen(() -> {
-            helper.assertTrue(goal[0] != null, "the ant has not reached its spot in the shaft yet");
-            helper.assertTrue(ant.getNavigator().isDone() && !ant.getNavigator().hasFailed() && ant.blockPosition().equals(goal[0]),
-                    "the ant (from the " + clung[0] + " wall) has not climbed out over the opposite side yet");
+            helper.assertTrue(arrived[0] >= 0, "the ant has not reached the top of the shaft yet");
+            helper.assertTrue(!Double.isNaN(stoppedAt[0]), "the other ant has not climbed up the shaft yet");
+            helper.assertTrue(helper.getTick() >= arrived[0] + 80 && helper.getTick() >= stoppedTick[0] + 80, "waiting to see whether the ants stay up");
+            helper.assertTrue(ant.getNavigator().isClimbing(), "the ant is not clinging to the wall");
+        });
+    }
+
+    /**
+     * Two ants hanging on a wall of the shaft, one at its top and one a cell lower (then the way out starts with a
+     * straight climb), each get a new job on the far side (they have to climb out over the opposite wall): they crawl
+     * over the walls and round the corners to it, and never let go to drift across the open shaft.
+     */
+    @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
+    public static void antsHangingInTheShaftCrawlRoundToTheOtherWall(GameTestHelper helper) {
+        buildNest(helper);
+        BlockPos start = chambers(helper).get(1).center().subtract(helper.absolutePos(BlockPos.ZERO));
+        int[] depths = {1, 2};
+        WorkerAntEntity[] ants = new WorkerAntEntity[depths.length];
+        BlockPos[] hangs = new BlockPos[depths.length];
+        BlockPos[] goals = new BlockPos[depths.length];
+        Direction[] clung = new Direction[depths.length];
+        long[] arrived = {-1, -1};
+        for (int k = 0; k < depths.length; k++) {
+            ants[k] = TestAnts.loneAnt(helper, start.getX(), start.getY(), start.getZ());
+            hangs[k] = helper.absolutePos(new BlockPos(MIDDLE, SURFACE - depths[k], MIDDLE));
+            int which = k;
+            // The second waits a little, so the two are not on the same stretch of wall at once.
+            helper.runAfterDelay(10 + 100 * k, () -> ants[which].getNavigator().moveTo(hangs[which], 1.0));
+            watch(helper, ants[k], k == 0);
+        }
+        helper.onEachTick(() -> {
+            for (int k = 0; k < depths.length; k++) {
+                WorkerAntEntity ant = ants[k];
+                if (arrived[k] < 0 && helper.getTick() > 12 + 100 * k && ant.getNavigator().isDone() && ant.blockPosition().equals(hangs[k])) {
+                    arrived[k] = helper.getTick();
+                }
+                if (goals[k] == null && arrived[k] >= 0 && helper.getTick() >= arrived[k] + 30) {
+                    // The wall it hangs on is the side its body is pushed furthest toward; send it out over the opposite one.
+                    double dx = ant.getX() - (hangs[k].getX() + 0.5);
+                    double dz = ant.getZ() - (hangs[k].getZ() + 0.5);
+                    clung[k] = Math.abs(dx) > Math.abs(dz) ? (dx > 0 ? Direction.EAST : Direction.WEST) : (dz > 0 ? Direction.SOUTH : Direction.NORTH);
+                    Direction out = clung[k].getOpposite();
+                    goals[k] = helper.absolutePos(new BlockPos(MIDDLE + out.getStepX() * 4, SURFACE, MIDDLE + out.getStepZ() * 4));
+                    boolean found = ant.getNavigator().moveTo(goals[k], 1.0);
+                    AntColoniesMod.LOGGER.info("[nav-test] #{} hangs on the {} wall, sent out to the {}: route found {} -> {}", ant.getId(),
+                            clung[k], out, found, ant.getNavigator().getRoute() == null ? "none" : relative(helper, ant.getNavigator().getRoute()));
+                }
+            }
+        });
+        helper.succeedWhen(() -> {
+            for (int k = 0; k < depths.length; k++) {
+                helper.assertTrue(goals[k] != null, "ant " + k + " has not reached its spot in the shaft yet");
+                helper.assertTrue(ants[k].getNavigator().isDone() && !ants[k].getNavigator().hasFailed() && ants[k].blockPosition().equals(goals[k]),
+                        "ant " + k + " (from the " + clung[k] + " wall) has not climbed out over the opposite side yet");
+            }
         });
     }
 
@@ -648,35 +539,40 @@ public class NavigationTests {
         });
     }
 
-    /** An ant hanging on the shaft wall when the world is saved is still on the wall after it is loaded again. */
+    /**
+     * Two ants hanging on when the world is saved, one on the shaft wall and one from the seed store's ceiling: after it
+     * is loaded again each is still where it was, holding on.
+     */
     @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
-    public static void antOnTheShaftWallIsStillThereAfterAReload(GameTestHelper helper) {
+    public static void antsOnTheShaftWallAndTheCeilingAreStillThereAfterAReload(GameTestHelper helper) {
         buildNest(helper);
         BlockPos start = chambers(helper).get(1).center().subtract(helper.absolutePos(BlockPos.ZERO));
-        WorkerAntEntity ant = TestAnts.loneAnt(helper, start.getX(), start.getY(), start.getZ());
-        BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE, SURFACE - 1, MIDDLE));
-        helper.runAfterDelay(10, () -> ant.getNavigator().moveTo(goal, 1.0));
-        reloadOnceUpAndCheckItStays(helper, ant, () -> ant.getNavigator().isDone() && ant.blockPosition().equals(goal));
-    }
-
-    /** An ant hanging from a room ceiling when the world is saved is still hanging there after it is loaded again. */
-    @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
-    public static void antOnTheCeilingIsStillThereAfterAReload(GameTestHelper helper) {
-        buildNest(helper);
+        WorkerAntEntity onWall = TestAnts.loneAnt(helper, start.getX(), start.getY(), start.getZ());
+        BlockPos wall = helper.absolutePos(new BlockPos(MIDDLE, SURFACE - 1, MIDDLE));
+        helper.runAfterDelay(10, () -> onWall.getNavigator().moveTo(wall, 1.0));
         NestPlan.Chamber store = chambers(helper).get(0);
         BlockPos corner = store.room().get(0).subtract(helper.absolutePos(BlockPos.ZERO));
-        WorkerAntEntity ant = TestAnts.loneAnt(helper, corner.getX(), corner.getY(), corner.getZ());
-        Foothold goal = Foothold.ceiling(store.center());
-        helper.runAfterDelay(10, () -> ant.getNavigator().moveTo(goal, 1.0));
-        reloadOnceUpAndCheckItStays(helper, ant, () -> ant.getNavigator().isDone() && ant.blockPosition().equals(goal.cell())
-                && ant.getNavigator().getSurface() == Direction.UP);
+        WorkerAntEntity onCeiling = TestAnts.loneAnt(helper, corner.getX(), corner.getY(), corner.getZ());
+        Foothold ceiling = Foothold.ceiling(store.center());
+        helper.runAfterDelay(10, () -> onCeiling.getNavigator().moveTo(ceiling, 1.0));
+        java.util.function.Supplier<String> wallCheck = reloadOnceUp(helper, onWall,
+                () -> onWall.getNavigator().isDone() && onWall.blockPosition().equals(wall));
+        java.util.function.Supplier<String> ceilingCheck = reloadOnceUp(helper, onCeiling, () -> onCeiling.getNavigator().isDone()
+                && onCeiling.blockPosition().equals(ceiling.cell()) && onCeiling.getNavigator().getSurface() == Direction.UP);
+        helper.succeedWhen(() -> {
+            String wallTrouble = wallCheck.get();
+            helper.assertTrue(wallTrouble == null, "on the shaft wall: " + wallTrouble);
+            String ceilingTrouble = ceilingCheck.get();
+            helper.assertTrue(ceilingTrouble == null, "on the ceiling: " + ceilingTrouble);
+        });
     }
 
     /**
      * Waits until the ant is up ({@code isUp}) and has hung there for 20 ticks, then saves it and puts a copy loaded from
-     * that save in its place (what happens when its chunk is saved and loaded again). The copy must not drop.
+     * that save in its place (what happens when its chunk is saved and loaded again). The copy must not drop. The check
+     * it gives back says what is still wrong, or null once the copy has stayed up long enough.
      */
-    private static void reloadOnceUpAndCheckItStays(GameTestHelper helper, WorkerAntEntity ant, java.util.function.BooleanSupplier isUp) {
+    private static java.util.function.Supplier<String> reloadOnceUp(GameTestHelper helper, WorkerAntEntity ant, java.util.function.BooleanSupplier isUp) {
         long[] upSince = {-1};
         WorkerAntEntity[] copy = {null};
         double[] savedY = {0.0};
@@ -704,13 +600,19 @@ public class NavigationTests {
                 loadedAt[0] = helper.getTick();
             }
         });
-        helper.succeedWhen(() -> {
-            helper.assertTrue(copy[0] != null, "the ant has not got up there yet");
+        return () -> {
+            if (copy[0] == null) {
+                return "the ant has not got up there yet";
+            }
             WorkerAntEntity loaded = copy[0];
-            helper.assertTrue(loaded.getY() >= savedY[0] - 0.05, "the ant dropped after the reload (from " + savedY[0] + " to " + loaded.getY() + ")");
-            helper.assertTrue(loaded.getNavigator().isClimbing(), "the ant let go after the reload");
-            helper.assertTrue(helper.getTick() >= loadedAt[0] + 80, "waiting to see whether the reloaded ant stays up");
-        });
+            if (loaded.getY() < savedY[0] - 0.05) {
+                return "the ant dropped after the reload (from " + savedY[0] + " to " + loaded.getY() + ")";
+            }
+            if (!loaded.getNavigator().isClimbing()) {
+                return "the ant let go after the reload";
+            }
+            return helper.getTick() >= loadedAt[0] + 80 ? null : "waiting to see whether the reloaded ant stays up";
+        };
     }
 
     /** Fails if a climbing ant stands still for 12 ticks or more, or slides sideways away from the wall it hugs. */
