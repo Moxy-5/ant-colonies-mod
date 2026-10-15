@@ -551,13 +551,13 @@ public class FoodStore {
 
     /**
      * One layer off the heap at {@code pile} (whose state is {@code state}). A fungus comb eaten right down leaves no
-     * block: its nodules are moved onto other comb ({@link FungusGarden#moveNodulesOff}).
+     * block, and its nodules go with it ({@link FungusGarden#loseNodules}).
      */
     private void takeOneLayer(Level level, BlockPos pile, BlockState state) {
         BlockState less = oneLayerLess(state);
         level.setBlock(pile, less, 3);
         if (less.isAir() && state.getBlock() instanceof FungusCombBlock) {
-            colony.garden().moveNodulesOff(level, pile, state.getValue(FungusCombBlock.NODULES));
+            colony.garden().loseNodules(state.getValue(FungusCombBlock.NODULES));
         }
     }
 

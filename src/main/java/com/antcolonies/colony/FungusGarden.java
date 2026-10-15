@@ -48,6 +48,8 @@ public class FungusGarden implements NurseFood {
     private int seenNodules;
     /** How many old layers have crumbled away since the colony was loaded (out of the food count). Not saved: for tests. */
     private int layersCrumbled;
+    /** How many nodules went with a comb block that was used up, since the colony was loaded. Not saved: for tests. */
+    private int nodulesLost;
     /** Tests only: how many times faster the comb ripens, goes old and crumbles. Not saved. */
     private float ageingSpeedForTests = 1.0F;
 
@@ -144,7 +146,7 @@ public class FungusGarden implements NurseFood {
             if (state != was) {
                 level.setBlock(pos, state, 3);
                 if (state.isAir()) {
-                    moveNodulesOff(level, pos, nodules);
+                    loseNodules(nodules);
                 }
                 changed = true;
             }
@@ -165,22 +167,12 @@ public class FungusGarden implements NurseFood {
     }
 
     /**
-     * A comb block is gone (its last layer eaten or crumbled away) with {@code nodules} still on it: the nurses pick
-     * them off onto other comb with room for them, so no food the colony counts vanishes with the block (found by the
-     * termite away test, docs/BUGS.md 26; where they go is my pick, to confirm). Any that fit nowhere are lost.
+     * A comb block is gone (its last layer eaten or crumbled away) with {@code nodules} still on it: they go with it, as
+     * on a real comb eaten away (the user's decision, 2026-10-15; docs/BUGS.md 26). The brain counts the nodules in
+     * the world, so its count simply has these fewer; they are only counted here, for tests.
      */
-    void moveNodulesOff(Level level, BlockPos from, int nodules) {
-        int lost = 0;
-        for (int i = 0; i < nodules; i++) {
-            BlockPos spot = pickReturnSpot(level, level.getRandom());
-            if (spot == null || spot.equals(from) || !putBack(level, spot, false)) {
-                lost++;
-            }
-        }
-        if (lost > 0) {
-            AntColoniesMod.LOGGER.info("[garden] colony {}: a comb at {} was used up, {} of its nodules had nowhere to go", colony.getId(),
-                    from.toShortString(), lost);
-        }
+    void loseNodules(int nodules) {
+        nodulesLost += nodules;
     }
 
     /** Tests only: the comb ripens, goes old and crumbles this many times faster (here and while away). */
@@ -255,6 +247,11 @@ public class FungusGarden implements NurseFood {
     /** How many old layers have crumbled away since the colony was loaded (for tests). */
     public int getLayersCrumbled() {
         return layersCrumbled;
+    }
+
+    /** How many nodules went with used-up comb blocks since the colony was loaded (for tests). */
+    public int getNodulesLost() {
+        return nodulesLost;
     }
 
     /** How many nodules have grown since the colony was loaded, here or away (for tests: each turned a ripe layer old). */

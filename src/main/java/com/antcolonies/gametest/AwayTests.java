@@ -322,6 +322,7 @@ public class AwayTests {
         int[] eggsLaid = new int[1];
         int[] foodBefore = new int[1];
         int[] grownBefore = new int[1];
+        int[] lostBefore = new int[1];
         int[] eatenBefore = new int[2];
         int[] expected = new int[5]; // fresh, ripe, old, nodules, layers: what the brain counted when the colony came back
         boolean[] back = {false};
@@ -435,6 +436,7 @@ public class AwayTests {
             expected[3] = colony.life().nurseFoodLeft(level);
             expected[4] = colony.food().getFood();
             grownBefore[0] = colony.garden().getNodulesGrown();
+            lostBefore[0] = colony.garden().getNodulesLost();
             colony.garden().setAgeingSpeedForTests(0.0F); // (only nodules may still grow: counted below)
             colony.away().setAwayForTests(false);
             loadAgain(level, queenOnDisk[0]);
@@ -450,15 +452,16 @@ public class AwayTests {
             }
             int[] blocks = combTotals(level, colony);
             int grown = colony.garden().getNodulesGrown() - grownBefore[0]; // (each turned a ripe layer old)
-            AntColoniesMod.LOGGER.info("[away-test] termites back: blocks {} (fresh, ripe, old, nodules, layers), counted {}, {} nodules grown since",
-                    java.util.Arrays.toString(blocks), java.util.Arrays.toString(expected), grown);
+            int lost = colony.garden().getNodulesLost() - lostBefore[0]; // (on comb eaten or crumbled right away)
+            AntColoniesMod.LOGGER.info("[away-test] termites back: blocks {} (fresh, ripe, old, nodules, layers), counted {}, {} nodules grown since, {} lost",
+                    java.util.Arrays.toString(blocks), java.util.Arrays.toString(expected), grown, lost);
             helper.assertTrue(blocks[4] == expected[4] && blocks[4] == colony.food().getFood(), "the comb should have " + expected[4]
                     + " layers as counted: " + java.util.Arrays.toString(blocks) + ", food " + colony.food().getFood());
             helper.assertTrue(blocks[0] == expected[0] && blocks[1] == expected[1] - grown && blocks[2] == expected[2] + grown,
                     "the comb's ages should be as counted: blocks " + java.util.Arrays.toString(blocks) + ", counted " + java.util.Arrays.toString(expected)
                             + ", " + grown + " nodules grown since");
-            helper.assertTrue(blocks[3] == expected[3] + grown, "the nodules should be as counted: blocks " + java.util.Arrays.toString(blocks)
-                    + ", counted " + java.util.Arrays.toString(expected) + ", " + grown + " grown since");
+            helper.assertTrue(blocks[3] == expected[3] + grown - lost, "the nodules should be as counted: blocks " + java.util.Arrays.toString(blocks)
+                    + ", counted " + java.util.Arrays.toString(expected) + ", " + grown + " grown since, " + lost + " lost with used-up comb");
             colony.garden().setAgeingSpeedForTests(1.0F);
             helper.succeed();
         });
