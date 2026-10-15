@@ -893,7 +893,10 @@ public class Nest {
         return null;
     }
 
-    /** Whether this cell of a runway holds a plant (grass) to be cut away. */
+    /**
+     * Whether this cell of a runway holds a plant to be cut away. Food (dry grass, a dead bush) is cut too, but its
+     * pieces are left lying for the foragers ({@code FoodStore.cutAwayForTheForagers}), so no food is thrown away.
+     */
     public boolean isRunwayPlant(Level level, BlockPos cell) {
         if (!level.isLoaded(cell)) {
             return false;

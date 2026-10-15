@@ -154,10 +154,11 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * always); outside those times the workers stay inside (see {@code Colony.isForagingTime}). {@code findRadius}
      * (optional, 0: the colony knows every plant in its area at once): a plant is only gone for once a worker has
      * been within this many blocks of it and brought the news home, and foragers with nothing good to go for scout
-     * the area (see {@code FoodMap}).
+     * the area (see {@code FoodMap}). {@code regrowth} (optional): eaten plants that grow back, and bare patches round
+     * the foraging holes (see {@link Regrowth}).
      */
     public record FoodNumbers(int radius, String items, List<PlantFood> plants, String piece, String pile, int millTicks, int breadStock,
-            List<String> forageAt, int findRadius) {
+            List<String> forageAt, int findRadius, Optional<Regrowth> regrowth) {
         /** Foraging at any time: day, night and in the rain. */
         public static final List<String> ALWAYS = List.of("day", "night", "rain");
 
@@ -170,7 +171,8 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 Codec.INT.optionalFieldOf("mill_ticks", 0).forGetter(FoodNumbers::millTicks),
                 Codec.INT.optionalFieldOf("bread_stock", 0).forGetter(FoodNumbers::breadStock),
                 Codec.STRING.listOf().optionalFieldOf("forage_at", ALWAYS).forGetter(FoodNumbers::forageAt),
-                Codec.INT.optionalFieldOf("find_radius", 0).forGetter(FoodNumbers::findRadius)
+                Codec.INT.optionalFieldOf("find_radius", 0).forGetter(FoodNumbers::findRadius),
+                Regrowth.CODEC.optionalFieldOf("regrowth").forGetter(FoodNumbers::regrowth)
         ).apply(i, FoodNumbers::new));
 
         /**
@@ -226,6 +228,63 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * {@code state} (optional): block state values the plant must have, for example {@code {"growth": "dry"}} so
      * termites only take Dry Grass once it has dried; a block without one of these properties never matches.
      */
+    /**
+     * Grass that grows back after it is eaten (the user's plan of 2026-10-14, "bare patches"): a tuft of one of the
+     * {@code plants} eaten away grows back as {@code growsBack} (with the values in {@code state}: green) about
+     * {@code ticks} later, from the roots left in the ground. A tuft eaten within {@code bareRadius} blocks (sideways) of
+     * a foraging hole leaves the grass block under it bare ({@code bareGround}, coarse dirt) until it grows back, so the
+     * ground round a busy hole is a patch of bare soil, as round real Macrotermes foraging holes; the rest of the
+     * savanna is only grazed.
+     */
+    public record Regrowth(List<String> plants, String growsBack, Map<String, String> state, int ticks, int bareRadius, String bareGround) {
+        public static final Codec<Regrowth> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.STRING.listOf().fieldOf("plants").forGetter(Regrowth::plants),
+                Codec.STRING.fieldOf("grows_back").forGetter(Regrowth::growsBack),
+                Codec.unboundedMap(Codec.STRING, Codec.STRING).optionalFieldOf("state", Map.of()).forGetter(Regrowth::state),
+                Codec.INT.fieldOf("ticks").forGetter(Regrowth::ticks),
+                Codec.INT.optionalFieldOf("bare_radius", 0).forGetter(Regrowth::bareRadius),
+                Codec.STRING.optionalFieldOf("bare_ground", "minecraft:coarse_dirt").forGetter(Regrowth::bareGround)
+        ).apply(i, Regrowth::new));
+
+        /** Whether this eaten plant grows back. */
+        public boolean regrows(BlockState state) {
+            for (String plant : plants) {
+                if (new PlantFood(plant, 1, false, 1).matches(state)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /** The young tuft that grows back, or null if the block is unknown. */
+        @Nullable
+        public BlockState growsBackState() {
+            ResourceLocation id = ResourceLocation.tryParse(growsBack);
+            BlockState young = id == null ? null : BuiltInRegistries.BLOCK.getOptional(id).map(Block::defaultBlockState).orElse(null);
+            if (young == null) {
+                return null;
+            }
+            for (Map.Entry<String, String> value : state.entrySet()) {
+                Property<?> property = young.getBlock().getStateDefinition().getProperty(value.getKey());
+                if (property != null) {
+                    young = withValue(young, property, value.getValue());
+                }
+            }
+            return young;
+        }
+
+        /** The bare ground left round a hole, or null if the block is unknown. */
+        @Nullable
+        public BlockState bareGroundState() {
+            ResourceLocation id = ResourceLocation.tryParse(bareGround);
+            return id == null ? null : BuiltInRegistries.BLOCK.getOptional(id).map(Block::defaultBlockState).orElse(null);
+        }
+
+        private static <T extends Comparable<T>> BlockState withValue(BlockState state, Property<T> property, String name) {
+            return property.getValue(name).map(value -> state.setValue(property, value)).orElse(state);
+        }
+    }
+
     public record PlantFood(String block, int pieces, boolean onlyDecaying, int foragers, Map<String, String> state, boolean rich) {
         public static final Codec<PlantFood> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.STRING.fieldOf("block").forGetter(PlantFood::block),
@@ -658,7 +717,7 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
             new QueenNumbers(20, 5, 5, 1200, 3600, 120000L),
             new BroodNumbers(10, 1200, 5, 48000L),
             new FoodNumbers(24, "antcolonies:seeds", List.of(new PlantFood("minecraft:short_grass", 10, false, 1)),
-                    "minecraft:wheat_seeds", "antcolonies:seed_pile", 60, 20, FoodNumbers.ALWAYS, 0),
+                    "minecraft:wheat_seeds", "antcolonies:seed_pile", 60, 20, FoodNumbers.ALWAYS, 0, Optional.empty()),
             new RefuseNumbers(6000),
             new NestNumbers(4, true, true, List.of(), 0, 8, "antcolonies:burrowed_dirt",
                     List.of(new LevelUnlock(1, 0), new LevelUnlock(6, 10), new LevelUnlock(12, 30), new LevelUnlock(20, 30))),

@@ -271,6 +271,7 @@ public class NestWalls {
                     || !isOpenToward(level, next, side.getOpposite())) {
                 continue;
             }
+            cutFood(level, next);
             level.setBlock(next, crust().withFace(level.getBlockState(next), side.getOpposite()), 3);
         }
         // Food over it that the insects could walk into (a fallen branch) is cased in mud on every other side, so the
@@ -283,10 +284,22 @@ public class NestWalls {
             }
             for (BlockPos gap : casingGaps(level, food, side.getOpposite(), nest)) {
                 if (!mound.containsKey(gap)) {
+                    cutFood(level, gap);
                     Direction toward = Direction.getNearest(food.getX() - gap.getX(), food.getY() - gap.getY(), food.getZ() - gap.getZ());
                     level.setBlock(gap, crust().withFace(level.getBlockState(gap), toward), 3);
                 }
             }
+        }
+    }
+
+    /**
+     * A plant the colony eats (a dead bush, a tuft of dry grass) where a wall is about to go is cut down first and its
+     * pieces left lying for the foragers, so the wall does not wipe the food out.
+     */
+    private void cutFood(Level level, BlockPos pos) {
+        BlockState state = level.getBlockState(pos);
+        if (!state.isAir() && !MudCrustBlock.isCrust(state) && colony.profile().food().plantFor(state) != null) {
+            colony.food().cutAwayForTheForagers(level, pos);
         }
     }
 
@@ -346,6 +359,7 @@ public class NestWalls {
                 }
             }
         }
+        cutFood(level, hole);
         level.setBlock(hole, wallFor(level, hole), 3);
         claimedLeaks.remove(hole);
         sealProgress.remove(hole);

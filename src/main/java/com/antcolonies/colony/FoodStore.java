@@ -74,10 +74,18 @@ public class FoodStore {
     private int seedsEaten;
     /** Seeds an ant is on its way to: item entity id -> game time when the claim runs out. Not saved. */
     private final Claims<Integer> claimedSeeds = new Claims<>();
+    /** Eaten grass growing back, and the bare patches round the holes. Saved. */
+    private final BarePatches barePatches;
 
     FoodStore(Colony colony) {
         this.colony = colony;
         this.center = colony.getCenter();
+        this.barePatches = new BarePatches(colony);
+    }
+
+    /** Eaten grass growing back, and the bare patches round the holes. */
+    public BarePatches barePatches() {
+        return barePatches;
     }
 
     public int getFood() {
@@ -378,6 +386,7 @@ public class FoodStore {
                 BlockState cast = castFor(level, pos, state);
                 if (cast == null) {
                     level.destroyBlock(pos, false);
+                    barePatches.eatenAway(level, pos, state);
                 } else {
                     level.levelEvent(net.minecraft.world.level.block.LevelEvent.PARTICLES_DESTROY_BLOCK, pos,
                             net.minecraft.world.level.block.Block.getId(state));
@@ -386,6 +395,32 @@ public class FoodStore {
             }
         } else if (plant.foragers() <= 1) {
             busyGrass.put(pos, level.getGameTime() + GRASS_REST_TICKS);
+        }
+    }
+
+    /**
+     * A food plant in the way of a wall or a runway is cut down by the builders: what is left of it (its pieces not cut
+     * yet) is left lying on the spot as pieces for the foragers to carry in, so no food is lost, and the grass grows
+     * back later like grass eaten.
+     */
+    public void cutAwayForTheForagers(Level level, BlockPos pos) {
+        BlockState state = level.getBlockState(pos);
+        SpeciesProfile.PlantFood plant = food().plantFor(state);
+        if (plant == null) {
+            return;
+        }
+        int cut = grassClips.getOrDefault(pos, state.getBlock() instanceof EatenInStages eaten ? eaten.eatenAlready(state, plant.pieces()) : 0);
+        int left = Math.max(0, plant.pieces() - cut);
+        grassClips.remove(pos);
+        busyGrass.remove(pos);
+        level.destroyBlock(pos, false);
+        barePatches.eatenAway(level, pos, state);
+        if (left > 0) {
+            ItemStack pieces = cutPiece();
+            pieces.setCount(left);
+            ItemEntity item = new ItemEntity(level, pos.getX() + 0.5, pos.getY() + 0.1, pos.getZ() + 0.5, pieces);
+            item.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
+            level.addFreshEntity(item);
         }
     }
 
@@ -537,6 +572,7 @@ public class FoodStore {
         CompoundTag clips = new CompoundTag();
         grassClips.forEach((pos, count) -> clips.putInt(Long.toString(pos.asLong()), count));
         tag.put("grassClips", clips);
+        barePatches.save(tag);
     }
 
     void load(CompoundTag tag) {
@@ -547,5 +583,6 @@ public class FoodStore {
         for (String key : clips.getAllKeys()) {
             grassClips.put(BlockPos.of(Long.parseLong(key)), clips.getInt(key));
         }
+        barePatches.load(tag);
     }
 }

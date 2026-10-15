@@ -127,7 +127,7 @@ class SpeciesProfileTest {
     @Test
     void foragersGoOutWhenTheirProfileSays() {
         SpeciesProfile.FoodNumbers ant = SpeciesProfile.RED_HARVESTER_ANT.food();
-        SpeciesProfile.FoodNumbers termite = new SpeciesProfile.FoodNumbers(24, "x", java.util.List.of(), "x", "x", 0, 0, java.util.List.of("night", "rain"), 0);
+        SpeciesProfile.FoodNumbers termite = new SpeciesProfile.FoodNumbers(24, "x", java.util.List.of(), "x", "x", 0, 0, java.util.List.of("night", "rain"), 0, java.util.Optional.empty());
         for (boolean day : new boolean[] {true, false}) {
             for (boolean rain : new boolean[] {true, false}) {
                 assertTrue(ant.foragesNow(day, rain), "the harvester ant forages at any time");

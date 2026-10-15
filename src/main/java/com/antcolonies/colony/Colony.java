@@ -293,7 +293,7 @@ public class Colony {
     /**
      * Once a second for every colony whose middle is loaded (called from {@code ModEvents}, not by the queen, so a
      * colony's own clock keeps going without her): the fungus garden, the mound's leftovers, the mushrooms, the alarm,
-     * the food map and the members that are numbers. A queenless colony with nobody left is abandoned: it ends, and its nest stays in the ground.
+     * the food map, the grass growing back and the members that are numbers. A queenless colony with nobody left is abandoned: it ends, and its nest stays in the ground.
      * Returns false once the colony has ended.
      */
     public boolean tick(ServerLevel level) {
@@ -306,6 +306,7 @@ public class Colony {
         alarm.tick(level);
         foodMap.tick(level);
         foragingHoles.tick(level);
+        food.barePatches().tick(level);
         population.tick(level);
         return true;
     }

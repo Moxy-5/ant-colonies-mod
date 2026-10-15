@@ -162,7 +162,11 @@ public class DigGoal extends Goal {
             colony.nest().clearDigProgress(target);
             colony.mound().blockDug(level, target);
             level.destroyBlockProgress(ant.getId(), target, -1);
-            level.destroyBlock(target, false, ant);
+            if (colony.nest().isRunwayPlant(level, target) && colony.profile().food().plantFor(state) != null) {
+                colony.food().cutAwayForTheForagers(level, target); // food in the way of a runway: left for the foragers
+            } else {
+                level.destroyBlock(target, false, ant);
+            }
         } else {
             level.destroyBlockProgress(ant.getId(), target, Math.min(9, (int) (progress * 10.0F)));
         }

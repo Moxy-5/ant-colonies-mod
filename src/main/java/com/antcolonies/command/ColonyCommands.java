@@ -384,6 +384,9 @@ public class ColonyCommands {
         String line = " | " + (colony.isForagingTime(level) ? "foraging now" : "staying in") + " (out at: " + when + ")";
         if (holes > 0) {
             line += ", holes open " + colony.foragingHoles().countOpen(level) + " of " + colony.foragingHoles().tunnels(level).size(); line += colony.foragingHoles().describeNewHoles(level) + colony.foragingHoles().describeRunways(level);
+            if (colony.profile().food().regrowth().isPresent()) {
+                line += ", " + colony.food().barePatches().describe();
+            }
         }
         return line;
     }
