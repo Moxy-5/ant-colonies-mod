@@ -311,6 +311,7 @@ public class QueenCare {
                 } else if (now >= nextFoundingEgg) {
                     eggsLaid++;
                     colony.brood().addInside(Brood.Young.egg(hatch));
+                colony.away().note(level, AwayReport.What.EGGS_LAID, 1);
                     nextFoundingEgg = now + founding.eggIntervalTicks();
                 }
                 changed = true;
@@ -320,6 +321,7 @@ public class QueenCare {
                 int young = colony.brood().hungriestInside();
                 if (young >= 0) {
                     colony.brood().feedInside(young); // from the founders' own fat
+                    colony.away().note(level, AwayReport.What.YOUNG_FED, 1);
                     changed = true;
                 }
             }
@@ -336,15 +338,18 @@ public class QueenCare {
                 queenBread = Math.max(0, queenBread - laying.foodPerEgg());
                 nextStreamEgg = now + laying.intervalFor(size);
                 colony.brood().addInside(Brood.Young.egg(hatch));
+                colony.away().note(level, AwayReport.What.EGGS_LAID, 1);
                 changed = true;
             }
         } else if (home && isEggDue(level)) {
             eggCameOut(level);
             colony.brood().addInside(Brood.Young.egg(hatch));
+                colony.away().note(level, AwayReport.What.EGGS_LAID, 1);
             changed = true;
         }
         if (hungerRunsOut(level)) {
             starvedAway = true;
+            colony.away().noteQueenStarved();
             AntColoniesMod.LOGGER.info("[away] colony {}: the queen starved while the colony was away", colony.getId());
             changed = true;
         }

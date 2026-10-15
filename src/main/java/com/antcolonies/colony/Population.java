@@ -260,6 +260,7 @@ public class Population {
             return;
         }
         colony.setCount(WorkerAntEntity.CASTE, colony.getCount(WorkerAntEntity.CASTE) - died);
+        colony.away().note(level, AwayReport.What.OLD_AGE, died);
         buried(level, died);
     }
 
@@ -286,6 +287,7 @@ public class Population {
             return;
         }
         colony.setCount(caste, colony.getCount(caste) - died);
+        colony.away().note(level, AwayReport.What.STARVED, died);
         com.antcolonies.AntColoniesMod.LOGGER.info("[meals] colony {}: {} {} numbers starved", colony.getId(), died, caste);
         if (WorkerAntEntity.CASTE.equals(caste)) {
             buried(level, died);

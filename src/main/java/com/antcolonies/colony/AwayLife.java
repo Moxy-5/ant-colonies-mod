@@ -57,6 +57,10 @@ public class AwayLife {
     private final Colony colony;
     /** The game time the nest's middle was first seen out of range, or {@link Colony#NOT_SET} while it is here. Saved. */
     private long awaySince = Colony.NOT_SET;
+    /** What happened while away, this time or the last time (shown in the colony list). Saved. */
+    private final AwayReport report = new AwayReport();
+    /** How long the colony was away the last time (ticks; 0 while away or never). Saved. */
+    private long lastAwayFor;
     /** The colony's insects frozen in unloaded land: id -> what it was. Saved. */
     private final Map<UUID, Frozen> frozen = new LinkedHashMap<>();
     /** Tests only: whether this runs at all (null: always, except on the game test server). Not saved. */
@@ -181,6 +185,8 @@ public class AwayLife {
         long now = level.getGameTime();
         if (awaySince == Colony.NOT_SET) {
             awaySince = now;
+            report.clear();
+            lastAwayFor = 0;
             ColonyManager.get(level).markChanged();
         }
         if (isAway(level)) {
@@ -286,6 +292,7 @@ public class AwayLife {
         if (awaySince != Colony.NOT_SET) {
             long away = level.getGameTime() - awaySince;
             awaySince = Colony.NOT_SET;
+            lastAwayFor = away;
             AntColoniesMod.LOGGER.info("[away] colony {} is back after {} ticks: {}", colony.getId(), away, describe(level));
             ColonyManager.get(level).markChanged();
         }
@@ -332,7 +339,31 @@ public class AwayLife {
         if (!owed.isEmpty()) {
             text.append(" | owed to the nest: ").append(String.join(", ", owed));
         }
+        if (awaySince != Colony.NOT_SET && isAway(level)) {
+            text.append(" | while away so far: ").append(report.describe());
+        } else if (lastAwayFor > 0) {
+            String time = lastAwayFor >= 24000 ? String.format(java.util.Locale.ROOT, "%.1f days", lastAwayFor / 24000.0)
+                    : String.format(java.util.Locale.ROOT, "%.1f hours", lastAwayFor / 1000.0); // (in-game: 1000 ticks an hour)
+            text.append(" | while away (").append(time).append("): ").append(report.describe());
+        }
         return text.toString();
+    }
+
+    /** Counts something that happened, if the colony is away now (see {@link AwayReport}). */
+    void note(ServerLevel level, AwayReport.What what, int count) {
+        if (count > 0 && isOn(level) && isAway(level)) {
+            report.add(what, count);
+        }
+    }
+
+    /** The queen starved while away (for the report). */
+    void noteQueenStarved() {
+        report.queenStarved();
+    }
+
+    /** What happened while away, this time or the last time. */
+    public AwayReport report() {
+        return report;
     }
 
     // --- tests ----------------------------------------------------------------------------------------------------
@@ -374,6 +405,8 @@ public class AwayLife {
     void save(CompoundTag tag) {
         CompoundTag away = new CompoundTag();
         away.putLong("since", awaySince);
+        away.putLong("lastAwayFor", lastAwayFor);
+        report.save(away);
         ListTag list = new ListTag();
         frozen.forEach((id, what) -> {
             CompoundTag entry = new CompoundTag();
@@ -403,6 +436,8 @@ public class AwayLife {
         }
         CompoundTag away = tag.getCompound("away");
         awaySince = away.getLong("since"); // (what an older save owed is read by the NestLedger)
+        lastAwayFor = away.getLong("lastAwayFor");
+        report.load(away);
         ListTag list = away.getList("frozen", Tag.TAG_COMPOUND);
         for (int i = 0; i < list.size(); i++) {
             CompoundTag entry = list.getCompound(i);

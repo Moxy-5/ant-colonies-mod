@@ -186,6 +186,7 @@ class Meals {
             }
             if (fed > 0) {
                 times.merge(minute(now), fed, Integer::sum);
+                colony.away().note(level, AwayReport.What.MEALS, fed);
             }
             if (diet.starveAfter() > 0) {
                 int starved = 0;

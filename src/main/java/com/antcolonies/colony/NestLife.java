@@ -104,6 +104,7 @@ public class NestLife {
                 long left = one.left() < 0 ? numbers.hatchTicks() : one.left() - 20;
                 if (left <= 0) {
                     young.set(i, Brood.Young.larva(0, 0, colony.soldiers().rankForNewNymph(level)));
+                    colony.away().note(level, AwayReport.What.HATCHED, 1);
                 } else {
                     young.set(i, Brood.Young.egg(left));
                 }
@@ -116,6 +117,7 @@ public class NestLife {
                 if (hungry >= numbers.larvaStarveTicks()) {
                     young.remove(i--);
                     colony.ledger().addBodies(1);
+                    colony.away().note(level, AwayReport.What.YOUNG_STARVED, 1);
                     AntColoniesMod.LOGGER.info("[nest] colony {}: a young one that is a number starved", colony.getId());
                 } else {
                     young.set(i, Brood.Young.larva(one.fed(), hungry, rank));
@@ -133,6 +135,7 @@ public class NestLife {
             }
             young.remove(i--);
             colony.population().addNewMembers(rank == null ? WorkerAntEntity.CASTE : rank.caste(), now, 1);
+            colony.away().note(level, AwayReport.What.GREW_UP, 1);
             changed = true;
         }
         return changed;
@@ -187,14 +190,17 @@ public class NestLife {
         while (nurseWork >= 1) {
             if (queen.wantsFoodAway(level, queenHome) && nurseFoodLeft(level) > 0) {
                 queen.feedQueen(level, takePiece(true));
+                colony.away().note(level, AwayReport.What.QUEEN_FED, 1);
             } else if (colony.brood().hungriestInside() >= 0 && nurseFoodLeft(level) > 0) {
                 int larva = colony.brood().hungriestInside();
                 takePiece(false);
                 colony.brood().feedInside(larva);
+                colony.away().note(level, AwayReport.What.YOUNG_FED, 1);
             } else if (bakery.needsBreadAway(level) && colony.food().getFood() > 0) {
                 boolean rich = colony.food().takeCounted(bakery.wantsRichBread());
                 bakery.countIn(rich);
                 colony.ledger().addNurseFood(1);
+                colony.away().note(level, AwayReport.What.BREAD_MADE, 1);
             } else {
                 break;
             }
@@ -260,6 +266,7 @@ public class NestLife {
         while (ripening >= 1 && garden.freshKnown() > 0) {
             ripening--;
             ledger.addRipened(1);
+            colony.away().note(level, AwayReport.What.COMB_RIPENED, 1);
             changed = true;
         }
         ripening = garden.freshKnown() > 0 ? ripening : 0;
@@ -274,6 +281,7 @@ public class NestLife {
                 ledger.addAged(1);
                 ledger.addNurseFood(1);
                 garden.grewAway();
+                colony.away().note(level, AwayReport.What.NODULES_GROWN, 1);
                 changed = true;
             }
         }
@@ -281,6 +289,7 @@ public class NestLife {
         while (ageing >= 1 && garden.ripeKnown() > 0) {
             ageing--;
             ledger.addAged(1);
+            colony.away().note(level, AwayReport.What.COMB_AGED, 1);
             changed = true;
         }
         ageing = garden.ripeKnown() > 0 ? ageing : 0;

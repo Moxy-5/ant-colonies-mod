@@ -13,6 +13,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import com.antcolonies.AntColoniesMod;
+import com.antcolonies.colony.AwayReport;
 import com.antcolonies.colony.Brood;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
@@ -253,6 +254,11 @@ public class AwayTests {
                     "the nurses should have fed the queen: " + colony.queenCare().getQueenBread());
             helper.assertTrue(colony.food().getFood() < 48 && colony.ledger().store() < 0,
                     "the nurses should have milled seeds into bread: " + colony.food().getFood() + " food, " + colony.ledger().describe());
+            AwayReport report = colony.away().report(); // what the player reads in the colony list
+            helper.assertTrue(report.get(AwayReport.What.EGGS_LAID) == 1 && report.get(AwayReport.What.HATCHED) == 1
+                    && report.get(AwayReport.What.GREW_UP) == 3 && report.get(AwayReport.What.QUEEN_FED) > 0
+                    && report.get(AwayReport.What.YOUNG_FED) > 0 && report.get(AwayReport.What.BREAD_MADE) > 0,
+                    "the away report should tell what happened: " + report.describe());
             List<BlockPos> store = colony.nest().getFoodStoreCells(level);
             for (int i = 0; i < 10; i++) {
                 colony.food().depositSeed(level, store.get(i % store.size())); // (a few seeds left in the store)
@@ -280,6 +286,9 @@ public class AwayTests {
             AntColoniesMod.LOGGER.info("[away-test] 2b back: {}{}", colony.population().describe(level), colony.away().describe(level));
             helper.assertTrue(colony.brood().insideCount() == 0 && colony.brood().countEggs(level) == 1,
                     "her egg should be real in the nursery: " + colony.brood().countEggs(level) + " eggs, " + colony.brood().insideCount() + " inside");
+            helper.assertTrue(colony.away().report().get(AwayReport.What.STARVED) >= 250, "the report should count the starved: " + colony.away().report().describe());
+            helper.assertTrue(colony.away().describe(level).contains("while away ("), "the report should be kept after coming back: "
+                    + colony.away().describe(level));
             helper.assertTrue(colony.ledger().isEmpty(), "the blocks should have caught up with the counts: " + colony.ledger().describe());
             helper.assertTrue(!colony.refuse().getRefuseCorpses(level).isEmpty(), "the starved workers' bodies should be in the refuse chamber");
             helper.succeed();
