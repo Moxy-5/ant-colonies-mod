@@ -267,7 +267,7 @@ public class NestWalls {
                     || !isOpenToward(level, next, side.getOpposite())) {
                 continue;
             }
-            level.setBlock(next, crust().withFace(level.getBlockState(next), side.getOpposite()), 3);
+            plate(level, next, side.getOpposite());
         }
         // Food over it that the insects could walk into (a fallen branch) is cased in mud on every other side, so the
         // gallery has a roof (real termites cover a branch in sheeting and eat it from underneath). The mud holds it up
@@ -280,10 +280,67 @@ public class NestWalls {
             for (BlockPos gap : casingGaps(level, food, side.getOpposite(), nest)) {
                 if (!mound.containsKey(gap)) {
                     Direction toward = Direction.getNearest(food.getX() - gap.getX(), food.getY() - gap.getY(), food.getZ() - gap.getZ());
-                    level.setBlock(gap, crust().withFace(level.getBlockState(gap), toward), 3);
+                    plate(level, gap, toward);
                 }
             }
         }
+    }
+
+    /**
+     * Puts a plate of mud on this face of the cell (wall first, a branch's casing). Never over anyone: nestmates standing
+     * in the cell are first nudged out to an open spot beside it, away from the plate (the user's bug of 2026-10-14:
+     * termites eating a branch from outside at night were cased in with it, could plan no route from inside the plate's
+     * block and were shut out by day; and like bug 8, "only if nobody is there" jams where traffic is dense). Anyone
+     * else there (a player, an animal, another colony's insect), or nowhere to nudge them to: no plate for now (the gap
+     * is a leak, patched later). Public for tests.
+     */
+    public boolean plate(Level level, BlockPos cell, Direction face) {
+        BlockState wall = crust().withFace(level.getBlockState(cell), face);
+        if (!nudgeOut(level, cell, wall)) {
+            return false;
+        }
+        level.setBlock(cell, wall, 3);
+        return true;
+    }
+
+    /**
+     * Moves the colony's insects in this cell out to an open spot beside it that the new {@code wall} (a crust) does not
+     * close off, with a floor to stand on if there is one. False (and nobody moved) if anyone else is in it or there is
+     * nowhere to go; true if the cell is free now.
+     */
+    private boolean nudgeOut(Level level, BlockPos cell, BlockState wall) {
+        List<LivingEntity> in = level.getEntitiesOfClass(LivingEntity.class, new AABB(cell), LivingEntity::isAlive);
+        if (in.isEmpty()) {
+            return true;
+        }
+        for (LivingEntity living : in) {
+            if (!(living instanceof com.antcolonies.entity.AbstractAntEntity insect) || !colony.getId().equals(insect.getColonyId())) {
+                return false;
+            }
+        }
+        BlockPos out = null;
+        for (boolean needFloor : new boolean[] {true, false}) {
+            for (Direction side : Direction.values()) {
+                BlockPos next = cell.relative(side);
+                if (out != null || side == Direction.DOWN || MudCrustBlock.hasFace(wall, side) || !level.isLoaded(next)) {
+                    continue;
+                }
+                BlockState state = level.getBlockState(next);
+                if (state.getCollisionShape(level, next).isEmpty() && state.getFluidState().isEmpty()
+                        && (!needFloor || level.getBlockState(next.below()).isFaceSturdy(level, next.below(), Direction.UP))) {
+                    out = next;
+                }
+            }
+        }
+        if (out == null) {
+            return false;
+        }
+        for (LivingEntity insect : in) {
+            insect.moveTo(out.getX() + 0.5, out.getY(), out.getZ() + 0.5);
+            insect.setDeltaMovement(0, 0, 0);
+            ((com.antcolonies.entity.AbstractAntEntity) insect).getNavigator().stop();
+        }
+        return true;
     }
 
     private static MudCrustBlock crust() {
@@ -327,8 +384,12 @@ public class NestWalls {
         if (hole.equals(center) || !isLeakOpen(level, hole)) {
             return false;
         }
-        // Never bury anyone, same as with the hill.
+        // Never bury anyone, same as with the hill. A plate of mud is no burial: nestmates there step out beside it.
+        BlockState wall = wallFor(level, hole);
         List<LivingEntity> inside = level.getEntitiesOfClass(LivingEntity.class, new AABB(hole));
+        if (!inside.isEmpty() && MudCrustBlock.isCrust(wall) && nudgeOut(level, hole, wall)) {
+            inside = List.of();
+        }
         if (!inside.isEmpty()) {
             BlockPos out = inside.stream().allMatch(this::isOwnSoldier) ? outsideOf(level, hole) : null;
             if (out == null) {
@@ -341,7 +402,7 @@ public class NestWalls {
                 }
             }
         }
-        level.setBlock(hole, wallFor(level, hole), 3);
+        level.setBlock(hole, wall, 3);
         claimedLeaks.remove(hole);
         sealProgress.remove(hole);
         return true;

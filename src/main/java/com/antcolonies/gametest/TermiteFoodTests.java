@@ -372,6 +372,46 @@ public class TermiteFoodTests {
     }
 
     /**
+     * The user's bug (2026-10-14): termites eating a branch from outside at night were cased in with it (a plate of mud
+     * put down in the spot they stood in), could plan no route from inside the plate's block and were shut out by day.
+     * Now a plate put down where a nestmate stands nudges it out first, to an open spot away from the plate; and a
+     * termite already inside a plate's block (put there by hand here) still finds a route out from the spots beside it.
+     */
+    @GameTest(template = "arena", skyAccess = true)
+    public static void aPlateOfMudIsNeverPutDownOnATermite(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        TermiteMoundTests.deepGround(helper);
+        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        helper.runAfterDelay(5, () -> {
+            helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE + 4, SURFACE, MIDDLE);
+            helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE - 4, SURFACE, MIDDLE);
+        });
+        helper.runAfterDelay(15, () -> {
+            com.antcolonies.colony.Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(colony != null, "no termite colony");
+            List<com.antcolonies.entity.TermiteWorkerEntity> workers = level.getEntitiesOfClass(com.antcolonies.entity.TermiteWorkerEntity.class,
+                    helper.getBounds(), worker -> colony.getId().equals(worker.getColonyId()));
+            helper.assertTrue(workers.size() == 2, workers.size() + " workers joined the colony, not 2");
+            com.antcolonies.entity.TermiteWorkerEntity first = workers.get(0);
+            BlockPos cell = first.blockPosition();
+            first.moveTo(cell.getX() + 0.5, cell.getY(), cell.getZ() + 0.5);
+            helper.assertTrue(colony.walls().plate(level, cell, net.minecraft.core.Direction.SOUTH), "the plate was not put down");
+            helper.assertTrue(com.antcolonies.block.MudCrustBlock.hasFace(level.getBlockState(cell), net.minecraft.core.Direction.SOUTH),
+                    "no plate in the cell");
+            helper.assertTrue(!first.blockPosition().equals(cell) && first.blockPosition().distManhattan(cell) == 1,
+                    "the termite was not nudged out beside the plate: at " + first.blockPosition().toShortString());
+            helper.assertTrue(!first.blockPosition().equals(cell.south()), "the termite was nudged through the plate");
+            // A termite already inside a plate's block plans its way out.
+            com.antcolonies.entity.TermiteWorkerEntity second = workers.get(1);
+            BlockPos caught = second.blockPosition();
+            second.moveTo(caught.getX() + 0.5, caught.getY(), caught.getZ() + 0.5);
+            level.setBlock(caught, ModBlocks.MUD_CRUST.get().withFace(Blocks.AIR.defaultBlockState(), net.minecraft.core.Direction.SOUTH), 3);
+            helper.assertTrue(second.getNavigator().moveTo(caught.north(4), 1.0), "a termite inside a plate's block found no route out");
+            helper.succeed();
+        });
+    }
+
+    /**
      * A fallen tree: an upright stump of dead wood, and a trunk of 4 to 6 dead wood blocks lying along the ground beside
      * it; termites count each dead wood block as a big food plant (several foragers at once), and it is eaten in stages.
      */

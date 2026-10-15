@@ -376,6 +376,15 @@ public class AntNavigator {
             Foothold landing = AntPathFinder.landing(map, ant.blockPosition());
             if (landing != null) {
                 starts.add(landing);
+            } else if (!map.isOpen(ant.blockPosition())) {
+                // Inside a block that is not open (a thin plate of mud put down where it stood, the user's bug of
+                // 2026-10-14): from the open spots beside it, which it can step out to.
+                for (Direction side : Direction.values()) {
+                    Foothold beside = side == Direction.DOWN ? null : AntPathFinder.landing(map, ant.blockPosition().relative(side));
+                    if (beside != null) {
+                        starts.add(beside);
+                    }
+                }
             }
         }
         long now = ant.level().getGameTime();
