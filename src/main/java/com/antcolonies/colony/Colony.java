@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
@@ -64,6 +65,18 @@ public class Colony {
     private Boolean dayForTests;
     @Nullable
     private Boolean rainForTests;
+    /** Tests only: pretend it is this time of day ({@link net.minecraft.world.level.Level#getDayTime}), for a day clock. Not saved. */
+    @Nullable
+    private Long timeForTests;
+    /**
+     * Game test server only: the time of day every day clock reads unless a test sets its own (the test server's sun
+     * keeps moving, so a long run would reach night part way through and the harvester foragers would stop). Not saved.
+     */
+    @Nullable
+    private static Long timeOnTestServer;
+    /** The biome's heat at the nest (its base temperature), for a day clock's midday rest; read once. Not saved. */
+    @Nullable
+    private Float heat;
 
     private final Nest nest;
     private final NestWalls walls;
@@ -257,8 +270,8 @@ public class Colony {
     }
 
     /**
-     * Whether it is time to forage (the profile's {@code food.forage_at}: termites at night and in the rain, harvester
-     * ants at any time). Outside this time the foragers stay home, the foraging holes are plugged, and a species that
+     * Whether it is time to forage (the profile's {@code food.day_clock} if it has one: harvester ants by day with a
+     * midday rest, never in the rain; otherwise its {@code food.forage_at}: termites at night and in the rain). Outside this time the foragers stay home, the foraging holes are plugged, and a species that
      * keeps to a schedule does no work outside the nest and the mound at all (it stays in, out of the sun). The end of the
      * night already counts as day ({@link #isBeforeDawn}): they head in before the sun is up. Never while the alarm is at
      * 2 or more ({@link Alarm#keepsEveryoneIn}): the foragers hurry home.
@@ -270,8 +283,41 @@ public class Colony {
         if (foragingTimeForTests != null) {
             return foragingTimeForTests;
         }
+        Optional<SpeciesProfile.DayClock> clock = profile().food().dayClock();
+        if (clock.isPresent()) {
+            return clock.get().outAt(timeOfDay(level), heat(level), rainForTests != null ? rainForTests : rainsOnNest(level));
+        }
         boolean day = dayForTests != null ? dayForTests : level.isDay() || isBeforeDawn(level);
         return profile().food().foragesNow(day, rainForTests != null ? rainForTests : level.isRaining());
+    }
+
+    /** The time of day for the day clock (see {@link #isForagingTime}). */
+    public long timeOfDay(net.minecraft.world.level.Level level) {
+        return timeForTests != null ? timeForTests : timeOnTestServer != null ? timeOnTestServer : level.getDayTime();
+    }
+
+    /** Game test server only: the time of day every day clock reads (see {@link #timeOnTestServer}). */
+    public static void setTimeOnTestServer(@Nullable Long dayTime) {
+        timeOnTestServer = dayTime;
+    }
+
+    /** The biome's heat at the nest (its base temperature: plains 0.8, badlands, desert and savanna 2.0). */
+    public float heat(net.minecraft.world.level.Level level) {
+        if (heat == null) {
+            heat = level.getBiome(center).value().getBaseTemperature();
+        }
+        return heat;
+    }
+
+    /** Whether rain falls on the nest now (never in a dry biome such as the badlands or the desert). */
+    private boolean rainsOnNest(net.minecraft.world.level.Level level) {
+        return level.isRaining() && level.getBiome(center).value().hasPrecipitation();
+    }
+
+    /** Tests only: pretend it is this time of day, and this hot (null for the real clock and biome). */
+    public void setClockForTests(@Nullable Long dayTime, @Nullable Float heat) {
+        timeForTests = dayTime;
+        this.heat = heat;
     }
 
     /**

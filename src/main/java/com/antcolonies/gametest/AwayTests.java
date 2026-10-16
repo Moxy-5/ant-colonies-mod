@@ -402,8 +402,10 @@ public class AwayTests {
      * sight. While here the numbers eat the hidden tufts up (they vanish, out of sight; 8 seeds in the store) and leave
      * the seen ones alone. Then the colony goes away (nobody near): from what the brain remembers they eat the other 4 up
      * too, but not a tuft that grew after the brain last looked; the away report counts it all.
+     * <p>Brain step 4b, in the same scene: away, the numbers keep the harvester ants' day clock: nothing is foraged at
+     * midnight, nor at 7:00 in the rain; on a dry morning in a hot biome they go out and eat the tufts up.
      */
-    @GameTest(template = "arena", timeoutTicks = 2400, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 3000, skyAccess = true)
     public static void antNumbersForageOnlyOutOfSightAndFromWhatTheyRemember(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         startAntColony(helper);
@@ -460,8 +462,21 @@ public class AwayTests {
             colony.population().setViewersForTests(List.of());
             level.setBlock(late, Blocks.SHORT_GRASS.defaultBlockState(), 3);
             colony.food().setPiecesCutForTests(late, 8);
+            colony.setClockForTests(18000L, null); // midnight: the foragers stay in
         });
-        helper.runAfterDelay(2000, () -> {
+        helper.runAfterDelay(1300, () -> {
+            Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
+            checkNothingForaged(helper, colony, seen, "at midnight");
+            colony.setClockForTests(1000L, null); // 7:00, but raining on the nest
+            colony.setSkyForTests(null, true);
+        });
+        helper.runAfterDelay(1600, () -> {
+            Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
+            checkNothingForaged(helper, colony, seen, "in the rain");
+            colony.setClockForTests(2000L, 2.0F); // 8:00 in a hot biome, dry: out (the midday rest is 11:00 to 15:00)
+            colony.setSkyForTests(null, false);
+        });
+        helper.runAfterDelay(2600, () -> {
             Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
             AntColoniesMod.LOGGER.info("[away-test] 2c ants away: food {}{}{}", colony.food().getFood(), colony.away().describe(level),
                     colony.field().describe());
@@ -481,10 +496,18 @@ public class AwayTests {
             colony.away().setAwayForTests(false);
             loadAgain(level, queenOnDisk[0]);
         });
-        helper.runAfterDelay(2060, () -> {
+        helper.runAfterDelay(2660, () -> {
             helper.assertTrue(antColony(helper) != null, "the queen should be back and alive");
             helper.succeed();
         });
+    }
+
+    /** Brain step 4b: out of the harvester ants' foraging hours the numbers bring nothing in from the remembered tufts. */
+    private static void checkNothingForaged(GameTestHelper helper, Colony colony, List<BlockPos> tufts, String when) {
+        for (BlockPos tuft : tufts) {
+            helper.assertTrue(colony.food().getPiecesCut(tuft) == 8, "no tuft should be foraged " + when + ": " + tuft + " cut " + colony.food().getPiecesCut(tuft));
+        }
+        helper.assertTrue(colony.away().report().get(AwayReport.What.FORAGED) == 0, "nothing should be brought in " + when + ": " + colony.away().report().describe());
     }
 
     /**

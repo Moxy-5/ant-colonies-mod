@@ -11,6 +11,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -49,6 +50,11 @@ public class QueenCare {
      * {@link #queenStarves}). Saved.
      */
     private boolean starvedAway;
+    /**
+     * The founding batch failed (every first worker died and no young are left) and the queen is laying her second,
+     * smaller batch from the fat she has left (the profile's {@code founding.second_batch_eggs}). Saved.
+     */
+    private boolean secondBatch;
     /** The workers on their way to feed the queen: ant -> game time when the claim runs out. Not saved. */
     private final Claims<UUID> feeders = new Claims<>();
 
@@ -191,7 +197,8 @@ public class QueenCare {
         long now = level.getGameTime();
         boolean changed = false;
         boolean sealedIn = isQueenHome(level) && !colony.nest().isEntranceOpen(level);
-        if (sealedIn && colony.isFounding() && eggsLaid < founding.eggs()) {
+        changed |= startSecondBatch(level, founding);
+        if (sealedIn && colony.isFounding() && eggsLaid < batchEggs(founding)) {
             if (nextFoundingEgg == Colony.NOT_SET) {
                 nextFoundingEgg = now + founding.eggIntervalTicks();
                 changed = true;
@@ -203,7 +210,7 @@ public class QueenCare {
                 changed = true;
             }
         }
-        boolean raising = eggsLaid <= founding.eggs() && colony.getCount(WorkerAntEntity.CASTE) < founding.eggs();
+        boolean raising = eggsLaid <= batchEggs(founding) && colony.getCount(WorkerAntEntity.CASTE) < founding.eggs();
         if (raising && now % founding.feedIntervalTicks() < 20) {
             // The hungriest young one gets the next piece.
             colony.brood().getLarvae(level).stream().filter(young -> !young.isFull())
@@ -214,6 +221,44 @@ public class QueenCare {
                     });
         }
         return changed;
+    }
+
+    /** How many eggs the founding queen lays from her own fat in all: the founding batch, and the second one once that failed. */
+    private int batchEggs(SpeciesProfile.Founding founding) {
+        return founding.eggs() + (secondBatch ? founding.secondBatchEggs() : 0);
+    }
+
+    /**
+     * A founding queen whose first workers have all died with no young left (the user's decision, 2026-10-15): she lays
+     * one more, smaller batch from the fat she has left, as a few real founding queens with reserves do. Only a queen who
+     * has laid just her founding batch (an older queen who has lost every worker has no founding fat left). True if it starts now.
+     */
+    private boolean startSecondBatch(ServerLevel level, SpeciesProfile.Founding founding) {
+        if (secondBatch || founding.secondBatchEggs() <= 0 || eggsLaid != founding.eggs() || !colony.isFounding()
+                || colony.brood().countBrood(level) > 0) {
+            return false;
+        }
+        secondBatch = true;
+        nextFoundingEgg = Colony.NOT_SET;
+        colony.away().note(level, AwayReport.What.SECOND_BATCH, 1);
+        AntColoniesMod.LOGGER.info("[queen] colony {}: her first workers are all dead; she lays a second batch from what fat she has left", colony.getId());
+        return true;
+    }
+
+    /**
+     * A founding queen with no batch left to raise and nobody to feed her (her first workers, and her second batch, are
+     * dead, or an older queen has lost every worker): she gets hungry like any queen, so she starves and the nest is
+     * abandoned (most real founding queens that lose their first workers die).
+     */
+    public boolean isSpent(Level level) {
+        SpeciesProfile.Founding founding = colony.profile().founding().orElse(null);
+        return founding != null && colony.isFounding() && eggsLaid >= founding.eggs() && colony.brood().countBrood(level) == 0
+                && (eggsLaid >= batchEggs(founding) && (secondBatch || founding.secondBatchEggs() <= 0) || eggsLaid > founding.eggs() && !secondBatch);
+    }
+
+    /** Whether she is laying her second batch (for tests and the colony list). */
+    public boolean isOnSecondBatch() {
+        return secondBatch;
     }
 
     /**
@@ -305,7 +350,8 @@ public class QueenCare {
         boolean changed = false;
         SpeciesProfile.Founding founding = colony.profile().founding().orElse(null);
         if (founding != null) {
-            if (sealedIn && colony.isFounding() && eggsLaid < founding.eggs()) {
+            changed |= startSecondBatch(level, founding);
+            if (sealedIn && colony.isFounding() && eggsLaid < batchEggs(founding)) {
                 if (nextFoundingEgg == Colony.NOT_SET) {
                     nextFoundingEgg = now + founding.eggIntervalTicks();
                 } else if (now >= nextFoundingEgg) {
@@ -316,7 +362,7 @@ public class QueenCare {
                 }
                 changed = true;
             }
-            boolean raising = eggsLaid <= founding.eggs() && colony.getCount(WorkerAntEntity.CASTE) < founding.eggs();
+            boolean raising = eggsLaid <= batchEggs(founding) && colony.getCount(WorkerAntEntity.CASTE) < founding.eggs();
             if (raising && now % founding.feedIntervalTicks() < 20) {
                 int young = colony.brood().hungriestInside();
                 if (young >= 0) {
@@ -375,7 +421,7 @@ public class QueenCare {
     private boolean hungerRunsOut(ServerLevel level) {
         long now = level.getGameTime();
         SpeciesProfile.QueenNumbers numbers = colony.profile().queen();
-        boolean satisfied = !royalsGetHungry(colony) || eggDue >= 0 || queenBread >= numbers.meal() || colony.brood().isFull(level);
+        boolean satisfied = !(royalsGetHungry(colony) || colony.isHungerOn() && isSpent(level)) || eggDue >= 0 || queenBread >= numbers.meal() || colony.brood().isFull(level);
         if (queenLastFed == Colony.NOT_SET || satisfied) {
             queenLastFed = now;
             return false;
@@ -404,6 +450,7 @@ public class QueenCare {
         tag.putLong("nextFoundingEgg", nextFoundingEgg);
         tag.putLong("nextStreamEgg", nextStreamEgg);
         tag.putBoolean("queenStarvedAway", starvedAway);
+        tag.putBoolean("secondBatch", secondBatch);
     }
 
     void load(CompoundTag tag) {
@@ -416,5 +463,6 @@ public class QueenCare {
         nextFoundingEgg = tag.contains("nextFoundingEgg") ? tag.getLong("nextFoundingEgg") : Colony.NOT_SET;
         nextStreamEgg = tag.contains("nextStreamEgg") ? tag.getLong("nextStreamEgg") : Colony.NOT_SET;
         starvedAway = tag.getBoolean("queenStarvedAway");
+        secondBatch = tag.getBoolean("secondBatch");
     }
 }

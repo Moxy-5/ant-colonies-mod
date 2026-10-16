@@ -33,7 +33,8 @@ public class AwayReport {
         MOUND_BUILT("mound blocks built"),
         OLD_AGE("died of old age"),
         STARVED("starved"),
-        YOUNG_STARVED("young starved");
+        YOUNG_STARVED("young starved"),
+        SECOND_BATCH("second founding batches begun (the first workers all died)");
 
         private final String label;
 

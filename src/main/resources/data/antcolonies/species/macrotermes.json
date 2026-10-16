@@ -84,7 +84,8 @@
   "founding": {
     "eggs": 5,
     "egg_interval_ticks": 400,
-    "feed_interval_ticks": 200
+    "feed_interval_ticks": 200,
+    "second_batch_eggs": 2
   },
   "garden": {
     "rooms": 6,

@@ -39,6 +39,16 @@
     "pile": "antcolonies:seed_pile",
     "mill_ticks": 60,
     "bread_stock": 20,
+    "day_clock": {
+      "_note": "The foragers' daily round (brain step 4b; real Pogonomyrmex forage in the morning, stop when the ground gets too hot at midday, go out again in the afternoon, and stay in at night and in the rain). Times are Minecraft day times: 0 is sunrise (6:00), 1000 ticks an hour. Out from out_from to in_by, except a midday rest centred on rest_middle; the rest goes by the biome's heat (base temperature): none at rest_from_heat or cooler, rest_most ticks at rest_full_heat or hotter (plains 0.8: about 50 minutes; badlands 2.0: 4 hours). not_in_rain: in while rain falls on the nest. User's decisions: rest by biome heat, never at night or in rain; the times are my picks, to confirm.",
+      "out_from": 0,
+      "in_by": 11000,
+      "rest_middle": 7000,
+      "rest_most": 4000,
+      "rest_from_heat": 0.5,
+      "rest_full_heat": 2.0,
+      "not_in_rain": true
+    },
     "trails": {
       "_note": "Lasting trunk trails (brain step 4a; real Pogonomyrmex keep a few cleared paths straight out from the nest disc, the foragers walk out along one and fan out at its end). half_life_ticks: a trail's strength halves in that long unused (each trip adds 1, at most most_strength); below fade_below it is forgotten and its bare ground grows back to grass about regrow_ticks later (half to one and a half times that). trunk: trails run from start blocks out (the hill's edge) to the food radius; a colony keeps 1 trail while young and up to most at full_at_workers workers; a trip goes by the trail within spread_degrees of its food's direction; new_trail_trips trips in a direction with no trail (within a day) lay a new one; a block walked by bare_after_trips trips wears bare: its plant is cut and the ground turns to bare_ground. All numbers are my picks, to confirm.",
       "half_life_ticks": 24000,
@@ -82,6 +92,7 @@
     "egg_interval_ticks": 400,
     "feed_interval_ticks": 200,
     "site_search_radius": 8,
-    "max_unevenness": 1
+    "max_unevenness": 1,
+    "second_batch_eggs": 2
   }
 }

@@ -180,4 +180,26 @@ class SpeciesProfileTest {
         assertEquals(3, colony.nurses(12));
         assertEquals(4, colony.nurses(20));
     }
+
+    @Test
+    void theHarvesterAntForagesByDayAndRestsAtMiddayByTheBiomesHeat() throws Exception {
+        SpeciesProfile.DayClock clock = read("red_harvester_ant").food().dayClock().orElseThrow();
+        float plains = 0.8F, badlands = 2.0F;
+        assertTrue(clock.outAt(1000, plains, false), "out at 7:00");
+        assertTrue(clock.outAt(10500, plains, false), "out at 16:30");
+        assertFalse(clock.outAt(11500, plains, false), "in at 17:30");
+        assertFalse(clock.outAt(18000, plains, false), "in at midnight");
+        assertFalse(clock.outAt(1000, plains, true), "in while it rains");
+        assertFalse(clock.outAt(7000, plains, false), "a short rest at 13:00 in the plains");
+        assertTrue(clock.outAt(6000, plains, false) && clock.outAt(8000, plains, false), "only a short rest in the plains");
+        assertTrue(clock.restTicks(plains) > 0 && clock.restTicks(plains) < 1500);
+        assertEquals(4000, clock.restTicks(badlands));
+        assertTrue(clock.outAt(4900, badlands, false), "out at 10:54 in the badlands");
+        assertFalse(clock.outAt(5000, badlands, false) || clock.outAt(8999, badlands, false), "in from 11:00 to 15:00 in the badlands");
+        assertTrue(clock.outAt(9000, badlands, false), "out again at 15:00 in the badlands");
+        assertEquals(0, clock.restTicks(0.3F), "no rest in a cool biome");
+        assertEquals("13:00", SpeciesProfile.DayClock.clock(7000));
+        assertEquals("5:30", SpeciesProfile.DayClock.clock(23500));
+        assertTrue(read("macrotermes").food().dayClock().isEmpty(), "termites keep their night and rain rule");
+    }
 }

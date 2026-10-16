@@ -395,9 +395,11 @@ public class NestTests {
      * A queen on her own (no workers), as when she founds a colony: she digs the shaft 2 blocks down and her small
      * founding chamber off it, and nothing else; she settles in it, closes the entrance from inside, lays her 3 eggs and
      * feeds the larvae on her own fat until they are her first 3 workers. They open the entrance again. She cannot
-     * place blocks, so no hill is built while she is alone.
+     * place blocks, so no hill is built while she is alone. Then (the user's decision, 2026-10-15) her first workers all
+     * die: she closes herself in again and raises a second, smaller batch of 2 from the fat she has left; when those die
+     * too she is spent, gets hungry and starves.
      */
-    @GameTest(template = "arena", timeoutTicks = 90000, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 180000, skyAccess = true)
     public static void aLoneQueenFoundsHerColonyAndRaisesHerFirstWorkers(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
@@ -405,6 +407,8 @@ public class NestTests {
         int[] dugWhenSealed = {-1};
         int[] moundWhenSealed = {-1};
         BlockPos entrance = helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE));
+        int[] phase = {0}; // 0 the first batch, 1 the second batch, 2 spent, 3 starving
+        java.util.UUID[] queenId = new java.util.UUID[1];
 
         helper.onEachTick(() -> {
             Colony colony = colony(helper);
@@ -424,8 +428,19 @@ public class NestTests {
         });
 
         helper.succeedWhen(() -> {
+            if (phase[0] == 3) {
+                // The spent queen starves: she dies and the colony ends.
+                net.minecraft.world.entity.Entity queen = level.getEntity(queenId[0]);
+                helper.assertTrue(queen == null || !queen.isAlive(), "the spent queen should have starved");
+                helper.assertTrue(colony(helper) == null, "the colony should be gone with her");
+                return;
+            }
             Colony colony = colony(helper);
             helper.assertTrue(colony != null, "no colony yet");
+            if (phase[0] > 0) {
+                laterBatches(helper, colony, phase, queenId);
+                return;
+            }
             helper.assertTrue(dugWhenSealed[0] >= 0, "she has not sealed herself in yet: " + airBelowSurface(helper) + " cells dug");
             // Shaft 2 down + the founding chamber only: the workers dig the rest.
             int expected = NestPlan.FOUNDING_DEPTH + FOUNDING_CELLS;
@@ -441,8 +456,38 @@ public class NestTests {
                     workers.size() + " workers, the colony counts " + colony.getCount(WorkerAntEntity.CASTE) + ", expected 3");
             helper.assertTrue(colony.nest().isEntranceOpen(level), "the entrance is still closed");
             helper.assertTrue(airBelowSurface(helper) > expected, "the workers have not started on the rest of the nest");
-            AntColoniesMod.LOGGER.info("[founding-test] finished at tick {}", helper.getTick());
+            AntColoniesMod.LOGGER.info("[founding-test] first workers out at tick {}; now they all die", helper.getTick());
+            helper.assertTrue(!colony.queenCare().isOnSecondBatch(), "no second batch while her first workers live");
+            queenId[0] = colony.getQueenId();
+            workers.forEach(WorkerAntEntity::kill);
+            phase[0] = 1;
+            helper.fail("(the second batch comes next)");
         });
+    }
+
+    /** {@link #aLoneQueenFoundsHerColonyAndRaisesHerFirstWorkers}, once her first workers have died. */
+    private static void laterBatches(GameTestHelper helper, Colony colony, int[] phase, java.util.UUID[] queenId) {
+        ServerLevel level = helper.getLevel();
+        var workers = level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds(), w -> w.isAlive() && colony.getId().equals(w.getColonyId()));
+        if (phase[0] == 1) {
+            helper.assertTrue(colony.queenCare().isOnSecondBatch(), "her first workers are dead: she should start a second batch");
+            helper.assertTrue(colony.queenCare().getEggsLaid() <= 5, "the second batch is 2 eggs: " + colony.queenCare().getEggsLaid() + " laid in all");
+            helper.assertTrue(!colony.queenCare().isSpent(level) || colony.queenCare().getEggsLaid() < 5, "she is not spent while raising her second batch");
+            helper.assertTrue(colony.queenCare().getEggsLaid() == 5 && colony.brood().countBrood(level) == 0 && workers.size() == 2
+                    && colony.getCount(WorkerAntEntity.CASTE) == 2, "the second batch should grow into 2 workers: eggs laid "
+                    + colony.queenCare().getEggsLaid() + ", brood " + colony.brood().countBrood(level) + ", workers " + workers.size());
+            AntColoniesMod.LOGGER.info("[founding-test] second batch out at tick {}; now they die too", helper.getTick());
+            workers.forEach(WorkerAntEntity::kill);
+            phase[0] = 2;
+            helper.fail("(she is spent next)");
+        }
+        // Spent: nothing more to lay, nobody to feed her; her hunger clock runs.
+        helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == 0 && colony.queenCare().isSpent(level), "she should be spent with no workers left");
+        helper.assertTrue(colony.queenCare().getEggsLaid() == 5, "no third batch: " + colony.queenCare().getEggsLaid() + " laid");
+        colony.setHungerOn(true); // (off in the nest tests)
+        colony.queenCare().setQueenLastFed(level.getGameTime() - colony.profile().queen().starveTicks() + 100);
+        phase[0] = 3;
+        helper.fail("(she starves next)");
     }
 
     /**

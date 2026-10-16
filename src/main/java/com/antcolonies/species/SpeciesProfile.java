@@ -208,9 +208,14 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * colony's foraging trails get stronger with use and fade unused, and lasting trunk trails worn into the ground.
      */
     public record FoodNumbers(int radius, String items, List<PlantFood> plants, String piece, String pile, int millTicks, int breadStock,
-            List<String> forageAt, int findRadius, Optional<Regrowth> regrowth, Trails trails) {
+            List<String> forageAt, int findRadius, Optional<Regrowth> regrowth, Trails trails, Optional<DayClock> dayClock) {
         /** Foraging at any time: day, night and in the rain. */
         public static final List<String> ALWAYS = List.of("day", "night", "rain");
+
+        public FoodNumbers(int radius, String items, List<PlantFood> plants, String piece, String pile, int millTicks, int breadStock,
+                List<String> forageAt, int findRadius, Optional<Regrowth> regrowth, Trails trails) {
+            this(radius, items, plants, piece, pile, millTicks, breadStock, forageAt, findRadius, regrowth, trails, Optional.empty());
+        }
 
         public FoodNumbers(int radius, String items, List<PlantFood> plants, String piece, String pile, int millTicks, int breadStock,
                 List<String> forageAt, int findRadius, Optional<Regrowth> regrowth) {
@@ -228,7 +233,8 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 Codec.STRING.listOf().optionalFieldOf("forage_at", ALWAYS).forGetter(FoodNumbers::forageAt),
                 Codec.INT.optionalFieldOf("find_radius", 0).forGetter(FoodNumbers::findRadius),
                 Regrowth.CODEC.optionalFieldOf("regrowth").forGetter(FoodNumbers::regrowth),
-                Trails.CODEC.optionalFieldOf("trails", Trails.DEFAULT).forGetter(FoodNumbers::trails)
+                Trails.CODEC.optionalFieldOf("trails", Trails.DEFAULT).forGetter(FoodNumbers::trails),
+                DayClock.CODEC.optionalFieldOf("day_clock").forGetter(FoodNumbers::dayClock)
         ).apply(i, FoodNumbers::new));
 
         /**
@@ -303,6 +309,57 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
         /** A strength of {@code strength} at some time, {@code ticks} later with no use. */
         public double decayed(double strength, long ticks) {
             return ticks <= 0 ? strength : strength * Math.pow(0.5, ticks / (double) Math.max(1, halfLifeTicks));
+        }
+    }
+
+    /**
+     * A day forager's daily round (real red harvester ants, <i>Pogonomyrmex barbatus</i>: out in the morning once the
+     * patrollers are back, in again when the ground gets too hot to walk on, out for an afternoon round, in before
+     * dusk; never at night and never in the rain). Times are Minecraft day times (0 is sunrise at 6:00, 1000 ticks an
+     * hour). The foragers are out from {@code outFrom} to {@code inBy}, except for a midday rest centred on
+     * {@code restMiddle}. The rest's length goes by the biome's heat (its base temperature): none at {@code restFromHeat}
+     * or cooler, {@code restMost} ticks at {@code restFullHeat} or hotter, in between in proportion. With
+     * {@code notInRain} they stay in while rain falls on the nest (a dry biome such as the badlands gets no rain).
+     */
+    public record DayClock(int outFrom, int inBy, int restMiddle, int restMost, float restFromHeat, float restFullHeat, boolean notInRain) {
+        public static final Codec<DayClock> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.INT.optionalFieldOf("out_from", 0).forGetter(DayClock::outFrom),
+                Codec.INT.optionalFieldOf("in_by", 11000).forGetter(DayClock::inBy),
+                Codec.INT.optionalFieldOf("rest_middle", 7000).forGetter(DayClock::restMiddle),
+                Codec.INT.optionalFieldOf("rest_most", 4000).forGetter(DayClock::restMost),
+                Codec.FLOAT.optionalFieldOf("rest_from_heat", 0.5F).forGetter(DayClock::restFromHeat),
+                Codec.FLOAT.optionalFieldOf("rest_full_heat", 2.0F).forGetter(DayClock::restFullHeat),
+                Codec.BOOL.optionalFieldOf("not_in_rain", true).forGetter(DayClock::notInRain)
+        ).apply(i, DayClock::new));
+
+        /** How long the midday rest is (in ticks) in a biome this hot. */
+        public int restTicks(float heat) {
+            float share = (heat - restFromHeat) / Math.max(0.01F, restFullHeat - restFromHeat);
+            return Math.round(restMost * Math.max(0.0F, Math.min(1.0F, share)));
+        }
+
+        /** The day time the midday rest begins (it ends {@link #restTicks} later). */
+        public int restStart(float heat) {
+            return restMiddle - restTicks(heat) / 2;
+        }
+
+        /** Whether the foragers are out at this day time ({@code dayTime} as Level#getDayTime) in a biome this hot. */
+        public boolean outAt(long dayTime, float heat, boolean raining) {
+            if (raining && notInRain) {
+                return false;
+            }
+            long time = Math.floorMod(dayTime, 24000L);
+            if (time < outFrom || time >= inBy) {
+                return false;
+            }
+            int start = restStart(heat);
+            return time < start || time >= start + restTicks(heat);
+        }
+
+        /** "6:00", "13:24": a day time as a clock time. */
+        public static String clock(long dayTime) {
+            long minutes = (Math.floorMod(dayTime, 24000L) * 60 / 1000 + 6 * 60) % (24 * 60);
+            return (minutes / 60) + ":" + String.format("%02d", minutes % 60);
         }
     }
 
@@ -642,17 +699,18 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * termites' royal pair, whose mound fills in round the slope). {@code maxUnevenness}: how many blocks higher or
      * lower than her spot the ground round it may be for it to count as level (both optional, default 0 and 1).
      */
-    public record Founding(int eggs, int eggIntervalTicks, int feedIntervalTicks, int siteSearchRadius, int maxUnevenness) {
+    public record Founding(int eggs, int eggIntervalTicks, int feedIntervalTicks, int siteSearchRadius, int maxUnevenness, int secondBatchEggs) {
         public static final Codec<Founding> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("eggs").forGetter(Founding::eggs),
                 Codec.INT.fieldOf("egg_interval_ticks").forGetter(Founding::eggIntervalTicks),
                 Codec.INT.fieldOf("feed_interval_ticks").forGetter(Founding::feedIntervalTicks),
                 Codec.INT.optionalFieldOf("site_search_radius", 0).forGetter(Founding::siteSearchRadius),
-                Codec.INT.optionalFieldOf("max_unevenness", 1).forGetter(Founding::maxUnevenness)
+                Codec.INT.optionalFieldOf("max_unevenness", 1).forGetter(Founding::maxUnevenness),
+                Codec.INT.optionalFieldOf("second_batch_eggs", 0).forGetter(Founding::secondBatchEggs)
         ).apply(i, Founding::new));
 
         public Founding(int eggs, int eggIntervalTicks, int feedIntervalTicks) {
-            this(eggs, eggIntervalTicks, feedIntervalTicks, 0, 1);
+            this(eggs, eggIntervalTicks, feedIntervalTicks, 0, 1, 0);
         }
     }
 
@@ -855,6 +913,6 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
             new NestNumbers(4, true, true, List.of(), 0, 8, "antcolonies:burrowed_dirt",
                     List.of(new LevelUnlock(1, 0), new LevelUnlock(6, 10), new LevelUnlock(12, 30), new LevelUnlock(20, 30))),
             Optional.empty(),
-            Optional.of(new Founding(3, 400, 200, 8, 1)),
+            Optional.of(new Founding(3, 400, 200, 8, 1, 2)),
             Optional.empty());
 }

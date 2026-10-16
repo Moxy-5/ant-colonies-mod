@@ -12,6 +12,7 @@ import com.antcolonies.debug.Perf;
 import com.antcolonies.entity.TermiteQueenEntity;
 import com.antcolonies.entity.TermiteSoldierEntity;
 import com.antcolonies.registry.ModBlocks;
+import com.antcolonies.species.SpeciesProfile;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 
 import java.util.Comparator;
@@ -377,6 +378,17 @@ public class ColonyCommands {
     /** " | foraging now (night, rain), holes open 1 of 2" for colonies that keep a schedule or have foraging holes, otherwise nothing. */
     private static String foraging(Colony colony, ServerLevel level) {
         int holes = colony.profile().nest().foragingHoles();
+        java.util.Optional<SpeciesProfile.DayClock> clock = colony.profile().food().dayClock();
+        if (clock.isPresent()) {
+            SpeciesProfile.DayClock c = clock.get();
+            float heat = colony.heat(level);
+            int rest = c.restTicks(heat);
+            return " | " + (colony.isForagingTime(level) ? "foraging now" : "staying in") + " (it is "
+                    + SpeciesProfile.DayClock.clock(colony.timeOfDay(level)) + "; out " + SpeciesProfile.DayClock.clock(c.outFrom())
+                    + " to " + SpeciesProfile.DayClock.clock(c.inBy()) + (rest > 0 ? ", resting " + SpeciesProfile.DayClock.clock(c.restStart(heat))
+                    + " to " + SpeciesProfile.DayClock.clock(c.restStart(heat) + rest) : ", no midday rest")
+                    + String.format(" (biome heat %.1f)", heat) + (c.notInRain() ? ", never in rain" : "") + ")";
+        }
         if (!colony.keepsASchedule() && holes == 0) {
             return "";
         }
