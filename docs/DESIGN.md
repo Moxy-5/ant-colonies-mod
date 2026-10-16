@@ -238,5 +238,12 @@ Goal: a mature colony can hold 1,000+ ants or termites without lag.
 - Each species' responses come from its species profile.
 
 ### Player interaction
-- Ants and termites ignore the player unless their nest is disturbed, then they defend it.
+- Ants and termites ignore the player unless their nest is disturbed, then they defend it. (They may stop to look at a moving player, or termites freeze at its footsteps, without attacking: see "Animations and body language".)
 - Later: an ant farm (catch a founding queen in a jar, build a glass-walled farm) and a field journal that fills in as the player observes behaviors.
+
+### Animations and body language (planned with the user, 2026-10-15; full plan in `docs/plans/animation-engine.md`, not built)
+- **The aim (user):** ants with personality: the whole body moving (bending at the joints over an edge), ants stopping to look at the player, "the little things". Real insect body language, not cartoon tricks (no squash and stretch: a hard body bends only at its joints).
+- **Engine:** a Python motion library from real-ant numbers (gait, antennae, body, little one-shot clips, a bone map for the user's M2 model), automatic checks (foot slide, clipping, loop seams, joint limits) and my own look in the ant pose viewer before the user sees anything; in game, separate animation controllers for legs, body, head and extras, plus a live layer (each ant's own clock, walk speed from the real stride, the rear following the front over edges, the head look).
+- **Decisions (user, 2026-10-15):** leg speed picked in the viewer (real speed, legs flickering, vs slower ants with visible steps); ants notice a player only by movement (a still player is soon ignored); what an ant does then depends on its personality (most look, bold ones step closer, shy ones back off); termites are blind and feel vibration (walking near makes workers freeze with raised antennae, sprinting and jumping from further), never looking at the player.
+- **Personality:** each real insect gets boldness, curiosity and restlessness (ranges in the species file, older ants bolder), saved; lost when it goes back into the numbers.
+- More little things will be added later (user).
