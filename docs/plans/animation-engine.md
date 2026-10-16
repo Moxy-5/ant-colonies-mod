@@ -142,5 +142,6 @@ They play only when the ant is idle or pausing, never mid-step.
 ## Open, to ask the user when we get there
 - The leg speed (decision 1, after the viewer comparison).
 - Sight range, look time, how close a bold ant comes (my picks above).
-- Soldiers' reaction to a strong shake.
+- Soldiers' reaction to a strong shake. (Answered 2026-10-16: they drum their heads as a warning only, no attack.
+  Also answered: a few foragers on a job notice a moving player, only close by; sneaking sets off no termite freeze.)
 - More little things (the user will add ideas).
