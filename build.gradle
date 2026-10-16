@@ -78,6 +78,16 @@ neoForge {
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         }
 
+        // The in-game camera (client/FilmDirector, development only): a fresh flat creative world, a shot list played
+        // and its screenshots saved to run-film/screenshots, then the game quits. Claude's eyes in the real game.
+        // ./gradlew runFilm  (the poses scene)  or  ./gradlew runFilm -PfilmScene=tools/film/<scene>.film
+        film {
+            client()
+            gameDirectory = project.file('run-film')
+            systemProperty 'antcolonies.film', project.file(project.findProperty('filmScene') ?: 'tools/film/poses.film').absolutePath
+            programArguments.addAll '--width', '960', '--height', '540'
+        }
+
         data {
             data()
             // example of overriding the workingDirectory set in configureEach above, uncomment if you want to use it
@@ -208,5 +218,21 @@ idea {
     module {
         downloadSources = true
         downloadJavadoc = true
+    }
+}
+
+// The in-game camera starts clean each time (a new world, no old screenshots) with quiet, never-pausing settings.
+def filmDir = file('run-film')
+tasks.matching { it.name == 'runFilm' }.configureEach {
+    doFirst {
+        new File(filmDir, 'saves/film').deleteDir()
+        new File(filmDir, 'screenshots').deleteDir()
+        def options = new File(filmDir, 'options.txt')
+        if (!options.exists()) {
+            filmDir.mkdirs()
+            options.text = ['onboardAccessibility:false', 'pauseOnLostFocus:false', 'renderDistance:4', 'particles:2', 'simulationDistance:5',
+                            'renderClouds:"false"', 'bobView:false', 'narrator:0', 'tutorialStep:none', 'joinedFirstServer:true',
+                            'skipMultiplayerWarning:true', 'soundCategory_master:0.0', 'guiScale:2'].join(System.lineSeparator()) + System.lineSeparator()
+        }
     }
 }

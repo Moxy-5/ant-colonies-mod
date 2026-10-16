@@ -6,6 +6,7 @@ import com.mojang.math.Axis;
 
 import software.bernie.geckolib.model.GeoModel;
 import software.bernie.geckolib.renderer.GeoEntityRenderer;
+import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 
 /**
@@ -41,6 +42,18 @@ public class AntRenderer<T extends AbstractAntEntity> extends GeoEntityRenderer<
         this.climbLift = lift;
         this.climbIntoWall = intoWall;
         return this;
+    }
+
+    @Override
+    public void render(T ant, float entityYaw, float partialTick, PoseStack poseStack, MultiBufferSource buffers,
+            int packedLight) {
+        if (FilmDirector.active()) {
+            // The in-game camera: every picture exactly on a game tick (a frozen game's in-between time jitters).
+            super.render(ant, entityYaw, 0.0F, poseStack, buffers, packedLight);
+            FilmDirector.noteRendered(ant, getGeoModel());
+            return;
+        }
+        super.render(ant, entityYaw, partialTick, poseStack, buffers, packedLight);
     }
 
     @Override

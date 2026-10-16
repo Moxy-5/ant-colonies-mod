@@ -1,5 +1,7 @@
 package com.antcolonies.entity;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -24,6 +26,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtUtils;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -873,6 +876,23 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         controllers.add(new AnimationController<>(this, "main", 3, this::animate));
     }
 
+    /** Clips asked for by the in-game camera, by name (made once each). */
+    private static final Map<String, RawAnimation> FILM_CLIPS = new HashMap<>();
+
+    /**
+     * For the in-game camera ({@code client/FilmDirector}, development only): an insect named {@code film:<clip>} plays
+     * only that clip, looping, so the camera can film any animation on a still insect. Null for every other insect.
+     */
+    @Nullable
+    private RawAnimation filmClip() {
+        Component name = getCustomName();
+        if (name == null) {
+            return null;
+        }
+        String text = name.getString();
+        return text.startsWith("film:") ? FILM_CLIPS.computeIfAbsent(text.substring(5), c -> RawAnimation.begin().thenLoop(c)) : null;
+    }
+
     /** An animation this insect plays instead of walking or standing (a soldier's head bang), or null. */
     @Nullable
     protected RawAnimation specialAnimation() {
@@ -880,6 +900,11 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     }
 
     private PlayState animate(AnimationState<AbstractAntEntity> state) {
+        RawAnimation film = filmClip();
+        if (film != null) {
+            state.getController().setAnimationSpeed(1.0);
+            return state.setAndContinue(film);
+        }
         RawAnimation special = specialAnimation();
         if (special != null) {
             state.getController().setAnimationSpeed(1.0);
