@@ -193,15 +193,23 @@ const buttons = document.getElementById('buttons');
 const play = document.getElementById('play');
 const cams = document.getElementById('cams');
 
-function pose(ant, tau) {
+// The head's bones play at their own pace, as in the game (its own controller): only the body and legs follow the
+// walking speed.
+const HEAD_BONE = /^(head|mandible|antenna|carry)/;
+
+function pose(ant, realTau) {
+  const rate = ant.anim.rate || 1;
+  const tau = realTau * rate;
   const t = tau % ant.anim.length;
+  const th = (realTau * (ant.anim.head_rate || rate)) % ant.anim.length;
   Object.values(ant.groups).forEach(g => { g.rotation.set(0, 0, 0); g.position.copy(g.userData.base); });
   for (const [bone, tr] of Object.entries(ant.tracks)) {
     const g = ant.groups[bone];
     if (!g) continue;
-    if (tr.rotation) setRot(g, sample(tr.rotation, t));
+    const tb = HEAD_BONE.test(bone) ? th : t;
+    if (tr.rotation) setRot(g, sample(tr.rotation, tb));
     if (tr.position) {
-      const p = sample(tr.position, t);
+      const p = sample(tr.position, tb);
       g.position.set(g.userData.base.x + p[0], g.userData.base.y + p[1], g.userData.base.z + p[2]);
     }
   }
