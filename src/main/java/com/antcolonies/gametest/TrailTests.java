@@ -32,7 +32,8 @@ public class TrailTests {
     /**
      * Step 4a, the harvester ant's trunk trails, with the trips sent straight to the brain (as its numbers make them).
      * Grass ground runs east and south from the nest, with short grass on it east and poppies south. 7 trips east lay no
-     * trail; the 8th does, and the forager is told to leave it at the block nearest its food. A young colony keeps 1
+     * trail; the 8th does, and the forager is told to leave it at the block nearest its food; the new trail is as strong as
+     * the 8 trips that laid it, so a minute unused it is still there (it once faded a second later). A young colony keeps 1
      * trail: 8 trips south lay none; with 1,500 workers it may keep more, and the next trip south lays one (the earlier
      * trips are remembered). 60 trips each way: the east trail wears bare out to the food (the grass cut, its seeds left
      * lying; coarse dirt), not past it; the south one waits while a pretend player looks at it, and wears bare once
@@ -76,6 +77,19 @@ public class TrailTests {
                     "the 8th trip should lay a trail east: " + trails.describe(level));
             helper.assertTrue(via != null && via.equals(new BlockPos(center[0].getX() + FOOD_OUT, groundY + 1, center[0].getZ())),
                     "the forager should leave the trail by its food: " + via);
+            // A new trail is as strong as the trips that laid it (it used to start at the fade line and fade a second
+            // later, the user's live game 2026-10-16): a minute unused, it is still there after the colony's next look.
+            trails.ageForTests(60 * 20);
+        });
+        helper.runAfterDelay(40, () -> {
+            Colony colony = PopulationTests.antColony(helper);
+            TrunkTrails trails = colony.trunkTrails();
+            int groundY = helper.absolutePos(new BlockPos(0, SURFACE - 1, 0)).getY();
+            BlockPos eastFood = new BlockPos(center[0].getX() + FOOD_OUT, groundY + 1, center[0].getZ());
+            BlockPos southFood = new BlockPos(center[0].getX(), groundY + 1, center[0].getZ() + FOOD_OUT);
+            int laidBy = colony.profile().food().trails().trunk().orElseThrow().newTrailTrips();
+            helper.assertTrue(trails.trails().size() == 1 && trails.strength(level, trails.trails().get(0)) > laidBy - 1,
+                    "a trail laid by " + laidBy + " trips should not fade a minute later: " + trails.describe(level));
             for (int i = 0; i < 8; i++) {
                 trails.setOut(level, southFood);
             }
@@ -96,7 +110,7 @@ public class TrailTests {
             colony.population().setViewersForTests(List.of(Vec3.atCenterOf(new BlockPos(center[0].getX() + 8, groundY + 2, center[0].getZ() + 8))));
             trails.checkSoonForTests();
         });
-        helper.runAfterDelay(60, () -> {
+        helper.runAfterDelay(85, () -> {
             Colony colony = PopulationTests.antColony(helper);
             AntColoniesMod.LOGGER.info("[trail-test] worn: {}", colony.trunkTrails().describe(level));
             int groundY = helper.absolutePos(new BlockPos(0, SURFACE - 1, 0)).getY();
@@ -118,7 +132,7 @@ public class TrailTests {
             colony.patrol().setOnForTests(true); // brain step 4b: a new round, with its patrol
             colony.patrol().newRoundForTests();
         });
-        helper.runAfterDelay(85, () -> {
+        helper.runAfterDelay(110, () -> {
             Colony colony = PopulationTests.antColony(helper);
             List<String> ways = colony.patrol().waysForTests();
             AntColoniesMod.LOGGER.info("[trail-test] patrol: {} ways {}", colony.patrol().describe(level), ways);
@@ -129,9 +143,9 @@ public class TrailTests {
             int groundY = helper.absolutePos(new BlockPos(0, SURFACE - 1, 0)).getY();
             helper.assertTrue(!colony.patrol().isOpen(level, new BlockPos(center[0].getX() + FOOD_OUT, groundY + 1, center[0].getZ())),
                     "nothing is open before a patroller is back");
-            colony.patrol().bringNumbersHomeForTests();
+            colony.patrol().bringNumbersHomeForTests(); // (checked 25 ticks on: the patrol is looked at once a second)
         });
-        helper.runAfterDelay(100, () -> {
+        helper.runAfterDelay(135, () -> {
             Colony colony = PopulationTests.antColony(helper);
             int groundY = helper.absolutePos(new BlockPos(0, SURFACE - 1, 0)).getY();
             BlockPos eastFood = new BlockPos(center[0].getX() + FOOD_OUT, groundY + 1, center[0].getZ());
@@ -169,14 +183,14 @@ public class TrailTests {
             colony.trunkTrails().ageForTests(7 * 24000L);
             colony.trunkTrails().checkSoonForTests();
         });
-        helper.runAfterDelay(140, () -> {
+        helper.runAfterDelay(175, () -> {
             Colony colony = PopulationTests.antColony(helper);
             helper.assertTrue(colony.trunkTrails().trails().isEmpty(), "unused for a week the trails should fade: " + colony.trunkTrails().describe(level));
             helper.assertTrue(colony.trunkTrails().regrowing() == bare[0] && bare[0] >= 2 * (FOOD_OUT - 3),
                     "their " + bare[0] + " bare blocks should be growing back: " + colony.trunkTrails().regrowing());
             colony.trunkTrails().growBackSoonForTests();
         });
-        helper.runAfterDelay(180, () -> {
+        helper.runAfterDelay(215, () -> {
             Colony colony = PopulationTests.antColony(helper);
             int groundY = helper.absolutePos(new BlockPos(0, SURFACE - 1, 0)).getY();
             for (int t = 4; t <= FOOD_OUT; t++) {
