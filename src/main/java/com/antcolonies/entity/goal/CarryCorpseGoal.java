@@ -76,8 +76,8 @@ public class CarryCorpseGoal extends Goal {
             }
             return true;
         }
-        // Only look for work now and then, so ants don't all think on the same tick.
-        if (ant.hasFullMandibles() || ant.getRandom().nextInt(20) != 0 || !ant.mayDo(ColonyRole.BUILDER)) {
+        // Only look for work now and then, so ants don't all think on the same tick (every time just before it would count as idle).
+        if (ant.hasFullMandibles() || !ant.looksForWork(20) || !ant.mayDo(ColonyRole.BUILDER)) {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());

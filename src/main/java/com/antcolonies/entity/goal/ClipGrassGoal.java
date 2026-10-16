@@ -64,8 +64,8 @@ public class ClipGrassGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        // Only look for work now and then, so ants don't all think on the same tick.
-        if (ant.getColonyId() == null || ant.hasFullMandibles() || ant.getRandom().nextInt(40) != 0
+        // Only look for work now and then, so ants don't all think on the same tick (every time just before it would count as idle).
+        if (ant.getColonyId() == null || ant.hasFullMandibles() || !ant.looksForWork(40)
                 || !ant.mayDo(ColonyRole.FORAGER) || !(ant.level() instanceof ServerLevel level)) {
             return false;
         }

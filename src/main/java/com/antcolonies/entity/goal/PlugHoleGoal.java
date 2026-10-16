@@ -48,7 +48,7 @@ public class PlugHoleGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        if (ant.getColonyId() == null || ant.hasFullMandibles() || ant.getRandom().nextInt(20) != 0 || !ant.mayDo(ColonyRole.BUILDER)
+        if (ant.getColonyId() == null || ant.hasFullMandibles() || !ant.looksForWork(20) || !ant.mayDo(ColonyRole.BUILDER)
                 || !(ant.level() instanceof ServerLevel level)) {
             return false;
         }

@@ -74,8 +74,8 @@ public class FeedLarvaGoal extends Goal {
         if (ant.getColonyId() == null || !(ant.level() instanceof ServerLevel level)) {
             return false;
         }
-        // Only look for work now and then, so ants don't all think on the same tick.
-        if (ant.hasFullMandibles() || ant.getRandom().nextInt(20) != 0 || !ant.mayDo(ColonyRole.NURSE)
+        // Only look for work now and then, so ants don't all think on the same tick (every time just before it would count as idle).
+        if (ant.hasFullMandibles() || !ant.looksForWork(20) || !ant.mayDo(ColonyRole.NURSE)
                 || level.getGameTime() < nextTry) {
             return false;
         }

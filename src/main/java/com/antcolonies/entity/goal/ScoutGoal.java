@@ -97,7 +97,7 @@ public class ScoutGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        if (ant.getColonyId() == null || ant.hasFullMandibles() || ant.getRandom().nextInt(40) != 0
+        if (ant.getColonyId() == null || ant.hasFullMandibles() || !ant.looksForWork(40)
                 || !ant.mayDo(ColonyRole.FORAGER) || !(ant.level() instanceof ServerLevel level)) {
             return false;
         }

@@ -46,7 +46,7 @@ public class CarryNightSoilGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        if (ant.getColonyId() == null || !ant.canPlaceBlocks() || ant.hasFullMandibles() || ant.getRandom().nextInt(20) != 0
+        if (ant.getColonyId() == null || !ant.canPlaceBlocks() || ant.hasFullMandibles() || !ant.looksForWork(20)
                 || !ant.mayDo(ColonyRole.BUILDER) || !ant.mayGoOut() || !(ant.level() instanceof ServerLevel level)) {
             return false;
         }

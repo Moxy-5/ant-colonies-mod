@@ -367,6 +367,20 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return idleSeconds >= IDLE_SECONDS;
     }
 
+    /**
+     * Whether a goal that looks for work looks now. Goals look only one time in {@code oneIn}, so the ants don't all
+     * think on the same tick; but in its last {@link #LAST_LOOK_SECONDS} before it counts as idle, an ant looks every
+     * time. Otherwise a builder with blocks still to dig could miss its work by chance for 5 seconds (about 1 pause in
+     * 13), count as idle and go out on a forager's search of up to 5 minutes, leaving the nest undug (found by the hill
+     * test on a step, 2026-10-16, see docs/BUGS.md 31).
+     */
+    public boolean looksForWork(int oneIn) {
+        return idleSeconds >= IDLE_SECONDS - LAST_LOOK_SECONDS && idleSeconds < IDLE_SECONDS || getRandom().nextInt(oneIn) == 0;
+    }
+
+    /** How long (in seconds) before it counts as idle an ant looks for its own work at every chance (see {@link #looksForWork}). */
+    private static final int LAST_LOOK_SECONDS = 2;
+
     /** Whether this insect is a worker that gets a role from its colony (builder, forager, nurse). Queens and kings don't. */
     protected boolean hasColonyRole() {
         return false;

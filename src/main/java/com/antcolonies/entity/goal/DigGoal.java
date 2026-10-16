@@ -57,9 +57,9 @@ public class DigGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        // Only look for work now and then, so ants don't all think on the same tick.
+        // Only look for work now and then, so ants don't all think on the same tick (every time just before it would count as idle).
         // An ant with a pellet in its mouth must carry it out before biting again.
-        if (ant.getColonyId() == null || ant.isCarrying() || ant.getRandom().nextInt(20) != 0 || !allowed.getAsBoolean()
+        if (ant.getColonyId() == null || ant.isCarrying() || !ant.looksForWork(20) || !allowed.getAsBoolean()
                 || !mayStart.getAsBoolean()) {
             return false;
         }

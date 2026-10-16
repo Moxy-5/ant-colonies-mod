@@ -49,7 +49,7 @@ public class ShapeMoundGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        if (ant.hasFullMandibles() || ant.getColonyId() == null || ant.getRandom().nextInt(20) != 0 || !ant.mayDo(ColonyRole.BUILDER)
+        if (ant.hasFullMandibles() || ant.getColonyId() == null || !ant.looksForWork(20) || !ant.mayDo(ColonyRole.BUILDER)
                 || !(ant.level() instanceof ServerLevel level)) {
             return false;
         }

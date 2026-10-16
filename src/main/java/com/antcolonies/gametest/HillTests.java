@@ -263,7 +263,8 @@ public class HillTests {
                     }
                 }
             }
-            if (problems.length() == 0 && colony.nest().findDigTarget(level) == null) {
+            BlockPos toDig = colony.nest().findDigTarget(level);
+            if (problems.length() == 0 && toDig == null) {
                 AntColoniesMod.LOGGER.info("[hill-ant] tick {}: the hill is built at {}", helper.getTick(), entrance.toShortString());
                 helper.succeed();
                 return;
@@ -271,7 +272,8 @@ public class HillTests {
             if (helper.getTick() % 2000 == 0) {
                 AntColoniesMod.LOGGER.info("[hill-ant] tick {}: {}", helper.getTick(), problems);
             }
-            helper.assertTrue(helper.getTick() < 58000, "the hill is not its planned shape: " + problems);
+            helper.assertTrue(helper.getTick() < 58000, problems.length() > 0 ? "the hill is not its planned shape: " + problems
+                    : "the hill is built but the nest is not dug yet: next block " + toDig.subtract(entrance).toShortString() + " from the entrance");
         });
     }
 
