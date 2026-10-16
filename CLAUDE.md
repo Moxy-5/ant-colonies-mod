@@ -62,6 +62,7 @@ A Minecraft mod where ants and termites live as real colonies: they dig, build, 
 1. Finish the termites (M7): 3b the mound (planning first), 4 food gathering, 5 fungus garden, 6 soldiers (guarding only).
 2. Tidy up both species (termite bodies, nest stages, growing past the 20-worker cap, other loose ends).
 3. The brain: virtual population, colonies live offline (this also fixes the hunger clocks that run on in unloaded chunks; the user only tests with loaded colonies, so no stopgap fix now), scouts, trails, food map.
+3a. **Before the fights (user, 2026-10-16):** a shared **test clock** for the game tests (a day/night clock that really moves morning, midday rest, afternoon, night, in place of each test freezing the time and patching around it, e.g. the seed test starting the next round itself), then a full run of all tests; and **clean up `AntNavigator`** (the user's plan; read `docs/BUGS.md` first, full run after).
 4. Fighting (M8), right after the brain (defense waves need the virtual population).
 5. Flying queens (M9): winged queens fly, score the land (food, biome, soil, distance to other colonies) and settle; species-neutral, termite royal pairs use it too.
 6. Other species on the same framework.
