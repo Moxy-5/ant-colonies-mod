@@ -683,7 +683,7 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      */
     public record NestNumbers(int maxLevels, boolean sealWhileFounding, boolean foundingChamber, List<String> sideRooms,
             int foragingHoles, int foragingHoleDistance, String plugBlock, List<LevelUnlock> levelUnlocks, Optional<NewHoles> newHoles,
-            boolean crustWalls, Optional<Sheeting> sheeting, NestPlan.RoomSizes roomSizes) {
+            boolean crustWalls, Optional<Sheeting> sheeting, NestPlan.RoomSizes roomSizes, NightSoil nightSoil) {
         public static final Codec<NestNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("max_levels").forGetter(NestNumbers::maxLevels),
                 Codec.BOOL.fieldOf("seal_while_founding").forGetter(NestNumbers::sealWhileFounding),
@@ -696,8 +696,16 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 NewHoles.CODEC.optionalFieldOf("new_holes").forGetter(NestNumbers::newHoles),
                 Codec.BOOL.optionalFieldOf("crust_walls", false).forGetter(NestNumbers::crustWalls),
                 Sheeting.CODEC.optionalFieldOf("sheeting").forGetter(NestNumbers::sheeting),
-                NestPlan.RoomSizes.CODEC.optionalFieldOf("room_sizes", NestPlan.RoomSizes.DEFAULT).forGetter(NestNumbers::roomSizes)
+                NestPlan.RoomSizes.CODEC.optionalFieldOf("room_sizes", NestPlan.RoomSizes.DEFAULT).forGetter(NestNumbers::roomSizes),
+                NightSoil.CODEC.optionalFieldOf("night_soil", NightSoil.DEFAULT).forGetter(NestNumbers::nightSoil)
         ).apply(i, NestNumbers::new));
+
+        public NestNumbers(int maxLevels, boolean sealWhileFounding, boolean foundingChamber, List<String> sideRooms,
+                int foragingHoles, int foragingHoleDistance, String plugBlock, List<LevelUnlock> levelUnlocks, Optional<NewHoles> newHoles,
+                boolean crustWalls, Optional<Sheeting> sheeting, NestPlan.RoomSizes roomSizes) {
+            this(maxLevels, sealWhileFounding, foundingChamber, sideRooms, foragingHoles, foragingHoleDistance, plugBlock, levelUnlocks, newHoles,
+                    crustWalls, sheeting, roomSizes, NightSoil.DEFAULT);
+        }
 
         public NestNumbers(int maxLevels, boolean sealWhileFounding, boolean foundingChamber, List<String> sideRooms,
                 int foragingHoles, int foragingHoleDistance, String plugBlock, List<LevelUnlock> levelUnlocks, Optional<NewHoles> newHoles,
@@ -769,6 +777,20 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * hole (no new hole is dug for it), the workers build a runway of mud crust from the hole to it, at most
      * {@code maxLength} blocks long; at most {@code max} runways at a time. Far food gets a new hole instead.
      */
+    /**
+     * The night soil (a species with a hill): soil dug while the surface is shut waits in loose piles on the floors near
+     * the top of the nest, {@code layersPerCell} layers a cell at most (2 pixels each), and is carried up first thing once
+     * the surface opens. Diggers rest while the surface is shut once {@code perBuilder} pellets wait for each builder (more
+     * than they could carry out in a morning). My picks, to confirm.
+     */
+    public record NightSoil(int layersPerCell, int perBuilder) {
+        public static final NightSoil DEFAULT = new NightSoil(4, 12);
+        public static final Codec<NightSoil> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.INT.optionalFieldOf("layers_per_cell", DEFAULT.layersPerCell()).forGetter(NightSoil::layersPerCell),
+                Codec.INT.optionalFieldOf("per_builder", DEFAULT.perBuilder()).forGetter(NightSoil::perBuilder)
+        ).apply(i, NightSoil::new));
+    }
+
     public record Sheeting(int max, int maxLength) {
         public static final Codec<Sheeting> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.optionalFieldOf("max", 3).forGetter(Sheeting::max),

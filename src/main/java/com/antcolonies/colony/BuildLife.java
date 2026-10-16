@@ -101,6 +101,9 @@ public class BuildLife {
 
     // --- coming back ----------------------------------------------------------------------------------------------
 
+    /** Who claims a pile of night soil for the builder numbers (see {@link #carryNightSoil}). */
+    private static final java.util.UUID BUILDERS = new java.util.UUID(0L, 0x4255494cL);
+
     /**
      * Once a second while the whole nest is loaded and there is building time left (from {@link AwayLife#settle}): the
      * work is done, out of every player's sight ({@code eyes}). True if any block changed. Once nothing more may be
@@ -113,7 +116,7 @@ public class BuildLife {
         }
         waited = false;
         int[] changes = {0};
-        boolean nestLeft = work > 0 && digNest(level, eyes, changes);
+        boolean nestLeft = work > 0 && (carryNightSoil(level, eyes, changes) || digNest(level, eyes, changes));
         boolean moundLeft = work > 0 && colony.mound().isActive() && buildMound(level, eyes, changes);
         if (!nestLeft && founders) {
             settleFounders(level, eyes, changes);
@@ -130,6 +133,46 @@ public class BuildLife {
 
     private void log(String what) {
         AntColoniesMod.LOGGER.info("[away-build] colony {} {}: {} ticks of work left over, {} soil", colony.getId(), what, work, soil);
+    }
+
+    /**
+     * The night soil first (as the real builders do each morning, see {@link NightSoil}): the piles near the top of
+     * the nest are carried up onto the hill before anything more is dug. True if some still waits (time ran out, or a
+     * player can see the pile or the hill).
+     */
+    private boolean carryNightSoil(ServerLevel level, List<Vec3> eyes, int[] changes) {
+        Hill hill = colony.hill();
+        if (colony.mound().numbers() != null || colony.isFounding()) {
+            return false;
+        }
+        while (work > 0 && hill.hasMoundRoom(level)) {
+            if (changes[0] >= PER_SECOND) {
+                return true;
+            }
+            BlockPos pile = hill.nightSoil().claimPile(level, BUILDERS);
+            if (pile == null) {
+                return false; // nothing waits
+            }
+            hill.nightSoil().release(BUILDERS);
+            if (!Population.outOfSight(level, pile, eyes)) {
+                waited = true;
+                return true;
+            }
+            BlockPos spot = hill.pickMoundSpot(level, level.getRandom(), null);
+            if (spot == null) {
+                return false;
+            }
+            if (!freeAndHidden(level, spot, eyes)) {
+                return true;
+            }
+            if (hill.nightSoil().takeLayer(level, pile, BUILDERS) == null || !hill.placePellet(level, spot)) {
+                return false;
+            }
+            work -= trip(pile, spot);
+            changes[0]++;
+            colony.away().report().add(AwayReport.What.HILL, 1);
+        }
+        return false;
     }
 
     /** The nest's plan, dug in the real diggers' order. True if there is more to dig (time ran out, or it waits). */

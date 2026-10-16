@@ -10,6 +10,7 @@
   "entity.antcolonies.ant_corpse": "Dead Ant",
   "entity.antcolonies.termite_corpse": "Dead Termite",
   "block.antcolonies.bread_pile": "Ant Bread Pile",
+  "block.antcolonies.loose_soil": "Loose Soil",
   "item.antcolonies.ant_bread": "Ant Bread",
   "item.antcolonies.rich_ant_bread": "Rich Ant Bread",
   "block.antcolonies.forage_pile": "Forage Pile",

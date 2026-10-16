@@ -455,6 +455,9 @@ public class Colony {
         away.settle(level);
         garden.grow(level);
         mound.tick(level);
+        if (mound.numbers() == null) {
+            hill.nightSoil().tick(level);
+        }
         mushrooms.tick(level);
         alarm.tick(level);
         foodMap.tick(level);
@@ -523,6 +526,21 @@ public class Colony {
             workOutRoles(level, now);
         }
         return roles.getOrDefault(ant.getUUID(), ColonyRole.BUILDER);
+    }
+
+    /** How many of the colony's real workers are builders now (the numbers inside the nest not counted). */
+    public int buildersNow(ServerLevel level) {
+        long now = level.getGameTime();
+        if (now - rolesWorkedOutAt >= 20 || now < rolesWorkedOutAt) {
+            workOutRoles(level, now);
+        }
+        int builders = 0;
+        for (ColonyRole role : roles.values()) {
+            if (role == ColonyRole.BUILDER) {
+                builders++;
+            }
+        }
+        return builders;
     }
 
     /** The role of the worker with this id (for tests and the colony list); a builder if it is not loaded. */

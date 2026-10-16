@@ -112,6 +112,11 @@
       "refuse": {"length": 5, "width": 5},
       "founding": {"length": 3, "width": 3}
     },
+    "night_soil": {
+      "_note": "Soil dug while the surface is shut (night, rain, the midday rest) waits in loose piles near the top of the nest (the top tunnel, and the founding chamber once the queen has moved down), at most layers_per_cell layers (2 pixels each) a cell; it is carried up onto the hill first thing once the surface opens, one carrier per pile, before anyone digs again. While the surface is shut the diggers rest once per_builder pellets wait for each builder (more than they could carry out in a morning). Real Pogonomyrmex: the nest maintenance workers are the first out each morning, carrying out the soil dug inside (Gordon). My picks, to confirm.",
+      "layers_per_cell": 4,
+      "per_builder": 12
+    },
     "level_unlocks": [
       {"workers": 1, "food": 0},
       {"workers": 6, "food": 10},

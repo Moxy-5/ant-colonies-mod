@@ -22,8 +22,10 @@ import net.minecraft.world.phys.AABB;
 /**
  * An ant holding a soil pellet carries it out of the hole and adds it to the mound around the entrance (or into a gap
  * in the hill that was knocked out; see {@link RepairHillGoal}). While the surface is shut to it (at night, in the rain,
- * in the midday rest: see {@link AbstractAntEntity#mayGoOut}) it puts the pellet on the night soil heap just under the
- * entrance instead; {@link CarryNightSoilGoal} brings that up once the clock opens.
+ * in the midday rest: see {@link AbstractAntEntity#mayGoOut}), or while the entrance is still plugged (the first workers
+ * opening their founding queen's plug: the way out is the block they bite), it puts the pellet on a pile of night soil
+ * near the top of the nest instead ({@link com.antcolonies.colony.NightSoil}); {@link CarryNightSoilGoal} brings that up
+ * once the surface opens. With the piles full the pellet is packed into the walls.
  */
 public class CarryPelletGoal extends Goal {
     /** How close (sideways, in blocks) the ant must get before it places the pellet. */
@@ -54,9 +56,13 @@ public class CarryPelletGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        night = colony != null && !ant.mayGoOut() && colony.hill().hasMoundRoom(level);
+        night = colony != null && surfaceShut(level) && colony.hill().hasMoundRoom(level);
         if (night) {
-            spot = colony.hill().getRepairSoilSpot();
+            spot = colony.hill().nightSoil().pickPile(level);
+            if (spot == null) {
+                ant.setCarriedBlock(null); // the piles are full: packed into the walls
+                return false;
+            }
             return true;
         }
         spot = colony == null ? null : colony.hill().pickMoundSpot(level, ant.getRandom(), ant.getUUID());
@@ -70,7 +76,12 @@ public class CarryPelletGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        return colony != null && spot != null && ant.isCarrying() && night == !ant.mayGoOut();
+        return colony != null && spot != null && ant.isCarrying() && ant.level() instanceof ServerLevel level && night == surfaceShut(level);
+    }
+
+    /** Whether this ant's soil cannot go out onto the hill now: the surface is shut to it, or the entrance is plugged. */
+    private boolean surfaceShut(ServerLevel level) {
+        return !ant.mayGoOut() || colony.nest().isEntrancePlugged(level);
     }
 
     @Override
@@ -145,22 +156,36 @@ public class CarryPelletGoal extends Goal {
         }
     }
 
-    /** Night: up the shaft to just under the entrance, where the pellet goes on the heap (it is not placed as a block). */
+    /** Surface shut: to a pile of night soil near the top of the nest, where the pellet is put down as one more layer. */
     private void heapNightSoil(ServerLevel level) {
         double dx = ant.getX() - (spot.getX() + 0.5);
         double dz = ant.getZ() - (spot.getZ() + 0.5);
         double dy = ant.getY() - spot.getY();
-        boolean there = dx * dx + dz * dz <= REACH * REACH && Math.abs(dy) < 2.0;
+        boolean there = dx * dx + dz * dz <= REACH * REACH && Math.abs(dy) < 1.5;
         if (!there && ++ticks < GIVE_UP_TICKS) {
             if (ant.getNavigator().isDone() && !ant.getNavigator().moveTo(spot, 1.0)) {
-                ticks = GIVE_UP_TICKS; // no way up: it is left where the ant is, on the heap all the same
+                ticks = GIVE_UP_TICKS; // no way there: packed into the walls where the ant is
             }
             return;
         }
         ant.getNavigator().stop();
-        colony.hill().addNightSoil(ant.getCarriedBlock());
+        boolean put = there && colony.hill().nightSoil().addLayer(level, spot);
+        if (there && !put) {
+            // Somebody else's soil filled this pile meanwhile: another one, or packed into the walls if they are all full.
+            spot = colony.hill().nightSoil().pickPile(level);
+            ticks = 0;
+            if (spot != null) {
+                return;
+            }
+        }
+        if (put) {
+            BlockState pellet = ant.getCarriedBlock();
+            level.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, pellet), spot.getX() + 0.5, spot.getY() + 0.2,
+                    spot.getZ() + 0.5, 4, 0.2, 0.05, 0.2, 0.05);
+            level.playSound(null, spot, pellet.getSoundType().getPlaceSound(), SoundSource.BLOCKS, 0.3F, 1.2F);
+        }
         ant.setCarriedBlock(null);
-        ColonyManager.get(level).markChanged();
+        spot = null;
     }
 
     /** Starts walking to a free cell next to the spot. False if there is none to go to. */

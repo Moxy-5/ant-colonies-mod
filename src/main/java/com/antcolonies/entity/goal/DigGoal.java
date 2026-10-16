@@ -67,14 +67,41 @@ public class DigGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
+        if (colony != null && soilWaits(level)) {
+            return false;
+        }
         target = colony == null ? null : colony.nest().findDigTarget(level, ant.getUUID());
         return target != null;
+    }
+
+    /**
+     * The morning clear-out of a species with a hill (real Pogonomyrmex: the nest maintenance workers carry out the
+     * soil dug in the night first thing each morning, before they dig on): while the surface is open, a builder
+     * carries a waiting pile up before it digs ({@link CarryNightSoilGoal}); while it is shut, the diggers rest once
+     * the piles are as big as a morning's carrying ({@link com.antcolonies.colony.NightSoil#isFull}). The entrance
+     * (a plug, a plant in it) is always bitten: that is how the surface opens.
+     */
+    private boolean soilWaits(ServerLevel level) {
+        if (!ant.canPlaceBlocks() || colony.mound().numbers() != null || !colony.hill().hasMoundRoom(level)) {
+            return false;
+        }
+        boolean plugged = colony.nest().isEntrancePlugged(level);
+        if (colony.nest().isPlantInEntrance(level) || plugged && colony.nest().mayOpenEntrance(level)) {
+            return false; // the entrance comes first
+        }
+        if (ant.mayGoOut() && !plugged) {
+            return colony.hill().nightSoil().hasFreePile(level, ant.getUUID());
+        }
+        return colony.hill().nightSoil().isFull(level);
     }
 
     @Override
     public boolean canContinueToUse() {
         return target != null && !ant.isCarrying() && stuckTicks < GIVE_UP_TICKS && allowed.getAsBoolean()
-                && colony != null && colony.nest().canDig(ant.level(), target);
+                && colony != null && colony.nest().canDig(ant.level(), target)
+                // now and then: has the night soil piled up (rest), or is there a pile to carry up first?
+                && (ant.tickCount % 20 != 0 || target.equals(colony.nest().getEntrance())
+                        || !(ant.level() instanceof ServerLevel level) || !soilWaits(level));
     }
 
     @Override

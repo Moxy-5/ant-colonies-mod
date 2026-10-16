@@ -49,6 +49,14 @@ public class ModBlocks {
                     .noCollission().noOcclusion().pushReaction(PushReaction.DESTROY));
 
     /**
+     * Loose soil near the top of the nest: the night soil (pellets dug while the surface was shut), waiting to be carried
+     * up onto the hill in the morning. One layer per pellet. Same block as the seed pile (nothing collides with it), other look.
+     */
+    public static final DeferredBlock<SeedPileBlock> LOOSE_SOIL = BLOCKS.registerBlock("loose_soil", SeedPileBlock::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.DIRT).strength(0.2F).sound(SoundType.GRAVEL)
+                    .noCollission().noOcclusion().pushReaction(PushReaction.DESTROY));
+
+    /**
      * A heap of forage (pieces of dead grass, leaves and twigs) in the termites' food store: one layer per piece a
      * termite brings in. Same block as the seed pile, other look.
      */

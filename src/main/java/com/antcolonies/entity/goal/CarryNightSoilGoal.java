@@ -7,6 +7,7 @@ import org.jetbrains.annotations.Nullable;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.ColonyRole;
+import com.antcolonies.colony.NightSoil;
 import com.antcolonies.entity.AbstractAntEntity;
 
 import net.minecraft.core.BlockPos;
@@ -19,14 +20,15 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * Carries the night soil up (brain step 4b): the soil dug while the surface was shut waits in a heap just under the
- * entrance (see {@code Hill.addNightSoil}); once the clock opens, builders pick it up there one pellet at a time, and
- * {@link CarryPelletGoal} takes each out onto the hill like any other pellet. Like {@link RepairHillGoal}.
+ * Carries the night soil up (brain step 4b): the soil dug while the surface was shut waits in piles of loose soil near
+ * the top of the nest (see {@link com.antcolonies.colony.NightSoil}); once the surface opens, builders pick it up one
+ * pellet at a time, one carrier to a pile, and {@link CarryPelletGoal} takes each out onto the hill like any other
+ * pellet. A builder does this before it digs again ({@link DigGoal}): the morning clear-out. Like {@link RepairHillGoal}.
  */
 public class CarryNightSoilGoal extends Goal {
     /** Ticks the ant takes to pick a pellet off the heap. */
     private static final int PICK_TICKS = 10;
-    /** If the ant can't get to the heap within 20 seconds it gives up (another ant, or later, will try). */
+    /** If the ant can't get to the pile within 20 seconds it gives up (another ant, or later, will try). */
     private static final int GIVE_UP_TICKS = 400;
 
     private final AbstractAntEntity ant;
@@ -49,17 +51,17 @@ public class CarryNightSoilGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        if (colony == null || !colony.hill().needsNightSoilCarried(level)) {
+        if (colony == null || colony.nest().isEntrancePlugged(level) || !colony.hill().hasMoundRoom(level)) {
             return false;
         }
-        heap = colony.hill().getRepairSoilSpot();
-        colony.hill().claimNightSoil(level, ant.getUUID());
-        return true;
+        heap = colony.hill().nightSoil().claimPile(level, ant.getUUID());
+        return heap != null;
     }
 
     @Override
     public boolean canContinueToUse() {
-        return colony != null && heap != null && !ant.hasFullMandibles() && ticks < GIVE_UP_TICKS && ant.mayGoOut();
+        return colony != null && heap != null && !ant.hasFullMandibles() && ticks < GIVE_UP_TICKS && ant.mayGoOut()
+                && NightSoil.layersAt(ant.level(), heap) > 0;
     }
 
     @Override
@@ -71,6 +73,9 @@ public class CarryNightSoilGoal extends Goal {
     @Override
     public void stop() {
         ant.getNavigator().stop();
+        if (colony != null) {
+            colony.hill().nightSoil().release(ant.getUUID());
+        }
         heap = null;
         colony = null;
     }
@@ -85,15 +90,15 @@ public class CarryNightSoilGoal extends Goal {
         ant.getLookControl().setLookAt(spot);
         double dx = ant.getX() - spot.x;
         double dz = ant.getZ() - spot.z;
-        if (dx * dx + dz * dz > 1.3 * 1.3 || Math.abs(ant.getY() - heap.getY()) >= 2.0) {
+        if (dx * dx + dz * dz > 1.3 * 1.3 || Math.abs(ant.getY() - heap.getY()) >= 1.5) {
             if (ant.getNavigator().isDone() && !ant.getNavigator().moveTo(heap, 1.0)) {
-                ticks = GIVE_UP_TICKS; // no way to the heap: let another ant have a go
+                ticks = GIVE_UP_TICKS; // no way to the pile: let another ant have a go
             }
             return;
         }
         ant.getNavigator().stop();
         if (++picking >= PICK_TICKS) {
-            BlockState pellet = colony.hill().takeNightSoil(ant.getUUID());
+            BlockState pellet = colony.hill().nightSoil().takeLayer(level, heap, ant.getUUID());
             if (pellet != null) {
                 level.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, pellet), spot.x, spot.y, spot.z, 4, 0.2, 0.2, 0.2, 0.05);
                 level.playSound(null, heap, pellet.getSoundType().getHitSound(), SoundSource.BLOCKS, 0.4F, 1.3F);

@@ -51,10 +51,12 @@ public class NestTests {
     private static final int NEST_CELLS = 3 + FOUNDING_CELLS + 4 * 3 + (25 + 25 + 9 + 25) + 3 * NestPlan.STAIR_LENGTH;
 
     /**
-     * Brain step 4b, in the same scene: once 15 cells are dug it is midnight for 1500 ticks: the diggers keep the
+     * Brain step 4b, in the same scene: once 15 cells are dug it is midnight for 3000 ticks: the diggers keep the
      * foragers' day clock for their surface work, so no worker is outside (after a moment to get in) and the soil dug
-     * meanwhile goes on the night soil heap under the entrance; once it is morning again it is carried up onto the hill
-     * (the heap is empty at the end).
+     * meanwhile lies in piles of Loose Soil near the top of the nest, only on the night soil cells and never more than
+     * they hold; once the piles are as big as a morning's carrying the diggers rest (no more than a few cells dug, the
+     * blocks they had started). Once it is morning again the piles are carried up onto the hill first (all gone within
+     * 3000 ticks; the user's bug of 2026-10-16: the night soil never reached the hill).
      */
     @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
     public static void workersDigTheWholeNestAndBuildTheMound(GameTestHelper helper) {
@@ -65,11 +67,35 @@ public class NestTests {
         startColony(helper);
 
         long[] nightFrom = {-1};
+        long[] morningAt = {-1};
+        long[] clearedAt = {-1};
         int[] heaped = {-1};
+        int[] dugWhenFull = {-1};
         String[] outsideAtNight = {null};
+        String[] pileProblem = {null};
         helper.onEachTick(() -> {
             Colony colony = colony(helper);
-            if (colony == null || heaped[0] >= 0) {
+            if (colony == null) {
+                return;
+            }
+            if (helper.getTick() % 50 == 0 && pileProblem[0] == null) {
+                List<BlockPos> cells = colony.nest().nightSoilCells(level);
+                for (BlockPos pile : looseSoil(helper)) {
+                    if (!cells.contains(pile)) {
+                        pileProblem[0] = "loose soil off the night soil cells at " + pile.toShortString() + " (tick " + helper.getTick() + ")";
+                    }
+                }
+                int waiting = colony.hill().nightSoil().waiting(level);
+                int room = cells.size() * colony.profile().nest().nightSoil().layersPerCell();
+                if (waiting > room) {
+                    pileProblem[0] = waiting + " pellets wait in piles that hold " + room + " (tick " + helper.getTick() + ")";
+                }
+            }
+            if (morningAt[0] >= 0) {
+                if (clearedAt[0] < 0 && colony.hill().nightSoil().waiting(level) == 0) {
+                    clearedAt[0] = helper.getTick();
+                    AntColoniesMod.LOGGER.info("[nest-test] tick {}: the night soil is carried up, {} ticks after morning", helper.getTick(), clearedAt[0] - morningAt[0]);
+                }
                 return;
             }
             if (nightFrom[0] < 0 && airBelowSurface(helper) >= 15) {
@@ -83,10 +109,23 @@ public class NestTests {
                     }
                 }
             }
-            if (nightFrom[0] >= 0 && helper.getTick() - nightFrom[0] >= 1500) {
-                heaped[0] = colony.hill().nightSoilCount();
+            if (nightFrom[0] >= 0 && dugWhenFull[0] < 0 && colony.hill().nightSoil().isFull(level)) {
+                dugWhenFull[0] = dugBelowSurface(helper);
+                AntColoniesMod.LOGGER.info("[nest-test] tick {}: the night soil piles are full ({} pellets), the diggers rest",
+                        helper.getTick(), colony.hill().nightSoil().waiting(level));
+            }
+            if (nightFrom[0] >= 0 && helper.getTick() - nightFrom[0] >= 3000) {
+                heaped[0] = colony.hill().nightSoil().waiting(level);
+                if (dugWhenFull[0] >= 0) {
+                    int dugSince = dugBelowSurface(helper) - dugWhenFull[0];
+                    if (dugSince > 3) {
+                        pileProblem[0] = dugSince + " cells dug at night after the piles were full";
+                    }
+                }
+                morningAt[0] = helper.getTick();
                 colony.setClockForTests(null, null); // morning again (7:00 on the test server)
-                AntColoniesMod.LOGGER.info("[nest-test] tick {}: morning, {} pellets of night soil heaped under the entrance", helper.getTick(), heaped[0]);
+                AntColoniesMod.LOGGER.info("[nest-test] tick {}: morning, {} pellets of night soil in piles (most {}, cells {})", helper.getTick(),
+                        heaped[0], colony.hill().nightSoil().limit(level), colony.nest().nightSoilCells(level).size());
             }
         });
 
@@ -117,9 +156,13 @@ public class NestTests {
             helper.assertTrue(queens.get(0).blockPosition().equals(room), "the queen is not in the middle of the room yet: " + queens.get(0).blockPosition().subtract(room));
             String hill = hillProblems(helper);
             helper.assertTrue(hill.isEmpty(), "the mound is not the planned hill yet: " + hill);
-            helper.assertTrue(heaped[0] > 0, "soil dug at night should be heaped under the entrance: " + heaped[0]);
+            helper.assertTrue(heaped[0] > 0, "soil dug at night should lie in piles near the top of the nest: " + heaped[0]);
             helper.assertTrue(outsideAtNight[0] == null, "a worker was outside at midnight: " + outsideAtNight[0]);
-            helper.assertTrue(colony.hill().nightSoilCount() == 0, "the night soil should be carried up: " + colony.hill().nightSoilCount() + " left");
+            helper.assertTrue(pileProblem[0] == null, "night soil: " + pileProblem[0]);
+            helper.assertTrue(colony.hill().nightSoil().waiting(level) == 0,
+                    "the night soil should be carried up: " + colony.hill().nightSoil().waiting(level) + " left");
+            helper.assertTrue(clearedAt[0] >= 0 && clearedAt[0] - morningAt[0] <= 3000,
+                    "the night soil should be carried up first thing in the morning, but it took " + (clearedAt[0] - morningAt[0]) + " ticks");
             AntColoniesMod.LOGGER.info("[nest-test] finished at tick {}: {}", helper.getTick(), describe(helper));
         });
     }
@@ -1770,6 +1813,26 @@ public class NestTests {
             }
         }
         return air;
+    }
+
+    /** Like {@link #airBelowSurface}, also counting the cells that hold night soil (dug, with soil lying in them). */
+    private static int dugBelowSurface(GameTestHelper helper) {
+        return airBelowSurface(helper) + looseSoil(helper).size();
+    }
+
+    /** Every block of Loose Soil (night soil piles) under the surface, in level coordinates. */
+    private static List<BlockPos> looseSoil(GameTestHelper helper) {
+        List<BlockPos> piles = new ArrayList<>();
+        for (int x = 0; x < 25; x++) {
+            for (int z = 0; z < 25; z++) {
+                for (int y = 0; y <= SURFACE; y++) {
+                    if (helper.getBlockState(new BlockPos(x, y, z)).is(ModBlocks.LOOSE_SOIL.get())) {
+                        piles.add(helper.absolutePos(new BlockPos(x, y, z)));
+                    }
+                }
+            }
+        }
+        return piles;
     }
 
     private static int moundBlocks(GameTestHelper helper) {
