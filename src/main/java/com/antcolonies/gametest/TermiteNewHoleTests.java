@@ -37,8 +37,11 @@ public class TermiteNewHoleTests {
      * with its nest dug out and six middle-aged real workers (builders, who dig). The colony knows of a hay bale 22
      * blocks east. It plans a tunnel to it, the workers dig it to the end and open a hole beside the hay at foraging
      * time. Then the hay is taken away: the hole is spent, plugged when the foraging is over and never opened again.
+     * On the test clock (roadmap 3a): real nights and days from 18:30; the spent hole is plugged at the end of the night
+     * and stays shut the next night. The bale is kept from running out until the new hole has been used (the workers
+     * eat it from the tunnel's end by day), as a bigger stack of hay would last.
      */
-    @GameTest(template = "arena", timeoutTicks = 30000, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
     public static void aBigColonyDigsATunnelToFarHayAndPlugsItsHoleWhenTheHayIsGone(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
@@ -58,7 +61,8 @@ public class TermiteNewHoleTests {
             }
         });
         BlockPos hay = helper.absolutePos(new BlockPos(MIDDLE + HAY_EAST, SURFACE, MIDDLE));
-        int[] phase = {0}; // 0 setting up, 1 waiting for the plan, 2 digging, 5 foraging by the new hole, 3 hay gone, 4 plugged
+        int[] phase = {0}; // 0 setting up, 1 waiting for the plan, 2 digging, 5 foraging by the new hole, 3 hay gone, 6 plugged, 4 the next night
+        TestClock clock = TestClock.moving(helper, 18.5);
         int[] cutWhenOpened = {0};
         boolean[] usedTheHole = {false};
         FoodWays.NewTunnel[] tunnel = {null};
@@ -72,7 +76,6 @@ public class TermiteNewHoleTests {
             }
             TermiteSoldierTests.digNestAtOnce(level, colony);
             colony.population().addNewMembers(WorkerAntEntity.CASTE, level.getGameTime() - 1000, 500);
-            colony.setForagingTimeForTests(true);
             level.setBlock(hay, Blocks.HAY_BLOCK.defaultBlockState(), 3);
             colony.food().rescanPlantsSoon();
             colony.foodMap().knowForTests(hay);
@@ -83,9 +86,17 @@ public class TermiteNewHoleTests {
             if (colony == null || phase[0] == 0) {
                 return;
             }
-            since[0]++;
+            if (phase[0] != 5 || colony.isForagingTime(level)) {
+                since[0]++; // (foraging by the new hole: night time only)
+            }
+            if ((phase[0] == 2 || phase[0] == 5) && colony.food().getPiecesCut(hay) > 24) {
+                // A bale holds 48 pieces, and once the tunnel reaches it the workers eat it from inside by day: until the
+                // new hole has been used it stands for a bigger stack of hay, which lasts (cuts since the hole opened kept).
+                cutWhenOpened[0] -= colony.food().getPiecesCut(hay);
+                colony.food().setPiecesCutForTests(hay, 0);
+            }
             if (helper.getTick() % 1000 == 0) {
-                AntColoniesMod.LOGGER.info("[new-hole-test] tick {} phase {}: {}{}", helper.getTick(), phase[0],
+                AntColoniesMod.LOGGER.info("[new-hole-test] tick {} {} phase {}: {}{}", helper.getTick(), clock.describe(), phase[0],
                         tunnel[0] == null ? "no tunnel yet" : "dug " + tunnel[0].tunnel().tunnel().stream().filter(c -> Nest.isDugOut(level, c)).count()
                                 + " of " + tunnel[0].tunnel().tunnel().size() + ", hole " + level.getBlockState(tunnel[0].tunnel().hole()),
                         colony.foragingHoles().describeNewHoles(level));
@@ -139,15 +150,23 @@ public class TermiteNewHoleTests {
                 case 3 -> {
                     BlockPos hole = tunnel[0].tunnel().hole();
                     if (colony.nest().foodWays().isSpent(hole)) {
-                        colony.setForagingTimeForTests(false); // the foraging is over: the holes are plugged
+                        // The foraging is over at the end of the night: the holes are plugged.
                         if (!ForagingHoles.isOpen(level, hole)) {
-                            colony.setForagingTimeForTests(true); // and a new night: the spent one stays shut
-                            phase[0] = 4;
+                            phase[0] = 6;
                             since[0] = 0;
+                        } else {
+                            helper.assertTrue(clock.phase(colony) != TestClock.Phase.DAY, "the spent hole was not plugged by sunrise: "
+                                    + level.getBlockState(hole));
                         }
+                    } else {
+                        helper.assertTrue(since[0] < 6000, "the hole beside the gone hay was not spent: " + level.getBlockState(hole));
                     }
-                    helper.assertTrue(since[0] < 6000, "the hole beside the gone hay was not spent and plugged: spent "
-                            + colony.nest().foodWays().isSpent(hole) + ", " + level.getBlockState(hole));
+                }
+                case 6 -> {
+                    if (clock.phase(colony) == TestClock.Phase.NIGHT) { // and a new night: the spent one stays shut
+                        phase[0] = 4;
+                        since[0] = 0;
+                    }
                 }
                 case 4 -> {
                     BlockPos hole = tunnel[0].tunnel().hole();
@@ -210,7 +229,7 @@ public class TermiteNewHoleTests {
             }
             TermiteSoldierTests.digNestAtOnce(level, colony);
             colony.population().addNewMembers(WorkerAntEntity.CASTE, level.getGameTime() - 1000, 500);
-            colony.setForagingTimeForTests(true);
+            TestClock.still(helper, 0.0); // midnight: foraging time
             for (BlockPos wood : tree) {
                 level.setBlock(wood, com.antcolonies.registry.ModBlocks.DEAD_WOOD.get().defaultBlockState()
                         .setValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS, net.minecraft.core.Direction.Axis.X), 3);
@@ -258,7 +277,7 @@ public class TermiteNewHoleTests {
      * Brain part 3: by day the brain remembers the log as food that can be eaten from inside, and the forager numbers go
      * to it then too (they forage by day only what they can eat from inside).
      */
-    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 90000, skyAccess = true)
     public static void aFallenLogOnTheEdgeOfAStepIsEatenFromBelowByDay(GameTestHelper helper) {
         eatenFromBelow(helper, true, Food.LOG);
     }
@@ -271,7 +290,7 @@ public class TermiteNewHoleTests {
      * block of stump standing on the log, which no gallery cell touches, is eaten by day from the cast under it, and is a
      * cast itself afterwards.
      */
-    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 90000, skyAccess = true)
     public static void aFallenLogAndTheStumpOnItAreEatenFromBelowByDay(GameTestHelper helper) {
         eatenFromBelow(helper, false, Food.STUMP);
     }
@@ -283,14 +302,18 @@ public class TermiteNewHoleTests {
      * 2026-10-14 whose casing and gallery stayed open on that side, 2 blocks high): the gallery's open side is walled
      * and the branch is cased on that side too.
      */
-    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 90000, skyAccess = true)
     public static void aFallenBranchOnTheEdgeOfAStepIsCasedInMudAndEatenFromBelowByDay(GameTestHelper helper) {
         eatenFromBelow(helper, true, Food.BRANCH);
     }
 
     private enum Food { LOG, STUMP, BRANCH }
 
-    /** (60000 ticks, was 40000: once the stump was still on its last bitten stage when the time ran out, 2026-10-14.) */
+    /**
+     * (60000 ticks, was 40000: once the stump was still on its last bitten stage when the time ran out, 2026-10-14; 90000
+     * on the test clock, roadmap 3a: real nights and days from 18:30 for the log and the stump, the gallery dug through
+     * the nights, then eaten from below by day, over more than one day if need be; the branch on a still midday.)
+     */
     private static void eatenFromBelow(GameTestHelper helper, boolean onAStep, Food kind) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
@@ -318,7 +341,10 @@ public class TermiteNewHoleTests {
             log.add(helper.absolutePos(new BlockPos(x, SURFACE, MIDDLE)));
         }
         BlockPos stump = log.get(0).above(); // put on the log at dawn (Food.STUMP)
-        int[] phase = {0}; // 0 setting up, 1 night: tunnel and gallery dug, 2 day: eaten from below
+        int[] phase = {0}; // 0 setting up, 1 tunnel and gallery dug (by night), 2 day: eaten from below
+        // A branch is small: by night the foragers outside would eat it all before the gallery is dug, so it is day.
+        TestClock clock = kind == Food.BRANCH ? TestClock.still(helper, 12.0) : TestClock.moving(helper, 18.5);
+        boolean[] night = {false}; // (phase 2: a night came between the days)
         int[] eatenAtDawn = {0};
         boolean[] numbersAte = {kind != Food.LOG}; // (brain part 3, the log test only)
         helper.runAfterDelay(10, () -> {
@@ -330,8 +356,6 @@ public class TermiteNewHoleTests {
             }
             TermiteSoldierTests.digNestAtOnce(level, colony);
             colony.population().addNewMembers(WorkerAntEntity.CASTE, level.getGameTime() - 1000, 500);
-            // A branch is small: by night the foragers outside would eat it all before the gallery is dug, so it is day.
-            colony.setForagingTimeForTests(kind != Food.BRANCH);
             for (int i = 0; i < log.size(); i++) {
                 level.setBlock(log.get(i), kind == Food.BRANCH
                         ? com.antcolonies.registry.ModBlocks.FALLEN_BRANCH.get().defaultBlockState()
@@ -373,7 +397,7 @@ public class TermiteNewHoleTests {
             }
             FoodWays.NewTunnel tunnel = colony.nest().foodWays().getNewTunnels().isEmpty() ? null : colony.nest().foodWays().getNewTunnels().get(0);
             if (helper.getTick() % 1000 == 0) {
-                AntColoniesMod.LOGGER.info("[new-hole-test] log from below: phase {}, tunnel {}, gallery {}, eaten {}", phase[0],
+                AntColoniesMod.LOGGER.info("[new-hole-test] log from below: {}, phase {}, tunnel {}, gallery {}, eaten {}", clock.describe(), phase[0],
                         tunnel == null ? "none" : tunnel.tunnel().tunnel().stream().filter(c -> Nest.isDugOut(level, c)).count() + "/" + tunnel.tunnel().tunnel().size(),
                         tunnel == null || tunnel.gallery() == null ? "none" : tunnel.gallery().stream().filter(c -> Nest.isDugOut(level, c)).count() + "/" + tunnel.gallery().size(),
                         eaten);
@@ -415,8 +439,7 @@ public class TermiteNewHoleTests {
                 if (tunnel != null) {
                     long under = log.stream().filter(wood -> tunnel.gallery().contains(wood.below())).count();
                     helper.assertTrue(under >= log.size() - 1, "the feeding gallery runs under only " + under + " of the " + log.size() + " blocks of food: " + tunnel.gallery());
-                    if (tunnel.gallery().stream().allMatch(c -> Nest.isDugOut(level, c))) {
-                        colony.setForagingTimeForTests(false); // day
+                    if (tunnel.gallery().stream().allMatch(c -> Nest.isDugOut(level, c)) && clock.phase(colony) == TestClock.Phase.DAY) {
                         eatenAtDawn[0] = eaten;
                         if (kind == Food.LOG) {
                             colony.field().setOnForTests(true); // (brain part 3: the 500 numbers forage too, by day only from inside)
@@ -438,8 +461,16 @@ public class TermiteNewHoleTests {
                         }
                     }
                 }
-                helper.assertTrue(helper.getTick() < 30000, "the tunnel and the feeding gallery under the log were not dug");
+                helper.assertTrue(helper.getTick() < 45000, "the tunnel and the feeding gallery under the log were not dug");
                 return;
+            }
+            if (clock.phase(colony) != TestClock.Phase.DAY) {
+                night[0] = true; // (the foragers outside may eat it from above by night: only the days count)
+                return;
+            }
+            if (night[0]) {
+                night[0] = false;
+                eatenAtDawn[0] = eaten;
             }
             // By day: eaten from below, and on the step the gallery's open side is a wall of mud crust.
             int crusts = 0;
@@ -476,7 +507,7 @@ public class TermiteNewHoleTests {
             } else if (eaten > eatenAtDawn[0] && (!onAStep || crusts > 0) && numbersAte[0]) {
                 helper.succeed();
             }
-            helper.assertTrue(helper.getTick() < 59000, "by day: eaten " + eaten + " (at dawn " + eatenAtDawn[0] + "), numbers ate " + numbersAte[0]
+            helper.assertTrue(helper.getTick() < 89000, "by day: eaten " + eaten + " (at dawn " + eatenAtDawn[0] + "), numbers ate " + numbersAte[0]
                     + " (" + colony.field().describe() + ", from inside " + log.stream().filter(colony.field()::remembersFromInside).count() + "), " + crusts
                     + " crust walls beside the gallery, " + colony.walls().getLeaks(level).size() + " leaks, log " + under + ", stump " + top
                     + ": first log block seen " + colony.food().plants(level).contains(log.get(0)) + ", gallery under it "

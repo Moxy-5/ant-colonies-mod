@@ -75,7 +75,7 @@ public final class TestFilter {
         if (!(server instanceof GameTestServer)) {
             return;
         }
-        com.antcolonies.colony.Colony.setTimeOnTestServer(1000L); // 7:00: the harvester foragers are out (tests set other times themselves)
+        TestClock.install(); // every colony reads its test's own clock (a still 7:00 if the test has none)
         if (only == null || only.isBlank()) {
             skipStressTests(server);
             return;

@@ -242,6 +242,13 @@ Goal: a mature colony can hold 1,000+ ants or termites without lag.
 - Ants and termites ignore the player unless their nest is disturbed, then they defend it. (They may stop to look at a moving player, or termites freeze at its footsteps, without attacking: see "Animations and body language".)
 - Later: an ant farm (catch a founding queen in a jar, build a glass-walled farm) and a field journal that fills in as the player observes behaviors.
 
+### Game tests: the test clock (user's decisions, 2026-10-16; plan `docs/plans/test-clock.md`)
+- Each game test that cares about the time of day has its own clock (`gametest/TestClock`): every colony in the test's arena reads it. The old per-colony switches (`setClockForTests`, `setForagingTimeForTests`, `setSkyForTests`, the frozen 7:00 on the test server) are gone.
+- **Real speed:** a test day is 24,000 ticks, as in the game, so the ants' walking and the sun stay in their real proportions.
+- **A moving clock only for the tests about the time of day** (foraging rounds, patrols, holes opening and plugging, runways, sentries, life while away); the others (walking, digging, building, the young) get a clock standing still at the hour they need. A test with no clock reads a still 7:00.
+- **Real nights:** where a termite test used to make "night" last until a job was done, it now waits through real nights and days (a termite night is about 9,450 ticks, 18:33 to 4:00) with longer timeouts, as real termites take several nights for a big job.
+- Skipping ahead (`clock.skipTo(hour)` or `skipTo(colony, phase)`) moves only the hour, like sleeping in a bed; hunger and ages do not jump.
+
 ### Animations and body language (planned with the user, 2026-10-15; full plan in `docs/plans/animation-engine.md`, not built)
 - **The aim (user):** ants with personality: the whole body moving (bending at the joints over an edge), ants stopping to look at the player, "the little things". Real insect body language, not cartoon tricks (no squash and stretch: a hard body bends only at its joints).
 - **Engine:** a Python motion library from real-ant numbers (gait, antennae, body, little one-shot clips, a bone map for the user's M2 model), automatic checks (foot slide, clipping, loop seams, joint limits) and my own look in the ant pose viewer before the user sees anything; in game, separate animation controllers for legs, body, head and extras, plus a live layer (each ant's own clock, walk speed from the real stride, the rear following the front over edges, the head look).

@@ -737,11 +737,6 @@ public class Patrol {
         numbers.replaceAll(out -> new Out(out.way(), 0));
     }
 
-    /** The next second starts a new round, as if the clock had just opened (for tests). */
-    public void newRoundForTests() {
-        clockWasOpen = false;
-    }
-
     // --- saving -----------------------------------------------------------------------------------------------------
 
     void save(CompoundTag tag) {

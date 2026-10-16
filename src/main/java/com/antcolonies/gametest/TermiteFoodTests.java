@@ -108,7 +108,7 @@ public class TermiteFoodTests {
             if (colony[0] == null) {
                 colony[0] = TermiteMoundTests.colony(helper);
                 if (colony[0] != null) {
-                    colony[0].setForagingTimeForTests(true); // always night here: the foragers go out
+                    TestClock.still(helper, 0.0); // always midnight here: the foragers go out
                     for (BlockPos plant : List.of(bush, tallGrass, grassA, grassB, hay)) {
                         colony[0].foodMap().knowForTests(helper.absolutePos(plant)); // (finding them is the next test)
                     }
@@ -235,9 +235,9 @@ public class TermiteFoodTests {
 
     /**
      * Finding food (the colony's food map): an old colony with its nest dug out and both foraging holes open, a tuft of
-     * Dry Grass right beside each hole and a hay bale 11 blocks out from the first. By "day" nobody knows the hay. A
+     * Dry Grass right beside each hole and a hay bale 11 blocks out from the first. By day nobody knows the hay. A
      * worker is put down beside it (as the user tests it): it finds the hay and, once it is back inside, tells the
-     * colony. Then "night": the foragers go for the hay (worth far more) rather than the grass by the holes. Checked:
+     * colony. Then night: the foragers go for the hay (worth far more) rather than the grass by the holes. Checked:
      * the hay is unknown at first, found and then known only once the finder is inside, and by the time 8 pieces are cut
      * off the hay at most half as many have been cut off the grass. Brain part 3: the brain (the foraging numbers' memory)
      * never remembers the hay before the colony knows of it, and once it does it remembers the walk to it by the nearest
@@ -260,7 +260,7 @@ public class TermiteFoodTests {
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
-            colony.setForagingTimeForTests(false);
+            TestClock.still(helper, 12.0); // midday: nobody goes out
             long old = level.getGameTime() - colony.profile().worker().builderUntilTicks() - 1000;
             for (com.antcolonies.entity.TermiteWorkerEntity worker : level.getEntitiesOfClass(com.antcolonies.entity.TermiteWorkerEntity.class, helper.getBounds())) {
                 worker.setGrownUpAt(old); // old workers: foragers first
@@ -319,7 +319,7 @@ public class TermiteFoodTests {
                 if (colony.foodMap().isKnown(spots[0])) {
                     helper.assertTrue(sawUntold[0], "the colony knew of the hay without anyone finding it first");
                     helper.assertTrue(colony.nest().isInside(level, finder[0].blockPosition()), "the hay is known while its finder is still outside");
-                    colony.setForagingTimeForTests(true);
+                    TestClock.still(helper, 0.0); // midnight: the foragers go out
                     knownAt[0] = helper.getTick();
                     phase[0] = 2;
                     AntColoniesMod.LOGGER.info("[find-test] tick {}: the hay is known, night", helper.getTick());

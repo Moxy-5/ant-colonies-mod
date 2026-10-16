@@ -1,4 +1,4 @@
-# Roadmap step 3a, part 1: a shared test clock for the game tests (plan, 2026-10-16, waiting for the user's OK)
+# Roadmap step 3a, part 1: a shared test clock for the game tests (plan, 2026-10-16, OK'd by the user the same day)
 
 Goal (user's decision, 2026-10-16): one shared day/night clock for the game tests that really moves through the
 morning, the midday rest, the afternoon and the night, in place of each test freezing the time and patching around it.
@@ -116,7 +116,7 @@ Every check stays: only how the time is set changes.
 - The other test-only switches (`FoodMap.setTestArea`, `Alarm.setTestArea`, `knowForTests`, the "alone" batches,
   `keepOutOfColonies`) are about neighbouring tests, not the time.
 
-## Questions for the user
+## Questions for the user (answered 2026-10-16: real speed; a moving clock only for the time-of-day tests; real nights)
 
 1. **Speed:** real speed (a day is 24,000 ticks, the ants' walking and the sun in true proportion; recommended), or a
    faster day in the tests.

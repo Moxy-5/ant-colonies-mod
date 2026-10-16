@@ -145,7 +145,7 @@ public class TermiteSoldierTests {
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
-            colony.setForagingTimeForTests(false); // day: everybody stays in
+            TestClock.still(helper, 12.0); // midday: everybody stays in
             for (TermiteWorkerEntity worker : level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds())) {
                 worker.setGrownUpAt(level.getGameTime()); // young: the colony's nurse is one of them
             }
@@ -268,12 +268,16 @@ public class TermiteSoldierTests {
      * The minors out at foraging time (step 6b). A colony with its royal chamber, a garden and both foraging tunnels dug
      * out, both holes open, and the entrance in the middle closed with stone (so the foragers go out by the holes). Five
      * old workers (mostly foragers) and five minors. A hay bale lies 11 blocks from the first hole, along the ground at a
-     * right angle to its tunnel. At "night" the foragers cut at the hay; the minors come out: one stands beside the
+     * right angle to its tunnel. At night the foragers cut at the hay; the minors come out: one stands beside the
      * first hole, three line the trail from it to the hay (every 3 blocks, on both sides, right beside it), and one
-     * stands beside the second hole (nobody's trail), each facing out. Then "day": the minors stay at their posts while
-     * any worker is still outside, and go in only after the last one; once everybody is in, both holes are plugged.
+     * stands beside the second hole (nobody's trail), each facing out. Then the night is over (4:00, before dawn): the
+     * minors stay at their posts while any worker is still outside, and go in only after the last one; once everybody
+     * is in, both holes are plugged. On the test clock (roadmap 3a): midday at first, then the night from 20:00 runs at
+     * real speed (8000 ticks to 4:00, the old limit for getting to their posts); once the minors have stood guard while a forager is at the hay, the clock skips on to 4:00 (as if
+     * slept through), so the night ends with a forager out (on a real night the five foragers were sometimes all home
+     * by 4:00, and then nothing tells whether the minors go in last).
      */
-    @GameTest(template = "arena", timeoutTicks = 8000, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 12000, skyAccess = true)
     public static void minorsGuardTheHolesAndLineTheForagersTrailThenGoInLast(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
@@ -288,10 +292,11 @@ public class TermiteSoldierTests {
         BlockPos[] trail = new BlockPos[2]; // the first hole's mouth, the hay
         int[] phase = {0}; // 0 setting up, 1 night, 2 day, 3 everybody in
         long[] at = {0, -1, -1, -1}; // since when all guard outside, when the day began, last tick a worker was out, first tick a minor was in
+        boolean[] stoodGuard = {false};
+        TestClock[] clock = {TestClock.still(helper, 12.0)}; // midday: setting up
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
-            colony.setForagingTimeForTests(false);
             long old = level.getGameTime() - colony.profile().worker().builderUntilTicks() - 1000;
             for (TermiteWorkerEntity worker : level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds())) {
                 worker.setGrownUpAt(old); // old workers: foragers first
@@ -315,7 +320,7 @@ public class TermiteSoldierTests {
         helper.runAfterDelay(40, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null, "no termite colony");
-            colony.setForagingTimeForTests(true);
+            clock[0] = TestClock.moving(helper, 20.0); // night
             phase[0] = 1;
         });
         helper.onEachTick(() -> {
@@ -330,13 +335,18 @@ public class TermiteSoldierTests {
                 if (tick % 500 == 0) {
                     AntColoniesMod.LOGGER.info("[sentry-test] tick {}: {}; {}", tick, wrong, colony.soldiers().describe(level));
                 }
-                // The day begins once they have stood guard a while, while a forager is out at the hay.
+                // They stand guard a while, while a forager is out at the hay; then the night ends (4:00).
                 boolean foragerAtTheHay = !level.getEntitiesOfClass(TermiteWorkerEntity.class, new AABB(trail[1]).inflate(2),
                         worker -> colony.getId().equals(worker.getColonyId())).isEmpty();
-                if (wrong == null && tick - at[0] >= 40 && foragerAtTheHay) {
-                    AntColoniesMod.LOGGER.info("[sentry-test] tick {}: the minors stand guard outside {}; {}", tick,
+                if (!stoodGuard[0] && wrong == null && tick - at[0] >= 40 && foragerAtTheHay) {
+                    AntColoniesMod.LOGGER.info("[sentry-test] tick {} ({}): the minors stand guard outside {}; {}", tick, clock[0].describe(),
                             minors.stream().map(m -> m.blockPosition().toShortString()).toList(), colony.soldiers().describe(level));
-                    colony.setForagingTimeForTests(false);
+                    stoodGuard[0] = true;
+                    clock[0].skipTo(colony, TestClock.Phase.BEFORE_DAWN);
+                }
+                if (clock[0].phase(colony) == TestClock.Phase.BEFORE_DAWN) {
+                    helper.assertTrue(stoodGuard[0], "by the end of the night the minors had not all stood guard outside while a forager was at the hay: " + wrong);
+                    AntColoniesMod.LOGGER.info("[sentry-test] tick {}: the night is over ({})", tick, clock[0].describe());
                     at[1] = tick;
                     phase[0] = 2;
                 }

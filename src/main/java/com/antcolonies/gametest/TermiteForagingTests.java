@@ -23,13 +23,14 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 @PrefixGameTestTemplate(false)
 public class TermiteForagingTests {
     /**
-     * A termite colony digs its two foraging tunnels and, at foraging time ("night", forced in the test), opens a hole
-     * at the end of each. When it is time to stay in ("day") the workers plug both holes with soil from inside and
-     * everybody is back inside the nest and the mound; a dead bush right outside is left alone all day. The middle
-     * hole (the entrance, open to the sky while the young mound has no roof over it) is plugged by day too. The next
-     * "night" the holes and the middle hole are opened again.
+     * A termite colony digs its two foraging tunnels and, at foraging time (night), opens a hole at the end of each.
+     * When it is time to stay in (day) the workers plug both holes with soil from inside and everybody is back inside the
+     * nest and the mound; a dead bush right outside is left alone all day. The middle hole (the entrance, open to the
+     * sky while the young mound has no roof over it) is plugged by day too. The next night the holes and the middle hole
+     * are opened again. On the test clock (roadmap 3a): real nights and days from 18:30, so digging the tunnels may take
+     * more than one night, as for real termites.
      */
-    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
     public static void termitesOpenTheirForagingHolesAtNightAndPlugThemByDay(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
@@ -42,8 +43,9 @@ public class TermiteForagingTests {
             }
         });
         BlockPos bush = new BlockPos(MIDDLE + 5, SURFACE, MIDDLE + 5);
-        int[] phase = {0}; // 0 first night, 1 day, 2 second night, 3 done
-        long[] dayFrom = {0};
+        TestClock clock = TestClock.moving(helper, 18.5);
+        int[] phase = {0}; // 0 the nights until both holes are open, 1 the day after, 2 waiting for the next night, 3 done
+        boolean[] bothOpen = {false};
         helper.onEachTick(() -> {
             Colony colony = TermiteMoundTests.colony(helper);
             if (colony == null) {
@@ -53,45 +55,55 @@ public class TermiteForagingTests {
             int tunnels = holes.tunnels(level).size();
             switch (phase[0]) {
                 case 0 -> {
-                    colony.setForagingTimeForTests(true);
-                    if (tunnels == 2 && holes.countOpen(level) == 2) {
-                        AntColoniesMod.LOGGER.info("[holes-test] tick {}: both holes open, day starts", helper.getTick());
-                        colony.setForagingTimeForTests(false);
+                    if (tunnels == 2 && holes.countOpen(level) == 2 && !bothOpen[0]) {
+                        bothOpen[0] = true;
+                        AntColoniesMod.LOGGER.info("[holes-test] tick {}: both holes open at {}", helper.getTick(), clock.describe());
+                    }
+                    if (bothOpen[0] && clock.phase(colony) == TestClock.Phase.DAY) {
+                        AntColoniesMod.LOGGER.info("[holes-test] tick {}: sunrise ({})", helper.getTick(), clock.describe());
                         helper.setBlock(bush, Blocks.DEAD_BUSH);
-                        dayFrom[0] = helper.getTick();
                         phase[0] = 1;
                     }
                 }
                 case 1 -> {
-                    helper.assertTrue(helper.getBlockState(bush).is(Blocks.DEAD_BUSH), "a termite cut at the dead bush by day");
+                    helper.assertTrue(clock.phase(colony) == TestClock.Phase.DAY, "by sunset the holes (and the middle hole) were not all plugged with everybody inside");
                     boolean plugged = holes.tunnels(level).stream().allMatch(t -> level.getBlockState(t.hole()).is(ModBlocks.TERMITE_MOUND.get()))
                             && (level.getBlockState(colony.nest().getEntrance()).is(ModBlocks.TERMITE_MOUND.get()) || colony.nest().isEntranceCovered(level));
-                    if (plugged && !holes.isAnyoneOutside(level) && helper.getTick() - dayFrom[0] > 1200) {
-                        AntColoniesMod.LOGGER.info("[holes-test] tick {}: both holes plugged, everybody inside, night starts", helper.getTick());
-                        colony.setForagingTimeForTests(true);
+                    if (plugged && !holes.isAnyoneOutside(level)) {
+                        AntColoniesMod.LOGGER.info("[holes-test] tick {}: both holes plugged, everybody inside ({})", helper.getTick(), clock.describe());
                         phase[0] = 2;
                     }
                 }
                 case 2 -> {
-                    if (holes.countOpen(level) == 2 && (ForagingHoles.isOpen(level, colony.nest().getEntrance()) || colony.nest().isEntranceCovered(level))) {
+                    if (clock.phase(colony) == TestClock.Phase.NIGHT) { // (the bush is the foragers' to cut from now on)
+                        AntColoniesMod.LOGGER.info("[holes-test] tick {}: night ({})", helper.getTick(), clock.describe());
                         phase[0] = 3;
+                    }
+                }
+                case 3 -> {
+                    if (holes.countOpen(level) == 2 && (ForagingHoles.isOpen(level, colony.nest().getEntrance()) || colony.nest().isEntranceCovered(level))) {
+                        phase[0] = 4;
                     }
                 }
                 default -> {
                 }
             }
+            if ((phase[0] == 1 || phase[0] == 2) && clock.phase(colony) == TestClock.Phase.DAY) {
+                helper.assertTrue(helper.getBlockState(bush).is(Blocks.DEAD_BUSH), "a termite cut at the dead bush by day");
+            }
             if (helper.getTick() % 1000 == 0) {
-                AntColoniesMod.LOGGER.info("[holes-test] tick {}: phase {}, tunnels {}, open {}, middle {} (covered {}), anyone outside {}, dig target {}",
-                        helper.getTick(), phase[0], tunnels, holes.countOpen(level), level.getBlockState(colony.nest().getEntrance()),
+                AntColoniesMod.LOGGER.info("[holes-test] tick {}: {}, phase {}, tunnels {}, open {}, middle {} (covered {}), anyone outside {}, dig target {}",
+                        helper.getTick(), clock.describe(), phase[0], tunnels, holes.countOpen(level), level.getBlockState(colony.nest().getEntrance()),
                         colony.nest().isEntranceCovered(level), holes.isAnyoneOutside(level), colony.nest().findDigTarget(level) + ", leaks " + colony.walls().getLeaks(level).size());
             }
         });
         helper.succeedWhen(() -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null, "no termite colony");
-            helper.assertTrue(phase[0] == 3, switch (phase[0]) {
+            helper.assertTrue(phase[0] == 4, switch (phase[0]) {
                 case 0 -> "the foraging holes were not both opened at night (" + colony.foragingHoles().countOpen(level) + " open)";
                 case 1 -> "by day the holes (and the middle hole) were not all plugged with everybody inside";
+                case 2 -> "the next night never came";
                 default -> "the holes and the middle hole were not opened again the next night";
             });
             // The holes lie at the ends of their tunnels, beyond the foot of the mound.

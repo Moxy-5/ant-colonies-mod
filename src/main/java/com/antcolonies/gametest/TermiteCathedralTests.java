@@ -101,13 +101,13 @@ public class TermiteCathedralTests {
             }
         });
         int[] lastStage = {0};
+        TestClock.still(helper, 0.0); // midnight: the mound is built at foraging time
         helper.onEachTick(() -> {
             Colony colony = TermiteMoundTests.colony(helper);
             if (colony == null || colony.isFounding()) {
                 return;
             }
             ServerLevel level = helper.getLevel();
-            colony.setForagingTimeForTests(true);
             if (colony.mound().getEarnedStage(level) != YOUNG) {
                 colony.mound().setStage(level, YOUNG);
             }
@@ -161,7 +161,8 @@ public class TermiteCathedralTests {
     /**
      * The user's report, with their own mound (stage 14 half built, dumped from their save, same shape seed): the
      * termites all stood at the top where the bottom of the main spire goes and nothing more was built. Night and day
-     * take turns and wet soil sets at its own pace, as in their world. The termites must finish stage 14.
+     * take turns and wet soil sets at its own pace, as in their world. The termites must finish stage 14. On the test
+     * clock (roadmap 3a): real nights and days from 18:30 (they took turns every 12,000 ticks before).
      */
     @GameTest(template = "arena", timeoutTicks = 240000, skyAccess = true, batch = "usermound")
     public static void termitesFinishTheUsersHalfBuiltStageFourteen(GameTestHelper helper) {
@@ -175,6 +176,7 @@ public class TermiteCathedralTests {
                         TermiteMoundTests.MIDDLE - 3 + i / 4);
             }
         });
+        TestClock clock = TestClock.moving(helper, 18.5); // a whole night first
         int[] lastLeft = {-1};
         boolean[] built = {false};
         helper.onEachTick(() -> {
@@ -183,8 +185,6 @@ public class TermiteCathedralTests {
                 return;
             }
             ServerLevel level = helper.getLevel();
-            boolean night = (helper.getTick() / 12000) % 2 == 0;
-            colony.setForagingTimeForTests(night);
             if (!built[0]) {
                 if (colony.nest().isEntrancePlugged(level)) {
                     return;
@@ -212,7 +212,7 @@ public class TermiteCathedralTests {
                 Map<String, Integer> left = jobsLeft(level, colony);
                 int total = left.values().stream().mapToInt(Integer::intValue).sum();
                 AntColoniesMod.LOGGER.info("[user-mound-test] tick {} ({}): building stage {}, left {}, windows open {}", helper.getTick(),
-                        night ? "night" : "day", colony.mound().getStage(level), left, openWindows(level, colony));
+                        clock.describe(), colony.mound().getStage(level), left, openWindows(level, colony));
                 if (helper.getTick() % 12000 == 9000) {
                     describe(helper, level, colony);
                 }

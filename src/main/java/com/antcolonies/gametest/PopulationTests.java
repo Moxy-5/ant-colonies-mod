@@ -265,7 +265,7 @@ public class PopulationTests {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null, "no termite colony");
             digNestAtOnce(level, colony);
-            colony.setForagingTimeForTests(false);
+            TestClock.still(helper, 12.0); // midday: the foragers stay in
             colony.population().setOnForTests(true);
             colony.population().setViewersForTests(List.of(Vec3.atCenterOf(helper.absolutePos(new BlockPos(MIDDLE + 20, SURFACE + 2, MIDDLE)))));
             long now = level.getGameTime();
@@ -330,7 +330,7 @@ public class PopulationTests {
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null, "no termite colony");
-            colony.setForagingTimeForTests(false);
+            TestClock.still(helper, 12.0); // midday: the foragers stay in
             colony.setHungerOn(true);
             TermiteSoldierTests.digNestAtOnce(level, colony);
             List<BlockPos> room = colony.nest().getHomeChamber(level).room();

@@ -80,10 +80,11 @@ public class TermiteTests {
     /**
      * The founding batch: once the pair have sealed themselves in, the queen lays 5 eggs in the chamber, they hatch into
      * nymphs, the pair feed the nymphs on their own fat until they grow into the first 5 workers, and the workers dig
-     * the entrance open again.
+     * the entrance open again (at night, when termites go out: on a moving test clock from 18:30).
      */
     @GameTest(template = "arena", timeoutTicks = 45000, skyAccess = true)
     public static void theFoundingBatchGrowsIntoWorkersWhoOpenTheEntrance(GameTestHelper helper) {
+        TestClock.moving(helper, 18.5);
         foundColony(helper, true);
         boolean[] sealed = {false};
         helper.onEachTick(() -> {

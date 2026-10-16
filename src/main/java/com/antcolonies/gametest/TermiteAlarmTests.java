@@ -67,7 +67,7 @@ public class TermiteAlarmTests {
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
-            colony.setForagingTimeForTests(false);
+            TestClock.still(helper, 12.0); // midday: everybody stays in
             long old = level.getGameTime() - colony.profile().worker().builderUntilTicks() - 1000;
             for (TermiteWorkerEntity worker : level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds())) {
                 worker.setGrownUpAt(old);
@@ -86,7 +86,7 @@ public class TermiteAlarmTests {
                 minors.add(TermiteSoldierTests.put(level, ModEntities.TERMITE_MINOR_SOLDIER.get(), room.get(i)));
             }
         });
-        helper.runAfterDelay(40, () -> TermiteMoundTests.colony(helper).setForagingTimeForTests(true));
+        helper.runAfterDelay(40, () -> TestClock.still(helper, 0.0)); // midnight: the foragers go out
         helper.onEachTick(() -> {
             Colony colony = TermiteMoundTests.colony(helper);
             if (colony == null || hay[0] == null || helper.getTick() < 40) {
@@ -199,7 +199,7 @@ public class TermiteAlarmTests {
             for (int i = 0; i < 2; i++) {
                 minors.add(TermiteSoldierTests.put(level, ModEntities.TERMITE_MINOR_SOLDIER.get(), room.get(i)));
             }
-            colony.setForagingTimeForTests(true);
+            TestClock.still(helper, 0.0); // midnight: foraging time
         });
         helper.onEachTick(() -> {
             Colony colony = TermiteMoundTests.colony(helper);
@@ -286,7 +286,7 @@ public class TermiteAlarmTests {
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null, "no termite colony");
-            colony.setForagingTimeForTests(false);
+            TestClock.still(helper, 12.0); // midday: everybody stays in
             TermiteSoldierTests.digNestAtOnce(level, colony);
             List<BlockPos> room = colony.nest().getHomeChamber(level).room();
             for (int i = 0; i < 3; i++) {
@@ -381,7 +381,7 @@ public class TermiteAlarmTests {
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null, "no termite colony");
-            colony.setForagingTimeForTests(true);
+            TestClock.still(helper, 0.0); // midnight: foraging time
             colony.setCount(WorkerAntEntity.CASTE, 20);
             helper.assertTrue(colony.soldiers().wanted(level, Rank.MINOR) == 2 && colony.soldiers().wanted(level, Rank.MAJOR) == 1,
                     "20 workers should want 2 minors and 1 major");
@@ -428,7 +428,7 @@ public class TermiteAlarmTests {
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null, "no termite colony");
-            colony.setForagingTimeForTests(false);
+            TestClock.still(helper, 12.0); // midday: everybody stays in
             TermiteSoldierTests.digNestAtOnce(level, colony);
             List<BlockPos> room = colony.nest().getHomeChamber(level).room();
             for (int i = 0; i < 3; i++) {

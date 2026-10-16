@@ -57,23 +57,15 @@ public class Colony {
     private boolean hungerOn = true;
     /** When the queen died (a queenless colony carries on without her and dwindles), or NOT_SET while she lives. Saved. */
     private long queenDiedAt = NOT_SET;
-    /** Tests only: forces foraging time on or off (null: the real clock and weather). Not saved. */
-    @Nullable
-    private Boolean foragingTimeForTests;
-    /** Tests only: pretend it is day or night, raining or not (null: the real clock and weather). Not saved. */
-    @Nullable
-    private Boolean dayForTests;
+    /** Tests only: pretend it rains on the nest or not (null: the real weather). Not saved. */
     @Nullable
     private Boolean rainForTests;
-    /** Tests only: pretend it is this time of day ({@link net.minecraft.world.level.Level#getDayTime}), for a day clock. Not saved. */
-    @Nullable
-    private Long timeForTests;
     /**
-     * Game test server only: the time of day every day clock reads unless a test sets its own (the test server's sun
-     * keeps moving, so a long run would reach night part way through and the harvester foragers would stop). Not saved.
+     * Game test server only: what each test's own clock shows at a spot ({@code gametest.TestClock}; the tests share one
+     * world and its one sun, but each starts at its own moment). Null in a normal game: the real time of day. Not saved.
      */
     @Nullable
-    private static Long timeOnTestServer;
+    private static TestTime testTime;
     /** The biome's heat at the nest (its base temperature), for a day clock's midday rest; read once. Not saved. */
     @Nullable
     private Float heat;
@@ -301,25 +293,46 @@ public class Colony {
         if (alarm.keepsEveryoneIn(level)) {
             return false;
         }
-        if (foragingTimeForTests != null) {
-            return foragingTimeForTests;
-        }
         Optional<SpeciesProfile.DayClock> clock = profile().food().dayClock();
         if (clock.isPresent()) {
             return clock.get().outAt(timeOfDay(level), heat(level), rainForTests != null ? rainForTests : rainsOnNest(level));
         }
-        boolean day = dayForTests != null ? dayForTests : level.isDay() || isBeforeDawn(level);
+        boolean day = isDay(level);
         return profile().food().foragesNow(day, rainForTests != null ? rainForTests : level.isRaining());
+    }
+
+    /** Whether it counts as day at the nest: the sun is up, or it is the end of the night ({@link #isBeforeDawn}). */
+    private boolean isDay(net.minecraft.world.level.Level level) {
+        if (testTime == null) {
+            return level.isDay() || isBeforeDawn(level);
+        }
+        long time = timeOfDay(level);
+        return !level.dimensionType().hasFixedTime() && (isSunUp(level, time) || isBeforeDawn(time));
+    }
+
+    /**
+     * Whether the sun is up at this time of day, by Minecraft's own sun ({@code Level.updateSkyBrightness}, without the
+     * weather): from about 5:28 (23460) to 18:33 (12550). For the test clocks, which keep their own time.
+     */
+    public static boolean isSunUp(net.minecraft.world.level.Level level, long dayTime) {
+        float sun = level.dimensionType().timeOfDay(dayTime);
+        double light = 0.5 + 2.0 * net.minecraft.util.Mth.clamp(net.minecraft.util.Mth.cos(sun * (float) (Math.PI * 2)), -0.25, 0.25);
+        return (int) ((1.0 - light) * 11.0) < 4;
     }
 
     /** The time of day for the day clock (see {@link #isForagingTime}). */
     public long timeOfDay(net.minecraft.world.level.Level level) {
-        return timeForTests != null ? timeForTests : timeOnTestServer != null ? timeOnTestServer : level.getDayTime();
+        return testTime != null ? testTime.dayTimeAt(level, center) : level.getDayTime();
     }
 
-    /** Game test server only: the time of day every day clock reads (see {@link #timeOnTestServer}). */
-    public static void setTimeOnTestServer(@Nullable Long dayTime) {
-        timeOnTestServer = dayTime;
+    /** Game test server only: what each test's clock shows at a spot (Level#getDayTime's scale: 0 is 6:00, 1000 an hour). */
+    public interface TestTime {
+        long dayTimeAt(net.minecraft.world.level.Level level, BlockPos pos);
+    }
+
+    /** Game test server only: the test clocks every colony reads (see {@link #testTime}). */
+    public static void setTestTime(@Nullable TestTime time) {
+        testTime = time;
     }
 
     /** The biome's heat at the nest (its base temperature: plains 0.8, badlands, desert and savanna 2.0). */
@@ -335,9 +348,8 @@ public class Colony {
         return level.isRaining() && level.getBiome(center).value().hasPrecipitation();
     }
 
-    /** Tests only: pretend it is this time of day, and this hot (null for the real clock and biome). */
-    public void setClockForTests(@Nullable Long dayTime, @Nullable Float heat) {
-        timeForTests = dayTime;
+    /** Tests only: pretend the biome at the nest is this hot, for the midday rest's length (null for the real biome). */
+    public void setHeatForTests(@Nullable Float heat) {
         this.heat = heat;
     }
 
@@ -363,18 +375,11 @@ public class Colony {
         return !profile().food().forageAt().containsAll(SpeciesProfile.FoodNumbers.ALWAYS);
     }
 
-    /** Tests only: forces foraging time on or off (null for the real clock and weather). */
-    public void setForagingTimeForTests(@Nullable Boolean on) {
-        foragingTimeForTests = on;
-    }
-
     /**
-     * Tests only: pretend it is day or night and raining or not, for the foraging time (null: the real clock and
-     * weather). Unlike {@link #setForagingTimeForTests} the species' own rule decides, and only this colony sees it (the
-     * test world's real rain would reach every test running beside it).
+     * Tests only: pretend it rains on the nest or not (null: the real weather). Only this colony sees it: the test
+     * world's real rain would reach every test running beside it.
      */
-    public void setSkyForTests(@Nullable Boolean day, @Nullable Boolean raining) {
-        dayForTests = day;
+    public void setRainForTests(@Nullable Boolean raining) {
         rainForTests = raining;
     }
 

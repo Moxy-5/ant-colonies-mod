@@ -55,7 +55,7 @@ public class TermiteRepairTests {
             if (colony == null) {
                 return;
             }
-            colony.setForagingTimeForTests(false); // day: everything is done from inside
+            TestClock.still(helper, 12.0); // midday: everything is done from inside
             if (!holes.isEmpty()) {
                 if (helper.getTick() % 1000 == 0) {
                     AntColoniesMod.LOGGER.info("[repair-test] tick {}: leaks {}, holes {}", helper.getTick(),

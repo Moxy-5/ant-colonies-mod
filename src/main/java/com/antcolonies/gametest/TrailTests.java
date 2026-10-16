@@ -115,8 +115,7 @@ public class TrailTests {
             helper.assertTrue(!level.getEntitiesOfClass(ItemEntity.class, eastTrail).isEmpty(), "the cut grass should leave its seeds lying");
             colony.population().setViewersForTests(List.of());
             colony.trunkTrails().checkSoonForTests();
-            colony.patrol().setOnForTests(true); // brain step 4b: a new round, with its patrol
-            colony.patrol().newRoundForTests();
+            colony.patrol().setOnForTests(true); // brain step 4b: a new round, with its patrol (it sees the day clock open, 7:00)
         });
         helper.runAfterDelay(85, () -> {
             Colony colony = PopulationTests.antColony(helper);

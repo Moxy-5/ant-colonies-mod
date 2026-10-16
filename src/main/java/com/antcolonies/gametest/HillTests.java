@@ -147,6 +147,7 @@ public class HillTests {
                 helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE - 2 + i % 4, SURFACE, MIDDLE - 3 + i / 4);
             }
         });
+        TestClock.still(helper, 0.0); // midnight: the mound is built at foraging time
         int[] stage = {1};
         int[] stageOneParts = {0};
         helper.onEachTick(() -> {
@@ -154,7 +155,6 @@ public class HillTests {
             if (colony == null) {
                 return;
             }
-            colony.setForagingTimeForTests(true);
             if (colony.mound().getStage(level) != stage[0]) {
                 colony.mound().setStage(level, stage[0]);
             }
@@ -329,7 +329,7 @@ public class HillTests {
                 chamber.cells().forEach(pos -> level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3));
             }
             colony.nest().getGardens(level).get(0).cells().forEach(pos -> level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3));
-            colony.setForagingTimeForTests(true);
+            TestClock.still(helper, 0.0); // midnight: foraging time
             ready[0] = true;
         });
         helper.onEachTick(() -> {
