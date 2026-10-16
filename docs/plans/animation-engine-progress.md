@@ -39,7 +39,7 @@ Nothing else in the worktree has changed since 04:21.
 
 ## Not done
 - Filmed in game (`./gradlew runFilm -PfilmScene=tools/film/work.film`, then `python tools/anim_lab.py match
-  run-film/screenshots worker_ant`): cleaning, digging and carrying look as in the lab
+  run-film/screenshots/work worker_ant`): cleaning, digging and carrying look as in the lab
   (`references/anim_lab/screenshots_match.png`). The edge curve can't be filmed yet (the camera has no climbing scene).
 - Leg cleaning, feeling the ground, the flinch at a shadow, the stretch on waking, greetings: later little things.
 - The termites' own clips (cleaning, digging) and soldiers' head bang at a strong shake (ask the user).

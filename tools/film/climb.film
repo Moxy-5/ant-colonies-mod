@@ -3,7 +3,9 @@
 # foot of the wall and hang over the top edge) and that the legs step when it turns on the spot.
 # The wall is a pillar one block wide, so the camera beside it sees the ant's side straight on (a long wall's near end
 # looks far bigger than the stone by the ant, which makes heights hard to judge), and a gaster in the stone would hide.
-# Run: ./gradlew runFilm -PfilmScene=tools/film/climb.film   Pictures, climb.txt and turn.txt: run-film/screenshots/
+# The turn from three-quarters is drawn 3 times a tick ("frames 3"), as a fast screen shows it between ticks.
+# Run: ./gradlew runFilm -PfilmScene=tools/film/climb.film   Pictures, climb.txt, turn.txt and checks.txt:
+# run-film/screenshots/climb/
 cmd time set noon
 cmd weather clear
 cmd fill 3 -60 -4 3 -59 4 air
@@ -29,7 +31,9 @@ burst turn_above 30 1
 look off
 follow 0.65 0.55 0.65 135 30
 look 12 -60 0.5
+frames 3
 burst turn_34 30 1
+frames 1
 look off
 log off
 follow off

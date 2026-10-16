@@ -25,8 +25,10 @@ Run from the project folder:
   python tools/anim_lab.py film worker_ant walk [--frames 8]
   python tools/anim_lab.py compare worker_ant walk idle sleep
   python tools/anim_lab.py check worker_ant [walk]
-  python tools/anim_lab.py sheet run-film/screenshots/film [--cols 4]
-  python tools/anim_lab.py match run-film/screenshots worker_ant
+  python tools/anim_lab.py sheet run-film/screenshots/<scene> [--cols 4]
+  python tools/anim_lab.py match run-film/screenshots/<scene> worker_ant
+(Each film scene's pictures are in run-film/screenshots/<scene>/; read run-film/screenshots/checks.txt first: the
+camera's automatic checks name the pictures with a body part in a block or a sudden jump.)
 Options: --anim <file stem> to read another insect's animation file (the queen uses worker_ant's), --speed <blocks a
 second> for the walking speed the treadmill and the checks assume (default: the insect's normal speed below).
 

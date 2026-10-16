@@ -51,8 +51,14 @@ public class AntRenderer<T extends AbstractAntEntity> extends GeoEntityRenderer<
         ant.setDrawScale(scaleWidth); // for the stride: the legs keep pace with the ground at the size it is drawn
         ant.setClimbPose(climbLift * scaleHeight, climbIntoWall * scaleWidth); // for drawing it over an edge
         if (FilmDirector.active()) {
-            // The in-game camera: every picture exactly on a game tick (a frozen game's in-between time jitters).
-            super.render(ant, entityYaw, 0.0F, poseStack, buffers, packedLight);
+            // The in-game camera: every picture at the in-between time it asks for (a frozen game's own one jitters),
+            // the insect's place included (the game put it where its own in-between time says).
+            float partial = FilmDirector.drawPartial();
+            Vec3 shift = ant.getPosition(partial).subtract(ant.getPosition(partialTick));
+            poseStack.pushPose();
+            poseStack.translate(shift.x, shift.y, shift.z);
+            super.render(ant, entityYaw, partial, poseStack, buffers, packedLight);
+            poseStack.popPose();
             FilmDirector.noteRendered(ant, getGeoModel());
             return;
         }

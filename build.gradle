@@ -81,10 +81,13 @@ neoForge {
         // The in-game camera (client/FilmDirector, development only): a fresh flat creative world, a shot list played
         // and its screenshots saved to run-film/screenshots, then the game quits. Claude's eyes in the real game.
         // ./gradlew runFilm  (the poses scene)  or  ./gradlew runFilm -PfilmScene=tools/film/<scene>.film
+        // several in one launch: -PfilmScene=tools/film/climb.film,tools/film/work.film  or  -PfilmScene=all
         film {
             client()
             gameDirectory = project.file('run-film')
-            systemProperty 'antcolonies.film', project.file(project.findProperty('filmScene') ?: 'tools/film/poses.film').absolutePath
+            def scenes = (project.findProperty('filmScene') ?: 'tools/film/poses.film').toString()
+            systemProperty 'antcolonies.film', (scenes == 'all' ? ['tools/film'] : scenes.split(',').toList())
+                    .collect { project.file(it.trim()).absolutePath }.join(',')
             programArguments.addAll '--width', '960', '--height', '540'
         }
 

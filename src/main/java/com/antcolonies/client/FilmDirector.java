@@ -49,9 +49,15 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 /**
  * The in-game camera (development only, the animation lab's eyes in the real game; 2026-10-15). Started by
- * {@code ./gradlew runFilm} (or {@code -PfilmScene=tools/film/<scene>.film}): it makes a fresh flat creative world,
- * plays a shot list and saves the screenshots to {@code run-film/screenshots/}, then quits. Claude reads the pictures
- * (or a contact sheet made by {@code python tools/anim_lab.py sheet run-film/screenshots}).
+ * {@code ./gradlew runFilm} (or {@code -PfilmScene=tools/film/<scene>.film}; several scenes in one launch:
+ * {@code -PfilmScene=tools/film/climb.film,tools/film/work.film}, or a folder, or {@code all} for every scene in
+ * {@code tools/film}): it makes a fresh flat creative world, plays each shot list in turn (the floor made new and every
+ * insect cleared between them) and saves each scene's screenshots to {@code run-film/screenshots/<scene>/}, then quits.
+ * Claude reads the pictures (or a contact sheet made by {@code python tools/anim_lab.py sheet run-film/screenshots/<scene>}).
+ *
+ * <p>Every picture is also checked ({@link FilmChecks}): body parts drawn inside blocks and parts that suddenly jump go
+ * into the scene's {@code checks.txt}, and every scene's summary line into {@code screenshots/checks.txt}, so only the
+ * pictures named there need looking at.
  *
  * <p>A shot list is a text file, one step a line ({@code #} starts a comment):
  * <pre>
@@ -61,6 +67,8 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * wait 20                         client ticks
  * shot walk_side                  one screenshot, saved as walk_side.png
  * burst walk_side 10 1            10 screenshots, the game stepped 1 tick between them (after "cmd tick freeze")
+ * frames 4                        from now, every burst tick is drawn 4 times, at 0, 1/4, 2/4 and 3/4 of the way to
+ *                                 the next tick (as a fast screen shows it between ticks); "frames 1" goes back
  * ant worker_ant walk             clear the floor, then one insect at the middle playing that clip, facing west
  * views walk 10 1.1               side (a burst of 10 frames), front, above and 3/4 shots of it, 1.1 blocks away
  *                                 (side and front level and from further off, like the lab's drawings)
@@ -81,7 +89,7 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 public final class FilmDirector {
     private static final Logger LOG = LogUtils.getLogger();
     private static final String WORLD = "film";
-    /** The shot list, or null when not filming. */
+    /** The shot lists (comma-separated files or folders), or null when not filming. */
     private static final String SCENE = FMLEnvironment.production ? null : System.getProperty("antcolonies.film");
 
     private static final Deque<String> steps = new ArrayDeque<>();
@@ -125,19 +133,103 @@ public final class FilmDirector {
                 title);
     }
 
+    /** Every shot list named (a folder means each {@code .film} file in it, by name), each starting with a "scene" step. */
     private static void load() {
-        try {
-            for (String line : Files.readAllLines(Path.of(SCENE), StandardCharsets.UTF_8)) {
-                String step = line.contains("#") && !line.trim().startsWith("cmd") ? line.substring(0, line.indexOf('#')) : line;
-                if (!step.isBlank()) {
-                    steps.add(step.trim());
+        java.util.List<Path> scenes = new java.util.ArrayList<>();
+        for (String name : SCENE.split(",")) {
+            Path path = Path.of(name.trim());
+            if (Files.isDirectory(path)) {
+                try (var files = Files.list(path)) {
+                    files.filter(f -> f.toString().endsWith(".film")).sorted().forEach(scenes::add);
+                } catch (IOException e) {
+                    LOG.error("Film: cannot read the folder {}", path, e);
                 }
+            } else {
+                scenes.add(path);
             }
-            LOG.info("Film: {} steps from {}", steps.size(), SCENE);
-        } catch (IOException e) {
-            LOG.error("Film: cannot read the shot list {}", SCENE, e);
-            steps.add("quit");
         }
+        for (Path scene : scenes) {
+            try {
+                java.util.List<String> lines = Files.readAllLines(scene, StandardCharsets.UTF_8);
+                steps.add("scene " + scene.getFileName().toString().replace(".film", ""));
+                for (String line : lines) {
+                    String step = line.contains("#") && !line.trim().startsWith("cmd") ? line.substring(0, line.indexOf('#')) : line;
+                    if (!step.isBlank()) {
+                        steps.add(step.trim());
+                    }
+                }
+            } catch (IOException e) {
+                LOG.error("Film: cannot read the shot list {}", scene, e);
+            }
+        }
+        LOG.info("Film: {} steps from {} scene(s): {}", steps.size(), scenes.size(), scenes);
+    }
+
+    /** The scene being filmed (its pictures and logs go into a folder of that name), and its checks. */
+    private static String sceneName = "film";
+    private static FilmChecks checks = new FilmChecks();
+    /** The summary line of each scene's checks so far, for screenshots/checks.txt. */
+    private static final StringBuilder summaries = new StringBuilder();
+    /** Pictures drawn each burst tick ("frames"), the one being drawn now, and the in-between time insects are drawn at. */
+    private static int framesPerTick = 1;
+    private static int burstSub;
+    private static float drawPartial;
+
+    /** The in-between time (0 to 1, from the last tick to the next) insects are drawn at while filming. */
+    public static float drawPartial() {
+        return drawPartial;
+    }
+
+    /** The "scene" step: the last scene's log and checks written, then everything set back for the next one. */
+    private static void startScene(String name) {
+        endScene();
+        sceneName = name;
+        checks = new FilmChecks();
+        lens = sceneFov = 30;
+        follow = null;
+        lookAt = null;
+        framesPerTick = 1;
+        drawPartial = 0.0F;
+        clipTimes.clear();
+        LOG.info("Film: scene {}", name);
+        Deque<String> now = new ArrayDeque<>();
+        now.add("cmd tick unfreeze");
+        now.add("cmd kill @e[type=!player]");
+        now.add("wait 25");
+        now.add("cmd kill @e[type=!player]");
+        // the flat world's floor made new round the middle (an earlier scene may have built or dug there)
+        now.add("cmd fill -12 -63 -12 12 -62 12 dirt");
+        now.add("cmd fill -12 -61 -12 12 -61 12 grass_block");
+        now.add("cmd fill -12 -60 -12 12 -48 12 air");
+        now.add("wait 5");
+        pushFront(now);
+    }
+
+    /** Writes the scene's log and its checks (checks.txt beside its pictures, the summary into screenshots/checks.txt). */
+    private static void endScene() {
+        Minecraft mc = Minecraft.getInstance();
+        writeLog(mc);
+        if (checks.isEmpty()) {
+            return;
+        }
+        java.util.List<String> lines = checks.report(framesPerTick);
+        String summary = sceneName + ": " + lines.get(lines.size() - 1);
+        LOG.info("Film checks, {}", summary);
+        summaries.append(summary).append(System.lineSeparator());
+        try {
+            Path folder = folder(mc);
+            Files.createDirectories(folder);
+            Files.write(folder.resolve("checks.txt"), lines, StandardCharsets.UTF_8);
+            Files.writeString(folder.getParent().resolve("checks.txt"), summaries.toString(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            LOG.warn("Film: cannot write the checks", e);
+        }
+        checks = new FilmChecks();
+    }
+
+    /** The scene's folder of pictures and logs. */
+    private static Path folder(Minecraft mc) {
+        return mc.gameDirectory.toPath().resolve("screenshots").resolve(sceneName);
     }
 
     @SubscribeEvent
@@ -167,8 +259,13 @@ public final class FilmDirector {
             return;
         }
         if (burstLeft > 0) {
+            drawPartial = (float) burstSub / framesPerTick;
             followWalker(mc);
-            pendingShot = String.format("%s_%02d", burstName, burstIndex++);
+            pendingShot = String.format(framesPerTick > 1 ? "%s_%03d" : "%s_%02d", burstName, burstIndex++);
+            if (++burstSub < framesPerTick) {
+                return;                        // the same tick again, a little further on
+            }
+            burstSub = 0;
             burstLeft--;
             if (burstLeft > 0 && burstGap > 0) {
                 send(mc, "tick step " + burstGap);
@@ -176,10 +273,12 @@ public final class FilmDirector {
             }
             return;
         }
+        drawPartial = 0.0F;
         while (!steps.isEmpty() && waitTicks == 0 && pendingShot == null && burstLeft == 0) {
             run(mc, steps.poll());
         }
         if (steps.isEmpty() && waitTicks == 0 && pendingShot == null && burstLeft == 0) {
+            endScene();
             LOG.info("Film: done");
             mc.stop();
         }
@@ -205,7 +304,10 @@ public final class FilmDirector {
                 burstLeft = Integer.parseInt(w[2]);
                 burstGap = w.length > 3 ? Integer.parseInt(w[3]) : 1;
                 burstIndex = 0;
+                burstSub = 0;
             }
+            case "frames" -> framesPerTick = Math.max(1, Integer.parseInt(w[1]));
+            case "scene" -> startScene(w[1]);
             case "ant" -> putAnt(w[1], w[2]);
             case "views" -> views(w[1], w.length > 2 ? Integer.parseInt(w[2]) : 1,
                     w.length > 3 ? Double.parseDouble(w[3]) : 1.1);
@@ -229,8 +331,10 @@ public final class FilmDirector {
                 logName = w[1].equals("off") ? null : w[1];
             }
             case "quit" -> {
-                writeLog(mc);
-                steps.clear();
+                // the end of this scene: on to the next one, if any
+                while (!steps.isEmpty() && !steps.peek().startsWith("scene ")) {
+                    steps.poll();
+                }
             }
             default -> LOG.warn("Film: unknown step '{}'", step);
         }
@@ -334,8 +438,8 @@ public final class FilmDirector {
         if (walker == null) {
             return;
         }
-        mc.player.moveTo(walker.getX() + follow[0], walker.getY() + follow[1] - EYE, walker.getZ() + follow[2],
-                (float) follow[3], (float) follow[4]);
+        Vec3 at = walker.getPosition(drawPartial);
+        mc.player.moveTo(at.x + follow[0], at.y + follow[1] - EYE, at.z + follow[2], (float) follow[3], (float) follow[4]);
         mc.player.setOldPosAndRot();
     }
 
@@ -363,7 +467,7 @@ public final class FilmDirector {
         if (logName == null) {
             return;
         }
-        Path file = mc.gameDirectory.toPath().resolve("screenshots").resolve(logName + ".txt");
+        Path file = folder(mc).resolve(logName + ".txt");
         try {
             Files.createDirectories(file.getParent());
             Files.writeString(file, logLines.toString(), StandardCharsets.UTF_8);
@@ -423,7 +527,13 @@ public final class FilmDirector {
         String name = pendingShot + ".png";
         pendingShot = null;
         writeTime(mc, name);
-        Screenshot.grab(mc.gameDirectory, name, mc.getMainRenderTarget(), message -> LOG.info("Film: saved {}", name));
+        try {
+            Files.createDirectories(folder(mc));
+        } catch (IOException e) {
+            LOG.warn("Film: cannot make {}", folder(mc), e);
+        }
+        String file = sceneName + "/" + name;
+        Screenshot.grab(mc.gameDirectory, file, mc.getMainRenderTarget(), message -> LOG.info("Film: saved {}", file));
     }
 
     /**
@@ -437,6 +547,13 @@ public final class FilmDirector {
      * drawn (GeckoLib keeps that inside, so it is read by reflection; development only), for {@code times.txt}.
      */
     public static void noteRendered(AbstractAntEntity ant, GeoModel<?> model) {
+        if (pendingShot != null) {
+            try {
+                checks.record(ant, model, drawPartial, pendingShot);
+            } catch (RuntimeException e) {
+                LOG.warn("Film: cannot check {}", ant, e);
+            }
+        }
         try {
             AnimationController<?> controller = ant.getAnimatableInstanceCache().getManagerForId(ant.getId())
                     .getAnimationControllers().get(AbstractAntEntity.BODY_PLAYER);
@@ -454,7 +571,7 @@ public final class FilmDirector {
             double seconds = (ticks % anim.length()) / 20.0;
             // then the tick it was drawn at and the waist bend it was drawn with, to set beside the log
             clipTimes.put(ant.getId(), String.format(java.util.Locale.ROOT, "%s %.4f drawn %d waist %.1f", anim.name(), seconds,
-                    ant.tickCount, ant.getWaistPitch(0.0F)));
+                    ant.tickCount, ant.getWaistPitch(drawPartial)));
         } catch (ReflectiveOperationException | RuntimeException e) {
             clipTimes.put(ant.getId(), "- -");
         }
@@ -465,7 +582,7 @@ public final class FilmDirector {
         StringBuilder line = new StringBuilder(picture);
         clipTimes.keySet().removeIf(id -> mc.level.getEntity(id) == null || !mc.level.getEntity(id).isAlive());
         clipTimes.forEach((id, time) -> line.append(' ').append(time));
-        Path file = mc.gameDirectory.toPath().resolve("screenshots").resolve("times.txt");
+        Path file = folder(mc).resolve("times.txt");
         try {
             Files.createDirectories(file.getParent());
             Files.writeString(file, line + System.lineSeparator(), StandardCharsets.UTF_8,

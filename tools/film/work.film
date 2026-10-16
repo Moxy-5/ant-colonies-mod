@@ -1,5 +1,5 @@
 # The work scene: the cleaning, digging and carrying clips filmed on their own (one ant on the floor at a time).
-# Run: ./gradlew runFilm -PfilmScene=tools/film/work.film   Pictures: run-film/screenshots/
+# Run: ./gradlew runFilm -PfilmScene=tools/film/work.film   Pictures: run-film/screenshots/work/
 cmd time set noon
 cmd weather clear
 lens 30
