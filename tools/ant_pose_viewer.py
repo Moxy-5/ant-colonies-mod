@@ -44,6 +44,10 @@ CANDIDATES = [
     ('Sleep', 'sinks onto the floor, feelers folded and drooping, only breathing', am.sleep()),
     ('Sleep with twitches', "as Sleep, with quick feeler flicks now and then (real ants' deep sleep)", am.sleep_twitch()),
     ('Hot, standing', 'stilting with the gaster up, feelers searching', am.idle_hot()),
+    ('Looking', 'noticing a player: stands taller, forebody up, feelers pointed and flicking, head tilting '
+                '(in game the head also turns toward the player)', am.look()),
+    ('Looking, wary', 'a shy one: the same, lower and stiller feelers, faster flicks, jaws open, gaster curled under',
+     am.look_wary()),
 ]
 
 

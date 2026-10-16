@@ -1,6 +1,7 @@
 package com.antcolonies.entity;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -15,6 +16,7 @@ import com.antcolonies.debug.Perf;
 import com.antcolonies.entity.body.AntAnimationController;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.entity.goal.NapGoal;
+import com.antcolonies.entity.goal.NoticeGoal;
 import com.antcolonies.nav.AntNavigator;
 import com.antcolonies.nav.AntPathFinder;
 import com.antcolonies.nav.Doorway;
@@ -41,6 +43,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.ai.goal.FloatGoal;
 import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
@@ -65,6 +68,16 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     private static final RawAnimation WALK_HOT = RawAnimation.begin().thenLoop("walk_hot");
     /** Ticks to blend into a nap and out of it (slow, as a real ant settles; other changes take 3). */
     private static final int SETTLE_TICKS = 20;
+    /**
+     * Noticing a player (see {@code NoticeGoal}): standing taller, forebody up, antennae pointed and flicking, the head
+     * cocked one way and the other (look), or the same with the jaws open (look_wary, a shy ant). Ants only.
+     */
+    private static final RawAnimation LOOK = RawAnimation.begin().thenLoop("look");
+    private static final RawAnimation LOOK_WARY = RawAnimation.begin().thenLoop("look_wary");
+    /** A termite frozen at a shake of the ground: antennae raised and quivering. Termites only. */
+    private static final RawAnimation FREEZE = RawAnimation.begin().thenLoop("freeze");
+    /** Ticks to blend into a look and out of it. */
+    private static final int LOOK_SETTLE_TICKS = 6;
     /** The look round with the head out of a chimney's mouth (termites; see DoorwayMotion). */
     private static final RawAnimation PEEK = RawAnimation.begin().thenPlay("peek");
     /** How far (blocks a tick) a worker climbs at its normal speed: its legs then step at 1.5 times the walk animation. */
@@ -93,6 +106,17 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
      */
     private static final EntityDataAccessor<Byte> DATA_POSE_FLAGS =
             SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.BYTE);
+    /**
+     * What it is noticing (see {@code NoticeGoal}): {@link #NOTICE_NONE}, {@link #NOTICE_LOOK} (looking at a player: the
+     * look clips, the head turned toward it), {@link #NOTICE_WARY} (the same, jaws open, a shy one) or
+     * {@link #NOTICE_FREEZE} (a termite frozen at a shake of the ground). Synced for the clips and the head look.
+     */
+    private static final EntityDataAccessor<Byte> DATA_NOTICE =
+            SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.BYTE);
+    public static final byte NOTICE_NONE = 0;
+    public static final byte NOTICE_LOOK = 1;
+    public static final byte NOTICE_WARY = 2;
+    public static final byte NOTICE_FREEZE = 3;
     /** How pale a young worker is drawn, 0 (grown dark) to 100 (just grown up). Synced for the renderer. */
     private static final EntityDataAccessor<Byte> DATA_YOUTH =
             SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.BYTE);
@@ -172,6 +196,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         builder.define(DATA_SURFACE, (byte) Direction.DOWN.get3DDataValue());
         builder.define(DATA_HEADING, 0.0F);
         builder.define(DATA_POSE_FLAGS, (byte) 0);
+        builder.define(DATA_NOTICE, NOTICE_NONE);
         builder.define(DATA_YOUTH, (byte) 0);
         builder.define(DATA_CARRIED, Optional.empty());
         builder.define(DATA_CARRIED_SEED, ItemStack.EMPTY);
@@ -509,6 +534,33 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return napChanceForTests;
     }
 
+    /** Tests only: the chance it notices a moving player it can tell is there (below 0: its profile's and its curiosity). */
+    private float noticeChanceForTests = -1.0F;
+
+    /** Tests only: gives it this chance to notice a moving player (below 0 for its profile's). */
+    public void setNoticeChanceForTests(float chance) {
+        noticeChanceForTests = chance;
+    }
+
+    /** The chance it notices a moving player, or below 0 for its profile's (see {@code NoticeGoal}). */
+    public float noticeChanceForTests() {
+        return noticeChanceForTests;
+    }
+
+    /** Tests only: the only players it may notice (null: the players in its level). */
+    @Nullable
+    private List<? extends Player> playersForTests;
+
+    /** Tests only: lets it notice only these players (mock players, not in the level), or null for the level's. */
+    public void setPlayersForTests(@Nullable List<? extends Player> players) {
+        playersForTests = players;
+    }
+
+    /** The players it may notice: its level's, or the test's (see {@code NoticeGoal}). */
+    public List<? extends Player> playersToNotice() {
+        return playersForTests != null ? playersForTests : level().players();
+    }
+
     /** Server: falls asleep or wakes up (see {@code NapGoal}). */
     public void setAsleep(boolean asleep) {
         this.asleep = asleep;
@@ -522,6 +574,68 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     /** Whether it stands on ground too hot to touch (synced: it stands and walks tall, the gaster up). */
     public boolean isOnHotGround() {
         return (entityData.get(DATA_POSE_FLAGS) & ON_HOT_GROUND) != 0;
+    }
+
+    /** What it is noticing now ({@link #NOTICE_NONE}, {@link #NOTICE_LOOK}, {@link #NOTICE_WARY} or {@link #NOTICE_FREEZE}; synced). */
+    public byte getNoticing() {
+        return entityData.get(DATA_NOTICE);
+    }
+
+    /** Server: starts or stops noticing something (see {@code NoticeGoal}). */
+    public void setNoticing(byte what) {
+        entityData.set(DATA_NOTICE, what);
+    }
+
+    // --- personality (the animation engine, 2026-10-16) -------------------------------------------------------------
+    /**
+     * Server: its personality, each trait 0 to 1 (see {@link SpeciesProfile.Traits}): drawn from its profile the first
+     * time it is asked for, then its own for life. Saved. An insect that goes into its colony's numbers loses it; a new
+     * real one draws its own (the numbers carry no individuals).
+     */
+    private float boldness = Float.NaN;
+    private float curiosity = Float.NaN;
+    private float restlessness = Float.NaN;
+
+    private SpeciesProfile.Traits traits() {
+        return profile().bodyLanguage().flatMap(SpeciesProfile.BodyLanguage::traits).orElse(SpeciesProfile.Traits.EVEN);
+    }
+
+    private void drawTraits() {
+        if (!Float.isNaN(boldness)) {
+            return;
+        }
+        SpeciesProfile.Traits traits = traits();
+        boldness = SpeciesProfile.Traits.draw(traits.boldness(), getRandom().nextDouble());
+        curiosity = SpeciesProfile.Traits.draw(traits.curiosity(), getRandom().nextDouble());
+        restlessness = SpeciesProfile.Traits.draw(traits.restlessness(), getRandom().nextDouble());
+    }
+
+    /**
+     * Server: how bold it is now (0 to 1): its own boldness, and bolder as it grows older (real foragers, the older
+     * workers, are bolder than the young nurses).
+     */
+    public float boldness() {
+        drawTraits();
+        return Mth.clamp(boldness + traits().olderBolder() * (0.5F - getYouth()), 0.0F, 1.0F);
+    }
+
+    /** Server: how curious it is (0 to 1): how often it stops to look at something new, and for how long. */
+    public float curiosity() {
+        drawTraits();
+        return curiosity;
+    }
+
+    /** Server: how restless it is (0 to 1): restless ones nap less and fidget and groom more. */
+    public float restlessness() {
+        drawTraits();
+        return restlessness;
+    }
+
+    /** Tests only: gives it this personality. */
+    public void setTraitsForTests(float boldness, float curiosity, float restlessness) {
+        this.boldness = boldness;
+        this.curiosity = curiosity;
+        this.restlessness = restlessness;
     }
 
     /**
@@ -614,7 +728,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         if (tickCount % 20 == getId() % 20) {
             boolean busy = goalSelector.getAvailableGoals().stream().anyMatch(wrapped -> wrapped.isRunning()
                     && !(wrapped.getGoal() instanceof FloatGoal || wrapped.getGoal() instanceof AntWanderGoal
-                    || wrapped.getGoal() instanceof RandomLookAroundGoal || wrapped.getGoal() instanceof NapGoal));
+                    || wrapped.getGoal() instanceof RandomLookAroundGoal || wrapped.getGoal() instanceof NapGoal
+                    || wrapped.getGoal() instanceof NoticeGoal));
             idleSeconds = busy ? 0 : idleSeconds + 1;
             updateYouth();
             if (level() instanceof ServerLevel serverLevel) {
@@ -680,6 +795,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             tiltOnSlope();
             measureWalk();
             tickNap();
+            tickLookWeight();
         }
     }
 
@@ -920,6 +1036,11 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         tag.putBoolean("FoodInCrop", isFoodInCrop());
         tag.putBoolean("CarryingCorpse", isCarryingCorpse());
         tag.putBoolean("SeedForBread", seedForBread);
+        if (!Float.isNaN(boldness)) {
+            tag.putFloat("Boldness", boldness);
+            tag.putFloat("Curiosity", curiosity);
+            tag.putFloat("Restlessness", restlessness);
+        }
         // The wall or ceiling it holds on to (or the channel it is in), so after a reload it is still there instead of
         // dropping to the bottom.
         Foothold hold = navigator.getHold();
@@ -947,6 +1068,11 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         entityData.set(DATA_IN_CROP, tag.getBoolean("FoodInCrop") && !getCarriedSeed().isEmpty());
         setCarryingCorpse(tag.getBoolean("CarryingCorpse"));
         seedForBread = tag.getBoolean("SeedForBread");
+        if (tag.contains("Boldness")) {
+            boldness = tag.getFloat("Boldness");
+            curiosity = tag.getFloat("Curiosity");
+            restlessness = tag.getFloat("Restlessness");
+        }
         if (tag.contains("HoldCell") && tag.contains("HoldSurface")) {
             navigator.restoreHold(new Foothold(BlockPos.of(tag.getLong("HoldCell")), Direction.from3DDataValue(tag.getByte("HoldSurface")),
                     tag.getBoolean("HoldChannel")));
@@ -1055,16 +1181,26 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             player.playAt(1.0);
             return state.setAndContinue(whole);
         }
-        RawAnimation clip = usualClip();
+        RawAnimation clip = noticingClip(true);
+        if (clip == null) {
+            clip = usualClip();
+        }
         settleInto(player, clip);
         player.playAt(ownPace(1));
         return state.setAndContinue(clip);
     }
 
-    /** What the body and the head play when nothing special is going on: walking or standing, hot or not, or asleep. */
+    /**
+     * What the body and the head play when nothing special is going on: walking or standing, hot or not, asleep, or
+     * standing still noticing something.
+     */
     private RawAnimation usualClip() {
         if (isAsleep()) {
             return twitching ? SLEEP_TWITCH : SLEEP;
+        }
+        RawAnimation noticing = walking ? null : noticingClip(false);
+        if (noticing != null) {
+            return noticing;
         }
         if (isOnHotGround()) {
             return walking ? WALK_HOT : IDLE_HOT;
@@ -1072,11 +1208,48 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return walking ? WALK : IDLE;
     }
 
-    /** Into a nap and out of it the pose blends slowly (a real ant settles down and gets up); otherwise quickly. */
+    /**
+     * The clip for what it is noticing, or null for none. The head keeps it while the legs walk ({@code head}: a bold ant
+     * walking closer with its antennae out, a shy one backing off with its jaws open).
+     */
+    @Nullable
+    private RawAnimation noticingClip(boolean head) {
+        return switch (getNoticing()) {
+            case NOTICE_LOOK -> LOOK;
+            case NOTICE_WARY -> LOOK_WARY;
+            case NOTICE_FREEZE -> head || !walking ? FREEZE : null;
+            default -> null;
+        };
+    }
+
+    /**
+     * Into a nap and out of it the pose blends slowly (a real ant settles down and gets up), into a look and out of it a
+     * little faster; otherwise quickly.
+     */
     private static void settleInto(AntAnimationController<?> player, RawAnimation clip) {
         RawAnimation now = player.getCurrentRawAnimation();
         boolean napping = clip == SLEEP || clip == SLEEP_TWITCH || now == SLEEP || now == SLEEP_TWITCH;
-        player.transitionLength(napping ? SETTLE_TICKS : 3);
+        boolean looking = clip == LOOK || clip == LOOK_WARY || clip == FREEZE || now == LOOK || now == LOOK_WARY || now == FREEZE;
+        player.transitionLength(napping ? SETTLE_TICKS : looking ? LOOK_SETTLE_TICKS : 3);
+    }
+
+    /**
+     * Client: how much the head is turned toward what it looks at (0 to 1; see {@code client.InsectModel}): it eases in
+     * when the insect starts looking at a player and out when it stops, so the head never snaps.
+     */
+    private float lookWeight;
+    private float lookWeightO;
+
+    private void tickLookWeight() {
+        lookWeightO = lookWeight;
+        byte noticing = getNoticing();
+        boolean turnsHead = (noticing == NOTICE_LOOK || noticing == NOTICE_WARY) && !isClimbing();
+        lookWeight = approach(lookWeight, turnsHead ? 1.0F : 0.0F, 0.2F);
+    }
+
+    /** Client: how much the head turns toward what it looks at, this frame (0 to 1). */
+    public float getLookWeight(float partialTick) {
+        return Mth.lerp(partialTick, lookWeightO, lookWeight);
     }
 
     /**

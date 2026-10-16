@@ -102,7 +102,7 @@ public class AntWanderGoal extends Goal {
 
     /** The first open cell with a floor in this column, looking a few blocks up and down from the ant's level. */
     @Nullable
-    private static BlockPos findFloor(CellMap map, BlockPos column) {
+    static BlockPos findFloor(CellMap map, BlockPos column) {
         for (int dy = 2; dy >= -3; dy--) {
             BlockPos pos = column.above(dy);
             if (map.isOpen(pos) && map.isSolidFace(pos.below(), Direction.UP)) {

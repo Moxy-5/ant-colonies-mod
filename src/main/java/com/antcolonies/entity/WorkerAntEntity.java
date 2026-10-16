@@ -16,6 +16,7 @@ import com.antcolonies.entity.goal.FeedLarvaGoal;
 import com.antcolonies.entity.goal.FeedQueenGoal;
 import com.antcolonies.entity.goal.MillBreadGoal;
 import com.antcolonies.entity.goal.NapGoal;
+import com.antcolonies.entity.goal.NoticeGoal;
 import com.antcolonies.entity.goal.PatrolGoal;
 import com.antcolonies.entity.goal.GatherSeedGoal;
 import com.antcolonies.entity.goal.RepairHillGoal;
@@ -107,6 +108,8 @@ public class WorkerAntEntity extends AbstractAntEntity {
         this.goalSelector.addGoal(10, new GoInsideGoal(this));
         // Still nothing to do, inside: now and then a short nap where it stands (real ants sleep in many short naps).
         this.goalSelector.addGoal(10, new NapGoal(this, false));
+        // Or a player moving near catches its eye: it stops and looks, and by its personality steps closer or backs off.
+        this.goalSelector.addGoal(10, new NoticeGoal(this));
         this.goalSelector.addGoal(11, new AntWanderGoal(this, 1.0, 120, 6, () -> true).hangsFromCeilings(0.25F));
         this.goalSelector.addGoal(12, new RandomLookAroundGoal(this));
     }

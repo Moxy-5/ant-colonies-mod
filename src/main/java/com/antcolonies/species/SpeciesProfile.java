@@ -973,13 +973,99 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
     /**
      * How the insects' bodies behave (the animation engine, 2026-10-16; species-neutral, every number my pick, to
      * confirm). {@code naps} (optional, none for a species that does not nap): see {@link Naps}. {@code hot} (optional):
-     * see {@link Heat}.
+     * see {@link Heat}. {@code traits} (optional, everyone in the middle without): see {@link Traits}. {@code notice}
+     * (optional, none for a species that never notices a player): see {@link Notice}.
      */
-    public record BodyLanguage(Optional<Naps> naps, Optional<Heat> heat) {
+    public record BodyLanguage(Optional<Naps> naps, Optional<Heat> heat, Optional<Traits> traits, Optional<Notice> notice) {
         public static final Codec<BodyLanguage> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Naps.CODEC.optionalFieldOf("naps").forGetter(BodyLanguage::naps),
-                Heat.CODEC.optionalFieldOf("hot").forGetter(BodyLanguage::heat)
+                Heat.CODEC.optionalFieldOf("hot").forGetter(BodyLanguage::heat),
+                Traits.CODEC.optionalFieldOf("traits").forGetter(BodyLanguage::traits),
+                Notice.CODEC.optionalFieldOf("notice").forGetter(BodyLanguage::notice)
         ).apply(i, BodyLanguage::new));
+    }
+
+    /**
+     * Personality (the animation engine, 2026-10-16). Workers of one colony really differ, each its whole life, in how
+     * bold, how curious and how restless they are (animal personality studies in ants, such as Temnothorax and Myrmica),
+     * and older ants (the foragers) are bolder than young ones (the nurses). Each real insect draws its three traits,
+     * 0 to 1, from these ranges (from, to) when it first needs them; {@code olderBolder} is how much bolder a worker at
+     * the end of its time as a nurse and after is than one just grown up (half of it either way from the drawn value).
+     */
+    public record Traits(List<Float> boldness, List<Float> curiosity, List<Float> restlessness, float olderBolder) {
+        public static final Codec<Traits> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.FLOAT.listOf().optionalFieldOf("boldness", List.of(0.0F, 1.0F)).forGetter(Traits::boldness),
+                Codec.FLOAT.listOf().optionalFieldOf("curiosity", List.of(0.0F, 1.0F)).forGetter(Traits::curiosity),
+                Codec.FLOAT.listOf().optionalFieldOf("restlessness", List.of(0.0F, 1.0F)).forGetter(Traits::restlessness),
+                Codec.FLOAT.optionalFieldOf("older_bolder", 0.3F).forGetter(Traits::olderBolder)
+        ).apply(i, Traits::new));
+
+        /** Everyone in the middle (a species without traits in its file). */
+        public static final Traits EVEN = new Traits(List.of(0.5F), List.of(0.5F), List.of(0.5F), 0.0F);
+
+        /** A value somewhere in this range ({@code share} 0 to 1). */
+        public static float draw(List<Float> range, double share) {
+            if (range.isEmpty()) {
+                return 0.5F;
+            }
+            float from = range.get(0);
+            float to = range.size() > 1 ? range.get(1) : from;
+            return from + (to - from) * (float) Math.max(0.0, Math.min(1.0, share));
+        }
+    }
+
+    /**
+     * Noticing a player (the animation engine, 2026-10-16; the user's decisions: movement only, and what the insect does
+     * depends on its personality). {@code sense}: {@code sight} (harvester ants have fairly good eyes and react to
+     * movement: an ant within {@code range} blocks of a player who moves, in plain view, stops, lifts its forebody, points
+     * its antennae and turns its head to follow; a still player is soon forgotten) or {@code vibration} (Macrotermes
+     * workers are blind and feel the ground shake: a player walking within {@code range}, or sprinting, jumping or
+     * landing within {@code shakeRange}, makes them freeze with antennae raised, never turning to look). How often an
+     * insect notices goes with its curiosity ({@code chance} a second for the most curious, a fifth of it for the least),
+     * and so does how long it looks ({@code lookTicks}, from, to). A bold one (boldness from {@code boldFrom}) then walks
+     * to about {@code comeWithin} blocks of the player; a shy one (below {@code shyBelow}) backs off {@code backOff}
+     * blocks, jaws open. Interest fades once the player has stood still for {@code forgetTicks}; then it does not notice
+     * again for {@code restTicks} (it gets used to a harmless thing). Only an insect with nothing to do: never one at
+     * work, carrying, asleep or in an alarm.
+     */
+    public record Notice(String sense, float range, float shakeRange, float chance, List<Integer> lookTicks, float boldFrom,
+            float shyBelow, float comeWithin, int backOff, int forgetTicks, int restTicks) {
+        public static final Codec<Notice> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.STRING.optionalFieldOf("sense", "sight").forGetter(Notice::sense),
+                Codec.FLOAT.optionalFieldOf("range", 6.0F).forGetter(Notice::range),
+                Codec.FLOAT.optionalFieldOf("shake_range", 6.0F).forGetter(Notice::shakeRange),
+                Codec.FLOAT.optionalFieldOf("chance", 0.8F).forGetter(Notice::chance),
+                Codec.INT.listOf().optionalFieldOf("look_ticks", List.of(60, 200)).forGetter(Notice::lookTicks),
+                Codec.FLOAT.optionalFieldOf("bold_from", 0.7F).forGetter(Notice::boldFrom),
+                Codec.FLOAT.optionalFieldOf("shy_below", 0.3F).forGetter(Notice::shyBelow),
+                Codec.FLOAT.optionalFieldOf("come_within", 1.0F).forGetter(Notice::comeWithin),
+                Codec.INT.optionalFieldOf("back_off", 2).forGetter(Notice::backOff),
+                Codec.INT.optionalFieldOf("forget_ticks", 60).forGetter(Notice::forgetTicks),
+                Codec.INT.optionalFieldOf("rest_ticks", 600).forGetter(Notice::restTicks)
+        ).apply(i, Notice::new));
+
+        /** Whether this species feels the ground shake instead of seeing (it freezes, it never turns to look). */
+        public boolean byVibration() {
+            return "vibration".equals(sense);
+        }
+
+        /**
+         * The chance that an insect this curious (0 to 1) notices a moving player when it can: by sight it goes with its
+         * curiosity; a shake is felt by all alike (freezing is a reflex).
+         */
+        public float chanceFor(float curiosity) {
+            return byVibration() ? chance : chance * (0.2F + 0.8F * Math.max(0.0F, Math.min(1.0F, curiosity)));
+        }
+
+        /** How long (ticks) an insect this curious looks before it goes on. */
+        public int lookTicksFor(float curiosity) {
+            if (lookTicks.isEmpty()) {
+                return 0;
+            }
+            int from = lookTicks.get(0);
+            int to = lookTicks.size() > 1 ? lookTicks.get(1) : from;
+            return from + Math.round((to - from) * Math.max(0.0F, Math.min(1.0F, curiosity)));
+        }
     }
 
     /**

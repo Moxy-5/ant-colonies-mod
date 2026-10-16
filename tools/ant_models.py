@@ -440,6 +440,65 @@ def idle_hot():
     return merged(idle(), stilts(), hot_look())
 
 
+# --- noticing (the animation engine, step 6, 2026-10-16) ----------------------------------------------------------
+# A harvester ant that sees something move nearby stops, stands a little taller with its forebody tipped up, points
+# both antennae at the thing and flicks them quickly (antennation: tasting the air for its smell), and turns and tilts
+# its head to place it. The game turns the head toward what the ant looks at, on top of the clip. A wary ant (a shy one
+# backing off) holds its head still on the thing, jaws wide open, its gaster curled a little under (where the sting is).
+# My picks, to confirm: the forebody up 8 degrees (10 when wary) and the body 0.2 units higher on its legs, every foot
+# where it stood (the motion library works the legs out); the antennae up and flicking 2.5 times a second (3.75 when
+# wary); the head tilting about 8 degrees each way over 3.2 seconds; the jaws 24 degrees open when wary.
+LOOK_SECONDS = 3.2
+LOOK_RAISE = 0.2
+
+
+def look_stance(lift, gaster=0):
+    """Standing tall with the forebody tipped up by lift degrees (and the gaster turned by gaster), feet planted."""
+    body = {'body_pos': [0, LOOK_RAISE, 0], 'forebody': [-lift, 0, 0]}
+    turns, _, _ = mo.stand(rig(), body)
+    pose = dict(turns, body_pos=[0, LOOK_RAISE, 0], forebody=[-lift, 0, 0])
+    if gaster:
+        pose['abdomen'] = [gaster, 0, 0]
+    return still(**pose)
+
+
+def look_antennae(track, seconds, flicks, lift, spread):
+    """Both antennae held up and forward, flicking quickly out of step (flicks: cycles per clip)."""
+    n = 8 * flicks
+    for i in range(n + 1):
+        t = seconds * i / n
+        for side, ph, sy in (('l', 0.0, 1), ('r', 0.5, -1)):
+            x = lift + mo.waves(t, seconds, [(flicks, 4, ph), (3, 3, ph + 0.2)])
+            y = sy * (spread + mo.waves(t, seconds, [(flicks, 3, ph + 0.25), (2, 4, ph)]))
+            whip = -4 + mo.waves(t, seconds, [(flicks, 5, ph - 0.1), (5, 2, ph + 0.3)])
+            track.put(f'antenna_{side}_1', t, [x, y, 0])
+            track.put(f'antenna_{side}_2', t, [whip, 0, 0])
+
+
+def look():
+    T = LOOK_SECONDS
+    tr = mo.Track(rig())
+    look_antennae(tr, T, flicks=8, lift=-6, spread=4)
+    out = look_stance(8)
+    out.update(tr.bones(tol=0.1))
+    # The head: up a little, then cocked to one side, held, to the other side, held (a negative X tips it up).
+    out['head'] = keys([(0, [-4, 0, 0]), (0.5, [-4, 8, -7]), (1.3, [-5, 8, -7]), (1.8, [-3, -1, 0]), (2.3, [-4, -8, 7]),
+                        (2.9, [-5, -8, 7]), (T, [-4, 0, 0])])
+    return out
+
+
+def look_wary():
+    T = LOOK_SECONDS
+    tr = mo.Track(rig())
+    look_antennae(tr, T, flicks=12, lift=0, spread=1)
+    out = look_stance(10, gaster=-8)
+    out.update(tr.bones(tol=0.1))
+    out['head'] = keys([(0, [-6, 0, 0]), (1.6, [-6, 1.5, 0]), (T, [-6, 0, 0])])
+    out['mandible_l'] = keys([(0, [0, -24, 0])])
+    out['mandible_r'] = keys([(0, [0, 24, 0])])
+    return out
+
+
 def walking(bones_stride, seconds):
     """A walking clip with its stride note (GeckoLib's timeline, read by the game's AntAnimationController)."""
     bones, stride = bones_stride
@@ -453,7 +512,9 @@ def animations():
         'sleep': {'loop': True, 'animation_length': REST_SECONDS, 'bones': sleep()},
         'sleep_twitch': {'loop': True, 'animation_length': REST_SECONDS, 'bones': sleep_twitch()},
         'idle_hot': {'loop': True, 'animation_length': IDLE_SECONDS, 'bones': idle_hot()},
-        'walk_hot': walking(walk_hot_clip(), WALK_SECONDS)}}
+        'walk_hot': walking(walk_hot_clip(), WALK_SECONDS),
+        'look': {'loop': True, 'animation_length': LOOK_SECONDS, 'bones': look()},
+        'look_wary': {'loop': True, 'animation_length': LOOK_SECONDS, 'bones': look_wary()}}}
 
 
 # --- preview ------------------------------------------------------------------------------------------------------

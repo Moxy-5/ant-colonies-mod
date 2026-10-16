@@ -510,6 +510,18 @@ def peek():
     return {'head': head, 'antenna_l_1': antenna('l'), 'antenna_r_1': antenna('r'),
             'mandible_l': mandible('l'), 'mandible_r': mandible('r')}
 
+# Freezing at a shake of the ground (the animation engine, 2026-10-16; my pick, to confirm). Real Macrotermes workers
+# are blind and feel the ground: a footstep nearby makes one stop dead, the head up a little and the antennae raised
+# and quivering (about 6 times a second, out of step with each other), for a second or two. It never turns to look.
+FREEZE_SECONDS = 1.0
+
+def freeze():
+    def quiver(phase):
+        n = 24
+        return {'rotation': {f'{FREEZE_SECONDS * i / n:g}': [round(-22 + 3.0 * math.sin(2 * math.pi * (6 * i / n + phase)), 2), 0, 0]
+                             for i in range(n + 1)}}
+    return {'antenna_l_1': quiver(0.0), 'antenna_r_1': quiver(0.5), 'head': {'rotation': {'0': [-6, 0, 0]}}}
+
 def animations():
     walk = walk_legs()
     wiggle = lambda a: {'0': [0, 0, 0], '0.6': [a, 0, 0], '1.2': [0, 0, 0], '1.8': [-a, 0, 0], '2.4': [0, 0, 0]}
@@ -520,7 +532,8 @@ def animations():
     return {'format_version': '1.8.0', 'animations': {
         'idle': {'loop': True, 'animation_length': 2.4, 'bones': idle},
         'walk': {'loop': True, 'animation_length': WALK_SECONDS, 'bones': walk},
-        'peek': {'loop': False, 'animation_length': PEEK_SECONDS, 'bones': peek()}}}
+        'peek': {'loop': False, 'animation_length': PEEK_SECONDS, 'bones': peek()},
+        'freeze': {'loop': True, 'animation_length': FREEZE_SECONDS, 'bones': freeze()}}}
 
 def sample(bones_anim, t):
     """The rotation of every bone of an animation at time t (straight lines between the key frames)."""

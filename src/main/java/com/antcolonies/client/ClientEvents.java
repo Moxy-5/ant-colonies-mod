@@ -29,8 +29,9 @@ public class ClientEvents {
     public static void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event) {
         // Looks for: geo/entity/worker_ant.geo.json, animations/entity/worker_ant.animation.json,
         // textures/entity/worker_ant.png
+        // (InsectModel: its head turns toward a player it looks at.)
         event.registerEntityRenderer(ModEntities.WORKER_ANT.get(), context -> new AntRenderer<>(
-                context, new DefaultedEntityGeoModel<WorkerAntEntity>(
+                context, new InsectModel<WorkerAntEntity>(
                         ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "worker_ant")))
                 .withScale(0.65F));
 

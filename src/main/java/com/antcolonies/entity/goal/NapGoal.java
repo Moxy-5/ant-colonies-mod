@@ -34,7 +34,9 @@ public class NapGoal extends Goal {
             return false; // (asked once a second)
         }
         SpeciesProfile.Naps naps = insect.profile().bodyLanguage().flatMap(SpeciesProfile.BodyLanguage::naps).orElse(null);
-        float chance = insect.napChanceForTests() >= 0.0F ? insect.napChanceForTests() : naps == null ? 0.0F : naps.chancePerSecond();
+        // A restless one naps half as often as most, a calm one half as often again (its personality).
+        float chance = insect.napChanceForTests() >= 0.0F ? insect.napChanceForTests()
+                : naps == null ? 0.0F : naps.chancePerSecond() * (1.5F - insect.restlessness());
         if (naps == null || insect.getRandom().nextFloat() >= chance) {
             return false;
         }
