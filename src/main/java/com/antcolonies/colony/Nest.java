@@ -123,6 +123,11 @@ public class Nest {
 
     @Nullable
     private BlockPos findDigTarget(Level level, @Nullable java.util.UUID digger, boolean live) {
+        // A plant growing in the entrance (grass, a flower) is bitten away first: until it is gone nobody can stand over
+        // the shaft's first block to dig it (the user's bug, 2026-10-15: founders that had stepped off the spot never dug).
+        if (isPlantInEntrance(level)) {
+            return center;
+        }
         // A colony that closed itself in while it was founded opens up again once it has workers: the plug first (a
         // colony that keeps a schedule only at night, see mayOpenEntrance).
         if (live && isEntrancePlugged(level) && mayOpenEntrance(level)) {
@@ -436,6 +441,72 @@ public class Nest {
     }
 
     /**
+     * Whether a plant grows in the entrance cell: grass, a fern, a flower, a sapling, a thin layer of snow (anything with
+     * nothing to stand on, no water). Real founding queens and kings clear their spot before they dig in.
+     */
+    public boolean isPlantInEntrance(Level level) {
+        if (!level.isLoaded(center)) {
+            return false;
+        }
+        BlockState state = level.getBlockState(center);
+        return !state.isAir() && state.getFluidState().isEmpty() && state.getCollisionShape(level, center).isEmpty()
+                && (state.canBeReplaced() || state.is(net.minecraft.tags.BlockTags.FLOWERS) || state.is(net.minecraft.tags.BlockTags.SAPLINGS));
+    }
+
+    /**
+     * Bites the plant in the entrance away: a food plant is cut down and its pieces left lying for the foragers (a
+     * tuft's seeds), any other plant is simply gone.
+     */
+    public void clearPlantInEntrance(Level level, @Nullable net.minecraft.world.entity.Entity by) {
+        if (colony.profile().food().plantFor(level.getBlockState(center)) != null) {
+            colony.food().cutAwayForTheForagers(level, center);
+        } else {
+            level.destroyBlock(center, false, by);
+        }
+    }
+
+    /**
+     * What the founders (the queen alone, or the royal pair) still have to dig before they can close themselves in: the
+     * plant in the entrance, the shaft down to their chamber and the chamber (the founding chamber, or the rooms the
+     * founders dig themselves). Empty when it is all dug; null while some of it is not loaded (or there is no plan yet).
+     */
+    @Nullable
+    public List<BlockPos> foundersDigLeft(Level level) {
+        NestLayout planned = getLayout(level);
+        if (planned == null) {
+            return null;
+        }
+        List<BlockPos> cells = new ArrayList<>();
+        if (planned.founding() != null) {
+            for (int i = 1; i <= NestPlan.FOUNDING_DEPTH; i++) {
+                cells.add(center.below(i));
+            }
+            cells.addAll(planned.founding().cells());
+        } else {
+            for (int i = 1; i <= shaftDepth(level); i++) {
+                cells.add(center.below(i));
+            }
+            int allowed = levelsUnlocked(level);
+            for (int i = 0; i < planned.chambers().size() && i < allowed; i++) {
+                cells.addAll(planned.chambers().get(i).cells());
+            }
+        }
+        List<BlockPos> left = new ArrayList<>();
+        if (isPlantInEntrance(level)) {
+            left.add(center);
+        }
+        for (BlockPos pos : cells) {
+            if (!level.isLoaded(pos)) {
+                return null;
+            }
+            if (isSoil(level.getBlockState(pos))) {
+                left.add(pos);
+            }
+        }
+        return left;
+    }
+
+    /**
      * Whether a worker may bite this block: soil (the diggable tag), the plug in its own entrance, or the mound's soil
      * where it must be hollow. A foraging hole only at foraging time (soil or its plug).
      */
@@ -443,7 +514,7 @@ public class Nest {
         if (colony.foragingHoles().isHole(level, pos)) {
             return colony.foragingHoles().mayOpen(level, pos);
         }
-        return isSoil(level.getBlockState(pos)) || (pos.equals(center) && isEntrancePlugged(level) && mayOpenEntrance(level))
+        return isSoil(level.getBlockState(pos)) || (pos.equals(center) && (isEntrancePlugged(level) && mayOpenEntrance(level) || isPlantInEntrance(level)))
                 || colony.mound().isClearJob(level, pos) || foodWays.isRunwayPlant(level, pos);
     }
 

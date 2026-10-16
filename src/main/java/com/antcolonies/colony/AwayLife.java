@@ -301,7 +301,8 @@ public class AwayLife {
             ColonyManager.get(level).markChanged();
         }
         colony.life().watch(level);
-        if (colony.ledger().isEmpty() && colony.brood().insideCount() == 0 && !colony.building().hasWork() || !nestLoaded(level)) {
+        if (colony.ledger().isEmpty() && colony.brood().insideCount() == 0 && !colony.building().hasWork() && !colony.life().foundedAway()
+                || !nestLoaded(level)) {
             return;
         }
         List<Vec3> eyes = colony.population().viewersInSight(level);
@@ -373,6 +374,11 @@ public class AwayLife {
     /** The king starved while away (for the report). */
     void noteKingStarved() {
         report.kingStarved();
+    }
+
+    /** The founders dug their chamber while away and closed themselves in (for the report). */
+    void noteFoundersSealed() {
+        report.foundersSealed();
     }
 
     /** What happened while away, this time or the last time. */

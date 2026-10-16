@@ -1272,11 +1272,18 @@ public class AwayTests {
      * queen lays the rest of her founding batch as numbers, the founders feed the young from their own fat, and they
      * grow up into the first workers, all while away; the queen does not starve (she lives on her fat). Back in range the
      * first workers come out as real ones and dig the entrance open, as in a real claustral founding.
+     * <p>Grass in the entrance (the user's bug, 2026-10-15): the founders start on a tuft of short grass. The ant queen is
+     * then put two blocks off it, with the grass grown back (before the fix she never dug: nobody could stand over the
+     * shaft's first block), and she has to bite it away and dig as before.
+     * <p>Founding while away (the user's bug, 2026-10-15: a founding nest dug nothing while away): the termite pair go
+     * away at once, before they have dug anything. While away they dig their chamber and close themselves in at the real
+     * pace (the report says so), and the queen lays her batch; back home they are in their chamber, the grass is gone.
      */
     private static void foundsWhileAway(GameTestHelper helper, boolean termites) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
         TermiteMoundTests.deepGround(helper);
+        helper.setBlock(MIDDLE, SURFACE, MIDDLE, net.minecraft.world.level.block.Blocks.SHORT_GRASS);
         if (termites) {
             helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
         } else {
@@ -1300,9 +1307,38 @@ public class AwayTests {
                 colony.away().setOnForTests(true); // (here: the nest's chunks are loaded)
                 colony.population().setOnForTests(true);
                 colony.population().setViewersForTests(List.of());
+                if (!termites) {
+                    // She steps off her spot and the grass is still there (or grows back).
+                    AbstractAntEntity queen = colony.getQueen(level);
+                    BlockPos aside = helper.absolutePos(new BlockPos(MIDDLE + 2, SURFACE, MIDDLE));
+                    queen.moveTo(aside.getX() + 0.5, aside.getY(), aside.getZ() + 0.5, 0.0F, 0.0F);
+                    level.setBlock(colony.getCenter(), net.minecraft.world.level.block.Blocks.SHORT_GRASS.defaultBlockState(), 3);
+                    helper.assertTrue(colony.nest().isPlantInEntrance(level), "the grass should be in the entrance");
+                }
             }
             Colony colony = byId(helper, id[0]);
             int eggs = colony.profile().founding().orElseThrow().eggs();
+            if (phase[0] == 0 && termites) {
+                // The pair go away at once: the king has joined, the brain has seen what they have to dig.
+                if (colony.getCount(com.antcolonies.entity.TermiteKingEntity.CASTE) == 0 || colony.life().foundingWorkLeft() <= 0) {
+                    return;
+                }
+                helper.assertTrue(colony.isFounding() && colony.nest().getHomeChamber(level) == null, "the pair should not have dug their chamber yet");
+                AntColoniesMod.LOGGER.info("[away-test] founding: the pair go away at tick {} with {} ticks of work left", helper.getTick(),
+                        colony.life().foundingWorkLeft());
+                List<Entity> all = new ArrayList<>();
+                all.add(colony.getQueen(level));
+                all.addAll(level.getEntitiesOfClass(com.antcolonies.entity.TermiteKingEntity.class, helper.getBounds(),
+                        king -> colony.getId().equals(king.getColonyId())));
+                for (Entity entity : all) {
+                    unloaded.put(entity.getUUID(), freezeAndUnload(colony, level, entity));
+                }
+                colony.away().setGraceForTests(20L);
+                colony.away().setAwayForTests(true);
+                at[1] = helper.getTick();
+                phase[0] = 1;
+                return;
+            }
             if (phase[0] == 0) {
                 boolean sealed = !colony.nest().isEntranceOpen(level) && colony.queenCare().isQueenHome(level);
                 if (!sealed) {
@@ -1353,6 +1389,8 @@ public class AwayTests {
                         "the first " + eggs + " workers should be numbers: " + colony.population().describe(level));
                 helper.assertTrue(!report.describe().contains("the queen starved") && !colony.isFounding(), "the queen should live on her fat: "
                         + report.describe());
+                helper.assertTrue(!termites || report.didFoundersSeal(), "the pair should have dug their chamber and closed themselves in while away: "
+                        + report.describe());
                 colony.away().setAwayForTests(false);
                 unloaded.values().forEach(tag -> loadAgain(level, tag));
                 at[1] = helper.getTick();
@@ -1364,6 +1402,13 @@ public class AwayTests {
                     mob -> mob.isAlive() && colony.getId().equals(mob.getColonyId()) && WorkerAntEntity.CASTE.equals(mob.nestCaste())).size();
             if (colony.getQueen(level) != null && real == eggs && colony.nest().isEntranceOpen(level)) {
                 helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == eggs, "still " + eggs + " workers: " + colony.getCount(WorkerAntEntity.CASTE));
+                helper.assertTrue(colony.queenCare().isQueenHome(level), "the queen should be in her chamber: " + colony.getQueen(level).blockPosition());
+                helper.assertTrue(!colony.nest().isPlantInEntrance(level), "the grass in the entrance should be gone");
+                if (termites) {
+                    AbstractAntEntity queen = colony.getQueen(level);
+                    helper.assertTrue(!level.getEntitiesOfClass(com.antcolonies.entity.TermiteKingEntity.class, queen.getBoundingBox().inflate(2.0),
+                            king -> king.isAlive() && colony.getId().equals(king.getColonyId())).isEmpty(), "the king should be with the queen");
+                }
                 helper.succeed();
             }
             helper.assertTrue(helper.getTick() - at[1] < 15000, "back: " + real + " real workers, entrance open " + colony.nest().isEntranceOpen(level)

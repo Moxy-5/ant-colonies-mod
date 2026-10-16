@@ -135,6 +135,15 @@ public class DigGoal extends Goal {
 
     private void bite(ServerLevel level, Vec3 blockCenter) {
         BlockState state = level.getBlockState(target);
+        if (target.equals(colony.nest().getEntrance()) && colony.nest().isPlantInEntrance(level)) {
+            // A plant in the entrance (grass, a flower): bitten through at the stem, no soil from it.
+            level.playSound(null, target, state.getSoundType().getBreakSound(), SoundSource.BLOCKS, 0.4F, 1.4F);
+            level.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, state),
+                    blockCenter.x, target.getY() + 0.3, blockCenter.z, 6, 0.2, 0.1, 0.2, 0.05);
+            colony.nest().clearPlantInEntrance(level, ant);
+            target = null;
+            return;
+        }
         // Harder blocks take more bites: plain dirt is about 6 bites, roughly 3 seconds for one ant.
         float bitesNeeded = Math.max(1.0F, state.getDestroySpeed(level, target) * 12.0F);
         float progress = colony.nest().addDigProgress(target, 1.0F / bitesNeeded);

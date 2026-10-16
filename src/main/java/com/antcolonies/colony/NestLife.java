@@ -48,6 +48,14 @@ public class NestLife {
     private boolean queenHome;
     private boolean sealedIn;
     private float queenSize;
+    /**
+     * Founding (the queen alone, or the royal pair): what the brain last saw the founders still had to do before they
+     * are closed in, as ticks of one founder's work (the bites of every block left, and the walk down and packing the
+     * hole shut); 0 when nothing is left. While away the founders work it off ({@link #foundWhileAway}). Saved.
+     */
+    private long foundingWorkLeft;
+    /** The founders finished digging and closed themselves in while away: on return they are put in their chamber (see {@link BuildLife}). Saved. */
+    private boolean foundedAway;
 
     NestLife(Colony colony) {
         this.colony = colony;
@@ -62,6 +70,73 @@ public class NestLife {
         queenHome = colony.queenCare().isQueenHome(level);
         sealedIn = queenHome && !colony.nest().isEntranceOpen(level);
         queenSize = queen instanceof TermiteQueenEntity termiteQueen ? termiteQueen.getSize() : 0.0F;
+        if (sealedIn) {
+            foundingWorkLeft = 0;
+            foundedAway = false; // (in their chamber, closed in: as it should be)
+        } else if (!colony.isFounding()) {
+            foundingWorkLeft = 0; // (the first workers are out: founded away or not, the queen is put in her chamber on return)
+        } else if (!foundedAway) {
+            List<net.minecraft.core.BlockPos> left = colony.nest().foundersDigLeft(level);
+            if (left != null) {
+                long work = SETTLE_TICKS;
+                for (net.minecraft.core.BlockPos pos : left) {
+                    work += (long) BuildLife.bites(level, pos) * BuildLife.BITE_TICKS;
+                }
+                foundingWorkLeft = work;
+            }
+        }
+    }
+
+    /**
+     * How long (ticks) the founders take, once their chamber is dug, to go down into it and pack the hole shut behind
+     * them (half a minute; my pick, to confirm).
+     */
+    static final int SETTLE_TICKS = 600;
+
+    /** How many founders dig: the queen, and the king with her (royal pairs). */
+    int founders() {
+        return 1 + (colony.kingCare().isAlive() ? 1 : 0);
+    }
+
+    /** Whether the founders still have digging (or closing in) to do while away. */
+    boolean foundersAtWork() {
+        return colony.isFounding() && !sealedIn && !foundedAway && foundingWorkLeft > 0;
+    }
+
+    /** The founders finished and closed themselves in while away: they still have to be put in their chamber on return. */
+    boolean foundedAway() {
+        return foundedAway;
+    }
+
+    /** The founders are in their chamber with the hole shut (from {@link BuildLife}, on return). */
+    void foundersSettled() {
+        foundedAway = false;
+    }
+
+    /**
+     * Once a second while away, founding: the founders dig on, at the real pace (each of them as one digger); once all
+     * of it is done they are in their chamber, closed in, and the queen starts on her founding batch (as she would here).
+     */
+    private boolean foundWhileAway(ServerLevel level) {
+        if (!foundersAtWork()) {
+            return false;
+        }
+        foundingWorkLeft -= 20L * founders();
+        if (foundingWorkLeft > 0) {
+            return false;
+        }
+        foundingWorkLeft = 0;
+        foundedAway = true;
+        queenHome = true;
+        sealedIn = colony.profile().nest().sealWhileFounding();
+        colony.away().noteFoundersSealed();
+        com.antcolonies.AntColoniesMod.LOGGER.info("[away] colony {}: the founders dug their chamber and closed themselves in while away", colony.getId());
+        return true;
+    }
+
+    /** For the tests: what the founders still have to do (ticks of one founder's work). */
+    public long foundingWorkLeft() {
+        return foundingWorkLeft;
     }
 
     /**
@@ -71,6 +146,7 @@ public class NestLife {
     boolean tick(ServerLevel level, boolean away) {
         boolean changed = growUp(level);
         if (away) {
+            changed |= foundWhileAway(level);
             changed |= colony.queenCare().liveAway(level, queenHome, sealedIn, queenSize);
             changed |= colony.kingCare().liveAway(level);
             changed |= nurse(level);
@@ -314,6 +390,8 @@ public class NestLife {
         life.putBoolean("queenHome", queenHome);
         life.putBoolean("sealedIn", sealedIn);
         life.putFloat("queenSize", queenSize);
+        life.putLong("foundingWorkLeft", foundingWorkLeft);
+        life.putBoolean("foundedAway", foundedAway);
         tag.put("nestLife", life);
     }
 
@@ -322,5 +400,7 @@ public class NestLife {
         queenHome = !tag.contains("nestLife") || life.getBoolean("queenHome"); // (older saves: she sat in her room)
         sealedIn = life.getBoolean("sealedIn");
         queenSize = life.getFloat("queenSize");
+        foundingWorkLeft = life.getLong("foundingWorkLeft");
+        foundedAway = life.getBoolean("foundedAway");
     }
 }

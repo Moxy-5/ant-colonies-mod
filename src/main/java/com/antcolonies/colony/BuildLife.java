@@ -85,8 +85,16 @@ public class BuildLife {
 
     /** Once a second while away (from {@link AwayLife#tickAway}): every builder number works the second. Never touches the world. */
     void tickAway(ServerLevel level) {
+        if (colony.isFounding()) {
+            // The founders (the queen alone, or the royal pair) dig their own chamber at the real pace (the user's bug,
+            // 2026-10-15: a founding nest dug nothing while away).
+            if (colony.life().foundersAtWork()) {
+                work += colony.life().founders() * 20L;
+            }
+            return;
+        }
         int builders = buildersInside(level);
-        if (builders > 0 && !colony.isFounding()) {
+        if (builders > 0) {
             work += builders * 20L;
         }
     }
@@ -99,15 +107,21 @@ public class BuildLife {
      * built (or dug) the time left over is dropped.
      */
     boolean catchUp(ServerLevel level, List<Vec3> eyes) {
-        if (work <= 0) {
+        boolean founders = colony.life().foundedAway();
+        if (work <= 0 && !founders) {
             return false;
         }
         waited = false;
         int[] changes = {0};
-        boolean nestLeft = digNest(level, eyes, changes);
-        boolean moundLeft = colony.mound().isActive() && buildMound(level, eyes, changes);
+        boolean nestLeft = work > 0 && digNest(level, eyes, changes);
+        boolean moundLeft = work > 0 && colony.mound().isActive() && buildMound(level, eyes, changes);
+        if (!nestLeft && founders) {
+            settleFounders(level, eyes, changes);
+        }
         if (!nestLeft && !moundLeft && !waited) {
-            log("is done");
+            if (work > 0) {
+                log("is done");
+            }
             work = 0; // nothing more to do: the builders had time to spare
             soil = 0; // (soil nobody needed was left in the galleries)
         }
@@ -134,8 +148,16 @@ public class BuildLife {
                 waited = true;
                 return true;
             }
-            // Ants carry the soil up onto the hill while it has room (the first spot is looked at before the block is dug).
-            BlockPos heap = ants && hill.hasMoundRoom(level) ? hill.pickMoundSpot(level, level.getRandom(), null) : null;
+            if (target.equals(colony.getCenter()) && colony.nest().isPlantInEntrance(level)) {
+                colony.nest().clearPlantInEntrance(level, null); // (a plant in the entrance: bitten off, no soil)
+                changes[0]++;
+                work -= BITE_TICKS;
+                continue;
+            }
+            // Ants carry the soil up onto the hill while it has room (the first spot is looked at before the block is
+            // dug). Founders leave theirs where it falls (they carry no soil, as when they dig here).
+            boolean founding = colony.isFounding();
+            BlockPos heap = ants && !founding && hill.hasMoundRoom(level) ? hill.pickMoundSpot(level, level.getRandom(), null) : null;
             if (heap != null && !freeAndHidden(level, heap, eyes)) {
                 waited = true;
                 return true;
@@ -162,7 +184,7 @@ public class BuildLife {
                         heap = null; // a player can see the hill now: the rest of this block's soil is left behind
                     }
                 }
-            } else if (colony.mound().isActive()) {
+            } else if (colony.mound().isActive() && !founding) {
                 soil += TermiteMoundBlock.FINISHED; // a dug block gives the soil for a mound block (as Mound.takePellet)
             }
         }
@@ -313,9 +335,82 @@ public class BuildLife {
     }
 
     /** How many bites a block takes (as {@code DigGoal}: plain dirt about 6). */
-    private static int bites(ServerLevel level, BlockPos pos) {
+    static int bites(ServerLevel level, BlockPos pos) {
         BlockState state = level.getBlockState(pos);
         return Math.max(1, (int) Math.ceil(state.getDestroySpeed(level, pos) * 12.0F));
+    }
+
+    /**
+     * The founders finished their chamber and closed themselves in while away (see {@link NestLife}): now, out of every
+     * player's sight, what is left of their digging is done (the brain counted it dug), the queen (and the king) are
+     * put in their chamber, and, while they are still alone, the entrance is packed shut behind them. Sets
+     * {@link #waited} if a player can see it or something is in the way.
+     */
+    private void settleFounders(ServerLevel level, List<Vec3> eyes, int[] changes) {
+        Nest nest = colony.nest();
+        List<BlockPos> left = nest.foundersDigLeft(level);
+        if (left == null) {
+            waited = true;
+            return;
+        }
+        for (BlockPos pos : left) {
+            if (!Population.outOfSight(level, pos, eyes)) {
+                waited = true;
+                return;
+            }
+            if (pos.equals(colony.getCenter()) && nest.isPlantInEntrance(level)) {
+                nest.clearPlantInEntrance(level, null);
+            } else if (colony.walls().wallFirst(level, pos)) {
+                dig(level, pos);
+                colony.away().report().add(AwayReport.What.DUG, 1);
+            } else {
+                waited = true;
+                return;
+            }
+            changes[0]++;
+        }
+        NestPlan.Chamber home = nest.getHomeChamber(level);
+        if (home == null) {
+            waited = true;
+            return;
+        }
+        BlockPos middle = home.center();
+        Vec3 spot = Vec3.atBottomCenterOf(middle);
+        List<LivingEntity> founders = new ArrayList<>();
+        LivingEntity queen = colony.getQueen(level);
+        if (queen != null) {
+            founders.add(queen);
+        }
+        founders.addAll(level.getEntitiesOfClass(com.antcolonies.entity.TermiteKingEntity.class, colony.nestArea().inflate(16.0),
+                king -> king.isAlive() && colony.getId().equals(king.getColonyId())));
+        for (int i = 0; i < founders.size(); i++) {
+            LivingEntity founder = founders.get(i);
+            Vec3 to = spot.add(i == 0 ? 0.0 : 0.6, 0.0, 0.0); // (the king at her side)
+            if (founder.position().distanceToSqr(to) < 0.25) {
+                continue;
+            }
+            if (!Population.outOfSight(level, founder.getEyePosition(), eyes) || !Population.outOfSight(level, middle, eyes)) {
+                waited = true;
+                return;
+            }
+            if (founder instanceof com.antcolonies.entity.AbstractAntEntity ant) {
+                ant.getNavigator().stop();
+            }
+            founder.moveTo(to.x, to.y, to.z, founder.getYRot(), 0.0F);
+            changes[0]++;
+        }
+        BlockPos hole = nest.getEntrance();
+        if (colony.isFounding() && colony.profile().nest().sealWhileFounding() && nest.isEntranceOpen(level)) {
+            if (!freeAndHidden(level, hole, eyes)) {
+                waited = true;
+                return;
+            }
+            level.setBlock(hole, colony.profile().nest().plugState(), 3);
+            changes[0]++;
+        }
+        colony.life().foundersSettled();
+        AntColoniesMod.LOGGER.info("[away-build] colony {}: the founders are in their chamber at {}{}", colony.getId(), middle.toShortString(),
+                colony.isFounding() ? ", the hole shut" : "");
     }
 
     /** The block is dug out, quietly (nobody is there to hear it). */

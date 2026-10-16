@@ -47,6 +47,8 @@ public class AwayReport {
     private boolean queenStarved;
     /** The king starved while away. Saved. */
     private boolean kingStarved;
+    /** The founders dug their chamber while away and closed themselves in. Saved. */
+    private boolean foundersSealed;
 
     void add(What what, int count) {
         if (count > 0) {
@@ -62,14 +64,24 @@ public class AwayReport {
         kingStarved = true;
     }
 
+    void foundersSealed() {
+        foundersSealed = true;
+    }
+
+    /** Whether the founders dug their chamber while away and closed themselves in (for tests). */
+    public boolean didFoundersSeal() {
+        return foundersSealed;
+    }
+
     void clear() {
         counts.clear();
         queenStarved = false;
         kingStarved = false;
+        foundersSealed = false;
     }
 
     public boolean isEmpty() {
-        return counts.isEmpty() && !queenStarved && !kingStarved;
+        return counts.isEmpty() && !queenStarved && !kingStarved && !foundersSealed;
     }
 
     /** Whether the king starved while away (for tests). */
@@ -92,6 +104,9 @@ public class AwayReport {
         if (kingStarved) {
             parts.add("the king starved");
         }
+        if (foundersSealed) {
+            parts.add(0, "the founders dug their chamber and closed themselves in");
+        }
         return parts.isEmpty() ? "nothing" : String.join(", ", parts);
     }
 
@@ -100,6 +115,7 @@ public class AwayReport {
         counts.forEach((what, count) -> report.putInt(what.name(), count));
         report.putBoolean("queenStarved", queenStarved);
         report.putBoolean("kingStarved", kingStarved);
+        report.putBoolean("foundersSealed", foundersSealed);
         tag.put("awayReport", report);
     }
 
@@ -111,5 +127,6 @@ public class AwayReport {
         }
         queenStarved = report.getBoolean("queenStarved");
         kingStarved = report.getBoolean("kingStarved");
+        foundersSealed = report.getBoolean("foundersSealed");
     }
 }
