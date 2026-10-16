@@ -34,7 +34,10 @@ public class AwayReport {
         OLD_AGE("died of old age"),
         STARVED("starved"),
         YOUNG_STARVED("young starved"),
-        SECOND_BATCH("second founding batches begun (the first workers all died)");
+        SECOND_BATCH("second founding batches begun (the first workers all died)"),
+        PATROLS("patrols sent"),
+        PATROLLERS_LOST("patrollers lost"),
+        NO_FORAGING_DAYS("days with no foraging (no patroller came back)");
 
         private final String label;
 

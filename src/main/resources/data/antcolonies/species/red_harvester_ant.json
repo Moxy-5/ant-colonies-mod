@@ -66,6 +66,24 @@
         "bare_ground": "minecraft:coarse_dirt",
         "regrow_ticks": 48000
       }
+    },
+    "door": {
+      "_note": "How many foragers go out (brain step 4b, Deborah Gordon's rule; real Pogonomyrmex barbatus): no ant is in charge. Foragers not out wait inside by the entrance; a forager home with a seed (or a patroller home from its round) touches the waiting ants it passes within touch_reach blocks; one touched touches_needed times within touch_memory_ticks goes out (Greene and Gordon: about one contact every 10 seconds). Empty returns do not count. Under small_colony_foragers foragers one touch is enough, a homecomer reaches every waiting ant by the entrance, and a forager's own seed counts as its touch (the user: young colonies must not be slowed). For the forager numbers each homecomer touches touches_per_return waiting ones. User's decisions: real touches at the real ants' pace; the numbers are my picks, to confirm.",
+      "touches_needed": 3,
+      "touch_memory_ticks": 600,
+      "touch_reach": 2.0,
+      "small_colony_foragers": 10,
+      "touches_per_return": 3
+    },
+    "patrol": {
+      "_note": "Patrollers (brain step 4b; real Pogonomyrmex barbatus, Gordon, Greene and Gordon 2007): each time the day clock opens (dawn, after the midday rest, after rain) workers taken from the builders go out first, over and round the hill and then reach blocks out along a trunk trail (or a new direction) and back. Foraging starts only once one is back, and only in the directions they came back from; with none back, none that round. Dawn patrol: share of the workers (the user's scaling: 2 at 10, 4 at 25, 8 at 50, 16 at 100), at least least; later rounds later_rounds of that (the user's: half). A patroller hurt or with a hostile mob within hostile_within blocks turns back: its direction shut for the day, extra_on_danger times as many again patrol the hill, foragers allowed out foragers_after_danger of the share for the rest of the day. Another colony's ants met: that direction shut for the day. reach, hostile_within, extra_on_danger and foragers_after_danger are my picks, to confirm.",
+      "share": 0.16,
+      "least": 1,
+      "reach": 10,
+      "later_rounds": 0.5,
+      "hostile_within": 4.0,
+      "extra_on_danger": 1.0,
+      "foragers_after_danger": 0.5
     }
   },
   "refuse": {

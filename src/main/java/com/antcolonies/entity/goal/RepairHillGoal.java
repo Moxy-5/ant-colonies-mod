@@ -49,7 +49,7 @@ public class RepairHillGoal extends Goal {
     public boolean canUse() {
         // Only look for work now and then, so ants don't all think on the same tick.
         if (ant.getColonyId() == null || !ant.canPlaceBlocks() || ant.hasFullMandibles() || ant.getRandom().nextInt(20) != 0
-                || !ant.mayDo(ColonyRole.BUILDER) || !(ant.level() instanceof ServerLevel level)) {
+                || !ant.mayDo(ColonyRole.BUILDER) || !ant.mayGoOut() || !(ant.level() instanceof ServerLevel level)) {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());

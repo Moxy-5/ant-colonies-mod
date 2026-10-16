@@ -21,7 +21,9 @@ import net.minecraft.world.phys.AABB;
 
 /**
  * An ant holding a soil pellet carries it out of the hole and adds it to the mound around the entrance (or into a gap
- * in the hill that was knocked out; see {@link RepairHillGoal}).
+ * in the hill that was knocked out; see {@link RepairHillGoal}). While the surface is shut to it (at night, in the rain,
+ * in the midday rest: see {@link AbstractAntEntity#mayGoOut}) it puts the pellet on the night soil heap just under the
+ * entrance instead; {@link CarryNightSoilGoal} brings that up once the clock opens.
  */
 public class CarryPelletGoal extends Goal {
     /** How close (sideways, in blocks) the ant must get before it places the pellet. */
@@ -38,6 +40,8 @@ public class CarryPelletGoal extends Goal {
     private BlockPos spot;
     private int ticks;
     private int failedRoutes;
+    /** Putting it on the night soil heap (the surface is shut), not on the hill. */
+    private boolean night;
 
     public CarryPelletGoal(AbstractAntEntity ant) {
         this.ant = ant;
@@ -50,6 +54,11 @@ public class CarryPelletGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
+        night = colony != null && !ant.mayGoOut() && colony.hill().hasMoundRoom(level);
+        if (night) {
+            spot = colony.hill().getRepairSoilSpot();
+            return true;
+        }
         spot = colony == null ? null : colony.hill().pickMoundSpot(level, ant.getRandom(), ant.getUUID());
         if (spot == null) {
             // Colony gone, or the mound is finished: nowhere to put it, so let go.
@@ -61,14 +70,18 @@ public class CarryPelletGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        return colony != null && spot != null && ant.isCarrying();
+        return colony != null && spot != null && ant.isCarrying() && night == !ant.mayGoOut();
     }
 
     @Override
     public void start() {
         ticks = 0;
         failedRoutes = 0;
-        walkToSpot();
+        if (night) {
+            ant.getNavigator().moveTo(spot, 1.0);
+        } else {
+            walkToSpot();
+        }
     }
 
     @Override
@@ -89,6 +102,10 @@ public class CarryPelletGoal extends Goal {
             spot = null;
         }
         if (spot == null || !(ant.level() instanceof ServerLevel level)) {
+            return;
+        }
+        if (night) {
+            heapNightSoil(level);
             return;
         }
         if (++ticks >= GIVE_UP_TICKS) {
@@ -126,6 +143,24 @@ public class CarryPelletGoal extends Goal {
         if (spot == null) {
             ant.setCarriedBlock(null);
         }
+    }
+
+    /** Night: up the shaft to just under the entrance, where the pellet goes on the heap (it is not placed as a block). */
+    private void heapNightSoil(ServerLevel level) {
+        double dx = ant.getX() - (spot.getX() + 0.5);
+        double dz = ant.getZ() - (spot.getZ() + 0.5);
+        double dy = ant.getY() - spot.getY();
+        boolean there = dx * dx + dz * dz <= REACH * REACH && Math.abs(dy) < 2.0;
+        if (!there && ++ticks < GIVE_UP_TICKS) {
+            if (ant.getNavigator().isDone() && !ant.getNavigator().moveTo(spot, 1.0)) {
+                ticks = GIVE_UP_TICKS; // no way up: it is left where the ant is, on the heap all the same
+            }
+            return;
+        }
+        ant.getNavigator().stop();
+        colony.hill().addNightSoil(ant.getCarriedBlock());
+        ant.setCarriedBlock(null);
+        ColonyManager.get(level).markChanged();
     }
 
     /** Starts walking to a free cell next to the spot. False if there is none to go to. */

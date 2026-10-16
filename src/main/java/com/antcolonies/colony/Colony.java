@@ -92,6 +92,8 @@ public class Colony {
     private final ForagingHoles foragingHoles;
     private final ForagingTrails trails;
     private final TrunkTrails trunkTrails;
+    private final Patrol patrol;
+    private final Door door;
     private final FungusGarden garden;
     private final Mushrooms mushrooms;
     private final Soldiers soldiers;
@@ -123,6 +125,8 @@ public class Colony {
         this.foragingHoles = new ForagingHoles(this);
         this.trails = new ForagingTrails(this);
         this.trunkTrails = new TrunkTrails(this);
+        this.patrol = new Patrol(this);
+        this.door = new Door(this);
         this.garden = new FungusGarden(this);
         this.mushrooms = new Mushrooms(this);
         this.soldiers = new Soldiers(this);
@@ -209,6 +213,16 @@ public class Colony {
     /** The lasting trunk trails out from the nest (species whose profile has {@code food.trails.trunk}). */
     public TrunkTrails trunkTrails() {
         return trunkTrails;
+    }
+
+    /** The patrollers: who goes out first each round, and where the foragers may go once they are back (species with {@code food.patrol}). */
+    public Patrol patrol() {
+        return patrol;
+    }
+
+    /** How many foragers go out: the touches of the homecomers (Gordon's rule, species with {@code food.door}). */
+    public Door door() {
+        return door;
     }
 
     /** The soldiers: how many the colony wants, which nymphs grow into them, where they stand guard (species with soldiers). */
@@ -441,6 +455,8 @@ public class Colony {
         food.barePatches().tick(level);
         population.tick(level);
         life.tick(level, false);
+        patrol.tick(level, false);
+        door.tick(level);
         field.tick(level, false);
         trunkTrails.tick(level, false);
         return true;
@@ -630,6 +646,9 @@ public class Colony {
         garden.save(tag);
         workerFood.save(tag);
         trunkTrails.save(tag);
+        patrol.save(tag);
+        door.save(tag);
+        hill.save(tag);
         trails.save(tag);
         return tag;
     }
@@ -665,6 +684,9 @@ public class Colony {
         colony.garden.load(tag);
         colony.workerFood.load(tag);
         colony.trunkTrails.load(tag);
+        colony.patrol.load(tag);
+        colony.door.load(tag);
+        colony.hill.load(tag);
         colony.trails.load(tag);
         return colony;
     }

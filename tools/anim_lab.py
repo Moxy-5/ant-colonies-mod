@@ -16,6 +16,8 @@ What it makes (pictures go to references/anim_lab/, Claude looks at them with it
             (stride, duty factor, steps a second at the game's walking speed).
   compare   several clips (or the same clip at several speeds) side by side, one row each.
   sheet     a contact sheet of screenshots (from the in-game camera) with their file names.
+  match     each in-game camera picture (its clip moment read from times.txt) above the lab's drawing of the same
+            moment from the same side, to prove the lab and the game agree.
   all       film + graphs + check for every clip of an insect.
 
 Run from the project folder:
@@ -24,6 +26,7 @@ Run from the project folder:
   python tools/anim_lab.py compare worker_ant walk idle sleep
   python tools/anim_lab.py check worker_ant [walk]
   python tools/anim_lab.py sheet run-film/screenshots/film [--cols 4]
+  python tools/anim_lab.py match run-film/screenshots worker_ant
 Options: --anim <file stem> to read another insect's animation file (the queen uses worker_ant's), --speed <blocks a
 second> for the walking speed the treadmill and the checks assume (default: the insect's normal speed below).
 
@@ -605,8 +608,11 @@ def unit_speed(model, speed_bps):
     return speed_bps / model.blocks_per_unit
 
 
-def film(model, clip, frames=8, views=('side', 'front', 'top', 'three'), treadmill=None, label=None, cw=300, ch=210):
-    """One canvas: `frames` moments of the clip (columns) from each view (rows)."""
+def film(model, clip, frames=8, views=('side', 'front', 'top', 'three'), treadmill=None, label=None, cw=300, ch=210,
+         times=None):
+    """One canvas: `frames` moments of the clip (columns) from each view (rows); or the moments in `times` (seconds)."""
+    if times is not None:
+        frames = len(times)
     gait = Gait(model, clip)
     speed = gait.speed if treadmill is None else treadmill
     ext = floor_extent(model)
@@ -620,7 +626,7 @@ def film(model, clip, frames=8, views=('side', 'front', 'top', 'three'), treadmi
         view = VIEWS[vname]
         bounds = fit_bounds(model, clip, view, floor_pts)
         for k in range(frames):
-            t = clip.length * k / frames
+            t = times[k] if times is not None else clip.length * k / frames
             x0, y0 = cw * k, title_h + (ch + label_h) * r
             cv.frame(x0, y0, cw, ch + label_h)
             cv.text(x0 + 6, y0 + 6, f'{view.title} {t:.3f} S')
@@ -883,6 +889,48 @@ def sheet(folder, cols=4, width=420):
 
 
 # --- the command line ------------------------------------------------------------------------------------------------
+GAME_VIEWS = {'side': 'side', 'front': 'front', 'above': 'top'}
+
+
+def match(folder, model, clips, cols=4, width=420):
+    """The in-game camera's pictures (with the clip moments in its times.txt) each above the lab's own drawing of the
+    same clip at the same moment from the same side: if the two ever disagree, the lab (or the game) has it wrong."""
+    rows = []
+    for line in open(os.path.join(folder, 'times.txt'), encoding='utf-8'):
+        w = line.split()
+        if len(w) < 3 or w[1] == '-' or w[1] not in clips:
+            continue
+        stem = os.path.splitext(w[0])[0]
+        view = next((v for k, v in GAME_VIEWS.items() if f'_{k}' in stem), None)
+        if view:
+            rows.append((w[0], clips[w[1]], float(w[2]), view))
+    if not rows:
+        raise SystemExit(f'no pictures with clip times in {folder}/times.txt')
+    lab_h = int(width * 0.6)
+    cells = []
+    for name, clip, t, view in rows:
+        gw, gh, px = read_png(os.path.join(folder, name))
+        # the game picture, cut to the middle (where the insect is) and scaled to the cell
+        cut_w, cut_h = gw // 2, gh // 2
+        x0, y0 = (gw - cut_w) // 2, (gh - cut_h) // 2
+        game_h = int(cut_h * width / cut_w)
+        lab = film(model, clip, views=(view,), times=[t], cw=width, ch=lab_h, label=f'LAB {clip.name} {t:.3f} S')
+        cells.append((name, x0, y0, cut_w, cut_h, game_h, gw, px, lab))
+    cell_h = 26 + cells[0][5] + cells[0][8].height
+    cv = Canvas(cols * width, ((len(cells) + cols - 1) // cols) * cell_h)
+    for i, (name, x0, y0, cut_w, cut_h, game_h, gw, px, lab) in enumerate(cells):
+        ox, oy = (i % cols) * width, (i // cols) * cell_h
+        cv.text(ox + 4, oy + 4, 'GAME ' + os.path.splitext(name)[0][:40], scale=2)
+        for y in range(game_h):
+            sy = y0 + y * cut_h // game_h
+            for x in range(width):
+                cv.color[(oy + 26 + y) * cv.width + ox + x] = px[sy * gw + x0 + x * cut_w // width][:3]
+        for y in range(lab.height):
+            base = (oy + 26 + game_h + y) * cv.width + ox
+            cv.color[base:base + lab.width] = lab.color[y * lab.width:(y + 1) * lab.width]
+    return cv
+
+
 def save(cv, name):
     os.makedirs(OUT, exist_ok=True)
     path = os.path.join(OUT, name)
@@ -895,6 +943,9 @@ def main(argv):
     opts, args = {}, []
     it = iter(argv)
     for a in it:
+        if a in ('--help', '-h'):
+            print(__doc__)
+            return
         if a.startswith('--'):
             opts[a[2:]] = next(it)
         else:
@@ -906,6 +957,11 @@ def main(argv):
     if cmd == 'sheet':
         folder = args[1]
         save(sheet(folder, int(opts.get('cols', 4))), os.path.basename(os.path.normpath(folder)) + '_sheet.png')
+        return
+    if cmd == 'match':
+        model = Model(args[2])
+        save(match(args[1], model, load_clips(opts.get('anim', args[2])), int(opts.get('cols', 4))),
+             os.path.basename(os.path.normpath(args[1])) + '_match.png')
         return
     model = Model(args[1])
     clips = load_clips(opts.get('anim', args[1]))

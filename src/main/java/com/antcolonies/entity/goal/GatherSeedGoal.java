@@ -57,6 +57,9 @@ public class GatherSeedGoal extends Goal {
         if (colony == null || !colony.isForagingTime(level)) {
             return false; // foragers only go out at foraging time (termites: at night and in the rain)
         }
+        if (!colony.door().mayGo(level, ant)) {
+            return false; // waits by the entrance for the homecomers' touches (Gordon's rule, see colony.Door)
+        }
         long now = level.getGameTime();
         unreachable.values().removeIf(until -> until <= now);
         seed = colony.food().findSeed(level, ant.blockPosition(), unreachable.keySet());
@@ -64,6 +67,7 @@ public class GatherSeedGoal extends Goal {
             return false;
         }
         colony.food().claimSeed(level, seed, ant.getUUID());
+        colony.door().setOut(level, ant);
         return true;
     }
 
