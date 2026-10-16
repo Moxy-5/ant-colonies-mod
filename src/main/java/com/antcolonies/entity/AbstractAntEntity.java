@@ -12,6 +12,7 @@ import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.debug.Perf;
+import com.antcolonies.entity.body.AntAnimationController;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.nav.AntNavigator;
 import com.antcolonies.nav.AntPathFinder;
@@ -44,7 +45,6 @@ import net.minecraft.world.phys.Vec3;
 import software.bernie.geckolib.animatable.GeoEntity;
 import software.bernie.geckolib.animatable.instance.AnimatableInstanceCache;
 import software.bernie.geckolib.animation.AnimatableManager;
-import software.bernie.geckolib.animation.AnimationController;
 import software.bernie.geckolib.animation.AnimationState;
 import software.bernie.geckolib.animation.PlayState;
 import software.bernie.geckolib.animation.RawAnimation;
@@ -602,6 +602,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         } else {
             turnBody();
             tiltOnSlope();
+            measureWalk();
         }
     }
 
@@ -887,9 +888,20 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return false;
     }
 
+    /**
+     * The insect's three animation players (see {@link AntAnimationController}), each moving its own bones: the body and
+     * legs at the pace of its steps, the head and antennae at the insect's own pace, and the little extras (grooming,
+     * played now and then over the other two: added last, so it wins on the bones its clip moves).
+     */
+    public static final String BODY_PLAYER = "body";
+    public static final String HEAD_PLAYER = "head";
+    public static final String EXTRA_PLAYER = "extra";
+
     @Override
     public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
-        controllers.add(new AnimationController<>(this, "main", 3, this::animate));
+        controllers.add(new AntAnimationController<>(this, BODY_PLAYER, 3, this::animateBody, AntAnimationController.BODY_BONES));
+        controllers.add(new AntAnimationController<>(this, HEAD_PLAYER, 3, this::animateHead, AntAnimationController.HEAD_BONES));
+        controllers.add(new AntAnimationController<>(this, EXTRA_PLAYER, 3, state -> PlayState.STOP, AntAnimationController.ALL_BONES));
     }
 
     /** Clips asked for by the in-game camera, by name (made once each). */
@@ -915,38 +927,107 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return null;
     }
 
-    private PlayState animate(AnimationState<AbstractAntEntity> state) {
+    /**
+     * A clip both the body and the head play whole, at the speed it was made, instead of their usual ones: the camera's
+     * clip, a special one (a soldier's head bang) or the look round out of a doorway's mouth. Null for none.
+     */
+    @Nullable
+    private RawAnimation wholeBodyClip() {
         RawAnimation film = filmClip();
         if (film != null) {
-            state.getController().setAnimationSpeed(1.0);
-            return state.setAndContinue(film);
+            return film;
         }
         RawAnimation special = specialAnimation();
         if (special != null) {
-            state.getController().setAnimationSpeed(1.0);
-            return state.setAndContinue(special);
+            return special;
         }
-        if (isPeeking()) {
-            state.getController().setAnimationSpeed(1.0);
-            return state.setAndContinue(PEEK);
+        return isPeeking() ? PEEK : null;
+    }
+
+    /** The body player: the walk with its legs in step with the ground, or standing about at the insect's own pace. */
+    private PlayState animateBody(AnimationState<AbstractAntEntity> state) {
+        AntAnimationController<?> player = (AntAnimationController<?>) state.getController();
+        RawAnimation whole = wholeBodyClip();
+        if (whole != null) {
+            player.playAt(1.0);
+            return state.setAndContinue(whole);
         }
-        // Moving on a wall isn't "horizontal" movement, so check climbing separately (an ant hanging still does not move its legs).
-        double dx = getX() - xo;
-        double dy = getY() - yo;
-        double dz = getZ() - zo;
-        double moved = dx * dx + dy * dy + dz * dz;
-        if (isClimbing() && moved > 1.0E-4) {
-            // The legs keep pace with the body: slower when it climbs slowly (poking its head out of a chimney).
-            state.getController().setAnimationSpeed(Mth.clamp(Math.sqrt(moved) / CLIMB_STEP * 1.5, 0.4, 1.5));
+        if (walking) {
+            player.keepPace(walkSpeed, walkRateWithoutStride());
             return state.setAndContinue(WALK);
         }
-        if (state.isMoving()) {
-            // Legs move faster when the ant moves faster, so they don't slide.
-            state.getController().setAnimationSpeed(Math.max(0.6, state.getLimbSwingAmount() * 6.0));
-            return state.setAndContinue(WALK);
-        }
-        state.getController().setAnimationSpeed(1.0);
+        player.playAt(ownPace(0));
         return state.setAndContinue(IDLE);
+    }
+
+    /**
+     * The head player: the same clip as the body (its head, mandibles and antennae), but always at the insect's own pace,
+     * so the antennae sweep at their own speed however fast the legs go.
+     */
+    private PlayState animateHead(AnimationState<AbstractAntEntity> state) {
+        AntAnimationController<?> player = (AntAnimationController<?>) state.getController();
+        RawAnimation whole = wholeBodyClip();
+        if (whole != null) {
+            player.playAt(1.0);
+            return state.setAndContinue(whole);
+        }
+        player.playAt(ownPace(1));
+        return state.setAndContinue(walking ? WALK : IDLE);
+    }
+
+    /**
+     * How fast a walk without a stride note plays (today's termite walks, not made by the motion library yet): the old
+     * guess from the speed, so their legs roughly keep up.
+     */
+    private double walkRateWithoutStride() {
+        if (isClimbing()) {
+            // The legs keep pace with the body: slower when it climbs slowly (poking its head out of a chimney).
+            return Mth.clamp(walkSpeed / CLIMB_STEP * 1.5, 0.4, 1.5);
+        }
+        return Math.max(0.6, Math.min(walkSpeed * 4.0, 1.0) * 6.0);
+    }
+
+    /**
+     * This insect's own pace for what is not tied to its steps (standing about, the head and antennae): 0.88 to 1.12
+     * times as made, the same all its life (from its id; {@code which} picks one of several), so no two insects move in
+     * step (my pick, to confirm).
+     */
+    private double ownPace(int which) {
+        long bits = getUUID().getMostSignificantBits() >>> (which * 16) & 0xFFFF;
+        return 0.88 + 0.24 * bits / 65535.0;
+    }
+
+    /** Client: how far it moves a tick (blocks; along a wall too while climbing), smoothed over a few ticks. */
+    private double walkSpeed;
+    /** Client: whether it is walking (its legs step), from {@link #walkSpeed}, with a gap so it never flickers between. */
+    private boolean walking;
+    /** Client: how big the renderer draws it (its scale), for the stride (set by {@code AntRenderer}). */
+    private float drawScale = 1.0F;
+    /** Walking starts above this speed and stops below the lower one (blocks a tick; my picks, to confirm). */
+    private static final double START_WALKING = 0.008;
+    private static final double STOP_WALKING = 0.004;
+
+    /**
+     * Client, once a tick: how fast it moves, for the legs (see {@link AntAnimationController}). On a floor only its
+     * movement over the ground counts (a falling ant does not walk); on a wall or a ceiling its movement along it.
+     */
+    private void measureWalk() {
+        double dx = getX() - xo;
+        double dy = isClimbing() ? getY() - yo : 0.0;
+        double dz = getZ() - zo;
+        double moved = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        walkSpeed += (moved - walkSpeed) * 0.4;
+        walking = walkSpeed > (walking ? STOP_WALKING : START_WALKING);
+    }
+
+    /** Client: how big the renderer draws it (1 = the model's own size). */
+    public float getDrawScale() {
+        return drawScale;
+    }
+
+    /** Client: set by the renderer each frame (its scale), so the stride is known in blocks. */
+    public void setDrawScale(float scale) {
+        drawScale = scale;
     }
 
     @Override

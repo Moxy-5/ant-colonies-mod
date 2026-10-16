@@ -278,7 +278,7 @@ public final class FilmDirector {
     public static void noteRendered(AbstractAntEntity ant, GeoModel<?> model) {
         try {
             AnimationController<?> controller = ant.getAnimatableInstanceCache().getManagerForId(ant.getId())
-                    .getAnimationControllers().get("main");
+                    .getAnimationControllers().get(AbstractAntEntity.BODY_PLAYER);
             if (controller == null || controller.getCurrentAnimation() == null
                     || controller.getAnimationState() != AnimationController.State.RUNNING) {
                 clipTimes.put(ant.getId(), "- -");

@@ -47,6 +47,7 @@ public class AntRenderer<T extends AbstractAntEntity> extends GeoEntityRenderer<
     @Override
     public void render(T ant, float entityYaw, float partialTick, PoseStack poseStack, MultiBufferSource buffers,
             int packedLight) {
+        ant.setDrawScale(scaleWidth); // for the stride: the legs keep pace with the ground at the size it is drawn
         if (FilmDirector.active()) {
             // The in-game camera: every picture exactly on a game tick (a frozen game's in-between time jitters).
             super.render(ant, entityYaw, 0.0F, poseStack, buffers, packedLight);
