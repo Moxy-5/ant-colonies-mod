@@ -91,6 +91,8 @@ public class NestTests {
      * Nest stages: six workers with no stored food dig only the first level (the seed store); the nursery, the queen's
      * deep room and the refuse chamber wait. Once the store holds 10 seeds (with 6 workers) the second level, the
      * nursery, is dug too, and the third still waits (it needs 12 workers).
+     * <p>Between the two, with nothing to do, every worker goes inside to rest by the entrance (none strolls about
+     * outside; the user's report 2026-10-15).
      */
     @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
     public static void theNestGrowsDeeperOnlyAsTheColonyGrows(GameTestHelper helper) {
@@ -98,6 +100,7 @@ public class NestTests {
         level.getServer().tickRateManager().setTickRate(2000.0F);
         startColony(helper, 6, false);
         int[] phase = {0};
+        long[] idleFrom = {0};
         helper.onEachTick(() -> {
             Colony colony = colony(helper);
             if (colony == null || helper.getTick() < 20) {
@@ -111,6 +114,18 @@ public class NestTests {
                 helper.assertTrue(colony.nest().levelsUnlocked(level) == 1, "with 6 workers and no food only 1 level should be open, not "
                         + colony.nest().levelsUnlocked(level));
                 helper.assertTrue(noneDug(level, levels.get(1)), "the nursery was dug before the colony had the food for it");
+                idleFrom[0] = helper.getTick();
+                phase[0] = 2;
+            } else if (phase[0] == 2) {
+                // Nothing to do (nothing to dig, no young, no seeds about): the spare workers go in and rest by the
+                // entrance, as real harvester ants do; they do not stroll about outside.
+                List<WorkerAntEntity> outside = level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds(),
+                        w -> w.isAlive() && !colony.nest().isInside(level, w.blockPosition()));
+                if (!outside.isEmpty() || helper.getTick() < idleFrom[0] + 600) {
+                    helper.assertTrue(helper.getTick() < idleFrom[0] + 8000, "with nothing to do every worker should be inside, but "
+                            + outside.size() + " are out, e.g. at " + (outside.isEmpty() ? "-" : outside.get(0).blockPosition().toShortString()));
+                    return;
+                }
                 // Ten seeds in the store.
                 List<BlockPos> store = colony.nest().getFoodStoreCells(level);
                 for (int i = 0; i < 10; i++) {

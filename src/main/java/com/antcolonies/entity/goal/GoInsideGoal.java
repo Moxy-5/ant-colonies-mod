@@ -19,11 +19,15 @@ import net.minecraft.world.level.Level;
 public class GoInsideGoal extends Goal {
     /** If it is not inside after this long (ticks) it stops trying for now (it tries again a little later). */
     private static final int GIVE_UP_TICKS = 1200;
+    /** After finding no way in, it waits this long (ticks) before looking again (a nest not dug yet has no inside). */
+    private static final int RETRY_TICKS = 200;
 
     private final AbstractAntEntity ant;
     @Nullable
     private Colony colony;
     private int ticks;
+    /** The game time before which it does not look for a way in again (after it found none). */
+    private long nextTry;
 
     public GoInsideGoal(AbstractAntEntity ant) {
         this.ant = ant;
@@ -32,15 +36,15 @@ public class GoInsideGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        if (ant.getRandom().nextInt(10) != 0 || ant.mayGoOut()) {
-            return false;
+        if (ant.getRandom().nextInt(10) != 0 || ant.mayGoOut() && !(ant.restsNearEntrance() > 0 && ant.isIdle())) {
+            return false; // (a harvester ant with nothing to do goes in too, to rest by the entrance)
         }
         colony = ant.getColony();
         if (colony == null) {
             return false;
         }
         Level level = ant.level();
-        if (colony.nest().isInside(level, ant.blockPosition())) {
+        if (colony.nest().isInside(level, ant.blockPosition()) || level.getGameTime() < nextTry) {
             return false;
         }
         // Not to a doorway (the entrance or a foraging hole): one that stops there blocks it from being plugged.
@@ -48,6 +52,7 @@ public class GoInsideGoal extends Goal {
         boolean going = ant.getNavigator().moveTo(at -> home.nest().isInside(level, at.cell()) && !home.foragingHoles().isDoorway(level, at.cell()),
                 colony.getCenter().below(), 1.0);
         if (!going) {
+            nextTry = level.getGameTime() + RETRY_TICKS;
             com.antcolonies.AntColoniesMod.LOGGER.debug("[go-inside] {} at {} ({}) found no way in", ant.getId(), ant.blockPosition().toShortString(),
                     ant.position());
         }

@@ -4,6 +4,7 @@ import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.goal.AntWanderGoal;
+import com.antcolonies.entity.goal.GoInsideGoal;
 import com.antcolonies.entity.goal.CarryCorpseGoal;
 import com.antcolonies.entity.goal.CarryEggGoal;
 import com.antcolonies.entity.goal.CarryPelletGoal;
@@ -90,8 +91,10 @@ public class WorkerAntEntity extends AbstractAntEntity {
         this.goalSelector.addGoal(8, new RepairHillGoal(this));
         // The nurse waits by the queen until there is an egg or a meal for her.
         this.goalSelector.addGoal(9, new StandByQueenGoal(this));
-        this.goalSelector.addGoal(10, new AntWanderGoal(this, 1.0, 120, 6, () -> true).hangsFromCeilings(0.25F));
-        this.goalSelector.addGoal(11, new RandomLookAroundGoal(this));
+        // With nothing to do it goes in (real harvester ants keep their spare workers inside, by the entrance) and strolls there.
+        this.goalSelector.addGoal(10, new GoInsideGoal(this));
+        this.goalSelector.addGoal(11, new AntWanderGoal(this, 1.0, 120, 6, () -> true).hangsFromCeilings(0.25F));
+        this.goalSelector.addGoal(12, new RandomLookAroundGoal(this));
     }
 
     @Override

@@ -473,6 +473,16 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return colony == null || !colony.keepsASchedule() || colony.isForagingTime(level());
     }
 
+    /**
+     * Whether this insect, with nothing to do, rests inside its nest near the entrance instead of strolling about: a
+     * worker of a species with {@code worker.rest_near_entrance} (real red harvester ants keep their spare workers in the
+     * upper chambers, see {@code SpeciesProfile.WorkerNumbers}). The blocks it rests within, or 0 if it strolls anywhere.
+     */
+    public int restsNearEntrance() {
+        Colony colony = getColony();
+        return colony == null || !hasColonyRole() ? 0 : colony.profile().worker().restNearEntrance();
+    }
+
     /** Whether this cell may be the end of a walk now: anywhere while it may go out (see {@link #mayGoOut}), otherwise only inside. */
     public boolean mayBeAt(BlockPos cell) {
         Colony colony = getColony();

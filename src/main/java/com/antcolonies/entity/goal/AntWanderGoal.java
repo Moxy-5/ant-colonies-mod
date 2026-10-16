@@ -5,6 +5,7 @@ import java.util.function.BooleanSupplier;
 
 import org.jetbrains.annotations.Nullable;
 
+import com.antcolonies.colony.Colony;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.nav.CellMap;
 import com.antcolonies.nav.Foothold;
@@ -52,12 +53,16 @@ public class AntWanderGoal extends Goal {
         }
         CellMap map = new LevelCellMap(ant.level(), ant);
         BlockPos here = ant.blockPosition();
+        int rest = ant.restsNearEntrance();
         for (int attempt = 0; attempt < 6; attempt++) {
             int dx = ant.getRandom().nextInt(radius * 2 + 1) - radius;
             int dz = ant.getRandom().nextInt(radius * 2 + 1) - radius;
             BlockPos spot = findFloor(map, here.offset(dx, 0, dz));
             if (spot == null || !ant.mayBeAt(spot)) {
                 continue; // by day a termite only strolls inside
+            }
+            if (rest > 0 && !restsAt(spot, here, rest)) {
+                continue; // a harvester ant with nothing to do stays in, up by the entrance
             }
             if (ceilingChance > 0.0F && ant.getRandom().nextFloat() < ceilingChance && !ant.level().canSeeSky(spot)
                     && Foothold.ceiling(spot).isValid(map)
@@ -69,6 +74,20 @@ public class AntWanderGoal extends Goal {
             }
         }
         return false;
+    }
+
+    /**
+     * For an insect that rests near the entrance ({@link AbstractAntEntity#restsNearEntrance}): a spot inside the nest,
+     * within {@code rest} blocks of the entrance, or, for one deeper down, nearer to it than where it is now (it drifts up).
+     */
+    private boolean restsAt(BlockPos spot, BlockPos here, int rest) {
+        Colony colony = ant.getColony();
+        if (colony == null || !colony.nest().isInside(ant.level(), spot)) {
+            return colony == null;
+        }
+        BlockPos entrance = colony.nest().getEntrance();
+        double limit = (double) rest * rest;
+        return spot.distSqr(entrance) <= limit || spot.distSqr(entrance) < here.distSqr(entrance);
     }
 
     @Override

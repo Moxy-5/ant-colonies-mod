@@ -13,7 +13,9 @@
     "starve_after_ticks": 72000,
     "nurse_until_ticks": 72000,
     "builder_until_ticks": 192000,
-    "lifespan_ticks": 480000
+    "lifespan_ticks": 480000,
+    "_rest_note": "rest_near_entrance: a worker with nothing to do goes inside and rests within this many blocks of the entrance (real Pogonomyrmex keep their spare workers in the upper chambers by the entrance, ready to go out; they do not stroll about outside). 0: they stroll about anywhere. User's decision 2026-10-15; the 8 blocks are my pick, to confirm.",
+    "rest_near_entrance": 8
   },
   "queen": {
     "meal": 20,
