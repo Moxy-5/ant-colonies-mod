@@ -1294,7 +1294,7 @@ public class AwayTests {
         }
         UUID[] id = new UUID[1];
         long[] at = {0, 0}; // when sealed in; when away (or back)
-        int[] phase = {0}; // 0 founding (here), 1 away, 2 back
+        int[] phase = {0}; // 0 founding (here), 1 away, 3 still away, living on (ants), 2 back
         int[] eggsBefore = new int[1];
         Map<UUID, CompoundTag> unloaded = new HashMap<>();
         helper.onEachTick(() -> {
@@ -1314,6 +1314,15 @@ public class AwayTests {
                     queen.moveTo(aside.getX() + 0.5, aside.getY(), aside.getZ() + 0.5, 0.0F, 0.0F);
                     level.setBlock(colony.getCenter(), net.minecraft.world.level.block.Blocks.SHORT_GRASS.defaultBlockState(), 3);
                     helper.assertTrue(colony.nest().isPlantInEntrance(level), "the grass should be in the entrance");
+                    // Grass round the nest the brain sees while here, for the first workers to forage while away.
+                    for (int i = 0; i < 12; i++) {
+                        BlockPos tuft = helper.absolutePos(new BlockPos(3 + 3 * (i % 4), SURFACE, 3 + 8 * (i / 4) - (i / 4 == 1 ? 1 : 0)));
+                        if (tuft.distManhattan(colony.getCenter()) > 3) {
+                            level.setBlock(tuft, net.minecraft.world.level.block.Blocks.SHORT_GRASS.defaultBlockState(), 3);
+                        }
+                    }
+                    colony.food().rescanPlantsSoon();
+                    colony.field().setOnForTests(true);
                 }
             }
             Colony colony = byId(helper, id[0]);
@@ -1391,6 +1400,36 @@ public class AwayTests {
                         + report.describe());
                 helper.assertTrue(!termites || report.didFoundersSeal(), "the pair should have dug their chamber and closed themselves in while away: "
                         + report.describe());
+                if (!termites) {
+                    // The user's bug (2026-10-15): the first workers starved while away, as the brain saw no food store to
+                    // forage into. They stay away past their starve time: they dig the store, forage and eat.
+                    helper.assertTrue(colony.life().storeWorkLeft() > 0, "the brain should know the food store is not dug yet");
+                    at[1] = helper.getTick();
+                    phase[0] = 3;
+                    return;
+                }
+                colony.away().setAwayForTests(false);
+                unloaded.values().forEach(tag -> loadAgain(level, tag));
+                at[1] = helper.getTick();
+                phase[0] = 2;
+                return;
+            }
+            if (phase[0] == 3) {
+                AwayReport report = colony.away().report();
+                long starve = colony.profile().worker().starveAfterTicks();
+                if (helper.getTick() % 2000 == 0) {
+                    AntColoniesMod.LOGGER.info("[away-test] founding, living on: store work left {}, food {}{}{}", colony.life().storeWorkLeft(),
+                            colony.food().getFood(), colony.away().describe(level), colony.field().describe());
+                }
+                helper.assertTrue(report.get(AwayReport.What.STARVED) == 0 && colony.getCount(WorkerAntEntity.CASTE) >= eggs,
+                        "the first workers should not starve while away: " + report.describe() + ", store work left "
+                                + colony.life().storeWorkLeft() + colony.field().describe());
+                if (helper.getTick() - at[1] < starve + 12000) {
+                    return;
+                }
+                helper.assertTrue(colony.life().storeWorkLeft() == 0, "the workers should have dug the food store while away: "
+                        + colony.life().storeWorkLeft() + " ticks of work left");
+                helper.assertTrue(report.get(AwayReport.What.FORAGED) > 0, "the first workers should forage while away: " + report.describe());
                 colony.away().setAwayForTests(false);
                 unloaded.values().forEach(tag -> loadAgain(level, tag));
                 at[1] = helper.getTick();
@@ -1416,8 +1455,11 @@ public class AwayTests {
         });
     }
 
-    /** Brain part 3: a lone harvester ant queen raises her first workers while away (see {@link #foundsWhileAway}). */
-    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
+    /**
+     * Brain part 3: a lone harvester ant queen raises her first workers while away, and they dig the food store, forage
+     * and live on past their starve time (see {@link #foundsWhileAway}).
+     */
+    @GameTest(template = "arena", timeoutTicks = 160000, skyAccess = true)
     public static void aFoundingAntQueenRaisesHerFirstWorkersWhileAway(GameTestHelper helper) {
         foundsWhileAway(helper, false);
     }

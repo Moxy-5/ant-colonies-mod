@@ -507,6 +507,48 @@ public class Nest {
     }
 
     /**
+     * What the workers still have to dig before the food store room is open, in the diggers' order: the plug in the
+     * entrance, the shaft and every level down to and including the food room. With which level the food room is and how
+     * many floor cells it has. Null if the plan has no food room (termites keep their food in the gardens) or some of it
+     * is not loaded. For the brain while away ({@link NestLife}): a young nest's first workers dig their store before
+     * they can bring food in.
+     */
+    @Nullable
+    public StoreDig foodStoreDigLeft(Level level) {
+        NestLayout planned = getLayout(level);
+        if (planned == null) {
+            return null;
+        }
+        List<BlockPos> cells = new ArrayList<>();
+        cells.add(center);
+        for (int i = 1; i <= shaftDepth(level); i++) {
+            cells.add(center.below(i));
+        }
+        for (int i = 0; i < planned.chambers().size(); i++) {
+            NestPlan.Chamber chamber = planned.chambers().get(i);
+            cells.addAll(chamber.cells());
+            if (chamber.kind() != NestPlan.Kind.FOOD) {
+                continue;
+            }
+            List<BlockPos> left = new ArrayList<>();
+            for (BlockPos pos : cells) {
+                if (!level.isLoaded(pos)) {
+                    return null;
+                }
+                if (isSoil(level.getBlockState(pos))) {
+                    left.add(pos);
+                }
+            }
+            return new StoreDig(left, i, chamber.room().size());
+        }
+        return null;
+    }
+
+    /** See {@link #foodStoreDigLeft}: the blocks left to dig, the food room's level (0 for the top one) and its floor cells. */
+    public record StoreDig(List<BlockPos> left, int level, int floorCells) {
+    }
+
+    /**
      * Whether a worker may bite this block: soil (the diggable tag), the plug in its own entrance, or the mound's soil
      * where it must be hollow. A foraging hole only at foraging time (soil or its plug).
      */

@@ -498,6 +498,14 @@ public class FoodStore {
         seenRoom = room;
     }
 
+    /**
+     * While away, the brain counts the food store room as dug out (the builder numbers have had the time, see
+     * {@link NestLife}): it can take as much as an empty room of that many floor cells, until the brain sees the real one.
+     */
+    void storeDugAway(int floorCells) {
+        seenRoom = Math.max(seenRoom, floorCells * food().pileBlock().maxLayers());
+    }
+
     /** How many more pieces the food store can take as far as the brain knows: the room it last saw, less what is owed to it. */
     int roomKnown() {
         return (roomForTests != null ? roomForTests : seenRoom) - colony.ledger().store();

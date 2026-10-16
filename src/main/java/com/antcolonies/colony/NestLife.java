@@ -56,6 +56,15 @@ public class NestLife {
     private long foundingWorkLeft;
     /** The founders finished digging and closed themselves in while away: on return they are put in their chamber (see {@link BuildLife}). Saved. */
     private boolean foundedAway;
+    /**
+     * A young nest whose food store room is not dug yet: what the brain last saw the builders still had to do before it
+     * is open, as ticks of one builder's work (each block's bites, each bite's soil carried up to the hill); 0 when it is
+     * dug (or the plan has no food room). While away the builder numbers work it off ({@link #digStoreAway}). Saved.
+     */
+    private long storeWorkLeft;
+    /** Which level of the nest the food room is (it may only be dug once the colony has unlocked it), and its floor cells. Saved. */
+    private int storeLevel;
+    private int storeCells;
 
     NestLife(Colony colony) {
         this.colony = colony;
@@ -84,6 +93,16 @@ public class NestLife {
                 }
                 foundingWorkLeft = work;
             }
+        }
+        Nest.StoreDig store = colony.nest().foodStoreDigLeft(level);
+        if (store != null) {
+            long work = 0;
+            for (net.minecraft.core.BlockPos pos : store.left()) {
+                work += BuildLife.bites(level, pos) * (BuildLife.BITE_TICKS + BuildLife.trip(pos, colony.getCenter()));
+            }
+            storeWorkLeft = work;
+            storeLevel = store.level();
+            storeCells = store.floorCells();
         }
     }
 
@@ -134,6 +153,35 @@ public class NestLife {
         return true;
     }
 
+    /**
+     * Once a second while away, a young nest whose food store is not dug yet: the builder numbers dig toward it at the
+     * real pace (the user's bug, 2026-10-15: a queen's first workers grew up while away but never foraged, as the brain
+     * saw no room for seeds in a nest that had only her founding chamber, and they starved). Once it is done the brain
+     * counts the room as open, so the foragers bring seeds in; the blocks are dug on return ({@link BuildLife}), rooms
+     * first, before the seeds are put down.
+     */
+    private boolean digStoreAway(ServerLevel level) {
+        if (storeWorkLeft <= 0 || colony.isFounding() || colony.nest().levelsUnlocked(level) <= storeLevel) {
+            return false;
+        }
+        int builders = colony.building().buildersInside(level);
+        if (builders <= 0) {
+            return false;
+        }
+        storeWorkLeft -= builders * 20L;
+        if (storeWorkLeft <= 0) {
+            storeWorkLeft = 0;
+            colony.food().storeDugAway(storeCells);
+            com.antcolonies.AntColoniesMod.LOGGER.info("[away] colony {}: the workers dug out the food store while away", colony.getId());
+        }
+        return true;
+    }
+
+    /** For the tests: what the builders still have to dig before the food store is open (ticks of one builder's work). */
+    public long storeWorkLeft() {
+        return storeWorkLeft;
+    }
+
     /** For the tests: what the founders still have to do (ticks of one founder's work). */
     public long foundingWorkLeft() {
         return foundingWorkLeft;
@@ -147,6 +195,7 @@ public class NestLife {
         boolean changed = growUp(level);
         if (away) {
             changed |= foundWhileAway(level);
+            changed |= digStoreAway(level);
             changed |= colony.queenCare().liveAway(level, queenHome, sealedIn, queenSize);
             changed |= colony.kingCare().liveAway(level);
             changed |= nurse(level);
@@ -392,6 +441,9 @@ public class NestLife {
         life.putFloat("queenSize", queenSize);
         life.putLong("foundingWorkLeft", foundingWorkLeft);
         life.putBoolean("foundedAway", foundedAway);
+        life.putLong("storeWorkLeft", storeWorkLeft);
+        life.putInt("storeLevel", storeLevel);
+        life.putInt("storeCells", storeCells);
         tag.put("nestLife", life);
     }
 
@@ -402,5 +454,8 @@ public class NestLife {
         queenSize = life.getFloat("queenSize");
         foundingWorkLeft = life.getLong("foundingWorkLeft");
         foundedAway = life.getBoolean("foundedAway");
+        storeWorkLeft = life.getLong("storeWorkLeft");
+        storeLevel = life.getInt("storeLevel");
+        storeCells = life.getInt("storeCells");
     }
 }

@@ -421,7 +421,7 @@ public class BuildLife {
     }
 
     /** The time (ticks) a pellet takes from where it was dug to where it goes, and the builder back. */
-    private static long trip(BlockPos from, BlockPos to) {
+    static long trip(BlockPos from, BlockPos to) {
         return 2L * TICKS_PER_BLOCK * from.distManhattan(to);
     }
 
