@@ -420,6 +420,7 @@ public class AwayTests {
         int[] foodBefore = new int[1];
         boolean[] patrolOn = {false};
         boolean[] foragedBeforePatrol = {false};
+        TestClock clock = TestClock.moving(helper, 7.0);
         helper.onEachTick(() -> noRealWorkers(helper));
         helper.onEachTick(() -> {
             if (helper.getTick() % 200 == 0 && queen[0] == null && helper.getTick() > 15) {
@@ -484,21 +485,21 @@ public class AwayTests {
             colony.population().setViewersForTests(List.of());
             level.setBlock(late, Blocks.SHORT_GRASS.defaultBlockState(), 3);
             colony.food().setPiecesCutForTests(late, 8);
-            colony.setClockForTests(18000L, null); // midnight: the foragers stay in
+            clock.skipTo(0.0); // midnight: the foragers stay in
         });
         helper.runAfterDelay(2300, () -> {
             Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
             checkNothingForaged(helper, colony, seen, "at midnight");
-            colony.setClockForTests(1000L, null); // 7:00, but raining on the nest
-            colony.setSkyForTests(null, true);
+            clock.skipTo(7.0); // 7:00 the next morning, but raining on the nest
+            colony.setRainForTests(true);
         });
         helper.runAfterDelay(2600, () -> {
             Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
             checkNothingForaged(helper, colony, seen, "in the rain");
-            colony.setClockForTests(2000L, 2.0F); // 8:00 in a hot biome, dry: out (the midday rest is 11:00 to 15:00)
-            colony.setSkyForTests(null, false);
-            colony.patrol().setOnForTests(true); // brain step 4b: a patrol first
-            colony.patrol().newRoundForTests();
+            clock.skipTo(8.0); // 8:00 in a hot biome, dry: out (the midday rest is 11:00 to 15:00)
+            colony.setHeatForTests(2.0F);
+            colony.setRainForTests(false);
+            colony.patrol().setOnForTests(true); // brain step 4b: a patrol first (the round begins as the patrol sees the day clock open)
             patrolOn[0] = true;
         });
         helper.runAfterDelay(2660, () -> {
@@ -552,7 +553,7 @@ public class AwayTests {
      * comb's count); they vanish out of sight and are remembered to grow back 3 days after they were eaten; the unknown
      * tuft is left.
      * <p>Brain part 3, in the same scene: then the species' own rule decides (the profile's {@code forage_at}, with a
-     * pretend sky): on a dry day 2 more known tufts are left; in the rain by day they are eaten (real Macrotermes forage
+     * test clock and a pretend rain): on a dry day 2 more known tufts are left; in the rain by day they are eaten (real Macrotermes forage
      * in the wet); on a dry night with the alarm at 2 nothing is foraged; the alarm calmed but the store full (as the
      * brain last saw it), nothing either; with room again, 2 more tufts are eaten up.
      */
@@ -565,11 +566,11 @@ public class AwayTests {
         int[] foodBefore = new int[1];
         long[] nightFrom = new long[1];
         List<BlockPos> more = new ArrayList<>(); // (brain part 3: the tufts of the later phases)
+        TestClock clock = TestClock.moving(helper, 12.0); // midday
         helper.onEachTick(() -> noRealWorkers(helper));
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null, "no termite colony");
-            colony.setForagingTimeForTests(false); // day
             colony.population().setOnForTests(false); // no swapping: the numbers stay numbers
             colony.population().setViewersForTests(List.of());
             TermiteSoldierTests.digNestAtOnce(level, colony);
@@ -599,7 +600,7 @@ public class AwayTests {
             helper.assertTrue(colony.field().remembers(tufts.get(0)) && !colony.field().remembers(tufts.get(3)),
                     "the brain should remember the known tufts only");
             helper.assertTrue(colony.food().getFood() == foodBefore[0], "no food by day: " + colony.food().getFood());
-            colony.setForagingTimeForTests(true); // night
+            clock.skipTo(colony, TestClock.Phase.NIGHT); // sunset
             nightFrom[0] = level.getGameTime();
         });
         helper.runAfterDelay(1500, () -> {
@@ -618,9 +619,9 @@ public class AwayTests {
                     && colony.food().getPiecesCut(tufts.get(3)) == 2, "the tuft nobody found should be left: cut " + colony.food().getPiecesCut(tufts.get(3)));
             helper.assertTrue(colony.food().getFood() == foodBefore[0] + 6, "6 pieces should have come in: " + colony.food().getFood()
                     + ", was " + foodBefore[0]);
-            // Brain part 3: by the species' own rule now (not forced): a dry day first, 2 more known tufts.
-            colony.setForagingTimeForTests(null);
-            colony.setSkyForTests(true, false);
+            // Brain part 3: the species' own rule with rain too: a dry day first (the next sunrise), 2 more known tufts.
+            clock.skipTo(colony, TestClock.Phase.DAY);
+            colony.setRainForTests(false);
             more.add(knownDryTuft(helper, colony, MIDDLE + 6, MIDDLE + 6));
             more.add(knownDryTuft(helper, colony, MIDDLE - 6, MIDDLE - 6));
         });
@@ -631,7 +632,7 @@ public class AwayTests {
                 helper.assertTrue(colony.field().remembers(tuft) && colony.food().getPiecesCut(tuft) == 2,
                         "a known tuft should be remembered and left on a dry day: " + tuft + " cut " + colony.food().getPiecesCut(tuft));
             }
-            colony.setSkyForTests(true, true); // rain by day: real Macrotermes forage in the wet too
+            colony.setRainForTests(true); // rain by day: real Macrotermes forage in the wet too
             foodBefore[0] = colony.food().getFood();
         });
         helper.runAfterDelay(2900, () -> {
@@ -647,7 +648,8 @@ public class AwayTests {
             more.clear();
             more.add(knownDryTuft(helper, colony, MIDDLE + 6, MIDDLE - 6));
             more.add(knownDryTuft(helper, colony, MIDDLE - 6, MIDDLE + 6));
-            colony.setSkyForTests(false, false);
+            clock.skipTo(colony, TestClock.Phase.NIGHT); // a dry night
+            colony.setRainForTests(false);
             colony.alarm().raise(level, 2, colony.getCenter(), null);
             foodBefore[0] = colony.food().getFood();
         });
@@ -748,7 +750,7 @@ public class AwayTests {
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null, "no termite colony");
-            colony.setForagingTimeForTests(false);
+            TestClock.still(helper, 12.0); // midday: the foragers stay in
             colony.setHungerOn(true);
             colony.population().setOnForTests(false); // no swapping: the numbers stay numbers
             colony.population().setViewersForTests(List.of());
@@ -866,7 +868,6 @@ public class AwayTests {
             // blocks must then show what the copy counted, and the mound must go up from the copy's building time).
             Colony original = colony;
             colony = saveAndLoad(helper, colony);
-            colony.setForagingTimeForTests(false);
             colony.setHungerOn(true);
             colony.population().setOnForTests(false);
             colony.population().setViewersForTests(List.of());
@@ -1263,7 +1264,7 @@ public class AwayTests {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null, "no termite colony");
             id[0] = colony.getId();
-            colony.setForagingTimeForTests(false);
+            TestClock.still(helper, 12.0); // midday: the foragers stay in
             colony.setHungerOn(true);
             colony.population().setOnForTests(false);
             colony.population().setViewersForTests(List.of());

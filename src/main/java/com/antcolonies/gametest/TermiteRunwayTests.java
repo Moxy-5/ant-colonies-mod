@@ -43,12 +43,14 @@ public class TermiteRunwayTests {
      * A colony (500 workers in the numbers, the brain off) with its nest dug out, both foraging holes dug, four
      * middle-aged workers (builders) and four old ones (foragers). The colony knows of a hay bale 5 blocks past its
      * first hole, up a step one block high (the runway climbs it, so it is 2 blocks high at the foot of the step: the
-     * user's runway on a hill of 2026-10-14 stayed open on its sides there), with short grass growing on the way. It plans a runway from the hole to the hay; at "night" the grass
-     * on it is cut and the workers plaster mud over it until it is closed all round. Then "day": the hole under the
+     * user's runway on a hill of 2026-10-14 stayed open on its sides there), with short grass growing on the way. It plans a runway from the hole to the hay; at night the grass
+     * on it is cut and the workers plaster mud over it until it is closed all round. Then by day: the hole under the
      * runway stays open, the other is plugged, and the hay is eaten from under the sheeting. Then the hay is taken away:
-     * the runway is given up, its hole plugged by day, and its mud crumbles away.
+     * the runway is given up, its hole plugged by day, and its mud crumbles away. On the test clock (roadmap 3a): real
+     * nights and days from 18:30 (the runway built over the nights, the day checks only by day; the bale is kept from
+     * running out by night until then, as a bigger stack of hay would last).
      */
-    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 70000, skyAccess = true)
     public static void hayNearAHoleGetsARunwayOfMudAndIsEatenUnderItByDay(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
@@ -73,6 +75,8 @@ public class TermiteRunwayTests {
         int[] cutWhenFinished = {0};
         boolean[] seenInside = {false};
         int[] since = {0};
+        TestClock clock = TestClock.moving(helper, 18.5);
+        boolean[] night = {false}; // (phase 3: a night came between the days)
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
@@ -111,7 +115,6 @@ public class TermiteRunwayTests {
                 level.setBlock(first.hole().above().relative(out, i).above(i >= STEP_OUT ? 1 : 0), Blocks.SHORT_GRASS.defaultBlockState(), 3);
             }
             level.setBlock(hay[0], Blocks.HAY_BLOCK.defaultBlockState(), 3);
-            colony.setForagingTimeForTests(true);
             colony.food().rescanPlantsSoon();
             colony.foodMap().knowForTests(hay[0]);
             phase[0] = 1;
@@ -121,9 +124,21 @@ public class TermiteRunwayTests {
             if (colony == null || phase[0] == 0) {
                 return;
             }
-            since[0]++;
+            boolean day = clock.phase(colony) == TestClock.Phase.DAY;
+            if (phase[0] == 2 ? !day : phase[0] != 3 || day) {
+                since[0]++; // (building the runway: night time only; eating under it: day time only)
+            }
+            if ((phase[0] == 2 || phase[0] == 3) && !day && colony.food().getPiecesCut(hay[0]) > 24) {
+                // A bale holds 48 pieces and 500 workers eat it in one night, out in the open too: until the day checks
+                // are done it stands for a bigger stack of hay, which lasts.
+                colony.food().setPiecesCutForTests(hay[0], 0);
+            }
+            if (phase[0] == 3 && !day) {
+                night[0] = true; // (by night they eat the hay from the open too: only the days count)
+                return;
+            }
             if (helper.getTick() % 1000 == 0) {
-                AntColoniesMod.LOGGER.info("[runway-test] tick {} phase {}{}{}", helper.getTick(), phase[0],
+                AntColoniesMod.LOGGER.info("[runway-test] tick {} {} phase {}{}{}", helper.getTick(), clock.describe(), phase[0],
                         colony.foragingHoles().describeRunways(level), colony.foragingHoles().describeNewHoles(level));
             }
             switch (phase[0]) {
@@ -143,7 +158,7 @@ public class TermiteRunwayTests {
                     }
                 }
                 case 2 -> {
-                    if (colony.nest().foodWays().isRunwayClosed(level, runway[0])) {
+                    if (colony.nest().foodWays().isRunwayClosed(level, runway[0]) && day) {
                         for (BlockPos cell : runway[0].cells()) {
                             helper.assertTrue(level.getBlockState(cell).isAir(), "the runway is not clear at " + cell.toShortString());
                             helper.assertTrue(level.getBlockState(cell.above()).getBlock() instanceof MudCrustBlock
@@ -151,13 +166,16 @@ public class TermiteRunwayTests {
                         }
                         AntColoniesMod.LOGGER.info("[runway-test] closed at tick {}", helper.getTick());
                         cutWhenFinished[0] = colony.food().getPiecesCut(hay[0]);
-                        colony.setForagingTimeForTests(false); // day
                         phase[0] = 3;
                         since[0] = 0;
                     }
                     helper.assertTrue(since[0] < 16000, "the runway was not closed: " + openSides(level, colony, runway[0]));
                 }
                 case 3 -> {
+                    if (night[0]) {
+                        night[0] = false;
+                        cutWhenFinished[0] = colony.food().getPiecesCut(hay[0]);
+                    }
                     BlockPos hole = runway[0].hole();
                     if (since[0] > 600) {
                         helper.assertTrue(ForagingHoles.isOpen(level, hole), "the hole under the finished runway was plugged by day");
@@ -180,11 +198,11 @@ public class TermiteRunwayTests {
                 case 4 -> {
                     BlockPos hole = runway[0].hole();
                     boolean gone = colony.nest().foodWays().runwayAt(hole) == null;
-                    if (gone && !ForagingHoles.isOpen(level, hole) && mudPlates(level, runway[0]) == 0) {
+                    if (gone && day && !ForagingHoles.isOpen(level, hole) && mudPlates(level, runway[0]) == 0) {
                         AntColoniesMod.LOGGER.info("[runway-test] crumbled away at tick {}", helper.getTick());
                         helper.succeed();
                     }
-                    helper.assertTrue(since[0] < 16000, "the runway did not crumble away: given up " + gone + ", hole open "
+                    helper.assertTrue(since[0] < 30000, "the runway did not crumble away: given up " + gone + ", hole open "
                             + ForagingHoles.isOpen(level, hole) + ", " + openSides(level, colony, runway[0]));
                 }
                 default -> {

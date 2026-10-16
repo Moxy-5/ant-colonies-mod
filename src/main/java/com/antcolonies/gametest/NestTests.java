@@ -40,8 +40,6 @@ public class NestTests {
     /** Height (inside the test area) of the first open cell above the ground. */
     private static final int SURFACE = 12;
     private static final int MIDDLE = 12;
-    /** The seed test: nobody out this long and the next foraging round begins (the test's clock stands still). */
-    private static final int NEXT_ROUND_AFTER = 3000;
     /**
      * The whole nest: a 3-deep shaft, then four levels (food store 5x5, nursery 5x5, queen 3x3, refuse chamber 5x5),
      * each a 3-long tunnel and its room, and a 3-block stair down to every level but the first.
@@ -100,7 +98,7 @@ public class NestTests {
             }
             if (nightFrom[0] < 0 && airBelowSurface(helper) >= 15) {
                 nightFrom[0] = helper.getTick();
-                colony.setClockForTests(18000L, null); // midnight
+                TestClock.still(helper, 0.0); // midnight
                 AntColoniesMod.LOGGER.info("[nest-test] tick {}: midnight", helper.getTick());
             } else if (nightFrom[0] >= 0 && helper.getTick() - nightFrom[0] >= 400 && outsideAtNight[0] == null) {
                 for (AbstractAntEntity ant : level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds())) {
@@ -123,7 +121,7 @@ public class NestTests {
                     }
                 }
                 morningAt[0] = helper.getTick();
-                colony.setClockForTests(null, null); // morning again (7:00 on the test server)
+                TestClock.still(helper, 7.0); // morning again
                 AntColoniesMod.LOGGER.info("[nest-test] tick {}: morning, {} pellets of night soil in piles (most {}, cells {})", helper.getTick(),
                         heaped[0], colony.hill().nightSoil().limit(level), colony.nest().nightSoilCells(level).size());
             }
@@ -598,8 +596,11 @@ public class NestTests {
      * out within a minute of the first patroller's return.
      * Brain step 4c, in the same scene: nobody knows where the food lies; each forager searches alone and finds it by
      * coming within 3 blocks of it, and an ant that cut a tuft goes back to that same tuft (site fidelity).
+     * The test clock (roadmap 3a): the nest is dug on a still 7:00; as the seeds are dropped the clock is set to 5:30 and
+     * runs at real speed, so the patrol's round begins when the day clock opens at 6:00, the foragers come in for the
+     * midday rest and at 17:00, and the next rounds begin after the rest and the next morning, all by themselves.
      */
-    @GameTest(template = "arena", timeoutTicks = 90000, skyAccess = true, batch = "seeds_alone") // (4c: searching alone takes longer)
+    @GameTest(template = "arena", timeoutTicks = 140000, skyAccess = true, batch = "seeds_alone") // (4c: searching alone takes longer; real days)
 
     public static void workersCarrySeedsAndClipGrassIntoTheFoodStore(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
@@ -608,6 +609,7 @@ public class NestTests {
         int[][] tufts = {{MIDDLE + 5, MIDDLE + 6}, {MIDDLE - 6, MIDDLE - 4}, {MIDDLE - 2, MIDDLE + 7}};
 
         boolean[] dropped = {false};
+        TestClock[] clock = {null};
         helper.onEachTick(() -> {
             Colony colony = colony(helper);
             if (dropped[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.nest().findDigTarget(level) != null
@@ -616,7 +618,7 @@ public class NestTests {
             }
             dropped[0] = true;
             colony.patrol().setOnForTests(true);
-            colony.patrol().newRoundForTests(); // the clock opens now: a patrol first
+            clock[0] = TestClock.moving(helper, 5.5); // the day clock opens at 6:00: a patrol first
             dropSeeds(helper, MIDDLE + 6, MIDDLE, 1);
             dropSeeds(helper, MIDDLE - 6, MIDDLE + 2, 1);
             dropSeeds(helper, MIDDLE + 1, MIDDLE - 7, 3);
@@ -628,7 +630,6 @@ public class NestTests {
         long[] firstBack = {-1};
         long[] firstOut = {-1};
         long[] dropTick = {-1};
-        long[] nobodyOutSince = {-1};
         helper.onEachTick(() -> {
             Colony colony = colony(helper);
             if (!dropped[0] || colony == null) {
@@ -651,60 +652,13 @@ public class NestTests {
                     }
                 }
             }
-            // The test's clock stands still in the morning, so there is only one round. In the game, once every searcher
-            // has come home empty the touches fade and the door stays shut until the next round (after the midday rest,
-            // or the next morning: Gordon's rule). Here that next round is started once nobody has been out for a while.
-            if (firstOut[0] >= 0) {
-                boolean anyOut = level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds()).stream()
-                        .anyMatch(ant -> colony.door().isOut(ant.getUUID()) || ant.isCarryingSeed() || colony.spots().isSearching(ant.getUUID()));
-                if (anyOut) {
-                    nobodyOutSince[0] = -1;
-                } else if (nobodyOutSince[0] < 0) {
-                    nobodyOutSince[0] = helper.getTick();
-                } else if (helper.getTick() - nobodyOutSince[0] >= NEXT_ROUND_AFTER) {
-                    nobodyOutSince[0] = -1;
-                    colony.patrol().newRoundForTests();
-                    AntColoniesMod.LOGGER.info("[seed-test] tick {}: nobody out for {} ticks: the next round begins", helper.getTick(), NEXT_ROUND_AFTER);
-                }
-            }
         });
         helper.onEachTick(() -> {
             if (dropped[0] && helper.getTick() % 200 == 0) {
                 Colony colony = colony(helper);
-                AntColoniesMod.LOGGER.info("[seed-test] tick {}: food {}, seeds in the store {}, seeds anywhere {}{}",
-                        helper.getTick(), colony.food().getFood(), seedsIn(level, storeBox(level, colony)), seedsIn(level, helper.getBounds()),
-                        colony.spots().describe());
-                if (helper.getTick() % 1000 == 0) {
-                    for (int[] tuft : tufts) {
-                        BlockPos pos = helper.absolutePos(new BlockPos(tuft[0], SURFACE, tuft[1]));
-                        StringBuilder near = new StringBuilder();
-                        for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, new AABB(pos).inflate(4))) {
-                            near.append(' ').append(ant.blockPosition().subtract(pos).toShortString());
-                        }
-                        AntColoniesMod.LOGGER.info("[seed-test-dbg] tuft {} {}: cut {}, found {}, open {}, inside {}, ants near:{}", tuft[0] + "," + tuft[1],
-                                level.getBlockState(pos).getBlock(), colony.food().getPiecesCut(pos), colony.foodMap().isFoundButUntold(pos),
-                                colony.patrol().isOpen(level, pos), colony.nest().isInside(level, pos), near);
-                    }
-                    BlockPos pile = helper.absolutePos(new BlockPos(MIDDLE + 1, SURFACE, MIDDLE - 7));
-                    StringBuilder by = new StringBuilder();
-                    for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds(), AbstractAntEntity::isColonyWorker)) {
-                        BlockPos spot = colony.spots().spotOf(ant.getUUID());
-                        by.append(String.format(" [%s d%.1f srch %s spot %s goals %s]", ant.getId(), Math.sqrt(ant.blockPosition().distSqr(pile)),
-                                colony.spots().isSearching(ant.getUUID()), spot == null ? "-" : spot.subtract(pile).toShortString(),
-                                ant.goalSelector.getAvailableGoals().stream().filter(g -> g.isRunning()).map(g -> g.getGoal().getClass().getSimpleName()).toList()));
-                    }
-                    int left = level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, new AABB(pile).inflate(2)).stream()
-                            .mapToInt(item -> item.getItem().getCount()).sum();
-                    AntColoniesMod.LOGGER.info("[seed-test-dbg] north pile {} left, open {}, small {}, wants seeds {}, food {}; ants:{}", left, colony.patrol().isOpen(level, pile),
-                            colony.door().isSmallColony(level), colony.food().wantsSeeds(level), colony.food().getFood(), by);
-                    StringBuilder loose = new StringBuilder();
-                    for (net.minecraft.world.entity.item.ItemEntity item : level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, helper.getBounds())) {
-                        loose.append(String.format(" [%s x%d at %s open %s inside %s y over middle %s]", item.getItem().getItem(), item.getItem().getCount(),
-                                helper.relativePos(item.blockPosition()).toShortString(), colony.patrol().isOpen(level, item.blockPosition()),
-                                colony.nest().isInside(level, item.blockPosition()), String.format("%.2f", item.getY() - colony.getCenter().getY())));
-                    }
-                    AntColoniesMod.LOGGER.info("[seed-test-dbg] loose items:{}", loose);
-                }
+                AntColoniesMod.LOGGER.info("[seed-test] tick {}: {} {}, food {}, seeds in the store {}, seeds anywhere {}{}",
+                        helper.getTick(), clock[0].describe(), clock[0].phase(colony), colony.food().getFood(), seedsIn(level, storeBox(level, colony)),
+                        seedsIn(level, helper.getBounds()), colony.spots().describe());
             }
         });
         // Brain step 4c, site fidelity: an ant that cut a piece off a tuft goes back to that same tuft for its next piece
@@ -712,10 +666,15 @@ public class NestTests {
         java.util.Map<java.util.UUID, BlockPos> spotAtLastPiece = new java.util.HashMap<>();
         java.util.Set<java.util.UUID> carrying = new java.util.HashSet<>();
         int[] backToItsSpot = {0};
+        // The bread each larva was fed (the most seen): over real days her egg can grow into a worker, its bread with it.
+        java.util.Map<java.util.UUID, Integer> larvaFed = new java.util.HashMap<>();
         helper.onEachTick(() -> {
             Colony colony = colony(helper);
             if (!dropped[0] || colony == null) {
                 return;
+            }
+            for (com.antcolonies.entity.AntLarvaEntity larva : level.getEntitiesOfClass(com.antcolonies.entity.AntLarvaEntity.class, helper.getBounds())) {
+                larvaFed.merge(larva.getUUID(), larva.getFed(), Math::max);
             }
             for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds(), AbstractAntEntity::isColonyWorker)) {
                 boolean now = ant.isCarryingSeed();
@@ -743,9 +702,8 @@ public class NestTests {
             }
             int expected = 5 + tufts.length * colony.food().piecesOf(Blocks.SHORT_GRASS.defaultBlockState());
             // The workers also feed the queen from the store: count what she has eaten too, and (searching alone takes
-            // long enough for her egg to hatch, brain step 4c) the bread fed to the larva.
-            int larvaeFed = level.getEntitiesOfClass(com.antcolonies.entity.AntLarvaEntity.class, helper.getBounds()).stream()
-                    .mapToInt(com.antcolonies.entity.AntLarvaEntity::getFed).sum();
+            // long enough for her egg to hatch, brain step 4c, and on real days to grow up) the bread fed to the larva.
+            int larvaeFed = larvaFed.values().stream().mapToInt(Integer::intValue).sum();
             int total = seedsAccountedFor(colony) + larvaeFed;
             helper.assertTrue(total == expected, "the colony has " + colony.food().getFood() + " food and the queen ate " + colony.queenCare().getQueenBread()
                     + " (+ " + colony.queenCare().getEggsLaid() + " eggs laid), the larvae " + larvaeFed + ", the workers " + colony.food().getSeedsEaten()

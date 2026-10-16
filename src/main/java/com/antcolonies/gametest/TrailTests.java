@@ -115,8 +115,7 @@ public class TrailTests {
             helper.assertTrue(!level.getEntitiesOfClass(ItemEntity.class, eastTrail).isEmpty(), "the cut grass should leave its seeds lying");
             colony.population().setViewersForTests(List.of());
             colony.trunkTrails().checkSoonForTests();
-            colony.patrol().setOnForTests(true); // brain step 4b: a new round, with its patrol
-            colony.patrol().newRoundForTests();
+            colony.patrol().setOnForTests(true); // brain step 4b: a new round, with its patrol (it sees the day clock open, 7:00)
         });
         helper.runAfterDelay(85, () -> {
             Colony colony = PopulationTests.antColony(helper);
@@ -131,7 +130,8 @@ public class TrailTests {
                     "nothing is open before a patroller is back");
             colony.patrol().bringNumbersHomeForTests();
         });
-        helper.runAfterDelay(100, () -> {
+        // (25 ticks: colonies think once a second, every 20 ticks; 15 ticks failed about 1 run in 4)
+        helper.runAfterDelay(110, () -> {
             Colony colony = PopulationTests.antColony(helper);
             int groundY = helper.absolutePos(new BlockPos(0, SURFACE - 1, 0)).getY();
             BlockPos eastFood = new BlockPos(center[0].getX() + FOOD_OUT, groundY + 1, center[0].getZ());
@@ -169,7 +169,7 @@ public class TrailTests {
             colony.trunkTrails().ageForTests(7 * 24000L);
             colony.trunkTrails().checkSoonForTests();
         });
-        helper.runAfterDelay(140, () -> {
+        helper.runAfterDelay(150, () -> {
             Colony colony = PopulationTests.antColony(helper);
             helper.assertTrue(colony.trunkTrails().trails().isEmpty(), "unused for a week the trails should fade: " + colony.trunkTrails().describe(level));
             helper.assertTrue(colony.trunkTrails().regrowing() == bare[0] && bare[0] >= 2 * (FOOD_OUT - 3),

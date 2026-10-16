@@ -45,7 +45,7 @@ public class StressTests {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null, "no termite colony");
             digNestAtOnce(level, colony);
-            colony.setForagingTimeForTests(false);
+            TestClock.still(helper, 12.0); // midday: building, no foraging
             colony.population().setOnForTests(true);
             // A pretend player 20 blocks off, watching (so soldiers come out to their posts too).
             colony.population().setViewersForTests(List.of(Vec3.atCenterOf(helper.absolutePos(new BlockPos(MIDDLE + 20, SURFACE + 2, MIDDLE)))));
@@ -70,7 +70,7 @@ public class StressTests {
             log(helper, name);
             Colony colony = TermiteMoundTests.colony(helper);
             colony.population().setStress(nextCap);
-            colony.setForagingTimeForTests(nextForaging);
+            TestClock.still(helper, nextForaging ? 0.0 : 12.0); // midnight: foraging time; midday: building
         });
     }
 
