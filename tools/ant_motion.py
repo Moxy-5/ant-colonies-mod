@@ -153,7 +153,9 @@ class Leg:
 
     Its joints work like a real leg's: the hip swings the whole leg forward and back about the upright (protraction)
     and lifts or lowers it in its own plane (levation); the knee and the ankle bend in that plane. Four numbers (psi,
-    lam, kap, tau, in degrees) set them all."""
+    lam, kap, tau, in degrees) set them all. A fifth, roll, is used only when a leg must lift clear of the body (a
+    front leg cleaning an antenna): the hip rolls the leg outward and up about the body's long axis, as a real ant's
+    coxa (the first leg segment, which turns in its socket) does."""
 
     def __init__(self, model, key):
         self.key, self.model = key, model
@@ -180,9 +182,36 @@ class Leg:
         """Grows when the knee gets near straight (so the solver never flips the knee the other way)."""
         return 0.3 * max(0.0, self.KNEE_MARGIN - (self.phi0 + kap))
 
+    # Solving with the roll free: the position must be met (weight 10 a unit), the thigh kept out (3 a share of its
+    # length) and the roll kept as small as it can be (0.01 a degree, so a 20 degree roll weighs as 0.02 units off).
+    AT, CLEAR, ROLL = 10.0, 3.0, 0.01
+
     def joints(self, q):
-        psi, lam, kap, tau = q
-        return (mat_mul(axis_turn(UP, psi), axis_turn(self.n, lam)), axis_turn(self.n, kap), axis_turn(self.n, tau))
+        psi, lam, kap, tau = q[:4]
+        lift = axis_turn(self.n, lam)
+        if len(q) > 4 and q[4]:
+            lift = mat_mul(axis_turn((0.0, 0.0, self.out), q[4]), lift)    # positive: the leg rolls outward and up
+        return (mat_mul(axis_turn(UP, psi), lift), axis_turn(self.n, kap), axis_turn(self.n, tau))
+
+    def clearance(self, q, out):
+        """Grows when the thigh points less than `out` of its length outward (away from the body's middle line)."""
+        thigh = mat_vec(self.joints(q)[0], unit(sub(self.K, self.H)))
+        return self.CLEAR * max(0.0, out - thigh[0] * self.out)
+
+    def _with_roll(self, at, q0, tau, out):
+        """Solves for psi, lam, kap and roll with residual at(q) (the position to meet), the thigh kept `out` (see
+        clearance); tau is fixed, or None to solve for it too (then at must also hold the foot's slant)."""
+        free_tau = tau is None
+        start = list(q0[:3]) + ([q0[3]] if free_tau else []) + [q0[4] if len(q0) > 4 else 0.0]
+
+        def full(v):
+            return (v[0], v[1], v[2], v[3] if free_tau else tau, v[-1])
+
+        def residual(v):
+            q = full(v)
+            return [self.AT * r for r in at(q)] + [self.knee_guard(q[2]), self.clearance(q, out), self.ROLL * q[4]]
+        v, _ = least_squares(residual, start)
+        return full(v)
 
     def points(self, q, pose):
         """The foot's tip and the ankle where joints q put them, in the model's frame, the body posed as in pose."""
@@ -197,26 +226,33 @@ class Leg:
             ankle = self.model.world(self.parent, ankle, pose)
         return tip, ankle
 
-    def reach(self, target, pose, q0, lift=None):
+    def reach(self, target, pose, q0, lift=None, out=None):
         """Joints putting the tip at target with the ankle `lift` over it (default: as when standing, so the foot keeps
-        its slant). Returns (q, how far off in units)."""
+        its slant). With `out`, the hip may roll the leg outward to keep the thigh at least that far out (a share of its
+        length; see clearance). Returns (q, how far off in units)."""
         lift = self.lift0 if lift is None else lift
 
-        def residual(q):
+        def at(q):
             tip, ankle = self.points(q, pose)
-            return [tip[0] - target[0], tip[1] - target[1], tip[2] - target[2], (ankle[1] - tip[1]) - lift,
-                    self.knee_guard(q[2])]
-        q, err = least_squares(residual, q0)
+            return [tip[0] - target[0], tip[1] - target[1], tip[2] - target[2], (ankle[1] - tip[1]) - lift]
+        if out is not None:
+            q = self._with_roll(at, q0, None, out)
+        else:
+            q, err = least_squares(lambda q: at(q) + [self.knee_guard(q[2])], q0[:4])
         tip, ankle = self.points(q, pose)
         return q, length(sub(tip, target))
 
-    def reach_ankle(self, target, pose, q0, tau):
-        """Joints putting the ankle (where the cleaning comb of a front leg sits) at target, the foot bent by tau."""
-        def residual(q3):
-            _, ankle = self.points((q3[0], q3[1], q3[2], tau), pose)
-            return [ankle[0] - target[0], ankle[1] - target[1], ankle[2] - target[2], self.knee_guard(q3[2])]
-        q3, _ = least_squares(residual, q0[:3])
-        q = (q3[0], q3[1], q3[2], tau)
+    def reach_ankle(self, target, pose, q0, tau, out=None):
+        """Joints putting the ankle (where the cleaning comb of a front leg sits) at target, the foot bent by tau. With
+        `out`, the hip may roll the leg outward as in reach."""
+        def at(q):
+            _, ankle = self.points(q, pose)
+            return [ankle[0] - target[0], ankle[1] - target[1], ankle[2] - target[2]]
+        if out is not None:
+            q = self._with_roll(at, q0, tau, out)
+        else:
+            q3, _ = least_squares(lambda q3: at((q3[0], q3[1], q3[2], tau)) + [self.knee_guard(q3[2])], q0[:3])
+            q = (q3[0], q3[1], q3[2], tau)
         return q, length(sub(self.points(q, pose)[1], target))
 
     def file_turns(self, q, near=None):

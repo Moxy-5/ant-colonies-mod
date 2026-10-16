@@ -48,6 +48,9 @@ CANDIDATES = [
                 '(in game the head also turns toward the player)', am.look()),
     ('Looking, wary', 'a shy one: the same, lower and stiller feelers, faster flicks, jaws open, gaster curled under',
      am.look_wary()),
+    ('Cleaning an antenna', 'the front leg combs the left antenna 3 times with its strigil, then is drawn through the '
+                            'jaws (plays once)', am.groom_antenna('l')),
+    ('Cleaning both antennae', 'left, then right', am.groom_antenna('lr')),
 ]
 
 

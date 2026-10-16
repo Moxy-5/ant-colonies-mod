@@ -499,6 +499,196 @@ def look_wary():
     return out
 
 
+# --- antenna cleaning (the animation engine, step 7, 2026-10-16) --------------------------------------------------
+# Real ants clean each antenna with the comb on the front leg of the same side (the strigil: a notch of stiff bristles
+# where the fore tibia meets the foot, closed by a spur; filmed in Camponotus by Hackmann et al. 2015, and described for
+# ants by Farish 1972). The ant stops, bends its head down and toward that side and lowers the antenna, swung out to the
+# side; it lays the whip in the comb near its base and draws it through to the tip, several strokes, the antenna
+# lifting a little as it is pulled; between strokes the leg comes off and goes back to the base. Then it cleans the
+# comb itself: the head turns to the leg and the leg is drawn through the open jaws (the mouthparts lick it clean).
+# Then it stands as before. The other five feet stay where they stood all the while (the motion library works out the
+# legs); the cleaning leg rises straight off the ground first and comes straight down onto its spot at the end.
+# My picks, to confirm: 3 strokes of 0.45 s (0.3 s pulling, 0.15 s back to the base); the leg in the jaws 0.43 s (two
+# draws); 2.6 s an antenna, both one after the other 5.2 s. While combing the forebody 5 degrees down and 4 toward the
+# side, the head 12 down, 6 toward it and tilted 4; the antenna swung 30 out, its whip 20 down. At the jaws the
+# forebody 13 up and turned 3.5 toward the leg, the head 6 up and turned 20 toward it (the leg drawn through the jaws
+# from beside the head, so it never passes through them), the jaws 20 open and closing on each draw.
+GROOM_SECONDS = 2.6
+GROOM_STEP = 1 / 40                # the legs are worked out every 1/40 s
+GROOM_LIFT = 0.8                   # how high the foot rises straight off the ground (units)
+GROOM_SWING = 0.3                  # how far the ankle bows out, up and back between two holds (units)
+GROOM_OUT = 0.45                   # the raised leg's thigh kept pointing at least this share of its length outward
+GROOM_STROKES = [(0.1, 0.92), (0.14, 0.95), (0.1, 0.9)]   # each stroke from and to, as shares of the whip's length
+
+
+def smooth(u):
+    """0 to 1, easing in and out (u clamped to 0..1)."""
+    u = max(0.0, min(1.0, u))
+    return u * u * (3 - 2 * u)
+
+
+def lerp(a, b, f):
+    return [x + (y - x) * f for x, y in zip(a, b)]
+
+
+def along(points, s):
+    """The point s of the way along a line through these points (by length)."""
+    lens = [mo.length(mo.sub(b, a)) for a, b in zip(points, points[1:])]
+    left = sum(lens) * s
+    for (a, b), ln in zip(zip(points, points[1:]), lens):
+        if left <= ln:
+            return mo.add(a, mo.mul(mo.sub(b, a), left / ln))
+        left -= ln
+    return points[-1]
+
+
+def groom_side(tr, side, t0):
+    """Cleaning the antenna on this side ('l' or 'r') into track tr, from time t0 for GROOM_SECONDS (see above).
+    Returns the time it ends."""
+    rig_ = rig()
+    model = rig_.model
+    s = 1 if side == 'l' else -1
+    other = 'r' if side == 'l' else 'l'
+
+    def m(x, y, z):                    # a turn given for the left side, mirrored for the right
+        return [x, s * y, s * z]
+
+    leg = rig_.legs[f'{side}1']
+    stance = rig_.stance(f'{side}1')
+    whip = [tuple(v * SCALE for v in (p if s > 0 else mirror(p))) for p in [ANTENNA_ELBOW] + ANTENNA_WHIP]
+
+    def jaw(x):                        # a point between the jaws, x units out toward the cleaning side (design units)
+        return tuple(v * SCALE for v in (s * x, 1.5, -6.1 + 0.33 * (x - 0.5)))
+
+    rest = {b: [0, 0, 0] for b in ('forebody', 'head', f'antenna_{side}_1', f'antenna_{side}_2', f'antenna_{other}_1',
+                                   f'antenna_{other}_2', 'mandible_l', 'mandible_r')}
+    comb = dict(rest, forebody=m(5, -4, 0), head=m(12, -6, 4))
+    comb.update({f'antenna_{side}_1': m(5, -30, 0), f'antenna_{side}_2': m(20, -10, 0),
+                 f'antenna_{other}_1': [-6, -s * 8, 0], f'antenna_{other}_2': [-4, 0, 0]})   # the other one held up, forward
+    jaws = dict(comb, forebody=m(-13, 3.5, 0), head=m(-6, -20, 1), mandible_l=[0, -20, 0], mandible_r=[0, 20, 0])
+    jaws.update({f'antenna_{side}_1': m(-8, -10, 0), f'antenna_{side}_2': m(6, 0, 0)})
+    pulled = {f'antenna_{side}_1': m(-6, 0, 0), f'antenna_{side}_2': m(-6, 0, 0), 'head': m(-3, 3, 0)}  # at a pull's end
+
+    on, stroke, pull_s = 0.35, 0.45, 0.30          # the leg on the antenna; each stroke; its pull
+    up = 0.14                                      # the foot clear of the ground
+    mouth = on + 2 * stroke + pull_s               # the last pull ends: to the jaws
+    in_jaws, draw, back = mouth + 0.3, 0.18, 0.07
+    out_of_jaws = in_jaws + 2 * draw + back
+    hover = GROOM_SECONDS - 0.12                   # over its spot, about to come straight down
+
+    def with_pull(f):
+        return {b: [a + f * c for a, c in zip(comb[b], pulled.get(b, [0, 0, 0]))] for b in comb}
+
+    def body_at(t):
+        """The pose of everything but the legs, and what the cleaning leg does: (pose, step, its share)."""
+        if t < on:
+            return {b: lerp(rest[b], comb[b], smooth(t / 0.3)) for b in rest}, 'lift', None
+        if t < mouth:
+            k = min(2, int((t - on) / stroke))
+            u = t - on - k * stroke
+            s0, s1 = GROOM_STROKES[k]
+            if u < pull_s:                                         # drawing the whip through, base to tip
+                f = smooth(u / pull_s)
+                return with_pull(f), 'comb', (s0 + (s1 - s0) * f, 0.0)
+            f = smooth((u - pull_s) / (stroke - pull_s))           # off the antenna and back to its base
+            nxt = GROOM_STROKES[min(2, k + 1)][0]
+            return with_pull(1 - f), 'comb', (s1 + (nxt - s1) * f, math.sin(math.pi * f))
+        if t < in_jaws:
+            f = smooth((t - mouth) / (in_jaws - mouth))
+            start = with_pull(1)
+            return {b: lerp(start[b], jaws[b], f) for b in comb}, 'to_jaws', f
+        if t < out_of_jaws:
+            u = t - in_jaws
+            if u < draw:                                           # drawn out through the jaws, which close on it
+                x, bite = 1.22 + 0.7 * smooth(u / draw), smooth(u / draw)
+            elif u < draw + back:                                  # quickly back in, the jaws opening
+                f = smooth((u - draw) / back)
+                x, bite = 1.92 - 0.7 * f, 1 - f
+            else:
+                f = smooth((u - draw - back) / draw)
+                x, bite = 1.22 + 0.7 * f, f
+            pose = dict(jaws, mandible_l=[0, -20 + 12 * bite, 0], mandible_r=[0, 20 - 12 * bite, 0])
+            return pose, 'jaws', x
+        return {b: lerp(jaws[b], rest[b], smooth((t - out_of_jaws) / (GROOM_SECONDS - out_of_jaws))) for b in comb}, 'down', None
+
+    def five(q):                       # joints with the hip's roll (0 when the solver was not asked for it)
+        return tuple(q) + (0.0,) * (5 - len(q))
+
+    def swing(qa, qb, f, pose, q_prev):
+        """From joints qa to qb: the ankle carried on a straight line between where they put it, lifted outward, up and back
+        on the way, the thigh kept out (so the leg never passes through the body)."""
+        pa, pb = leg.points(five(qa), pose)[1], leg.points(five(qb), pose)[1]
+        bump = GROOM_SWING * math.sin(math.pi * f)
+        target = mo.add(lerp(pa, pb, f), (s * bump, bump, bump))    # +Z is back
+        q_, _ = leg.reach_ankle(target, pose, five(q_prev), qa[3] + (qb[3] - qa[3]) * f, out=GROOM_OUT)
+        return q_
+
+    q = qs = None
+    q_on = q_up = q_combed = q_in = q_out = q_over = None
+    near = None
+    for i in range(round(GROOM_SECONDS / GROOM_STEP) + 1):
+        t = i * GROOM_STEP
+        body, step, arg = body_at(t)
+        pose = mo.pose_of(body)
+        turns, qs, _ = mo.stand(rig_, body, guess=qs)               # every foot planted ...
+        if step == 'lift':
+            if q_on is None:
+                start = mo.pose_of(body_at(on)[0])
+                f0 = [model.world(f'antenna_{side}_2', p, start) for p in whip]
+                q_on, _ = leg.reach_ankle(along(f0, GROOM_STROKES[0][0]), start, (30.0 * s, -30.0, -20.0, 15.0, 0.0), 15.0,
+                                          out=GROOM_OUT)
+            if t <= up:
+                lift = GROOM_LIFT * smooth((t - 0.04) / (up - 0.04))
+                q, _ = leg.reach((stance[0], stance[1] + lift, stance[2]), pose, q or qs[f'{side}1'])
+                q = q_up = five(q)
+            else:
+                q = swing(q_up, q_on, smooth((t - up) / (on - up)), pose, q)
+        elif step == 'comb':
+            share, off = arg
+            f = [model.world(f'antenna_{side}_2', p, pose) for p in whip]
+            target = mo.add(along(f, share), (0.5 * s * off, -0.35 * off, 0.0))
+            q, _ = leg.reach_ankle(target, pose, q, 15.0, out=GROOM_OUT)
+            q_combed = q
+        elif step == 'to_jaws':
+            if q_in is None:
+                jp = mo.pose_of(jaws)
+                q_in, _ = leg.reach(model.world('head', jaw(1.22), jp), jp, (25.0 * s, -75.0, 15.0, 44.0, -34.0), 0.47, out=GROOM_OUT)
+            q = swing(q_combed, q_in, arg, pose, q)
+        elif step == 'jaws':
+            q, _ = leg.reach(model.world('head', jaw(arg), pose), pose, q, 0.47, out=GROOM_OUT)
+            q_out = q
+        else:
+            if q_over is None:
+                q_over, _ = leg.reach((stance[0], stance[1] + GROOM_LIFT, stance[2]), mo.pose_of(body_at(hover)[0]), q_up)
+                q_over = five(q_over)
+            if t < hover:
+                q = tuple(lerp(q_out, q_over, smooth((t - out_of_jaws) / (hover - out_of_jaws))))
+            else:
+                lift = GROOM_LIFT * (1 - smooth((t - hover) / (GROOM_SECONDS - hover)))
+                q, _ = leg.reach((stance[0], stance[1] + lift, stance[2]), pose, q)
+                q = five(q)
+        bones = (leg.hip, leg.knee, leg.foot)                        # ... but the cleaning leg's
+        near = leg.file_turns(q, near)
+        turns.update(zip(bones, near))
+        for bone, vec in list(body.items()) + list(turns.items()):
+            tr.put(bone, t0 + t, vec)
+    return t0 + GROOM_SECONDS
+
+
+def groom_antenna(sides):
+    """Cleaning the antennae on these sides, one after the other ('l', 'r' or 'lr')."""
+    tr = mo.Track(rig())
+    t = 0.0
+    for side in sides:
+        t = groom_side(tr, side, t)
+    return tr.bones(tol=0.1)
+
+
+def once(bones, seconds):
+    """A clip played once (the game holds its last frame, the standing pose, until it changes clips)."""
+    return {'loop': False, 'animation_length': seconds, 'bones': bones}
+
+
 def walking(bones_stride, seconds):
     """A walking clip with its stride note (GeckoLib's timeline, read by the game's AntAnimationController)."""
     bones, stride = bones_stride
@@ -514,7 +704,10 @@ def animations():
         'idle_hot': {'loop': True, 'animation_length': IDLE_SECONDS, 'bones': idle_hot()},
         'walk_hot': walking(walk_hot_clip(), WALK_SECONDS),
         'look': {'loop': True, 'animation_length': LOOK_SECONDS, 'bones': look()},
-        'look_wary': {'loop': True, 'animation_length': LOOK_SECONDS, 'bones': look_wary()}}}
+        'look_wary': {'loop': True, 'animation_length': LOOK_SECONDS, 'bones': look_wary()},
+        'groom_antenna_l': once(groom_antenna('l'), GROOM_SECONDS),
+        'groom_antenna_r': once(groom_antenna('r'), GROOM_SECONDS),
+        'groom_antenna_both': once(groom_antenna('lr'), 2 * GROOM_SECONDS)}}
 
 
 # --- preview ------------------------------------------------------------------------------------------------------
