@@ -36,7 +36,15 @@ import net.minecraft.world.level.block.state.properties.Property;
 public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNumbers queen, BroodNumbers brood,
         FoodNumbers food, RefuseNumbers refuse, NestNumbers nest, Optional<QueenBody> queenBody, Optional<Founding> founding,
         Optional<MoundNumbers> mound, Optional<GardenNumbers> garden, Optional<Laying> laying, Optional<SoldierNumbers> soldiers,
-        Optional<AlarmNumbers> alarm) {
+        Optional<AlarmNumbers> alarm, Optional<BodyLanguage> bodyLanguage) {
+
+    /** The numbers without a body language section (the insects' bodies just walk and stand). */
+    public SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNumbers queen, BroodNumbers brood, FoodNumbers food,
+            RefuseNumbers refuse, NestNumbers nest, Optional<QueenBody> queenBody, Optional<Founding> founding,
+            Optional<MoundNumbers> mound, Optional<GardenNumbers> garden, Optional<Laying> laying, Optional<SoldierNumbers> soldiers,
+            Optional<AlarmNumbers> alarm) {
+        this(colony, worker, queen, brood, food, refuse, nest, queenBody, founding, mound, garden, laying, soldiers, alarm, Optional.empty());
+    }
 
     /** The numbers without a fungus garden, without a steady stream of eggs (the queen lays one egg per meal) and without soldiers. */
     public SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNumbers queen, BroodNumbers brood, FoodNumbers food,
@@ -962,6 +970,73 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
         }
     }
 
+    /**
+     * How the insects' bodies behave (the animation engine, 2026-10-16; species-neutral, every number my pick, to
+     * confirm). {@code naps} (optional, none for a species that does not nap): see {@link Naps}. {@code hot} (optional):
+     * see {@link Heat}.
+     */
+    public record BodyLanguage(Optional<Naps> naps, Optional<Heat> heat) {
+        public static final Codec<BodyLanguage> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Naps.CODEC.optionalFieldOf("naps").forGetter(BodyLanguage::naps),
+                Heat.CODEC.optionalFieldOf("hot").forGetter(BodyLanguage::heat)
+        ).apply(i, BodyLanguage::new));
+    }
+
+    /**
+     * Short naps (real ants sleep in many short naps: Cassill et al. 2009, fire ants, workers about 250 naps a day of
+     * about a minute each, queens about 90 of about 6 minutes; with twitches of the antennae now and then, "rapid
+     * antennal movement"). A worker with nothing to do inside the nest (or anywhere, while it has no colony) falls
+     * asleep with {@code chancePerSecond} each second; a nap lasts {@code workerTicks} (from, to), a queen's
+     * {@code queenTicks}. Any job, being hurt or the alarm wakes it.
+     */
+    public record Naps(float chancePerSecond, List<Integer> workerTicks, List<Integer> queenTicks) {
+        public static final Codec<Naps> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.FLOAT.optionalFieldOf("chance_per_second", 0.033F).forGetter(Naps::chancePerSecond),
+                Codec.INT.listOf().optionalFieldOf("worker_ticks", List.of(800, 1600)).forGetter(Naps::workerTicks),
+                Codec.INT.listOf().optionalFieldOf("queen_ticks", List.of(3600, 7200)).forGetter(Naps::queenTicks)
+        ).apply(i, Naps::new));
+
+        /** How long one nap lasts (ticks), somewhere in the caste's range; {@code share} is 0 to 1. */
+        public int ticksFor(boolean queen, double share) {
+            List<Integer> range = queen ? queenTicks : workerTicks;
+            if (range.isEmpty()) {
+                return 0;
+            }
+            int from = range.get(0);
+            int to = range.size() > 1 ? range.get(1) : from;
+            return from + (int) Math.round((to - from) * Math.max(0.0, Math.min(1.0, share)));
+        }
+    }
+
+    /**
+     * Hot ground (real desert and harvester ants: on soil too hot to touch they stand and walk tall on straight legs, the
+     * gaster raised, the antennae held up, and they take quick short trips). Outside under the open sky in a biome at
+     * least {@code fromHeat} hot (its base temperature: desert, badlands and savanna 2.0, plains 0.8), in the hottest
+     * hours: from {@code aroundRestTicks} before the day clock's midday rest until as long after it (the rest is when the
+     * ground is too hot even for them; a species without a day clock: the same hours as the harvester ant's).
+     */
+    public record Heat(float fromHeat, int aroundRestTicks) {
+        public static final Codec<Heat> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.FLOAT.optionalFieldOf("from_heat", 1.5F).forGetter(Heat::fromHeat),
+                Codec.INT.optionalFieldOf("around_rest_ticks", 2000).forGetter(Heat::aroundRestTicks)
+        ).apply(i, Heat::new));
+
+        /** Whether the ground is hot at this day time in a biome this hot, with this day clock (empty: the usual hours). */
+        public boolean hotAt(long dayTime, float biomeHeat, Optional<DayClock> clock) {
+            if (biomeHeat < fromHeat) {
+                return false;
+            }
+            DayClock day = clock.orElse(USUAL_DAY);
+            long time = Math.floorMod(dayTime, 24000L);
+            int rest = Math.max(day.restTicks(biomeHeat), 1);
+            int start = day.restStart(biomeHeat);
+            return time >= start - aroundRestTicks && time < start + rest + aroundRestTicks;
+        }
+
+        /** The harvester ant's day clock as built into the code (for the hot hours of a species without one). */
+        private static final DayClock USUAL_DAY = new DayClock(0, 11000, 7000, 4000, 0.5F, 2.0F, true);
+    }
+
     public static final Codec<SpeciesProfile> CODEC = RecordCodecBuilder.create(i -> i.group(
             ColonyNumbers.CODEC.fieldOf("colony").forGetter(SpeciesProfile::colony),
             WorkerNumbers.CODEC.fieldOf("worker").forGetter(SpeciesProfile::worker),
@@ -976,7 +1051,8 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
             GardenNumbers.CODEC.optionalFieldOf("garden").forGetter(SpeciesProfile::garden),
             Laying.CODEC.optionalFieldOf("laying").forGetter(SpeciesProfile::laying),
             SoldierNumbers.CODEC.optionalFieldOf("soldiers").forGetter(SpeciesProfile::soldiers),
-            AlarmNumbers.CODEC.optionalFieldOf("alarm").forGetter(SpeciesProfile::alarm)
+            AlarmNumbers.CODEC.optionalFieldOf("alarm").forGetter(SpeciesProfile::alarm),
+            BodyLanguage.CODEC.optionalFieldOf("body_language").forGetter(SpeciesProfile::bodyLanguage)
     ).apply(i, SpeciesProfile::new));
 
     /**

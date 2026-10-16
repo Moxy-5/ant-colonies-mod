@@ -52,6 +52,11 @@ public class TermiteQueenEntity extends AbstractAntEntity {
         super(type, level);
     }
 
+    @Override
+    protected net.minecraft.resources.ResourceLocation species() {
+        return Species.MACROTERMES;
+    }
+
     public static AttributeSupplier.Builder createAttributes() {
         return PathfinderMob.createMobAttributes()
                 .add(Attributes.MAX_HEALTH, 20.0)

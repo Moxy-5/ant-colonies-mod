@@ -41,6 +41,11 @@ public class TermiteKingEntity extends AbstractAntEntity implements FedByNurses 
         super(type, level);
     }
 
+    @Override
+    protected net.minecraft.resources.ResourceLocation species() {
+        return Species.MACROTERMES;
+    }
+
     public static AttributeSupplier.Builder createAttributes() {
         return PathfinderMob.createMobAttributes()
                 .add(Attributes.MAX_HEALTH, 10.0)

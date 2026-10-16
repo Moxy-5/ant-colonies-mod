@@ -14,10 +14,12 @@ import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.debug.Perf;
 import com.antcolonies.entity.body.AntAnimationController;
 import com.antcolonies.entity.goal.AntWanderGoal;
+import com.antcolonies.entity.goal.NapGoal;
 import com.antcolonies.nav.AntNavigator;
 import com.antcolonies.nav.AntPathFinder;
 import com.antcolonies.nav.Doorway;
 import com.antcolonies.species.SpeciesProfile;
+import com.antcolonies.species.SpeciesProfiles;
 import com.antcolonies.nav.Foothold;
 import com.antcolonies.nav.Slope;
 import com.antcolonies.registry.ModItems;
@@ -28,6 +30,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -54,6 +57,14 @@ import software.bernie.geckolib.util.GeckoLibUtil;
 public abstract class AbstractAntEntity extends PathfinderMob implements GeoEntity {
     private static final RawAnimation IDLE = RawAnimation.begin().thenLoop("idle");
     private static final RawAnimation WALK = RawAnimation.begin().thenLoop("walk");
+    /** Asleep: still, and now and then a short bout of antenna twitches (see {@link #napTicks}). Ants only. */
+    private static final RawAnimation SLEEP = RawAnimation.begin().thenLoop("sleep");
+    private static final RawAnimation SLEEP_TWITCH = RawAnimation.begin().thenLoop("sleep_twitch");
+    /** On hot ground: standing and walking tall on straight legs, the gaster up. Ants only. */
+    private static final RawAnimation IDLE_HOT = RawAnimation.begin().thenLoop("idle_hot");
+    private static final RawAnimation WALK_HOT = RawAnimation.begin().thenLoop("walk_hot");
+    /** Ticks to blend into a nap and out of it (slow, as a real ant settles; other changes take 3). */
+    private static final int SETTLE_TICKS = 20;
     /** The look round with the head out of a chimney's mouth (termites; see DoorwayMotion). */
     private static final RawAnimation PEEK = RawAnimation.begin().thenPlay("peek");
     /** How far (blocks a tick) a worker climbs at its normal speed: its legs then step at 1.5 times the walk animation. */
@@ -77,7 +88,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     /**
      * What the body is doing besides holding its surface, for the client: bit 0 = looking round with its head out of a
      * doorway's mouth (plays the "peek" animation), bit 1 = tipping over to its new surface slowly (over a mouth's rim),
-     * bit 2 = inside a channel (a termite tunnel: drawn in the channel's middle, not pressed against a wall).
+     * bit 2 = inside a channel (a termite tunnel: drawn in the channel's middle, not pressed against a wall), bit 3 =
+     * asleep (see {@code NapGoal}), bit 4 = on hot ground (see {@link #checkHeat}).
      */
     private static final EntityDataAccessor<Byte> DATA_POSE_FLAGS =
             SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.BYTE);
@@ -89,6 +101,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     private static final int PEEKING = 1;
     private static final int TURNING_SLOWLY = 2;
     private static final int IN_CHANNEL = 4;
+    private static final int ASLEEP = 8;
+    private static final int ON_HOT_GROUND = 16;
 
     /** The soil pellet held in the mandibles (empty = carrying nothing). Synced so the renderer can draw it. */
     private static final EntityDataAccessor<Optional<BlockState>> DATA_CARRIED =
@@ -468,6 +482,65 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return getColonyId() != null && level() instanceof ServerLevel serverLevel ? ColonyManager.get(serverLevel).getColony(getColonyId()) : null;
     }
 
+    /** The species this insect is (for its profile while it has no colony). */
+    protected abstract ResourceLocation species();
+
+    /** Server: this insect's species profile (its colony's, or its species' own while it has none). */
+    public SpeciesProfile profile() {
+        Colony colony = getColony();
+        return colony != null ? colony.profile() : SpeciesProfiles.get(species());
+    }
+
+    /** Server: whether it is having a nap (set by {@code NapGoal}; not saved: after a reload the nap is over). */
+    private boolean asleep;
+    /** Server: whether it stands on hot ground (see {@link #checkHeat}). */
+    private boolean onHotGround;
+
+    /** Tests only: the chance a second it falls asleep when it may (below 0: its profile's). */
+    private float napChanceForTests = -1.0F;
+
+    /** Tests only: gives it this chance a second to fall asleep when it may (below 0 for its profile's). */
+    public void setNapChanceForTests(float chance) {
+        napChanceForTests = chance;
+    }
+
+    /** The chance a second it falls asleep when it may, or below 0 for its profile's (see {@code NapGoal}). */
+    public float napChanceForTests() {
+        return napChanceForTests;
+    }
+
+    /** Server: falls asleep or wakes up (see {@code NapGoal}). */
+    public void setAsleep(boolean asleep) {
+        this.asleep = asleep;
+    }
+
+    /** Whether it is having a nap (synced, for the sleeping clips). */
+    public boolean isAsleep() {
+        return (entityData.get(DATA_POSE_FLAGS) & ASLEEP) != 0;
+    }
+
+    /** Whether it stands on ground too hot to touch (synced: it stands and walks tall, the gaster up). */
+    public boolean isOnHotGround() {
+        return (entityData.get(DATA_POSE_FLAGS) & ON_HOT_GROUND) != 0;
+    }
+
+    /**
+     * Server, once a second: whether the ground under it is hot (its profile's {@code body_language.hot}: outside on a
+     * floor under the open sky, no rain, in a hot biome, in the hottest hours of the day).
+     */
+    private void checkHeat(ServerLevel level) {
+        SpeciesProfile.Heat heat = profile().bodyLanguage().flatMap(SpeciesProfile.BodyLanguage::heat).orElse(null);
+        if (heat == null || isClimbing() || !onGround()) {
+            onHotGround = false;
+            return;
+        }
+        Colony colony = getColony();
+        BlockPos at = blockPosition();
+        onHotGround = level.canSeeSky(at) && !level.isRainingAt(at) && (colony == null || !colony.nest().isInside(level, at))
+                && heat.hotAt(colony != null ? colony.timeOfDay(level) : level.getDayTime(), level.getBiome(at).value().getBaseTemperature(),
+                        profile().food().dayClock());
+    }
+
     /**
      * Whether this insect may work outside its nest and mound now. Always, unless its colony keeps a schedule (termites:
      * out only at night and in the rain) and it is not foraging time: then it stays inside, out of the sun. A species
@@ -541,9 +614,12 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         if (tickCount % 20 == getId() % 20) {
             boolean busy = goalSelector.getAvailableGoals().stream().anyMatch(wrapped -> wrapped.isRunning()
                     && !(wrapped.getGoal() instanceof FloatGoal || wrapped.getGoal() instanceof AntWanderGoal
-                    || wrapped.getGoal() instanceof RandomLookAroundGoal));
+                    || wrapped.getGoal() instanceof RandomLookAroundGoal || wrapped.getGoal() instanceof NapGoal));
             idleSeconds = busy ? 0 : idleSeconds + 1;
             updateYouth();
+            if (level() instanceof ServerLevel serverLevel) {
+                checkHeat(serverLevel);
+            }
         }
         // A forager home with a seed touches the ants waiting inside by the entrance as it walks in (Gordon's rule, see colony.Door).
         if (tickCount % 5 == getId() % 5 && getColonyId() != null && level() instanceof ServerLevel serverLevel) {
@@ -598,11 +674,12 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             entityData.set(DATA_SURFACE, (byte) (navigator.getSurface().get3DDataValue() | navigator.getCeilingRef().get3DDataValue() << 3));
             entityData.set(DATA_HEADING, navigator.getHeading());
             entityData.set(DATA_POSE_FLAGS, (byte) ((navigator.isPeeking() ? PEEKING : 0) | (navigator.isTurningSlowly() ? TURNING_SLOWLY : 0)
-                    | (navigator.isInChannel() ? IN_CHANNEL : 0)));
+                    | (navigator.isInChannel() ? IN_CHANNEL : 0) | (asleep ? ASLEEP : 0) | (onHotGround ? ON_HOT_GROUND : 0)));
         } else {
             turnBody();
             tiltOnSlope();
             measureWalk();
+            tickNap();
         }
     }
 
@@ -944,20 +1021,26 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return isPeeking() ? PEEK : null;
     }
 
-    /** The body player: the walk with its legs in step with the ground, or standing about at the insect's own pace. */
+    /**
+     * The body player: the walk with its legs in step with the ground (on hot ground the tall walk), asleep, or standing
+     * about at the insect's own pace.
+     */
     private PlayState animateBody(AnimationState<AbstractAntEntity> state) {
         AntAnimationController<?> player = (AntAnimationController<?>) state.getController();
         RawAnimation whole = wholeBodyClip();
         if (whole != null) {
+            player.transitionLength(3);
             player.playAt(1.0);
             return state.setAndContinue(whole);
         }
-        if (walking) {
+        RawAnimation clip = usualClip();
+        settleInto(player, clip);
+        if (clip == WALK || clip == WALK_HOT) {
             player.keepPace(walkSpeed, walkRateWithoutStride());
-            return state.setAndContinue(WALK);
+        } else {
+            player.playAt(ownPace(0));
         }
-        player.playAt(ownPace(0));
-        return state.setAndContinue(IDLE);
+        return state.setAndContinue(clip);
     }
 
     /**
@@ -968,11 +1051,59 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         AntAnimationController<?> player = (AntAnimationController<?>) state.getController();
         RawAnimation whole = wholeBodyClip();
         if (whole != null) {
+            player.transitionLength(3);
             player.playAt(1.0);
             return state.setAndContinue(whole);
         }
+        RawAnimation clip = usualClip();
+        settleInto(player, clip);
         player.playAt(ownPace(1));
-        return state.setAndContinue(walking ? WALK : IDLE);
+        return state.setAndContinue(clip);
+    }
+
+    /** What the body and the head play when nothing special is going on: walking or standing, hot or not, or asleep. */
+    private RawAnimation usualClip() {
+        if (isAsleep()) {
+            return twitching ? SLEEP_TWITCH : SLEEP;
+        }
+        if (isOnHotGround()) {
+            return walking ? WALK_HOT : IDLE_HOT;
+        }
+        return walking ? WALK : IDLE;
+    }
+
+    /** Into a nap and out of it the pose blends slowly (a real ant settles down and gets up); otherwise quickly. */
+    private static void settleInto(AntAnimationController<?> player, RawAnimation clip) {
+        RawAnimation now = player.getCurrentRawAnimation();
+        boolean napping = clip == SLEEP || clip == SLEEP_TWITCH || now == SLEEP || now == SLEEP_TWITCH;
+        player.transitionLength(napping ? SETTLE_TICKS : 3);
+    }
+
+    /**
+     * Client: a nap is lying still, then a short bout of antenna twitches (the "rapid antennal movement" of sleeping ants,
+     * Cassill et al. 2009), by turns: still stretches of 15 to 25 seconds, twitch bouts of 6 (one play of the twitch
+     * clip; my picks, to confirm). The ticks left of the present stretch, whether it is a twitch bout, and whether a nap
+     * is under way.
+     */
+    private int napTicks;
+    private boolean twitching;
+    private boolean dozing;
+    private static final int TWITCH_TICKS = 120;
+
+    private void tickNap() {
+        if (!isAsleep()) {
+            dozing = false;
+            twitching = false;
+            return;
+        }
+        if (!dozing) {
+            dozing = true;
+            twitching = false;
+            napTicks = 300 + getRandom().nextInt(201);
+        } else if (--napTicks <= 0) {
+            twitching = !twitching;
+            napTicks = twitching ? TWITCH_TICKS : 300 + getRandom().nextInt(201);
+        }
     }
 
     /**

@@ -114,5 +114,17 @@
     "site_search_radius": 8,
     "max_unevenness": 1,
     "second_batch_eggs": 2
+  },
+  "body_language": {
+    "_note": "How the bodies behave (the animation engine, 2026-10-16; every number my pick, to confirm). naps: real ants sleep in many short naps (Cassill et al. 2009, fire ants: workers about 250 a day of about a minute, queens about 90 of about 6 minutes; nothing measured for Pogonomyrmex yet). A worker with nothing to do inside the nest falls asleep with chance_per_second each second; a nap lasts worker_ticks (from, to), a queen's queen_ticks. hot: on ground too hot to touch they stand and walk tall with the gaster up; outside under the open sky in a biome at least from_heat hot (base temperature: badlands, desert and savanna 2.0, plains 0.8), from around_rest_ticks before the midday rest until as long after it.",
+    "naps": {
+      "chance_per_second": 0.033,
+      "worker_ticks": [800, 1600],
+      "queen_ticks": [3600, 7200]
+    },
+    "hot": {
+      "from_heat": 1.5,
+      "around_rest_ticks": 2000
+    }
   }
 }
