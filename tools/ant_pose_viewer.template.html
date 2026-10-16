@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ant Pose Viewer</title>
+<style>
+  :root { --bg: #f4efe6; --panel: #fffaf2; --ink: #2b211b; --muted: #75685d; --line: #dccfbe; --accent: #a8401f; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #1d1915; --panel: #27211c; --ink: #efe6da; --muted: #a8998a; --line: #3d342c; --accent: #e07a52; }
+  }
+  :root[data-theme="dark"] { --bg: #1d1915; --panel: #27211c; --ink: #efe6da; --muted: #a8998a; --line: #3d342c; --accent: #e07a52; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, sans-serif; }
+  header { padding: 14px 16px 6px; }
+  h1 { margin: 0 0 4px; font-size: 20px; }
+  header p { margin: 0; color: var(--muted); max-width: 70ch; }
+  #wrap { position: relative; height: 62vh; min-height: 340px; margin: 10px 16px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; }
+  #labels { position: absolute; inset: 0; pointer-events: none; }
+  .tag { position: absolute; transform: translate(-50%, -100%); background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+         padding: 2px 7px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 16px; align-items: center; }
+  button { font: inherit; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+  button.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  ol { margin: 12px 16px 24px; padding-left: 22px; max-width: 80ch; }
+  li { margin: 4px 0; }
+  li b { color: var(--accent); }
+  .muted { color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Ant pose viewer</h1>
+  <p>The worker ant as the game draws it, every option playing side by side. Drag to turn, scroll or pinch to zoom, right-drag to slide. Click a name to look closer at that one.</p>
+</header>
+<div id="wrap"><canvas id="c"></canvas><div id="labels"></div></div>
+<div class="controls" id="buttons"></div>
+<ol id="list"></ol>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const DATA = /*DATA*/null;
+const canvas = document.getElementById('c');
+const wrap = document.getElementById('wrap');
+const renderer = new THREE.WebGLRenderer({canvas, antialias: true});
+renderer.setPixelRatio(window.devicePixelRatio);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#cfe3ee');
+const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 500);
+const controls = new THREE.OrbitControls(camera, canvas);
+scene.add(new THREE.HemisphereLight('#ffffff', '#8a7454', 0.75));
+const sun = new THREE.DirectionalLight('#ffffff', 0.55);
+sun.position.set(20, 40, 15);
+scene.add(sun);
+
+const SPACING = 18;
+const n = DATA.anims.length;
+// A sandy floor with a faint block grid (1 block = 16 model units; the game draws the worker at 0.65 of the model).
+const floorSize = SPACING * (n + 1);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(floorSize, 140), new THREE.MeshLambertMaterial({color: '#d8c391'}));
+floor.rotation.x = -Math.PI / 2;
+scene.add(floor);
+const grid = new THREE.GridHelper(floorSize, Math.round(floorSize / (16 / 0.65)) * 1, '#b9a273', '#c8b282');
+grid.position.y = 0.01;
+scene.add(grid);
+
+function deg(v) { return v * Math.PI / 180; }
+function setRot(obj, r) { obj.rotation.set(deg(-r[0]), deg(r[1]), deg(-r[2]), 'ZYX'); }
+
+function buildAnt() {
+  const root = new THREE.Group();
+  const groups = {};
+  const byName = {};
+  DATA.bones.forEach(b => byName[b.name] = b);
+  DATA.bones.forEach(b => {
+    const g = new THREE.Group();
+    const p = b.parent ? byName[b.parent].pivot : [0, 0, 0];
+    g.position.set(b.pivot[0] - p[0], b.pivot[1] - p[1], b.pivot[2] - p[2]);
+    g.userData.base = g.position.clone();
+    groups[b.name] = g;
+    (b.cubes || []).forEach(c => {
+      const mat = new THREE.MeshLambertMaterial({color: c.colour});
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(Math.max(c.size[0], 0.02), Math.max(c.size[1], 0.02), Math.max(c.size[2], 0.02)), mat);
+      const centre = [c.origin[0] + c.size[0] / 2, c.origin[1] + c.size[1] / 2, c.origin[2] + c.size[2] / 2];
+      if (c.rotation) {
+        const holder = new THREE.Group();
+        holder.position.set(c.pivot[0] - b.pivot[0], c.pivot[1] - b.pivot[1], c.pivot[2] - b.pivot[2]);
+        setRot(holder, c.rotation);
+        mesh.position.set(centre[0] - c.pivot[0], centre[1] - c.pivot[1], centre[2] - c.pivot[2]);
+        holder.add(mesh);
+        g.add(holder);
+      } else {
+        mesh.position.set(centre[0] - b.pivot[0], centre[1] - b.pivot[1], centre[2] - b.pivot[2]);
+        g.add(mesh);
+      }
+    });
+  });
+  DATA.bones.forEach(b => (b.parent ? groups[b.parent] : root).add(groups[b.name]));
+  return {root, groups};
+}
+
+// GeckoLib's easeInOutSine between key frames.
+function sample(frames, t) {
+  const list = Object.keys(frames).map(k => [parseFloat(k), frames[k].vector]).sort((a, b) => a[0] - b[0]);
+  if (list.length === 1 || t <= list[0][0]) return list[0][1];
+  for (let i = 0; i < list.length - 1; i++) {
+    const [t0, v0] = list[i], [t1, v1] = list[i + 1];
+    if (t <= t1) {
+      let f = t1 === t0 ? 0 : (t - t0) / (t1 - t0);
+      f = -(Math.cos(Math.PI * f) - 1) / 2;
+      return v0.map((a, j) => a + (v1[j] - a) * f);
+    }
+  }
+  return list[list.length - 1][1];
+}
+
+const ants = DATA.anims.map((anim, i) => {
+  const ant = buildAnt();
+  ant.root.position.x = (i - (n - 1) / 2) * SPACING;
+  ant.root.rotation.y = -Math.PI / 2 - 0.5;   // head turned toward the viewer's left, three-quarter view
+  scene.add(ant.root);
+  const spot = new THREE.Mesh(new THREE.CircleGeometry(5, 32), new THREE.MeshBasicMaterial({color: '#000', transparent: true, opacity: 0.13}));
+  spot.rotation.x = -Math.PI / 2;
+  spot.scale.set(0.9, 1.4, 1);
+  spot.position.set(ant.root.position.x, 0.02, 0);
+  spot.rotation.z = 0.5;
+  scene.add(spot);
+  const tag = document.createElement('div');
+  tag.className = 'tag';
+  tag.textContent = (i + 1) + '. ' + anim.name;
+  document.getElementById('labels').appendChild(tag);
+  ant.tag = tag;
+  ant.anim = anim;
+  return ant;
+});
+
+const list = document.getElementById('list');
+const buttons = document.getElementById('buttons');
+function focus(i) {
+  [...buttons.children].forEach((b, j) => b.classList.toggle('on', j === i + 1));
+  if (i < 0) {
+    // far enough back that the whole row fits the width of the window
+    const d = Math.max(60, SPACING * n / (2 * Math.tan(deg(17.5)) * camera.aspect) * 1.05);
+    controls.target.set(0, 2, 0);
+    camera.position.set(0, d * 0.36, d);
+  } else {
+    const x = ants[i].root.position.x;
+    controls.target.set(x, 1.5, 0);
+    camera.position.set(x + 17, 9, 24);
+  }
+  controls.update();
+}
+const all = document.createElement('button');
+all.textContent = 'All';
+all.onclick = () => focus(-1);
+buttons.appendChild(all);
+DATA.anims.forEach((a, i) => {
+  const b = document.createElement('button');
+  b.textContent = (i + 1) + '. ' + a.name;
+  b.onclick = () => focus(i);
+  buttons.appendChild(b);
+  const li = document.createElement('li');
+  li.innerHTML = '<b>' + a.name + '</b> <span class="muted">— ' + a.note + '</span>';
+  list.appendChild(li);
+});
+function resize() {
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+resize();
+focus(-1);
+
+const clock = new THREE.Clock();
+const v = new THREE.Vector3();
+function frame() {
+  const now = clock.getElapsedTime();
+  ants.forEach(ant => {
+    const t = now % ant.anim.length;
+    Object.values(ant.groups).forEach(g => { g.rotation.set(0, 0, 0); g.position.copy(g.userData.base); });
+    for (const [bone, channels] of Object.entries(ant.anim.bones)) {
+      const g = ant.groups[bone];
+      if (!g) continue;
+      if (channels.rotation) setRot(g, sample(channels.rotation, t));
+      if (channels.position) {
+        const p = sample(channels.position, t);
+        g.position.set(g.userData.base.x + p[0], g.userData.base.y + p[1], g.userData.base.z + p[2]);
+      }
+    }
+    v.set(ant.root.position.x, 7.5, 0).project(camera);
+    ant.tag.style.left = ((v.x + 1) / 2 * wrap.clientWidth) + 'px';
+    ant.tag.style.top = ((1 - v.y) / 2 * wrap.clientHeight) + 'px';
+    ant.tag.style.display = v.z < 1 ? '' : 'none';
+  });
+  controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+frame();
+</script>
+</body>
+</html>

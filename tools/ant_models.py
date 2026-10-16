@@ -291,10 +291,133 @@ def idle():
     }
 
 
+# --- the midday rest and hot ground (picked by the user in the ant pose viewer, 2026-10-15) ---------------------
+# Sleep and sleep_twitch are played by turns while an ant rests (real ants switch between quiet sleep and sleep with
+# quick antenna flicks); idle_hot and walk_hot replace idle and walk on hot ground (with steam, the user's one
+# unrealistic touch, drawn by the game, not the model).
+LEG_SIDES = [(side, n) for n in (1, 2, 3) for side in ('l', 'r')]
+
+
+def merged(*anims):
+    """Several bone animations played together: the rotations of the same bone at the same time are added up
+    (each animation must give a bone its key frames at the same times, or be a single still pose at time 0)."""
+    out = {}
+    for anim in anims:
+        for bone, channels in anim.items():
+            for channel, frames in channels.items():
+                have = out.setdefault(bone, {}).setdefault(channel, {})
+                if not have:
+                    have.update(json.loads(json.dumps(frames)))
+                    continue
+                if len(frames) == 1 and '0' in frames:          # a still offset: added to every frame there is
+                    add = frames['0']['vector']
+                    for f in have.values():
+                        f['vector'] = [round(a + b, 2) for a, b in zip(f['vector'], add)]
+                elif len(have) == 1 and '0' in have:             # the other way round
+                    add = have['0']['vector']
+                    have.clear()
+                    for t, f in frames.items():
+                        have[t] = {'vector': [round(a + b, 2) for a, b in zip(f['vector'], add)], 'easing': IO}
+                else:
+                    raise ValueError(f'{bone} {channel}: two moving animations at different times')
+    return out
+
+
+def still(**bones):
+    """A still pose: bone name -> rotation [x, y, z] (or 'body_pos' -> a position offset for the body)."""
+    out = {}
+    for name, vec in bones.items():
+        if name == 'body_pos':
+            out.setdefault('body', {}).update(keys([(0, vec)], 'position'))
+        else:
+            out[name] = keys([(0, vec)])
+    return out
+
+
+def side_z(side, angle):
+    """A Z turn that lifts (positive angle) a leg on either side: a negative Z lifts a left leg, a positive one a right."""
+    return -angle if side == 'l' else angle
+
+
+# --- the midday rest ------------------------------------------------------------------------------------------------
+REST_SECONDS = 6.0
+
+
+def sleep_pose():
+    """Real sleeping ants (fire ant workers studied by Cassill et al. 2009 nap about 250 times a day, a minute or so
+    each): the body sinks onto the floor, the legs ease outward to let it down, the antennae fold back and droop so the
+    whip lies on the ground, the head dips, the mandibles hang a little open. Nothing else moves but slow breathing."""
+    pose = {'body_pos': [0, -0.45, 0], 'head': [8, 0, 0], 'mandible_l': [0, -9, 0], 'mandible_r': [0, 9, 0],
+            'antenna_l_1': [24, -16, 0], 'antenna_r_1': [24, 16, 0], 'antenna_l_2': [34, 0, 0], 'antenna_r_2': [34, 0, 0]}
+    for side, n in LEG_SIDES:
+        pose[f'leg_{side}{n}'] = [0, 0, side_z(side, 14)]              # the leg lifts at the hip: the body comes down
+        pose[f'leg_{side}{n}_lower'] = [0, 0, side_z(side, -10)]      # the shin turns in to keep the foot on the floor
+    return still(**pose)
+
+
+def breathing():
+    T = REST_SECONDS
+    return {'abdomen': keys([(0, [-4, 0, 0]), (T / 2, [-6.5, 0, 0]), (T, [-4, 0, 0])])}
+
+
+def sleep():
+    return merged(sleep_pose(), breathing())
+
+
+def sleep_twitch():
+    """As sleep, with the quick antenna flicks real ants show in their deeper sleep (Cassill's "rapid antennal movement"):
+    now and then one whip twitches two or three times, and once a leg jerks."""
+    T = REST_SECONDS
+    flick_l = [(0, [0, 0, 0]), (1.4, [0, 0, 0]), (1.5, [-9, 0, 0]), (1.6, [0, 0, 0]), (1.7, [-7, 0, 0]), (1.8, [0, 0, 0]),
+               (4.2, [0, 0, 0]), (4.3, [-6, 0, 0]), (4.4, [0, 0, 0]), (T, [0, 0, 0])]
+    flick_r = [(0, [0, 0, 0]), (2.9, [0, 0, 0]), (3.0, [-8, 0, 0]), (3.1, [0, 0, 0]), (3.2, [-9, 0, 0]), (3.3, [0, 0, 0]),
+               (3.4, [-5, 0, 0]), (3.5, [0, 0, 0]), (T, [0, 0, 0])]
+    jerk = [(0, [0, 0, 0]), (5.0, [0, 0, 0]), (5.1, [0, 8, -6]), (5.3, [0, 0, 0]), (T, [0, 0, 0])]
+    return merged(sleep_pose(), breathing(),
+                  {'antenna_l_2': keys(flick_l), 'antenna_r_2': keys(flick_r), 'leg_l2': keys(jerk)})
+
+
+# --- hot ground -----------------------------------------------------------------------------------------------------
+HOT_STEP = 0.7   # a hot ant steps quicker: the step takes 0.7 of the time
+
+
+def stilts():
+    """Stilting (real desert ants on hot sand, best known in Cataglyphis): the legs straighten to hold the body high
+    above the hot ground, where the air is cooler. The hip turns the leg down and the knee opens."""
+    pose = {'body_pos': [0, 0.85, 0]}
+    for side, n in LEG_SIDES:
+        pose[f'leg_{side}{n}'] = [0, 0, side_z(side, -16)]             # the leg pushes down at the hip
+        pose[f'leg_{side}{n}_lower'] = [0, 0, side_z(side, 13)]       # the knee opens: a straighter leg
+    return still(**pose)
+
+
+def hot_look():
+    """The gaster held up off the ground (Cataglyphis run with it raised), the antennae lifted off the hot sand."""
+    return still(antenna_l_1=[-10, 0, 0], antenna_r_1=[-10, 0, 0], petiole=[14, 0, 0], abdomen=[12, 0, 0])
+
+
+def walk_hot():
+    """Walking on hot ground: stilting with the gaster up, and quicker steps (an ant is as warm as its ground: a hot
+    ant runs faster)."""
+    quick = {}
+    for bone, channels in walk().items():
+        quick[bone] = {ch: {f'{float(t) * HOT_STEP:g}': f for t, f in frames.items()} for ch, frames in channels.items()}
+    return merged(quick, stilts(), hot_look())
+
+
+def idle_hot():
+    """Standing on hot ground: the stilt and the raised gaster, with today's idle (feelers searching) on top."""
+    return merged(idle(), stilts(), hot_look())
+
+
 def animations():
     return {'format_version': '1.8.0', 'animations': {
         'idle': {'loop': True, 'animation_length': IDLE_SECONDS, 'bones': idle()},
-        'walk': {'loop': True, 'animation_length': WALK_SECONDS, 'bones': walk()}}}
+        'walk': {'loop': True, 'animation_length': WALK_SECONDS, 'bones': walk()},
+        'sleep': {'loop': True, 'animation_length': REST_SECONDS, 'bones': sleep()},
+        'sleep_twitch': {'loop': True, 'animation_length': REST_SECONDS, 'bones': sleep_twitch()},
+        'idle_hot': {'loop': True, 'animation_length': IDLE_SECONDS, 'bones': idle_hot()},
+        'walk_hot': {'loop': True, 'animation_length': round(WALK_SECONDS * HOT_STEP, 3), 'bones': walk_hot()}}}
 
 
 # --- preview ------------------------------------------------------------------------------------------------------
