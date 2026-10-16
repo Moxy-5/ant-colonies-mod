@@ -396,6 +396,10 @@ class Clip:
         # clip ("stride 6.03"), so the game plays it at the speed that keeps the feet planted.
         self.notes = {k: (v if isinstance(v, str) else ' '.join(v)) for k, v in data.get('timeline', {}).items()}
         self.stride = next((float(w.split()[1]) for w in self.notes.values() if w.startswith('stride ')), None)
+        # A turn on the spot says how far it turns the insect in one play (degrees, positive to the right: "turn 50").
+        self.turn = next((float(w.split()[1]) for w in self.notes.values() if w.startswith('turn ')), None)
+        # A walk made for a band of speeds says which (model units a second: "speeds 19.56 45.23").
+        self.speeds = next((tuple(map(float, w.split()[1:3])) for w in self.notes.values() if w.startswith('speeds ')), None)
 
     def pose(self, t):
         if self.loop:
@@ -775,10 +779,40 @@ def check(model, clip, speed_bps=None, quiet=False):
     """Checks one clip. Returns a list of (level, message); level 'BAD' or 'NOTE'."""
     out = []
     gait = Gait(model, clip)
+    if speed_bps is None and clip.speeds:
+        # A walk for a band of speeds: judged in the middle of its band (the fast one at the game's walking speed).
+        low, high = clip.speeds
+        top = WALK_SPEED.get(model.name, 2.0) / model.blocks_per_unit
+        speed_bps = (top if high > top else (max(low, 0.4 * high) * high) ** 0.5) * model.blocks_per_unit
     speed_bps = speed_bps if speed_bps is not None else WALK_SPEED.get(model.name, 2.0)
     n = Gait.STEPS
     dt = clip.length / n
-    if gait.walking:
+    if clip.turn is not None and gait.legs:
+        # Turning on the spot: each planted foot should go round the middle as the body turns over it (the body turns
+        # right, so a foot standing still on the ground turns left round the middle in the body's frame).
+        w = math.radians(clip.turn) / clip.length
+        worst = {}
+        for k in gait.legs:
+            for i in range(n):
+                if gait.down[k][i] and gait.down[k][i + 1]:
+                    a, b = gait.tips[i][k], gait.tips[i + 1][k]
+                    vx, vz = (b[0] - a[0]) / dt, (b[2] - a[2]) / dt
+                    ex, ez = -w * a[2], w * a[0]
+                    slip = math.hypot(vx - ex, vz - ez) / max(1e-6, math.hypot(ex, ez))
+                    if slip > worst.get(k, (0, 0))[0]:
+                        worst[k] = (slip, gait.times[i])
+        for k, (slip, t) in sorted(worst.items()):
+            if slip > 0.35:
+                out.append(('BAD', f'foot {k} slides while turning: off by {slip * 100:.0f}% of its speed round the middle at {t:.3f} s'))
+            elif slip > 0.15:
+                out.append(('NOTE', f'foot {k} slips a little while turning: {slip * 100:.0f}% at {t:.3f} s'))
+        down_min = min(sum(gait.down[k][i] for k in gait.legs) for i in range(n + 1))
+        if down_min < 3 and len(gait.legs) == 6:
+            out.append(('BAD', f'only {down_min} feet on the ground while turning (at least 3 should be down)'))
+        duty = {k: sum(gait.down[k][:-1]) / n for k in gait.legs}
+        out.append(('NOTE', f'turns {clip.turn:g} degrees a cycle; at 90 degrees a second each leg steps '
+                            f'{90 / abs(clip.turn):.1f} times a second; duty ' + ', '.join(f'{k} {d:.2f}' for k, d in duty.items())))
+    elif gait.walking:
         # Sliding: each planted foot should move back at the treadmill speed and not sideways.
         worst = {}
         for k in gait.legs:

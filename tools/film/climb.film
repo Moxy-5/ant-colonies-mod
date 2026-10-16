@@ -1,0 +1,36 @@
+# The climbing scene: a walker walks to a wall, climbs it, crosses its top and climbs down the far side, then turns
+# round where it stands. Checks which way the waist bends at the corners (the gaster should stay along the floor at the
+# foot of the wall and hang over the top edge) and that the legs step when it turns on the spot.
+# The wall is a pillar one block wide, so the camera beside it sees the ant's side straight on (a long wall's near end
+# looks far bigger than the stone by the ant, which makes heights hard to judge), and a gaster in the stone would hide.
+# Run: ./gradlew runFilm -PfilmScene=tools/film/climb.film   Pictures, climb.txt and turn.txt: run-film/screenshots/
+cmd time set noon
+cmd weather clear
+cmd fill 3 -60 -4 3 -59 4 air
+cmd fill 3 -60 0 3 -59 0 stone
+lens 30
+walker worker_ant 1.5 -60 0.5 -90
+camera 1.0 -59.0 -3.5 -20 25
+shot climb_scene
+log climb
+cmd tick freeze
+fov 10
+follow 0 0.15 -7 0 0
+go 3 -58 0
+burst up 60 1
+go 6 -60 0
+burst down 70 1
+log off
+log turn
+fov 30
+follow 0 1.9 0 0 90
+look 0 -60 0.5
+burst turn_above 30 1
+look off
+follow 0.65 0.55 0.65 135 30
+look 12 -60 0.5
+burst turn_34 30 1
+look off
+log off
+follow off
+quit

@@ -82,6 +82,14 @@ before the body gets there (Sumo Digital's *Spyder*). Most realistic, but a big 
 with the baked clips kept for everything else. The plan already lists it as "later" (feet that follow uneven ground);
 best after items 1 to 3, maybe with the M2 model.
 
+## Built (2026-10-16)
+Items 1, 2 and 3 are built on `anim-engine` (details in `docs/HISTORY.md`, "The review's top three"), with the
+climbing film scene (`tools/film/climb.film`). The film also found an older bug (fixed: an ant coming down a wall
+landed facing the wall and swung round) and one more, from the user's report of the gaster going into the stone on
+top of a wall, now fixed too: over an outside edge the body tipped only when its middle reached the edge (now it
+tips from when the front feet get there, `entity/body/EdgeOver`). The same report found the live layer's bend piling
+up frame after frame on bones a clip does not move (fixed, `BodyLanguage.turnBy`).
+
 ## Order I would suggest
 1, 2 (with the climbing film scene) and 3 first (every walking ant gets better), then 4, 7, 6, 5 and 8, then 11, then
 the live legs.

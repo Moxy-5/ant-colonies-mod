@@ -34,12 +34,17 @@ def length(anim):
 
 CANDIDATES = [
     ('Idle', 'standing: feelers searching, slow breathing', am.idle()),
-    # Decision 1 of the animation engine plan (docs/plans/animation-engine.md): the leg speed. The new walk's feet stay
-    # planted at any speed (the game plays it from the distance walked), so the only question is how fast ants walk.
-    ('Walk, game speed', "2.75 blocks a second (today's speed): each leg steps about 12 times a second, as real "
-                         'harvester ants do at this pace. The legs flicker', am.walk(), 2.75),
-    ('Walk, 1 block a second', 'the same walk, the ant slower: about 4 steps a second, every step visible', am.walk(), 1.0),
-    ('Walk, half a block a second', 'slower still: about 2 steps a second', am.walk(), 0.5),
+    # The walk at three speeds (2026-10-16, the review's first fix): real ants walk faster mostly by longer strides, with
+    # less of each step on the ground; the game picks the walk by speed and plays it so the feet stay planted.
+    ('Fast walk, game speed', 'a worker on the floor, 2.75 blocks a second: long strides (0.48 body lengths, the most '
+                              'these legs reach), about 12 steps a second', am.walk_clip(am.WALK_FAST)[0], 2.75),
+    ('Walk, climbing speed', 'up a wall, 1.2 blocks a second: medium strides (0.37 body lengths), about 6.5 steps a '
+                             'second', am.walk_clip(am.WALK)[0], 1.2),
+    ('Slow walk', 'a slow ant, here half a block a second: short strides (0.26 body lengths), more feet down and a '
+                  'looser tripod, about 4 steps a second', am.walk_clip(am.WALK_SLOW)[0], 0.5),
+    ('Turning on the spot', 'stepping round to the right, 40 degrees a step cycle (here the body stays still and the '
+                            'feet go round it; in game the body turns over the planted feet)',
+     am.turn_clip(am.TURN_DEGREES)[0]),
     ('Hot walk, game speed', 'on stilts with the gaster up, at 2.75 blocks a second', am.walk_hot(), 2.75),
     ('Sleep', 'sinks onto the floor, feelers folded and drooping, only breathing', am.sleep()),
     ('Sleep with twitches', "as Sleep, with quick feeler flicks now and then (real ants' deep sleep)", am.sleep_twitch()),

@@ -70,6 +70,11 @@ public class GroomGoal extends Goal {
     }
 
     @Override
+    public boolean requiresUpdateEveryTick() {
+        return true; // it counts its time in ticks, and must end with the clip (the game ticks other goals only every other tick)
+    }
+
+    @Override
     public void start() {
         insect.getNavigator().stop();
         insect.setActivity(side);

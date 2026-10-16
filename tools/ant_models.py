@@ -254,17 +254,29 @@ def rig():
 # The walk (rebuilt with the motion library, 2026-10-16). Real walking ants use the tripod gait: front and hind leg of
 # one side with the middle leg of the other. Each foot's path is set and the legs are worked out backwards from it, so
 # a foot on the ground stays put while the body passes over it (the old hand-set walk's feet slid 2 to 3 times the walk
-# speed). The numbers, my picks from filmed ants, to confirm:
-#   sweep 3.2 units: how far a planted foot travels under the body (adjacent feet touch beyond about 3.3);
-#   duty 0.55: the share of a step a foot is down (real tripod walkers 0.5 to 0.65; lower when faster);
-#   lift 0.9 units: how high a foot rises in the air;
-#   shift: the front feet stand 0.15 units further back and the hind feet 0.6 further forward than at rest, so the
-#   short legs of this model never lock straight.
-# Stride: 3.2 / 0.55 = 5.8 units a step, 0.48 body lengths (real ants 0.5 to 0.7); at the game's 2.75 blocks a second
-# each leg steps about 11.6 times a second (real Pogonomyrmex about 10). The game plays the clip at the speed that keeps
-# the feet planted, from its stride note.
+# speed).
+#
+# Three walks for three speeds (2026-10-16, the review's first fix): real ants walk faster mostly by taking longer
+# strides, and step faster as well (Wahl et al. 2015, Cataglyphis: the stride grows almost in a straight line with
+# speed, from 0.4 body lengths when very slow; the duty factor, the share of a step a foot is down, stays near 0.6 at
+# walking speeds and the middle legs stay down longer than the front and hind ones; slow ants keep to a looser
+# tripod). This model's legs reach at most about half a body length a step (further, the feet miss or the legs hit
+# each other and the head), so the strides keep the real proportions scaled to that: slow 0.26, walking 0.37, fast
+# 0.48 body lengths. The game plays the walk whose speed band (its "speeds" note) holds the ant's speed, changing at a
+# moment when the walks look alike (the "swap" note) so the legs stay in step. Numbers my picks, to confirm:
+#   sweep (units): how far a planted foot travels under the body; duty: the share of a step a foot is down (middle:
+#   the middle legs' own); lift 0.9 units: how high a foot rises; shift: the front feet stand 0.15 units further back
+#   and the hind feet 0.6 further forward than at rest, so the short legs of this model never lock straight.
+# At the game's 2.75 blocks a second (5.5 body lengths) a worker plays the fast walk, each leg stepping about 11.6
+# times a second (real Pogonomyrmex about 10); climbing (1.2 blocks a second) plays the walking one, a queen the slow.
 WALK_SECONDS = 0.5
-WALK = dict(sweep=3.2, duty=0.55, lift=0.9, shift={1: 0.15, 3: -0.6})
+WALK_SHIFT = {1: 0.15, 3: -0.6}
+WALK_SLOW = dict(sweep=2.2, duty=0.68, middle_duty=0.72, lift=0.9, shift=WALK_SHIFT, phases=mo.LOOSE_TRIPOD, keys=80)
+WALK = dict(sweep=2.8, duty=0.62, middle_duty=0.67, lift=0.9, shift=WALK_SHIFT, keys=60)
+WALK_FAST = dict(sweep=3.2, duty=0.55, lift=0.9, shift=WALK_SHIFT)
+# The speed bands, in body lengths a second: slow below 1.6, fast from 3.7 (between the walks' own speeds of about 1,
+# 2.5 and 5.5 body lengths a second, which real ants of this size reach with strides like these).
+WALK_BANDS = {'walk_slow': (0.0, 1.6), 'walk': (1.6, 3.7), 'walk_fast': (3.7, 999.0)}
 
 
 def walking_antennae(track, seconds, lift=0.0):
@@ -282,15 +294,32 @@ def walking_antennae(track, seconds, lift=0.0):
             track.put(f'antenna_{side}_2', t, [whip, 0, 0])
 
 
-def walk_clip():
-    """The walk: (bones, stride in units a clip)."""
-    tr, stride, _ = mo.walk(rig(), WALK_SECONDS, **WALK)
+def walk_clip(settings=None):
+    """A walk (the walking one, or the settings given): (bones, stride in units a clip, swap moment 0-1)."""
+    tr, stride, report = mo.walk(rig(), WALK_SECONDS, **(settings or WALK))
     walking_antennae(tr, WALK_SECONDS)
-    return tr.bones(), stride
+    return tr.bones(), stride, report['swap']
 
 
 def walk():
     return walk_clip()[0]
+
+
+# Turning on the spot (2026-10-16, the review's third fix): real ants step to turn, their feet never skate round. The
+# legs keep the tripod; a planted foot goes round the body's middle as the body turns over it (front and hind feet
+# sideways, middle ones forward on the outer side and back on the inner). The front feet stand 0.8 units wider and
+# take shorter steps (duty 0.4) so they clear the head as they swing in under it; the forebody leads 2 degrees into
+# the turn and the gaster trails. 40 degrees a cycle; the game plays it at the speed the body turns (its "turn" note).
+# My picks, to confirm.
+TURN_DEGREES = 40.0
+TURN = dict(duty={1: 0.4, 2: 0.6, 3: 0.6}, lift=0.7, shift=WALK_SHIFT, wide={1: 0.8, 2: 0.3, 3: 0.3}, lead=2.0, keys=60)
+
+
+def turn_clip(degrees):
+    """Turning on the spot, to the right (positive degrees) or the left: (bones, swap moment)."""
+    tr, report = mo.turn(rig(), WALK_SECONDS, degrees, **TURN)
+    walking_antennae(tr, WALK_SECONDS)
+    return tr.bones(), report['swap']
 
 
 IDLE_SECONDS = 4.0
@@ -426,9 +455,9 @@ def walk_hot_clip():
     """Walking on hot ground: the tripod walk on stilts with the gaster up and the antennae lifted. (The steps are as
     quick as the walking speed makes them: a hot ant really does run faster, but that is the game's speed, not the
     clip's; see the notes.) Returns (bones, stride)."""
-    tr, stride, _ = mo.walk(rig(), WALK_SECONDS, raise_by=STILT_RAISE, still=HOT_BODY, **dict(WALK, sweep=HOT_SWEEP))
+    tr, stride, report = mo.walk(rig(), WALK_SECONDS, raise_by=STILT_RAISE, still=HOT_BODY, **dict(WALK_FAST, sweep=HOT_SWEEP))
     walking_antennae(tr, WALK_SECONDS, lift=HOT_ANTENNAE)
-    return tr.bones(), stride
+    return tr.bones(), stride, report['swap']
 
 
 def walk_hot():
@@ -758,16 +787,33 @@ def once(bones, seconds):
     return {'loop': False, 'animation_length': seconds, 'bones': bones}
 
 
-def walking(bones_stride, seconds):
-    """A walking clip with its stride note (GeckoLib's timeline, read by the game's AntAnimationController)."""
-    bones, stride = bones_stride
-    return {'loop': True, 'animation_length': seconds, 'timeline': {'0': f'stride {stride:.4f}'}, 'bones': bones}
+def walking(clip, seconds, band=None):
+    """A walking clip with its notes (GeckoLib's timeline, read by the game's AntAnimationController): its stride (model
+    units a clip), the moment it can change to another walk (swap, 0-1 of the cycle) and, for the walks made for a
+    speed, the speeds it is for (model units a second; band in body lengths a second)."""
+    bones, stride, swap = clip
+    notes = {'0': f'stride {stride:.4f}', '0.001': f'swap {swap:.4f}'}
+    if band:
+        body = rig().model.length
+        notes['0.002'] = f'speeds {band[0] * body:.2f} {band[1] * body:.2f}'
+    return {'loop': True, 'animation_length': seconds, 'timeline': notes, 'bones': bones}
+
+
+def turning(clip, degrees, seconds):
+    """A turning clip with its notes: degrees turned a clip (positive to the right) and its swap moment."""
+    bones, swap = clip
+    return {'loop': True, 'animation_length': seconds, 'timeline': {'0': f'turn {degrees:g}', '0.001': f'swap {swap:.4f}'},
+            'bones': bones}
 
 
 def animations():
     return {'format_version': '1.8.0', 'animations': {
         'idle': {'loop': True, 'animation_length': IDLE_SECONDS, 'bones': idle()},
-        'walk': walking(walk_clip(), WALK_SECONDS),
+        'walk_slow': walking(walk_clip(WALK_SLOW), WALK_SECONDS, WALK_BANDS['walk_slow']),
+        'walk': walking(walk_clip(), WALK_SECONDS, WALK_BANDS['walk']),
+        'walk_fast': walking(walk_clip(WALK_FAST), WALK_SECONDS, WALK_BANDS['walk_fast']),
+        'turn_r': turning(turn_clip(TURN_DEGREES), TURN_DEGREES, WALK_SECONDS),
+        'turn_l': turning(turn_clip(-TURN_DEGREES), -TURN_DEGREES, WALK_SECONDS),
         'sleep': {'loop': True, 'animation_length': REST_SECONDS, 'bones': sleep()},
         'sleep_twitch': {'loop': True, 'animation_length': REST_SECONDS, 'bones': sleep_twitch()},
         'idle_hot': {'loop': True, 'animation_length': IDLE_SECONDS, 'bones': idle_hot()},

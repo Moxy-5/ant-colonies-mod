@@ -3,6 +3,7 @@ package com.antcolonies.client;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
+import net.minecraft.world.phys.Vec3;
 
 import software.bernie.geckolib.model.GeoModel;
 import software.bernie.geckolib.renderer.GeoEntityRenderer;
@@ -48,6 +49,7 @@ public class AntRenderer<T extends AbstractAntEntity> extends GeoEntityRenderer<
     public void render(T ant, float entityYaw, float partialTick, PoseStack poseStack, MultiBufferSource buffers,
             int packedLight) {
         ant.setDrawScale(scaleWidth); // for the stride: the legs keep pace with the ground at the size it is drawn
+        ant.setClimbPose(climbLift * scaleHeight, climbIntoWall * scaleWidth); // for drawing it over an edge
         if (FilmDirector.active()) {
             // The in-game camera: every picture exactly on a game tick (a frozen game's in-between time jitters).
             super.render(ant, entityYaw, 0.0F, poseStack, buffers, packedLight);
@@ -60,6 +62,12 @@ public class AntRenderer<T extends AbstractAntEntity> extends GeoEntityRenderer<
     @Override
     protected void applyRotations(T ant, PoseStack poseStack, float ageInTicks, float rotationYaw,
             float partialTick, float nativeScale) {
+        // Over an outside edge (or just after, fading out): the middle of the feet goes where the body says (world
+        // axes, in blocks; the pose here is already scaled to the drawn size).
+        Vec3 edge = ant.getEdgeShift(partialTick);
+        if (edge != null) {
+            poseStack.translate(edge.x / scaleWidth, edge.y / scaleHeight, edge.z / scaleWidth);
+        }
         if (!ant.isInWallPose()) {
             super.applyRotations(ant, poseStack, ageInTicks, rotationYaw, partialTick, nativeScale);
             // On a slope (a ramp): tilt with it, head up going uphill, leaning across it.
@@ -74,7 +82,9 @@ public class AntRenderer<T extends AbstractAntEntity> extends GeoEntityRenderer<
         // Face the wall, slide against it, tip upright (head up) or on over (upside down), then turn to the heading.
         super.applyRotations(ant, poseStack, ageInTicks, ant.getWallYaw(partialTick), partialTick, nativeScale);
         float tilt = ant.getBodyTilt(partialTick);
-        if (tilt <= 90.0F) {
+        if (edge != null) {
+            // already put in place above
+        } else if (tilt <= 90.0F) {
             float share = tilt / 90.0F;
             poseStack.translate(0.0F, climbLift * share, -(ant.isInChannel() ? CHANNEL_INTO_WALL : climbIntoWall) * share);
         } else {

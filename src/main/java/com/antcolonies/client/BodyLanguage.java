@@ -56,9 +56,25 @@ public final class BodyLanguage {
         if (head == null || data == null) {
             return;
         }
-        // Added to the clip's own head angles each frame (the clip sets them afresh every frame, so nothing builds up).
-        head.setRotY(head.getRotY() + Mth.clamp(data.netHeadYaw(), -MAX_YAW, MAX_YAW) * Mth.DEG_TO_RAD * weight);
-        head.setRotX(head.getRotX() + Mth.clamp(data.headPitch(), -MAX_PITCH, MAX_PITCH) * Mth.DEG_TO_RAD * weight);
+        turnBy(head, Mth.clamp(data.headPitch(), -MAX_PITCH, MAX_PITCH) * Mth.DEG_TO_RAD * weight,
+                Mth.clamp(data.netHeadYaw(), -MAX_YAW, MAX_YAW) * Mth.DEG_TO_RAD * weight);
+    }
+
+    /**
+     * Turns a bone this much more than the clip has it this frame (radians). GeckoLib puts a bone back to the clip's
+     * pose (or its resting pose) at the start of each frame only if nothing marked it as moved, and setting a turn
+     * marks it; so a bone the playing clip does not move (the postpetiole in the walk, the waist in the dig) kept this
+     * frame's bend and got the next one added on top, frame after frame, and the model's bones are shared, so the next
+     * ant drawn got it too (2026-10-16: the gaster messed up while climbing, seen in game by the user). So the marks
+     * are put back as they were.
+     */
+    private static void turnBy(GeoBone bone, float x, float y) {
+        boolean marked = bone.hasRotationChanged() || bone.hasPositionChanged() || bone.hasScaleChanged();
+        bone.setRotX(bone.getRotX() + x);
+        bone.setRotY(bone.getRotY() + y);
+        if (!marked) {
+            bone.resetStateChanges();
+        }
     }
 
     /**
@@ -78,8 +94,7 @@ public final class BodyLanguage {
             if (joint == null) {
                 continue;
             }
-            joint.setRotX(joint.getRotX() - pitch * WAIST_SHARE[i] * Mth.DEG_TO_RAD);
-            joint.setRotY(joint.getRotY() + yaw * WAIST_SHARE[i] * Mth.DEG_TO_RAD);
+            turnBy(joint, -pitch * WAIST_SHARE[i] * Mth.DEG_TO_RAD, yaw * WAIST_SHARE[i] * Mth.DEG_TO_RAD);
         }
     }
 }

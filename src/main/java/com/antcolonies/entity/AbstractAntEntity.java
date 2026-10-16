@@ -14,6 +14,7 @@ import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.debug.Perf;
 import com.antcolonies.entity.body.AntAnimationController;
+import com.antcolonies.entity.body.EdgeOver;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.entity.goal.GroomGoal;
 import com.antcolonies.entity.goal.NapGoal;
@@ -61,6 +62,18 @@ import software.bernie.geckolib.util.GeckoLibUtil;
 public abstract class AbstractAntEntity extends PathfinderMob implements GeoEntity {
     private static final RawAnimation IDLE = RawAnimation.begin().thenLoop("idle");
     private static final RawAnimation WALK = RawAnimation.begin().thenLoop("walk");
+    /**
+     * The walks for each speed (2026-10-16): real ants walk faster mostly by taking longer strides, so a slow ant takes
+     * short steps and a fast one long ones. Slowest first; each clip says the speeds it is for (its "speeds" note), and
+     * the body player changes between them in step ({@code AntAnimationController.gearFor}). Ants only (the termites'
+     * file has only "walk").
+     */
+    private static final RawAnimation WALK_SLOW = RawAnimation.begin().thenLoop("walk_slow");
+    private static final RawAnimation WALK_FAST = RawAnimation.begin().thenLoop("walk_fast");
+    private static final List<RawAnimation> WALKS = List.of(WALK_SLOW, WALK, WALK_FAST);
+    /** Stepping round to turn where it stands (to the right, to the left; see {@link #measureWalk}). Ants only. */
+    private static final RawAnimation TURN_R = RawAnimation.begin().thenLoop("turn_r");
+    private static final RawAnimation TURN_L = RawAnimation.begin().thenLoop("turn_l");
     /** Asleep: still, and now and then a short bout of antenna twitches (see {@link #napTicks}). Ants only. */
     private static final RawAnimation SLEEP = RawAnimation.begin().thenLoop("sleep");
     private static final RawAnimation SLEEP_TWITCH = RawAnimation.begin().thenLoop("sleep_twitch");
@@ -208,6 +221,14 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     private boolean wallPose;
     private float bodyTilt;
     private float bodyTiltO;
+    /** Client: going over an outside edge, where the drawn feet are put (see {@link #getEdgeShift}); null otherwise. */
+    @Nullable
+    private Vec3 edgeShift;
+    @Nullable
+    private Vec3 edgeShiftO;
+    /** Client: what is left of the edge pose's shift while it fades out (see {@link #fadeEdge}). */
+    private Vec3 edgeLeft = Vec3.ZERO;
+    private boolean edgeFading;
     /** Client: how the drawn body tilts on a slope (a ramp): head up (pitch) and right side up (roll), in degrees. */
     private float slopePitch;
     private float slopePitchO;
@@ -875,18 +896,36 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     }
 
     /**
-     * Client: the edge curve (the animation engine, step 9, 2026-10-16). A real ant's body is three hard parts joined at
-     * the neck and the waist: going over an edge, onto a wall or a ceiling, up a ramp or round a turn, the front turns
-     * first and the gaster follows a moment later, so the waist bends. Here the front's turns (pitch: up a wall or a
-     * ramp; yaw: round a turn) are added up tick by tick, and the waist bends by how far the front has turned in the
-     * last {@link #WAIST_LAG} ticks (the rear still lies the old way). My picks, to confirm: 4 ticks behind, at most 60
-     * degrees up or down and 25 to the side.
+     * Client: the edge curve (the animation engine, step 9, 2026-10-16; by distance since the review of the same day). A
+     * real ant's body is three hard parts joined at the neck and the waist: going over an edge, onto a wall or a ceiling,
+     * up a ramp or round a turn, the front turns first and the gaster follows the same path, so the waist bends while
+     * the gaster is still on the old surface. Here the front's turns (pitch: up a wall or a ramp; yaw: round a turn) are
+     * added up tick by tick and remembered with the distance walked, and the rear lies the way the path lay where it
+     * is now ("follow the leader"): the gaster the way the front lay, on average, over the stretch of path it covers,
+     * {@link #GASTER_START} to {@link #GASTER_END} behind the middle; over an outside edge it hangs down only while the
+     * waist joints ({@link #WAIST_AT} to {@link #GASTER_START}) are still over the edge. So the bend is the same at any
+     * speed, stays if the ant stops half way over an edge, and the gaster never dips into the block it walks onto. A
+     * turn where it stands turns the whole body, gaster and all (no bend); standing still a second, a side bend eases
+     * out (the ant straightens itself), an up-and-down one stays (its gaster still lies over the edge). My picks, to
+     * confirm: at most 60 degrees up or down and 25 to the side.
      */
-    public static final int WAIST_LAG = 4;
+    /** Where the waist begins, the gaster begins and the gaster ends, behind the body's middle (model units; the worker model). */
+    private static final double WAIST_AT = 0.64;
+    private static final double GASTER_START = 2.4;
+    private static final double GASTER_END = 5.2;
+    /** The tightest curve the path itself takes (model units across; a sharper turn is the body turning on the spot). */
+    private static final double WAIST_TIGHTEST = 3.0;
     private static final float WAIST_MAX_PITCH = 60.0F;
     private static final float WAIST_MAX_YAW = 25.0F;
-    private final float[] frontPitchPast = new float[WAIST_LAG + 1];
-    private final float[] frontYawPast = new float[WAIST_LAG + 1];
+    private static final int WAIST_MEMORY = 64;
+    /** The front's pitch and yaw along the path: the distance walked at each mark (blocks), and the front's pose there. */
+    private final double[] pathMark = new double[WAIST_MEMORY];
+    private final float[] pitchMark = new float[WAIST_MEMORY];
+    private final float[] yawMark = new float[WAIST_MEMORY];
+    private int marks;
+    private int newestMark;
+    private double pathWalked;
+    private int standingTicks;
     private float frontPitch;
     private float frontYaw;
     private float waistPitch;
@@ -900,19 +939,102 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         float tipped = (bodyTilt - bodyTiltO) * Mth.cos(bodyHeading * Mth.DEG_TO_RAD);
         frontPitch += tipped + (slopePitch - slopePitchO);
         // Turning right is a growing body yaw on a floor; on a wall the heading grows turning left.
-        frontYaw += wallPose ? -Mth.wrapDegrees(bodyHeading - bodyHeadingO) : Mth.wrapDegrees(yBodyRot - yBodyRotO);
-        System.arraycopy(frontPitchPast, 1, frontPitchPast, 0, WAIST_LAG);
-        System.arraycopy(frontYawPast, 1, frontYawPast, 0, WAIST_LAG);
-        frontPitchPast[WAIST_LAG] = frontPitch;
-        frontYawPast[WAIST_LAG] = frontYaw;
-        if (tickCount <= WAIST_LAG) {
-            java.util.Arrays.fill(frontPitchPast, frontPitch);   // just loaded: no bend from where it was put down
-            java.util.Arrays.fill(frontYawPast, frontYaw);
+        float turned = wallPose ? -Mth.wrapDegrees(bodyHeading - bodyHeadingO) : Mth.wrapDegrees(yBodyRot - yBodyRotO);
+        frontYaw += turned;
+        double scale = drawScale / 16.0;
+        if (tickCount <= 2 || marks == 0) {
+            marks = 0;                                     // just loaded: no bend from where it was put down
+        } else {
+            // The path itself turns at most so much over the ground walked this tick; the rest of the turn is the body
+            // turning where it stands, which turns the gaster with it.
+            float curve = (float) Math.min(Math.abs(turned), moved / (WAIST_TIGHTEST * scale / 2.0) * Mth.RAD_TO_DEG);
+            float onTheSpot = turned - Math.copySign(curve, turned);
+            standingTicks = moved < 1.0E-4 ? standingTicks + 1 : 0;
+            float ease = standingTicks > 20 ? 0.1F : 0.0F;
+            for (int i = 0; i < marks; i++) {
+                int k = Math.floorMod(newestMark - i, WAIST_MEMORY);
+                yawMark[k] += onTheSpot + (frontYaw - yawMark[k] - onTheSpot) * ease;
+            }
         }
+        pathWalked += moved;
+        if (marks == 0 || moved >= 1.0E-4) {
+            newestMark = (newestMark + 1) % WAIST_MEMORY;
+            marks = Math.min(WAIST_MEMORY, marks + 1);
+        }
+        pathMark[newestMark] = pathWalked;
+        pitchMark[newestMark] = frontPitch;
+        yawMark[newestMark] = frontYaw;
+        // The rear lies the way the path lay where it is now: the gaster along the path its whole length took (the
+        // front's pose averaged over it), so at an inside corner (a wall up from the floor, the floor at the foot of a
+        // wall) it lies along the old surface and comes round bit by bit as it passes the corner. Over an outside edge
+        // it hangs down only while the waist itself is still over the edge: once the waist is on the new surface the
+        // gaster lies on it too, never into the block (2026-10-16, seen in the climbing film by the user and me).
+        double waist = pathWalked - WAIST_AT * scale;
+        float gasterPitch = averageMark(pitchMark, pathWalked - GASTER_END * scale, waist);
+        float waistJointsPitch = averageMark(pitchMark, pathWalked - GASTER_START * scale, waist);
+        float gasterYaw = averageMark(yawMark, pathWalked - GASTER_END * scale, waist);
+        float bend = Math.max(frontPitch - gasterPitch, Math.min(frontPitch - waistJointsPitch, 0.0F));
         waistPitchO = waistPitch;
         waistYawO = waistYaw;
-        waistPitch = Mth.clamp(frontPitch - frontPitchPast[0], -WAIST_MAX_PITCH, WAIST_MAX_PITCH);
-        waistYaw = Mth.clamp(frontYaw - frontYawPast[0], -WAIST_MAX_YAW, WAIST_MAX_YAW);
+        waistPitch = Mth.clamp(bend, -WAIST_MAX_PITCH, WAIST_MAX_PITCH);
+        waistYaw = Mth.clamp(frontYaw - gasterYaw, -WAIST_MAX_YAW, WAIST_MAX_YAW);
+    }
+
+    /**
+     * The front's pose (one of the mark rings) averaged over the stretch of path walked from {@code from} to {@code to}
+     * (blocks walked; straight lines between marks, the oldest mark's pose before the remembered path).
+     */
+    private float averageMark(float[] pose, double from, double to) {
+        if (to - from < 1.0E-9) {
+            return poseAt(pose, to);
+        }
+        double sum = 0.0;
+        double at = to;
+        float poseThere = poseAt(pose, to);
+        for (int i = 0; i < marks && at > from; i++) {
+            int k = Math.floorMod(newestMark - i, WAIST_MEMORY);
+            if (pathMark[k] >= at) {
+                continue;
+            }
+            double next;
+            float poseNext;
+            if (pathMark[k] >= from || i == 0) {
+                next = Math.max(pathMark[k], from);
+                poseNext = pose[k];
+            } else {
+                // The stretch starts between this mark and the later one: part way.
+                int later = Math.floorMod(k + 1, WAIST_MEMORY);
+                double span = pathMark[later] - pathMark[k];
+                next = from;
+                poseNext = Mth.lerp(span > 1.0E-9 ? (float) ((from - pathMark[k]) / span) : 0.0F, pose[k], pose[later]);
+            }
+            sum += (at - next) * (poseThere + poseNext) / 2.0;
+            at = next;
+            poseThere = poseNext;
+        }
+        if (at > from) {
+            sum += (at - from) * poseThere;                // before the remembered path: as the oldest mark
+        }
+        return (float) (sum / (to - from));
+    }
+
+    /** The front's pose (one of the mark rings) at this distance walked (between two marks, part way). */
+    private float poseAt(float[] pose, double walked) {
+        float there = pose[newestMark];
+        for (int i = 0; i < marks; i++) {
+            int k = Math.floorMod(newestMark - i, WAIST_MEMORY);
+            there = pose[k];
+            if (pathMark[k] <= walked) {
+                if (i > 0) {
+                    int later = Math.floorMod(k + 1, WAIST_MEMORY);
+                    double span = pathMark[later] - pathMark[k];
+                    float f = span > 1.0E-9 ? (float) ((walked - pathMark[k]) / span) : 0.0F;
+                    there = Mth.lerp(f, pose[k], pose[later]);
+                }
+                break;
+            }
+        }
+        return there;
     }
 
     /** Client: how far the front has tipped up past the rear (degrees, the waist's bend; see {@link #tickWaist}). */
@@ -1028,14 +1150,28 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
      * just tips on over, so it keeps the yaw of the wall it came up (on a ceiling the yaw and the heading both turn the
      * body round the vertical, so one can stand in for the other). Onto a wall facing the other way (over the top of a
      * thin wall, such as a chimney's rim) it first lies flat and then tips up onto the new wall, never spinning round
-     * within the old one.
+     * within the old one. Going over an outside edge (the top of a wall, the brink of a drop) the body is drawn across
+     * the edge instead, from where it is ({@link EdgeOver}; 2026-10-16), and the usual turning takes over after.
      */
     private void turnBody() {
         bodyTiltO = bodyTilt;
         wallYawO = wallYaw;
         bodyHeadingO = bodyHeading;
+        edgeShiftO = edgeShift;
         Direction surface = getSurface();
         float turn = isTurningSlowly() ? BODY_TURN_SPEED / 2.0F : BODY_TURN_SPEED;
+        EdgeOver.Pose edge = overAnEdge();
+        if (edge != null) {
+            goOverEdge(edge, turn);
+            return;
+        }
+        Vec3 lastShift = edgeShift;
+        turnToSurface(surface, turn);
+        fadeEdge(lastShift);
+    }
+
+    /** Client: the usual turning of the drawn body toward the synced surface and heading (see {@link #turnBody}). */
+    private void turnToSurface(Direction surface, float turn) {
         if (surface != Direction.DOWN) {
             Direction wall = surface == Direction.UP ? getCeilingRef() : surface;
             float targetTilt = surface == Direction.UP ? 180.0F : 90.0F;
@@ -1089,7 +1225,17 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             bodyTilt = bodyTilt < targetTilt ? Math.min(targetTilt, bodyTilt + turn)
                     : Math.max(targetTilt, bodyTilt - turn);
         } else if (wallPose) {
-            // Tipping back onto the floor, ending up facing the body yaw.
+            // Tipping back onto the floor, going on the way the head pointed on the wall (2026-10-16, seen in the
+            // climbing film): on a wall the game's yaw faces the wall, so one coming down head first would land facing
+            // back into it and swing round as it walked off. This side's yaw is put where the drawn body goes on; the
+            // game's own turns from there as usual.
+            float onward = wallYaw - bodyHeading;
+            setYRot(onward);
+            yRotO = onward;
+            yBodyRot = onward;
+            yBodyRotO = onward;
+            yHeadRot = onward;
+            yHeadRotO = onward;
             bodyTilt = Math.max(0.0F, bodyTilt - turn);
             bodyHeading = approach(bodyHeading, wallYaw - yBodyRot, turn);
             if (bodyTilt <= 0.0F && Math.abs(Mth.wrapDegrees(bodyHeading - (wallYaw - yBodyRot))) < 1.0F) {
@@ -1103,6 +1249,100 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
 
     private static float approach(float from, float to, float speed) {
         return from + Mth.clamp(Mth.wrapDegrees(to - from), -speed, speed);
+    }
+
+    /**
+     * Client: the pose across an outside edge it is going over now (see {@link EdgeOver}), or null. Not in a channel,
+     * over a doorway's rim (those tip over their own way) or peeking out of one.
+     */
+    @Nullable
+    private EdgeOver.Pose overAnEdge() {
+        if (tickCount < 3 || isInChannel() || isTurningSlowly() || isPeeking()) {
+            return null;
+        }
+        return EdgeOver.find(level(), position(), getBbWidth(), getBbHeight(), getSurface(), entityData.get(DATA_HEADING),
+                getYRot(), drawScale / 16.0, drawLift, drawIntoWall);
+    }
+
+    /** Client: draws the body across the edge, as {@link EdgeOver} has it. */
+    private void goOverEdge(EdgeOver.Pose edge, float turn) {
+        float yaw = edge.wall().toYRot();
+        if (!wallPose) {
+            // From the floor (the brink of a drop ahead): begin from how the body lay there.
+            wallPose = true;
+            wallYaw = yaw;
+            bodyHeading = Mth.wrapDegrees(yaw - floorYaw);
+            wallYawO = wallYaw;
+            bodyHeadingO = bodyHeading;
+            bodyTiltO = edge.tilt();
+        } else {
+            // Another wall (lying flat on top of a thin wall, now over its far side): the same look, measured from it.
+            float shift = Mth.wrapDegrees(yaw - wallYaw);
+            wallYaw += shift;
+            wallYawO += shift;
+            bodyHeading += shift;
+            bodyHeadingO += shift;
+        }
+        bodyHeading = approach(bodyHeading, edge.heading(), turn);
+        bodyTilt = edge.tilt();
+        edgeShift = edge.shift();
+        edgeFading = false;
+    }
+
+    /**
+     * Client: after the edge pose, the usual pose takes over. Leaving it at either end of the edge they agree; leaving it
+     * part way (it turned away from the edge, or the navigator put it on a doorway's rim) what is left of the edge pose's
+     * shift fades out over a few ticks, so the body never jumps.
+     */
+    private void fadeEdge(@Nullable Vec3 lastShift) {
+        if (lastShift == null) {
+            return;
+        }
+        Vec3 usual = usualDrawShift();
+        if (usual == null) {
+            edgeShift = null;
+            edgeFading = false;
+            return;
+        }
+        edgeLeft = edgeFading ? edgeLeft.scale(0.5) : lastShift.subtract(usual);
+        edgeFading = true;
+        if (edgeLeft.lengthSqr() < 1.0E-5) {
+            edgeShift = null;
+            edgeFading = false;
+        } else {
+            edgeShift = usual.add(edgeLeft);
+        }
+    }
+
+    /**
+     * Client: where the usual pose draws the middle of the feet, from the insect's position (blocks, world axes): on a
+     * wall lifted up it and pushed in toward it as far as it has tipped up (see {@code AntRenderer}); null where that is
+     * not worked out here (on a ceiling, in a channel).
+     */
+    @Nullable
+    private Vec3 usualDrawShift() {
+        if (!wallPose) {
+            return Vec3.ZERO;
+        }
+        if (bodyTilt > 90.0F || isInChannel()) {
+            return null;
+        }
+        double share = bodyTilt / 90.0;
+        double yaw = wallYaw * Mth.DEG_TO_RAD;
+        double into = drawIntoWall * share;
+        return new Vec3(-Math.sin(yaw) * into, drawLift * share, Math.cos(yaw) * into);
+    }
+
+    /**
+     * Client: where the middle of the drawn body's feet is put from its position while it goes over an outside edge
+     * (blocks, world axes; see {@link EdgeOver}), or null in the usual pose.
+     */
+    @Nullable
+    public Vec3 getEdgeShift(float partialTick) {
+        if (edgeShift == null) {
+            return null;
+        }
+        return edgeShiftO == null ? edgeShift : edgeShiftO.lerp(edgeShift, partialTick);
     }
 
     /** Client: whether the body is drawn by the wall angles below (on a wall, or tipping onto or off one). */
@@ -1251,6 +1491,21 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return text.startsWith("film:") ? FILM_CLIPS.computeIfAbsent(text.substring(5), c -> RawAnimation.begin().thenLoop(c)) : null;
     }
 
+    /** For the in-game camera's walker (development only): takes away every goal, so only the camera tells it where to go. */
+    public void forgetGoalsForFilm() {
+        goalSelector.removeAllGoals(goal -> true);
+        targetSelector.removeAllGoals(goal -> true);
+    }
+
+    /** For the in-game camera's log (development only): the drawn body this tick, on one line. */
+    public String filmReport() {
+        return String.format(java.util.Locale.ROOT,
+                "pos %.3f %.3f %.3f surface %s yaw %.1f heading %.1f tilt %.1f walk %.4f moved %.4f turn %.2f turning %b waist %.1f %.1f front %.1f %.1f",
+                getX(), getY(), getZ(), getSurface(), yBodyRot, bodyHeading, bodyTilt, walkSpeed, moved, turnSpeed, turning,
+                waistPitch, waistYaw, frontPitch, frontYaw)
+                + (edgeShift == null ? " edge -" : String.format(java.util.Locale.ROOT, " edge %.3f %.3f %.3f", edgeShift.x, edgeShift.y, edgeShift.z));
+    }
+
     /** An animation this insect plays instead of walking or standing (a soldier's head bang), or null. */
     @Nullable
     protected RawAnimation specialAnimation() {
@@ -1275,8 +1530,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     }
 
     /**
-     * The body player: the walk with its legs in step with the ground (on hot ground the tall walk), asleep, or standing
-     * about at the insect's own pace.
+     * The body player: the walk with its legs in step with the ground (the walk for its speed; on hot ground the tall
+     * walk), stepping round to turn, asleep, or standing about at the insect's own pace.
      */
     private PlayState animateBody(AnimationState<AbstractAntEntity> state) {
         AntAnimationController<?> player = (AntAnimationController<?>) state.getController();
@@ -1287,9 +1542,14 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             return state.setAndContinue(whole);
         }
         RawAnimation clip = usualClip();
+        if (clip == WALK) {
+            clip = player.gearFor(WALKS, WALK, walkSpeed);
+        }
         settleInto(player, clip);
-        if (clip == WALK || clip == WALK_HOT) {
+        if (WALKS.contains(clip) || clip == WALK_HOT) {
             player.keepPace(walkSpeed, walkRateWithoutStride());
+        } else if (clip == TURN_R || clip == TURN_L) {
+            player.keepTurn(turnSpeed);
         } else if (isMadeSpeed(clip)) {
             player.playAt(1.0);
         } else {
@@ -1326,8 +1586,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     }
 
     /**
-     * What the body and the head play when nothing special is going on: walking or standing, hot or not, asleep, or
-     * standing still noticing something.
+     * What the body and the head play when nothing special is going on: walking or standing, hot or not, asleep,
+     * stepping round to turn, or standing still noticing something.
      */
     private RawAnimation usualClip() {
         if (isAsleep()) {
@@ -1336,6 +1596,9 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         RawAnimation work = activityClip();
         if (work != null) {
             return work;
+        }
+        if (turning) {
+            return turnSpeed > 0.0 ? TURN_R : TURN_L;
         }
         RawAnimation noticing = walking ? null : noticingClip(false);
         if (noticing != null) {
@@ -1377,8 +1640,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     }
 
     /**
-     * Whether its animation file has the work clips (cleaning, digging, carrying): the ant model's does (made by
-     * tools/ant_models.py); the termites' do not yet, so they keep their usual clips while they work.
+     * Whether its animation file has the work clips (cleaning, digging, carrying) and the turning ones: the ant model's
+     * does (made by tools/ant_models.py); the termites' do not yet, so they keep their usual clips while they work.
      */
     protected boolean hasWorkClips() {
         return false;
@@ -1475,9 +1738,28 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     private boolean walking;
     /** Client: how big the renderer draws it (its scale), for the stride (set by {@code AntRenderer}). */
     private float drawScale = 1.0F;
+    /** Client: the renderer's climbing lift and push into a wall (blocks; set by {@code AntRenderer}). */
+    private double drawLift;
+    private double drawIntoWall;
     /** Walking starts above this speed and stops below the lower one (blocks a tick; my picks, to confirm). */
     private static final double START_WALKING = 0.008;
     private static final double STOP_WALKING = 0.004;
+    /** Client: how far it moved this tick (blocks; along a wall too while climbing). */
+    private double moved;
+    /** Client: how fast the drawn body turns (degrees a tick, positive to the right), smoothed like {@link #walkSpeed}. */
+    private double turnSpeed;
+    /**
+     * Client: whether its legs step round to turn where it stands (2026-10-16, the review's third fix): real ants step
+     * to turn, their feet never skate round. It steps when the body turns faster than {@link #START_TURNING} (until it
+     * is below {@link #STOP_TURNING}) and the turn moves the feet more than walking does (curving while walking, the walk
+     * steps). Not on hot ground (the tall stance has no turning clip). Ants only.
+     */
+    private boolean turning;
+    /** Degrees a tick (40 and 20 a second; my picks, to confirm). */
+    private static final double START_TURNING = 2.0;
+    private static final double STOP_TURNING = 1.0;
+    /** How far the outer feet of the ant model stand from the body's middle (model units; tools/ant_models.py, TURN). */
+    private static final double TURN_REACH = 5.8;
 
     /**
      * Client, once a tick: how fast it moves, for the legs (see {@link AntAnimationController}). On a floor only its
@@ -1487,9 +1769,16 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         double dx = getX() - xo;
         double dy = isClimbing() ? getY() - yo : 0.0;
         double dz = getZ() - zo;
-        double moved = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        moved = Math.sqrt(dx * dx + dy * dy + dz * dz);
         walkSpeed += (moved - walkSpeed) * 0.4;
         walking = walkSpeed > (walking ? STOP_WALKING : START_WALKING);
+        // Turning: the drawn body's turn this tick (right is a growing body yaw on a floor; on a wall the heading grows
+        // turning left). Its feet step round when the turn would move them over the ground faster than the walk does.
+        double turned = wallPose ? -Mth.wrapDegrees(bodyHeading - bodyHeadingO) : Mth.wrapDegrees(yBodyRot - yBodyRotO);
+        turnSpeed += (turned - turnSpeed) * 0.4;
+        double feet = Math.abs(turnSpeed) * Mth.DEG_TO_RAD * TURN_REACH / 16.0 * drawScale;
+        turning = hasWorkClips() && !isOnHotGround() && feet > walkSpeed
+                && Math.abs(turnSpeed) > (turning ? STOP_TURNING : START_TURNING);
     }
 
     /** Client: how big the renderer draws it (1 = the model's own size). */
@@ -1500,6 +1789,15 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     /** Client: set by the renderer each frame (its scale), so the stride is known in blocks. */
     public void setDrawScale(float scale) {
         drawScale = scale;
+    }
+
+    /**
+     * Client: set by the renderer each frame, how far its climbing pose lifts the drawn body up a wall and pushes it in
+     * toward it (blocks), for drawing it over an edge ({@link EdgeOver}).
+     */
+    public void setClimbPose(double lift, double intoWall) {
+        drawLift = lift;
+        drawIntoWall = intoWall;
     }
 
     @Override

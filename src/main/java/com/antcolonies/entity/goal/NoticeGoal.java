@@ -164,6 +164,11 @@ public class NoticeGoal extends Goal {
     }
 
     @Override
+    public boolean requiresUpdateEveryTick() {
+        return true; // it counts its time in ticks (the game ticks other goals only every other tick)
+    }
+
+    @Override
     public boolean canContinueToUse() {
         SpeciesProfile.Notice notice = notice();
         if (notice == null || player == null || !player.isAlive() || player.isSpectator() || player.level() != insect.level()

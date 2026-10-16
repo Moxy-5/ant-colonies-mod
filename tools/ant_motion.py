@@ -378,6 +378,10 @@ def stand(rig, still, feet=None, guess=None):
 # The tripod gait: the moment in the cycle each foot touches down. L1, R2 and L3 step together, the other three half a
 # cycle later; inside a tripod the hind foot lands a little first and the front one last (my pick from filmed ants).
 TRIPOD = {'l3': 0.0, 'r2': 0.03, 'l1': 0.06, 'r3': 0.5, 'l2': 0.53, 'r1': 0.56}
+# Walking slowly, real ants keep to a tripod less tightly: the three feet of a tripod land one after another, with
+# moments of wave and tetrapod stepping and of all six feet down (Wahl et al. 2015, Cataglyphis below about 3 body
+# lengths a second). My pick: the feet of a tripod land 0.08 of a cycle apart instead of 0.03.
+LOOSE_TRIPOD = {'l3': 0.0, 'r2': 0.08, 'l1': 0.16, 'r3': 0.5, 'l2': 0.58, 'r1': 0.66}
 
 
 def hermite(p0, p1, m0, m1, s):
@@ -421,7 +425,7 @@ def ease_in(rig, leg, target, pose, q, steps=24):
 
 
 def walk(rig, seconds, cycles=1, sweep=3.4, duty=0.58, lift=0.9, phases=TRIPOD, bob=0.06, sway=2.0, gaster_sway=3.0,
-         wide=0.0, shift=None, raise_by=0.0, still=None, keys=40, track=None):
+         wide=0.0, shift=None, raise_by=0.0, still=None, keys=40, track=None, middle_duty=None):
     """A walking clip with every leg worked out backwards from its foot's path (see foot_path).
 
     seconds: the clip's length; cycles: gait cycles in it. sweep (units), duty, lift (units): the step.
@@ -429,7 +433,10 @@ def walk(rig, seconds, cycles=1, sweep=3.4, duty=0.58, lift=0.9, phases=TRIPOD, 
     sway (degrees): the forebody turning toward the front leg on the ground; gaster_sway: the gaster against it.
     wide (units): the feet that much further out; shift: {leg number: z shift}; raise_by: the body that much higher.
     still: a still pose under it all (the hot look's raised gaster, ...).
-    Returns (track, stride in units per clip, report)."""
+    middle_duty: the middle legs' own duty (real ants keep them down longer than the front and hind ones, Wahl et al.
+    2015); they then sweep further, so every planted foot still moves with the ground. Default: the same duty.
+    Returns (track, stride in units per clip, report); report['swap'] is the moment in the cycle (0-1) when R2 is at
+    the middle of its stance (see walk_swap)."""
     tr = track or Track(rig)
     still = dict(still or {})
     base_pos = still.pop('body_pos', [0.0, 0.0, 0.0])
@@ -442,14 +449,16 @@ def walk(rig, seconds, cycles=1, sweep=3.4, duty=0.58, lift=0.9, phases=TRIPOD, 
     turns = {key: None for key in rig.legs}
     worst = {key: 0.0 for key in rig.legs}
     first = None
-    mid = TRIPOD['l1'] + duty / 2                     # tripod 1's mid-stance: the body is highest
+    per_cycle = sweep / duty                          # ground covered in one cycle
+    duties = {key: (middle_duty if middle_duty and key[1] == '2' else duty) for key in rig.legs}
+    mid = phases['l1'] + duty / 2                     # tripod 1's mid-stance: the body is highest
     for warm in (True, False):                        # one cycle to settle the solver, then the clip
         for i in range(n + 1 if not warm else keys):
             eased = warm and i == 0
             t = seconds * i / n
             p = (i / keys) % 1.0
-            yaw = -sway * math.sin(2 * math.pi * (p - TRIPOD['l1']))
-            gaster = gaster_sway * math.sin(2 * math.pi * (p - TRIPOD['l1']))
+            yaw = -sway * math.sin(2 * math.pi * (p - phases['l1']))
+            gaster = gaster_sway * math.sin(2 * math.pi * (p - phases['l1']))
             body_pos = [base_pos[0], base_pos[1] + raise_by + bob * math.cos(4 * math.pi * (p - mid)), base_pos[2]]
             pose_still = dict(still)
             fore = still.get('forebody', [0, 0, 0])
@@ -457,7 +466,7 @@ def walk(rig, seconds, cycles=1, sweep=3.4, duty=0.58, lift=0.9, phases=TRIPOD, 
             pose_still['body_pos'] = body_pos
             pose = pose_of(pose_still)
             for key, leg in rig.legs.items():
-                target, _ = foot_path(centres[key], sweep, duty, lift, 0.25 * leg.out, phases[key], p)
+                target, _ = foot_path(centres[key], per_cycle * duties[key], duties[key], lift, 0.25 * leg.out, phases[key], p)
                 if eased:
                     q[key] = ease_in(rig, leg, target, pose, q[key])
                 q[key], err = leg.reach(target, pose, q[key])
@@ -485,9 +494,78 @@ def walk(rig, seconds, cycles=1, sweep=3.4, duty=0.58, lift=0.9, phases=TRIPOD, 
         for bone, a, b in zip((leg.hip, leg.knee, leg.foot), first[key], turns[key]):
             seam = max(seam, max(abs(x - y) for x, y in zip(a, b)))
             tr.put(bone, seconds, a)
-    stride = cycles * sweep / duty
-    report = {'worst_miss': max(worst.values()), 'misses': worst, 'seam': seam, 'stride': stride}
+    stride = cycles * per_cycle
+    report = {'worst_miss': max(worst.values()), 'misses': worst, 'seam': seam, 'stride': stride,
+              'swap': walk_swap(phases, duties['r2'])}
     return tr, stride, report
+
+
+def walk_swap(phases, middle_duty):
+    """The moment in a walk's cycle (0-1) when R2 stands at the middle of its stance (and half a cycle later L2): then
+    every planted foot stands near its own middle and the feet in the air are half way through their swing, so walks
+    of different strides look almost the same there. The game changes from one walk to another at these moments
+    (each clip's "swap" note), keeping the legs in step."""
+    return (phases['r2'] + middle_duty / 2) % 1.0
+
+
+# --- turning on the spot ----------------------------------------------------------------------------------------------
+def turn(rig, seconds, degrees, duty=0.6, lift=0.8, phases=TRIPOD, lead=4.0, shift=None, wide=0.0, keys=40, track=None):
+    """Turning on the spot: the body turns `degrees` in one cycle (positive: to the right) about its middle (the insect's
+    place in the world), every planted foot staying put on the ground while the body turns over it, the legs stepping
+    round in the tripod gait (real ants step to turn; their feet never skate round). A planted foot travels on an arc
+    round the middle, the front and hind feet sideways and the middle ones forward on the outer side and back on the
+    inner, as in a turning insect. lead (degrees): the forebody turned that much into the turn and the gaster a little
+    the other way (it trails). shift: as in walk; wide: as in walk, or {leg number: units}; duty: one for all legs or
+    {leg number: duty}. Returns (track, report)."""
+    tr = track or Track(rig)
+    sign = 1.0 if degrees >= 0 else -1.0
+    duties = {key: (duty.get(int(key[1]), 0.6) if isinstance(duty, dict) else duty) for key in rig.legs}
+    centres = {}
+    for key, leg in rig.legs.items():
+        x, y, z = rig.stance(key)
+        out = wide.get(int(key[1]), 0.0) if isinstance(wide, dict) else wide
+        centres[key] = (x + leg.out * out, y, z + (shift or {}).get(int(key[1]), 0.0))
+    still = {'forebody': [0.0, sign * lead, 0.0], 'petiole': [0.0, -sign * lead / 4, 0.0],
+             'abdomen': [0.0, -sign * lead / 4, 0.0]}
+    pose = pose_of(still)
+    q = {key: (0.0, 0.0, 0.0, 0.0) for key in rig.legs}
+    turns = {key: None for key in rig.legs}
+    worst = {key: 0.0 for key in rig.legs}
+    first = None
+    for warm in (True, False):
+        for i in range(keys + 1 if not warm else keys):
+            t = seconds * i / keys
+            p = (i / keys) % 1.0
+            for key, leg in rig.legs.items():
+                cx, cy, cz = centres[key]
+                arc = math.radians(abs(degrees)) * duties[key]     # the angle a planted foot travels round
+                (bow, y, z), _ = foot_path((0.0, cy, 0.0), arc, duties[key], lift, 0.25, phases[key], p)
+                a = -sign * z                            # the foot's angle round the middle: ahead at touch-down
+                bx = cx + leg.out * bow
+                target = (bx * math.cos(a) + cz * math.sin(a), y, -bx * math.sin(a) + cz * math.cos(a))
+                if warm and i == 0:
+                    q[key] = ease_in(rig, leg, target, pose, q[key])
+                q[key], err = leg.reach(target, pose, q[key])
+                if not warm:
+                    worst[key] = max(worst[key], err)
+                    turns[key] = leg.file_turns(q[key], turns[key])
+                    for bone, turn_ in zip((leg.hip, leg.knee, leg.foot), turns[key]):
+                        tr.put(bone, t, turn_)
+            if warm:
+                continue
+            if first is None:
+                first = {key: list(map(list, turns[key])) for key in rig.legs}
+            for bone, vec in still.items():
+                tr.put(bone, t, vec)
+    seam = 0.0
+    for key, leg in rig.legs.items():
+        for bone, a_, b_ in zip((leg.hip, leg.knee, leg.foot), first[key], turns[key]):
+            seam = max(seam, max(abs(x - y) for x, y in zip(a_, b_)))
+            tr.put(bone, seconds, a_)
+    report = {'worst_miss': max(worst.values()), 'misses': worst, 'seam': seam,
+              'reach': max(math.hypot(c[0], c[2]) for c in centres.values()),
+              'swap': walk_swap(phases, duties['r2'])}
+    return tr, report
 
 
 # --- self-test --------------------------------------------------------------------------------------------------------

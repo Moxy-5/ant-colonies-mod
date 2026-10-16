@@ -19,7 +19,11 @@ import org.slf4j.Logger;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.level.DataPackConfig;
 import net.minecraft.world.level.GameRules;
@@ -41,6 +45,7 @@ import net.neoforged.neoforge.client.event.RenderNameTagEvent;
 import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.client.event.ViewportEvent;
 import net.neoforged.neoforge.common.util.TriState;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 /**
  * The in-game camera (development only, the animation lab's eyes in the real game; 2026-10-15). Started by
@@ -59,10 +64,17 @@ import net.neoforged.neoforge.common.util.TriState;
  * ant worker_ant walk             clear the floor, then one insect at the middle playing that clip, facing west
  * views walk 10 1.1               side (a burst of 10 frames), front, above and 3/4 shots of it, 1.1 blocks away
  *                                 (side and front level and from further off, like the lab's drawings)
+ * walker worker_ant 0.5 -60 0.5 -90   clear the floor, then one insect that walks where it is sent (its goals taken
+ *                                 away), standing at x y z facing that way
+ * go 3 -58 0 1.0                  the walker walks its own route (the real legs: AntNavigator) to that cell
+ * look 0 -60 0.5                  the walker keeps looking at that point (head and body turn as in the game); "look off"
+ * follow 0 0.1 -7 0 0             the camera rides along with the walker, this far off it, with this turn and tilt,
+ *                                 for every shot from now ("follow off" stops it)
+ * log climb                       one line a tick about the walker's drawn body into climb.txt ("log off" ends it)
  * quit
  * </pre>
  * An insect named {@code film:<clip>} plays that clip and nothing else ({@code AbstractAntEntity.filmClip}); name tags
- * are hidden while filming. Never active in a real game (only with the {@code antcolonies.film} system property, and
+ * are hidden while filming. The walker is named {@code film-walker}, so it plays its usual clips. Never active in a real game (only with the {@code antcolonies.film} system property, and
  * never in production).
  */
 @EventBusSubscriber(modid = AntColoniesMod.MODID, value = Dist.CLIENT)
@@ -155,6 +167,7 @@ public final class FilmDirector {
             return;
         }
         if (burstLeft > 0) {
+            followWalker(mc);
             pendingShot = String.format("%s_%02d", burstName, burstIndex++);
             burstLeft--;
             if (burstLeft > 0 && burstGap > 0) {
@@ -183,7 +196,10 @@ public final class FilmDirector {
             }
             case "fov" -> lens = Double.parseDouble(w[1]);
             case "lens" -> lens = sceneFov = Integer.parseInt(w[1]);
-            case "shot" -> pendingShot = w[1];
+            case "shot" -> {
+                followWalker(mc);
+                pendingShot = w[1];
+            }
             case "burst" -> {
                 burstName = w[1];
                 burstLeft = Integer.parseInt(w[2]);
@@ -193,7 +209,29 @@ public final class FilmDirector {
             case "ant" -> putAnt(w[1], w[2]);
             case "views" -> views(w[1], w.length > 2 ? Integer.parseInt(w[2]) : 1,
                     w.length > 3 ? Double.parseDouble(w[3]) : 1.1);
-            case "quit" -> steps.clear();
+            case "walker" -> putWalker(w[1], w[2], w[3], w[4], w[5]);
+            case "forget" -> onWalker(mc, ant -> {
+                ant.forgetGoalsForFilm();
+                ant.getNavigator().stop();
+            });
+            case "go" -> {
+                BlockPos goal = new BlockPos(Integer.parseInt(w[1]), Integer.parseInt(w[2]), Integer.parseInt(w[3]));
+                double speed = w.length > 4 ? Double.parseDouble(w[4]) : 1.0;
+                onWalker(mc, ant -> LOG.info("Film: walker to {}: {}", goal,
+                        ant.getNavigator().moveTo(goal, speed) ? "route found" : "NO ROUTE"));
+            }
+            case "look" -> lookAt = w[1].equals("off") ? null
+                    : new Vec3(Double.parseDouble(w[1]), Double.parseDouble(w[2]), Double.parseDouble(w[3]));
+            case "follow" -> follow = w[1].equals("off") ? null : new double[] {Double.parseDouble(w[1]),
+                    Double.parseDouble(w[2]), Double.parseDouble(w[3]), Double.parseDouble(w[4]), Double.parseDouble(w[5])};
+            case "log" -> {
+                writeLog(mc);
+                logName = w[1].equals("off") ? null : w[1];
+            }
+            case "quit" -> {
+                writeLog(mc);
+                steps.clear();
+            }
             default -> LOG.warn("Film: unknown step '{}'", step);
         }
     }
@@ -215,6 +253,126 @@ public final class FilmDirector {
         now.add("wait 60");                     // (and the smoke of the kills has gone)
         now.add("cmd tick freeze");
         pushFront(now);
+    }
+
+    /** The walker's name: not {@code film:...}, so it plays its usual clips (walking, climbing, turning). */
+    private static final String WALKER = "film-walker";
+
+    /** The "walker" step: like "ant", but an insect with its AI (its goals then taken away) that the camera sends about. */
+    private static void putWalker(String type, String x, String y, String z, String yaw) {
+        Deque<String> now = new ArrayDeque<>();
+        now.add("cmd tick unfreeze");
+        now.add("cmd kill @e[type=!player]");
+        now.add("wait 25");
+        now.add("cmd kill @e[type=!player]");
+        now.add(String.format("cmd summon antcolonies:%s %s %s %s {PersistenceRequired:1b,Rotation:[%sf,0f],CustomName:'\"%s\"'}",
+                type, x, y, z, yaw, WALKER));
+        now.add("wait 2");
+        now.add("forget");
+        now.add("wait 40");
+        pushFront(now);
+    }
+
+    private static boolean isWalker(Entity entity) {
+        return entity instanceof AbstractAntEntity && entity.getCustomName() != null
+                && WALKER.equals(entity.getCustomName().getString());
+    }
+
+    /** Runs this on the game's own (server) side, for the walker there: its mind and legs live on that side. */
+    private static void onWalker(Minecraft mc, java.util.function.Consumer<AbstractAntEntity> action) {
+        MinecraftServer server = mc.getSingleplayerServer();
+        if (server == null) {
+            LOG.warn("Film: no game server for the walker");
+            return;
+        }
+        server.execute(() -> {
+            boolean found = false;
+            for (Entity entity : server.overworld().getAllEntities()) {
+                if (isWalker(entity)) {
+                    action.accept((AbstractAntEntity) entity);
+                    found = true;
+                }
+            }
+            if (!found) {
+                LOG.warn("Film: no walker");
+            }
+        });
+    }
+
+    /** The walker as this side draws it, or null. */
+    private static AbstractAntEntity drawnWalker(Minecraft mc) {
+        for (Entity entity : mc.level.entitiesForRendering()) {
+            if (isWalker(entity)) {
+                return (AbstractAntEntity) entity;
+            }
+        }
+        return null;
+    }
+
+    /** The point the walker keeps looking at ("look"), or null. */
+    private static volatile Vec3 lookAt;
+
+    @SubscribeEvent
+    public static void onServerTick(ServerTickEvent.Pre event) {
+        Vec3 target = lookAt;
+        if (!active() || target == null) {
+            return;
+        }
+        for (Entity entity : event.getServer().overworld().getAllEntities()) {
+            if (isWalker(entity)) {
+                ((AbstractAntEntity) entity).getLookControl().setLookAt(target.x, target.y, target.z);
+            }
+        }
+    }
+
+    /** The "follow" camera: x y z off the walker, turn and tilt; null when the camera stays where it is put. */
+    private static double[] follow;
+
+    /** Puts the camera (the player, on this side, so at once) where "follow" says, for the next shot. */
+    private static void followWalker(Minecraft mc) {
+        AbstractAntEntity walker = follow == null ? null : drawnWalker(mc);
+        if (walker == null) {
+            return;
+        }
+        mc.player.moveTo(walker.getX() + follow[0], walker.getY() + follow[1] - EYE, walker.getZ() + follow[2],
+                (float) follow[3], (float) follow[4]);
+        mc.player.setOldPosAndRot();
+    }
+
+    /** The "log" step: the file's name and its lines so far, and the walker's last logged tick. */
+    private static String logName;
+    private static final StringBuilder logLines = new StringBuilder();
+    private static int loggedTick = -1;
+
+    @SubscribeEvent
+    public static void onLogTick(ClientTickEvent.Post event) {
+        Minecraft mc = Minecraft.getInstance();
+        if (!active() || logName == null || mc.level == null) {
+            return;
+        }
+        AbstractAntEntity walker = drawnWalker(mc);
+        if (walker == null || walker.tickCount == loggedTick) {
+            return;                                     // frozen: no new tick
+        }
+        loggedTick = walker.tickCount;
+        logLines.append("tick ").append(walker.tickCount).append(' ').append(walker.filmReport()).append(" clip ")
+                .append(clipTimes.getOrDefault(walker.getId(), "- -")).append(System.lineSeparator());
+    }
+
+    private static void writeLog(Minecraft mc) {
+        if (logName == null) {
+            return;
+        }
+        Path file = mc.gameDirectory.toPath().resolve("screenshots").resolve(logName + ".txt");
+        try {
+            Files.createDirectories(file.getParent());
+            Files.writeString(file, logLines.toString(), StandardCharsets.UTF_8);
+            LOG.info("Film: log written to {}", file);
+        } catch (IOException e) {
+            LOG.warn("Film: cannot write {}", file, e);
+        }
+        logLines.setLength(0);
+        logName = null;
     }
 
     /**
@@ -268,7 +426,10 @@ public final class FilmDirector {
         Screenshot.grab(mc.gameDirectory, name, mc.getMainRenderTarget(), message -> LOG.info("Film: saved {}", name));
     }
 
-    /** The clip moment each filmed insect was last drawn at: its clip's name and the seconds into it. */
+    /**
+     * The clip moment each filmed insect was last drawn at: its clip's name and the seconds into it (then, for checking
+     * against the log, the tick it was drawn at and the waist bend it was drawn with).
+     */
     private static final java.util.Map<Integer, String> clipTimes = new java.util.HashMap<>();
 
     /**
@@ -291,7 +452,9 @@ public final class FilmDirector {
             double ticks = (double) adjust.invoke(controller, animTime.getDouble(model));
             var anim = controller.getCurrentAnimation().animation();
             double seconds = (ticks % anim.length()) / 20.0;
-            clipTimes.put(ant.getId(), String.format(java.util.Locale.ROOT, "%s %.4f", anim.name(), seconds));
+            // then the tick it was drawn at and the waist bend it was drawn with, to set beside the log
+            clipTimes.put(ant.getId(), String.format(java.util.Locale.ROOT, "%s %.4f drawn %d waist %.1f", anim.name(), seconds,
+                    ant.tickCount, ant.getWaistPitch(0.0F)));
         } catch (ReflectiveOperationException | RuntimeException e) {
             clipTimes.put(ant.getId(), "- -");
         }
