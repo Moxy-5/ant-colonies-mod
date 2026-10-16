@@ -136,8 +136,10 @@ function ease(name, f) {
   if (m[1] === 'out') return 1 - c(1 - f);
   return f < 0.5 ? c(2 * f) / 2 : 1 - c(2 - 2 * f) / 2;
 }
-function prepare(frames) {
-  return Object.keys(frames).map(k => [parseFloat(k), frames[k].vector, frames[k].easing]).sort((a, b) => a[0] - b[0]);
+function prepare(frames) {      // a key frame is {vector, easing} or, from the motion library, just the vector (linear)
+  return Object.keys(frames).map(k => Array.isArray(frames[k]) ? [parseFloat(k), frames[k], 'linear']
+                                                               : [parseFloat(k), frames[k].vector, frames[k].easing])
+    .sort((a, b) => a[0] - b[0]);
 }
 function sample(list, t) {
   if (list.length === 1 || t <= list[0][0]) return list[0][1];
