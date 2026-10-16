@@ -448,6 +448,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             Colony colony = getColony();
             if (colony != null) {
                 colony.alarm().memberHurt(serverLevel, attacker);
+                colony.patrol().danger(serverLevel, this, "hurt by " + attacker.getType().toShortString()); // a patroller turns back
             }
         }
         return hurt;
@@ -466,11 +467,19 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
 
     /**
      * Whether this insect may work outside its nest and mound now. Always, unless its colony keeps a schedule (termites:
-     * out only at night and in the rain) and it is not foraging time: then it stays inside, out of the sun.
+     * out only at night and in the rain) and it is not foraging time: then it stays inside, out of the sun. A species
+     * whose foragers keep a day clock ({@code food.day_clock}, the harvester ant) keeps it for all its workers' surface
+     * work too (the user's decision, brain step 4b: in at night, in the rain and in the midday rest); not the queen.
      */
     public boolean mayGoOut() {
         Colony colony = getColony();
-        return colony == null || !colony.keepsASchedule() || colony.isForagingTime(level());
+        if (colony == null) {
+            return true;
+        }
+        if (colony.keepsASchedule()) {
+            return colony.isForagingTime(level());
+        }
+        return !isColonyWorker() || colony.profile().food().dayClock().isEmpty() || colony.isForagingTime(level());
     }
 
     /**
@@ -532,6 +541,13 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
                     || wrapped.getGoal() instanceof RandomLookAroundGoal));
             idleSeconds = busy ? 0 : idleSeconds + 1;
             updateYouth();
+        }
+        // A forager home with a seed touches the ants waiting inside by the entrance as it walks in (Gordon's rule, see colony.Door).
+        if (tickCount % 5 == getId() % 5 && getColonyId() != null && level() instanceof ServerLevel serverLevel) {
+            Colony colony = getColony();
+            if (colony != null && isCarryingSeed() && colony.door().isOn(serverLevel) && colony.nest().isInside(serverLevel, blockPosition())) {
+                colony.door().homecomer(serverLevel, this, true);
+            }
         }
         if (navigator.isAttached()) {
             // Holding a wall or going round an edge: the navigator decides the exact motion along the surface.

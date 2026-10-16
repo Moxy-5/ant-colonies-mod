@@ -215,11 +215,21 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * the area (see {@code FoodMap}). {@code regrowth} (optional): eaten plants that grow back, and bare patches round
      * the foraging holes (see {@link Regrowth}). {@code trails} (optional, the defaults of {@link Trails}): how the
      * colony's foraging trails get stronger with use and fade unused, and lasting trunk trails worn into the ground.
+     * {@code dayClock} (optional): the foragers' daily round. {@code door} (optional): how many foragers go out is
+     * driven by the foragers coming home with food (Deborah Gordon's rule, see {@link DoorNumbers}). {@code patrol}
+     * (optional): patrollers open each round of foraging (see {@link PatrolNumbers}).
      */
     public record FoodNumbers(int radius, String items, List<PlantFood> plants, String piece, String pile, int millTicks, int breadStock,
-            List<String> forageAt, int findRadius, Optional<Regrowth> regrowth, Trails trails, Optional<DayClock> dayClock) {
+            List<String> forageAt, int findRadius, Optional<Regrowth> regrowth, Trails trails, Optional<DayClock> dayClock,
+            Optional<DoorNumbers> door, Optional<PatrolNumbers> patrol) {
         /** Foraging at any time: day, night and in the rain. */
         public static final List<String> ALWAYS = List.of("day", "night", "rain");
+
+        public FoodNumbers(int radius, String items, List<PlantFood> plants, String piece, String pile, int millTicks, int breadStock,
+                List<String> forageAt, int findRadius, Optional<Regrowth> regrowth, Trails trails, Optional<DayClock> dayClock) {
+            this(radius, items, plants, piece, pile, millTicks, breadStock, forageAt, findRadius, regrowth, trails, dayClock, Optional.empty(),
+                    Optional.empty());
+        }
 
         public FoodNumbers(int radius, String items, List<PlantFood> plants, String piece, String pile, int millTicks, int breadStock,
                 List<String> forageAt, int findRadius, Optional<Regrowth> regrowth, Trails trails) {
@@ -243,7 +253,9 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 Codec.INT.optionalFieldOf("find_radius", 0).forGetter(FoodNumbers::findRadius),
                 Regrowth.CODEC.optionalFieldOf("regrowth").forGetter(FoodNumbers::regrowth),
                 Trails.CODEC.optionalFieldOf("trails", Trails.DEFAULT).forGetter(FoodNumbers::trails),
-                DayClock.CODEC.optionalFieldOf("day_clock").forGetter(FoodNumbers::dayClock)
+                DayClock.CODEC.optionalFieldOf("day_clock").forGetter(FoodNumbers::dayClock),
+                DoorNumbers.CODEC.optionalFieldOf("door").forGetter(FoodNumbers::door),
+                PatrolNumbers.CODEC.optionalFieldOf("patrol").forGetter(FoodNumbers::patrol)
         ).apply(i, FoodNumbers::new));
 
         /**
@@ -369,6 +381,66 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
         public static String clock(long dayTime) {
             long minutes = (Math.floorMod(dayTime, 24000L) * 60 / 1000 + 6 * 60) % (24 * 60);
             return (minutes / 60) + ":" + String.format("%02d", minutes % 60);
+        }
+    }
+
+    /**
+     * The door (brain step 4b; Deborah Gordon's rule for red harvester ants): no ant is in charge of how many go out.
+     * Foragers that are not out wait inside by the entrance; a forager (or a patroller) coming home touches the waiting
+     * ants it passes within {@code touchReach} blocks, and one that has had {@code touchesNeeded} touches within
+     * {@code touchMemoryTicks} goes out (Greene and Gordon: about one contact every 10 seconds). A forager home with
+     * nothing does not count. While the colony has fewer than {@code smallColonyForagers} foragers one touch is enough,
+     * a homecomer reaches every waiting ant by the entrance (a tiny nest), and a forager's own seed counts as its touch,
+     * so a young colony is never slower than before. For the foragers that are numbers, each homecomer touches
+     * {@code touchesPerReturn} of the waiting ones. My picks, to confirm.
+     */
+    public record DoorNumbers(int touchesNeeded, int touchMemoryTicks, double touchReach, int smallColonyForagers, int touchesPerReturn) {
+        public static final Codec<DoorNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.INT.optionalFieldOf("touches_needed", 3).forGetter(DoorNumbers::touchesNeeded),
+                Codec.INT.optionalFieldOf("touch_memory_ticks", 600).forGetter(DoorNumbers::touchMemoryTicks),
+                Codec.DOUBLE.optionalFieldOf("touch_reach", 2.0).forGetter(DoorNumbers::touchReach),
+                Codec.INT.optionalFieldOf("small_colony_foragers", 10).forGetter(DoorNumbers::smallColonyForagers),
+                Codec.INT.optionalFieldOf("touches_per_return", 3).forGetter(DoorNumbers::touchesPerReturn)
+        ).apply(i, DoorNumbers::new));
+
+        /** How many touches a waiting forager needs to go out, in a colony with this many foragers. */
+        public int touchesFor(int foragers) {
+            return foragers < smallColonyForagers ? 1 : Math.max(1, touchesNeeded);
+        }
+    }
+
+    /**
+     * Patrollers (brain step 4b; real <i>Pogonomyrmex barbatus</i>, Gordon; Greene and Gordon 2007): each time the day
+     * clock opens (at dawn, after the midday rest, after rain) a few workers taken from the builders go out first, over
+     * and round the hill and then about {@code reach} blocks out along a trunk trail (or in a new direction) and back.
+     * Foraging starts only once one is back, and only in the directions they came back from. A dawn patrol is
+     * {@code share} of the workers (at least {@code least}); a later one {@code laterRounds} of that. A patroller hurt, or
+     * with a hostile mob within {@code hostileWithin} blocks, turns back: its direction stays shut for the day,
+     * {@code extraOnDanger} times as many again come out to patrol the hill, and the foragers allowed out are
+     * {@code foragersAfterDanger} of the forager share for the rest of the day. A patroller meeting another colony's ants
+     * turns back and shuts that direction for the day. The share and the later rounds are the user's; the rest my picks.
+     */
+    public record PatrolNumbers(float share, int least, int reach, float laterRounds, double hostileWithin, float extraOnDanger,
+            float foragersAfterDanger) {
+        public static final Codec<PatrolNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.FLOAT.optionalFieldOf("share", 0.16F).forGetter(PatrolNumbers::share),
+                Codec.INT.optionalFieldOf("least", 1).forGetter(PatrolNumbers::least),
+                Codec.INT.optionalFieldOf("reach", 10).forGetter(PatrolNumbers::reach),
+                Codec.FLOAT.optionalFieldOf("later_rounds", 0.5F).forGetter(PatrolNumbers::laterRounds),
+                Codec.DOUBLE.optionalFieldOf("hostile_within", 4.0).forGetter(PatrolNumbers::hostileWithin),
+                Codec.FLOAT.optionalFieldOf("extra_on_danger", 1.0F).forGetter(PatrolNumbers::extraOnDanger),
+                Codec.FLOAT.optionalFieldOf("foragers_after_danger", 0.5F).forGetter(PatrolNumbers::foragersAfterDanger)
+        ).apply(i, PatrolNumbers::new));
+
+        /** How many patrol at dawn in a colony of this many workers (2 at 10, 4 at 25, 8 at 50, 16 at 100). */
+        public int dawnPatrol(int workers) {
+            return workers <= 0 ? 0 : Math.min(workers, Math.max(least, Math.round(workers * share)));
+        }
+
+        /** How many patrol after the midday rest or after rain: {@code laterRounds} of the dawn patrol. */
+        public int laterPatrol(int workers) {
+            int dawn = dawnPatrol(workers);
+            return dawn <= 0 ? 0 : Math.min(dawn, Math.max(least, Math.round(dawn * laterRounds)));
         }
     }
 

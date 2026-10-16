@@ -387,7 +387,9 @@ public class ColonyCommands {
                     + SpeciesProfile.DayClock.clock(colony.timeOfDay(level)) + "; out " + SpeciesProfile.DayClock.clock(c.outFrom())
                     + " to " + SpeciesProfile.DayClock.clock(c.inBy()) + (rest > 0 ? ", resting " + SpeciesProfile.DayClock.clock(c.restStart(heat))
                     + " to " + SpeciesProfile.DayClock.clock(c.restStart(heat) + rest) : ", no midday rest")
-                    + String.format(" (biome heat %.1f)", heat) + (c.notInRain() ? ", never in rain" : "") + ")";
+                    + String.format(" (biome heat %.1f)", heat) + (c.notInRain() ? ", never in rain" : "") + ")"
+                    + colony.patrol().describe(level) + colony.door().describe(level)
+                    + (colony.hill().nightSoilCount() > 0 ? " | night soil under the entrance: " + colony.hill().nightSoilCount() + " pellets" : "");
         }
         if (!colony.keepsASchedule() && holes == 0) {
             return "";

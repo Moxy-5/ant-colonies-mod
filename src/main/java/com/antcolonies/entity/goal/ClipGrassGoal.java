@@ -79,6 +79,9 @@ public class ClipGrassGoal extends Goal {
         if (fromInside && !colony.keepsASchedule()) {
             return false;
         }
+        if (!fromInside && !colony.door().mayGo(level, ant)) {
+            return false; // waits by the entrance for the homecomers' touches (Gordon's rule, see colony.Door)
+        }
         long now = level.getGameTime();
         unreachable.values().removeIf(until -> until <= now);
         grass = colony.food().findGrass(level, ant.blockPosition(), unreachable.keySet(), ant.getUUID(), fromInside);
@@ -86,6 +89,9 @@ public class ClipGrassGoal extends Goal {
             return false;
         }
         colony.food().claimGrass(level, grass, ant.getUUID());
+        if (!fromInside) {
+            colony.door().setOut(level, ant);
+        }
         via = fromInside ? null : colony.trunkTrails().setOut(level, grass);
         if (via != null && flat(ant.blockPosition()) >= flat(via) - 1.0) {
             via = null; // already out past the trail's end for this plant (it was out in the field): straight there

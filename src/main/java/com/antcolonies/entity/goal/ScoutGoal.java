@@ -52,14 +52,18 @@ public class ScoutGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        if (colony == null || !colony.foodMap().findsByLooking() || !colony.isForagingTime(level) || !colony.food().wantsSeeds(level)) {
-            return false;
+        if (colony == null || !colony.foodMap().findsByLooking() || !colony.isForagingTime(level) || !colony.food().wantsSeeds(level)
+                || !colony.door().mayGo(level, ant)) {
+            return false; // (a searcher waits for the homecomers' touches like any forager, see colony.Door)
         }
         boolean foodToGoFor = colony.food().findGrass(level, ant.blockPosition(), java.util.Set.of(), ant.getUUID()) != null;
         if (foodToGoFor && ant.getRandom().nextInt(SCOUT_ANYWAY) != 0) {
             return false;
         }
         spot = pickSpot(level, colony);
+        if (spot != null) {
+            colony.door().setOut(level, ant);
+        }
         return spot != null;
     }
 
@@ -78,7 +82,7 @@ public class ScoutGoal extends Goal {
             }
             BlockPos cell = new BlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z), z);
             BlockPos below = cell.below();
-            if (!colony.foodMap().mayScout(cell)) {
+            if (!colony.foodMap().mayScout(cell) || !colony.patrol().isOpen(level, cell)) {
                 continue;
             }
             if (Math.abs(cell.getY() - center.getY()) > 6 || !level.getFluidState(cell).isEmpty()

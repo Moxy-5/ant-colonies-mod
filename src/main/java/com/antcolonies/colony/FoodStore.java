@@ -177,7 +177,8 @@ public class FoodStore {
         double bestDistance = Double.MAX_VALUE;
         for (ItemEntity item : level.getEntitiesOfClass(ItemEntity.class, area)) {
             if (!item.isAlive() || !item.getItem().is(items) || item.getY() < center.getY() - 0.5
-                    || claimedSeeds.contains(item.getId()) || avoid.contains(item.getId())) {
+                    || claimedSeeds.contains(item.getId()) || avoid.contains(item.getId())
+                    || !colony.patrol().isOpen(level, item.blockPosition())) { // (only where the patrollers came back from)
                 continue;
             }
             double distance = item.distanceToSqr(near.getX() + 0.5, near.getY() + 0.5, near.getZ() + 0.5);
@@ -232,7 +233,8 @@ public class FoodStore {
             SpeciesProfile.PlantFood plant = food().plantFor(level.getBlockState(pos));
             // (a plant the numbers have used up out of sight still stands until it is out of every player's sight: skipped)
             if (plant == null || plant.pieces() - getPiecesCut(pos) <= 0 || busyGrass.contains(pos) || avoid.contains(pos) || foragersAt(pos) >= Math.max(1, plant.foragers())
-                    || !colony.foodMap().knows(pos, ant) || fromInside && !isFeedableFromInside(level, pos)) {
+                    || !colony.foodMap().knows(pos, ant) || fromInside && !isFeedableFromInside(level, pos)
+                    || !fromInside && !colony.patrol().isOpen(level, pos)) { // (only where the patrollers came back from)
                 continue;
             }
             double worth = worth(plant.pieces() - getPiecesCut(pos), tripLength(pos, exits.isEmpty() ? List.of(center) : exits), pos.distSqr(near));

@@ -183,10 +183,25 @@ public class FieldLife {
         return Colony.shareOut(workers, colony.profile().colony().nurses(workers), ages)[ColonyRole.FORAGER.ordinal()];
     }
 
-    /** The forager numbers' trips this second (see the class comment). */
+    /**
+     * The forager numbers' trips this second (see the class comment). How many may be out is the door's (Gordon's rule:
+     * the homecomings with food bring more out, see {@link Door}), and only to plants the patrollers opened ({@link Patrol}).
+     */
     private boolean forage(ServerLevel level) {
-        out = 0;
         int foragers = foragersInside(level);
+        returnedNow = 0;
+        placedNow = 0;
+        boolean changed = forageWith(level, foragers);
+        colony.door().numbersSecond(level, foragers, returnedNow, placedNow);
+        return changed;
+    }
+
+    /** Pieces the numbers brought home this second, and how many of them were at work on a plant (for the door). */
+    private int returnedNow;
+    private double placedNow;
+
+    private boolean forageWith(ServerLevel level, int foragers) {
+        out = 0;
         if (foragers <= 0 || known.isEmpty()) {
             progress.clear();
             return false;
@@ -207,7 +222,7 @@ public class FieldLife {
         for (Map.Entry<BlockPos, Plant> entry : known.entrySet()) {
             Plant plant = entry.getValue();
             if (plant.kind() < 0 || plant.kind() >= kinds.size() || !outside && !plant.fromInside()
-                    || !colony.foodMap().knows(entry.getKey(), null)) {
+                    || !colony.foodMap().knows(entry.getKey(), null) || !colony.patrol().isOpen(level, entry.getKey())) {
                 continue;
             }
             int left = kinds.get(plant.kind()).pieces() - food.getPiecesCut(entry.getKey());
@@ -219,7 +234,7 @@ public class FieldLife {
         plants.sort(Comparator.comparingDouble((Map.Entry<BlockPos, Plant> entry) -> -worth.get(entry.getKey())));
         List<Vec3> eyes = colony.population().viewersInSight(level);
         long now = level.getGameTime();
-        double free = foragers;
+        double free = colony.door().numbersFree(level, foragers);
         boolean changed = false;
         int worked = 0;
         List<BlockPos> usedUp = new ArrayList<>();
@@ -244,6 +259,7 @@ public class FieldLife {
             double atPlant = plant.trip() * TICKS_PER_BLOCK + CUT_TICKS + (kind.foragers() <= 1 ? REST_TICKS : 0);
             double sent = Math.min(free, places * trip / atPlant);
             free -= sent;
+            placedNow += sent;
             out += (int) Math.round(sent);
             double got = progress.getOrDefault(pos, 0.0) + sent * 20.0 / trip;
             int left = kind.pieces() - food.getPiecesCut(pos);
@@ -253,6 +269,7 @@ public class FieldLife {
                 left = kind.pieces() - food.cutByNumbers(level, pos, kind);
                 food.countIn(false);
                 colony.ledger().addStore(1);
+                returnedNow++;
                 colony.trunkTrails().tripByNumbers(level, pos); // their trip out and back wears the trail too
                 owed.put(pos, now);
                 colony.away().note(level, AwayReport.What.FORAGED, 1);

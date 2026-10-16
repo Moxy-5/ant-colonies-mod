@@ -37,6 +37,10 @@ public class TrailTests {
      * trips are remembered). 60 trips each way: the east trail wears bare out to the food (the grass cut, its seeds left
      * lying; coarse dirt), not past it; the south one waits while a pretend player looks at it, and wears bare once
      * nobody does (a low wall hides the east trail from them). Saved and loaded with the colony. Unused for a week it fades, and its bare ground grows back to grass.
+     * <p>Brain step 4b part 3, in the same scene: with the patrollers on, a new round's patrol (the share of the workers,
+     * all numbers here) walks the two trunk trails first; once they are back food along the trails is open; a patroller
+     * killed on the east trail shuts it for the day (the south one stays open) and fewer foragers may go out; the
+     * patrol is saved and loaded with the colony.
      */
     @GameTest(template = "arena", timeoutTicks = 600, skyAccess = true)
     public static void foragersWearLastingTrunkTrailsThatFadeAndGrowBack(GameTestHelper helper) {
@@ -111,10 +115,38 @@ public class TrailTests {
             helper.assertTrue(!level.getEntitiesOfClass(ItemEntity.class, eastTrail).isEmpty(), "the cut grass should leave its seeds lying");
             colony.population().setViewersForTests(List.of());
             colony.trunkTrails().checkSoonForTests();
+            colony.patrol().setOnForTests(true); // brain step 4b: a new round, with its patrol
+            colony.patrol().newRoundForTests();
+        });
+        helper.runAfterDelay(85, () -> {
+            Colony colony = PopulationTests.antColony(helper);
+            List<String> ways = colony.patrol().waysForTests();
+            AntColoniesMod.LOGGER.info("[trail-test] patrol: {} ways {}", colony.patrol().describe(level), ways);
+            helper.assertTrue(colony.patrol().isRoundOn() && ways.size() >= 2 && ways.get(0).endsWith("(trail)") && ways.get(1).endsWith("(trail)")
+                    && ways.contains("east (trail)") && ways.contains("south (trail)"), "the patrol should walk the two trunk trails first: " + ways);
+            helper.assertTrue(colony.patrol().sentThisRound() == colony.profile().food().patrol().orElseThrow().dawnPatrol(colony.getCount(WorkerAntEntity.CASTE)),
+                    "the dawn patrol should be the share of the workers: " + colony.patrol().describe(level));
+            int groundY = helper.absolutePos(new BlockPos(0, SURFACE - 1, 0)).getY();
+            helper.assertTrue(!colony.patrol().isOpen(level, new BlockPos(center[0].getX() + FOOD_OUT, groundY + 1, center[0].getZ())),
+                    "nothing is open before a patroller is back");
+            colony.patrol().bringNumbersHomeForTests();
         });
         helper.runAfterDelay(100, () -> {
             Colony colony = PopulationTests.antColony(helper);
             int groundY = helper.absolutePos(new BlockPos(0, SURFACE - 1, 0)).getY();
+            BlockPos eastFood = new BlockPos(center[0].getX() + FOOD_OUT, groundY + 1, center[0].getZ());
+            BlockPos southFood = new BlockPos(center[0].getX(), groundY + 1, center[0].getZ() + FOOD_OUT);
+            helper.assertTrue(colony.patrol().backThisRound() > 0 && colony.patrol().isOpen(level, eastFood) && colony.patrol().isOpen(level, southFood),
+                    "with the patrol back the trails should be open: " + colony.patrol().describe(level));
+            colony.patrol().patrollerKilledForTests(level, 0.0);
+            helper.assertTrue(!colony.patrol().isOpen(level, eastFood) && colony.patrol().isOpen(level, southFood),
+                    "a patroller killed east should shut the east trail only: " + colony.patrol().describe(level));
+            helper.assertTrue(colony.patrol().dangerToday() && colony.patrol().foragerShareToday(level) < 1.0F,
+                    "after a patroller is lost fewer foragers may go out today");
+            Colony copy = Colony.load(colony.save());
+            copy.patrol().setOnForTests(true);
+            helper.assertTrue(copy.patrol().describe(level).equals(colony.patrol().describe(level)) && !copy.patrol().isOpen(level, eastFood),
+                    "the patrol should be saved: " + copy.patrol().describe(level) + " / " + colony.patrol().describe(level));
             for (int t = 4; t <= FOOD_OUT; t++) {
                 BlockPos south = new BlockPos(center[0].getX(), groundY, center[0].getZ() + t);
                 helper.assertTrue(level.getBlockState(south).is(Blocks.COARSE_DIRT) && level.getBlockState(south.above()).isAir(),

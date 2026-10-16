@@ -13,10 +13,19 @@ import com.antcolonies.registry.ModBlocks;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.StringTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
 
@@ -49,6 +58,19 @@ public class Hill {
 
     /** No repair soil is fetched before this game time (see {@link #HILL_PAUSE_TICKS}). Not saved. */
     private long hillPausedUntil;
+
+    /** At most this many pellets wait in the night soil heap; more dug at night is packed into the walls. */
+    public static final int NIGHT_SOIL_MOST = 512;
+    /** Most ants that carry night soil up at the same time. */
+    private static final int MAX_NIGHT_SOIL_CARRIERS = 4;
+    /**
+     * The night soil (brain step 4b, the user's decision): pellets dug while the surface is shut (at night, in the rain,
+     * in the midday rest; the diggers keep the foragers' day clock) wait in the shaft just under the entrance, and are
+     * carried up onto the hill once the clock opens. Counted, not placed as blocks (so the shaft is never blocked). Saved.
+     */
+    private final List<BlockState> nightSoil = new ArrayList<>();
+    /** The ants carrying night soil up now: ant -> until when. Not saved. */
+    private final Claims<UUID> nightSoilCarriers = new Claims<>();
 
     Hill(Colony colony) {
         this.colony = colony;
@@ -146,6 +168,66 @@ public class Hill {
     /** A soil pellet could not be brought to the hill (no route to the gap): wait a while before fetching more for repairs. */
     public void pauseHillRepair(Level level) {
         hillPausedUntil = level.getGameTime() + HILL_PAUSE_TICKS;
+    }
+
+    /** A pellet dug while the surface is shut is put on the night soil heap under the entrance (see {@link #nightSoil}). */
+    public void addNightSoil(BlockState pellet) {
+        if (nightSoil.size() < NIGHT_SOIL_MOST) {
+            nightSoil.add(pellet);
+        }
+    }
+
+    /** How many pellets wait in the night soil heap. */
+    public int nightSoilCount() {
+        return nightSoil.size();
+    }
+
+    /** Whether a builder should carry night soil up now: some waits, the hill has room, and not too many are at it. */
+    public boolean needsNightSoilCarried(ServerLevel level) {
+        nightSoilCarriers.prune(level.getGameTime());
+        if (nightSoil.isEmpty() || nightSoilCarriers.size() >= Math.min(MAX_NIGHT_SOIL_CARRIERS, nightSoil.size())) {
+            return false;
+        }
+        if (!hasMoundRoom(level)) {
+            nightSoil.clear(); // the hill is finished: the rest is packed into the walls
+            return false;
+        }
+        return true;
+    }
+
+    public void claimNightSoil(ServerLevel level, UUID ant) {
+        nightSoilCarriers.put(ant, level.getGameTime() + REPAIR_CLAIM_TICKS);
+    }
+
+    /** One pellet taken from the night soil heap (null if there is none). */
+    @Nullable
+    public BlockState takeNightSoil(UUID ant) {
+        nightSoilCarriers.remove(ant);
+        return nightSoil.isEmpty() ? null : nightSoil.remove(nightSoil.size() - 1);
+    }
+
+    /** Tests only: empties the night soil heap. */
+    public void clearNightSoilForTests() {
+        nightSoil.clear();
+    }
+
+    void save(CompoundTag tag) {
+        ListTag list = new ListTag();
+        for (BlockState pellet : nightSoil) {
+            list.add(StringTag.valueOf(BuiltInRegistries.BLOCK.getKey(pellet.getBlock()).toString()));
+        }
+        tag.put("nightSoil", list);
+    }
+
+    void load(CompoundTag tag) {
+        nightSoil.clear();
+        for (Tag t : tag.getList("nightSoil", Tag.TAG_STRING)) {
+            ResourceLocation id = ResourceLocation.tryParse(t.getAsString());
+            Block block = id == null ? Blocks.AIR : BuiltInRegistries.BLOCK.get(id);
+            if (block != Blocks.AIR) {
+                nightSoil.add(block.defaultBlockState());
+            }
+        }
     }
 
     /** Where repair soil is scraped up: inside the entrance shaft, right under the hole. */

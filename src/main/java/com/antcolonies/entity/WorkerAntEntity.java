@@ -7,6 +7,7 @@ import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.entity.goal.GoInsideGoal;
 import com.antcolonies.entity.goal.CarryCorpseGoal;
 import com.antcolonies.entity.goal.CarryEggGoal;
+import com.antcolonies.entity.goal.CarryNightSoilGoal;
 import com.antcolonies.entity.goal.CarryPelletGoal;
 import com.antcolonies.entity.goal.ClipGrassGoal;
 import com.antcolonies.entity.goal.DigGoal;
@@ -14,6 +15,7 @@ import com.antcolonies.entity.goal.EatGoal;
 import com.antcolonies.entity.goal.FeedLarvaGoal;
 import com.antcolonies.entity.goal.FeedQueenGoal;
 import com.antcolonies.entity.goal.MillBreadGoal;
+import com.antcolonies.entity.goal.PatrolGoal;
 import com.antcolonies.entity.goal.GatherSeedGoal;
 import com.antcolonies.entity.goal.RepairHillGoal;
 import com.antcolonies.entity.goal.ScoutGoal;
@@ -84,8 +86,12 @@ public class WorkerAntEntity extends AbstractAntEntity {
         // Dead nestmates are carried down to the refuse chamber (the builders' job) before more seeds are fetched.
         this.goalSelector.addGoal(6, new CarryCorpseGoal(this));
         this.goalSelector.addGoal(6, new GatherSeedGoal(this));
+        // The patrollers go out first each round, over the hill and along the trails (see colony.Patrol).
+        this.goalSelector.addGoal(6, new PatrolGoal(this));
         this.goalSelector.addGoal(7, new ClipGrassGoal(this));
         this.goalSelector.addGoal(7, new ScoutGoal(this));
+        // Soil dug while the surface was shut waits under the entrance: carried up onto the hill once the clock opens.
+        this.goalSelector.addGoal(8, new CarryNightSoilGoal(this));
         this.goalSelector.addGoal(8, new DigGoal(this, () -> true, () -> mayDo(ColonyRole.BUILDER)));
         // Once the nest is dug, builders mend the hill when a block of it has been knocked out.
         this.goalSelector.addGoal(8, new RepairHillGoal(this));
@@ -198,6 +204,7 @@ public class WorkerAntEntity extends AbstractAntEntity {
             Colony colony = manager.getColony(getColonyId());
             if (colony != null) {
                 dropLoadOnDeath(serverLevel, colony);
+                colony.patrol().died(serverLevel, getUUID()); // a patroller killed never comes back: its way stays shut today
                 colony.setCount(CASTE, colony.getCount(CASTE) - 1);
                 manager.markChanged();
             }

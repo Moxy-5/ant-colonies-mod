@@ -48,6 +48,12 @@ public class NestTests {
     private static final int FOUNDING_CELLS = 1 + 9;
     private static final int NEST_CELLS = 3 + FOUNDING_CELLS + 4 * 3 + (25 + 25 + 9 + 25) + 3 * NestPlan.STAIR_LENGTH;
 
+    /**
+     * Brain step 4b, in the same scene: once 15 cells are dug it is midnight for 1500 ticks: the diggers keep the
+     * foragers' day clock for their surface work, so no worker is outside (after a moment to get in) and the soil dug
+     * meanwhile goes on the night soil heap under the entrance; once it is morning again it is carried up onto the hill
+     * (the heap is empty at the end).
+     */
     @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
     public static void workersDigTheWholeNestAndBuildTheMound(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
@@ -55,6 +61,32 @@ public class NestTests {
         level.getServer().tickRateManager().setTickRate(2000.0F);
 
         startColony(helper);
+
+        long[] nightFrom = {-1};
+        int[] heaped = {-1};
+        String[] outsideAtNight = {null};
+        helper.onEachTick(() -> {
+            Colony colony = colony(helper);
+            if (colony == null || heaped[0] >= 0) {
+                return;
+            }
+            if (nightFrom[0] < 0 && airBelowSurface(helper) >= 15) {
+                nightFrom[0] = helper.getTick();
+                colony.setClockForTests(18000L, null); // midnight
+                AntColoniesMod.LOGGER.info("[nest-test] tick {}: midnight", helper.getTick());
+            } else if (nightFrom[0] >= 0 && helper.getTick() - nightFrom[0] >= 400 && outsideAtNight[0] == null) {
+                for (AbstractAntEntity ant : level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds())) {
+                    if (!colony.nest().isInside(level, ant.blockPosition())) {
+                        outsideAtNight[0] = ant.blockPosition().toShortString() + " at tick " + helper.getTick();
+                    }
+                }
+            }
+            if (nightFrom[0] >= 0 && helper.getTick() - nightFrom[0] >= 1500) {
+                heaped[0] = colony.hill().nightSoilCount();
+                colony.setClockForTests(null, null); // morning again (7:00 on the test server)
+                AntColoniesMod.LOGGER.info("[nest-test] tick {}: morning, {} pellets of night soil heaped under the entrance", helper.getTick(), heaped[0]);
+            }
+        });
 
         int[] lastAirCount = {0};
         helper.onEachTick(() -> {
@@ -83,6 +115,9 @@ public class NestTests {
             helper.assertTrue(queens.get(0).blockPosition().equals(room), "the queen is not in the middle of the room yet: " + queens.get(0).blockPosition().subtract(room));
             String hill = hillProblems(helper);
             helper.assertTrue(hill.isEmpty(), "the mound is not the planned hill yet: " + hill);
+            helper.assertTrue(heaped[0] > 0, "soil dug at night should be heaped under the entrance: " + heaped[0]);
+            helper.assertTrue(outsideAtNight[0] == null, "a worker was outside at midnight: " + outsideAtNight[0]);
+            helper.assertTrue(colony.hill().nightSoilCount() == 0, "the night soil should be carried up: " + colony.hill().nightSoilCount() + " left");
             AntColoniesMod.LOGGER.info("[nest-test] finished at tick {}: {}", helper.getTick(), describe(helper));
         });
     }
@@ -511,6 +546,9 @@ public class NestTests {
      * floor of the food store, the colony counts them, and nothing is left outside.
      * It runs in a batch of its own: its foragers fetch seeds from up to 24 blocks away, so seeds or grass in a
      * neighbouring test's arena were brought in too (it once counted 7 or 8 seeds instead of 5).
+     * Brain step 4b: the patrollers are on here, and a new round starts as the seeds are dropped: no forager sets out
+     * before a patroller is back (Gordon), and the young colony is not slowed (the user's worry): its first forager is
+     * out within a minute of the first patroller's return.
      */
     @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true, batch = "seeds_alone")
     public static void workersCarrySeedsAndClipGrassIntoTheFoodStore(GameTestHelper helper) {
@@ -527,6 +565,8 @@ public class NestTests {
                 return;
             }
             dropped[0] = true;
+            colony.patrol().setOnForTests(true);
+            colony.patrol().newRoundForTests(); // the clock opens now: a patrol first
             dropSeeds(helper, MIDDLE + 6, MIDDLE, 1);
             dropSeeds(helper, MIDDLE - 6, MIDDLE + 2, 1);
             dropSeeds(helper, MIDDLE + 1, MIDDLE - 7, 3);
@@ -534,6 +574,32 @@ public class NestTests {
                 helper.setBlock(tuft[0], SURFACE, tuft[1], Blocks.SHORT_GRASS);
             }
             AntColoniesMod.LOGGER.info("[seed-test] tick {}: 5 seeds dropped and 3 tufts of grass planted around the hill", helper.getTick());
+        });
+        long[] firstBack = {-1};
+        long[] firstOut = {-1};
+        long[] dropTick = {-1};
+        helper.onEachTick(() -> {
+            Colony colony = colony(helper);
+            if (!dropped[0] || colony == null) {
+                return;
+            }
+            if (dropTick[0] < 0) {
+                dropTick[0] = helper.getTick();
+            }
+            if (firstBack[0] < 0 && colony.patrol().isRoundOn() && colony.patrol().backThisRound() > 0) {
+                firstBack[0] = helper.getTick();
+                AntColoniesMod.LOGGER.info("[seed-test] tick {}: the first patroller is back ({} ticks after the round began){}", helper.getTick(),
+                        helper.getTick() - dropTick[0], colony.patrol().describe(level));
+            }
+            if (firstOut[0] < 0) {
+                for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
+                    if (colony.door().isOut(ant.getUUID()) || ant.isCarryingSeed()) {
+                        firstOut[0] = helper.getTick();
+                        AntColoniesMod.LOGGER.info("[seed-test] tick {}: the first forager sets out", helper.getTick());
+                        break;
+                    }
+                }
+            }
         });
         helper.onEachTick(() -> {
             if (dropped[0] && helper.getTick() % 200 == 0) {
@@ -546,6 +612,10 @@ public class NestTests {
         helper.succeedWhen(() -> {
             Colony colony = colony(helper);
             helper.assertTrue(dropped[0] && colony != null, "no seeds have been dropped yet");
+            helper.assertTrue(firstBack[0] >= 0, "no patroller came back");
+            helper.assertTrue(firstOut[0] >= firstBack[0], "a forager set out at tick " + firstOut[0] + ", before the first patroller was back at " + firstBack[0]);
+            helper.assertTrue(firstOut[0] - firstBack[0] <= 1200, "the first forager set out " + (firstOut[0] - firstBack[0])
+                    + " ticks after the first patroller was back: the young colony is slowed");
             for (int[] tuft : tufts) {
                 helper.assertBlock(new BlockPos(tuft[0], SURFACE, tuft[1]), block -> block == Blocks.AIR, "a tuft of grass is still there");
             }

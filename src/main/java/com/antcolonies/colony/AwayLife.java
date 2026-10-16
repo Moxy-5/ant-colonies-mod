@@ -207,6 +207,7 @@ public class AwayLife {
         if (isAway(level)) {
             colony.population().tickAway(level);
             colony.life().tick(level, true);
+            colony.patrol().tick(level, true);
             colony.field().tick(level, true);
             colony.building().tickAway(level);
             colony.trunkTrails().tick(level, true);

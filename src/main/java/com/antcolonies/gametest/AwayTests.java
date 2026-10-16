@@ -404,8 +404,11 @@ public class AwayTests {
      * too, but not a tuft that grew after the brain last looked; the away report counts it all.
      * <p>Brain step 4b, in the same scene: away, the numbers keep the harvester ants' day clock: nothing is foraged at
      * midnight, nor at 7:00 in the rain; on a dry morning in a hot biome they go out and eat the tufts up.
+     * <p>Brain step 4b parts 2 and 3, in the same scene: on that morning the patrollers are on: the numbers send a patrol
+     * first (as numbers: no real worker is loaded), nothing is foraged before one is back, and the door then lets the
+     * foragers out by the homecomings; the away report counts the patrol.
      */
-    @GameTest(template = "arena", timeoutTicks = 3000, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 4000, skyAccess = true)
     public static void antNumbersForageOnlyOutOfSightAndFromWhatTheyRemember(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         startAntColony(helper);
@@ -415,7 +418,18 @@ public class AwayTests {
         UUID[] queen = new UUID[1];
         CompoundTag[] queenOnDisk = new CompoundTag[1];
         int[] foodBefore = new int[1];
+        boolean[] patrolOn = {false};
+        boolean[] foragedBeforePatrol = {false};
         helper.onEachTick(() -> noRealWorkers(helper));
+        helper.onEachTick(() -> {
+            if (!patrolOn[0]) {
+                return;
+            }
+            Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElse(null);
+            if (colony != null && colony.patrol().backThisRound() == 0 && colony.away().report().get(AwayReport.What.FORAGED) > 0) {
+                foragedBeforePatrol[0] = true;
+            }
+        });
         helper.runAfterDelay(15, () -> {
             Colony colony = antColony(helper);
             colony.population().setOnForTests(false); // no swapping: the numbers stay numbers
@@ -475,8 +489,19 @@ public class AwayTests {
             checkNothingForaged(helper, colony, seen, "in the rain");
             colony.setClockForTests(2000L, 2.0F); // 8:00 in a hot biome, dry: out (the midday rest is 11:00 to 15:00)
             colony.setSkyForTests(null, false);
+            colony.patrol().setOnForTests(true); // brain step 4b: a patrol first
+            colony.patrol().newRoundForTests();
+            patrolOn[0] = true;
         });
-        helper.runAfterDelay(2600, () -> {
+        helper.runAfterDelay(1660, () -> {
+            Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
+            AntColoniesMod.LOGGER.info("[away-test] 4b: {}{}", colony.patrol().describe(level), colony.door().describe(level));
+            helper.assertTrue(colony.patrol().isRoundOn() && colony.patrol().numbersOut() > 0 && colony.patrol().realOut().isEmpty(),
+                    "the numbers should send a patrol of numbers first: " + colony.patrol().describe(level));
+            helper.assertTrue(colony.patrol().sentThisRound() == colony.profile().food().patrol().orElseThrow().dawnPatrol(colony.getCount(WorkerAntEntity.CASTE)),
+                    "the dawn patrol should be the share of the workers: " + colony.patrol().describe(level));
+        });
+        helper.runAfterDelay(3600, () -> {
             Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
             AntColoniesMod.LOGGER.info("[away-test] 2c ants away: food {}{}{}", colony.food().getFood(), colony.away().describe(level),
                     colony.field().describe());
@@ -493,10 +518,12 @@ public class AwayTests {
                     + " in the store and " + milled + " milled, was " + foodBefore[0]);
             helper.assertTrue(report.get(AwayReport.What.FORAGED) == 8 && report.get(AwayReport.What.PLANTS_USED_UP) == 4,
                     "the away report should count the food brought in and the tufts eaten up: " + report.describe());
+            helper.assertTrue(!foragedBeforePatrol[0], "nothing should be foraged before a patroller is back");
+            helper.assertTrue(report.get(AwayReport.What.PATROLS) >= 1, "the away report should count the patrol: " + report.describe());
             colony.away().setAwayForTests(false);
             loadAgain(level, queenOnDisk[0]);
         });
-        helper.runAfterDelay(2660, () -> {
+        helper.runAfterDelay(3660, () -> {
             helper.assertTrue(antColony(helper) != null, "the queen should be back and alive");
             helper.succeed();
         });
