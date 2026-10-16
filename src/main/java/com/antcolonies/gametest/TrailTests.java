@@ -131,7 +131,8 @@ public class TrailTests {
                     "nothing is open before a patroller is back");
             colony.patrol().bringNumbersHomeForTests();
         });
-        helper.runAfterDelay(100, () -> {
+        // (25 ticks after the patrol was sent home: the colony counts them back on its next second, every 20 ticks)
+        helper.runAfterDelay(110, () -> {
             Colony colony = PopulationTests.antColony(helper);
             int groundY = helper.absolutePos(new BlockPos(0, SURFACE - 1, 0)).getY();
             BlockPos eastFood = new BlockPos(center[0].getX() + FOOD_OUT, groundY + 1, center[0].getZ());
