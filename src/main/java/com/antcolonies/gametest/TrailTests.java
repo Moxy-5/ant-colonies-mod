@@ -1,0 +1,159 @@
+package com.antcolonies.gametest;
+
+import static com.antcolonies.gametest.TermiteMoundTests.SURFACE;
+
+import java.util.List;
+
+import com.antcolonies.AntColoniesMod;
+import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.TrunkTrails;
+import com.antcolonies.entity.WorkerAntEntity;
+
+import net.minecraft.core.BlockPos;
+import net.minecraft.gametest.framework.GameTest;
+import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+
+/**
+ * The brain, part 4: lasting trails ({@link TrunkTrails}, step 4a). Category {@code colony}.
+ */
+@GameTestHolder(AntColoniesMod.MODID)
+@PrefixGameTestTemplate(false)
+public class TrailTests {
+    /** How far out (blocks) the test's food lies, east and south of the nest. */
+    private static final int FOOD_OUT = 15;
+
+    /**
+     * Step 4a, the harvester ant's trunk trails, with the trips sent straight to the brain (as its numbers make them).
+     * Grass ground runs east and south from the nest, with short grass on it east and poppies south. 7 trips east lay no
+     * trail; the 8th does, and the forager is told to leave it at the block nearest its food. A young colony keeps 1
+     * trail: 8 trips south lay none; with 1,500 workers it may keep more, and the next trip south lays one (the earlier
+     * trips are remembered). 60 trips each way: the east trail wears bare out to the food (the grass cut, its seeds left
+     * lying; coarse dirt), not past it; the south one waits while a pretend player looks at it, and wears bare once
+     * nobody does (a low wall hides the east trail from them). Saved and loaded with the colony. Unused for a week it fades, and its bare ground grows back to grass.
+     */
+    @GameTest(template = "arena", timeoutTicks = 600, skyAccess = true)
+    public static void foragersWearLastingTrunkTrailsThatFadeAndGrowBack(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        PopulationTests.startAntColony(helper);
+        helper.onEachTick(() -> AwayTests.noRealWorkers(helper));
+        BlockPos[] center = new BlockPos[1];
+        int[] bare = new int[1];
+        helper.runAfterDelay(15, () -> {
+            Colony colony = PopulationTests.antColony(helper);
+            colony.population().setOnForTests(false); // (the numbers stay numbers)
+            center[0] = colony.getCenter();
+            int groundY = helper.absolutePos(new BlockPos(0, SURFACE - 1, 0)).getY();
+            for (int t = 1; t <= 26; t++) {
+                BlockPos east = new BlockPos(center[0].getX() + t, groundY, center[0].getZ());
+                BlockPos south = new BlockPos(center[0].getX(), groundY, center[0].getZ() + t);
+                level.setBlock(east, Blocks.GRASS_BLOCK.defaultBlockState(), 3);
+                level.setBlock(south, Blocks.GRASS_BLOCK.defaultBlockState(), 3);
+                if (t >= 4) {
+                    level.setBlock(east.above(), Blocks.SHORT_GRASS.defaultBlockState(), 3);
+                    level.setBlock(south.above(), Blocks.POPPY.defaultBlockState(), 3);
+                }
+            }
+            TrunkTrails trails = colony.trunkTrails();
+            BlockPos eastFood = new BlockPos(center[0].getX() + FOOD_OUT, groundY + 1, center[0].getZ());
+            BlockPos southFood = new BlockPos(center[0].getX(), groundY + 1, center[0].getZ() + FOOD_OUT);
+            for (int i = 0; i < 7; i++) {
+                helper.assertTrue(trails.setOut(level, eastFood) == null, "no trail should go east yet");
+            }
+            helper.assertTrue(trails.trails().isEmpty(), "7 trips should lay no trail: " + trails.describe(level));
+            BlockPos via = trails.setOut(level, eastFood);
+            helper.assertTrue(trails.trails().size() == 1 && Math.abs(trails.trails().get(0).angle()) < Math.toRadians(10),
+                    "the 8th trip should lay a trail east: " + trails.describe(level));
+            helper.assertTrue(via != null && via.equals(new BlockPos(center[0].getX() + FOOD_OUT, groundY + 1, center[0].getZ())),
+                    "the forager should leave the trail by its food: " + via);
+            for (int i = 0; i < 8; i++) {
+                trails.setOut(level, southFood);
+            }
+            helper.assertTrue(trails.trails().size() == 1, "a young colony should keep 1 trail: " + trails.describe(level));
+            colony.population().addNewMembers(WorkerAntEntity.CASTE, level.getGameTime(), 1500);
+            trails.setOut(level, southFood);
+            helper.assertTrue(trails.trails().size() == 2, "a big colony should lay a trail south: " + trails.describe(level));
+            for (int i = 0; i < 60; i++) {
+                trails.setOut(level, eastFood);
+                trails.setOut(level, southFood);
+            }
+            // A pretend player stands right by the south trail; a low wall hides the east one from them.
+            for (int x = 3; x <= FOOD_OUT + 4; x++) {
+                for (int y = 1; y <= 3; y++) {
+                    level.setBlock(new BlockPos(center[0].getX() + x, groundY + y, center[0].getZ() + 1), Blocks.STONE.defaultBlockState(), 3);
+                }
+            }
+            colony.population().setViewersForTests(List.of(Vec3.atCenterOf(new BlockPos(center[0].getX() + 8, groundY + 2, center[0].getZ() + 8))));
+            trails.checkSoonForTests();
+        });
+        helper.runAfterDelay(60, () -> {
+            Colony colony = PopulationTests.antColony(helper);
+            AntColoniesMod.LOGGER.info("[trail-test] worn: {}", colony.trunkTrails().describe(level));
+            int groundY = helper.absolutePos(new BlockPos(0, SURFACE - 1, 0)).getY();
+            for (int t = 4; t <= FOOD_OUT; t++) {
+                BlockPos east = new BlockPos(center[0].getX() + t, groundY, center[0].getZ());
+                helper.assertTrue(level.getBlockState(east).is(Blocks.COARSE_DIRT) && level.getBlockState(east.above()).isAir(),
+                        "the east trail should be worn bare " + t + " out: " + level.getBlockState(east) + ", " + level.getBlockState(east.above()));
+                BlockPos south = new BlockPos(center[0].getX(), groundY, center[0].getZ() + t);
+                helper.assertTrue(level.getBlockState(south).is(Blocks.GRASS_BLOCK) && level.getBlockState(south.above()).is(Blocks.POPPY),
+                        "the south trail should wait while a player looks: " + t + " out");
+            }
+            BlockPos past = new BlockPos(center[0].getX() + FOOD_OUT + 3, groundY, center[0].getZ());
+            helper.assertTrue(level.getBlockState(past).is(Blocks.GRASS_BLOCK) && level.getBlockState(past.above()).is(Blocks.SHORT_GRASS),
+                    "the trail past the food should not be worn");
+            AABB eastTrail = new AABB(center[0]).expandTowards(FOOD_OUT + 1, 0, 0).inflate(1, 3, 1);
+            helper.assertTrue(!level.getEntitiesOfClass(ItemEntity.class, eastTrail).isEmpty(), "the cut grass should leave its seeds lying");
+            colony.population().setViewersForTests(List.of());
+            colony.trunkTrails().checkSoonForTests();
+        });
+        helper.runAfterDelay(100, () -> {
+            Colony colony = PopulationTests.antColony(helper);
+            int groundY = helper.absolutePos(new BlockPos(0, SURFACE - 1, 0)).getY();
+            for (int t = 4; t <= FOOD_OUT; t++) {
+                BlockPos south = new BlockPos(center[0].getX(), groundY, center[0].getZ() + t);
+                helper.assertTrue(level.getBlockState(south).is(Blocks.COARSE_DIRT) && level.getBlockState(south.above()).isAir(),
+                        "with nobody looking the south trail should wear bare " + t + " out");
+            }
+            // Saved and loaded with the colony.
+            List<TrunkTrails.Trail> before = colony.trunkTrails().trails();
+            List<TrunkTrails.Trail> after = Colony.load(colony.save()).trunkTrails().trails();
+            helper.assertTrue(after.size() == before.size(), "the trails should be saved: " + after.size());
+            for (int i = 0; i < before.size(); i++) {
+                TrunkTrails.Trail a = before.get(i);
+                TrunkTrails.Trail b = after.get(i);
+                helper.assertTrue(a.angle() == b.angle() && a.reach() == b.reach() && a.length() == b.length(), "trail " + i + " should load the same");
+                for (int c = 0; c < a.length(); c++) {
+                    helper.assertTrue(a.wear(c) == b.wear(c) && a.isBare(c) == b.isBare(c), "trail " + i + " column " + c + " should load the same");
+                    bare[0] += a.isBare(c) ? 1 : 0;
+                }
+            }
+            // A week unused: they fade.
+            colony.trunkTrails().ageForTests(7 * 24000L);
+            colony.trunkTrails().checkSoonForTests();
+        });
+        helper.runAfterDelay(140, () -> {
+            Colony colony = PopulationTests.antColony(helper);
+            helper.assertTrue(colony.trunkTrails().trails().isEmpty(), "unused for a week the trails should fade: " + colony.trunkTrails().describe(level));
+            helper.assertTrue(colony.trunkTrails().regrowing() == bare[0] && bare[0] >= 2 * (FOOD_OUT - 3),
+                    "their " + bare[0] + " bare blocks should be growing back: " + colony.trunkTrails().regrowing());
+            colony.trunkTrails().growBackSoonForTests();
+        });
+        helper.runAfterDelay(180, () -> {
+            Colony colony = PopulationTests.antColony(helper);
+            int groundY = helper.absolutePos(new BlockPos(0, SURFACE - 1, 0)).getY();
+            for (int t = 4; t <= FOOD_OUT; t++) {
+                helper.assertTrue(level.getBlockState(new BlockPos(center[0].getX() + t, groundY, center[0].getZ())).is(Blocks.GRASS_BLOCK)
+                        && level.getBlockState(new BlockPos(center[0].getX(), groundY, center[0].getZ() + t)).is(Blocks.GRASS_BLOCK),
+                        "the bare ground should grow back to grass " + t + " out");
+            }
+            helper.assertTrue(colony.trunkTrails().regrowing() == 0, "nothing should be left to grow back: " + colony.trunkTrails().regrowing());
+            helper.succeed();
+        });
+    }
+}

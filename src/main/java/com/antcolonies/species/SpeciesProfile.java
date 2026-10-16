@@ -204,12 +204,18 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * (optional, 0: the colony knows every plant in its area at once): a plant is only gone for once a worker has
      * been within this many blocks of it and brought the news home, and foragers with nothing good to go for scout
      * the area (see {@code FoodMap}). {@code regrowth} (optional): eaten plants that grow back, and bare patches round
-     * the foraging holes (see {@link Regrowth}).
+     * the foraging holes (see {@link Regrowth}). {@code trails} (optional, the defaults of {@link Trails}): how the
+     * colony's foraging trails get stronger with use and fade unused, and lasting trunk trails worn into the ground.
      */
     public record FoodNumbers(int radius, String items, List<PlantFood> plants, String piece, String pile, int millTicks, int breadStock,
-            List<String> forageAt, int findRadius, Optional<Regrowth> regrowth) {
+            List<String> forageAt, int findRadius, Optional<Regrowth> regrowth, Trails trails) {
         /** Foraging at any time: day, night and in the rain. */
         public static final List<String> ALWAYS = List.of("day", "night", "rain");
+
+        public FoodNumbers(int radius, String items, List<PlantFood> plants, String piece, String pile, int millTicks, int breadStock,
+                List<String> forageAt, int findRadius, Optional<Regrowth> regrowth) {
+            this(radius, items, plants, piece, pile, millTicks, breadStock, forageAt, findRadius, regrowth, Trails.DEFAULT);
+        }
 
         public static final Codec<FoodNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("radius").forGetter(FoodNumbers::radius),
@@ -221,7 +227,8 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 Codec.INT.optionalFieldOf("bread_stock", 0).forGetter(FoodNumbers::breadStock),
                 Codec.STRING.listOf().optionalFieldOf("forage_at", ALWAYS).forGetter(FoodNumbers::forageAt),
                 Codec.INT.optionalFieldOf("find_radius", 0).forGetter(FoodNumbers::findRadius),
-                Regrowth.CODEC.optionalFieldOf("regrowth").forGetter(FoodNumbers::regrowth)
+                Regrowth.CODEC.optionalFieldOf("regrowth").forGetter(FoodNumbers::regrowth),
+                Trails.CODEC.optionalFieldOf("trails", Trails.DEFAULT).forGetter(FoodNumbers::trails)
         ).apply(i, FoodNumbers::new));
 
         /**
@@ -277,6 +284,65 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * {@code state} (optional): block state values the plant must have, for example {@code {"growth": "dry"}} so
      * termites only take Dry Grass once it has dried; a block without one of these properties never matches.
      */
+    /**
+     * The colony's foraging trails (brain part 4, step 4a; species-neutral). Every trip along a trail makes it one
+     * stronger, up to {@code mostStrength}; unused, its strength halves every {@code halfLifeTicks}, and below
+     * {@code fadeBelow} the trail has faded and is forgotten. So a trail used every day lasts, and one nobody uses
+     * fades over several days. {@code trunk} (optional): the colony keeps lasting trunk trails worn into the ground
+     * (see {@code colony.TrunkTrails}).
+     */
+    public record Trails(int halfLifeTicks, double mostStrength, double fadeBelow, Optional<TrunkNumbers> trunk) {
+        public static final Trails DEFAULT = new Trails(24000, 64.0, 1.0, Optional.empty());
+        public static final Codec<Trails> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.INT.optionalFieldOf("half_life_ticks", 24000).forGetter(Trails::halfLifeTicks),
+                Codec.DOUBLE.optionalFieldOf("most_strength", 64.0).forGetter(Trails::mostStrength),
+                Codec.DOUBLE.optionalFieldOf("fade_below", 1.0).forGetter(Trails::fadeBelow),
+                TrunkNumbers.CODEC.optionalFieldOf("trunk").forGetter(Trails::trunk)
+        ).apply(i, Trails::new));
+
+        /** A strength of {@code strength} at some time, {@code ticks} later with no use. */
+        public double decayed(double strength, long ticks) {
+            return ticks <= 0 ? strength : strength * Math.pow(0.5, ticks / (double) Math.max(1, halfLifeTicks));
+        }
+    }
+
+    /**
+     * Lasting trunk trails (real red harvester ants, <i>Pogonomyrmex barbatus</i>: cleared paths running straight out
+     * from the nest disc, used for years). Each starts {@code start} blocks from the nest's middle (the hill's edge). The
+     * colony keeps 1 trail while young, and more as it grows: up to {@code most} at {@code fullAtWorkers} workers. A
+     * forager going for food within {@code spreadDegrees} of a trail's line walks out along it and leaves it at the
+     * spot nearest its food; a direction with no trail gets a new one once {@code newTrailTrips} trips have gone that
+     * way within a day (while the colony may have more). A block of the trail walked by {@code bareAfterTrips} trips
+     * wears bare: the plants on it are cut and the ground turns to {@code bareGround}. A faded trail's bare ground
+     * grows back to grass about {@code regrowTicks} later (a bit sooner or later for each block).
+     */
+    public record TrunkNumbers(int start, int most, int fullAtWorkers, int spreadDegrees, int newTrailTrips, int bareAfterTrips,
+            String bareGround, int regrowTicks) {
+        public static final Codec<TrunkNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.INT.optionalFieldOf("start", 4).forGetter(TrunkNumbers::start),
+                Codec.INT.optionalFieldOf("most", 8).forGetter(TrunkNumbers::most),
+                Codec.INT.optionalFieldOf("full_at_workers", 1500).forGetter(TrunkNumbers::fullAtWorkers),
+                Codec.INT.optionalFieldOf("spread_degrees", 35).forGetter(TrunkNumbers::spreadDegrees),
+                Codec.INT.optionalFieldOf("new_trail_trips", 8).forGetter(TrunkNumbers::newTrailTrips),
+                Codec.INT.optionalFieldOf("bare_after_trips", 60).forGetter(TrunkNumbers::bareAfterTrips),
+                Codec.STRING.optionalFieldOf("bare_ground", "minecraft:coarse_dirt").forGetter(TrunkNumbers::bareGround),
+                Codec.INT.optionalFieldOf("regrow_ticks", 48000).forGetter(TrunkNumbers::regrowTicks)
+        ).apply(i, TrunkNumbers::new));
+
+        /** How many trunk trails a colony of this many workers keeps: 1 while young, up to {@code most}. */
+        public int trailsFor(int workers) {
+            double share = Math.min(1.0, Math.max(0, workers) / (double) Math.max(1, fullAtWorkers));
+            return Math.max(1, Math.min(most, 1 + (int) Math.floor((most - 1) * share)));
+        }
+
+        /** The block bare ground turns into (coarse dirt if the name is unknown). */
+        public BlockState bareGroundState() {
+            ResourceLocation id = ResourceLocation.tryParse(bareGround);
+            Block block = id == null ? null : BuiltInRegistries.BLOCK.getOptional(id).orElse(null);
+            return (block == null ? net.minecraft.world.level.block.Blocks.COARSE_DIRT : block).defaultBlockState();
+        }
+    }
+
     /**
      * Grass that grows back after it is eaten (the user's plan of 2026-10-14, "bare patches"): a tuft of one of the
      * {@code plants} eaten away grows back as {@code growsBack} (with the values in {@code state}: green) about

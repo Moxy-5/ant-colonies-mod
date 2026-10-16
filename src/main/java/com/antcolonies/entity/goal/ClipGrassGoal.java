@@ -48,6 +48,12 @@ public class ClipGrassGoal extends Goal {
     private int clipping;
     /** Eating from inside the nest (out of foraging time): from a foothold inside only. */
     private boolean fromInside;
+    /**
+     * Where the forager leaves the colony's trunk trail for its plant (harvester ants: it walks out along the trail
+     * first, then fans out; see {@code TrunkTrails}); null once it is there, or with no trail that way.
+     */
+    @Nullable
+    private BlockPos via;
     /** Grass this ant failed to reach: position -> game time until which it leaves it alone. */
     private final Map<BlockPos, Long> unreachable = new HashMap<>();
 
@@ -80,6 +86,10 @@ public class ClipGrassGoal extends Goal {
             return false;
         }
         colony.food().claimGrass(level, grass, ant.getUUID());
+        via = fromInside ? null : colony.trunkTrails().setOut(level, grass);
+        if (via != null && flat(ant.blockPosition()) >= flat(via) - 1.0) {
+            via = null; // already out past the trail's end for this plant (it was out in the field): straight there
+        }
         return true;
     }
 
@@ -93,6 +103,13 @@ public class ClipGrassGoal extends Goal {
     /** Any foothold from which the ant can nibble at {@code plant}: in its own cell or one of the 26 round it. */
     private static Predicate<Foothold> nearPlant(BlockPos plant) {
         return at -> isNear(at.cell(), plant);
+    }
+
+    /** How far (sideways) a cell is from the nest's middle. */
+    private double flat(BlockPos pos) {
+        double dx = pos.getX() - colony.getCenter().getX();
+        double dz = pos.getZ() - colony.getCenter().getZ();
+        return Math.sqrt(dx * dx + dz * dz);
     }
 
     private static boolean isNear(BlockPos cell, BlockPos plant) {
@@ -113,6 +130,7 @@ public class ClipGrassGoal extends Goal {
             colony.food().releaseGrass(ant.getUUID());
         }
         grass = null;
+        via = null;
         colony = null;
     }
 
@@ -122,6 +140,18 @@ public class ClipGrassGoal extends Goal {
             return;
         }
         ticks++;
+        if (via != null) {
+            // Out along the trunk trail first.
+            BlockPos at = ant.blockPosition();
+            if (Math.abs(at.getX() - via.getX()) <= 1 && Math.abs(at.getZ() - via.getZ()) <= 1 && Math.abs(at.getY() - via.getY()) <= 2) {
+                via = null;
+                ant.getNavigator().stop();
+            } else if (ant.getNavigator().isDone() && !ant.getNavigator().moveTo(via, 1.0)) {
+                via = null; // no way onto the trail from here: straight to the plant
+            } else {
+                return;
+            }
+        }
         ant.getLookControl().setLookAt(grass.getX() + 0.5, grass.getY() + 0.3, grass.getZ() + 0.5);
         if (ant.getNavigator().isDone() && isNear(ant.blockPosition(), grass)) {
             clip(level);

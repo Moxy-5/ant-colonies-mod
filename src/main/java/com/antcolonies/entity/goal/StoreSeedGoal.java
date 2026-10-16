@@ -31,6 +31,12 @@ public class StoreSeedGoal extends Goal {
     private BlockPos spot;
     private int ticks;
     private int failedRoutes;
+    /**
+     * Where the forager joins the trunk trail it came out by, on its way home (harvester ants; see
+     * {@code TrunkTrails}); null once it is on it, or with no trail that way.
+     */
+    @Nullable
+    private BlockPos via;
 
     public StoreSeedGoal(AbstractAntEntity ant) {
         this.ant = ant;
@@ -62,13 +68,18 @@ public class StoreSeedGoal extends Goal {
     public void start() {
         ticks = 0;
         failedRoutes = 0;
-        walkToSpot();
+        via = ant.level() instanceof ServerLevel level && colony != null ? colony.trunkTrails().wayHome(level, ant.blockPosition()) : null;
+        if (via == null || !ant.getNavigator().moveTo(via, 1.0)) {
+            via = null;
+            walkToSpot();
+        }
     }
 
     @Override
     public void stop() {
         ant.getNavigator().stop();
         spot = null;
+        via = null;
         colony = null;
     }
 
@@ -79,6 +90,18 @@ public class StoreSeedGoal extends Goal {
         }
         if (++ticks >= GIVE_UP_TICKS) {
             dropSeed();
+            return;
+        }
+        if (via != null) {
+            // Back to the trunk trail first, then home along it.
+            BlockPos at = ant.blockPosition();
+            if (Math.abs(at.getX() - via.getX()) <= 1 && Math.abs(at.getZ() - via.getZ()) <= 1 && Math.abs(at.getY() - via.getY()) <= 2) {
+                via = null;
+                walkToSpot();
+            } else if (ant.getNavigator().isDone() && !ant.getNavigator().moveTo(via, 1.0)) {
+                via = null;
+                walkToSpot();
+            }
             return;
         }
         double dx = ant.getX() - (spot.getX() + 0.5);

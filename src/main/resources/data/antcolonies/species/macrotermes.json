@@ -54,6 +54,12 @@
       "state": { "growth": "green" },
       "ticks": 72000,
       "bare_radius": 3
+    },
+    "trails": {
+      "_note": "The foragers' trail memory (brain step 4a): each way out the foragers use gets a trail toward the food they found, 1 stronger per visit (at most most_strength); unused, its strength halves every half_life_ticks and below fade_below it is forgotten. No trunk: Macrotermes forage under cover, through their tunnels and holes, not on bare open paths. My picks, to confirm.",
+      "half_life_ticks": 24000,
+      "most_strength": 64.0,
+      "fade_below": 1.0
     }
   },
   "refuse": {

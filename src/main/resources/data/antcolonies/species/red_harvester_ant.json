@@ -38,7 +38,23 @@
     "piece": "minecraft:wheat_seeds",
     "pile": "antcolonies:seed_pile",
     "mill_ticks": 60,
-    "bread_stock": 20
+    "bread_stock": 20,
+    "trails": {
+      "_note": "Lasting trunk trails (brain step 4a; real Pogonomyrmex keep a few cleared paths straight out from the nest disc, the foragers walk out along one and fan out at its end). half_life_ticks: a trail's strength halves in that long unused (each trip adds 1, at most most_strength); below fade_below it is forgotten and its bare ground grows back to grass about regrow_ticks later (half to one and a half times that). trunk: trails run from start blocks out (the hill's edge) to the food radius; a colony keeps 1 trail while young and up to most at full_at_workers workers; a trip goes by the trail within spread_degrees of its food's direction; new_trail_trips trips in a direction with no trail (within a day) lay a new one; a block walked by bare_after_trips trips wears bare: its plant is cut and the ground turns to bare_ground. All numbers are my picks, to confirm.",
+      "half_life_ticks": 24000,
+      "most_strength": 64.0,
+      "fade_below": 1.0,
+      "trunk": {
+        "start": 4,
+        "most": 8,
+        "full_at_workers": 1500,
+        "spread_degrees": 35,
+        "new_trail_trips": 8,
+        "bare_after_trips": 60,
+        "bare_ground": "minecraft:coarse_dirt",
+        "regrow_ticks": 48000
+      }
+    }
   },
   "refuse": {
     "corpse_decay_ticks": 6000

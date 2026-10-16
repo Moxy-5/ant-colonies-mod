@@ -253,6 +253,7 @@ public class FieldLife {
                 left = kind.pieces() - food.cutByNumbers(level, pos, kind);
                 food.countIn(false);
                 colony.ledger().addStore(1);
+                colony.trunkTrails().tripByNumbers(level, pos); // their trip out and back wears the trail too
                 owed.put(pos, now);
                 colony.away().note(level, AwayReport.What.FORAGED, 1);
                 changed = true;

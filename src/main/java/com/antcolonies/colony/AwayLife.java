@@ -209,6 +209,7 @@ public class AwayLife {
             colony.life().tick(level, true);
             colony.field().tick(level, true);
             colony.building().tickAway(level);
+            colony.trunkTrails().tick(level, true);
             ColonyManager.get(level).markChanged();
         }
     }

@@ -28,7 +28,12 @@ import net.minecraft.world.phys.AABB;
  * trails (see {@link Soldiers}).
  *
  * <p>It also keeps count of the workers outside (once a second), which tells the soldiers when the last of them is
- * back in. Not saved: after a reload the trails form again as the foragers go out.
+ * back in. The visits are not saved: after a reload the trails form again as the foragers go out.
+ *
+ * <p><b>The lasting memory</b> (brain step 4a): each way out also keeps a remembered trail to the patch its foragers
+ * went to, 1 stronger per visit; unused it fades (the profile's {@code food.trails}: its strength halves every
+ * {@code half_life_ticks}) and below {@code fade_below} it is forgotten. It is saved, and lasts while the colony is away
+ * (it fades by the clock, nothing needs to run). The ants' own lasting trails over the ground are {@link TrunkTrails}.
  */
 public class ForagingTrails {
     /** How long (ticks) a food spot is remembered: 2 minutes. */
@@ -52,7 +57,17 @@ public class ForagingTrails {
     public record Trail(BlockPos exit, BlockPos patch, int spots) {
     }
 
+    /** A remembered trail: from a way out to a patch, its strength at the game time {@code at}. */
+    private record Memory(BlockPos patch, double strength, long at) {
+    }
+
+    /** A remembered trail as the colony knows it now: from a way out (its mouth) to a patch, and its strength now. */
+    public record Remembered(BlockPos exit, BlockPos patch, double strength) {
+    }
+
     private final Colony colony;
+    /** The remembered trail of each way out (its mouth). Saved. */
+    private final Map<BlockPos, Memory> memory = new LinkedHashMap<>();
     private final ArrayDeque<Visit> visits = new ArrayDeque<>();
     /** The way out each worker last came out by (its mouth). */
     private final Map<UUID, BlockPos> lastExit = new HashMap<>();
@@ -71,9 +86,75 @@ public class ForagingTrails {
 
     /** A forager of this colony is going to this food spot, or took a piece there. */
     public void visited(Level level, BlockPos spot, UUID ant) {
-        visits.addLast(new Visit(spot.immutable(), lastExit.get(ant), level.getGameTime()));
+        BlockPos exit = lastExit.get(ant);
+        visits.addLast(new Visit(spot.immutable(), exit, level.getGameTime()));
         while (visits.size() > MAX_VISITS) {
             visits.removeFirst();
+        }
+        if (exit == null) {
+            exit = nearest(colony.foragingHoles().waysOut(level).stream().map(ForagingHoles.WayOut::mouth).toList(), spot, Double.MAX_VALUE);
+        }
+        if (exit != null) {
+            strengthen(level, exit, spot);
+        }
+    }
+
+    /** The remembered trail from this way out grows 1 stronger (a new one leads to this spot). */
+    private void strengthen(Level level, BlockPos exit, BlockPos spot) {
+        com.antcolonies.species.SpeciesProfile.Trails numbers = colony.profile().food().trails();
+        long now = level.getGameTime();
+        Memory was = memory.get(exit);
+        double strength = was == null ? 0.0 : numbers.decayed(was.strength(), now - was.at());
+        // It leads to the patch where most of this way out's recent spots lie (the new spot alone if it is new).
+        List<BlockPos> spots = new ArrayList<>();
+        for (Visit visit : visits) {
+            if (exit.equals(visit.exit())) {
+                spots.add(visit.spot());
+            }
+        }
+        spots.add(spot.immutable());
+        BlockPos patch = was == null || strength < numbers.fadeBelow() ? spot.immutable() : densest(spots, PATCH_RADIUS);
+        memory.put(exit.immutable(), new Memory(patch, Math.min(numbers.mostStrength(), strength + 1.0), now));
+    }
+
+    /**
+     * The remembered trails now, strongest first (faded ones are forgotten): where the foragers of each way out have
+     * been going, lasting long after the visits themselves (for the brain's later steps: recruiting along a trail,
+     * going back to a known patch).
+     */
+    public List<Remembered> remembered(Level level) {
+        com.antcolonies.species.SpeciesProfile.Trails numbers = colony.profile().food().trails();
+        long now = level.getGameTime();
+        List<Remembered> list = new ArrayList<>();
+        memory.entrySet().removeIf(entry -> numbers.decayed(entry.getValue().strength(), now - entry.getValue().at()) < numbers.fadeBelow());
+        memory.forEach((exit, trail) -> list.add(new Remembered(exit, trail.patch(), numbers.decayed(trail.strength(), now - trail.at()))));
+        list.sort(Comparator.comparingDouble(Remembered::strength).reversed());
+        return list;
+    }
+
+    /** For the tests: every remembered trail's last visit was this many ticks earlier. */
+    public void ageMemoryForTests(long ticks) {
+        memory.replaceAll((exit, trail) -> new Memory(trail.patch(), trail.strength(), trail.at() - ticks));
+    }
+
+    void save(net.minecraft.nbt.CompoundTag tag) {
+        net.minecraft.nbt.ListTag list = new net.minecraft.nbt.ListTag();
+        memory.forEach((exit, trail) -> {
+            net.minecraft.nbt.CompoundTag entry = new net.minecraft.nbt.CompoundTag();
+            entry.putLong("exit", exit.asLong());
+            entry.putLong("patch", trail.patch().asLong());
+            entry.putDouble("strength", trail.strength());
+            entry.putLong("at", trail.at());
+            list.add(entry);
+        });
+        tag.put("trailMemory", list);
+    }
+
+    void load(net.minecraft.nbt.CompoundTag tag) {
+        memory.clear();
+        for (net.minecraft.nbt.Tag t : tag.getList("trailMemory", net.minecraft.nbt.Tag.TAG_COMPOUND)) {
+            net.minecraft.nbt.CompoundTag entry = (net.minecraft.nbt.CompoundTag) t;
+            memory.put(BlockPos.of(entry.getLong("exit")), new Memory(BlockPos.of(entry.getLong("patch")), entry.getDouble("strength"), entry.getLong("at")));
         }
     }
 
@@ -151,6 +232,10 @@ public class ForagingTrails {
                 patch = was;
             }
             patches.put(entry.getKey(), patch);
+            Memory remembered = memory.get(entry.getKey());
+            if (remembered != null) {
+                memory.put(entry.getKey(), new Memory(patch, remembered.strength(), remembered.at()));
+            }
             trails.add(new Trail(entry.getKey(), patch, spots.size()));
         }
         patches.keySet().retainAll(byExit.keySet());
@@ -226,6 +311,20 @@ public class ForagingTrails {
         for (Trail trail : trails) {
             line.append(" from ").append(trail.exit().toShortString()).append(" to ").append(trail.patch().toShortString())
                     .append(" (").append(trail.spots()).append(" spots)");
+        }
+        return line.toString();
+    }
+
+    /** For the colony list: " | remembered trails: from 20,12,12 to 20,12,23 (strength 12)", or empty. */
+    public String describeMemory(Level level) {
+        List<Remembered> list = remembered(level);
+        if (list.isEmpty()) {
+            return "";
+        }
+        StringBuilder line = new StringBuilder(" | remembered trails:");
+        for (Remembered trail : list) {
+            line.append(" from ").append(trail.exit().toShortString()).append(" to ").append(trail.patch().toShortString())
+                    .append(" (strength ").append(Math.round(trail.strength())).append(")");
         }
         return line.toString();
     }

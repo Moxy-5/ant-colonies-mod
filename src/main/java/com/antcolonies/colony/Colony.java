@@ -78,6 +78,7 @@ public class Colony {
     private final Mound mound;
     private final ForagingHoles foragingHoles;
     private final ForagingTrails trails;
+    private final TrunkTrails trunkTrails;
     private final FungusGarden garden;
     private final Mushrooms mushrooms;
     private final Soldiers soldiers;
@@ -108,6 +109,7 @@ public class Colony {
         this.mound = new Mound(this);
         this.foragingHoles = new ForagingHoles(this);
         this.trails = new ForagingTrails(this);
+        this.trunkTrails = new TrunkTrails(this);
         this.garden = new FungusGarden(this);
         this.mushrooms = new Mushrooms(this);
         this.soldiers = new Soldiers(this);
@@ -189,6 +191,11 @@ public class Colony {
     /** Where the foragers have been finding food lately and by which way out they went (the trails the minor soldiers line). */
     public ForagingTrails trails() {
         return trails;
+    }
+
+    /** The lasting trunk trails out from the nest (species whose profile has {@code food.trails.trunk}). */
+    public TrunkTrails trunkTrails() {
+        return trunkTrails;
     }
 
     /** The soldiers: how many the colony wants, which nymphs grow into them, where they stand guard (species with soldiers). */
@@ -389,6 +396,7 @@ public class Colony {
         population.tick(level);
         life.tick(level, false);
         field.tick(level, false);
+        trunkTrails.tick(level, false);
         return true;
     }
 
@@ -575,6 +583,8 @@ public class Colony {
         building.save(tag);
         garden.save(tag);
         workerFood.save(tag);
+        trunkTrails.save(tag);
+        trails.save(tag);
         return tag;
     }
 
@@ -608,6 +618,8 @@ public class Colony {
         colony.building.load(tag);
         colony.garden.load(tag);
         colony.workerFood.load(tag);
+        colony.trunkTrails.load(tag);
+        colony.trails.load(tag);
         return colony;
     }
 }

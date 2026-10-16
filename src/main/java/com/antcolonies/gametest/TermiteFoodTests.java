@@ -349,6 +349,18 @@ public class TermiteFoodTests {
             int grass = grassCut(level, colony, spots[1]) + grassCut(level, colony, spots[2]);
             helper.assertTrue(hay >= 8, "only " + hay + " pieces cut off the hay (grass " + grass + ")");
             helper.assertTrue(grass * 2 <= hay, grass + " pieces cut off the grass by the holes, " + hay + " off the hay");
+            // Brain step 4a: the colony remembers a trail to the hay (strengthened by every visit), saved with the
+            // colony, and fading once unused: a week of game days later it is forgotten.
+            List<com.antcolonies.colony.ForagingTrails.Remembered> remembered = colony.trails().remembered(level);
+            helper.assertTrue(remembered.stream().anyMatch(trail -> flat(trail.patch(), spots[0]) <= 4.0) && remembered.get(0).strength() >= 4.0,
+                    "a remembered trail should lead to the hay: " + colony.trails().describeMemory(level));
+            List<com.antcolonies.colony.ForagingTrails.Remembered> loaded = Colony.load(colony.save()).trails().remembered(level);
+            helper.assertTrue(loaded.size() == remembered.size() && loaded.get(0).patch().equals(remembered.get(0).patch())
+                    && Math.abs(loaded.get(0).strength() - remembered.get(0).strength()) < 0.01,
+                    "the remembered trails should be saved: " + loaded + " vs " + remembered);
+            colony.trails().ageMemoryForTests(7 * 24000L);
+            helper.assertTrue(colony.trails().remembered(level).isEmpty(), "a week unused the trails should be forgotten: "
+                    + colony.trails().describeMemory(level));
         });
     }
 
