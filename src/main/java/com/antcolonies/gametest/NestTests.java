@@ -40,6 +40,8 @@ public class NestTests {
     /** Height (inside the test area) of the first open cell above the ground. */
     private static final int SURFACE = 12;
     private static final int MIDDLE = 12;
+    /** The seed test: nobody out this long and the next foraging round begins (the test's clock stands still). */
+    private static final int NEXT_ROUND_AFTER = 3000;
     /**
      * The whole nest: a 3-deep shaft, then four levels (food store 5x5, nursery 5x5, queen 3x3, refuse chamber 5x5),
      * each a 3-long tunnel and its room, and a 3-block stair down to every level but the first.
@@ -583,6 +585,7 @@ public class NestTests {
         long[] firstBack = {-1};
         long[] firstOut = {-1};
         long[] dropTick = {-1};
+        long[] nobodyOutSince = {-1};
         helper.onEachTick(() -> {
             Colony colony = colony(helper);
             if (!dropped[0] || colony == null) {
@@ -605,6 +608,22 @@ public class NestTests {
                     }
                 }
             }
+            // The test's clock stands still in the morning, so there is only one round. In the game, once every searcher
+            // has come home empty the touches fade and the door stays shut until the next round (after the midday rest,
+            // or the next morning: Gordon's rule). Here that next round is started once nobody has been out for a while.
+            if (firstOut[0] >= 0) {
+                boolean anyOut = level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds()).stream()
+                        .anyMatch(ant -> colony.door().isOut(ant.getUUID()) || ant.isCarryingSeed() || colony.spots().isSearching(ant.getUUID()));
+                if (anyOut) {
+                    nobodyOutSince[0] = -1;
+                } else if (nobodyOutSince[0] < 0) {
+                    nobodyOutSince[0] = helper.getTick();
+                } else if (helper.getTick() - nobodyOutSince[0] >= NEXT_ROUND_AFTER) {
+                    nobodyOutSince[0] = -1;
+                    colony.patrol().newRoundForTests();
+                    AntColoniesMod.LOGGER.info("[seed-test] tick {}: nobody out for {} ticks: the next round begins", helper.getTick(), NEXT_ROUND_AFTER);
+                }
+            }
         });
         helper.onEachTick(() -> {
             if (dropped[0] && helper.getTick() % 200 == 0) {
@@ -623,6 +642,25 @@ public class NestTests {
                                 level.getBlockState(pos).getBlock(), colony.food().getPiecesCut(pos), colony.foodMap().isFoundButUntold(pos),
                                 colony.patrol().isOpen(level, pos), colony.nest().isInside(level, pos), near);
                     }
+                    BlockPos pile = helper.absolutePos(new BlockPos(MIDDLE + 1, SURFACE, MIDDLE - 7));
+                    StringBuilder by = new StringBuilder();
+                    for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds(), AbstractAntEntity::isColonyWorker)) {
+                        BlockPos spot = colony.spots().spotOf(ant.getUUID());
+                        by.append(String.format(" [%s d%.1f srch %s spot %s goals %s]", ant.getId(), Math.sqrt(ant.blockPosition().distSqr(pile)),
+                                colony.spots().isSearching(ant.getUUID()), spot == null ? "-" : spot.subtract(pile).toShortString(),
+                                ant.goalSelector.getAvailableGoals().stream().filter(g -> g.isRunning()).map(g -> g.getGoal().getClass().getSimpleName()).toList()));
+                    }
+                    int left = level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, new AABB(pile).inflate(2)).stream()
+                            .mapToInt(item -> item.getItem().getCount()).sum();
+                    AntColoniesMod.LOGGER.info("[seed-test-dbg] north pile {} left, open {}, small {}, wants seeds {}, food {}; ants:{}", left, colony.patrol().isOpen(level, pile),
+                            colony.door().isSmallColony(level), colony.food().wantsSeeds(level), colony.food().getFood(), by);
+                    StringBuilder loose = new StringBuilder();
+                    for (net.minecraft.world.entity.item.ItemEntity item : level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, helper.getBounds())) {
+                        loose.append(String.format(" [%s x%d at %s open %s inside %s y over middle %s]", item.getItem().getItem(), item.getItem().getCount(),
+                                helper.relativePos(item.blockPosition()).toShortString(), colony.patrol().isOpen(level, item.blockPosition()),
+                                colony.nest().isInside(level, item.blockPosition()), String.format("%.2f", item.getY() - colony.getCenter().getY())));
+                    }
+                    AntColoniesMod.LOGGER.info("[seed-test-dbg] loose items:{}", loose);
                 }
             }
         });
