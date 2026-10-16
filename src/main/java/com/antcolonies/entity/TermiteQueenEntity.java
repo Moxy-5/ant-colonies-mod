@@ -141,6 +141,10 @@ public class TermiteQueenEntity extends AbstractAntEntity {
         if (tickCount % 20 == 0 && getColonyId() != null) {
             Colony colony = manager.getColony(getColonyId());
             if (colony != null) {
+                if (colony.queenCare().queenStarves(serverLevel)) {
+                    hurt(damageSources().starve(), 1000.0F); // unfed for days (here, or while away): she dies and the colony ends
+                    return;
+                }
                 if (colony.queenCare().raiseFoundingBatch(serverLevel, this)) {
                     manager.markChanged();
                 }

@@ -375,14 +375,23 @@ public class QueenCare {
     private boolean hungerRunsOut(ServerLevel level) {
         long now = level.getGameTime();
         SpeciesProfile.QueenNumbers numbers = colony.profile().queen();
-        // A founding queen lives on her own body fat (nobody could feed her yet).
-        boolean satisfied = !colony.isHungerOn() || eggDue >= 0 || queenBread >= numbers.meal()
-                || colony.brood().isFull(level) || colony.isFounding();
+        boolean satisfied = !royalsGetHungry(colony) || eggDue >= 0 || queenBread >= numbers.meal() || colony.brood().isFull(level);
         if (queenLastFed == Colony.NOT_SET || satisfied) {
             queenLastFed = now;
             return false;
         }
         return now - queenLastFed >= numbers.starveTicks();
+    }
+
+    /**
+     * Whether the queen (and the king) can get hungry now: the colony's hunger is on, it is not founding (the founders
+     * live on their own body fat, nobody could feed them yet), and for a species whose workers only get hungry once the
+     * store has held its first piece (termites: a young colony has no garden yet, its first workers feed the royals on
+     * what they find) once it has.
+     */
+    static boolean royalsGetHungry(Colony colony) {
+        return colony.isHungerOn() && !colony.isFounding()
+                && (!colony.profile().worker().diet().hungryFromFirstFood() || colony.food().hasHadFood());
     }
 
     void save(CompoundTag tag) {

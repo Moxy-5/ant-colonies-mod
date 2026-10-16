@@ -19,6 +19,7 @@ public class AwayReport {
         HATCHED("eggs hatched"),
         GREW_UP("young grown up"),
         QUEEN_FED("pieces fed to the queen"),
+        KING_FED("pieces fed to the king"),
         YOUNG_FED("pieces fed to the young"),
         BREAD_MADE("seeds milled into bread"),
         MEALS("meals eaten"),
@@ -44,6 +45,8 @@ public class AwayReport {
     private final Map<What, Integer> counts = new EnumMap<>(What.class);
     /** The queen starved while away. Saved. */
     private boolean queenStarved;
+    /** The king starved while away. Saved. */
+    private boolean kingStarved;
 
     void add(What what, int count) {
         if (count > 0) {
@@ -55,13 +58,23 @@ public class AwayReport {
         queenStarved = true;
     }
 
+    void kingStarved() {
+        kingStarved = true;
+    }
+
     void clear() {
         counts.clear();
         queenStarved = false;
+        kingStarved = false;
     }
 
     public boolean isEmpty() {
-        return counts.isEmpty() && !queenStarved;
+        return counts.isEmpty() && !queenStarved && !kingStarved;
+    }
+
+    /** Whether the king starved while away (for tests). */
+    public boolean didKingStarve() {
+        return kingStarved;
     }
 
     /** How many of this were counted (for tests). */
@@ -76,6 +89,9 @@ public class AwayReport {
         if (queenStarved) {
             parts.add("the queen starved");
         }
+        if (kingStarved) {
+            parts.add("the king starved");
+        }
         return parts.isEmpty() ? "nothing" : String.join(", ", parts);
     }
 
@@ -83,6 +99,7 @@ public class AwayReport {
         CompoundTag report = new CompoundTag();
         counts.forEach((what, count) -> report.putInt(what.name(), count));
         report.putBoolean("queenStarved", queenStarved);
+        report.putBoolean("kingStarved", kingStarved);
         tag.put("awayReport", report);
     }
 
@@ -93,5 +110,6 @@ public class AwayReport {
             add(what, report.getInt(what.name()));
         }
         queenStarved = report.getBoolean("queenStarved");
+        kingStarved = report.getBoolean("kingStarved");
     }
 }

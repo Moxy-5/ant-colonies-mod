@@ -2,6 +2,7 @@ package com.antcolonies.entity;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.colony.KingCare;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.entity.goal.DigGoal;
 import com.antcolonies.entity.goal.QueenToRoomGoal;
@@ -23,15 +24,14 @@ import net.minecraft.world.level.Level;
  * The termite king: founds the colony together with the queen (a royal pair), helps her dig the royal chamber, closes
  * the entrance from inside, and then lives beside her for good. He joins the nearest termite queen that has no king yet.
  * Like the queen he is fed by the nurses, mouth to mouth (a nodule a day, the workers' meal interval; my pick, to
- * confirm); unfed he does not starve (not decided yet).
+ * confirm); unfed he starves by the queen's rule. His hunger clock is kept by the brain ({@link KingCare}), so it runs on
+ * while the colony is away.
  */
 public class TermiteKingEntity extends AbstractAntEntity implements FedByNurses {
     public static final String CASTE = "king";
     /** How close (in blocks) a queen without a king must be for him to join her. */
     private static final double JOIN_RADIUS = 32.0;
 
-    /** The game time of his last meal ({@link Colony#NOT_SET}: his clock has not started). Saved. */
-    private long lastFed = Colony.NOT_SET;
     /** The nurse on its way to feed him, and until when. Not saved. */
     @org.jetbrains.annotations.Nullable
     private java.util.UUID feeder;
@@ -72,26 +72,33 @@ public class TermiteKingEntity extends AbstractAntEntity implements FedByNurses 
         return getColonyId() == null || !(level() instanceof ServerLevel serverLevel) ? null : ColonyManager.get(serverLevel).getColony(getColonyId());
     }
 
-    /** Whether he wants a nodule: in a colony whose members get hungry, a day (the workers' meal interval) after the last. */
+    /** Whether he wants a nodule: a day (the workers' meal interval) after the last, see {@link KingCare#wantsFood}. */
     @Override
     public boolean wantsFood() {
         Colony colony = colony();
-        return colony != null && colony.isHungerOn() && lastFed != Colony.NOT_SET
-                && level().getGameTime() - lastFed >= colony.profile().worker().mealIntervalTicks();
+        return colony != null && level() instanceof ServerLevel serverLevel && colony.kingCare().wantsFood(serverLevel);
     }
 
     @Override
     public void takeFood() {
-        lastFed = level().getGameTime();
+        Colony colony = colony();
+        if (colony != null && level() instanceof ServerLevel serverLevel) {
+            colony.kingCare().fed(serverLevel);
+        }
     }
 
+    /** The game time of his last meal (kept by his colony's brain; {@link Colony#NOT_SET} without a colony). */
     public long getLastFed() {
-        return lastFed;
+        Colony colony = colony();
+        return colony == null ? Colony.NOT_SET : colony.kingCare().getLastFed();
     }
 
     /** For the tests: pretend his last meal was at this game time. */
     public void setLastFed(long gameTime) {
-        lastFed = gameTime;
+        Colony colony = colony();
+        if (colony != null) {
+            colony.kingCare().setLastFed(gameTime);
+        }
     }
 
     @Override
@@ -113,24 +120,16 @@ public class TermiteKingEntity extends AbstractAntEntity implements FedByNurses 
     }
 
     @Override
-    public void addAdditionalSaveData(net.minecraft.nbt.CompoundTag tag) {
-        super.addAdditionalSaveData(tag);
-        tag.putLong("LastFed", lastFed);
-    }
-
-    @Override
-    public void readAdditionalSaveData(net.minecraft.nbt.CompoundTag tag) {
-        super.readAdditionalSaveData(tag);
-        lastFed = tag.contains("LastFed") ? tag.getLong("LastFed") : Colony.NOT_SET;
-    }
-
-    @Override
     public void tick() {
         super.tick();
-        if (tickCount % 20 == 0 && level() instanceof ServerLevel) {
+        if (tickCount % 20 == 0 && level() instanceof ServerLevel serverLevel) {
             Colony colony = colony();
-            if (lastFed == Colony.NOT_SET || colony == null || !colony.isHungerOn()) {
-                lastFed = level().getGameTime(); // his clock only runs in a colony that gets hungry
+            if (colony != null && colony.kingCare().starves(serverLevel)) {
+                hurt(damageSources().starve(), 1000.0F); // unfed for days (here, or while the colony was away): he dies
+                return;
+            }
+            if (colony != null && tickCount % 1200 == 0) {
+                ColonyManager.get(serverLevel).markChanged(); // his hunger clock changes all the time: make sure it gets saved
             }
         }
         // Every two seconds while he has no queen: look for a termite queen nearby that has no king yet.
@@ -154,6 +153,7 @@ public class TermiteKingEntity extends AbstractAntEntity implements FedByNurses 
         if (colony != null) {
             setColonyId(colony.getId());
             colony.setCount(CASTE, 1);
+            colony.kingCare().joined(serverLevel);
             manager.markChanged();
         }
     }

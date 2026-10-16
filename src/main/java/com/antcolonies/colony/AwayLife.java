@@ -369,6 +369,11 @@ public class AwayLife {
         report.queenStarved();
     }
 
+    /** The king starved while away (for the report). */
+    void noteKingStarved() {
+        report.kingStarved();
+    }
+
     /** What happened while away, this time or the last time. */
     public AwayReport report() {
         return report;

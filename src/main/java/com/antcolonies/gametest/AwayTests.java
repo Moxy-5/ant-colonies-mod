@@ -658,8 +658,9 @@ public class AwayTests {
      * grows from them), nodules grow, old layers crumble (out of the food count), all as counts owed to the blocks; the
      * known ages still add up to the layers counted; the nurses feed the queen nodules and she lays her stream. Then the
      * workers' and soldiers' meals come due: the young share eat nodules, the old ones old comb (4 meals a piece), the
-     * soldiers a nodule each, and nobody is left hungry. Then (brain part 3) the game is saved and loaded again while
-     * away, and the loaded copy carries on. Back in range, the blocks catch up: the ledger empties and the comb blocks
+     * soldiers a nodule each, and nobody is left hungry. The king lies beside the queen, a day and more since his last
+     * nodule (brain part 4, the king fix): the nurse numbers feed him too, and he lives. Then (brain part 3) the game is
+     * saved and loaded again while away, and the loaded copy carries on. Back in range, the blocks catch up: the ledger empties and the comb blocks
      * hold just the ages and nodules the brain counted.
      * <p>Step 2d in the same scene: the colony has earned the mound's second stage and nothing of it is built. While away
      * nothing is built (the land is not loaded), the builders' time is counted. Back in range a pretend player looks at the
@@ -671,9 +672,13 @@ public class AwayTests {
         ServerLevel level = helper.getLevel();
         TermiteMoundTests.deepGround(helper);
         helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        helper.runAfterDelay(2, () -> helper.spawn(ModEntities.TERMITE_KING.get(), MIDDLE + 1, SURFACE, MIDDLE));
         var foods = com.antcolonies.species.SpeciesProfile.MealFood.values();
         UUID[] queen = new UUID[1];
+        UUID[] king = new UUID[1];
+        long[] kingHungrySince = new long[1];
         CompoundTag[] queenOnDisk = new CompoundTag[1];
+        CompoundTag[] kingOnDisk = new CompoundTag[1];
         int[] eggsLaid = new int[1];
         int[] foodBefore = new int[1];
         int[] grownBefore = new int[1];
@@ -719,12 +724,21 @@ public class AwayTests {
             helper.assertTrue(colony.food().getFood() == combTotals(level, colony)[4], "the food count " + colony.food().getFood()
                     + " is not the " + combTotals(level, colony)[4] + " layers of comb");
         });
-        helper.runAfterDelay(40, () -> {
+        helper.runAfterDelay(60, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony.queenCare().isQueenHome(level), "the queen should be in the royal chamber");
             helper.assertTrue(!colony.isFounding(), "the colony should have workers");
             AbstractAntEntity theQueen = colony.getQueen(level);
             queen[0] = theQueen.getUUID();
+            // The king, a day and more since his last nodule: he wants one.
+            var theKing = level.getEntitiesOfClass(com.antcolonies.entity.TermiteKingEntity.class, helper.getBounds(),
+                    mob -> colony.getId().equals(mob.getColonyId())).stream().findFirst().orElse(null);
+            helper.assertTrue(theKing != null && colony.getCount(com.antcolonies.entity.TermiteKingEntity.CASTE) == 1, "the king should have joined");
+            theKing.teleportTo(theQueen.getX() + 1.0, theQueen.getY(), theQueen.getZ());
+            king[0] = theKing.getUUID();
+            kingHungrySince[0] = level.getGameTime() - colony.profile().worker().mealIntervalTicks() - 100;
+            colony.kingCare().setLastFed(kingHungrySince[0]);
+            helper.assertTrue(colony.kingCare().wantsFood(level), "the king should want a nodule");
             eggsLaid[0] = colony.queenCare().getEggsLaid();
             colony.queenCare().setQueenLastFed(level.getGameTime());
             int[] blocks = combTotals(level, colony);
@@ -739,9 +753,10 @@ public class AwayTests {
             colony.away().setOnForTests(true);
             colony.away().setGraceForTests(20L);
             queenOnDisk[0] = freezeAndUnload(colony, level, theQueen);
+            kingOnDisk[0] = freezeAndUnload(colony, level, theKing);
             colony.away().setAwayForTests(true);
         });
-        helper.runAfterDelay(400, () -> {
+        helper.runAfterDelay(420, () -> {
             Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
             AntColoniesMod.LOGGER.info("[away-test] termites away: {}{} | known comb {}/{}/{}, nodules {}, food {}, queen food {}",
                     colony.population().describe(level), colony.away().describe(level), colony.garden().freshKnown(), colony.garden().ripeKnown(),
@@ -759,6 +774,9 @@ public class AwayTests {
                     + colony.food().getFood() + " counted");
             helper.assertTrue(ledger.nurseFood() < 0 && colony.queenCare().getQueenBread() + 2 * (colony.queenCare().getEggsLaid() - eggsLaid[0]) > 0,
                     "the nurses should have fed the queen nodules: " + ledger.describe() + ", she holds " + colony.queenCare().getQueenBread());
+            helper.assertTrue(colony.away().report().get(AwayReport.What.KING_FED) >= 1 && colony.kingCare().getLastFed() > kingHungrySince[0]
+                    && !colony.kingCare().wantsFood(level), "the nurses should have fed the king a nodule while away: " + colony.away().report().describe());
+            helper.assertTrue(!colony.away().report().didKingStarve(), "the king should not starve");
             // The meals come due: the workers' and the soldiers'.
             long due = level.getGameTime() - colony.profile().worker().mealIntervalTicks() - 30;
             colony.population().setLastAteForTests(level, WorkerAntEntity.CASTE, due);
@@ -768,7 +786,7 @@ public class AwayTests {
             eatenBefore[0] = colony.workerFood().getPiecesEaten(foods[0]);
             eatenBefore[1] = colony.workerFood().getPiecesEaten(foods[1]);
         });
-        helper.runAfterDelay(460, () -> {
+        helper.runAfterDelay(480, () -> {
             Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
             int comb = colony.workerFood().getPiecesEaten(com.antcolonies.species.SpeciesProfile.MealFood.STORE) - eatenBefore[0];
             int nodules = colony.workerFood().getPiecesEaten(com.antcolonies.species.SpeciesProfile.MealFood.NURSE_FOOD) - eatenBefore[1];
@@ -818,8 +836,10 @@ public class AwayTests {
             grownBefore[0] = colony.garden().getNodulesGrown();
             lostBefore[0] = colony.garden().getNodulesLost();
             colony.garden().setAgeingSpeedForTests(0.0F); // (only nodules may still grow: counted below)
+            helper.assertTrue(colony.kingCare().getLastFed() == original.kingCare().getLastFed(), "the loaded colony should know when the king ate");
             colony.away().setAwayForTests(false);
             loadAgain(level, queenOnDisk[0]);
+            loadAgain(level, kingOnDisk[0]);
             back[0] = true;
         });
         helper.onEachTick(() -> {
@@ -846,6 +866,9 @@ public class AwayTests {
                             + ", " + grown + " nodules grown since");
             helper.assertTrue(blocks[3] == expected[3] + grown - lost, "the nodules should be as counted: blocks " + java.util.Arrays.toString(blocks)
                     + ", counted " + java.util.Arrays.toString(expected) + ", " + grown + " grown since, " + lost + " lost with used-up comb");
+            Entity theKing = level.getEntity(king[0]);
+            helper.assertTrue(theKing != null && theKing.isAlive() && colony.getCount(com.antcolonies.entity.TermiteKingEntity.CASTE) == 1,
+                    "the king, fed while away, should be alive when his land loads: " + theKing);
             colony.garden().setAgeingSpeedForTests(1.0F);
             phase[0] = 1;
             phase[1] = level.getGameTime();
@@ -1157,6 +1180,88 @@ public class AwayTests {
             helper.assertTrue(colony.refuse().getRefuseCorpses(level).size() >= 2, "the young's bodies should lie in the refuse chamber: "
                     + colony.refuse().getRefuseCorpses(level).size() + ", " + colony.ledger().describe());
             helper.assertTrue(colony.away().report().describe().contains("the queen starved"), "the report should still say so after coming back");
+            helper.succeed();
+        });
+    }
+
+    /**
+     * Brain part 4, the king fix: a starving termite royal pair while away (real Macrotermes kings and queens are fed
+     * mouth to mouth and die without it). A Macrotermes colony with its nest dug, 20 worker numbers (just fed), a comb
+     * of fresh forage but not one nodule, the queen in the royal chamber and the king beside her, both long unfed. While
+     * away the nurses have nothing to give them: the queen starves, and the king too by her rule (his hunger clock is
+     * the brain's, so it runs on while he is frozen); the workers live. The report says so. Back in range both die as
+     * their land loads and the colony carries on queenless.
+     */
+    @GameTest(template = "arena", timeoutTicks = 900)
+    public static void aStarvingTermitePairAwayDieWhenTheirLandLoads(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        TermiteMoundTests.deepGround(helper);
+        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        helper.runAfterDelay(2, () -> helper.spawn(ModEntities.TERMITE_KING.get(), MIDDLE + 1, SURFACE, MIDDLE));
+        UUID[] id = new UUID[1];
+        UUID[] royals = new UUID[2];
+        Map<UUID, CompoundTag> unloaded = new HashMap<>();
+        helper.runAfterDelay(10, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(colony != null, "no termite colony");
+            id[0] = colony.getId();
+            colony.setForagingTimeForTests(false);
+            colony.setHungerOn(true);
+            colony.population().setOnForTests(false);
+            colony.population().setViewersForTests(List.of());
+            TermiteSoldierTests.digNestAtOnce(level, colony);
+            BlockPos room = colony.nest().getFinishedRoomCenter(level);
+            helper.assertTrue(room != null, "the royal chamber should be dug");
+            colony.getQueen(level).teleportTo(room.getX() + 0.5, room.getY(), room.getZ() + 0.5);
+            colony.population().addNewMembers(WorkerAntEntity.CASTE, level.getGameTime(), 20);
+            BlockPos spot = colony.food().pickFoodSpot(level, level.getRandom());
+            helper.assertTrue(spot != null, "no spot for comb in the garden");
+            colony.food().depositSeed(level, spot); // (fresh forage: the colony has had its first comb, so its royals get hungry)
+        });
+        helper.runAfterDelay(60, () -> {
+            Colony colony = byId(helper, id[0]);
+            helper.assertTrue(colony.queenCare().isQueenHome(level), "the queen should be in the royal chamber");
+            helper.assertTrue(colony.life().nurseFoodLeft(level) == 0, "there should be no nodule: " + colony.life().nurseFoodLeft(level));
+            AbstractAntEntity theQueen = colony.getQueen(level);
+            var theKing = level.getEntitiesOfClass(com.antcolonies.entity.TermiteKingEntity.class, helper.getBounds(),
+                    mob -> colony.getId().equals(mob.getColonyId())).stream().findFirst().orElse(null);
+            helper.assertTrue(theKing != null, "the king should have joined");
+            theKing.teleportTo(theQueen.getX() + 1.0, theQueen.getY(), theQueen.getZ());
+            royals[0] = theQueen.getUUID();
+            royals[1] = theKing.getUUID();
+            long now = level.getGameTime();
+            colony.queenCare().setQueenLastFed(now - colony.profile().queen().starveTicks() + 200);
+            colony.kingCare().setLastFed(now - colony.profile().worker().mealIntervalTicks() - colony.profile().queen().starveTicks() + 300);
+            helper.assertTrue(!colony.kingCare().starves(level), "the king should not have starved yet");
+            colony.away().setOnForTests(true);
+            colony.away().setGraceForTests(20L);
+            unloaded.put(royals[0], freezeAndUnload(colony, level, theQueen));
+            unloaded.put(royals[1], freezeAndUnload(colony, level, theKing));
+            colony.away().setAwayForTests(true);
+        });
+        helper.runAfterDelay(500, () -> {
+            Colony colony = byId(helper, id[0]);
+            AwayReport report = colony.away().report();
+            AntColoniesMod.LOGGER.info("[away-test] king fix, starving pair: {}{}", colony.population().describe(level), colony.away().describe(level));
+            helper.assertTrue(colony.away().isAway(level), "the colony should be away");
+            helper.assertTrue(report.describe().contains("the queen starved") && report.didKingStarve() && report.describe().contains("the king starved"),
+                    "the queen and the king should starve while away: " + report.describe());
+            helper.assertTrue(report.get(AwayReport.What.QUEEN_FED) == 0 && report.get(AwayReport.What.KING_FED) == 0,
+                    "there was nothing to feed them: " + report.describe());
+            helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == 20 && report.get(AwayReport.What.STARVED) == 0,
+                    "the workers, just fed, should live: " + colony.getCount(WorkerAntEntity.CASTE));
+            colony.away().setAwayForTests(false);
+            unloaded.values().forEach(tag -> loadAgain(level, tag));
+        });
+        helper.runAfterDelay(650, () -> {
+            Colony colony = byId(helper, id[0]);
+            Entity theQueen = level.getEntity(royals[0]);
+            Entity theKing = level.getEntity(royals[1]);
+            AntColoniesMod.LOGGER.info("[away-test] king fix, starving pair back: queen {}, king {}, {}", theQueen, theKing, colony.away().describe(level));
+            helper.assertTrue(theQueen == null || !theQueen.isAlive(), "the queen who starved while away should die as her land loads");
+            helper.assertTrue(theKing == null || !theKing.isAlive(), "the king who starved while away should die as his land loads");
+            helper.assertTrue(colony.isQueenless() && colony.getCount(com.antcolonies.entity.TermiteKingEntity.CASTE) == 0,
+                    "the colony should carry on without them: kings " + colony.getCount(com.antcolonies.entity.TermiteKingEntity.CASTE));
             helper.succeed();
         });
     }

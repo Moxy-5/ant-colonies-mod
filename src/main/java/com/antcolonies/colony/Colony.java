@@ -72,6 +72,7 @@ public class Colony {
     private final FoodMap foodMap;
     private final Bakery bakery;
     private final QueenCare queenCare;
+    private final KingCare kingCare;
     private final Brood brood;
     private final Refuse refuse;
     private final Mound mound;
@@ -101,6 +102,7 @@ public class Colony {
         this.foodMap = new FoodMap(this);
         this.bakery = new Bakery(this);
         this.queenCare = new QueenCare(this);
+        this.kingCare = new KingCare(this);
         this.brood = new Brood(this);
         this.refuse = new Refuse(this);
         this.mound = new Mound(this);
@@ -152,6 +154,11 @@ public class Colony {
     /** The queen: feeding her, her eggs and her hunger. */
     public QueenCare queenCare() {
         return queenCare;
+    }
+
+    /** The king (termites): his hunger, here and away. */
+    public KingCare kingCare() {
+        return kingCare;
     }
 
     /** Eggs and larvae. */
@@ -554,6 +561,7 @@ public class Colony {
         food.save(tag);
         bakery.save(tag);
         queenCare.save(tag);
+        kingCare.save(tag);
         nest.save(tag);
         mound.save(tag);
         alarm.save(tag);
@@ -586,6 +594,7 @@ public class Colony {
         colony.food.load(tag);
         colony.bakery.load(tag);
         colony.queenCare.load(tag);
+        colony.kingCare.load(tag);
         colony.nest.load(tag);
         colony.mound.load(tag);
         colony.alarm.load(tag);

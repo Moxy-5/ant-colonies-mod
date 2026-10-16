@@ -72,6 +72,7 @@ public class NestLife {
         boolean changed = growUp(level);
         if (away) {
             changed |= colony.queenCare().liveAway(level, queenHome, sealedIn, queenSize);
+            changed |= colony.kingCare().liveAway(level);
             changed |= nurse(level);
             changed |= growNodules(level);
         } else {
@@ -178,8 +179,8 @@ public class NestLife {
 
     /**
      * The nurses' work while away, one job each {@link #NURSE_JOB_TICKS}: first food for the queen when she wants some
-     * (rich bread first), then the hungriest young, then milling a seed into bread while there is less than is wanted
-     * (a rich seed when the queen wants rich bread).
+     * (rich bread first), then for the king when he wants some, then the hungriest young, then milling a seed into bread
+     * while there is less than is wanted (a rich seed when the queen wants rich bread).
      */
     private boolean nurse(ServerLevel level) {
         int nurses = nursesInside(level);
@@ -191,6 +192,10 @@ public class NestLife {
             if (queen.wantsFoodAway(level, queenHome) && nurseFoodLeft(level) > 0) {
                 queen.feedQueen(level, takePiece(true));
                 colony.away().note(level, AwayReport.What.QUEEN_FED, 1);
+            } else if (colony.kingCare().wantsFood(level) && nurseFoodLeft(level) > 0) {
+                takePiece(false);
+                colony.kingCare().fed(level);
+                colony.away().note(level, AwayReport.What.KING_FED, 1);
             } else if (colony.brood().hungriestInside() >= 0 && nurseFoodLeft(level) > 0) {
                 int larva = colony.brood().hungriestInside();
                 takePiece(false);
