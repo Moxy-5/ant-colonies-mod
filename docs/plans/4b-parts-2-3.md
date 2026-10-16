@@ -1,0 +1,50 @@
+# Brain step 4b parts 2 and 3: Gordon's door rule and patrollers (planned with the user, 2026-10-15)
+
+From the planning session (2026-10-15); the decisions are also in docs/DESIGN.md ("4b parts 2 and 3").
+
+## Real behaviour (as explained to the user)
+- Foragers not out wait just inside the entrance. A forager coming home **with a seed** touches the waiting ants (antennae; seed + forager scent). A waiting ant goes out once touched often enough in a short time (Greene & Gordon 2003, bead experiments: about one contact per 10 s was enough, sparser not). Quick returns -> more go out; slow returns -> touches fade, outflow dies down. Empty-handed returns don't count. (Gordon's "anternet", Prabhakar et al. 2012.)
+- Patrollers: a separate task group, recruited from nest maintenance workers (our diggers), first out at dawn, over the hill and along the first part of the trails. Foraging starts only after they return (patrollers removed -> no foraging that day; Greene & Gordon 2007), and foragers use only the trails patrollers came back on. Patrollers meeting a disturbance: fewer foragers, more workers turn to patrolling (Gordon 1986). Neighbours met in a direction -> that direction avoided next day (Brown & Gordon 2000).
+- What a patroller is (the user asked): a safety inspector, not a food scout.
+
+## The user's decisions
+1. **The door: real touches.** A real forager home with a seed touches the real ants waiting near it by the entrance; each waiting ant counts its own touches. The waiting numbers are touched the same way, counted. An ant resting deep inside gets no touches.
+2. **Speed: real ant pace.** Touches fade in about 30 real seconds; outflow follows returns within a minute or two.
+3. **Restart: only a new patrol.** Once nobody is out and nobody returns, the door stays shut until the next patrol (after the midday rest, after rain, or the next dawn). No lone spontaneous foragers.
+4. **Patroller count: the user's scaling, about 16% of the workers**: 2 at 10, 4 at 25, 8 at 50, 16 at 100 "and so on" (3,000 workers -> about 480). At least 1 (a tiny colony: one worker patrols first). Taken from the diggers (builders) for the patrol, back to digging after. The real share of the 50 real ants patrols as real mobs; the rest patrol as numbers out of sight. User is not sure of real mature counts: keep it a species-file number.
+5. **Danger: real reaction.** A patroller hurt (mob or player) or with a hostile mob close turns back at once; its direction stays shut the rest of the day; more workers come out to patrol (from the diggers); fewer foragers that day. A patroller killed never returns: its direction stays shut.
+6. **Neighbours: shut that way today.** A patroller meeting another colony's ants or trunk trail turns back; that direction is shut for the day. Step 4g later turns the trails away from that side over the next days. No fighting (M8).
+7. **Later rounds smaller:** the patrol after the midday rest or after rain is half the dawn patrol (at least 1).
+8. **Reach: hill + first part.** Over and round the hill, then out along a trail about 10 blocks (or the trail's end if shorter) and back. More patrollers than trails: the extras go out in new directions (how a new trail opens).
+9. **Away: yes, as numbers.** Same rule while away; until 4g the numbers always return safely (nothing can hurt them out of sight yet).
+10. **Day clock for all surface work: yes.** Diggers' surface work and refuse carriers keep `food.day_clock` too (in at night, in rain, in the midday rest). Patrollers obviously too.
+11. **Night soil: pile it inside.** Digging underground goes on at any hour at the same speed; soil dug while the surface is shut is heaped in the shaft just below the entrance and carried up onto the hill when the clock opens. (My idea, I told the user I'm not sure real Pogonomyrmex do exactly this; it avoids slowing the young nest by about a third.)
+12. **Small-colony door rule: yes.** User's worry: "none of these changes will vastly slow down ants in the early game". While a colony has only a few foragers (my pick: under 10), **one touch is enough, and a forager's own seed counts as its touch** (so it goes straight back out). The full rule (about 3 touches within 30 s) from about 10 foragers. Real fit: tiny entrance, every homecomer meets everyone.
+13. **List: one short line**, e.g. `patrol: 8 out at 6:00, 7 back, 1 lost; open: north, east` and `foragers out 14 of 40 (12 back with seeds in the last minute)`. Away report adds `patrols sent`, `patrollers lost`, `days with no foraging`.
+
+## Numbers (my picks, to confirm unless noted)
+- `food.door` (species-neutral, only in red_harvester_ant.json): `touches_needed` 3, `touch_memory_ticks` 600 (30 s; a touch counts for that long, or a half-life of ~400 ticks if a fading count is easier), `touch_reach` 2 blocks (real ants within this of the homecomer inside the entrance zone), `small_colony_foragers` 10 (below: 1 touch, own trip counts). Cap: real + numbers out <= the forager share (`Colony.shareOut` FORAGER) as before; the share becomes the most, not a fixed number.
+- `food.patrol`: `share` 0.16 (user's), `min` 1, `reach` 10 blocks, `later_round_share` 0.5 (user's), danger: `hostile_within` 4 blocks, `extra_patrollers_on_danger` as many again (from builders), `forager_cap_after_danger` 0.5 of the share for the rest of the day. Patrol time = the walk (real ants) or about 40 s + 8 ticks/block for numbers (FieldLife's pace).
+- The first foragers after a patrol: each returning patroller counts as one touch for the waiting foragers it passes (Greene & Gordon: patroller contacts start foraging). Small colony: the first patroller back opens the door.
+- Rounds: a patrol each time the day clock opens after being shut (dawn at 6:00, end of the midday rest, rain stopping). The plains rest is ~50 min, so the plains get a second, half-size patrol at about 13:24.
+
+## Code parts (mind / legs / body kept apart)
+- `species/SpeciesProfile.java` + `red_harvester_ant.json`: `food.door`, `food.patrol` (absent = today's behaviour; termites unchanged, their trail-strength version of Gordon's rule is later).
+- New `colony/Door` (or `Outflow`): touches per waiting real ant (UUID -> recent touch times) and for the numbers (a count of waiting numbers and their touches); `mayGo(ant)` / `numbersMayGo()`; `homeWithSeed(pos)` touches the real ants within reach and the numbers; empty returns ignored; shuts (clears) when the clock shuts; cap from shareOut. Saved: little (resets each round).
+- New `colony/Patrol`: today's rounds, who went (real UUIDs and a number count), each direction's state (out / back / lost / danger / neighbour), the open directions (angle ranges, trail ids or new angles); `isOpen(direction)`; extra patrol on danger; numbers' patrol while away. Saved (open directions for today, the round).
+- New `entity/goal/PatrolGoal` (mind): a builder chosen by Patrol walks over and round the hill, out along its trail (TrunkTrails) about 10 blocks and back, via AntNavigator only; reports back on return; turns back when hurt (hook in AbstractAntEntity hurt), a hostile within 4 blocks, or another colony's ant/trail.
+- `ClipGrassGoal`, `GatherSeedGoal` (and `ScoutGoal` if it ever applies to ants): canUse also needs `door.mayGo(ant)` and the plant in an open direction (filter in `FoodStore.findGrass` / `findSeed`, or `TrunkTrails.setOut` returning only open trails); delivery calls `door.homeWithSeed`.
+- `FieldLife.forage`: `free` = numbers the door lets out (not all foragersInside); plants only in open directions; numbers' returns touch the door too; numbers patrol while away (Patrol).
+- `Colony.isForagingTime` stays the day clock (holes, soldiers etc. use it); add `Colony.mayForageNow` (clock && patrol back && door) for the foragers only.
+- Surface work keeps the clock: `AbstractAntEntity` ~line 473 (`keepsASchedule` gate; the harvester keeps none today because `forage_at` is ALWAYS; make the day clock count as a schedule for surface work), the digger's pellet-to-hill trip and the refuse carrier. Night soil: a heap (count or pellet blocks) in the shaft under the entrance, carried up when the clock opens. Read docs/BUGS.md first (block placing).
+- `GoInsideGoal`/`AntWanderGoal.restsAt`: waiting foragers rest near the entrance (already: 8 blocks); `touch_reach` works on those.
+- `command/ColonyCommands` (list line), `colony/AwayReport` (PATROLS_SENT, PATROLLERS_LOST, DAYS_WITHOUT_FORAGING).
+- `BuildLife` away: leave as is (built out of sight on return).
+
+## Tests (add to existing scenes where possible)
+- Unit tests (`./gradlew test`): Door math (quick returns grow the outflow up to the share cap; slow returns decay it to none; empty returns don't count; small colony: one touch, own seed counts); patroller count (10->2, 25->4, 50->8, 100->16, 3->1; later rounds half).
+- `away`: `antNumbersForageOnlyOutOfSightAndFromWhatTheyRemember` (same scene): nothing foraged before the numbers' patrol is back; only tufts in open directions eaten; after the midday rest a half patrol reopens; a day whose patrol is lost has no foraging (report says so).
+- `antnest`: `workersCarrySeedsAndClipGrassIntoTheFoodStore` (same scene): at dawn the patrollers go out first and no forager leaves before one is back; foragers only take open directions; tufts placed far away (slow returns) -> outflow dies down.
+- Trails: `TrailTests.foragersWearLastingTrunkTrailsThatFadeAndGrowBack` (same scene): patrollers walk the strongest trails; a direction with a killed patroller stays shut for the day; another colony's ant on a trail shuts it.
+- Early-game check (the user's worry): `aLoneQueenFoundsHerColonyAndRaisesHerFirstWorkers` or `theNestGrowsDeeperOnlyAsTheColonyGrows` (same scene): a 3-worker colony forages seeds within about a minute of the day opening, and its nest digging reaches the same depth in the same time as before (night soil heaped and carried up in the morning).
+- Run `antnest`, `away`, `colony` (plus the trails test); new feature touching colony life -> `away` too.
