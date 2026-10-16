@@ -37,7 +37,9 @@ public class BodyTests {
 
     /**
      * A worker with nothing to do falls asleep (here it takes every chance, so the test is quick) and wakes at once when
-     * hurt. One holding a seed never naps, and a termite never does (its species has no naps).
+     * hurt. One holding a seed never naps, and a termite never does (its species has no naps). In the same scene, cleaning
+     * the antennae: an idle worker that does not nap stops and cleans an antenna (or both), and goes back to standing when
+     * the clip is over; the one holding a seed never does, nor does the termite (its species has no cleaning).
      */
     @GameTest(template = "arena", timeoutTicks = 600)
     public static void idleWorkersNapAndWakeWhenHurt(GameTestHelper helper) {
@@ -51,7 +53,29 @@ public class BodyTests {
         TermiteWorkerEntity termite = helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE - 4, SURFACE, MIDDLE);
         termite.keepOutOfColonies();
         termite.setNapChanceForTests(1.0F);
+        WorkerAntEntity groomer = helper.spawn(ModEntities.WORKER_ANT.get(), MIDDLE, SURFACE, MIDDLE + 4);
+        groomer.keepOutOfColonies();
+        groomer.setNapChanceForTests(0.0F);
+        groomer.setGroomChanceForTests(1.0F);
+        holder.setGroomChanceForTests(1.0F);
+        termite.setGroomChanceForTests(1.0F);
+        int[] groomedTicks = {0, 0};   // this cleaning so far; the longest finished one
         helper.onEachTick(() -> {
+            if (holder.getActivity() != AbstractAntEntity.ACTIVITY_NONE) {
+                helper.fail("an ant holding a seed started cleaning its antennae");
+            }
+            if (termite.getActivity() != AbstractAntEntity.ACTIVITY_NONE) {
+                helper.fail("a termite started cleaning its antennae (its species has no cleaning)");
+            }
+            if (groomer.getActivity() != AbstractAntEntity.ACTIVITY_NONE) {
+                groomedTicks[0]++;
+                if (groomedTicks[0] > AbstractAntEntity.GROOM_BOTH_TICKS + 20) {
+                    helper.fail("the cleaning ant went on cleaning for " + groomedTicks[0] + " ticks");
+                }
+            } else if (groomedTicks[0] > 0) {
+                groomedTicks[1] = Math.max(groomedTicks[1], groomedTicks[0]);
+                groomedTicks[0] = 0;
+            }
             if (holder.isAsleep()) {
                 helper.fail("an ant holding a seed fell asleep");
             }
@@ -63,6 +87,8 @@ public class BodyTests {
                 .thenWaitUntil(() -> helper.assertTrue(sleeper.isAsleep(), "the idle worker has not fallen asleep"))
                 .thenExecute(() -> sleeper.hurt(helper.getLevel().damageSources().generic(), 0.1F))
                 .thenWaitUntil(() -> helper.assertFalse(sleeper.isAsleep(), "the hurt worker sleeps on"))
+                .thenWaitUntil(() -> helper.assertTrue(groomedTicks[1] >= AbstractAntEntity.GROOM_ONE_TICKS,
+                        "the idle worker has not cleaned an antenna and stood again (" + groomedTicks[0] + " ticks cleaning)"))
                 .thenSucceed();
     }
 

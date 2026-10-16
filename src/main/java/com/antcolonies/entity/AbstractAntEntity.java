@@ -15,6 +15,7 @@ import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.debug.Perf;
 import com.antcolonies.entity.body.AntAnimationController;
 import com.antcolonies.entity.goal.AntWanderGoal;
+import com.antcolonies.entity.goal.GroomGoal;
 import com.antcolonies.entity.goal.NapGoal;
 import com.antcolonies.entity.goal.NoticeGoal;
 import com.antcolonies.nav.AntNavigator;
@@ -78,6 +79,28 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     private static final RawAnimation FREEZE = RawAnimation.begin().thenLoop("freeze");
     /** Ticks to blend into a look and out of it. */
     private static final int LOOK_SETTLE_TICKS = 6;
+    /**
+     * Cleaning an antenna with the comb on the front leg (see {@code GroomGoal}), the left, the right, or both one after
+     * the other. Played once at the speed they were made; the last frame (the standing pose) is held. Ants only.
+     */
+    private static final RawAnimation GROOM_L = RawAnimation.begin().thenPlayAndHold("groom_antenna_l");
+    private static final RawAnimation GROOM_R = RawAnimation.begin().thenPlayAndHold("groom_antenna_r");
+    private static final RawAnimation GROOM_BOTH = RawAnimation.begin().thenPlayAndHold("groom_antenna_both");
+    /**
+     * Digging (see {@code DigGoal}): the forebody and head down, the jaws biting, the front legs raking the loose soil
+     * back by turns, the antennae tapping the face it digs. Ants only.
+     */
+    private static final RawAnimation DIG = RawAnimation.begin().thenLoop("dig");
+    /**
+     * Carrying something in the jaws (played by the head player only, over the walk or the stand): the head held up, the
+     * jaws closed on the load, the antennae high. Ants only.
+     */
+    private static final RawAnimation CARRY = RawAnimation.begin().thenLoop("carry");
+    /** How long the cleaning clips last (ticks; worker_ant.animation.json, made by tools/ant_models.py). */
+    public static final int GROOM_ONE_TICKS = 52;
+    public static final int GROOM_BOTH_TICKS = 104;
+    /** Ticks to blend into a cleaning clip and out of it (my pick, to confirm). */
+    public static final int GROOM_SETTLE_TICKS = 4;
     /** The look round with the head out of a chimney's mouth (termites; see DoorwayMotion). */
     private static final RawAnimation PEEK = RawAnimation.begin().thenPlay("peek");
     /** How far (blocks a tick) a worker climbs at its normal speed: its legs then step at 1.5 times the walk animation. */
@@ -117,6 +140,18 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     public static final byte NOTICE_LOOK = 1;
     public static final byte NOTICE_WARY = 2;
     public static final byte NOTICE_FREEZE = 3;
+    /**
+     * A short piece of body work it is doing, for the client's clips: {@link #ACTIVITY_NONE}, cleaning its left, right
+     * or both antennae ({@link #ACTIVITY_GROOM_L}, {@link #ACTIVITY_GROOM_R}, {@link #ACTIVITY_GROOM_BOTH}; see
+     * {@code GroomGoal}) or biting soil loose ({@link #ACTIVITY_DIG}). Synced.
+     */
+    private static final EntityDataAccessor<Byte> DATA_ACTIVITY =
+            SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.BYTE);
+    public static final byte ACTIVITY_NONE = 0;
+    public static final byte ACTIVITY_GROOM_L = 1;
+    public static final byte ACTIVITY_GROOM_R = 2;
+    public static final byte ACTIVITY_GROOM_BOTH = 3;
+    public static final byte ACTIVITY_DIG = 4;
     /** How pale a young worker is drawn, 0 (grown dark) to 100 (just grown up). Synced for the renderer. */
     private static final EntityDataAccessor<Byte> DATA_YOUTH =
             SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.BYTE);
@@ -197,6 +232,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         builder.define(DATA_HEADING, 0.0F);
         builder.define(DATA_POSE_FLAGS, (byte) 0);
         builder.define(DATA_NOTICE, NOTICE_NONE);
+        builder.define(DATA_ACTIVITY, ACTIVITY_NONE);
         builder.define(DATA_YOUTH, (byte) 0);
         builder.define(DATA_CARRIED, Optional.empty());
         builder.define(DATA_CARRIED_SEED, ItemStack.EMPTY);
@@ -586,6 +622,29 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         entityData.set(DATA_NOTICE, what);
     }
 
+    /** The piece of body work it is doing now ({@link #ACTIVITY_NONE}, a cleaning or digging; synced). */
+    public byte getActivity() {
+        return entityData.get(DATA_ACTIVITY);
+    }
+
+    /** Server: starts or stops a piece of body work (see {@code GroomGoal}, {@code DigGoal}). */
+    public void setActivity(byte what) {
+        entityData.set(DATA_ACTIVITY, what);
+    }
+
+    /** Tests only: the chance a second it starts cleaning its antennae when it may (below 0: its profile's). */
+    private float groomChanceForTests = -1.0F;
+
+    /** Tests only: gives it this chance a second to start cleaning its antennae (below 0 for its profile's). */
+    public void setGroomChanceForTests(float chance) {
+        groomChanceForTests = chance;
+    }
+
+    /** The chance a second it starts cleaning its antennae, or below 0 for its profile's (see {@code GroomGoal}). */
+    public float groomChanceForTests() {
+        return groomChanceForTests;
+    }
+
     // --- personality (the animation engine, 2026-10-16) -------------------------------------------------------------
     /**
      * Server: its personality, each trait 0 to 1 (see {@link SpeciesProfile.Traits}): drawn from its profile the first
@@ -729,7 +788,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             boolean busy = goalSelector.getAvailableGoals().stream().anyMatch(wrapped -> wrapped.isRunning()
                     && !(wrapped.getGoal() instanceof FloatGoal || wrapped.getGoal() instanceof AntWanderGoal
                     || wrapped.getGoal() instanceof RandomLookAroundGoal || wrapped.getGoal() instanceof NapGoal
-                    || wrapped.getGoal() instanceof NoticeGoal));
+                    || wrapped.getGoal() instanceof NoticeGoal || wrapped.getGoal() instanceof GroomGoal));
             idleSeconds = busy ? 0 : idleSeconds + 1;
             updateYouth();
             if (level() instanceof ServerLevel serverLevel) {
@@ -796,7 +855,74 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             measureWalk();
             tickNap();
             tickLookWeight();
+            tickWaist();
+            tickSteam();
         }
+    }
+
+    /**
+     * Client: steam off an ant on hot ground (the user's choice, 2026-10-15, and the mod's one knowingly unrealistic
+     * touch, so a player sees the heat at a glance): now and then a wisp of white smoke rises off its back. About one
+     * every 30 ticks (my pick, to confirm). Not near a sleeping ant (it rests inside, out of the heat).
+     */
+    private void tickSteam() {
+        if (!isOnHotGround() || isAsleep() || random.nextInt(30) != 0) {
+            return;
+        }
+        level().addParticle(net.minecraft.core.particles.ParticleTypes.WHITE_SMOKE,
+                getX() + (random.nextDouble() - 0.5) * 0.2, getY() + getBbHeight(), getZ() + (random.nextDouble() - 0.5) * 0.2,
+                0.0, 0.015, 0.0);
+    }
+
+    /**
+     * Client: the edge curve (the animation engine, step 9, 2026-10-16). A real ant's body is three hard parts joined at
+     * the neck and the waist: going over an edge, onto a wall or a ceiling, up a ramp or round a turn, the front turns
+     * first and the gaster follows a moment later, so the waist bends. Here the front's turns (pitch: up a wall or a
+     * ramp; yaw: round a turn) are added up tick by tick, and the waist bends by how far the front has turned in the
+     * last {@link #WAIST_LAG} ticks (the rear still lies the old way). My picks, to confirm: 4 ticks behind, at most 60
+     * degrees up or down and 25 to the side.
+     */
+    public static final int WAIST_LAG = 4;
+    private static final float WAIST_MAX_PITCH = 60.0F;
+    private static final float WAIST_MAX_YAW = 25.0F;
+    private final float[] frontPitchPast = new float[WAIST_LAG + 1];
+    private final float[] frontYawPast = new float[WAIST_LAG + 1];
+    private float frontPitch;
+    private float frontYaw;
+    private float waistPitch;
+    private float waistPitchO;
+    private float waistYaw;
+    private float waistYawO;
+
+    private void tickWaist() {
+        // On a wall the body tips about its own side-to-side line only when the head points up or down the wall (the
+        // tilt turns it about the wall's level line, the heading turns it within the wall).
+        float tipped = (bodyTilt - bodyTiltO) * Mth.cos(bodyHeading * Mth.DEG_TO_RAD);
+        frontPitch += tipped + (slopePitch - slopePitchO);
+        // Turning right is a growing body yaw on a floor; on a wall the heading grows turning left.
+        frontYaw += wallPose ? -Mth.wrapDegrees(bodyHeading - bodyHeadingO) : Mth.wrapDegrees(yBodyRot - yBodyRotO);
+        System.arraycopy(frontPitchPast, 1, frontPitchPast, 0, WAIST_LAG);
+        System.arraycopy(frontYawPast, 1, frontYawPast, 0, WAIST_LAG);
+        frontPitchPast[WAIST_LAG] = frontPitch;
+        frontYawPast[WAIST_LAG] = frontYaw;
+        if (tickCount <= WAIST_LAG) {
+            java.util.Arrays.fill(frontPitchPast, frontPitch);   // just loaded: no bend from where it was put down
+            java.util.Arrays.fill(frontYawPast, frontYaw);
+        }
+        waistPitchO = waistPitch;
+        waistYawO = waistYaw;
+        waistPitch = Mth.clamp(frontPitch - frontPitchPast[0], -WAIST_MAX_PITCH, WAIST_MAX_PITCH);
+        waistYaw = Mth.clamp(frontYaw - frontYawPast[0], -WAIST_MAX_YAW, WAIST_MAX_YAW);
+    }
+
+    /** Client: how far the front has tipped up past the rear (degrees, the waist's bend; see {@link #tickWaist}). */
+    public float getWaistPitch(float partialTick) {
+        return Mth.lerp(partialTick, waistPitchO, waistPitch);
+    }
+
+    /** Client: how far the front has turned right past the rear (degrees, the waist's bend). */
+    public float getWaistYaw(float partialTick) {
+        return Mth.lerp(partialTick, waistYawO, waistYaw);
     }
 
     /**
@@ -1093,8 +1219,9 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
 
     /**
      * The insect's three animation players (see {@link AntAnimationController}), each moving its own bones: the body and
-     * legs at the pace of its steps, the head and antennae at the insect's own pace, and the little extras (grooming,
-     * played now and then over the other two: added last, so it wins on the bones its clip moves).
+     * legs at the pace of its steps, the head and antennae at the insect's own pace, and the little extras (none yet:
+     * added last, so it would win on the bones its clip moves). Whole-body work such as cleaning the antennae is played
+     * by both the body and the head player at once, at the speed it was made.
      */
     public static final String BODY_PLAYER = "body";
     public static final String HEAD_PLAYER = "head";
@@ -1163,6 +1290,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         settleInto(player, clip);
         if (clip == WALK || clip == WALK_HOT) {
             player.keepPace(walkSpeed, walkRateWithoutStride());
+        } else if (isMadeSpeed(clip)) {
+            player.playAt(1.0);
         } else {
             player.playAt(ownPace(0));
         }
@@ -1181,12 +1310,18 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             player.playAt(1.0);
             return state.setAndContinue(whole);
         }
-        RawAnimation clip = noticingClip(true);
+        RawAnimation clip = activityClip();
+        if (clip == null) {
+            clip = noticingClip(true);
+        }
+        if (clip == null && hasWorkClips() && hasFullMandibles() && !isAsleep()) {
+            clip = CARRY;
+        }
         if (clip == null) {
             clip = usualClip();
         }
         settleInto(player, clip);
-        player.playAt(ownPace(1));
+        player.playAt(isMadeSpeed(clip) ? 1.0 : ownPace(1));
         return state.setAndContinue(clip);
     }
 
@@ -1197,6 +1332,10 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     private RawAnimation usualClip() {
         if (isAsleep()) {
             return twitching ? SLEEP_TWITCH : SLEEP;
+        }
+        RawAnimation work = activityClip();
+        if (work != null) {
+            return work;
         }
         RawAnimation noticing = walking ? null : noticingClip(false);
         if (noticing != null) {
@@ -1222,6 +1361,34 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         };
     }
 
+    /** The clip for the body work it is doing (cleaning an antenna, digging), or null for none (or no such clips). */
+    @Nullable
+    private RawAnimation activityClip() {
+        if (!hasWorkClips()) {
+            return null;
+        }
+        return switch (getActivity()) {
+            case ACTIVITY_GROOM_L -> GROOM_L;
+            case ACTIVITY_GROOM_R -> GROOM_R;
+            case ACTIVITY_GROOM_BOTH -> GROOM_BOTH;
+            case ACTIVITY_DIG -> DIG;
+            default -> null;
+        };
+    }
+
+    /**
+     * Whether its animation file has the work clips (cleaning, digging, carrying): the ant model's does (made by
+     * tools/ant_models.py); the termites' do not yet, so they keep their usual clips while they work.
+     */
+    protected boolean hasWorkClips() {
+        return false;
+    }
+
+    /** Whether this clip plays at the speed it was made (a piece of work played once), not at the insect's own pace. */
+    private static boolean isMadeSpeed(RawAnimation clip) {
+        return clip == GROOM_L || clip == GROOM_R || clip == GROOM_BOTH;
+    }
+
     /**
      * Into a nap and out of it the pose blends slowly (a real ant settles down and gets up), into a look and out of it a
      * little faster; otherwise quickly.
@@ -1230,7 +1397,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         RawAnimation now = player.getCurrentRawAnimation();
         boolean napping = clip == SLEEP || clip == SLEEP_TWITCH || now == SLEEP || now == SLEEP_TWITCH;
         boolean looking = clip == LOOK || clip == LOOK_WARY || clip == FREEZE || now == LOOK || now == LOOK_WARY || now == FREEZE;
-        player.transitionLength(napping ? SETTLE_TICKS : looking ? LOOK_SETTLE_TICKS : 3);
+        boolean working = isMadeSpeed(clip) || isMadeSpeed(now);
+        player.transitionLength(napping ? SETTLE_TICKS : looking ? LOOK_SETTLE_TICKS : working ? GROOM_SETTLE_TICKS : 3);
     }
 
     /**

@@ -40,10 +40,11 @@ public class ClientEvents {
         event.registerEntityRenderer(ModEntities.ANT_CORPSE.get(), AntCorpseRenderer::new);
         event.registerEntityRenderer(ModEntities.TERMITE_CORPSE.get(), AntCorpseRenderer::termite);
 
-        // Placeholder: the queen reuses the worker model and animations, just bigger and with her own texture.
+        // Placeholder: the queen reuses the worker model and animations, just bigger and with her own texture (and the
+        // live layer: her head look and her waist bending).
         ResourceLocation workerAsset = ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "worker_ant");
         event.registerEntityRenderer(ModEntities.QUEEN_ANT.get(), context -> new AntRenderer<>(
-                context, new DefaultedEntityGeoModel<QueenAntEntity>(
+                context, new InsectModel<QueenAntEntity>(
                         ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "queen_ant"))
                 .withAltModel(workerAsset)
                 .withAltAnimations(workerAsset))

@@ -974,15 +974,31 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * How the insects' bodies behave (the animation engine, 2026-10-16; species-neutral, every number my pick, to
      * confirm). {@code naps} (optional, none for a species that does not nap): see {@link Naps}. {@code hot} (optional):
      * see {@link Heat}. {@code traits} (optional, everyone in the middle without): see {@link Traits}. {@code notice}
-     * (optional, none for a species that never notices a player): see {@link Notice}.
+     * (optional, none for a species that never notices a player): see {@link Notice}. {@code groom} (optional, none for
+     * a species whose model has no cleaning clips yet): see {@link Groom}.
      */
-    public record BodyLanguage(Optional<Naps> naps, Optional<Heat> heat, Optional<Traits> traits, Optional<Notice> notice) {
+    public record BodyLanguage(Optional<Naps> naps, Optional<Heat> heat, Optional<Traits> traits, Optional<Notice> notice,
+                               Optional<Groom> groom) {
         public static final Codec<BodyLanguage> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Naps.CODEC.optionalFieldOf("naps").forGetter(BodyLanguage::naps),
                 Heat.CODEC.optionalFieldOf("hot").forGetter(BodyLanguage::heat),
                 Traits.CODEC.optionalFieldOf("traits").forGetter(BodyLanguage::traits),
-                Notice.CODEC.optionalFieldOf("notice").forGetter(BodyLanguage::notice)
+                Notice.CODEC.optionalFieldOf("notice").forGetter(BodyLanguage::notice),
+                Groom.CODEC.optionalFieldOf("groom").forGetter(BodyLanguage::groom)
         ).apply(i, BodyLanguage::new));
+    }
+
+    /**
+     * Cleaning the antennae (real ants groom often, and the antennae most of all: each is drawn through the comb on the
+     * front leg of its side, the strigil, then the comb is cleaned in the jaws; Farish 1972, Hackmann et al. 2015). An
+     * insect standing about with nothing to do starts with {@code chancePerSecond} each second (times 0.5 to 1.5 by its
+     * restlessness); {@code bothShare} of the time it cleans both, one after the other, otherwise one side.
+     */
+    public record Groom(float chancePerSecond, float bothShare) {
+        public static final Codec<Groom> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.FLOAT.optionalFieldOf("chance_per_second", 0.05F).forGetter(Groom::chancePerSecond),
+                Codec.FLOAT.optionalFieldOf("both_share", 0.4F).forGetter(Groom::bothShare)
+        ).apply(i, Groom::new));
     }
 
     /**

@@ -440,7 +440,16 @@ class Gait:
                     speeds.append((self.tips[i + 1][k][2] - self.tips[i][k][2]) / dt)
         moving = [s for s in speeds if abs(s) > 1e-3]
         self.speed = sum(moving) / len(moving) if moving and len(moving) > len(speeds) * 0.3 else 0.0
-        self.walking = abs(self.speed) > 0.5
+        # Walking only when most feet travel back while down: a clip where only the front feet move on the ground (an
+        # ant raking soil while it digs) is standing, not walking.
+        travelling = 0
+        for k in legs:
+            mine = [(self.tips[i + 1][k][2] - self.tips[i][k][2]) / dt for i in range(n) if self.down[k][i] and self.down[k][i + 1]]
+            if mine and abs(sum(mine) / len(mine)) > 0.5:
+                travelling += 1
+        self.walking = abs(self.speed) > 0.5 and travelling > len(legs) // 2
+        if not self.walking:
+            self.speed = 0.0
 
     def stride(self):
         """Ground covered in one cycle, in model units."""

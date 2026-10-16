@@ -9,6 +9,7 @@ import com.antcolonies.colony.NestSite;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.entity.goal.DigGoal;
 import com.antcolonies.entity.goal.FindNestSiteGoal;
+import com.antcolonies.entity.goal.GroomGoal;
 import com.antcolonies.entity.goal.NapGoal;
 import com.antcolonies.entity.goal.QueenToRoomGoal;
 import com.antcolonies.entity.goal.SealEntranceGoal;
@@ -74,6 +75,8 @@ public class QueenAntEntity extends AbstractAntEntity {
         this.goalSelector.addGoal(4, new AntWanderGoal(this, 0.6, 400, 4, () -> QueenToRoomGoal.findFinishedRoom(this) == null));
         // Resting in her room she naps now and then, longer than the workers (real ant queens: fewer, longer naps).
         this.goalSelector.addGoal(4, new NapGoal(this, true));
+        // And now and then she cleans her antennae.
+        this.goalSelector.addGoal(4, new GroomGoal(this));
         this.goalSelector.addGoal(5, new RandomLookAroundGoal(this));
     }
 
@@ -171,5 +174,11 @@ public class QueenAntEntity extends AbstractAntEntity {
         if (getColonyId() != null && level() instanceof ServerLevel serverLevel) {
             ColonyManager.queenDied(serverLevel, getColonyId());
         }
+    }
+
+    /** The worker ant model's animation file has the work clips (cleaning, digging, carrying). */
+    @Override
+    protected boolean hasWorkClips() {
+        return true;
     }
 }

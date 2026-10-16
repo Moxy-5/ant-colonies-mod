@@ -88,6 +88,7 @@ public class DigGoal extends Goal {
         // The crack overlay is left in place (the game fades it out by itself): the ant leaves to
         // carry a pellet and the block is still half dug.
         ant.getNavigator().stop();
+        ant.setActivity(AbstractAntEntity.ACTIVITY_NONE);
         target = null;
         colony = null;
     }
@@ -106,6 +107,7 @@ public class DigGoal extends Goal {
         boolean touching = ant.blockPosition().distManhattan(target) == 1;
         if (!touching && ant.distanceToSqr(blockCenter) > REACH * REACH) {
             // Walk to the open space next to the block (above it in the shaft, beside it in the tunnel).
+            ant.setActivity(AbstractAntEntity.ACTIVITY_NONE);
             AntNavigator legs = ant.getNavigator();
             if (legs.isDone()) {
                 boolean walking = false;
@@ -127,6 +129,7 @@ public class DigGoal extends Goal {
 
         stuckTicks = 0;
         ant.getNavigator().stop();
+        ant.setActivity(AbstractAntEntity.ACTIVITY_DIG);   // biting the soil loose (the body's dig clip)
         if (--biteCooldown <= 0) {
             biteCooldown = BITE_INTERVAL;
             bite(level, blockCenter);

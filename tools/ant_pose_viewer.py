@@ -51,6 +51,9 @@ CANDIDATES = [
     ('Cleaning an antenna', 'the front leg combs the left antenna 3 times with its strigil, then is drawn through the '
                             'jaws (plays once)', am.groom_antenna('l')),
     ('Cleaning both antennae', 'left, then right', am.groom_antenna('lr')),
+    ('Digging', 'head down at the soil, jaws biting 3 times a second, front legs raking the loose soil back by turns',
+     am.dig()),
+    ('Carrying (head only)', 'head up, jaws shut on the load, antennae high; the game plays it over the walk', am.carry()),
 ]
 
 

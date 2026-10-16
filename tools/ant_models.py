@@ -684,6 +684,75 @@ def groom_antenna(sides):
     return tr.bones(tol=0.1)
 
 
+# --- digging and carrying (the animation engine, step 8, 2026-10-16) ----------------------------------------------
+# Real harvester ants dig with their jaws: the ant stands with its forebody and head bent down to the soil face, bites
+# into it and scrapes it loose with quick snaps of the mandibles, and rakes the loose soil back under its body with its
+# front legs, one and then the other (Pogonomyrmex workers then pick the loose soil up as a pellet; Tschinkel's nest
+# casts, and films of digging ants). The antennae keep tapping the face as it works.
+# My picks, to confirm: a 1 s loop; the forebody 4 degrees down and the head 12 down, nodding 2 and 3 more with each
+# bite (more puts the jaws into the floor or the front legs through the head); the jaws snapping 3 times a second (25
+# degrees open); each front leg rakes once a second, by turns: 0.6 s on the ground drawn from 0.5 units in front of
+# where it stands to 0.8 behind (0.1 in toward the middle), then 0.4 s lifted 0.6 units back to the front; the antennae
+# down at the face and tapping 6 times a second.
+DIG_SECONDS = 1.0
+DIG_STEP = 1 / 40
+DIG_BODY = {'forebody': 4.0, 'head': 12.0}
+DIG_BITES = 3
+DIG_RAKE = dict(front=0.5, back=0.8, inward=0.1, lift=0.6, down=0.6)   # down: the share of a rake on the ground
+
+
+def rake_foot(stance, s, u):
+    """Where a raking front foot is (s: +1 left, -1 right; u: 0 to 1 through its rake): on the ground drawn back from in
+    front, then lifted and brought forward again."""
+    r = DIG_RAKE
+    x = stance[0] - s * r['inward']
+    if u < r['down']:
+        f = smooth(u / r['down'])
+        return (x, stance[1], stance[2] - r['front'] + (r['front'] + r['back']) * f)
+    f = (u - r['down']) / (1 - r['down'])
+    return (x, stance[1] + r['lift'] * math.sin(math.pi * f), stance[2] + r['back'] - (r['front'] + r['back']) * smooth(f))
+
+
+def dig():
+    """Digging: the forebody and head down at the soil, the jaws biting, the front legs raking by turns, the antennae
+    tapping (see above). The four other feet stay where they stand."""
+    T = DIG_SECONDS
+    rig_ = rig()
+    tr = mo.Track(rig_)
+    qs = None
+    for i in range(round(T / DIG_STEP) + 1):
+        t = i * DIG_STEP
+        bite = 0.5 - 0.5 * math.cos(2 * math.pi * DIG_BITES * t / T)          # 0 shut, 1 open
+        body = {'forebody': [DIG_BODY['forebody'] + 2 * (1 - bite), 0, 0], 'head': [DIG_BODY['head'] + 3 * (1 - bite), 0, 0],
+                'mandible_l': [0, -25 * bite, 0], 'mandible_r': [0, 25 * bite, 0]}
+        feet = {'l1': rake_foot(rig_.stance('l1'), 1, (t / T) % 1.0),
+                'r1': rake_foot(rig_.stance('r1'), -1, (t / T + 0.5) % 1.0)}
+        turns, qs, worst = mo.stand(rig_, body, feet=feet, guess=qs)
+        if worst > 0.05:
+            raise ValueError(f'dig: a foot misses its spot by {worst:.3f} at {t:.3f} s')
+        for bone, vec in list(body.items()) + list(turns.items()):
+            tr.put(bone, t, vec)
+        for side, ph, sy in (('l', 0.0, 1), ('r', 0.5, -1)):          # tapping the face
+            tap = mo.waves(t, T, [(6, 5, ph), (2, 2, ph + 0.3)])
+            tr.put(f'antenna_{side}_1', t, [14 + tap, sy * (4 + mo.waves(t, T, [(1, 3, ph)])), 0])
+            tr.put(f'antenna_{side}_2', t, [10 + mo.waves(t, T, [(6, 6, ph - 0.1)]), 0, 0])
+    return tr.bones(tol=0.1)
+
+
+# Carrying (real Pogonomyrmex carry a seed or a soil pellet high in their jaws, the head held up so the load clears the
+# ground, the antennae raised and sweeping ahead). Played by the head's player over the walk or the stand, so only the
+# head, jaws and antennae move. My picks, to confirm: the head 12 degrees up, the jaws shut, the antennae 8 higher.
+CARRY_SECONDS = 2.0
+
+
+def carry():
+    tr = mo.Track(rig())
+    walking_antennae(tr, CARRY_SECONDS, lift=-8)
+    out = tr.bones(tol=0.1)
+    out.update(still(head=[-12, 0, 0], mandible_l=[0, 0, 0], mandible_r=[0, 0, 0]))
+    return out
+
+
 def once(bones, seconds):
     """A clip played once (the game holds its last frame, the standing pose, until it changes clips)."""
     return {'loop': False, 'animation_length': seconds, 'bones': bones}
@@ -707,7 +776,9 @@ def animations():
         'look_wary': {'loop': True, 'animation_length': LOOK_SECONDS, 'bones': look_wary()},
         'groom_antenna_l': once(groom_antenna('l'), GROOM_SECONDS),
         'groom_antenna_r': once(groom_antenna('r'), GROOM_SECONDS),
-        'groom_antenna_both': once(groom_antenna('lr'), 2 * GROOM_SECONDS)}}
+        'groom_antenna_both': once(groom_antenna('lr'), 2 * GROOM_SECONDS),
+        'dig': {'loop': True, 'animation_length': DIG_SECONDS, 'bones': dig()},
+        'carry': {'loop': True, 'animation_length': CARRY_SECONDS, 'bones': carry()}}}
 
 
 # --- preview ------------------------------------------------------------------------------------------------------

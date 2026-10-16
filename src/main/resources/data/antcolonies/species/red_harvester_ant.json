@@ -145,6 +145,8 @@
       "back_off": 2,
       "forget_ticks": 60,
       "rest_ticks": 600
-    }
+    },
+    "_groom_note": "Cleaning the antennae (real ants: each antenna drawn through the comb on the front leg of its side, the strigil, then the comb cleaned in the jaws). An ant standing about with nothing to do starts with chance_per_second each second (times 0.5 to 1.5 by its restlessness); both_share of the time it cleans both, otherwise one. My picks, to confirm.",
+    "groom": { "chance_per_second": 0.05, "both_share": 0.4 }
   }
 }
