@@ -28,6 +28,8 @@ import json, math, os, random, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import termite_models as tm  # the PNG writer and the little box renderer
+import anim_lab as lab       # the animation lab: the model as the game builds it
+import ant_motion as mo      # the motion library: legs worked out from where the feet must be
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, '..', 'src', 'main', 'resources', 'assets', 'antcolonies')
@@ -239,37 +241,56 @@ def keys(frames, channel='rotation'):
     return {channel: {f'{t:g}': {'vector': [round(v, 2) for v in vec], 'easing': IO} for t, vec in frames}}
 
 
-WALK_SECONDS, STEP_SWING, STEP_LIFT, KNEE_LIFT = 0.5, 22.0, 18.0, 14.0
+_RIG = []
+
+
+def rig():
+    """The worker's model ready for the motion library (built once)."""
+    if not _RIG:
+        _RIG.append(mo.Rig(lab.Model('worker_ant', bones=worker_model())))
+    return _RIG[0]
+
+
+# The walk (rebuilt with the motion library, 2026-10-16). Real walking ants use the tripod gait: front and hind leg of
+# one side with the middle leg of the other. Each foot's path is set and the legs are worked out backwards from it, so
+# a foot on the ground stays put while the body passes over it (the old hand-set walk's feet slid 2 to 3 times the walk
+# speed). The numbers, my picks from filmed ants, to confirm:
+#   sweep 3.2 units: how far a planted foot travels under the body (adjacent feet touch beyond about 3.3);
+#   duty 0.55: the share of a step a foot is down (real tripod walkers 0.5 to 0.65; lower when faster);
+#   lift 0.9 units: how high a foot rises in the air;
+#   shift: the front feet stand 0.15 units further back and the hind feet 0.6 further forward than at rest, so the
+#   short legs of this model never lock straight.
+# Stride: 3.2 / 0.55 = 5.8 units a step, 0.48 body lengths (real ants 0.5 to 0.7); at the game's 2.75 blocks a second
+# each leg steps about 11.6 times a second (real Pogonomyrmex about 10). The game plays the clip at the speed that keeps
+# the feet planted, from its stride note.
+WALK_SECONDS = 0.5
+WALK = dict(sweep=3.2, duty=0.55, lift=0.9, shift={1: 0.15, 3: -0.6})
+
+
+def walking_antennae(track, seconds, lift=0.0):
+    """The antennae while walking (played by the head's own controller at its own pace, so they do not flicker with
+    the legs): held forward and a little down, the two sweeping out of step with each other, the whip (the part past
+    the elbow) following the base a moment later. lift: the whole antenna raised (negative) or lowered."""
+    n = 40
+    for i in range(n + 1):
+        t = seconds * i / n
+        for side, ph, sy in (('l', 0.0, 1), ('r', 0.5, -1)):
+            x = lift + 4 + mo.waves(t, seconds, [(1, 6, ph), (2, 2, ph + 0.3)])
+            y = sy * (2 + mo.waves(t, seconds, [(1, 9, ph + 0.25), (3, 1.5, ph + 0.1)]))
+            whip = 2 + mo.waves(t, seconds, [(1, 7, ph - 0.1), (2, 3, ph + 0.15)])
+            track.put(f'antenna_{side}_1', t, [x, y, 0])
+            track.put(f'antenna_{side}_2', t, [whip, 0, 0])
+
+
+def walk_clip():
+    """The walk: (bones, stride in units a clip)."""
+    tr, stride, _ = mo.walk(rig(), WALK_SECONDS, **WALK)
+    walking_antennae(tr, WALK_SECONDS)
+    return tr.bones(), stride
 
 
 def walk():
-    """A tripod gait: front-left, middle-right and back-left step together, then the other three. Each leg pushes
-    back on the ground, then lifts (the knee bends) and swings forward. The antennae sweep out of step, the gaster
-    sways a little against the stride."""
-    anim = {}
-    t4 = WALK_SECONDS / 4
-    for n in (1, 2, 3):
-        for side in ('l', 'r'):
-            left = side == 'l'
-            fwd = STEP_SWING if left else -STEP_SWING
-            lift = -STEP_LIFT if left else STEP_LIFT
-            knee = -KNEE_LIFT if left else KNEE_LIFT
-            first = (side, n) in (('l', 1), ('r', 2), ('l', 3))
-            # Ground phase then swing phase, for the first group; the second group is half a step later.
-            ground = [(0, [0, fwd, 0]), (t4, [0, 0, 0]), (2 * t4, [0, -fwd, 0]), (3 * t4, [0, 0, lift]), (4 * t4, [0, fwd, 0])]
-            lower = [(0, [0, 0, 0]), (2 * t4, [0, 0, 0]), (3 * t4, [0, 0, knee]), (4 * t4, [0, 0, 0])]
-            if not first:
-                ground = [(0, [0, -fwd, 0]), (t4, [0, 0, lift]), (2 * t4, [0, fwd, 0]), (3 * t4, [0, 0, 0]), (4 * t4, [0, -fwd, 0])]
-                lower = [(0, [0, 0, 0]), (t4, [0, 0, knee]), (2 * t4, [0, 0, 0]), (4 * t4, [0, 0, 0])]
-            anim[f'leg_{side}{n}'] = keys(ground)
-            anim[f'leg_{side}{n}_lower'] = keys(lower)
-    anim['antenna_l_1'] = keys([(0, [6, 10, 0]), (2 * t4, [-4, -6, 0]), (4 * t4, [6, 10, 0])])
-    anim['antenna_r_1'] = keys([(0, [-4, 6, 0]), (2 * t4, [6, -10, 0]), (4 * t4, [-4, 6, 0])])
-    anim['antenna_l_2'] = keys([(0, [0, 0, 0]), (t4, [8, 0, 0]), (2 * t4, [0, 0, 0]), (3 * t4, [-6, 0, 0]), (4 * t4, [0, 0, 0])])
-    anim['antenna_r_2'] = keys([(0, [-6, 0, 0]), (t4, [0, 0, 0]), (2 * t4, [8, 0, 0]), (3 * t4, [0, 0, 0]), (4 * t4, [-6, 0, 0])])
-    anim['abdomen'] = keys([(0, [0, 3, 0]), (2 * t4, [0, -3, 0]), (4 * t4, [0, 3, 0])])
-    anim['head'] = keys([(0, [0, -2, 0]), (2 * t4, [0, 2, 0]), (4 * t4, [0, -2, 0])])
-    return anim
+    return walk_clip()[0]
 
 
 IDLE_SECONDS = 4.0
@@ -378,34 +399,40 @@ def sleep_twitch():
 
 
 # --- hot ground -----------------------------------------------------------------------------------------------------
-HOT_STEP = 0.7   # a hot ant steps quicker: the step takes 0.7 of the time
-# How far each pair of legs pushes down at the hip so its foot still reaches the floor under the raised body (worked
-# out with tools/anim_lab.py; the middle legs are shorter and need less).
-STILT_HIP = {1: 21.7, 2: 20.1, 3: 21.7}
+# How high the body is held on hot ground (the peer session's pick, seen by the user in the viewer).
+STILT_RAISE = 0.85
 
 
 def stilts():
     """Stilting (real desert ants on hot sand, best known in Cataglyphis): the legs straighten to hold the body high
-    above the hot ground, where the air is cooler. The hip turns the leg down and the knee opens."""
-    pose = {'body_pos': [0, 0.85, 0]}
-    for side, n in LEG_SIDES:
-        pose[f'leg_{side}{n}'] = [0, 0, side_z(side, -STILT_HIP[n])]   # the leg pushes down at the hip
-        pose[f'leg_{side}{n}_lower'] = [0, 0, side_z(side, 13)]       # the knee opens: a straighter leg
-    return still(**pose)
+    above the hot ground, where the air is cooler. Since 2026-10-16 the legs are worked out by the motion library so
+    every foot stays exactly where it stood."""
+    turns, _, _ = mo.stand(rig(), {'body_pos': [0, STILT_RAISE, 0]})
+    return still(body_pos=[0, STILT_RAISE, 0], **turns)
+
+
+HOT_BODY = {'petiole': [14, 0, 0], 'abdomen': [12, 0, 0]}
+# On stilts the straighter legs bring the knees closer together: a slightly shorter step keeps the shins apart.
+HOT_SWEEP = 3.1
+HOT_ANTENNAE = -10
 
 
 def hot_look():
     """The gaster held up off the ground (Cataglyphis run with it raised), the antennae lifted off the hot sand."""
-    return still(antenna_l_1=[-10, 0, 0], antenna_r_1=[-10, 0, 0], petiole=[14, 0, 0], abdomen=[12, 0, 0])
+    return still(antenna_l_1=[HOT_ANTENNAE, 0, 0], antenna_r_1=[HOT_ANTENNAE, 0, 0], **HOT_BODY)
+
+
+def walk_hot_clip():
+    """Walking on hot ground: the tripod walk on stilts with the gaster up and the antennae lifted. (The steps are as
+    quick as the walking speed makes them: a hot ant really does run faster, but that is the game's speed, not the
+    clip's; see the notes.) Returns (bones, stride)."""
+    tr, stride, _ = mo.walk(rig(), WALK_SECONDS, raise_by=STILT_RAISE, still=HOT_BODY, **dict(WALK, sweep=HOT_SWEEP))
+    walking_antennae(tr, WALK_SECONDS, lift=HOT_ANTENNAE)
+    return tr.bones(), stride
 
 
 def walk_hot():
-    """Walking on hot ground: stilting with the gaster up, and quicker steps (an ant is as warm as its ground: a hot
-    ant runs faster)."""
-    quick = {}
-    for bone, channels in walk().items():
-        quick[bone] = {ch: {f'{float(t) * HOT_STEP:g}': f for t, f in frames.items()} for ch, frames in channels.items()}
-    return merged(quick, stilts(), hot_look())
+    return walk_hot_clip()[0]
 
 
 def idle_hot():
@@ -413,14 +440,20 @@ def idle_hot():
     return merged(idle(), stilts(), hot_look())
 
 
+def walking(bones_stride, seconds):
+    """A walking clip with its stride note (GeckoLib's timeline, read by the game's AntAnimationController)."""
+    bones, stride = bones_stride
+    return {'loop': True, 'animation_length': seconds, 'timeline': {'0': f'stride {stride:.4f}'}, 'bones': bones}
+
+
 def animations():
     return {'format_version': '1.8.0', 'animations': {
         'idle': {'loop': True, 'animation_length': IDLE_SECONDS, 'bones': idle()},
-        'walk': {'loop': True, 'animation_length': WALK_SECONDS, 'bones': walk()},
+        'walk': walking(walk_clip(), WALK_SECONDS),
         'sleep': {'loop': True, 'animation_length': REST_SECONDS, 'bones': sleep()},
         'sleep_twitch': {'loop': True, 'animation_length': REST_SECONDS, 'bones': sleep_twitch()},
         'idle_hot': {'loop': True, 'animation_length': IDLE_SECONDS, 'bones': idle_hot()},
-        'walk_hot': {'loop': True, 'animation_length': round(WALK_SECONDS * HOT_STEP, 3), 'bones': walk_hot()}}}
+        'walk_hot': walking(walk_hot_clip(), WALK_SECONDS)}}
 
 
 # --- preview ------------------------------------------------------------------------------------------------------
@@ -457,14 +490,23 @@ def model_boxes(bones, anim=None, tint=(1.0, 1.0, 1.0)):
 
 
 def sample(bones_anim, t):
-    """Every bone's rotation at time t (eased between the key frames, as GeckoLib's easeInOutSine)."""
+    """Every bone's rotation at time t (eased between the key frames as GeckoLib does: easeInOutSine where a key frame
+    says so, else straight)."""
     out = {}
     for name, channels in bones_anim.items():
-        frames = sorted((float(k), v['vector']) for k, v in channels['rotation'].items())
-        for (t0, r0), (t1, r1) in zip(frames, frames[1:]):
+        if 'rotation' not in channels:
+            continue
+        frames = sorted((float(k), v['vector'] if isinstance(v, dict) else v, isinstance(v, dict) and v.get('easing') == IO)
+                        for k, v in channels['rotation'].items())
+        if len(frames) == 1 or t <= frames[0][0]:
+            out[name] = frames[0][1]
+            continue
+        out[name] = frames[-1][1]
+        for (t0, r0, _), (t1, r1, eased) in zip(frames, frames[1:]):
             if t0 <= t <= t1:
                 f = 0 if t1 == t0 else (t - t0) / (t1 - t0)
-                f = -(math.cos(math.pi * f) - 1) / 2
+                if eased:
+                    f = -(math.cos(math.pi * f) - 1) / 2
                 out[name] = [a + (b - a) * f for a, b in zip(r0, r1)]
                 break
     return out

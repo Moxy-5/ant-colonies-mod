@@ -179,12 +179,17 @@ FACE_CORNERS = {'north': (0, 2, 6, 4), 'south': (1, 5, 7, 3), 'west': (0, 1, 3, 
 
 
 class Model:
-    def __init__(self, name):
+    def __init__(self, name, bones=None):
+        """The insect's model from the game's geo file, or from a list of bones (the motion library, tools/ant_motion.py,
+        works on the model before the file is written)."""
         self.name = name
-        geo = json.load(open(os.path.join(ASSETS, 'geo', 'entity', f'{name}.geo.json'), encoding='utf-8'))
-        g = geo['minecraft:geometry'][0]
-        desc = g['description']
-        self.bones = g['bones']
+        if bones is None:
+            geo = json.load(open(os.path.join(ASSETS, 'geo', 'entity', f'{name}.geo.json'), encoding='utf-8'))
+            g = geo['minecraft:geometry'][0]
+            desc = g['description']
+            self.bones = g['bones']
+        else:
+            desc, self.bones = {}, bones
         self.by = {b['name']: b for b in self.bones}
         tex_path = os.path.join(ASSETS, 'textures', 'entity', f'{name}.png')
         tex = read_png(tex_path) if os.path.exists(tex_path) else None
@@ -387,6 +392,10 @@ class Clip:
                     self.bones.setdefault(bone, {})[ch] = frames
                     last = max(last, frames[-1][0])
         self.length = float(data.get('animation_length', last)) or 1.0
+        # The clip's own notes (GeckoLib's "timeline"): a walk says how far it carries the insect, in model units per
+        # clip ("stride 6.03"), so the game plays it at the speed that keeps the feet planted.
+        self.notes = {k: (v if isinstance(v, str) else ' '.join(v)) for k, v in data.get('timeline', {}).items()}
+        self.stride = next((float(w.split()[1]) for w in self.notes.values() if w.startswith('stride ')), None)
 
     def pose(self, t):
         if self.loop:
@@ -794,6 +803,11 @@ def check(model, clip, speed_bps=None, quiet=False):
         out.append(('NOTE', f'at {speed_bps:g} blocks a second ({speed_bps / body_blocks:.1f} body lengths a second) the walk '
                             f'must play {cycles:.1f} cycles a second = playback speed {cycles * clip.length:.2f} '
                             f'(each leg steps {cycles:.1f} times a second)'))
+        if clip.stride is None:
+            out.append(('NOTE', 'no stride note in the clip: the game can only guess how fast to play it'))
+        elif abs(clip.stride - gait.stride()) > 0.03 * gait.stride():
+            out.append(('BAD', f"the clip's stride note says {clip.stride:.2f} units, its feet cover {gait.stride():.2f}: "
+                               'the game would play it at the wrong speed and the feet would slide'))
         out.append(('NOTE', 'duty factor (share of the cycle a foot is down; real tripod walkers 0.5 to 0.65): '
                             + ', '.join(f'{k} {d:.2f}' for k, d in duty.items())))
         out.append(('NOTE', 'touch-down moment in the cycle (tripod: L1 R2 L3 together, the others half a cycle off): '
