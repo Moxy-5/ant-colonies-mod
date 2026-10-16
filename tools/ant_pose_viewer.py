@@ -10,6 +10,11 @@ The model and the animations come straight from ant_models.py (the same bones, b
 page shows what the game would. Each box takes its swatch's colour (flat, Minecraft-style face shading).
 The page needs the internet for three.js (from cdnjs/jsdelivr).
 
+Since the animation lab (2026-10-15): soft shadows from an overhead sun (a foot touches its shadow only on the floor),
+each foot's path over the floor (a planted foot is one dot, a sliding one smears), pause, slow motion, frame steps,
+walking across the floor at the walk's own speed, fixed cameras, and settings from the address so Claude can take exact
+screenshots: references/ant_pose_viewer.html#focus=1&cam=low&t=0.2&pause=1 (or lab.set({...}) in the console).
+
 Run from the project folder:  python tools/ant_pose_viewer.py [out.html]   (default references/ant_pose_viewer.html)
 """
 import json
@@ -18,6 +23,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import ant_models as am  # noqa: E402
+import anim_lab as lab  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -44,13 +50,26 @@ def colour(cube):
     return '#ff00ff'
 
 
+def entry(name, note, anim):
+    """One option for the page, with its feet worked out by the animation lab (tools/anim_lab.py): the walk's own speed
+    (model units a second; 0 for a standing clip) and each foot's tip through the cycle, for the foot trails."""
+    clip = lab.Clip(name, {'loop': True, 'animation_length': length(anim), 'bones': anim})
+    gait = lab.Gait(MODEL, clip)
+    tips = {leg: [[round(v, 3) for v in t[leg]] for t in gait.tips] for leg in gait.legs}
+    return {'name': name, 'note': note, 'length': clip.length, 'bones': anim, 'speed': gait.speed,
+            'times': [round(t, 4) for t in gait.times], 'tips': tips}
+
+
+MODEL = lab.Model('worker_ant')
+
+
 def main():
     out = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / 'references' / 'ant_pose_viewer.html'
     bones = am.worker_model()
     for b in bones:
         for c in b.get('cubes', []):
             c['colour'] = colour(c)
-    data = {'bones': bones, 'anims': [{'name': n, 'note': note, 'length': length(a), 'bones': a} for n, note, a in CANDIDATES]}
+    data = {'bones': bones, 'anims': [entry(n, note, a) for n, note, a in CANDIDATES]}
     page = (ROOT / 'tools' / 'ant_pose_viewer.template.html').read_text(encoding='utf-8')
     out.write_text(page.replace('/*DATA*/null', json.dumps(data)), encoding='utf-8')
     print(f'wrote {out}')

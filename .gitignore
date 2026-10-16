@@ -42,3 +42,4 @@ repo/
 ### Automatic game tests ###
 run-test/
 __pycache__/
+references/anim_lab/
