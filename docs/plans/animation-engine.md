@@ -112,6 +112,13 @@ They play only when the ant is idle or pausing, never mid-step.
 `tools/ant_models.py`; the steam is drawn by the game, not the model).
 
 ## Build order (each step small, tested by the user before the next)
+0. **Ways to see (BUILT 2026-10-15, the user's request before any animation):** the animation lab
+   (`tools/anim_lab.py`: film strips with a treadmill floor and foot trails, graphs and the footfall diagram, the
+   automatic checks of part 2 above, `compare`, `match`), the upgraded pose viewer, and the in-game camera
+   (`./gradlew runFilm`, `client/FilmDirector`, shot lists in `tools/film/`). The game and the lab agree for every
+   worker clip. Found in today's clips, to fix in step 1: the walk's feet slide (2 to 3 times the walk speed), the
+   stride is short (0.30 body lengths a cycle), `leg_l1` touches the head at the start of the walk, `walk_hot`'s
+   middle legs never touch down.
 1. **Groundwork:** the motion library and checks; the controllers split; each ant's own clock; walk speed from the real
    stride; the leg speed comparison in the viewer (decision 1); hook up the sleeps and the hot look. Test in game: 10
    ants standing about never move in step; feet don't slide at any speed; resting ants sleep.
