@@ -379,6 +379,9 @@ def sleep_twitch():
 
 # --- hot ground -----------------------------------------------------------------------------------------------------
 HOT_STEP = 0.7   # a hot ant steps quicker: the step takes 0.7 of the time
+# How far each pair of legs pushes down at the hip so its foot still reaches the floor under the raised body (worked
+# out with tools/anim_lab.py; the middle legs are shorter and need less).
+STILT_HIP = {1: 21.7, 2: 20.1, 3: 21.7}
 
 
 def stilts():
@@ -386,7 +389,7 @@ def stilts():
     above the hot ground, where the air is cooler. The hip turns the leg down and the knee opens."""
     pose = {'body_pos': [0, 0.85, 0]}
     for side, n in LEG_SIDES:
-        pose[f'leg_{side}{n}'] = [0, 0, side_z(side, -16)]             # the leg pushes down at the hip
+        pose[f'leg_{side}{n}'] = [0, 0, side_z(side, -STILT_HIP[n])]   # the leg pushes down at the hip
         pose[f'leg_{side}{n}_lower'] = [0, 0, side_z(side, 13)]       # the knee opens: a straighter leg
     return still(**pose)
 
