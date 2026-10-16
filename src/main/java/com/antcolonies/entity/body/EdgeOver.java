@@ -101,6 +101,78 @@ public final class EdgeOver {
     }
 
     /**
+     * The pose round an inside corner, the foot of a wall (2026-10-16, found by the in-game camera's checks): coming down
+     * a wall head first onto the floor, or walking up to a wall and onto it. A real ant does not stop and flip there: its
+     * front legs reach the new surface first and walk on along it while its hind legs still hold the old one, so the
+     * thorax bridges the corner like a ramp, standing up (or lying down) bit by bit as it goes, and it is fully round
+     * only once its hind legs have left the old surface. The usual pose instead tipped the whole body over in three
+     * ticks once the navigator changed the surface (and the gaster touched the wall as it did). So near the foot of a
+     * full block the drawn body is put across the corner: the hind feet on the surface it comes from, the front feet on
+     * the one it goes onto, a body's feet apart; how far round it is grows steadily with how far its box has gone round
+     * the corner, from its front feet reaching the new surface until its hind feet leave the old one. At both ends it is
+     * drawn where the usual poses draw it (a little off the corner, never into it). Null when not at such a corner now.
+     *
+     * @param drawnWall    the wall the drawn body faces now, or null when it is drawn lying on the floor
+     * @param drawnHeading where its head points within that wall (0 up, 180 down)
+     * @param walking      whether it is walking now: on the floor the pose begins only for an insect walking up to the
+     *                     wall (one standing at it, digging into it say, stays lying on the floor)
+     */
+    @Nullable
+    public static Pose findCorner(Level level, Vec3 pos, float width, float height, Direction surface, float heading,
+            float yaw, double unit, double lift, double intoWall, @Nullable Direction drawnWall, float drawnHeading,
+            boolean walking) {
+        Vec3 middle = pos.add(0.0, height / 2.0, 0.0);
+        Body body = new Body(pos, middle, FRONT_FEET * unit, HIND_FEET * unit, width / 2.0, height / 2.0, lift,
+                width / 2.0 - intoWall);
+        Direction wall;
+        boolean down;
+        if (surface.getAxis().isHorizontal()) {
+            wall = surface;
+            if (Math.abs(Mth.wrapDegrees(heading)) < SQUARE) {
+                down = false;
+            } else if (Math.abs(Mth.wrapDegrees(heading - 180.0F)) < SQUARE) {
+                down = true;
+            } else {
+                return null;
+            }
+        } else if (surface == Direction.DOWN) {
+            if (drawnWall != null && drawnWall.getAxis().isHorizontal()
+                    && Math.abs(Mth.wrapDegrees(drawnHeading - 180.0F)) < SQUARE) {
+                // just come down a wall: still drawn bridging the corner behind it
+                wall = drawnWall;
+                down = true;
+            } else {
+                if (drawnWall == null && !walking) {
+                    return null;
+                }
+                wall = Direction.fromYRot(yaw);
+                if (Math.abs(Mth.wrapDegrees(yaw - wall.toYRot())) > SQUARE) {
+                    return null;
+                }
+                down = false;
+            }
+        } else {
+            return null;
+        }
+        // The corner: a full wall block, open air in front of its foot, and a full floor block under that air.
+        BlockPos cell = BlockPos.containing(middle.x, pos.y + 0.05, middle.z);
+        for (int dy : new int[] {0, -1, 1}) {
+            for (int k : new int[] {0, 1, -1}) {
+                BlockPos air = cell.offset(0, dy, 0).relative(wall, k);
+                BlockPos block = air.relative(wall);
+                if (isFull(level, block) && isOpen(level, air) && isFull(level, air.below())) {
+                    double face = wall.getAxisDirection() == Direction.AxisDirection.POSITIVE
+                            ? block.get(wall.getAxis()) : block.get(wall.getAxis()) + 1;
+                    Vec3 corner = wall.getAxis() == Direction.Axis.X ? new Vec3(face, air.getY(), middle.z)
+                            : new Vec3(middle.x, air.getY(), face);
+                    return body.round(corner, wall, down);
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
      * The top edge of a full block on {@code side} near {@code under}: that block, the next one that way, or the one
      * before (round an edge the navigator moves the body's middle over the open air beside the block for a moment); or
      * null.
@@ -144,6 +216,46 @@ public final class EdgeOver {
     /** The insect's body and how the usual poses draw it (all blocks). */
     private record Body(Vec3 pos, Vec3 middle, double front, double hind, double halfWidth, double halfHeight, double lift,
             double offWall) {
+        /**
+         * Its pose round the inside corner at {@code corner} (the foot of {@code wall}, which it faces): coming down the
+         * wall onto the floor, or from the floor up onto it. A is the surface it comes from and B the one it goes onto,
+         * {@code nA} and {@code nB} pointing out of them; a point is written as its distance off A ({@code xA}) and off
+         * B ({@code xB}). Its progress round the corner ({@code s}) is how far its box's middle is out along B less how
+         * far it still is up along A, each counted from where the box touches that surface: it grows steadily round the
+         * corner whichever surface the navigator holds it to.
+         */
+        @Nullable
+        Pose round(Vec3 corner, Direction wall, boolean down) {
+            Vec3 outOfWall = Vec3.atLowerCornerOf(wall.getOpposite().getNormal());
+            Vec3 up = new Vec3(0.0, 1.0, 0.0);
+            Vec3 nA = down ? outOfWall : up;
+            Vec3 nB = down ? up : outOfWall;
+            double cA = down ? halfWidth : halfHeight;
+            double cB = down ? halfHeight : halfWidth;
+            Vec3 rel = middle.subtract(corner);
+            double s = (rel.dot(nA) - cA) - (rel.dot(nB) - cB);
+            if (s <= -front || s >= hind) {
+                return null;
+            }
+            // eased in and out: the front feet take hold and the hind feet let go gently, so the tipping starts
+            // and ends slowly instead of at full speed (seen as a jump by the camera's checks)
+            double t = (s + front) / (front + hind);
+            t = t * t * (3.0 - 2.0 * t);
+            s = -front + (front + hind) * t;
+            // The thorax bridges the corner: hind feet on A, front feet on B, a body's feet apart; it has turned theta
+            // from lying along A, and the middle of its feet (between them as the feet lie on the body) is s along.
+            double theta = Math.atan2(front, hind) + Math.asin(Mth.clamp(s / Math.sqrt(front * front + hind * hind), -1.0, 1.0));
+            double xA = hind * Math.sin(theta);
+            double xB = front * Math.cos(theta);
+            // where the usual poses draw the feet at the two ends, beyond the bare corner (on a wall lifted up it and
+            // a little off it, on the floor under the box's middle), shared out along the way
+            xA += down ? Mth.lerp(t, offWall, halfWidth) : Mth.lerp(t, 0.0, lift);
+            xB += down ? Mth.lerp(t, lift, 0.0) : Mth.lerp(t, halfWidth, offWall);
+            Vec3 feet = corner.add(nA.scale(xA)).add(nB.scale(xB));
+            float degrees = (float) Math.toDegrees(theta);
+            return new Pose(wall, down ? 90.0F - degrees : degrees, down ? 180.0F : 0.0F, feet.subtract(pos));
+        }
+
         /**
          * Its pose over this edge: going up the side and over the top ({@code upAndOver}), or over the top and down the
          * side. The surface it comes from (A) and the one it goes onto (B): it walks along A toward the edge ({@code f})

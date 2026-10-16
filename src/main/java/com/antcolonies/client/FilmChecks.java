@@ -32,7 +32,8 @@ import software.bernie.geckolib.util.RenderUtil;
  * to look at the pictures where something went wrong:
  * <ul>
  * <li><b>inside</b>: a body part drawn inside a solid block (deeper than {@link #INSIDE} blocks), with the block;</li>
- * <li><b>jump</b>: a body part that moves far more from one picture to the next than just before and after it (a pop:
+ * <li><b>jump</b>: a body part that moves far more from one picture to the next than just before and after it, and
+ * than its own big moves in the rest of the scene (a pop:
  * a clip changing at the wrong moment, a bend piling up, a turn snapping), measured against the insect itself, so its
  * walking about does not count.</li>
  * </ul>
@@ -46,6 +47,11 @@ final class FilmChecks {
     static final double JUMP_MIN = 0.03;
     /** ... and this many times the usual move of that part in the pictures round it. */
     static final double JUMP_TIMES = 3.0;
+    /**
+     * ... and this many times the part's own big moves in the whole scene (the move 9 in 10 are below): a leg starting
+     * its quick swing moves far more than in the picture before, but no more than in its other swings.
+     */
+    static final double ABOVE_BIG = 1.5;
     /** How many points along each side of a box are tested for being inside a block (3: corners, edge middles, ...). */
     private static final int GRID = 3;
 
@@ -205,9 +211,10 @@ final class FilmChecks {
                 for (int i = 1; i < samples.size(); i++) {
                     moves[i] = moved(samples.get(i - 1), samples.get(i)) * framesPerTick;
                 }
+                double big = bigMoves(moves);
                 for (int i = 1; i < samples.size(); i++) {
                     double usual = usual(moves, i);
-                    if (moves[i] > JUMP_MIN && moves[i] > JUMP_TIMES * usual) {
+                    if (moves[i] > JUMP_MIN && moves[i] > JUMP_TIMES * usual && moves[i] > ABOVE_BIG * big) {
                         jumps++;
                         lines.add(String.format(Locale.ROOT, "jump %s tick %d %s: %s moved %.3f a tick (usually %.3f), from %s",
                                 samples.get(i).picture(), samples.get(i).tick(), who, part.getKey(), moves[i], usual,
@@ -232,6 +239,16 @@ final class FilmChecks {
             most = Math.max(most, a.corners().get(i).distanceTo(b.corners().get(i)));
         }
         return most;
+    }
+
+    /** The move 9 in 10 of the part's moves are below (for a short film: its second biggest). */
+    private static double bigMoves(double[] moves) {
+        if (moves.length < 3) {
+            return 0.0;
+        }
+        double[] sorted = java.util.Arrays.copyOfRange(moves, 1, moves.length);
+        java.util.Arrays.sort(sorted);
+        return sorted[Math.min(sorted.length - 2, (int) (sorted.length * 0.9))];
     }
 
     /** The middle of the part's moves in the two pictures before and the two after this one (not counting it). */

@@ -1138,6 +1138,12 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return getSurface() != Direction.DOWN;
     }
 
+    // The body turns after the head smoothly, pivoting on its legs (the game's own rule snapped it round in jumps).
+    @Override
+    protected net.minecraft.world.entity.ai.control.BodyRotationControl createBodyControl() {
+        return new com.antcolonies.entity.body.BodyTurn(this);
+    }
+
     // Tells the game this entity is holding on to something (no falling while the navigator moves it along a surface).
     @Override
     public boolean onClimbable() {
@@ -1252,7 +1258,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     }
 
     /**
-     * Client: the pose across an outside edge it is going over now (see {@link EdgeOver}), or null. Not in a channel,
+     * Client: the pose across an outside edge it is going over now, or round the inside corner at a wall's foot (see
+     * {@link EdgeOver}), or null. Not in a channel,
      * over a doorway's rim (those tip over their own way) or peeking out of one.
      */
     @Nullable
@@ -1260,8 +1267,17 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         if (tickCount < 3 || isInChannel() || isTurningSlowly() || isPeeking()) {
             return null;
         }
-        return EdgeOver.find(level(), position(), getBbWidth(), getBbHeight(), getSurface(), entityData.get(DATA_HEADING),
-                getYRot(), drawScale / 16.0, drawLift, drawIntoWall);
+        EdgeOver.Pose edge = EdgeOver.find(level(), position(), getBbWidth(), getBbHeight(), getSurface(),
+                entityData.get(DATA_HEADING), getYRot(), drawScale / 16.0, drawLift, drawIntoWall);
+        if (edge != null) {
+            return edge;
+        }
+        // or round an inside corner, the foot of a wall (see EdgeOver.findCorner)
+        double dx = getX() - xo;
+        double dz = getZ() - zo;
+        return EdgeOver.findCorner(level(), position(), getBbWidth(), getBbHeight(), getSurface(),
+                entityData.get(DATA_HEADING), getYRot(), drawScale / 16.0, drawLift, drawIntoWall,
+                wallPose ? Direction.fromYRot(wallYaw) : null, bodyHeading, dx * dx + dz * dz > 1.0E-5);
     }
 
     /** Client: draws the body across the edge, as {@link EdgeOver} has it. */
