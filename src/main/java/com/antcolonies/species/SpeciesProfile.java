@@ -217,13 +217,21 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * colony's foraging trails get stronger with use and fade unused, and lasting trunk trails worn into the ground.
      * {@code dayClock} (optional): the foragers' daily round. {@code door} (optional): how many foragers go out is
      * driven by the foragers coming home with food (Deborah Gordon's rule, see {@link DoorNumbers}). {@code patrol}
-     * (optional): patrollers open each round of foraging (see {@link PatrolNumbers}).
+     * (optional): patrollers open each round of foraging (see {@link PatrolNumbers}). {@code search} (optional): each
+     * forager searches alone and remembers its own spot (see {@link SearchNumbers}).
      */
     public record FoodNumbers(int radius, String items, List<PlantFood> plants, String piece, String pile, int millTicks, int breadStock,
             List<String> forageAt, int findRadius, Optional<Regrowth> regrowth, Trails trails, Optional<DayClock> dayClock,
-            Optional<DoorNumbers> door, Optional<PatrolNumbers> patrol) {
+            Optional<DoorNumbers> door, Optional<PatrolNumbers> patrol, Optional<SearchNumbers> search) {
         /** Foraging at any time: day, night and in the rain. */
         public static final List<String> ALWAYS = List.of("day", "night", "rain");
+
+        public FoodNumbers(int radius, String items, List<PlantFood> plants, String piece, String pile, int millTicks, int breadStock,
+                List<String> forageAt, int findRadius, Optional<Regrowth> regrowth, Trails trails, Optional<DayClock> dayClock,
+                Optional<DoorNumbers> door, Optional<PatrolNumbers> patrol) {
+            this(radius, items, plants, piece, pile, millTicks, breadStock, forageAt, findRadius, regrowth, trails, dayClock, door, patrol,
+                    Optional.empty());
+        }
 
         public FoodNumbers(int radius, String items, List<PlantFood> plants, String piece, String pile, int millTicks, int breadStock,
                 List<String> forageAt, int findRadius, Optional<Regrowth> regrowth, Trails trails, Optional<DayClock> dayClock) {
@@ -255,7 +263,8 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 Trails.CODEC.optionalFieldOf("trails", Trails.DEFAULT).forGetter(FoodNumbers::trails),
                 DayClock.CODEC.optionalFieldOf("day_clock").forGetter(FoodNumbers::dayClock),
                 DoorNumbers.CODEC.optionalFieldOf("door").forGetter(FoodNumbers::door),
-                PatrolNumbers.CODEC.optionalFieldOf("patrol").forGetter(FoodNumbers::patrol)
+                PatrolNumbers.CODEC.optionalFieldOf("patrol").forGetter(FoodNumbers::patrol),
+                SearchNumbers.CODEC.optionalFieldOf("search").forGetter(FoodNumbers::search)
         ).apply(i, FoodNumbers::new));
 
         /**
@@ -441,6 +450,40 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
         public int laterPatrol(int workers) {
             int dawn = dawnPatrol(workers);
             return dawn <= 0 ? 0 : Math.min(dawn, Math.max(least, Math.round(dawn * laterRounds)));
+        }
+    }
+
+    /**
+     * Searching alone with site fidelity (brain step 4c; real red harvester ants, <i>Pogonomyrmex barbatus</i>: no
+     * forager tells the others of a seed; each walks out along a trunk trail, searches alone in a meandering walk and
+     * goes back to where it last found food). {@code alone}: what a worker finds (within {@code food.find_radius}) is its
+     * own, never told to the colony. A searcher looks within {@code wander} blocks of its search centre; a trip to its
+     * own spot that finds nothing in {@code spotTicks} counts as empty, and {@code emptyToDrop} empties drop the spot.
+     * It searches until it finds food (or the foraging time ends), giving up after {@code giveUpTicks}. Every
+     * {@code driftTicks} without a find its search centre moves {@code driftBlocks} farther out, never more than
+     * {@code stretch} blocks past the colony's foraging range (the range stretches from the ants' own failures).
+     */
+    public record SearchNumbers(boolean alone, int wander, int spotTicks, int emptyToDrop, int giveUpTicks, int driftTicks, int driftBlocks,
+            int stretch) {
+        public static final Codec<SearchNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.BOOL.optionalFieldOf("alone", true).forGetter(SearchNumbers::alone),
+                Codec.INT.optionalFieldOf("wander", 4).forGetter(SearchNumbers::wander),
+                Codec.INT.optionalFieldOf("spot_ticks", 1200).forGetter(SearchNumbers::spotTicks),
+                Codec.INT.optionalFieldOf("empty_to_drop", 2).forGetter(SearchNumbers::emptyToDrop),
+                Codec.INT.optionalFieldOf("give_up_ticks", 6000).forGetter(SearchNumbers::giveUpTicks),
+                Codec.INT.optionalFieldOf("drift_ticks", 1200).forGetter(SearchNumbers::driftTicks),
+                Codec.INT.optionalFieldOf("drift_blocks", 3).forGetter(SearchNumbers::driftBlocks),
+                Codec.INT.optionalFieldOf("stretch", 8).forGetter(SearchNumbers::stretch)
+        ).apply(i, SearchNumbers::new));
+
+        /**
+         * How far out (blocks from the nest's middle) a search centre that started {@code from} blocks out has drifted
+         * after {@code searched} ticks without a find: {@code driftBlocks} more every {@code driftTicks}, never past
+         * {@code range} plus the stretch (and never in from where it started).
+         */
+        public double drifted(double from, long searched, int range) {
+            double out = from + driftBlocks * Math.max(0, searched / Math.max(1, driftTicks));
+            return Math.max(from, Math.min(out, range + stretch));
         }
     }
 

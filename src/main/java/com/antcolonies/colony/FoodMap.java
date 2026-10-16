@@ -32,6 +32,10 @@ import net.minecraft.world.phys.AABB;
  * nestmates to a rich find). From then on any forager may go for it; foragers choose by worth (see
  * {@link FoodStore#findGrass}), so a hay bale draws a line of them. A plant that is used up or gone is forgotten. Known
  * plants are saved; plants found but not yet told of are not.
+ *
+ * <p>A species that searches alone ({@code food.search.alone}, the red harvester ant: real <i>Pogonomyrmex</i> do not
+ * recruit nestmates to seeds) never tells: what a worker finds is its own, and it remembers it going inside (it goes
+ * back out to cut it; its spot is kept apart, see {@link ForagerSpots}). The colony then knows no plant at all.
  */
 public class FoodMap {
     /** How often (ticks) the workers look round. */
@@ -58,6 +62,17 @@ public class FoodMap {
     /** Whether this colony finds its food by looking (its profile has a find radius); otherwise it knows every plant. */
     public boolean findsByLooking() {
         return food().findRadius() > 0;
+    }
+
+    /** Whether what a worker finds stays its own, never told to the colony (it searches alone, brain step 4c). */
+    public boolean searchesAlone() {
+        return findsByLooking() && food().search().map(SpeciesProfile.SearchNumbers::alone).orElse(false);
+    }
+
+    /** Whether this worker has found food of its own that it has not told of (or, searching alone, never will). */
+    public boolean hasFound(UUID worker) {
+        Set<BlockPos> own = found.get(worker);
+        return own != null && !own.isEmpty();
     }
 
     /** Whether this worker may go for the plant: the colony knows it, or the worker found it itself. */
@@ -104,7 +119,8 @@ public class FoodMap {
         Set<BlockPos> stillPlants = new HashSet<>(plants);
         known.removeIf(plant -> level.isLoaded(plant) && !stillPlants.contains(plant) && !colony.food().isFoodPlant(level.getBlockState(plant)));
         double see = food().findRadius();
-        double reach = colony.foragingRadius() + 8.0;
+        double reach = colony.searchReach() + 8.0;
+
         AABB area = new AABB(colony.getCenter()).inflate(reach, 24.0, reach);
         Set<UUID> seen = new HashSet<>();
         for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, area,
@@ -113,8 +129,16 @@ public class FoodMap {
             seen.add(id);
             BlockPos at = ant.blockPosition();
             if (colony.nest().isInside(level, at)) {
+                if (searchesAlone()) {
+                    // Searching alone it tells nobody, but remembers where it found food: it goes back out for it.
+                    Set<BlockPos> own = found.get(id);
+                    if (own != null) {
+                        own.removeIf(plant -> !colony.food().isFoodPlant(level.getBlockState(plant)));
+                    }
+                    continue;
+                }
                 Set<BlockPos> news = found.remove(id);
-                if (news != null) {
+                if (news != null && !searchesAlone()) {
                     news.removeIf(plant -> !colony.food().isFoodPlant(level.getBlockState(plant)));
                     if (!news.isEmpty()) {
                         known.addAll(news);
@@ -135,7 +159,8 @@ public class FoodMap {
     /** A worker went into the colony's numbers (it is home, see {@link Population}): it tells the colony of what it found. */
     void wentHome(UUID worker) {
         Set<BlockPos> news = found.remove(worker);
-        if (news != null) {
+        if (news != null && !searchesAlone()) {
+
             known.addAll(news);
         }
     }
@@ -162,10 +187,11 @@ public class FoodMap {
 
     /** For the colony list: " | knows 12 food plants (3 found, not yet told)", or empty for a species that knows them all. */
     public String describe() {
-        if (!findsByLooking()) {
-            return "";
+        if (!findsByLooking() || searchesAlone()) {
+            return ""; // (searching alone: see ForagerSpots' line)
         }
         int untold = 0;
+
         for (Set<BlockPos> plants : found.values()) {
             untold += plants.size();
         }

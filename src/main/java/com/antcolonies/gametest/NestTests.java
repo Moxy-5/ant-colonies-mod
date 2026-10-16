@@ -153,9 +153,11 @@ public class NestTests {
                 phase[0] = 2;
             } else if (phase[0] == 2) {
                 // Nothing to do (nothing to dig, no young, no seeds about): the spare workers go in and rest by the
-                // entrance, as real harvester ants do; they do not stroll about outside.
+                // entrance, as real harvester ants do; they do not stroll about outside. (Brain step 4c: with the store
+                // empty the foragers search for seeds, a job, not strolling; in game tests the door rule that holds them
+                // in is off, so the searchers are not counted.)
                 List<WorkerAntEntity> outside = level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds(),
-                        w -> w.isAlive() && !colony.nest().isInside(level, w.blockPosition()));
+                        w -> w.isAlive() && !colony.nest().isInside(level, w.blockPosition()) && !colony.spots().isSearching(w.getUUID()));
                 if (!outside.isEmpty() || helper.getTick() < idleFrom[0] + 600) {
                     helper.assertTrue(helper.getTick() < idleFrom[0] + 8000, "with nothing to do every worker should be inside, but "
                             + outside.size() + " are out, e.g. at " + (outside.isEmpty() ? "-" : outside.get(0).blockPosition().toShortString()));
@@ -549,8 +551,11 @@ public class NestTests {
      * Brain step 4b: the patrollers are on here, and a new round starts as the seeds are dropped: no forager sets out
      * before a patroller is back (Gordon), and the young colony is not slowed (the user's worry): its first forager is
      * out within a minute of the first patroller's return.
+     * Brain step 4c, in the same scene: nobody knows where the food lies; each forager searches alone and finds it by
+     * coming within 3 blocks of it, and an ant that cut a tuft goes back to that same tuft (site fidelity).
      */
-    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true, batch = "seeds_alone")
+    @GameTest(template = "arena", timeoutTicks = 90000, skyAccess = true, batch = "seeds_alone") // (4c: searching alone takes longer)
+
     public static void workersCarrySeedsAndClipGrassIntoTheFoodStore(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
@@ -604,8 +609,44 @@ public class NestTests {
         helper.onEachTick(() -> {
             if (dropped[0] && helper.getTick() % 200 == 0) {
                 Colony colony = colony(helper);
-                AntColoniesMod.LOGGER.info("[seed-test] tick {}: food {}, seeds in the store {}, seeds anywhere {}",
-                        helper.getTick(), colony.food().getFood(), seedsIn(level, storeBox(level, colony)), seedsIn(level, helper.getBounds()));
+                AntColoniesMod.LOGGER.info("[seed-test] tick {}: food {}, seeds in the store {}, seeds anywhere {}{}",
+                        helper.getTick(), colony.food().getFood(), seedsIn(level, storeBox(level, colony)), seedsIn(level, helper.getBounds()),
+                        colony.spots().describe());
+                if (helper.getTick() % 1000 == 0) {
+                    for (int[] tuft : tufts) {
+                        BlockPos pos = helper.absolutePos(new BlockPos(tuft[0], SURFACE, tuft[1]));
+                        StringBuilder near = new StringBuilder();
+                        for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, new AABB(pos).inflate(4))) {
+                            near.append(' ').append(ant.blockPosition().subtract(pos).toShortString());
+                        }
+                        AntColoniesMod.LOGGER.info("[seed-test-dbg] tuft {} {}: cut {}, found {}, open {}, inside {}, ants near:{}", tuft[0] + "," + tuft[1],
+                                level.getBlockState(pos).getBlock(), colony.food().getPiecesCut(pos), colony.foodMap().isFoundButUntold(pos),
+                                colony.patrol().isOpen(level, pos), colony.nest().isInside(level, pos), near);
+                    }
+                }
+            }
+        });
+        // Brain step 4c, site fidelity: an ant that cut a piece off a tuft goes back to that same tuft for its next piece
+        // (each piece is a trip home and out again). Watched by each ant's spot when it starts carrying.
+        java.util.Map<java.util.UUID, BlockPos> spotAtLastPiece = new java.util.HashMap<>();
+        java.util.Set<java.util.UUID> carrying = new java.util.HashSet<>();
+        int[] backToItsSpot = {0};
+        helper.onEachTick(() -> {
+            Colony colony = colony(helper);
+            if (!dropped[0] || colony == null) {
+                return;
+            }
+            for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds(), AbstractAntEntity::isColonyWorker)) {
+                boolean now = ant.isCarryingSeed();
+                if (now && carrying.add(ant.getUUID())) {
+                    BlockPos spot = colony.spots().spotOf(ant.getUUID());
+                    BlockPos before = spotAtLastPiece.put(ant.getUUID(), spot);
+                    if (spot != null && spot.equals(before)) {
+                        backToItsSpot[0]++;
+                    }
+                } else if (!now) {
+                    carrying.remove(ant.getUUID());
+                }
             }
         });
 
@@ -620,17 +661,23 @@ public class NestTests {
                 helper.assertBlock(new BlockPos(tuft[0], SURFACE, tuft[1]), block -> block == Blocks.AIR, "a tuft of grass is still there");
             }
             int expected = 5 + tufts.length * colony.food().piecesOf(Blocks.SHORT_GRASS.defaultBlockState());
-            // The workers also feed the queen from the store: count what she has eaten too.
-            int total = seedsAccountedFor(colony);
+            // The workers also feed the queen from the store: count what she has eaten too, and (searching alone takes
+            // long enough for her egg to hatch, brain step 4c) the bread fed to the larva.
+            int larvaeFed = level.getEntitiesOfClass(com.antcolonies.entity.AntLarvaEntity.class, helper.getBounds()).stream()
+                    .mapToInt(com.antcolonies.entity.AntLarvaEntity::getFed).sum();
+            int total = seedsAccountedFor(colony) + larvaeFed;
             helper.assertTrue(total == expected, "the colony has " + colony.food().getFood() + " food and the queen ate " + colony.queenCare().getQueenBread()
-                    + " (+ " + colony.queenCare().getEggsLaid() + " eggs laid), expected " + expected + " seeds in all; holding: " + carriers(helper));
+                    + " (+ " + colony.queenCare().getEggsLaid() + " eggs laid), the larvae " + larvaeFed + ", the workers " + colony.food().getSeedsEaten()
+                    + ", expected " + expected + " seeds in all; holding: " + carriers(helper));
             helper.assertTrue(seedsIn(level, storeBox(level, colony)) == colony.food().getFood(), "only " + seedsIn(level, storeBox(level, colony)) + " seeds are in the food store");
             helper.assertTrue(seedsIn(level, helper.getBounds()) == colony.food().getFood(), "some seeds are still lying around outside the store");
             for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
                 helper.assertTrue(!ant.isCarryingSeed(), "an ant is still carrying a seed");
             }
+            helper.assertTrue(backToItsSpot[0] > 0, "no ant went back to the tuft it last cut from (site fidelity)");
         });
     }
+
 
     /**
      * In a finished nest with 25 seeds in the food store the nurse mills them into ant bread in the nursery and the
@@ -652,6 +699,7 @@ public class NestTests {
         boolean[] breadInNursery = {false};
         long[] seedTakenAt = {-1};
         long[] breadAt = {-1};
+        boolean[] eggInNursery = {false};
         helper.onEachTick(() -> {
             Colony colony = colony(helper);
             if (stocked[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.nest().findDigTarget(level) != null
@@ -682,6 +730,10 @@ public class NestTests {
                 for (BlockPos pos : colony.nest().getNurseryCells(level)) {
                     breadInNursery[0] |= level.getBlockState(pos).is(ModBlocks.BREAD_PILE.get());
                 }
+            }
+            if (!eggInNursery[0] && colony.queenCare().getEggsLaid() > 0 && colony.brood().getNurseryEggs(level).size() == 1) {
+                eggInNursery[0] = true;
+                AntColoniesMod.LOGGER.info("[egg-test] tick {}: the egg is in the nursery", helper.getTick());
             }
             if (incubationStart[0] < 0 && colony.queenCare().isIncubating()) {
                 incubationStart[0] = level.getGameTime();
@@ -724,11 +776,14 @@ public class NestTests {
             helper.assertTrue(carried >= colony.profile().queen().incubationTicks() && carried <= colony.profile().queen().incubationTicks() + 100,
                     "the egg came out after " + carried + " ticks, expected " + colony.profile().queen().incubationTicks());
             helper.assertTrue(cameOutBehindHer[0], "the egg did not come out behind the queen in her room");
-            var eggs = colony.brood().getEggs(level);
-            helper.assertTrue(eggs.size() == 1 && colony.brood().getNurseryEggs(level).size() == 1,
-                    "expected 1 egg, in the nursery, but there are " + eggs.size() + " (" + colony.brood().getNurseryEggs(level).size() + " in the nursery)");
-            helper.assertTrue(level.getEntitiesOfClass(com.antcolonies.entity.AntEggEntity.class, helper.getBounds()).size() == 1,
-                    "there is an egg somewhere else");
+            // (the egg may have hatched into a larva by the time the queen has eaten her last pieces: it hatches in the
+            // nursery after hatch_ticks, while the foragers are out searching, brain step 4c)
+            helper.assertTrue(eggInNursery[0], "the egg was never carried into the nursery");
+            int young = colony.brood().getEggs(level).size() + colony.brood().countLarvae(level);
+            helper.assertTrue(young == 1, "expected 1 egg or the larva it hatched into, but there are " + young);
+            helper.assertTrue(level.getEntitiesOfClass(com.antcolonies.entity.AntEggEntity.class, helper.getBounds()).size()
+                    + level.getEntitiesOfClass(com.antcolonies.entity.AntLarvaEntity.class, helper.getBounds()).size() == 1,
+                    "there is an egg or larva somewhere else");
             helper.assertTrue(breadInNursery[0], "no bread was ever seen on the nursery floor");
             helper.assertTrue(colony.queenCare().getQueenBread() == 5, "the queen was fed " + colony.queenCare().getQueenBread() + " pieces of bread for the next egg, expected the 5 that were left");
             helper.assertTrue(colony.food().getFood() == 0 && seedsIn(level, storeBox(level, colony)) == 0, "seeds are left in the store");

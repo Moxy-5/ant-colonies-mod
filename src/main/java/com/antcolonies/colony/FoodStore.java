@@ -162,7 +162,9 @@ public class FoodStore {
     /**
      * The seed (the species' food item) on the ground nearest to {@code near} that the ants should fetch, or null: only once the food store
      * has room (or the queen wants seeds), only on the surface (not what is already stored below), within the profile's food radius of the entrance,
-     * and not one another ant is on its way to. {@code avoid}: item entity ids this ant could not reach.
+     * and not one another ant is on its way to. {@code avoid}: item entity ids this ant could not reach. A species that
+     * searches alone ({@link FoodMap#searchesAlone}) only takes a seed the ant has come across: within the find radius
+     * of {@code near} (real foragers bump into seeds; nobody tells them where one lies).
      */
     @Nullable
     public ItemEntity findSeed(Level level, BlockPos near, Set<Integer> avoid) {
@@ -175,6 +177,7 @@ public class FoodStore {
         AABB area = new AABB(center).inflate(radius, 0, radius).expandTowards(0, 8, 0);
         ItemEntity best = null;
         double bestDistance = Double.MAX_VALUE;
+        double feel = colony.foodMap().searchesAlone() ? food().findRadius() : Double.MAX_VALUE;
         for (ItemEntity item : level.getEntitiesOfClass(ItemEntity.class, area)) {
             if (!item.isAlive() || !item.getItem().is(items) || item.getY() < center.getY() - 0.5
                     || claimedSeeds.contains(item.getId()) || avoid.contains(item.getId())
@@ -182,7 +185,11 @@ public class FoodStore {
                 continue;
             }
             double distance = item.distanceToSqr(near.getX() + 0.5, near.getY() + 0.5, near.getZ() + 0.5);
+            if (distance > feel * feel) {
+                continue; // (searching alone: not come across yet)
+            }
             if (distance < bestDistance) {
+
                 best = item;
                 bestDistance = distance;
             }
@@ -278,7 +285,8 @@ public class FoodStore {
         if (now >= grassScanTime || now + GRASS_SCAN_TICKS < grassScanTime) {
             grassScanTime = now + GRASS_SCAN_TICKS;
             grassTufts.clear();
-            int radius = colony.foragingRadius();
+            int radius = colony.searchReach(); // (out to where a searcher's drift may take it)
+
             for (int x = center.getX() - radius; x <= center.getX() + radius; x++) {
                 for (int z = center.getZ() - radius; z <= center.getZ() + radius; z++) {
                     if (!level.hasChunkAt(new BlockPos(x, center.getY(), z))) {
@@ -380,6 +388,7 @@ public class FoodStore {
         BlockPos pos = grass.immutable();
         plantClaims.remove(ant);
         colony.trails().visited(level, pos, ant);
+        colony.spots().found(ant, pos); // it found food here: its spot now (site fidelity, species that search alone)
         BlockState before = level.getBlockState(pos);
         SpeciesProfile.PlantFood plant = food().plantFor(before);
         if (plant != null && before.getBlock() instanceof EatenInStages eaten) {

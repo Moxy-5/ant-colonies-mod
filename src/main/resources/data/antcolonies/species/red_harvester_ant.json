@@ -41,6 +41,18 @@
     "pile": "antcolonies:seed_pile",
     "mill_ticks": 60,
     "bread_stock": 20,
+    "find_radius": 3,
+    "search": {
+      "_note": "Searching alone with site fidelity (brain step 4c; real Pogonomyrmex barbatus do not tell nestmates of seeds: each forager walks out a trunk trail, searches alone in a meandering walk until it finds food, and goes back to where it last found some). find_radius (above): a worker notices a tuft or a seed this close. alone: what a worker finds is its own, never told. wander: it searches within this many blocks of its search centre. spot_ticks: a trip to its own spot that finds nothing in this long counts empty; empty_to_drop empties and the spot is dropped. give_up_ticks: it comes home empty after this long (or when the foraging time ends). Every drift_ticks without a find its search centre moves drift_blocks farther out, at most stretch blocks past the foraging range (the user's decision: the range stretches from the ants' own failures). User's decisions: search until found, stretch from the ants; the numbers are my picks, to confirm.",
+      "alone": true,
+      "wander": 4,
+      "spot_ticks": 1200,
+      "empty_to_drop": 2,
+      "give_up_ticks": 6000,
+      "drift_ticks": 1200,
+      "drift_blocks": 3,
+      "stretch": 8
+    },
     "day_clock": {
       "_note": "The foragers' daily round (brain step 4b; real Pogonomyrmex forage in the morning, stop when the ground gets too hot at midday, go out again in the afternoon, and stay in at night and in the rain). Times are Minecraft day times: 0 is sunrise (6:00), 1000 ticks an hour. Out from out_from to in_by, except a midday rest centred on rest_middle; the rest goes by the biome's heat (base temperature): none at rest_from_heat or cooler, rest_most ticks at rest_full_heat or hotter (plains 0.8: about 50 minutes; badlands 2.0: 4 hours). not_in_rain: in while rain falls on the nest. User's decisions: rest by biome heat, never at night or in rain; the times are my picks, to confirm.",
       "out_from": 0,

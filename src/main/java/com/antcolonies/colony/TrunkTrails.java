@@ -159,7 +159,49 @@ public class TrunkTrails {
         return trail == null ? null : standOn(level, trail, leaveAt(trail, plant));
     }
 
+    /**
+     * A real searcher sets out to search round {@code toward} (brain step 4c): where it leaves the trail going that way,
+     * as {@link #setOut}, but the trip is not counted yet (it is, once the searcher finds food and goes for it). Null: no
+     * trail goes that way, or the spot is right by the hill.
+     */
+    @Nullable
+    public BlockPos wayOut(ServerLevel level, BlockPos toward) {
+        SpeciesProfile.TrunkNumbers numbers = numbers();
+        if (numbers == null || flat(toward) <= numbers.start() + 1) {
+            return null;
+        }
+        Trail trail = nearest(angleOf(toward), numbers);
+        return trail == null ? null : standOn(level, trail, leaveAt(trail, toward));
+    }
+
+    /**
+     * A trail for a searcher with no spot of its own to walk out on, picked at random by strength (a stronger, busier
+     * trail draws more foragers); null if the colony has none.
+     */
+    @Nullable
+    public Trail pickForSearch(Level level, net.minecraft.util.RandomSource random) {
+        double total = 0;
+        for (Trail trail : trails) {
+            total += Math.max(0.5, strength(level, trail));
+        }
+        double pick = random.nextDouble() * total;
+        for (Trail trail : trails) {
+            pick -= Math.max(0.5, strength(level, trail));
+            if (pick <= 0) {
+                return trail;
+            }
+        }
+        return trails.isEmpty() ? null : trails.get(trails.size() - 1);
+    }
+
+    /** How far out (blocks from the nest's middle) foragers have left this trail at most (its start if none yet). */
+    public int reachBlocks(Trail trail) {
+        SpeciesProfile.TrunkNumbers numbers = numbers();
+        return (numbers == null ? 0 : numbers.start()) + Math.max(trail.reach, 0);
+    }
+
     /** One of the forager numbers goes for food at {@code plant} (maybe in unloaded land): the trip is counted. */
+
     void tripByNumbers(ServerLevel level, BlockPos plant) {
         trip(level, plant);
     }

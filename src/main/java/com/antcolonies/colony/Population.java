@@ -503,6 +503,7 @@ public class Population {
         putInside(mob.nestCaste(), grownUpAt, 1);
         meals.add(mob.nestCaste(), mob.getLastMeal(), level.getGameTime());
         colony.foodMap().wentHome(mob.getUUID());
+        colony.spots().intoNumbers(mob.getUUID()); // its spot goes into the numbers' pool (site fidelity)
         mob.discard();
     }
 
@@ -544,7 +545,11 @@ public class Population {
         }
         takeInside(caste, minute, 1);
         level.addFreshEntity(mob);
+        if (WorkerAntEntity.CASTE.equals(caste) && mob.mayDo(ColonyRole.FORAGER)) {
+            colony.spots().outOfNumbers(mob.getUUID()); // a forager takes a spot from the numbers' pool
+        }
         return true;
+
     }
 
     /**

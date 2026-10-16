@@ -109,7 +109,11 @@ class SpeciesProfileTest {
         assertTrue(read("red_harvester_ant").soldiers().isEmpty(), "harvester ants have no soldier caste");
         assertTrue(read("red_harvester_ant").alarm().isEmpty(), "harvester ants raise no alarm yet (their workers are unchanged)");
         assertTrue(read("macrotermes").food().findRadius() > 0, "termites find their food by looking");
-        assertTrue(read("red_harvester_ant").food().findRadius() == 0, "harvester ants know every plant round the nest (unchanged)");
+        // Brain step 4c (the user's decision): harvester ants no longer know every plant round the nest; each searches alone.
+        assertTrue(read("red_harvester_ant").food().findRadius() > 0, "harvester ants find their food by looking too");
+        assertTrue(read("red_harvester_ant").food().search().map(search -> search.alone()).orElse(false), "harvester ants search alone");
+        assertTrue(read("macrotermes").food().search().isEmpty(), "termites still tell the colony what they find");
+
     }
 
     /** Termites eat dead plant material only: Dry Grass once it is dry, never green grass. */

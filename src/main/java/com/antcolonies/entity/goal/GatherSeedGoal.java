@@ -120,6 +120,8 @@ public class GatherSeedGoal extends Goal {
             seed.setItem(stack);
         }
         ant.setCarriedSeed(one);
+        colony.spots().found(ant.getUUID(), seed.blockPosition()); // its spot now (site fidelity, species that search alone)
+
         ant.setSeedForBread(colony.bakery().claimSeedForBread(level, ant.getUUID())); // to the mill if there is no store yet
         level.playSound(null, ant.blockPosition(), SoundEvents.ITEM_PICKUP, SoundSource.NEUTRAL, 0.15F, 1.6F);
     }

@@ -44,8 +44,8 @@ import net.minecraft.world.phys.AABB;
 public class Door {
     /** A real forager out of sight this long (its land unloaded, or it went into the numbers) is no longer counted out. */
     private static final int OUT_OF_SIGHT_TICKS = 2400;
-    /** A trip this long is over, whatever became of it. */
-    private static final int LONGEST_TRIP_TICKS = 6000;
+    /** A trip this long is over, whatever became of it (a search lasts up to 5 minutes, plus the walks out and home). */
+    private static final int LONGEST_TRIP_TICKS = 9000;
     /**
      * How many waiting foragers crowd the entrance chamber at a time: the ones the homecomers meet (as each goes out,
      * the next moves up). So a few quick homecomings bring the first ones out, however many wait deeper in. My pick.
@@ -223,7 +223,13 @@ public class Door {
         }
     }
 
+    /** This real forager gave up its search and goes home empty: its trip is over (an empty return touches nobody). */
+    public void endTrip(AbstractAntEntity ant) {
+        trips.remove(ant.getUUID());
+    }
+
     /** The homecomer has put its load down (or the patroller its round): its touching is over. */
+
     public void doneCarrying(AbstractAntEntity ant) {
         touching.remove(ant.getUUID());
         patrollerSince.remove(ant.getUUID());

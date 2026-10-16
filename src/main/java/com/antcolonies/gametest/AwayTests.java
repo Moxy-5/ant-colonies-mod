@@ -408,7 +408,7 @@ public class AwayTests {
      * first (as numbers: no real worker is loaded), nothing is foraged before one is back, and the door then lets the
      * foragers out by the homecomings; the away report counts the patrol.
      */
-    @GameTest(template = "arena", timeoutTicks = 4000, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 5000, skyAccess = true)
     public static void antNumbersForageOnlyOutOfSightAndFromWhatTheyRemember(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         startAntColony(helper);
@@ -421,6 +421,14 @@ public class AwayTests {
         boolean[] patrolOn = {false};
         boolean[] foragedBeforePatrol = {false};
         helper.onEachTick(() -> noRealWorkers(helper));
+        helper.onEachTick(() -> {
+            if (helper.getTick() % 200 == 0 && queen[0] == null && helper.getTick() > 15) {
+                Colony colony = antColony(helper);
+                AntColoniesMod.LOGGER.info("[away-test] 2c tick {}: food {}, cut {} {} {}{}{}", helper.getTick(), colony.food().getFood(),
+                        hidden.stream().map(colony.food()::getPiecesCut).toList(), seen.stream().map(colony.food()::getPiecesCut).toList(),
+                        colony.away().report().describe(), colony.spots().describe(), colony.field().describe());
+            }
+        });
         helper.onEachTick(() -> {
             if (!patrolOn[0]) {
                 return;
@@ -451,7 +459,7 @@ public class AwayTests {
             foodBefore[0] = colony.food().getFood();
             colony.field().setOnForTests(true);
         });
-        helper.runAfterDelay(1000, () -> {
+        helper.runAfterDelay(2000, () -> {
             Colony colony = antColony(helper);
             AntColoniesMod.LOGGER.info("[away-test] 2c ants here: food {}{}{}", colony.food().getFood(), colony.population().describe(level),
                     colony.field().describe());
@@ -478,13 +486,13 @@ public class AwayTests {
             colony.food().setPiecesCutForTests(late, 8);
             colony.setClockForTests(18000L, null); // midnight: the foragers stay in
         });
-        helper.runAfterDelay(1300, () -> {
+        helper.runAfterDelay(2300, () -> {
             Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
             checkNothingForaged(helper, colony, seen, "at midnight");
             colony.setClockForTests(1000L, null); // 7:00, but raining on the nest
             colony.setSkyForTests(null, true);
         });
-        helper.runAfterDelay(1600, () -> {
+        helper.runAfterDelay(2600, () -> {
             Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
             checkNothingForaged(helper, colony, seen, "in the rain");
             colony.setClockForTests(2000L, 2.0F); // 8:00 in a hot biome, dry: out (the midday rest is 11:00 to 15:00)
@@ -493,7 +501,7 @@ public class AwayTests {
             colony.patrol().newRoundForTests();
             patrolOn[0] = true;
         });
-        helper.runAfterDelay(1660, () -> {
+        helper.runAfterDelay(2660, () -> {
             Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
             AntColoniesMod.LOGGER.info("[away-test] 4b: {}{}", colony.patrol().describe(level), colony.door().describe(level));
             helper.assertTrue(colony.patrol().isRoundOn() && colony.patrol().numbersOut() > 0 && colony.patrol().realOut().isEmpty(),
@@ -501,7 +509,7 @@ public class AwayTests {
             helper.assertTrue(colony.patrol().sentThisRound() == colony.profile().food().patrol().orElseThrow().dawnPatrol(colony.getCount(WorkerAntEntity.CASTE)),
                     "the dawn patrol should be the share of the workers: " + colony.patrol().describe(level));
         });
-        helper.runAfterDelay(3600, () -> {
+        helper.runAfterDelay(4600, () -> {
             Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
             AntColoniesMod.LOGGER.info("[away-test] 2c ants away: food {}{}{}", colony.food().getFood(), colony.away().describe(level),
                     colony.field().describe());
@@ -523,7 +531,7 @@ public class AwayTests {
             colony.away().setAwayForTests(false);
             loadAgain(level, queenOnDisk[0]);
         });
-        helper.runAfterDelay(3660, () -> {
+        helper.runAfterDelay(4660, () -> {
             helper.assertTrue(antColony(helper) != null, "the queen should be back and alive");
             helper.succeed();
         });

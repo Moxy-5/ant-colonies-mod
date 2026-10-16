@@ -93,6 +93,7 @@ public class Colony {
     private final ForagingTrails trails;
     private final TrunkTrails trunkTrails;
     private final Patrol patrol;
+    private final ForagerSpots spots;
     private final Door door;
     private final FungusGarden garden;
     private final Mushrooms mushrooms;
@@ -126,6 +127,7 @@ public class Colony {
         this.trails = new ForagingTrails(this);
         this.trunkTrails = new TrunkTrails(this);
         this.patrol = new Patrol(this);
+        this.spots = new ForagerSpots(this);
         this.door = new Door(this);
         this.garden = new FungusGarden(this);
         this.mushrooms = new Mushrooms(this);
@@ -218,6 +220,11 @@ public class Colony {
     /** The patrollers: who goes out first each round, and where the foragers may go once they are back (species with {@code food.patrol}). */
     public Patrol patrol() {
         return patrol;
+    }
+
+    /** Where each forager last found food (site fidelity, species with {@code food.search}). */
+    public ForagerSpots spots() {
+        return spots;
     }
 
     /** How many foragers go out: the touches of the homecomers (Gordon's rule, species with {@code food.door}). */
@@ -471,7 +478,16 @@ public class Colony {
         return profile().nest().newHoles().map(holes -> Math.max(radius, holes.reach(getCount(com.antcolonies.entity.WorkerAntEntity.CASTE)))).orElse(radius);
     }
 
+    /**
+     * How far (blocks, sideways from the nest's middle) the colony's searchers may get at most: the foraging range plus
+     * the stretch of a search drifting outward when nothing is found nearer (brain step 4c, {@code food.search}).
+     */
+    public int searchReach() {
+        return foragingRadius() + profile().food().search().map(SpeciesProfile.SearchNumbers::stretch).orElse(0);
+    }
+
     /** The area (around the nest, down to the refuse chamber) where the colony's eggs, larvae and dead ants are looked for. */
+
     AABB nestArea() {
         int radius = profile().food().radius();
         return new AABB(center).inflate(radius, 0, radius).expandTowards(0, 8, 0).expandTowards(0, -12, 0);
@@ -647,6 +663,7 @@ public class Colony {
         workerFood.save(tag);
         trunkTrails.save(tag);
         patrol.save(tag);
+        spots.save(tag);
         door.save(tag);
         hill.save(tag);
         trails.save(tag);
@@ -685,6 +702,8 @@ public class Colony {
         colony.workerFood.load(tag);
         colony.trunkTrails.load(tag);
         colony.patrol.load(tag);
+        colony.spots.load(tag);
+
         colony.door.load(tag);
         colony.hill.load(tag);
         colony.trails.load(tag);

@@ -88,7 +88,8 @@ public class WorkerAntEntity extends AbstractAntEntity {
         this.goalSelector.addGoal(6, new GatherSeedGoal(this));
         // The patrollers go out first each round, over the hill and along the trails (see colony.Patrol).
         this.goalSelector.addGoal(6, new PatrolGoal(this));
-        this.goalSelector.addGoal(7, new ClipGrassGoal(this));
+        // Above searching: a searcher that comes across food is taken over by cutting or gathering where it stands.
+        this.goalSelector.addGoal(6, new ClipGrassGoal(this));
         this.goalSelector.addGoal(7, new ScoutGoal(this));
         // Soil dug while the surface was shut waits under the entrance: carried up onto the hill once the clock opens.
         this.goalSelector.addGoal(8, new CarryNightSoilGoal(this));
@@ -205,6 +206,8 @@ public class WorkerAntEntity extends AbstractAntEntity {
             if (colony != null) {
                 dropLoadOnDeath(serverLevel, colony);
                 colony.patrol().died(serverLevel, getUUID()); // a patroller killed never comes back: its way stays shut today
+                colony.spots().died(getUUID()); // its spot is lost with it
+
                 colony.setCount(CASTE, colony.getCount(CASTE) - 1);
                 manager.markChanged();
             }
