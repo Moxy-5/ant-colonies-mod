@@ -146,9 +146,12 @@ public class DigGoal extends Goal {
                 }
                 if (!walking) {
                     stuckTicks = GIVE_UP_TICKS; // no way to get there: let another block (or ant) have a go
-                } else {
+                    com.antcolonies.AntColoniesMod.LOGGER.debug("[dig] {} found no way to {} from {} (stand spots {})", ant.getId(),
+                            target.toShortString(), ant.position(), colony.nest().standSpotsFor(level, target));
+                } else if (++stuckTicks >= GIVE_UP_TICKS) {
                     // Arrived but still out of reach counts toward giving up.
-                    stuckTicks++;
+                    com.antcolonies.AntColoniesMod.LOGGER.debug("[dig] {} gave up on {}: out of reach at {} on {} (stand spots {})", ant.getId(),
+                            target.toShortString(), ant.position(), legs.getFoothold(), colony.nest().standSpotsFor(level, target));
                 }
             }
             return;

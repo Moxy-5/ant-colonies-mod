@@ -266,12 +266,17 @@ public class TermiteNewHoleTests {
                 java.util.List<BlockPos> gallery = tunnel[0].gallery() == null ? java.util.List.of() : tunnel[0].gallery();
                 BlockPos next = colony.nest().findDigTarget(level);
                 java.util.List<BlockPos> cells = tunnel[0].tunnel().tunnel();
-                AntColoniesMod.LOGGER.info("[new-hole-test] slope: gallery dug {} of {}, next dig {} ({}), hole {}, tunnel from {} to {}, workers at {}",
+                AntColoniesMod.LOGGER.info("[new-hole-test] slope: gallery dug {} of {}, next dig {} ({}, stand spots {}), hole {}, tunnel from {} to {}, workers at {}",
                         gallery.stream().filter(c -> Nest.isDugOut(level, c)).count(), gallery.size(),
-                        next == null ? null : helper.relativePos(next), next == null ? null : level.getBlockState(next), helper.relativePos(hole),
+                        next == null ? null : helper.relativePos(next), next == null ? null : level.getBlockState(next),
+                        next == null ? null : colony.nest().standSpotsFor(level, next).stream().map(p -> helper.relativePos(p).toShortString()).toList(),
+                        helper.relativePos(hole),
                         helper.relativePos(cells.get(0)), helper.relativePos(cells.get(cells.size() - 1)),
-                        level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds()).stream()
-                                .map(w -> helper.relativePos(w.blockPosition()).toShortString()).toList());
+                        TestIsolation.insectsOf(level, colony, TermiteWorkerEntity.class).stream()
+                                .map(w -> helper.relativePos(w.blockPosition()).toShortString() + " " + colony.roleOf(level, w)
+                                        + (w.isCarrying() ? " carrying" : "") + " " + w.goalSelector.getAvailableGoals().stream()
+                                                .filter(g -> g.isRunning()).map(g -> g.getGoal().getClass().getSimpleName()).toList())
+                                .toList());
             }
             helper.assertTrue(!colony.nest().foodWays().isSpent(hole), "the hole was given up while the rest of the tree is still there");
             if (ForagingHoles.isDug(level, tunnel[0].tunnel()) && ForagingHoles.isOpen(level, hole)) {

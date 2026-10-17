@@ -55,8 +55,13 @@ public class NavigationTests {
         });
     }
 
-    /** Regression test for a crash: the route was only the cell the ant already stood in, and the ant then left that cell. */
-    @GameTest(template = "arena", timeoutTicks = 400, skyAccess = true)
+    /**
+     * Regression test for a crash: the route was only the cell the ant already stood in, and the ant then left that cell.
+     * And (the navigator tidy-up, 2026-10-16) an ant walking a route a mind handed it ({@code follow}, later a trail or a
+     * marching column) that is moved off it gets back onto it where it left it and goes on along it, instead of walking
+     * straight to its end: the route goes round three sides of a square, and the ant is moved far off half way along.
+     */
+    @GameTest(template = "arena", timeoutTicks = 600, skyAccess = true)
     public static void antToldToGoToItsOwnCellSurvivesBeingMovedAway(GameTestHelper helper) {
         buildNest(helper);
         WorkerAntEntity ant = TestAnts.loneAnt(helper, MIDDLE + 5, SURFACE, MIDDLE + 5);
@@ -65,9 +70,46 @@ public class NavigationTests {
             ant.getNavigator().moveTo(ant.blockPosition(), 1.0);
             ant.setPos(ant.getX() + 1.6, ant.getY(), ant.getZ()); // out of the cell before the first step
         });
-        helper.succeedWhen(() -> helper.assertTrue(
-                ant.getNavigator().isDone() && !ant.getNavigator().hasFailed() && ant.blockPosition().equals(goal) && helper.getTick() > 20,
-                "the ant has not walked back to its cell yet"));
+        // Three sides of a square: 3 east, 3 south, 3 west.
+        int x0 = MIDDLE - 7;
+        int z0 = MIDDLE + 6;
+        List<Route.Step> steps = new java.util.ArrayList<>();
+        steps.add(new Route.Step(Foothold.floor(helper.absolutePos(new BlockPos(x0, SURFACE, z0))), StepKind.START));
+        int[][] moves = {{1, 0}, {1, 0}, {1, 0}, {0, 1}, {0, 1}, {0, 1}, {-1, 0}, {-1, 0}, {-1, 0}};
+        int x = x0;
+        int z = z0;
+        for (int[] move : moves) {
+            x += move[0];
+            z += move[1];
+            steps.add(new Route.Step(Foothold.floor(helper.absolutePos(new BlockPos(x, SURFACE, z))), StepKind.WALK));
+        }
+        Route square = new Route(steps, 9.0);
+        BlockPos farCorner = helper.absolutePos(new BlockPos(x0 + 3, SURFACE, z0 + 3));
+        WorkerAntEntity follower = TestAnts.loneAnt(helper, x0, SURFACE, z0);
+        boolean[] movedOff = {false};
+        boolean[] atFarCorner = {false};
+        helper.runAfterDelay(10, () -> helper.assertTrue(follower.getNavigator().follow(square, 1.0), "no way onto the route " + square));
+        helper.onEachTick(() -> {
+            if (!movedOff[0] && helper.getTick() > 10 && follower.getNavigator().getNextWaypoint() == 2) {
+                // Half way along the first side: put it 4 blocks west of the route's start, nearer the end than the far corner.
+                BlockPos off = helper.absolutePos(new BlockPos(x0 - 4, SURFACE, z0 + 2));
+                follower.setPos(off.getX() + 0.5, off.getY(), off.getZ() + 0.5);
+                movedOff[0] = true;
+            }
+            if (movedOff[0] && follower.blockPosition().equals(farCorner)) {
+                atFarCorner[0] = true;
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(
+                    ant.getNavigator().isDone() && !ant.getNavigator().hasFailed() && ant.blockPosition().equals(goal) && helper.getTick() > 20,
+                    "the ant has not walked back to its cell yet");
+            helper.assertTrue(movedOff[0], "the follower was not moved off its route yet");
+            helper.assertTrue(follower.getNavigator().isDone(), "the follower has not finished its route yet");
+            helper.assertTrue(!follower.getNavigator().hasFailed() && follower.blockPosition().equals(square.end().cell()),
+                    "the follower did not get to the end of its route");
+            helper.assertTrue(atFarCorner[0], "the follower walked straight to the end of its route instead of back onto it");
+        });
     }
 
     /**
@@ -661,7 +703,7 @@ public class NavigationTests {
             boolean moved = lastPos[0] != null && ant.position().distanceTo(lastPos[0]) >= 0.01;
             lastPos[0] = ant.position();
             boolean hovers = ant.getNavigator().isClimbing() && !ant.getNavigator().isDone() && !moved
-                    && !ant.getNavigator().isWalkingADoorway() // holding still in a chimney mouth's tube, looking out
+                    && !ant.getNavigator().isMovingExactly() // holding still in a chimney mouth's tube, looking out
                     && helper.getLevel().noCollision(ant, ant.getBoundingBox().move(0.0, -0.05, 0.0))
                     && helper.getLevel().noCollision(ant, ant.getBoundingBox().move(0.0, 0.05, 0.0)); // a ceiling holds it too
             hovering[0] = hovers ? hovering[0] + 1 : 0;
@@ -681,7 +723,7 @@ public class NavigationTests {
             // Holding nothing: no block's shape (as it is drawn) near the body. The drawn shape, not the collision: a
             // termite climbs the outside of a chimney mouth it could also pass through. Not while it goes in or out by a
             // chimney mouth's tube: that motion is exact, and the tube sticks up out of the block.
-            boolean hanging = ant.getNavigator().isClimbing() && !ant.getNavigator().isWalkingADoorway()
+            boolean hanging = ant.getNavigator().isClimbing() && !ant.getNavigator().isMovingExactly()
                     && !touchesABlock(helper, ant.getBoundingBox().inflate(0.08));
             floating[0] = hanging ? floating[0] + 1 : 0;
             helper.assertTrue(floating[0] <= MAX_FLOATING_TICKS, "the ant is floating while climbing, at "
