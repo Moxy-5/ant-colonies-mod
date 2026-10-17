@@ -278,4 +278,109 @@ class GalleryProofTest {
         }
         assertTrue(planned >= 2 * LANDSCAPES, "too few tunnels planned to prove anything: " + planned);
     }
+
+    /**
+     * Termites underground, step 1 (holes take turns): on every landscape the nest's own 2 side tunnels, the 4 arms out
+     * from them ({@link Galleries#planArms}) and the holes along every tunnel ({@link Galleries#holesAlong}), all dug and
+     * every hole open at once (the worst case): no tunnel block opens to the open air but at a hole, no arm block is dug
+     * near the middle (the mound and the rooms), the holes keep their spacing and stay off the mound, and from the
+     * shaft a termite walks out of every hole and back in, with the real route finder and search budget.
+     */
+    @Test
+    void theArmsAndTheHolesAlongThemCanAllBeWalkedOutOfAndBackIntoAndNeverOpenToTheSky() {
+        int landscapes = 0;
+        int arms = 0;
+        int holes = 0;
+        List<String> failures = new ArrayList<>();
+        for (long seed = 1; seed <= LANDSCAPES; seed++) {
+            Landscape land = new Landscape(seed);
+            int entrance = land.top(0, 0);
+            BlockPos center = new BlockPos(0, entrance, 0);
+            for (int y = entrance - 2; y <= entrance; y++) {
+                land.dug.add(new BlockPos(0, y, 0)); // the shaft up to the entrance
+            }
+            BlockPos start = new BlockPos(0, entrance - 2, 0);
+            Direction front = Direction.NORTH;
+            List<NestPlan.ForagingTunnel> own = new ArrayList<>();
+            for (Direction side : List.of(front.getCounterClockWise(), front.getClockWise())) {
+                TunnelRoute.Plan plan = TunnelRoute.straight(start, side, 8, 4, land.ground());
+                if (plan != null) {
+                    own.add(new NestPlan.ForagingTunnel(plan.cells(), plan.hole(), side));
+                    land.dug.addAll(plan.cells());
+                }
+            }
+            if (own.isEmpty()) {
+                continue;
+            }
+            landscapes++;
+            List<Direction> ways = new ArrayList<>();
+            own.forEach(tunnel -> ways.add(tunnel.side()));
+            ways.add(front);
+            ways.add(front.getOpposite());
+            List<NestPlan.ForagingTunnel> planned = Galleries.planArms(own, ways, land.ground(), center, 16, 9);
+            arms += planned.size();
+            List<NestPlan.ForagingTunnel> tunnels = new ArrayList<>(own);
+            tunnels.addAll(planned);
+            String where = "landscape " + seed;
+            for (NestPlan.ForagingTunnel arm : planned) {
+                land.dug.addAll(arm.tunnel());
+                for (BlockPos cell : arm.tunnel()) {
+                    boolean leadIn = own.stream().anyMatch(tunnel -> tunnel.tunnel().contains(cell));
+                    if (!leadIn && Math.hypot(cell.getX(), cell.getZ()) < 9) {
+                        failures.add(where + ": the arm to the " + arm.side() + " digs " + cell.toShortString() + " near the middle");
+                    }
+                }
+            }
+            List<BlockPos> taken = new ArrayList<>(List.of(center));
+            tunnels.forEach(tunnel -> taken.add(tunnel.hole()));
+            List<NestPlan.ForagingTunnel> all = new ArrayList<>(tunnels);
+            for (NestPlan.ForagingTunnel tunnel : tunnels) {
+                all.addAll(Galleries.holesAlong(tunnel, land.ground(), center, 8, 4, taken));
+            }
+            holes += all.size();
+            Set<BlockPos> holeCells = new HashSet<>();
+            all.forEach(tunnel -> holeCells.add(tunnel.hole()));
+            for (NestPlan.ForagingTunnel a : all) {
+                if (Math.hypot(a.hole().getX(), a.hole().getZ()) < 8 && !own.contains(a)) {
+                    failures.add(where + ": a hole at " + a.hole().toShortString() + " under the mound");
+                }
+                for (NestPlan.ForagingTunnel b : all) {
+                    if (a != b && Math.hypot(a.hole().getX() - b.hole().getX(), a.hole().getZ() - b.hole().getZ()) < 4 && tunnels.indexOf(b) < 0) {
+                        failures.add(where + ": the holes at " + a.hole().toShortString() + " and " + b.hole().toShortString() + " are too close");
+                    }
+                }
+            }
+            land.dug.addAll(holeCells);
+            for (NestPlan.ForagingTunnel tunnel : all) {
+                for (BlockPos cell : tunnel.tunnel()) {
+                    for (Direction side : Direction.values()) {
+                        BlockPos next = cell.relative(side);
+                        if (land.isOutsideAir(next) && !holeCells.contains(next) && !(cell.getX() == 0 && cell.getZ() == 0)) {
+                            failures.add(where + ": the tunnel block " + cell.toShortString() + " opens to the open air " + side);
+                        }
+                    }
+                }
+            }
+            CellMap map = land.cells();
+            for (NestPlan.ForagingTunnel tunnel : all) {
+                BlockPos hole = tunnel.hole();
+                java.util.function.Predicate<Foothold> outside = at -> at.isFloor() && at.cell().getY() == hole.getY() + 1
+                        && Math.abs(at.cell().getX() - hole.getX()) + Math.abs(at.cell().getZ() - hole.getZ()) == 1;
+                Route out = AntPathFinder.find(map, AntPathFinder.footholdsIn(map, start), outside, hole, AntPathFinder.DEFAULT_MAX_EXPANSIONS,
+                        AntPathFinder.StepCosts.NONE);
+                if (out == null) {
+                    failures.add(where + ": no way out of the hole at " + hole.toShortString() + " from the shaft");
+                } else if (AntPathFinder.find(map, out.end().cell(), start, AntPathFinder.DEFAULT_MAX_EXPANSIONS) == null) {
+                    failures.add(where + ": no way back in from the hole at " + hole.toShortString());
+                }
+            }
+        }
+        System.out.println("[gallery proof] arms and holes: " + landscapes + " landscapes, " + arms + " arms, " + holes + " holes, "
+                + failures.size() + " failures");
+        failures.forEach(line -> System.out.println("[gallery proof] " + line));
+        if (!failures.isEmpty()) {
+            fail(failures.size() + " failures, first ones:\n" + String.join("\n", failures.subList(0, Math.min(15, failures.size()))));
+        }
+        assertTrue(arms >= 3 * landscapes, "too few arms planned to prove anything: " + arms + " on " + landscapes + " landscapes");
+    }
 }

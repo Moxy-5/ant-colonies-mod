@@ -163,8 +163,14 @@ public class Soldiers {
             if (minorsOut(level)) {
                 posts.addAll(outsidePosts(level));
             }
+            List<NestPlan.ForagingTunnel> own = nest.ownForagingTunnels(level);
             for (NestPlan.ForagingTunnel tunnel : nest.getForagingTunnels(level)) {
                 List<BlockPos> cells = tunnel.tunnel();
+                // Holes taking turns (termites underground): the nest's own tunnels are always guarded (its main ways
+                // in); out along the arms only the holes in use, not every plugged one.
+                if (!own.contains(tunnel) && !nest.galleries().isInTurn(tunnel.hole()) && !ForagingHoles.isOpen(level, tunnel.hole())) {
+                    continue;
+                }
                 if (cells.size() >= 2) {
                     add(level, posts, cells.get(cells.size() - 2), tunnel.end());
                 }

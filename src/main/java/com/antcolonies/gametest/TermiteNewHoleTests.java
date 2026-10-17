@@ -77,6 +77,10 @@ public class TermiteNewHoleTests {
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
+            // The food lies a set distance out, past the old 2 holes: with the arms of termites underground (step 1)
+            // a hole along an arm may land near it, and the colony then uses that hole (a runway) and digs no new
+            // tunnel. This scene is about the tunnel out to far food, so the arms are switched off here.
+            colony.nest().galleries().setSwitchForTests(false);
             long middleAged = level.getGameTime() - colony.profile().worker().nurseUntilTicks() - 1000;
             for (TermiteWorkerEntity worker : level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds())) {
                 worker.setGrownUpAt(middleAged);
@@ -407,6 +411,10 @@ public class TermiteNewHoleTests {
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
+            // The food lies a set distance out, past the old 2 holes: with the arms of termites underground (step 1)
+            // a hole along an arm may land near it, and the colony then uses that hole (a runway) and digs no new
+            // tunnel. This scene is about the tunnel out to far food, so the arms are switched off here.
+            colony.nest().galleries().setSwitchForTests(false);
             long middleAged = level.getGameTime() - colony.profile().worker().nurseUntilTicks() - 1000;
             for (TermiteWorkerEntity worker : level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds())) {
                 worker.setGrownUpAt(middleAged);
@@ -550,6 +558,10 @@ public class TermiteNewHoleTests {
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
+            // The food lies a set distance out, past the old 2 holes: with the arms of termites underground (step 1)
+            // a hole along an arm may land near it, and the colony then uses that hole (a runway) and digs no new
+            // tunnel. This scene is about the tunnel out to far food, so the arms are switched off here.
+            colony.nest().galleries().setSwitchForTests(false);
             long middleAged = level.getGameTime() - colony.profile().worker().nurseUntilTicks() - 1000;
             for (TermiteWorkerEntity worker : level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds())) {
                 worker.setGrownUpAt(middleAged);

@@ -177,9 +177,13 @@ public class ForagingHoles {
         return isHole(level, pos) && colony.profile().nest().isPlug(level.getBlockState(pos));
     }
 
-    /** Whether a worker may bite this hole open now: it is foraging time and the hole is closed with soil or its plug. */
+    /**
+     * Whether a worker may bite this hole open now: it is foraging time, it is the hole's turn (termites underground, see
+     * {@link Galleries#isInTurn}), and the hole is closed with soil or its plug. A hole under a finished runway is always open.
+     */
     public boolean mayOpen(Level level, BlockPos hole) {
-        if (!(colony.isForagingTime(level) || hasFinishedRunway(level, hole)) || !level.isLoaded(hole)) {
+        boolean runway = hasFinishedRunway(level, hole);
+        if (!(colony.isForagingTime(level) && colony.nest().galleries().isInTurn(hole) || runway) || !level.isLoaded(hole)) {
             return false;
         }
         BlockState state = level.getBlockState(hole);

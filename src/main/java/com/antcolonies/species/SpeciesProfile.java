@@ -755,7 +755,7 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      */
     public record NestNumbers(int maxLevels, boolean sealWhileFounding, boolean foundingChamber, List<String> sideRooms,
             int foragingHoles, int foragingHoleDistance, String plugBlock, List<LevelUnlock> levelUnlocks, Optional<NewHoles> newHoles,
-            boolean crustWalls, Optional<Sheeting> sheeting, NestPlan.RoomSizes roomSizes, NightSoil nightSoil) {
+            boolean crustWalls, Optional<Sheeting> sheeting, NestPlan.RoomSizes roomSizes, NightSoil nightSoil, Optional<GalleryNumbers> galleries) {
         public static final Codec<NestNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("max_levels").forGetter(NestNumbers::maxLevels),
                 Codec.BOOL.fieldOf("seal_while_founding").forGetter(NestNumbers::sealWhileFounding),
@@ -769,8 +769,16 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 Codec.BOOL.optionalFieldOf("crust_walls", false).forGetter(NestNumbers::crustWalls),
                 Sheeting.CODEC.optionalFieldOf("sheeting").forGetter(NestNumbers::sheeting),
                 NestPlan.RoomSizes.CODEC.optionalFieldOf("room_sizes", NestPlan.RoomSizes.DEFAULT).forGetter(NestNumbers::roomSizes),
-                NightSoil.CODEC.optionalFieldOf("night_soil", NightSoil.DEFAULT).forGetter(NestNumbers::nightSoil)
+                NightSoil.CODEC.optionalFieldOf("night_soil", NightSoil.DEFAULT).forGetter(NestNumbers::nightSoil),
+                GalleryNumbers.CODEC.optionalFieldOf("galleries").forGetter(NestNumbers::galleries)
         ).apply(i, NestNumbers::new));
+
+        public NestNumbers(int maxLevels, boolean sealWhileFounding, boolean foundingChamber, List<String> sideRooms,
+                int foragingHoles, int foragingHoleDistance, String plugBlock, List<LevelUnlock> levelUnlocks, Optional<NewHoles> newHoles,
+                boolean crustWalls, Optional<Sheeting> sheeting, NestPlan.RoomSizes roomSizes, NightSoil nightSoil) {
+            this(maxLevels, sealWhileFounding, foundingChamber, sideRooms, foragingHoles, foragingHoleDistance, plugBlock, levelUnlocks, newHoles,
+                    crustWalls, sheeting, roomSizes, nightSoil, Optional.empty());
+        }
 
         public NestNumbers(int maxLevels, boolean sealWhileFounding, boolean foundingChamber, List<String> sideRooms,
                 int foragingHoles, int foragingHoleDistance, String plugBlock, List<LevelUnlock> levelUnlocks, Optional<NewHoles> newHoles,
@@ -861,6 +869,40 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 Codec.INT.optionalFieldOf("layers_per_cell", DEFAULT.layersPerCell()).forGetter(NightSoil::layersPerCell),
                 Codec.INT.optionalFieldOf("per_builder", DEFAULT.perBuilder()).forGetter(NightSoil::perBuilder)
         ).apply(i, NightSoil::new));
+    }
+
+    /**
+     * Termites underground (the user's plan of 2026-10-17, {@code docs/plans/termites-underground.md}), behind a switch:
+     * {@code enabled} turns it on (off: the 2 foraging holes of before, both open every foraging time). Step 1, holes
+     * take turns (real Macrotermes: many small holes along the galleries, only some opened on a night, near food found
+     * before plus a few new ones to explore): the nest's tunnels reach out in 4 arms {@code armLength} blocks from the
+     * middle (the 2 side tunnels go on out, 2 more branch off them past the mound round to the front and back); holes
+     * lie about {@code holeSpacing} blocks apart along every tunnel; on each foraging time one hole is open for every
+     * {@code foragersPerHole} foragers (at least 1), {@code rainMore} times as many again in the rain; the holes with
+     * food the colony knows within {@code foodRadius} blocks (or a remembered trail to food still there) open first, and
+     * {@code explore} of them (none if only 1 opens, 1 if 2 or 3) go to the holes rested longest. My picks for the numbers, to confirm.
+     */
+    public record GalleryNumbers(boolean enabled, int armLength, int holeSpacing, int foragersPerHole, double rainMore, int foodRadius, int explore) {
+        public static final Codec<GalleryNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.BOOL.optionalFieldOf("enabled", false).forGetter(GalleryNumbers::enabled),
+                Codec.INT.optionalFieldOf("arm_length", 16).forGetter(GalleryNumbers::armLength),
+                Codec.INT.optionalFieldOf("hole_spacing", 4).forGetter(GalleryNumbers::holeSpacing),
+                Codec.INT.optionalFieldOf("foragers_per_hole", 6).forGetter(GalleryNumbers::foragersPerHole),
+                Codec.DOUBLE.optionalFieldOf("rain_more", 0.5).forGetter(GalleryNumbers::rainMore),
+                Codec.INT.optionalFieldOf("food_radius", 6).forGetter(GalleryNumbers::foodRadius),
+                Codec.INT.optionalFieldOf("explore", 2).forGetter(GalleryNumbers::explore)
+        ).apply(i, GalleryNumbers::new));
+
+        /** How many holes open on a foraging time with this many foragers, in the rain or not. */
+        public int holesFor(int foragers, boolean raining) {
+            int holes = Math.max(1, (foragers + foragersPerHole - 1) / Math.max(1, foragersPerHole));
+            return raining ? (int) Math.ceil(holes * (1 + rainMore)) : holes;
+        }
+
+        /** How many of {@code open} holes go to exploring (the rest to holes near known food): none of 1, 1 of 2 or 3. */
+        public int exploreOf(int open) {
+            return open <= 1 ? 0 : Math.min(open, open <= 3 ? 1 : explore);
+        }
     }
 
     public record Sheeting(int max, int maxLength) {

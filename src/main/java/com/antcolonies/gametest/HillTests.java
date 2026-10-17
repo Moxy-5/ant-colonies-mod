@@ -331,6 +331,10 @@ public class HillTests {
                 chamber.cells().forEach(pos -> level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3));
             }
             colony.nest().getGardens(level).get(0).cells().forEach(pos -> level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3));
+            // This scene is about where the two holes open on the slope, not which holes take their turn tonight (a
+            // small colony opens only one of them): the arms and turns are switched off here (they have their own
+            // proof over 400 landscapes, GalleryProofTest, and their own scene in TermiteForagingTests).
+            colony.nest().galleries().setSwitchForTests(false);
             TestClock.still(helper, 0.0); // midnight: foraging time
             ready[0] = true;
         });

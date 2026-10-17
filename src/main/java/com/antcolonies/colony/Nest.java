@@ -65,6 +65,7 @@ public class Nest {
     private boolean allForagingTunnelsStale = true;
     /** The tunnels out to rich food, their feeding galleries and the runways of mud sheeting. Saved with the nest. */
     private final FoodWays foodWays;
+    private final Galleries galleries;
     /** The cells that count as inside (see {@link #isInside}), worked out at most once a tick. */
     private Set<BlockPos> inside = Set.of();
     /** The mound's planned channel cells (tunnels, spire pieces, mouths): inside only where the block is built. */
@@ -80,6 +81,15 @@ public class Nest {
             allForagingTunnelsStale = true;
             insideTick = Long.MIN_VALUE;
         });
+        this.galleries = new Galleries(colony, () -> {
+            allForagingTunnelsStale = true;
+            insideTick = Long.MIN_VALUE;
+        });
+    }
+
+    /** Termites underground: the arms, the holes along the tunnels and whose turn it is (see {@link Galleries}). */
+    public Galleries galleries() {
+        return galleries;
     }
 
     /** The tunnels out to rich food, their feeding galleries and the runways of mud sheeting (see {@link FoodWays}). */
@@ -777,11 +787,19 @@ public class Nest {
         }
         if (allForagingTunnelsStale) {
             List<NestPlan.ForagingTunnel> all = new ArrayList<>(foragingTunnels);
+            all.addAll(galleries.arms());
             foodWays.getNewTunnels().forEach(tunnel -> all.add(tunnel.tunnel()));
+            all.addAll(galleries.holesAlong());
             allForagingTunnels = List.copyOf(all);
             allForagingTunnelsStale = false;
         }
         return allForagingTunnels;
+    }
+
+    /** Only the nest plan's own foraging tunnels (not the arms, the new tunnels to food or the holes along them). */
+    List<NestPlan.ForagingTunnel> ownForagingTunnels(Level level) {
+        getForagingTunnels(level);
+        return foragingTunnels == null ? List.of() : foragingTunnels;
     }
 
     /**
@@ -1045,6 +1063,7 @@ public class Nest {
     void save(CompoundTag tag) {
         tag.putInt("nestLevelsUnlocked", levelsUnlocked);
         foodWays.save(tag);
+        galleries.save(tag);
         if (fittedTunnels != null) {
             ListTag fitted = new ListTag();
             for (NestPlan.ForagingTunnel tunnel : fittedTunnels) {
@@ -1069,6 +1088,7 @@ public class Nest {
         // A nest saved before nest stages existed digs all its levels, as it did then.
         levelsUnlocked = tag.contains("nestLevelsUnlocked") ? tag.getInt("nestLevelsUnlocked") : Integer.MAX_VALUE;
         foodWays.load(tag);
+        galleries.load(tag);
         fittedTunnels = null;
         if (tag.contains("fittedTunnels")) {
             List<NestPlan.ForagingTunnel> fitted = new ArrayList<>();

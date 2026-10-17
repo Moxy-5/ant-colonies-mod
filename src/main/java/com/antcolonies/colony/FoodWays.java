@@ -221,6 +221,11 @@ public class FoodWays {
         changed.run();
     }
 
+    /** Whether this hole is the end of a tunnel dug out to rich food whose food is not gone yet. */
+    public boolean isLiveNewHole(BlockPos hole) {
+        return !isSpent(hole) && newTunnels.stream().anyMatch(t -> t.tunnel().hole().equals(hole));
+    }
+
     /** Whether this hole's food is gone: it is plugged for good and never opened again. */
     public boolean isSpent(BlockPos hole) {
         return spentHoles.contains(hole);

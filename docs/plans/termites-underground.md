@@ -50,7 +50,14 @@ Planned with the user 2026-10-17 (the termite half of `docs/plans/long-trails.md
 - **How many: by foragers and rain.** One open hole for every so many foragers going out (my pick: 6), at least 1;
   more on rainy nights (my pick: half as many again), as real ones open more after rain.
 - **Old holes stay:** a plugged hole stays usable for ever; filling in comes with step 3's far branches.
-- Each night's choice is made once, when foraging starts, and kept until the holes are plugged (saved).
+- **4 tunnels, a bit longer (user, 2026-10-17, asked while building):** the full mound (radius up to about 7.6)
+  leaves no room for holes along the 8-block tunnels, so the 2 side tunnels go on out to about 16 blocks
+  (`arm_length`) and 2 more arms branch off them past the mound to the front and back; the holes are spaced along
+  those arms (none within the foraging-hole distance of the nest middle).
+- Each night's choice is made once, when foraging starts, and kept until the holes are plugged (saved). A tunnel dug
+  out to rich food (new holes) opens every night while its food lasts, also when it was finished after the night's
+  turns were picked; a hole with a runway of sheeting stays open as before.
+- Soldiers keep their posts in the nest's own 2 tunnels; out along the arms they guard only the holes in use.
 - Behind the switch `nest.galleries.enabled` (off: today's 2 holes, both open).
 - **Parts that use the holes and must work with any open set:** the alarm (run to the nearest open hole, plug it),
   the soldiers' sentry line, runways (only from a hole that is open), bare patches, mushrooms, the food map and

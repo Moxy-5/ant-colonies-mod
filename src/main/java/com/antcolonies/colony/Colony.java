@@ -383,6 +383,11 @@ public class Colony {
         return level.isRaining() && level.getBiome(center).value().hasPrecipitation();
     }
 
+    /** Whether it rains on the nest now (as the colony sees it: a game test may pretend, see {@link #setRainForTests}). */
+    public boolean rainsNow(net.minecraft.world.level.Level level) {
+        return rainForTests != null ? rainForTests : rainsOnNest(level);
+    }
+
     /** Tests only: pretend the biome at the nest is this hot, for the midday rest's length (null for the real biome). */
     public void setHeatForTests(@Nullable Float heat) {
         this.heat = heat;
@@ -502,6 +507,7 @@ public class Colony {
         alarm.tick(level);
         foodMap.tick(level);
         foragingHoles.tick(level);
+        nest.galleries().tick(level);
         food.barePatches().tick(level);
         population.tick(level);
         life.tick(level, false);
@@ -592,6 +598,16 @@ public class Colony {
     /** The role of the worker with this id (for tests and the colony list); a builder if it is not loaded. */
     public ColonyRole roleOf(ServerLevel level, UUID ant) {
         return level.getEntity(ant) instanceof AbstractAntEntity worker ? roleOf(level, worker) : roles.getOrDefault(ant, ColonyRole.BUILDER);
+    }
+
+    /** How many foragers the colony has now: its real workers whose job is foraging, and the forager numbers inside. */
+    public int foragersNow(ServerLevel level) {
+        workOutRoles(level, level.getGameTime());
+        int real = 0;
+        for (ColonyRole role : roles.values()) {
+            real += role == ColonyRole.FORAGER ? 1 : 0;
+        }
+        return real + field.foragersInside(level);
     }
 
     /**

@@ -74,7 +74,17 @@
     "new_holes": { "reach_min": 10, "reach_max": 40, "reach_full_at_workers": 500, "min_distance": 8, "max": 6 },
     "plug_block": "antcolonies:termite_mound",
     "crust_walls": true,
-    "sheeting": { "max": 3, "max_length": 12 }
+    "sheeting": { "max": 3, "max_length": 12 },
+    "galleries": {
+      "_note": "Termites underground (docs/plans/termites-underground.md), the switch: enabled false brings back the 2 holes of before, both open every foraging time. Step 1, holes take turns: the tunnels reach out in 4 arms arm_length blocks from the middle; holes about hole_spacing blocks apart along every tunnel; each foraging time 1 hole open per foragers_per_hole foragers (at least 1), rain_more times as many again in the rain; holes with known food within food_radius blocks open first, explore of them (none if only 1 opens, 1 if 2 or 3) go to the holes rested longest (with no known food, all do). My picks, to confirm.",
+      "enabled": true,
+      "arm_length": 16,
+      "hole_spacing": 4,
+      "foragers_per_hole": 6,
+      "rain_more": 0.5,
+      "food_radius": 6,
+      "explore": 2
+    }
   },
   "queen_body": {
     "full_size_at_members": 60,
