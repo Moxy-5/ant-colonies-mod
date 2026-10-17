@@ -46,7 +46,7 @@ import net.minecraft.world.phys.AABB;
  */
 public class ForagingHoles {
     /** After the foraging time is over the holes are plugged at the latest this long after (ticks), even with workers still outside. */
-    static final int PLUG_GRACE_TICKS = 600;
+    public static final int PLUG_GRACE_TICKS = 600;
     /** A worker's claim on a hole it plugs lasts this long (ticks). */
     private static final int CLAIM_TICKS = 600;
     /** How often (ticks) the colony checks whether any of its members are still outside. */

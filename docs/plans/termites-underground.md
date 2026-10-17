@@ -1,7 +1,7 @@
 # Termites underground: the range is the galleries
 
 Planned with the user 2026-10-17 (the termite half of `docs/plans/long-trails.md`). Decisions in `docs/DESIGN.md`,
-"Termites underground". Nothing built yet.
+"Termites underground". Step 0 built (branch `termites-underground`).
 
 ## Real Macrotermes (what this copies)
 - Under a mound lies a web of thin foraging galleries just below the surface, radiating out tens of metres (about
@@ -34,6 +34,7 @@ Planned with the user 2026-10-17 (the termite half of `docs/plans/long-trails.md
 4. **Smallest visible change first**, each step confirmed in-game before the next.
 
 ## Step 0: the safety net (no change in game)
+**BUILT 2026-10-17** (`docs/HISTORY.md`); the proof found and fixed a real bug (`docs/BUGS.md` 45).
 - The proof test above (pure route code, like `TunnelRoute`'s unit tests).
 - A stuck watcher in the game tests: a termite with no progress in a tunnel for a while fails the test, with where.
 - A long-walk scene: termites walk a ready-made 40-block gallery out and back (real mobs, the switch's walking part).
@@ -60,5 +61,5 @@ Planned with the user 2026-10-17 (the termite half of `docs/plans/long-trails.md
 - Then the switch is removed once the user is happy, with the old code it replaces.
 
 ## Tests
-- After each step: `termitefood,mound,soldiers,away` on 8 servers; full run before merging (it touches shared parts).
+- After each step: `termitefood,mound,soldiers,away` on 6 servers; full run before merging (it touches shared parts).
 - Every old check of the new-hole, runway, bare patch and away tests stays (merged, never deleted).

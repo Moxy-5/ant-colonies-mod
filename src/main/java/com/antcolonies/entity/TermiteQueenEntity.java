@@ -170,6 +170,11 @@ public class TermiteQueenEntity extends AbstractAntEntity {
                         setSize(Math.min(target, getSize() + step));
                     }
                 });
+                // Swollen too big to walk while on her way somewhere: she lies where she is, and her legs drop the
+                // route they were on (her goals no longer run to stop it; found by the stuck watcher, 2026-10-17).
+                if (isTooBigToWalk() && !getNavigator().isDone()) {
+                    getNavigator().stop();
+                }
             }
         }
     }

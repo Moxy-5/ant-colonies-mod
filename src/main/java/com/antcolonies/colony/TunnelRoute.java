@@ -116,7 +116,7 @@ public final class TunnelRoute {
                 List<BlockPos> step = step(new BlockPos(x, node.y, z), new BlockPos(nx, ny, nz));
                 boolean diggable = true;
                 for (BlockPos cell : step) {
-                    diggable &= ground.mayDig(cell);
+                    diggable &= ground.mayDig(cell) && isWalledIn(cell, ground);
                 }
                 int cost = node.cost + step.size();
                 long next = column(nx, nz);
@@ -157,7 +157,7 @@ public final class TunnelRoute {
             List<BlockPos> step = k == 1 && next.getY() < at.getY() ? List.of(next) : step(at, next);
             boolean diggable = true;
             for (BlockPos cell : step) {
-                diggable &= ground.mayDig(cell) || ground.isDug(cell);
+                diggable &= (ground.mayDig(cell) || ground.isDug(cell)) && isWalledIn(cell, ground);
             }
             if (!diggable) {
                 break;
@@ -206,6 +206,21 @@ public final class TunnelRoute {
             cells.addAll(step(new BlockPos(columnX(a), heightOf.get(a), columnZ(a)), new BlockPos(columnX(b), heightOf.get(b), columnZ(b))));
         }
         return cells;
+    }
+
+    /**
+     * Whether no side of this tunnel block opens onto the open air of a lower column beside it (a tunnel one block
+     * under the ground running along the top of a drop of 2 or more). Found by the gallery proof on made-up hillsides
+     * (2026-10-17, {@code GalleryProofTest}): real galleries stay closed. A column of unknown ground (the mound) counts as closed.
+     */
+    static boolean isWalledIn(BlockPos cell, Ground ground) {
+        for (Direction side : Direction.Plane.HORIZONTAL) {
+            Integer top = ground.groundTop(cell.getX() + side.getStepX(), cell.getZ() + side.getStepZ());
+            if (top != null && top < cell.getY()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static boolean isBesideFood(int x, int z, BlockPos food) {

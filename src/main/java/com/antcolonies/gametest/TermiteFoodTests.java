@@ -73,6 +73,7 @@ public class TermiteFoodTests {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
         TermiteMoundTests.deepGround(helper);
+        StuckWatcher.watch(helper, () -> TermiteMoundTests.colony(helper)); // the termites-underground safety net (2026-10-17)
         helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
         helper.runAfterDelay(5, () -> {
             helper.spawn(ModEntities.TERMITE_KING.get(), MIDDLE + 2, SURFACE, MIDDLE + 1);

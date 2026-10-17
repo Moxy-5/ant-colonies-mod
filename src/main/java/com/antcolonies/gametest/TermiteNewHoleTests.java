@@ -63,6 +63,7 @@ public class TermiteNewHoleTests {
                 helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE - 3 + i, SURFACE, MIDDLE - 2);
             }
         });
+        StuckWatcher.watch(helper, () -> TermiteMoundTests.colony(helper));
         BlockPos hay = helper.absolutePos(new BlockPos(MIDDLE + HAY_EAST, SURFACE, MIDDLE));
         int[] phase = {0}; // 0 setting up, 1 waiting for the plan, 2 digging, 5 foraging by the new hole, 3 hay gone, 6 plugged, 4 the next night
         TestClock clock = TestClock.moving(helper, 18.5);
@@ -70,6 +71,7 @@ public class TermiteNewHoleTests {
         boolean[] usedTheHole = {false};
         FoodWays.NewTunnel[] tunnel = {null};
         int[] since = {0};
+        long[] overSince = {-1}; // when the foraging was over after the hay went
         TermiteWorkerEntity[] kept = {null}; // the worker kept in the gallery when the hay goes
         long[] keptUntil = {0};
         helper.runAfterDelay(10, () -> {
@@ -182,12 +184,21 @@ public class TermiteNewHoleTests {
                     BlockPos hole = tunnel[0].tunnel().hole();
                     if (colony.nest().foodWays().isSpent(hole)) {
                         // The foraging is over at the end of the night: the holes are plugged.
+                        // (Not "by sunrise": the holes are plugged once everybody is in, or PLUG_GRACE_TICKS after the
+                        // foraging ends, and when the hay went just before dawn that runs past sunrise; the 8-server run of
+                        // 2026-10-17 failed so. The rule: plugged within the grace, plus a while for a worker to get there.)
                         if (!ForagingHoles.isOpen(level, hole)) {
                             phase[0] = 6;
                             since[0] = 0;
+                        } else if (colony.isForagingTime(level)) {
+                            overSince[0] = -1;
                         } else {
-                            helper.assertTrue(clock.phase(colony) != TestClock.Phase.DAY, "the spent hole was not plugged by sunrise: "
-                                    + level.getBlockState(hole));
+                            if (overSince[0] < 0) {
+                                overSince[0] = helper.getTick();
+                            }
+                            helper.assertTrue(helper.getTick() - overSince[0] <= ForagingHoles.PLUG_GRACE_TICKS + 1200,
+                                    "the spent hole was not plugged " + (helper.getTick() - overSince[0]) + " ticks after the foraging ended: "
+                                            + level.getBlockState(hole));
                         }
                     } else {
                         helper.assertTrue(since[0] < 6000, "the hole beside the gone hay was not spent: " + level.getBlockState(hole));
@@ -217,6 +228,136 @@ public class TermiteNewHoleTests {
                 }
                 default -> {
                 }
+            }
+        });
+    }
+
+    /** How far east of the nest's middle the hay lies in the long walk (inside a big colony's 40-block reach). */
+    private static final int LONG_HAY_EAST = 38;
+    /** How many trips out of the far hole and back into the nest the long walk wants. */
+    private static final int LONG_TRIPS = 3;
+    /** The most (ticks) a trip home from the far hole may take (about 45 blocks of tunnel and shaft; my pick, generous). */
+    private static final int LONG_TRIP_TICKS = 2400;
+
+    /**
+     * The termites-underground safety net, step 0 (the user's plan of 2026-10-17): the long walk. A big colony knows of
+     * hay 38 blocks east; once it has planned its tunnel there, the tunnel is dug out at once (a ready-made gallery, so
+     * the test is about walking, not digging); the builders dig the feeding gallery and open the hole, and 13 old
+     * workers forage by it, both ways through the 1-block tunnel. A trip counts when a worker is at the far end (the
+     * tunnel's last blocks, the hole, or the feeding gallery up under the hay: once it is dug the workers eat the hay
+     * from below, as real Macrotermes do, and seldom use the hole), is then seen in the middle of the tunnel (seen on the
+     * open ground, it starts over: foragers walking to the hay over the ground pass the hole's spot), and gets home (anywhere in the nest within 8 blocks of its middle, out of this tunnel: the garden
+     * rooms, where foragers take their load), within {@value #LONG_TRIP_TICKS} ticks (a worker that keeps
+     * moving but goes round in circles is caught by this, not by the stuck watcher). {@value #LONG_TRIPS} trips are
+     * wanted, the stuck watcher fails the test if any insect gets stuck under the ground, and it must have seen
+     * workers walking under the ground (a watcher that saw nothing proves nothing).
+     */
+    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    public static void foragersWalkALongGalleryOutAndBack(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        for (int x = 0; x <= MIDDLE + LONG_HAY_EAST + 6; x++) {
+            for (int z = 0; z < 25; z++) {
+                for (int y = 0; y < SURFACE - 1; y++) {
+                    helper.setBlock(x, y, z, Blocks.DIRT);
+                }
+                helper.setBlock(x, SURFACE - 1, z, Blocks.GRASS_BLOCK);
+            }
+        }
+        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        helper.runAfterDelay(5, () -> {
+            for (int i = 0; i < 16; i++) {
+                helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE - 4 + i % 8, SURFACE, MIDDLE - 2 - i / 8);
+            }
+        });
+        StuckWatcher.Tracker watcher = StuckWatcher.watch(helper, () -> TermiteMoundTests.colony(helper));
+        BlockPos hay = helper.absolutePos(new BlockPos(MIDDLE + LONG_HAY_EAST, SURFACE, MIDDLE));
+        TestClock clock = TestClock.moving(helper, 18.5);
+        FoodWays.NewTunnel[] tunnel = {null};
+        // Each worker on its way home: 1 came out of the far hole, 2 seen in the middle of the tunnel since; and when it was last outside.
+        java.util.Map<java.util.UUID, Integer> stage = new java.util.HashMap<>();
+        java.util.Map<java.util.UUID, Integer> outAt = new java.util.HashMap<>();
+        java.util.List<Integer> tripTicks = new java.util.ArrayList<>();
+        helper.runAfterDelay(10, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
+            long now = level.getGameTime();
+            int i = 0;
+            for (TermiteWorkerEntity worker : level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds())) {
+                // 3 builders (they dig the feeding gallery), the rest old foragers.
+                worker.setGrownUpAt(now - (i++ < 3 ? colony.profile().worker().nurseUntilTicks() : colony.profile().worker().builderUntilTicks()) - 1000);
+            }
+            TermiteSoldierTests.digNestAtOnce(level, colony);
+            colony.population().addNewMembers(WorkerAntEntity.CASTE, now - 1000, 500);
+            level.setBlock(hay, Blocks.HAY_BLOCK.defaultBlockState(), 3);
+            colony.food().rescanPlantsSoon();
+            colony.foodMap().knowForTests(hay);
+        });
+        helper.onEachTick(() -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            if (colony == null || helper.getTick() < 20) {
+                return;
+            }
+            if (colony.food().getPiecesCut(hay) > 24) {
+                colony.food().setPiecesCutForTests(hay, 0); // a bigger stack of hay: it lasts the whole test
+            }
+            if (tunnel[0] == null) {
+                if (!colony.nest().foodWays().getNewTunnels().isEmpty()) {
+                    tunnel[0] = colony.nest().foodWays().getNewTunnels().get(0);
+                    for (BlockPos cell : tunnel[0].tunnel().tunnel()) {
+                        level.setBlock(cell, Blocks.AIR.defaultBlockState(), 3); // the ready-made gallery
+                    }
+                    AntColoniesMod.LOGGER.info("[long-walk] a tunnel of {} blocks dug at once, hole at {}", tunnel[0].tunnel().tunnel().size(),
+                            helper.relativePos(tunnel[0].tunnel().hole()));
+                } else {
+                    helper.assertTrue(helper.getTick() < 1000, "no tunnel was planned to the hay: " + colony.foragingHoles().describeNewHoles(level));
+                }
+                return;
+            }
+            java.util.List<BlockPos> cells = tunnel[0].tunnel().tunnel();
+            java.util.List<BlockPos> middle = cells.subList(cells.size() * 2 / 5, cells.size() * 3 / 5);
+            java.util.Set<BlockPos> farEnd = new java.util.HashSet<>(cells.subList(Math.max(0, cells.size() - 2), cells.size()));
+            farEnd.add(tunnel[0].tunnel().hole());
+            if (tunnel[0].gallery() != null) {
+                farEnd.addAll(tunnel[0].gallery());
+            }
+            BlockPos center = colony.getCenter();
+            for (TermiteWorkerEntity worker : TestIsolation.insectsOf(level, colony, TermiteWorkerEntity.class)) {
+                BlockPos at = worker.blockPosition();
+                java.util.UUID id = worker.getUUID();
+                if (farEnd.contains(at)) {
+                    stage.put(id, 1); // at the far end: the tunnel's last blocks, the gallery under the hay, or the hole
+                    outAt.put(id, (int) helper.getTick());
+                } else if (stage.containsKey(id) && level.canSeeSky(at)) {
+                    stage.remove(id); // out on the ground again: not on its way home
+                } else if (stage.getOrDefault(id, 0) == 1 && middle.contains(at)) {
+                    stage.put(id, 2); // on its way home underground
+                } else if (stage.getOrDefault(id, 0) == 2 && !cells.contains(at) && colony.nest().isInside(level, at)
+                        && Math.max(Math.abs(at.getX() - center.getX()), Math.abs(at.getZ() - center.getZ())) <= 8) {
+                    // Home: anywhere in the nest near its middle (the garden rooms, where foragers take their load), out of this tunnel.
+                    stage.remove(id);
+                    int took = (int) helper.getTick() - outAt.get(id);
+                    tripTicks.add(took);
+                    AntColoniesMod.LOGGER.info("[long-walk] trip {} home in {} ticks, back in at tick {} ({}) at {}", tripTicks.size(), took,
+                            helper.getTick(), clock.describe(), helper.relativePos(at));
+                    helper.assertTrue(took <= LONG_TRIP_TICKS, "a worker took " + took + " ticks to get home from the far hole (at most "
+                            + LONG_TRIP_TICKS + "): lost on the way?");
+                }
+            }
+            for (java.util.Map.Entry<java.util.UUID, Integer> going : stage.entrySet()) {
+                // Seen in the tunnel on its way home and still not in, long after: lost underground.
+                helper.assertTrue(going.getValue() < 2 || helper.getTick() - outAt.get(going.getKey()) <= 2 * LONG_TRIP_TICKS,
+                        "a worker out of the far hole at tick " + outAt.get(going.getKey()) + " went into the tunnel and never got home");
+            }
+            if (helper.getTick() % 1000 == 0) {
+                AntColoniesMod.LOGGER.info("[long-walk] tick {} {}: hole {}, {} on their way home, trips {}, {} insect-ticks watched underground, {}",
+                        helper.getTick(), clock.describe(), level.getBlockState(tunnel[0].tunnel().hole()), stage.size(), tripTicks,
+                        watcher.watchedTicks(), colony.foragingHoles().describeNewHoles(level));
+            }
+            if (tripTicks.size() >= LONG_TRIPS) {
+                helper.assertTrue(watcher.watchedTicks() > 0, "the stuck watcher never saw an insect walking under the ground");
+                AntColoniesMod.LOGGER.info("[long-walk] done: trips {} ticks, {} insect-ticks watched underground", tripTicks, watcher.watchedTicks());
+                helper.succeed();
             }
         });
     }
@@ -394,6 +535,7 @@ public class TermiteNewHoleTests {
                 helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE - 3 + i, SURFACE, MIDDLE - 2);
             }
         });
+        StuckWatcher.watch(helper, () -> TermiteMoundTests.colony(helper));
         java.util.List<BlockPos> log = new java.util.ArrayList<>();
         for (int x = logStart; x < logStart + (kind == Food.BRANCH ? 3 : 5); x++) {
             log.add(helper.absolutePos(new BlockPos(x, SURFACE, MIDDLE)));
