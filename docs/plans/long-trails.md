@@ -44,6 +44,12 @@ Harvester ants first; termites underground right after, as a step of their own (
   in unloaded land, where only the numbers forage (never force-loading chunks).
 
 ## Step 2: recruiting to rich patches (B)
+- **The user's decisions (2026-10-17, before the night's work):** how many nestmates a recruiter calls out **depends on
+  how big the patch is** (real recruiting gets stronger with a richer find; my pick: 1 for every 16 pieces of food in
+  the patch, at least 1, at most 8); **plants and fallen seeds both count** toward a rich patch; recruits **follow the
+  scent line** closely, single file. Steps 2 and 3 are built in this session overnight; step 4 in a new linked session
+  on its own branch from this one, then merged back here (the user's OK) after its tests, with a full run, so one copy
+  holds everything for the morning. Nothing goes into `master`.
 - **A rich patch** (my pick): a find with at least 24 pieces of food within 4 blocks of it. A ripe grama stand
   counts; a lone seed or a tuft of short grass does not. The richness needed grows with the distance home (C, below).
 - **The scent line:** the finder heads straight home and the brain notes a **recruit line** from the patch to the
