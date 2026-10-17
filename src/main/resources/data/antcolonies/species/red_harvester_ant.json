@@ -35,7 +35,10 @@
     "radius": 24,
     "items": "antcolonies:seeds",
     "plants": [
-      { "block": "minecraft:short_grass", "pieces": 10 }
+      { "block": "minecraft:short_grass", "pieces": 10 },
+      { "_note": "Grama grass (the user's decisions, 2026-10-16): only ripe heads; a head cut bare dries off, the plant lives on. 16 seeds a blue grama plant, 12 a black grama bunch: my picks, to confirm.",
+        "block": "antcolonies:blue_grama", "pieces": 16, "state": { "stage": "ripe" } },
+      { "block": "antcolonies:black_grama", "pieces": 12, "state": { "stage": "ripe" } }
     ],
     "piece": "minecraft:wheat_seeds",
     "pile": "antcolonies:seed_pile",

@@ -132,6 +132,19 @@ class SpeciesProfileTest {
     }
 
     @Test
+    void harvesterAntsCutGramaOnlyWhenRipe() throws Exception {
+        java.util.List<SpeciesProfile.PlantFood> plants = read("red_harvester_ant").food().plants();
+        for (String grama : java.util.List.of("antcolonies:blue_grama", "antcolonies:black_grama")) {
+            SpeciesProfile.PlantFood plant = plants.stream().filter(p -> p.block().equals(grama)).findFirst().orElseThrow();
+            assertEquals(java.util.Map.of("stage", "ripe"), plant.state(), grama + " is cut before it is ripe");
+            assertTrue(plant.pieces() > 10, grama + " is richer than a tuft of short grass");
+        }
+        for (SpeciesProfile.PlantFood plant : read("macrotermes").food().plants()) {
+            assertTrue(!plant.block().contains("grama"), "termites eat green grama");
+        }
+    }
+
+    @Test
     void foragersGoOutWhenTheirProfileSays() {
         SpeciesProfile.FoodNumbers ant = SpeciesProfile.RED_HARVESTER_ANT.food();
         SpeciesProfile.FoodNumbers termite = new SpeciesProfile.FoodNumbers(24, "x", java.util.List.of(), "x", "x", 0, 0, java.util.List.of("night", "rain"), 0, java.util.Optional.empty());

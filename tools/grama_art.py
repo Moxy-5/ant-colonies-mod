@@ -18,14 +18,21 @@ rain), ripe (in seed: the ants' jackpot), dried (the seed is gone; dry stalks un
 Looks: A "Minecraft-simple" (few pixels, clean shapes, close to vanilla grass); B "Field detail" (more blades, the
 comb of spikelets, anthers, the white wool, the runners).
 
-Needs no extra libraries. Run from the project folder:  python tools/grama_art.py   (writes a preview PNG)
+The user picked look B for both kinds (2026-10-16); the game's files use it (PICKED).
+
+Needs no extra libraries. Run from the project folder:  python tools/grama_art.py
+(writes a preview PNG, and the game's textures, models, blockstates, loot tables and world generation for both kinds)
 """
+import json
 import random
 import struct
 import zlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+ASSETS = ROOT / "src/main/resources/assets/antcolonies"
+DATA = ROOT / "src/main/resources/data/antcolonies"
+PICKED = "B"
 PREVIEW = ROOT / "references/ants/preview"
 S = 16
 KINDS = ["blue", "black"]
@@ -307,5 +314,73 @@ def preview():
     print("wrote", out)
 
 
+def seeds_icon(kind):
+    """The seeds item: three seeds, blue grama's straw-gold with a dark awn, black grama's grey with a white woolly tuft."""
+    img = blank()
+    if kind == "blue":
+        body, dark, extra = (196, 164, 104), (146, 108, 66), (110, 84, 52)
+    else:
+        body, dark, extra = (164, 152, 128), (110, 100, 86), BLACK["wool"]
+    for cx, cy, lean in ((5, 9, 1), (9, 6, -1), (10, 11, 1)):
+        for k in range(4):
+            put(img, cx + (k * lean) // 2, cy + k - 2, body if k < 3 else dark)
+            put(img, cx + 1 + (k * lean) // 2, cy + k - 2, dark if k else body)
+        put(img, cx - lean, cy - 3, extra)  # the awn (blue) or the wool (black)
+        if kind == "blue":
+            put(img, cx - 2 * lean, cy - 4, extra)
+    return img
+
+
+def write_json(path, data):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2) + chr(10), encoding="utf-8")
+
+
+def game_files():
+    """The game's files for both kinds, in the picked look."""
+    for kind in KINDS:
+        name = f"{kind}_grama"
+        variants = {}
+        for stage in STAGES:
+            models = []
+            for v in range(VARIANTS):
+                tex = f"{name}_{stage}_{v}"
+                out = ASSETS / f"textures/block/{tex}.png"
+                out.parent.mkdir(parents=True, exist_ok=True)
+                out.write_bytes(png(texture(kind, PICKED, stage, v)))
+                write_json(ASSETS / f"models/block/{tex}.json", {"parent": "minecraft:block/cross", "render_type": "minecraft:cutout",
+                                                                  "textures": {"cross": f"antcolonies:block/{tex}"}})
+                models.append({"model": f"antcolonies:block/{tex}"})
+            variants[f"stage={stage}"] = models
+        write_json(ASSETS / f"blockstates/{name}.json", {"variants": variants})
+        seeds = f"{name}_seeds"
+        (ASSETS / f"textures/item/{seeds}.png").write_bytes(png(seeds_icon(kind)))
+        write_json(ASSETS / f"models/item/{seeds}.json", {"parent": "minecraft:item/generated", "textures": {"layer0": f"antcolonies:item/{seeds}"}})
+        # Broken: a ripe plant gives 1 to 3 seeds; shears give nothing extra (it is never picked whole, it is grown from seed).
+        write_json(DATA / f"loot_table/blocks/{name}.json", {"type": "minecraft:block", "pools": [{
+            "rolls": 1.0, "bonus_rolls": 0.0,
+            "entries": [{"type": "minecraft:item", "name": f"antcolonies:{seeds}",
+                         "functions": [{"function": "minecraft:set_count", "count": {"type": "minecraft:uniform", "min": 1, "max": 3}},
+                                       {"function": "minecraft:explosion_decay"}]}],
+            "conditions": [{"condition": "minecraft:block_state_property", "block": f"antcolonies:{name}", "properties": {"stage": "ripe"}}]}]})
+    # World generation (my picks, to confirm): a blue grama meadow 2 to 4 blocks out in 1 chunk in 6; black grama round
+    # 1 or 2 dead bushes in 1 chunk in 3.
+    stands = {
+        "blue_grama": ({"radius": {"type": "minecraft:uniform", "min_inclusive": 2, "max_inclusive": 4}, "density": 0.8, "bushes": 0}, 6,
+                       ["minecraft:plains", "minecraft:sunflower_plains", "minecraft:meadow"]),
+        "black_grama": ({"radius": {"type": "minecraft:uniform", "min_inclusive": 1, "max_inclusive": 2}, "density": 0.45,
+                         "bushes": {"type": "minecraft:uniform", "min_inclusive": 1, "max_inclusive": 2}}, 3, "#minecraft:is_badlands"),
+    }
+    for name, (config, rarity, biomes) in stands.items():
+        write_json(DATA / f"worldgen/configured_feature/{name}.json", {"type": "antcolonies:grama_patch", "config": dict({"block": f"antcolonies:{name}"}, **config)})
+        write_json(DATA / f"worldgen/placed_feature/{name}.json", {"feature": f"antcolonies:{name}", "placement": [
+            {"type": "minecraft:rarity_filter", "chance": rarity}, {"type": "minecraft:in_square"},
+            {"type": "minecraft:heightmap", "heightmap": "WORLD_SURFACE_WG"}, {"type": "minecraft:biome"}]})
+        write_json(DATA / f"neoforge/biome_modifier/{name}.json", {"type": "neoforge:add_features", "biomes": biomes,
+                                                                    "features": f"antcolonies:{name}", "step": "vegetal_decoration"})
+    print("wrote the game files for", ", ".join(f"{k}_grama" for k in KINDS))
+
+
 if __name__ == "__main__":
     preview()
+    game_files()

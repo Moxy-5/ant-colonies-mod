@@ -5,6 +5,7 @@ import com.antcolonies.AntColoniesMod;
 import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemNameBlockItem;
 import net.neoforged.neoforge.common.DeferredSpawnEggItem;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -29,6 +30,13 @@ public class ModItems {
     public static final DeferredItem<BlockItem> FALLEN_BRANCH = ITEMS.registerSimpleBlockItem(ModBlocks.FALLEN_BRANCH);
     public static final DeferredItem<BlockItem> DEAD_WOOD = ITEMS.registerSimpleBlockItem(ModBlocks.DEAD_WOOD);
     public static final DeferredItem<BlockItem> MUD_CRUST = ITEMS.registerSimpleBlockItem(ModBlocks.MUD_CRUST);
+
+    /** Blue grama seeds: what a ripe blue grama plant sheds and drops when broken; planted, they grow into blue grama. */
+    public static final DeferredItem<ItemNameBlockItem> BLUE_GRAMA_SEEDS = ITEMS.register("blue_grama_seeds",
+            () -> new ItemNameBlockItem(ModBlocks.BLUE_GRAMA.get(), new Item.Properties()));
+    /** Black grama seeds, the same for black grama (plantable on sand and red sand too). */
+    public static final DeferredItem<ItemNameBlockItem> BLACK_GRAMA_SEEDS = ITEMS.register("black_grama_seeds",
+            () -> new ItemNameBlockItem(ModBlocks.BLACK_GRAMA.get(), new Item.Properties()));
 
     /** One piece of ant bread: what the ants carry from the mill to the queen, and what a broken bread pile drops. */
     public static final DeferredItem<Item> ANT_BREAD = ITEMS.registerSimpleItem("ant_bread");

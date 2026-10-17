@@ -10,6 +10,7 @@ import com.antcolonies.registry.ModEntities;
 import com.antcolonies.registry.ModItems;
 
 import com.antcolonies.block.DryGrassBlock;
+import com.antcolonies.block.GramaGrassBlock;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.debug.Perf;
 import com.antcolonies.worldgen.BranchShedding;
@@ -143,6 +144,13 @@ public class ModEvents {
                 .toList();
     }
 
+    /** A grama seeds item that places a grown plant at this stage, named so it can be told apart (for testing). */
+    private static ItemStack grama(ItemStack stack, GramaGrassBlock.Stage stage, String name) {
+        stack.set(DataComponents.BLOCK_STATE, BlockItemStateProperties.EMPTY.with(GramaGrassBlock.STAGE, stage));
+        stack.set(DataComponents.ITEM_NAME, Component.translatable(name));
+        return stack;
+    }
+
     /** A Dry Grass item that places the grass green (it dries out over a few days), named so it can be told apart. */
     private static ItemStack greenGrass(ItemStack stack, String name) {
         stack.set(DataComponents.BLOCK_STATE, BlockItemStateProperties.EMPTY.with(DryGrassBlock.GROWTH, DryGrassBlock.Growth.GREEN));
@@ -170,6 +178,13 @@ public class ModEvents {
             event.accept(greenGrass(ModItems.DRY_GRASS.toStack(), "block.antcolonies.dry_grass.green"));
             event.accept(ModItems.TALL_DRY_GRASS);
             event.accept(greenGrass(ModItems.TALL_DRY_GRASS.toStack(), "block.antcolonies.tall_dry_grass.green"));
+            // Grama: the seeds (planted, they come up young), and grown plants for testing (leaves wait for rain; ripe for the ants).
+            event.accept(ModItems.BLUE_GRAMA_SEEDS);
+            event.accept(grama(ModItems.BLUE_GRAMA_SEEDS.toStack(), GramaGrassBlock.Stage.LEAVES, "block.antcolonies.blue_grama.leaves"));
+            event.accept(grama(ModItems.BLUE_GRAMA_SEEDS.toStack(), GramaGrassBlock.Stage.RIPE, "block.antcolonies.blue_grama.ripe"));
+            event.accept(ModItems.BLACK_GRAMA_SEEDS);
+            event.accept(grama(ModItems.BLACK_GRAMA_SEEDS.toStack(), GramaGrassBlock.Stage.LEAVES, "block.antcolonies.black_grama.leaves"));
+            event.accept(grama(ModItems.BLACK_GRAMA_SEEDS.toStack(), GramaGrassBlock.Stage.RIPE, "block.antcolonies.black_grama.ripe"));
             event.accept(ModItems.FALLEN_BRANCH);
             event.accept(ModItems.DEAD_WOOD);
             event.accept(ModItems.MUD_CRUST);

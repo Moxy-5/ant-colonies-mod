@@ -1,0 +1,13 @@
+{
+  "type": "antcolonies:grama_patch",
+  "config": {
+    "block": "antcolonies:blue_grama",
+    "radius": {
+      "type": "minecraft:uniform",
+      "min_inclusive": 2,
+      "max_inclusive": 4
+    },
+    "density": 0.8,
+    "bushes": 0
+  }
+}

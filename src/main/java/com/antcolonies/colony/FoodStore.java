@@ -422,6 +422,11 @@ public class FoodStore {
      * {@code loud}: with the crumbs of the last bite (a real forager); without, out of sight (the numbers, see {@link FieldLife}).
      */
     private void eatAway(Level level, BlockPos pos, BlockState state, long eatenAt, boolean loud) {
+        BlockState lives = state.getBlock() instanceof EatenInStages eaten ? eaten.afterLastPiece(state) : null;
+        if (lives != null) {
+            level.setBlock(pos, lives, 3); // a plant that lives on (grama grass: its head cut bare dries off)
+            return;
+        }
         BlockState cast = castFor(level, pos, state);
         if (cast == null) {
             if (loud) {
