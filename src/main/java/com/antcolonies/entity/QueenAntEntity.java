@@ -68,10 +68,10 @@ public class QueenAntEntity extends AbstractAntEntity {
         this.goalSelector.addGoal(1, new FindNestSiteGoal(this, () -> siteTarget, this::foundColony));
         // Alone (no workers yet), once her founding chamber is dug she closes the entrance from inside.
         this.goalSelector.addGoal(1, new SealEntranceGoal(this));
-        // She helps dig the shaft and her own room; when the room is finished she goes down and sits in its middle.
+        // While she founds the colony she digs the shaft and her own room; when the room is finished she goes down and sits in its middle.
         this.goalSelector.addGoal(2, new QueenToRoomGoal(this));
         // Otherwise she hardly ever wanders: low chance to start a stroll, and never far. Settled in her room, never.
-        this.goalSelector.addGoal(3, new DigGoal(this, () -> QueenToRoomGoal.findFinishedRoom(this) == null));
+        this.goalSelector.addGoal(3, new DigGoal(this, () -> QueenToRoomGoal.mayDig(this)));
         this.goalSelector.addGoal(4, new AntWanderGoal(this, 0.6, 400, 4, () -> QueenToRoomGoal.findFinishedRoom(this) == null));
         // Resting in her room she naps now and then, longer than the workers (real ant queens: fewer, longer naps).
         this.goalSelector.addGoal(4, new NapGoal(this, true));

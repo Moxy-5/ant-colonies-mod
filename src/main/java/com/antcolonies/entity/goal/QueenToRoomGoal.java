@@ -21,6 +21,17 @@ public class QueenToRoomGoal extends Goal {
         setFlags(EnumSet.of(Flag.MOVE));
     }
 
+    /**
+     * Whether a queen (or a termite king) digs now: only while she founds her colony and her room is not finished yet.
+     * A real Pogonomyrmex queen, and a real Macrotermes royal pair, dig only their founding chamber; once the first
+     * workers are out they never dig again (the full run of 2026-10-16: a king in the user's mound, with workers round
+     * him and no finished room, tried to dig the shaft for ever and never got there, 29 ms a tick of route searches).
+     */
+    public static boolean mayDig(AbstractAntEntity royal) {
+        Colony colony = royal.getColony();
+        return colony != null && colony.isFounding() && findFinishedRoom(royal) == null;
+    }
+
     /** The middle of her colony's finished room, or null if there is none yet. */
     @Nullable
     public static BlockPos findFinishedRoom(AbstractAntEntity queen) {
