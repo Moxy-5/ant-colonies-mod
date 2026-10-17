@@ -13,6 +13,9 @@ Run from the project folder:  python tools/model_viewer.py [out.html]
 
 Second scene, the fungus comb as it ages (2026-10-15, comb_age_art.py; its own page template, comb_viewer.template.html):
 python tools/model_viewer.py comb [out.html]   (default references/comb_viewer.html)
+
+Third scene, the grama grasses for the harvester ants (2026-10-16, grama_art.py; its own template, grama_viewer.template.html):
+python tools/model_viewer.py grama [out.html]   (default references/grama_viewer.html)
 """
 import base64
 import json
@@ -139,7 +142,24 @@ def comb_page(out):
     print("wrote", out)
 
 
+def grama_page(out):
+    """The grama looks: for each kind (blue, black), look (A, B) and stage, two versions; and the ground round them."""
+    import grama_art as grama
+    data = {"grass": uri(png(grama.grass_top())), "redSand": uri(png(grama.red_sand())),
+            "shortGrass": uri(png(grama.short_grass())), "deadBush": uri(png(grama.dead_bush()))}
+    for kind in grama.KINDS:
+        data[kind] = {look: {stage: [uri(grama.png(grama.texture(kind, look, stage, v))) for v in range(grama.VARIANTS)]
+                             for stage in grama.STAGES} for look in grama.LOOKS}
+    template = (Path(__file__).resolve().parent / "grama_viewer.template.html").read_text(encoding="utf-8")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")
+    print("wrote", out)
+
+
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "grama":
+        grama_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/grama_viewer.html")
+        return
     if len(sys.argv) > 1 and sys.argv[1] == "comb":
         comb_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/comb_viewer.html")
         return
