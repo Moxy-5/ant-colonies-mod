@@ -276,7 +276,11 @@ public class Door {
     /** Once a second (here only): trips that are over, old touches gone, the real foragers counted. */
     void tick(ServerLevel level) {
         SpeciesProfile.DoorNumbers numbers = numbers();
-        if (numbers == null || !isOn(level)) {
+        if (numbers == null) {
+            return;
+        }
+        if (!isOn(level)) {
+            countForagers(level, numbers); // (a small colony's searchers spread out every way, door or no door: ScoutGoal)
             return;
         }
         long now = level.getGameTime();
@@ -326,6 +330,11 @@ public class Door {
             }
             return done;
         });
+        countForagers(level, numbers);
+    }
+
+    /** The real foragers counted, and whether the colony is small (under {@code small_colony_foragers}). */
+    private void countForagers(ServerLevel level, SpeciesProfile.DoorNumbers numbers) {
         int count = 0;
         BlockPos center = colony.getCenter();
         int radius = colony.searchReach();

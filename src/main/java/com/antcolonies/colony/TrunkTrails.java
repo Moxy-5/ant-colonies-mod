@@ -131,6 +131,9 @@ public class TrunkTrails {
     /** Bare ground of faded trails growing back. Saved. */
     private final List<Regrow> regrowing = new ArrayList<>();
     private long nextCheck;
+    /** Game tests only: the trails stop at their test's arena's edge (arenas are 45 blocks apart, trails reach 96). */
+    @Nullable
+    private AABB testFence;
 
     TrunkTrails(Colony colony) {
         this.colony = colony;
@@ -317,6 +320,9 @@ public class TrunkTrails {
             return null;
         }
         int column = leaveAt(trail, plant);
+        while (column > 0 && !insideFence(trail, column)) {
+            column--; // (a game test's trail stops at its arena's edge)
+        }
         for (int i = 0; i <= column; i++) {
             trail.wear[i] = Math.min(trail.wear[i] + 1, 1_000_000);
         }
@@ -671,6 +677,20 @@ public class TrunkTrails {
     /** How many columns of faded trails are waiting to grow back (for tests). */
     public int regrowing() {
         return regrowing.size();
+    }
+
+    private boolean insideFence(Trail trail, int column) {
+        if (testFence == null) {
+            return true;
+        }
+        int x = colony.getCenter().getX() + trail.columns[column][0];
+        int z = colony.getCenter().getZ() + trail.columns[column][1];
+        return testFence.minX <= x && x < testFence.maxX && testFence.minZ <= z && z < testFence.maxZ;
+    }
+
+    /** Game tests only: this colony's trails stop at the edge of this area (its test's arena), or nowhere (null). */
+    public void setTestFence(@Nullable AABB area) {
+        testFence = area;
     }
 
     /** Every faded trail's bare ground grows back on the next look (for tests). */

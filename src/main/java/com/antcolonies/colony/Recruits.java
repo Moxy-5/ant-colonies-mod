@@ -426,6 +426,13 @@ public class Recruits {
         return dx * dx + dz * dz <= reach * reach && Math.abs(a.getY() - b.getY()) <= 4;
     }
 
+    /** For the tests: every scent line was last laid this many ticks earlier. */
+    public void ageForTests(long ticks) {
+        for (Line line : lines) {
+            line.laidAt -= ticks;
+        }
+    }
+
     /** The scent lines the colony has now (for tests). */
     public List<Line> lines() {
         return lines;

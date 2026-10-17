@@ -1,13 +1,20 @@
 package com.antcolonies.gametest;
 
+import static com.antcolonies.gametest.TermiteMoundTests.MIDDLE;
 import static com.antcolonies.gametest.TermiteMoundTests.SURFACE;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 
 import com.antcolonies.AntColoniesMod;
+import com.antcolonies.block.GramaGrassBlock;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.TrunkTrails;
 import com.antcolonies.entity.WorkerAntEntity;
+import com.antcolonies.registry.ModBlocks;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -223,6 +230,153 @@ public class TrailTests {
             }
             helper.assertTrue(colony.trunkTrails().regrowing() == 0, "nothing should be left to grow back: " + colony.trunkTrails().regrowing());
             helper.succeed();
+        });
+    }
+
+    /** The far meadow's near and far edge (blocks east of the nest's middle), and how far it reaches north and south. */
+    private static final int MEADOW_FROM = 34;
+    private static final int MEADOW_TO = 40;
+    private static final int MEADOW_SIDE = 2;
+    /** Ticks for a finder that cut at the meadow just before it went to get home and call (Recruits: 3,600 to lay, 200 to call). */
+    private static final int HOME_FROM_THE_MEADOW = 4000;
+    /** The old trail east reaches this far out when the test begins. */
+    private static final int OLD_TIP = 26;
+
+    /**
+     * Long trails step 4 (2026-10-17), the far meadow: a finished harvester nest with 30 real workers, an old trunk
+     * trail east whose food is eaten (its tip 26 blocks out), and a ripe blue grama meadow 34 to 40 blocks out, past
+     * the tip, on a moving test clock. Real <i>Pogonomyrmex</i> foragers walk out a trail and fan out past its end; a
+     * find out there pulls the trail out to it, and a rich patch is recruited to. Checks: a searcher fanning out past
+     * the tip finds the meadow; it lays a scent line home to it and calls nestmates out, and more than one of those
+     * called out takes food there; the trail's tip moves out to the meadow and the colony's range with it. Then the
+     * meadow is gone (cut bare): once the finders on their way home from it are in, the scent line fades within the
+     * day and, unused, the tip pulls back from the meadow within a week of game days (aged a day at a time). The trails stop at the arena's edge ({@code TestIsolation}).
+     */
+    @GameTest(template = "arena", timeoutTicks = 72000, skyAccess = true, batch = "far_meadow")
+    public static void aFarMeadowPastTheTrailsTipIsFoundRecruitedToAndPullsTheTrailOut(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        PopulationTests.startAntColony(helper);
+        // Ground east of the nest out past the meadow (the arena's own ground is only 25 blocks across).
+        for (int x = 25; x <= MIDDLE + MEADOW_TO + 6; x++) {
+            for (int z = 0; z < 25; z++) {
+                for (int y = SURFACE - 4; y < SURFACE - 1; y++) {
+                    helper.setBlock(x, y, z, Blocks.DIRT);
+                }
+                helper.setBlock(x, SURFACE - 1, z, Blocks.GRASS_BLOCK);
+            }
+        }
+        List<BlockPos> meadow = new ArrayList<>();
+        for (int x = MIDDLE + MEADOW_FROM; x <= MIDDLE + MEADOW_TO; x++) {
+            for (int z = MIDDLE - MEADOW_SIDE; z <= MIDDLE + MEADOW_SIDE; z++) {
+                meadow.add(new BlockPos(x, SURFACE, z));
+            }
+        }
+        long[] phase = {0, -1, -1, -1, -1}; // 0 waiting, 1 running, 2 meadow gone; then the ticks: found, recruited, tip out, gone
+        Set<UUID> called = new HashSet<>();
+        Set<UUID> calledAtTheMeadow = new HashSet<>();
+        int[] days = {0};
+        helper.runAfterDelay(15, () -> {
+            Colony colony = PopulationTests.antColony(helper);
+            for (BlockPos grama : meadow) {
+                helper.setBlock(grama, ModBlocks.BLUE_GRAMA.get().defaultBlockState().setValue(GramaGrassBlock.STAGE, GramaGrassBlock.Stage.RIPE));
+            }
+            long now = level.getGameTime();
+            colony.population().addNewMembers(WorkerAntEntity.CASTE, now - 250000, 24); // old: foragers
+            colony.population().addNewMembers(WorkerAntEntity.CASTE, now - 100000, 6); // middle-aged: builders
+            // The old trail east: its food, 26 blocks out, is eaten (12 trips laid and held it).
+            BlockPos center = colony.getCenter();
+            BlockPos oldFood = new BlockPos(center.getX() + OLD_TIP, center.getY(), center.getZ());
+            for (int i = 0; i < 12; i++) {
+                colony.trunkTrails().setOut(level, oldFood);
+            }
+            helper.assertTrue(colony.trunkTrails().trails().size() == 1 && Math.abs(colony.trunkTrails().longestTip() - OLD_TIP) <= 1,
+                    "the old trail east should reach " + OLD_TIP + " blocks: " + colony.trunkTrails().describe(level));
+            TestClock.moving(helper, 6.5);
+            phase[0] = 1;
+        });
+        helper.onEachTick(() -> {
+            Colony colony = PopulationTests.antColony(helper);
+            if (colony == null || phase[0] == 0) {
+                return;
+            }
+            long tick = helper.getTick();
+            BlockPos center = colony.getCenter();
+            TrunkTrails trails = colony.trunkTrails();
+            if (phase[0] == 1) {
+                if (phase[1] < 0) {
+                    for (BlockPos grama : meadow) {
+                        if (colony.food().getPiecesCut(helper.absolutePos(grama)) > 0) {
+                            phase[1] = tick;
+                            AntColoniesMod.LOGGER.info("[far-meadow] tick {}: a searcher found the meadow at {} | {}", tick, grama.toShortString(), trails.describe(level));
+                            break;
+                        }
+                    }
+                }
+                for (var line : colony.recruits().lines()) {
+                    int out = line.patch().getX() - center.getX();
+                    helper.assertTrue(out >= MEADOW_FROM - 5 && Math.abs(line.patch().getZ() - center.getZ()) <= MEADOW_SIDE + 5,
+                            "a scent line was laid to " + line.patch().subtract(center).toShortString() + ", not the far meadow");
+                }
+                for (WorkerAntEntity ant : TestIsolation.insectsOf(level, colony, WorkerAntEntity.class)) {
+                    if (colony.recruits().isRecruited(ant.getUUID())) {
+                        called.add(ant.getUUID());
+                    }
+                    BlockPos spot = colony.spots().spotOf(ant.getUUID());
+                    if (called.contains(ant.getUUID()) && ant.isCarryingSeed() && spot != null && spot.getX() - center.getX() >= MEADOW_FROM - 5
+                            && calledAtTheMeadow.add(ant.getUUID())) {
+                        AntColoniesMod.LOGGER.info("[far-meadow] tick {}: a nestmate called out took food at the meadow ({} so far){}", tick,
+                                calledAtTheMeadow.size(), colony.recruits().describe(level));
+                    }
+                }
+                if (phase[2] < 0 && !colony.recruits().lines().isEmpty() && calledAtTheMeadow.size() >= 2) {
+                    phase[2] = tick;
+                }
+                if (phase[3] < 0 && trails.longestTip() >= MEADOW_FROM - 1) {
+                    phase[3] = tick;
+                    AntColoniesMod.LOGGER.info("[far-meadow] tick {}: the trail's tip is out at the meadow | {}", tick, trails.describe(level));
+                }
+                if (tick % 2000 == 0) {
+                    StringBuilder out = new StringBuilder();
+                    for (WorkerAntEntity ant : TestIsolation.insectsOf(level, colony, WorkerAntEntity.class)) {
+                        if (!colony.nest().isInside(level, ant.blockPosition())) {
+                            out.append(' ').append(ant.getBlockX() - center.getX()).append(',').append(ant.getBlockZ() - center.getZ());
+                        }
+                    }
+                    AntColoniesMod.LOGGER.info("[far-meadow] tick {}: {} | range {}{} | {} | small {} | out:{}", tick, trails.describe(level), colony.foragingRadius(),
+                            colony.recruits().describe(level), colony.spots().describe(), colony.door().isSmallColony(level), out);
+                }
+                if (phase[1] >= 0 && phase[2] >= 0 && phase[3] >= 0) {
+                    helper.assertTrue(colony.foragingRadius() >= MEADOW_FROM - 1, "the range should be the trail's tip: " + colony.foragingRadius());
+                    for (BlockPos grama : meadow) {
+                        helper.setBlock(grama, Blocks.AIR); // cut bare and gone
+                    }
+                    phase[4] = tick;
+                    phase[0] = 2;
+                    AntColoniesMod.LOGGER.info("[far-meadow] tick {}: the meadow is gone | {}{}", tick, trails.describe(level), colony.recruits().describe(level));
+                }
+                return;
+            }
+            // The meadow gone: first the finders still on their way home from it lay their lines and call (as real ones
+            // would: they found it rich), then a day of game time passes every 40 ticks (aged) and the colony looks at
+            // its trails.
+            if (tick - phase[4] < HOME_FROM_THE_MEADOW || (tick - phase[4]) % 40 != 0) {
+                return;
+            }
+            if (days[0] >= 1) {
+                helper.assertTrue(colony.recruits().lines().isEmpty(), "a day after the meadow is gone its scent line should have faded"
+                        + colony.recruits().describe(level));
+            }
+            int tip = trails.longestTip();
+            if (days[0] >= 1 && tip < MEADOW_FROM - 4) {
+                AntColoniesMod.LOGGER.info("[far-meadow] {} days after the meadow was gone the tip pulled back to {} | {}", days[0], tip, trails.describe(level));
+                helper.succeed();
+                return;
+            }
+            helper.assertTrue(days[0] < 7, "a week after the meadow was gone the trail's tip should have pulled back: " + trails.describe(level));
+            days[0]++;
+            trails.ageForTests(24000);
+            colony.recruits().ageForTests(24000);
+            trails.checkSoonForTests();
         });
     }
 }

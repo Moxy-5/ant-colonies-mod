@@ -72,6 +72,7 @@ Harvester ants first; termites underground right after, as a step of their own (
 - Scattered seeds far out are still picked up by a searcher who comes across one, but never recruited to.
 
 ## Step 4: making 96 blocks work (the parts that assume a 24-block circle)
+**BUILT 2026-10-17 overnight** (in this session: the app could not start the linked session while the user slept). Most of it had come with step 1 (the range is the longest tip, the plant scan along the trails); added: the test fence, the far-meadow test, and a fix (`docs/BUGS.md` 41). What stays short on purpose is in `docs/HISTORY.md`.
 - `Colony.foragingRadius()` becomes **the longest trail's tip** (at least the young colony's 10 to 12). Every user
   of it follows: the alarm reach, the food map, the patrol's reach, the door, the population's area, the trail wear.
 - **Plant scanning:** today it scans every column in a square out to the reach (at 104 blocks that is over 40,000
