@@ -36,10 +36,11 @@
     "radius": 12,
     "items": "antcolonies:seeds",
     "plants": [
-      { "block": "minecraft:short_grass", "pieces": 10 },
-      { "_note": "Grama grass (the user's decisions, 2026-10-16): only ripe heads; a head cut bare dries off, the plant lives on. 16 seeds a blue grama plant, 12 a black grama bunch: my picks, to confirm.",
-        "block": "antcolonies:blue_grama", "pieces": 16, "state": { "stage": "ripe" } },
-      { "block": "antcolonies:black_grama", "pieces": 12, "state": { "stage": "ripe" } }
+      { "_note": "Short grass: one take and the tuft is gone, growing back later (the user's decision, 2026-10-17: the plains are full of it, so it must not be rich food).",
+        "block": "minecraft:short_grass", "pieces": 1 },
+      { "_note": "Grama grass (the user's decisions, 2026-10-16): only ripe heads; a head cut bare dries off, the plant lives on. 10 takes a plant, blue and black alike (the user's decision, 2026-10-17).",
+        "block": "antcolonies:blue_grama", "pieces": 10, "state": { "stage": "ripe" } },
+      { "block": "antcolonies:black_grama", "pieces": 10, "state": { "stage": "ripe" } }
     ],
     "piece": "minecraft:wheat_seeds",
     "pile": "antcolonies:seed_pile",
@@ -57,12 +58,12 @@
       "drift_blocks": 3,
       "stretch": 8,
       "recruit": {
-        "_note": "Recruiting to rich patches (long trails step 2; real P. barbatus and P. rugosus: a forager that finds a dense patch drags its sting tip home, laying an invisible scent line, and touches nestmates, which follow it out single file). A find is a rich patch when the pieces left on these plants within patch_radius blocks of it, plus the seeds lying there, are at least rich_pieces at at_blocks blocks or nearer, growing with the distance to the power distance_power (value against distance: 24 at 20 blocks, about 48 at 60, 64 at 96). The finder calls out one nestmate for every pieces_per_recruit pieces in the patch, at most most_recruits (the user's decision: by the size of the patch). The line halves in strength every half_life_ticks unless a recruit lays it again. Short grass is not a patch (only grama, which grows in stands). Numbers are my picks, to confirm.",
+        "_note": "Recruiting to rich patches (long trails step 2; real P. barbatus and P. rugosus: a forager that finds a dense patch drags its sting tip home, laying an invisible scent line, and touches nestmates, which follow it out single file). A find is a rich patch when the pieces left on these plants within patch_radius blocks of it, plus the seeds lying there, are at least rich_pieces at at_blocks blocks or nearer, growing with the distance to the power distance_power (value against distance: 15 at 20 blocks, about 30 at 60, 40 at 96; with 10 pieces a grama plant that is 1.5 plants near home and 4 at 96 blocks, one recruit per plant). The finder calls out one nestmate for every pieces_per_recruit pieces in the patch, at most most_recruits (the user's decision: by the size of the patch). The line halves in strength every half_life_ticks unless a recruit lays it again. Short grass is not a patch (only grama, which grows in stands). Numbers are my picks, to confirm.",
         "patch_radius": 4,
-        "rich_pieces": 24,
+        "rich_pieces": 15,
         "at_blocks": 20,
         "distance_power": 0.62,
-        "pieces_per_recruit": 16,
+        "pieces_per_recruit": 10,
         "most_recruits": 8,
         "half_life_ticks": 3600,
         "plants": [ "antcolonies:blue_grama", "antcolonies:black_grama" ]

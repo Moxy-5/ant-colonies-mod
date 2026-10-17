@@ -137,7 +137,8 @@ class SpeciesProfileTest {
         for (String grama : java.util.List.of("antcolonies:blue_grama", "antcolonies:black_grama")) {
             SpeciesProfile.PlantFood plant = plants.stream().filter(p -> p.block().equals(grama)).findFirst().orElseThrow();
             assertEquals(java.util.Map.of("stage", "ripe"), plant.state(), grama + " is cut before it is ripe");
-            assertTrue(plant.pieces() > 10, grama + " is richer than a tuft of short grass");
+            assertTrue(plant.pieces() > plants.get(0).pieces(), grama + " is richer than a tuft of short grass");
+            assertEquals(10, plant.pieces(), grama + " lasts 10 takes (the user's decision, 2026-10-17)");
         }
         for (SpeciesProfile.PlantFood plant : read("macrotermes").food().plants()) {
             assertTrue(!plant.block().contains("grama"), "termites eat green grama");
@@ -166,16 +167,16 @@ class SpeciesProfileTest {
     void aRichPatchIsWorthAWalkThatGrowsWithItsSize() throws Exception {
         SpeciesProfile profile = read("red_harvester_ant");
         SpeciesProfile.RecruitNumbers recruit = profile.food().search().orElseThrow().recruit().orElseThrow();
-        // Value against distance (long trails step 3): 24 pieces near home, about 48 at 60 blocks, about 64 at 96.
-        assertEquals(24, recruit.needed(5), 1e-9, "near the nest");
-        assertEquals(24, recruit.needed(20), 1e-9);
-        assertEquals(48, recruit.needed(60), 1.5);
-        assertEquals(64, recruit.needed(96), 1.5);
+        // Value against distance (long trails step 3): 15 pieces near home (1.5 grama plants), about 30 at 60 blocks, about 40 at 96.
+        assertEquals(15, recruit.needed(5), 1e-9, "near the nest");
+        assertEquals(15, recruit.needed(20), 1e-9);
+        assertEquals(30, recruit.needed(60), 1.0);
+        assertEquals(40, recruit.needed(96), 1.0);
         assertTrue(recruit.needed(40) > recruit.needed(30), "farther needs more");
-        // How many are called out goes by the size of the patch (the user's decision): 1 per 16 pieces, 1 to 8.
-        assertEquals(1, recruit.recruitsFor(24));
-        assertEquals(2, recruit.recruitsFor(32));
-        assertEquals(4, recruit.recruitsFor(64), "four ripe blue grama plants");
+        // How many are called out goes by the size of the patch (the user's decision): 1 per 10 pieces (a grama plant), 1 to 8.
+        assertEquals(1, recruit.recruitsFor(15));
+        assertEquals(2, recruit.recruitsFor(20));
+        assertEquals(4, recruit.recruitsFor(40), "four ripe blue grama plants");
         assertEquals(8, recruit.recruitsFor(500), "never more than 8 a call");
         // Grama counts, short grass does not (a tuft is not a patch).
         SpeciesProfile.PlantFood grass = profile.food().plants().stream().filter(p -> p.block().equals("minecraft:short_grass")).findFirst().orElseThrow();
