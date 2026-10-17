@@ -85,6 +85,11 @@ public class ScoutGoal extends Goal {
     /** How far out (blocks from the nest's middle) the search centre was when it set out, and is now (it drifts). */
     private double from;
     private double out;
+    /**
+     * How far out (blocks from the nest's middle) this search's way reaches: the tip of the trail it went out by, or the
+     * colony's range; its drift goes at most the stretch past it (long trails: a trail grows from its tip).
+     */
+    private int reachOfWay;
     /** Whether it is searching round its own spot, not yet found empty this trip. */
     private boolean atOwnSpot;
     private boolean arrived;
@@ -169,6 +174,7 @@ public class ScoutGoal extends Goal {
             angle = Math.atan2(own.getZ() - middle.getZ(), own.getX() - middle.getX());
             from = Math.max(LEAST_OUT, flat(own));
             out = from;
+            reachOfWay = Math.max(colony.foragingRadius(), (int) Math.ceil(from));
             return own;
         }
         atOwnSpot = false;
@@ -189,14 +195,17 @@ public class ScoutGoal extends Goal {
             if (trail != null) {
                 angle = trail.angle() + (ant.getRandom().nextDouble() - 0.5) * 0.5;
                 base = trails.reachBlocks(trail) - ant.getRandom().nextInt(4);
+                // Out at the trail's tip, fanning out past it (not out to the colony's longest trail).
+                reachOfWay = Math.max(colony.profile().food().radius(), trails.reachBlocks(trail));
             } else {
+                reachOfWay = range;
                 angle = failed == null ? ant.getRandom().nextDouble() * Mth.TWO_PI
                         : failed.angle() + ANOTHER_WAY + ant.getRandom().nextDouble() * (Mth.TWO_PI - 2 * ANOTHER_WAY);
                 // Near the nest, then outward as it drifts (the user's decision of 2026-10-16: it used to start anywhere in
                 // the inner half of the range, and seeds 6 blocks from the nest lay unfound for a game day).
                 base = LEAST_OUT + 2 + ant.getRandom().nextInt(NEAR_START + 1);
             }
-            from = Math.min(Math.max(LEAST_OUT + 2, base), range + search.stretch());
+            from = Math.min(Math.max(LEAST_OUT + 2, base), reachOfWay + search.stretch());
             out = from;
             BlockPos cell = groundCell(level, colony, angle, from, 2);
             if (cell != null && colony.patrol().isOpen(level, cell)) {
@@ -385,7 +394,7 @@ public class ScoutGoal extends Goal {
             colony.spots().emptyAtSpot(ant.getUUID()); // nothing at its spot this time
             atOwnSpot = false;
         }
-        double drifted = search.drifted(from, searched, colony.foragingRadius());
+        double drifted = search.drifted(from, searched, reachOfWay);
         if (drifted > out + 0.5) {
             BlockPos moved = groundCell(level, colony, angle, drifted, 1);
             out = drifted;

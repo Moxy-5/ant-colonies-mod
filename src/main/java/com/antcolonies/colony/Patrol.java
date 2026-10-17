@@ -520,7 +520,7 @@ public class Patrol {
     /** The real workers of the colony that may patrol now: grown up, holding nothing, by the nest; builders first. */
     private List<AbstractAntEntity> candidates(ServerLevel level) {
         BlockPos center = colony.getCenter();
-        int radius = colony.profile().food().radius();
+        int radius = Math.max(24, colony.profile().food().radius()); // (by the nest: as before a young colony's reach became 12)
         List<AbstractAntEntity> ants = new ArrayList<>(level.getEntitiesOfClass(AbstractAntEntity.class,
                 new AABB(center).inflate(radius, 16, radius), ant -> ant.isAlive() && ant.isColonyWorker()
                         && colony.getId().equals(ant.getColonyId()) && !ant.hasFullMandibles() && !real.containsKey(ant.getUUID())

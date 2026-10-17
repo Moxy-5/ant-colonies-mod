@@ -28,6 +28,8 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 public class TrailTests {
     /** How far out (blocks) the test's food lies, east and south of the nest. */
     private static final int FOOD_OUT = 15;
+    /** A trip this far out (blocks) moves the east trail's tip out (long trails). */
+    private static final int FAR_OUT = 30;
 
     /**
      * Step 4a, the harvester ant's trunk trails, with the trips sent straight to the brain (as its numbers make them).
@@ -97,6 +99,14 @@ public class TrailTests {
             colony.population().addNewMembers(WorkerAntEntity.CASTE, level.getGameTime(), 1500);
             trails.setOut(level, southFood);
             helper.assertTrue(trails.trails().size() == 2, "a big colony should lay a trail south: " + trails.describe(level));
+            // Long trails (2026-10-17): a trip to food past the east trail's tip moves the tip out to it, and the colony's
+            // range is its longest trail's tip (a young harvester colony reaches 12 blocks).
+            helper.assertTrue(Math.abs(colony.foragingRadius() - FOOD_OUT) <= 1, "the range should be the trails' tips, " + FOOD_OUT + " blocks out: "
+                    + colony.foragingRadius() + ", " + trails.describe(level));
+            trails.setOut(level, new BlockPos(center[0].getX() + FAR_OUT, groundY + 1, center[0].getZ()));
+            TrunkTrails.Trail east = trails.trails().get(0);
+            helper.assertTrue(Math.abs(trails.reachBlocks(east) - FAR_OUT) <= 1 && colony.foragingRadius() >= FAR_OUT - 1,
+                    "a trip " + FAR_OUT + " blocks out should move the east tip out there: " + trails.describe(level) + ", range " + colony.foragingRadius());
             for (int i = 0; i < 60; i++) {
                 trails.setOut(level, eastFood);
                 trails.setOut(level, southFood);
@@ -179,18 +189,31 @@ public class TrailTests {
                     bare[0] += a.isBare(c) ? 1 : 0;
                 }
             }
+            // Five days unused: their traffic no longer holds them out to the food, so their tips pull back.
+            colony.trunkTrails().ageForTests(5 * 24000L);
+        });
+        helper.runAfterDelay(160, () -> {
+            Colony colony = PopulationTests.antColony(helper);
+            TrunkTrails trails = colony.trunkTrails();
+            helper.assertTrue(trails.trails().size() == 2, "five days unused the trails should still be there: " + trails.describe(level));
+            for (TrunkTrails.Trail trail : trails.trails()) {
+                helper.assertTrue(trails.reachBlocks(trail) >= 10 && trails.reachBlocks(trail) <= 13,
+                        "a weak trail's tip should pull back to about 12 blocks: " + trails.describe(level));
+            }
+            helper.assertTrue(trails.regrowing() > 0, "the bare ground past the tips should be growing back: " + trails.describe(level));
+            helper.assertTrue(colony.foragingRadius() == colony.profile().food().radius(), "the range should shrink with the trails: " + colony.foragingRadius());
             // A week unused: they fade.
             colony.trunkTrails().ageForTests(7 * 24000L);
             colony.trunkTrails().checkSoonForTests();
         });
-        helper.runAfterDelay(175, () -> {
+        helper.runAfterDelay(185, () -> {
             Colony colony = PopulationTests.antColony(helper);
             helper.assertTrue(colony.trunkTrails().trails().isEmpty(), "unused for a week the trails should fade: " + colony.trunkTrails().describe(level));
             helper.assertTrue(colony.trunkTrails().regrowing() == bare[0] && bare[0] >= 2 * (FOOD_OUT - 3),
                     "their " + bare[0] + " bare blocks should be growing back: " + colony.trunkTrails().regrowing());
             colony.trunkTrails().growBackSoonForTests();
         });
-        helper.runAfterDelay(215, () -> {
+        helper.runAfterDelay(225, () -> {
             Colony colony = PopulationTests.antColony(helper);
             int groundY = helper.absolutePos(new BlockPos(0, SURFACE - 1, 0)).getY();
             for (int t = 4; t <= FOOD_OUT; t++) {

@@ -144,6 +144,24 @@ class SpeciesProfileTest {
         }
     }
 
+    /** Long trails (the user's decisions of 2026-10-17): a trail reaches as far as its traffic holds, 96 blocks at most. */
+    @Test
+    void aTrailReachesAsFarAsItsTrafficHolds() throws Exception {
+        SpeciesProfile profile = read("red_harvester_ant");
+        SpeciesProfile.Trails trails = profile.food().trails();
+        SpeciesProfile.TrunkNumbers trunk = trails.trunk().orElseThrow();
+        assertEquals(12, profile.food().radius(), "a young colony reaches about 12 blocks");
+        assertEquals(96, trunk.mostLength());
+        assertEquals(trunk.start(), trunk.holds(0, trails.halfLifeTicks()), 1e-9, "an unused trail holds nothing past its start");
+        // A trail walked r times a day settles near a strength of r / ln 2 (half-life a day): it holds 6 blocks a trip a day.
+        for (int tripsADay : new int[] {1, 5, 10}) {
+            double strength = tripsADay / Math.log(2) * trails.halfLifeTicks() / 24000.0;
+            assertEquals(trunk.start() + 6.0 * tripsADay, trunk.holds(strength, trails.halfLifeTicks()), 1e-6, tripsADay + " trips a day");
+        }
+        assertTrue(trunk.holds(trails.mostStrength(), trails.halfLifeTicks()) == 96, "a busy trail stops at 96 blocks");
+        assertTrue(trunk.holds(5, trails.halfLifeTicks()) < 30, "a weak trail (a few trips a day) stays short");
+    }
+
     @Test
     void foragersGoOutWhenTheirProfileSays() {
         SpeciesProfile.FoodNumbers ant = SpeciesProfile.RED_HARVESTER_ANT.food();

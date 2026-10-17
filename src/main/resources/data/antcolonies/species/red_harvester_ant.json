@@ -32,7 +32,8 @@
     "larva_starve_ticks": 48000
   },
   "food": {
-    "radius": 24,
+    "_radius_note": "radius: a young colony's reach (blocks from the nest's middle; real young Pogonomyrmex colonies forage only a few metres out). Long trails (the user's decisions of 2026-10-17): past that the colony reaches as far as its trunk trails go (trails.trunk.most_length).",
+    "radius": 12,
     "items": "antcolonies:seeds",
     "plants": [
       { "block": "minecraft:short_grass", "pieces": 10 },
@@ -79,7 +80,10 @@
         "new_trail_trips": 8,
         "bare_after_trips": 60,
         "bare_ground": "minecraft:coarse_dirt",
-        "regrow_ticks": 48000
+        "regrow_ticks": 48000,
+        "_long_note": "Long trails (the user's decisions of 2026-10-17, docs/plans/long-trails.md): a trail's tip is as far as its trips go, at most most_length blocks out, and only as far as its traffic holds: blocks_per_daily_trip blocks for each trip a day (my pick, to confirm); past that its tip pulls back and its outer bare ground grows back.",
+        "most_length": 96,
+        "blocks_per_daily_trip": 6.0
       }
     },
     "door": {

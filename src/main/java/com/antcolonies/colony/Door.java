@@ -318,7 +318,7 @@ public class Door {
         });
         int count = 0;
         BlockPos center = colony.getCenter();
-        int radius = colony.profile().food().radius();
+        int radius = colony.searchReach();
         for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, new AABB(center).inflate(radius, 16, radius),
                 ant -> ant.isAlive() && ant.isColonyWorker() && colony.getId().equals(ant.getColonyId()))) {
             if (colony.roleOf(level, ant) == ColonyRole.FORAGER) {

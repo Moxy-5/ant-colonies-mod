@@ -504,9 +504,13 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * way within a day (while the colony may have more). A block of the trail walked by {@code bareAfterTrips} trips
      * wears bare: the plants on it are cut and the ground turns to {@code bareGround}. A faded trail's bare ground
      * grows back to grass about {@code regrowTicks} later (a bit sooner or later for each block).
+     * <p>Long trails (the user's decisions of 2026-10-17, {@code docs/plans/long-trails.md}): a trail reaches out as far as
+     * its trips go (its tip), at most {@code mostLength} blocks from the nest's middle, and only as far as its traffic
+     * holds: {@code blocksPerDailyTrip} blocks for each trip a day it gets (real trails live by their traffic; a long one
+     * needs more trips, so a small colony keeps short trails).
      */
     public record TrunkNumbers(int start, int most, int fullAtWorkers, int spreadDegrees, int newTrailTrips, int bareAfterTrips,
-            String bareGround, int regrowTicks) {
+            String bareGround, int regrowTicks, int mostLength, double blocksPerDailyTrip) {
         public static final Codec<TrunkNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.optionalFieldOf("start", 4).forGetter(TrunkNumbers::start),
                 Codec.INT.optionalFieldOf("most", 8).forGetter(TrunkNumbers::most),
@@ -515,8 +519,21 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 Codec.INT.optionalFieldOf("new_trail_trips", 8).forGetter(TrunkNumbers::newTrailTrips),
                 Codec.INT.optionalFieldOf("bare_after_trips", 60).forGetter(TrunkNumbers::bareAfterTrips),
                 Codec.STRING.optionalFieldOf("bare_ground", "minecraft:coarse_dirt").forGetter(TrunkNumbers::bareGround),
-                Codec.INT.optionalFieldOf("regrow_ticks", 48000).forGetter(TrunkNumbers::regrowTicks)
+                Codec.INT.optionalFieldOf("regrow_ticks", 48000).forGetter(TrunkNumbers::regrowTicks),
+                Codec.INT.optionalFieldOf("most_length", 96).forGetter(TrunkNumbers::mostLength),
+                Codec.DOUBLE.optionalFieldOf("blocks_per_daily_trip", 6.0).forGetter(TrunkNumbers::blocksPerDailyTrip)
         ).apply(i, TrunkNumbers::new));
+
+        /**
+         * How far out (blocks from the nest's middle) a trail of this {@code strength} can reach: {@code blocksPerDailyTrip}
+         * for each trip a day it gets past its start, at most {@code mostLength}. A trail's strength halves every
+         * {@code halfLifeTicks} unused and each trip adds 1, so a trail walked {@code r} times a day sits near a strength
+         * of {@code r * halfLife / (day * ln 2)}: its trips a day are its strength times {@code ln 2 * day / halfLife}.
+         */
+        public double holds(double strength, int halfLifeTicks) {
+            double tripsADay = Math.max(0, strength) * Math.log(2) * 24000.0 / Math.max(1, halfLifeTicks);
+            return Math.min(mostLength, start + blocksPerDailyTrip * tripsADay);
+        }
 
         /** How many trunk trails a colony of this many workers keeps: 1 while young, up to {@code most}. */
         public int trailsFor(int workers) {

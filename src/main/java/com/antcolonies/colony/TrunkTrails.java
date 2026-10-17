@@ -34,7 +34,11 @@ import net.minecraft.world.phys.Vec3;
  * the traffic and the ants' clipping keep the path bare.
  *
  * <p><b>A trail</b> is a direction from the nest's middle, saved as an angle, and the blocks (columns) along that line
- * from the hill's edge out to the food radius. Each column counts the trips that walked over it (its <b>wear</b>); a
+ * from the hill's edge out to the longest a trail may get ({@code most_length}). Its <b>tip</b> is as far out as its trips
+ * have gone (long trails, the user's decisions of 2026-10-17, {@code docs/plans/long-trails.md}): a trip to food past
+ * the tip moves it out, and the tip pulls back where the traffic no longer holds it ({@link SpeciesProfile.TrunkNumbers#holds}:
+ * a long trail needs more trips a day), the outer part's wear forgotten and its bare ground growing back. The colony's
+ * reach is its longest trail's tip ({@link Colony#foragingRadius}). Each column counts the trips that walked over it (its <b>wear</b>); a
  * column walked by enough trips wears bare (the plants on it are cut, the ground turns to coarse dirt). Each trip also
  * makes the trail stronger; unused, its strength fades ({@link SpeciesProfile.Trails}), and a faded trail is forgotten
  * and its bare ground grows back to grass a day or two later.
@@ -194,10 +198,53 @@ public class TrunkTrails {
         return trails.isEmpty() ? null : trails.get(trails.size() - 1);
     }
 
-    /** How far out (blocks from the nest's middle) foragers have left this trail at most (its start if none yet). */
+    /** How far out (blocks from the nest's middle) foragers have left this trail at most: its tip (its start if none yet). */
     public int reachBlocks(Trail trail) {
         SpeciesProfile.TrunkNumbers numbers = numbers();
-        return (numbers == null ? 0 : numbers.start()) + Math.max(trail.reach, 0);
+        return trail.reach <= 0 ? (numbers == null ? 0 : numbers.start()) : (int) Math.round(columnOut(trail, trail.reach - 1));
+    }
+
+    /** How far out (blocks from the nest's middle) the longest trail's tip is; 0 with no trail. */
+    public int longestTip() {
+        int longest = 0;
+        for (Trail trail : trails) {
+            longest = Math.max(longest, reachBlocks(trail));
+        }
+        return longest;
+    }
+
+    /**
+     * The columns (offsets from the nest's middle) within {@code side} blocks either side of each trail's line, from its
+     * start out to its tip plus the searchers' stretch and {@code side} (where its foragers fan out), never past
+     * {@code most} blocks out: the ground the colony looks over for food along its trails.
+     */
+    public List<int[]> columnsNear(int side, int most) {
+        SpeciesProfile.TrunkNumbers numbers = numbers();
+        List<int[]> columns = new ArrayList<>();
+        if (numbers == null) {
+            return columns;
+        }
+        int stretch = colony.profile().food().search().map(SpeciesProfile.SearchNumbers::stretch).orElse(0);
+        Set<Long> seen = new HashSet<>();
+        for (Trail trail : trails) {
+            double cos = Math.cos(trail.angle);
+            double sin = Math.sin(trail.angle);
+            double end = Math.min(most, reachBlocks(trail) + stretch + side);
+            for (double t = numbers.start(); t <= end; t += 0.5) {
+                for (double u = -side; u <= side; u += 0.5) {
+                    int[] column = {(int) Math.round(cos * t - sin * u), (int) Math.round(sin * t + cos * u)};
+                    if (seen.add(key(column))) {
+                        columns.add(column);
+                    }
+                }
+            }
+        }
+        return columns;
+    }
+
+    /** How far (blocks, sideways) this column of the trail is from the nest's middle. */
+    private static double columnOut(Trail trail, int column) {
+        return Math.hypot(trail.columns[column][0], trail.columns[column][1]);
     }
 
     /** One of the forager numbers goes for food at {@code plant} (maybe in unloaded land): the trip is counted. */
@@ -297,7 +344,7 @@ public class TrunkTrails {
     }
 
     private Trail newTrail(double angle, SpeciesProfile.TrunkNumbers numbers, long now, double strength) {
-        int[][] columns = columnsFor(angle, numbers.start(), colony.profile().food().radius());
+        int[][] columns = columnsFor(angle, numbers.start(), numbers.mostLength());
         return new Trail(angle, columns, new int[columns.length], new BitSet(columns.length), 0, strength, now);
     }
 
@@ -441,7 +488,9 @@ public class TrunkTrails {
         SpeciesProfile.Trails strength = strengthNumbers();
         for (Iterator<Trail> it = trails.iterator(); it.hasNext(); ) {
             Trail trail = it.next();
-            if (strength.decayed(trail.strength, now - trail.strengthAt) >= strength.fadeBelow()) {
+            double left = strength.decayed(trail.strength, now - trail.strengthAt);
+            if (left >= strength.fadeBelow()) {
+                pullBack(trail, numbers.holds(left, strength.halfLifeTicks()), now, numbers, level);
                 continue;
             }
             it.remove();
@@ -454,10 +503,32 @@ public class TrunkTrails {
         }
     }
 
+    /**
+     * The tip of a trail pulls back to as far as its traffic holds ({@code holds} blocks out): the columns past it are
+     * forgotten (no wear) and their bare ground grows back about the regrow time later, as a faded trail's does.
+     */
+    private void pullBack(Trail trail, double holds, long now, SpeciesProfile.TrunkNumbers numbers, ServerLevel level) {
+        int before = trail.reach;
+        while (trail.reach > 0 && columnOut(trail, trail.reach - 1) > holds + 0.5) {
+            int i = --trail.reach;
+            trail.wear[i] = 0;
+            if (trail.bare.get(i)) {
+                trail.bare.clear(i);
+                long growsAt = now + (long) (numbers.regrowTicks() * (0.5 + colony.random().nextDouble()));
+                regrowing.add(new Regrow(colony.getCenter().getX() + trail.columns[i][0], colony.getCenter().getZ() + trail.columns[i][1], growsAt));
+            }
+        }
+        if (trail.reach < before) {
+            com.antcolonies.AntColoniesMod.LOGGER.info("[trails] colony {}: the trunk trail toward {} pulled back to {} blocks (its traffic holds {})",
+                    colony.getId(), compass(trail.angle), reachBlocks(trail), Math.round(holds));
+            ColonyManager.get(level).markChanged();
+        }
+    }
+
     /** The columns (sideways) the colony's real workers outside stand in, and the ones round them. */
     private Set<Long> workerColumns(ServerLevel level) {
         Set<Long> columns = new HashSet<>();
-        double reach = colony.profile().food().radius() + 2.0;
+        double reach = colony.searchReach() + 2.0;
         AABB area = new AABB(colony.getCenter()).inflate(reach, 16.0, reach);
         for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, area,
                 ant -> ant.isAlive() && ant.isColonyWorker() && colony.getId().equals(ant.getColonyId()))) {
@@ -606,7 +677,7 @@ public class TrunkTrails {
         }
         StringBuilder line = new StringBuilder(" | trunk trails:");
         for (Trail trail : trails) {
-            line.append(' ').append(compass(trail.angle)).append(' ').append(trail.reach).append(" blocks (strength ")
+            line.append(' ').append(compass(trail.angle)).append(' ').append(reachBlocks(trail)).append(" blocks (strength ")
                     .append(Math.round(strength(level, trail))).append(", ").append(trail.bare.cardinality()).append(" bare),");
         }
         line.setLength(line.length() - 1);
@@ -657,7 +728,7 @@ public class TrunkTrails {
         for (Tag t : all.getList("trails", Tag.TAG_COMPOUND)) {
             CompoundTag entry = (CompoundTag) t;
             double angle = entry.getDouble("angle");
-            int[][] columns = columnsFor(angle, start, colony.profile().food().radius());
+            int[][] columns = columnsFor(angle, start, numbers == null ? colony.profile().food().radius() : numbers.mostLength());
             int[] wear = new int[columns.length];
             int[] saved = entry.getIntArray("wear");
             System.arraycopy(saved, 0, wear, 0, Math.min(saved.length, wear.length));

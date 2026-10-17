@@ -4,6 +4,7 @@ import com.antcolonies.block.FungusCombBlock;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -172,7 +173,7 @@ public class FoodStore {
             return null; // no food store yet (and the queen wants nothing), or it is full
         }
         claimedSeeds.prune(level.getGameTime());
-        int radius = food().radius();
+        int radius = colony.searchReach(); // (out to where a searcher may get: the trails' tips and its drift)
         var items = food().itemTag();
         AABB area = new AABB(center).inflate(radius, 0, radius).expandTowards(0, 8, 0);
         ItemEntity best = null;
@@ -276,9 +277,12 @@ public class FoodStore {
     }
 
     /**
-     * The food plants within the profile's food radius of the entrance (scanned again at most every few seconds: the top
-     * block of each column, or the block under it for solid plants like a hay bale, and the food stacked under that: a
-     * log under a stump). The list may hold plants that are gone since the last scan.
+     * The food plants the colony's ants can come across (scanned again at most every few seconds: the top block of each
+     * column, or the block under it for solid plants like a hay bale, and the food stacked under that: a log under a
+     * stump). The list may hold plants that are gone since the last scan. A colony without trunk trails scans the whole
+     * square out to its search reach; one with trails (long trails: up to 96 blocks out, too many columns to scan) scans
+     * the square out to its young reach plus the stretch, a band along each trail out past its tip, and the ground round
+     * each of its real workers out farther (where a searcher off any trail is).
      */
     public List<BlockPos> plants(Level level) {
         long now = level.getGameTime();
@@ -286,33 +290,30 @@ public class FoodStore {
             grassScanTime = now + GRASS_SCAN_TICKS;
             grassTufts.clear();
             int radius = colony.searchReach(); // (out to where a searcher's drift may take it)
-
-            for (int x = center.getX() - radius; x <= center.getX() + radius; x++) {
-                for (int z = center.getZ() - radius; z <= center.getZ() + radius; z++) {
-                    if (!level.hasChunkAt(new BlockPos(x, center.getY(), z))) {
-                        continue;
+            int inner = Math.min(radius, food().radius() + food().search().map(SpeciesProfile.SearchNumbers::stretch).orElse(0));
+            if (!colony.trunkTrails().keepsTrails()) {
+                inner = radius;
+            }
+            for (int x = center.getX() - inner; x <= center.getX() + inner; x++) {
+                for (int z = center.getZ() - inner; z <= center.getZ() + inner; z++) {
+                    scanColumn(level, x, z, false);
+                }
+            }
+            if (inner < radius) {
+                Set<Long> done = new HashSet<>();
+                int side = BAND + food().search().map(SpeciesProfile.SearchNumbers::wander).orElse(0);
+                for (int[] column : colony.trunkTrails().columnsNear(side, radius)) {
+                    scanOuter(level, center.getX() + column[0], center.getZ() + column[1], inner, done);
+                }
+                AABB out = new AABB(center).inflate(radius + 2, 16, radius + 2);
+                for (com.antcolonies.entity.AbstractAntEntity ant : level.getEntitiesOfClass(com.antcolonies.entity.AbstractAntEntity.class, out,
+                        ant -> ant.isAlive() && ant.isColonyWorker() && colony.getId().equals(ant.getColonyId()))) {
+                    if (Math.abs(ant.getBlockX() - center.getX()) <= inner - side && Math.abs(ant.getBlockZ() - center.getZ()) <= inner - side) {
+                        continue; // (all round it is scanned already)
                     }
-                    BlockPos top = new BlockPos(x, level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z), z);
-                    // The first air above any block (a thin branch over a gallery dug under it is no surface for MOTION_BLOCKING),
-                    // and mud plastered over food (a branch's casing, a log's top) does not hide it.
-                    while (MudCrustBlock.isCrust(level.getBlockState(top.below()))) {
-                        top = top.below();
-                    }
-                    boolean found = false;
-                    for (int down = 0; down < (found ? STACK_DEPTH : 2); down++) {
-                        BlockPos pos = top.below(down);
-                        SpeciesProfile.PlantFood plant = food().plantFor(level.getBlockState(pos));
-                        int dy = pos.getY() - center.getY();
-                        // Rich food (a fallen tree, a hay bale) counts up or down a slope too (the user's fallen tree on a
-                        // terrace above the nest was never seen, 2026-10-14); other plants only near the nest's height.
-                        if (plant != null && (dy >= -1 && dy <= 4 || plant.rich() && Math.abs(dy) <= RICH_HEIGHT)) {
-                            grassTufts.add(pos);
-                            if (!plant.rich()) {
-                                break; // one plant a column (the two halves of tall grass are one plant)
-                            }
-                            found = true;
-                        } else if (found) {
-                            break;
+                    for (int dx = -side; dx <= side; dx++) {
+                        for (int dz = -side; dz <= side; dz++) {
+                            scanOuter(level, ant.getBlockX() + dx, ant.getBlockZ() + dz, inner, done);
                         }
                     }
                 }
@@ -322,6 +323,51 @@ public class FoodStore {
             grassClips.keySet().removeIf(pos -> level.hasChunkAt(pos) && food().plantFor(level.getBlockState(pos)) == null);
         }
         return grassTufts;
+    }
+
+    /** A trail's band reaches this many blocks either side of its line (plus the searchers' wander). */
+    private static final int BAND = 4;
+
+    /** A column past the inner square (once only: {@code done}); within the square it was scanned already. */
+    private void scanOuter(Level level, int x, int z, int inner, Set<Long> done) {
+        if (Math.abs(x - center.getX()) <= inner && Math.abs(z - center.getZ()) <= inner
+                || !done.add(((long) x << 32) ^ (z & 0xffffffffL))) {
+            return;
+        }
+        scanColumn(level, x, z, true);
+    }
+
+    /**
+     * The food in one column. {@code far}: out along a trail or by a worker far out, where the ground may be well above or
+     * below the nest (long trails run over hills): any plant counts up to the rich food's height difference.
+     */
+    private void scanColumn(Level level, int x, int z, boolean far) {
+        if (!level.hasChunkAt(new BlockPos(x, center.getY(), z))) {
+            return;
+        }
+        BlockPos top = new BlockPos(x, level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z), z);
+        // The first air above any block (a thin branch over a gallery dug under it is no surface for MOTION_BLOCKING),
+        // and mud plastered over food (a branch's casing, a log's top) does not hide it.
+        while (MudCrustBlock.isCrust(level.getBlockState(top.below()))) {
+            top = top.below();
+        }
+        boolean found = false;
+        for (int down = 0; down < (found ? STACK_DEPTH : 2); down++) {
+            BlockPos pos = top.below(down);
+            SpeciesProfile.PlantFood plant = food().plantFor(level.getBlockState(pos));
+            int dy = pos.getY() - center.getY();
+            // Rich food (a fallen tree, a hay bale) counts up or down a slope too (the user's fallen tree on a
+            // terrace above the nest was never seen, 2026-10-14); other plants only near the nest's height.
+            if (plant != null && (dy >= -1 && dy <= 4 || (plant.rich() || far) && Math.abs(dy) <= RICH_HEIGHT)) {
+                grassTufts.add(pos);
+                if (!plant.rich()) {
+                    break; // one plant a column (the two halves of tall grass are one plant)
+                }
+                found = true;
+            } else if (found) {
+                break;
+            }
+        }
     }
 
     /** Food stacked under the top food block of a column (a stump on a log, a stump 2 blocks tall) is seen this deep. */
