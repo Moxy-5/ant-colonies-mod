@@ -260,8 +260,18 @@ public class TermiteNewHoleTests {
             }
             BlockPos hole = tunnel[0].tunnel().hole();
             if (since[0] % 1000 == 0) {
-                AntColoniesMod.LOGGER.info("[new-hole-test] slope: dug {} of {}, hole {}", tunnel[0].tunnel().tunnel().stream().filter(c -> Nest.isDugOut(level, c)).count(),
-                        tunnel[0].tunnel().tunnel().size(), level.getBlockState(hole));
+                AntColoniesMod.LOGGER.info("[new-hole-test] slope: dug {} of {}, hole {}, may open {}, foraging time {}{}", tunnel[0].tunnel().tunnel().stream().filter(c -> Nest.isDugOut(level, c)).count(),
+                        tunnel[0].tunnel().tunnel().size(), level.getBlockState(hole), colony.foragingHoles().mayOpen(level, hole), colony.isForagingTime(level),
+                        colony.alarm().describe(level));
+                java.util.List<BlockPos> gallery = tunnel[0].gallery() == null ? java.util.List.of() : tunnel[0].gallery();
+                BlockPos next = colony.nest().findDigTarget(level);
+                java.util.List<BlockPos> cells = tunnel[0].tunnel().tunnel();
+                AntColoniesMod.LOGGER.info("[new-hole-test] slope: gallery dug {} of {}, next dig {} ({}), hole {}, tunnel from {} to {}, workers at {}",
+                        gallery.stream().filter(c -> Nest.isDugOut(level, c)).count(), gallery.size(),
+                        next == null ? null : helper.relativePos(next), next == null ? null : level.getBlockState(next), helper.relativePos(hole),
+                        helper.relativePos(cells.get(0)), helper.relativePos(cells.get(cells.size() - 1)),
+                        level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds()).stream()
+                                .map(w -> helper.relativePos(w.blockPosition()).toShortString()).toList());
             }
             helper.assertTrue(!colony.nest().foodWays().isSpent(hole), "the hole was given up while the rest of the tree is still there");
             if (ForagingHoles.isDug(level, tunnel[0].tunnel()) && ForagingHoles.isOpen(level, hole)) {

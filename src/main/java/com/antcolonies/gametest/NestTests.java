@@ -1289,7 +1289,7 @@ public class NestTests {
 
     /**
      * Dead ants are carried down to the refuse chamber: three bodies lying on the ground around the hill, one lying in
-     * the nursery, and a worker that is killed (it leaves its body behind where it died). Every body ends up in the
+     * the nursery, and a worker killed at the nest (it leaves its body behind where it died). Every body ends up in the
      * refuse chamber, one to a cell, and none is left lying about or in an ant's mandibles.
      */
     @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
@@ -1315,7 +1315,11 @@ public class NestTests {
             colony.refuse().spawnCorpse(level, nursery.getX() + 0.5, nursery.getY(), nursery.getZ() + 0.5);
             var workers = colonyWorkers(helper, colony);
             workersBefore[0] = workers.size();
-            workers.get(0).hurt(level.damageSources().genericKill(), 1000.0F);
+            // The one nearest the nest: a forager killed out on a far search (up to 32 blocks out since step 4c) dies past
+            // the colony's reach, and its body rightly crumbles where it lies (the full run of 2026-10-16).
+            BlockPos nest = colony.getCenter();
+            workers.stream().min(java.util.Comparator.comparingDouble(worker -> worker.distanceToSqr(nest.getX() + 0.5, nest.getY(), nest.getZ() + 0.5)))
+                    .orElseThrow().hurt(level.damageSources().genericKill(), 1000.0F);
             AntColoniesMod.LOGGER.info("[refuse-test] tick {}: 4 bodies put out, one worker killed ({} workers before)", helper.getTick(), workersBefore[0]);
         });
         helper.onEachTick(() -> {

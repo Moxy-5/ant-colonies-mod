@@ -5,12 +5,15 @@ import static com.antcolonies.gametest.TermiteMoundTests.SURFACE;
 
 import java.util.List;
 
+import org.jetbrains.annotations.Nullable;
+
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.TermiteWorkerEntity;
 import com.antcolonies.entity.WorkerAntEntity;
 import com.antcolonies.entity.goal.GroundShakes;
 import com.antcolonies.registry.ModEntities;
+import com.antcolonies.species.SpeciesProfile;
 
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -153,8 +156,23 @@ public class BodyTests {
         Vec3[] frozenAt = {null};
         int[] secondJumpAt = {-1};
         String[] state = {""};
+        int lookerRest = looker.profile().bodyLanguage().flatMap(SpeciesProfile.BodyLanguage::notice).orElseThrow().restTicks();
+        int termiteRest = termite.profile().bodyLanguage().flatMap(SpeciesProfile.BodyLanguage::notice).orElseThrow().restTicks();
+        // Where each moving player stands (in the arena, before its sway): beside its insect until the insect notices, then
+        // still there. Insects stroll, and with the players on fixed spots a shy ant or the termite sometimes strolled out
+        // of range before its first chance to notice (the full run of 2026-10-16).
+        Vec3[] lookerAt = {null};
+        Vec3[] boldAt = {null};
+        Vec3[] shyAt = {null};
+        Vec3[] termiteAt = {null};
+        boolean[] boldNoticed = {false};
         helper.onEachTick(() -> {
             int t = ++tick[0];
+            boldNoticed[0] |= bold.getNoticing() != AbstractAntEntity.NOTICE_NONE;
+            lookerAt[0] = beside(helper, lookerAt[0], looker, 0, 4, lookStart[0] < 0);
+            boldAt[0] = beside(helper, boldAt[0], bold, 5, 0, !boldNoticed[0]);
+            shyAt[0] = beside(helper, shyAt[0], shy, -3, 0, shyStart[0] < 0);
+            termiteAt[0] = beside(helper, termiteAt[0], termite, 0, t <= 80 ? -2 : -5, t < jumpAt);
             double hx = lookerSeen.getX() - looker.getX();
             double hz = lookerSeen.getZ() - looker.getZ();
             state[0] = String.format(java.util.Locale.ROOT,
@@ -162,19 +180,19 @@ public class BodyTests {
                             + " shy: noticing %d, %.1f off, from %.1f; termite: noticing %d, froze at %d)",
                     t, looker.getNoticing(), lookStart[0], lookEnd[0],
                     Mth.wrapDegrees(looker.getYHeadRot() - ((float) (Mth.atan2(hz, hx) * (180.0 / Math.PI)) - 90.0F)),
-                    bold.getNoticing(), horizontal(bold.position(), helper.absoluteVec(new Vec3(9.5, FLOOR, 20.5))),
-                    shy.getNoticing(), horizontal(shy.position(), helper.absoluteVec(new Vec3(17.5, FLOOR, 20.5))), shyStart[0],
+                    bold.getNoticing(), horizontal(bold.position(), helper.absoluteVec(boldAt[0])),
+                    shy.getNoticing(), horizontal(shy.position(), helper.absoluteVec(shyAt[0])), shyStart[0],
                     termite.getNoticing(), freezeStart[0]);
             double sway = 0.6 * Math.sin(t * 2.0 * Math.PI / 30.0);
-            place(helper, lookerSeen, 4 + sway, 8);
-            place(helper, boldSeen, 9, 20 + sway);
-            place(helper, shySeen, 17, 20 + sway);
-            place(helper, carrierSeen, 12 + sway, 7);
+            place(helper, lookerSeen, lookerAt[0].add(sway, 0.0, 0.0));
+            place(helper, boldSeen, boldAt[0].add(0.0, 0.0, sway));
+            place(helper, shySeen, shyAt[0].add(0.0, 0.0, sway));
+            place(helper, carrierSeen, beside(helper, null, carrier, 0, 3, true).add(sway, 0.0, 0.0));
             if (t <= 80) {
-                place(helper, termiteFelt, 12 + sway, 18); // sneaking 2 blocks off: soft steps
+                place(helper, termiteFelt, termiteAt[0].add(sway, 0.0, 0.0)); // sneaking 2 blocks off: soft steps
             } else {
                 termiteFelt.setShiftKeyDown(false);
-                place(helper, termiteFelt, 12, 15); // standing still 5 blocks off
+                place(helper, termiteFelt, termiteAt[0]); // 5 blocks off, and still from the jump on
             }
             if (still.getNoticing() != AbstractAntEntity.NOTICE_NONE) {
                 helper.fail("an ant noticed a player who stood still");
@@ -190,10 +208,11 @@ public class BodyTests {
             }
 
             // The middling ant: looks, its head on the player, and stays put; then takes no notice for a while.
-            if (looker.getNoticing() == AbstractAntEntity.NOTICE_LOOK) {
-                if (lookEnd[0] >= 0) {
-                    helper.fail("the ant noticed the player again right after its look");
+            if (looker.getNoticing() == AbstractAntEntity.NOTICE_LOOK && lookEnd[0] >= 0) {
+                if (t - lookEnd[0] < lookerRest) {
+                    helper.fail("the ant noticed the player again right after its look (" + (t - lookEnd[0]) + " ticks after)");
                 }
+            } else if (looker.getNoticing() == AbstractAntEntity.NOTICE_LOOK) {
                 if (lookStart[0] < 0) {
                     lookStart[0] = t;
                     lookAt[0] = looker.position();
@@ -215,11 +234,11 @@ public class BodyTests {
 
             // The bold ant walks up to the player; the shy one backs off, wary.
             if (bold.getNoticing() == AbstractAntEntity.NOTICE_LOOK
-                    && horizontal(bold.position(), helper.absoluteVec(new Vec3(9.5, FLOOR, 20.5))) <= 2.6) {
+                    && horizontal(bold.position(), helper.absoluteVec(boldAt[0])) <= 2.6) {
                 boldClose[0] = true;
             }
             if (shy.getNoticing() == AbstractAntEntity.NOTICE_WARY) {
-                double away = horizontal(shy.position(), helper.absoluteVec(new Vec3(17.5, FLOOR, 20.5)));
+                double away = horizontal(shy.position(), helper.absoluteVec(shyAt[0]));
                 if (shyStart[0] < 0) {
                     shyStart[0] = away;
                 } else if (away >= shyStart[0] + 1.2) {
@@ -232,12 +251,13 @@ public class BodyTests {
             if (felt != AbstractAntEntity.NOTICE_NONE && felt != AbstractAntEntity.NOTICE_FREEZE) {
                 helper.fail("a termite looked at a player (it is blind: it only freezes)");
             }
-            if (felt == AbstractAntEntity.NOTICE_FREEZE) {
+            if (felt == AbstractAntEntity.NOTICE_FREEZE && secondJumpAt[0] >= 0) {
+                if (t - secondJumpAt[0] < termiteRest) {
+                    helper.fail("a termite froze again right after its freeze");
+                }
+            } else if (felt == AbstractAntEntity.NOTICE_FREEZE) {
                 if (t < jumpAt) {
                     helper.fail("a termite felt a sneaking player's steps, or one standing still");
-                }
-                if (secondJumpAt[0] >= 0) {
-                    helper.fail("a termite froze again right after its freeze");
                 }
                 if (freezeStart[0] < 0) {
                     freezeStart[0] = t;
@@ -279,9 +299,23 @@ public class BodyTests {
 
     /** Puts a mock player standing on the arena floor at this spot (the middle of the block at x, z, plus any part). */
     private static void place(GameTestHelper helper, Player player, double x, double z) {
-        Vec3 at = helper.absoluteVec(new Vec3(x + 0.5, FLOOR, z + 0.5));
+        place(helper, player, new Vec3(x + 0.5, FLOOR, z + 0.5));
+    }
+
+    /** Puts the player at this spot in the arena (relative), on the ground. */
+    private static void place(GameTestHelper helper, Player player, Vec3 spot) {
+        Vec3 at = helper.absoluteVec(spot);
         player.setPos(at.x, at.y, at.z);
         player.setOnGround(true);
+    }
+
+    /** A spot in the arena dx, dz blocks from the insect (while {@code following}, or the first time), else where it was. */
+    private static Vec3 beside(GameTestHelper helper, @Nullable Vec3 was, AbstractAntEntity insect, double dx, double dz, boolean following) {
+        if (was != null && !following) {
+            return was;
+        }
+        Vec3 at = helper.relativeVec(insect.position());
+        return new Vec3(at.x + dx, FLOOR, at.z + dz);
     }
 
     private static double horizontal(Vec3 a, Vec3 b) {
