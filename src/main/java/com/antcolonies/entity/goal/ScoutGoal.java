@@ -34,7 +34,7 @@ import net.minecraft.world.level.levelgen.Heightmap;
  * barbatus</i>): a forager with no food of its own to go for walks out to search. Where: round its own spot (where it
  * last found food, see {@code ForagerSpots}) if it has one; otherwise out along a trunk trail (a stronger trail draws
  * more) to about where the foragers leave it, now and then in a new direction instead (how a new trail opens); after an
- * empty trip, the same way again from as far out as that search drifted. How: out by the trail, then a meandering search in short hops round the
+ * empty trip, another way than that one, from near the nest (the user's decision of 2026-10-16). How: out by the trail, then a meandering search in short hops round the
  * search centre, feeling about at each. It searches until it finds food (the user's decision: real foragers seldom come
  * home empty); then {@code ClipGrassGoal} or {@code GatherSeedGoal} take over. A trip to its own spot that finds nothing
  * there in {@code spot_ticks} counts as empty (two and the spot is dropped). Every {@code drift_ticks} without a find,
@@ -57,6 +57,10 @@ public class ScoutGoal extends Goal {
     private static final int FEEL_TICKS = 20;
     /** How often (ticks) a lone searcher checks whether it has come across food. */
     private static final int CHECK_TICKS = 10;
+    /** After an empty trip the next new way is at least this far (radians) from the way that failed: 60 degrees. My pick. */
+    private static final double ANOTHER_WAY = Math.PI / 3.0;
+    /** A new way's search starts this many blocks or fewer past {@code LEAST_OUT + 2} from the nest's middle. My pick. */
+    private static final int NEAR_START = 2;
     /** A search never starts nearer the nest's middle than this (the hill). */
     private static final int LEAST_OUT = 4;
     /** A lone searcher that came across food stands by it this long (ticks), for cutting or gathering to take over. */
@@ -148,7 +152,9 @@ public class ScoutGoal extends Goal {
 
     /**
      * Where a lone searcher searches this trip (see the class comment), or null if no open ground was hit: its own spot,
-     * or out along a trunk trail, or a new way. Sets the search's direction and how far out it starts.
+     * or out along a trunk trail, or a new way (after an empty trip, not the way that failed). A new way's search starts
+     * just past the hill (6 to 8 blocks from the nest's middle) and drifts outward while it finds nothing, so the ground
+     * near the nest keeps being searched. Sets the search's direction and how far out it starts.
      */
     @Nullable
     private BlockPos planSearch(ServerLevel level, Colony colony) {
@@ -167,17 +173,8 @@ public class ScoutGoal extends Goal {
         }
         atOwnSpot = false;
         int range = colony.foragingRadius();
-        ForagerSpots.Lead lead = colony.spots().leadOf(ant.getUUID());
-        if (lead != null) {
-            // It came home empty last time: the same way again, from as far out as that search drifted.
-            angle = lead.angle();
-            from = Math.min(lead.out(), range + search.stretch());
-            out = from;
-            BlockPos cell = groundCell(level, colony, angle, from, 2);
-            if (cell != null && colony.patrol().isOpen(level, cell)) {
-                return cell;
-            }
-        }
+        // It came home empty last time: another way this time.
+        ForagerSpots.Lead failed = colony.spots().leadOf(ant.getUUID());
         TrunkTrails trails = colony.trunkTrails();
         // A young colony's foragers spread out every way: real Pogonomyrmex trunk trails only form as the colony grows
         // (Gordon), so a small colony's searchers pick a new way each trip instead of following its few trails.
@@ -186,12 +183,18 @@ public class ScoutGoal extends Goal {
             TrunkTrails.Trail trail = !young && trails.keepsTrails() && ant.getRandom().nextInt(NEW_WAY) != 0
                     ? trails.pickForSearch(level, ant.getRandom()) : null;
             double base;
+            if (trail != null && failed != null && Math.abs(Mth.wrapDegrees(Math.toDegrees(trail.angle() - failed.angle()))) < Math.toDegrees(ANOTHER_WAY)) {
+                trail = null; // the way that failed last time: a new way instead
+            }
             if (trail != null) {
                 angle = trail.angle() + (ant.getRandom().nextDouble() - 0.5) * 0.5;
                 base = trails.reachBlocks(trail) - ant.getRandom().nextInt(4);
             } else {
-                angle = ant.getRandom().nextDouble() * Mth.TWO_PI;
-                base = LEAST_OUT + 2 + ant.getRandom().nextDouble() * Math.max(0, range / 2.0 - LEAST_OUT - 2); // the inner half of the range
+                angle = failed == null ? ant.getRandom().nextDouble() * Mth.TWO_PI
+                        : failed.angle() + ANOTHER_WAY + ant.getRandom().nextDouble() * (Mth.TWO_PI - 2 * ANOTHER_WAY);
+                // Near the nest, then outward as it drifts (the user's decision of 2026-10-16: it used to start anywhere in
+                // the inner half of the range, and seeds 6 blocks from the nest lay unfound for a game day).
+                base = LEAST_OUT + 2 + ant.getRandom().nextInt(NEAR_START + 1);
             }
             from = Math.min(Math.max(LEAST_OUT + 2, base), range + search.stretch());
             out = from;
@@ -301,8 +304,8 @@ public class ScoutGoal extends Goal {
             boolean closing = !colony.isForagingTime(ant.level());
             boolean gaveUp = ticks >= giveUpTicks();
             if (!found && !ant.hasFullMandibles() && arrived && (closing || gaveUp)) {
-                // Home empty: its next new search starts as far out as this one drifted.
-                colony.spots().cameHomeEmpty(ant.getUUID(), angle, (int) Math.round(out), colony.searchReach());
+                // Home empty: its next search goes another way, from near the nest again.
+                colony.spots().cameHomeEmpty(ant.getUUID(), angle);
                 if (gaveUp) {
                     colony.door().endTrip(ant); // its trip is over: it goes in and waits for touches again
                 }

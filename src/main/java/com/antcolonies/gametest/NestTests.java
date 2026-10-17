@@ -1035,6 +1035,14 @@ public class NestTests {
             hungry[0].setLastAte(level.getGameTime() - colony.profile().worker().mealIntervalTicks() - 5);
             AntColoniesMod.LOGGER.info("[hunger-test] tick {}: worker #{} is hungry, {} seeds in the store", helper.getTick(), hungry[0].getId(), foodBefore[0]);
         });
+        helper.onEachTick(() -> {
+            if (hungry[0] != null && helper.getTick() % 2000 == 0) {
+                AntColoniesMod.LOGGER.info("[hunger-test] tick {}: worker #{} at {}, hungry {}, alive {}, searching {}, goals {}", helper.getTick(), hungry[0].getId(),
+                        hungry[0].blockPosition().subtract(helper.absolutePos(BlockPos.ZERO)).toShortString(), hungry[0].isHungry(), hungry[0].isAlive(),
+                        colony(helper) != null && colony(helper).spots().isSearching(hungry[0].getUUID()),
+                        hungry[0].goalSelector.getAvailableGoals().stream().filter(g -> g.isRunning()).map(g -> g.getGoal().getClass().getSimpleName()).toList());
+            }
+        });
 
         helper.succeedWhen(() -> {
             Colony colony = colony(helper);
@@ -1509,6 +1517,14 @@ public class NestTests {
                 if (helper.getTick() % 4000 == 0) {
                     AntColoniesMod.LOGGER.info("[early-feed-test] tick {}: {}{} | {} | {} | {}", helper.getTick(), colony.describeJobs(level), colony.spots().describe(),
                             colony.door().describe(level), colony.patrol().describe(level), carriers(helper));
+                    StringBuilder ants = new StringBuilder();
+                    for (WorkerAntEntity worker : level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds().inflate(32))) {
+                        ants.append(" #").append(worker.getId()).append(" at ").append(worker.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO)).toShortString())
+                                .append(colony.spots().isSearching(worker.getUUID()) ? " searching" : "")
+                                .append(colony.spots().spotOf(worker.getUUID()) != null ? " spot " + colony.spots().spotOf(worker.getUUID()).subtract(helper.absolutePos(BlockPos.ZERO)).toShortString() : "")
+                                .append(" ").append(worker.goalSelector.getAvailableGoals().stream().filter(g -> g.isRunning()).map(g -> g.getGoal().getClass().getSimpleName()).toList());
+                    }
+                    AntColoniesMod.LOGGER.info("[early-feed-test] tick {}: workers{}", helper.getTick(), ants);
                 }
             }
         });

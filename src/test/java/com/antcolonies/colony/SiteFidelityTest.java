@@ -41,16 +41,15 @@ class SiteFidelityTest {
     }
 
     @Test
-    void anEmptyTripMakesTheNextSearchGoTheSameWayFartherOutUntilAFind() {
+    void anEmptyTripIsRememberedSoTheNextSearchGoesAnotherWayUntilAFind() {
         ForagerSpots spots = spots();
         UUID ant = UUID.randomUUID();
-        spots.cameHomeEmpty(ant, 1.5, 17, 32);
-        assertEquals(17, spots.leadOf(ant).out());
-        assertEquals(1.5, spots.leadOf(ant).angle(), 1e-9, "the same way as the empty search");
+        spots.cameHomeEmpty(ant, 1.5);
+        assertEquals(1.5, spots.leadOf(ant).angle(), 1e-9, "the way that came home empty (the next search avoids it)");
         spots.found(ant, new BlockPos(17, 64, 0));
-        assertNull(spots.leadOf(ant), "a find lets it settle back");
-        spots.cameHomeEmpty(ant, 0.5, 32, 32);
-        assertNull(spots.leadOf(ant), "empty at the farthest it may go: it tries another way next time");
+        assertNull(spots.leadOf(ant), "a find clears it");
+        spots.cameHomeEmpty(ant, 0.5);
+        assertEquals(0.5, spots.leadOf(ant).angle(), 1e-9, "only the last empty way is kept");
     }
 
     @Test

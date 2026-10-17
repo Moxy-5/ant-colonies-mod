@@ -26,9 +26,10 @@ import net.minecraft.nbt.Tag;
  * (Hölldobler 1976). Only for species whose profile has {@code food.search}.
  *
  * <p>Each real forager has its <b>spot</b> (where it last cut or picked up food) and how many trips since found nothing
- * there; {@code empty_to_drop} empty trips and the spot is dropped. A forager that came home empty searches the same
- * way next time, starting as far out as its last search drifted ({@link #leadOf}; the range stretches from the ants'
- * own failures, the user's decision). The forager numbers keep their spots in a pool, each held by some of them ({@link Held}). The
+ * there; {@code empty_to_drop} empty trips and the spot is dropped. A forager that came home empty searches another
+ * way next time ({@link #leadOf}), starting near the nest again and drifting outward as it finds nothing (the range
+ * still stretches from the ants' own failures, within each search; the user's decision of 2026-10-16: ground near the
+ * nest must not go unsearched). The forager numbers keep their spots in a pool, each held by some of them ({@link Held}). The
  * golden rule of the numbers: a real forager going into the numbers puts its spot in the pool, one coming out takes a
  * spot from it, so a spot is never doubled or lost; a dead forager's spot is lost with it. All saved.
  */
@@ -37,8 +38,8 @@ public class ForagerSpots {
     public record Spot(BlockPos pos, int empties) {
     }
 
-    /** Where a forager that came home empty searches next: the same way ({@code angle}, radians), {@code out} blocks out. */
-    public record Lead(double angle, int out) {
+    /** The way ({@code angle}, radians from the nest's middle) a forager last searched and came home empty: it tries another way next. */
+    public record Lead(double angle) {
     }
 
     /** A spot of the numbers: where, how many forager numbers hold it, and the trips since that found nothing there. */
@@ -66,7 +67,7 @@ public class ForagerSpots {
     private final Supplier<Optional<SpeciesProfile.SearchNumbers>> numbers;
     /** Each real forager's spot. Saved. */
     private final Map<UUID, Spot> spots = new HashMap<>();
-    /** Where a real forager searches next after an empty trip. Saved. */
+    /** The way a real forager last searched in vain. Saved. */
     private final Map<UUID, Lead> leads = new HashMap<>();
     /** The numbers' spots. Saved. */
     private final List<Held> held = new ArrayList<>();
@@ -105,7 +106,7 @@ public class ForagerSpots {
         return spot == null ? null : spot.pos();
     }
 
-    /** Where this forager searches next after an empty trip (the same way, farther out), or null: where it likes. */
+    /** The way this forager last searched and came home empty (its next search goes another way), or null. */
     @Nullable
     public Lead leadOf(UUID ant) {
         return leads.get(ant);
@@ -139,15 +140,11 @@ public class ForagerSpots {
 
     /**
      * The forager came home empty from searching {@code angle} (radians from the nest's middle): next time it searches
-     * the same way from {@code out} blocks out (as far as this one drifted), unless that is already the farthest it may
-     * go ({@code most}: the range plus the stretch), when it tries another way.
+     * another way, from near the nest again. (Until 2026-10-16 it searched the same way from as far out as this search
+     * had drifted, so ground near the nest could go unsearched for a game day: the queen's founding chamber test.)
      */
-    public void cameHomeEmpty(UUID ant, double angle, int out, int most) {
-        if (out >= most) {
-            leads.remove(ant);
-        } else {
-            leads.put(ant, new Lead(angle, out));
-        }
+    public void cameHomeEmpty(UUID ant, double angle) {
+        leads.put(ant, new Lead(angle));
         emptyTrips++;
     }
 
@@ -314,7 +311,6 @@ public class ForagerSpots {
             CompoundTag one = new CompoundTag();
             one.putUUID("ant", entry.getKey());
             one.putDouble("angle", entry.getValue().angle());
-            one.putInt("out", entry.getValue().out());
             out.add(one);
         }
         tag.put("foragerLeads", out);
@@ -343,7 +339,7 @@ public class ForagerSpots {
         for (Tag one : tag.getList("foragerLeads", Tag.TAG_COMPOUND)) {
             CompoundTag out = (CompoundTag) one;
             if (out.hasUUID("ant")) {
-                leads.put(out.getUUID("ant"), new Lead(out.getDouble("angle"), out.getInt("out")));
+                leads.put(out.getUUID("ant"), new Lead(out.getDouble("angle")));
             }
         }
 
