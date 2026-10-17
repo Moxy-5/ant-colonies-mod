@@ -76,7 +76,7 @@ public class Brood {
     public AntEggEntity spawnEgg(Level level, double x, double y, double z) {
         AntEggEntity egg = new AntEggEntity(ModEntities.ANT_EGG.get(), level);
         egg.setColonyId(id);
-        egg.moveTo(x, y, z, level.getRandom().nextFloat() * 360.0F, 0.0F);
+        egg.moveTo(x, y, z, colony.random().nextFloat() * 360.0F, 0.0F);
         level.addFreshEntity(egg);
         return egg;
     }
@@ -134,7 +134,7 @@ public class Brood {
         AntLarvaEntity larva = new AntLarvaEntity(youngType(), level);
         larva.setColonyId(id);
         larva.setMeal(colony.soldiers().mealFor(null));
-        larva.moveTo(x, y, z, level.getRandom().nextFloat() * 360.0F, 0.0F);
+        larva.moveTo(x, y, z, colony.random().nextFloat() * 360.0F, 0.0F);
         level.addFreshEntity(larva);
         return larva;
     }
@@ -225,7 +225,7 @@ public class Brood {
         boolean changed = false;
         for (java.util.Iterator<Young> it = inside.iterator(); it.hasNext(); ) {
             Young young = it.next();
-            BlockPos spot = pickEggSpot(level, level.getRandom());
+            BlockPos spot = pickEggSpot(level, colony.random());
             if (spot == null) {
                 break; // no room: later
             }
@@ -450,7 +450,7 @@ public class Brood {
      */
     @Nullable
     public AntEggEntity findLooseEgg(Level level, BlockPos near, Set<UUID> avoid) {
-        if (pickEggSpot(level, level.getRandom()) == null) {
+        if (pickEggSpot(level, colony.random()) == null) {
             return null;
         }
         claimedEggs.prune(level.getGameTime());

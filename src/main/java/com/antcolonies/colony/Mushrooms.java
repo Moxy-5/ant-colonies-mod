@@ -86,7 +86,7 @@ public class Mushrooms {
         if (numbers == null || count <= 0) {
             return 0;
         }
-        RandomSource random = level.getRandom();
+        RandomSource random = colony.random();
         int sprouted = 0;
         for (int tries = 0; tries < count * TRIES_PER_MUSHROOM && sprouted < count; tries++) {
             BlockPos cell = pickSpot(level, random, numbers.mushroomRadius());

@@ -536,7 +536,7 @@ public class ForagingHoles {
                         continue;
                     }
                     any = true;
-                    if (level.getRandom().nextInt(CRUMBLE_CHANCE) == 0) {
+                    if (colony.random().nextInt(CRUMBLE_CHANCE) == 0) {
                         BlockState less = state.setValue(com.antcolonies.block.MudCrustBlock.FACES.get(side.getOpposite()), false);
                         boolean empty = com.antcolonies.block.MudCrustBlock.FACES.values().stream().noneMatch(less::getValue);
                         level.levelEvent(net.minecraft.world.level.block.LevelEvent.PARTICLES_DESTROY_BLOCK, wall,

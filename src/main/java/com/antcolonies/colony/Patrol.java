@@ -488,7 +488,7 @@ public class Patrol {
             Job job = jobFor(index, hillOnly);
             int blocks = (int) Math.round(2 * Math.PI * HILL_ROUND + (job.hillOnly() ? 0 : 2.0 * Math.max(0, job.reach() - HILL_ROUND)));
             long walk = TRIP_TICKS + (long) blocks * FieldLife.TICKS_PER_BLOCK;
-            numbers.add(new Out(job.way(), now + Math.round(walk * (0.75 + 0.5 * level.getRandom().nextDouble()))));
+            numbers.add(new Out(job.way(), now + Math.round(walk * (0.75 + 0.5 * colony.random().nextDouble()))));
             if (job.way() >= 0) {
                 ways.get(job.way()).sent++;
             }
@@ -567,7 +567,7 @@ public class Patrol {
         for (int i = 0; i < MOST_WAYS; i++) {
             points.add(i);
         }
-        java.util.Collections.shuffle(points, new java.util.Random(level.getRandom().nextLong()));
+        java.util.Collections.shuffle(points, new java.util.Random(colony.random().nextLong()));
         points.sort(Comparator.comparingInt((Integer i) -> -food[i]));
         for (int point : points) {
             if (ways.size() >= wanted) {

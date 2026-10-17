@@ -69,17 +69,24 @@ public final class TestFilter {
     }
 
     /** Called when the server is about to start, before the test server groups its tests into batches. */
-    @SuppressWarnings("unchecked")
     public static void apply(MinecraftServer server) {
         String only = System.getenv("ANTCOLONIES_TESTS");
         if (!(server instanceof GameTestServer)) {
             return;
         }
         TestClock.install(); // every colony reads its test's own clock (a still 7:00 if the test has none)
+        TestIsolation.install(); // each colony its own dice; a test's colonies go when it is done
         if (only == null || only.isBlank()) {
             skipStressTests(server);
-            return;
+        } else {
+            onlyNamed(server, only);
         }
+        keepShard(server);
+    }
+
+    /** Leaves only the tests named by the words of {@code ANTCOLONIES_TESTS} (see the class comment). */
+    @SuppressWarnings("unchecked")
+    private static void onlyNamed(MinecraftServer server, String only) {
         List<String> words = Arrays.stream(only.toLowerCase(Locale.ROOT).split(",")).map(String::trim).filter(w -> !w.isEmpty()).toList();
         try {
             Field field = GameTestServer.class.getDeclaredField("testFunctions");
@@ -110,6 +117,57 @@ public final class TestFilter {
             AntColoniesMod.LOGGER.warn("[test-filter] ONLY running {} of {} game tests (ANTCOLONIES_TESTS={})", tests.size(), before, only);
         } catch (ReflectiveOperationException e) {
             AntColoniesMod.LOGGER.error("[test-filter] could not filter the game tests, running them all", e);
+        }
+    }
+
+    /**
+     * Tests side by side (test health plan, 2026-10-16): {@code tools/run_game_tests.sh} starts several test servers at
+     * once, each with the system property {@code antcolonies.shard} set to "i/n", and each keeps only its share of the
+     * tests. Tests with a batch of their own (the long whole-colony ones) are dealt out first, then the rest class by
+     * class, so the long ones and each class's tests spread over all the servers.
+     */
+    @SuppressWarnings("unchecked")
+    private static void keepShard(MinecraftServer server) {
+        String shard = System.getProperty("antcolonies.shard");
+        if (shard == null || shard.isBlank()) {
+            return;
+        }
+        String[] parts = shard.trim().split("/");
+        int index;
+        int count;
+        try {
+            index = Integer.parseInt(parts[0]);
+            count = Integer.parseInt(parts[1]);
+        } catch (RuntimeException e) {
+            AntColoniesMod.LOGGER.error("[test-filter] antcolonies.shard should look like 2/5, was {}: running every test", shard);
+            return;
+        }
+        Map<String, String> classOf = new java.util.HashMap<>();
+        for (List<Class<?>> category : CATEGORIES.values()) {
+            for (Class<?> testClass : category) {
+                for (java.lang.reflect.Method method : testClass.getDeclaredMethods()) {
+                    classOf.put(method.getName().toLowerCase(Locale.ROOT), testClass.getSimpleName());
+                }
+            }
+        }
+        try {
+            Field field = GameTestServer.class.getDeclaredField("testFunctions");
+            field.setAccessible(true);
+            Collection<TestFunction> tests = (Collection<TestFunction>) field.get(server);
+            List<TestFunction> order = new java.util.ArrayList<>(tests);
+            order.sort(java.util.Comparator.comparing((TestFunction test) -> test.batchName().equals("defaultBatch") ? 1 : 0)
+                    .thenComparing(test -> classOf.getOrDefault(test.testName(), ""))
+                    .thenComparing(TestFunction::testName));
+            java.util.Set<String> kept = new java.util.HashSet<>();
+            for (int i = index - 1; i < order.size(); i += count) {
+                kept.add(order.get(i).testName());
+            }
+            int before = tests.size();
+            tests.removeIf(test -> !kept.contains(test.testName()));
+            AntColoniesMod.LOGGER.warn("[test-filter] shard {}: running {} of {} game tests: {}", shard, tests.size(), before,
+                    tests.stream().map(TestFunction::testName).sorted().toList());
+        } catch (ReflectiveOperationException e) {
+            AntColoniesMod.LOGGER.error("[test-filter] could not split the game tests, running them all", e);
         }
     }
 }

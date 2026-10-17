@@ -1,0 +1,182 @@
+package com.antcolonies.gametest;
+
+import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import org.jetbrains.annotations.Nullable;
+
+import com.antcolonies.AntColoniesMod;
+import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.entity.AbstractAntEntity;
+import com.antcolonies.entity.AntCorpseEntity;
+import com.antcolonies.entity.AntEggEntity;
+import com.antcolonies.entity.AntLarvaEntity;
+
+import net.minecraft.core.BlockPos;
+import net.minecraft.gametest.framework.GameTestInfo;
+import net.minecraft.gametest.framework.GameTestTicker;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.AABB;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
+
+/**
+ * Keeps the game tests out of each other's way (the test health plan, 2026-10-16). The tests run side by side in one
+ * world, and three things leaked from one test into another, so a test could pass alone and fail beside others:
+ * <ol>
+ * <li><b>Shared dice.</b> Every colony rolled the world's one random stream, so its luck changed with whatever the
+ * neighbouring colonies rolled. Now each colony rolls its own ({@link Colony#random}), seeded here from its test's name
+ * and its spot in the arena: a test rolls the same colony dice alone or in a crowd. (Each insect still has its own
+ * dice, as every Minecraft mob does, so a test is not fully the same every run.)</li>
+ * <li><b>Leftover colonies.</b> When a test passes, Minecraft removes only the creatures inside its box (not a forager
+ * out searching), and when it fails nothing at all; the colony itself lived on in the colony list, "away", through all
+ * the later tests. Now, when a test is done, every colony that was founded in its arena is removed, with every insect,
+ * egg, larva and body of it, wherever it is.</li>
+ * <li><b>Counting boxes</b> (in the tests themselves): a test that counts "the workers in my box" misses its own
+ * foragers out searching past the box's edge and counts a neighbour's. Such checks count the colony's own insects
+ * instead ({@link #insectsOf}).</li>
+ * </ol>
+ */
+final class TestIsolation {
+    /** The tests running now, as the test server keeps them ({@code GameTestTicker.testInfos}). */
+    @Nullable
+    private static Collection<GameTestInfo> running;
+    /** Each running test's box, read while it runs (its structure block may be gone once it is done). */
+    private static final Map<GameTestInfo, AABB> ARENAS = new HashMap<>();
+    /** Each colony and the test in whose arena it was founded. */
+    private static final Map<UUID, GameTestInfo> OWNERS = new HashMap<>();
+
+    private TestIsolation() {
+    }
+
+    /** Called once when the test server starts. */
+    @SuppressWarnings("unchecked")
+    static void install() {
+        try {
+            Field field = GameTestTicker.class.getDeclaredField("testInfos");
+            field.setAccessible(true);
+            running = (Collection<GameTestInfo>) field.get(GameTestTicker.SINGLETON);
+        } catch (ReflectiveOperationException e) {
+            AntColoniesMod.LOGGER.error("[test-isolation] could not see the running tests: the tests are not kept apart", e);
+            return;
+        }
+        Colony.setTestSeeds(TestIsolation::seedAt);
+        NeoForge.EVENT_BUS.addListener((ServerTickEvent.Post event) -> tick(event.getServer().overworld()));
+    }
+
+    /** The seed of the dice of a colony at this spot: from its test's name and the spot in the test's arena. */
+    @Nullable
+    private static Long seedAt(BlockPos pos) {
+        GameTestInfo test = testAt(pos);
+        if (test == null) {
+            return null;
+        }
+        AABB arena = ARENAS.get(test);
+        long x = pos.getX() - (long) Math.floor(arena.minX);
+        long z = pos.getZ() - (long) Math.floor(arena.minZ);
+        return test.getTestName().hashCode() * 1_000_003L + x * 1009L + z;
+    }
+
+    /** The running test whose arena holds this spot, or null. */
+    @Nullable
+    private static GameTestInfo testAt(BlockPos pos) {
+        readArenas();
+        for (Map.Entry<GameTestInfo, AABB> entry : ARENAS.entrySet()) {
+            AABB arena = entry.getValue();
+            if (!entry.getKey().isDone() && arena.minX <= pos.getX() && pos.getX() < arena.maxX
+                    && arena.minZ <= pos.getZ() && pos.getZ() < arena.maxZ) {
+                return entry.getKey();
+            }
+        }
+        return null;
+    }
+
+    private static void readArenas() {
+        if (running == null) {
+            return;
+        }
+        for (GameTestInfo test : running) {
+            if (!test.isDone() && test.getStructureBlockPos() != null && !ARENAS.containsKey(test)) {
+                try {
+                    ARENAS.put(test, test.getStructureBounds());
+                } catch (IllegalStateException e) {
+                    // the structure is not placed yet: next tick
+                }
+            }
+        }
+    }
+
+    private static void tick(ServerLevel level) {
+        if (running == null) {
+            return;
+        }
+        ColonyManager manager = ColonyManager.get(level);
+        // Which test each colony belongs to (a colony can be founded at any moment of its test).
+        for (Colony colony : manager.getColonies()) {
+            if (!OWNERS.containsKey(colony.getId())) {
+                GameTestInfo test = testAt(colony.getCenter());
+                if (test != null) {
+                    OWNERS.put(colony.getId(), test);
+                }
+            }
+        }
+        // The colonies of tests that are done go, with all of their insects.
+        List<UUID> gone = new ArrayList<>();
+        OWNERS.forEach((id, test) -> {
+            if (test.isDone()) {
+                gone.add(id);
+            }
+        });
+        if (!gone.isEmpty()) {
+            List<Entity> leftovers = new ArrayList<>();
+            for (Entity entity : level.getAllEntities()) {
+                UUID colonyId = colonyOf(entity);
+                if (colonyId != null && gone.contains(colonyId)) {
+                    leftovers.add(entity);
+                }
+            }
+            leftovers.forEach(entity -> entity.remove(Entity.RemovalReason.DISCARDED));
+            for (UUID id : gone) {
+                manager.removeColony(id);
+                OWNERS.remove(id);
+            }
+        }
+        ARENAS.keySet().removeIf(test -> test.isDone() && !OWNERS.containsValue(test));
+    }
+
+    /** The colony an insect, egg, larva or body belongs to, or null. */
+    @Nullable
+    private static UUID colonyOf(Entity entity) {
+        if (entity instanceof AbstractAntEntity ant) {
+            return ant.getColonyId();
+        } else if (entity instanceof AntEggEntity egg) {
+            return egg.getColonyId();
+        } else if (entity instanceof AntLarvaEntity larva) {
+            return larva.getColonyId();
+        } else if (entity instanceof AntCorpseEntity corpse) {
+            return corpse.getColonyId();
+        }
+        return null;
+    }
+
+    /**
+     * Every insect of this kind that belongs to the colony, wherever it is in the world (a forager out searching can be
+     * past the edge of its test's box, and a neighbour's forager inside it).
+     */
+    static <T extends AbstractAntEntity> List<T> insectsOf(ServerLevel level, Colony colony, Class<T> kind) {
+        List<T> found = new ArrayList<>();
+        for (Entity entity : level.getAllEntities()) {
+            if (kind.isInstance(entity) && colony.getId().equals(((AbstractAntEntity) entity).getColonyId())) {
+                found.add(kind.cast(entity));
+            }
+        }
+        return found;
+    }
+}

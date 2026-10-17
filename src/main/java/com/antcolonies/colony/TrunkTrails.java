@@ -444,7 +444,7 @@ public class TrunkTrails {
             }
             it.remove();
             for (int i = trail.bare.nextSetBit(0); i >= 0; i = trail.bare.nextSetBit(i + 1)) {
-                long growsAt = now + (long) (numbers.regrowTicks() * (0.5 + level.getRandom().nextDouble()));
+                long growsAt = now + (long) (numbers.regrowTicks() * (0.5 + colony.random().nextDouble()));
                 regrowing.add(new Regrow(colony.getCenter().getX() + trail.columns[i][0], colony.getCenter().getZ() + trail.columns[i][1], growsAt));
             }
             com.antcolonies.AntColoniesMod.LOGGER.info("[trails] colony {}: the trunk trail toward {} faded", colony.getId(), compass(trail.angle));

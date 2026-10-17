@@ -66,6 +66,15 @@ public class Colony {
      */
     @Nullable
     private static TestTime testTime;
+    /**
+     * Game test server only: the seed of the dice of a colony at a spot ({@code gametest.TestIsolation}: from its test's
+     * name), so a test rolls the same dice whether it runs alone or beside others. Null in a normal game. Not saved.
+     */
+    @Nullable
+    private static java.util.function.Function<BlockPos, Long> testSeeds;
+    /** The colony's own dice ({@link #random}). Not saved. */
+    @Nullable
+    private net.minecraft.util.RandomSource random;
     /** The biome's heat at the nest (its base temperature), for a day clock's midday rest; read once. Not saved. */
     @Nullable
     private Float heat;
@@ -333,6 +342,25 @@ public class Colony {
     /** Game test server only: the test clocks every colony reads (see {@link #testTime}). */
     public static void setTestTime(@Nullable TestTime time) {
         testTime = time;
+    }
+
+    /**
+     * The colony's own dice, for its decisions (which seed heap, which way to search, who dies of old age, ...). Each
+     * colony rolls its own, never the world's shared dice: on the test server the tests run side by side in one world, and
+     * with shared dice every colony's luck changed with whatever its neighbours rolled (the test health plan, 2026-10-16).
+     * In a game: seeded from the colony's id; on the test server: from its test (the same dice every run).
+     */
+    public net.minecraft.util.RandomSource random() {
+        if (random == null) {
+            Long seed = testSeeds == null ? null : testSeeds.apply(center);
+            random = net.minecraft.util.RandomSource.create(seed != null ? seed : id.getMostSignificantBits() ^ id.getLeastSignificantBits());
+        }
+        return random;
+    }
+
+    /** Game test server only: where each colony's dice come from (see {@link #testSeeds}). */
+    public static void setTestSeeds(@Nullable java.util.function.Function<BlockPos, Long> seeds) {
+        testSeeds = seeds;
     }
 
     /** The biome's heat at the nest (its base temperature: plains 0.8, badlands, desert and savanna 2.0). */

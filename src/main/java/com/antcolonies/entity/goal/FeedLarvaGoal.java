@@ -121,7 +121,7 @@ public class FeedLarvaGoal extends Goal {
         if (hungry.isEmpty()) {
             return null;
         }
-        Entity chosen = hungry.get(level.getRandom().nextInt(hungry.size()));
+        Entity chosen = hungry.get(colony.random().nextInt(hungry.size()));
         ((FedByNurses) chosen).claimFeeder(ant.getUUID(), now + Brood.LARVA_CLAIM_TICKS);
         return chosen;
     }

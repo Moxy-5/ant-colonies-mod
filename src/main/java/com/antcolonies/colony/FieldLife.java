@@ -406,7 +406,7 @@ public class FieldLife {
      */
     private void searchOnce(ServerLevel level, SpeciesProfile.SearchNumbers search, int range) {
         BlockPos middle = colony.getCenter();
-        var random = level.getRandom();
+        var random = colony.random();
         TrunkTrails trails = colony.trunkTrails();
         TrunkTrails.Trail trail = trails.keepsTrails() && random.nextInt(5) != 0 ? trails.pickForSearch(level, random) : null;
         double angle;

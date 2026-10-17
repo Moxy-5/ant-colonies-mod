@@ -131,7 +131,7 @@ class Meals {
                 times.merge(minute(now), want - have, Integer::sum);
             }
             for (int extra = have - want; extra > 0 && !times.isEmpty(); extra--) {
-                remove(times, pick(times, level.getRandom()), 1);
+                remove(times, pick(times, colony.random()), 1);
             }
         }
         lastAte.forEach((caste, times) -> {

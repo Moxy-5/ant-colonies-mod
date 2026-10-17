@@ -156,7 +156,7 @@ public class FoodStore {
      * (the ant then brings the seed straight to the mill, so nothing is put down without a store).
      */
     public boolean wantsSeeds(ServerLevel level) {
-        return pickFoodSpot(level, level.getRandom()) != null || colony.bakery().needsBread(level);
+        return pickFoodSpot(level, colony.random()) != null || colony.bakery().needsBread(level);
     }
 
     /**

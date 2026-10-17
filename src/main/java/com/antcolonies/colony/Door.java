@@ -440,7 +440,7 @@ public class Door {
                 / Math.max(1.0, foragers - numbersOut + waiting.size()));
         long now = level.getGameTime();
         for (AbstractAntEntity ant : waiting) {
-            if (level.getRandom().nextDouble() < chance) {
+            if (colony.random().nextDouble() < chance) {
                 touches.computeIfAbsent(ant.getUUID(), key -> new ArrayDeque<>()).add(now);
             }
         }

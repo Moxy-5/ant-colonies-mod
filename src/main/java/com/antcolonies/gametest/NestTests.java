@@ -721,7 +721,7 @@ public class NestTests {
     /**
      * In a finished nest with 25 seeds in the food store the nurse mills them into ant bread in the nursery and the
      * workers feed the queen 20 pieces. She then carries an egg for 3 minutes (3600 ticks), the egg comes out behind her
-     * in her room, and a worker carries it into the nursery. After that she is fed the 5 pieces that are left.
+     * in her room, and a worker carries it into the nursery. After that the 5 pieces that are left go to her (and to the larva, if her egg has hatched by then: the nurses feed both).
      * Milling: the first seed is gone from the store as the nurse takes it, and only becomes bread (on the nursery floor)
      * after the milling time.
      */
@@ -739,6 +739,14 @@ public class NestTests {
         long[] seedTakenAt = {-1};
         long[] breadAt = {-1};
         boolean[] eggInNursery = {false};
+        // The bread each larva was fed (the most seen): her egg can hatch before she has eaten the last pieces, and the
+        // nurses feed the larva too (as real nurses feed the queen and the young from the same bread).
+        java.util.Map<java.util.UUID, Integer> larvaFed = new java.util.HashMap<>();
+        helper.onEachTick(() -> {
+            for (com.antcolonies.entity.AntLarvaEntity larva : level.getEntitiesOfClass(com.antcolonies.entity.AntLarvaEntity.class, helper.getBounds())) {
+                larvaFed.merge(larva.getUUID(), larva.getFed(), Math::max);
+            }
+        });
         helper.onEachTick(() -> {
             Colony colony = colony(helper);
             if (stocked[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.nest().findDigTarget(level) != null
@@ -824,7 +832,9 @@ public class NestTests {
                     + level.getEntitiesOfClass(com.antcolonies.entity.AntLarvaEntity.class, helper.getBounds()).size() == 1,
                     "there is an egg or larva somewhere else");
             helper.assertTrue(breadInNursery[0], "no bread was ever seen on the nursery floor");
-            helper.assertTrue(colony.queenCare().getQueenBread() == 5, "the queen was fed " + colony.queenCare().getQueenBread() + " pieces of bread for the next egg, expected the 5 that were left");
+            int larvaeFed = larvaFed.values().stream().mapToInt(Integer::intValue).sum();
+            helper.assertTrue(colony.queenCare().getQueenBread() + larvaeFed == 5, "the queen was fed " + colony.queenCare().getQueenBread()
+                    + " pieces of bread for the next egg and the larva " + larvaeFed + ", expected the 5 that were left between them");
             helper.assertTrue(colony.food().getFood() == 0 && seedsIn(level, storeBox(level, colony)) == 0, "seeds are left in the store");
             helper.assertTrue(colony.bakery().getBread() == 0 && breadIn(level, helper.getBounds()) == 0, "bread is left in the nursery");
             for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
@@ -1587,7 +1597,8 @@ public class NestTests {
             helper.assertTrue(queens.size() == 1, "no queen");
             int[] roles = new int[com.antcolonies.colony.ColonyRole.values().length];
             int nursesNearQueen = 0;
-            for (WorkerAntEntity worker : level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds())) {
+            // (the colony's own workers wherever they are: a forager out searching can be past the edge of the box)
+            for (WorkerAntEntity worker : TestIsolation.insectsOf(level, colony, WorkerAntEntity.class)) {
                 var role = colony.roleOf(level, worker.getUUID());
                 roles[role.ordinal()]++;
                 double dx = worker.getX() - queens.get(0).getX();

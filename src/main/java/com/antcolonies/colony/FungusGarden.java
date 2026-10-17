@@ -97,7 +97,7 @@ public class FungusGarden implements NurseFood {
         if (numbers == null) {
             return false;
         }
-        RandomSource random = level.getRandom();
+        RandomSource random = colony.random();
         float chance = chancePerSecond(numbers);
         float ripen = Math.min(1.0F, ageingSpeedForTests * 20.0F / Math.max(20, numbers.ripenTicks()));
         float age = Math.min(1.0F, ageingSpeedForTests * 20.0F / Math.max(20, numbers.oldTicks()));

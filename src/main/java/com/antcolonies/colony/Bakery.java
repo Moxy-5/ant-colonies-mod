@@ -74,7 +74,7 @@ public class Bakery implements NurseFood {
         millers.prune(level.getGameTime());
         Brood brood = colony.brood();
         int wanted = (brood.isFull(level) ? 0 : colony.profile().food().breadStock()) + brood.larvaHunger(level);
-        return bread + millers.size() < wanted && pickBreadSpot(level, level.getRandom()) != null;
+        return bread + millers.size() < wanted && pickBreadSpot(level, colony.random()) != null;
     }
 
     /** A worker sets out to mill a seed. False if no more bread is needed right now. */
@@ -116,7 +116,7 @@ public class Bakery implements NurseFood {
      * otherwise (no store yet, or full) to the mill if bread is needed. True = the mill; the worker is then counted.
      */
     public boolean claimSeedForBread(ServerLevel level, UUID ant) {
-        return colony.food().pickFoodSpot(level, level.getRandom()) == null && claimMilling(level, ant);
+        return colony.food().pickFoodSpot(level, colony.random()) == null && claimMilling(level, ant);
     }
 
     /**

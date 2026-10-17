@@ -78,6 +78,18 @@ neoForge {
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         }
 
+        // Tests side by side (tools/run_game_tests.sh): one more game test server per share of the tests, each in its
+        // own folder and world. How many: -PtestShards=n (5 if not given; the PC has 20 threads and 64 GB).
+        def testShards = (project.findProperty('testShards') ?: '5') as int
+        (1..testShards).each { shard ->
+            register("gameTestShard${shard}") {
+                type = "gameTestServer"
+                gameDirectory = project.file("run-test-shards/${shard}")
+                systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+                systemProperty 'antcolonies.shard', "${shard}/${testShards}"
+            }
+        }
+
         data {
             data()
             // example of overriding the workingDirectory set in configureEach above, uncomment if you want to use it

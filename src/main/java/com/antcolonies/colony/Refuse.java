@@ -43,7 +43,7 @@ public class Refuse {
         AntCorpseEntity corpse = new AntCorpseEntity(colony.getSpecies().equals(com.antcolonies.species.Species.MACROTERMES)
                 ? ModEntities.TERMITE_CORPSE.get() : ModEntities.ANT_CORPSE.get(), level);
         corpse.setColonyId(id);
-        corpse.moveTo(x, y, z, level.getRandom().nextFloat() * 360.0F, 0.0F);
+        corpse.moveTo(x, y, z, colony.random().nextFloat() * 360.0F, 0.0F);
         level.addFreshEntity(corpse);
         return corpse;
     }
@@ -148,10 +148,10 @@ public class Refuse {
     @Nullable
     public AntCorpseEntity findLooseCorpse(Level level, BlockPos near, Set<UUID> avoid, java.util.function.Predicate<BlockPos> canGo) {
         boolean eats = eatsOrBuries();
-        if (!eats && pickCorpseSpot(level, level.getRandom()) == null) {
+        if (!eats && pickCorpseSpot(level, colony.random()) == null) {
             return null;
         }
-        boolean roomToEat = eats && colony.food().pickFoodSpot(level, level.getRandom()) != null;
+        boolean roomToEat = eats && colony.food().pickFoodSpot(level, colony.random()) != null;
         claimedCorpses.prune(level.getGameTime());
         Set<BlockPos> chamber = new HashSet<>(colony.nest().getRefuseCells(level));
         AntCorpseEntity best = null;

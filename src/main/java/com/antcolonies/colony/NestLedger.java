@@ -138,7 +138,7 @@ public class NestLedger {
 
     /** A comb out of every player's sight whose state passes {@code test}, or null. */
     @org.jetbrains.annotations.Nullable
-    private static BlockPos pick(ServerLevel level, List<BlockPos> combs, List<Vec3> eyes,
+    private BlockPos pick(ServerLevel level, List<BlockPos> combs, List<Vec3> eyes,
             java.util.function.Predicate<net.minecraft.world.level.block.state.BlockState> test) {
         List<BlockPos> fits = new java.util.ArrayList<>();
         for (BlockPos pos : combs) {
@@ -147,7 +147,7 @@ public class NestLedger {
                 fits.add(pos);
             }
         }
-        return fits.isEmpty() ? null : fits.get(level.getRandom().nextInt(fits.size()));
+        return fits.isEmpty() ? null : fits.get(colony.random().nextInt(fits.size()));
     }
 
     private boolean applyBodies(ServerLevel level, List<Vec3> eyes) {
@@ -157,7 +157,7 @@ public class NestLedger {
                 bodies = 0; // termites ate their dead in the garden
                 return true;
             }
-            BlockPos spot = colony.refuse().pickCorpseSpot(level, level.getRandom());
+            BlockPos spot = colony.refuse().pickCorpseSpot(level, colony.random());
             if (spot == null) {
                 bodies = 0; // the refuse chamber is full (or not dug): the rest were carried out of the nest
                 return true;
@@ -177,7 +177,7 @@ public class NestLedger {
         FoodStore food = colony.food();
         boolean changed = false;
         for (int tries = 0; store > 0 && tries < PER_SECOND; tries++) {
-            BlockPos spot = food.pickFoodSpot(level, level.getRandom());
+            BlockPos spot = food.pickFoodSpot(level, colony.random());
             if (spot == null) {
                 store--; // the store is full (or not dug): eaten, or put somewhere else
                 food.used(1);
@@ -204,7 +204,7 @@ public class NestLedger {
                 store = 0; // nothing left to take off: it was taken already
                 return true;
             }
-            BlockPos heap = heaps.get(level.getRandom().nextInt(heaps.size()));
+            BlockPos heap = heaps.get(colony.random().nextInt(heaps.size()));
             if (!Population.outOfSight(level, Vec3.atCenterOf(heap), eyes)) {
                 if (heaps.stream().noneMatch(pos -> Population.outOfSight(level, Vec3.atCenterOf(pos), eyes))) {
                     break; // a player can see every heap: later
@@ -223,7 +223,7 @@ public class NestLedger {
         NurseFood food = colony.nurseFood();
         boolean changed = false;
         for (int tries = 0; nurseFood > 0 && tries < PER_SECOND; tries++) {
-            BlockPos spot = food.pickReturnSpot(level, level.getRandom());
+            BlockPos spot = food.pickReturnSpot(level, colony.random());
             if (spot == null) {
                 nurseFood--; // nowhere to keep it: eaten meanwhile
                 food.forget(1);
@@ -239,7 +239,7 @@ public class NestLedger {
             }
         }
         for (int tries = 0; nurseFood < 0 && tries < PER_SECOND; tries++) {
-            BlockPos spot = food.findFood(level, level.getRandom());
+            BlockPos spot = food.findFood(level, colony.random());
             if (spot == null) {
                 nurseFood = 0; // nothing left to take: it was taken already
                 return true;

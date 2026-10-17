@@ -158,7 +158,7 @@ public class BuildLife {
                 waited = true;
                 return true;
             }
-            BlockPos spot = hill.pickMoundSpot(level, level.getRandom(), null);
+            BlockPos spot = hill.pickMoundSpot(level, colony.random(), null);
             if (spot == null) {
                 return false;
             }
@@ -200,7 +200,7 @@ public class BuildLife {
             // Ants carry the soil up onto the hill while it has room (the first spot is looked at before the block is
             // dug). Founders leave theirs where it falls (they carry no soil, as when they dig here).
             boolean founding = colony.isFounding();
-            BlockPos heap = ants && !founding && hill.hasMoundRoom(level) ? hill.pickMoundSpot(level, level.getRandom(), null) : null;
+            BlockPos heap = ants && !founding && hill.hasMoundRoom(level) ? hill.pickMoundSpot(level, colony.random(), null) : null;
             if (heap != null && !freeAndHidden(level, heap, eyes)) {
                 waited = true;
                 return true;
@@ -222,7 +222,7 @@ public class BuildLife {
                     work -= trip(target, heap);
                     changes[0]++;
                     colony.away().report().add(AwayReport.What.HILL, 1);
-                    heap = hill.hasMoundRoom(level) ? hill.pickMoundSpot(level, level.getRandom(), null) : null;
+                    heap = hill.hasMoundRoom(level) ? hill.pickMoundSpot(level, colony.random(), null) : null;
                     if (heap != null && !freeAndHidden(level, heap, eyes)) {
                         heap = null; // a player can see the hill now: the rest of this block's soil is left behind
                     }

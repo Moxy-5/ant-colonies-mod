@@ -248,7 +248,7 @@ public class Population {
                 deaths = count;
             } else {
                 double expected = count * 20.0 / (until - age);
-                deaths = (int) expected + (level.getRandom().nextDouble() < expected - (int) expected ? 1 : 0);
+                deaths = (int) expected + (colony.random().nextDouble() < expected - (int) expected ? 1 : 0);
                 deaths = Math.min(count, deaths);
             }
             if (deaths > 0) {
@@ -273,7 +273,7 @@ public class Population {
         int died = 0;
         while (ages != null && !ages.isEmpty() && died < count) {
             int total = ages.values().stream().mapToInt(Integer::intValue).sum();
-            int pick = level.getRandom().nextInt(total);
+            int pick = colony.random().nextInt(total);
             for (Map.Entry<Long, Integer> entry : ages.entrySet()) {
                 pick -= entry.getValue();
                 if (pick < 0) {
@@ -303,7 +303,7 @@ public class Population {
             colony.ledger().addBodies(died);
         } else if (!colony.refuse().eatsOrBuries()) {
             for (int i = 0; i < died; i++) {
-                BlockPos spot = colony.refuse().pickCorpseSpot(level, level.getRandom());
+                BlockPos spot = colony.refuse().pickCorpseSpot(level, colony.random());
                 if (spot == null || !colony.refuse().placeCorpse(level, spot)) {
                     break;
                 }
@@ -440,7 +440,7 @@ public class Population {
                 if (rooms == null) {
                     rooms = hiddenRoomCells(level, eyes);
                 }
-                if (rooms.isEmpty() || !comeOut(level, caste, rooms.get(level.getRandom().nextInt(rooms.size())))) {
+                if (rooms.isEmpty() || !comeOut(level, caste, rooms.get(colony.random().nextInt(rooms.size())))) {
                     break;
                 }
                 have++;
@@ -537,11 +537,11 @@ public class Population {
         if (mob == null) {
             return false;
         }
-        mob.moveTo(cell.getX() + 0.5, cell.getY(), cell.getZ() + 0.5, level.getRandom().nextFloat() * 360.0F, 0.0F);
+        mob.moveTo(cell.getX() + 0.5, cell.getY(), cell.getZ() + 0.5, colony.random().nextFloat() * 360.0F, 0.0F);
         // Somewhere in the minute it grew up, so the ones of the same minute are not all exactly the same age.
-        mob.comeOutOfNest(colony, minute + level.getRandom().nextInt((int) AGE_STEP));
+        mob.comeOutOfNest(colony, minute + colony.random().nextInt((int) AGE_STEP));
         if (meals.dietOf(caste) != null) {
-            mob.setLastMeal(Math.min(level.getGameTime(), meals.take(caste, level.getRandom(), level.getGameTime())));
+            mob.setLastMeal(Math.min(level.getGameTime(), meals.take(caste, colony.random(), level.getGameTime())));
         }
         takeInside(caste, minute, 1);
         level.addFreshEntity(mob);
@@ -577,7 +577,7 @@ public class Population {
             }
         }
         int total = from.values().stream().mapToInt(Integer::intValue).sum();
-        int pick = level.getRandom().nextInt(total);
+        int pick = colony.random().nextInt(total);
         for (Map.Entry<Long, Integer> entry : from.entrySet()) {
             pick -= entry.getValue();
             if (pick < 0) {
