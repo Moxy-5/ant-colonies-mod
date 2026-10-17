@@ -84,8 +84,17 @@ it.** If a decision changes, ask the user first, then update it here. The short 
   - **Build order** (user: "sounds good"): **6a** the two soldier mobs (models, head-bang animation), nymphs becoming soldiers on demand, nurses feeding them, majors guarding inside (BUILT); **6b** minors at the holes and the sentry line with the foragers (BUILT); **6c** the alarm ladder (drumming that spreads, rush to the breach, sealing them out, level 4) (BUILT, with the chickens and the bite).
   - **Chickens and a simple bite in 6c (user, 2026-10-13):** chickens hunt workers out on the surface (the easy way to test alarm level 2), and minor soldiers fight back, against chickens only for now: a simple bite of **3 damage** (a chicken has 4 health, so 2 bites kill it) with a quick jaws-shut animation (simple placeholder, refined later). Players and ants are still not attacked (M8). How often chickens hunt and how hard they peck were my picks when 6c was built (in `docs/HISTORY.md`, to confirm).
 
+### Matabele ants and the first fights (M8, user's decision 2026-10-17)
+- **M8 is now "Matabele ants and the first fights"** (was "Ant vs termite fights"). The user moved the Matabele ant (*Megaponera analis*) up from the later species, as the termites' real enemy: real harvester ants (*Pogonomyrmex*, the Americas) never meet *Macrotermes* (Africa), while Matabele ants hunt nothing but termites, fungus-growing termites including *Macrotermes*, at their feeding spots rather than the mound. Raiding is their only way to eat, so they can't come before fighting: the shared fight system is built with them as the first fighters, species-neutral, for the harvester ants to use after.
+- **Real behaviour to build from** (Erik Frank's studies in Ivory Coast, 2017 to 2023; details decided in M8's planning session, before any code):
+  - **Raids:** a scout finds termites feeding, goes home and leads a column of about 200 to 500 ants there, 2 to 4 raids a day. Big workers break open the termites' mud runways and sheeting, small workers go in and sting; the big workers carry stacks of dead termites home in their jaws.
+  - **Rescue:** a hurt ant (a termite soldier clamped on, legs bitten off) gives off a "help me" smell; nestmates pull the termites off and carry it home. Lightly hurt ants tuck their legs in to be carried; badly hurt ones (5 legs gone) flail and are left behind.
+  - **Wound care:** there are no special nurse ants; in the nest any nestmate licks the wounds and treats infected ones with a germ-killing liquid from a gland on its body (without care about 80% of the hurt die, with care about 10%). Ants missing a leg or two learn to walk on four.
+  - **Other details:** they squeak loudly when disturbed and smell strongly, nest in the ground, rotten logs and old termite mounds, move their nest often, and found new colonies by splitting (a wingless queen; founding type `colony_fission`).
+- **Build order (my suggestion, the user agreed to the milestone; confirm in the planning session):** (1) the ant and its nest, (2) scouts and raids on termite feeding spots, (3) rescue and wound care. It comes after grama grass and brain steps 4c part 2 and 4g. Harvester ant fights come after, on the same fight system.
+- **Open (ask the user in M8's planning):** do harvester ants still fight termites where plains meet savanna (the old plan, not real), or mainly their own harvester neighbours (real territory fights)?
+
 ### Later species (NOT version 1)
-- Matabele ant: savanna termite raiders, march in columns, carry injured nestmates home. Wingless queens; new colonies form by the colony splitting in two.
 - Leafcutter ants (cut leaf pieces, farm fungus) and army ants (living bivouacs, raiding swarms).
 
 ## Core systems
