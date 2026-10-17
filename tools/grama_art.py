@@ -1,5 +1,5 @@
 """Draws the grama grasses for the harvester ants (the user's decisions, 2026-10-16, docs/DESIGN.md "Custom plants"):
-blue grama in the plains and black grama in the badlands, each at every stage of its life, in two looks for the user to
+blue grama in the plains and black grama in the badlands (dried: weathered dark grey-brown, the 'black' in its name), each at every stage of its life, in two looks for the user to
 pick from in the viewer (python tools/model_viewer.py grama). Once a look is picked this file also writes the game's
 textures and block files.
 
@@ -82,8 +82,8 @@ BLACK = {
     "young": ((96, 116, 76), (156, 164, 120)),
     "cured_tip": (176, 168, 140),
     "runner": (62, 56, 50),
-    "stalk": {"flowering": (100, 104, 84), "ripe": (150, 140, 116), "dried": (180, 172, 150)},
-    "spike": {"flowering": (118, 90, 112), "ripe": (172, 156, 124), "dried": (190, 182, 160)},
+    "stalk": {"flowering": (100, 104, 84), "ripe": (150, 140, 116), "dried": (96, 88, 78)},
+    "spike": {"flowering": (118, 90, 112), "ripe": (172, 156, 124), "dried": (112, 102, 90)},
     "wool": (234, 232, 222),
 }
 
@@ -171,7 +171,9 @@ def black_leaves(img, rng, look, stage):
     """Sparse wiry upright leaves, and in look B the dark runners creeping along the ground."""
     base, tip = BLACK["young"] if stage == "young" else BLACK["leaf"]
     if stage in ("ripe", "dried"):
-        tip = mix(tip, BLACK["cured_tip"], 0.4 if stage == "ripe" else 0.75)
+        tip = mix(tip, BLACK["cured_tip"], 0.4) if stage == "ripe" else mix(tip, (118, 110, 96), 0.7)
+        if stage == "dried":
+            base = mix(base, (74, 68, 60), 0.5)  # old stems weather dark grey-brown: the "black" of black grama
     count = 3 if stage == "young" else (7 if look == "A" else 9)
     for i in range(count):
         spread = 1.8 if stage == "young" else 1.0
