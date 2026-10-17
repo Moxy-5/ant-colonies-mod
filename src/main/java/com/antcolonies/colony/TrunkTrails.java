@@ -287,16 +287,18 @@ public class TrunkTrails {
             }
         }
         recent.removeIf(trip -> difference(trip.angle(), angle) <= spread);
-        Trail trail = newTrail(mean, numbers, now);
+        // As strong as the trips that laid it (this one adds its own 1 in trip()): starting at 0, one trip's 1 sat right
+        // at the profile's fade line and the trail faded a second later.
+        Trail trail = newTrail(mean, numbers, now, count - 1);
         trails.add(trail);
         com.antcolonies.AntColoniesMod.LOGGER.info("[trails] colony {} laid a new trunk trail toward {} ({} trails)", colony.getId(),
                 compass(mean), trails.size());
         return trail;
     }
 
-    private Trail newTrail(double angle, SpeciesProfile.TrunkNumbers numbers, long now) {
+    private Trail newTrail(double angle, SpeciesProfile.TrunkNumbers numbers, long now, double strength) {
         int[][] columns = columnsFor(angle, numbers.start(), colony.profile().food().radius());
-        return new Trail(angle, columns, new int[columns.length], new BitSet(columns.length), 0, 0.0, now);
+        return new Trail(angle, columns, new int[columns.length], new BitSet(columns.length), 0, strength, now);
     }
 
     /**
