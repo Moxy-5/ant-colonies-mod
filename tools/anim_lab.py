@@ -25,8 +25,10 @@ Run from the project folder:
   python tools/anim_lab.py film worker_ant walk [--frames 8]
   python tools/anim_lab.py compare worker_ant walk idle sleep
   python tools/anim_lab.py check worker_ant [walk]
-  python tools/anim_lab.py sheet run-film/screenshots/film [--cols 4]
-  python tools/anim_lab.py match run-film/screenshots worker_ant
+  python tools/anim_lab.py sheet run-film/screenshots/<scene> [--cols 4]
+  python tools/anim_lab.py match run-film/screenshots/<scene> worker_ant
+(Each film scene's pictures are in run-film/screenshots/<scene>/; read run-film/screenshots/checks.txt first: the
+camera's automatic checks name the pictures with a body part in a block or a sudden jump.)
 Options: --anim <file stem> to read another insect's animation file (the queen uses worker_ant's), --speed <blocks a
 second> for the walking speed the treadmill and the checks assume (default: the insect's normal speed below).
 
@@ -179,12 +181,17 @@ FACE_CORNERS = {'north': (0, 2, 6, 4), 'south': (1, 5, 7, 3), 'west': (0, 1, 3, 
 
 
 class Model:
-    def __init__(self, name):
+    def __init__(self, name, bones=None):
+        """The insect's model from the game's geo file, or from a list of bones (the motion library, tools/ant_motion.py,
+        works on the model before the file is written)."""
         self.name = name
-        geo = json.load(open(os.path.join(ASSETS, 'geo', 'entity', f'{name}.geo.json'), encoding='utf-8'))
-        g = geo['minecraft:geometry'][0]
-        desc = g['description']
-        self.bones = g['bones']
+        if bones is None:
+            geo = json.load(open(os.path.join(ASSETS, 'geo', 'entity', f'{name}.geo.json'), encoding='utf-8'))
+            g = geo['minecraft:geometry'][0]
+            desc = g['description']
+            self.bones = g['bones']
+        else:
+            desc, self.bones = {}, bones
         self.by = {b['name']: b for b in self.bones}
         tex_path = os.path.join(ASSETS, 'textures', 'entity', f'{name}.png')
         tex = read_png(tex_path) if os.path.exists(tex_path) else None
@@ -387,6 +394,14 @@ class Clip:
                     self.bones.setdefault(bone, {})[ch] = frames
                     last = max(last, frames[-1][0])
         self.length = float(data.get('animation_length', last)) or 1.0
+        # The clip's own notes (GeckoLib's "timeline"): a walk says how far it carries the insect, in model units per
+        # clip ("stride 6.03"), so the game plays it at the speed that keeps the feet planted.
+        self.notes = {k: (v if isinstance(v, str) else ' '.join(v)) for k, v in data.get('timeline', {}).items()}
+        self.stride = next((float(w.split()[1]) for w in self.notes.values() if w.startswith('stride ')), None)
+        # A turn on the spot says how far it turns the insect in one play (degrees, positive to the right: "turn 50").
+        self.turn = next((float(w.split()[1]) for w in self.notes.values() if w.startswith('turn ')), None)
+        # A walk made for a band of speeds says which (model units a second: "speeds 19.56 45.23").
+        self.speeds = next((tuple(map(float, w.split()[1:3])) for w in self.notes.values() if w.startswith('speeds ')), None)
 
     def pose(self, t):
         if self.loop:
@@ -431,7 +446,16 @@ class Gait:
                     speeds.append((self.tips[i + 1][k][2] - self.tips[i][k][2]) / dt)
         moving = [s for s in speeds if abs(s) > 1e-3]
         self.speed = sum(moving) / len(moving) if moving and len(moving) > len(speeds) * 0.3 else 0.0
-        self.walking = abs(self.speed) > 0.5
+        # Walking only when most feet travel back while down: a clip where only the front feet move on the ground (an
+        # ant raking soil while it digs) is standing, not walking.
+        travelling = 0
+        for k in legs:
+            mine = [(self.tips[i + 1][k][2] - self.tips[i][k][2]) / dt for i in range(n) if self.down[k][i] and self.down[k][i + 1]]
+            if mine and abs(sum(mine) / len(mine)) > 0.5:
+                travelling += 1
+        self.walking = abs(self.speed) > 0.5 and travelling > len(legs) // 2
+        if not self.walking:
+            self.speed = 0.0
 
     def stride(self):
         """Ground covered in one cycle, in model units."""
@@ -757,10 +781,40 @@ def check(model, clip, speed_bps=None, quiet=False):
     """Checks one clip. Returns a list of (level, message); level 'BAD' or 'NOTE'."""
     out = []
     gait = Gait(model, clip)
+    if speed_bps is None and clip.speeds:
+        # A walk for a band of speeds: judged in the middle of its band (the fast one at the game's walking speed).
+        low, high = clip.speeds
+        top = WALK_SPEED.get(model.name, 2.0) / model.blocks_per_unit
+        speed_bps = (top if high > top else (max(low, 0.4 * high) * high) ** 0.5) * model.blocks_per_unit
     speed_bps = speed_bps if speed_bps is not None else WALK_SPEED.get(model.name, 2.0)
     n = Gait.STEPS
     dt = clip.length / n
-    if gait.walking:
+    if clip.turn is not None and gait.legs:
+        # Turning on the spot: each planted foot should go round the middle as the body turns over it (the body turns
+        # right, so a foot standing still on the ground turns left round the middle in the body's frame).
+        w = math.radians(clip.turn) / clip.length
+        worst = {}
+        for k in gait.legs:
+            for i in range(n):
+                if gait.down[k][i] and gait.down[k][i + 1]:
+                    a, b = gait.tips[i][k], gait.tips[i + 1][k]
+                    vx, vz = (b[0] - a[0]) / dt, (b[2] - a[2]) / dt
+                    ex, ez = -w * a[2], w * a[0]
+                    slip = math.hypot(vx - ex, vz - ez) / max(1e-6, math.hypot(ex, ez))
+                    if slip > worst.get(k, (0, 0))[0]:
+                        worst[k] = (slip, gait.times[i])
+        for k, (slip, t) in sorted(worst.items()):
+            if slip > 0.35:
+                out.append(('BAD', f'foot {k} slides while turning: off by {slip * 100:.0f}% of its speed round the middle at {t:.3f} s'))
+            elif slip > 0.15:
+                out.append(('NOTE', f'foot {k} slips a little while turning: {slip * 100:.0f}% at {t:.3f} s'))
+        down_min = min(sum(gait.down[k][i] for k in gait.legs) for i in range(n + 1))
+        if down_min < 3 and len(gait.legs) == 6:
+            out.append(('BAD', f'only {down_min} feet on the ground while turning (at least 3 should be down)'))
+        duty = {k: sum(gait.down[k][:-1]) / n for k in gait.legs}
+        out.append(('NOTE', f'turns {clip.turn:g} degrees a cycle; at 90 degrees a second each leg steps '
+                            f'{90 / abs(clip.turn):.1f} times a second; duty ' + ', '.join(f'{k} {d:.2f}' for k, d in duty.items())))
+    elif gait.walking:
         # Sliding: each planted foot should move back at the treadmill speed and not sideways.
         worst = {}
         for k in gait.legs:
@@ -794,6 +848,11 @@ def check(model, clip, speed_bps=None, quiet=False):
         out.append(('NOTE', f'at {speed_bps:g} blocks a second ({speed_bps / body_blocks:.1f} body lengths a second) the walk '
                             f'must play {cycles:.1f} cycles a second = playback speed {cycles * clip.length:.2f} '
                             f'(each leg steps {cycles:.1f} times a second)'))
+        if clip.stride is None:
+            out.append(('NOTE', 'no stride note in the clip: the game can only guess how fast to play it'))
+        elif abs(clip.stride - gait.stride()) > 0.03 * gait.stride():
+            out.append(('BAD', f"the clip's stride note says {clip.stride:.2f} units, its feet cover {gait.stride():.2f}: "
+                               'the game would play it at the wrong speed and the feet would slide'))
         out.append(('NOTE', 'duty factor (share of the cycle a foot is down; real tripod walkers 0.5 to 0.65): '
                             + ', '.join(f'{k} {d:.2f}' for k, d in duty.items())))
         out.append(('NOTE', 'touch-down moment in the cycle (tripod: L1 R2 L3 together, the others half a cycle off): '

@@ -36,7 +36,15 @@ import net.minecraft.world.level.block.state.properties.Property;
 public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNumbers queen, BroodNumbers brood,
         FoodNumbers food, RefuseNumbers refuse, NestNumbers nest, Optional<QueenBody> queenBody, Optional<Founding> founding,
         Optional<MoundNumbers> mound, Optional<GardenNumbers> garden, Optional<Laying> laying, Optional<SoldierNumbers> soldiers,
-        Optional<AlarmNumbers> alarm) {
+        Optional<AlarmNumbers> alarm, Optional<BodyLanguage> bodyLanguage) {
+
+    /** The numbers without a body language section (the insects' bodies just walk and stand). */
+    public SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNumbers queen, BroodNumbers brood, FoodNumbers food,
+            RefuseNumbers refuse, NestNumbers nest, Optional<QueenBody> queenBody, Optional<Founding> founding,
+            Optional<MoundNumbers> mound, Optional<GardenNumbers> garden, Optional<Laying> laying, Optional<SoldierNumbers> soldiers,
+            Optional<AlarmNumbers> alarm) {
+        this(colony, worker, queen, brood, food, refuse, nest, queenBody, founding, mound, garden, laying, soldiers, alarm, Optional.empty());
+    }
 
     /** The numbers without a fungus garden, without a steady stream of eggs (the queen lays one egg per meal) and without soldiers. */
     public SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNumbers queen, BroodNumbers brood, FoodNumbers food,
@@ -1027,6 +1035,175 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
         }
     }
 
+    /**
+     * How the insects' bodies behave (the animation engine, 2026-10-16; species-neutral, every number my pick, to
+     * confirm). {@code naps} (optional, none for a species that does not nap): see {@link Naps}. {@code hot} (optional):
+     * see {@link Heat}. {@code traits} (optional, everyone in the middle without): see {@link Traits}. {@code notice}
+     * (optional, none for a species that never notices a player): see {@link Notice}. {@code groom} (optional, none for
+     * a species whose model has no cleaning clips yet): see {@link Groom}.
+     */
+    public record BodyLanguage(Optional<Naps> naps, Optional<Heat> heat, Optional<Traits> traits, Optional<Notice> notice,
+                               Optional<Groom> groom) {
+        public static final Codec<BodyLanguage> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Naps.CODEC.optionalFieldOf("naps").forGetter(BodyLanguage::naps),
+                Heat.CODEC.optionalFieldOf("hot").forGetter(BodyLanguage::heat),
+                Traits.CODEC.optionalFieldOf("traits").forGetter(BodyLanguage::traits),
+                Notice.CODEC.optionalFieldOf("notice").forGetter(BodyLanguage::notice),
+                Groom.CODEC.optionalFieldOf("groom").forGetter(BodyLanguage::groom)
+        ).apply(i, BodyLanguage::new));
+    }
+
+    /**
+     * Cleaning the antennae (real ants groom often, and the antennae most of all: each is drawn through the comb on the
+     * front leg of its side, the strigil, then the comb is cleaned in the jaws; Farish 1972, Hackmann et al. 2015). An
+     * insect standing about with nothing to do starts with {@code chancePerSecond} each second (times 0.5 to 1.5 by its
+     * restlessness); {@code bothShare} of the time it cleans both, one after the other, otherwise one side.
+     */
+    public record Groom(float chancePerSecond, float bothShare) {
+        public static final Codec<Groom> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.FLOAT.optionalFieldOf("chance_per_second", 0.05F).forGetter(Groom::chancePerSecond),
+                Codec.FLOAT.optionalFieldOf("both_share", 0.4F).forGetter(Groom::bothShare)
+        ).apply(i, Groom::new));
+    }
+
+    /**
+     * Personality (the animation engine, 2026-10-16). Workers of one colony really differ, each its whole life, in how
+     * bold, how curious and how restless they are (animal personality studies in ants, such as Temnothorax and Myrmica),
+     * and older ants (the foragers) are bolder than young ones (the nurses). Each real insect draws its three traits,
+     * 0 to 1, from these ranges (from, to) when it first needs them; {@code olderBolder} is how much bolder a worker at
+     * the end of its time as a nurse and after is than one just grown up (half of it either way from the drawn value).
+     */
+    public record Traits(List<Float> boldness, List<Float> curiosity, List<Float> restlessness, float olderBolder) {
+        public static final Codec<Traits> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.FLOAT.listOf().optionalFieldOf("boldness", List.of(0.0F, 1.0F)).forGetter(Traits::boldness),
+                Codec.FLOAT.listOf().optionalFieldOf("curiosity", List.of(0.0F, 1.0F)).forGetter(Traits::curiosity),
+                Codec.FLOAT.listOf().optionalFieldOf("restlessness", List.of(0.0F, 1.0F)).forGetter(Traits::restlessness),
+                Codec.FLOAT.optionalFieldOf("older_bolder", 0.3F).forGetter(Traits::olderBolder)
+        ).apply(i, Traits::new));
+
+        /** Everyone in the middle (a species without traits in its file). */
+        public static final Traits EVEN = new Traits(List.of(0.5F), List.of(0.5F), List.of(0.5F), 0.0F);
+
+        /** A value somewhere in this range ({@code share} 0 to 1). */
+        public static float draw(List<Float> range, double share) {
+            if (range.isEmpty()) {
+                return 0.5F;
+            }
+            float from = range.get(0);
+            float to = range.size() > 1 ? range.get(1) : from;
+            return from + (to - from) * (float) Math.max(0.0, Math.min(1.0, share));
+        }
+    }
+
+    /**
+     * Noticing a player (the animation engine, 2026-10-16; the user's decisions: movement only, and what the insect does
+     * depends on its personality). {@code sense}: {@code sight} (harvester ants have fairly good eyes and react to
+     * movement: an ant within {@code range} blocks of a player who moves, in plain view, stops, lifts its forebody, points
+     * its antennae and turns its head to follow; a still player is soon forgotten) or {@code vibration} (Macrotermes
+     * workers are blind and feel the ground shake: a player walking within {@code range}, or sprinting, jumping or
+     * landing within {@code shakeRange}, makes them freeze with antennae raised, never turning to look). How often an
+     * insect notices goes with its curiosity ({@code chance} a second for the most curious, a fifth of it for the least),
+     * and so does how long it looks ({@code lookTicks}, from, to). A bold one (boldness from {@code boldFrom}) then walks
+     * to about {@code comeWithin} blocks of the player; a shy one (below {@code shyBelow}) backs off {@code backOff}
+     * blocks, jaws open. Interest fades once the player has stood still for {@code forgetTicks}; then it does not notice
+     * again for {@code restTicks} (it gets used to a harmless thing). Only an insect with nothing to do: never one at
+     * work, carrying, asleep or in an alarm.
+     */
+    public record Notice(String sense, float range, float shakeRange, float chance, List<Integer> lookTicks, float boldFrom,
+            float shyBelow, float comeWithin, int backOff, int forgetTicks, int restTicks) {
+        public static final Codec<Notice> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.STRING.optionalFieldOf("sense", "sight").forGetter(Notice::sense),
+                Codec.FLOAT.optionalFieldOf("range", 6.0F).forGetter(Notice::range),
+                Codec.FLOAT.optionalFieldOf("shake_range", 6.0F).forGetter(Notice::shakeRange),
+                Codec.FLOAT.optionalFieldOf("chance", 0.8F).forGetter(Notice::chance),
+                Codec.INT.listOf().optionalFieldOf("look_ticks", List.of(60, 200)).forGetter(Notice::lookTicks),
+                Codec.FLOAT.optionalFieldOf("bold_from", 0.7F).forGetter(Notice::boldFrom),
+                Codec.FLOAT.optionalFieldOf("shy_below", 0.3F).forGetter(Notice::shyBelow),
+                Codec.FLOAT.optionalFieldOf("come_within", 1.0F).forGetter(Notice::comeWithin),
+                Codec.INT.optionalFieldOf("back_off", 2).forGetter(Notice::backOff),
+                Codec.INT.optionalFieldOf("forget_ticks", 60).forGetter(Notice::forgetTicks),
+                Codec.INT.optionalFieldOf("rest_ticks", 600).forGetter(Notice::restTicks)
+        ).apply(i, Notice::new));
+
+        /** Whether this species feels the ground shake instead of seeing (it freezes, it never turns to look). */
+        public boolean byVibration() {
+            return "vibration".equals(sense);
+        }
+
+        /**
+         * The chance that an insect this curious (0 to 1) notices a moving player when it can: by sight it goes with its
+         * curiosity; a shake is felt by all alike (freezing is a reflex).
+         */
+        public float chanceFor(float curiosity) {
+            return byVibration() ? chance : chance * (0.2F + 0.8F * Math.max(0.0F, Math.min(1.0F, curiosity)));
+        }
+
+        /** How long (ticks) an insect this curious looks before it goes on. */
+        public int lookTicksFor(float curiosity) {
+            if (lookTicks.isEmpty()) {
+                return 0;
+            }
+            int from = lookTicks.get(0);
+            int to = lookTicks.size() > 1 ? lookTicks.get(1) : from;
+            return from + Math.round((to - from) * Math.max(0.0F, Math.min(1.0F, curiosity)));
+        }
+    }
+
+    /**
+     * Short naps (real ants sleep in many short naps: Cassill et al. 2009, fire ants, workers about 250 naps a day of
+     * about a minute each, queens about 90 of about 6 minutes; with twitches of the antennae now and then, "rapid
+     * antennal movement"). A worker with nothing to do inside the nest (or anywhere, while it has no colony) falls
+     * asleep with {@code chancePerSecond} each second; a nap lasts {@code workerTicks} (from, to), a queen's
+     * {@code queenTicks}. Any job, being hurt or the alarm wakes it.
+     */
+    public record Naps(float chancePerSecond, List<Integer> workerTicks, List<Integer> queenTicks) {
+        public static final Codec<Naps> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.FLOAT.optionalFieldOf("chance_per_second", 0.033F).forGetter(Naps::chancePerSecond),
+                Codec.INT.listOf().optionalFieldOf("worker_ticks", List.of(800, 1600)).forGetter(Naps::workerTicks),
+                Codec.INT.listOf().optionalFieldOf("queen_ticks", List.of(3600, 7200)).forGetter(Naps::queenTicks)
+        ).apply(i, Naps::new));
+
+        /** How long one nap lasts (ticks), somewhere in the caste's range; {@code share} is 0 to 1. */
+        public int ticksFor(boolean queen, double share) {
+            List<Integer> range = queen ? queenTicks : workerTicks;
+            if (range.isEmpty()) {
+                return 0;
+            }
+            int from = range.get(0);
+            int to = range.size() > 1 ? range.get(1) : from;
+            return from + (int) Math.round((to - from) * Math.max(0.0, Math.min(1.0, share)));
+        }
+    }
+
+    /**
+     * Hot ground (real desert and harvester ants: on soil too hot to touch they stand and walk tall on straight legs, the
+     * gaster raised, the antennae held up, and they take quick short trips). Outside under the open sky in a biome at
+     * least {@code fromHeat} hot (its base temperature: desert, badlands and savanna 2.0, plains 0.8), in the hottest
+     * hours: from {@code aroundRestTicks} before the day clock's midday rest until as long after it (the rest is when the
+     * ground is too hot even for them; a species without a day clock: the same hours as the harvester ant's).
+     */
+    public record Heat(float fromHeat, int aroundRestTicks) {
+        public static final Codec<Heat> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.FLOAT.optionalFieldOf("from_heat", 1.5F).forGetter(Heat::fromHeat),
+                Codec.INT.optionalFieldOf("around_rest_ticks", 2000).forGetter(Heat::aroundRestTicks)
+        ).apply(i, Heat::new));
+
+        /** Whether the ground is hot at this day time in a biome this hot, with this day clock (empty: the usual hours). */
+        public boolean hotAt(long dayTime, float biomeHeat, Optional<DayClock> clock) {
+            if (biomeHeat < fromHeat) {
+                return false;
+            }
+            DayClock day = clock.orElse(USUAL_DAY);
+            long time = Math.floorMod(dayTime, 24000L);
+            int rest = Math.max(day.restTicks(biomeHeat), 1);
+            int start = day.restStart(biomeHeat);
+            return time >= start - aroundRestTicks && time < start + rest + aroundRestTicks;
+        }
+
+        /** The harvester ant's day clock as built into the code (for the hot hours of a species without one). */
+        private static final DayClock USUAL_DAY = new DayClock(0, 11000, 7000, 4000, 0.5F, 2.0F, true);
+    }
+
     public static final Codec<SpeciesProfile> CODEC = RecordCodecBuilder.create(i -> i.group(
             ColonyNumbers.CODEC.fieldOf("colony").forGetter(SpeciesProfile::colony),
             WorkerNumbers.CODEC.fieldOf("worker").forGetter(SpeciesProfile::worker),
@@ -1041,7 +1218,8 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
             GardenNumbers.CODEC.optionalFieldOf("garden").forGetter(SpeciesProfile::garden),
             Laying.CODEC.optionalFieldOf("laying").forGetter(SpeciesProfile::laying),
             SoldierNumbers.CODEC.optionalFieldOf("soldiers").forGetter(SpeciesProfile::soldiers),
-            AlarmNumbers.CODEC.optionalFieldOf("alarm").forGetter(SpeciesProfile::alarm)
+            AlarmNumbers.CODEC.optionalFieldOf("alarm").forGetter(SpeciesProfile::alarm),
+            BodyLanguage.CODEC.optionalFieldOf("body_language").forGetter(SpeciesProfile::bodyLanguage)
     ).apply(i, SpeciesProfile::new));
 
     /**

@@ -12,6 +12,7 @@ import com.antcolonies.entity.goal.FeedLarvaGoal;
 import com.antcolonies.entity.goal.FeedQueenGoal;
 import com.antcolonies.entity.goal.GatherSeedGoal;
 import com.antcolonies.entity.goal.GoInsideGoal;
+import com.antcolonies.entity.goal.NoticeGoal;
 import com.antcolonies.entity.goal.PlugHoleGoal;
 import com.antcolonies.entity.goal.ScoutGoal;
 import com.antcolonies.entity.goal.SealGoal;
@@ -68,6 +69,11 @@ public class TermiteWorkerEntity extends AbstractAntEntity {
         super(type, level);
     }
 
+    @Override
+    protected net.minecraft.resources.ResourceLocation species() {
+        return Species.MACROTERMES;
+    }
+
     public static AttributeSupplier.Builder createAttributes() {
         return PathfinderMob.createMobAttributes()
                 .add(Attributes.MAX_HEALTH, 3.0)
@@ -99,6 +105,8 @@ public class TermiteWorkerEntity extends AbstractAntEntity {
         this.goalSelector.addGoal(4, new ScoutGoal(this));
         // Outside when it is time to stay in: back inside.
         this.goalSelector.addGoal(4, new GoInsideGoal(this));
+        // With nothing to do, a player's steps or a jump shaking the ground near: it freezes, antennae up (it is blind).
+        this.goalSelector.addGoal(4, new NoticeGoal(this));
         this.goalSelector.addGoal(5, new StandByQueenGoal(this));
         this.goalSelector.addGoal(5, new AntWanderGoal(this, 1.0, 160, 5, () -> true).hangsFromCeilings(0.25F));
         this.goalSelector.addGoal(6, new RandomLookAroundGoal(this));

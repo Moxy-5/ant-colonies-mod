@@ -1,5 +1,8 @@
 package com.antcolonies.entity;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -10,11 +13,17 @@ import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.debug.Perf;
+import com.antcolonies.entity.body.AntAnimationController;
+import com.antcolonies.entity.body.EdgeOver;
 import com.antcolonies.entity.goal.AntWanderGoal;
+import com.antcolonies.entity.goal.GroomGoal;
+import com.antcolonies.entity.goal.NapGoal;
+import com.antcolonies.entity.goal.NoticeGoal;
 import com.antcolonies.nav.AntNavigator;
 import com.antcolonies.nav.AntPathFinder;
 import com.antcolonies.nav.Doorway;
 import com.antcolonies.species.SpeciesProfile;
+import com.antcolonies.species.SpeciesProfiles;
 import com.antcolonies.nav.Foothold;
 import com.antcolonies.nav.Slope;
 import com.antcolonies.registry.ModItems;
@@ -24,6 +33,8 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtUtils;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -34,6 +45,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.ai.goal.FloatGoal;
 import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
@@ -41,7 +53,6 @@ import net.minecraft.world.phys.Vec3;
 import software.bernie.geckolib.animatable.GeoEntity;
 import software.bernie.geckolib.animatable.instance.AnimatableInstanceCache;
 import software.bernie.geckolib.animation.AnimatableManager;
-import software.bernie.geckolib.animation.AnimationController;
 import software.bernie.geckolib.animation.AnimationState;
 import software.bernie.geckolib.animation.PlayState;
 import software.bernie.geckolib.animation.RawAnimation;
@@ -51,6 +62,58 @@ import software.bernie.geckolib.util.GeckoLibUtil;
 public abstract class AbstractAntEntity extends PathfinderMob implements GeoEntity {
     private static final RawAnimation IDLE = RawAnimation.begin().thenLoop("idle");
     private static final RawAnimation WALK = RawAnimation.begin().thenLoop("walk");
+    /**
+     * The walks for each speed (2026-10-16): real ants walk faster mostly by taking longer strides, so a slow ant takes
+     * short steps and a fast one long ones. Slowest first; each clip says the speeds it is for (its "speeds" note), and
+     * the body player changes between them in step ({@code AntAnimationController.gearFor}). Ants only (the termites'
+     * file has only "walk").
+     */
+    private static final RawAnimation WALK_SLOW = RawAnimation.begin().thenLoop("walk_slow");
+    private static final RawAnimation WALK_FAST = RawAnimation.begin().thenLoop("walk_fast");
+    private static final List<RawAnimation> WALKS = List.of(WALK_SLOW, WALK, WALK_FAST);
+    /** Stepping round to turn where it stands (to the right, to the left; see {@link #measureWalk}). Ants only. */
+    private static final RawAnimation TURN_R = RawAnimation.begin().thenLoop("turn_r");
+    private static final RawAnimation TURN_L = RawAnimation.begin().thenLoop("turn_l");
+    /** Asleep: still, and now and then a short bout of antenna twitches (see {@link #napTicks}). Ants only. */
+    private static final RawAnimation SLEEP = RawAnimation.begin().thenLoop("sleep");
+    private static final RawAnimation SLEEP_TWITCH = RawAnimation.begin().thenLoop("sleep_twitch");
+    /** On hot ground: standing and walking tall on straight legs, the gaster up. Ants only. */
+    private static final RawAnimation IDLE_HOT = RawAnimation.begin().thenLoop("idle_hot");
+    private static final RawAnimation WALK_HOT = RawAnimation.begin().thenLoop("walk_hot");
+    /** Ticks to blend into a nap and out of it (slow, as a real ant settles; other changes take 3). */
+    private static final int SETTLE_TICKS = 20;
+    /**
+     * Noticing a player (see {@code NoticeGoal}): standing taller, forebody up, antennae pointed and flicking, the head
+     * cocked one way and the other (look), or the same with the jaws open (look_wary, a shy ant). Ants only.
+     */
+    private static final RawAnimation LOOK = RawAnimation.begin().thenLoop("look");
+    private static final RawAnimation LOOK_WARY = RawAnimation.begin().thenLoop("look_wary");
+    /** A termite frozen at a shake of the ground: antennae raised and quivering. Termites only. */
+    private static final RawAnimation FREEZE = RawAnimation.begin().thenLoop("freeze");
+    /** Ticks to blend into a look and out of it. */
+    private static final int LOOK_SETTLE_TICKS = 6;
+    /**
+     * Cleaning an antenna with the comb on the front leg (see {@code GroomGoal}), the left, the right, or both one after
+     * the other. Played once at the speed they were made; the last frame (the standing pose) is held. Ants only.
+     */
+    private static final RawAnimation GROOM_L = RawAnimation.begin().thenPlayAndHold("groom_antenna_l");
+    private static final RawAnimation GROOM_R = RawAnimation.begin().thenPlayAndHold("groom_antenna_r");
+    private static final RawAnimation GROOM_BOTH = RawAnimation.begin().thenPlayAndHold("groom_antenna_both");
+    /**
+     * Digging (see {@code DigGoal}): the forebody and head down, the jaws biting, the front legs raking the loose soil
+     * back by turns, the antennae tapping the face it digs. Ants only.
+     */
+    private static final RawAnimation DIG = RawAnimation.begin().thenLoop("dig");
+    /**
+     * Carrying something in the jaws (played by the head player only, over the walk or the stand): the head held up, the
+     * jaws closed on the load, the antennae high. Ants only.
+     */
+    private static final RawAnimation CARRY = RawAnimation.begin().thenLoop("carry");
+    /** How long the cleaning clips last (ticks; worker_ant.animation.json, made by tools/ant_models.py). */
+    public static final int GROOM_ONE_TICKS = 52;
+    public static final int GROOM_BOTH_TICKS = 104;
+    /** Ticks to blend into a cleaning clip and out of it (my pick, to confirm). */
+    public static final int GROOM_SETTLE_TICKS = 4;
     /** The look round with the head out of a chimney's mouth (termites; see DoorwayMotion). */
     private static final RawAnimation PEEK = RawAnimation.begin().thenPlay("peek");
     /** How far (blocks a tick) a worker climbs at its normal speed: its legs then step at 1.5 times the walk animation. */
@@ -74,10 +137,34 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     /**
      * What the body is doing besides holding its surface, for the client: bit 0 = looking round with its head out of a
      * doorway's mouth (plays the "peek" animation), bit 1 = tipping over to its new surface slowly (over a mouth's rim),
-     * bit 2 = inside a channel (a termite tunnel: drawn in the channel's middle, not pressed against a wall).
+     * bit 2 = inside a channel (a termite tunnel: drawn in the channel's middle, not pressed against a wall), bit 3 =
+     * asleep (see {@code NapGoal}), bit 4 = on hot ground (see {@link #checkHeat}).
      */
     private static final EntityDataAccessor<Byte> DATA_POSE_FLAGS =
             SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.BYTE);
+    /**
+     * What it is noticing (see {@code NoticeGoal}): {@link #NOTICE_NONE}, {@link #NOTICE_LOOK} (looking at a player: the
+     * look clips, the head turned toward it), {@link #NOTICE_WARY} (the same, jaws open, a shy one) or
+     * {@link #NOTICE_FREEZE} (a termite frozen at a shake of the ground). Synced for the clips and the head look.
+     */
+    private static final EntityDataAccessor<Byte> DATA_NOTICE =
+            SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.BYTE);
+    public static final byte NOTICE_NONE = 0;
+    public static final byte NOTICE_LOOK = 1;
+    public static final byte NOTICE_WARY = 2;
+    public static final byte NOTICE_FREEZE = 3;
+    /**
+     * A short piece of body work it is doing, for the client's clips: {@link #ACTIVITY_NONE}, cleaning its left, right
+     * or both antennae ({@link #ACTIVITY_GROOM_L}, {@link #ACTIVITY_GROOM_R}, {@link #ACTIVITY_GROOM_BOTH}; see
+     * {@code GroomGoal}) or biting soil loose ({@link #ACTIVITY_DIG}). Synced.
+     */
+    private static final EntityDataAccessor<Byte> DATA_ACTIVITY =
+            SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.BYTE);
+    public static final byte ACTIVITY_NONE = 0;
+    public static final byte ACTIVITY_GROOM_L = 1;
+    public static final byte ACTIVITY_GROOM_R = 2;
+    public static final byte ACTIVITY_GROOM_BOTH = 3;
+    public static final byte ACTIVITY_DIG = 4;
     /** How pale a young worker is drawn, 0 (grown dark) to 100 (just grown up). Synced for the renderer. */
     private static final EntityDataAccessor<Byte> DATA_YOUTH =
             SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.BYTE);
@@ -86,6 +173,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     private static final int PEEKING = 1;
     private static final int TURNING_SLOWLY = 2;
     private static final int IN_CHANNEL = 4;
+    private static final int ASLEEP = 8;
+    private static final int ON_HOT_GROUND = 16;
 
     /** The soil pellet held in the mandibles (empty = carrying nothing). Synced so the renderer can draw it. */
     private static final EntityDataAccessor<Optional<BlockState>> DATA_CARRIED =
@@ -132,6 +221,14 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     private boolean wallPose;
     private float bodyTilt;
     private float bodyTiltO;
+    /** Client: going over an outside edge, where the drawn feet are put (see {@link #getEdgeShift}); null otherwise. */
+    @Nullable
+    private Vec3 edgeShift;
+    @Nullable
+    private Vec3 edgeShiftO;
+    /** Client: what is left of the edge pose's shift while it fades out (see {@link #fadeEdge}). */
+    private Vec3 edgeLeft = Vec3.ZERO;
+    private boolean edgeFading;
     /** Client: how the drawn body tilts on a slope (a ramp): head up (pitch) and right side up (roll), in degrees. */
     private float slopePitch;
     private float slopePitchO;
@@ -155,6 +252,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         builder.define(DATA_SURFACE, (byte) Direction.DOWN.get3DDataValue());
         builder.define(DATA_HEADING, 0.0F);
         builder.define(DATA_POSE_FLAGS, (byte) 0);
+        builder.define(DATA_NOTICE, NOTICE_NONE);
+        builder.define(DATA_ACTIVITY, ACTIVITY_NONE);
         builder.define(DATA_YOUTH, (byte) 0);
         builder.define(DATA_CARRIED, Optional.empty());
         builder.define(DATA_CARRIED_SEED, ItemStack.EMPTY);
@@ -479,6 +578,177 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return getColonyId() != null && level() instanceof ServerLevel serverLevel ? ColonyManager.get(serverLevel).getColony(getColonyId()) : null;
     }
 
+    /** The species this insect is (for its profile while it has no colony). */
+    protected abstract ResourceLocation species();
+
+    /** Server: this insect's species profile (its colony's, or its species' own while it has none). */
+    public SpeciesProfile profile() {
+        Colony colony = getColony();
+        return colony != null ? colony.profile() : SpeciesProfiles.get(species());
+    }
+
+    /** Server: whether it is having a nap (set by {@code NapGoal}; not saved: after a reload the nap is over). */
+    private boolean asleep;
+    /** Server: whether it stands on hot ground (see {@link #checkHeat}). */
+    private boolean onHotGround;
+
+    /** Tests only: the chance a second it falls asleep when it may (below 0: its profile's). */
+    private float napChanceForTests = -1.0F;
+
+    /** Tests only: gives it this chance a second to fall asleep when it may (below 0 for its profile's). */
+    public void setNapChanceForTests(float chance) {
+        napChanceForTests = chance;
+    }
+
+    /** The chance a second it falls asleep when it may, or below 0 for its profile's (see {@code NapGoal}). */
+    public float napChanceForTests() {
+        return napChanceForTests;
+    }
+
+    /** Tests only: the chance it notices a moving player it can tell is there (below 0: its profile's and its curiosity). */
+    private float noticeChanceForTests = -1.0F;
+
+    /** Tests only: gives it this chance to notice a moving player (below 0 for its profile's). */
+    public void setNoticeChanceForTests(float chance) {
+        noticeChanceForTests = chance;
+    }
+
+    /** The chance it notices a moving player, or below 0 for its profile's (see {@code NoticeGoal}). */
+    public float noticeChanceForTests() {
+        return noticeChanceForTests;
+    }
+
+    /** Tests only: the only players it may notice (null: the players in its level). */
+    @Nullable
+    private List<? extends Player> playersForTests;
+
+    /** Tests only: lets it notice only these players (mock players, not in the level), or null for the level's. */
+    public void setPlayersForTests(@Nullable List<? extends Player> players) {
+        playersForTests = players;
+    }
+
+    /** The players it may notice: its level's, or the test's (see {@code NoticeGoal}). */
+    public List<? extends Player> playersToNotice() {
+        return playersForTests != null ? playersForTests : level().players();
+    }
+
+    /** Server: falls asleep or wakes up (see {@code NapGoal}). */
+    public void setAsleep(boolean asleep) {
+        this.asleep = asleep;
+    }
+
+    /** Whether it is having a nap (synced, for the sleeping clips). */
+    public boolean isAsleep() {
+        return (entityData.get(DATA_POSE_FLAGS) & ASLEEP) != 0;
+    }
+
+    /** Whether it stands on ground too hot to touch (synced: it stands and walks tall, the gaster up). */
+    public boolean isOnHotGround() {
+        return (entityData.get(DATA_POSE_FLAGS) & ON_HOT_GROUND) != 0;
+    }
+
+    /** What it is noticing now ({@link #NOTICE_NONE}, {@link #NOTICE_LOOK}, {@link #NOTICE_WARY} or {@link #NOTICE_FREEZE}; synced). */
+    public byte getNoticing() {
+        return entityData.get(DATA_NOTICE);
+    }
+
+    /** Server: starts or stops noticing something (see {@code NoticeGoal}). */
+    public void setNoticing(byte what) {
+        entityData.set(DATA_NOTICE, what);
+    }
+
+    /** The piece of body work it is doing now ({@link #ACTIVITY_NONE}, a cleaning or digging; synced). */
+    public byte getActivity() {
+        return entityData.get(DATA_ACTIVITY);
+    }
+
+    /** Server: starts or stops a piece of body work (see {@code GroomGoal}, {@code DigGoal}). */
+    public void setActivity(byte what) {
+        entityData.set(DATA_ACTIVITY, what);
+    }
+
+    /** Tests only: the chance a second it starts cleaning its antennae when it may (below 0: its profile's). */
+    private float groomChanceForTests = -1.0F;
+
+    /** Tests only: gives it this chance a second to start cleaning its antennae (below 0 for its profile's). */
+    public void setGroomChanceForTests(float chance) {
+        groomChanceForTests = chance;
+    }
+
+    /** The chance a second it starts cleaning its antennae, or below 0 for its profile's (see {@code GroomGoal}). */
+    public float groomChanceForTests() {
+        return groomChanceForTests;
+    }
+
+    // --- personality (the animation engine, 2026-10-16) -------------------------------------------------------------
+    /**
+     * Server: its personality, each trait 0 to 1 (see {@link SpeciesProfile.Traits}): drawn from its profile the first
+     * time it is asked for, then its own for life. Saved. An insect that goes into its colony's numbers loses it; a new
+     * real one draws its own (the numbers carry no individuals).
+     */
+    private float boldness = Float.NaN;
+    private float curiosity = Float.NaN;
+    private float restlessness = Float.NaN;
+
+    private SpeciesProfile.Traits traits() {
+        return profile().bodyLanguage().flatMap(SpeciesProfile.BodyLanguage::traits).orElse(SpeciesProfile.Traits.EVEN);
+    }
+
+    private void drawTraits() {
+        if (!Float.isNaN(boldness)) {
+            return;
+        }
+        SpeciesProfile.Traits traits = traits();
+        boldness = SpeciesProfile.Traits.draw(traits.boldness(), getRandom().nextDouble());
+        curiosity = SpeciesProfile.Traits.draw(traits.curiosity(), getRandom().nextDouble());
+        restlessness = SpeciesProfile.Traits.draw(traits.restlessness(), getRandom().nextDouble());
+    }
+
+    /**
+     * Server: how bold it is now (0 to 1): its own boldness, and bolder as it grows older (real foragers, the older
+     * workers, are bolder than the young nurses).
+     */
+    public float boldness() {
+        drawTraits();
+        return Mth.clamp(boldness + traits().olderBolder() * (0.5F - getYouth()), 0.0F, 1.0F);
+    }
+
+    /** Server: how curious it is (0 to 1): how often it stops to look at something new, and for how long. */
+    public float curiosity() {
+        drawTraits();
+        return curiosity;
+    }
+
+    /** Server: how restless it is (0 to 1): restless ones nap less and fidget and groom more. */
+    public float restlessness() {
+        drawTraits();
+        return restlessness;
+    }
+
+    /** Tests only: gives it this personality. */
+    public void setTraitsForTests(float boldness, float curiosity, float restlessness) {
+        this.boldness = boldness;
+        this.curiosity = curiosity;
+        this.restlessness = restlessness;
+    }
+
+    /**
+     * Server, once a second: whether the ground under it is hot (its profile's {@code body_language.hot}: outside on a
+     * floor under the open sky, no rain, in a hot biome, in the hottest hours of the day).
+     */
+    private void checkHeat(ServerLevel level) {
+        SpeciesProfile.Heat heat = profile().bodyLanguage().flatMap(SpeciesProfile.BodyLanguage::heat).orElse(null);
+        if (heat == null || isClimbing() || !onGround()) {
+            onHotGround = false;
+            return;
+        }
+        Colony colony = getColony();
+        BlockPos at = blockPosition();
+        onHotGround = level.canSeeSky(at) && !level.isRainingAt(at) && (colony == null || !colony.nest().isInside(level, at))
+                && heat.hotAt(colony != null ? colony.timeOfDay(level) : level.getDayTime(), level.getBiome(at).value().getBaseTemperature(),
+                        profile().food().dayClock());
+    }
+
     /**
      * Whether this insect may work outside its nest and mound now. Always, unless its colony keeps a schedule (termites:
      * out only at night and in the rain) and it is not foraging time: then it stays inside, out of the sun. A species
@@ -552,9 +822,13 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         if (tickCount % 20 == getId() % 20) {
             boolean busy = goalSelector.getAvailableGoals().stream().anyMatch(wrapped -> wrapped.isRunning()
                     && !(wrapped.getGoal() instanceof FloatGoal || wrapped.getGoal() instanceof AntWanderGoal
-                    || wrapped.getGoal() instanceof RandomLookAroundGoal));
+                    || wrapped.getGoal() instanceof RandomLookAroundGoal || wrapped.getGoal() instanceof NapGoal
+                    || wrapped.getGoal() instanceof NoticeGoal || wrapped.getGoal() instanceof GroomGoal));
             idleSeconds = busy ? 0 : idleSeconds + 1;
             updateYouth();
+            if (level() instanceof ServerLevel serverLevel) {
+                checkHeat(serverLevel);
+            }
         }
         // A forager home with a seed touches the ants waiting inside by the entrance as it walks in (Gordon's rule, see colony.Door).
         if (tickCount % 5 == getId() % 5 && getColonyId() != null && level() instanceof ServerLevel serverLevel) {
@@ -609,11 +883,182 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             entityData.set(DATA_SURFACE, (byte) (navigator.getSurface().get3DDataValue() | navigator.getCeilingRef().get3DDataValue() << 3));
             entityData.set(DATA_HEADING, navigator.getHeading());
             entityData.set(DATA_POSE_FLAGS, (byte) ((navigator.isPeeking() ? PEEKING : 0) | (navigator.isTurningSlowly() ? TURNING_SLOWLY : 0)
-                    | (navigator.isInChannel() ? IN_CHANNEL : 0)));
+                    | (navigator.isInChannel() ? IN_CHANNEL : 0) | (asleep ? ASLEEP : 0) | (onHotGround ? ON_HOT_GROUND : 0)));
         } else {
             turnBody();
             tiltOnSlope();
+            measureWalk();
+            tickNap();
+            tickLookWeight();
+            tickWaist();
+            tickSteam();
         }
+    }
+
+    /**
+     * Client: steam off an ant on hot ground (the user's choice, 2026-10-15, and the mod's one knowingly unrealistic
+     * touch, so a player sees the heat at a glance): now and then a wisp of white smoke rises off its back. About one
+     * every 30 ticks (my pick, to confirm). Not near a sleeping ant (it rests inside, out of the heat).
+     */
+    private void tickSteam() {
+        if (!isOnHotGround() || isAsleep() || random.nextInt(30) != 0) {
+            return;
+        }
+        level().addParticle(net.minecraft.core.particles.ParticleTypes.WHITE_SMOKE,
+                getX() + (random.nextDouble() - 0.5) * 0.2, getY() + getBbHeight(), getZ() + (random.nextDouble() - 0.5) * 0.2,
+                0.0, 0.015, 0.0);
+    }
+
+    /**
+     * Client: the edge curve (the animation engine, step 9, 2026-10-16; by distance since the review of the same day). A
+     * real ant's body is three hard parts joined at the neck and the waist: going over an edge, onto a wall or a ceiling,
+     * up a ramp or round a turn, the front turns first and the gaster follows the same path, so the waist bends while
+     * the gaster is still on the old surface. Here the front's turns (pitch: up a wall or a ramp; yaw: round a turn) are
+     * added up tick by tick and remembered with the distance walked, and the rear lies the way the path lay where it
+     * is now ("follow the leader"): the gaster the way the front lay, on average, over the stretch of path it covers,
+     * {@link #GASTER_START} to {@link #GASTER_END} behind the middle; over an outside edge it hangs down only while the
+     * waist joints ({@link #WAIST_AT} to {@link #GASTER_START}) are still over the edge. So the bend is the same at any
+     * speed, stays if the ant stops half way over an edge, and the gaster never dips into the block it walks onto. A
+     * turn where it stands turns the whole body, gaster and all (no bend); standing still a second, a side bend eases
+     * out (the ant straightens itself), an up-and-down one stays (its gaster still lies over the edge). My picks, to
+     * confirm: at most 60 degrees up or down and 25 to the side.
+     */
+    /** Where the waist begins, the gaster begins and the gaster ends, behind the body's middle (model units; the worker model). */
+    private static final double WAIST_AT = 0.64;
+    private static final double GASTER_START = 2.4;
+    private static final double GASTER_END = 5.2;
+    /** The tightest curve the path itself takes (model units across; a sharper turn is the body turning on the spot). */
+    private static final double WAIST_TIGHTEST = 3.0;
+    private static final float WAIST_MAX_PITCH = 60.0F;
+    private static final float WAIST_MAX_YAW = 25.0F;
+    private static final int WAIST_MEMORY = 64;
+    /** The front's pitch and yaw along the path: the distance walked at each mark (blocks), and the front's pose there. */
+    private final double[] pathMark = new double[WAIST_MEMORY];
+    private final float[] pitchMark = new float[WAIST_MEMORY];
+    private final float[] yawMark = new float[WAIST_MEMORY];
+    private int marks;
+    private int newestMark;
+    private double pathWalked;
+    private int standingTicks;
+    private float frontPitch;
+    private float frontYaw;
+    private float waistPitch;
+    private float waistPitchO;
+    private float waistYaw;
+    private float waistYawO;
+
+    private void tickWaist() {
+        // On a wall the body tips about its own side-to-side line only when the head points up or down the wall (the
+        // tilt turns it about the wall's level line, the heading turns it within the wall).
+        float tipped = (bodyTilt - bodyTiltO) * Mth.cos(bodyHeading * Mth.DEG_TO_RAD);
+        frontPitch += tipped + (slopePitch - slopePitchO);
+        // Turning right is a growing body yaw on a floor; on a wall the heading grows turning left.
+        float turned = wallPose ? -Mth.wrapDegrees(bodyHeading - bodyHeadingO) : Mth.wrapDegrees(yBodyRot - yBodyRotO);
+        frontYaw += turned;
+        double scale = drawScale / 16.0;
+        if (tickCount <= 2 || marks == 0) {
+            marks = 0;                                     // just loaded: no bend from where it was put down
+        } else {
+            // The path itself turns at most so much over the ground walked this tick; the rest of the turn is the body
+            // turning where it stands, which turns the gaster with it.
+            float curve = (float) Math.min(Math.abs(turned), moved / (WAIST_TIGHTEST * scale / 2.0) * Mth.RAD_TO_DEG);
+            float onTheSpot = turned - Math.copySign(curve, turned);
+            standingTicks = moved < 1.0E-4 ? standingTicks + 1 : 0;
+            float ease = standingTicks > 20 ? 0.1F : 0.0F;
+            for (int i = 0; i < marks; i++) {
+                int k = Math.floorMod(newestMark - i, WAIST_MEMORY);
+                yawMark[k] += onTheSpot + (frontYaw - yawMark[k] - onTheSpot) * ease;
+            }
+        }
+        pathWalked += moved;
+        if (marks == 0 || moved >= 1.0E-4) {
+            newestMark = (newestMark + 1) % WAIST_MEMORY;
+            marks = Math.min(WAIST_MEMORY, marks + 1);
+        }
+        pathMark[newestMark] = pathWalked;
+        pitchMark[newestMark] = frontPitch;
+        yawMark[newestMark] = frontYaw;
+        // The rear lies the way the path lay where it is now: the gaster along the path its whole length took (the
+        // front's pose averaged over it), so at an inside corner (a wall up from the floor, the floor at the foot of a
+        // wall) it lies along the old surface and comes round bit by bit as it passes the corner. Over an outside edge
+        // it hangs down only while the waist itself is still over the edge: once the waist is on the new surface the
+        // gaster lies on it too, never into the block (2026-10-16, seen in the climbing film by the user and me).
+        double waist = pathWalked - WAIST_AT * scale;
+        float gasterPitch = averageMark(pitchMark, pathWalked - GASTER_END * scale, waist);
+        float waistJointsPitch = averageMark(pitchMark, pathWalked - GASTER_START * scale, waist);
+        float gasterYaw = averageMark(yawMark, pathWalked - GASTER_END * scale, waist);
+        float bend = Math.max(frontPitch - gasterPitch, Math.min(frontPitch - waistJointsPitch, 0.0F));
+        waistPitchO = waistPitch;
+        waistYawO = waistYaw;
+        waistPitch = Mth.clamp(bend, -WAIST_MAX_PITCH, WAIST_MAX_PITCH);
+        waistYaw = Mth.clamp(frontYaw - gasterYaw, -WAIST_MAX_YAW, WAIST_MAX_YAW);
+    }
+
+    /**
+     * The front's pose (one of the mark rings) averaged over the stretch of path walked from {@code from} to {@code to}
+     * (blocks walked; straight lines between marks, the oldest mark's pose before the remembered path).
+     */
+    private float averageMark(float[] pose, double from, double to) {
+        if (to - from < 1.0E-9) {
+            return poseAt(pose, to);
+        }
+        double sum = 0.0;
+        double at = to;
+        float poseThere = poseAt(pose, to);
+        for (int i = 0; i < marks && at > from; i++) {
+            int k = Math.floorMod(newestMark - i, WAIST_MEMORY);
+            if (pathMark[k] >= at) {
+                continue;
+            }
+            double next;
+            float poseNext;
+            if (pathMark[k] >= from || i == 0) {
+                next = Math.max(pathMark[k], from);
+                poseNext = pose[k];
+            } else {
+                // The stretch starts between this mark and the later one: part way.
+                int later = Math.floorMod(k + 1, WAIST_MEMORY);
+                double span = pathMark[later] - pathMark[k];
+                next = from;
+                poseNext = Mth.lerp(span > 1.0E-9 ? (float) ((from - pathMark[k]) / span) : 0.0F, pose[k], pose[later]);
+            }
+            sum += (at - next) * (poseThere + poseNext) / 2.0;
+            at = next;
+            poseThere = poseNext;
+        }
+        if (at > from) {
+            sum += (at - from) * poseThere;                // before the remembered path: as the oldest mark
+        }
+        return (float) (sum / (to - from));
+    }
+
+    /** The front's pose (one of the mark rings) at this distance walked (between two marks, part way). */
+    private float poseAt(float[] pose, double walked) {
+        float there = pose[newestMark];
+        for (int i = 0; i < marks; i++) {
+            int k = Math.floorMod(newestMark - i, WAIST_MEMORY);
+            there = pose[k];
+            if (pathMark[k] <= walked) {
+                if (i > 0) {
+                    int later = Math.floorMod(k + 1, WAIST_MEMORY);
+                    double span = pathMark[later] - pathMark[k];
+                    float f = span > 1.0E-9 ? (float) ((walked - pathMark[k]) / span) : 0.0F;
+                    there = Mth.lerp(f, pose[k], pose[later]);
+                }
+                break;
+            }
+        }
+        return there;
+    }
+
+    /** Client: how far the front has tipped up past the rear (degrees, the waist's bend; see {@link #tickWaist}). */
+    public float getWaistPitch(float partialTick) {
+        return Mth.lerp(partialTick, waistPitchO, waistPitch);
+    }
+
+    /** Client: how far the front has turned right past the rear (degrees, the waist's bend). */
+    public float getWaistYaw(float partialTick) {
+        return Mth.lerp(partialTick, waistYawO, waistYaw);
     }
 
     /**
@@ -707,6 +1152,12 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return getSurface() != Direction.DOWN;
     }
 
+    // The body turns after the head smoothly, pivoting on its legs (the game's own rule snapped it round in jumps).
+    @Override
+    protected net.minecraft.world.entity.ai.control.BodyRotationControl createBodyControl() {
+        return new com.antcolonies.entity.body.BodyTurn(this);
+    }
+
     // Tells the game this entity is holding on to something (no falling while the navigator moves it along a surface).
     @Override
     public boolean onClimbable() {
@@ -719,14 +1170,28 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
      * just tips on over, so it keeps the yaw of the wall it came up (on a ceiling the yaw and the heading both turn the
      * body round the vertical, so one can stand in for the other). Onto a wall facing the other way (over the top of a
      * thin wall, such as a chimney's rim) it first lies flat and then tips up onto the new wall, never spinning round
-     * within the old one.
+     * within the old one. Going over an outside edge (the top of a wall, the brink of a drop) the body is drawn across
+     * the edge instead, from where it is ({@link EdgeOver}; 2026-10-16), and the usual turning takes over after.
      */
     private void turnBody() {
         bodyTiltO = bodyTilt;
         wallYawO = wallYaw;
         bodyHeadingO = bodyHeading;
+        edgeShiftO = edgeShift;
         Direction surface = getSurface();
         float turn = isTurningSlowly() ? BODY_TURN_SPEED / 2.0F : BODY_TURN_SPEED;
+        EdgeOver.Pose edge = overAnEdge();
+        if (edge != null) {
+            goOverEdge(edge, turn);
+            return;
+        }
+        Vec3 lastShift = edgeShift;
+        turnToSurface(surface, turn);
+        fadeEdge(lastShift);
+    }
+
+    /** Client: the usual turning of the drawn body toward the synced surface and heading (see {@link #turnBody}). */
+    private void turnToSurface(Direction surface, float turn) {
         if (surface != Direction.DOWN) {
             Direction wall = surface == Direction.UP ? getCeilingRef() : surface;
             float targetTilt = surface == Direction.UP ? 180.0F : 90.0F;
@@ -780,7 +1245,17 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             bodyTilt = bodyTilt < targetTilt ? Math.min(targetTilt, bodyTilt + turn)
                     : Math.max(targetTilt, bodyTilt - turn);
         } else if (wallPose) {
-            // Tipping back onto the floor, ending up facing the body yaw.
+            // Tipping back onto the floor, going on the way the head pointed on the wall (2026-10-16, seen in the
+            // climbing film): on a wall the game's yaw faces the wall, so one coming down head first would land facing
+            // back into it and swing round as it walked off. This side's yaw is put where the drawn body goes on; the
+            // game's own turns from there as usual.
+            float onward = wallYaw - bodyHeading;
+            setYRot(onward);
+            yRotO = onward;
+            yBodyRot = onward;
+            yBodyRotO = onward;
+            yHeadRot = onward;
+            yHeadRotO = onward;
             bodyTilt = Math.max(0.0F, bodyTilt - turn);
             bodyHeading = approach(bodyHeading, wallYaw - yBodyRot, turn);
             if (bodyTilt <= 0.0F && Math.abs(Mth.wrapDegrees(bodyHeading - (wallYaw - yBodyRot))) < 1.0F) {
@@ -794,6 +1269,110 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
 
     private static float approach(float from, float to, float speed) {
         return from + Mth.clamp(Mth.wrapDegrees(to - from), -speed, speed);
+    }
+
+    /**
+     * Client: the pose across an outside edge it is going over now, or round the inside corner at a wall's foot (see
+     * {@link EdgeOver}), or null. Not in a channel,
+     * over a doorway's rim (those tip over their own way) or peeking out of one.
+     */
+    @Nullable
+    private EdgeOver.Pose overAnEdge() {
+        if (tickCount < 3 || isInChannel() || isTurningSlowly() || isPeeking()) {
+            return null;
+        }
+        EdgeOver.Pose edge = EdgeOver.find(level(), position(), getBbWidth(), getBbHeight(), getSurface(),
+                entityData.get(DATA_HEADING), getYRot(), drawScale / 16.0, drawLift, drawIntoWall);
+        if (edge != null) {
+            return edge;
+        }
+        // or round an inside corner, the foot of a wall (see EdgeOver.findCorner)
+        double dx = getX() - xo;
+        double dz = getZ() - zo;
+        return EdgeOver.findCorner(level(), position(), getBbWidth(), getBbHeight(), getSurface(),
+                entityData.get(DATA_HEADING), getYRot(), drawScale / 16.0, drawLift, drawIntoWall,
+                wallPose ? Direction.fromYRot(wallYaw) : null, bodyHeading, dx * dx + dz * dz > 1.0E-5);
+    }
+
+    /** Client: draws the body across the edge, as {@link EdgeOver} has it. */
+    private void goOverEdge(EdgeOver.Pose edge, float turn) {
+        float yaw = edge.wall().toYRot();
+        if (!wallPose) {
+            // From the floor (the brink of a drop ahead): begin from how the body lay there.
+            wallPose = true;
+            wallYaw = yaw;
+            bodyHeading = Mth.wrapDegrees(yaw - floorYaw);
+            wallYawO = wallYaw;
+            bodyHeadingO = bodyHeading;
+            bodyTiltO = edge.tilt();
+        } else {
+            // Another wall (lying flat on top of a thin wall, now over its far side): the same look, measured from it.
+            float shift = Mth.wrapDegrees(yaw - wallYaw);
+            wallYaw += shift;
+            wallYawO += shift;
+            bodyHeading += shift;
+            bodyHeadingO += shift;
+        }
+        bodyHeading = approach(bodyHeading, edge.heading(), turn);
+        bodyTilt = edge.tilt();
+        edgeShift = edge.shift();
+        edgeFading = false;
+    }
+
+    /**
+     * Client: after the edge pose, the usual pose takes over. Leaving it at either end of the edge they agree; leaving it
+     * part way (it turned away from the edge, or the navigator put it on a doorway's rim) what is left of the edge pose's
+     * shift fades out over a few ticks, so the body never jumps.
+     */
+    private void fadeEdge(@Nullable Vec3 lastShift) {
+        if (lastShift == null) {
+            return;
+        }
+        Vec3 usual = usualDrawShift();
+        if (usual == null) {
+            edgeShift = null;
+            edgeFading = false;
+            return;
+        }
+        edgeLeft = edgeFading ? edgeLeft.scale(0.5) : lastShift.subtract(usual);
+        edgeFading = true;
+        if (edgeLeft.lengthSqr() < 1.0E-5) {
+            edgeShift = null;
+            edgeFading = false;
+        } else {
+            edgeShift = usual.add(edgeLeft);
+        }
+    }
+
+    /**
+     * Client: where the usual pose draws the middle of the feet, from the insect's position (blocks, world axes): on a
+     * wall lifted up it and pushed in toward it as far as it has tipped up (see {@code AntRenderer}); null where that is
+     * not worked out here (on a ceiling, in a channel).
+     */
+    @Nullable
+    private Vec3 usualDrawShift() {
+        if (!wallPose) {
+            return Vec3.ZERO;
+        }
+        if (bodyTilt > 90.0F || isInChannel()) {
+            return null;
+        }
+        double share = bodyTilt / 90.0;
+        double yaw = wallYaw * Mth.DEG_TO_RAD;
+        double into = drawIntoWall * share;
+        return new Vec3(-Math.sin(yaw) * into, drawLift * share, Math.cos(yaw) * into);
+    }
+
+    /**
+     * Client: where the middle of the drawn body's feet is put from its position while it goes over an outside edge
+     * (blocks, world axes; see {@link EdgeOver}), or null in the usual pose.
+     */
+    @Nullable
+    public Vec3 getEdgeShift(float partialTick) {
+        if (edgeShift == null) {
+            return null;
+        }
+        return edgeShiftO == null ? edgeShift : edgeShiftO.lerp(edgeShift, partialTick);
     }
 
     /** Client: whether the body is drawn by the wall angles below (on a wall, or tipping onto or off one). */
@@ -853,6 +1432,11 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         tag.putBoolean("FoodInCrop", isFoodInCrop());
         tag.putBoolean("CarryingCorpse", isCarryingCorpse());
         tag.putBoolean("SeedForBread", seedForBread);
+        if (!Float.isNaN(boldness)) {
+            tag.putFloat("Boldness", boldness);
+            tag.putFloat("Curiosity", curiosity);
+            tag.putFloat("Restlessness", restlessness);
+        }
         // The wall or ceiling it holds on to (or the channel it is in), so after a reload it is still there instead of
         // dropping to the bottom.
         Foothold hold = navigator.getHold();
@@ -880,6 +1464,11 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         entityData.set(DATA_IN_CROP, tag.getBoolean("FoodInCrop") && !getCarriedSeed().isEmpty());
         setCarryingCorpse(tag.getBoolean("CarryingCorpse"));
         seedForBread = tag.getBoolean("SeedForBread");
+        if (tag.contains("Boldness")) {
+            boldness = tag.getFloat("Boldness");
+            curiosity = tag.getFloat("Curiosity");
+            restlessness = tag.getFloat("Restlessness");
+        }
         if (tag.contains("HoldCell") && tag.contains("HoldSurface")) {
             navigator.restoreHold(new Foothold(BlockPos.of(tag.getLong("HoldCell")), Direction.from3DDataValue(tag.getByte("HoldSurface")),
                     tag.getBoolean("HoldChannel")));
@@ -898,9 +1487,53 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return false;
     }
 
+    /**
+     * The insect's three animation players (see {@link AntAnimationController}), each moving its own bones: the body and
+     * legs at the pace of its steps, the head and antennae at the insect's own pace, and the little extras (none yet:
+     * added last, so it would win on the bones its clip moves). Whole-body work such as cleaning the antennae is played
+     * by both the body and the head player at once, at the speed it was made.
+     */
+    public static final String BODY_PLAYER = "body";
+    public static final String HEAD_PLAYER = "head";
+    public static final String EXTRA_PLAYER = "extra";
+
     @Override
     public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
-        controllers.add(new AnimationController<>(this, "main", 3, this::animate));
+        controllers.add(new AntAnimationController<>(this, BODY_PLAYER, 3, this::animateBody, AntAnimationController.BODY_BONES));
+        controllers.add(new AntAnimationController<>(this, HEAD_PLAYER, 3, this::animateHead, AntAnimationController.HEAD_BONES));
+        controllers.add(new AntAnimationController<>(this, EXTRA_PLAYER, 3, state -> PlayState.STOP, AntAnimationController.ALL_BONES));
+    }
+
+    /** Clips asked for by the in-game camera, by name (made once each). */
+    private static final Map<String, RawAnimation> FILM_CLIPS = new HashMap<>();
+
+    /**
+     * For the in-game camera ({@code client/FilmDirector}, development only): an insect named {@code film:<clip>} plays
+     * only that clip, looping, so the camera can film any animation on a still insect. Null for every other insect.
+     */
+    @Nullable
+    private RawAnimation filmClip() {
+        Component name = getCustomName();
+        if (name == null) {
+            return null;
+        }
+        String text = name.getString();
+        return text.startsWith("film:") ? FILM_CLIPS.computeIfAbsent(text.substring(5), c -> RawAnimation.begin().thenLoop(c)) : null;
+    }
+
+    /** For the in-game camera's walker (development only): takes away every goal, so only the camera tells it where to go. */
+    public void forgetGoalsForFilm() {
+        goalSelector.removeAllGoals(goal -> true);
+        targetSelector.removeAllGoals(goal -> true);
+    }
+
+    /** For the in-game camera's log (development only): the drawn body this tick, on one line. */
+    public String filmReport() {
+        return String.format(java.util.Locale.ROOT,
+                "pos %.3f %.3f %.3f surface %s yaw %.1f heading %.1f tilt %.1f walk %.4f moved %.4f turn %.2f turning %b waist %.1f %.1f front %.1f %.1f",
+                getX(), getY(), getZ(), getSurface(), yBodyRot, bodyHeading, bodyTilt, walkSpeed, moved, turnSpeed, turning,
+                waistPitch, waistYaw, frontPitch, frontYaw)
+                + (edgeShift == null ? " edge -" : String.format(java.util.Locale.ROOT, " edge %.3f %.3f %.3f", edgeShift.x, edgeShift.y, edgeShift.z));
     }
 
     /** An animation this insect plays instead of walking or standing (a soldier's head bang), or null. */
@@ -909,33 +1542,292 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return null;
     }
 
-    private PlayState animate(AnimationState<AbstractAntEntity> state) {
+    /**
+     * A clip both the body and the head play whole, at the speed it was made, instead of their usual ones: the camera's
+     * clip, a special one (a soldier's head bang) or the look round out of a doorway's mouth. Null for none.
+     */
+    @Nullable
+    private RawAnimation wholeBodyClip() {
+        RawAnimation film = filmClip();
+        if (film != null) {
+            return film;
+        }
         RawAnimation special = specialAnimation();
         if (special != null) {
-            state.getController().setAnimationSpeed(1.0);
-            return state.setAndContinue(special);
+            return special;
         }
-        if (isPeeking()) {
-            state.getController().setAnimationSpeed(1.0);
-            return state.setAndContinue(PEEK);
+        return isPeeking() ? PEEK : null;
+    }
+
+    /**
+     * The body player: the walk with its legs in step with the ground (the walk for its speed; on hot ground the tall
+     * walk), stepping round to turn, asleep, or standing about at the insect's own pace.
+     */
+    private PlayState animateBody(AnimationState<AbstractAntEntity> state) {
+        AntAnimationController<?> player = (AntAnimationController<?>) state.getController();
+        RawAnimation whole = wholeBodyClip();
+        if (whole != null) {
+            player.transitionLength(3);
+            player.playAt(1.0);
+            return state.setAndContinue(whole);
         }
-        // Moving on a wall isn't "horizontal" movement, so check climbing separately (an ant hanging still does not move its legs).
-        double dx = getX() - xo;
-        double dy = getY() - yo;
-        double dz = getZ() - zo;
-        double moved = dx * dx + dy * dy + dz * dz;
-        if (isClimbing() && moved > 1.0E-4) {
+        RawAnimation clip = usualClip();
+        if (clip == WALK) {
+            clip = player.gearFor(WALKS, WALK, walkSpeed);
+        }
+        settleInto(player, clip);
+        if (WALKS.contains(clip) || clip == WALK_HOT) {
+            player.keepPace(walkSpeed, walkRateWithoutStride());
+        } else if (clip == TURN_R || clip == TURN_L) {
+            player.keepTurn(turnSpeed);
+        } else if (isMadeSpeed(clip)) {
+            player.playAt(1.0);
+        } else {
+            player.playAt(ownPace(0));
+        }
+        return state.setAndContinue(clip);
+    }
+
+    /**
+     * The head player: the same clip as the body (its head, mandibles and antennae), but always at the insect's own pace,
+     * so the antennae sweep at their own speed however fast the legs go.
+     */
+    private PlayState animateHead(AnimationState<AbstractAntEntity> state) {
+        AntAnimationController<?> player = (AntAnimationController<?>) state.getController();
+        RawAnimation whole = wholeBodyClip();
+        if (whole != null) {
+            player.transitionLength(3);
+            player.playAt(1.0);
+            return state.setAndContinue(whole);
+        }
+        RawAnimation clip = activityClip();
+        if (clip == null) {
+            clip = noticingClip(true);
+        }
+        if (clip == null && hasWorkClips() && hasFullMandibles() && !isAsleep()) {
+            clip = CARRY;
+        }
+        if (clip == null) {
+            clip = usualClip();
+        }
+        settleInto(player, clip);
+        player.playAt(isMadeSpeed(clip) ? 1.0 : ownPace(1));
+        return state.setAndContinue(clip);
+    }
+
+    /**
+     * What the body and the head play when nothing special is going on: walking or standing, hot or not, asleep,
+     * stepping round to turn, or standing still noticing something.
+     */
+    private RawAnimation usualClip() {
+        if (isAsleep()) {
+            return twitching ? SLEEP_TWITCH : SLEEP;
+        }
+        RawAnimation work = activityClip();
+        if (work != null) {
+            return work;
+        }
+        if (turning) {
+            return turnSpeed > 0.0 ? TURN_R : TURN_L;
+        }
+        RawAnimation noticing = walking ? null : noticingClip(false);
+        if (noticing != null) {
+            return noticing;
+        }
+        if (isOnHotGround()) {
+            return walking ? WALK_HOT : IDLE_HOT;
+        }
+        return walking ? WALK : IDLE;
+    }
+
+    /**
+     * The clip for what it is noticing, or null for none. The head keeps it while the legs walk ({@code head}: a bold ant
+     * walking closer with its antennae out, a shy one backing off with its jaws open).
+     */
+    @Nullable
+    private RawAnimation noticingClip(boolean head) {
+        return switch (getNoticing()) {
+            case NOTICE_LOOK -> LOOK;
+            case NOTICE_WARY -> LOOK_WARY;
+            case NOTICE_FREEZE -> head || !walking ? FREEZE : null;
+            default -> null;
+        };
+    }
+
+    /** The clip for the body work it is doing (cleaning an antenna, digging), or null for none (or no such clips). */
+    @Nullable
+    private RawAnimation activityClip() {
+        if (!hasWorkClips()) {
+            return null;
+        }
+        return switch (getActivity()) {
+            case ACTIVITY_GROOM_L -> GROOM_L;
+            case ACTIVITY_GROOM_R -> GROOM_R;
+            case ACTIVITY_GROOM_BOTH -> GROOM_BOTH;
+            case ACTIVITY_DIG -> DIG;
+            default -> null;
+        };
+    }
+
+    /**
+     * Whether its animation file has the work clips (cleaning, digging, carrying) and the turning ones: the ant model's
+     * does (made by tools/ant_models.py); the termites' do not yet, so they keep their usual clips while they work.
+     */
+    protected boolean hasWorkClips() {
+        return false;
+    }
+
+    /** Whether this clip plays at the speed it was made (a piece of work played once), not at the insect's own pace. */
+    private static boolean isMadeSpeed(RawAnimation clip) {
+        return clip == GROOM_L || clip == GROOM_R || clip == GROOM_BOTH;
+    }
+
+    /**
+     * Into a nap and out of it the pose blends slowly (a real ant settles down and gets up), into a look and out of it a
+     * little faster; otherwise quickly.
+     */
+    private static void settleInto(AntAnimationController<?> player, RawAnimation clip) {
+        RawAnimation now = player.getCurrentRawAnimation();
+        boolean napping = clip == SLEEP || clip == SLEEP_TWITCH || now == SLEEP || now == SLEEP_TWITCH;
+        boolean looking = clip == LOOK || clip == LOOK_WARY || clip == FREEZE || now == LOOK || now == LOOK_WARY || now == FREEZE;
+        boolean working = isMadeSpeed(clip) || isMadeSpeed(now);
+        player.transitionLength(napping ? SETTLE_TICKS : looking ? LOOK_SETTLE_TICKS : working ? GROOM_SETTLE_TICKS : 3);
+    }
+
+    /**
+     * Client: how much the head is turned toward what it looks at (0 to 1; see {@code client.InsectModel}): it eases in
+     * when the insect starts looking at a player and out when it stops, so the head never snaps.
+     */
+    private float lookWeight;
+    private float lookWeightO;
+
+    private void tickLookWeight() {
+        lookWeightO = lookWeight;
+        byte noticing = getNoticing();
+        boolean turnsHead = (noticing == NOTICE_LOOK || noticing == NOTICE_WARY) && !isClimbing();
+        lookWeight = approach(lookWeight, turnsHead ? 1.0F : 0.0F, 0.2F);
+    }
+
+    /** Client: how much the head turns toward what it looks at, this frame (0 to 1). */
+    public float getLookWeight(float partialTick) {
+        return Mth.lerp(partialTick, lookWeightO, lookWeight);
+    }
+
+    /**
+     * Client: a nap is lying still, then a short bout of antenna twitches (the "rapid antennal movement" of sleeping ants,
+     * Cassill et al. 2009), by turns: still stretches of 15 to 25 seconds, twitch bouts of 6 (one play of the twitch
+     * clip; my picks, to confirm). The ticks left of the present stretch, whether it is a twitch bout, and whether a nap
+     * is under way.
+     */
+    private int napTicks;
+    private boolean twitching;
+    private boolean dozing;
+    private static final int TWITCH_TICKS = 120;
+
+    private void tickNap() {
+        if (!isAsleep()) {
+            dozing = false;
+            twitching = false;
+            return;
+        }
+        if (!dozing) {
+            dozing = true;
+            twitching = false;
+            napTicks = 300 + getRandom().nextInt(201);
+        } else if (--napTicks <= 0) {
+            twitching = !twitching;
+            napTicks = twitching ? TWITCH_TICKS : 300 + getRandom().nextInt(201);
+        }
+    }
+
+    /**
+     * How fast a walk without a stride note plays (today's termite walks, not made by the motion library yet): the old
+     * guess from the speed, so their legs roughly keep up.
+     */
+    private double walkRateWithoutStride() {
+        if (isClimbing()) {
             // The legs keep pace with the body: slower when it climbs slowly (poking its head out of a chimney).
-            state.getController().setAnimationSpeed(Mth.clamp(Math.sqrt(moved) / CLIMB_STEP * 1.5, 0.4, 1.5));
-            return state.setAndContinue(WALK);
+            return Mth.clamp(walkSpeed / CLIMB_STEP * 1.5, 0.4, 1.5);
         }
-        if (state.isMoving()) {
-            // Legs move faster when the ant moves faster, so they don't slide.
-            state.getController().setAnimationSpeed(Math.max(0.6, state.getLimbSwingAmount() * 6.0));
-            return state.setAndContinue(WALK);
-        }
-        state.getController().setAnimationSpeed(1.0);
-        return state.setAndContinue(IDLE);
+        return Math.max(0.6, Math.min(walkSpeed * 4.0, 1.0) * 6.0);
+    }
+
+    /**
+     * This insect's own pace for what is not tied to its steps (standing about, the head and antennae): 0.88 to 1.12
+     * times as made, the same all its life (from its id; {@code which} picks one of several), so no two insects move in
+     * step (my pick, to confirm).
+     */
+    private double ownPace(int which) {
+        long bits = getUUID().getMostSignificantBits() >>> (which * 16) & 0xFFFF;
+        return 0.88 + 0.24 * bits / 65535.0;
+    }
+
+    /** Client: how far it moves a tick (blocks; along a wall too while climbing), smoothed over a few ticks. */
+    private double walkSpeed;
+    /** Client: whether it is walking (its legs step), from {@link #walkSpeed}, with a gap so it never flickers between. */
+    private boolean walking;
+    /** Client: how big the renderer draws it (its scale), for the stride (set by {@code AntRenderer}). */
+    private float drawScale = 1.0F;
+    /** Client: the renderer's climbing lift and push into a wall (blocks; set by {@code AntRenderer}). */
+    private double drawLift;
+    private double drawIntoWall;
+    /** Walking starts above this speed and stops below the lower one (blocks a tick; my picks, to confirm). */
+    private static final double START_WALKING = 0.008;
+    private static final double STOP_WALKING = 0.004;
+    /** Client: how far it moved this tick (blocks; along a wall too while climbing). */
+    private double moved;
+    /** Client: how fast the drawn body turns (degrees a tick, positive to the right), smoothed like {@link #walkSpeed}. */
+    private double turnSpeed;
+    /**
+     * Client: whether its legs step round to turn where it stands (2026-10-16, the review's third fix): real ants step
+     * to turn, their feet never skate round. It steps when the body turns faster than {@link #START_TURNING} (until it
+     * is below {@link #STOP_TURNING}) and the turn moves the feet more than walking does (curving while walking, the walk
+     * steps). Not on hot ground (the tall stance has no turning clip). Ants only.
+     */
+    private boolean turning;
+    /** Degrees a tick (40 and 20 a second; my picks, to confirm). */
+    private static final double START_TURNING = 2.0;
+    private static final double STOP_TURNING = 1.0;
+    /** How far the outer feet of the ant model stand from the body's middle (model units; tools/ant_models.py, TURN). */
+    private static final double TURN_REACH = 5.8;
+
+    /**
+     * Client, once a tick: how fast it moves, for the legs (see {@link AntAnimationController}). On a floor only its
+     * movement over the ground counts (a falling ant does not walk); on a wall or a ceiling its movement along it.
+     */
+    private void measureWalk() {
+        double dx = getX() - xo;
+        double dy = isClimbing() ? getY() - yo : 0.0;
+        double dz = getZ() - zo;
+        moved = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        walkSpeed += (moved - walkSpeed) * 0.4;
+        walking = walkSpeed > (walking ? STOP_WALKING : START_WALKING);
+        // Turning: the drawn body's turn this tick (right is a growing body yaw on a floor; on a wall the heading grows
+        // turning left). Its feet step round when the turn would move them over the ground faster than the walk does.
+        double turned = wallPose ? -Mth.wrapDegrees(bodyHeading - bodyHeadingO) : Mth.wrapDegrees(yBodyRot - yBodyRotO);
+        turnSpeed += (turned - turnSpeed) * 0.4;
+        double feet = Math.abs(turnSpeed) * Mth.DEG_TO_RAD * TURN_REACH / 16.0 * drawScale;
+        turning = hasWorkClips() && !isOnHotGround() && feet > walkSpeed
+                && Math.abs(turnSpeed) > (turning ? STOP_TURNING : START_TURNING);
+    }
+
+    /** Client: how big the renderer draws it (1 = the model's own size). */
+    public float getDrawScale() {
+        return drawScale;
+    }
+
+    /** Client: set by the renderer each frame (its scale), so the stride is known in blocks. */
+    public void setDrawScale(float scale) {
+        drawScale = scale;
+    }
+
+    /**
+     * Client: set by the renderer each frame, how far its climbing pose lifts the drawn body up a wall and pushes it in
+     * toward it (blocks), for drawing it over an edge ({@link EdgeOver}).
+     */
+    public void setClimbPose(double lift, double intoWall) {
+        drawLift = lift;
+        drawIntoWall = intoWall;
     }
 
     @Override

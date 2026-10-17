@@ -33,12 +33,32 @@ def length(anim):
 
 
 CANDIDATES = [
-    ('Idle (now)', 'today\'s idle: feelers searching, slow breathing', am.idle()),
-    ('Walk (now)', 'today\'s walk: the tripod gait', am.walk()),
+    ('Idle', 'standing: feelers searching, slow breathing', am.idle()),
+    # The walk at three speeds (2026-10-16, the review's first fix): real ants walk faster mostly by longer strides, with
+    # less of each step on the ground; the game picks the walk by speed and plays it so the feet stay planted.
+    ('Fast walk, game speed', 'a worker on the floor, 2.75 blocks a second: long strides (0.48 body lengths, the most '
+                              'these legs reach), about 12 steps a second', am.walk_clip(am.WALK_FAST)[0], 2.75),
+    ('Walk, climbing speed', 'up a wall, 1.2 blocks a second: medium strides (0.37 body lengths), about 6.5 steps a '
+                             'second', am.walk_clip(am.WALK)[0], 1.2),
+    ('Slow walk', 'a slow ant, here half a block a second: short strides (0.26 body lengths), more feet down and a '
+                  'looser tripod, about 4 steps a second', am.walk_clip(am.WALK_SLOW)[0], 0.5),
+    ('Turning on the spot', 'stepping round to the right, 40 degrees a step cycle (here the body stays still and the '
+                            'feet go round it; in game the body turns over the planted feet)',
+     am.turn_clip(am.TURN_DEGREES)[0]),
+    ('Hot walk, game speed', 'on stilts with the gaster up, at 2.75 blocks a second', am.walk_hot(), 2.75),
     ('Sleep', 'sinks onto the floor, feelers folded and drooping, only breathing', am.sleep()),
     ('Sleep with twitches', "as Sleep, with quick feeler flicks now and then (real ants' deep sleep)", am.sleep_twitch()),
     ('Hot, standing', 'stilting with the gaster up, feelers searching', am.idle_hot()),
-    ('Hot, walking', 'stilting with the gaster up, quicker steps', am.walk_hot()),
+    ('Looking', 'noticing a player: stands taller, forebody up, feelers pointed and flicking, head tilting '
+                '(in game the head also turns toward the player)', am.look()),
+    ('Looking, wary', 'a shy one: the same, lower and stiller feelers, faster flicks, jaws open, gaster curled under',
+     am.look_wary()),
+    ('Cleaning an antenna', 'the front leg combs the left antenna 3 times with its strigil, then is drawn through the '
+                            'jaws (plays once)', am.groom_antenna('l')),
+    ('Cleaning both antennae', 'left, then right', am.groom_antenna('lr')),
+    ('Digging', 'head down at the soil, jaws biting 3 times a second, front legs raking the loose soil back by turns',
+     am.dig()),
+    ('Carrying (head only)', 'head up, jaws shut on the load, antennae high; the game plays it over the walk', am.carry()),
 ]
 
 
@@ -50,14 +70,17 @@ def colour(cube):
     return '#ff00ff'
 
 
-def entry(name, note, anim):
+def entry(name, note, anim, bps=None):
     """One option for the page, with its feet worked out by the animation lab (tools/anim_lab.py): the walk's own speed
-    (model units a second; 0 for a standing clip) and each foot's tip through the cycle, for the foot trails."""
+    (model units a second; 0 for a standing clip) and each foot's tip through the cycle, for the foot trails.
+    bps: play a walk so the ant moves this many blocks a second (the body and legs faster or slower, the head at its own
+    pace, as the game does)."""
     clip = lab.Clip(name, {'loop': True, 'animation_length': length(anim), 'bones': anim})
     gait = lab.Gait(MODEL, clip)
     tips = {leg: [[round(v, 3) for v in t[leg]] for t in gait.tips] for leg in gait.legs}
+    rate = bps / (gait.speed * MODEL.blocks_per_unit) if bps and gait.speed else 1.0
     return {'name': name, 'note': note, 'length': clip.length, 'bones': anim, 'speed': gait.speed,
-            'times': [round(t, 4) for t in gait.times], 'tips': tips}
+            'times': [round(t, 4) for t in gait.times], 'tips': tips, 'rate': round(rate, 4), 'head_rate': 1.0}
 
 
 MODEL = lab.Model('worker_ant')
@@ -69,7 +92,7 @@ def main():
     for b in bones:
         for c in b.get('cubes', []):
             c['colour'] = colour(c)
-    data = {'bones': bones, 'anims': [entry(n, note, a) for n, note, a in CANDIDATES]}
+    data = {'bones': bones, 'anims': [entry(*c) for c in CANDIDATES]}
     page = (ROOT / 'tools' / 'ant_pose_viewer.template.html').read_text(encoding='utf-8')
     out.write_text(page.replace('/*DATA*/null', json.dumps(data)), encoding='utf-8')
     print(f'wrote {out}')

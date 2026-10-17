@@ -9,6 +9,8 @@ import com.antcolonies.colony.NestSite;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.entity.goal.DigGoal;
 import com.antcolonies.entity.goal.FindNestSiteGoal;
+import com.antcolonies.entity.goal.GroomGoal;
+import com.antcolonies.entity.goal.NapGoal;
 import com.antcolonies.entity.goal.QueenToRoomGoal;
 import com.antcolonies.entity.goal.SealEntranceGoal;
 import com.antcolonies.species.Species;
@@ -47,6 +49,11 @@ public class QueenAntEntity extends AbstractAntEntity {
         super(type, level);
     }
 
+    @Override
+    protected net.minecraft.resources.ResourceLocation species() {
+        return Species.RED_HARVESTER_ANT;
+    }
+
     public static AttributeSupplier.Builder createAttributes() {
         return PathfinderMob.createMobAttributes()
                 .add(Attributes.MAX_HEALTH, 20.0)
@@ -66,6 +73,10 @@ public class QueenAntEntity extends AbstractAntEntity {
         // Otherwise she hardly ever wanders: low chance to start a stroll, and never far. Settled in her room, never.
         this.goalSelector.addGoal(3, new DigGoal(this, () -> QueenToRoomGoal.findFinishedRoom(this) == null));
         this.goalSelector.addGoal(4, new AntWanderGoal(this, 0.6, 400, 4, () -> QueenToRoomGoal.findFinishedRoom(this) == null));
+        // Resting in her room she naps now and then, longer than the workers (real ant queens: fewer, longer naps).
+        this.goalSelector.addGoal(4, new NapGoal(this, true));
+        // And now and then she cleans her antennae.
+        this.goalSelector.addGoal(4, new GroomGoal(this));
         this.goalSelector.addGoal(5, new RandomLookAroundGoal(this));
     }
 
@@ -163,5 +174,11 @@ public class QueenAntEntity extends AbstractAntEntity {
         if (getColonyId() != null && level() instanceof ServerLevel serverLevel) {
             ColonyManager.queenDied(serverLevel, getColonyId());
         }
+    }
+
+    /** The worker ant model's animation file has the work clips (cleaning, digging, carrying). */
+    @Override
+    protected boolean hasWorkClips() {
+        return true;
     }
 }

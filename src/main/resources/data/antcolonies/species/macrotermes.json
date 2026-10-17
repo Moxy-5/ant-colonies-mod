@@ -130,5 +130,22 @@
     "gallery_levels": 3,
     "gallery_radius": 13,
     "chimney_trip_chance": 0.1
+  },
+  "body_language": {
+    "_note": "How the bodies behave (the animation engine, 2026-10-16; every number my pick, to confirm). No naps or hot ground for termites yet. notice: Macrotermes workers are blind and feel the ground shake: a player walking within range blocks, or sprinting, jumping or landing within shake_range, makes an idle worker freeze with its antennae raised for look_ticks (from, to), with chance; it never turns to look. Then it does not freeze again for rest_ticks.",
+    "traits": {
+      "boldness": [0.0, 1.0],
+      "curiosity": [0.0, 1.0],
+      "restlessness": [0.0, 1.0],
+      "older_bolder": 0.3
+    },
+    "notice": {
+      "sense": "vibration",
+      "range": 3.0,
+      "shake_range": 6.0,
+      "chance": 1.0,
+      "look_ticks": [20, 40],
+      "rest_ticks": 100
+    }
   }
 }

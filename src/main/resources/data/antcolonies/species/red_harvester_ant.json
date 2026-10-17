@@ -131,5 +131,39 @@
     "site_search_radius": 8,
     "max_unevenness": 1,
     "second_batch_eggs": 2
+  },
+  "body_language": {
+    "_note": "How the bodies behave (the animation engine, 2026-10-16; every number my pick, to confirm). naps: real ants sleep in many short naps (Cassill et al. 2009, fire ants: workers about 250 a day of about a minute, queens about 90 of about 6 minutes; nothing measured for Pogonomyrmex yet). A worker with nothing to do inside the nest falls asleep with chance_per_second each second; a nap lasts worker_ticks (from, to), a queen's queen_ticks. hot: on ground too hot to touch they stand and walk tall with the gaster up; outside under the open sky in a biome at least from_heat hot (base temperature: badlands, desert and savanna 2.0, plains 0.8), from around_rest_ticks before the midday rest until as long after it.",
+    "naps": {
+      "chance_per_second": 0.033,
+      "worker_ticks": [800, 1600],
+      "queen_ticks": [3600, 7200]
+    },
+    "hot": {
+      "from_heat": 1.5,
+      "around_rest_ticks": 2000
+    },
+    "_traits_note": "Personality: each real ant draws boldness, curiosity and restlessness (0 to 1) from these ranges; an old forager is older_bolder bolder than a worker just grown up (real ant personality studies; foragers bolder than nurses).",
+    "traits": {
+      "boldness": [0.0, 1.0],
+      "curiosity": [0.0, 1.0],
+      "restlessness": [0.0, 1.0],
+      "older_bolder": 0.3
+    },
+    "_notice_note": "Noticing a player by sight (movement only): an idle ant within range blocks, in plain view of a player who moves, notices with chance a second (times 0.2 to 1 by its curiosity), stops and looks for look_ticks (from, to, by curiosity); a bold one (from bold_from) walks to about come_within blocks of the player, a shy one (below shy_below) backs off back_off blocks with its jaws open. The player still for forget_ticks: it goes on, and does not notice again for rest_ticks.",
+    "notice": {
+      "sense": "sight",
+      "range": 6.0,
+      "chance": 0.8,
+      "look_ticks": [60, 200],
+      "bold_from": 0.7,
+      "shy_below": 0.3,
+      "come_within": 1.0,
+      "back_off": 2,
+      "forget_ticks": 60,
+      "rest_ticks": 600
+    },
+    "_groom_note": "Cleaning the antennae (real ants: each antenna drawn through the comb on the front leg of its side, the strigil, then the comb cleaned in the jaws). An ant standing about with nothing to do starts with chance_per_second each second (times 0.5 to 1.5 by its restlessness); both_share of the time it cleans both, otherwise one. My picks, to confirm.",
+    "groom": { "chance_per_second": 0.05, "both_share": 0.4 }
   }
 }

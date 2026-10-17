@@ -1,0 +1,19 @@
+# The poses scene: each worker clip filmed on its own (one ant on the floor at a time), from the side, the front,
+# above and three-quarters. Run: ./gradlew runFilm   Pictures: run-film/screenshots/poses/
+# Steps: see client/FilmDirector. "views <name> <frames>" films the side view as a burst of frames, 1 tick apart.
+cmd time set noon
+cmd weather clear
+lens 30
+ant worker_ant idle
+views idle
+ant worker_ant walk
+views walk 10
+ant worker_ant sleep
+views sleep
+ant worker_ant sleep_twitch
+views sleep_twitch 6
+ant worker_ant idle_hot
+views idle_hot
+ant worker_ant walk_hot
+views walk_hot 7
+quit

@@ -115,6 +115,11 @@ public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurs
         this.rank = rank;
     }
 
+    @Override
+    protected ResourceLocation species() {
+        return Species.MACROTERMES;
+    }
+
     /** A minor soldier: quick and agile (it guards the foragers outside). */
     public static AttributeSupplier.Builder createMinorAttributes() {
         return PathfinderMob.createMobAttributes()

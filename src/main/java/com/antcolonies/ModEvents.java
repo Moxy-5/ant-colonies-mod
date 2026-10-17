@@ -14,6 +14,7 @@ import com.antcolonies.colony.Colony;
 import com.antcolonies.debug.Perf;
 import com.antcolonies.worldgen.BranchShedding;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.entity.goal.GroundShakes;
 import com.antcolonies.entity.goal.HuntTermitesGoal;
 
 import net.minecraft.core.component.DataComponents;
@@ -30,6 +31,7 @@ import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.living.LivingEvent;
+import net.neoforged.neoforge.event.entity.living.LivingFallEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
 
 @EventBusSubscriber(modid = AntColoniesMod.MODID)
@@ -105,9 +107,18 @@ public class ModEvents {
     @SubscribeEvent
     public static void onJump(LivingEvent.LivingJumpEvent event) {
         if (event.getEntity() instanceof Player player && player.level() instanceof ServerLevel level) {
+            GroundShakes.hard(player); // termites nearby feel it (NoticeGoal)
             for (Colony colony : coloniesNear(level, player.blockPosition())) {
                 colony.alarm().footsteps(level, player);
             }
+        }
+    }
+
+    /** A player landing shakes the ground: termites nearby feel it (see {@code NoticeGoal}). */
+    @SubscribeEvent
+    public static void onLand(LivingFallEvent event) {
+        if (event.getEntity() instanceof Player player && !player.level().isClientSide && event.getDistance() > 0.5F) {
+            GroundShakes.hard(player);
         }
     }
 
