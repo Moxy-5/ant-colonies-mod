@@ -407,10 +407,11 @@ public class TermiteNewHoleTests {
             }
             FoodWays.NewTunnel tunnel = colony.nest().foodWays().getNewTunnels().isEmpty() ? null : colony.nest().foodWays().getNewTunnels().get(0);
             if (helper.getTick() % 1000 == 0) {
-                AntColoniesMod.LOGGER.info("[new-hole-test] log from below: {}, phase {}, tunnel {}, gallery {}, eaten {}", clock.describe(), phase[0],
+                AntColoniesMod.LOGGER.info("[new-hole-test] log from below: {}, phase {}, tunnel {}, gallery {}, eaten {}{}", clock.describe(), phase[0],
                         tunnel == null ? "none" : tunnel.tunnel().tunnel().stream().filter(c -> Nest.isDugOut(level, c)).count() + "/" + tunnel.tunnel().tunnel().size(),
                         tunnel == null || tunnel.gallery() == null ? "none" : tunnel.gallery().stream().filter(c -> Nest.isDugOut(level, c)).count() + "/" + tunnel.gallery().size(),
-                        eaten);
+                        eaten, kind == Food.STUMP && phase[0] == 2 ? ", under the stump " + level.getBlockState(log.get(0)) + " (cut " + colony.food().getPiecesCut(log.get(0))
+                                + "), stump " + level.getBlockState(stump) + " (cut " + colony.food().getPiecesCut(stump) + ")" : "");
             }
             if (tunnel != null) {
                 // Planned with the tunnel, as one job (the user's decision, 2026-10-14), not once the tunnel is dug.

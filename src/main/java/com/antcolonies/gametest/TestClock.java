@@ -30,9 +30,13 @@ import net.minecraft.world.phys.AABB;
 public final class TestClock {
     /** What a test without a clock of its own reads: 7:00, standing still (the harvester foragers are out, termites in). */
     static final long DEFAULT = 1000;
-    /** Minecraft's sunset (18:33) and sunrise (5:28), by its own sun ({@link Colony#isSunUp}). */
-    static final long SUNSET = 12550;
-    static final long SUNRISE = 23460;
+    /**
+     * Minecraft's sunset (about 18:32) and sunrise (5:28), read from its own sun ({@link Colony#isSunUp}), the very rule
+     * the colonies go by. (They were written in as 12550 and 23460, but the sun sets at 12541: for those 9 ticks this
+     * clock still said day while the termites were already out, and a "no foraging by day" check failed, 2026-10-16.)
+     */
+    private static long sunset = -1;
+    private static long sunrise = -1;
 
     /** The parts of a day, as the colony's species keeps them (its {@code food.day_clock}, or day and night). */
     public enum Phase {
@@ -187,13 +191,39 @@ public final class TestClock {
             }
             starts.put(Phase.AFTERNOON, (long) (day.restStart(heat) + day.restTicks(heat)));
             starts.put(Phase.EVENING, (long) day.inBy());
-            starts.put(Phase.NIGHT, SUNSET);
+            starts.put(Phase.NIGHT, sunset());
         } else {
-            starts.put(Phase.DAY, SUNRISE);
-            starts.put(Phase.NIGHT, SUNSET);
+            starts.put(Phase.DAY, sunrise());
+            starts.put(Phase.NIGHT, sunset());
             starts.put(Phase.BEFORE_DAWN, Colony.HEAD_IN_FROM);
         }
         return starts;
+    }
+
+    private long sunset() {
+        findSunEdges();
+        return sunset;
+    }
+
+    private long sunrise() {
+        findSunEdges();
+        return sunrise;
+    }
+
+    /** The first day time the sun is down, and the first it is up again after the night (once; every test shares one sun). */
+    private void findSunEdges() {
+        if (sunset >= 0) {
+            return;
+        }
+        for (long time = 1; time < 24000; time++) {
+            boolean up = Colony.isSunUp(level, time);
+            if (sunset < 0 && !up && Colony.isSunUp(level, time - 1)) {
+                sunset = time;
+            } else if (sunset >= 0 && up) {
+                sunrise = time;
+                return;
+            }
+        }
     }
 
     /** Holds the hour (for a check), until {@link #run}. */

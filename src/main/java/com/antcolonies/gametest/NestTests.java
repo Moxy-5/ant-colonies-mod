@@ -1506,6 +1506,10 @@ public class NestTests {
                 AntColoniesMod.LOGGER.info("[early-feed-test] tick {}: queen fed {}, bread {} (milling {}), food {}, eggs laid {}, eggs {}, larvae {}, seeds on the ground {}",
                         helper.getTick(), colony.queenCare().getQueenBread(), colony.bakery().getBread(), colony.bakery().getMilling(), colony.food().getFood(), colony.queenCare().getEggsLaid(),
                         colony.brood().countEggs(level), colony.brood().countLarvae(level), seedsIn(level, helper.getBounds()) - colony.food().getFood());
+                if (helper.getTick() % 4000 == 0) {
+                    AntColoniesMod.LOGGER.info("[early-feed-test] tick {}: {}{} | {} | {} | {}", helper.getTick(), colony.describeJobs(level), colony.spots().describe(),
+                            colony.door().describe(level), colony.patrol().describe(level), carriers(helper));
+                }
             }
         });
 
