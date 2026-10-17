@@ -39,7 +39,10 @@ public class TermiteNewHoleTests {
      * time. Then the hay is taken away: the hole is spent, plugged when the foraging is over and never opened again.
      * On the test clock (roadmap 3a): real nights and days from 18:30; the spent hole is plugged at the end of the night
      * and stays shut the next night. The bale is kept from running out until the new hole has been used (the workers
-     * eat it from the tunnel's end by day), as a bigger stack of hay would last.
+     * eat it from the tunnel's end by day), as a bigger stack of hay would last. When the hay goes a worker is kept in
+     * the feeding gallery for 30 seconds (one taking the last bite): the spent gallery must never be sealed off with a
+     * worker in it, and once let go the worker gets out (the full run of 2026-10-16: one was walled in alive, see
+     * docs/BUGS.md 39).
      */
     @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
     public static void aBigColonyDigsATunnelToFarHayAndPlugsItsHoleWhenTheHayIsGone(GameTestHelper helper) {
@@ -67,6 +70,8 @@ public class TermiteNewHoleTests {
         boolean[] usedTheHole = {false};
         FoodWays.NewTunnel[] tunnel = {null};
         int[] since = {0};
+        TermiteWorkerEntity[] kept = {null}; // the worker kept in the gallery when the hay goes
+        long[] keptUntil = {0};
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
@@ -100,6 +105,21 @@ public class TermiteNewHoleTests {
                         tunnel[0] == null ? "no tunnel yet" : "dug " + tunnel[0].tunnel().tunnel().stream().filter(c -> Nest.isDugOut(level, c)).count()
                                 + " of " + tunnel[0].tunnel().tunnel().size() + ", hole " + level.getBlockState(tunnel[0].tunnel().hole()),
                         colony.foragingHoles().describeNewHoles(level));
+            }
+            if (kept[0] != null) {
+                // Never a worker in the spent gallery with its mouth and its roof (where the hay lay) both shut: walled in alive.
+                java.util.List<BlockPos> gallery = tunnel[0].gallery();
+                BlockPos mouth = galleryMouth(tunnel[0]);
+                boolean shut = level.getBlockState(mouth).isCollisionShapeFullBlock(level, mouth)
+                        && level.getBlockState(hay).isCollisionShapeFullBlock(level, hay);
+                for (TermiteWorkerEntity worker : TestIsolation.insectsOf(level, colony, TermiteWorkerEntity.class)) {
+                    helper.assertTrue(!shut || !gallery.contains(worker.blockPosition()) || worker.blockPosition().equals(mouth),
+                            "worker " + worker.getId() + " was walled in in the spent gallery at " + helper.relativePos(worker.blockPosition())
+                                    + " (its mouth " + level.getBlockState(mouth) + ")");
+                }
+                if (helper.getTick() == keptUntil[0]) {
+                    kept[0].setNoAi(false); // let go: it must find its way out
+                }
             }
             switch (phase[0]) {
                 case 1 -> {
@@ -141,6 +161,17 @@ public class TermiteNewHoleTests {
                         AntColoniesMod.LOGGER.info("[new-hole-test] foragers use the new hole: {} pieces cut since it opened", cut);
                         level.setBlock(hay, Blocks.AIR.defaultBlockState(), 3);
                         colony.food().rescanPlantsSoon();
+                        // One worker taking the last bite: kept at the top of the gallery under the hay for 30 seconds.
+                        java.util.List<BlockPos> gallery = tunnel[0].gallery();
+                        helper.assertTrue(gallery != null && !gallery.isEmpty(), "the tunnel to the hay has no feeding gallery");
+                        BlockPos top = gallery.get(gallery.size() - 1);
+                        kept[0] = TestIsolation.insectsOf(level, colony, TermiteWorkerEntity.class).stream()
+                                .min(java.util.Comparator.comparingDouble(w -> w.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(top))))
+                                .orElseThrow();
+                        kept[0].getNavigator().stop();
+                        kept[0].teleportTo(top.getX() + 0.5, top.getY(), top.getZ() + 0.5);
+                        kept[0].setNoAi(true);
+                        keptUntil[0] = helper.getTick() + 600;
                         phase[0] = 3;
                         since[0] = 0;
                     }
@@ -173,8 +204,14 @@ public class TermiteNewHoleTests {
                     helper.assertTrue(!ForagingHoles.isOpen(level, hole), "the spent hole was opened again");
                     helper.assertTrue(colony.foragingHoles().waysOut(level).stream().noneMatch(way -> way.mouth().equals(hole.above())),
                             "the spent hole is still a way out");
-                    if (since[0] > 1200) {
+                    if (since[0] > 1200 && helper.getTick() > keptUntil[0] + 1200) {
                         helper.assertTrue(colony.nest().isInside(level, tunnel[0].tunnel().end()), "the tunnel is no longer part of the nest");
+                        helper.assertTrue(!kept[0].isAlive() || !tunnel[0].gallery().contains(kept[0].blockPosition())
+                                        || kept[0].blockPosition().equals(galleryMouth(tunnel[0])),
+                                "the worker kept in the gallery never got out: at " + helper.relativePos(kept[0].blockPosition()));
+                        BlockPos mouth = galleryMouth(tunnel[0]);
+                        AntColoniesMod.LOGGER.info("[new-hole-test] the spent gallery's mouth at the end: {}; the kept worker at {}",
+                                level.getBlockState(mouth), helper.relativePos(kept[0].blockPosition()));
                         helper.succeed();
                     }
                 }
@@ -182,6 +219,12 @@ public class TermiteNewHoleTests {
                 }
             }
         });
+    }
+
+    /** The cell of a feeding gallery next to the end of its tunnel (the gallery's way in). */
+    private static BlockPos galleryMouth(FoodWays.NewTunnel tunnel) {
+        BlockPos end = tunnel.tunnel().end();
+        return tunnel.gallery().stream().filter(c -> c.distManhattan(end) == 1).findFirst().orElse(tunnel.gallery().get(0));
     }
 
     /**

@@ -195,6 +195,15 @@ public class TermiteCathedralTests {
                 built[0] = true;
                 AntColoniesMod.LOGGER.info("[user-mound-test] tick {}: the user's mound put up", helper.getTick());
             }
+            // The royal pair dig only while they found the colony (the full run of 2026-10-16: here the king, with workers
+            // round him and no finished room, tried to dig the shaft for ever, 29 ms a tick of failed route searches).
+            for (com.antcolonies.entity.AbstractAntEntity royal : TestIsolation.insectsOf(level, colony, com.antcolonies.entity.AbstractAntEntity.class)) {
+                if (royal instanceof com.antcolonies.entity.TermiteKingEntity || royal instanceof com.antcolonies.entity.TermiteQueenEntity) {
+                    helper.assertTrue(royal.goalSelector.getAvailableGoals().stream()
+                                    .noneMatch(g -> g.isRunning() && g.getGoal() instanceof com.antcolonies.entity.goal.DigGoal),
+                            "the " + royal.getType().getDescription().getString() + " digs, though the colony has workers");
+                }
+            }
             // The test world has no random ticks: wet soil sets here at about the game's pace (a finished block in about 20
             // minutes at normal speed, see TermiteMoundBlock).
             for (BlockPos pos : colony.mound().getParts(level).keySet()) {

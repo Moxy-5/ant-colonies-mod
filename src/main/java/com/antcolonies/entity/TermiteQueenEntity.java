@@ -70,7 +70,7 @@ public class TermiteQueenEntity extends AbstractAntEntity {
         // She closes the entrance herself only if she has no king.
         this.goalSelector.addGoal(1, new SealEntranceGoal(this));
         this.goalSelector.addGoal(2, new QueenToRoomGoal(this));
-        this.goalSelector.addGoal(3, new DigGoal(this, () -> QueenToRoomGoal.findFinishedRoom(this) == null));
+        this.goalSelector.addGoal(3, new DigGoal(this, () -> QueenToRoomGoal.mayDig(this)));
         this.goalSelector.addGoal(4, new AntWanderGoal(this, 0.6, 400, 3, () -> QueenToRoomGoal.findFinishedRoom(this) == null));
         this.goalSelector.addGoal(5, new RandomLookAroundGoal(this));
     }

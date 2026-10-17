@@ -49,7 +49,8 @@ public class NestTests {
     private static final int NEST_CELLS = 3 + FOUNDING_CELLS + 4 * 3 + (25 + 25 + 9 + 25) + 3 * NestPlan.STAIR_LENGTH;
 
     /**
-     * Brain step 4b, in the same scene: once 15 cells are dug it is midnight for 3000 ticks: the diggers keep the
+     * The queen digs the shaft and her founding chamber alone, then 6 workers dig the rest and build the hill.
+     * <p>Brain step 4b, in the same scene: once 15 cells are dug it is midnight for 3000 ticks: the diggers keep the
      * foragers' day clock for their surface work, so no worker is outside (after a moment to get in) and the soil dug
      * meanwhile lies in piles of Loose Soil near the top of the nest, only on the night soil cells and never more than
      * they hold; once the piles are as big as a morning's carrying the diggers rest (no more than a few cells dug, the
@@ -62,7 +63,21 @@ public class NestTests {
         // Run the game faster than normal so the test doesn't take minutes.
         level.getServer().tickRateManager().setTickRate(2000.0F);
 
-        startColony(helper);
+        // As in a real founding (and in the game): the queen digs the shaft and her founding chamber alone, and her soil
+        // never reaches the hill (a queen carries none); her first workers come once it is dug. (Until 2026-10-16 the
+        // workers came at once and the queen dug beside them for good; now a queen digs only while she founds, so the
+        // workers' soil filled the hill before the night below, and no night soil could pile up, docs/BUGS.md 39.)
+        startColony(helper, 0);
+        boolean[] workersIn = {false};
+        helper.onEachTick(() -> {
+            if (!workersIn[0] && airBelowSurface(helper) >= Nest.SHAFT_DEPTH + FOUNDING_CELLS) {
+                workersIn[0] = true;
+                for (int i = 0; i < 6; i++) {
+                    helper.spawn(ModEntities.WORKER_ANT.get(), MIDDLE - 2 + i % 3 * 2, SURFACE, MIDDLE - 3 + i / 3 * 6);
+                }
+                AntColoniesMod.LOGGER.info("[nest-test] tick {}: the founding chamber is dug, the first 6 workers come", helper.getTick());
+            }
+        });
 
         long[] nightFrom = {-1};
         long[] morningAt = {-1};
