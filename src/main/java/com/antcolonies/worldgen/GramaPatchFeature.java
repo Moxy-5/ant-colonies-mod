@@ -21,7 +21,8 @@ import net.minecraft.world.level.levelgen.feature.configurations.FeatureConfigur
 /**
  * Lays down a stand of grama grass (see {@link GramaGrassBlock}; the user's decisions, 2026-10-16). With no
  * {@code bushes}: a meadow, a rough blob {@code radius} blocks out (blue grama on the plains: real blue grama grows in
- * mats over whole stretches of shortgrass prairie). With {@code bushes}: that many dead bushes, each with loose bunches
+ * mats over whole stretches of shortgrass prairie; the user's decision, 2026-10-17: mostly small meadows 5 to 9 blocks
+ * across, about 1 in 8 a big one 15 to 20 across, the long trails' goal). With {@code bushes}: that many dead bushes, each with loose bunches
  * round it within {@code radius} (black grama in the badlands: in the real desert grassland the grass gathers round
  * the shrubs, where the soil holds more water). {@code density}: the share of cells in the stand that get a plant.
  *
@@ -34,7 +35,7 @@ public class GramaPatchFeature extends Feature<GramaPatchFeature.Config> {
     public record Config(Block block, IntProvider radius, float density, IntProvider bushes) implements FeatureConfiguration {
         public static final Codec<Config> CODEC = RecordCodecBuilder.create(i -> i.group(
                 BuiltInRegistries.BLOCK.byNameCodec().fieldOf("block").forGetter(Config::block),
-                IntProvider.codec(1, 8).fieldOf("radius").forGetter(Config::radius),
+                IntProvider.codec(1, 12).fieldOf("radius").forGetter(Config::radius),
                 Codec.floatRange(0.0F, 1.0F).fieldOf("density").forGetter(Config::density),
                 IntProvider.codec(0, 4).fieldOf("bushes").forGetter(Config::bushes)).apply(i, Config::new));
     }
