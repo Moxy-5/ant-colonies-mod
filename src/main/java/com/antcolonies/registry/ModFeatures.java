@@ -4,6 +4,7 @@ import com.antcolonies.AntColoniesMod;
 import com.antcolonies.worldgen.DeepSoilFeature;
 import com.antcolonies.worldgen.FallenBranchFeature;
 import com.antcolonies.worldgen.FallenTreeFeature;
+import com.antcolonies.worldgen.GramaPatchFeature;
 
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.levelgen.feature.Feature;
@@ -25,4 +26,11 @@ public class ModFeatures {
     /** Lays a fallen dead acacia (stump, trunk, branches). Switched on for savannas by .../biome_modifier/fallen_tree.json. */
     public static final DeferredHolder<Feature<?>, FallenTreeFeature> FALLEN_TREE =
             FEATURES.register("fallen_tree", () -> new FallenTreeFeature(NoneFeatureConfiguration.CODEC));
+
+    /**
+     * Lays a stand of grama grass: blue grama meadows on the plains, black grama bunches round dead bushes in the
+     * badlands. Switched on by .../biome_modifier/blue_grama.json and black_grama.json.
+     */
+    public static final DeferredHolder<Feature<?>, GramaPatchFeature> GRAMA_PATCH =
+            FEATURES.register("grama_patch", () -> new GramaPatchFeature(GramaPatchFeature.Config.CODEC));
 }

@@ -397,9 +397,9 @@ public class AwayTests {
 
     /**
      * Step 2c, the harvester ant (the user's decision: the numbers forage always, but only out of every player's sight).
-     * 60 old workers (foragers) in the numbers, no real workers, and 8 tufts of short grass, each with 8 of its 10 seeds
+     * 60 old workers (foragers) in the numbers, no real workers, and 8 tufts of short grass, each with all but 2 of its seeds (since 2026-10-17 short grass is one take, so none)
      * cut already: 4 in the west corner more than 64 blocks from the pretend player's eyes, 4 in the east corner in plain
-     * sight. While here the numbers eat the hidden tufts up (they vanish, out of sight; 8 seeds in the store) and leave
+     * sight. While here the numbers eat the hidden tufts up (they vanish, out of sight; their seeds in the store) and leave
      * the seen ones alone. Then the colony goes away (nobody near): from what the brain remembers they eat the other 4 up
      * too, but not a tuft that grew after the brain last looked; the away report counts it all.
      * <p>Brain step 4b, in the same scene: away, the numbers keep the harvester ants' day clock: nothing is foraged at
@@ -452,7 +452,7 @@ public class AwayTests {
             all.addAll(seen);
             for (BlockPos tuft : all) {
                 level.setBlock(tuft, Blocks.SHORT_GRASS.defaultBlockState(), 3);
-                colony.food().setPiecesCutForTests(tuft, 8);
+                colony.food().setPiecesCutForTests(tuft, preCut(colony));
             }
             // The pretend player stands far to the south-east: the east tufts are 54 blocks off in plain sight, the west ones 82.
             colony.population().setViewersForTests(List.of(Vec3.atCenterOf(helper.absolutePos(new BlockPos(60, SURFACE + 2, 60)))));
@@ -469,11 +469,11 @@ public class AwayTests {
                 helper.assertTrue(!colony.field().remembers(tuft), "an eaten-up tuft should be forgotten: " + tuft);
             }
             for (BlockPos tuft : seen) {
-                helper.assertTrue(level.getBlockState(tuft).is(Blocks.SHORT_GRASS) && colony.food().getPiecesCut(tuft) == 8,
+                helper.assertTrue(level.getBlockState(tuft).is(Blocks.SHORT_GRASS) && colony.food().getPiecesCut(tuft) == preCut(colony),
                         "a tuft in the player's sight should be left alone: " + tuft + " cut " + colony.food().getPiecesCut(tuft));
                 helper.assertTrue(colony.field().remembers(tuft), "the brain should remember the tuft in sight: " + tuft);
             }
-            helper.assertTrue(colony.food().getFood() == foodBefore[0] + 8, "the 8 seeds should be in the store: " + colony.food().getFood()
+            helper.assertTrue(colony.food().getFood() == foodBefore[0] + 4 * leftOn(colony), "the seeds left on the 4 tufts should be in the store: " + colony.food().getFood()
                     + ", was " + foodBefore[0]);
             helper.assertTrue(colony.away().report().isEmpty(), "nothing counts as away while the colony is here: " + colony.away().report().describe());
             // Away, nobody near; a new tuft grows meanwhile, which the brain never saw.
@@ -484,7 +484,7 @@ public class AwayTests {
             colony.away().setAwayForTests(true);
             colony.population().setViewersForTests(List.of());
             level.setBlock(late, Blocks.SHORT_GRASS.defaultBlockState(), 3);
-            colony.food().setPiecesCutForTests(late, 8);
+            colony.food().setPiecesCutForTests(late, preCut(colony));
             clock.skipTo(0.0); // midnight: the foragers stay in
         });
         helper.runAfterDelay(2300, () -> {
@@ -519,13 +519,13 @@ public class AwayTests {
                 helper.assertTrue(colony.food().getPiecesCut(tuft) == 0 && !colony.field().remembers(tuft),
                         "while away the remembered tuft should be eaten up: " + tuft + " cut " + colony.food().getPiecesCut(tuft));
             }
-            helper.assertTrue(colony.food().getPiecesCut(late) == 8 && level.getBlockState(late).is(Blocks.SHORT_GRASS),
+            helper.assertTrue(colony.food().getPiecesCut(late) == preCut(colony) && level.getBlockState(late).is(Blocks.SHORT_GRASS),
                     "a tuft the brain never saw should not be foraged while away: cut " + colony.food().getPiecesCut(late));
             AwayReport report = colony.away().report();
             int milled = report.get(AwayReport.What.BREAD_MADE); // (the nurses mill some into bread for the queen)
-            helper.assertTrue(colony.food().getFood() + milled == foodBefore[0] + 16, "16 seeds in all should have come in: " + colony.food().getFood()
+            helper.assertTrue(colony.food().getFood() + milled == foodBefore[0] + 8 * leftOn(colony), "the seeds left on all 8 tufts should have come in: " + colony.food().getFood()
                     + " in the store and " + milled + " milled, was " + foodBefore[0]);
-            helper.assertTrue(report.get(AwayReport.What.FORAGED) == 8 && report.get(AwayReport.What.PLANTS_USED_UP) == 4,
+            helper.assertTrue(report.get(AwayReport.What.FORAGED) == 4 * leftOn(colony) && report.get(AwayReport.What.PLANTS_USED_UP) == 4,
                     "the away report should count the food brought in and the tufts eaten up: " + report.describe());
             helper.assertTrue(!foragedBeforePatrol[0], "nothing should be foraged before a patroller is back");
             helper.assertTrue(report.get(AwayReport.What.PATROLS) >= 1, "the away report should count the patrol: " + report.describe());
@@ -541,7 +541,7 @@ public class AwayTests {
     /** Brain step 4b: out of the harvester ants' foraging hours the numbers bring nothing in from the remembered tufts. */
     private static void checkNothingForaged(GameTestHelper helper, Colony colony, List<BlockPos> tufts, String when) {
         for (BlockPos tuft : tufts) {
-            helper.assertTrue(colony.food().getPiecesCut(tuft) == 8, "no tuft should be foraged " + when + ": " + tuft + " cut " + colony.food().getPiecesCut(tuft));
+            helper.assertTrue(colony.food().getPiecesCut(tuft) == preCut(colony), "no tuft should be foraged " + when + ": " + tuft + " cut " + colony.food().getPiecesCut(tuft));
         }
         helper.assertTrue(colony.away().report().get(AwayReport.What.FORAGED) == 0, "nothing should be brought in " + when + ": " + colony.away().report().describe());
     }
@@ -1028,7 +1028,7 @@ public class AwayTests {
      * brain remembers, seen by a pretend player while the colony is here. It goes away (an egg and 2 hungry larvae as
      * numbers too). Partway the game is saved and loaded again, and the loaded colony lives on: the nurses mill seeds
      * into bread and feed the queen and the young, the queen's egg comes out, the 3 young grow up into workers (and hers too, in time),
-     * the foragers bring in the 8 seeds from the remembered tufts (none were cut while the player watched), and the
+     * the foragers bring in the seeds left on the remembered tufts (none were cut while the player watched), and the
      * builders' time is counted (nothing dug while away); the away report counts all of it, from before the save and
      * after. Back in range, out of sight: the refuse chamber is dug, its soil heaped on the hill, the eaten tufts are
      * gone, the young not grown up yet lie in the nursery, and the blocks have caught up with the counts.
@@ -1072,7 +1072,7 @@ public class AwayTests {
             for (int i = 0; i < 4; i++) {
                 BlockPos tuft = helper.absolutePos(new BlockPos(1 + 2 * (i % 2), SURFACE, 1 + 2 * (i / 2)));
                 level.setBlock(tuft, Blocks.SHORT_GRASS.defaultBlockState(), 3);
-                colony.food().setPiecesCutForTests(tuft, 8);
+                colony.food().setPiecesCutForTests(tuft, preCut(colony));
                 tufts.add(tuft);
             }
             // A pretend player looks at the tufts while the colony is here: the numbers leave them to the real foragers.
@@ -1083,7 +1083,7 @@ public class AwayTests {
         helper.runAfterDelay(160, () -> {
             Colony colony = byId(helper, id[0]);
             for (BlockPos tuft : tufts) {
-                helper.assertTrue(colony.field().remembers(tuft) && colony.food().getPiecesCut(tuft) == 8,
+                helper.assertTrue(colony.field().remembers(tuft) && colony.food().getPiecesCut(tuft) == preCut(colony),
                         "the brain should remember the tuft and leave it while it is seen: " + tuft + " cut " + colony.food().getPiecesCut(tuft));
             }
             helper.assertTrue(colony.queenCare().isQueenHome(level), "the queen should be in her room");
@@ -1136,9 +1136,9 @@ public class AwayTests {
                     "the queen's egg should have come out while away (before the save) and be counted: " + report.describe());
             helper.assertTrue(report.get(AwayReport.What.QUEEN_FED) > 0 && report.get(AwayReport.What.YOUNG_FED) > 0
                     && report.get(AwayReport.What.BREAD_MADE) > 0, "the nurses should mill bread and feed the queen and the young: " + report.describe());
-            helper.assertTrue(report.get(AwayReport.What.FORAGED) == 8 && report.get(AwayReport.What.PLANTS_USED_UP) == 4,
-                    "the foragers should bring in the 8 seeds left on the remembered tufts: " + report.describe());
-            helper.assertTrue(colony.food().getFood() + report.get(AwayReport.What.BREAD_MADE) == foodBefore[0] + 8,
+            helper.assertTrue(report.get(AwayReport.What.FORAGED) == 4 * leftOn(colony) && report.get(AwayReport.What.PLANTS_USED_UP) == 4,
+                    "the foragers should bring in the seeds left on the remembered tufts: " + report.describe());
+            helper.assertTrue(colony.food().getFood() + report.get(AwayReport.What.BREAD_MADE) == foodBefore[0] + 4 * leftOn(colony),
                     "every seed brought in should be in the store or milled: " + colony.food().getFood() + " food, " + report.describe()
                             + ", was " + foodBefore[0]);
             helper.assertTrue(undug.stream().allMatch(cell -> level.getBlockState(cell).is(Blocks.DIRT)) && hillBlocks(level, colony) == 0
@@ -1527,5 +1527,15 @@ public class AwayTests {
     @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
     public static void aFoundingTermitePairRaiseTheirFirstWorkersWhileAway(GameTestHelper helper) {
         foundsWhileAway(helper, true);
+    }
+
+    /** The pieces a test tuft of short grass has cut already: all but 2 (none since short grass is one take, 2026-10-17). */
+    private static int preCut(Colony colony) {
+        return Math.max(0, colony.food().piecesOf(Blocks.SHORT_GRASS.defaultBlockState()) - 2);
+    }
+
+    /** The pieces left on such a tuft. */
+    private static int leftOn(Colony colony) {
+        return colony.food().piecesOf(Blocks.SHORT_GRASS.defaultBlockState()) - preCut(colony);
     }
 }

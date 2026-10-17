@@ -156,6 +156,9 @@ public class Door {
         if (share < 1.0F && trips.size() >= Math.max(1, Math.round(realForagers * share))) {
             return false;
         }
+        if (colony.recruits().isRecruited(id)) {
+            return true; // called out by a forager home from a rich patch (see colony.Recruits): it follows the scent line
+        }
         boolean small = isSmall(level, numbers);
         if (small && ownSeed.contains(id)) {
             return true;
@@ -246,6 +249,13 @@ public class Door {
         return times == null ? 0 : times.size();
     }
 
+    /** A recruiter called out {@code count} forager numbers to its patch (see {@link Recruits}): they go out now. */
+    void recruitedNumbers(ServerLevel level, int count) {
+        if (isOn(level) && colony.patrol().mayForage(level)) {
+            numbersOut += count;
+        }
+    }
+
     /** Number patrollers home safely: each touches the waiting ones like a real one. */
     void patrollerNumbersHome(int count) {
         pendingTouches += count;
@@ -266,7 +276,11 @@ public class Door {
     /** Once a second (here only): trips that are over, old touches gone, the real foragers counted. */
     void tick(ServerLevel level) {
         SpeciesProfile.DoorNumbers numbers = numbers();
-        if (numbers == null || !isOn(level)) {
+        if (numbers == null) {
+            return;
+        }
+        if (!isOn(level)) {
+            countForagers(level, numbers); // (a small colony's searchers spread out every way, door or no door: ScoutGoal)
             return;
         }
         long now = level.getGameTime();
@@ -316,9 +330,14 @@ public class Door {
             }
             return done;
         });
+        countForagers(level, numbers);
+    }
+
+    /** The real foragers counted, and whether the colony is small (under {@code small_colony_foragers}). */
+    private void countForagers(ServerLevel level, SpeciesProfile.DoorNumbers numbers) {
         int count = 0;
         BlockPos center = colony.getCenter();
-        int radius = colony.profile().food().radius();
+        int radius = colony.searchReach();
         for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, new AABB(center).inflate(radius, 16, radius),
                 ant -> ant.isAlive() && ant.isColonyWorker() && colony.getId().equals(ant.getColonyId()))) {
             if (colony.roleOf(level, ant) == ColonyRole.FORAGER) {

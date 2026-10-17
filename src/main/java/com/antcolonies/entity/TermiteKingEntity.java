@@ -58,8 +58,8 @@ public class TermiteKingEntity extends AbstractAntEntity implements FedByNurses 
         this.goalSelector.addGoal(0, new FloatGoal(this));
         this.goalSelector.addGoal(1, new SealEntranceGoal(this));
         this.goalSelector.addGoal(2, new StayWithQueenGoal(this));
-        // He digs with her until their chamber is finished.
-        this.goalSelector.addGoal(3, new DigGoal(this, () -> QueenToRoomGoal.findFinishedRoom(this) == null));
+        // He digs with her while they found the colony, until their chamber is finished.
+        this.goalSelector.addGoal(3, new DigGoal(this, () -> QueenToRoomGoal.mayDig(this)));
         this.goalSelector.addGoal(4, new AntWanderGoal(this, 0.8, 300, 3, () -> QueenToRoomGoal.findFinishedRoom(this) == null));
         this.goalSelector.addGoal(5, new RandomLookAroundGoal(this));
     }

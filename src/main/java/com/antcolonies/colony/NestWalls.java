@@ -403,10 +403,11 @@ public class NestWalls {
      * Fills a leak with the species' plug block (Burrowed Dirt, mound soil). False if it is already closed or someone is
      * standing in it (try again later). A soldier of the colony standing in it (guarding the breach) does not stop it: it
      * is pushed out to the far side, shut outside, like real termites sealing a breach behind their soldiers (it comes
-     * back in later by a foraging hole); if the hole leads nowhere open, it is pushed back into the nest.
+     * back in later by a foraging hole); if the hole leads nowhere open, it is pushed back into the nest. Never while a
+     * nestmate is in a closed pocket behind it (see {@link #shutsInANestmate}).
      */
     public boolean plugLeak(Level level, BlockPos hole) {
-        if (hole.equals(center) || !isLeakOpen(level, hole)) {
+        if (hole.equals(center) || !isLeakOpen(level, hole) || shutsInANestmate(level, hole)) {
             return false;
         }
         // Never bury anyone, same as with the hill. A plate of mud is no burial: nestmates there step out beside it.
@@ -432,6 +433,70 @@ public class NestWalls {
         claimedLeaks.remove(hole);
         sealProgress.remove(hole);
         return true;
+    }
+
+    /** A pocket beyond a leak bigger than this many open cells counts as open to the world (a cave, the sky). */
+    private static final int MAX_POCKET = 32;
+
+    /**
+     * Whether closing this hole would shut one of the colony's insects into a small pocket of open cells behind it, out
+     * of the nest and closed all round (the full run of 2026-10-16: a termite worker still in a feeding gallery when its
+     * food was gone; the gallery left the nest, its mouth counted as a leak, and the worker was walled in alive, trying
+     * for ever to plan a way out). Real termites backfill a gallery they give up, but not over a nestmate: the seal waits
+     * until it has come through. A pocket open to the world (more than {@link #MAX_POCKET} cells) is no trap.
+     */
+    private boolean shutsInANestmate(Level level, BlockPos hole) {
+        Set<BlockPos> nest = colony.nest().nestCells(level);
+        Set<BlockPos> seen = new HashSet<>();
+        // Each side of the hole on its own: the hole may join the open sky on one side to a small closed gallery on another.
+        for (Direction side : Direction.values()) {
+            BlockPos start = hole.relative(side);
+            if (seen.contains(start) || !isOutsideOpen(level, nest, start)) {
+                continue;
+            }
+            Set<BlockPos> pocket = new HashSet<>();
+            java.util.ArrayDeque<BlockPos> queue = new java.util.ArrayDeque<>();
+            pocket.add(start);
+            queue.add(start);
+            boolean open = false;
+            while (!queue.isEmpty() && !open) {
+                BlockPos cell = queue.poll();
+                for (Direction way : Direction.values()) {
+                    BlockPos next = cell.relative(way);
+                    if (!next.equals(hole) && !pocket.contains(next) && isOutsideOpen(level, nest, next)) {
+                        pocket.add(next);
+                        queue.add(next);
+                        if (pocket.size() > MAX_POCKET) {
+                            open = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            seen.addAll(pocket);
+            if (!open && hasNestmateIn(level, pocket)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasNestmateIn(Level level, Set<BlockPos> pocket) {
+        AABB box = null;
+        for (BlockPos cell : pocket) {
+            box = box == null ? new AABB(cell) : box.minmax(new AABB(cell));
+        }
+        return !level.getEntitiesOfClass(com.antcolonies.entity.AbstractAntEntity.class, box,
+                insect -> colony.getId().equals(insect.getColonyId()) && pocket.contains(insect.blockPosition())).isEmpty();
+    }
+
+    /** A cell an insect can be in (loaded, not a full block, no fluid) that is not part of the nest. */
+    private boolean isOutsideOpen(Level level, Set<BlockPos> nest, BlockPos cell) {
+        if (nest.contains(cell) || !level.isLoaded(cell) || colony.nest().isInside(level, cell)) {
+            return false;
+        }
+        BlockState state = level.getBlockState(cell);
+        return !state.isCollisionShapeFullBlock(level, cell) && state.getFluidState().isEmpty();
     }
 
     private boolean isOwnSoldier(LivingEntity entity) {

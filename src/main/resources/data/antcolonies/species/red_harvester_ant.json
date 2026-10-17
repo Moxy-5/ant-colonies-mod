@@ -32,10 +32,15 @@
     "larva_starve_ticks": 48000
   },
   "food": {
-    "radius": 24,
+    "_radius_note": "radius: a young colony's reach (blocks from the nest's middle; real young Pogonomyrmex colonies forage only a few metres out). Long trails (the user's decisions of 2026-10-17): past that the colony reaches as far as its trunk trails go (trails.trunk.most_length).",
+    "radius": 12,
     "items": "antcolonies:seeds",
     "plants": [
-      { "block": "minecraft:short_grass", "pieces": 10 }
+      { "_note": "Short grass: one take and the tuft is gone, growing back later (the user's decision, 2026-10-17: the plains are full of it, so it must not be rich food).",
+        "block": "minecraft:short_grass", "pieces": 1 },
+      { "_note": "Grama grass (the user's decisions, 2026-10-16): only ripe heads; a head cut bare dries off, the plant lives on. 10 takes a plant, blue and black alike (the user's decision, 2026-10-17).",
+        "block": "antcolonies:blue_grama", "pieces": 10, "state": { "stage": "ripe" } },
+      { "block": "antcolonies:black_grama", "pieces": 10, "state": { "stage": "ripe" } }
     ],
     "piece": "minecraft:wheat_seeds",
     "pile": "antcolonies:seed_pile",
@@ -51,7 +56,18 @@
       "give_up_ticks": 6000,
       "drift_ticks": 1200,
       "drift_blocks": 3,
-      "stretch": 8
+      "stretch": 8,
+      "recruit": {
+        "_note": "Recruiting to rich patches (long trails step 2; real P. barbatus and P. rugosus: a forager that finds a dense patch drags its sting tip home, laying an invisible scent line, and touches nestmates, which follow it out single file). A find is a rich patch when the pieces left on these plants within patch_radius blocks of it, plus the seeds lying there, are at least rich_pieces at at_blocks blocks or nearer, growing with the distance to the power distance_power (value against distance: 15 at 20 blocks, about 30 at 60, 40 at 96; with 10 pieces a grama plant that is 1.5 plants near home and 4 at 96 blocks, one recruit per plant). The finder calls out one nestmate for every pieces_per_recruit pieces in the patch, at most most_recruits (the user's decision: by the size of the patch). The line halves in strength every half_life_ticks unless a recruit lays it again. Short grass is not a patch (only grama, which grows in stands). Numbers are my picks, to confirm.",
+        "patch_radius": 4,
+        "rich_pieces": 15,
+        "at_blocks": 20,
+        "distance_power": 0.62,
+        "pieces_per_recruit": 10,
+        "most_recruits": 8,
+        "half_life_ticks": 3600,
+        "plants": [ "antcolonies:blue_grama", "antcolonies:black_grama" ]
+      }
     },
     "day_clock": {
       "_note": "The foragers' daily round (brain step 4b; real Pogonomyrmex forage in the morning, stop when the ground gets too hot at midday, go out again in the afternoon, and stay in at night and in the rain). Times are Minecraft day times: 0 is sunrise (6:00), 1000 ticks an hour. Out from out_from to in_by, except a midday rest centred on rest_middle; the rest goes by the biome's heat (base temperature): none at rest_from_heat or cooler, rest_most ticks at rest_full_heat or hotter (plains 0.8: about 50 minutes; badlands 2.0: 4 hours). not_in_rain: in while rain falls on the nest. User's decisions: rest by biome heat, never at night or in rain; the times are my picks, to confirm.",
@@ -76,7 +92,10 @@
         "new_trail_trips": 8,
         "bare_after_trips": 60,
         "bare_ground": "minecraft:coarse_dirt",
-        "regrow_ticks": 48000
+        "regrow_ticks": 48000,
+        "_long_note": "Long trails (the user's decisions of 2026-10-17, docs/plans/long-trails.md): a trail's tip is as far as its trips go, at most most_length blocks out, and only as far as its traffic holds: blocks_per_daily_trip blocks for each trip a day (my pick, to confirm); past that its tip pulls back and its outer bare ground grows back.",
+        "most_length": 96,
+        "blocks_per_daily_trip": 6.0
       }
     },
     "door": {

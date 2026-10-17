@@ -184,7 +184,9 @@ public class AntAnimationController<T extends AbstractAntEntity> extends Animati
             return plain;
         }
         double speed = blocksPerTick * 20.0 * 16.0 / animatable.getDrawScale();
-        int gear = walks.indexOf(nextClip != null ? nextClip : currentRawAnimation);
+        // (nothing may be playing yet, e.g. just after a whole-body clip; a List.of list throws on looking up null)
+        RawAnimation playing = nextClip != null ? nextClip : currentRawAnimation;
+        int gear = playing == null ? -1 : walks.indexOf(playing);
         if (gear < 0) {
             RawAnimation pick = null;
             for (RawAnimation walk : walks) {

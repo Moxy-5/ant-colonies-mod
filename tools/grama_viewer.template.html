@@ -1,0 +1,229 @@
+<title>Grama Grass Looks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+  /* A field-notebook bench: the 3D patch on the main stage, the choices beside it like a specimen label. */
+  :root {
+    --bg: #eceee6; --panel: #f7f8f3; --fg: #1d221d; --muted: #5a6157; --line: #c9cdc0; --accent: #7a5a2c; --sky: #b9d3e4;
+    --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+    --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #151915; --panel: #1d221d; --fg: #e5e8df; --muted: #a3ab9d; --line: #353c34; --accent: #d6a85e; --sky: #2b3b46;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #151915; --panel: #1d221d; --fg: #e5e8df; --muted: #a3ab9d; --line: #353c34; --accent: #d6a85e; --sky: #2b3b46;
+    color-scheme: dark;
+  }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.5; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 28px; display: grid; gap: 16px; }
+  header h1 { font-family: var(--display); font-weight: 800; font-size: clamp(1.6rem, 3vw, 2.2rem); line-height: 1.1; margin: 0; text-wrap: balance; }
+  header p { margin: 6px 0 0; color: var(--muted); max-width: 70ch; }
+  .bench { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 16px; align-items: start; }
+  @media (max-width: 820px) { .bench { grid-template-columns: minmax(0, 1fr); } }
+  .stage { position: relative; background: var(--sky); border-radius: 10px; overflow: hidden; aspect-ratio: 4 / 3; max-width: 100%; }
+  .stage canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+  .stage canvas:active { cursor: grabbing; }
+  .hint { position: absolute; left: 12px; bottom: 10px; font-size: 12px; color: var(--fg); background: color-mix(in srgb, var(--panel) 80%, transparent); padding: 3px 8px; border-radius: 6px; }
+  .label { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 18px; min-width: 0; }
+  .label h2 { font-family: var(--display); font-weight: 600; font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+  .choices { display: grid; gap: 6px; }
+  .choice { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; align-items: start; text-align: left; font: inherit; color: inherit;
+            background: transparent; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; cursor: pointer; }
+  .choice b { font-family: var(--display); font-size: 1.1rem; line-height: 1.2; }
+  .choice small { color: var(--muted); font-size: 0.82rem; line-height: 1.35; display: block; }
+  .choice[aria-pressed="true"] { border-color: var(--fg); box-shadow: inset 0 0 0 1px var(--fg); }
+  .choice:focus-visible, .stages button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .stages { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+  .stages button { font: inherit; font-size: 0.78rem; color: inherit; background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 6px 2px; cursor: pointer; }
+  .stages button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--panel); }
+  .note { color: var(--muted); font-size: 0.85rem; margin: 0; }
+  .flat { display: flex; gap: 8px; flex-wrap: wrap; }
+  .flat img { width: 52px; height: 52px; image-rendering: pixelated; background: color-mix(in srgb, var(--sky) 50%, var(--panel)); border-radius: 6px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Grama Grass Looks</h1>
+    <p>The harvester ants' rich food. Blue grama grows in meadows on the plains, black grama in loose bunches on badlands red sand round dead bushes. Pick a look for each kind, and step through its life: young, leaves, flowering after rain, ripe (the ants' jackpot), dried.</p>
+  </header>
+  <div class="bench">
+    <div class="stage">
+      <canvas id="view" aria-label="3D view of a patch of grama grass"></canvas>
+      <div class="hint">Drag to turn, scroll or pinch to zoom</div>
+    </div>
+    <aside class="label">
+      <div>
+        <h2>Kind</h2>
+        <div class="choices" id="kinds"></div>
+      </div>
+      <div>
+        <h2>Look</h2>
+        <div class="choices" id="looks"></div>
+      </div>
+      <div>
+        <h2>Stage</h2>
+        <div class="stages" id="stages"></div>
+      </div>
+      <div>
+        <h2>Flat, as drawn</h2>
+        <div class="flat" id="flat"></div>
+      </div>
+      <p class="note">The taller vanilla-style grass at the meadow's edge and the dead bushes are stand-ins, there for size. Each plant has two versions and sits a little off the block's middle, as vanilla grass does.</p>
+    </aside>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const DATA = /*DATA*/null;
+const KINDS = [
+  { id: "blue", swatch: "#7f9468", name: "Blue grama", text: "Plains and Meadow: low grey-green mats, curved eyelash seed heads." },
+  { id: "black", swatch: "#8a8670", name: "Black grama", text: "Badlands: wiry grey bunches, small flags up the stalk with white wool, dark runners." },
+];
+const LOOKS = [
+  { id: "A", name: "Minecraft-simple", text: "Few pixels and clean shapes, close to vanilla grass." },
+  { id: "B", name: "Field detail", text: "More blades, the comb of spikelets, yellow anthers, white wool, runners." },
+];
+const STAGES = ["young", "leaves", "flowering", "ripe", "dried"];
+let kind = "blue", look = { blue: "A", black: "A" }, stage = 3;
+try { const saved = JSON.parse(localStorage.getItem("grama-looks") || "null"); if (saved) look = saved; } catch (e) {}
+
+const canvas = document.getElementById("view");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, 4 / 3, 0.05, 100);
+camera.position.set(4.5, 3.2, 6.5);
+const controls = new THREE.OrbitControls(camera, canvas);
+controls.target.set(0, 0.3, 0);
+controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI * 0.49;
+controls.minDistance = 1; controls.maxDistance = 16;
+
+const loader = new THREE.TextureLoader();
+const cache = {};
+function tex(src, repeat) {
+  const key = src + (repeat || "");
+  if (!cache[key]) {
+    const t = loader.load(src, () => draw());
+    t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.encoding = THREE.sRGBEncoding;
+    if (repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(repeat, repeat); }
+    cache[key] = t;
+  }
+  return cache[key];
+}
+const groundMat = {};
+function ground(src) {
+  if (!groundMat[src]) groundMat[src] = new THREE.MeshBasicMaterial({ map: tex(src, 11) });
+  return groundMat[src];
+}
+const plantMat = {};
+function plant(src) {
+  if (!plantMat[src]) plantMat[src] = new THREE.MeshBasicMaterial({ map: tex(src), transparent: false, alphaTest: 0.5, side: THREE.DoubleSide, color: new THREE.Color(0.92, 0.92, 0.92) });
+  return plantMat[src];
+}
+
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(11, 11));
+floor.rotation.x = -Math.PI / 2;
+scene.add(floor);
+const patch = new THREE.Group();
+scene.add(patch);
+const quad = new THREE.PlaneGeometry(1, 1);
+
+// A Minecraft cross: two planes through the block's middle at 45 degrees.
+function cross(src, x, z) {
+  const g = new THREE.Group();
+  for (const a of [Math.PI / 4, -Math.PI / 4]) {
+    const m = new THREE.Mesh(quad, plant(src));
+    m.rotation.y = a; m.position.y = 0.5;
+    g.add(m);
+  }
+  g.position.set(x, 0, z);
+  patch.add(g);
+}
+
+// The same layout every time (a seeded random), so changing a choice only changes the plants' look.
+function rand(seed) { let s = seed; return () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; }; }
+
+function build() {
+  patch.clear();
+  const k = DATA[kind];
+  floor.material = ground(kind === "blue" ? DATA.grass : DATA.redSand);
+  const r = rand(kind === "blue" ? 7 : 11);
+  const bushes = [[-1, 0], [2, 1]];
+  for (let x = -5; x <= 5; x++) {
+    for (let z = -5; z <= 5; z++) {
+      const ox = (r() - 0.5) * 0.5, oz = (r() - 0.5) * 0.5, v = r() < 0.5 ? 0 : 1, roll = r();
+      const px = x + 0.5 + ox - 0.5, pz = z + 0.5 + oz - 0.5;
+      if (kind === "blue") {
+        // A meadow: a rough blob of grama, plains grass round it.
+        const d = Math.hypot(x * 1.0, z * 1.25) + Math.sin(x * 1.7 + z) * 0.6;
+        if (d < 3.4 && roll < 0.85) cross(k[look.blue][STAGES[stage]][v], px, pz);
+        else if (d >= 3.4 && roll < 0.35) cross(DATA.shortGrass, px, pz);
+      } else {
+        const isBush = bushes.some(([bx, bz]) => bx === x && bz === z);
+        if (isBush) { cross(DATA.deadBush, x, z); continue; }
+        const near = Math.min(...bushes.map(([bx, bz]) => Math.hypot(x - bx, z - bz)));
+        if ((near < 2.3 && roll < 0.5) || roll < 0.06) cross(k[look.black][STAGES[stage]][v], px, pz);
+      }
+    }
+  }
+  const flat = document.getElementById("flat");
+  flat.innerHTML = "";
+  for (const s of STAGES) {
+    const img = document.createElement("img");
+    img.src = k[look[kind]][s][0]; img.alt = s; img.title = s;
+    flat.appendChild(img);
+  }
+  draw();
+}
+
+function resize() {
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (!w || !h) return;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+  draw();
+}
+let pending = false;
+function draw() {
+  if (pending) return;
+  pending = true;
+  requestAnimationFrame(() => { pending = false; if (controls.update()) draw(); renderer.render(scene, camera); });
+}
+controls.addEventListener("change", draw);
+new ResizeObserver(resize).observe(canvas);
+
+function choices(el, list, onPick) {
+  for (const c of list) {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "choice"; b.dataset.id = c.id;
+    b.innerHTML = `<b${c.swatch ? ` style="color:${c.swatch}"` : ""}>${c.swatch ? "&#9679;" : c.id}</b><span>${c.name}<small>${c.text}</small></span>`;
+    b.addEventListener("click", () => { onPick(c.id); sync(); build(); });
+    el.appendChild(b);
+  }
+}
+choices(document.getElementById("kinds"), KINDS, id => { kind = id; });
+choices(document.getElementById("looks"), LOOKS, id => { look[kind] = id; try { localStorage.setItem("grama-looks", JSON.stringify(look)); } catch (e) {} });
+const stagesEl = document.getElementById("stages");
+STAGES.forEach((name, i) => {
+  const b = document.createElement("button");
+  b.type = "button"; b.id = "stage-" + i; b.textContent = name;
+  b.addEventListener("click", () => { stage = i; sync(); build(); });
+  stagesEl.appendChild(b);
+});
+function sync() {
+  document.querySelectorAll("#kinds .choice").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.id === kind)));
+  document.querySelectorAll("#looks .choice").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.id === look[kind])));
+  STAGES.forEach((_, i) => document.getElementById("stage-" + i).setAttribute("aria-pressed", String(i === stage)));
+}
+sync(); build(); resize();
+</script>

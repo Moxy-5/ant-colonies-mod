@@ -472,7 +472,12 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * {@code stretch} blocks past the colony's foraging range (the range stretches from the ants' own failures).
      */
     public record SearchNumbers(boolean alone, int wander, int spotTicks, int emptyToDrop, int giveUpTicks, int driftTicks, int driftBlocks,
-            int stretch) {
+            int stretch, Optional<RecruitNumbers> recruit) {
+        public SearchNumbers(boolean alone, int wander, int spotTicks, int emptyToDrop, int giveUpTicks, int driftTicks, int driftBlocks,
+                int stretch) {
+            this(alone, wander, spotTicks, emptyToDrop, giveUpTicks, driftTicks, driftBlocks, stretch, Optional.empty());
+        }
+
         public static final Codec<SearchNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.BOOL.optionalFieldOf("alone", true).forGetter(SearchNumbers::alone),
                 Codec.INT.optionalFieldOf("wander", 4).forGetter(SearchNumbers::wander),
@@ -481,7 +486,8 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 Codec.INT.optionalFieldOf("give_up_ticks", 6000).forGetter(SearchNumbers::giveUpTicks),
                 Codec.INT.optionalFieldOf("drift_ticks", 1200).forGetter(SearchNumbers::driftTicks),
                 Codec.INT.optionalFieldOf("drift_blocks", 3).forGetter(SearchNumbers::driftBlocks),
-                Codec.INT.optionalFieldOf("stretch", 8).forGetter(SearchNumbers::stretch)
+                Codec.INT.optionalFieldOf("stretch", 8).forGetter(SearchNumbers::stretch),
+                RecruitNumbers.CODEC.optionalFieldOf("recruit").forGetter(SearchNumbers::recruit)
         ).apply(i, SearchNumbers::new));
 
         /**
@@ -496,6 +502,47 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
     }
 
     /**
+     * Recruiting to rich patches (long trails step 2; the user's decisions of 2026-10-17; real <i>Pogonomyrmex barbatus</i>
+     * and <i>P. rugosus</i>: a forager that finds a dense patch of seed drags its sting tip on the way home, laying a
+     * poison-gland scent line, and in the nest it runs about touching nestmates, which follow the line out). A find is a
+     * rich patch when the food within {@code patchRadius} blocks of it (the pieces left on the {@code plants} named here,
+     * all food plants if none are named, plus the seeds lying there) is at least {@link #needed} for its distance home:
+     * {@code richPieces} at {@code atBlocks} blocks or nearer, growing with the distance to the power
+     * {@code distancePower} (value against distance: a long trip only for a big prize). The finder calls out one
+     * nestmate for every {@code piecesPerRecruit} pieces in the patch, at least 1 and at most {@code mostRecruits}
+     * (a richer find, a stronger recruitment). The scent line halves in strength every {@code halfLifeTicks} unless a
+     * returning recruit lays it again. Numbers are my picks, to confirm.
+     */
+    public record RecruitNumbers(int patchRadius, int richPieces, int atBlocks, double distancePower, int piecesPerRecruit, int mostRecruits,
+            int halfLifeTicks, List<String> plants) {
+        public static final Codec<RecruitNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.INT.optionalFieldOf("patch_radius", 4).forGetter(RecruitNumbers::patchRadius),
+                Codec.INT.optionalFieldOf("rich_pieces", 24).forGetter(RecruitNumbers::richPieces),
+                Codec.INT.optionalFieldOf("at_blocks", 20).forGetter(RecruitNumbers::atBlocks),
+                Codec.DOUBLE.optionalFieldOf("distance_power", 0.62).forGetter(RecruitNumbers::distancePower),
+                Codec.INT.optionalFieldOf("pieces_per_recruit", 16).forGetter(RecruitNumbers::piecesPerRecruit),
+                Codec.INT.optionalFieldOf("most_recruits", 8).forGetter(RecruitNumbers::mostRecruits),
+                Codec.INT.optionalFieldOf("half_life_ticks", 3600).forGetter(RecruitNumbers::halfLifeTicks),
+                Codec.STRING.listOf().optionalFieldOf("plants", List.of()).forGetter(RecruitNumbers::plants)
+        ).apply(i, RecruitNumbers::new));
+
+        /** The food a patch this far (blocks) from the nest's middle needs to be worth recruiting to (24 at 20, about 48 at 60, 64 at 96). */
+        public double needed(double distance) {
+            return richPieces * Math.pow(Math.max(1.0, distance / Math.max(1, atBlocks)), distancePower);
+        }
+
+        /** How many nestmates a find with this much food in its patch calls out (1 per {@code piecesPerRecruit}, 1 to {@code mostRecruits}). */
+        public int recruitsFor(int food) {
+            return Math.max(1, Math.min(mostRecruits, food / Math.max(1, piecesPerRecruit)));
+        }
+
+        /** Whether this food plant (its {@code block} as the profile names it) counts toward a rich patch. */
+        public boolean counts(PlantFood plant) {
+            return plants.isEmpty() || plants.contains(plant.block());
+        }
+    }
+
+    /**
      * Lasting trunk trails (real red harvester ants, <i>Pogonomyrmex barbatus</i>: cleared paths running straight out
      * from the nest disc, used for years). Each starts {@code start} blocks from the nest's middle (the hill's edge). The
      * colony keeps 1 trail while young, and more as it grows: up to {@code most} at {@code fullAtWorkers} workers. A
@@ -504,9 +551,13 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * way within a day (while the colony may have more). A block of the trail walked by {@code bareAfterTrips} trips
      * wears bare: the plants on it are cut and the ground turns to {@code bareGround}. A faded trail's bare ground
      * grows back to grass about {@code regrowTicks} later (a bit sooner or later for each block).
+     * <p>Long trails (the user's decisions of 2026-10-17, {@code docs/plans/long-trails.md}): a trail reaches out as far as
+     * its trips go (its tip), at most {@code mostLength} blocks from the nest's middle, and only as far as its traffic
+     * holds: {@code blocksPerDailyTrip} blocks for each trip a day it gets (real trails live by their traffic; a long one
+     * needs more trips, so a small colony keeps short trails).
      */
     public record TrunkNumbers(int start, int most, int fullAtWorkers, int spreadDegrees, int newTrailTrips, int bareAfterTrips,
-            String bareGround, int regrowTicks) {
+            String bareGround, int regrowTicks, int mostLength, double blocksPerDailyTrip) {
         public static final Codec<TrunkNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.optionalFieldOf("start", 4).forGetter(TrunkNumbers::start),
                 Codec.INT.optionalFieldOf("most", 8).forGetter(TrunkNumbers::most),
@@ -515,8 +566,21 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 Codec.INT.optionalFieldOf("new_trail_trips", 8).forGetter(TrunkNumbers::newTrailTrips),
                 Codec.INT.optionalFieldOf("bare_after_trips", 60).forGetter(TrunkNumbers::bareAfterTrips),
                 Codec.STRING.optionalFieldOf("bare_ground", "minecraft:coarse_dirt").forGetter(TrunkNumbers::bareGround),
-                Codec.INT.optionalFieldOf("regrow_ticks", 48000).forGetter(TrunkNumbers::regrowTicks)
+                Codec.INT.optionalFieldOf("regrow_ticks", 48000).forGetter(TrunkNumbers::regrowTicks),
+                Codec.INT.optionalFieldOf("most_length", 96).forGetter(TrunkNumbers::mostLength),
+                Codec.DOUBLE.optionalFieldOf("blocks_per_daily_trip", 6.0).forGetter(TrunkNumbers::blocksPerDailyTrip)
         ).apply(i, TrunkNumbers::new));
+
+        /**
+         * How far out (blocks from the nest's middle) a trail of this {@code strength} can reach: {@code blocksPerDailyTrip}
+         * for each trip a day it gets past its start, at most {@code mostLength}. A trail's strength halves every
+         * {@code halfLifeTicks} unused and each trip adds 1, so a trail walked {@code r} times a day sits near a strength
+         * of {@code r * halfLife / (day * ln 2)}: its trips a day are its strength times {@code ln 2 * day / halfLife}.
+         */
+        public double holds(double strength, int halfLifeTicks) {
+            double tripsADay = Math.max(0, strength) * Math.log(2) * 24000.0 / Math.max(1, halfLifeTicks);
+            return Math.min(mostLength, start + blocksPerDailyTrip * tripsADay);
+        }
 
         /** How many trunk trails a colony of this many workers keeps: 1 while young, up to {@code most}. */
         public int trailsFor(int workers) {

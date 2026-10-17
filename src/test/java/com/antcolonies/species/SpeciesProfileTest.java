@@ -132,6 +132,60 @@ class SpeciesProfileTest {
     }
 
     @Test
+    void harvesterAntsCutGramaOnlyWhenRipe() throws Exception {
+        java.util.List<SpeciesProfile.PlantFood> plants = read("red_harvester_ant").food().plants();
+        for (String grama : java.util.List.of("antcolonies:blue_grama", "antcolonies:black_grama")) {
+            SpeciesProfile.PlantFood plant = plants.stream().filter(p -> p.block().equals(grama)).findFirst().orElseThrow();
+            assertEquals(java.util.Map.of("stage", "ripe"), plant.state(), grama + " is cut before it is ripe");
+            assertTrue(plant.pieces() > plants.get(0).pieces(), grama + " is richer than a tuft of short grass");
+            assertEquals(10, plant.pieces(), grama + " lasts 10 takes (the user's decision, 2026-10-17)");
+        }
+        for (SpeciesProfile.PlantFood plant : read("macrotermes").food().plants()) {
+            assertTrue(!plant.block().contains("grama"), "termites eat green grama");
+        }
+    }
+
+    /** Long trails (the user's decisions of 2026-10-17): a trail reaches as far as its traffic holds, 96 blocks at most. */
+    @Test
+    void aTrailReachesAsFarAsItsTrafficHolds() throws Exception {
+        SpeciesProfile profile = read("red_harvester_ant");
+        SpeciesProfile.Trails trails = profile.food().trails();
+        SpeciesProfile.TrunkNumbers trunk = trails.trunk().orElseThrow();
+        assertEquals(12, profile.food().radius(), "a young colony reaches about 12 blocks");
+        assertEquals(96, trunk.mostLength());
+        assertEquals(trunk.start(), trunk.holds(0, trails.halfLifeTicks()), 1e-9, "an unused trail holds nothing past its start");
+        // A trail walked r times a day settles near a strength of r / ln 2 (half-life a day): it holds 6 blocks a trip a day.
+        for (int tripsADay : new int[] {1, 5, 10}) {
+            double strength = tripsADay / Math.log(2) * trails.halfLifeTicks() / 24000.0;
+            assertEquals(trunk.start() + 6.0 * tripsADay, trunk.holds(strength, trails.halfLifeTicks()), 1e-6, tripsADay + " trips a day");
+        }
+        assertTrue(trunk.holds(trails.mostStrength(), trails.halfLifeTicks()) == 96, "a busy trail stops at 96 blocks");
+        assertTrue(trunk.holds(5, trails.halfLifeTicks()) < 30, "a weak trail (a few trips a day) stays short");
+    }
+
+    @Test
+    void aRichPatchIsWorthAWalkThatGrowsWithItsSize() throws Exception {
+        SpeciesProfile profile = read("red_harvester_ant");
+        SpeciesProfile.RecruitNumbers recruit = profile.food().search().orElseThrow().recruit().orElseThrow();
+        // Value against distance (long trails step 3): 15 pieces near home (1.5 grama plants), about 30 at 60 blocks, about 40 at 96.
+        assertEquals(15, recruit.needed(5), 1e-9, "near the nest");
+        assertEquals(15, recruit.needed(20), 1e-9);
+        assertEquals(30, recruit.needed(60), 1.0);
+        assertEquals(40, recruit.needed(96), 1.0);
+        assertTrue(recruit.needed(40) > recruit.needed(30), "farther needs more");
+        // How many are called out goes by the size of the patch (the user's decision): 1 per 10 pieces (a grama plant), 1 to 8.
+        assertEquals(1, recruit.recruitsFor(15));
+        assertEquals(2, recruit.recruitsFor(20));
+        assertEquals(4, recruit.recruitsFor(40), "four ripe blue grama plants");
+        assertEquals(8, recruit.recruitsFor(500), "never more than 8 a call");
+        // Grama counts, short grass does not (a tuft is not a patch).
+        SpeciesProfile.PlantFood grass = profile.food().plants().stream().filter(p -> p.block().equals("minecraft:short_grass")).findFirst().orElseThrow();
+        SpeciesProfile.PlantFood grama = profile.food().plants().stream().filter(p -> p.block().equals("antcolonies:blue_grama")).findFirst().orElseThrow();
+        assertTrue(recruit.counts(grama));
+        assertTrue(!recruit.counts(grass));
+    }
+
+    @Test
     void foragersGoOutWhenTheirProfileSays() {
         SpeciesProfile.FoodNumbers ant = SpeciesProfile.RED_HARVESTER_ANT.food();
         SpeciesProfile.FoodNumbers termite = new SpeciesProfile.FoodNumbers(24, "x", java.util.List.of(), "x", "x", 0, 0, java.util.List.of("night", "rain"), 0, java.util.Optional.empty());

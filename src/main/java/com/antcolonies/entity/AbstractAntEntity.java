@@ -836,6 +836,9 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             if (colony != null && isCarryingSeed() && colony.door().isOn(serverLevel) && colony.nest().isInside(serverLevel, blockPosition())) {
                 colony.door().homecomer(serverLevel, this, true);
             }
+            if (colony != null && colony.recruits().isLaying(getUUID())) {
+                colony.recruits().layingTick(serverLevel, this); // home from a rich patch: its scent line, then its call (colony.Recruits)
+            }
         }
         if (navigator.isAttached()) {
             // Holding a wall or going round an edge: the navigator decides the exact motion along the surface.

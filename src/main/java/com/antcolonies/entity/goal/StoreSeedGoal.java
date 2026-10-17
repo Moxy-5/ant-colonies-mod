@@ -110,6 +110,7 @@ public class StoreSeedGoal extends Goal {
         if (dx * dx + dz * dz <= REACH * REACH && Math.abs(dy) < 1.5) {
             if (colony.food().depositSeed(level, spot, ant.getCarriedSeed().is(com.antcolonies.registry.ModTags.RICH_SEEDS))) {
                 ant.setCarriedSeed(net.minecraft.world.item.ItemStack.EMPTY);
+                colony.food().releaseStorePlace(ant.getUUID());
                 ColonyManager.get(level).markChanged();
             } else {
                 spot = colony.food().pickFoodSpot(level, ant.getRandom()); // that heap is full
@@ -144,6 +145,11 @@ public class StoreSeedGoal extends Goal {
                     ant.getId(), ant.blockPosition().toShortString(), ticks, failedRoutes);
             ant.spawnAtLocation(ant.getCarriedSeed());
             ant.setCarriedSeed(net.minecraft.world.item.ItemStack.EMPTY);
+            Colony mine = ant.getColonyId() != null && ant.level() instanceof ServerLevel level ? ColonyManager.get(level).getColony(ant.getColonyId()) : null;
+            if (mine != null) {
+                mine.food().releaseStorePlace(ant.getUUID());
+                mine.food().seedDropped();
+            }
         }
     }
 }

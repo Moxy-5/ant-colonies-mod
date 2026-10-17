@@ -63,8 +63,8 @@ public class GatherSeedGoal extends Goal {
         long now = level.getGameTime();
         unreachable.values().removeIf(until -> until <= now);
         seed = colony.food().findSeed(level, ant.blockPosition(), unreachable.keySet());
-        if (seed == null) {
-            return false;
+        if (seed == null || colony.recruits().passesBy(ant.getUUID(), seed.blockPosition())) {
+            return false; // (a recruit on its way to its patch passes poorer food by)
         }
         colony.food().claimSeed(level, seed, ant.getUUID());
         colony.door().setOut(level, ant);
@@ -112,6 +112,10 @@ public class GatherSeedGoal extends Goal {
 
     /** Takes one seed out of the pile on the ground. */
     private void take(ServerLevel level) {
+        if (!colony.bakery().hasPlaceForASeed(level, ant.getUUID())) {
+            ticks = GIVE_UP_TICKS; // nowhere to take it now (the store full, the mill busy): it stays where it lies
+            return;
+        }
         ItemStack stack = seed.getItem();
         ItemStack one = stack.split(1);
         if (stack.isEmpty()) {
@@ -121,8 +125,9 @@ public class GatherSeedGoal extends Goal {
         }
         ant.setCarriedSeed(one);
         colony.spots().found(ant.getUUID(), seed.blockPosition()); // its spot now (site fidelity, species that search alone)
+        colony.recruits().found(level, ant.getUUID(), seed.blockPosition()); // a rich patch: it lays a scent line home
 
-        ant.setSeedForBread(colony.bakery().claimSeedForBread(level, ant.getUUID())); // to the mill if there is no store yet
+        ant.setSeedForBread(colony.bakery().isMilling(ant.getUUID())); // to the mill if the store has no room
         level.playSound(null, ant.blockPosition(), SoundEvents.ITEM_PICKUP, SoundSource.NEUTRAL, 0.15F, 1.6F);
     }
 }

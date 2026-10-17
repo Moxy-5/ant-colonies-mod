@@ -1,7 +1,9 @@
 package com.antcolonies.entity.goal;
 
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -19,6 +21,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.ai.goal.Goal;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.level.levelgen.Heightmap;
 
 /**
@@ -40,6 +43,11 @@ import net.minecraft.world.level.levelgen.Heightmap;
  * there in {@code spot_ticks} counts as empty (two and the spot is dropped). Every {@code drift_ticks} without a find,
  * its search drifts farther out (the range stretches from the ants' own failures, the user's decision). It comes home
  * empty only when the foraging time ends or after {@code give_up_ticks}.
+ *
+ * <p><b>Called out to a rich patch</b> ({@code food.search.recruit}, see {@code Recruits}; real <i>P. barbatus</i> and
+ * <i>P. rugosus</i>): a forager touched by a nestmate home from a rich patch goes out at once, the patch as its spot,
+ * and follows the finder's scent line out point by point, single file with the others called out, passing poorer
+ * food by on the way. Once at the patch it takes food there like any forager.
  *
  * <p>Only at foraging time, only while the colony wants food, and only once the door lets it out. Mind layer: it only
  * says where to go, through the ant's navigator.
@@ -85,6 +93,11 @@ public class ScoutGoal extends Goal {
     /** How far out (blocks from the nest's middle) the search centre was when it set out, and is now (it drifts). */
     private double from;
     private double out;
+    /**
+     * How far out (blocks from the nest's middle) this search's way reaches: the tip of the trail it went out by, or the
+     * colony's range; its drift goes at most the stretch past it (long trails: a trail grows from its tip).
+     */
+    private int reachOfWay;
     /** Whether it is searching round its own spot, not yet found empty this trip. */
     private boolean atOwnSpot;
     private boolean arrived;
@@ -93,6 +106,11 @@ public class ScoutGoal extends Goal {
     private boolean found;
     private int stayed;
     private int feeling;
+    /** The scent line a recruit follows out (nest end first), and the point it walks to next; null when not following one. */
+    @Nullable
+    private List<BlockPos> line;
+    private int lineAt;
+    private int lineStuck;
 
     public ScoutGoal(AbstractAntEntity ant) {
         this.ant = ant;
@@ -129,10 +147,20 @@ public class ScoutGoal extends Goal {
         return spot != null;
     }
 
-    /** Whether this lone searcher has come across food it may go for: a plant it found, or a seed by it. */
+    /**
+     * Whether this lone searcher has come across food it may go for: a plant it found, or a seed by it (a recruit on its
+     * way to its patch passes poorer food by, see {@code Recruits}).
+     */
     private boolean hasFoodOfItsOwn(ServerLevel level) {
-        return colony.foodMap().hasFound(ant.getUUID()) && colony.food().findGrass(level, ant.blockPosition(), Set.of(), ant.getUUID()) != null
-                || colony.food().findSeed(level, ant.blockPosition(), Set.of()) != null;
+        UUID id = ant.getUUID();
+        if (colony.foodMap().hasFound(id)) {
+            BlockPos grass = colony.food().findGrass(level, ant.blockPosition(), Set.of(), id);
+            if (grass != null && !colony.recruits().passesBy(id, grass)) {
+                return true;
+            }
+        }
+        ItemEntity seed = colony.food().findSeed(level, ant.blockPosition(), Set.of());
+        return seed != null && !colony.recruits().passesBy(id, seed.blockPosition());
     }
 
     /** A random open spot on the ground in the colony's food area, outside the nest and the mound; null if none was hit. */
@@ -169,6 +197,7 @@ public class ScoutGoal extends Goal {
             angle = Math.atan2(own.getZ() - middle.getZ(), own.getX() - middle.getX());
             from = Math.max(LEAST_OUT, flat(own));
             out = from;
+            reachOfWay = Math.max(colony.foragingRadius(), (int) Math.ceil(from));
             return own;
         }
         atOwnSpot = false;
@@ -189,14 +218,17 @@ public class ScoutGoal extends Goal {
             if (trail != null) {
                 angle = trail.angle() + (ant.getRandom().nextDouble() - 0.5) * 0.5;
                 base = trails.reachBlocks(trail) - ant.getRandom().nextInt(4);
+                // Out at the trail's tip, fanning out past it (not out to the colony's longest trail).
+                reachOfWay = Math.max(colony.profile().food().radius(), trails.reachBlocks(trail));
             } else {
+                reachOfWay = range;
                 angle = failed == null ? ant.getRandom().nextDouble() * Mth.TWO_PI
                         : failed.angle() + ANOTHER_WAY + ant.getRandom().nextDouble() * (Mth.TWO_PI - 2 * ANOTHER_WAY);
                 // Near the nest, then outward as it drifts (the user's decision of 2026-10-16: it used to start anywhere in
                 // the inner half of the range, and seeds 6 blocks from the nest lay unfound for a game day).
                 base = LEAST_OUT + 2 + ant.getRandom().nextInt(NEAR_START + 1);
             }
-            from = Math.min(Math.max(LEAST_OUT + 2, base), range + search.stretch());
+            from = Math.min(Math.max(LEAST_OUT + 2, base), reachOfWay + search.stretch());
             out = from;
             BlockPos cell = groundCell(level, colony, angle, from, 2);
             if (cell != null && colony.patrol().isOpen(level, cell)) {
@@ -278,8 +310,18 @@ public class ScoutGoal extends Goal {
         stayed = 0;
         arrived = false;
         via = null;
+        line = null;
+        lineStuck = 0;
         if (alone && colony != null && spot != null && ant.level() instanceof ServerLevel level) {
             colony.spots().setSearching(ant.getUUID(), true);
+            line = colony.recruits().lineFor(level, ant.getUUID());
+            if (line != null) {
+                lineAt = nearestPoint(line); // called out: along the finder's scent line, from where it meets it
+                if (ant.getNavigator().moveTo(line.get(lineAt), 1.0)) {
+                    return;
+                }
+                line = null; // no way onto the line from here: as any forager to its spot
+            }
             via = colony.trunkTrails().wayOut(level, spot);
             if (via != null && flat(ant.blockPosition()) >= flat(via) - 1.0) {
                 via = null; // already out past where it would leave the trail
@@ -296,10 +338,26 @@ public class ScoutGoal extends Goal {
         }
     }
 
+    /** The point of the line nearest the ant (where it joins it). */
+    private int nearestPoint(List<BlockPos> points) {
+        int best = 0;
+        double bestDistance = Double.MAX_VALUE;
+        for (int i = 0; i < points.size(); i++) {
+            double distance = points.get(i).distSqr(ant.blockPosition());
+            if (distance < bestDistance) {
+                best = i;
+                bestDistance = distance;
+            }
+        }
+        return best;
+    }
+
     @Override
     public void stop() {
         ant.getNavigator().stop();
+        line = null;
         if (alone && colony != null) {
+            colony.recruits().tripOver(ant.getUUID()); // (got there and took food, or did not: it was told once)
             colony.spots().setSearching(ant.getUUID(), false);
             boolean closing = !colony.isForagingTime(ant.level());
             boolean gaveUp = ticks >= giveUpTicks();
@@ -356,6 +414,10 @@ public class ScoutGoal extends Goal {
             ant.getNavigator().stop();
             return;
         }
+        if (line != null) {
+            followLine();
+            return;
+        }
         if (via != null) {
             BlockPos at = ant.blockPosition();
             if (Math.abs(at.getX() - via.getX()) <= 1 && Math.abs(at.getZ() - via.getZ()) <= 1 && Math.abs(at.getY() - via.getY()) <= 2) {
@@ -385,7 +447,7 @@ public class ScoutGoal extends Goal {
             colony.spots().emptyAtSpot(ant.getUUID()); // nothing at its spot this time
             atOwnSpot = false;
         }
-        double drifted = search.drifted(from, searched, colony.foragingRadius());
+        double drifted = search.drifted(from, searched, reachOfWay);
         if (drifted > out + 0.5) {
             BlockPos moved = groundCell(level, colony, angle, drifted, 1);
             out = drifted;
@@ -416,6 +478,26 @@ public class ScoutGoal extends Goal {
             }
         }
         feeling = FEEL_TICKS; // nowhere to hop to just now: feels about here
+    }
+
+    /** A recruit walks the scent line out, point by point (single file: every recruit walks the same points). */
+    private void followLine() {
+        BlockPos next = line.get(lineAt);
+        BlockPos at = ant.blockPosition();
+        boolean there = horizontal(at, next) <= 1.5 && Math.abs(at.getY() - next.getY()) <= 2;
+        if (!there && ant.getNavigator().isDone()) {
+            there = ++lineStuck > 3 || !ant.getNavigator().moveTo(next, 1.0); // can't get right onto this point: on to the next
+        }
+        if (!there) {
+            return;
+        }
+        lineStuck = 0;
+        if (++lineAt >= line.size()) {
+            line = null; // at the patch's end of the line: it walks to its spot and searches round it
+            ant.getNavigator().stop();
+            return;
+        }
+        ant.getNavigator().moveTo(line.get(lineAt), 1.0);
     }
 
     private void lookRound() {

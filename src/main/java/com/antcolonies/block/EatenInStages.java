@@ -3,7 +3,7 @@ package com.antcolonies.block;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
- * A food plant that shows how much of it has been eaten (a fallen branch, dead wood): as foragers cut pieces off it,
+ * A food plant that shows how much of it has been eaten (a fallen branch, dead wood), or lives on once eaten (grama grass): as foragers cut pieces off it,
  * the colony's food store asks it how it looks now. Species-neutral: any colony cutting at it uses this.
  */
 public interface EatenInStages {
@@ -15,4 +15,12 @@ public interface EatenInStages {
      * forgot) does not count a half-eaten block as whole.
      */
     int eatenAlready(BlockState state, int pieces);
+
+    /**
+     * What this block becomes once its last piece is cut, or null if it is used up and goes (the default). A plant that
+     * lives on (grama grass: the head dries off, the plant stays) returns its new state.
+     */
+    default BlockState afterLastPiece(BlockState state) {
+        return null;
+    }
 }

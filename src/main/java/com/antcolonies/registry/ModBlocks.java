@@ -4,6 +4,7 @@ import com.antcolonies.AntColoniesMod;
 import com.antcolonies.block.DeadWoodBlock;
 import com.antcolonies.block.DryGrassBlock;
 import com.antcolonies.block.FallenBranchBlock;
+import com.antcolonies.block.GramaGrassBlock;
 import com.antcolonies.block.FungusCombBlock;
 import com.antcolonies.block.MudCastBlock;
 import com.antcolonies.block.MudCrustBlock;
@@ -120,6 +121,14 @@ public class ModBlocks {
     /** Savanna grass two blocks tall with seed heads; dries like the short tuft (see TallDryGrassBlock). */
     public static final DeferredBlock<TallDryGrassBlock> TALL_DRY_GRASS = BLOCKS.registerBlock("tall_dry_grass", TallDryGrassBlock::new,
             grassProperties());
+
+    /** Blue grama, the shortgrass prairie's seed grass, in meadows on the plains (see GramaGrassBlock). */
+    public static final DeferredBlock<GramaGrassBlock> BLUE_GRAMA = BLOCKS.register("blue_grama",
+            () -> new GramaGrassBlock(grassProperties().mapColor(MapColor.PLANT), false, () -> ModItems.BLUE_GRAMA_SEEDS.get()));
+
+    /** Black grama, the desert grassland's seed grass, in bunches in the badlands, on sand too (see GramaGrassBlock). */
+    public static final DeferredBlock<GramaGrassBlock> BLACK_GRAMA = BLOCKS.register("black_grama",
+            () -> new GramaGrassBlock(grassProperties().mapColor(MapColor.COLOR_GRAY), true, () -> ModItems.BLACK_GRAMA_SEEDS.get()));
 
     /** A block of a dead branch lying on the ground, eaten by termites in stages (see FallenBranchBlock). */
     public static final DeferredBlock<FallenBranchBlock> FALLEN_BRANCH = BLOCKS.registerBlock("fallen_branch", FallenBranchBlock::new,

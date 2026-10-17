@@ -30,6 +30,12 @@ public class DigGoal extends Goal {
     private static final double REACH = 1.4;
     private static final int BITE_INTERVAL = 10;
     private static final int GIVE_UP_TICKS = 60;
+    /**
+     * A block this ant found no way to is left alone for this long, as in the other goals (the full run of 2026-10-16:
+     * a worker walled in planned a route to the colony's next block about once a second for minutes, each failed search
+     * up to 6000 steps; and the king in the user's mound cost 29 ms a tick that way).
+     */
+    private static final int UNREACHABLE_TICKS = 400;
 
     private final AbstractAntEntity ant;
     /** Lets an ant dig only some of the time (the queen stops once her room is finished). */
@@ -40,6 +46,8 @@ public class DigGoal extends Goal {
     private BlockPos target;
     private int biteCooldown;
     private int stuckTicks;
+    /** Blocks this ant found no way to: block -> game time until which it leaves it alone. */
+    private final java.util.Map<BlockPos, Long> unreachable = new java.util.HashMap<>();
 
     /** Checked only when the ant starts digging (a worker's role), not while it digs. */
     private final BooleanSupplier mayStart;
@@ -71,7 +79,9 @@ public class DigGoal extends Goal {
             return false;
         }
         target = colony == null ? null : colony.nest().findDigTarget(level, ant.getUUID());
-        return target != null;
+        long now = level.getGameTime();
+        unreachable.values().removeIf(until -> until <= now || until > now + UNREACHABLE_TICKS);
+        return target != null && !unreachable.containsKey(target);
     }
 
     /**
@@ -146,6 +156,7 @@ public class DigGoal extends Goal {
                 }
                 if (!walking) {
                     stuckTicks = GIVE_UP_TICKS; // no way to get there: let another block (or ant) have a go
+                    unreachable.put(target.immutable(), level.getGameTime() + UNREACHABLE_TICKS);
                     com.antcolonies.AntColoniesMod.LOGGER.debug("[dig] {} found no way to {} from {} (stand spots {})", ant.getId(),
                             target.toShortString(), ant.position(), colony.nest().standSpotsFor(level, target));
                 } else if (++stuckTicks >= GIVE_UP_TICKS) {

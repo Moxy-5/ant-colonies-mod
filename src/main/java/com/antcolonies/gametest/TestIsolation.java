@@ -39,6 +39,8 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * out searching), and when it fails nothing at all; the colony itself lived on in the colony list, "away", through all
  * the later tests. Now, when a test is done, every colony that was founded in its arena is removed, with every insect,
  * egg, larva and body of it, wherever it is.</li>
+ * <li><b>Long trails</b> (2026-10-17): a trunk trail can reach 96 blocks and the arenas are about 45 apart, so each
+ * colony's trails stop at its own arena's edge ({@code TrunkTrails.setTestFence}).</li>
  * <li><b>Counting boxes</b> (in the tests themselves): a test that counts "the workers in my box" misses its own
  * foragers out searching past the box's edge and counts a neighbour's. Such checks count the colony's own insects
  * instead ({@link #insectsOf}).</li>
@@ -124,6 +126,7 @@ final class TestIsolation {
                 GameTestInfo test = testAt(colony.getCenter());
                 if (test != null) {
                     OWNERS.put(colony.getId(), test);
+                    colony.trunkTrails().setTestFence(ARENAS.get(test)); // (its trails stop at its own arena's edge)
                 }
             }
         }
