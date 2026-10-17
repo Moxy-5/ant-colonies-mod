@@ -40,9 +40,28 @@ Planned with the user 2026-10-17 (the termite half of `docs/plans/long-trails.md
 - A long-walk scene: termites walk a ready-made 40-block gallery out and back (real mobs, the switch's walking part).
 
 ## Step 1: holes take turns
-- More holes along the tunnels the colony already has (spaced, my pick about 6 blocks apart). Each night only a few
-  open (my pick: 2 to 4 by colony size), others next time, so grazing and bare patches spread out. No new digging.
-- Soldiers' sentry line, the alarm (plug on alarm), runways and the middle hole keep working with any open hole.
+**Decided with the user 2026-10-17** (the real behaviour explained first; all four recommended answers picked):
+- **More holes, no new digging:** holes about **4 blocks apart** along the tunnels the colony already has (the nest's
+  own 2 tunnels and the new-hole tunnels to food), each bitten up through the tunnel's roof (the one block of soil over
+  it). Today's tunnels are 8 blocks long, so only about 2 each for now; step 2's growing galleries bring many more.
+- **Which open each night: food-led.** Holes near food found on earlier nights (the food map: food within a few blocks
+  of the hole, my pick 6) open again while that food lasts; plus 1 or 2 holes rested longest (or not yet opened) to
+  explore. Real foragers go back to good spots and keep probing new ones.
+- **How many: by foragers and rain.** One open hole for every so many foragers going out (my pick: 6), at least 1;
+  more on rainy nights (my pick: half as many again), as real ones open more after rain.
+- **Old holes stay:** a plugged hole stays usable for ever; filling in comes with step 3's far branches.
+- Each night's choice is made once, when foraging starts, and kept until the holes are plugged (saved).
+- Behind the switch `nest.galleries.enabled` (off: today's 2 holes, both open).
+- **Parts that use the holes and must work with any open set:** the alarm (run to the nearest open hole, plug it),
+  the soldiers' sentry line, runways (only from a hole that is open), bare patches, mushrooms, the food map and
+  scouting, going inside and plugging, the middle hole of a young mound, and the numbers foraging while away
+  (`FieldLife`: from the holes chosen that night).
+- **Tests (added to existing scenes where one builds the same world):** the holes are spaced and roofed and walkable
+  (the gallery proof grows a check for holes along a tunnel); on a night only the chosen holes open and all are
+  plugged after; food-led: a hole by a known food patch reopens the next night and an explore hole opens too; more open
+  on a rainy night; the switch off keeps today's behaviour. Then `termitefood,mound,soldiers,away` on 6 servers.
+- In game: from above the nest at night, holes open in a few spots round the mound, different ones on different
+  nights, grazing (bare patches) spreading out instead of two worn circles.
 
 ## Step 2: galleries grow tip by tip
 - Builders extend gallery tips outward a few blocks at a time (soil to the mound, as all digging); new holes appear
