@@ -163,6 +163,28 @@ class SpeciesProfileTest {
     }
 
     @Test
+    void aRichPatchIsWorthAWalkThatGrowsWithItsSize() throws Exception {
+        SpeciesProfile profile = read("red_harvester_ant");
+        SpeciesProfile.RecruitNumbers recruit = profile.food().search().orElseThrow().recruit().orElseThrow();
+        // Value against distance (long trails step 3): 24 pieces near home, about 48 at 60 blocks, about 64 at 96.
+        assertEquals(24, recruit.needed(5), 1e-9, "near the nest");
+        assertEquals(24, recruit.needed(20), 1e-9);
+        assertEquals(48, recruit.needed(60), 1.5);
+        assertEquals(64, recruit.needed(96), 1.5);
+        assertTrue(recruit.needed(40) > recruit.needed(30), "farther needs more");
+        // How many are called out goes by the size of the patch (the user's decision): 1 per 16 pieces, 1 to 8.
+        assertEquals(1, recruit.recruitsFor(24));
+        assertEquals(2, recruit.recruitsFor(32));
+        assertEquals(4, recruit.recruitsFor(64), "four ripe blue grama plants");
+        assertEquals(8, recruit.recruitsFor(500), "never more than 8 a call");
+        // Grama counts, short grass does not (a tuft is not a patch).
+        SpeciesProfile.PlantFood grass = profile.food().plants().stream().filter(p -> p.block().equals("minecraft:short_grass")).findFirst().orElseThrow();
+        SpeciesProfile.PlantFood grama = profile.food().plants().stream().filter(p -> p.block().equals("antcolonies:blue_grama")).findFirst().orElseThrow();
+        assertTrue(recruit.counts(grama));
+        assertTrue(!recruit.counts(grass));
+    }
+
+    @Test
     void foragersGoOutWhenTheirProfileSays() {
         SpeciesProfile.FoodNumbers ant = SpeciesProfile.RED_HARVESTER_ANT.food();
         SpeciesProfile.FoodNumbers termite = new SpeciesProfile.FoodNumbers(24, "x", java.util.List.of(), "x", "x", 0, 0, java.util.List.of("night", "rain"), 0, java.util.Optional.empty());

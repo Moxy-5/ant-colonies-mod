@@ -156,6 +156,9 @@ public class Door {
         if (share < 1.0F && trips.size() >= Math.max(1, Math.round(realForagers * share))) {
             return false;
         }
+        if (colony.recruits().isRecruited(id)) {
+            return true; // called out by a forager home from a rich patch (see colony.Recruits): it follows the scent line
+        }
         boolean small = isSmall(level, numbers);
         if (small && ownSeed.contains(id)) {
             return true;
@@ -244,6 +247,13 @@ public class Door {
     public int touchesOf(UUID ant) {
         ArrayDeque<Long> times = touches.get(ant);
         return times == null ? 0 : times.size();
+    }
+
+    /** A recruiter called out {@code count} forager numbers to its patch (see {@link Recruits}): they go out now. */
+    void recruitedNumbers(ServerLevel level, int count) {
+        if (isOn(level) && colony.patrol().mayForage(level)) {
+            numbersOut += count;
+        }
     }
 
     /** Number patrollers home safely: each touches the waiting ones like a real one. */

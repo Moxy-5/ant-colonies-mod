@@ -28,6 +28,7 @@ Harvester ants first; termites underground right after, as a step of their own (
   the line out. The line fades within minutes unless it is laid again; heavy traffic turns it into a trunk trail.
 
 ## Step 1: trails that grow tip by tip (A)
+**BUILT 2026-10-17** (`docs/HISTORY.md`).
 - Each trunk trail gets a **tip**: how far out its columns go, saved. A new trail is laid only out to where the trips
   that laid it found food, not to the old food radius.
 - **Out and fan out:** a forager walks its trail out to the tip (or to its own spot along it, as today) and searches
@@ -44,6 +45,7 @@ Harvester ants first; termites underground right after, as a step of their own (
   in unloaded land, where only the numbers forage (never force-loading chunks).
 
 ## Step 2: recruiting to rich patches (B)
+**BUILT 2026-10-17 overnight** (`colony/Recruits`; `docs/HISTORY.md`). How it was built: the finder's way home is noted every 3 blocks; at home it calls out the nearest foragers waiting by the entrance (forager numbers if too few are waiting); recruits walk the line's points out (`ScoutGoal.followLine`) and pass poorer food by (`Recruits.passesBy`). Checked in the seed scene (two ripe grama side by side).
 - **The user's decisions (2026-10-17, before the night's work):** how many nestmates a recruiter calls out **depends on
   how big the patch is** (real recruiting gets stronger with a richer find; my pick: 1 for every 16 pieces of food in
   the patch, at least 1, at most 8); **plants and fallen seeds both count** toward a rich patch; recruits **follow the
@@ -63,6 +65,7 @@ Harvester ants first; termites underground right after, as a step of their own (
 - The numbers recruit too: a patch the colony knows of draws more of them out while it lasts.
 
 ## Step 3: value against distance (C)
+**BUILT 2026-10-17 overnight**: the recruit threshold by distance (`RecruitNumbers.needed`), recruits passing poorer food by, and a trail walked twice as fast as grass in the worth of a plant (`TrunkTrails.walkTo`, `ON_TRAIL` 0.5, my pick), so a forager leaves the trail only for food worth the extra walk.
 - The worth rule (food left ^ 0.75 / trip) already makes a forager pick a rich plant over a near poor one. Added: a
   forager **leaves the trail** for a plant only when the plant is worth the extra walk, and a **recruiter only
   recruits** when the patch is worth the trip (my pick: 24 pieces at 20 blocks, about 48 at 60 blocks, about 64 at 96).

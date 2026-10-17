@@ -98,9 +98,11 @@ public class WorkerAntEntity extends AbstractAntEntity {
         this.goalSelector.addGoal(6, new PatrolGoal(this));
         // Above searching: a searcher that comes across food is taken over by cutting or gathering where it stands.
         this.goalSelector.addGoal(6, new ClipGrassGoal(this));
-        this.goalSelector.addGoal(7, new ScoutGoal(this));
         // Soil dug while the surface was shut waits under the entrance: carried up onto the hill once the clock opens.
-        this.goalSelector.addGoal(8, new CarryNightSoilGoal(this));
+        // Above searching: builders who rested all night count as idle at dawn and could otherwise go off on a long
+        // food search first; a builder already out searching comes back for it (docs/BUGS.md 39).
+        this.goalSelector.addGoal(6, new CarryNightSoilGoal(this));
+        this.goalSelector.addGoal(7, new ScoutGoal(this));
         this.goalSelector.addGoal(8, new DigGoal(this, () -> true, () -> mayDo(ColonyRole.BUILDER)));
         // Once the nest is dug, builders mend the hill when a block of it has been knocked out.
         this.goalSelector.addGoal(8, new RepairHillGoal(this));
@@ -221,6 +223,7 @@ public class WorkerAntEntity extends AbstractAntEntity {
                 dropLoadOnDeath(serverLevel, colony);
                 colony.patrol().died(serverLevel, getUUID()); // a patroller killed never comes back: its way stays shut today
                 colony.spots().died(getUUID()); // its spot is lost with it
+                colony.recruits().died(getUUID());
 
                 colony.setCount(CASTE, colony.getCount(CASTE) - 1);
                 manager.markChanged();

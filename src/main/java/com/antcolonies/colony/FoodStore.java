@@ -245,7 +245,9 @@ public class FoodStore {
                     || !fromInside && !colony.patrol().isOpen(level, pos)) { // (only where the patrollers came back from)
                 continue;
             }
-            double worth = worth(plant.pieces() - getPiecesCut(pos), tripLength(pos, exits.isEmpty() ? List.of(center) : exits), pos.distSqr(near));
+            double trip = tripLength(pos, exits.isEmpty() ? List.of(center) : exits);
+            double byTrail = colony.trunkTrails().walkTo(pos); // (a cleared trail walks quicker: worth the walk)
+            double worth = worth(plant.pieces() - getPiecesCut(pos), byTrail >= 0 ? Math.min(trip, byTrail) : trip, pos.distSqr(near));
             if (worth > bestWorth) {
                 best = pos;
                 bestWorth = worth;
@@ -435,6 +437,7 @@ public class FoodStore {
         plantClaims.remove(ant);
         colony.trails().visited(level, pos, ant);
         colony.spots().found(ant, pos); // it found food here: its spot now (site fidelity, species that search alone)
+        colony.recruits().found(level, ant, pos); // a rich patch: it lays a scent line home and calls nestmates out
         BlockState before = level.getBlockState(pos);
         SpeciesProfile.PlantFood plant = food().plantFor(before);
         if (plant != null && before.getBlock() instanceof EatenInStages eaten) {

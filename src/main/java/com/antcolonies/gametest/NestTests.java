@@ -600,6 +600,9 @@ public class NestTests {
      * The test clock (roadmap 3a): the nest is dug on a still 7:00; as the seeds are dropped the clock is set to 5:30 and
      * runs at real speed, so the patrol's round begins when the day clock opens at 6:00, the foragers come in for the
      * midday rest and at 17:00, and the next rounds begin after the rest and the next morning, all by themselves.
+     * Long trails step 2, recruiting (2026-10-17): two ripe blue grama side by side are a rich patch; a forager that
+     * cuts there lays a scent line home (and only to it, never to the scattered seeds or the tufts), calls nestmates
+     * out in the nest, and one called out takes food at the patch.
      */
     @GameTest(template = "arena", timeoutTicks = 140000, skyAccess = true, batch = "seeds_alone") // (4c: searching alone takes longer; real days)
 
@@ -608,7 +611,8 @@ public class NestTests {
         level.getServer().tickRateManager().setTickRate(2000.0F);
         startColony(helper);
         int[][] tufts = {{MIDDLE + 5, MIDDLE + 6}, {MIDDLE - 6, MIDDLE - 4}, {MIDDLE - 2, MIDDLE + 7}};
-        BlockPos grama = new BlockPos(MIDDLE + 5, SURFACE, MIDDLE - 5);
+        // Two ripe blue grama side by side: 32 seeds, a rich patch near home (long trails step 2, recruiting).
+        BlockPos[] gramas = {new BlockPos(MIDDLE + 5, SURFACE, MIDDLE - 5), new BlockPos(MIDDLE + 6, SURFACE, MIDDLE - 5)};
 
         boolean[] dropped = {false};
         TestClock[] clock = {null};
@@ -627,47 +631,85 @@ public class NestTests {
             for (int[] tuft : tufts) {
                 helper.setBlock(tuft[0], SURFACE, tuft[1], Blocks.SHORT_GRASS);
             }
-            helper.setBlock(grama.getX(), grama.getY(), grama.getZ(), ModBlocks.BLUE_GRAMA.get().defaultBlockState()
-                    .setValue(GramaGrassBlock.STAGE, GramaGrassBlock.Stage.RIPE));
-            AntColoniesMod.LOGGER.info("[seed-test] tick {}: 5 seeds dropped, 3 tufts of grass and a ripe grama plant planted around the hill", helper.getTick());
+            for (BlockPos grama : gramas) {
+                helper.setBlock(grama.getX(), grama.getY(), grama.getZ(), ModBlocks.BLUE_GRAMA.get().defaultBlockState()
+                        .setValue(GramaGrassBlock.STAGE, GramaGrassBlock.Stage.RIPE));
+            }
+            AntColoniesMod.LOGGER.info("[seed-test] tick {}: 5 seeds dropped, 3 tufts of grass and 2 ripe grama plants planted around the hill", helper.getTick());
         });
         // Grama grass (2026-10-16), in the same scene: the ants cut seeds off the ripe head (as many as it holds) and a
         // head cut bare dries off, the plant lives on. Seeds it sheds on the ground are fetched too (counted here, kept
         // from despawning like the dropped ones). Once seen dried it is taken away, so it cannot ripen again in the test.
-        int[] gramaCut = {0};
-        int[] gramaLast = {0};
-        boolean[] gramaDried = {false};
+        int[] gramaCut = new int[gramas.length];
+        int[] gramaLast = new int[gramas.length];
+        boolean[] gramaDried = new boolean[gramas.length];
         Set<java.util.UUID> shed = new HashSet<>();
         int[] gramaShed = {0};
         helper.onEachTick(() -> {
             Colony colony = colony(helper);
-            if (!dropped[0] || colony == null || gramaDried[0]) {
+            if (!dropped[0] || colony == null) {
                 return;
             }
-            BlockPos at = helper.absolutePos(grama);
-            var state = level.getBlockState(at);
-            int cut = colony.food().getPiecesCut(at);
-            if (cut > gramaLast[0]) {
-                gramaCut[0] += cut - gramaLast[0];
-            }
-            if (state.is(ModBlocks.BLUE_GRAMA.get()) && state.getValue(GramaGrassBlock.STAGE) == GramaGrassBlock.Stage.DRIED) {
-                int pieces = colony.food().piecesOf(state.setValue(GramaGrassBlock.STAGE, GramaGrassBlock.Stage.RIPE));
-                if (gramaLast[0] == pieces - 1) {
-                    gramaCut[0]++; // (the last piece: the plant forgets its cuts as it dries off)
+            for (int g = 0; g < gramas.length; g++) {
+                if (gramaDried[g]) {
+                    continue;
                 }
-                gramaDried[0] = true;
-                AntColoniesMod.LOGGER.info("[seed-test] tick {}: the grama head is dry, {} pieces cut, {} seeds shed", helper.getTick(), gramaCut[0], gramaShed[0]);
-                level.setBlock(at, Blocks.AIR.defaultBlockState(), 3);
+                BlockPos at = helper.absolutePos(gramas[g]);
+                var state = level.getBlockState(at);
+                int cut = colony.food().getPiecesCut(at);
+                if (cut > gramaLast[g]) {
+                    gramaCut[g] += cut - gramaLast[g];
+                }
+                if (state.is(ModBlocks.BLUE_GRAMA.get()) && state.getValue(GramaGrassBlock.STAGE) == GramaGrassBlock.Stage.DRIED) {
+                    int pieces = colony.food().piecesOf(state.setValue(GramaGrassBlock.STAGE, GramaGrassBlock.Stage.RIPE));
+                    if (gramaLast[g] == pieces - 1) {
+                        gramaCut[g]++; // (the last piece: the plant forgets its cuts as it dries off)
+                    }
+                    gramaDried[g] = true;
+                    AntColoniesMod.LOGGER.info("[seed-test] tick {}: grama head {} is dry, {} pieces cut, {} seeds shed", helper.getTick(), g, gramaCut[g], gramaShed[0]);
+                    level.setBlock(at, Blocks.AIR.defaultBlockState(), 3);
+                    continue;
+                }
+                helper.assertTrue(state.is(ModBlocks.BLUE_GRAMA.get()), "a grama plant was broken: it should dry off when cut bare");
+                gramaLast[g] = cut;
+                for (var item : level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, new AABB(at).inflate(1.5),
+                        e -> e.getItem().is(com.antcolonies.registry.ModItems.BLUE_GRAMA_SEEDS.get()))) {
+                    if (shed.add(item.getUUID())) {
+                        gramaShed[0] += item.getItem().getCount();
+                        item.setUnlimitedLifetime();
+                    }
+                }
+            }
+        });
+        // Long trails step 2, recruiting (2026-10-17), in the same scene: the grama stand is a rich patch (32 seeds near
+        // home), so a forager that cuts there lays a scent line home and calls nestmates out; one called out walks to the
+        // patch and takes food there, not on the way. Scattered seeds and tufts of grass are no patch: no line to them.
+        Set<java.util.UUID> called = new HashSet<>();
+        int[] linesSeen = {0};
+        int[] recruitsAtThePatch = {0};
+        Set<java.util.UUID> recruitCarrying = new HashSet<>();
+        helper.onEachTick(() -> {
+            Colony colony = colony(helper);
+            if (!dropped[0] || colony == null) {
                 return;
             }
-            helper.assertTrue(state.is(ModBlocks.BLUE_GRAMA.get()), "the grama plant was broken: it should dry off when cut bare");
-            gramaLast[0] = cut;
-            for (var item : level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, new AABB(at).inflate(1.5),
-                    e -> e.getItem().is(com.antcolonies.registry.ModItems.BLUE_GRAMA_SEEDS.get()))) {
-                if (shed.add(item.getUUID())) {
-                    gramaShed[0] += item.getItem().getCount();
-                    item.setUnlimitedLifetime();
+            linesSeen[0] = Math.max(linesSeen[0], colony.recruits().lines().size());
+            for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds(), AbstractAntEntity::isColonyWorker)) {
+                if (colony.recruits().isRecruited(ant.getUUID())) {
+                    called.add(ant.getUUID());
                 }
+                if (called.contains(ant.getUUID()) && ant.isCarryingSeed() && recruitCarrying.add(ant.getUUID())) {
+                    BlockPos spot = colony.spots().spotOf(ant.getUUID());
+                    if (spot != null && spot.closerThan(helper.absolutePos(gramas[0]), 5)) {
+                        recruitsAtThePatch[0]++;
+                        AntColoniesMod.LOGGER.info("[seed-test] tick {}: a nestmate called out took food at the grama patch{}", helper.getTick(),
+                                colony.recruits().describe(level));
+                    }
+                }
+            }
+            for (var line : colony.recruits().lines()) {
+                helper.assertTrue(line.patch().closerThan(helper.absolutePos(gramas[0]), 5),
+                        "a scent line was laid to " + line.patch().subtract(helper.absolutePos(BlockPos.ZERO)).toShortString() + ", not the grama patch");
             }
         });
         long[] firstBack = {-1};
@@ -743,10 +785,18 @@ public class NestTests {
             for (int[] tuft : tufts) {
                 helper.assertBlock(new BlockPos(tuft[0], SURFACE, tuft[1]), block -> block == Blocks.AIR, "a tuft of grass is still there");
             }
-            helper.assertTrue(gramaDried[0], "the ripe grama head was not cut bare (" + gramaCut[0] + " pieces cut so far)");
-            helper.assertTrue(gramaCut[0] == colony.food().piecesOf(ModBlocks.BLUE_GRAMA.get().defaultBlockState()
-                    .setValue(GramaGrassBlock.STAGE, GramaGrassBlock.Stage.RIPE)), "the grama head dried with only " + gramaCut[0] + " pieces cut");
-            int expected = 5 + tufts.length * colony.food().piecesOf(Blocks.SHORT_GRASS.defaultBlockState()) + gramaCut[0] + gramaShed[0];
+            int ripePieces = colony.food().piecesOf(ModBlocks.BLUE_GRAMA.get().defaultBlockState().setValue(GramaGrassBlock.STAGE, GramaGrassBlock.Stage.RIPE));
+            int gramaCutAll = 0;
+            for (int g = 0; g < gramas.length; g++) {
+                helper.assertTrue(gramaDried[g], "ripe grama head " + g + " was not cut bare (" + gramaCut[g] + " pieces cut so far)");
+                helper.assertTrue(gramaCut[g] == ripePieces, "grama head " + g + " dried with only " + gramaCut[g] + " pieces cut");
+                gramaCutAll += gramaCut[g];
+            }
+            helper.assertTrue(linesSeen[0] >= 1 && colony.recruits().calledOut() >= 1,
+                    "nobody laid a scent line home from the rich grama patch and called nestmates out" + colony.recruits().describe(level));
+            helper.assertTrue(recruitsAtThePatch[0] >= 1, "no nestmate called out took food at the grama patch (" + called.size() + " called)"
+                    + colony.recruits().describe(level));
+            int expected = 5 + tufts.length * colony.food().piecesOf(Blocks.SHORT_GRASS.defaultBlockState()) + gramaCutAll + gramaShed[0];
             // The workers also feed the queen from the store: count what she has eaten too, and (searching alone takes
             // long enough for her egg to hatch, brain step 4c, and on real days to grow up) the bread fed to the larva.
             int larvaeFed = larvaFed.values().stream().mapToInt(Integer::intValue).sum();

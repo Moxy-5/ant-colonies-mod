@@ -85,8 +85,8 @@ public class ClipGrassGoal extends Goal {
         long now = level.getGameTime();
         unreachable.values().removeIf(until -> until <= now);
         grass = colony.food().findGrass(level, ant.blockPosition(), unreachable.keySet(), ant.getUUID(), fromInside);
-        if (grass == null) {
-            return false;
+        if (grass == null || colony.recruits().passesBy(ant.getUUID(), grass)) {
+            return false; // (a recruit on its way to its patch passes poorer food by)
         }
         colony.food().claimGrass(level, grass, ant.getUUID());
         if (!fromInside) {

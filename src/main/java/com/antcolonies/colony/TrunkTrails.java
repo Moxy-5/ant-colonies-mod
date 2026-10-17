@@ -247,6 +247,35 @@ public class TrunkTrails {
         return Math.hypot(trail.columns[column][0], trail.columns[column][1]);
     }
 
+    /**
+     * How a walk on a trail counts against a walk through the grass (worth the walk, long trails step 3): a cleared
+     * trunk trail is walked about twice as fast (real <i>Pogonomyrmex</i> foragers run faster and straighter on their
+     * trails; Fewell 1988). My pick, to confirm.
+     */
+    static final double ON_TRAIL = 0.5;
+
+    /**
+     * The walk from the nest out to {@code plant} by the trail going that way, counted as through the grass (see
+     * {@link #ON_TRAIL}): out along its cleared part to where the forager would leave it (never past its tip), then
+     * straight to the plant; or -1 if no trail goes that way. So food out along a trail is worth more than food as far off
+     * it, and a forager leaves the trail only for food worth the extra walk.
+     */
+    public double walkTo(BlockPos plant) {
+        SpeciesProfile.TrunkNumbers numbers = numbers();
+        if (numbers == null || flat(plant) <= numbers.start() + 1) {
+            return -1;
+        }
+        Trail trail = nearest(angleOf(plant), numbers);
+        if (trail == null || trail.reach <= 0) {
+            return -1;
+        }
+        int column = Math.min(leaveAt(trail, plant), trail.reach - 1);
+        double along = columnOut(trail, column);
+        double side = Math.hypot(colony.getCenter().getX() + trail.columns[column][0] - plant.getX(),
+                colony.getCenter().getZ() + trail.columns[column][1] - plant.getZ());
+        return numbers.start() + Math.max(0, along - numbers.start()) * ON_TRAIL + side;
+    }
+
     /** One of the forager numbers goes for food at {@code plant} (maybe in unloaded land): the trip is counted. */
 
     void tripByNumbers(ServerLevel level, BlockPos plant) {

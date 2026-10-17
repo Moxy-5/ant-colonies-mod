@@ -96,6 +96,7 @@ public class Colony {
     private final Patrol patrol;
     private final ForagerSpots spots;
     private final Door door;
+    private final Recruits recruits;
     private final FungusGarden garden;
     private final Mushrooms mushrooms;
     private final Soldiers soldiers;
@@ -130,6 +131,7 @@ public class Colony {
         this.patrol = new Patrol(this);
         this.spots = new ForagerSpots(this);
         this.door = new Door(this);
+        this.recruits = new Recruits(this);
         this.garden = new FungusGarden(this);
         this.mushrooms = new Mushrooms(this);
         this.soldiers = new Soldiers(this);
@@ -226,6 +228,11 @@ public class Colony {
     /** Where each forager last found food (site fidelity, species with {@code food.search}). */
     public ForagerSpots spots() {
         return spots;
+    }
+
+    /** Recruiting to rich patches: the scent lines and the nestmates called out (species with {@code food.search.recruit}). */
+    public Recruits recruits() {
+        return recruits;
     }
 
     /** How many foragers go out: the touches of the homecomers (Gordon's rule, species with {@code food.door}). */
@@ -500,6 +507,7 @@ public class Colony {
         life.tick(level, false);
         patrol.tick(level, false);
         door.tick(level);
+        recruits.tick(level);
         field.tick(level, false);
         trunkTrails.tick(level, false);
         return true;

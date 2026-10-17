@@ -273,6 +273,9 @@ public class FieldLife {
         if (places <= 0) {
             return 0;
         }
+        if (level.isLoaded(pos) && colony.profile().food().plantFor(level.getBlockState(pos)) == null) {
+            return 0; // no plant there any more (the next look forgets it): nothing to cut
+        }
         if (level.isLoaded(pos) && !Population.outOfSight(level, pos, eyes)) {
             progress.remove(pos); // a player sees it: left to the real foragers
             return 0;
@@ -446,11 +449,34 @@ public class FieldLife {
         int band = Math.max(colony.spots().numbersStartOut(), range / 2);
         if (best != null) {
             colony.spots().addHeld(best, 1, 0);
+            // A rich patch draws more of them out (recruiting, see Recruits), as many as are free to go.
+            int more = colony.recruits().numbersCalled(best, rememberedPatch(best));
+            int free = foragersInside(level) - colony.spots().holders();
+            if (more > 0 && free > 0) {
+                colony.spots().addHeld(best, Math.min(more, free), 0);
+            }
             colony.spots().setNumbersStartOut(band - search.driftBlocks()); // a find: the band settles back
         } else {
             colony.spots().setNumbersStartOut(Math.min(band + 1, most)); // nothing: the band reaches a little farther
         }
 
+    }
+
+    /** The food the colony remembers in the patch round {@code at}: the pieces left on remembered plants that count for recruiting. */
+    private int rememberedPatch(BlockPos at) {
+        SpeciesProfile.RecruitNumbers numbers = colony.recruits().settings().orElse(null);
+        if (numbers == null) {
+            return 0;
+        }
+        List<SpeciesProfile.PlantFood> kinds = colony.profile().food().plants();
+        int food = 0;
+        for (BlockPos pos : plantsNear(at, numbers.patchRadius())) {
+            Plant plant = known.get(pos);
+            if (plant != null && plant.kind() >= 0 && plant.kind() < kinds.size() && numbers.counts(kinds.get(plant.kind()))) {
+                food += Math.max(0, kinds.get(plant.kind()).pieces() - colony.food().getPiecesCut(pos));
+            }
+        }
+        return food;
     }
 
     /** The remembered plants within {@code reach} blocks (sideways) of {@code at}. */
@@ -506,6 +532,13 @@ public class FieldLife {
                 continue;
             }
             colony.food().showCuts(level, pos, entry.getValue());
+            if (colony.profile().food().plantFor(level.getBlockState(pos)) == null) {
+                // Eaten away just now: forgotten at once. (The brain's look, earlier this second, still saw the plant and
+                // remembered it again with its cuts already cleared, so the numbers cut one more piece off thin air: an
+                // extra seed, the away test 2c, 2026-10-17.)
+                known.remove(pos);
+                progress.remove(pos);
+            }
             it.remove();
             done++;
             changed = true;
