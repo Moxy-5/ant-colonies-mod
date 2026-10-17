@@ -46,6 +46,8 @@ public class FoodStore {
 
     /** An ant that went for a seed keeps the others away from it this long (in ticks). */
     private static final int SEED_CLAIM_TICKS = 600;
+    /** How long a place in the food store is kept for a seed on its way in (2 minutes, my pick; a long trip home fits). */
+    private static final int STORE_PLACE_TICKS = 2400;
     /** A plant only one ant at a time cuts at is left alone this long after a cut (in ticks), so the ants don't all crowd one tuft. */
     private static final int GRASS_REST_TICKS = 200;
     /** The plants around the nest are looked up again after this many ticks (a scan of the whole area). */
@@ -84,6 +86,11 @@ public class FoodStore {
     private int seedsEaten;
     /** Seeds an ant is on its way to: item entity id -> game time when the claim runs out. Not saved. */
     private final Claims<Integer> claimedSeeds = new Claims<>();
+    /**
+     * Ants on their way in with a seed for the food store, each holding a place there (so two foragers never count on
+     * the same last place, {@code docs/BUGS.md} 44). Not saved.
+     */
+    private final Claims<UUID> storeBound = new Claims<>();
     /** Eaten grass growing back, and the bare patches round the holes. Saved. */
     private final BarePatches barePatches;
 
@@ -108,6 +115,17 @@ public class FoodStore {
 
     public int getSeedsEaten() {
         return seedsEaten;
+    }
+
+    /** Seeds an ant carried but found no place for and dropped (not saved; for the tests, {@code docs/BUGS.md} 44). */
+    private int seedsDropped;
+
+    public void seedDropped() {
+        seedsDropped++;
+    }
+
+    public int getSeedsDroppedForTests() {
+        return seedsDropped;
     }
 
     /** Whether the store has ever held a piece of food (for a termite colony: its first comb). */
@@ -157,7 +175,50 @@ public class FoodStore {
      * (the ant then brings the seed straight to the mill, so nothing is put down without a store).
      */
     public boolean wantsSeeds(ServerLevel level) {
-        return pickFoodSpot(level, colony.random()) != null || colony.bakery().needsBread(level);
+        return hasStoreRoom(level) || colony.bakery().needsBread(level);
+    }
+
+    /** Whether the food store has a place left that no seed on its way in is holding. */
+    public boolean hasStoreRoom(Level level) {
+        storeBound.prune(level.getGameTime());
+        return roomInStore(level) > storeBound.size();
+    }
+
+    /**
+     * A forager about to take a seed outside asks for a place in the food store: true (and the place is held for it
+     * until it puts the seed down, drops it, or 2 minutes pass) if there is one left; an ant holding one keeps it.
+     */
+    public boolean claimStorePlace(Level level, UUID ant) {
+        storeBound.prune(level.getGameTime());
+        if (!storeBound.contains(ant) && roomInStore(level) <= storeBound.size()) {
+            return false;
+        }
+        storeBound.put(ant, level.getGameTime() + STORE_PLACE_TICKS);
+        return true;
+    }
+
+    /** The ant put its seed down (or lost it): its place in the store is free again. */
+    public void releaseStorePlace(UUID ant) {
+        storeBound.remove(ant);
+    }
+
+    /** How many more seeds the food store takes right now: the empty layers of its heaps and its empty cells. */
+    private int roomInStore(Level level) {
+        Set<BlockPos> young = colony.brood().getBroodCells(level);
+        SeedPileBlock pile = food().pileBlock();
+        int room = 0;
+        for (BlockPos pos : colony.nest().getFoodStoreCells(level)) {
+            if (young.contains(pos)) {
+                continue;
+            }
+            BlockState state = level.getBlockState(pos);
+            if (state.isAir()) {
+                room += pile.maxLayers();
+            } else if (state.is(pile)) {
+                room += Math.max(0, pile.maxLayers() - state.getValue(SeedPileBlock.LAYERS));
+            }
+        }
+        return room;
     }
 
     /**

@@ -1989,4 +1989,86 @@ public class NestTests {
         }
         return text.toString();
     }
+
+    /**
+     * The user's bug of 2026-10-17 ({@code docs/BUGS.md} 44): seeds lying round the nest, a full food store and bread
+     * wanted. Before, "bread wanted" sent the foragers for the seeds, the mill took a few, and the rest picked a seed up
+     * and dropped it again on the spot, over and over. Checks: with the store full no seed is picked up only to be
+     * dropped (the mill may take some); once the store has room again, the seeds lying round the nest, shed blue grama
+     * seeds among them, are all fetched into the store.
+     */
+    @GameTest(template = "arena", timeoutTicks = 30000, skyAccess = true, batch = "full_store")
+    public static void seedsLyingByAFullStoreAreLeftThereAndFetchedOnceThereIsRoom(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        PopulationTests.startAntColony(helper);
+        int[][] where = {{6, 0}, {-6, 1}, {1, 7}, {-2, -6}, {5, 5}, {-5, -5}, {7, -3}, {-4, 6}};
+        int[] phase = {0};
+        long[] roomAt = {-1};
+        helper.runAfterDelay(15, () -> {
+            Colony colony = PopulationTests.antColony(helper);
+            long now = level.getGameTime();
+            colony.population().addNewMembers(WorkerAntEntity.CASTE, now - 250000, 30); // old: foragers
+            colony.population().addNewMembers(WorkerAntEntity.CASTE, now - 30000, 4); // young: nurses
+            int stored = 0;
+            BlockPos spot;
+            while ((spot = colony.food().pickFoodSpot(level, colony.random())) != null && stored < 2000) {
+                colony.food().depositSeed(level, spot);
+                stored++;
+            }
+            BlockPos center = colony.getCenter();
+            for (int[] at : where) {
+                BlockPos ground = level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                        center.offset(at[0], 0, at[1]));
+                var item = new net.minecraft.world.entity.item.ItemEntity(level, ground.getX() + 0.5, ground.getY(), ground.getZ() + 0.5,
+                        new net.minecraft.world.item.ItemStack(com.antcolonies.registry.ModItems.BLUE_GRAMA_SEEDS.get(), 5)); // 40 in all, twice the bread wanted
+                item.setDeltaMovement(0, 0, 0);
+                item.setUnlimitedLifetime();
+                level.addFreshEntity(item);
+            }
+            helper.assertTrue(colony.bakery().needsBread(level), "the scene needs bread wanted (or it does not test the bug)");
+            TestClock.moving(helper, 6.5);
+            AntColoniesMod.LOGGER.info("[full-store] tick {}: {} seeds stored, the store is full; {} grama seeds lying round the nest (5 a spot)",
+                    helper.getTick(), stored, where.length * 5);
+            phase[0] = 1;
+        });
+        helper.onEachTick(() -> {
+            Colony colony = PopulationTests.antColony(helper);
+            if (colony == null || phase[0] == 0) {
+                return;
+            }
+            helper.assertTrue(colony.food().getSeedsDroppedForTests() == 0, "an ant picked up a seed and dropped it again ("
+                    + colony.food().getSeedsDroppedForTests() + " dropped), " + (phase[0] == 1 ? "with the store full" : "with room in the store"));
+            long tick = helper.getTick();
+            if (phase[0] == 1 && tick >= 4000) {
+                // Room again: the nurses take seeds out (as for the mill); 20 places free.
+                for (int i = 0; i < 20; i++) {
+                    BlockPos pile = colony.food().findSeedPile(level, colony.random());
+                    helper.assertTrue(pile != null, "no seed pile in the full store");
+                    colony.food().takeSeedAt(level, pile, java.util.UUID.randomUUID(), false);
+                }
+                roomAt[0] = tick;
+                phase[0] = 2;
+                AntColoniesMod.LOGGER.info("[full-store] tick {}: room for 20 seeds made; {} seeds still lying", tick, lyingOutside(level, helper, colony));
+            } else if (phase[0] == 2) {
+                int lying = lyingOutside(level, helper, colony);
+                if (lying == 0) {
+                    AntColoniesMod.LOGGER.info("[full-store] every seed lying round the nest fetched {} ticks after room was made", tick - roomAt[0]);
+                    helper.succeed();
+                } else if (tick % 2000 == 0) {
+                    AntColoniesMod.LOGGER.info("[full-store] tick {}: {} seeds still lying{}", tick, lying, colony.spots().describe());
+                }
+            }
+        });
+    }
+
+    /** Seeds lying as items on the ground, above the nest's top (not in the store). */
+    private static int lyingOutside(ServerLevel level, GameTestHelper helper, Colony colony) {
+        int seeds = 0;
+        for (var item : level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, helper.getBounds())) {
+            if (item.getY() >= colony.getCenter().getY() - 0.5 && item.getItem().is(com.antcolonies.registry.ModTags.SEEDS)) {
+                seeds += item.getItem().getCount();
+            }
+        }
+        return seeds;
+    }
 }

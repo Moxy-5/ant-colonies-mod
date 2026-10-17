@@ -179,8 +179,12 @@ public class ClipGrassGoal extends Goal {
             level.playSound(null, grass, sound.getHitSound(), SoundSource.NEUTRAL, 0.2F, 1.6F);
         }
         if (clipping >= CLIP_TICKS) {
+            if (!colony.bakery().hasPlaceForASeed(level, ant.getUUID())) {
+                ticks = GIVE_UP_TICKS; // nowhere to take a piece now (the store full, the mill busy): the plant is left
+                return;
+            }
             ant.setCarriedSeed(colony.food().cutPiece());
-            ant.setSeedForBread(colony.bakery().claimSeedForBread(level, ant.getUUID())); // to the mill if there is no store yet
+            ant.setSeedForBread(colony.bakery().isMilling(ant.getUUID())); // to the mill if the store has no room
             colony.food().clippedGrass(level, grass, ant.getUUID());
             ColonyManager.get(level).markChanged();
             grass = null; // so stop() does not free the tuft again

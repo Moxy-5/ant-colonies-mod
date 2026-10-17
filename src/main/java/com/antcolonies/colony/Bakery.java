@@ -112,11 +112,24 @@ public class Bakery implements NurseFood {
     }
 
     /**
-     * A worker that has just picked up a seed outside decides where it goes: to the food store if that has room,
-     * otherwise (no store yet, or full) to the mill if bread is needed. True = the mill; the worker is then counted.
+     * Before a worker takes a seed outside (off the ground or off a plant): whether it has somewhere to take it right
+     * now, a place in the food store (held for it, {@link FoodStore#claimStorePlace}) or the mill (then it is counted
+     * as a miller and {@link #isMilling} is true). If
+     * neither, it leaves the seed where it is (the user's bug, 2026-10-17, {@code docs/BUGS.md} 44: with the store full,
+     * "bread wanted" sent many foragers for seeds, the mill took a few, and the rest dropped theirs on the spot and
+     * picked them up again).
      */
-    public boolean claimSeedForBread(ServerLevel level, UUID ant) {
-        return colony.food().pickFoodSpot(level, colony.random()) == null && claimMilling(level, ant);
+    public boolean hasPlaceForASeed(ServerLevel level, UUID ant) {
+        if (colony.food().claimStorePlace(level, ant)) {
+            millers.remove(ant); // (to the store, not counted for the mill)
+            return true;
+        }
+        return claimMilling(level, ant);
+    }
+
+    /** Whether this worker is counted as milling (it claimed a seed for the mill). */
+    public boolean isMilling(UUID ant) {
+        return millers.contains(ant);
     }
 
     /**
