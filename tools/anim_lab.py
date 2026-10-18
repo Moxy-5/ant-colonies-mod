@@ -44,13 +44,30 @@ Short scene names: climb = tools/film/climb.film, guard = the folder tools/film/
 Options: --anim <file stem> to read another insect's animation file (the queen uses worker_ant's), --speed <blocks a
 second> for the walking speed the treadmill and the checks assume (default: the insect's normal speed below).
 
+Speed (2026-10-18, idea M5 of docs/plans/animation-engine-upgrade-review.md): quick enough to run after every change.
+  - Clips run side by side on several processes: --jobs <n> (default: half the computer's threads, 10 on the user's
+    PC; --jobs 1 runs them one after another in this process, as before). The output comes clip by clip in the same
+    order as ever.
+  - `check` and `all` remember each clip's fingerprint (the lab's own code, the model's geo and texture, the clip's key
+    frames, the options) in references/anim_lab/.lab_cache.json, and skip a clip whose fingerprint is unchanged since
+    its last run: its findings are printed from memory (the check is exact, so the same clip gives the same findings),
+    and `all` keeps its pictures ("kept ...") unless they were written over since. --fresh runs every clip again.
+    The last line before the problem count says how many clips ran, on how many processes, and how long it took.
+  - The per-frame work is faster with the same numbers: each pose's bone turns are worked out once instead of per
+    point, a box's sums once instead of per point tested, key frames found by halving, every sum still done the same
+    way (Python's sum(), which since 3.12 adds floats with a correction term, so a written-out a + b + c would differ in
+    the last digit). Proof kept with the change (docs/HISTORY.md): every check line and every picture of the worker and
+    the five termite models came out byte for byte the same as before, and a deliberately sliding foot is still caught.
+  Times for the worker's 17 clips: `check` 45 s before; now 6.4 s on one process, 1.6 s on 10, 0.35 s when nothing
+  changed. `all` 115 s before; now 36 s on one process, 7 s on 10.
+
 Conventions (the same as tools/ant_models.py, which matched the game): units are model pixels, 16 to a block before
 the renderer's scale; the head points to -Z; the ground is y = 0. A bone turns about its pivot, X first, then Y, then
 Z; an animation's X and Z turn the other way round from the right-hand rule (as in Blockbench). Easing between two key
 frames is the later key frame's (GeckoLib's rule); a looping clip holds its last key frame until its length.
 No libraries needed: the PNG reader and writer and the little renderer are plain Python.
 """
-import json, math, os, re, struct, sys, zlib
+import bisect, hashlib, json, math, os, re, struct, sys, time, zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -266,6 +283,36 @@ class Model:
     def is_antenna(self, bone):
         return bone in self.plan.antenna_bones() if self.plan else bone.startswith('antenna')
 
+    def transforms(self, pose, names=None):
+        """Each bone's move in this pose (or only the named bones'), worked out once (its pivot, scale, the sines and
+        cosines of its turns, its offset), so that placing many points of one pose does not redo them per point.
+        world() with these gives exactly the same numbers as without (the same sums in the same order)."""
+        xf = {}
+        for name in self.by if names is None else names:
+            b = self.by[name]
+            piv = b.get('pivot', [0, 0, 0])
+            rot, pos, scl = pose.get(name, ((0, 0, 0), (0, 0, 0), (1, 1, 1)))
+            rest = b.get('rotation')
+            if rest:
+                rot = tuple(a + r for a, r in zip(rot, rest))
+            rx, ry, rz = (math.radians(v) for v in rot)
+            xf[name] = (piv[0], piv[1], piv[2], scl[0], scl[1], scl[2],
+                        (math.cos(-rx), math.sin(-rx)) if rx else None,
+                        (math.cos(ry), math.sin(ry)) if ry else None,
+                        (math.cos(-rz), math.sin(-rz)) if rz else None,
+                        pos[0], pos[1], pos[2])
+        return xf
+
+    def _chain(self, bone):
+        chains = self.__dict__.setdefault('_chains', {})
+        names = chains.get(bone)
+        if names is None:
+            names = chains[bone] = self.chain(bone)
+        return names
+
+    def _steps(self, bone, xf):
+        return [xf[n] for n in self._chain(bone)]
+
     def _find_feet(self):
         """Each leg's last bone (foot, else lower leg, else leg) and the rest corner of it that touches the ground."""
         legs = {}
@@ -296,23 +343,19 @@ class Model:
                 feet[key] = (bone, best[1], best[2])
         return feet
 
-    def world(self, bone, p, pose):
-        """Where point p of bone ends up in the given pose (bone -> (rot, pos, scale))."""
-        for name in self.chain(bone):
-            b = self.by[name]
-            piv = b.get('pivot', [0, 0, 0])
-            rot, pos, scl = pose.get(name, ((0, 0, 0), (0, 0, 0), (1, 1, 1)))
-            rest = b.get('rotation')
-            if rest:
-                rot = tuple(a + r for a, r in zip(rot, rest))
-            q = tuple((a - c) * s for a, c, s in zip(p, piv, scl))
-            q = turn(q, rot)
-            p = tuple(a + c + d for a, c, d in zip(q, piv, pos))
-        return p
+    def world(self, bone, p, pose, xf=None):
+        """Where point p of bone ends up in the given pose (bone -> (rot, pos, scale)); xf: the pose's transforms(),
+        if already worked out."""
+        return place(self._steps(bone, xf or self.transforms(pose, self._chain(bone))), p)
 
-    def posed(self, pose):
+    def posed(self, pose, xf=None):
         """Every cube's 8 corners in the pose, with its face colours and bone."""
-        return [(bn, [self.world(bn, p, pose) for p in corners], colours) for bn, corners, colours in self.cubes]
+        xf = xf or self.transforms(pose)
+        out = []
+        for bn, corners, colours in self.cubes:
+            steps = self._steps(bn, xf)
+            out.append((bn, [place(steps, p) for p in corners], colours))
+        return out
 
     def weights(self):
         """Each cube's weight for the centre of weight: 0 for a leg's, else its own volume less the part of it already
@@ -359,8 +402,29 @@ class Model:
             sz += v * sum(zs) / 8
         return (sx / total, sz / total) if total else (0.0, 0.0)
 
-    def foot_tips(self, pose):
-        return {key: self.world(bone, self.cubes[i][1][k], pose) for key, (bone, i, k) in self.feet.items()}
+    def foot_tips(self, pose, xf=None):
+        xf = xf or self.transforms(pose)
+        return {key: place(self._steps(bone, xf), self.cubes[i][1][k]) for key, (bone, i, k) in self.feet.items()}
+
+
+def place(steps, p):
+    """Point p moved through a bone chain's steps (Model.transforms), the bone itself first: per bone, scale about the
+    pivot, turn X then Y then Z (as turn()), then back to the pivot plus the bone's offset. Written out by hand for
+    speed; every sum is the one the old per-point code did, in the same order, so the numbers are identical."""
+    x, y, z = p
+    for c0, c1, c2, s0, s1, s2, rx, ry, rz, d0, d1, d2 in steps:
+        x, y, z = (x - c0) * s0, (y - c1) * s1, (z - c2) * s2
+        if rx:
+            c, s = rx
+            y, z = y * c - z * s, y * s + z * c
+        if ry:
+            c, s = ry
+            x, z = x * c + z * s, -x * s + z * c
+        if rz:
+            c, s = rz
+            x, y = x * c - y * s, x * s + y * c
+        x, y, z = x + c0 + d0, y + c1 + d1, z + c2 + d2
+    return (x, y, z)
 
 
 def average_colour(tex, rect, tw, th):
@@ -429,9 +493,9 @@ def value(v, t):
 def keyframes(channel):
     """[(time, pre, post, easing)] sorted, from any of the file's forms."""
     if isinstance(channel, (list, int, float, str)):
-        return [(0.0, channel, channel, 'linear')]
+        return Keys([(0.0, channel, channel, 'linear')])
     if 'vector' in channel:
-        return [(0.0, channel['vector'], channel['vector'], channel.get('easing', 'linear'))]
+        return Keys([(0.0, channel['vector'], channel['vector'], channel.get('easing', 'linear'))])
     out = []
     for k, f in channel.items():
         if isinstance(f, dict):
@@ -444,13 +508,24 @@ def keyframes(channel):
             pre = post = f
             easing = 'linear'
         out.append((float(k), pre, post, easing))
-    return sorted(out, key=lambda x: x[0])
+    return Keys(sorted(out, key=lambda x: x[0]))
+
+
+class Keys(list):
+    """A channel's key frames, with their times kept beside them for sample_channel's search."""
+    def __init__(self, frames):
+        super().__init__(frames)
+        self.times = [f[0] for f in frames]
 
 
 def sample_channel(frames, t):
     if t <= frames[0][0]:
         return value(frames[0][1], t)
-    for i in range(len(frames) - 1):
+    # The first pair of key frames with t0 <= t <= t1: since t is past the first key, that is the pair ending at the
+    # first key at or after t (found by halving instead of walking every key from the start; the same pair).
+    times = getattr(frames, 'times', None) or [f[0] for f in frames]
+    j = bisect.bisect_left(times, t, 1)
+    for i in range(j - 1, len(frames) - 1):
         t0, _, post0, _ = frames[i]
         t1, pre1, _, easing = frames[i + 1]
         if t0 <= t <= t1:
@@ -501,10 +576,10 @@ class Clip:
         return out
 
 
-def load_clips(stem, model=None):
+def load_clips(stem, model=None, plan=None):
     """The clips of an animation file; with the model they play on, their bones renamed to the model's role names."""
     data = json.load(open(os.path.join(ASSETS, 'animations', 'entity', f'{stem}.animation.json'), encoding='utf-8'))
-    plan = model.plan if model is not None else None
+    plan = model.plan if model is not None else plan
     return {name: Clip(name, plan.clip_to_roles(a) if plan else a) for name, a in data['animations'].items()}
 
 
@@ -591,6 +666,15 @@ class Gait:
         return abs(self.speed) * self.clip.length
 
 
+def gait_of(model, clip):
+    """The clip's Gait on this model, worked out once and kept on the clip (film, graphs and check all need it)."""
+    kept = clip.__dict__.setdefault('_gaits', {})
+    g = kept.get(id(model))
+    if g is None or g.model is not model:
+        g = kept[id(model)] = Gait(model, clip)
+    return g
+
+
 # --- drawing ------------------------------------------------------------------------------------------------------
 class Canvas(tm.Canvas):
     def text(self, x, y, words, scale=2, rgb=(40, 30, 25)):
@@ -605,6 +689,27 @@ class Canvas(tm.Canvas):
                                 if 0 <= px < self.width and 0 <= py < self.height:
                                     self.color[py * self.width + px] = rgb
             x += 6 * scale
+
+    def save(self, path):
+        """The same PNG file, byte for byte, as termite_models.write_png writes (each pixel's colour turned into its
+        bytes once per colour instead of once per pixel)."""
+        w, h = self.width, self.height
+        lut = {}
+        rows = []
+        for y in range(h):
+            line = self.color[y * w:(y + 1) * w]
+            for c in set(line).difference(lut):
+                lut[c] = bytes(c + (255,))
+            rows.append(b'\x00' + b''.join(map(lut.__getitem__, line)))
+        raw = b''.join(rows)
+
+        def chunk(kind, data):
+            return struct.pack('>I', len(data)) + kind + data + struct.pack('>I', zlib.crc32(kind + data) & 0xffffffff)
+        png = b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', w, h, 8, 6, 0, 0, 0)) \
+            + chunk(b'IDAT', zlib.compress(raw, 9)) + chunk(b'IEND', b'')
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'wb') as f:
+            f.write(png)
 
     def put(self, x, y, rgb, z=None):
         if 0 <= x < self.width and 0 <= y < self.height:
@@ -651,7 +756,10 @@ def cross(a, b):
 
 
 def dot3(a, b):
-    return sum(x * y for x, y in zip(a, b))
+    # sum() of the three products, not a + b + c: since Python 3.12 sum() adds floats with a correction term
+    # (compensated summation), so a written-out a + b + c can differ in the last digit and flip a pixel where two faces
+    # lie exactly on each other. This is the old sum(x * y for x, y in zip(a, b)) without the slow generator.
+    return sum((a[0] * b[0], a[1] * b[1], a[2] * b[2]))
 
 
 class View:
@@ -704,24 +812,36 @@ class Frame:
                     rgb = tuple(int(c * 0.35 + t * 0.65) for c, t in zip(rgb, tint))
                 col = tuple(min(255, int(ch * shade)) for ch in rgb)
                 q = [pts[i] for i in idx]
+                depth, colour = cv.depth, cv.color
                 for tri in ((q[0], q[1], q[2]), (q[0], q[2], q[3])):
                     (ax, ay, az), (bx, by, bz), (cx, cy, cz) = tri
                     area = (bx - ax) * (cy - ay) - (cx - ax) * (by - ay)
                     if abs(area) < 1e-9:
                         continue
+                    # The same sums per pixel as ever, the parts that only change per row or per column worked out
+                    # once (so the picture is exactly the same).
+                    xs = range(max(x0, int(min(ax, bx, cx))), min(x0 + w, int(max(ax, bx, cx)) + 1))
+                    cols = [(px, px + 0.5) for px in xs]
+                    cols = [(px, bx - sx, cx - sx, ax - sx) for px, sx in cols]
                     for py in range(max(y0, int(min(ay, by, cy))), min(y0 + h, int(max(ay, by, cy)) + 1)):
-                        for px in range(max(x0, int(min(ax, bx, cx))), min(x0 + w, int(max(ax, bx, cx)) + 1)):
-                            sx, sy = px + 0.5, py + 0.5
-                            w0 = ((bx - sx) * (cy - sy) - (cx - sx) * (by - sy)) / area
-                            w1 = ((cx - sx) * (ay - sy) - (ax - sx) * (cy - sy)) / area
+                        sy = py + 0.5
+                        cys, bys, ays = cy - sy, by - sy, ay - sy
+                        row = py * width
+                        for px, bxs, cxs, axs in cols:
+                            w0 = (bxs * cys - cxs * bys) / area
+                            if w0 < 0:
+                                continue
+                            w1 = (cxs * ays - axs * cys) / area
+                            if w1 < 0:
+                                continue
                             w2 = 1 - w0 - w1
-                            if w0 < 0 or w1 < 0 or w2 < 0:
+                            if w2 < 0:
                                 continue
                             zz = w0 * az + w1 * bz + w2 * cz
-                            i = py * width + px
-                            if zz < cv.depth[i]:
-                                cv.depth[i] = zz
-                                cv.color[i] = col
+                            i = row + px
+                            if zz < depth[i]:
+                                depth[i] = zz
+                                colour[i] = col
 
     def grid(self, ground, shift, extent, step=1.0, bold=4):
         """The floor: lines every `step` units (every `bold`-th darker), moved `shift` units along +Z (the treadmill)."""
@@ -766,7 +886,7 @@ def film(model, clip, frames=8, views=('side', 'front', 'top', 'three'), treadmi
     """One canvas: `frames` moments of the clip (columns) from each view (rows); or the moments in `times` (seconds)."""
     if times is not None:
         frames = len(times)
-    gait = Gait(model, clip)
+    gait = gait_of(model, clip)
     speed = gait.speed if treadmill is None else treadmill
     ext = floor_extent(model)
     ground = gait.ground if model.feet else 0.0
@@ -820,7 +940,7 @@ def mark_below(fr, model, pose, ground):
 
 def graphs(model, clip, cw=270, ch=90):
     """Every animated bone's turn (and position) over the clip, the footfall pattern and the foot heights."""
-    gait = Gait(model, clip)
+    gait = gait_of(model, clip)
     rows = [(b, c) for b in sorted(clip.bones) for c in ('rotation', 'position') if c in clip.bones[b]]
     cols = 4
     n_rows = math.ceil(len(rows) / cols)
@@ -891,6 +1011,34 @@ def inside_box(p, corners, margin=0.05):
     return True
 
 
+def box_test(corners, margin):
+    """inside_box's sums for one box worked out once, for testing many points against it with in_box (the same
+    numbers as inside_box: the same sums, done the same way). None for a flat box, which holds no point."""
+    o = corners[0]
+    axes = []
+    for i in (4, 2, 1):
+        c = corners[i]
+        a0, a1, a2 = c[0] - o[0], c[1] - o[1], c[2] - o[2]
+        ln2 = sum((a0 * a0, a1 * a1, a2 * a2))              # as dot3: sum(), not +
+        if ln2 < 1e-9:
+            return None
+        m = margin / math.sqrt(ln2)
+        axes.append((a0, a1, a2, ln2, m, 1 - m))
+    return o[0], o[1], o[2], axes
+
+
+def in_box(p, box):
+    """inside_box(p, corners, margin) for box = box_test(corners, margin)."""
+    if box is None:
+        return False
+    o0, o1, o2, axes = box
+    d0, d1, d2 = p[0] - o0, p[1] - o1, p[2] - o2
+    for a0, a1, a2, ln2, m, top in axes:
+        if not (m < sum((d0 * a0, d1 * a1, d2 * a2)) / ln2 < top):
+            return False
+    return True
+
+
 def segment_points(corners, n=6):
     """Points along a cube's long middle line (a leg segment's core)."""
     o = corners[0]
@@ -909,7 +1057,7 @@ def is_leg(model, bone):
 def check(model, clip, speed_bps=None, quiet=False):
     """Checks one clip. Returns a list of (level, message); level 'BAD' or 'NOTE'."""
     out = []
-    gait = Gait(model, clip)
+    gait = gait_of(model, clip)
     if speed_bps is None and clip.speeds:
         # A walk for a band of speeds: judged in the middle of its band (the fast one at the game's walking speed).
         low, high = clip.speeds
@@ -1015,7 +1163,9 @@ def check(model, clip, speed_bps=None, quiet=False):
     body_cubes = [i for i, (b, _, _) in enumerate(model.cubes) if not is_leg(model, b) and not model.is_antenna(b)]
     for s in range(0, n + 1, 2):
         t = gait.times[s]
-        posed = model.posed(clip.pose(t))
+        pose = clip.pose(t)
+        xf = model.transforms(pose)
+        posed = model.posed(pose, xf)
         if sunk is None:
             for b, corners, _ in posed:
                 low = min(p[1] for p in corners)
@@ -1023,17 +1173,19 @@ def check(model, clip, speed_bps=None, quiet=False):
                     sunk = (b, t, floor - low)
                     break
         if clipped is None:
+            body_boxes = [(posed[bi][0], box_test(posed[bi][1], 0.08)) for bi in body_cubes]
+            leg_boxes = [(posed[oi][0], box_test(posed[oi][1], 0.03)) for oi in leg_cubes]
             for li in leg_cubes:
                 lb = posed[li][0]
                 root = model.hip_of(model.leg_of(lb))                      # the hip, where the leg is meant to sit
-                hip = model.world(root, model.by[root]['pivot'], clip.pose(t))
+                hip = model.world(root, model.by[root]['pivot'], pose, xf)
                 for p in segment_points(posed[li][1]):
                     if math.dist(p, hip) < 1.0:
                         continue
-                    hit = next((posed[bi][0] for bi in body_cubes if inside_box(p, posed[bi][1], 0.08)), None)
+                    hit = next((bn for bn, box in body_boxes if in_box(p, box)), None)
                     if hit is None:
-                        hit = next((posed[oi][0] for oi in leg_cubes if model.leg_of(posed[oi][0]) != model.leg_of(lb)
-                                    and inside_box(p, posed[oi][1], 0.03)), None)
+                        hit = next((bn for bn, box in leg_boxes if model.leg_of(bn) != model.leg_of(lb)
+                                    and in_box(p, box)), None)
                     if hit:
                         clipped = (lb, hit, t)
                         break
@@ -1056,10 +1208,15 @@ def check(model, clip, speed_bps=None, quiet=False):
         if fast > 2500:
             out.append(('NOTE', f'{bone} turns at up to {fast:.0f} degrees a second (a snap: fine for a flick or a bite, not for a sweep)'))
     if not quiet:
-        print(f'--- {model.name} {clip.name} ({clip.length:g} s{", loop" if clip.loop else ""})')
-        for level, msg in out or [('OK', 'nothing found')]:
-            print(f'  {level:4} {msg}')
+        report(model.name, clip, out)
     return out
+
+
+def report(model_name, clip, out):
+    """Prints one clip's check results."""
+    print(f'--- {model_name} {clip.name} ({clip.length:g} s{", loop" if clip.loop else ""})')
+    for level, msg in out or [('OK', 'nothing found')]:
+        print(f'  {level:4} {msg}')
 
 
 # --- contact sheets of screenshots -----------------------------------------------------------------------------------
@@ -1133,12 +1290,172 @@ def match(folder, model, clips, cols=4, width=420):
     return cv
 
 
-def save(cv, name):
+def save(cv, name, quiet=False):
     os.makedirs(OUT, exist_ok=True)
     path = os.path.join(OUT, name)
     cv.save(path)
-    print('wrote', os.path.relpath(path, PROJECT))
+    if not quiet:
+        print('wrote', os.path.relpath(path, PROJECT))
     return path
+
+
+# --- running many clips: side by side, and remembering what was checked ---------------------------------------------
+# A clip's fingerprint is a digest of everything its check (or its pictures) depends on: the lab's own code (this file,
+# termite_models.py, which holds the font and the canvas, and body_plan.py), the model's geo file, texture and body
+# plan, the clip's own key
+# frames in the animation file, and the options (walking speed, frames). A clip whose fingerprint is the same as at its
+# last run gets its remembered findings (the check is exact and repeatable: the same numbers in give the same findings
+# out), and `all` keeps its pictures while they are still there. Any change to the clip, the model or the lab makes it
+# run again; --fresh runs everything.
+CACHE = os.path.join(OUT, '.lab_cache.json')
+FLAGS = ('fresh',)                     # options without a value
+_LOADED = {}
+
+
+def _stamp(files):
+    """Each picture's size and time stamp: a picture written since (by `film` at another speed, say) is redrawn."""
+    out = {}
+    for f in files:
+        try:
+            st = os.stat(os.path.join(OUT, f))
+            out[f] = [st.st_size, st.st_mtime_ns]
+        except OSError:
+            out[f] = None
+    return out
+
+
+def _bytes(path):
+    try:
+        with open(path, 'rb') as f:
+            return f.read()
+    except OSError:
+        return b''
+
+
+def _digest(*parts):
+    h = hashlib.sha256()
+    for p in parts:
+        h.update(p if isinstance(p, bytes) else json.dumps(p, sort_keys=True).encode('utf-8'))
+        h.update(b'|')
+    return h.hexdigest()
+
+
+def _read_cache():
+    try:
+        with open(CACHE, encoding='utf-8') as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _write_cache(updates):
+    """Adds this run's entries to the remembered ones (read again first, so two runs at once keep each other's)."""
+    data = _read_cache()
+    for section, entries in updates.items():
+        data.setdefault(section, {}).update(entries)
+    os.makedirs(OUT, exist_ok=True)
+    tmp = f'{CACHE}.{os.getpid()}.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(data, f)
+    os.replace(tmp, CACHE)
+
+
+def _loaded(name, anim):
+    if (name, anim) not in _LOADED:
+        model = Model(name)
+        _LOADED[(name, anim)] = (model, load_clips(anim, model))
+    return _LOADED[(name, anim)]
+
+
+def _work(job):
+    """One clip's work, in a helper process when clips run side by side: draws what is asked and checks the clip.
+    Returns the lines to print and the check's findings (None when not checked)."""
+    name, anim, nm, speed, frames, do_film, film_speed, do_graphs, do_check = job
+    model, clips = _loaded(name, anim)
+    clip = clips[nm]
+    lines = []
+    if do_film:
+        tread = unit_speed(model, speed) if film_speed and speed is not None else None
+        path = save(film(model, clip, frames, treadmill=tread), f'{model.name}_{nm}_film.png', quiet=True)
+        lines.append('wrote ' + os.path.relpath(path, PROJECT))
+    if do_graphs:
+        path = save(graphs(model, clip), f'{model.name}_{nm}_graphs.png', quiet=True)
+        lines.append('wrote ' + os.path.relpath(path, PROJECT))
+    out = check(model, clip, speed, quiet=True) if do_check else None
+    return lines, out
+
+
+def run_clips(cmd, name, anim, clips, names, speed, frames, jobs, fresh):
+    """`film`, `graphs`, `check` or `all` for the named clips, on up to `jobs` processes at once. The output is
+    printed clip by clip in the clips' order, exactly as one process prints it. `check` and `all` skip clips whose
+    fingerprint has not changed since their last run (unless fresh). Returns the number of BAD findings."""
+    start = time.time()
+    remember = cmd in ('check', 'all')
+    cache = {} if fresh or not remember else _read_cache()
+    if remember:
+        code = (_bytes(os.path.abspath(__file__)) + _bytes(os.path.abspath(tm.__file__))
+                + _bytes(os.path.abspath(body_plan.__file__)))
+        model_bytes = (_bytes(os.path.join(ASSETS, 'geo', 'entity', f'{name}.geo.json'))
+                       + _bytes(os.path.join(ASSETS, 'textures', 'entity', f'{name}.png'))
+                       + _bytes(body_plan.plan_path(name)))
+        with open(os.path.join(ASSETS, 'animations', 'entity', f'{anim}.animation.json'), encoding='utf-8') as f:
+            raw = json.load(f)['animations']
+    plans, updates = [], {'check': {}, 'draw': {}}
+    for nm in names:
+        key = f'{name}|{anim}|{nm}'
+        do_check, do_film, do_graphs = cmd in ('check', 'all'), cmd in ('film', 'all'), cmd in ('graphs', 'all')
+        out = fp_check = fp_draw = None
+        kept = []
+        if remember:
+            fp_check = _digest('check', code, model_bytes, name, anim, nm, raw[nm], speed)
+            seen = cache.get('check', {}).get(key)
+            if seen and seen.get('fp') == fp_check:
+                do_check, out = False, [tuple(x) for x in seen['out']]
+        if cmd == 'all':
+            fp_draw = _digest('draw', code, model_bytes, name, anim, nm, raw[nm], frames)
+            files = [f'{name}_{nm}_film.png', f'{name}_{nm}_graphs.png']
+            seen = cache.get('draw', {}).get(key)
+            stamp = _stamp(files)
+            if seen and seen.get('fp') == fp_draw and seen.get('files') == stamp and None not in stamp.values():
+                do_film = do_graphs = False
+                kept = ['kept ' + os.path.relpath(os.path.join(OUT, f), PROJECT) + ' (unchanged)' for f in files]
+        job = (name, anim, nm, speed, frames, do_film, cmd == 'film', do_graphs, do_check)
+        plans.append((nm, key, job, out, kept, fp_check, fp_draw))
+    busy = lambda job: job[5] or job[7] or job[8]  # noqa: E731
+    todo = [p for p in plans if busy(p[2])]
+    workers = max(1, min(jobs, len(todo)))
+    pool = futures = None
+    if workers > 1:
+        from concurrent.futures import ProcessPoolExecutor
+        pool = ProcessPoolExecutor(workers)
+        futures = {p[0]: pool.submit(_work, p[2]) for p in todo}
+    bad = 0
+    try:
+        for nm, key, job, out, kept, fp_check, fp_draw in plans:
+            lines, found = (futures[nm].result() if futures else _work(job)) if busy(job) else ([], None)
+            for line in kept + lines:
+                print(line)
+            if found is not None:
+                out = found
+                if remember:
+                    updates['check'][key] = {'fp': fp_check, 'out': out}
+            if fp_draw and lines:
+                files = [f'{name}_{nm}_film.png', f'{name}_{nm}_graphs.png']
+                updates['draw'][key] = {'fp': fp_draw, 'files': _stamp(files)}
+            if out is not None:
+                report(name, clips[nm], out)
+                bad += sum(1 for level, _ in out if level == 'BAD')
+            sys.stdout.flush()
+    finally:
+        if pool:
+            pool.shutdown(cancel_futures=True)
+    if remember:
+        if updates['check'] or updates['draw']:
+            _write_cache(updates)
+        print(f'lab: {len(plans)} clip(s), {len(todo)} worked on ({workers} process{"es" if workers > 1 else ""}), '
+              f'{len(plans) - len(todo)} unchanged since their last run (remembered), {time.time() - start:.1f} s')
+    return bad
 
 
 def main(argv):
@@ -1148,7 +1465,9 @@ def main(argv):
         if a in ('--help', '-h'):
             print(__doc__)
             return
-        if a.startswith('--'):
+        if a[2:] in FLAGS:
+            opts[a[2:]] = True
+        elif a.startswith('--'):
             opts[a[2:]] = next(it)
         else:
             args.append(a)
@@ -1165,28 +1484,26 @@ def main(argv):
         save(match(args[1], model, load_clips(opts.get('anim', args[2]), model), int(opts.get('cols', 4))),
              os.path.basename(os.path.normpath(args[1])) + '_match.png')
         return
-    model = Model(args[1])
-    clips = load_clips(opts.get('anim', args[1]), model)
+    name, anim = args[1], opts.get('anim', args[1])
+    if not os.path.exists(os.path.join(ASSETS, 'geo', 'entity', f'{name}.geo.json')):
+        Model(name)                      # no such model: the same error as ever
+    clips = load_clips(anim, plan=body_plan.load(name))
     names = args[2:] or list(clips)
     speed = float(opts['speed']) if 'speed' in opts else None
     frames = int(opts.get('frames', 8))
+    jobs = int(opts.get('jobs', max(1, (os.cpu_count() or 2) // 2)))
+    fresh = opts.get('fresh', False)
     for nm in names:
         if nm not in clips:
             raise SystemExit(f'no clip "{nm}"; there are: {", ".join(clips)}')
-    if cmd == 'film':
-        for nm in names:
-            save(film(model, clips[nm], frames, treadmill=None if speed is None else unit_speed(model, speed)),
-                 f'{model.name}_{nm}_film.png')
-    elif cmd == 'graphs':
-        for nm in names:
-            save(graphs(model, clips[nm]), f'{model.name}_{nm}_graphs.png')
+    if cmd in ('film', 'graphs', 'all'):
+        run_clips(cmd, name, anim, clips, names, speed, frames, jobs, fresh)
     elif cmd == 'check':
-        bad = 0
-        for nm in names:
-            bad += sum(1 for level, _ in check(model, clips[nm], speed) if level == 'BAD')
+        bad = run_clips(cmd, name, anim, clips, names, speed, frames, jobs, fresh)
         print(f'{bad} problem(s)')
         sys.exit(1 if bad else 0)
     elif cmd == 'compare':
+        model = Model(name)
         rows = [film(model, clips[nm], frames, views=(opts.get('view', 'side'),), label=nm) for nm in names]
         cv = Canvas(max(r.width for r in rows), sum(r.height for r in rows))
         y = 0
@@ -1195,11 +1512,6 @@ def main(argv):
                 cv.color[(y + yy) * cv.width:(y + yy) * cv.width + r.width] = r.color[yy * r.width:(yy + 1) * r.width]
             y += r.height
         save(cv, f'{model.name}_compare_{"_".join(names)}.png')
-    elif cmd == 'all':
-        for nm in names:
-            save(film(model, clips[nm], frames), f'{model.name}_{nm}_film.png')
-            save(graphs(model, clips[nm]), f'{model.name}_{nm}_graphs.png')
-            check(model, clips[nm], speed)
     else:
         print(__doc__)
 
