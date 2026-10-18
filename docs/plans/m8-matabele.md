@@ -1,0 +1,58 @@
+# M8: Matabele ants and the first fights (plan)
+
+Planned with the user 2026-10-18 (no code yet). Every decision is in `docs/DESIGN.md`,
+"Matabele ants and the first fights". Starts after brain step 4g is finished.
+Each step is tested in-game by the user before the next; the fine details of each
+step are planned with the user at its start (sizes in numbers, health, damage,
+timings: all "my pick, to confirm" until then).
+
+## The real animal (Megaponera analis, Erik Frank's studies)
+- Majors about 16-18 mm, minors about 5-10 mm, few in between; colony 400-2,500;
+  one wingless (ergatoid) queen; winged males.
+- Eats only termites. Lone scouts find termites feeding under mud cover, lay a scent
+  line home and lead a column of 200-500 back; 2-4 raids a day, morning and late
+  afternoon, usually within about 20 m, at most about 50 m.
+- Majors break the mud, minors go in and sting (paralyse); majors carry stacks of
+  up to about 10 termites home.
+- Hurt ants call for help by smell; nestmates pull termite soldiers off and carry
+  them home; lightly hurt tuck their legs in, badly hurt flail and are left.
+- Wound care by any nestmate (licking, a germ-killing gland liquid): infected wounds
+  kill about 80% untreated, about 10% treated. Ants walk on 4-5 legs after losses.
+- Nests in old termite mounds, under logs, in the ground; shallow; dig little;
+  move house now and then; new colonies by splitting.
+
+**Before step 1: M7.5, giant savanna trees** (user, 2026-10-18; `docs/DESIGN.md`,
+"Giant savanna trees"): the fallen hollow giants are the Matabele log homes.
+
+## Steps
+1. **Dead mounds and the ant.** Dead termite mounds (a dead colony's mound stays,
+   empty, wearing down; some placed by world generation). The Matabele species
+   profile (`colony_fission`), the ant with its own size from the real spread (one
+   placeholder model, scaled), the queen, a shallow nest that reuses ready spaces
+   (dead mound, under a fallen tree, or a few rooms in the ground), the prey pile
+   (goes off in about a day), hunger, world generation in savannas, spawn egg and
+   command.
+2. **The shared fight system** (species-neutral, the harvester ants use it later
+   against their neighbours): health and damage per caste from the profile, the
+   sting (paralysis), termite soldiers clamping on and riding along, legs bitten
+   off (saved per ant, hidden on the model, 5- and 4-legged walks), stinging a
+   player who provokes them, defenders in waves who give up past their territory.
+   Replaces `Alarm`/`Soldiers` using `TermiteSoldierEntity` directly with a shared
+   defender idea.
+3. **Drawn-only ants** (brain step 4e, pulled forward): the column far from the
+   player drawn by the player's game, almost free on the server.
+4. **Scouts and raids:** lone scouts by day, the scent line home, the column to a
+   termite feeding spot (sheeting, feeding gallery, shallow gallery, the holes by
+   them; never the mound), majors opening the mud, minors in, termites as numbers
+   in the galleries shown on break-in (`HiddenTrips`), the termites plugging and
+   closing (`ClosedHoles`, danger memory), the column home with prey; 2-4 raids a
+   day by hunger, morning and late afternoon.
+5. **Rescue and wound care:** the help smell, pulling clamped soldiers off, carrying
+   the hurt home (legs tucked), the badly hurt left; wounds and infection in the
+   nest, care by any nestmate.
+6. **Moving house:** when prey runs out nearby, after repeated attacks, when the
+   nest floods or is too small, and now and then anyway; scouts pick the site, the
+   colony walks there in a column with brood and prey.
+
+Later (M9): splitting into daughter colonies nearby, winged males mating in other
+colonies. After M8: harvester ant territory fights with their neighbours.
