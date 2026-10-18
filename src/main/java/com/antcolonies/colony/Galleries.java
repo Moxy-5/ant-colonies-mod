@@ -141,6 +141,8 @@ public class Galleries {
     private final Map<BlockPos, Long> lastUsed = new HashMap<>();
     /** Blocks of gallery filled in and not grown again since: only growth toward food may use them. Saved. */
     private int filledLength;
+    /** How many pieces were walled off against neighbours (step 5). Saved. */
+    private int walledOff;
     /** How many pieces were filled in, and how many blocks (for the colony list). Saved. */
     private int fills;
     private int filledBlocks;
@@ -673,6 +675,9 @@ public class Galleries {
             if (colony.closedHoles().isClosed(level, tip.way().hole())) {
                 stopped.add(tip.way().hole()); // (brain step 4g: no tip grows on from where the colony was attacked)
             }
+            if (yieldsAhead(level, tip)) {
+                stopped.add(tip.way().hole()); // (step 5: nor toward a neighbour the colony yields to)
+            }
         }
         if (colony.foragingHoles().isFoodWaiting()) {
             return; // food leads: rich food waits for a piece the workers do not allow yet
@@ -698,9 +703,9 @@ public class Galleries {
         int keepOut = colony.profile().nest().foragingHoleDistance() + 1;
         TunnelRoute.Ground ground = new GroundReader(level, colony, colony.nest().nestCells(level));
         List<Tip> grown = grow(tip, tips, ground, center, keepOut, numbers, colony.random());
-        List<Tip> clear = clearOfAttacks(level, tip, grown);
+        List<Tip> clear = clearOfNeighbours(level, tip, clearOfAttacks(level, tip, grown));
         if (clear.isEmpty() && !grown.isEmpty()) {
-            return; // the way on leads toward where the colony was attacked: not now (no dead end: it may grow there later)
+            return; // the way on leads toward where the colony was attacked, or a neighbour it yields to: not now (no dead end: it may grow there later)
         }
         addGrown(level, tip, clear, false);
     }
@@ -726,6 +731,169 @@ public class Galleries {
             }
         }
         return clear;
+    }
+
+    // --- brain step 4g, step 5: neighbours ------------------------------------------------------------------------------
+
+    /** The other colonies of this species with galleries whose web may come within reach of this one's. */
+    private List<Colony> neighbourColonies(ServerLevel level) {
+        List<Colony> near = new ArrayList<>();
+        SpeciesProfile.NeighbourNumbers numbers = colony.neighbours().numbers();
+        if (numbers == null) {
+            return near;
+        }
+        double most = 2.0 * (numbers().reach() + numbers().pieceLength()) + numbers.within() + 8;
+        for (Colony other : ColonyManager.get(level).getColonies()) {
+            if (other != colony && other.getSpecies().equals(colony.getSpecies()) && other.nest().galleries().isOn()
+                    && other.getCenter().distSqr(colony.getCenter()) <= most * most) {
+                near.add(other);
+            }
+        }
+        return near;
+    }
+
+    /** Whether the colony yields to a neighbour at this tip's end or a piece's length ahead of it, the way it grows. */
+    private boolean yieldsAhead(Level level, Tip tip) {
+        Neighbours neighbours = colony.neighbours();
+        if (neighbours.isEmpty()) {
+            return false;
+        }
+        BlockPos end = tip.end();
+        double ahead = numbers().pieceLength() + TunnelRoute.HOLE_REACH;
+        double way = Math.toRadians(tip.bearing());
+        BlockPos next = BlockPos.containing(end.getX() + Math.cos(way) * ahead, end.getY(), end.getZ() + Math.sin(way) * ahead);
+        return neighbours.yieldsAt(level, end) || neighbours.yieldsAt(level, next);
+    }
+
+    /** Of {@code cells}, the one that comes closest to {@code other}'s galleries within {@code within}, and their cell: {ours, theirs}; or null. */
+    @Nullable
+    private static BlockPos[] closestTo(Colony other, List<BlockPos> cells, double within) {
+        BlockPos[] best = null;
+        double bestDistance = Double.MAX_VALUE;
+        for (BlockPos cell : cells) {
+            BlockPos theirs = other.nest().galleries().galleryCellNear(cell, within);
+            if (theirs != null && theirs.distSqr(cell) < bestDistance) {
+                best = new BlockPos[] {cell, theirs};
+                bestDistance = theirs.distSqr(cell);
+            }
+        }
+        return best;
+    }
+
+    /** The cell of this colony's galleries (their own blocks) nearest {@code pos} within {@code within} blocks, or null. */
+    @Nullable
+    public BlockPos galleryCellNear(BlockPos pos, double within) {
+        BlockPos best = null;
+        double bestDistance = within * within;
+        for (NestPlan.ForagingTunnel arm : arms) {
+            for (BlockPos cell : ownCells(arm)) {
+                double distance = cell.distSqr(pos);
+                if (distance <= bestDistance) {
+                    best = cell;
+                    bestDistance = distance;
+                }
+            }
+        }
+        return best;
+    }
+
+    /**
+     * A meeting of the galleries (real neighbouring Macrotermes sense each other's tunnels through the soil): this
+     * colony's cell {@code ours} lies within reach of the other colony's cell {@code theirs}. Both colonies remember it,
+     * once a minute per piece. Returns whether this colony now yields there.
+     */
+    private boolean galleriesMet(ServerLevel level, Colony other, BlockPos ours, BlockPos theirs, BlockPos piece) {
+        java.util.UUID mine = colony.getId();
+        java.util.UUID key = new java.util.UUID(other.getId().getMostSignificantBits() ^ piece.asLong(), other.getId().getLeastSignificantBits());
+        colony.neighbours().met(level, ours, other.getId(), key);
+        other.neighbours().met(level, theirs, mine, new java.util.UUID(mine.getMostSignificantBits() ^ piece.asLong(), mine.getLeastSignificantBits()));
+        return colony.neighbours().yieldsAt(level, ours);
+    }
+
+    /**
+     * Step 5: the pieces {@code grown} from {@code tip} that keep clear of the neighbours' galleries. A piece whose new
+     * blocks come within {@code colony.neighbours.within} of another colony's gallery is a meeting; it is not dug if this
+     * colony yields there (an old one, or a young one after several meetings) or if it would touch the other gallery (the
+     * webs never join).
+     */
+    private List<Tip> clearOfNeighbours(ServerLevel level, Tip tip, List<Tip> grown) {
+        SpeciesProfile.NeighbourNumbers numbers = colony.neighbours().numbers();
+        if (grown.isEmpty() || numbers == null || !numbers.wallGalleries()) {
+            return grown;
+        }
+        List<Colony> others = neighbourColonies(level);
+        if (others.isEmpty()) {
+            return grown;
+        }
+        List<Tip> clear = new ArrayList<>();
+        for (Tip piece : grown) {
+            List<BlockPos> cells = new ArrayList<>(piece.way().tunnel().subList(Math.min(tip.way().tunnel().size(), piece.way().tunnel().size()),
+                    piece.way().tunnel().size()));
+            cells.add(piece.way().hole());
+            boolean ok = true;
+            for (Colony other : others) {
+                BlockPos[] closest = closestTo(other, cells, numbers.within());
+                if (closest != null && (galleriesMet(level, other, closest[0], closest[1], tip.way().hole()) || closest[0].distSqr(closest[1]) <= 2)) {
+                    ok = false; // (one meeting per piece and neighbour, where they come closest)
+                }
+            }
+            if (ok) {
+                clear.add(piece);
+            }
+        }
+        if (clear.isEmpty()) {
+            tipFails.merge(tip.way().hole(), 1, Integer::sum); // (tried that way enough: the tip waits, as at a dead end)
+        }
+        return clear;
+    }
+
+    /**
+     * Step 5, in the upkeep: a piece at the web's edge within a piece's length of another colony's gallery is a meeting
+     * (once a minute; real termites sense a neighbour's tunnels through the soil, so a young colony stopped short of
+     * them keeps meeting them until it yields); a piece (not one of the
+     * 4 arms, nothing growing from it) whose tip this colony yields at is walled off: packed with soil back to its fork,
+     * as real neighbouring Macrotermes seal their galleries where they come close, by the same rules as filling in (out
+     * of sight, nobody inside). Returns whether a piece was walled off.
+     */
+    private boolean wallOffNeighbours(ServerLevel level, Map<BlockPos, BlockPos> holeOf) {
+        SpeciesProfile.NeighbourNumbers numbers = colony.neighbours().numbers();
+        if (numbers == null || !numbers.wallGalleries()) {
+            return false;
+        }
+        List<Colony> others = neighbourColonies(level);
+        if (others.isEmpty()) {
+            return false;
+        }
+        for (NestPlan.ForagingTunnel arm : List.copyOf(arms)) {
+            if (!isLeaf(arm.hole())) {
+                continue;
+            }
+            List<BlockPos> own = ownCells(arm);
+            // (a tip stopped short of the neighbour still senses its tunnels through the soil, as far as its next piece would reach)
+            double sense = numbers().pieceLength() + TunnelRoute.HOLE_REACH + numbers.within();
+            for (Colony other : others) {
+                BlockPos[] closest = closestTo(other, own, sense);
+                if (closest == null || !galleriesMet(level, other, closest[0], closest[1], arm.hole())) {
+                    continue;
+                }
+                BlockPos theirs = closest[1];
+                if (base.contains(arm.hole()) || colony.nest().foodWays().isLiveNewHole(arm.hole())) {
+                    continue; // (the 4 arms and a way to food in use are only stopped, never filled)
+                }
+                if (fillIn(level, arm, holeOf)) {
+                    walledOff++;
+                    AntColoniesMod.LOGGER.info("[neighbours] colony {}: the gallery to {} is walled off with soil (colony {}'s gallery at {})",
+                            colony.getId(), arm.hole().toShortString(), other.getId(), theirs.toShortString());
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** How many gallery pieces were walled off against neighbours (for the tests and the list). */
+    public int walledOff() {
+        return walledOff;
     }
 
     /** Whether the ground round a tip's end is loaded as far as its next piece may go. */
@@ -864,9 +1032,9 @@ public class Galleries {
         AntColoniesMod.LOGGER.debug("[galleries] grass worth {} past the tip at {} pulls it toward {}, {}", Math.round(bestWorth),
                 end.toShortString(), Math.round(aimX), Math.round(aimZ));
         tips.set(tips.indexOf(best), aimed);
-        List<Tip> clear = clearOfAttacks(level, aimed, grown);
+        List<Tip> clear = clearOfNeighbours(level, aimed, clearOfAttacks(level, aimed, grown));
         if (clear.isEmpty() && !grown.isEmpty()) {
-            return true; // (the way to the grass runs toward an attack: not now)
+            return true; // (the way to the grass runs toward an attack, or a neighbour the colony yields to: not now)
         }
         addGrown(level, aimed, clear, true);
         return true;
@@ -1066,6 +1234,9 @@ public class Galleries {
         foragedFrom.keySet().removeIf(hole -> !holeOf.containsKey(hole));
         foragedFrom.forEach((hole, at) -> markUsed(holeOf.get(hole), Math.min(at, now)));
         rememberDugHoles(level);
+        if (wallOffNeighbours(level, holeOf)) {
+            return; // (one piece at a time)
+        }
         long unused = numbers().fillDays() * DAY;
         if (numbers().fillDays() <= 0) {
             return;
@@ -1762,6 +1933,7 @@ public class Galleries {
         out.put("lastUsed", usedList);
         out.putInt("filledLength", filledLength);
         out.putInt("fills", fills);
+        out.putInt("walledOff", walledOff);
         out.putInt("filledBlocks", filledBlocks);
         out.putLongArray("backfilled", backfilled.stream().mapToLong(BlockPos::asLong).toArray());
         out.putLongArray("dugHoles", dugHoles.stream().mapToLong(BlockPos::asLong).toArray());
@@ -1832,6 +2004,7 @@ public class Galleries {
         }
         filledLength = in.getInt("filledLength");
         fills = in.getInt("fills");
+        walledOff = in.getInt("walledOff");
         filledBlocks = in.getInt("filledBlocks");
         backfilled.clear();
         for (long hole : in.getLongArray("backfilled")) {

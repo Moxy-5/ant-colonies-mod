@@ -59,7 +59,7 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * how many workers on there is one nurse, two nurses, and so on (one number per nurse, smallest first).
      */
     public record ColonyNumbers(int maxWorkers, List<Integer> nursesFrom, int realCap, int crew, int watchRadius, int swapsPerSecond,
-            Optional<DangerNumbers> danger, Optional<LostNumbers> lost) {
+            Optional<DangerNumbers> danger, Optional<LostNumbers> lost, Optional<NeighbourNumbers> neighbours) {
         public static final Codec<ColonyNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("max_workers").forGetter(ColonyNumbers::maxWorkers),
                 Codec.INT.listOf().fieldOf("nurses_from_workers").forGetter(ColonyNumbers::nursesFrom),
@@ -68,11 +68,17 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 Codec.INT.optionalFieldOf("watch_radius", 48).forGetter(ColonyNumbers::watchRadius),
                 Codec.INT.optionalFieldOf("swaps_per_second", 2).forGetter(ColonyNumbers::swapsPerSecond),
                 DangerNumbers.CODEC.optionalFieldOf("danger").forGetter(ColonyNumbers::danger),
-                LostNumbers.CODEC.optionalFieldOf("lost").forGetter(ColonyNumbers::lost)
+                LostNumbers.CODEC.optionalFieldOf("lost").forGetter(ColonyNumbers::lost),
+                NeighbourNumbers.CODEC.optionalFieldOf("neighbours").forGetter(ColonyNumbers::neighbours)
         ).apply(i, ColonyNumbers::new));
 
+        public ColonyNumbers(int maxWorkers, List<Integer> nursesFrom, int realCap, int crew, int watchRadius, int swapsPerSecond,
+                Optional<DangerNumbers> danger) {
+            this(maxWorkers, nursesFrom, realCap, crew, watchRadius, swapsPerSecond, danger, Optional.empty(), Optional.empty());
+        }
+
         public ColonyNumbers(int maxWorkers, List<Integer> nursesFrom, int realCap, int crew, int watchRadius, int swapsPerSecond) {
-            this(maxWorkers, nursesFrom, realCap, crew, watchRadius, swapsPerSecond, Optional.empty(), Optional.empty());
+            this(maxWorkers, nursesFrom, realCap, crew, watchRadius, swapsPerSecond, Optional.empty(), Optional.empty(), Optional.empty());
         }
 
         /**
@@ -120,6 +126,39 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
         /** The chance a body lying {@code fromNest} blocks (sideways) from the nest's middle is found by nestmates. */
         public double foundChance(double fromNest) {
             return fromNest <= foundWithin ? 1.0 : Math.max(0.0, 1.0 - foundDropPerBlock * (fromNest - foundWithin));
+        }
+    }
+
+    /**
+     * Neighbours (brain step 4g, step 5, {@code colony.Neighbours}; the user's decisions of 2026-10-17 and 2026-10-18). A
+     * member within {@code within} blocks of an insect of another colony of its species, or one standing on another such
+     * colony's trunk trail, records a meeting there (the same insect or trail again only after {@code meetEveryTicks});
+     * meetings within {@code mergeWithin} blocks are one place, each adds 1; a place's strength halves every
+     * {@code halfLifeTicks} and below {@code forgetBelow} it is forgotten. The colony yields to a place once its strength
+     * reaches the meetings needed for its age: {@code youngMeetings} at founding, falling evenly to 1 at
+     * {@code oldAtDays} game days old (Gordon and Kulig: old colonies turn away, young ones push on). Yielding: no
+     * foraging, trail growth or new trail past the place within {@code turnDegrees} of its direction from the nest
+     * (harvester ants); a gallery piece reaching within {@code within} of the neighbour's galleries is walled off with soil
+     * and no tip grows that way ({@code wallGalleries}, termites). A meeting is not danger: nobody is hurt.
+     */
+    public record NeighbourNumbers(double within, int meetEveryTicks, double mergeWithin, int halfLifeTicks, double forgetBelow,
+            double youngMeetings, double oldAtDays, double turnDegrees, boolean wallGalleries) {
+        public static final Codec<NeighbourNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.DOUBLE.optionalFieldOf("within", 3.0).forGetter(NeighbourNumbers::within),
+                Codec.INT.optionalFieldOf("meet_every_ticks", 1200).forGetter(NeighbourNumbers::meetEveryTicks),
+                Codec.DOUBLE.optionalFieldOf("merge_within", 4.0).forGetter(NeighbourNumbers::mergeWithin),
+                Codec.INT.optionalFieldOf("half_life_ticks", 48000).forGetter(NeighbourNumbers::halfLifeTicks),
+                Codec.DOUBLE.optionalFieldOf("forget_below", 0.5).forGetter(NeighbourNumbers::forgetBelow),
+                Codec.DOUBLE.optionalFieldOf("young_meetings", 4.0).forGetter(NeighbourNumbers::youngMeetings),
+                Codec.DOUBLE.optionalFieldOf("old_at_days", 8.0).forGetter(NeighbourNumbers::oldAtDays),
+                Codec.DOUBLE.optionalFieldOf("turn_degrees", 30.0).forGetter(NeighbourNumbers::turnDegrees),
+                Codec.BOOL.optionalFieldOf("wall_galleries", false).forGetter(NeighbourNumbers::wallGalleries)
+        ).apply(i, NeighbourNumbers::new));
+
+        /** The meetings a colony this many game days old needs at one place before it yields there. */
+        public double needed(double ageDays) {
+            double old = Math.max(0, Math.min(1, ageDays / Math.max(0.001, oldAtDays)));
+            return youngMeetings - (youngMeetings - 1) * old;
         }
     }
 

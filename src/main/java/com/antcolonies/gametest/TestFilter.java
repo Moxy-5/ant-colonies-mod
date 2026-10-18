@@ -40,7 +40,7 @@ public final class TestFilter {
         // Soldiers and the alarm.
         CATEGORIES.put("soldiers", List.of(TermiteSoldierTests.class, TermiteAlarmTests.class));
         // The colony: founding, jobs by age, the virtual population, the lasting trails (brain part 4).
-        CATEGORIES.put("colony", List.of(TermiteTests.class, JobsByAgeTests.class, PopulationTests.class, TrailTests.class));
+        CATEGORIES.put("colony", List.of(TermiteTests.class, JobsByAgeTests.class, PopulationTests.class, TrailTests.class, NeighbourTests.class));
         // Colonies that live while the player is away (the brain, part 2 on): going away and coming back, eating and
         // raising the young as numbers, the termites' life while away.
         CATEGORIES.put("away", List.of(AwayTests.class));

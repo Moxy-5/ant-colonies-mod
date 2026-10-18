@@ -6,6 +6,17 @@
     "watch_radius": 48,
     "swaps_per_second": 2,
     "nurses_from_workers": [3, 8, 12, 20],
+    "neighbours": {
+      "_note": "Brain step 4g, step 5 (the user's answers of 2026-10-18; real Pogonomyrmex barbatus, Gordon and Kulig): a worker on the surface within 'within' blocks of an ant of another harvester colony, or on that colony's trunk trail, counts a meeting there (the same ant or trail again only after meet_every_ticks); meetings within merge_within are one place, each adds 1, halving every half_life_ticks (2 days), forgotten below forget_below. The colony yields to a place once it holds young_meetings meetings at founding, falling evenly to 1 at old_at_days game days old (old colonies turn away, young ones push on), and keeps yielding until the place has faded to half that (one meeting for an old colony: about 2 days): nothing past the place within turn_degrees of its direction from the nest is foraged, no trail grows past it, no new trail or search goes that way. Not danger: nobody is hurt. Confirmed by the user before building: 8 days, same species only, half every 2 days, 30 degrees; 'within' 3 and the rest my picks.",
+      "within": 3.0,
+      "meet_every_ticks": 1200,
+      "merge_within": 4.0,
+      "half_life_ticks": 48000,
+      "forget_below": 0.5,
+      "young_meetings": 4.0,
+      "old_at_days": 8.0,
+      "turn_degrees": 30.0
+    },
     "danger": {
       "hurt": 2.0,
       "killed": 4.0,
