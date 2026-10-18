@@ -51,6 +51,19 @@ import net.minecraft.world.level.Level;
  * colony's workers allow ({@code workers_per_block}; the arms are the least), no tip past {@code reach} blocks from the
  * middle. A tip with no route on 3 tries stops (a dead end). Each piece is a gallery with a hole at its end, and holes
  * are laid out along it as along the rest; the farthest hole sets the colony's range ({@link #range}).</li>
+ * <li><b>Step 3, growing toward food</b> (the user's decisions of 2026-10-17, all the real answers): food leads. Rich food
+ * (a branch, a fallen tree, hay) the colony knows far from every hole gets a gallery piece straight to it from the nearest
+ * dug gallery ({@link #pieceTo}, planned by {@link ForagingHoles} with its feeding gallery as before: one system, the
+ * feeding spot stays on record in {@link FoodWays}); known grass just past a tip pulls that tip toward it
+ * ({@code pull_reach}). Only then do the tips spread evenly. A tip stops at its food while the food lasts and may grow on
+ * once it is eaten. Food spends the same length budget, and may use the length that filled-in branches gave back
+ * (spreading may not).</li>
+ * <li><b>Filling in:</b> a far piece of gallery is used while it leads to food (known food near one of its holes, a
+ * feeding spot, a runway, a remembered trail; a piece beyond it that is used counts for it too). One that led to no food
+ * for {@code fill_days} game days (counted while away too: game time runs on) is packed with soil, as real termites
+ * backfill galleries that lead nowhere, from the far end back to its fork (a piece at a time, the last one first), once
+ * nobody is in it, no traveller is on it, its holes are shut and no player can see it; its holes leave the web for good.
+ * The 4 arms never fill in. The piece it forked from no longer spreads at random (that way led nowhere), only toward food.</li>
  * </ul>
  */
 public class Galleries {
@@ -60,6 +73,11 @@ public class Galleries {
     private static final double PATCH_FOOD = 4.0;
     /** The numbers when the species file has none (only a test switching it on for a species without them). */
     private static final SpeciesProfile.GalleryNumbers DEFAULT = new SpeciesProfile.GalleryNumbers(true, 16, 4, 6, 0.5, 6, 2);
+
+    /** How often (ticks) the pieces' use is looked at and unused far branches filled in. */
+    private static final int UPKEEP_TICKS = 200;
+    /** Game ticks in a day. */
+    private static final long DAY = 24000L;
 
     /** A tip with no route found this many times stops growing. */
     private static final int TIP_TRIES = 3;
@@ -71,8 +89,17 @@ public class Galleries {
     /**
      * A growing tip: the gallery that ends there ({@code way}, from the nest's shaft to the tip, its hole at the tip),
      * the way it grows (degrees: 0 east, 90 south), the blocks grown since it last forked and when it forks next.
+     * {@code pulled}: it grew toward food (step 3), so it stops while known food lies round its hole.
      */
-    record Tip(NestPlan.ForagingTunnel way, double bearing, int sinceFork, int forkAt) {
+    record Tip(NestPlan.ForagingTunnel way, double bearing, int sinceFork, int forkAt, boolean pulled) {
+        Tip(NestPlan.ForagingTunnel way, double bearing, int sinceFork, int forkAt) {
+            this(way, bearing, sinceFork, forkAt, false);
+        }
+
+        Tip asPulled() {
+            return new Tip(way, bearing, sinceFork, forkAt, true);
+        }
+
         BlockPos end() {
             return way.tunnel().get(way.tunnel().size() - 1);
         }
@@ -106,6 +133,23 @@ public class Galleries {
     /** Whether a foraging time is going on (its holes are picked). Saved. */
     private boolean inRound;
     private long tickedAt = Long.MIN_VALUE;
+    /** The holes of the first arms (they never fill in). Saved. */
+    private final Set<BlockPos> base = new HashSet<>();
+    /** Each piece's parent (by their holes; none for the first arms and pieces off the nest's own tunnels). Saved. */
+    private final Map<BlockPos, BlockPos> parents = new HashMap<>();
+    /** When each piece last led to food (game time, by its hole). Saved. */
+    private final Map<BlockPos, Long> lastUsed = new HashMap<>();
+    /** Blocks of gallery filled in and not grown again since: only growth toward food may use them. Saved. */
+    private int filledLength;
+    /** How many pieces were filled in, and how many blocks (for the colony list). Saved. */
+    private int fills;
+    private int filledBlocks;
+    private long upkeptAt = Long.MIN_VALUE;
+    /**
+     * The pieces whose branch beyond was filled in: that way led nowhere, so they no longer spread at random (real
+     * termites do not dig again where they backfilled); food may still draw them on. Saved.
+     */
+    private final Set<BlockPos> backfilled = new HashSet<>();
     /** Tests only: the switch, whatever the species file says (null: as the file says). */
     @Nullable
     private Boolean switchForTests;
@@ -135,9 +179,77 @@ public class Galleries {
         return colony.profile().nest().galleries().orElse(DEFAULT);
     }
 
-    /** The arms (none while switched off). */
+    /**
+     * The arms and every piece grown from them (none while switched off). The pieces out to food whose food lasts come
+     * first: the diggers take the tunnels in this order, so the way to found food is dug before the rest.
+     */
     List<NestPlan.ForagingTunnel> arms() {
-        return isOn() ? arms : List.of();
+        if (!isOn()) {
+            return List.of();
+        }
+        FoodWays ways = colony.nest().foodWays();
+        List<NestPlan.ForagingTunnel> ordered = new ArrayList<>();
+        arms.stream().filter(arm -> ways.isLiveNewHole(arm.hole())).forEach(ordered::add);
+        arms.stream().filter(arm -> !ways.isLiveNewHole(arm.hole())).forEach(ordered::add);
+        return ordered;
+    }
+
+    /** Whether this hole is the end of one of the galleries' pieces (an arm, a piece grown from a tip, a piece out to food). */
+    public boolean hasPiece(BlockPos hole) {
+        return isOn() && pieceAt(hole) != null;
+    }
+
+    /** Whether this hole is the end of one of the first arms (they never fill in). */
+    public boolean isFirstArm(BlockPos hole) {
+        return base.contains(hole);
+    }
+
+    /** The holes at the ends of every piece (for the tests). */
+    public List<BlockPos> pieceHoles() {
+        return arms.stream().map(NestPlan.ForagingTunnel::hole).toList();
+    }
+
+    /** The piece ending at this hole, or null. */
+    @Nullable
+    public NestPlan.ForagingTunnel pieceAt(BlockPos hole) {
+        for (NestPlan.ForagingTunnel arm : arms) {
+            if (arm.hole().equals(hole)) {
+                return arm;
+            }
+        }
+        return null;
+    }
+
+    /** Whether no other piece grows from this one. */
+    public boolean isLeaf(BlockPos hole) {
+        return !parents.containsValue(hole);
+    }
+
+    /** The piece this one grew from, or null (a first arm, or a piece off the nest's own tunnels). */
+    @Nullable
+    public BlockPos parentOf(BlockPos hole) {
+        return parents.get(hole);
+    }
+
+    /** How many blocks of filled-in gallery only growth toward food may use again. */
+    public int filledLength() {
+        return filledLength;
+    }
+
+    /** How many pieces were filled in so far. */
+    public int fills() {
+        return fills;
+    }
+
+    /** When the piece ending at this hole last led to food, or {@link Colony#NOT_SET}. */
+    public long lastUsed(BlockPos hole) {
+        return lastUsed.getOrDefault(hole, Colony.NOT_SET);
+    }
+
+    /** Tests only: every piece's last use moved this many ticks back, as if that long had gone by unused. */
+    public void ageForTests(long ticks) {
+        lastUsed.replaceAll((hole, at) -> at - ticks);
+        upkeptAt = Long.MIN_VALUE;
     }
 
     /** The holes along the tunnels (none while switched off). */
@@ -177,6 +289,7 @@ public class Galleries {
         if (own.isEmpty()) {
             return;
         }
+        adoptFoodTunnels(level);
         if (!armsPlanned) {
             planArms(level, own);
         }
@@ -184,6 +297,10 @@ public class Galleries {
             growTips(level);
         }
         layOutHoles(level, own);
+        if (upkeptAt == Long.MIN_VALUE || now - upkeptAt >= UPKEEP_TICKS || now < upkeptAt) {
+            upkeptAt = now;
+            upkeep(level);
+        }
         boolean foraging = colony.isForagingTime(level);
         if (foraging && !inRound) {
             inRound = true;
@@ -219,9 +336,13 @@ public class Galleries {
         int keepOut = colony.profile().nest().foragingHoleDistance() + 1;
         TunnelRoute.Ground ground = new GroundReader(level, colony, colony.nest().nestCells(level));
         List<NestPlan.ForagingTunnel> planned = planArms(own, ways, ground, center, numbers.armLength(), keepOut);
-        arms = List.copyOf(planned);
+        List<NestPlan.ForagingTunnel> all = new ArrayList<>(planned);
+        all.addAll(arms); // (pieces out to food planned before the arms)
+        arms = List.copyOf(all);
         for (NestPlan.ForagingTunnel arm : planned) {
             newFrom.put(arm.hole(), leadInLength(own, arm));
+            base.add(arm.hole().immutable());
+            lastUsed.put(arm.hole().immutable(), level.getGameTime());
         }
         armsPlanned = true;
         changed.run();
@@ -385,9 +506,12 @@ public class Galleries {
         if (!tipsMade) {
             tips.clear();
             for (NestPlan.ForagingTunnel arm : arms) {
-                tips.add(new Tip(arm, bearing(center, arm.hole()), 0, forkAt(numbers, colony.random())));
+                tips.add(new Tip(arm, bearing(center, arm.hole()), 0, forkAt(numbers, colony.random()),
+                        colony.nest().foodWays().isLiveNewHole(arm.hole())));
             }
-            baseLength = length();
+            for (NestPlan.ForagingTunnel arm : arms) {
+                baseLength += base.contains(arm.hole()) ? ownCells(arm).size() : 0;
+            }
             tipsMade = true;
             ColonyManager.get(level).markChanged();
         }
@@ -401,53 +525,535 @@ public class Galleries {
                 }
             }
         }
-        List<Tip> order = new ArrayList<>(tips);
-        shuffle(order, colony.random());
         Set<BlockPos> stopped = new HashSet<>();
         tipFails.forEach((hole, fails) -> {
             if (fails >= TIP_TRIES) {
                 stopped.add(hole);
             }
         });
-        Tip tip = pickTip(order, center, tipReach(), stopped);
-        if (tip == null) {
+        stopped.addAll(atFood(level));
+        if (colony.foragingHoles().isFoodWaiting()) {
+            return; // food leads: rich food waits for a piece the workers do not allow yet
+        }
+        if (reachForTests != null) {
+            numbers = numbers.withReach(reachForTests);
+        }
+        // Food leads (step 3): known grass just past a tip pulls it first; the even spreading only when nothing pulls.
+        if (pullTowardGrass(level, numbers, center, stopped)) {
             return;
         }
-        int around = numbers.pieceLength() + TunnelRoute.HOLE_REACH + 2;
-        BlockPos end = tip.end();
-        if (!level.isLoaded(end.offset(around, 0, around)) || !level.isLoaded(end.offset(-around, 0, -around))
-                || !level.isLoaded(end.offset(around, 0, -around)) || !level.isLoaded(end.offset(-around, 0, around))) {
+        if (length() + filledLength >= lengthAllowed()) {
+            return; // the length filled-in branches gave back is for growth toward food only
+        }
+        List<Tip> order = new ArrayList<>(tips);
+        shuffle(order, colony.random());
+        Set<BlockPos> spreadStopped = new HashSet<>(stopped);
+        spreadStopped.addAll(backfilled); // (a way that led nowhere is not explored again)
+        Tip tip = pickTip(order, center, tipReach(), spreadStopped);
+        if (tip == null || !loadedAround(level, tip.end(), numbers)) {
             return; // (later, once the ground out there is loaded)
         }
         int keepOut = colony.profile().nest().foragingHoleDistance() + 1;
         TunnelRoute.Ground ground = new GroundReader(level, colony, colony.nest().nestCells(level));
-        if (reachForTests != null) {
-            numbers = new SpeciesProfile.GalleryNumbers(numbers.enabled(), numbers.armLength(), numbers.holeSpacing(), numbers.foragersPerHole(),
-                    numbers.rainMore(), numbers.foodRadius(), numbers.explore(), numbers.workersPerBlock(), numbers.maxLength(), reachForTests,
-                    numbers.pieceLength(), numbers.forkMin(), numbers.forkMax(), numbers.forkAngle(), numbers.wander(), numbers.hiddenTrip());
-        }
         List<Tip> grown = grow(tip, tips, ground, center, keepOut, numbers, colony.random());
+        addGrown(level, tip, grown, false);
+    }
+
+    /** Whether the ground round a tip's end is loaded as far as its next piece may go. */
+    private static boolean loadedAround(Level level, BlockPos end, SpeciesProfile.GalleryNumbers numbers) {
+        int around = numbers.pieceLength() + TunnelRoute.HOLE_REACH + 2;
+        return level.isLoaded(end.offset(around, 0, around)) && level.isLoaded(end.offset(-around, 0, -around))
+                && level.isLoaded(end.offset(around, 0, -around)) && level.isLoaded(end.offset(-around, 0, around));
+    }
+
+    /**
+     * The pieces {@code grown} from {@code tip} join the web (they take its place as tips; {@code pulled}: grown toward
+     * food). None grown: the tip failed once more, and stops after {@link #TIP_TRIES}.
+     */
+    private void addGrown(ServerLevel level, Tip tip, List<Tip> grown, boolean pulled) {
         if (grown.isEmpty()) {
             int fails = tipFails.merge(tip.way().hole(), 1, Integer::sum);
             if (fails >= TIP_TRIES) {
                 tips.remove(tip); // a dead end: stone, water, a cliff or the edge of the reach all round
                 ColonyManager.get(level).markChanged();
-                AntColoniesMod.LOGGER.debug("[galleries] the tip at {} stops: no way on", end.toShortString());
+                AntColoniesMod.LOGGER.debug("[galleries] the tip at {} stops: no way on", tip.end().toShortString());
             }
             return;
         }
         tips.remove(tip);
-        tips.addAll(grown);
         List<NestPlan.ForagingTunnel> all = new ArrayList<>(arms);
         for (Tip piece : grown) {
+            tips.add(pulled ? piece.asPulled() : piece);
             all.add(piece.way());
-            newFrom.put(piece.way().hole(), tip.way().tunnel().size());
+            BlockPos hole = piece.way().hole().immutable();
+            newFrom.put(hole, tip.way().tunnel().size());
+            parents.put(hole, tip.way().hole().immutable());
+            lastUsed.put(hole, level.getGameTime());
+            if (pulled) {
+                filledLength = Math.max(0, filledLength - (piece.way().tunnel().size() - tip.way().tunnel().size()));
+            }
         }
         arms = List.copyOf(all);
         changed.run();
         ColonyManager.get(level).markChanged();
-        AntColoniesMod.LOGGER.debug("[galleries] the tip at {} grows{}: {} blocks of {} allowed", end.toShortString(),
-                grown.size() > 1 ? " and forks" : "", length(), lengthAllowed());
+        AntColoniesMod.LOGGER.debug("[galleries] the tip at {} grows{}{}: {} blocks of {} allowed", tip.end().toShortString(),
+                pulled ? " toward food" : "", grown.size() > 1 ? " and forks" : "", length(), lengthAllowed());
+    }
+
+    /**
+     * The tips that stay where they are for now, at their food (step 3: a tip stops at the food while it lasts): one at a
+     * feeding spot whose food is not gone, and one grown toward grass while known food lies round its hole.
+     */
+    private Set<BlockPos> atFood(ServerLevel level) {
+        Set<BlockPos> at = new HashSet<>();
+        List<BlockPos> pulledHoles = new ArrayList<>();
+        for (Tip tip : tips) {
+            BlockPos hole = tip.way().hole();
+            if (colony.nest().foodWays().isLiveNewHole(hole)) {
+                at.add(hole);
+            } else if (tip.pulled()) {
+                pulledHoles.add(hole);
+            }
+        }
+        if (!pulledHoles.isEmpty()) {
+            foodNear(level, pulledHoles, numbers().foodRadius()).forEach((hole, food) -> {
+                if (food > 0) {
+                    at.add(hole);
+                }
+            });
+        }
+        return at;
+    }
+
+    /**
+     * Food leads (step 3): the tip with the most known grass (by its pieces) lying within {@code pull_reach} blocks past
+     * its hole, farther out than the hole and not yet grazed from any hole (beyond the graze, {@code food_radius}),
+     * grows a piece straight toward that grass (no wander; a fork is still made when due, as real tunnels branch round
+     * found food). It may use the length filled-in branches gave back. False if no grass pulls.
+     */
+    private boolean pullTowardGrass(ServerLevel level, SpeciesProfile.GalleryNumbers numbers, BlockPos center, Set<BlockPos> stopped) {
+        List<BlockPos> grass = new ArrayList<>();
+        for (BlockPos plant : colony.food().plants(level)) {
+            SpeciesProfile.PlantFood food = colony.profile().food().plantFor(level.getBlockState(plant));
+            if (food != null && !food.rich() && colony.foodMap().knows(plant, null)) {
+                grass.add(plant);
+            }
+        }
+        if (grass.isEmpty()) {
+            return false;
+        }
+        List<BlockPos> holes = new ArrayList<>();
+        holes.add(colony.nest().getEntrance());
+        colony.foragingHoles().tunnels(level).forEach(tunnel -> holes.add(tunnel.hole()));
+        grass.removeIf(plant -> nearAny(plant, holes, numbers.foodRadius() + 0.5));
+        if (grass.isEmpty()) {
+            return false;
+        }
+        Tip best = null;
+        double bestWorth = 0;
+        double aimX = 0;
+        double aimZ = 0;
+        for (Tip tip : tips) {
+            BlockPos hole = tip.way().hole();
+            double out = flat(hole, center);
+            if (stopped.contains(hole) || out >= tipReach() - 1) {
+                continue;
+            }
+            double worth = 0;
+            double x = 0;
+            double z = 0;
+            for (BlockPos plant : grass) {
+                if (flat(plant, hole) <= numbers.pullReach() && flat(plant, center) > out + 1) {
+                    SpeciesProfile.PlantFood food = colony.profile().food().plantFor(level.getBlockState(plant));
+                    double pieces = food == null ? 1 : Math.max(1, food.pieces());
+                    worth += pieces;
+                    x += plant.getX() * pieces;
+                    z += plant.getZ() * pieces;
+                }
+            }
+            if (worth > bestWorth) {
+                best = tip;
+                bestWorth = worth;
+                aimX = x / worth;
+                aimZ = z / worth;
+            }
+        }
+        if (best == null || !loadedAround(level, best.end(), numbers)) {
+            return false;
+        }
+        BlockPos end = best.end();
+        double toward = Math.toDegrees(Math.atan2(aimZ - end.getZ(), aimX - end.getX()));
+        Tip aimed = new Tip(best.way(), toward, best.sinceFork(), best.forkAt(), best.pulled());
+        int keepOut = colony.profile().nest().foragingHoleDistance() + 1;
+        TunnelRoute.Ground ground = new GroundReader(level, colony, colony.nest().nestCells(level));
+        List<Tip> grown = grow(aimed, tips, ground, center, keepOut, numbers.withWander(0), colony.random());
+        AntColoniesMod.LOGGER.debug("[galleries] grass worth {} past the tip at {} pulls it toward {}, {}", Math.round(bestWorth),
+                end.toShortString(), Math.round(aimX), Math.round(aimZ));
+        tips.set(tips.indexOf(best), aimed);
+        addGrown(level, aimed, grown, true);
+        return true;
+    }
+
+    // --- step 3: pieces out to rich food --------------------------------------------------------------------------
+
+    /**
+     * A piece of gallery planned out to rich food: {@code tunnel} from the shaft (its first {@code from} blocks are the
+     * gallery it leaves from, {@code parent}'s, or one of the nest's own tunnels when {@code parent} is null).
+     */
+    record Piece(NestPlan.ForagingTunnel tunnel, int from, @Nullable BlockPos parent) {
+    }
+
+    /** How far from the middle (blocks, sideways) food may lie for a piece to be dug out to it: the tips' reach. */
+    public int foodReach() {
+        return tipReach();
+    }
+
+    /**
+     * A piece of gallery out to rich food at {@code food} (step 3; {@link ForagingHoles} picks the food, checks the
+     * workers allow it ({@link #affords}) and plans its feeding gallery), from the nearest dug gallery, or null: no route.
+     */
+    @Nullable
+    Piece pieceTo(ServerLevel level, BlockPos food) {
+        List<NestPlan.ForagingTunnel> from = new ArrayList<>(colony.nest().ownForagingTunnels(level));
+        from.addAll(arms);
+        List<NestPlan.ForagingTunnel> dug = new ArrayList<>();
+        for (NestPlan.ForagingTunnel tunnel : from) {
+            if (ForagingHoles.isDug(level, tunnel)) {
+                dug.add(tunnel);
+            }
+        }
+        if (dug.isEmpty()) {
+            return null;
+        }
+        int keepOut = colony.profile().nest().foragingHoleDistance() + 1;
+        TunnelRoute.Ground ground = new GroundReader(level, colony, colony.nest().nestCells(level));
+        return planPiece(dug, food, ground, colony.getCenter(), keepOut, tipReach() + 16);
+    }
+
+    /**
+     * Whether the workers allow this piece out to food now: the galleries with it no longer than they allow and one
+     * piece's length over (the length filled-in branches gave back may be used for food).
+     */
+    boolean affords(Piece piece) {
+        int fresh = piece.tunnel().tunnel().size() - piece.from();
+        if (length() + fresh > lengthAllowed() + numbers().pieceLength()) {
+            AntColoniesMod.LOGGER.debug("[galleries] the way to the food at {} is {} blocks: more than the workers allow now ({} of {})",
+                    piece.tunnel().hole().toShortString(), fresh, length(), lengthAllowed());
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * A piece out to {@code food} from the nearest of the dug tunnels {@code from} (the nest's own, the arms, any piece),
+     * kept out of {@code keepOut} blocks round the middle (the mound): its tunnel from the shaft, with the part of the
+     * tunnel it leaves from before its own blocks. Null if there is no route. Pure (the gallery proof checks it).
+     */
+    @Nullable
+    static Piece planPiece(List<NestPlan.ForagingTunnel> from, BlockPos food, TunnelRoute.Ground ground, BlockPos center, int keepOut,
+            int maxLength) {
+        List<BlockPos> starts = new ArrayList<>();
+        from.forEach(tunnel -> starts.addAll(tunnel.tunnel()));
+        TunnelRoute.Plan plan = TunnelRoute.plan(starts, food, keepOutOf(ground, center, keepOut), maxLength);
+        if (plan == null || plan.cells().isEmpty()) {
+            return null;
+        }
+        BlockPos first = plan.cells().get(0);
+        NestPlan.ForagingTunnel source = null;
+        List<BlockPos> lead = List.of();
+        for (NestPlan.ForagingTunnel tunnel : from) {
+            List<BlockPos> prefix = leadIn(List.of(tunnel), first);
+            if (!prefix.isEmpty() && (source == null || prefix.size() < lead.size())) {
+                source = tunnel;
+                lead = prefix;
+            }
+        }
+        List<BlockPos> cells = new ArrayList<>(lead);
+        cells.addAll(plan.cells());
+        Direction side = Direction.getNearest(plan.hole().getX() - center.getX(), 0, plan.hole().getZ() - center.getZ());
+        BlockPos parent = source == null ? null : source.hole();
+        return new Piece(new NestPlan.ForagingTunnel(List.copyOf(cells), plan.hole(), side), lead.size(), parent);
+    }
+
+    /**
+     * A piece out to rich food joins the web (its feeding spot is kept by {@link FoodWays}): a tip at its food. A piece
+     * leaving from the end of a tip takes that tip's place. Uses the length filled-in branches gave back first.
+     */
+    void addFoodPiece(ServerLevel level, Piece piece) {
+        BlockPos hole = piece.tunnel().hole().immutable();
+        BlockPos parent = piece.parent() != null && pieceAt(piece.parent()) != null ? piece.parent().immutable() : null;
+        List<NestPlan.ForagingTunnel> all = new ArrayList<>(arms);
+        all.add(piece.tunnel());
+        arms = List.copyOf(all);
+        newFrom.put(hole, piece.from());
+        if (parent != null) {
+            parents.put(hole, parent);
+            NestPlan.ForagingTunnel of = pieceAt(parent);
+            if (of != null && piece.from() >= of.tunnel().size()) {
+                tips.removeIf(tip -> tip.way().hole().equals(parent)); // grown on from the tip's end
+            }
+        }
+        lastUsed.put(hole, level.getGameTime());
+        if (tipsMade) {
+            tips.add(new Tip(piece.tunnel(), bearing(colony.getCenter(), hole), 0, forkAt(numbers(), colony.random()), true));
+        }
+        filledLength = Math.max(0, filledLength - (piece.tunnel().tunnel().size() - piece.from()));
+        changed.run();
+        ColonyManager.get(level).markChanged();
+        AntColoniesMod.LOGGER.debug("[galleries] a piece of {} blocks out to food, hole at {}{}", piece.tunnel().tunnel().size() - piece.from(),
+                hole.toShortString(), parent == null ? " (off the nest's own tunnel)" : " (from the piece to " + parent.toShortString() + ")");
+    }
+
+    /**
+     * The tunnels dug out to rich food before step 3 (or while the switch was off) join the web as pieces: their
+     * feeding spots stay as they are (the user's decision: one system).
+     */
+    private void adoptFoodTunnels(ServerLevel level) {
+        boolean adopted = false;
+        for (FoodWays.NewTunnel tunnel : colony.nest().foodWays().getNewTunnels()) {
+            BlockPos hole = tunnel.tunnel().hole();
+            if (pieceAt(hole) != null) {
+                continue;
+            }
+            List<NestPlan.ForagingTunnel> all = new ArrayList<>(arms);
+            all.add(tunnel.tunnel());
+            arms = List.copyOf(all);
+            newFrom.put(hole.immutable(), 0);
+            BlockPos first = tunnel.tunnel().tunnel().get(0);
+            for (NestPlan.ForagingTunnel arm : arms) {
+                if (!arm.hole().equals(hole) && !leadIn(List.of(arm), first).isEmpty()) {
+                    parents.put(hole.immutable(), arm.hole().immutable());
+                    break;
+                }
+            }
+            lastUsed.put(hole.immutable(), level.getGameTime());
+            if (tipsMade) {
+                tips.add(new Tip(tunnel.tunnel(), bearing(colony.getCenter(), hole), 0, forkAt(numbers(), colony.random()), true));
+            }
+            adopted = true;
+            AntColoniesMod.LOGGER.debug("[galleries] the tunnel to the food at {} joins the web", tunnel.food().toShortString());
+        }
+        if (adopted) {
+            changed.run();
+            ColonyManager.get(level).markChanged();
+        }
+    }
+
+    // --- step 3: using and filling in -------------------------------------------------------------------------------
+
+    /**
+     * Every few seconds: each piece that leads to food now (a feeding spot whose food lasts, a runway from one of its
+     * holes, known food or a remembered trail to food at one of its holes) is used, and so is every piece it grew from;
+     * then one far piece unused for {@code fill_days} days is filled in, if it may be now.
+     */
+    private void upkeep(ServerLevel level) {
+        long now = level.getGameTime();
+        FoodWays ways = colony.nest().foodWays();
+        Map<BlockPos, BlockPos> holeOf = new HashMap<>(); // each hole (the ends and the holes along) to its piece
+        for (NestPlan.ForagingTunnel arm : arms) {
+            holeOf.put(arm.hole(), arm.hole());
+            lastUsed.putIfAbsent(arm.hole().immutable(), now); // (an older save: counted from now)
+            Long at = lastUsed.get(arm.hole());
+            if (at > now) {
+                lastUsed.put(arm.hole().immutable(), now); // (the game's clock was set back)
+            }
+        }
+        Map<BlockPos, BlockPos> cellOf = new HashMap<>();
+        for (NestPlan.ForagingTunnel arm : arms) {
+            ownCells(arm).forEach(cell -> cellOf.putIfAbsent(cell, arm.hole()));
+        }
+        for (NestPlan.ForagingTunnel along : holes) {
+            BlockPos piece = cellOf.get(along.hole().below());
+            if (piece != null) {
+                holeOf.put(along.hole(), piece);
+            }
+        }
+        Map<BlockPos, Double> food = foodNear(level, new ArrayList<>(holeOf.keySet()), numbers().foodRadius());
+        Set<BlockPos> used = new HashSet<>();
+        holeOf.forEach((hole, piece) -> {
+            if (ways.isLiveNewHole(hole) || ways.runwayAt(hole) != null || food.getOrDefault(hole, 0.0) > 0) {
+                used.add(piece);
+            }
+        });
+        for (BlockPos piece : used) {
+            BlockPos at = piece;
+            for (int up = 0; at != null && up < 1000; up++) {
+                lastUsed.put(at.immutable(), now);
+                at = parents.get(at);
+            }
+        }
+        long unused = numbers().fillDays() * DAY;
+        if (numbers().fillDays() <= 0) {
+            return;
+        }
+        List<NestPlan.ForagingTunnel> due = new ArrayList<>();
+        for (NestPlan.ForagingTunnel arm : arms) {
+            BlockPos hole = arm.hole();
+            if (!base.contains(hole) && isLeaf(hole) && !ways.isLiveNewHole(hole) && now - lastUsed.get(hole) >= unused) {
+                due.add(arm);
+            }
+        }
+        // The farthest first: the web is filled in from its far ends back.
+        BlockPos center = colony.getCenter();
+        due.sort(Comparator.comparingDouble((NestPlan.ForagingTunnel arm) -> -flat(arm.hole(), center)));
+        for (NestPlan.ForagingTunnel piece : due) {
+            if (fillIn(level, piece, holeOf)) {
+                return; // one piece at a time
+            }
+        }
+    }
+
+    /**
+     * Packs one unused far piece with soil and takes it out of the web for good (step 3, the user's decision: real
+     * termites backfill galleries that lead nowhere), if it may be now: every block loaded, its holes shut, nobody in it
+     * or travelling unseen through it, and no player able to see any of it (it is done out of sight, all at once).
+     */
+    private boolean fillIn(ServerLevel level, NestPlan.ForagingTunnel piece, Map<BlockPos, BlockPos> holeOf) {
+        BlockPos end = piece.hole();
+        List<BlockPos> holesOfPiece = new ArrayList<>();
+        holeOf.forEach((hole, of) -> {
+            if (of.equals(end)) {
+                holesOfPiece.add(hole);
+            }
+        });
+        List<BlockPos> cells = new ArrayList<>(ownCells(piece));
+        FoodWays.NewTunnel toFood = colony.nest().foodWays().newTunnelAt(end);
+        if (toFood != null && toFood.gallery() != null) {
+            cells.addAll(toFood.gallery());
+        }
+        // Blocks another tunnel (the nest's own, another piece, another feeding gallery) runs through stay open.
+        Set<BlockPos> others = new HashSet<>();
+        for (NestPlan.ForagingTunnel tunnel : colony.nest().ownForagingTunnels(level)) {
+            others.addAll(tunnel.tunnel());
+        }
+        for (NestPlan.ForagingTunnel arm : arms) {
+            if (!arm.hole().equals(end)) {
+                others.addAll(ownCells(arm));
+            }
+        }
+        for (FoodWays.NewTunnel tunnel : colony.nest().foodWays().getNewTunnels()) {
+            if (!tunnel.tunnel().hole().equals(end)) {
+                others.addAll(tunnel.tunnel().tunnel());
+                if (tunnel.gallery() != null) {
+                    others.addAll(tunnel.gallery());
+                }
+            }
+        }
+        cells.removeIf(others::contains);
+        if (cells.isEmpty()) {
+            return false;
+        }
+        for (BlockPos cell : cells) {
+            if (!level.isLoaded(cell)) {
+                return false;
+            }
+        }
+        for (BlockPos hole : holesOfPiece) {
+            if (!level.isLoaded(hole) || ForagingHoles.isOpen(level, hole)) {
+                return false; // (shut tonight, or once the foragers are in)
+            }
+        }
+        Set<BlockPos> inside = new HashSet<>(cells);
+        inside.addAll(holesOfPiece);
+        int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE;
+        int maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE, maxZ = Integer.MIN_VALUE;
+        for (BlockPos cell : inside) {
+            minX = Math.min(minX, cell.getX());
+            minY = Math.min(minY, cell.getY());
+            minZ = Math.min(minZ, cell.getZ());
+            maxX = Math.max(maxX, cell.getX());
+            maxY = Math.max(maxY, cell.getY());
+            maxZ = Math.max(maxZ, cell.getZ());
+        }
+        net.minecraft.world.phys.AABB box = new net.minecraft.world.phys.AABB(minX, minY, minZ, maxX + 1, maxY + 1, maxZ + 1).inflate(1);
+        for (net.minecraft.world.entity.LivingEntity mob : level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class, box,
+                net.minecraft.world.entity.LivingEntity::isAlive)) {
+            BlockPos at = mob.blockPosition();
+            if (inside.contains(at) || inside.contains(at.above()) || inside.contains(at.below())) {
+                return false; // never wall an insect in (docs/BUGS.md 8, 9, 24, 42)
+            }
+        }
+        HiddenTrips trips = colony.hiddenTrips();
+        for (java.util.UUID id : trips.travellers()) {
+            for (BlockPos cell : trips.runOf(id)) {
+                if (inside.contains(cell)) {
+                    return false;
+                }
+            }
+        }
+        List<net.minecraft.world.phys.Vec3> eyes = colony.population().viewersInSight(level);
+        if (!eyes.isEmpty()) {
+            for (BlockPos cell : inside) {
+                if (!Population.outOfSight(level, cell, eyes)) {
+                    return false;
+                }
+            }
+        }
+        int filled = 0;
+        for (BlockPos cell : cells) {
+            if (Nest.isDugOut(level, cell)) {
+                level.setBlockAndUpdate(cell, soilFor(level, cell));
+                filled++;
+            }
+        }
+        int own = ownCellsCount(piece);
+        removePiece(level, piece, holesOfPiece);
+        filledLength += own;
+        fills++;
+        filledBlocks += filled;
+        AntColoniesMod.LOGGER.debug("[galleries] the piece to {} led to no food for {} days: filled in ({} blocks packed with soil)",
+                end.toShortString(), numbers().fillDays(), filled);
+        return true;
+    }
+
+    /** The soil a filled-in block is packed with: the ground round it where that is soil the termites dig, else dirt. */
+    private static net.minecraft.world.level.block.state.BlockState soilFor(ServerLevel level, BlockPos cell) {
+        for (Direction side : new Direction[] {Direction.DOWN, Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST}) {
+            BlockPos next = cell.relative(side);
+            net.minecraft.world.level.block.state.BlockState state = level.getBlockState(next);
+            if (state.is(com.antcolonies.registry.ModTags.DIGGABLE) && state.isCollisionShapeFullBlock(level, next) && !state.hasBlockEntity()) {
+                return state.getBlock() == net.minecraft.world.level.block.Blocks.GRASS_BLOCK
+                        ? net.minecraft.world.level.block.Blocks.DIRT.defaultBlockState() : state.getBlock().defaultBlockState();
+            }
+        }
+        return net.minecraft.world.level.block.Blocks.DIRT.defaultBlockState();
+    }
+
+    private int ownCellsCount(NestPlan.ForagingTunnel piece) {
+        return piece.tunnel().size() - Math.min(piece.tunnel().size(), newFrom.getOrDefault(piece.hole(), 0));
+    }
+
+    /** A filled-in piece leaves the web with its holes (they are never opened again); the piece it grew from may grow on. */
+    private void removePiece(ServerLevel level, NestPlan.ForagingTunnel piece, List<BlockPos> holesOfPiece) {
+        BlockPos end = piece.hole();
+        List<NestPlan.ForagingTunnel> all = new ArrayList<>(arms);
+        all.remove(piece);
+        arms = List.copyOf(all);
+        newFrom.remove(end);
+        lastUsed.remove(end);
+        tipFails.remove(end);
+        tips.removeIf(tip -> tip.way().hole().equals(end));
+        laidOut.remove(end);
+        holes.removeIf(along -> holesOfPiece.contains(along.hole()));
+        for (BlockPos hole : holesOfPiece) {
+            holesAlongSet.remove(hole);
+            lastTurn.remove(hole);
+            tonight.remove(hole);
+        }
+        colony.nest().foodWays().dropNewTunnel(end);
+        BlockPos parent = parents.remove(end);
+        if (parent != null && tipsMade && isLeaf(parent) && tips.stream().noneMatch(tip -> tip.way().hole().equals(parent))) {
+            NestPlan.ForagingTunnel of = pieceAt(parent);
+            if (of != null) {
+                tips.add(new Tip(of, bearing(colony.getCenter(), parent), 0, forkAt(numbers(), colony.random())));
+            }
+        }
+        if (parent != null) {
+            backfilled.add(parent);
+        }
+        backfilled.remove(end);
+        changed.run();
+        ColonyManager.get(level).markChanged();
     }
 
     /**
@@ -713,9 +1319,12 @@ public class Galleries {
         if (!isOn()) {
             return "";
         }
-        return " | galleries: " + arms.size() + " pieces, " + tips.size() + " tips, " + length() + " of " + lengthAllowed()
-                + " blocks, reach " + reach() + ", " + colony.foragingHoles().tunnels(level).size() + " holes, "
-                + tonight.size() + " in turn" + (inRound ? "" : " (last time)");
+        FoodWays ways = colony.nest().foodWays();
+        long toFood = arms.stream().filter(arm -> ways.isLiveNewHole(arm.hole())).count();
+        return " | galleries: " + arms.size() + " pieces (" + toFood + " out to food), " + tips.size() + " tips, " + length() + " of "
+                + lengthAllowed() + " blocks, reach " + reach() + ", " + colony.foragingHoles().tunnels(level).size() + " holes, "
+                + tonight.size() + " in turn" + (inRound ? "" : " (last time)")
+                + (fills > 0 ? ", " + fills + " filled in (" + filledBlocks + " blocks)" : "");
     }
 
     void save(CompoundTag tag) {
@@ -749,11 +1358,33 @@ public class Galleries {
             entry.putDouble("bearing", tip.bearing());
             entry.putInt("sinceFork", tip.sinceFork());
             entry.putInt("forkAt", tip.forkAt());
+            entry.putBoolean("pulled", tip.pulled());
             tipList.add(entry);
         }
         out.put("tips", tipList);
         out.putBoolean("tipsMade", tipsMade);
         out.putInt("baseLength", baseLength);
+        out.putLongArray("base", base.stream().mapToLong(BlockPos::asLong).toArray());
+        ListTag parentList = new ListTag();
+        parents.forEach((hole, parent) -> {
+            CompoundTag entry = new CompoundTag();
+            entry.putLong("hole", hole.asLong());
+            entry.putLong("parent", parent.asLong());
+            parentList.add(entry);
+        });
+        out.put("parents", parentList);
+        ListTag usedList = new ListTag();
+        lastUsed.forEach((hole, at) -> {
+            CompoundTag entry = new CompoundTag();
+            entry.putLong("hole", hole.asLong());
+            entry.putLong("at", at);
+            usedList.add(entry);
+        });
+        out.put("lastUsed", usedList);
+        out.putInt("filledLength", filledLength);
+        out.putInt("fills", fills);
+        out.putInt("filledBlocks", filledBlocks);
+        out.putLongArray("backfilled", backfilled.stream().mapToLong(BlockPos::asLong).toArray());
         tag.put("galleries", out);
     }
 
@@ -789,12 +1420,60 @@ public class Galleries {
             CompoundTag entry = (CompoundTag) element;
             BlockPos hole = BlockPos.of(entry.getLong("hole"));
             arms.stream().filter(arm -> arm.hole().equals(hole)).findFirst().ifPresent(arm -> tips.add(
-                    new Tip(arm, entry.getDouble("bearing"), entry.getInt("sinceFork"), entry.getInt("forkAt"))));
+                    new Tip(arm, entry.getDouble("bearing"), entry.getInt("sinceFork"), entry.getInt("forkAt"), entry.getBoolean("pulled"))));
         }
         tipsMade = in.getBoolean("tipsMade");
         baseLength = in.getInt("baseLength");
+        parents.clear();
+        for (Tag element : in.getList("parents", Tag.TAG_COMPOUND)) {
+            CompoundTag entry = (CompoundTag) element;
+            parents.put(BlockPos.of(entry.getLong("hole")), BlockPos.of(entry.getLong("parent")));
+        }
+        base.clear();
+        if (in.contains("base")) {
+            for (long hole : in.getLongArray("base")) {
+                base.add(BlockPos.of(hole));
+            }
+        } else {
+            deriveOlderSave();
+        }
+        lastUsed.clear();
+        for (Tag element : in.getList("lastUsed", Tag.TAG_COMPOUND)) {
+            CompoundTag entry = (CompoundTag) element;
+            lastUsed.put(BlockPos.of(entry.getLong("hole")), entry.getLong("at"));
+        }
+        filledLength = in.getInt("filledLength");
+        fills = in.getInt("fills");
+        filledBlocks = in.getInt("filledBlocks");
+        backfilled.clear();
+        for (long hole : in.getLongArray("backfilled")) {
+            backfilled.add(BlockPos.of(hole));
+        }
+        upkeptAt = Long.MIN_VALUE;
         tipFails.clear();
         changed.run();
+    }
+
+    /**
+     * A save from before step 3: each piece's parent is the piece whose whole tunnel its own starts with, and the first
+     * arms are the ones with none (the pieces' last use is counted from now, see {@link #upkeep}).
+     */
+    private void deriveOlderSave() {
+        for (NestPlan.ForagingTunnel arm : arms) {
+            int from = Math.min(arm.tunnel().size(), newFrom.getOrDefault(arm.hole(), 0));
+            for (NestPlan.ForagingTunnel other : arms) {
+                if (other != arm && other.tunnel().size() == from && arm.tunnel().subList(0, from).equals(other.tunnel())) {
+                    parents.put(arm.hole(), other.hole());
+                    break;
+                }
+            }
+        }
+        FoodWays ways = colony.nest().foodWays();
+        for (NestPlan.ForagingTunnel arm : arms) {
+            if (!parents.containsKey(arm.hole()) && ways.newTunnelAt(arm.hole()) == null) {
+                base.add(arm.hole());
+            }
+        }
     }
 
     private static ListTag saveTunnels(List<NestPlan.ForagingTunnel> tunnels) {

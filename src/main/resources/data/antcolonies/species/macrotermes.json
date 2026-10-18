@@ -76,7 +76,7 @@
     "crust_walls": true,
     "sheeting": { "max": 3, "max_length": 12 },
     "galleries": {
-      "_note": "Termites underground (docs/plans/termites-underground.md), the switch: enabled false brings back the 2 holes of before, both open every foraging time. Step 1, holes take turns: the tunnels reach out in 4 arms arm_length blocks from the middle; holes about hole_spacing blocks apart along every tunnel; each foraging time 1 hole open per foragers_per_hole foragers (at least 1), rain_more times as many again in the rain; holes with known food within food_radius blocks open first, explore of them (none if only 1 opens, 1 if 2 or 3) go to the holes rested longest (with no known food, all do). Step 2a, galleries grow tip by tip: the galleries in all may be workers / workers_per_block blocks long, at most max_length (the arms are the least; a giant colony would otherwise fill the whole circle), no tip farther than reach blocks from the middle; the shortest tip grows first by piece_length blocks, wandering up to wander degrees and away from the other tips; a tip forks in two (fork_angle degrees either side) after fork_min to fork_max blocks of growth. Step 2b, hidden trips: a termite whose route runs at least hidden_trip blocks along a closed stretch of gallery leaves the world and comes out at the far end after the walk's time; if anything breaks in on the way, everyone travelling there shows up where they would be by then (0 = off, all walk). My picks, to confirm.",
+      "_note": "Termites underground (docs/plans/termites-underground.md), the switch: enabled false brings back the 2 holes of before, both open every foraging time. Step 1, holes take turns: the tunnels reach out in 4 arms arm_length blocks from the middle; holes about hole_spacing blocks apart along every tunnel; each foraging time 1 hole open per foragers_per_hole foragers (at least 1), rain_more times as many again in the rain; holes with known food within food_radius blocks open first, explore of them (none if only 1 opens, 1 if 2 or 3) go to the holes rested longest (with no known food, all do). Step 2a, galleries grow tip by tip: the galleries in all may be workers / workers_per_block blocks long, at most max_length (the arms are the least; a giant colony would otherwise fill the whole circle), no tip farther than reach blocks from the middle; the shortest tip grows first by piece_length blocks, wandering up to wander degrees and away from the other tips; a tip forks in two (fork_angle degrees either side) after fork_min to fork_max blocks of growth. Step 2b, hidden trips: a termite whose route runs at least hidden_trip blocks along a closed stretch of gallery leaves the world and comes out at the far end after the walk's time; if anything breaks in on the way, everyone travelling there shows up where they would be by then (0 = off, all walk). Step 3, growing toward food (the user's decisions, 2026-10-17): rich food the colony knows far from every hole gets a gallery piece dug straight to it from the nearest dug gallery (it may lie as far out as reach); known grass within pull_reach blocks past a tip pulls that tip toward it; only then do the tips spread evenly. A tip stops at its food while it lasts. A far piece that has led to no food for fill_days game days (counted while away too) is packed with soil, from the far end back to its fork, once nobody is in it and no player can see it; the 4 arms never fill in. Its length may only be dug again toward food. My picks, to confirm.",
       "enabled": true,
       "arm_length": 16,
       "hole_spacing": 4,
@@ -92,7 +92,9 @@
       "fork_max": 12,
       "fork_angle": 30,
       "wander": 20,
-      "hidden_trip": 12
+      "hidden_trip": 12,
+      "fill_days": 10,
+      "pull_reach": 12
     }
   },
   "queen_body": {

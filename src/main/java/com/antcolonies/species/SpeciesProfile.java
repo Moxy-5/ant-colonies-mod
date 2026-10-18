@@ -880,11 +880,15 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * lie about {@code holeSpacing} blocks apart along every tunnel; on each foraging time one hole is open for every
      * {@code foragersPerHole} foragers (at least 1), {@code rainMore} times as many again in the rain; the holes with
      * food the colony knows within {@code foodRadius} blocks (or a remembered trail to food still there) open first, and
-     * {@code explore} of them (none if only 1 opens, 1 if 2 or 3) go to the holes rested longest. My picks for the numbers, to confirm.
+     * {@code explore} of them (none if only 1 opens, 1 if 2 or 3) go to the holes rested longest. Step 3, growing toward
+     * food: known grass up to {@code pullReach} blocks past a tip pulls it; a far branch that led to no food for
+     * {@code fillDays} game days is packed with soil. My picks for the numbers, to confirm.
      */
     public record GalleryNumbers(boolean enabled, int armLength, int holeSpacing, int foragersPerHole, double rainMore, int foodRadius, int explore,
-            int workersPerBlock, int maxLength, int reach, int pieceLength, int forkMin, int forkMax, int forkAngle, int wander, int hiddenTrip) {
-        public static final Codec<GalleryNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
+            int workersPerBlock, int maxLength, int reach, int pieceLength, int forkMin, int forkMax, int forkAngle, int wander, int hiddenTrip,
+            int fillDays, int pullReach) {
+        /** The first 16 numbers (a codec group holds at most 16), the step 3 ones at their defaults. */
+        private static final com.mojang.serialization.MapCodec<GalleryNumbers> STEPS_1_TO_2 = RecordCodecBuilder.mapCodec(i -> i.group(
                 Codec.BOOL.optionalFieldOf("enabled", false).forGetter(GalleryNumbers::enabled),
                 Codec.INT.optionalFieldOf("arm_length", 16).forGetter(GalleryNumbers::armLength),
                 Codec.INT.optionalFieldOf("hole_spacing", 4).forGetter(GalleryNumbers::holeSpacing),
@@ -902,10 +906,39 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 Codec.INT.optionalFieldOf("wander", 20).forGetter(GalleryNumbers::wander),
                 Codec.INT.optionalFieldOf("hidden_trip", 12).forGetter(GalleryNumbers::hiddenTrip)
         ).apply(i, GalleryNumbers::new));
+        public static final Codec<GalleryNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
+                STEPS_1_TO_2.forGetter(numbers -> numbers),
+                Codec.INT.optionalFieldOf("fill_days", 10).forGetter(GalleryNumbers::fillDays),
+                Codec.INT.optionalFieldOf("pull_reach", 12).forGetter(GalleryNumbers::pullReach)
+        ).apply(i, (numbers, fillDays, pullReach) -> numbers.withStep3(fillDays, pullReach)));
 
-        /** Step 1's numbers only (growing with the step 2 defaults). */
+        /** Step 1's numbers only (growing with the step 2 and 3 defaults). */
         public GalleryNumbers(boolean enabled, int armLength, int holeSpacing, int foragersPerHole, double rainMore, int foodRadius, int explore) {
             this(enabled, armLength, holeSpacing, foragersPerHole, rainMore, foodRadius, explore, 4, 600, 50, 4, 8, 12, 30, 20, 12);
+        }
+
+        /** Steps 1 and 2's numbers (step 3's at their defaults). */
+        public GalleryNumbers(boolean enabled, int armLength, int holeSpacing, int foragersPerHole, double rainMore, int foodRadius, int explore,
+                int workersPerBlock, int maxLength, int reach, int pieceLength, int forkMin, int forkMax, int forkAngle, int wander, int hiddenTrip) {
+            this(enabled, armLength, holeSpacing, foragersPerHole, rainMore, foodRadius, explore, workersPerBlock, maxLength, reach, pieceLength,
+                    forkMin, forkMax, forkAngle, wander, hiddenTrip, 10, 12);
+        }
+
+        GalleryNumbers withStep3(int fillDays, int pullReach) {
+            return new GalleryNumbers(enabled, armLength, holeSpacing, foragersPerHole, rainMore, foodRadius, explore, workersPerBlock, maxLength,
+                    reach, pieceLength, forkMin, forkMax, forkAngle, wander, hiddenTrip, fillDays, pullReach);
+        }
+
+        /** The same numbers with another reach (tests keep a web inside their arena). */
+        public GalleryNumbers withReach(int reach) {
+            return new GalleryNumbers(enabled, armLength, holeSpacing, foragersPerHole, rainMore, foodRadius, explore, workersPerBlock, maxLength,
+                    reach, pieceLength, forkMin, forkMax, forkAngle, wander, hiddenTrip, fillDays, pullReach);
+        }
+
+        /** The same numbers with another wander (a tip pulled toward food goes straight for it). */
+        public GalleryNumbers withWander(int wander) {
+            return new GalleryNumbers(enabled, armLength, holeSpacing, foragersPerHole, rainMore, foodRadius, explore, workersPerBlock, maxLength,
+                    reach, pieceLength, forkMin, forkMax, forkAngle, wander, hiddenTrip, fillDays, pullReach);
         }
 
         /** How many blocks of gallery a colony with this many workers may have in all, at most max_length (0 when it does not grow). */

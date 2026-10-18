@@ -302,6 +302,17 @@ public class ForagingHoles {
     // --- new holes near food ----------------------------------------------------------------------------------
 
     /**
+     * Whether rich food the colony knows waits for a gallery piece the workers do not allow yet (termites underground,
+     * step 3: food leads, so the galleries grow no other way meanwhile). Not saved: worked out again on the next check.
+     */
+    private boolean foodWaiting;
+
+    /** See {@link #foodWaiting}. */
+    public boolean isFoodWaiting() {
+        return foodWaiting;
+    }
+
+    /**
      * Every few seconds (from {@link Colony#tick}): a new hole whose food is gone is spent (plugged for good), and if
      * every new tunnel is dug and there may be more, a new tunnel is planned out to the nearest rich plant the colony
      * knows that is far from every way out.
@@ -314,6 +325,7 @@ public class ForagingHoles {
             return;
         }
         newHolesCheckedAt = now;
+        foodWaiting = false;
         List<BlockPos> plants = colony.food().plants(level);
         tickRunways(level, plants, numbers);
         int active = 0;
@@ -356,6 +368,27 @@ public class ForagingHoles {
         noRouteUntil.values().removeIf(until -> until <= now || until > now + NO_ROUTE_TICKS);
         BlockPos food = pickFood(level, plants, numbers);
         if (food == null) {
+            return;
+        }
+        Galleries galleries = colony.nest().galleries();
+        if (galleries.isOn()) {
+            // Step 3 of termites underground: the way to the food is a piece of the galleries, from the nearest dug one.
+            Galleries.Piece piece = galleries.pieceTo(level, food);
+            if (piece == null) {
+                noRouteUntil.put(food.immutable(), now + NO_ROUTE_TICKS);
+                AntColoniesMod.LOGGER.debug("[new-hole] no gallery piece to the food at {}", food.toShortString());
+                return;
+            }
+            if (!galleries.affords(piece)) {
+                foodWaiting = true; // food leads: the galleries grow no other way until the workers allow this piece
+                return;
+            }
+            List<BlockPos> gallery = planGallery(level, piece.tunnel(), food);
+            colony.nest().foodWays().addNewTunnel(new FoodWays.NewTunnel(piece.tunnel(), food.immutable(), gallery));
+            galleries.addFoodPiece(level, piece);
+            ColonyManager.get(level).markChanged();
+            AntColoniesMod.LOGGER.debug("[new-hole] a gallery piece to the food at {}, hole at {}, with a feeding gallery of {} blocks",
+                    food.toShortString(), piece.tunnel().hole().toShortString(), gallery.size());
             return;
         }
         List<BlockPos> starts = startsFor(level);
@@ -423,7 +456,7 @@ public class ForagingHoles {
         List<BlockPos> taken = new java.util.ArrayList<>(runways.stream().map(FoodWays.Runway::food).toList());
         colony.nest().foodWays().getNewTunnels().forEach(tunnel -> taken.add(tunnel.food()));
         BlockPos center = colony.getCenter();
-        int reach = numbers.reach(colony.getCount(com.antcolonies.entity.WorkerAntEntity.CASTE));
+        int reach = foodReach(numbers);
         BlockPos food = null;
         double bestDistance = Double.MAX_VALUE;
         for (BlockPos plant : plants) {
@@ -598,7 +631,7 @@ public class ForagingHoles {
         if (noRouteUntil.containsKey(food)) {
             why.add("no route found earlier");
         }
-        if (sideways(food, colony.getCenter()) > numbers.reach(colony.getCount(com.antcolonies.entity.WorkerAntEntity.CASTE))) {
+        if (sideways(food, colony.getCenter()) > foodReach(numbers)) {
             why.add("out of reach");
         }
         if (colony.food().isFeedableFromInside(level, food)) {
@@ -633,7 +666,7 @@ public class ForagingHoles {
     @Nullable
     private BlockPos pickFood(Level level, List<BlockPos> plants, SpeciesProfile.NewHoles numbers) {
         BlockPos center = colony.getCenter();
-        int reach = numbers.reach(colony.getCount(com.antcolonies.entity.WorkerAntEntity.CASTE));
+        int reach = foodReach(numbers);
         List<BlockPos> holes = new java.util.ArrayList<>();
         holes.add(colony.nest().getEntrance());
         for (NestPlan.ForagingTunnel tunnel : tunnels(level)) {
@@ -657,6 +690,15 @@ public class ForagingHoles {
             bestDistance = fromNest;
         }
         return best;
+    }
+
+    /**
+     * How far (blocks, sideways from the middle) food may lie to be dug out to or sheeted over: with the galleries on, as
+     * far as their tips may grow (step 3: the reach grows with the web); else the reach for the colony's size.
+     */
+    private int foodReach(SpeciesProfile.NewHoles numbers) {
+        Galleries galleries = colony.nest().galleries();
+        return galleries.isOn() ? galleries.foodReach() : numbers.reach(colony.getCount(com.antcolonies.entity.WorkerAntEntity.CASTE));
     }
 
     /** The blocks of the dug foraging tunnels, where a new tunnel may start (the route planner picks the best). */

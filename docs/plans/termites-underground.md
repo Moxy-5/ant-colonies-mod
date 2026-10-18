@@ -105,9 +105,45 @@ in-game) and **2b** (hidden trips).
   Game test `hiddenTripsGoUnseenAndShowUpWhereTheyAreWhenTheGalleryIsBrokenInto`. Confirmed in-game by the user 2026-10-17, together with 2a ("it all works well").
 
 ## Step 3: growing toward food
-- Food found from a hole pulls the nearest tip toward it; rich food gets its feeding gallery as today. Today's
-  separate "new hole to rich food" becomes part of this (one system).
-- Unused far branches fill in after about 10 days.
+**Decided with the user 2026-10-17** (real behaviour explained first: termites do not smell food from afar; a find
+draws recruits and the digging goes there, tunnels near food branch, the tip stops at the food, which becomes a feeding
+spot; galleries leading to nothing are backfilled with soil from the far end, their holes plugged; mostly from lab work
+on *Reticulitermes* and *Coptotermes*, Macrotermes galleries being little mapped). All six real answers picked:
+- **Food leads:** food the colony knows past its galleries (within the reach) gets the next piece: the gallery nearest
+  to it grows straight for it, rich food (branches, fallen trees, hay) first, then grass patches by their worth. The
+  even spreading of 2a goes on only while no food pulls. It spends the same length budget (a small colony reaches
+  only a little way).
+- **Stops at the food, grows on later:** the tip stops at the food while it lasts; rich food gets its feeding gallery
+  under it and a hole beside it, as today; once the food is gone that tip may explore outward again.
+- **Today's new-hole tunnels join the web:** each one becomes a gallery piece with its feeding gallery, its record of
+  the food spot (for the Matabele ants) and its holes; its hole takes turns but opens every night while its food lasts;
+  once the food is gone it is a tip that may grow on, or a branch that may fill in. New tunnels to food are only dug as
+  gallery pieces (one system). The 10-to-40 reach table goes; the galleries' budget and reach rule. Old saves keep
+  their tunnels.
+- **Filling in = packed with soil:** a far branch is packed full of soil from its far end back to where it forked
+  off, its holes plugged for good; it leaves the web (no turns, no hidden trips) and its length is free again for
+  growth toward food. Done out of every player's sight, never while anyone is inside. The 4 arms and any piece leading
+  to known food never fill in.
+- **Used means led to food:** a branch is in use while one of its holes has known food near it, it leads to a feeding
+  spot, or foragers found food out of it; holes that only opened to explore and found nothing do not count.
+- **The 10 days count while away** (real colonies do not stop); a branch unused 10 days is filled the next time its
+  ground is loaded and out of sight.
+- **BUILT 2026-10-17** (`colony/Galleries`; `ForagingHoles` plans the food and its feeding gallery as before, the way
+  there is `Galleries.pieceTo`/`addFoodPiece`; numbers `nest.galleries.fill_days` 10 and `pull_reach` 12). Rich food:
+  a piece from the nearest dug gallery; if the workers do not allow it yet, the food waits and nothing else grows
+  (`ForagingHoles.isFoodWaiting`). Grass: known grass within 12 blocks past a tip, not yet grazed from a hole, pulls the
+  tip with the most of it (no wander). Then the even spreading, which may not use length given back by filling in, nor grow again from a piece whose
+  branch was filled in (only food may draw that way again).
+  A piece is used while one of its holes has known food or a remembered trail near it, a runway, or a live feeding
+  spot; use counts for the pieces it grew from. Filling in: one piece per 10 seconds, the farthest first, only a piece
+  nothing grows from, with every block loaded, its holes shut, nobody in it, no hidden traveller on it and no player
+  able to see it; packed with the soil round it (else dirt), the feeding gallery too; blocks other tunnels use stay
+  open. Old saves: parents and first arms worked out on load, old new-hole tunnels join the web as pieces. Tests: the
+  growth scene `theGalleriesGrowTipByTipWithTheColony` (hay waits, then comes first, the tip stops at it, 11 days of
+  no use fill the web back to the arms, the piece by a known dead bush stays, dead bushes pull a tip) and the gallery
+  proof (pieces out to food and filled-in pieces over 99 landscapes, 0 failures). The far-hay test still runs with
+  the switch off (the old way stays while the switch exists). `termitefood,mound,soldiers,hills,away,colony` 70 of 70
+  on 4 servers; full run owed before merging. Waiting for the user to test in-game.
 
 ## Step 4: away and speed
 - The numbers forage from the galleries while away; galleries grow while away (`BuildLife`).

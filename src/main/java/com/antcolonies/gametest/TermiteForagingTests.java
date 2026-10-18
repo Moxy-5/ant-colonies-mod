@@ -287,14 +287,22 @@ public class TermiteForagingTests {
     }
 
     /**
-     * Termites underground, step 2a (the galleries grow tip by tip, the user's decisions of 2026-10-17). The same colony
-     * as above, by day (they dig underground day and night), tips kept within 26 blocks of the middle (the arena). With
-     * its 38 workers the colony's arms are already longer than its workers allow: no tip grows. Then 600 worker numbers
-     * join: the tips grow one piece at a time (each dug at once here) until the galleries are as long as the workers allow
-     * (a fork's second piece may go a little over), the tips fork, no hole lies past the reach, holes are laid out along
+     * Termites underground, step 2a (the galleries grow tip by tip, the user's decisions of 2026-10-17) and step 3
+     * (growing toward food, filling in). The same colony as above, by day (they dig underground day and night), tips
+     * kept within 26 blocks of the middle (the arena). It knows of a hay bale out to the south-east, 21 blocks from the
+     * middle. With its 38 workers the colony's arms are already longer than its workers allow: no tip grows, and the
+     * piece out to the hay waits (food leads: nothing else grows meanwhile). Then 600 worker numbers join: the first
+     * growth is the piece to the hay (its hole beside the bale), no tip grows on past the hay while it lasts; then the
+     * tips grow one piece at a time (each dug at once here) until the galleries are as long as the workers allow (a
+     * fork's second piece may go a little over), the tips fork, no hole lies past the reach, holes are laid out along
      * the new pieces, and the colony's range is the galleries' (the farthest hole and the graze round it).
+     * Step 3 on: the hay is taken away (its hole is spent), a dead bush the colony knows is put by one far piece, and
+     * 11 days go by: every far piece that led to no food is packed with soil, the hay's piece and its feeding gallery
+     * too (its feeding spot leaves the record), back to the first arms, which stay; the piece by the dead bush and the
+     * pieces it grew from stay; no tip spreads into the length given back. Last, dead bushes the colony knows 8 blocks
+     * past a first arm's end pull that tip toward them, using the length given back.
      */
-    @GameTest(template = "arena", timeoutTicks = 6000, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 30000, skyAccess = true)
     public static void theGalleriesGrowTipByTipWithTheColony(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
@@ -315,11 +323,29 @@ public class TermiteForagingTests {
             }
         });
         TestClock.still(helper, 12); // midday: the termites stay in, and dig
+        BlockPos hay = helper.absolutePos(new BlockPos(mid + 15, SURFACE, mid + 15));
         int[] stage = {0};
         long[] since = {0};
         int[] holesBefore = {0};
         int[] lastLength = {-1};
         int[] mostTips = {0};
+        int[] lengthAtStart = {0}; // when the 600 join
+        BlockPos[] hayHole = {null};
+        BlockPos[] kept = {null}; // the far piece by the dead bush
+        java.util.Set<BlockPos> keptChain = new java.util.HashSet<>();
+        java.util.Set<BlockPos> firstArms = new java.util.HashSet<>();
+        java.util.List<BlockPos> hayCells = new java.util.ArrayList<>();
+        int[] lengthBeforeFills = {0};
+        long[] agedAt = {0};
+        boolean[] hayFilled = {false};
+        int[] lastFills = {0};
+        long[] lastFillAt = {0};
+        BlockPos[] pullTip = {null};
+        BlockPos[] pullAim = {null};
+        int[] filledBeforePull = {0};
+        long[] spentAt = {-1};
+        java.util.Map<BlockPos, BlockPos> piecesSeen = new java.util.HashMap<>(); // piece -> the piece it grew from
+        java.util.Set<BlockPos> backfilledAt = new java.util.HashSet<>(); // pieces whose branch beyond was filled in
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
@@ -331,6 +357,9 @@ public class TermiteForagingTests {
             colony.population().addNewMembers(com.antcolonies.entity.WorkerAntEntity.CASTE, now - colony.profile().worker().builderUntilTicks() - 1000, 30);
             colony.nest().galleries().setSwitchForTests(true);
             colony.nest().galleries().setReachForTests(reach);
+            level.setBlock(hay, Blocks.HAY_BLOCK.defaultBlockState(), 3);
+            colony.food().rescanPlantsSoon();
+            colony.foodMap().knowForTests(hay);
             stage[0] = 1;
         });
         helper.onEachTick(() -> {
@@ -350,8 +379,11 @@ public class TermiteForagingTests {
             }
             long tick = helper.getTick();
             if (tick % 200 == 0) {
-                AntColoniesMod.LOGGER.info("[web-test] tick {}: stage {}{}, range {}", tick, stage[0], galleries.describe(level), colony.foragingRadius());
+                AntColoniesMod.LOGGER.info("[web-test] tick {}: stage {}{}, range {}, filled {}", tick, stage[0], galleries.describe(level),
+                        colony.foragingRadius(), galleries.filledLength());
             }
+            BlockPos center = colony.getCenter();
+            int pieceLength = colony.profile().nest().galleries().orElseThrow().pieceLength();
             switch (stage[0]) {
                 case 1 -> { // the arms planned and their tips made: the small colony's galleries stay as they are
                     if (galleries.tipCount() >= 3) {
@@ -359,8 +391,13 @@ public class TermiteForagingTests {
                         helper.assertTrue(galleries.length() <= galleries.lengthAllowed(),
                                 "a colony of " + colony.getCount(com.antcolonies.entity.WorkerAntEntity.CASTE) + " workers grew its galleries past the arms:"
                                         + galleries.describe(level));
+                        helper.assertTrue(colony.nest().foodWays().getNewTunnels().isEmpty(),
+                                "a colony of 38 workers dug a piece out to the hay, more than its workers allow:" + galleries.describe(level));
                         if (since[0] >= 300) {
+                            helper.assertTrue(colony.foragingHoles().isFoodWaiting(), "the known hay is not waiting for its piece:"
+                                    + galleries.describe(level) + colony.foragingHoles().describeNewHoles(level));
                             holesBefore[0] = tunnels.size();
+                            lengthAtStart[0] = galleries.length();
                             colony.population().addNewMembers(com.antcolonies.entity.WorkerAntEntity.CASTE, level.getGameTime() - 1000, 600);
                             AntColoniesMod.LOGGER.info("[web-test] tick {}: 600 workers join, {} blocks allowed", tick, galleries.lengthAllowed());
                             since[0] = 0;
@@ -370,13 +407,33 @@ public class TermiteForagingTests {
                         helper.assertTrue(tick < 600, "no arms and tips:" + galleries.describe(level));
                     }
                 }
-                case 2 -> { // growing
+                case 2 -> { // growing: the piece to the hay first
+                    if (hayHole[0] == null) {
+                        if (!colony.nest().foodWays().getNewTunnels().isEmpty()) {
+                            com.antcolonies.colony.FoodWays.NewTunnel toHay = colony.nest().foodWays().getNewTunnels().get(0);
+                            hayHole[0] = toHay.tunnel().hole();
+                            helper.assertTrue(toHay.food().equals(hay), "the piece is for " + toHay.food() + ", not the hay");
+                            helper.assertTrue(Math.max(Math.abs(hayHole[0].getX() - hay.getX()), Math.abs(hayHole[0].getZ() - hay.getZ())) <= 2,
+                                    "the hole " + hayHole[0].toShortString() + " is not beside the hay");
+                            helper.assertTrue(galleries.hasPiece(hayHole[0]), "the tunnel to the hay is not a piece of the galleries");
+                            AntColoniesMod.LOGGER.info("[web-test] tick {}: the piece to the hay, hole at {}", tick, helper.relativePos(hayHole[0]));
+                        } else {
+                            helper.assertTrue(galleries.length() == lengthAtStart[0], "the galleries spread before the piece out to the known hay:"
+                                    + galleries.describe(level));
+                            helper.assertTrue(++since[0] < 1000, "no piece out to the hay:" + galleries.describe(level)
+                                    + colony.foragingHoles().describeNewHoles(level));
+                            return;
+                        }
+                    }
+                    for (BlockPos piece : galleries.pieceHoles()) {
+                        helper.assertTrue(!hayHole[0].equals(galleries.parentOf(piece)), "a tip grew on past the hay while it lasts, to "
+                                + helper.relativePos(piece));
+                    }
                     mostTips[0] = Math.max(mostTips[0], galleries.tipCount()); // tips at the reach stop, so count the most at once
-                    int pieceLength = colony.profile().nest().galleries().orElseThrow().pieceLength();
                     helper.assertTrue(galleries.length() <= galleries.lengthAllowed() + 2 * (pieceLength + 3),
                             "the galleries grew past what the workers allow:" + galleries.describe(level));
                     for (NestPlan.ForagingTunnel tunnel : tunnels) {
-                        double out = Math.hypot(tunnel.hole().getX() - colony.getCenter().getX(), tunnel.hole().getZ() - colony.getCenter().getZ());
+                        double out = Math.hypot(tunnel.hole().getX() - center.getX(), tunnel.hole().getZ() - center.getZ());
                         helper.assertTrue(out <= reach + 2.5, "a hole at " + helper.relativePos(tunnel.hole()) + " is " + Math.round(out)
                                 + " blocks out, past the reach of " + reach);
                     }
@@ -384,30 +441,162 @@ public class TermiteForagingTests {
                         lastLength[0] = galleries.length();
                         since[0] = 0;
                     }
-                    if (galleries.length() >= galleries.lengthAllowed()) {
-                        stage[0] = 3;
-                    } else if (++since[0] >= 600) {
+                    boolean done = galleries.length() >= galleries.lengthAllowed();
+                    if (!done && ++since[0] >= 600) {
                         // Stopped short of what the workers allow: only right if the tips are all out at the reach.
                         helper.assertTrue(galleries.reach() >= reach - 3, "the galleries stopped growing short of what the workers allow and of the reach:"
                                 + galleries.describe(level));
+                        done = true;
+                    }
+                    if (done) {
+                        helper.assertTrue(mostTips[0] > 4, "the tips never forked (at most " + mostTips[0] + " at once):" + galleries.describe(level));
+                        helper.assertTrue(galleries.reach() > 20, "the galleries did not grow out past the arms:" + galleries.describe(level));
+                        int holes = tunnels.size();
+                        helper.assertTrue(holes > holesBefore[0] + 4, "no holes along the new pieces: " + holesBefore[0] + " before, " + holes + " now");
+                        helper.assertTrue(colony.foragingRadius() >= galleries.range() && galleries.range() == galleries.reach() + 6,
+                                "the range should be the galleries' (farthest hole " + galleries.reach() + " and the graze): " + colony.foragingRadius());
+                        // Step 3: the hay goes; a dead bush the colony knows by the farthest other piece that leads on from no other.
+                        level.setBlock(hay, Blocks.AIR.defaultBlockState(), 3);
+                        for (BlockPos piece : galleries.pieceHoles()) {
+                            if (galleries.isFirstArm(piece)) {
+                                firstArms.add(piece);
+                            } else if (galleries.isLeaf(piece) && !piece.equals(hayHole[0]) && (kept[0] == null
+                                    || Math.hypot(piece.getX() - center.getX(), piece.getZ() - center.getZ())
+                                            > Math.hypot(kept[0].getX() - center.getX(), kept[0].getZ() - center.getZ()))) {
+                                kept[0] = piece;
+                            }
+                        }
+                        helper.assertTrue(kept[0] != null, "no far piece to put the dead bush by:" + galleries.describe(level));
+                        BlockPos bush = new BlockPos(kept[0].getX() + 1, hay.getY(), kept[0].getZ() + 1);
+                        level.setBlock(bush, Blocks.DEAD_BUSH.defaultBlockState(), 3);
+                        colony.foodMap().knowForTests(bush);
+                        colony.food().rescanPlantsSoon();
+                        for (BlockPos at = kept[0]; at != null; at = galleries.parentOf(at)) {
+                            keptChain.add(at);
+                        }
+                        NestPlan.ForagingTunnel hayPiece = galleries.pieceAt(hayHole[0]);
+                        hayCells.addAll(galleries.digCells(hayPiece));
+                        com.antcolonies.colony.FoodWays.NewTunnel toHay = colony.nest().foodWays().newTunnelAt(hayHole[0]);
+                        if (toHay.gallery() != null) {
+                            toHay.gallery().stream().filter(cell -> com.antcolonies.colony.Nest.isDugOut(level, cell)).forEach(hayCells::add);
+                        }
+                        AntColoniesMod.LOGGER.info("[web-test] tick {}: the hay goes; a dead bush by the piece to {}", tick, helper.relativePos(kept[0]));
+                        since[0] = 0;
                         stage[0] = 3;
                     }
+                }
+                case 3 -> { // the hay's hole spent (and a moment for its tip to grow on, as it may): 11 days go by
+                    if (spentAt[0] < 0 && colony.nest().foodWays().isSpent(hayHole[0])) {
+                        spentAt[0] = tick;
+                    }
+                    if (spentAt[0] >= 0 && tick - spentAt[0] >= 100) {
+                        for (BlockPos piece : galleries.pieceHoles()) {
+                            piecesSeen.put(piece, galleries.parentOf(piece));
+                        }
+                        lengthBeforeFills[0] = galleries.length();
+                        galleries.ageForTests(11 * 24000L);
+                        agedAt[0] = level.getGameTime();
+                        lastFillAt[0] = tick;
+                        since[0] = 0;
+                        stage[0] = 4;
+                    } else {
+                        helper.assertTrue(++since[0] < 1100, "the hole by the gone hay was not spent");
+                    }
+                }
+                case 4 -> { // filling in
+                    helper.assertTrue(galleries.length() + galleries.filledLength()
+                            <= Math.max(galleries.lengthAllowed(), lengthBeforeFills[0]) + 2 * (pieceLength + 3),
+                            "the tips spread into the length the filled-in pieces gave back:" + galleries.describe(level));
+                    for (BlockPos arm : firstArms) {
+                        helper.assertTrue(galleries.hasPiece(arm), "a first arm was filled in, to " + helper.relativePos(arm));
+                    }
+                    for (BlockPos piece : keptChain) {
+                        helper.assertTrue(galleries.hasPiece(piece), "the piece to " + helper.relativePos(piece)
+                                + " was filled in, though it leads to the dead bush the colony knows");
+                    }
+                    // A piece whose branch beyond was filled in does not dig that way again (it led nowhere).
+                    for (BlockPos piece : galleries.pieceHoles()) {
+                        if (!piecesSeen.containsKey(piece)) {
+                            piecesSeen.put(piece, galleries.parentOf(piece));
+                            helper.assertTrue(!backfilledAt.contains(galleries.parentOf(piece)), "the piece to " + helper.relativePos(galleries.parentOf(piece))
+                                    + " dug again where its branch was filled in, to " + helper.relativePos(piece));
+                        }
+                    }
+                    for (java.util.Map.Entry<BlockPos, BlockPos> seen : piecesSeen.entrySet()) {
+                        if (!galleries.hasPiece(seen.getKey()) && seen.getValue() != null) {
+                            backfilledAt.add(seen.getValue());
+                        }
+                    }
+                    if (!hayFilled[0] && !galleries.hasPiece(hayHole[0])) {
+                        hayFilled[0] = true;
+                        helper.assertTrue(colony.nest().foodWays().newTunnelAt(hayHole[0]) == null, "the filled-in hay piece's feeding spot is still on record");
+                        for (BlockPos cell : hayCells) {
+                            helper.assertTrue(!com.antcolonies.colony.Nest.isDugOut(level, cell), "a block of the hay's filled-in piece is still open at "
+                                    + helper.relativePos(cell));
+                        }
+                        AntColoniesMod.LOGGER.info("[web-test] tick {}: the hay's piece is filled in ({} blocks)", tick, hayCells.size());
+                    }
+                    if (galleries.fills() != lastFills[0]) {
+                        lastFills[0] = galleries.fills();
+                        lastFillAt[0] = tick;
+                    }
+                    if (tick - lastFillAt[0] >= 1200) {
+                        helper.assertTrue(hayFilled[0], "the hay's piece was never filled in:" + galleries.describe(level));
+                        helper.assertTrue(galleries.filledLength() > 0, "no length given back:" + galleries.describe(level));
+                        for (BlockPos piece : galleries.pieceHoles()) {
+                            helper.assertTrue(galleries.isFirstArm(piece) || keptChain.contains(piece) || galleries.lastUsed(piece) >= agedAt[0],
+                                    "the piece to " + helper.relativePos(piece) + " led to no food for 11 days and was not filled in:"
+                                            + galleries.describe(level));
+                        }
+                        // Dead bushes the colony knows 8 blocks past a first arm's end, clear of every hole: they pull that tip.
+                        java.util.List<BlockPos> holes = colony.foragingHoles().tunnels(level).stream().map(NestPlan.ForagingTunnel::hole).toList();
+                        for (BlockPos arm : firstArms) {
+                            if (!galleries.isLeaf(arm)) {
+                                continue;
+                            }
+                            double out = Math.hypot(arm.getX() - center.getX(), arm.getZ() - center.getZ());
+                            double k = (out + 8) / out;
+                            BlockPos aim = new BlockPos((int) Math.round(center.getX() + (arm.getX() - center.getX()) * k), hay.getY(),
+                                    (int) Math.round(center.getZ() + (arm.getZ() - center.getZ()) * k));
+                            if (holes.stream().allMatch(hole -> Math.hypot(hole.getX() - aim.getX(), hole.getZ() - aim.getZ()) > 7.5)) {
+                                pullTip[0] = arm;
+                                pullAim[0] = aim;
+                                break;
+                            }
+                        }
+                        helper.assertTrue(pullTip[0] != null, "no first arm's end clear for the dead bushes:" + galleries.describe(level));
+                        for (int dx = -1; dx <= 1; dx++) {
+                            BlockPos bush = pullAim[0].offset(dx, 0, 0);
+                            level.setBlock(bush, Blocks.DEAD_BUSH.defaultBlockState(), 3);
+                            colony.foodMap().knowForTests(bush);
+                        }
+                        colony.food().rescanPlantsSoon();
+                        filledBeforePull[0] = galleries.filledLength();
+                        AntColoniesMod.LOGGER.info("[web-test] tick {}: {} pieces filled in; dead bushes at {} past the arm to {}", tick,
+                                galleries.fills(), helper.relativePos(pullAim[0]), helper.relativePos(pullTip[0]));
+                        since[0] = 0;
+                        stage[0] = 5;
+                    }
+                }
+                case 5 -> { // the dead bushes pull the tip
+                    for (BlockPos piece : galleries.pieceHoles()) {
+                        if (pullTip[0].equals(galleries.parentOf(piece))) {
+                            double before = Math.hypot(pullTip[0].getX() - pullAim[0].getX(), pullTip[0].getZ() - pullAim[0].getZ());
+                            double after = Math.hypot(piece.getX() - pullAim[0].getX(), piece.getZ() - pullAim[0].getZ());
+                            helper.assertTrue(after < before - 1, "the tip grew from " + helper.relativePos(pullTip[0]) + " to "
+                                    + helper.relativePos(piece) + ", not toward the dead bushes at " + helper.relativePos(pullAim[0]));
+                            helper.assertTrue(galleries.filledLength() < filledBeforePull[0], "growing toward food did not use the length given back");
+                            stage[0] = 6;
+                            return;
+                        }
+                    }
+                    helper.assertTrue(++since[0] < 1500, "the dead bushes past the arm's end did not pull its tip:" + galleries.describe(level));
                 }
                 default -> {
                 }
             }
         });
-        helper.succeedWhen(() -> {
-            helper.assertTrue(stage[0] == 3, "the galleries did not grow to what the workers allow (stage " + stage[0] + ")");
-            Colony colony = TermiteMoundTests.colony(helper);
-            com.antcolonies.colony.Galleries galleries = colony.nest().galleries();
-            helper.assertTrue(mostTips[0] > 4, "the tips never forked (at most " + mostTips[0] + " at once):" + galleries.describe(level));
-            helper.assertTrue(galleries.reach() > 20, "the galleries did not grow out past the arms:" + galleries.describe(level));
-            int holes = colony.foragingHoles().tunnels(level).size();
-            helper.assertTrue(holes > holesBefore[0] + 4, "no holes along the new pieces: " + holesBefore[0] + " before, " + holes + " now");
-            helper.assertTrue(colony.foragingRadius() >= galleries.range() && galleries.range() == galleries.reach() + 6,
-                    "the range should be the galleries' (farthest hole " + galleries.reach() + " and the graze): " + colony.foragingRadius());
-        });
+        helper.succeedWhen(() -> helper.assertTrue(stage[0] == 6, "the galleries' growth and filling in did not finish (stage " + stage[0] + ")"));
     }
 
     /** Termites head in before dawn: the last in-game hour or so of the night already counts as day for them. */

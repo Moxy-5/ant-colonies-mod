@@ -211,6 +211,14 @@ public class Nest {
             if (next != null) {
                 return next;
             }
+            // A piece out to rich food (they come first): its feeding gallery up under the food right after it.
+            FoodWays.NewTunnel toFood = galleries.isOn() ? foodWays.newTunnelAt(tunnel.hole()) : null;
+            if (toFood != null && toFood.gallery() != null && !foodWays.isSpent(tunnel.hole()) && ForagingHoles.isDug(level, tunnel)) {
+                next = firstDiggable(level, toFood.gallery());
+                if (next != null) {
+                    return next;
+                }
+            }
         }
         // The feeding galleries up under rich food, once their tunnels are dug (in the order planned: from the tunnel up).
         for (FoodWays.NewTunnel tunnel : foodWays.getNewTunnels()) {
@@ -788,7 +796,8 @@ public class Nest {
         if (allForagingTunnelsStale) {
             List<NestPlan.ForagingTunnel> all = new ArrayList<>(foragingTunnels);
             all.addAll(galleries.arms());
-            foodWays.getNewTunnels().forEach(tunnel -> all.add(tunnel.tunnel()));
+            foodWays.getNewTunnels().stream().filter(tunnel -> !galleries.hasPiece(tunnel.tunnel().hole())) // (one of the pieces)
+                    .forEach(tunnel -> all.add(tunnel.tunnel()));
             all.addAll(galleries.holesAlong());
             allForagingTunnels = List.copyOf(all);
             allForagingTunnelsStale = false;

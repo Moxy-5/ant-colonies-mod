@@ -221,6 +221,25 @@ public class FoodWays {
         changed.run();
     }
 
+    /** The tunnel dug out to rich food ending at this hole, or null. */
+    @Nullable
+    public NewTunnel newTunnelAt(BlockPos hole) {
+        for (NewTunnel tunnel : newTunnels) {
+            if (tunnel.tunnel().hole().equals(hole)) {
+                return tunnel;
+            }
+        }
+        return null;
+    }
+
+    /** The tunnel to rich food ending at this hole is gone from the record (its gallery piece was filled in with soil). */
+    void dropNewTunnel(BlockPos hole) {
+        if (newTunnels.removeIf(tunnel -> tunnel.tunnel().hole().equals(hole))) {
+            spentHoles.remove(hole);
+            changed.run();
+        }
+    }
+
     /** Whether this hole is the end of a tunnel dug out to rich food whose food is not gone yet. */
     public boolean isLiveNewHole(BlockPos hole) {
         return !isSpent(hole) && newTunnels.stream().anyMatch(t -> t.tunnel().hole().equals(hole));

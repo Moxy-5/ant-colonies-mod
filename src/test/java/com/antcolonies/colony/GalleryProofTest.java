@@ -410,6 +410,8 @@ class GalleryProofTest {
         int holes = 0;
         int allSides = 0;
         int longest = 0;
+        int foodPieces = 0;
+        int filledIn = 0;
         List<String> failures = new ArrayList<>();
         for (long seed = 1; seed <= WEB_LANDSCAPES; seed++) {
             Landscape land = new Landscape(seed);
@@ -484,6 +486,74 @@ class GalleryProofTest {
                 }
             }
             longest = Math.max(longest, webCells.size());
+            // Step 3: pieces out to food from the nearest gallery (2 per landscape, 20 to 45 blocks out, any way).
+            int arms = Math.min(4, web.size());
+            for (int f = 0; f < 2; f++) {
+                double way = random.nextDouble() * Math.PI * 2;
+                double out = 20 + random.nextInt(26);
+                int fx = (int) Math.round(Math.cos(way) * out);
+                int fz = (int) Math.round(Math.sin(way) * out);
+                BlockPos food = new BlockPos(fx, land.top(fx, fz) + 1, fz);
+                List<NestPlan.ForagingTunnel> from = new ArrayList<>(own);
+                from.addAll(web);
+                Galleries.Piece piece = Galleries.planPiece(from, food, land.ground(), center, 9, numbers.reach() + 16);
+                if (piece == null) {
+                    continue;
+                }
+                foodPieces++;
+                List<BlockPos> cells = piece.tunnel().tunnel();
+                List<BlockPos> lead = cells.subList(0, piece.from());
+                if (lead.isEmpty() || from.stream().noneMatch(tunnel -> tunnel.tunnel().size() >= lead.size()
+                        && tunnel.tunnel().subList(0, lead.size()).equals(lead))) {
+                    failures.add(where + ": the piece to the food at " + food.toShortString() + " does not leave from a gallery");
+                }
+                BlockPos hole = piece.tunnel().hole();
+                if (Math.hypot(hole.getX() - fx, hole.getZ() - fz) > TunnelRoute.HOLE_REACH + 1) {
+                    failures.add(where + ": the hole " + hole.toShortString() + " of the piece to the food at " + food.toShortString() + " is not beside it");
+                }
+                List<BlockPos> fresh = cells.subList(piece.from(), cells.size());
+                for (BlockPos cell : fresh) {
+                    if (Math.hypot(cell.getX(), cell.getZ()) < 9) {
+                        failures.add(where + ": the piece to the food digs " + cell.toShortString() + " near the middle");
+                    }
+                }
+                land.dug.addAll(fresh);
+                webCells.addAll(fresh);
+                web.add(piece.tunnel());
+            }
+            // Filling in: far pieces nothing leads on from are packed with soil, in rounds (back toward their forks); the
+            // blocks another tunnel uses stay open. The first arms never fill in.
+            for (int round = 0; round < 3; round++) {
+                for (int i = web.size() - 1; i >= arms; i--) {
+                    NestPlan.ForagingTunnel piece = web.get(i);
+                    BlockPos end = piece.tunnel().get(piece.tunnel().size() - 1);
+                    Set<BlockPos> others = new HashSet<>(ownCells);
+                    for (NestPlan.ForagingTunnel other : web) {
+                        if (other != piece) {
+                            others.addAll(other.tunnel());
+                        }
+                    }
+                    if (others.contains(end) || random.nextInt(3) != 0) {
+                        continue; // something leads on from it (or not this one)
+                    }
+                    for (BlockPos cell : piece.tunnel()) {
+                        if (!others.contains(cell)) {
+                            land.dug.remove(cell);
+                            webCells.remove(cell);
+                        }
+                    }
+                    web.remove(i);
+                    filledIn++;
+                }
+            }
+            for (NestPlan.ForagingTunnel tunnel : web) {
+                for (BlockPos cell : tunnel.tunnel()) {
+                    if (!land.dug.contains(cell)) {
+                        failures.add(where + ": the gallery to " + tunnel.hole().toShortString() + " runs through the filled-in block " + cell.toShortString());
+                        break;
+                    }
+                }
+            }
             // The holes: each piece's own, and along every gallery.
             List<BlockPos> taken = new ArrayList<>(List.of(center));
             own.forEach(tunnel -> taken.add(tunnel.hole()));
@@ -536,12 +606,15 @@ class GalleryProofTest {
             }
         }
         System.out.println("[gallery proof] whole webs: " + landscapes + " landscapes, " + pieces + " pieces, " + forks + " forks, "
-                + holes + " holes, the longest web " + longest + " blocks, out on every side on " + allSides + ", " + failures.size() + " failures");
+                + holes + " holes, the longest web " + longest + " blocks, out on every side on " + allSides + ", " + foodPieces + " pieces out to food, "
+                + filledIn + " filled in, " + failures.size() + " failures");
         failures.forEach(line -> System.out.println("[gallery proof] " + line));
         if (!failures.isEmpty()) {
             fail(failures.size() + " failures, first ones:\n" + String.join("\n", failures.subList(0, Math.min(15, failures.size()))));
         }
         assertTrue(forks >= landscapes, "too few forks: " + forks + " on " + landscapes + " landscapes");
+        assertTrue(foodPieces >= landscapes, "too few pieces out to food: " + foodPieces + " on " + landscapes + " landscapes");
+        assertTrue(filledIn >= landscapes / 2, "too few pieces filled in: " + filledIn + " on " + landscapes + " landscapes");
         assertTrue(allSides >= landscapes * 3 / 4, "the webs should reach out on every side of the mound on most landscapes: " + allSides
                 + " of " + landscapes);
     }
