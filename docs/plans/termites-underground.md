@@ -102,7 +102,7 @@ in-game) and **2b** (hidden trips).
 - **BUILT 2026-10-17** (`colony/HiddenTrips`, `nav/HiddenWays`, `AntNavigator.goUnder`/`cameUp`; switch
   `nest.galleries.hidden_trip`, 0 = off). Not a number in the population: the same insect, taken out of the world and
   put back (its job, load and route kept), counted among the real mobs meanwhile. Break-ins looked for once a second.
-  Game test `hiddenTripsGoUnseenAndShowUpWhereTheyAreWhenTheGalleryIsBrokenInto`. To be tried in-game with 2a.
+  Game test `hiddenTripsGoUnseenAndShowUpWhereTheyAreWhenTheGalleryIsBrokenInto`. Confirmed in-game by the user 2026-10-17, together with 2a ("it all works well").
 
 ## Step 3: growing toward food
 - Food found from a hole pulls the nearest tip toward it; rich food gets its feeding gallery as today. Today's
