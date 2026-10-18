@@ -103,6 +103,7 @@ Ranked by time saved, quality kept. Sizes: **small** = one session, **medium** =
 more of sessions.
 
 ### M1. Guard films: the body's standing tests, filmed and checked after every change (new idea)
+**BUILT 2026-10-18** (branch `claude/nostalgic-engelbart-1cf92f`, merged into `brain-danger`): `tools/guard_films.py`, with F1 (`client/FilmFrameMeter`); `docs/HISTORY.md`, "Guard films".
 - **What:** a fixed set of in-game camera scenes for the body, run automatically after every change to the clips or
   the live layer: walking at each of the three speeds, turning on the spot both ways, up a wall and over the top, over
   a brink and head first down, down a wall and onto the floor (the landing), the inside corner at a wall's foot, onto
@@ -139,6 +140,7 @@ for M3.
 - **Size:** small to medium. **Depends on:** nothing.
 
 ### M3. Body plans and a gait maker (Part 2, B1 and B2)
+**BUILT 2026-10-18** (branch `claude/nostalgic-engelbart-1cf92f`, merged into `brain-danger`; plan `docs/plans/body-plans-and-gaits.md`): `tools/body_plan.py`, `assets/antcolonies/body_plans/`; `docs/HISTORY.md`, "Body plans and the gait maker".
 - **What:** describe any creature's body once in a file, and get its walks (slow, normal, fast), turns, idle, looks and
   standing poses made automatically, with planted feet and the stride note, for any number of legs, including lost
   legs. Details in B1 and B2.
@@ -158,6 +160,7 @@ for M3.
 - **Size:** medium. **Depends on:** M3 (the plan).
 
 ### M5. Faster lab checks
+**BUILT 2026-10-18** (branch `claude/lab-speed-b2a068`, merged into `brain-danger`): `tools/anim_lab.py`; `docs/HISTORY.md`, "Faster lab checks".
 - **What:** the lab's full check takes 38 seconds for 17 clips. Check the clips side by side (the PC has 20 threads:
   about 5 seconds), and only re-check clips whose numbers changed (remember a fingerprint of each).
 - **Why:** with many creatures and lost-leg gaits (dozens of clips each) the check stays under a minute, so it is run
@@ -349,7 +352,7 @@ Ranked by value for the coming work (Matabele ants and fights first, then the sa
 - **Size:** small to medium. **Depends on:** B1.
 
 ### B11. The termites onto the motion library
-- **Planned with the user 2026-10-18:** `docs/plans/termite-walks.md` (not built yet).
+- **Planned with the user 2026-10-18:** `docs/plans/termite-walks.md`. **Built 2026-10-18** (branch `claude/gracious-greider-989f2d`, merged into `brain-danger`; `docs/HISTORY.md`, "Termite walks (B11)").
 - **What:** the termites still walk with the old hand-set walk (`walk_legs` in `tools/termite_models.py`: feet slide,
   no stride note, the game guesses the playback speed), and have no turning, cleaning or digging clips
   (`hasWorkClips` is false for them). With B1 and B2 they get the planted-feet walks and turns in an afternoon.
