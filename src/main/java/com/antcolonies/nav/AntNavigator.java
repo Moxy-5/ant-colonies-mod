@@ -779,16 +779,38 @@ public class AntNavigator {
         return false;
     }
 
-    /** Down the wall to the floor, then the body tips back onto it. */
+    /**
+     * Down the wall to the floor, then the body tips back onto it, then it walks straight out from the wall until its
+     * rear is off the wall too, before it turns where the route goes (the user's report, 2026-10-18: turning at once at
+     * the foot slid the body sideways with the abdomen still raised against the wall; a real ant coming down head first
+     * walks on until the whole body is on the floor). How far: its box's width, about its body behind the middle and
+     * the bend's settling (the worker's 0.3 blocks, as the films showed its gaster flat after), for every body.
+     */
     private boolean offWall(Foothold from) {
-        surface = from.surface();
-        if (moveAttached(wallPoint(from, from.cell().getY()))) {
-            setYaw(from.surface().toYRot() - heading);
-            surface = Direction.DOWN;
+        Direction wall = from.surface();
+        if (leg == 0) {
+            surface = wall;
+            if (moveAttached(wallPoint(from, from.cell().getY()))) {
+                setYaw(wall.toYRot() - heading);
+                surface = Direction.DOWN;
+                leg = 1;
+            }
+            return false;
+        }
+        surface = Direction.DOWN;
+        Direction.Axis axis = wall.getAxis();
+        double out = Math.min(ant.getBbWidth(), 1.0 - 2.0 * (half() + EPS));
+        double clear = pinned(from.cell(), wall) - wall.getAxisDirection().getStep() * out;
+        if (Math.abs(coord(ant.position(), axis) - pinned(from.cell(), wall)) >= out - CLEAR_OF_WALL_SLACK) {
             return true;
         }
+        Vec3 aim = with(ant.position(), axis, clear);
+        ant.getMoveControl().setWantedPosition(aim.x, aim.y, aim.z, speed);
         return false;
     }
+
+    /** How near the walk out from the foot of a wall counts as there (blocks; well under one tick's walk). */
+    private static final double CLEAR_OF_WALL_SLACK = 0.02;
 
     /** Up, down or sideways along a wall into the next cell's part of it. */
     private boolean climb(Foothold to, boolean sideways) {

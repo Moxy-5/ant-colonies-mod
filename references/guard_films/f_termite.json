@@ -357,12 +357,8 @@
  ],
  "findings": {
   "jump head": [
-   2,
+   1,
    0.103
-  ],
-  "jump at ramp_up_05": [
-   7,
-   0.098
   ],
   "jump at pillar_down_35": [
    8,
@@ -377,7 +373,7 @@
    0.062
   ],
   "jump mandible_r": [
-   2,
+   1,
    0.11
   ],
   "inside antenna_l_1": [
@@ -385,7 +381,7 @@
    0.026
   ],
   "jump antenna_l_1": [
-   2,
+   1,
    0.117
   ],
   "inside antenna_l_2": [
@@ -409,7 +405,7 @@
    0.042
   ],
   "jump antenna_l_2": [
-   3,
+   2,
    0.148
   ],
   "jump at pillar_down_36": [
@@ -421,7 +417,7 @@
    0.02
   ],
   "jump mandible_l": [
-   2,
+   1,
    0.11
   ],
   "inside antenna_r_1": [
@@ -429,7 +425,7 @@
    0.027
   ],
   "jump antenna_r_1": [
-   2,
+   1,
    0.114
   ],
   "inside antenna_r_2": [
@@ -449,7 +445,7 @@
    0.012
   ],
   "jump antenna_r_2": [
-   3,
+   2,
    0.143
   ],
   "inside leg_r3_lower": [

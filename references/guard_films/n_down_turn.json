@@ -1,0 +1,232 @@
+{
+ "pictures": [
+  "down_turn_00.png",
+  "down_turn_01.png",
+  "down_turn_02.png",
+  "down_turn_03.png",
+  "down_turn_04.png",
+  "down_turn_05.png",
+  "down_turn_06.png",
+  "down_turn_07.png",
+  "down_turn_08.png",
+  "down_turn_09.png",
+  "down_turn_10.png",
+  "down_turn_11.png",
+  "down_turn_12.png",
+  "down_turn_13.png",
+  "down_turn_14.png",
+  "down_turn_15.png",
+  "down_turn_16.png",
+  "down_turn_17.png",
+  "down_turn_18.png",
+  "down_turn_19.png",
+  "down_turn_20.png",
+  "down_turn_21.png",
+  "down_turn_22.png",
+  "down_turn_23.png",
+  "down_turn_24.png",
+  "down_turn_25.png",
+  "down_turn_26.png",
+  "down_turn_27.png",
+  "down_turn_28.png",
+  "down_turn_29.png",
+  "down_turn_30.png",
+  "down_turn_31.png",
+  "down_turn_32.png",
+  "down_turn_33.png",
+  "down_turn_34.png",
+  "down_turn_35.png",
+  "down_turn_36.png",
+  "down_turn_37.png",
+  "down_turn_38.png",
+  "down_turn_39.png",
+  "down_turn_40.png",
+  "down_turn_41.png",
+  "down_turn_42.png",
+  "down_turn_43.png",
+  "down_turn_44.png",
+  "down_turn_45.png",
+  "down_turn_46.png",
+  "down_turn_47.png",
+  "down_turn_48.png",
+  "down_turn_49.png",
+  "down_turn_50.png",
+  "down_turn_51.png",
+  "down_turn_52.png",
+  "down_turn_53.png",
+  "down_turn_54.png",
+  "down_turn_55.png",
+  "down_turn_56.png",
+  "down_turn_57.png",
+  "down_turn_58.png",
+  "down_turn_59.png",
+  "down_turn_60.png",
+  "down_turn_61.png",
+  "down_turn_62.png",
+  "down_turn_63.png",
+  "down_turn_64.png",
+  "down_turn_65.png",
+  "down_turn_66.png",
+  "down_turn_67.png",
+  "down_turn_68.png",
+  "down_turn_69.png",
+  "down_turn_70.png",
+  "down_turn_71.png",
+  "down_turn_72.png",
+  "down_turn_73.png",
+  "down_turn_74.png",
+  "down_turn_75.png",
+  "down_turn_76.png",
+  "down_turn_77.png",
+  "down_turn_78.png",
+  "down_turn_79.png",
+  "down_turn_80.png",
+  "down_turn_81.png",
+  "down_turn_82.png",
+  "down_turn_83.png",
+  "down_turn_84.png",
+  "down_turn_85.png",
+  "down_turn_86.png",
+  "down_turn_87.png",
+  "down_turn_88.png",
+  "down_turn_89.png",
+  "down_turn_90.png",
+  "down_turn_91.png",
+  "down_turn_92.png",
+  "down_turn_93.png",
+  "down_turn_94.png",
+  "down_turn_95.png",
+  "down_turn_96.png",
+  "down_turn_97.png",
+  "down_turn_98.png",
+  "down_turn_99.png",
+  "down_turn_100.png",
+  "down_turn_101.png",
+  "down_turn_102.png",
+  "down_turn_103.png",
+  "down_turn_104.png",
+  "down_turn_105.png",
+  "down_turn_106.png",
+  "down_turn_107.png",
+  "down_turn_108.png",
+  "down_turn_109.png",
+  "down_turn_110.png",
+  "down_turn_111.png",
+  "down_turn_112.png",
+  "down_turn_113.png",
+  "down_turn_114.png",
+  "down_turn_115.png",
+  "down_turn_116.png",
+  "down_turn_117.png",
+  "down_turn_118.png",
+  "down_turn_119.png",
+  "down_turn_120.png",
+  "down_turn_121.png",
+  "down_turn_122.png",
+  "down_turn_123.png",
+  "down_turn_124.png",
+  "down_turn_125.png",
+  "down_turn_126.png",
+  "down_turn_127.png",
+  "down_turn_128.png",
+  "down_turn_129.png"
+ ],
+ "size": [
+  240,
+  136
+ ],
+ "findings": {
+  "jump leg_r2": [
+   1,
+   0.132
+  ],
+  "jump at down_turn_19": [
+   9,
+   0.229
+  ],
+  "jump leg_l2": [
+   1,
+   0.101
+  ],
+  "jump at down_turn_41": [
+   8,
+   0.215
+  ],
+  "jump thorax": [
+   2,
+   0.126
+  ],
+  "jump head": [
+   1,
+   0.145
+  ],
+  "jump mandible_r": [
+   1,
+   0.157
+  ],
+  "jump antenna_l_1": [
+   1,
+   0.119
+  ],
+  "jump antenna_l_2": [
+   1,
+   0.183
+  ],
+  "jump mandible_l": [
+   1,
+   0.152
+  ],
+  "jump antenna_r_1": [
+   1,
+   0.133
+  ],
+  "jump antenna_r_2": [
+   1,
+   0.229
+  ],
+  "jump leg_r3": [
+   1,
+   0.147
+  ],
+  "jump leg_l3_lower": [
+   1,
+   0.195
+  ],
+  "jump leg_l3_foot": [
+   1,
+   0.215
+  ],
+  "jump petiole": [
+   2,
+   0.134
+  ],
+  "jump at down_turn_20": [
+   2,
+   0.071
+  ],
+  "jump postpetiole": [
+   2,
+   0.149
+  ],
+  "inside abdomen": [
+   1,
+   0.026
+  ],
+  "inside at down_turn_26": [
+   1,
+   0.026
+  ],
+  "jump abdomen": [
+   2,
+   0.189
+  ],
+  "jump at down_turn_27": [
+   1,
+   0.131
+  ]
+ },
+ "body_findings": {
+  "tipped": 1
+ },
+ "known_bugs": "older, not BUGS 56: at the top, going over the ridge's side edge after walking along it, the worker's tilt wobbles (16, 46, 36, 48 degrees) and its abdomen grazes the stone 0.03; at the foot the body settles flat fast (33 to 9 to 0 degrees in 2 ticks), as in c_climb (BUGS 57)"
+}

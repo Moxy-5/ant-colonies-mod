@@ -1,0 +1,15 @@
+# Guard film (docs/BUGS.md 56): the major soldier off the ridge, the same as n_down_turn for the biggest body.
+cmd time set noon
+cmd weather clear
+cmd fill -6 -60 0 0 -60 0 stone
+lens 30
+walker termite_major_soldier -4.5 -59 0.5 -90
+log down_turn_major
+cmd tick freeze
+fov 12
+follow 0 2.2 -1.6 0 55
+go 3 -60 2
+burst major_down_turn 130 1
+log off
+follow off
+quit

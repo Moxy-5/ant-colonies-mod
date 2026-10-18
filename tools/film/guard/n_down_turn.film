@@ -1,0 +1,17 @@
+# Guard film (docs/BUGS.md 56, the user's report 2026-10-18): off a ridge one block wide, head first down its side, then
+# along its foot: the body walks straight out until it is flat on the floor, and only then turns (it once turned at once
+# and slid sideways with the abdomen still up the wall).
+cmd time set noon
+cmd weather clear
+cmd fill -6 -60 0 0 -60 0 stone
+lens 30
+walker worker_ant -4.5 -59 0.5 -90
+log down_turn
+cmd tick freeze
+fov 12
+follow 0 2.2 -1.6 0 55
+go 3 -60 2
+burst down_turn 130 1
+log off
+follow off
+quit
