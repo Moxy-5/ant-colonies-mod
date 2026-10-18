@@ -104,11 +104,16 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * {@code halfLifeTicks}; below {@code forgetBelow} the place is forgotten. Ground within {@code reach} blocks of a place
      * is dangerous while the strengths there add up to {@code dangerousFrom}; the nest's own ground (within {@code home}
      * blocks of its middle) never is. {@code keepAway}: the foragers leave dangerous ground and the trails through it alone
-     * (harvester ants; termites plug their holes instead, step 3). My picks, to confirm: a death 4 (kept away from about 2
-     * days, remembered 3), a hurt 2, a sighting 1, halving every day.
+     * (harvester ants). {@code closeHoles}: the colony plugs and closes its foraging holes where its members were attacked
+     * (termites, step 3: every hole within {@code reach} of an attack, and every hole whose gallery out from the nest runs
+     * that near one, until the danger fades); a place that was once as strong as {@code leaveFrom} is left for good: its
+     * holes within {@code mergeWithin} are never opened again, and a new hole is opened on the same gallery at least
+     * {@code newHoleFrom} blocks from it. My picks, to confirm: a death 4 (kept away from about 2 days, remembered 3), a
+     * hurt 2, a sighting 1, halving every day; a hole left after 6 (two deaths, or a death and a hurt), its new hole 7 out.
      */
     public record DangerNumbers(double hurt, double killed, double seen, double seenWithin, int seenEveryTicks, double mergeWithin,
-            double reach, int halfLifeTicks, double forgetBelow, double dangerousFrom, double most, double home, boolean keepAway) {
+            double reach, int halfLifeTicks, double forgetBelow, double dangerousFrom, double most, double home, boolean keepAway,
+            boolean closeHoles, double leaveFrom, double newHoleFrom) {
         public static final Codec<DangerNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.DOUBLE.optionalFieldOf("hurt", 2.0).forGetter(DangerNumbers::hurt),
                 Codec.DOUBLE.optionalFieldOf("killed", 4.0).forGetter(DangerNumbers::killed),
@@ -122,7 +127,10 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 Codec.DOUBLE.optionalFieldOf("dangerous_from", 1.0).forGetter(DangerNumbers::dangerousFrom),
                 Codec.DOUBLE.optionalFieldOf("most", 12.0).forGetter(DangerNumbers::most),
                 Codec.DOUBLE.optionalFieldOf("home", 6.0).forGetter(DangerNumbers::home),
-                Codec.BOOL.optionalFieldOf("keep_away", false).forGetter(DangerNumbers::keepAway)
+                Codec.BOOL.optionalFieldOf("keep_away", false).forGetter(DangerNumbers::keepAway),
+                Codec.BOOL.optionalFieldOf("close_holes", false).forGetter(DangerNumbers::closeHoles),
+                Codec.DOUBLE.optionalFieldOf("leave_from", 6.0).forGetter(DangerNumbers::leaveFrom),
+                Codec.DOUBLE.optionalFieldOf("new_hole_from", 7.0).forGetter(DangerNumbers::newHoleFrom)
         ).apply(i, DangerNumbers::new));
     }
 

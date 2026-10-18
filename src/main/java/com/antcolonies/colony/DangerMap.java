@@ -43,13 +43,19 @@ public class DangerMap {
         String what;
         /** Killed members here, in all (for the colony list). */
         int deaths;
+        /** Members hurt here and not killed, in all: with {@link #deaths}, whether anyone was attacked here (not only a hostile seen). */
+        int hurts;
+        /** The most the strength has been (a place once hit hard enough is left for good: termites, step 3). */
+        double peak;
 
-        Place(BlockPos pos, double strength, long at, String what, int deaths) {
+        Place(BlockPos pos, double strength, long at, String what, int deaths, int hurts, double peak) {
             this.pos = pos;
             this.strength = strength;
             this.at = at;
             this.what = what;
             this.deaths = deaths;
+            this.hurts = hurts;
+            this.peak = peak;
         }
 
         public BlockPos pos() {
@@ -63,6 +69,15 @@ public class DangerMap {
         public int deaths() {
             return deaths;
         }
+
+        /** Whether a member was hurt or killed here (not only a hostile seen). */
+        public boolean attacked() {
+            return deaths + hurts > 0;
+        }
+
+        public double peak() {
+            return peak;
+        }
     }
 
     /** How sightings are counted: once a mob has been seen it adds again only after this long (ticks). */
@@ -71,6 +86,8 @@ public class DangerMap {
     private final List<Place> places = new ArrayList<>();
     /** Places forgotten since the colony was loaded (for the list). */
     private int forgotten;
+    /** Counts every place added to, made or forgotten (the closed holes are worked out again when it changes). */
+    private int version;
 
     DangerMap(Colony colony) {
         this.colony = colony;
@@ -89,7 +106,7 @@ public class DangerMap {
         if (numbers == null) {
             return;
         }
-        add(level, where, killed ? numbers.killed() : numbers.hurt(), what, killed, killed ? "a member killed" : "a member hurt");
+        add(level, where, killed ? numbers.killed() : numbers.hurt(), what, killed, true, killed ? "a member killed" : "a member hurt");
     }
 
     /** A member out on the surface saw a hostile mob ({@code mob}) close by at {@code where}: counted once per {@code seen_every_ticks}. */
@@ -107,10 +124,10 @@ public class DangerMap {
         if (seenAt.size() > 256) {
             seenAt.values().removeIf(time -> now - time >= numbers.seenEveryTicks() || time > now);
         }
-        add(level, where, numbers.seen(), what, false, "a hostile seen");
+        add(level, where, numbers.seen(), what, false, false, "a hostile seen");
     }
 
-    private void add(ServerLevel level, BlockPos where, double amount, String what, boolean killed, String happened) {
+    private void add(ServerLevel level, BlockPos where, double amount, String what, boolean killed, boolean attack, String happened) {
         SpeciesProfile.DangerNumbers numbers = numbers();
         long now = level.getGameTime();
         Place nearest = null;
@@ -123,15 +140,19 @@ public class DangerMap {
             }
         }
         if (nearest == null) {
-            nearest = new Place(where.immutable(), 0, now, what, 0);
+            nearest = new Place(where.immutable(), 0, now, what, 0, 0, 0);
             places.add(nearest);
         }
         nearest.strength = Math.min(numbers.most(), strength(nearest, now) + amount);
         nearest.at = now;
         nearest.what = what;
+        nearest.peak = Math.max(nearest.peak, nearest.strength);
         if (killed) {
             nearest.deaths++;
+        } else if (attack) {
+            nearest.hurts++;
         }
+        version++;
         AntColoniesMod.LOGGER.info("[danger] colony {}: {} at {} ({}), strength now {}", colony.getId(), happened, where.toShortString(), what,
                 String.format("%.1f", nearest.strength));
         ColonyManager.get(level).markChanged();
@@ -169,15 +190,57 @@ public class DangerMap {
     }
 
     /**
+     * Whether {@code pos} lies where members were attacked (hurt or killed, not only a hostile seen): the strength of the
+     * places within {@code reach} where someone was attacked adds up to {@code dangerous_from}. The nest's own ground never
+     * does. What the termites close their holes for (step 3, {@link ClosedHoles}).
+     */
+    public boolean isAttacked(Level level, BlockPos pos) {
+        SpeciesProfile.DangerNumbers numbers = numbers();
+        if (numbers == null || places.isEmpty()) {
+            return false;
+        }
+        long now = level.getGameTime();
+        double sum = 0;
+        for (Place place : places) {
+            if (place.attacked() && flat(place.pos, pos) <= numbers.reach() && !atHome(place.pos)) {
+                sum += strength(place, now);
+            }
+        }
+        return sum >= numbers.dangerousFrom();
+    }
+
+    /** The places where someone was attacked that were once as strong as {@code leave_from} (left for good: termites, step 3). */
+    public List<Place> hitHard() {
+        SpeciesProfile.DangerNumbers numbers = numbers();
+        List<Place> hard = new ArrayList<>();
+        if (numbers != null) {
+            for (Place place : places) {
+                if (place.attacked() && place.peak >= numbers.leaveFrom() && !atHome(place.pos)) {
+                    hard.add(place);
+                }
+            }
+        }
+        return hard;
+    }
+
+    /** Changes each time a place is added to, made or forgotten (for the caches built on the memory). */
+    public int version() {
+        return version;
+    }
+
+    /**
      * Whether the colony's foragers keep away from {@code pos} now (species with {@code keep_away}): it is a dangerous
      * place, or the trunk trail a forager would walk out to it passes one (see {@link TrunkTrails#passesDanger}).
      */
     public boolean avoids(Level level, BlockPos pos) {
         SpeciesProfile.DangerNumbers numbers = numbers();
-        if (numbers == null || !numbers.keepAway() || places.isEmpty()) {
+        if (numbers == null || places.isEmpty()) {
             return false;
         }
-        return isDangerous(level, pos) || colony.trunkTrails().passesDanger(level, pos);
+        if (numbers.closeHoles() && isAttacked(level, pos)) {
+            return true; // (termites: no food is fetched where they were attacked, from outside or from inside)
+        }
+        return numbers.keepAway() && (isDangerous(level, pos) || colony.trunkTrails().passesDanger(level, pos));
     }
 
     /** Whether any place is remembered at all (a quick check before the costly ones). */
@@ -203,6 +266,7 @@ public class DangerMap {
             if (strength(place, now) < numbers.forgetBelow() || place.at > now + 24000L) {
                 it.remove();
                 forgotten++;
+                version++;
                 colony.away().note(level, AwayReport.What.DANGER_FORGOTTEN, 1);
                 AntColoniesMod.LOGGER.info("[danger] colony {}: the danger at {} is forgotten", colony.getId(), place.pos.toShortString());
                 ColonyManager.get(level).markChanged();
@@ -233,6 +297,7 @@ public class DangerMap {
         for (Place place : places) {
             place.at -= ticks;
         }
+        version++;
     }
 
     /** For the colony list: " | danger: 2 places (strongest 3.4 at 10, 64, -5: zombie, 1 killed), 1 forgotten", or empty. */
@@ -265,6 +330,8 @@ public class DangerMap {
             one.putLong("at", place.at);
             one.putString("what", place.what);
             one.putInt("deaths", place.deaths);
+            one.putInt("hurts", place.hurts);
+            one.putDouble("peak", place.peak);
             list.add(one);
         }
         tag.put("danger", list);
@@ -275,7 +342,7 @@ public class DangerMap {
         for (Tag entry : tag.getList("danger", Tag.TAG_COMPOUND)) {
             CompoundTag one = (CompoundTag) entry;
             places.add(new Place(BlockPos.of(one.getLong("pos")), one.getDouble("strength"), one.getLong("at"), one.getString("what"),
-                    one.getInt("deaths")));
+                    one.getInt("deaths"), one.getInt("hurts"), one.contains("peak") ? one.getDouble("peak") : one.getDouble("strength")));
         }
     }
 }
