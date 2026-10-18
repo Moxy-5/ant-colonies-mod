@@ -1,5 +1,8 @@
 package com.antcolonies.client;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
+
 import com.antcolonies.AntColoniesMod;
 import com.mojang.logging.LogUtils;
 
@@ -19,35 +22,38 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 /**
- * A burst's steps of the frozen game, as fast as the pictures can be taken and the same every run (development only,
- * 2026-10-18). A burst steps the game a tick between its pictures; the camera used to send {@code tick step} and wait
- * a fixed 3 client ticks more for it to come through: about two thirds of a scene's time, and the pictures still
- * depended on timing in two ways. Now:
+ * The frozen game stepped for the camera, as fast as the pictures can be taken and the same every run (development
+ * only, 2026-10-18). A burst steps the game a tick between its pictures; the camera used to send {@code tick step} and
+ * wait a fixed 3 client ticks more for it to come through: about two thirds of a scene's time, and the pictures still
+ * depended on timing in three ways. Now:
  * <ul>
  * <li>the game's side, at the end of each stepped tick, sends a hidden marker message; messages arrive in the order
  * they were sent, so once the marker is here, so is everything the game sent before it;</li>
  * <li>this side runs each of its own stepped ticks (a frozen client moves its insects, particles and textures only on
  * those) only once that tick's marker is here. With the fixed wait the client ran its tick before the game's news
  * arrived on some ticks and after on others, by timing luck;</li>
- * <li>within a burst the game holds still at the end of each stepped tick until the camera has its picture, and then
- * goes straight on to the next step. A frozen game still runs empty ticks, and on each it may send the insects' state
- * to the client (each insect counts its own sends); a real game has no empty ticks, and how many came between two
- * pictures depended on timing (about 5 with the fixed wait);</li>
+ * <li>while it is frozen the game never runs an empty tick: its thread holds still and does only what the camera asks,
+ * in the order asked (the camera's commands and the walker's orders, {@link #serve}, and the steps). A frozen game
+ * would otherwise run empty ticks, and on each it may send the insects' state to the client (each insect counts its own
+ * sends, and the count decides when it sends); a real game has no empty ticks, and how many came between two pictures,
+ * between two bursts or between the freeze and the first step depended on timing (one launch of the climbing scene
+ * parted from another just after its first burst, at the walk to the far wall). The hold starts as soon as the freeze
+ * is done and ends when the camera unfreezes the game;</li>
  * <li>the picture is taken on the first still client tick after the step (on a stepped tick the game is drawn blended
  * by real time, different every run).</li>
  * </ul>
- * If the step is not seen arriving in time the camera takes its picture anyway and logs it; the game never holds
- * longer than {@link #HOLD_MS}.
+ * If the step is not seen arriving in time the camera takes its picture anyway and logs it; the frozen game lets go by
+ * itself when the camera has asked nothing of it for {@link #HOLD_MS} (and holds again with the camera's next order).
  */
 @EventBusSubscriber(modid = AntColoniesMod.MODID, value = Dist.CLIENT)
 final class FilmStep {
     private static final Logger LOG = LogUtils.getLogger();
     private static final String MARK = "antcolonies:film-step ";
-    /** The longest the game holds still for the camera (it lets go by itself after this). */
+    /** The longest the frozen game holds still with nothing asked of it (it lets go by itself after this). */
     private static final long HOLD_MS = 3000;
 
-    /** A step asked for: its number, its length, and whether another step of the burst follows its picture. */
-    private record Order(int step, int length, boolean more) {
+    /** A step asked for: its number and its length. */
+    private record Order(int step, int length) {
     }
 
     /** This side: the step waited for (its number and length), whether one is, and its ticks run here so far. */
@@ -63,13 +69,18 @@ final class FilmStep {
     private static int missed;
 
     /**
-     * Between the two sides, guarded by {@link #LOCK}: whether the game holds still (or is about to, its marker sent)
-     * for the camera's next order, and that order once given.
+     * Between the two sides, guarded by {@link #LOCK}: what the camera asked of the game and the game has not done yet,
+     * in order (a {@link Runnable} or an {@link Order}); whether the game's thread reads that list before it runs a tick
+     * of its own (it is holding still, or running a step whose last tick holds again); and whether a task to read it is
+     * already on its way to the game's thread.
      */
     private static final Object LOCK = new Object();
+    private static final Deque<Object> asked = new ArrayDeque<>();
     private static boolean holding;
-    private static Order next;
-    /** The game's side: the order being run and how many of its ticks are still to run. */
+    private static boolean readPosted;
+    /** The camera is closing the game: the game never holds again (it must see the player leave). */
+    private static boolean closing;
+    /** The game's side: the step being run and how many of its ticks are still to run. */
     private static Order running;
     private static int ticksLeft;
 
@@ -77,40 +88,115 @@ final class FilmStep {
     }
 
     /**
-     * Steps the frozen game {@code ticks} ticks for a burst's next picture; {@code more} says whether another step
-     * follows that picture. False when it cannot (not a frozen game in this window): the camera sends {@code tick step}.
+     * Runs this on the game's side, after everything the camera asked before it and, while the game is frozen, before
+     * the game runs another tick. False when there is no game in this window (the caller does it another way).
      */
-    static boolean step(Minecraft mc, int ticks, boolean more) {
+    static boolean serve(Minecraft mc, Runnable job) {
+        MinecraftServer server = mc.getSingleplayerServer();
+        if (server == null) {
+            return false;
+        }
+        ask(server, job);
+        return true;
+    }
+
+    /**
+     * Steps the frozen game {@code ticks} ticks for a burst's next picture. False when it cannot (not a frozen game in
+     * this window): the camera sends {@code tick step}.
+     */
+    static boolean step(Minecraft mc, int ticks) {
         MinecraftServer server = mc.getSingleplayerServer();
         if (server == null || mc.level == null || !mc.level.tickRateManager().isFrozen() || ticks <= 0) {
             cancel();
             return false;
         }
-        Order order = new Order(++step, ticks, more);
+        Order order = new Order(++step, ticks);
         length = ticks;
         ran = 0;
         held = 0;
         stepping = false;
         waiting = true;
-        synchronized (LOCK) {
-            if (holding) {
-                next = order;
-                LOCK.notifyAll();
-                return true;
-            }
-        }
-        server.execute(() -> start(server, order));
+        ask(server, order);
         return true;
     }
 
-    /** The burst was dropped (the watch mode starts again): a game holding still goes on as normal. */
+    /** The burst was dropped (the watch mode starts again): steps asked for and not started yet are forgotten. */
     static void cancel() {
         waiting = false;
         synchronized (LOCK) {
+            asked.removeIf(job -> job instanceof Order);
+        }
+    }
+
+    /** The camera is done and closes the game: a game holding still goes on, and holds no more. */
+    static void letGo() {
+        synchronized (LOCK) {
+            closing = true;
+            LOCK.notifyAll();
+        }
+    }
+
+    private static void ask(MinecraftServer server, Object job) {
+        synchronized (LOCK) {
+            asked.add(job);
             if (holding) {
-                next = new Order(0, 0, false);
-                LOCK.notifyAll();
+                LOCK.notifyAll();               // the game's thread reads it before its next tick
+                return;
             }
+            if (readPosted) {
+                return;
+            }
+            readPosted = true;
+        }
+        server.execute(() -> {
+            synchronized (LOCK) {
+                readPosted = false;
+                holding = true;
+            }
+            hold(server);
+        });
+    }
+
+    /**
+     * The game's side: does what the camera asked, in order, and while the game is frozen holds still for more. Ends
+     * when a step is started (its last tick holds again), when the game is not frozen and nothing more is asked, or
+     * when nothing is asked for {@link #HOLD_MS}.
+     */
+    private static void hold(MinecraftServer server) {
+        long until = System.currentTimeMillis() + HOLD_MS;
+        while (true) {
+            Object job;
+            synchronized (LOCK) {
+                while (asked.isEmpty() && !closing && server.isRunning() && FilmDirector.active()
+                        && server.tickRateManager().isFrozen()) {
+                    long left = until - System.currentTimeMillis();
+                    if (left <= 0) {
+                        LOG.info("Film: the frozen game held still {} ms with nothing asked of it and goes on", HOLD_MS);
+                        break;
+                    }
+                    try {
+                        LOCK.wait(Math.min(left, 100));     // short waits: the game may be closing
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
+                job = asked.poll();
+                if (job == null) {
+                    holding = false;
+                    return;
+                }
+            }
+            if (job instanceof Order order) {
+                if (server.tickRateManager().stepGameIfPaused(order.length())) {
+                    running = order;
+                    ticksLeft = order.length();
+                    return;                             // still holding: the step's last tick reads the list again
+                }
+            } else {
+                ((Runnable) job).run();
+            }
+            until = System.currentTimeMillis() + HOLD_MS;
         }
     }
 
@@ -124,6 +210,11 @@ final class FilmStep {
             return true;
         }
         return false;
+    }
+
+    /** The step's ticks this side has run so far while waiting for it (0 when not waiting). */
+    static int ranSoFar() {
+        return waiting ? ran : 0;
     }
 
     /** The camera's longest wait ran out: the held ticks are let go and the step counts as arrived anyway. */
@@ -142,15 +233,6 @@ final class FilmStep {
         }
     }
 
-    /** The game's side: an order's ticks start (the next server tick is its first). */
-    private static void start(MinecraftServer server, Order order) {
-        running = order;
-        ticksLeft = order.length();
-        if (order.length() > 0) {
-            server.tickRateManager().stepGameIfPaused(order.length());
-        }
-    }
-
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
         MinecraftServer server = event.getServer();
@@ -158,45 +240,12 @@ final class FilmStep {
             return;
         }
         ticksLeft--;
-        if (ticksLeft == 0 && running.more()) {
-            synchronized (LOCK) {
-                holding = true;                     // before the marker: the camera's answer may come at once
-            }
-        }
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             player.sendSystemMessage(Component.literal(MARK + running.step() + " " + (running.length() - ticksLeft)), true);
         }
-        if (ticksLeft == 0 && running.more()) {
-            Order order = holdForNext();
-            if (order != null) {
-                start(server, order);
-            } else {
-                running = null;
-                LOG.warn("Film: the game held still {} ms for the camera's next step and went on without it", HOLD_MS);
-            }
-        }
-    }
-
-    /** The game's side: holds still until the camera's next order comes (null if it does not come in time). */
-    private static Order holdForNext() {
-        long until = System.currentTimeMillis() + HOLD_MS;
-        synchronized (LOCK) {
-            while (next == null) {
-                long left = until - System.currentTimeMillis();
-                if (left <= 0) {
-                    break;
-                }
-                try {
-                    LOCK.wait(left);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    break;
-                }
-            }
-            Order order = next;
-            next = null;
-            holding = false;
-            return order;
+        if (ticksLeft == 0) {
+            running = null;
+            hold(server);                               // the camera's next order may come at once
         }
     }
 
