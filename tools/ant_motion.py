@@ -278,6 +278,15 @@ class Rig:
         # The leg whose mid-stance is a walk's swap moment (see walk_swap): the right leg of the middle pair.
         self.swap_leg = 'r' + str(pairs[len(pairs) // 2])
         self.centre = model.centre({})               # the body's centre of weight seen from above, standing
+        # The bones the gaster's sway goes on, half each (2026-10-18, for any waist): the first and the last joint of
+        # the body plan's waist (an ant's petiole and its gaster); a body with one waist joint (a termite, broad-waisted:
+        # its abdomen) puts the whole sway on it.
+        waist = [b for b, _ in model.plan.waist] if model.plan and model.plan.waist else ['petiole', 'abdomen']
+        self.sway = [waist[0], waist[-1]] if len(waist) > 1 else [waist[0]]
+
+    def sway_share(self):
+        """The share of the gaster's sway each of the sway bones takes."""
+        return 1.0 / len(self.sway)
 
     def is_middle(self, key):
         """A leg between the front and the hind pair (an ant's middle legs; all of a centipede's but two pairs)."""
@@ -555,12 +564,11 @@ def walk(rig, seconds, cycles=1, sweep=3.4, duty=0.58, lift=0.9, phases=TRIPOD, 
                 first = {key: list(map(list, turns[key])) for key in rig.legs}
             tr.put('body', t, body_pos, 'position')
             tr.put('forebody', t, pose_still['forebody'])
-            pet = still.get('petiole', [0, 0, 0])
-            ab = still.get('abdomen', [0, 0, 0])
-            tr.put('petiole', t, [pet[0], pet[1] + gaster / 2, pet[2]])
-            tr.put('abdomen', t, [ab[0], ab[1] + gaster / 2, ab[2]])
+            for bone in rig.sway:
+                was = still.get(bone, [0, 0, 0])
+                tr.put(bone, t, [was[0], was[1] + gaster * rig.sway_share(), was[2]])
             for bone, vec in still.items():
-                if bone not in ('forebody', 'petiole', 'abdomen'):
+                if bone != 'forebody' and bone not in rig.sway:
                     tr.put(bone, t, vec)
     # The last key is the first one again (the loop closes exactly).
     seam = 0.0
@@ -600,8 +608,9 @@ def turn(rig, seconds, degrees, duty=0.6, lift=0.8, phases=TRIPOD, lead=4.0, shi
         x, y, z = rig.stance(key)
         out = wide.get(leg.pair, 0.0) if isinstance(wide, dict) else wide
         centres[key] = (x + leg.out * out, y, z + (shift or {}).get(leg.pair, 0.0))
-    still = {'forebody': [0.0, sign * lead, 0.0], 'petiole': [0.0, -sign * lead / 4, 0.0],
-             'abdomen': [0.0, -sign * lead / 4, 0.0]}
+    still = {'forebody': [0.0, sign * lead, 0.0]}
+    for bone in rig.sway:
+        still[bone] = [0.0, -sign * lead / 2 * rig.sway_share(), 0.0]
     pose = pose_of(still)
     q = {key: (0.0, 0.0, 0.0, 0.0) for key in rig.legs}
     turns = {key: None for key in rig.legs}

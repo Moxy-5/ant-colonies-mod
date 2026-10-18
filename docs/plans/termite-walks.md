@@ -2,7 +2,7 @@
 
 Planned with the user 2026-10-18 (session from the animation upgrade work). Builds on the body plans and the gait maker
 (`docs/plans/body-plans-and-gaits.md`, branch `claude/nostalgic-engelbart-1cf92f`, commit 23cfb2b), so this branch starts
-from there. **Nothing is built yet; build only after the user says go.**
+from there. **Built 2026-10-18 after the user's go** (what was built and the picks: `docs/HISTORY.md`, "Termite walks (B11)"). Changes from the plan while building: the queen got her own clip file too; the lab's centre of weight was fixed (it counted overlapping and slanted boxes several times, which put the queen's balance line far off); the major soldier also needed its front feet 0.6 units further back and its own wider turn.
 
 ## The real termite gait (what the plan is based on)
 

@@ -85,6 +85,9 @@ public class AntAnimationController<T extends AbstractAntEntity> extends Animati
     @Nullable
     private Queue<AnimationProcessor.QueuedAnimation> nextQueue;
     private double waitingSince;
+    /** The turning clip's reach (read once; NaN: no turning clip), and whether it was read yet. */
+    private double turnReach = Double.NaN;
+    private boolean turnReachRead;
 
     public AntAnimationController(T insect, String name, int transitionTicks, AnimationStateHandler<T> handler, Predicate<String> owns) {
         super(insect, name, transitionTicks, handler);
@@ -155,6 +158,20 @@ public class AntAnimationController<T extends AbstractAntEntity> extends Animati
      */
     public static double strideOf(Animation clip) {
         return noteOf(clip, "stride");
+    }
+
+    /**
+     * How far the outer feet of a turning clip stand from the body's middle (model units, its {@code reach} note, written
+     * by the tools for each model's own legs), which tells the insect when its feet should step round instead of the walk
+     * (see {@code AbstractAntEntity.measureWalk}); NaN while no model is known or if the model has no such clip.
+     */
+    public double turnReach(RawAnimation turning) {
+        if (!turnReachRead && lastModel != null) {
+            Animation clip = lastModel.getAnimation(animatable, turning.getAnimationStages().get(0).animationName());
+            turnReach = clip == null ? Double.NaN : noteOf(clip, "reach");
+            turnReachRead = true;
+        }
+        return turnReach;
     }
 
     /** How fast the clip plays now (1 = as made): one cycle a stride walked, one a turn turned, or the rate it was given. */

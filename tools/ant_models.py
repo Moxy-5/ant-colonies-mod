@@ -317,10 +317,11 @@ TURN = dict(duty={1: 0.4, 2: 0.6, 3: 0.6}, lift=0.7, shift=WALK_SHIFT, wide={1: 
 
 
 def turn_clip(degrees):
-    """Turning on the spot, to the right (positive degrees) or the left: (bones, swap moment)."""
+    """Turning on the spot, to the right (positive degrees) or the left: (bones, swap moment, reach: how far the outer
+    feet stand from the middle, which the game uses to tell when the feet should step round)."""
     tr, report = mo.turn(rig(), WALK_SECONDS, degrees, **TURN)
     walking_antennae(tr, WALK_SECONDS)
-    return tr.bones(), report['swap']
+    return tr.bones(), report['swap'], report['reach']
 
 
 IDLE_SECONDS = 4.0
@@ -801,9 +802,10 @@ def walking(clip, seconds, band=None):
 
 
 def turning(clip, degrees, seconds):
-    """A turning clip with its notes: degrees turned a clip (positive to the right) and its swap moment."""
-    bones, swap = clip
-    return {'loop': True, 'animation_length': seconds, 'timeline': {'0': f'turn {degrees:g}', '0.001': f'swap {swap:.4f}'},
+    """A turning clip with its notes: degrees turned a clip (positive to the right), its swap moment and its reach."""
+    bones, swap, reach = clip
+    return {'loop': True, 'animation_length': seconds,
+            'timeline': {'0': f'turn {degrees:g}', '0.001': f'swap {swap:.4f}', '0.002': f'reach {reach:.2f}'},
             'bones': bones}
 
 

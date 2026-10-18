@@ -16027,7 +16027,8 @@
    "animation_length": 0.5,
    "timeline": {
     "0": "turn 40",
-    "0.001": "swap 0.3300"
+    "0.001": "swap 0.3300",
+    "0.002": "reach 5.83"
    },
    "bones": {
     "leg_l1": {
@@ -19862,7 +19863,8 @@
    "animation_length": 0.5,
    "timeline": {
     "0": "turn -40",
-    "0.001": "swap 0.3300"
+    "0.001": "swap 0.3300",
+    "0.002": "reach 5.83"
    },
    "bones": {
     "leg_l1": {

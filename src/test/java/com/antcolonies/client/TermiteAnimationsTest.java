@@ -35,7 +35,7 @@ class TermiteAnimationsTest {
 
     @Test
     void theTermiteAnimationsReadAndThePeekIsAsLongAsTheTermiteHoldsStill() throws Exception {
-        BakedAnimations animations = read("termite_king.animation.json");
+        BakedAnimations animations = read("termite_worker.animation.json");
         for (String name : new String[] {"idle", "walk", "peek"}) {
             assertNotNull(animations.getAnimation(name), "no " + name + " animation");
         }

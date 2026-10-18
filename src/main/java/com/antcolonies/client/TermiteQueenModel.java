@@ -54,7 +54,6 @@ public class TermiteQueenModel extends DefaultedEntityGeoModel<TermiteQueenEntit
 
     public TermiteQueenModel() {
         super(ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "termite_queen"));
-        withAltAnimations(ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "termite_king"));
     }
 
     @Override

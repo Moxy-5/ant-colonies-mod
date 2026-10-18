@@ -181,6 +181,13 @@ FACE_CORNERS = {'north': (0, 2, 6, 4), 'south': (1, 5, 7, 3), 'west': (0, 1, 3, 
                 'down': (0, 4, 5, 1), 'up': (2, 3, 7, 6)}
 
 
+def inside(pt, box):
+    """Whether a point is inside a box given as (a corner, its three edges, their squared lengths)."""
+    o, edges, lens = box
+    d = tuple(p - q for p, q in zip(pt, o))
+    return all(ln > 0 and 0.0 <= sum(a * b for a, b in zip(d, e)) <= ln for e, ln in zip(edges, lens))
+
+
 class Model:
     def __init__(self, name, bones=None):
         """The insect's model from the game's geo file, or from a list of bones (the motion library, tools/ant_motion.py,
@@ -295,17 +302,46 @@ class Model:
         """Every cube's 8 corners in the pose, with its face colours and bone."""
         return [(bn, [self.world(bn, p, pose) for p in corners], colours) for bn, corners, colours in self.cubes]
 
+    def weights(self):
+        """Each cube's weight for the centre of weight: 0 for a leg's, else its own volume less the part of it already
+        inside an earlier cube, so every bit of the body counts once (2026-10-18: the termite queen's skin is boxes laid
+        crossways over each other; weighed by the upright box round each, as before, her abdomen counted several times
+        over and her centre of weight sat far behind where it is). Worked out once, at rest, on a grid of points in each
+        cube (my pick: the parts are all equally dense; real legs weigh little)."""
+        if getattr(self, '_weights', None) is None:
+            boxes, out = [], []
+            for bone, c, _ in self.cubes:
+                o = c[0]
+                edges = [tuple(b - a for a, b in zip(o, c[k])) for k in (4, 2, 1)]
+                lens = [sum(e * e for e in edge) for edge in edges]
+                if self.leg_of(bone) is not None:
+                    out.append(0.0)
+                    continue
+                n = 6
+                own = 0
+                for i in range(n):
+                    for j in range(n):
+                        for k in range(n):
+                            f = ((i + 0.5) / n, (j + 0.5) / n, (k + 0.5) / n)
+                            pt = tuple(o[d] + sum(f[e] * edges[e][d] for e in range(3)) for d in range(3))
+                            if not any(inside(pt, box) for box in boxes):
+                                own += 1
+                volume = math.sqrt(lens[0] * lens[1] * lens[2])
+                out.append(max(1e-6, volume) * own / n ** 3)
+                boxes.append((o, edges, lens))
+            self._weights = out
+        return self._weights
+
     def centre(self, pose):
         """The body's centre of weight seen from above (x, z) in a pose: the middle of every cube that is not a leg,
-        each weighed by its size (my pick: the parts are all equally dense; real legs weigh little)."""
+        each weighed by its share of the body (see weights)."""
         total = sx = sz = 0.0
-        for bone, corners, _ in self.cubes:
-            if self.leg_of(bone) is not None:
+        for (bone, corners, _), v in zip(self.cubes, self.weights()):
+            if v <= 0.0:
                 continue
             if pose:
                 corners = [self.world(bone, p, pose) for p in corners]
             xs, ys, zs = zip(*corners)
-            v = max(1e-6, (max(xs) - min(xs)) * (max(ys) - min(ys)) * (max(zs) - min(zs)))
             total += v
             sx += v * sum(xs) / 8
             sz += v * sum(zs) / 8
