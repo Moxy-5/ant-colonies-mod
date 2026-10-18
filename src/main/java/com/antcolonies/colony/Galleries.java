@@ -580,6 +580,11 @@ public class Galleries {
             }
             return;
         }
+        grown = grown.stream().filter(piece -> !takenHole(piece.way().hole())).toList(); // (never two pieces at one hole)
+        if (grown.isEmpty()) {
+            tipFails.merge(tip.way().hole(), 1, Integer::sum);
+            return;
+        }
         tips.remove(tip);
         List<NestPlan.ForagingTunnel> all = new ArrayList<>(arms);
         for (Tip piece : grown) {
@@ -727,7 +732,13 @@ public class Galleries {
         }
         int keepOut = colony.profile().nest().foragingHoleDistance() + 1;
         TunnelRoute.Ground ground = new GroundReader(level, colony, colony.nest().nestCells(level));
-        return planPiece(dug, food, ground, colony.getCenter(), keepOut, tipReach() + 16);
+        Piece piece = planPiece(dug, food, ground, colony.getCenter(), keepOut, tipReach() + 16);
+        return piece == null || takenHole(piece.tunnel().hole()) ? null : piece; // (never two pieces ending at one hole)
+    }
+
+    /** Whether a piece, a hole along a tunnel or one of the nest's own tunnels already ends at this hole. */
+    private boolean takenHole(BlockPos hole) {
+        return pieceAt(hole) != null || holesAlongSet.contains(hole);
     }
 
     /**
@@ -1130,6 +1141,9 @@ public class Galleries {
             if (plan == null || plan.cells().isEmpty() || flat(plan.hole(), center) > numbers.reach()) {
                 continue;
             }
+            if (plan.hole().equals(tip.way().hole()) || others.contains(plan.hole())) {
+                continue; // (a hole the web has already: two pieces may never end at one hole)
+            }
             List<BlockPos> cells = new ArrayList<>(tip.way().tunnel());
             cells.addAll(plan.cells());
             BlockPos last = plan.cells().get(plan.cells().size() - 1);
@@ -1451,7 +1465,58 @@ public class Galleries {
         }
         upkeptAt = Long.MIN_VALUE;
         tipFails.clear();
+        repairSharedHoles();
         changed.run();
+    }
+
+    /**
+     * A save from before the fix of 2026-10-17 may hold two pieces ending at one hole (a tip grew a piece whose hole was
+     * its own): the longer one is kept (it holds the other's blocks), counted from the piece it really grew from.
+     */
+    private void repairSharedHoles() {
+        Map<BlockPos, NestPlan.ForagingTunnel> longest = new HashMap<>();
+        boolean any = false;
+        for (NestPlan.ForagingTunnel arm : arms) {
+            NestPlan.ForagingTunnel other = longest.get(arm.hole());
+            if (other != null) {
+                any = true;
+            }
+            if (other == null || arm.tunnel().size() > other.tunnel().size()) {
+                longest.put(arm.hole(), arm);
+            }
+        }
+        if (!any) {
+            return;
+        }
+        List<NestPlan.ForagingTunnel> kept = new ArrayList<>();
+        for (NestPlan.ForagingTunnel arm : arms) {
+            if (longest.get(arm.hole()) == arm && !kept.contains(arm)) {
+                kept.add(arm);
+            }
+        }
+        for (NestPlan.ForagingTunnel arm : kept) {
+            if (!parents.containsKey(arm.hole()) || !arm.hole().equals(parents.get(arm.hole()))) {
+                continue;
+            }
+            // Its parent is itself: the real one is the longest other piece whose whole tunnel it starts with.
+            NestPlan.ForagingTunnel parent = null;
+            for (NestPlan.ForagingTunnel other : kept) {
+                if (other != arm && other.tunnel().size() < arm.tunnel().size()
+                        && arm.tunnel().subList(0, other.tunnel().size()).equals(other.tunnel())
+                        && (parent == null || other.tunnel().size() > parent.tunnel().size())) {
+                    parent = other;
+                }
+            }
+            if (parent != null) {
+                parents.put(arm.hole(), parent.hole());
+                newFrom.put(arm.hole(), parent.tunnel().size());
+            } else {
+                parents.remove(arm.hole());
+            }
+        }
+        arms = List.copyOf(kept);
+        tips.removeIf(tip -> !kept.contains(tip.way()));
+        AntColoniesMod.LOGGER.info("[galleries] repaired pieces sharing a hole: {} pieces now", arms.size());
     }
 
     /**

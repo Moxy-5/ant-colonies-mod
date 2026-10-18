@@ -300,7 +300,8 @@ public class TermiteForagingTests {
      * 11 days go by: every far piece that led to no food is packed with soil, the hay's piece and its feeding gallery
      * too (its feeding spot leaves the record), back to the first arms, which stay; the piece by the dead bush and the
      * pieces it grew from stay; no tip spreads into the length given back. Last, dead bushes the colony knows 8 blocks
-     * past a first arm's end pull that tip toward them, using the length given back.
+     * past a first arm's end pull that tip toward them, using the length given back. Then 4 hay bales the colony knows,
+     * each 3 blocks from a different hole: each gets a runway or, as only 3 runways are made at a time, a gallery piece.
      */
     @GameTest(template = "arena", timeoutTicks = 30000, skyAccess = true)
     public static void theGalleriesGrowTipByTipWithTheColony(GameTestHelper helper) {
@@ -346,6 +347,7 @@ public class TermiteForagingTests {
         long[] spentAt = {-1};
         java.util.Map<BlockPos, BlockPos> piecesSeen = new java.util.HashMap<>(); // piece -> the piece it grew from
         java.util.Set<BlockPos> backfilledAt = new java.util.HashSet<>(); // pieces whose branch beyond was filled in
+        java.util.List<BlockPos> nearHay = new java.util.ArrayList<>(); // hay bales by the holes (stage 6)
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
@@ -586,17 +588,69 @@ public class TermiteForagingTests {
                             helper.assertTrue(after < before - 1, "the tip grew from " + helper.relativePos(pullTip[0]) + " to "
                                     + helper.relativePos(piece) + ", not toward the dead bushes at " + helper.relativePos(pullAim[0]));
                             helper.assertTrue(galleries.filledLength() < filledBeforePull[0], "growing toward food did not use the length given back");
+                            // Four hay bales the colony knows, each 3 blocks from a different hole (the user's bug,
+                            // 2026-10-17: known hay near a hole, with the 3 runways in use, got neither a runway nor a piece).
+                            java.util.List<BlockPos> holes = tunnels.stream().map(NestPlan.ForagingTunnel::hole).toList();
+                            java.util.Set<BlockPos> cells = new java.util.HashSet<>();
+                            tunnels.forEach(t -> cells.addAll(t.tunnel()));
+                            for (BlockPos hole : holes) {
+                                if (nearHay.size() == 4 || colony.nest().foodWays().isSpent(hole) || colony.nest().foodWays().runwayAt(hole) != null) {
+                                    continue;
+                                }
+                                for (int[] side : new int[][] {{3, 0}, {-3, 0}, {0, 3}, {0, -3}, {2, 2}, {-2, 2}, {2, -2}, {-2, -2}, {4, 0}, {-4, 0}, {0, 4}, {0, -4}}) {
+                                    BlockPos spot = new BlockPos(hole.getX() + side[0], hay.getY(), hole.getZ() + side[1]);
+                                    boolean clear = helper.getBounds().inflate(-2, 0, -2).contains(spot.getX() + 0.5, helper.getBounds().minY + 1, spot.getZ() + 0.5)
+                                            && level.getBlockState(spot).isAir() && level.getBlockState(spot.below()).isSolidRender(level, spot.below())
+                                            && holes.stream().allMatch(h -> Math.hypot(h.getX() - spot.getX(), h.getZ() - spot.getZ()) >= 2)
+                                            && cells.stream().noneMatch(c -> c.getX() == spot.getX() && c.getZ() == spot.getZ())
+                                            && nearHay.stream().allMatch(o -> Math.hypot(o.getX() - spot.getX(), o.getZ() - spot.getZ()) >= 6);
+                                    if (clear) {
+                                        level.setBlock(spot, Blocks.HAY_BLOCK.defaultBlockState(), 3);
+                                        colony.foodMap().knowForTests(spot);
+                                        nearHay.add(spot);
+                                        break;
+                                    }
+                                }
+                            }
+                            helper.assertTrue(nearHay.size() == 4, "found room for only " + nearHay.size() + " hay bales by the " + holes.size() + " holes");
+                            colony.food().rescanPlantsSoon();
+                            AntColoniesMod.LOGGER.info("[web-test] tick {}: hay by the holes at {}", tick, nearHay.stream().map(helper::relativePos).toList());
+                            since[0] = 0;
                             stage[0] = 6;
                             return;
                         }
                     }
                     helper.assertTrue(++since[0] < 1500, "the dead bushes past the arm's end did not pull its tip:" + galleries.describe(level));
                 }
+                case 6 -> { // hay by the holes: each gets a runway or a piece of its own (only 3 runways at a time)
+                    java.util.List<BlockPos> served = new java.util.ArrayList<>();
+                    colony.nest().foodWays().getRunways().forEach(runway -> served.add(runway.food()));
+                    int pieces = 0;
+                    for (com.antcolonies.colony.FoodWays.NewTunnel tunnel : colony.nest().foodWays().getNewTunnels()) {
+                        served.add(tunnel.food());
+                        if (nearHay.contains(tunnel.food())) {
+                            pieces++;
+                            helper.assertTrue(galleries.hasPiece(tunnel.tunnel().hole()), "the tunnel to the hay by a hole is not a gallery piece");
+                        }
+                    }
+                    java.util.List<BlockPos> unserved = nearHay.stream().filter(bale -> !served.contains(bale)).toList();
+                    if (unserved.isEmpty()) {
+                        helper.assertTrue(pieces >= 1, "4 hay bales by holes and only 3 runways may be made, but no bale got a piece");
+                        AntColoniesMod.LOGGER.info("[web-test] tick {}: the hay by the holes: {} runways, {} pieces", tick,
+                                colony.nest().foodWays().getRunways().size(), pieces);
+                        stage[0] = 7;
+                    } else {
+                        helper.assertTrue(++since[0] < 2000, "the known hay at " + helper.relativePos(unserved.get(0))
+                                + " by a hole got neither a runway nor a gallery piece:" + galleries.describe(level)
+                                + colony.foragingHoles().describeNewHoles(level) + colony.foragingHoles().describeRunways(level)
+                                + colony.foragingHoles().whyNoRunway(level, unserved.get(0)));
+                    }
+                }
                 default -> {
                 }
             }
         });
-        helper.succeedWhen(() -> helper.assertTrue(stage[0] == 6, "the galleries' growth and filling in did not finish (stage " + stage[0] + ")"));
+        helper.succeedWhen(() -> helper.assertTrue(stage[0] == 7, "the galleries' growth and filling in did not finish (stage " + stage[0] + ")"));
     }
 
     /** Termites head in before dawn: the last in-game hour or so of the night already counts as day for them. */

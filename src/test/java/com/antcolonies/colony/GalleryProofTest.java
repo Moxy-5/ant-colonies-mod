@@ -486,6 +486,7 @@ class GalleryProofTest {
                 }
             }
             longest = Math.max(longest, webCells.size());
+            int grownPieces = web.size();
             // Step 3: pieces out to food from the nearest gallery (2 per landscape, 20 to 45 blocks out, any way).
             int arms = Math.min(4, web.size());
             for (int f = 0; f < 2; f++) {
@@ -520,6 +521,14 @@ class GalleryProofTest {
                 land.dug.addAll(fresh);
                 webCells.addAll(fresh);
                 web.add(piece.tunnel());
+            }
+            // No two pieces end at one hole (the user's game, 2026-10-17: two did, and filling one in lost the other's start).
+            Set<BlockPos> ends = new HashSet<>();
+            own.forEach(tunnel -> ends.add(tunnel.hole()));
+            for (NestPlan.ForagingTunnel piece : web) {
+                if (!ends.add(piece.hole())) {
+                    failures.add(where + ": two pieces end at the hole " + piece.hole().toShortString() + (web.indexOf(piece) >= grownPieces ? " (to food)" : " (grown)"));
+                }
             }
             // Filling in: far pieces nothing leads on from are packed with soil, in rounds (back toward their forks); the
             // blocks another tunnel uses stay open. The first arms never fill in.

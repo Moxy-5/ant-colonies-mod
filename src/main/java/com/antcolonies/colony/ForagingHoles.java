@@ -69,6 +69,11 @@ public class ForagingHoles {
     private long newHolesCheckedAt = Long.MIN_VALUE;
     /** Plants the colony found no tunnel route to, and until when it leaves them. Not saved. */
     private final java.util.Map<BlockPos, Long> noRouteUntil = new java.util.HashMap<>();
+    /**
+     * Plants the colony found no runway route to, and until when it leaves them; kept apart from {@link #noRouteUntil}
+     * so food a runway cannot reach may still get a gallery piece (the user's bug, 2026-10-17). Not saved.
+     */
+    private final java.util.Map<BlockPos, Long> noRunwayUntil = new java.util.HashMap<>();
 
     ForagingHoles(Colony colony) {
         this.colony = colony;
@@ -426,6 +431,8 @@ public class ForagingHoles {
         if (sheeting == null) {
             return;
         }
+        long checked = level.getGameTime();
+        noRunwayUntil.values().removeIf(until -> until <= checked || until > checked + NO_ROUTE_TICKS);
         for (FoodWays.Runway runway : colony.nest().foodWays().getRunways()) {
             boolean spent = colony.nest().foodWays().isSpent(runway.hole());
             if (spent || level.isLoaded(runway.food()) && richBlockNear(level, runway.food(), FOOD_STILL_THERE) == null) {
@@ -442,13 +449,7 @@ public class ForagingHoles {
         }
         // The holes a runway may leave from: dug, open for use, without a runway yet. One is always left for the
         // foragers outside (a hole with a runway leads into it).
-        List<BlockPos> free = new java.util.ArrayList<>();
-        for (NestPlan.ForagingTunnel tunnel : tunnels(level)) {
-            if (isDug(level, tunnel) && !colony.nest().foodWays().isSpent(tunnel.hole()) && colony.nest().foodWays().runwayAt(tunnel.hole()) == null
-                    && level.isLoaded(tunnel.hole().above())) {
-                free.add(tunnel.hole());
-            }
-        }
+        List<BlockPos> free = runwayHoles(level);
         if (free.size() <= 1) {
             return;
         }
@@ -460,7 +461,7 @@ public class ForagingHoles {
         BlockPos food = null;
         double bestDistance = Double.MAX_VALUE;
         for (BlockPos plant : plants) {
-            if (!isRich(level, plant) || !colony.foodMap().knows(plant, null) || noRouteUntil.containsKey(plant)
+            if (!isRich(level, plant) || !colony.foodMap().knows(plant, null) || noRunwayUntil.containsKey(plant)
                     || sideways(plant, center) > reach || nearAny(plant, taken, FOOD_STILL_THERE)
                     || colony.food().isFeedableFromInside(level, plant)) {
                 continue;
@@ -491,7 +492,7 @@ public class ForagingHoles {
                 return;
             }
         }
-        noRouteUntil.put(food.immutable(), now + NO_ROUTE_TICKS);
+        noRunwayUntil.put(food.immutable(), now + NO_ROUTE_TICKS);
         AntColoniesMod.LOGGER.debug("[runway] no runway to the food at {}", food.toShortString());
     }
 
@@ -628,7 +629,7 @@ public class ForagingHoles {
         if (!colony.foodMap().knows(food, null)) {
             why.add("the colony does not know it");
         }
-        if (noRouteUntil.containsKey(food)) {
+        if (noRunwayUntil.containsKey(food)) {
             why.add("no route found earlier");
         }
         if (sideways(food, colony.getCenter()) > foodReach(numbers)) {
@@ -637,14 +638,7 @@ public class ForagingHoles {
         if (colony.food().isFeedableFromInside(level, food)) {
             why.add("eaten from inside already");
         }
-        int free = 0;
-        for (NestPlan.ForagingTunnel tunnel : tunnels(level)) {
-            if (isDug(level, tunnel) && !colony.nest().foodWays().isSpent(tunnel.hole()) && colony.nest().foodWays().runwayAt(tunnel.hole()) == null
-                    && level.isLoaded(tunnel.hole().above())) {
-                free++;
-            }
-        }
-        why.add(free + " free holes (needs 2)");
+        why.add(runwayHoles(level).size() + " free holes (needs 2)");
         return " | why no runway: " + String.join(", ", why);
     }
 
@@ -661,7 +655,8 @@ public class ForagingHoles {
     /**
      * The rich plant to dig a new tunnel to, or null: one the colony knows, within its tunnels' reach of the nest's
      * middle, more than {@code min_distance} blocks from every way out (planned or open) and from the food of every new
-     * tunnel; the nearest to the nest first.
+     * tunnel; the nearest to the nest first. With the galleries on, food near a hole is left only while a runway may
+     * still come to it (fewer than the most runways, a free hole near it, no failed runway route).
      */
     @Nullable
     private BlockPos pickFood(Level level, List<BlockPos> plants, SpeciesProfile.NewHoles numbers) {
@@ -674,7 +669,17 @@ public class ForagingHoles {
                 holes.add(tunnel.hole());
             }
         }
-        List<BlockPos> dugFor = colony.nest().foodWays().getNewTunnels().stream().map(FoodWays.NewTunnel::food).toList();
+        List<BlockPos> dugFor = new java.util.ArrayList<>(colony.nest().foodWays().getNewTunnels().stream().map(FoodWays.NewTunnel::food).toList());
+        // With the galleries, holes lie every few blocks, so most food lies near one: food near a hole waits for a
+        // runway only while one may still come; else it gets a short gallery piece with its feeding gallery (the user's
+        // bug, 2026-10-17: known hay 15 to 25 blocks out with the 3 runways in use got neither, and was only bitten).
+        boolean galleriesOn = colony.nest().galleries().isOn();
+        SpeciesProfile.Sheeting sheeting = colony.profile().nest().sheeting().orElse(null);
+        List<BlockPos> runwayHoles = galleriesOn && sheeting != null
+                && colony.nest().foodWays().getRunways().size() < sheeting.max() ? runwayHoles(level) : List.of();
+        if (galleriesOn) {
+            colony.nest().foodWays().getRunways().forEach(runway -> dugFor.add(runway.food()));
+        }
         BlockPos best = null;
         double bestDistance = Double.MAX_VALUE;
         for (BlockPos plant : plants) {
@@ -682,14 +687,34 @@ public class ForagingHoles {
                 continue;
             }
             double fromNest = sideways(plant, center);
-            if (fromNest > reach || fromNest >= bestDistance || nearAny(plant, holes, numbers.minDistance())
-                    || nearAny(plant, dugFor, FOOD_STILL_THERE)) {
+            if (fromNest > reach || fromNest >= bestDistance || nearAny(plant, dugFor, FOOD_STILL_THERE)) {
+                continue;
+            }
+            if (galleriesOn) {
+                boolean runwayMayCome = runwayHoles.size() > 1 && !noRunwayUntil.containsKey(plant)
+                        && nearAny(plant, runwayHoles, numbers.minDistance());
+                if (runwayMayCome || colony.food().isFeedableFromInside(level, plant)) {
+                    continue;
+                }
+            } else if (nearAny(plant, holes, numbers.minDistance())) {
                 continue;
             }
             best = plant;
             bestDistance = fromNest;
         }
         return best;
+    }
+
+    /** The holes a runway may leave from: dug, open for use, without a runway yet, loaded. */
+    private List<BlockPos> runwayHoles(Level level) {
+        List<BlockPos> free = new java.util.ArrayList<>();
+        for (NestPlan.ForagingTunnel tunnel : tunnels(level)) {
+            if (isDug(level, tunnel) && !colony.nest().foodWays().isSpent(tunnel.hole()) && colony.nest().foodWays().runwayAt(tunnel.hole()) == null
+                    && level.isLoaded(tunnel.hole().above())) {
+                free.add(tunnel.hole());
+            }
+        }
+        return free;
     }
 
     /**

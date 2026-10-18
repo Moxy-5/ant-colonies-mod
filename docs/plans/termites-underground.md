@@ -143,7 +143,11 @@ on *Reticulitermes* and *Coptotermes*, Macrotermes galleries being little mapped
   no use fill the web back to the arms, the piece by a known dead bush stays, dead bushes pull a tip) and the gallery
   proof (pieces out to food and filled-in pieces over 99 landscapes, 0 failures). The far-hay test still runs with
   the switch off (the old way stays while the switch exists). `termitefood,mound,soldiers,hills,away,colony` 70 of 70
-  on 4 servers; full run owed before merging. Waiting for the user to test in-game.
+  on 4 servers; full run owed before merging. Branches and fallen trees confirmed in-game by the user 2026-10-17 ("it
+  works great for branches and dead trees"); known hay near a hole got no tunnel in-game: fixed (`docs/BUGS.md` 46 and 47).
+  **User's idea, to plan:** far out (about the outer half of the galleries), the termites open holes here and there
+  to search even with no food known, graze round them and go back (real: new holes probe new ground; the targets of
+  Matabele raids).
 
 ## Step 4: away and speed
 - The numbers forage from the galleries while away; galleries grow while away (`BuildLife`).
