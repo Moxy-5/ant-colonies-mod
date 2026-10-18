@@ -21,7 +21,7 @@ MOD_ID = "antcolonies"
 # Blockbench project, game model, texture, animation file
 PROJECTS = [
     ("Blockbench/harvester_ant_worker.bbmodel", "worker_ant", "worker_ant", "worker_ant"),
-    ("Blockbench/Termite.bbmodel", "termite_worker", "termite_worker", "termite_king"),
+    ("Blockbench/Termite.bbmodel", "termite_worker", "termite_worker", "termite_worker"),
 ]
 
 FACES = ["north", "east", "south", "west", "up", "down"]

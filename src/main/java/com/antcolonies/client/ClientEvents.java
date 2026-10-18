@@ -50,8 +50,8 @@ public class ClientEvents {
                 .withAltAnimations(workerAsset))
                 .withScale(1.3F));
 
-        // Termites (placeholder models made by tools/termite_models.py). The queen shares the king's animations;
-        // her swelling and pulsing are done in TermiteQueenModel.
+        // Termites (placeholder models made by tools/termite_models.py). Each has its own animation file of the same name,
+        // its walks made for its own legs (2026-10-18); the queen's swelling and pulsing are done in TermiteQueenModel.
         event.registerEntityRenderer(ModEntities.TERMITE_KING.get(), context -> new AntRenderer<>(
                 context, new DefaultedEntityGeoModel<TermiteKingEntity>(
                         ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "termite_king")))
@@ -59,22 +59,18 @@ public class ClientEvents {
         event.registerEntityRenderer(ModEntities.TERMITE_QUEEN.get(), TermiteQueenRenderer::new);
         event.registerEntityRenderer(ModEntities.TERMITE_WORKER.get(), context -> new AntRenderer<>(
                 context, new DefaultedEntityGeoModel<TermiteWorkerEntity>(
-                        ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "termite_worker"))
-                .withAltAnimations(ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "termite_king")))
+                        ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "termite_worker")))
                 .withScale(TermiteQueenModel.RENDER_SCALE));
         event.registerEntityRenderer(ModEntities.TERMITE_NYMPH.get(), TermiteNymphRenderer::new);
-        // Soldiers (tools/termite_models.py): both share termite_soldier.animation.json (idle, walk, head_bang). The
-        // major's bigger body is pressed farther toward a wall it climbs, and lifted more so its tail clears the floor.
-        ResourceLocation soldierAnimations = ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "termite_soldier");
+        // Soldiers (tools/termite_models.py): each its own file (idle, the walks and turns, head_bang, bite). The major's
+        // bigger body is pressed farther toward a wall it climbs, and lifted more so its tail clears the floor.
         event.registerEntityRenderer(ModEntities.TERMITE_MINOR_SOLDIER.get(), context -> new AntRenderer<>(
                 context, new DefaultedEntityGeoModel<TermiteSoldierEntity>(
-                        ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "termite_minor_soldier"))
-                .withAltAnimations(soldierAnimations))
+                        ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "termite_minor_soldier")))
                 .withScale(TermiteQueenModel.RENDER_SCALE));
         event.registerEntityRenderer(ModEntities.TERMITE_MAJOR_SOLDIER.get(), context -> new AntRenderer<>(
                 context, new DefaultedEntityGeoModel<TermiteSoldierEntity>(
-                        ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "termite_major_soldier"))
-                .withAltAnimations(soldierAnimations))
+                        ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "termite_major_soldier")))
                 .withClimbPose(0.4F, 0.27F)
                 .withScale(TermiteQueenModel.RENDER_SCALE));
     }

@@ -66,13 +66,13 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     /**
      * The walks for each speed (2026-10-16): real ants walk faster mostly by taking longer strides, so a slow ant takes
      * short steps and a fast one long ones. Slowest first; each clip says the speeds it is for (its "speeds" note), and
-     * the body player changes between them in step ({@code AntAnimationController.gearFor}). Ants only (the termites'
-     * file has only "walk").
+     * the body player changes between them in step ({@code AntAnimationController.gearFor}). Every model's file has
+     * them (the termites' since 2026-10-18, made by tools/termite_models.py).
      */
     private static final RawAnimation WALK_SLOW = RawAnimation.begin().thenLoop("walk_slow");
     private static final RawAnimation WALK_FAST = RawAnimation.begin().thenLoop("walk_fast");
     private static final List<RawAnimation> WALKS = List.of(WALK_SLOW, WALK, WALK_FAST);
-    /** Stepping round to turn where it stands (to the right, to the left; see {@link #measureWalk}). Ants only. */
+    /** Stepping round to turn where it stands (to the right, to the left; see {@link #measureWalk}). Ants and termites. */
     private static final RawAnimation TURN_R = RawAnimation.begin().thenLoop("turn_r");
     private static final RawAnimation TURN_L = RawAnimation.begin().thenLoop("turn_l");
     /** Asleep: still, and now and then a short bout of antenna twitches (see {@link #napTicks}). Ants only. */
@@ -1613,6 +1613,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             player.playAt(1.0);
             return state.setAndContinue(whole);
         }
+        turnReach = player.turnReach(TURN_R);
         RawAnimation clip = usualClip();
         if (clip == WALK) {
             clip = player.gearFor(WALKS, WALK, walkSpeed);
@@ -1712,8 +1713,9 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     }
 
     /**
-     * Whether its animation file has the work clips (cleaning, digging, carrying) and the turning ones: the ant model's
-     * does (made by tools/ant_models.py); the termites' do not yet, so they keep their usual clips while they work.
+     * Whether its animation file has the work clips (cleaning, digging, carrying): the ant model's does (made by
+     * tools/ant_models.py); the termites' do not yet, so they keep their usual clips while they work. (Turning on the
+     * spot goes by its own clip's reach note, {@link #turnReach}.)
      */
     protected boolean hasWorkClips() {
         return false;
@@ -1824,14 +1826,18 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
      * Client: whether its legs step round to turn where it stands (2026-10-16, the review's third fix): real ants step
      * to turn, their feet never skate round. It steps when the body turns faster than {@link #START_TURNING} (until it
      * is below {@link #STOP_TURNING}) and the turn moves the feet more than walking does (curving while walking, the walk
-     * steps). Not on hot ground (the tall stance has no turning clip). Ants only.
+     * steps). Not on hot ground (the tall stance has no turning clip). Any model whose file has the turning clips (the
+     * ant's, and the termites' since 2026-10-18).
      */
     private boolean turning;
     /** Degrees a tick (40 and 20 a second; my picks, to confirm). */
     private static final double START_TURNING = 2.0;
     private static final double STOP_TURNING = 1.0;
-    /** How far the outer feet of the ant model stand from the body's middle (model units; tools/ant_models.py, TURN). */
-    private static final double TURN_REACH = 5.8;
+    /**
+     * Client: how far the outer feet of its model stand from the body's middle while turning (model units), from the
+     * turning clip's {@code reach} note (each model's own legs); NaN until the model is known, or if it has no turning clip.
+     */
+    private double turnReach = Double.NaN;
 
     /**
      * Client, once a tick: how fast it moves, for the legs (see {@link AntAnimationController}). On a floor only its
@@ -1848,8 +1854,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         // turning left). Its feet step round when the turn would move them over the ground faster than the walk does.
         double turned = wallPose ? -Mth.wrapDegrees(bodyHeading - bodyHeadingO) : Mth.wrapDegrees(yBodyRot - yBodyRotO);
         turnSpeed += (turned - turnSpeed) * 0.4;
-        double feet = Math.abs(turnSpeed) * Mth.DEG_TO_RAD * TURN_REACH / 16.0 * drawScale;
-        turning = hasWorkClips() && !isOnHotGround() && feet > walkSpeed
+        double feet = Math.abs(turnSpeed) * Mth.DEG_TO_RAD * turnReach / 16.0 * drawScale;
+        turning = !Double.isNaN(turnReach) && !isOnHotGround() && feet > walkSpeed
                 && Math.abs(turnSpeed) > (turning ? STOP_TURNING : START_TURNING);
     }
 

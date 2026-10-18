@@ -1,0 +1,28 @@
+# Guard film: a termite worker walking up three mound ramps onto the soil and back down (walking, never climbing),
+# then up a pillar and down its far side, the termites' own body on the same edges as the ants.
+cmd time set noon
+cmd weather clear
+cmd fill -6 -60 -2 -6 -60 2 antcolonies:termite_mound[layers=5,age=2]
+cmd fill -5 -60 -2 -5 -59 2 antcolonies:termite_mound[layers=5,age=2]
+cmd fill -4 -60 -2 -2 -58 2 antcolonies:termite_mound[layers=5,age=2]
+cmd fill -7 -60 -2 -7 -60 2 antcolonies:termite_ramp[facing=east,age=2]
+cmd fill -6 -59 -2 -6 -59 2 antcolonies:termite_ramp[facing=east,age=2]
+cmd fill -5 -58 -2 -5 -58 2 antcolonies:termite_ramp[facing=east,age=2]
+cmd fill 4 -60 0 4 -59 0 stone
+lens 30
+walker termite_worker -10.5 -60 0.5 -90
+log termite
+cmd tick freeze
+fov 10
+follow 0 0.15 -7 0 0
+go -3 -57 0
+burst ramp_up 80 1
+go -10 -60 0
+burst ramp_down 80 1
+go 4 -58 0
+burst pillar 120 1
+go 8 -60 0
+burst pillar_down 70 1
+log off
+follow off
+quit

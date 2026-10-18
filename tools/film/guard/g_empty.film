@@ -1,0 +1,8 @@
+# Guard film: the drawing-time meter (FilmFrameMeter) with no insects, the baseline for the crowd scene after it.
+cmd time set noon
+cmd weather clear
+lens 30
+camera 0.5 -58.4 -9 0 25
+wait 200
+shot empty
+quit

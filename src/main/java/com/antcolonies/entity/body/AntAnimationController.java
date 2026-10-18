@@ -42,9 +42,11 @@ import software.bernie.geckolib.model.GeoModel;
  * </ul>
  */
 public class AntAnimationController<T extends AbstractAntEntity> extends AnimationController<T> {
-    /** The head player's bones: the head, the mandibles, the antennae and the carried load's place in the jaws. */
-    public static final Predicate<String> HEAD_BONES = bone -> bone.startsWith("head") || bone.startsWith("mandible")
-            || bone.startsWith("antenna") || bone.startsWith("carry");
+    /**
+     * The head player's bones: the head, the mandibles, the antennae and the carried load's place in the jaws (each
+     * model's body plan lists them, {@link BodyPlans}).
+     */
+    public static final Predicate<String> HEAD_BONES = BodyPlans::isHeadPlayerBone;
     /** The body player's bones: everything that is not the head's (the body, the forebody, the legs, the waist, the gaster). */
     public static final Predicate<String> BODY_BONES = HEAD_BONES.negate();
     /** The extras' player: every bone (it only moves the bones of the clip it plays). */
@@ -83,6 +85,9 @@ public class AntAnimationController<T extends AbstractAntEntity> extends Animati
     @Nullable
     private Queue<AnimationProcessor.QueuedAnimation> nextQueue;
     private double waitingSince;
+    /** The turning clip's reach (read once; NaN: no turning clip), and whether it was read yet. */
+    private double turnReach = Double.NaN;
+    private boolean turnReachRead;
 
     public AntAnimationController(T insect, String name, int transitionTicks, AnimationStateHandler<T> handler, Predicate<String> owns) {
         super(insect, name, transitionTicks, handler);
@@ -153,6 +158,20 @@ public class AntAnimationController<T extends AbstractAntEntity> extends Animati
      */
     public static double strideOf(Animation clip) {
         return noteOf(clip, "stride");
+    }
+
+    /**
+     * How far the outer feet of a turning clip stand from the body's middle (model units, its {@code reach} note, written
+     * by the tools for each model's own legs), which tells the insect when its feet should step round instead of the walk
+     * (see {@code AbstractAntEntity.measureWalk}); NaN while no model is known or if the model has no such clip.
+     */
+    public double turnReach(RawAnimation turning) {
+        if (!turnReachRead && lastModel != null) {
+            Animation clip = lastModel.getAnimation(animatable, turning.getAnimationStages().get(0).animationName());
+            turnReach = clip == null ? Double.NaN : noteOf(clip, "reach");
+            turnReachRead = true;
+        }
+        return turnReach;
     }
 
     /** How fast the clip plays now (1 = as made): one cycle a stride walked, one a turn turned, or the rate it was given. */

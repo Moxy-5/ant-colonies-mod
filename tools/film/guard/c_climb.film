@@ -1,0 +1,19 @@
+# Guard film: up a pillar two blocks high, over its top and head first down the far side onto the floor, then away
+# from it. Guards the climbing session's bugs: the gaster in the stone on top (docs/BUGS.md 34), the ant landing facing
+# the wall at the foot of the climb down, the body not bridging the inside corner at the wall's foot.
+cmd time set noon
+cmd weather clear
+cmd fill 3 -60 0 3 -59 0 stone
+lens 30
+walker worker_ant 0.5 -60 0.5 -90
+log climb
+cmd tick freeze
+fov 10
+follow 0 0.15 -7 0 0
+go 3 -58 0
+burst up 70 1
+go 7 -60 0
+burst down 70 1
+log off
+follow off
+quit

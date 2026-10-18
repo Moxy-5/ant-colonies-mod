@@ -1,0 +1,27 @@
+# Guard film: the major termite soldier (the biggest body, its legs set forward under its heavy head) walking at the
+# three speeds, then turning on the spot both ways seen from above: its feet must stay put on the ground while the
+# body passes over them, and step round as it turns (docs/plans/termite-walks.md).
+cmd time set noon
+cmd weather clear
+lens 30
+walker termite_major_soldier -9.5 -60 0.5 -90
+log soldier
+cmd tick freeze
+fov 10
+follow 0 0.2 -8 0 0
+go -4 -60 0 0.4
+burst slow 40 1
+go 2 -60 0 1.0
+burst normal 30 1
+go 8 -60 0 1.8
+burst fast 30 1
+burst stop 40 1
+follow 0 2.6 0 0 90
+look 8 -60 -8
+burst left_above 30 1
+look 8 -60 8
+burst right_above 30 1
+look off
+log off
+follow off
+quit

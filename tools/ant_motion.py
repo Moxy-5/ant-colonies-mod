@@ -1,12 +1,13 @@
 """
 The motion library (2026-10-16): writes insects' animations from real-insect numbers instead of hand-set key frames.
-Used by tools/ant_models.py (and later tools/termite_models.py: it is species-neutral and works on any model with the
-shared bone names). The plan is docs/plans/animation-engine.md, part 1.
+Used by tools/ant_models.py (and later tools/termite_models.py: it is species-neutral and works on any model with a
+body plan, tools/body_plan.py). The plan is docs/plans/animation-engine.md, part 1.
 
 What it does:
   Legs (inverse kinematics): from where a foot must be, it works out the hip, knee and ankle turns that put it there.
     A foot on the ground stays put while the body moves over it, and a lifted leg follows a real foot's path.
-  Gait: the tripod gait of walking ants (the front and hind leg of one side step with the middle leg of the other).
+  Gait: the gait maker (2026-10-18) gives each leg its moment in the step from where it sits on the body, by the one
+    rule real walkers with legs in pairs share (see gait): a tripod for ants, the right pattern for 4, 8 or 40 legs.
     Each foot's path through a cycle comes from the sweep (how far a planted foot travels under the body), the duty
     factor (the share of the cycle a foot is down) and its moment in the step pattern. The clip's stride (the ground
     it covers) goes into the file as a timeline note, so the game plays the walk at exactly the speed that keeps the
@@ -15,8 +16,8 @@ What it does:
     and gaster swaying against the stride; the body's small bob.
   Poses with planted feet: any body pose (the forebody raised to look, lowered to dig, the body on stilts) with the
     legs worked out so the feet stay where they stood.
-  Bone map: clips use the standard bone names; a model with other names (the user's Blockbench worker, M2) gets a map
-    from the standard names to its own (Rig(model, bonemap)).
+  Body plans: the legs and the other parts come from the model's body plan (tools/body_plan.py), in role names; a
+    model with other bone names (the user's Blockbench worker, M2) only needs its plan's rename table changed.
 
 Conventions are the lab's (tools/anim_lab.py): geo units (16 to a block before the renderer's scale), the head to -Z,
 the ground at y = 0, the insect's left at +X. A file turn [x, y, z] in degrees turns X first (the other way round from
@@ -160,8 +161,10 @@ class Leg:
     def __init__(self, model, key):
         self.key, self.model = key, model
         self.side = key[0]
+        self.pair = int(key[1:])                        # counted from the front: 1 is the front pair
         foot_bone, ci, k = model.feet[key]
-        self.hip, self.knee, self.foot = f'leg_{key}', f'leg_{key}_lower', f'leg_{key}_foot'
+        chain = model.plan.legs[key] if model.plan else [f'leg_{key}', f'leg_{key}_lower', f'leg_{key}_foot']
+        self.hip, self.knee, self.foot = chain
         if foot_bone != self.foot:
             raise ValueError(f'{key}: the motion library needs hip, _lower and _foot bones (found {foot_bone})')
         piv = lambda b: tuple(model.by[b]['pivot'])  # noqa: E731
@@ -262,16 +265,32 @@ class Leg:
 
 
 class Rig:
-    """An insect's model ready for posing: its six legs, where its feet stand, and the bone map."""
+    """An insect's model ready for posing: its legs (from its body plan) and where its feet stand. Everything is in role
+    names; tools/ant_models.py renames the finished clips to the model's own bone names as it writes them."""
 
-    def __init__(self, model, bonemap=None):
+    def __init__(self, model):
         self.model = model
-        self.map = dict(bonemap or {})
         self.legs = {k: Leg(model, k) for k in sorted(model.feet)}
         self.ground = min(leg.T[1] for leg in self.legs.values())
+        pairs = sorted({leg.pair for leg in self.legs.values()})
+        self.first_pair, self.last_pair = pairs[0], pairs[-1]
+        self.front_left = min((k for k in self.legs if k[0] == 'l'), key=lambda k: self.legs[k].pair)
+        # The leg whose mid-stance is a walk's swap moment (see walk_swap): the right leg of the middle pair.
+        self.swap_leg = 'r' + str(pairs[len(pairs) // 2])
+        self.centre = model.centre({})               # the body's centre of weight seen from above, standing
+        # The bones the gaster's sway goes on, half each (2026-10-18, for any waist): the first and the last joint of
+        # the body plan's waist (an ant's petiole and its gaster); a body with one waist joint (a termite, broad-waisted:
+        # its abdomen) puts the whole sway on it.
+        waist = [b for b, _ in model.plan.waist] if model.plan and model.plan.waist else ['petiole', 'abdomen']
+        self.sway = [waist[0], waist[-1]] if len(waist) > 1 else [waist[0]]
 
-    def name(self, standard):
-        return self.map.get(standard, standard)
+    def sway_share(self):
+        """The share of the gaster's sway each of the sway bones takes."""
+        return 1.0 / len(self.sway)
+
+    def is_middle(self, key):
+        """A leg between the front and the hind pair (an ant's middle legs; all of a centipede's but two pairs)."""
+        return self.first_pair < self.legs[key].pair < self.last_pair
 
     def stance(self, key):
         """Where a leg's foot stands at rest, on the ground."""
@@ -349,7 +368,7 @@ class Track:
                 pts = simplify(sorted(frames.items()), tol)
                 if all(max(abs(a - b) for a, b in zip(v, pts[0][1])) < tol for _, v in pts):
                     pts = [pts[0]]                       # never moves: one key
-                out.setdefault(self.rig.name(bone), {})[ch] = {fmt_time(t): [round(v, 3) for v in vec] for t, vec in pts}
+                out.setdefault(bone, {})[ch] = {fmt_time(t): [round(v, 3) for v in vec] for t, vec in pts}
         return out
 
 
@@ -374,14 +393,77 @@ def stand(rig, still, feet=None, guess=None):
     return out, qs, worst
 
 
+# --- the gait maker (2026-10-18) ---------------------------------------------------------------------------------------
+# Real walkers with legs in pairs share one rule for when each foot steps (Wilson 1966, "Insect walking"; the same
+# pattern runs through spiders, centipedes, lizards and mammals): on each side the steps run as a wave from the back
+# leg to the front one, each leg landing a fixed share of the cycle (the LAG) after the leg behind it, and the two
+# sides do the same half a cycle apart. Two numbers then give every real gait:
+#   6 legs, lag about 0.5: the tripod of ants (L1 R2 L3 together, then R1 L2 R3); a lag a little over 0.5 lands the
+#       feet of a tripod one after another, hind first (the ant's walks: 0.53, and 0.58 slow and loose).
+#   6 legs, lag about 0.25: the wave gait of slow insects (one or two feet in the air at a time).
+#   8 legs, lag 0.5: the alternating tetrapod of spiders (L1 R2 L3 R4 together, Wilson 1967).
+#   many legs, a small lag: a centipede's waves running from tail to head (Manton 1952: retrograde waves).
+#   4 legs, lag 0.25: the lateral-sequence walk of mammals and slow lizards (left hind, left fore, right hind, right
+#       fore); lag 0.5: the trot (diagonal pairs) of lizards, dogs, horses.
+#   2 legs: walking; sides 0 instead of 0.5 (both sides together): hopping or bounding.
+# Lost legs (lost=...): the rule runs over the legs that are left. Both middle legs lost: the four left step in diagonal
+# pairs like a trotting quadruped, as real insects do (Hughes 1957, Wilson 1966); for one lost leg the rule gives a
+# good start, and the balance check below says whether the body still stays over its feet.
+INSECT_LEGS = ('l1', 'r1', 'l2', 'r2', 'l3', 'r3')
+
+
+def gait(legs=INSECT_LEGS, lag=0.53, sides=0.5, lost=()):
+    """The moment in the cycle (0-1) each foot touches down, by the rule above: {leg key: moment}. legs: the leg keys
+    (l or r, then the pair counted from the front); the left hind leg lands at 0."""
+    keep = [k for k in legs if k not in lost]
+    out = {}
+    for side, start in (('l', 0.0), ('r', sides)):
+        row = sorted((k for k in keep if k[0] == side), key=lambda k: -int(k[1:]))      # the hind leg first
+        for i, key in enumerate(row):
+            out[key] = round((start + i * lag) % 1.0, 6)
+    return out
+
+
+# The ant's walks (the same numbers as the step tables they replace, 2026-10-16): the tripod, the hind foot of a tripod
+# landing a little first and the front one last (my pick from filmed ants); walking slowly, real ants keep to a tripod
+# less tightly, the three feet of a tripod landing one after another, with moments of wave and tetrapod stepping and of
+# all six feet down (Wahl et al. 2015, Cataglyphis below about 3 body lengths a second; my pick: 0.08 of a cycle apart
+# instead of 0.03).
+TRIPOD = gait(lag=0.53)
+LOOSE_TRIPOD = gait(lag=0.58)
+
+
+hull = lab.hull                    # the feet's shape and the centre's place in it live in the lab (it checks clips)
+support_margin = lab.support_margin
+
+
+def balance(rig, phases, duty, sweep, middle_duty=None, shift=None, wide=0.0, samples=200):
+    """The balance check for a gait: through one cycle, how far the body's centre of weight stays inside the feet on
+    the ground (static balance: an insect walking slowly is balanced at every moment; a fast runner need not be, its
+    speed carries it, Ting, Blickhan and Full 1994). Returns (closest it gets in units, negative = outside;
+    the share of the cycle it is outside; the fewest feet down)."""
+    centre = rig.centre
+    duties = {key: (middle_duty if middle_duty and rig.is_middle(key) else duty) for key in phases}
+    per_cycle = sweep / duty
+    worst, outside, fewest = 1e9, 0, len(phases)
+    for i in range(samples):
+        p = i / samples
+        feet = []
+        for key in phases:
+            leg = rig.legs[key]
+            x, y, z = rig.stance(key)
+            c = (x + leg.out * wide, y, z + (shift or {}).get(leg.pair, 0.0))
+            point, down = foot_path(c, per_cycle * duties[key], duties[key], 0.0, 0.0, phases[key], p)
+            if down:
+                feet.append((point[0], point[2]))
+        m = support_margin(centre, feet)
+        worst = min(worst, m)
+        outside += m < 0
+        fewest = min(fewest, len(feet))
+    return worst, outside / samples, fewest
+
+
 # --- walking ----------------------------------------------------------------------------------------------------------
-# The tripod gait: the moment in the cycle each foot touches down. L1, R2 and L3 step together, the other three half a
-# cycle later; inside a tripod the hind foot lands a little first and the front one last (my pick from filmed ants).
-TRIPOD = {'l3': 0.0, 'r2': 0.03, 'l1': 0.06, 'r3': 0.5, 'l2': 0.53, 'r1': 0.56}
-# Walking slowly, real ants keep to a tripod less tightly: the three feet of a tripod land one after another, with
-# moments of wave and tetrapod stepping and of all six feet down (Wahl et al. 2015, Cataglyphis below about 3 body
-# lengths a second). My pick: the feet of a tripod land 0.08 of a cycle apart instead of 0.03.
-LOOSE_TRIPOD = {'l3': 0.0, 'r2': 0.08, 'l1': 0.16, 'r3': 0.5, 'l2': 0.58, 'r1': 0.66}
 
 
 def hermite(p0, p1, m0, m1, s):
@@ -443,22 +525,23 @@ def walk(rig, seconds, cycles=1, sweep=3.4, duty=0.58, lift=0.9, phases=TRIPOD, 
     centres = {}
     for key, leg in rig.legs.items():
         x, y, z = rig.stance(key)
-        centres[key] = (x + leg.out * wide, y, z + (shift or {}).get(int(key[1]), 0.0))
+        centres[key] = (x + leg.out * wide, y, z + (shift or {}).get(leg.pair, 0.0))
     n = keys * cycles
     q = {key: (0.0, 0.0, 0.0, 0.0) for key in rig.legs}
     turns = {key: None for key in rig.legs}
     worst = {key: 0.0 for key in rig.legs}
     first = None
     per_cycle = sweep / duty                          # ground covered in one cycle
-    duties = {key: (middle_duty if middle_duty and key[1] == '2' else duty) for key in rig.legs}
-    mid = phases['l1'] + duty / 2                     # tripod 1's mid-stance: the body is highest
+    duties = {key: (middle_duty if middle_duty and rig.is_middle(key) else duty) for key in rig.legs}
+    front = rig.front_left
+    mid = phases[front] + duty / 2                    # tripod 1's mid-stance: the body is highest
     for warm in (True, False):                        # one cycle to settle the solver, then the clip
         for i in range(n + 1 if not warm else keys):
             eased = warm and i == 0
             t = seconds * i / n
             p = (i / keys) % 1.0
-            yaw = -sway * math.sin(2 * math.pi * (p - phases['l1']))
-            gaster = gaster_sway * math.sin(2 * math.pi * (p - phases['l1']))
+            yaw = -sway * math.sin(2 * math.pi * (p - phases[front]))
+            gaster = gaster_sway * math.sin(2 * math.pi * (p - phases[front]))
             body_pos = [base_pos[0], base_pos[1] + raise_by + bob * math.cos(4 * math.pi * (p - mid)), base_pos[2]]
             pose_still = dict(still)
             fore = still.get('forebody', [0, 0, 0])
@@ -481,12 +564,11 @@ def walk(rig, seconds, cycles=1, sweep=3.4, duty=0.58, lift=0.9, phases=TRIPOD, 
                 first = {key: list(map(list, turns[key])) for key in rig.legs}
             tr.put('body', t, body_pos, 'position')
             tr.put('forebody', t, pose_still['forebody'])
-            pet = still.get('petiole', [0, 0, 0])
-            ab = still.get('abdomen', [0, 0, 0])
-            tr.put('petiole', t, [pet[0], pet[1] + gaster / 2, pet[2]])
-            tr.put('abdomen', t, [ab[0], ab[1] + gaster / 2, ab[2]])
+            for bone in rig.sway:
+                was = still.get(bone, [0, 0, 0])
+                tr.put(bone, t, [was[0], was[1] + gaster * rig.sway_share(), was[2]])
             for bone, vec in still.items():
-                if bone not in ('forebody', 'petiole', 'abdomen'):
+                if bone != 'forebody' and bone not in rig.sway:
                     tr.put(bone, t, vec)
     # The last key is the first one again (the loop closes exactly).
     seam = 0.0
@@ -496,16 +578,17 @@ def walk(rig, seconds, cycles=1, sweep=3.4, duty=0.58, lift=0.9, phases=TRIPOD, 
             tr.put(bone, seconds, a)
     stride = cycles * per_cycle
     report = {'worst_miss': max(worst.values()), 'misses': worst, 'seam': seam, 'stride': stride,
-              'swap': walk_swap(phases, duties['r2'])}
+              'swap': walk_swap(phases, duties[rig.swap_leg], rig.swap_leg),
+              'balance': balance(rig, phases, duty, sweep, middle_duty, shift, wide)}
     return tr, stride, report
 
 
-def walk_swap(phases, middle_duty):
+def walk_swap(phases, middle_duty, leg='r2'):
     """The moment in a walk's cycle (0-1) when R2 stands at the middle of its stance (and half a cycle later L2): then
     every planted foot stands near its own middle and the feet in the air are half way through their swing, so walks
     of different strides look almost the same there. The game changes from one walk to another at these moments
     (each clip's "swap" note), keeping the legs in step."""
-    return (phases['r2'] + middle_duty / 2) % 1.0
+    return (phases[leg] + middle_duty / 2) % 1.0
 
 
 # --- turning on the spot ----------------------------------------------------------------------------------------------
@@ -519,14 +602,15 @@ def turn(rig, seconds, degrees, duty=0.6, lift=0.8, phases=TRIPOD, lead=4.0, shi
     {leg number: duty}. Returns (track, report)."""
     tr = track or Track(rig)
     sign = 1.0 if degrees >= 0 else -1.0
-    duties = {key: (duty.get(int(key[1]), 0.6) if isinstance(duty, dict) else duty) for key in rig.legs}
+    duties = {key: (duty.get(leg.pair, 0.6) if isinstance(duty, dict) else duty) for key, leg in rig.legs.items()}
     centres = {}
     for key, leg in rig.legs.items():
         x, y, z = rig.stance(key)
-        out = wide.get(int(key[1]), 0.0) if isinstance(wide, dict) else wide
-        centres[key] = (x + leg.out * out, y, z + (shift or {}).get(int(key[1]), 0.0))
-    still = {'forebody': [0.0, sign * lead, 0.0], 'petiole': [0.0, -sign * lead / 4, 0.0],
-             'abdomen': [0.0, -sign * lead / 4, 0.0]}
+        out = wide.get(leg.pair, 0.0) if isinstance(wide, dict) else wide
+        centres[key] = (x + leg.out * out, y, z + (shift or {}).get(leg.pair, 0.0))
+    still = {'forebody': [0.0, sign * lead, 0.0]}
+    for bone in rig.sway:
+        still[bone] = [0.0, -sign * lead / 2 * rig.sway_share(), 0.0]
     pose = pose_of(still)
     q = {key: (0.0, 0.0, 0.0, 0.0) for key in rig.legs}
     turns = {key: None for key in rig.legs}
@@ -564,7 +648,7 @@ def turn(rig, seconds, degrees, duty=0.6, lift=0.8, phases=TRIPOD, lead=4.0, shi
             tr.put(bone, seconds, a_)
     report = {'worst_miss': max(worst.values()), 'misses': worst, 'seam': seam,
               'reach': max(math.hypot(c[0], c[2]) for c in centres.values()),
-              'swap': walk_swap(phases, duties['r2'])}
+              'swap': walk_swap(phases, duties[rig.swap_leg], rig.swap_leg)}
     return tr, report
 
 
@@ -590,6 +674,20 @@ def self_test():
         tip = model.foot_tips(pose)[key]
         assert length(sub(tip, target)) < 1e-3 and err < 1e-4, (key, tip, target, err)
     print('motion library: turns agree with the lab, every leg reaches its targets')
+    # The gait maker: the ant's step tables as they were typed in by hand (2026-10-16), and the real gaits of the rule.
+    assert TRIPOD == {'l3': 0.0, 'r2': 0.03, 'l1': 0.06, 'r3': 0.5, 'l2': 0.53, 'r1': 0.56}, TRIPOD
+    assert LOOSE_TRIPOD == {'l3': 0.0, 'r2': 0.08, 'l1': 0.16, 'r3': 0.5, 'l2': 0.58, 'r1': 0.66}, LOOSE_TRIPOD
+    spider = gait([s + str(n) for n in range(1, 5) for s in 'lr'], lag=0.5)
+    assert spider['l1'] == spider['r2'] == spider['l3'] == spider['r4'] != spider['r1'], spider       # Wilson 1967
+    walk4 = gait(['l1', 'r1', 'l2', 'r2'], lag=0.25)                  # 4 legs: pair 1 the fore legs, 2 the hind ones
+    assert [walk4[k] for k in ('l2', 'l1', 'r2', 'r1')] == [0.0, 0.25, 0.5, 0.75], walk4   # lateral sequence
+    trot = gait(['l1', 'r1', 'l2', 'r2'], lag=0.5)
+    assert trot['l2'] == trot['r1'] and trot['l1'] == trot['r2'] and trot['l1'] != trot['l2'], trot   # diagonal pairs
+    lost = gait(lag=0.53, lost=('l2', 'r2'))
+    assert abs(lost['l1'] - lost['r3']) < 0.05 and abs(lost['r1'] - lost['l3']) < 0.05, lost         # Hughes 1957
+    centipede = gait([s + str(n) for n in range(1, 16) for s in 'lr'], lag=0.1)
+    assert all(abs((centipede[f'l{n}'] - centipede[f'l{n + 1}']) % 1.0 - 0.1) < 1e-6 for n in range(1, 15)), centipede  # tail to head
+    print('gait maker: the tripod tables, the spider, the walk, the trot, lost legs and the centipede come out right')
 
 
 if __name__ == '__main__':

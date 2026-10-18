@@ -1,0 +1,61 @@
+{
+ "about": "Body plan (tools/body_plan.py explains every part). \"bones\" is the rename table: role name (left, used everywhere else in this file and in the tools) to the bone name in the model (right). The names are the placeholder models' for now; when the real model has other bone names, change only the right-hand side, then run python tools/body_plan.py check.",
+ "model": "termite_worker",
+ "bones": {
+  "body": "body",
+  "forebody": "forebody",
+  "head": "head",
+  "mandible_l": "mandible_l",
+  "mandible_r": "mandible_r",
+  "carry": "carry",
+  "antenna_l_1": "antenna_l_1",
+  "antenna_l_2": "antenna_l_2",
+  "antenna_r_1": "antenna_r_1",
+  "antenna_r_2": "antenna_r_2",
+  "thorax": "thorax",
+  "leg_l1": "leg_l1",
+  "leg_l1_lower": "leg_l1_lower",
+  "leg_l1_foot": "leg_l1_foot",
+  "leg_r1": "leg_r1",
+  "leg_r1_lower": "leg_r1_lower",
+  "leg_r1_foot": "leg_r1_foot",
+  "leg_l2": "leg_l2",
+  "leg_l2_lower": "leg_l2_lower",
+  "leg_l2_foot": "leg_l2_foot",
+  "leg_r2": "leg_r2",
+  "leg_r2_lower": "leg_r2_lower",
+  "leg_r2_foot": "leg_r2_foot",
+  "leg_l3": "leg_l3",
+  "leg_l3_lower": "leg_l3_lower",
+  "leg_l3_foot": "leg_l3_foot",
+  "leg_r3": "leg_r3",
+  "leg_r3_lower": "leg_r3_lower",
+  "leg_r3_foot": "leg_r3_foot",
+  "abdomen": "abdomen"
+ },
+ "root": "body",
+ "forebody": "forebody",
+ "legs": {
+  "l1": ["leg_l1", "leg_l1_lower", "leg_l1_foot"],
+  "r1": ["leg_r1", "leg_r1_lower", "leg_r1_foot"],
+  "l2": ["leg_l2", "leg_l2_lower", "leg_l2_foot"],
+  "r2": ["leg_r2", "leg_r2_lower", "leg_r2_foot"],
+  "l3": ["leg_l3", "leg_l3_lower", "leg_l3_foot"],
+  "r3": ["leg_r3", "leg_r3_lower", "leg_r3_foot"]
+ },
+ "head": {
+  "bone": "head",
+  "jaws": ["mandible_l", "mandible_r"],
+  "antennae": {
+   "l": ["antenna_l_1", "antenna_l_2"],
+   "r": ["antenna_r_1", "antenna_r_2"]
+  },
+  "sockets": {
+   "carry": "carry"
+  }
+ },
+ "head_player": ["head", "mandible_l", "mandible_r", "carry", "antenna_l_1", "antenna_l_2", "antenna_r_1", "antenna_r_2"],
+ "waist": [
+  {"bone": "abdomen", "share": 0.25}
+ ]
+}

@@ -179,6 +179,11 @@ public final class FilmDirector {
     private static int burstSub;
     private static float drawPartial;
 
+    /** The scene being filmed now (for {@link FilmFrameMeter}). */
+    static String sceneName() {
+        return sceneName;
+    }
+
     /**
      * The in-between time (0 to 1, from the last tick to the next) insects are drawn at while filming. While a step is
      * on its way the drawn time stays where the last picture was (the step's ticks already run here are taken off):

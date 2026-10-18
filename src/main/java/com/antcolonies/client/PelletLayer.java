@@ -2,6 +2,7 @@ package com.antcolonies.client;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.entity.AbstractAntEntity;
+import com.antcolonies.entity.body.BodyPlans;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 
@@ -24,12 +25,11 @@ import software.bernie.geckolib.renderer.layer.BlockAndItemGeoLayer;
  * nursery shows, lying across the mandibles) or a dead nestmate (the same body the refuse chamber shows, smaller).
  */
 public class PelletLayer<T extends AbstractAntEntity> extends BlockAndItemGeoLayer<T> {
-    /**
+    /*
      * The bone that marks where a load is held: an empty bone of the head, just in front of the mandible tips (every
-     * ant and termite model has one, made by tools/ant_models.py and tools/termite_models.py), so the load sits in
-     * each model's own jaws and moves with the head.
+     * ant and termite model has one, made by tools/ant_models.py and tools/termite_models.py; its body plan names it,
+     * the "carry" socket, BodyPlans.isHoldBone), so the load sits in each model's own jaws and moves with the head.
      */
-    private static final String HOLD_BONE = "carry";
     /** Pellet size as a fraction of a full block. */
     private static final float SIZE = 0.12F;
     /** A carried seed is drawn this big (as a fraction of a full item). */
@@ -50,10 +50,10 @@ public class PelletLayer<T extends AbstractAntEntity> extends BlockAndItemGeoLay
 
     public PelletLayer(GeoRenderer<T> renderer, ModelPart eggModel, ModelPart corpseModel) {
         super(renderer,
-                (bone, ant) -> !HOLD_BONE.equals(bone.getName()) ? null
+                (bone, ant) -> !BodyPlans.isHoldBone(bone.getName()) ? null
                         : ant.isCarryingCorpse() ? CORPSE_MARKER : ant.isCarryingEgg() ? EGG_MARKER
                         : !ant.getCarriedSeed().isEmpty() && !ant.isFoodInCrop() ? ant.getCarriedSeed() : null,
-                (bone, ant) -> HOLD_BONE.equals(bone.getName()) ? ant.getCarriedBlock() : null);
+                (bone, ant) -> BodyPlans.isHoldBone(bone.getName()) ? ant.getCarriedBlock() : null);
         this.eggModel = eggModel;
         this.corpseModel = corpseModel;
     }
