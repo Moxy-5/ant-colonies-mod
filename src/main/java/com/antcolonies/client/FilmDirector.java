@@ -259,8 +259,13 @@ public final class FilmDirector {
             return;                            // waiting for the frame to be drawn
         }
         if (waitTicks > 0) {
-            waitTicks--;
-            return;
+            if (!FilmStep.arrived()) {         // a burst's step seen arriving ends its wait at once
+                if (--waitTicks == 0) {
+                    FilmStep.gaveUp();
+                }
+                return;
+            }
+            waitTicks = 0;
         }
         if (burstLeft > 0) {
             drawPartial = (float) burstSub / framesPerTick;
@@ -272,8 +277,12 @@ public final class FilmDirector {
             burstSub = 0;
             burstLeft--;
             if (burstLeft > 0 && burstGap > 0) {
-                send(mc, "tick step " + burstGap);
-                waitTicks = 3 + burstGap;      // the stepped ticks reach the client
+                if (FilmStep.step(mc, burstGap, burstLeft > 1)) {
+                    waitTicks = 20 + burstGap; // at most: the step is seen arriving long before
+                } else {
+                    send(mc, "tick step " + burstGap);
+                    waitTicks = 3 + burstGap;  // the stepped ticks reach the client
+                }
             }
             return;
         }
@@ -335,6 +344,7 @@ public final class FilmDirector {
         waitTicks = 0;
         pendingShot = null;
         burstLeft = 0;
+        FilmStep.cancel();
         logName = null;
         logLines.setLength(0);
         checks = new FilmChecks();
