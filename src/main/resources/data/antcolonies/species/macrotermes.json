@@ -7,6 +7,18 @@
     "watch_radius": 48,
     "swaps_per_second": 2,
     "nurses_from_workers": [3, 8, 12, 20],
+    "neighbours": {
+      "_note": "Brain step 4g, step 5 (the user's answers of 2026-10-18; real neighbouring Macrotermes wall off their galleries where they come close): workers on the surface meet as the ants do, and a gallery piece coming within 'within' blocks of another Macrotermes colony's gallery is a meeting for both. The colony yields as the ants do (young_meetings at founding down to 1 at old_at_days): its tip there stops, a piece grown that way is not dug, and a piece whose tip it yields at is walled off (wall_galleries: packed with soil back to its fork, out of sight, nobody inside; the 4 arms only stop). The webs never join (a piece touching the other gallery is never dug). My picks as for the ants, to confirm.",
+      "within": 3.0,
+      "meet_every_ticks": 1200,
+      "merge_within": 4.0,
+      "half_life_ticks": 48000,
+      "forget_below": 0.5,
+      "young_meetings": 4.0,
+      "old_at_days": 8.0,
+      "turn_degrees": 30.0,
+      "wall_galleries": true
+    },
     "danger": {
       "hurt": 2.0,
       "killed": 4.0,

@@ -233,6 +233,9 @@ public class DangerMap {
      * place, or the trunk trail a forager would walk out to it passes one (see {@link TrunkTrails#passesDanger}).
      */
     public boolean avoids(Level level, BlockPos pos) {
+        if (colony.neighbours().yieldsAt(level, pos)) {
+            return true; // (step 5: past a place where the colony yields to a neighbour; not danger, but kept off the same way)
+        }
         SpeciesProfile.DangerNumbers numbers = numbers();
         if (numbers == null || places.isEmpty()) {
             return false;

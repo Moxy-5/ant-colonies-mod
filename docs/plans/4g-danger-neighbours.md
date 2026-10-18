@@ -80,6 +80,12 @@ Numbers marked "my pick" go in the species files and are to be confirmed by the 
 - No fighting (M8 builds fights on this).
 - Tests: two harvester colonies about 30 blocks apart in one arena, both with trails toward each other: the old one turns
   away first, the young one later; two termite colonies' galleries stop short and the meeting cell is walled.
+- **BUILT 2026-10-18** on branch `claude/pensive-moore-530c7e` (`colony/Neighbours`, `NeighbourTests`; `docs/HISTORY.md`).
+  The user's answers before building: old at day 8, same species only, half every 2 days, 30 degrees. Changed while
+  building (my picks, to confirm): the meetings are their own memory (`Neighbours`), not places in `DangerMap`; a colony
+  that turned away stays away until the place has faded to half what it needed (else an old colony would yield for only
+  about 90 seconds after one meeting); the termite "wall" packs the whole piece reaching toward the neighbour with soil
+  back to its fork (as filling in does), the 4 arms only stop; the webs never join.
 
 ## Order, branch and tests
 - One step at a time, each tested in-game by the user before the next. Steps 1 and 2 together are the first thing to see
