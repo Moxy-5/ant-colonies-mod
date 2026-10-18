@@ -150,7 +150,7 @@ on *Reticulitermes* and *Coptotermes*, Macrotermes galleries being little mapped
   Matabele raids).
 
 ## Step 4: away and speed
-**BUILT 2026-10-17** (see `docs/HISTORY.md`). **Decided with the user 2026-10-17** (real behaviour explained first: a Macrotermes colony forages every suitable
+**BUILT 2026-10-17** (see `docs/HISTORY.md`), confirmed in-game by the user 2026-10-17 ("everything works"). **Decided with the user 2026-10-17** (real behaviour explained first: a Macrotermes colony forages every suitable
 night whether anyone watches, through some of its holes, and its builders never stop: galleries are pushed out toward
 finds and backfilled where they led nowhere, so a long absence changes the web; new food is found by holes opened over
 fresh ground, not smelt from afar). All the real answers picked:
