@@ -4906,7 +4906,18 @@
          ]
         }
        }
-      },
+      }
+     ]
+    },
+    {
+     "name": "abdomen_2",
+     "pivot": [
+      0,
+      1.85,
+      1.0
+     ],
+     "parent": "abdomen",
+     "cubes": [
       {
        "origin": [
         -1.25,
@@ -5128,7 +5139,18 @@
          ]
         }
        }
-      },
+      }
+     ]
+    },
+    {
+     "name": "abdomen_3",
+     "pivot": [
+      0,
+      1.85,
+      1.6
+     ],
+     "parent": "abdomen_2",
+     "cubes": [
       {
        "origin": [
         -1.275,
@@ -5350,7 +5372,18 @@
          ]
         }
        }
-      },
+      }
+     ]
+    },
+    {
+     "name": "abdomen_4",
+     "pivot": [
+      0,
+      1.85,
+      2.2
+     ],
+     "parent": "abdomen_3",
+     "cubes": [
       {
        "origin": [
         -1.225,
@@ -5572,7 +5605,18 @@
          ]
         }
        }
-      },
+      }
+     ]
+    },
+    {
+     "name": "abdomen_5",
+     "pivot": [
+      0,
+      1.85,
+      2.8
+     ],
+     "parent": "abdomen_4",
+     "cubes": [
       {
        "origin": [
         -1.075,
@@ -5794,7 +5838,18 @@
          ]
         }
        }
-      },
+      }
+     ]
+    },
+    {
+     "name": "abdomen_6",
+     "pivot": [
+      0,
+      1.85,
+      3.4
+     ],
+     "parent": "abdomen_5",
+     "cubes": [
       {
        "origin": [
         -0.8,

@@ -155,5 +155,15 @@
   240,
   136
  ],
- "findings": {}
+ "findings": {
+  "jump abdomen": [
+   1,
+   0.1
+  ],
+  "jump at back_up_38": [
+   1,
+   0.1
+  ]
+ },
+ "body_findings": {}
 }

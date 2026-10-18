@@ -22,7 +22,7 @@ import software.bernie.geckolib.model.data.EntityModelData;
  * <ul>
  * <li>the head look: the head turned toward what the insect looks at ({@code NoticeGoal}), within a real ant's neck;
  * <li>the edge curve: the waist bent by how far the front has turned ahead of the rear (over an edge, onto a wall or a
- * ceiling, up a ramp, round a turn; see {@link AbstractAntEntity#getWaistPitch}).
+ * ceiling, up a ramp, round a turn; each piece of the spine, see {@link AbstractAntEntity#getSpinePitch}).
  * </ul>
  * Insects farther than {@link #NEAR} blocks from the camera skip it (too small to see; saves time with many ants).
  */
@@ -32,12 +32,6 @@ public final class BodyLanguage {
     private static final float MAX_PITCH = 25.0F;
     /** The live layer only within this many blocks of the camera (my pick, to confirm). */
     public static final double NEAR = 32.0;
-    /**
-     * The waist's joints and their shares of the bend (petiole, postpetiole, the gaster's joint; my picks, to confirm)
-     * for a model with no body plan; a plan names its own ("waist", {@link BodyPlans}).
-     */
-    private static final List<String> WAIST = List.of("petiole", "postpetiole", "abdomen");
-    private static final float[] WAIST_SHARE = {0.40F, 0.35F, 0.25F};
 
     private BodyLanguage() {
     }
@@ -90,26 +84,29 @@ public final class BodyLanguage {
     }
 
     /**
-     * The edge curve: the rear still lies the way the front lay a moment ago, so each waist joint takes its share of
-     * the difference. A front tipped up past the rear lifts the gaster relative to the body (a positive X in the
-     * animation file, which GeckoLib stores negated); a front turned right leaves the gaster pointing a little to the
+     * The edge curve: each piece of the spine still lies the way the front lay a moment ago, so each of its joints takes
+     * its share of the piece's bend. A front tipped up past the rear lifts the rear relative to the body (a positive X in
+     * the animation file, which GeckoLib stores negated); a front turned right leaves the rear pointing a little to the
      * right of the body's line behind (a negative Y in the file, stored negated).
      */
     private static void waist(AbstractAntEntity insect, Function<String, GeoBone> bones, @Nullable BodyPlans.Plan plan,
             float partialTick) {
-        float pitch = insect.getWaistPitch(partialTick);
-        float yaw = insect.getWaistYaw(partialTick);
-        if (Math.abs(pitch) < 0.05F && Math.abs(yaw) < 0.05F) {
-            return;
-        }
-        List<String> waist = plan != null ? plan.waist() : WAIST;
-        float[] shares = plan != null ? plan.waistShare() : WAIST_SHARE;
-        for (int i = 0; i < waist.size(); i++) {
-            GeoBone joint = bones.apply(waist.get(i));
-            if (joint == null) {
+        List<BodyPlans.Piece> spine = plan != null && !plan.spine().isEmpty() ? plan.spine() : List.of(BodyPlans.WORKER_WAIST);
+        for (int p = 0; p < spine.size(); p++) {
+            float pitch = insect.getSpinePitch(p, partialTick);
+            float yaw = insect.getSpineYaw(p, partialTick);
+            if (Math.abs(pitch) < 0.05F && Math.abs(yaw) < 0.05F) {
                 continue;
             }
-            turnBy(joint, -pitch * shares[i] * Mth.DEG_TO_RAD, yaw * shares[i] * Mth.DEG_TO_RAD);
+            BodyPlans.Piece piece = spine.get(p);
+            for (int i = 0; i < piece.joints().size(); i++) {
+                GeoBone joint = bones.apply(piece.joints().get(i));
+                if (joint == null) {
+                    continue;
+                }
+                float share = piece.shares()[i];
+                turnBy(joint, -pitch * share * Mth.DEG_TO_RAD, yaw * share * Mth.DEG_TO_RAD);
+            }
         }
     }
 }

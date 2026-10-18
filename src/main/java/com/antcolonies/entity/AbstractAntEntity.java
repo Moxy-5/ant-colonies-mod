@@ -14,7 +14,9 @@ import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.debug.Perf;
 import com.antcolonies.entity.body.AntAnimationController;
+import com.antcolonies.entity.body.BodyPlans;
 import com.antcolonies.entity.body.EdgeOver;
+import com.antcolonies.entity.body.Spine;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.entity.goal.GroomGoal;
 import com.antcolonies.entity.goal.NapGoal;
@@ -952,155 +954,38 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     }
 
     /**
-     * Client: the edge curve (the animation engine, step 9, 2026-10-16; by distance since the review of the same day). A
-     * real ant's body is three hard parts joined at the neck and the waist: going over an edge, onto a wall or a ceiling,
-     * up a ramp or round a turn, the front turns first and the gaster follows the same path, so the waist bends while
-     * the gaster is still on the old surface. Here the front's turns (pitch: up a wall or a ramp; yaw: round a turn) are
-     * added up tick by tick and remembered with the distance walked, and the rear lies the way the path lay where it
-     * is now ("follow the leader"): the gaster the way the front lay, on average, over the stretch of path it covers,
-     * {@link #GASTER_START} to {@link #GASTER_END} behind the middle; over an outside edge it hangs down only while the
-     * waist joints ({@link #WAIST_AT} to {@link #GASTER_START}) are still over the edge. So the bend is the same at any
-     * speed, stays if the ant stops half way over an edge, and the gaster never dips into the block it walks onto. A
-     * turn where it stands turns the whole body, gaster and all (no bend); standing still a second, a side bend eases
-     * out (the ant straightens itself), an up-and-down one stays (its gaster still lies over the edge). My picks, to
-     * confirm: at most 60 degrees up or down and 25 to the side.
+     * Client: the edge curve (the animation engine, step 9, 2026-10-16; by distance since the review of the same day;
+     * every body's own spine since 2026-10-18). Going over an edge, onto a wall or a ceiling, up a ramp or round a turn,
+     * the front turns first and the rear follows the same path ("follow the leader", {@link Spine}): the front's turns
+     * this tick are handed to the spine, which bends each piece behind the thorax (the ant's waist and gaster, the
+     * termite's abdomen) the way the path lay under it. Where the pieces lie, the tightest curve and how far each bends
+     * at most come from the body's plan ({@link BodyPlans}; the worker's numbers without one). My picks, to confirm: the
+     * worker at most 60 degrees up or down and 25 to the side.
      */
-    /** Where the waist begins, the gaster begins and the gaster ends, behind the body's middle (model units; the worker model). */
-    private static final double WAIST_AT = 0.64;
-    private static final double GASTER_START = 2.4;
-    private static final double GASTER_END = 5.2;
-    /** The tightest curve the path itself takes (model units across; a sharper turn is the body turning on the spot). */
-    private static final double WAIST_TIGHTEST = 3.0;
-    private static final float WAIST_MAX_PITCH = 60.0F;
-    private static final float WAIST_MAX_YAW = 25.0F;
-    private static final int WAIST_MEMORY = 64;
-    /** The front's pitch and yaw along the path: the distance walked at each mark (blocks), and the front's pose there. */
-    private final double[] pathMark = new double[WAIST_MEMORY];
-    private final float[] pitchMark = new float[WAIST_MEMORY];
-    private final float[] yawMark = new float[WAIST_MEMORY];
-    private int marks;
-    private int newestMark;
-    private double pathWalked;
-    private int standingTicks;
-    private float frontPitch;
-    private float frontYaw;
-    private float waistPitch;
-    private float waistPitchO;
-    private float waistYaw;
-    private float waistYawO;
+    private final Spine spine = new Spine();
 
     private void tickWaist() {
         // On a wall the body tips about its own side-to-side line only when the head points up or down the wall (the
         // tilt turns it about the wall's level line, the heading turns it within the wall).
         float tipped = (bodyTilt - bodyTiltO) * Mth.cos(bodyHeading * Mth.DEG_TO_RAD);
-        frontPitch += tipped + (slopePitch - slopePitchO);
         // Turning right is a growing body yaw on a floor; on a wall the heading grows turning left.
         float turned = wallPose ? -Mth.wrapDegrees(bodyHeading - bodyHeadingO) : Mth.wrapDegrees(yBodyRot - yBodyRotO);
-        frontYaw += turned;
-        double scale = drawScale / 16.0;
-        if (tickCount <= 2 || marks == 0) {
-            marks = 0;                                     // just loaded: no bend from where it was put down
-        } else {
-            // The path itself turns at most so much over the ground walked this tick; the rest of the turn is the body
-            // turning where it stands, which turns the gaster with it.
-            float curve = (float) Math.min(Math.abs(turned), moved / (WAIST_TIGHTEST * scale / 2.0) * Mth.RAD_TO_DEG);
-            float onTheSpot = turned - Math.copySign(curve, turned);
-            standingTicks = moved < 1.0E-4 ? standingTicks + 1 : 0;
-            float ease = standingTicks > 20 ? 0.1F : 0.0F;
-            for (int i = 0; i < marks; i++) {
-                int k = Math.floorMod(newestMark - i, WAIST_MEMORY);
-                yawMark[k] += onTheSpot + (frontYaw - yawMark[k] - onTheSpot) * ease;
-            }
-        }
-        pathWalked += moved;
-        if (marks == 0 || moved >= 1.0E-4) {
-            newestMark = (newestMark + 1) % WAIST_MEMORY;
-            marks = Math.min(WAIST_MEMORY, marks + 1);
-        }
-        pathMark[newestMark] = pathWalked;
-        pitchMark[newestMark] = frontPitch;
-        yawMark[newestMark] = frontYaw;
-        // The rear lies the way the path lay where it is now: the gaster along the path its whole length took (the
-        // front's pose averaged over it), so at an inside corner (a wall up from the floor, the floor at the foot of a
-        // wall) it lies along the old surface and comes round bit by bit as it passes the corner. Over an outside edge
-        // it hangs down only while the waist itself is still over the edge: once the waist is on the new surface the
-        // gaster lies on it too, never into the block (2026-10-16, seen in the climbing film by the user and me).
-        double waist = pathWalked - WAIST_AT * scale;
-        float gasterPitch = averageMark(pitchMark, pathWalked - GASTER_END * scale, waist);
-        float waistJointsPitch = averageMark(pitchMark, pathWalked - GASTER_START * scale, waist);
-        float gasterYaw = averageMark(yawMark, pathWalked - GASTER_END * scale, waist);
-        float bend = Math.max(frontPitch - gasterPitch, Math.min(frontPitch - waistJointsPitch, 0.0F));
-        waistPitchO = waistPitch;
-        waistYawO = waistYaw;
-        waistPitch = Mth.clamp(bend, -WAIST_MAX_PITCH, WAIST_MAX_PITCH);
-        waistYaw = Mth.clamp(frontYaw - gasterYaw, -WAIST_MAX_YAW, WAIST_MAX_YAW);
+        spine.tick(tipped + (slopePitch - slopePitchO), turned, moved, drawScale / 16.0, tickCount <= 2, rear, climb.tightestCurve());
     }
 
-    /**
-     * The front's pose (one of the mark rings) averaged over the stretch of path walked from {@code from} to {@code to}
-     * (blocks walked; straight lines between marks, the oldest mark's pose before the remembered path).
-     */
-    private float averageMark(float[] pose, double from, double to) {
-        if (to - from < 1.0E-9) {
-            return poseAt(pose, to);
-        }
-        double sum = 0.0;
-        double at = to;
-        float poseThere = poseAt(pose, to);
-        for (int i = 0; i < marks && at > from; i++) {
-            int k = Math.floorMod(newestMark - i, WAIST_MEMORY);
-            if (pathMark[k] >= at) {
-                continue;
-            }
-            double next;
-            float poseNext;
-            if (pathMark[k] >= from || i == 0) {
-                next = Math.max(pathMark[k], from);
-                poseNext = pose[k];
-            } else {
-                // The stretch starts between this mark and the later one: part way.
-                int later = Math.floorMod(k + 1, WAIST_MEMORY);
-                double span = pathMark[later] - pathMark[k];
-                next = from;
-                poseNext = Mth.lerp(span > 1.0E-9 ? (float) ((from - pathMark[k]) / span) : 0.0F, pose[k], pose[later]);
-            }
-            sum += (at - next) * (poseThere + poseNext) / 2.0;
-            at = next;
-            poseThere = poseNext;
-        }
-        if (at > from) {
-            sum += (at - from) * poseThere;                // before the remembered path: as the oldest mark
-        }
-        return (float) (sum / (to - from));
-    }
-
-    /** The front's pose (one of the mark rings) at this distance walked (between two marks, part way). */
-    private float poseAt(float[] pose, double walked) {
-        float there = pose[newestMark];
-        for (int i = 0; i < marks; i++) {
-            int k = Math.floorMod(newestMark - i, WAIST_MEMORY);
-            there = pose[k];
-            if (pathMark[k] <= walked) {
-                if (i > 0) {
-                    int later = Math.floorMod(k + 1, WAIST_MEMORY);
-                    double span = pathMark[later] - pathMark[k];
-                    float f = span > 1.0E-9 ? (float) ((walked - pathMark[k]) / span) : 0.0F;
-                    there = Mth.lerp(f, pose[k], pose[later]);
-                }
-                break;
-            }
-        }
-        return there;
-    }
-
-    /** Client: how far the front has tipped up past the rear (degrees, the waist's bend; see {@link #tickWaist}). */
+    /** Client: how far the front has tipped up past the rear (degrees, the first piece's bend; see {@link #tickWaist}). */
     public float getWaistPitch(float partialTick) {
-        return Mth.lerp(partialTick, waistPitchO, waistPitch);
+        return spine.pitch(0, partialTick);
     }
 
-    /** Client: how far the front has turned right past the rear (degrees, the waist's bend). */
-    public float getWaistYaw(float partialTick) {
-        return Mth.lerp(partialTick, waistYawO, waistYaw);
+    /** Client: how far the piece in front of this spine piece has tipped up past it (degrees, its bend). */
+    public float getSpinePitch(int piece, float partialTick) {
+        return spine.pitch(piece, partialTick);
+    }
+
+    /** Client: how far the piece in front of this spine piece has turned right past it (degrees, its bend). */
+    public float getSpineYaw(int piece, float partialTick) {
+        return spine.yaw(piece, partialTick);
     }
 
     /**
@@ -1324,7 +1209,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             return null;
         }
         EdgeOver.Pose edge = EdgeOver.find(level(), position(), getBbWidth(), getBbHeight(), getSurface(),
-                entityData.get(DATA_HEADING), getYRot(), drawScale / 16.0, drawLift, drawIntoWall);
+                entityData.get(DATA_HEADING), getYRot(), climb, drawScale / 16.0, drawLift, drawIntoWall);
         if (edge != null) {
             return edge;
         }
@@ -1332,7 +1217,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         double dx = getX() - xo;
         double dz = getZ() - zo;
         return EdgeOver.findCorner(level(), position(), getBbWidth(), getBbHeight(), getSurface(),
-                entityData.get(DATA_HEADING), getYRot(), drawScale / 16.0, drawLift, drawIntoWall,
+                entityData.get(DATA_HEADING), getYRot(), climb, drawScale / 16.0, drawLift, drawIntoWall,
                 wallPose ? Direction.fromYRot(wallYaw) : null, bodyHeading, dx * dx + dz * dz > 1.0E-5);
     }
 
@@ -1574,7 +1459,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return String.format(java.util.Locale.ROOT,
                 "pos %.3f %.3f %.3f surface %s yaw %.1f heading %.1f tilt %.1f walk %.4f moved %.4f turn %.2f turning %b waist %.1f %.1f front %.1f %.1f",
                 getX(), getY(), getZ(), getSurface(), yBodyRot, bodyHeading, bodyTilt, walkSpeed, moved, turnSpeed, turning,
-                waistPitch, waistYaw, frontPitch, frontYaw)
+                spine.pitch(0, 1.0F), spine.yaw(0, 1.0F), spine.frontPitch(), spine.frontYaw())
                 + (edgeShift == null ? " edge -" : String.format(java.util.Locale.ROOT, " edge %.3f %.3f %.3f", edgeShift.x, edgeShift.y, edgeShift.z));
     }
 
@@ -1815,6 +1700,9 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     /** Client: the renderer's climbing lift and push into a wall (blocks; set by {@code AntRenderer}). */
     private double drawLift;
     private double drawIntoWall;
+    /** Client: its body's climbing numbers and its spine's pieces (its body plan's; set by {@code AntRenderer}). */
+    private BodyPlans.Climb climb = BodyPlans.WORKER_CLIMB;
+    private List<BodyPlans.Piece> rear = List.of(BodyPlans.WORKER_WAIST);
     /** Walking starts above this speed and stops below the lower one (blocks a tick; my picks, to confirm). */
     private static final double START_WALKING = 0.008;
     private static final double STOP_WALKING = 0.004;
@@ -1876,6 +1764,15 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     public void setClimbPose(double lift, double intoWall) {
         drawLift = lift;
         drawIntoWall = intoWall;
+    }
+
+    /**
+     * Client: set by the renderer each frame, the body plan of the model it is drawn with (null: none, the worker's
+     * numbers), for the waist's bend and for drawing it over an edge.
+     */
+    public void setBodyPlan(@Nullable BodyPlans.Plan plan) {
+        climb = plan != null ? plan.climb() : BodyPlans.WORKER_CLIMB;
+        rear = plan != null && !plan.spine().isEmpty() ? plan.spine() : List.of(BodyPlans.WORKER_WAIST);
     }
 
     @Override

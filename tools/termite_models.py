@@ -191,15 +191,25 @@ def front_half(legs=KING_LEGS):
 # --- the king's abdomen: dark plates on top, lighter belly, golden lines between segments -----------------------
 KING_SEGMENTS = [(2.3, 1.7), (2.5, 1.85), (2.55, 1.9), (2.45, 1.8), (2.15, 1.6), (1.6, 1.15)]
 
+def abdomen_bone(i):
+    """The name of the abdomen's i-th segment bone (0 the front one): abdomen, abdomen_2, abdomen_3, ..."""
+    return 'abdomen' if i == 0 else f'abdomen_{i + 1}'
+
 def king_abdomen():
-    cubes, z = [], 0.4
-    for w, h in KING_SEGMENTS:
+    """The abdomen of the king, the worker and the soldiers (2026-10-18, the user's pick, soft segments): a real termite
+    has no waist, and its soft abdomen curves along its length over an edge or round a turn. So each segment (its back
+    plate, belly plate and the seam behind) is its own bone, hung off the one in front at its front edge, in a chain:
+    the clips that sway `abdomen` sway the whole of it, and the live layer bends each joint along the path."""
+    bones, z, parent = [], 0.4, 'body'
+    for i, (w, h) in enumerate(KING_SEGMENTS):
         cy = 1.85
-        cubes.append(centered(0, cy + h * 0.2, z + 0.29, w, h * 0.6, 0.5, 'back'))
-        cubes.append(centered(0, cy - h * 0.3, z + 0.29, w * 0.92, h * 0.4, 0.5, 'belly'))
-        cubes.append(centered(0, cy, z + 0.56, w * 0.9, h * 0.9, 0.1, 'joint'))
+        cubes = [centered(0, cy + h * 0.2, z + 0.29, w, h * 0.6, 0.5, 'back'),
+                 centered(0, cy - h * 0.3, z + 0.29, w * 0.92, h * 0.4, 0.5, 'belly'),
+                 centered(0, cy, z + 0.56, w * 0.9, h * 0.9, 0.1, 'joint')]
+        bones.append(bone(abdomen_bone(i), parent, [0, cy, round(z, 3)], cubes))
+        parent = abdomen_bone(i)
         z += 0.6
-    return [bone('abdomen', 'body', [0, 1.85, 0.4], cubes)]
+    return bones
 
 # --- the queen's abdomen: six segments that the renderer stretches ----------------------------------------------
 # Keep these numbers in step with TermiteQueenModel.java.
@@ -276,7 +286,7 @@ def worker_model():
     for b in front_half() + king_abdomen():
         if b['name'] == 'wing_stubs':
             continue
-        colours = WORKER_ABDOMEN_COLOURS if b['name'] == 'abdomen' else WORKER_COLOURS
+        colours = WORKER_ABDOMEN_COLOURS if b['name'].startswith('abdomen') else WORKER_COLOURS
         nb = {k: v for k, v in b.items() if k != 'cubes'}
         nb['pivot'] = [round(v * WORKER_SCALE, 3) for v in b['pivot']]
         cubes = []
@@ -374,7 +384,7 @@ def soldier_model(major, legs=None):
     bones = []
     for b in raw + head:
         own = b['name'] in HEAD_BONES
-        colours = {} if own else SOLDIER_ABDOMEN_COLOURS if b['name'] == 'abdomen' else SOLDIER_COLOURS
+        colours = {} if own else SOLDIER_ABDOMEN_COLOURS if b['name'].startswith('abdomen') else SOLDIER_COLOURS
         nb = {k: v for k, v in b.items() if k != 'cubes'}
         nb['pivot'] = [round(v, 3) for v in moved(b['pivot'])]
         cubes = []

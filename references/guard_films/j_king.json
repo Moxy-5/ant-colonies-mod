@@ -1,0 +1,123 @@
+{
+ "pictures": [
+  "slow_00.png",
+  "slow_01.png",
+  "slow_02.png",
+  "slow_03.png",
+  "slow_04.png",
+  "slow_05.png",
+  "slow_06.png",
+  "slow_07.png",
+  "slow_08.png",
+  "slow_09.png",
+  "slow_10.png",
+  "slow_11.png",
+  "slow_12.png",
+  "slow_13.png",
+  "slow_14.png",
+  "slow_15.png",
+  "slow_16.png",
+  "slow_17.png",
+  "slow_18.png",
+  "slow_19.png",
+  "slow_20.png",
+  "slow_21.png",
+  "slow_22.png",
+  "slow_23.png",
+  "slow_24.png",
+  "slow_25.png",
+  "slow_26.png",
+  "slow_27.png",
+  "slow_28.png",
+  "slow_29.png",
+  "slow_30.png",
+  "slow_31.png",
+  "slow_32.png",
+  "slow_33.png",
+  "slow_34.png",
+  "slow_35.png",
+  "slow_36.png",
+  "slow_37.png",
+  "slow_38.png",
+  "slow_39.png",
+  "slow_40.png",
+  "slow_41.png",
+  "slow_42.png",
+  "slow_43.png",
+  "slow_44.png",
+  "slow_45.png",
+  "slow_46.png",
+  "slow_47.png",
+  "slow_48.png",
+  "slow_49.png",
+  "normal_00.png",
+  "normal_01.png",
+  "normal_02.png",
+  "normal_03.png",
+  "normal_04.png",
+  "normal_05.png",
+  "normal_06.png",
+  "normal_07.png",
+  "normal_08.png",
+  "normal_09.png",
+  "normal_10.png",
+  "normal_11.png",
+  "normal_12.png",
+  "normal_13.png",
+  "normal_14.png",
+  "normal_15.png",
+  "normal_16.png",
+  "normal_17.png",
+  "normal_18.png",
+  "normal_19.png",
+  "normal_20.png",
+  "normal_21.png",
+  "normal_22.png",
+  "normal_23.png",
+  "normal_24.png",
+  "normal_25.png",
+  "normal_26.png",
+  "normal_27.png",
+  "normal_28.png",
+  "normal_29.png"
+ ],
+ "size": [
+  240,
+  136
+ ],
+ "findings": {
+  "jump leg_r1": [
+   2,
+   0.051
+  ],
+  "jump at normal_10": [
+   1,
+   0.051
+  ],
+  "jump at normal_28": [
+   1,
+   0.047
+  ],
+  "jump leg_l1": [
+   1,
+   0.05
+  ],
+  "jump at normal_12": [
+   1,
+   0.05
+  ],
+  "jump leg_l3": [
+   2,
+   0.049
+  ],
+  "jump at normal_11": [
+   1,
+   0.049
+  ],
+  "jump at normal_29": [
+   1,
+   0.048
+  ]
+ },
+ "body_findings": {}
+}

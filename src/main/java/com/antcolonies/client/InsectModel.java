@@ -30,8 +30,7 @@ public class InsectModel<T extends AbstractAntEntity> extends DefaultedEntityGeo
     private BodyPlans.Plan planOf(T insect) {
         ResourceLocation model = getModelResource(insect);
         if (!model.equals(planModel)) {
-            String path = model.getPath();                               // geo/entity/worker_ant.geo.json
-            plan = BodyPlans.of(path.substring(path.lastIndexOf('/') + 1).replace(".geo.json", ""));
+            plan = BodyPlans.ofGeo(model);
             planModel = model;
         }
         return plan;

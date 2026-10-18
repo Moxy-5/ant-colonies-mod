@@ -1,0 +1,21 @@
+# Guard film (climbing done once for every body, 2026-10-18, docs/plans/climbing-every-body.md): the major termite up a
+# pillar two blocks high, over its top and head first down the far side onto the floor, then away from it, with its
+# own body's numbers (its feet, its soft abdomen in segments following the path, its lift and push on the wall). The
+# abdomen must follow each edge, never into the stone or out into the air; the body tips over an edge from when its
+# front feet reach it until its hind feet are over.
+cmd time set noon
+cmd weather clear
+cmd fill 3 -60 0 3 -59 0 stone
+lens 30
+walker termite_major_soldier 0.5 -60 0.5 -90
+log major
+cmd tick freeze
+fov 10
+follow 0 0.15 -7 0 0
+go 3 -58 0
+burst up 80 1
+go 7 -60 0
+burst down 80 1
+log off
+follow off
+quit

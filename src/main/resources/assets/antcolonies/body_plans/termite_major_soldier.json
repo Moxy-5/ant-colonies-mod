@@ -31,7 +31,12 @@
   "leg_r3": "leg_r3",
   "leg_r3_lower": "leg_r3_lower",
   "leg_r3_foot": "leg_r3_foot",
-  "abdomen": "abdomen"
+  "abdomen": "abdomen",
+  "abdomen_2": "abdomen_2",
+  "abdomen_3": "abdomen_3",
+  "abdomen_4": "abdomen_4",
+  "abdomen_5": "abdomen_5",
+  "abdomen_6": "abdomen_6"
  },
  "root": "body",
  "forebody": "forebody",
@@ -55,7 +60,79 @@
   }
  },
  "head_player": ["head", "mandible_l", "mandible_r", "carry", "antenna_l_1", "antenna_l_2", "antenna_r_1", "antenna_r_2"],
- "waist": [
-  {"bone": "abdomen", "share": 0.25}
- ]
+ "spine": [
+  {
+   "joints": [
+    {"bone": "abdomen", "share": 1.0}
+   ],
+   "max_pitch": 15,
+   "max_yaw": 6,
+   "hinge": 3.67,
+   "from": 3.67,
+   "to": 4.35
+  },
+  {
+   "joints": [
+    {"bone": "abdomen_2", "share": 1.0}
+   ],
+   "max_pitch": 15,
+   "max_yaw": 6,
+   "hinge": 4.39,
+   "from": 4.39,
+   "to": 5.07
+  },
+  {
+   "joints": [
+    {"bone": "abdomen_3", "share": 1.0}
+   ],
+   "max_pitch": 15,
+   "max_yaw": 6,
+   "hinge": 5.11,
+   "from": 5.11,
+   "to": 5.79
+  },
+  {
+   "joints": [
+    {"bone": "abdomen_4", "share": 1.0}
+   ],
+   "max_pitch": 15,
+   "max_yaw": 6,
+   "hinge": 5.83,
+   "from": 5.83,
+   "to": 6.51
+  },
+  {
+   "joints": [
+    {"bone": "abdomen_5", "share": 1.0}
+   ],
+   "max_pitch": 15,
+   "max_yaw": 6,
+   "hinge": 6.55,
+   "from": 6.55,
+   "to": 7.23
+  },
+  {
+   "joints": [
+    {"bone": "abdomen_6", "share": 1.0}
+   ],
+   "max_pitch": 15,
+   "max_yaw": 6,
+   "hinge": 7.27,
+   "from": 7.27,
+   "to": 7.95
+  }
+ ],
+ "climb": {
+  "front_feet": 2.14,
+  "hind_feet": 5.02,
+  "front_end": 7.95,
+  "rear_end": 7.95,
+  "tightest_curve": 4.29,
+  "lift": 0.4,
+  "into_wall": 0.27
+ },
+ "approved": {
+  "why": "The major soldier's wall lift and push, set by eye in M7 (2026-10-15) so its feet touch the wall and its tail clears the floor.",
+  "keys": []
+ }
 }

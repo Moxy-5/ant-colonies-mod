@@ -6,7 +6,6 @@ import com.antcolonies.entity.TermiteQueenEntity;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import software.bernie.geckolib.animation.AnimationState;
-import software.bernie.geckolib.model.DefaultedEntityGeoModel;
 
 /**
  * The termite queen's model (tools/termite_models.py): the king's head, thorax and legs, and an abdomen of six
@@ -14,9 +13,10 @@ import software.bernie.geckolib.model.DefaultedEntityGeoModel;
  * and taller, while its dark back plate and lighter belly plate keep their size and stay on the outside of the skin, so
  * the plates drift apart into brown islands on a cream body, as in a real Macrotermes queen. Full grown she is about
  * 2 blocks long, centred on where she lies. The abdomen sinks to the floor as it grows, and slow waves run along it
- * from front to back (the "pulse"), stronger the bigger she is.
+ * from front to back (the "pulse"), stronger the bigger she is. The live layer ({@link InsectModel}) bends her abdomen
+ * over edges while she is small enough to walk.
  */
-public class TermiteQueenModel extends DefaultedEntityGeoModel<TermiteQueenEntity> {
+public class TermiteQueenModel extends InsectModel<TermiteQueenEntity> {
     /** The renderer's scale for the king and the queen (the model is drawn at 3/4 size). */
     public static final float RENDER_SCALE = 0.75F;
 

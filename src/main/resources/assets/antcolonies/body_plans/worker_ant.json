@@ -57,9 +57,31 @@
   }
  },
  "head_player": ["head", "mandible_l", "antenna_l_1", "antenna_l_2", "mandible_r", "antenna_r_1", "antenna_r_2", "carry"],
- "waist": [
-  {"bone": "petiole", "share": 0.4},
-  {"bone": "postpetiole", "share": 0.35},
-  {"bone": "abdomen", "share": 0.25}
- ]
+ "spine": [
+  {
+   "joints": [
+    {"bone": "petiole", "share": 0.4},
+    {"bone": "postpetiole", "share": 0.35},
+    {"bone": "abdomen", "share": 0.25}
+   ],
+   "hinge": 0.64,
+   "from": 2.4,
+   "to": 5.2,
+   "max_pitch": 60,
+   "max_yaw": 25
+  }
+ ],
+ "climb": {
+  "front_feet": 3.6,
+  "hind_feet": 2.85,
+  "front_end": 5.57,
+  "rear_end": 5.57,
+  "tightest_curve": 3.0,
+  "lift": 0.25,
+  "into_wall": 0.17
+ },
+ "approved": {
+  "why": "The harvester worker's climbing, approved by the user in-game 2026-10-16 (\"they look amazing\"): kept as it was.",
+  "keys": ["climb.front_feet", "climb.hind_feet", "climb.tightest_curve", "spine.0.hinge", "spine.0.from", "spine.0.to"]
+ }
 }

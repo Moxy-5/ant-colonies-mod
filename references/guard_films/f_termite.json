@@ -356,142 +356,163 @@
   136
  ],
  "findings": {
-  "inside leg_r2_lower": [
-   1,
-   0.023
-  ],
-  "inside at pillar_57": [
-   11,
-   0.054
-  ],
-  "inside leg_r2_foot": [
-   2,
-   0.033
-  ],
-  "inside at ramp_up_69": [
-   6,
-   0.047
-  ],
-  "jump leg_l2": [
-   1,
-   0.076
-  ],
-  "jump at pillar_down_34": [
-   7,
-   0.132
-  ],
-  "inside leg_l2_lower": [
-   1,
-   0.025
-  ],
-  "inside at ramp_up_67": [
-   10,
-   0.048
-  ],
-  "jump leg_l2_lower": [
-   1,
-   0.077
-  ],
-  "inside leg_l2_foot": [
-   3,
-   0.036
-  ],
-  "inside at pillar_58": [
-   7,
-   0.059
-  ],
-  "inside thorax": [
-   2,
-   0.027
-  ],
-  "jump thorax": [
-   1,
-   0.091
-  ],
-  "jump at pillar_down_40": [
-   6,
-   0.127
-  ],
   "jump head": [
    1,
-   0.071
+   0.103
+  ],
+  "jump at pillar_down_35": [
+   8,
+   0.148
+  ],
+  "inside mandible_r": [
+   1,
+   0.019
+  ],
+  "inside at ramp_up_37": [
+   6,
+   0.062
+  ],
+  "jump mandible_r": [
+   1,
+   0.11
+  ],
+  "inside antenna_l_1": [
+   1,
+   0.026
   ],
   "jump antenna_l_1": [
    1,
-   0.059
+   0.117
+  ],
+  "inside antenna_l_2": [
+   5,
+   0.062
+  ],
+  "inside at ramp_up_38": [
+   2,
+   0.062
+  ],
+  "inside at ramp_up_39": [
+   2,
+   0.041
+  ],
+  "inside at pillar_28": [
+   2,
+   0.054
+  ],
+  "inside at pillar_29": [
+   2,
+   0.042
+  ],
+  "jump antenna_l_2": [
+   2,
+   0.148
+  ],
+  "jump at pillar_down_36": [
+   2,
+   0.138
+  ],
+  "inside mandible_l": [
+   1,
+   0.02
+  ],
+  "jump mandible_l": [
+   1,
+   0.11
+  ],
+  "inside antenna_r_1": [
+   1,
+   0.027
   ],
   "jump antenna_r_1": [
-   2,
-   0.108
+   1,
+   0.114
+  ],
+  "inside antenna_r_2": [
+   8,
+   0.062
+  ],
+  "inside at pillar_27": [
+   1,
+   0.028
+  ],
+  "inside at pillar_30": [
+   1,
+   0.011
+  ],
+  "inside at pillar_down_34": [
+   1,
+   0.012
   ],
   "jump antenna_r_2": [
-   1,
-   0.132
+   2,
+   0.143
   ],
-  "inside leg_r3": [
+  "inside leg_r3_lower": [
    4,
-   0.023
+   0.018
+  ],
+  "inside at ramp_up_67": [
+   2,
+   0.021
   ],
   "inside at ramp_up_68": [
    6,
-   0.058
+   0.044
   ],
-  "jump leg_r3": [
-   1,
-   0.093
-  ],
-  "inside leg_r3_lower": [
-   6,
-   0.048
+  "inside at pillar_57": [
+   3,
+   0.031
   ],
   "inside at pillar_59": [
    5,
-   0.045
-  ],
-  "jump leg_r3_lower": [
-   1,
-   0.062
+   0.032
   ],
   "inside leg_r3_foot": [
-   8,
-   0.054
+   4,
+   0.032
   ],
-  "inside at ramp_up_70": [
-   2,
-   0.022
-  ],
-  "inside at ramp_up_71": [
+  "inside at pillar_60": [
    1,
    0.013
   ],
-  "jump leg_r1": [
+  "jump leg_l1_lower": [
    1,
-   0.089
-  ],
-  "inside leg_l3": [
-   2,
-   0.02
+   0.12
   ],
   "inside leg_l3_lower": [
-   7,
-   0.043
-  ],
-  "inside at pillar_60": [
    2,
-   0.028
+   0.016
+  ],
+  "inside at ramp_up_69": [
+   5,
+   0.034
+  ],
+  "inside at pillar_58": [
+   6,
+   0.044
   ],
   "inside leg_l3_foot": [
-   8,
-   0.048
+   4,
+   0.034
   ],
-  "inside abdomen": [
-   6,
-   0.059
-  ],
-  "jump abdomen": [
+  "inside abdomen_3": [
    2,
-   0.127
+   0.016
+  ],
+  "inside abdomen_4": [
+   4,
+   0.03
+  ],
+  "inside abdomen_5": [
+   4,
+   0.044
+  ],
+  "inside abdomen_6": [
+   4,
+   0.044
   ]
  },
+ "body_findings": {},
  "known_bugs": "at the top of the ramps the termite's legs and gaster are drawn up to 0.06 blocks inside the ramp and the soil (found 2026-10-18 by the first guard films)"
 }

@@ -13,7 +13,6 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
-import software.bernie.geckolib.model.DefaultedEntityGeoModel;
 
 @EventBusSubscriber(modid = AntColoniesMod.MODID, value = Dist.CLIENT)
 public class ClientEvents {
@@ -52,26 +51,28 @@ public class ClientEvents {
 
         // Termites (placeholder models made by tools/termite_models.py). Each has its own animation file of the same name,
         // its walks made for its own legs (2026-10-18); the queen's swelling and pulsing are done in TermiteQueenModel.
+        // (InsectModel: the live layer, its abdomen following the path over edges and round turns; termites are blind and
+        // never turn their heads to look.)
         event.registerEntityRenderer(ModEntities.TERMITE_KING.get(), context -> new AntRenderer<>(
-                context, new DefaultedEntityGeoModel<TermiteKingEntity>(
+                context, new InsectModel<TermiteKingEntity>(
                         ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "termite_king")))
                 .withScale(TermiteQueenModel.RENDER_SCALE));
         event.registerEntityRenderer(ModEntities.TERMITE_QUEEN.get(), TermiteQueenRenderer::new);
         event.registerEntityRenderer(ModEntities.TERMITE_WORKER.get(), context -> new AntRenderer<>(
-                context, new DefaultedEntityGeoModel<TermiteWorkerEntity>(
+                context, new InsectModel<TermiteWorkerEntity>(
                         ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "termite_worker")))
                 .withScale(TermiteQueenModel.RENDER_SCALE));
         event.registerEntityRenderer(ModEntities.TERMITE_NYMPH.get(), TermiteNymphRenderer::new);
         // Soldiers (tools/termite_models.py): each its own file (idle, the walks and turns, head_bang, bite). The major's
-        // bigger body is pressed farther toward a wall it climbs, and lifted more so its tail clears the floor.
+        // bigger body is pressed farther toward a wall it climbs, and lifted more so its tail clears the floor (its body
+        // plan's climbing numbers, as every insect's).
         event.registerEntityRenderer(ModEntities.TERMITE_MINOR_SOLDIER.get(), context -> new AntRenderer<>(
-                context, new DefaultedEntityGeoModel<TermiteSoldierEntity>(
+                context, new InsectModel<TermiteSoldierEntity>(
                         ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "termite_minor_soldier")))
                 .withScale(TermiteQueenModel.RENDER_SCALE));
         event.registerEntityRenderer(ModEntities.TERMITE_MAJOR_SOLDIER.get(), context -> new AntRenderer<>(
-                context, new DefaultedEntityGeoModel<TermiteSoldierEntity>(
+                context, new InsectModel<TermiteSoldierEntity>(
                         ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "termite_major_soldier")))
-                .withClimbPose(0.4F, 0.27F)
                 .withScale(TermiteQueenModel.RENDER_SCALE));
     }
 }

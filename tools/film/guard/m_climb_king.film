@@ -1,0 +1,22 @@
+# Guard film (climbing done once for every body, 2026-10-18, docs/plans/climbing-every-body.md): the king termite up a
+# pillar two blocks high, over its top and head first down the far side onto the floor, then away from it, with its
+# own body's numbers (its feet, its soft abdomen in segments following the path, its lift and push on the wall). The
+# abdomen must follow each edge, never into the stone or out into the air; the body tips over an edge from when its
+# front feet reach it until its hind feet are over. The king walks slowly, so it starts near the pillar and gets more
+# time (with 80 ticks from 0.5 it had not reached the top when told to go on, and backed off the wall).
+cmd time set noon
+cmd weather clear
+cmd fill 3 -60 0 3 -59 0 stone
+lens 30
+walker termite_king 2.0 -60 0.5 -90
+log king
+cmd tick freeze
+fov 10
+follow 0 0.15 -7 0 0
+go 3 -58 0
+burst up 130 1
+go 5 -60 0
+burst down 130 1
+log off
+follow off
+quit

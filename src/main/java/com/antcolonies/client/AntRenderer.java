@@ -1,8 +1,10 @@
 package com.antcolonies.client;
 
 import com.antcolonies.entity.AbstractAntEntity;
+import com.antcolonies.entity.body.BodyPlans;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.phys.Vec3;
 
 import software.bernie.geckolib.model.GeoModel;
@@ -18,16 +20,19 @@ import net.minecraft.client.renderer.entity.EntityRendererProvider;
  * {@code AbstractAntEntity.turnBody} and {@code tiltOnSlope}).
  */
 public class AntRenderer<T extends AbstractAntEntity> extends GeoEntityRenderer<T> {
-    /** How far the model is moved up while climbing, so the tail doesn't sink into the floor. */
-    private static final float CLIMB_LIFT = 0.25F;
-    /** How far the model is moved toward the wall, so the feet touch it. */
-    private static final float CLIMB_INTO_WALL = 0.17F;
-    /** The same inside a narrow channel (a termite tunnel): less, so the body stays in the channel's middle. */
+    /** How far the model is moved toward the wall inside a narrow channel (a termite tunnel): less, so the body stays in the channel's middle. */
     private static final float CHANNEL_INTO_WALL = 0.08F;
 
-    /** This renderer's climbing lift and push into the wall (a bigger body needs more; see {@link #withClimbPose}). */
-    private float climbLift = CLIMB_LIFT;
-    private float climbIntoWall = CLIMB_INTO_WALL;
+    /**
+     * How far the model is moved up while climbing, so the tail doesn't sink into the floor, and toward the wall, so the
+     * feet touch it (before the renderer's scale): from the body plan of the model drawn ({@link BodyPlans.Climb}; a
+     * bigger body needs more), set each frame.
+     */
+    private float climbLift;
+    private float climbIntoWall;
+    /** The geo model last drawn and its body plan (the queen draws the worker's model, so she gets the worker's plan). */
+    private ResourceLocation planModel;
+    private BodyPlans.Plan plan;
 
     public AntRenderer(EntityRendererProvider.Context context, GeoModel<T> model) {
         super(context, model);
@@ -35,20 +40,15 @@ public class AntRenderer<T extends AbstractAntEntity> extends GeoEntityRenderer<
         addRenderLayer(new PelletLayer<>(this, context.bakeLayer(AntEggRenderer.LAYER), context.bakeLayer(AntCorpseRenderer.LAYER)));
     }
 
-    /**
-     * For a bigger body (a major soldier): how far the model is moved up while climbing and toward the wall (in model
-     * units before the renderer's scale), so its feet touch the wall and its tail stays out of the floor.
-     */
-    public AntRenderer<T> withClimbPose(float lift, float intoWall) {
-        this.climbLift = lift;
-        this.climbIntoWall = intoWall;
-        return this;
-    }
-
     @Override
     public void render(T ant, float entityYaw, float partialTick, PoseStack poseStack, MultiBufferSource buffers,
             int packedLight) {
         ant.setDrawScale(scaleWidth); // for the stride: the legs keep pace with the ground at the size it is drawn
+        BodyPlans.Plan plan = planOf(ant);
+        ant.setBodyPlan(plan); // its own waist and feet, for the bend and for drawing it over an edge
+        BodyPlans.Climb climb = plan != null ? plan.climb() : BodyPlans.WORKER_CLIMB;
+        climbLift = (float) climb.liftFor(ant.getBbHeight(), scaleHeight);
+        climbIntoWall = (float) climb.intoWallFor(ant.getBbWidth(), scaleWidth);
         ant.setClimbPose(climbLift * scaleHeight, climbIntoWall * scaleWidth); // for drawing it over an edge
         if (FilmDirector.active()) {
             // The in-game camera: every picture at the in-between time it asks for (a frozen game's own one jitters),
@@ -63,6 +63,15 @@ public class AntRenderer<T extends AbstractAntEntity> extends GeoEntityRenderer<
             return;
         }
         super.render(ant, entityYaw, partialTick, poseStack, buffers, packedLight);
+    }
+
+    private BodyPlans.Plan planOf(T ant) {
+        ResourceLocation model = getGeoModel().getModelResource(ant);
+        if (!model.equals(planModel)) {
+            plan = BodyPlans.ofGeo(model);
+            planModel = model;
+        }
+        return plan;
     }
 
     @Override

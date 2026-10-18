@@ -48,6 +48,38 @@ class BodyPlansTest {
         assertEquals("head", worker.bone("head"));
     }
 
+    /**
+     * Climbing done once for every body (2026-10-18): the worker climbs exactly as the user approved it in-game, every
+     * other body with its own measured numbers, and the lift and push worked out from a body's size give the worker's
+     * approved ones for the worker's size.
+     */
+    @Test
+    void everyBodyClimbsWithItsOwnNumbers() {
+        BodyPlans.Plan worker = BodyPlans.of("worker_ant");
+        assertEquals(BodyPlans.WORKER_CLIMB, worker.climb());
+        BodyPlans.Piece waist = worker.spine().get(0);
+        assertEquals(BodyPlans.WORKER_WAIST.joints(), waist.joints());
+        assertArrayEquals(BodyPlans.WORKER_WAIST.shares(), waist.shares());
+        assertEquals(BodyPlans.WORKER_WAIST.hinge(), waist.hinge());
+        assertEquals(BodyPlans.WORKER_WAIST.from(), waist.from());
+        assertEquals(BodyPlans.WORKER_WAIST.to(), waist.to());
+        assertEquals(BodyPlans.WORKER_WAIST.maxPitch(), waist.maxPitch());
+        assertEquals(BodyPlans.WORKER_WAIST.maxYaw(), waist.maxYaw());
+        BodyPlans.Climb sized = new BodyPlans.Climb(3.6, 2.85, 5.57, 5.57, 3.0, Double.NaN, Double.NaN);
+        assertEquals(0.25, sized.liftFor(0.2F, 0.65F), 1e-6);
+        assertEquals(0.17, sized.intoWallFor(0.3F, 0.65F), 1e-6);
+        for (String model : MODELS) {
+            BodyPlans.Plan plan = BodyPlans.of(model);
+            assertTrue(!plan.spine().isEmpty(), model + ": no spine");
+            if (!model.equals("worker_ant")) {
+                assertTrue(plan.climb().hindFeet() != BodyPlans.WORKER_CLIMB.hindFeet(), model + ": the worker's feet");
+            }
+        }
+        BodyPlans.Plan major = BodyPlans.of("termite_major_soldier");
+        assertEquals(0.4, major.climb().liftFor(0.3F, 0.75F), 1e-9);
+        assertEquals(0.27, major.climb().intoWallFor(0.45F, 0.75F), 1e-9);
+    }
+
     private static List<String> geoBones(String model) throws Exception {
         try (InputStream in = BodyPlansTest.class.getResourceAsStream("/assets/antcolonies/geo/entity/" + model + ".geo.json")) {
             assertNotNull(in, "no " + model + ".geo.json");

@@ -31,7 +31,12 @@
   "leg_r3": "leg_r3",
   "leg_r3_lower": "leg_r3_lower",
   "leg_r3_foot": "leg_r3_foot",
-  "abdomen": "abdomen"
+  "abdomen": "abdomen",
+  "abdomen_2": "abdomen_2",
+  "abdomen_3": "abdomen_3",
+  "abdomen_4": "abdomen_4",
+  "abdomen_5": "abdomen_5",
+  "abdomen_6": "abdomen_6"
  },
  "root": "body",
  "forebody": "forebody",
@@ -55,7 +60,73 @@
   }
  },
  "head_player": ["head", "mandible_l", "mandible_r", "carry", "antenna_l_1", "antenna_l_2", "antenna_r_1", "antenna_r_2"],
- "waist": [
-  {"bone": "abdomen", "share": 0.25}
- ]
+ "spine": [
+  {
+   "joints": [
+    {"bone": "abdomen", "share": 1.0}
+   ],
+   "max_pitch": 15,
+   "max_yaw": 6,
+   "hinge": 0.37,
+   "from": 0.37,
+   "to": 0.86
+  },
+  {
+   "joints": [
+    {"bone": "abdomen_2", "share": 1.0}
+   ],
+   "max_pitch": 15,
+   "max_yaw": 6,
+   "hinge": 0.88,
+   "from": 0.88,
+   "to": 1.37
+  },
+  {
+   "joints": [
+    {"bone": "abdomen_3", "share": 1.0}
+   ],
+   "max_pitch": 15,
+   "max_yaw": 6,
+   "hinge": 1.39,
+   "from": 1.39,
+   "to": 1.88
+  },
+  {
+   "joints": [
+    {"bone": "abdomen_4", "share": 1.0}
+   ],
+   "max_pitch": 15,
+   "max_yaw": 6,
+   "hinge": 1.9,
+   "from": 1.9,
+   "to": 2.39
+  },
+  {
+   "joints": [
+    {"bone": "abdomen_5", "share": 1.0}
+   ],
+   "max_pitch": 15,
+   "max_yaw": 6,
+   "hinge": 2.41,
+   "from": 2.41,
+   "to": 2.9
+  },
+  {
+   "joints": [
+    {"bone": "abdomen_6", "share": 1.0}
+   ],
+   "max_pitch": 15,
+   "max_yaw": 6,
+   "hinge": 2.92,
+   "from": 2.92,
+   "to": 3.41
+  }
+ ],
+ "climb": {
+  "front_feet": 2.76,
+  "hind_feet": 1.19,
+  "front_end": 4.21,
+  "rear_end": 3.41,
+  "tightest_curve": 2.06
+ }
 }

@@ -15,8 +15,21 @@ The files are src/main/resources/assets/antcolonies/body_plans/<model>.json (the
             place: carry, where a load is held in the jaws).
   head_player  the bones the head's player owns (the head, the jaws, the antennae, the load's place); every other
             bone belongs to the body's player (entity/body/AntAnimationController).
-  waist     the joints behind the thorax that bend over edges and round turns (client/BodyLanguage), each with its
-            share of the bend, front to back.
+  spine     the pieces behind the thorax that follow the path (entity/body/Spine, 2026-10-18, M4): front to back,
+            each lies the way the path lay under it, bending over edges, up walls and round turns. A piece: its joints
+            (bones that bend for it, each with its share of the bend; an ant's waist is one piece of three joints, the
+            petiole, postpetiole and gaster joint, with the gaster behind them), "hinge" where its first joint is,
+            "from" and "to" where the piece itself lies (model units behind the body's middle), and the most it may
+            bend, "max_pitch" (up and down) and "max_yaw" (sideways), in degrees (a real joint's reach: written by
+            hand). A termite's soft abdomen is one piece per segment (abdomen, abdomen_2, ... in a chain), each
+            of one joint.
+  climb     the numbers the climbing body needs (entity/body/EdgeOver, the spine, the renderer): how far the front feet
+            reach ahead of the middle and the hind feet behind it (the walk's average stance), how far the body's front
+            and rear ends reach (front_end, rear_end), the tightest curve the path takes (tightest_curve), and where
+            approved by eye the wall lift and push (lift, into_wall, in blocks before the drawn scale; without them the
+            game works them out from the ends and the hitbox).
+  approved  numbers the user has approved in-game (keys like "climb.front_feet" or "spine.0.from", and why): `measure`
+            keeps them and only says what measuring would give.
   forebody  the bone that carries the thorax, the head and the legs (it sways with the stride).
   root      the bone that holds everything (the body's rise and fall goes there).
 
@@ -28,8 +41,9 @@ Run from the project folder:
   python tools/body_plan.py check            every plan against its model: every bone named exists, no bone left out
   python tools/body_plan.py new <model>      a starter plan for a model whose bones follow the placeholder names
   python tools/body_plan.py rename-test      proves a model with other bone names reads, checks and walks the same
+  python tools/body_plan.py measure <model>  (or all) works out its climb and spine numbers from the model and writes them
 """
-import json, os, re, sys
+import json, math, os, re, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROJECT = os.path.normpath(os.path.join(HERE, '..'))
@@ -53,7 +67,12 @@ class Plan:
         self.antennae = {k: list(v) for k, v in head.get('antennae', {}).items()}
         self.sockets = dict(head.get('sockets', {}))
         self.head_player = list(data.get('head_player', []))
-        self.waist = [(w['bone'], w['share']) for w in data.get('waist', [])]
+        # The spine: the pieces behind the thorax, front to back (an old plan's "waist" is one piece)
+        pieces = data.get('spine') or ([{'joints': data['waist']}] if data.get('waist') else [])
+        self.spine = [dict(p, joints=[(j['bone'], j['share']) for j in p['joints']]) for p in pieces]
+        self.waist = self.spine[0]['joints'] if self.spine else []     # the first piece's joints (the sway goes there)
+        self.climb = dict(data.get('climb', {}))
+        self.approved = set(data.get('approved', {}).get('keys', []))
         self._leg_by_bone = {b: key for key, chain in self.legs.items() for b in chain}
         self._antenna_bones = {b for chain in self.antennae.values() for b in chain}
 
@@ -139,7 +158,7 @@ def problems(plan, bones):
     for name in sorted(names - set(plan.to_bone.values())):
         out.append(f'the model\'s bone "{name}" is not in the plan\'s bones table')
     used = [plan.root, plan.forebody, plan.head] + plan.jaws + sorted(plan.antenna_bones()) + list(plan.sockets.values())
-    used += plan.head_player + [w for w, _ in plan.waist] + [b for chain in plan.legs.values() for b in chain]
+    used += plan.head_player + [j for p in plan.spine for j, _ in p['joints']] + [b for chain in plan.legs.values() for b in chain]
     for role in used:
         if role not in plan.to_bone:
             out.append(f'role "{role}" is used in the plan but missing from its bones table')
@@ -152,7 +171,131 @@ def problems(plan, bones):
         other = ('r' if key[0] == 'l' else 'l') + key[1:]
         if other not in plan.legs:
             out.append(f'leg {key} has no partner {other} on the other side (a lost leg is the gait maker\'s job, not the plan\'s)')
+    parents = {b['name']: b.get('parent') for b in bones}
+    for i, piece in enumerate(plan.spine):
+        if abs(sum(s for _, s in piece['joints']) - 1.0) > 1e-6:
+            out.append(f'spine piece {i}: its joints\' shares add up to {sum(s for _, s in piece["joints"]):g}, not 1')
+        for key in ('max_pitch', 'max_yaw'):
+            if key not in piece:
+                out.append(f'spine piece {i} has no {key} (a real joint\'s reach, written by hand)')
+        if i > 0:
+            # each piece hangs off the one in front (its first joint's bone a child of that piece's last), so the
+            # bends add up along the spine as the segments do in a real body
+            first = plan.to_bone.get(piece['joints'][0][0])
+            behind = plan.to_bone.get(plan.spine[i - 1]['joints'][-1][0])
+            if first in parents and parents[first] != behind:
+                out.append(f'spine piece {i}: bone "{first}" should hang off "{behind}" (the piece in front)')
     return out
+
+
+def stale(plan):
+    """The plan's measured numbers that no longer match its model (a model changed since `measure`): sentences."""
+    out = []
+    numbers = measured(plan.model)
+    for key, value in numbers.items():
+        if key in plan.approved:
+            continue
+        written = get_number(plan.data, key)
+        if written is None or abs(written - value) > 0.005:
+            out.append(f'{key} is {written}, the model gives {value}: run python tools/body_plan.py measure {plan.model}')
+    return out
+
+
+# --- measuring the climbing numbers -----------------------------------------------------------------------------------
+# The tightest curve the path takes, as a share of the body's length (front end to rear end): the approved worker's
+# 3.0 units over its 11.1 (2026-10-16), so every body turns as tightly for its size (my pick, to confirm).
+TIGHTEST_SHARE = 0.27
+
+
+def measured(model):
+    """The climb and spine numbers worked out from the model (model units, 2 decimals), by key ("climb.front_feet",
+    "spine.0.from", ...): the feet from the walk's average stance (the rest pose if it has no walk), the ends from the
+    body without its legs and antennae, each spine piece from its bones' boxes at rest."""
+    sys.path.insert(0, HERE)
+    import anim_lab as lab
+    m = lab.Model(model)
+    plan = m.plan
+    walk = lab.load_clips(model, m).get('walk') if os.path.exists(
+        os.path.join(ASSETS, 'animations', 'entity', f'{model}.animation.json')) else None
+    poses = [walk.pose(walk.length * i / 40) for i in range(40)] if walk else [{}]
+    pairs = plan.pairs()
+    front_keys = [k for k in plan.legs if plan.pair(k) == pairs[0]]
+    hind_keys = [k for k in plan.legs if plan.pair(k) == pairs[-1]]
+    tips = [m.foot_tips(p) for p in poses]
+    front_feet = sum(-t[k][2] for t in tips for k in front_keys) / (len(tips) * len(front_keys))
+    hind_feet = sum(t[k][2] for t in tips for k in hind_keys) / (len(tips) * len(hind_keys))
+    own = {}
+    for bone, corners, _ in m.posed({}):
+        if plan.leg_of(bone) is not None or bone in plan.antenna_bones():
+            continue
+        zs = [p[2] for p in corners]
+        lo, hi = own.get(bone, (math.inf, -math.inf))
+        own[bone] = (min(lo, min(zs)), max(hi, max(zs)))
+    front_end = -min(lo for lo, _ in own.values())
+    rear_end = max(hi for _, hi in own.values())
+    out = {'climb.front_feet': front_feet, 'climb.hind_feet': hind_feet, 'climb.front_end': front_end,
+           'climb.rear_end': rear_end, 'climb.tightest_curve': TIGHTEST_SHARE * (front_end + rear_end)}
+    children = {}
+    for b in m.bones:
+        children.setdefault(b.get('parent'), []).append(b['name'])
+    later = set()
+
+    def extent(bone):
+        """A bone's boxes with everything hanging off it, but not the spine's later pieces (they lie farther back)."""
+        lo, hi = own.get(bone, (math.inf, -math.inf))
+        for child in children.get(bone, []):
+            if child not in later:
+                clo, chi = extent(child)
+                lo, hi = min(lo, clo), max(hi, chi)
+        return lo, hi
+
+    for i, piece in enumerate(plan.spine):
+        later = {j for p in plan.spine[i + 1:] for j, _ in p['joints']}
+        first, last = piece['joints'][0][0], piece['joints'][-1][0]
+        out[f'spine.{i}.hinge'] = extent(first)[0]
+        out[f'spine.{i}.from'], out[f'spine.{i}.to'] = extent(last)
+    return {k: round(v, 2) for k, v in out.items()}
+
+
+def get_number(data, key):
+    part, *rest = key.split('.')
+    if part == 'climb':
+        return data.get('climb', {}).get(rest[0])
+    pieces = data.get('spine', [])
+    i = int(rest[0])
+    return pieces[i].get(rest[1]) if i < len(pieces) else None
+
+
+def set_number(data, key, value):
+    part, *rest = key.split('.')
+    if part == 'climb':
+        data.setdefault('climb', {})[rest[0]] = value
+    else:
+        data['spine'][int(rest[0])][rest[1]] = value
+
+
+def measure(model):
+    """Writes the model's measured climb and spine numbers into its plan, keeping the approved ones (and saying what
+    measuring would give for them)."""
+    plan = load(model)
+    data = json.loads(json.dumps(plan.data))
+    if 'spine' not in data and data.get('waist'):
+        data['spine'] = [{'joints': data.pop('waist')}]
+    data.pop('waist', None)
+    lines = []
+    for key, value in measured(model).items():
+        if key in plan.approved:
+            lines.append(f'  {key}: kept {get_number(data, key)} (approved; measuring gives {value})')
+        else:
+            old = get_number(data, key)
+            set_number(data, key, value)
+            if old != value:
+                lines.append(f'  {key}: {old} -> {value}')
+    write_plan(model, data)
+    _CACHE.pop(model, None)
+    print(f'{model}: ' + ('measured' if lines else 'unchanged'))
+    for line in lines:
+        print(line)
 
 
 def check_all():
@@ -165,6 +308,7 @@ def check_all():
             bad += 1
             continue
         found = problems(plan, geo_bones(model))
+        found += [] if found else stale(plan)
         print(f'{model}: ' + ('OK' if not found else f'{len(found)} problem(s)'))
         for p in found:
             print('  ' + p)
@@ -198,7 +342,9 @@ def starter(model):
     sockets = {n: n for n in names if n == 'carry'}
     head_player = [n for n in names if n.startswith(('head', 'mandible', 'antenna', 'carry'))]
     waist = [n for n in ('petiole', 'postpetiole', 'abdomen') if n in names]
-    shares = {'petiole': 0.40, 'postpetiole': 0.35, 'abdomen': 0.25}
+    segments = ['abdomen'] + sorted((n for n in names if re.match(r'abdomen_\d+$', n)), key=lambda n: int(n.split('_')[1]))
+    segments = segments if 'abdomen' in names else []
+    shares = {'petiole': 0.40, 'postpetiole': 0.35, 'abdomen': 0.25} if len(waist) == 3 else {w: 1.0 / len(waist) for w in waist}
     return {
         'about': 'Body plan (tools/body_plan.py explains every part). "bones" is the rename table: role name (left, '
                  'used everywhere else in this file and in the tools) to the bone name in the model (right). The names '
@@ -211,7 +357,11 @@ def starter(model):
         'legs': legs,
         'head': {'bone': 'head', 'jaws': jaws, 'antennae': antennae, 'sockets': sockets},
         'head_player': head_player,
-        'waist': [{'bone': w, 'share': shares[w]} for w in waist],
+        # one piece (an ant's waist and gaster, or a one-piece abdomen), or one piece per segment of a soft abdomen
+        # (abdomen, abdomen_2, ...); its reach my picks, to confirm, and its places worked out by `measure`
+        'spine': ([{'joints': [{'bone': n, 'share': 1.0}], 'max_pitch': 15, 'max_yaw': 6} for n in segments]
+                  if len(segments) > 1 else
+                  [{'joints': [{'bone': w, 'share': shares[w]} for w in waist], 'max_pitch': 60, 'max_yaw': 25}] if waist else []),
     }
 
 
@@ -265,7 +415,10 @@ if __name__ == '__main__':
         rename_test(*args[1:])
     elif args[:1] == ['new'] and len(args) == 2:
         write_plan(args[1], starter(args[1]))
-        print(f'wrote {plan_path(args[1])}; add "{args[1]}" to {INDEX}')
+        print(f'wrote {plan_path(args[1])}; add "{args[1]}" to {INDEX}, then run measure {args[1]}')
+    elif args[:1] == ['measure'] and len(args) == 2:
+        for name in json.load(open(INDEX, encoding='utf-8'))['plans'] if args[1] == 'all' else [args[1]]:
+            measure(name)
     elif args[:1] in (['check'], []):
         sys.exit(1 if check_all() else 0)
     else:

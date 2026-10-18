@@ -24,13 +24,6 @@ import net.minecraft.world.phys.Vec3;
  * doorway's rim, a channel) keep the usual pose.
  */
 public final class EdgeOver {
-    /**
-     * How far the front feet reach ahead of the body's middle and the hind feet behind it (model units; the worker
-     * model's foot bones, {@code tools/ant_models.py}). The tipping starts when the front feet get to the edge and ends
-     * when the hind feet are over it (my picks, to confirm).
-     */
-    public static final double FRONT_FEET = 3.6;
-    public static final double HIND_FEET = 2.85;
     /** Only a body heading within this many degrees of straight over the edge (my pick, to confirm). */
     private static final float SQUARE = 25.0F;
 
@@ -54,16 +47,18 @@ public final class EdgeOver {
      * @param surface  the surface the navigator holds it to ({@link Direction#DOWN} a floor, a side a wall)
      * @param heading  on a wall, where the head points within it (0 up, 180 down)
      * @param yaw      on a floor, the way it faces
+     * @param climb    its body's climbing numbers (its body plan's): the tipping starts when its front feet get to the
+     *                 edge and ends when its hind feet are over it
      * @param unit     how long one model unit is drawn (blocks)
      * @param lift     how far the usual climbing pose lifts the drawn body up a wall (blocks)
      * @param intoWall how far the usual climbing pose pushes the drawn body in toward a wall (blocks)
      */
     @Nullable
     public static Pose find(Level level, Vec3 pos, float width, float height, Direction surface, float heading, float yaw,
-            double unit, double lift, double intoWall) {
+            BodyPlans.Climb climb, double unit, double lift, double intoWall) {
         Vec3 middle = pos.add(0.0, height / 2.0, 0.0);
-        Body body = new Body(pos, middle, FRONT_FEET * unit, HIND_FEET * unit, width / 2.0, height / 2.0, lift,
-                width / 2.0 - intoWall);
+        Body body = new Body(pos, middle, climb.frontFeet() * unit, climb.hindFeet() * unit, climb.frontEnd() * unit,
+                width / 2.0, height / 2.0, lift, width / 2.0 - intoWall);
         if (surface.getAxis().isHorizontal()) {
             boolean up = Math.abs(Mth.wrapDegrees(heading)) < SQUARE;
             boolean down = Math.abs(Mth.wrapDegrees(heading - 180.0F)) < SQUARE;
@@ -119,11 +114,11 @@ public final class EdgeOver {
      */
     @Nullable
     public static Pose findCorner(Level level, Vec3 pos, float width, float height, Direction surface, float heading,
-            float yaw, double unit, double lift, double intoWall, @Nullable Direction drawnWall, float drawnHeading,
+            float yaw, BodyPlans.Climb climb, double unit, double lift, double intoWall, @Nullable Direction drawnWall, float drawnHeading,
             boolean walking) {
         Vec3 middle = pos.add(0.0, height / 2.0, 0.0);
-        Body body = new Body(pos, middle, FRONT_FEET * unit, HIND_FEET * unit, width / 2.0, height / 2.0, lift,
-                width / 2.0 - intoWall);
+        Body body = new Body(pos, middle, climb.frontFeet() * unit, climb.hindFeet() * unit, climb.frontEnd() * unit,
+                width / 2.0, height / 2.0, lift, width / 2.0 - intoWall);
         Direction wall;
         boolean down;
         if (surface.getAxis().isHorizontal()) {
@@ -165,7 +160,7 @@ public final class EdgeOver {
                             ? block.get(wall.getAxis()) : block.get(wall.getAxis()) + 1;
                     Vec3 corner = wall.getAxis() == Direction.Axis.X ? new Vec3(face, air.getY(), middle.z)
                             : new Vec3(middle.x, air.getY(), face);
-                    return body.round(corner, wall, down);
+                    return body.round(corner, wall, down, surface.getAxis().isHorizontal() != down);
                 }
             }
         }
@@ -214,8 +209,8 @@ public final class EdgeOver {
     }
 
     /** The insect's body and how the usual poses draw it (all blocks). */
-    private record Body(Vec3 pos, Vec3 middle, double front, double hind, double halfWidth, double halfHeight, double lift,
-            double offWall) {
+    private record Body(Vec3 pos, Vec3 middle, double front, double hind, double head, double halfWidth,
+            double halfHeight, double lift, double offWall) {
         /**
          * Its pose round the inside corner at {@code corner} (the foot of {@code wall}, which it faces): coming down the
          * wall onto the floor, or from the floor up onto it. A is the surface it comes from and B the one it goes onto,
@@ -225,7 +220,7 @@ public final class EdgeOver {
          * corner whichever surface the navigator holds it to.
          */
         @Nullable
-        Pose round(Vec3 corner, Direction wall, boolean down) {
+        Pose round(Vec3 corner, Direction wall, boolean down, boolean onB) {
             Vec3 outOfWall = Vec3.atLowerCornerOf(wall.getOpposite().getNormal());
             Vec3 up = new Vec3(0.0, 1.0, 0.0);
             Vec3 nA = down ? outOfWall : up;
@@ -234,6 +229,15 @@ public final class EdgeOver {
             double cB = down ? halfHeight : halfWidth;
             Vec3 rel = middle.subtract(corner);
             double s = (rel.dot(nA) - cA) - (rel.dot(nB) - cB);
+            // A head reaching out past the front feet (a major soldier's, with its long jaws) gets to B first: the
+            // front legs reach up for it from then, so the head is never drawn in the block.
+            double front = Math.max(this.front, head - cB);
+            if (s <= -front && onB && !down) {
+                // walking up to the wall, the navigator already holds it to the wall, though its front feet (or head)
+                // have not got there yet: it is still drawn lying on the floor, as at the stretch's start, never tipped
+                // by the usual pose in one go (coming down, it can't be on the floor this early)
+                return new Pose(wall, 0.0F, 0.0F, Vec3.ZERO);
+            }
             if (s <= -front || s >= hind) {
                 return null;
             }

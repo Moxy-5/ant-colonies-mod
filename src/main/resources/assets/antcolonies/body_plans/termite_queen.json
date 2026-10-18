@@ -80,7 +80,23 @@
   }
  },
  "head_player": ["head", "mandible_l", "mandible_r", "carry", "antenna_l_1", "antenna_l_2", "antenna_r_1", "antenna_r_2"],
- "waist": [
-  {"bone": "abdomen", "share": 0.25}
- ]
+ "spine": [
+  {
+   "joints": [
+    {"bone": "abdomen", "share": 1.0}
+   ],
+   "hinge": 0.4,
+   "from": 0.4,
+   "to": 4.3,
+   "max_pitch": 30,
+   "max_yaw": 15
+  }
+ ],
+ "climb": {
+  "front_feet": 3.25,
+  "hind_feet": 1.79,
+  "front_end": 4.95,
+  "rear_end": 4.3,
+  "tightest_curve": 2.5
+ }
 }
