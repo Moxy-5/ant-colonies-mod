@@ -94,12 +94,29 @@ neoForge {
         // and its screenshots saved to run-film/screenshots, then the game quits. Claude's eyes in the real game.
         // ./gradlew runFilm  (the poses scene)  or  ./gradlew runFilm -PfilmScene=tools/film/<scene>.film
         // several in one launch: -PfilmScene=tools/film/climb.film,tools/film/work.film  or  -PfilmScene=all
+        // Short names work too: -PfilmScene=climb is tools/film/climb.film, -PfilmScene=guard the folder tools/film/guard.
+        // Watch mode (client/FilmWatch; tools/film.sh watch): -PfilmWatch keeps the camera open after its scenes and
+        // shoots them again whenever the animation or model files (or the shot lists) change, or tools/film.sh shoot asks.
         film {
             client()
             gameDirectory = project.file('run-film')
             def scenes = (project.findProperty('filmScene') ?: 'tools/film/poses.film').toString()
             systemProperty 'antcolonies.film', (scenes == 'all' ? ['tools/film'] : scenes.split(',').toList())
-                    .collect { project.file(it.trim()).absolutePath }.join(',')
+                    .collect { def name = it.trim()
+                        project.file(name).exists() ? project.file(name).absolutePath
+                                : project.file("tools/film/${name}.film").exists() ? project.file("tools/film/${name}.film").absolutePath
+                                : project.file("tools/film/${name}").absolutePath }.join(',')
+            if (project.hasProperty('filmWatch')) {
+                systemProperty 'antcolonies.film.watch', 'true'
+                systemProperty 'antcolonies.film.src', project.file('src/main/resources').absolutePath
+                systemProperty 'antcolonies.film.out', project.file('build/resources/main').absolutePath
+                systemProperty 'antcolonies.film.project', project.projectDir.absolutePath
+            }
+            // -PfilmDebug: the game listens for the debugger on port 5005, so tools/film.sh swap can swap changed Java
+            // method bodies into it (tools/film_swap.py) without a relaunch
+            if (project.hasProperty('filmDebug')) {
+                jvmArguments.add '-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=127.0.0.1:5005'
+            }
             programArguments.addAll '--width', '960', '--height', '540'
         }
 

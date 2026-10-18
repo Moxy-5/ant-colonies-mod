@@ -55,6 +55,9 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * insect cleared between them) and saves each scene's screenshots to {@code run-film/screenshots/<scene>/}, then quits.
  * Claude reads the pictures (or a contact sheet made by {@code python tools/anim_lab.py sheet run-film/screenshots/<scene>}).
  *
+ * <p>With {@code -PfilmWatch} ({@code tools/film.sh watch}) the camera stays open after its scenes and films them again
+ * when the clips change or it is asked to ({@link FilmWatch}).
+ *
  * <p>Every picture is also checked ({@link FilmChecks}): body parts drawn inside blocks and parts that suddenly jump go
  * into the scene's {@code checks.txt}, and every scene's summary line into {@code screenshots/checks.txt}, so only the
  * pictures named there need looking at.
@@ -136,7 +139,7 @@ public final class FilmDirector {
     /** Every shot list named (a folder means each {@code .film} file in it, by name), each starting with a "scene" step. */
     private static void load() {
         java.util.List<Path> scenes = new java.util.ArrayList<>();
-        for (String name : SCENE.split(",")) {
+        for (String name : sceneList.split(",")) {
             Path path = Path.of(name.trim());
             if (Files.isDirectory(path)) {
                 try (var files = Files.list(path)) {
@@ -251,6 +254,7 @@ public final class FilmDirector {
             waitTicks = 60;                     // let the land load and settle
             return;
         }
+        FilmWatch.tick(mc, !(filmed && steps.isEmpty() && waitTicks == 0 && pendingShot == null && burstLeft == 0));
         if (pendingShot != null) {
             return;                            // waiting for the frame to be drawn
         }
@@ -277,10 +281,76 @@ public final class FilmDirector {
         while (!steps.isEmpty() && waitTicks == 0 && pendingShot == null && burstLeft == 0) {
             run(mc, steps.poll());
         }
-        if (steps.isEmpty() && waitTicks == 0 && pendingShot == null && burstLeft == 0) {
+        boolean done = steps.isEmpty() && waitTicks == 0 && pendingShot == null && burstLeft == 0;
+        if (done && !filmed) {
+            filmed = true;
             endScene();
             LOG.info("Film: done");
+        }
+        if (done && !FilmWatch.enabled()) {
             mc.stop();
+        }
+    }
+
+    /** The shot lists filmed (comma-separated, changed by the watch mode), and whether they have all been played. */
+    private static String sceneList = SCENE;
+    private static boolean filmed;
+
+    /** The watch mode ({@link FilmWatch}): the shot lists filmed now, as named and as files and folders. */
+    static String scenes() {
+        return sceneList;
+    }
+
+    static java.util.List<Path> sceneFiles() {
+        return java.util.Arrays.stream(sceneList.split(",")).map(name -> Path.of(name.trim())).toList();
+    }
+
+    static void setScenes(String scenes) {
+        sceneList = scenes;
+    }
+
+    /** The watch mode: every scene played again from the start, its old pictures and checks cleared first. */
+    static void reshoot() {
+        Minecraft mc = Minecraft.getInstance();
+        Path screenshots = mc.gameDirectory.toPath().resolve("screenshots");
+        halt();
+        summaries.setLength(0);
+        load();
+        for (String step : steps) {
+            if (step.startsWith("scene ")) {
+                deleteFolder(screenshots.resolve(step.substring(6)));
+            }
+        }
+        try {
+            Files.deleteIfExists(screenshots.resolve("checks.txt"));
+        } catch (IOException e) {
+            LOG.warn("Film: cannot clear the checks", e);
+        }
+        filmed = false;
+    }
+
+    /** The watch mode: the shoot now playing dropped where it is (its files changed), nothing of it written. */
+    static void halt() {
+        steps.clear();
+        waitTicks = 0;
+        pendingShot = null;
+        burstLeft = 0;
+        logName = null;
+        logLines.setLength(0);
+        checks = new FilmChecks();
+        filmed = true;
+    }
+
+    private static void deleteFolder(Path folder) {
+        if (!Files.isDirectory(folder)) {
+            return;
+        }
+        try (var files = Files.walk(folder)) {
+            for (Path file : files.sorted(java.util.Comparator.reverseOrder()).toList()) {
+                Files.delete(file);
+            }
+        } catch (IOException e) {
+            LOG.warn("Film: cannot clear {}", folder, e);
         }
     }
 

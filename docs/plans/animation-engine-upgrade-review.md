@@ -124,6 +124,9 @@ more of sessions.
   compare, and a one-command run). **Depends on:** nothing.
 
 ### M2. Films without relaunching the game
+**BUILT 2026-10-18** (branch `claude/film-reload-2c4721`): `tools/film.sh` and `client/FilmWatch`; measured and
+described in `docs/HISTORY.md` ("Films without relaunching the game"). The scenes written from the body plans wait
+for M3.
 - **What:** each `runFilm` starts the whole game (about a minute before the first picture, plus the build). GeckoLib
   reloads animation files when the game reloads its resources, so a film session can stay open: change a clip, the
   camera reloads the files and shoots the scenes again in seconds. Changes to the live layer's Java code still need a

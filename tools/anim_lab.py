@@ -29,6 +29,18 @@ Run from the project folder:
   python tools/anim_lab.py match run-film/screenshots/<scene> worker_ant
 (Each film scene's pictures are in run-film/screenshots/<scene>/; read run-film/screenshots/checks.txt first: the
 camera's automatic checks name the pictures with a body part in a block or a sudden jump.)
+
+Filming without relaunching the game (tools/film.sh, the camera's watch mode, 2026-10-18; full list in its top comment):
+  tools/film.sh watch climb      open a film session (once, about 50 s to 90 s) and film the scene
+  python tools/ant_models.py     change a clip: the open camera reloads the animation and model files by itself (0.1 s)
+  tools/film.sh shoot            and films again: waits for the new pictures and prints checks.txt (the scene's own
+                                 length, 20 s for work, 55 s for climb, instead of a whole launch)
+  tools/film.sh shoot poses,work other scenes from now on, in the same session
+  tools/film.sh swap             Java changes (the live layer, EdgeOver, ...): compiles and swaps new method code into
+                                 the open game in about 3 s, then films; a change Java cannot swap relaunches by itself
+  tools/film.sh stop             close it
+Short scene names: climb = tools/film/climb.film, guard = the folder tools/film/guard; also with ./gradlew runFilm
+-PfilmScene=climb.
 Options: --anim <file stem> to read another insect's animation file (the queen uses worker_ant's), --speed <blocks a
 second> for the walking speed the treadmill and the checks assume (default: the insect's normal speed below).
 
