@@ -55,6 +55,9 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * insect cleared between them) and saves each scene's screenshots to {@code run-film/screenshots/<scene>/}, then quits.
  * Claude reads the pictures (or a contact sheet made by {@code python tools/anim_lab.py sheet run-film/screenshots/<scene>}).
  *
+ * <p>With {@code -PfilmWatch} ({@code tools/film.sh watch}) the camera stays open after its scenes and films them again
+ * when the clips change or it is asked to ({@link FilmWatch}).
+ *
  * <p>Every picture is also checked ({@link FilmChecks}): body parts drawn inside blocks and parts that suddenly jump go
  * into the scene's {@code checks.txt}, and every scene's summary line into {@code screenshots/checks.txt}, so only the
  * pictures named there need looking at.
@@ -73,7 +76,8 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * views walk 10 1.1               side (a burst of 10 frames), front, above and 3/4 shots of it, 1.1 blocks away
  *                                 (side and front level and from further off, like the lab's drawings)
  * walker worker_ant 0.5 -60 0.5 -90   clear the floor, then one insect that walks where it is sent (its goals taken
- *                                 away), standing at x y z facing that way
+ *                                 away), standing at x y z facing that way; the game is left frozen
+ * step 5                          the frozen game stepped 5 ticks, no picture
  * go 3 -58 0 1.0                  the walker walks its own route (the real legs: AntNavigator) to that cell
  * look 0 -60 0.5                  the walker keeps looking at that point (head and body turn as in the game); "look off"
  * follow 0 0.1 -7 0 0             the camera rides along with the walker, this far off it, with this turn and tilt,
@@ -136,7 +140,7 @@ public final class FilmDirector {
     /** Every shot list named (a folder means each {@code .film} file in it, by name), each starting with a "scene" step. */
     private static void load() {
         java.util.List<Path> scenes = new java.util.ArrayList<>();
-        for (String name : SCENE.split(",")) {
+        for (String name : sceneList.split(",")) {
             Path path = Path.of(name.trim());
             if (Files.isDirectory(path)) {
                 try (var files = Files.list(path)) {
@@ -175,9 +179,15 @@ public final class FilmDirector {
     private static int burstSub;
     private static float drawPartial;
 
-    /** The in-between time (0 to 1, from the last tick to the next) insects are drawn at while filming. */
+    /**
+     * The in-between time (0 to 1, from the last tick to the next) insects are drawn at while filming. While a step is
+     * on its way the drawn time stays where the last picture was (the step's ticks already run here are taken off):
+     * the screen draws frames in between, and each moves the insects' clip clocks on to its time. Without this, after
+     * a stepped tick at 2/3 ("frames 3") the frames drew the next tick's 2/3, past the next picture's moment, so the
+     * clip ran on too far, but only when a frame came between that tick and the picture's (timing luck).
+     */
     public static float drawPartial() {
-        return drawPartial;
+        return drawPartial - FilmStep.ranSoFar();
     }
 
     /** The "scene" step: the last scene's log and checks written, then everything set back for the next one. */
@@ -251,12 +261,18 @@ public final class FilmDirector {
             waitTicks = 60;                     // let the land load and settle
             return;
         }
+        FilmWatch.tick(mc, !(filmed && steps.isEmpty() && waitTicks == 0 && pendingShot == null && burstLeft == 0));
         if (pendingShot != null) {
             return;                            // waiting for the frame to be drawn
         }
         if (waitTicks > 0) {
-            waitTicks--;
-            return;
+            if (!FilmStep.arrived()) {         // a burst's step seen arriving ends its wait at once
+                if (--waitTicks == 0) {
+                    FilmStep.gaveUp();
+                }
+                return;
+            }
+            waitTicks = 0;
         }
         if (burstLeft > 0) {
             drawPartial = (float) burstSub / framesPerTick;
@@ -268,8 +284,12 @@ public final class FilmDirector {
             burstSub = 0;
             burstLeft--;
             if (burstLeft > 0 && burstGap > 0) {
-                send(mc, "tick step " + burstGap);
-                waitTicks = 3 + burstGap;      // the stepped ticks reach the client
+                if (FilmStep.step(mc, burstGap)) {
+                    waitTicks = 20 + burstGap; // at most: the step is seen arriving long before
+                } else {
+                    send(mc, "tick step " + burstGap);
+                    waitTicks = 3 + burstGap;  // the stepped ticks reach the client
+                }
             }
             return;
         }
@@ -277,10 +297,78 @@ public final class FilmDirector {
         while (!steps.isEmpty() && waitTicks == 0 && pendingShot == null && burstLeft == 0) {
             run(mc, steps.poll());
         }
-        if (steps.isEmpty() && waitTicks == 0 && pendingShot == null && burstLeft == 0) {
+        boolean done = steps.isEmpty() && waitTicks == 0 && pendingShot == null && burstLeft == 0;
+        if (done && !filmed) {
+            filmed = true;
             endScene();
             LOG.info("Film: done");
+        }
+        if (done && !FilmWatch.enabled()) {
+            FilmStep.letGo();
             mc.stop();
+        }
+    }
+
+    /** The shot lists filmed (comma-separated, changed by the watch mode), and whether they have all been played. */
+    private static String sceneList = SCENE;
+    private static boolean filmed;
+
+    /** The watch mode ({@link FilmWatch}): the shot lists filmed now, as named and as files and folders. */
+    static String scenes() {
+        return sceneList;
+    }
+
+    static java.util.List<Path> sceneFiles() {
+        return java.util.Arrays.stream(sceneList.split(",")).map(name -> Path.of(name.trim())).toList();
+    }
+
+    static void setScenes(String scenes) {
+        sceneList = scenes;
+    }
+
+    /** The watch mode: every scene played again from the start, its old pictures and checks cleared first. */
+    static void reshoot() {
+        Minecraft mc = Minecraft.getInstance();
+        Path screenshots = mc.gameDirectory.toPath().resolve("screenshots");
+        halt();
+        summaries.setLength(0);
+        load();
+        for (String step : steps) {
+            if (step.startsWith("scene ")) {
+                deleteFolder(screenshots.resolve(step.substring(6)));
+            }
+        }
+        try {
+            Files.deleteIfExists(screenshots.resolve("checks.txt"));
+        } catch (IOException e) {
+            LOG.warn("Film: cannot clear the checks", e);
+        }
+        filmed = false;
+    }
+
+    /** The watch mode: the shoot now playing dropped where it is (its files changed), nothing of it written. */
+    static void halt() {
+        steps.clear();
+        waitTicks = 0;
+        pendingShot = null;
+        burstLeft = 0;
+        FilmStep.cancel();
+        logName = null;
+        logLines.setLength(0);
+        checks = new FilmChecks();
+        filmed = true;
+    }
+
+    private static void deleteFolder(Path folder) {
+        if (!Files.isDirectory(folder)) {
+            return;
+        }
+        try (var files = Files.walk(folder)) {
+            for (Path file : files.sorted(java.util.Comparator.reverseOrder()).toList()) {
+                Files.delete(file);
+            }
+        } catch (IOException e) {
+            LOG.warn("Film: cannot clear {}", folder, e);
         }
     }
 
@@ -306,12 +394,22 @@ public final class FilmDirector {
                 burstIndex = 0;
                 burstSub = 0;
             }
+            case "step" -> {
+                int ticks = Integer.parseInt(w[1]);
+                if (FilmStep.step(mc, ticks)) {
+                    waitTicks = 20 + ticks;     // at most: the step is seen arriving long before
+                } else {
+                    send(mc, "tick step " + ticks);
+                    waitTicks = 3 + ticks;
+                }
+            }
             case "frames" -> framesPerTick = Math.max(1, Integer.parseInt(w[1]));
             case "scene" -> startScene(w[1]);
             case "ant" -> putAnt(w[1], w[2]);
             case "views" -> views(w[1], w.length > 2 ? Integer.parseInt(w[2]) : 1,
                     w.length > 3 ? Double.parseDouble(w[3]) : 1.1);
             case "walker" -> putWalker(w[1], w[2], w[3], w[4], w[5]);
+            case "freshclocks" -> freshClocks();
             case "forget" -> onWalker(mc, ant -> {
                 ant.forgetGoalsForFilm();
                 ant.getNavigator().stop();
@@ -361,20 +459,77 @@ public final class FilmDirector {
 
     /** The walker's name: not {@code film:...}, so it plays its usual clips (walking, climbing, turning). */
     private static final String WALKER = "film-walker";
+    /**
+     * The walker's id, the same every run: an insect's own pace for standing about and for its head and antennae comes
+     * from its id ({@code AbstractAntEntity.ownPace}), and a new random one each run made those clips differ from run to
+     * run. This one gives both paces 1.0, the clips as made.
+     */
+    private static final String WALKER_ID = "[I;1179208781,2147450879,0,1]";
 
-    /** The "walker" step: like "ant", but an insect with its AI (its goals then taken away) that the camera sends about. */
+    /**
+     * The "walker" step: like "ant", but an insect with its AI (its goals then taken away) that the camera sends about.
+     * It comes into a frozen game, which is stepped through its first ticks and left frozen: the game sends an insect's
+     * place to the client every so many of its ticks, counted from when it came, so a walker that stood a few ticks
+     * more or less in a running game (by timing luck) walked the same way but was drawn differently all scene.
+     */
     private static void putWalker(String type, String x, String y, String z, String yaw) {
         Deque<String> now = new ArrayDeque<>();
         now.add("cmd tick unfreeze");
         now.add("cmd kill @e[type=!player]");
         now.add("wait 25");
         now.add("cmd kill @e[type=!player]");
-        now.add(String.format("cmd summon antcolonies:%s %s %s %s {PersistenceRequired:1b,Rotation:[%sf,0f],CustomName:'\"%s\"'}",
-                type, x, y, z, yaw, WALKER));
-        now.add("wait 2");
+        now.add("cmd tick freeze");     // its first ticks stepped, so they are the same every run (see the javadoc)
+        now.add("freshclocks");
+        // seen from its first tick, so its clips start then (filmed after another scene the camera may already be
+        // looking there, filmed alone it is not)
+        now.add(camera(Double.parseDouble(x) + 0.8, Double.parseDouble(y) + 0.55, Double.parseDouble(z) + 0.8, 135, 22));
+        now.add(String.format("cmd summon antcolonies:%s %s %s %s {PersistenceRequired:1b,Rotation:[%sf,0f],CustomName:'\"%s\"',UUID:%s}",
+                type, x, y, z, yaw, WALKER, WALKER_ID));
+        now.add("step 2");
         now.add("forget");
-        now.add("wait 40");
+        now.add("step 40");
         pushFront(now);
+    }
+
+    /** Every insect model drawn so far (each one GeckoLib model, shared by all insects drawn with it). */
+    private static final java.util.Set<GeoModel<?>> models =
+            java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+
+    /**
+     * The walker's step, before it comes: every insect model's animation clock and bones set back to how a fresh game
+     * has them. GeckoLib keeps one clock per model, moved on by whichever insect was drawn last, and one set of bones,
+     * left in the last insect's pose, so the earlier scenes' insects could change how the walker is drawn (the climb
+     * filmed alone and after other scenes differed by a pixel).
+     */
+    private static void freshClocks() {
+        try {
+            Field animTime = GeoModel.class.getDeclaredField("animTime");
+            Field lastTick = GeoModel.class.getDeclaredField("lastGameTickTime");
+            Field lastDrawn = GeoModel.class.getDeclaredField("lastRenderedInstance");
+            animTime.setAccessible(true);
+            lastTick.setAccessible(true);
+            lastDrawn.setAccessible(true);
+            for (GeoModel<?> model : models) {
+                animTime.setDouble(model, 0.0);
+                lastTick.setDouble(model, 0.0);
+                lastDrawn.setLong(model, -1L);
+                for (software.bernie.geckolib.cache.object.GeoBone bone : model.getAnimationProcessor().getRegisteredBones()) {
+                    software.bernie.geckolib.animation.state.BoneSnapshot first = bone.getInitialSnapshot();
+                    bone.setRotX(first.getRotX());
+                    bone.setRotY(first.getRotY());
+                    bone.setRotZ(first.getRotZ());
+                    bone.setPosX(first.getOffsetX());
+                    bone.setPosY(first.getOffsetY());
+                    bone.setPosZ(first.getOffsetZ());
+                    bone.setScaleX(first.getScaleX());
+                    bone.setScaleY(first.getScaleY());
+                    bone.setScaleZ(first.getScaleZ());
+                    bone.resetStateChanges();
+                }
+            }
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            LOG.warn("Film: cannot set the models' clocks back", e);
+        }
     }
 
     private static boolean isWalker(Entity entity) {
@@ -389,7 +544,7 @@ public final class FilmDirector {
             LOG.warn("Film: no game server for the walker");
             return;
         }
-        server.execute(() -> {
+        FilmStep.serve(mc, () -> {
             boolean found = false;
             for (Entity entity : server.overworld().getAllEntities()) {
                 if (isWalker(entity)) {
@@ -513,9 +668,22 @@ public final class FilmDirector {
         }
     }
 
+    /**
+     * Runs a command as the player. In this window's own game it goes straight to the game's thread with the walker's
+     * orders and the steps ({@link FilmStep#serve}), so they are done in the order given and, while frozen, between
+     * the same ticks every run (a command sent as a chat message could come before or after a walker's order).
+     */
     private static void send(Minecraft mc, String command) {
         LOG.info("Film: /{}", command);
-        mc.player.connection.sendCommand(command);
+        java.util.UUID player = mc.player.getUUID();
+        MinecraftServer server = mc.getSingleplayerServer();
+        if (server == null || !FilmStep.serve(mc, () -> {
+            net.minecraft.server.level.ServerPlayer source = server.getPlayerList().getPlayer(player);
+            server.getCommands().performPrefixedCommand(
+                    source != null ? source.createCommandSourceStack() : server.createCommandSourceStack(), command);
+        })) {
+            mc.player.connection.sendCommand(command);
+        }
     }
 
     @SubscribeEvent
@@ -547,6 +715,7 @@ public final class FilmDirector {
      * drawn (GeckoLib keeps that inside, so it is read by reflection; development only), for {@code times.txt}.
      */
     public static void noteRendered(AbstractAntEntity ant, GeoModel<?> model) {
+        models.add(model);
         if (pendingShot != null) {
             try {
                 checks.record(ant, model, drawPartial, pendingShot);
