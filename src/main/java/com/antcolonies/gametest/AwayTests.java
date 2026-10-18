@@ -1036,6 +1036,158 @@ public class AwayTests {
         return null;
     }
 
+    /**
+     * Brain step 4g, step 4, harm out of sight (the user's decisions of 2026-10-18), the termites. 60 old worker numbers,
+     * galleries off, and a place 10 blocks east where hostiles were seen 6 times (strength 6: not an attack, so no hole
+     * closes and the termites still graze there). At night, with no hostile really there (loaded land), the numbers eat
+     * two known tufts by it and nobody is lost: nobody dies of a mere memory. Then a husk stands there (out of sight):
+     * at the next tufts some numbers are lost (no piece from those trips), the headcount drops by as many, and a body
+     * found by nestmates (likely 10 blocks out) counts in the memory as a death. With the husk gone, the chance is 0 again.
+     */
+    @GameTest(template = "arena", timeoutTicks = 3000, skyAccess = true)
+    public static void termiteNumbersAreLostOutOfSightOnlyWhereAHostileReallyIs(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        TermiteMoundTests.deepGround(helper);
+        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        BlockPos place = helper.absolutePos(new BlockPos(MIDDLE + 10, SURFACE, MIDDLE));
+        List<BlockPos> first = new ArrayList<>();
+        List<BlockPos> second = new ArrayList<>();
+        int[] before = new int[2];
+        net.minecraft.world.entity.Mob[] husk = new net.minecraft.world.entity.Mob[1];
+        TestClock clock = TestClock.moving(helper, 12.0);
+        helper.onEachTick(() -> noRealWorkers(helper));
+        helper.runAfterDelay(10, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(colony != null, "no termite colony");
+            colony.population().setOnForTests(false); // no swapping: the numbers stay numbers
+            colony.population().setViewersForTests(List.of());
+            TermiteSoldierTests.digNestAtOnce(level, colony);
+            colony.population().addNewMembers(WorkerAntEntity.CASTE, level.getGameTime() - 250000, 60);
+            colony.nest().galleries().setSwitchForTests(false);
+            for (int i = 0; i < 6; i++) {
+                colony.danger().seen(level, place, UUID.randomUUID(), "husk"); // seen only: not an attack
+            }
+            first.add(knownDryTuft(helper, colony, MIDDLE + 10, MIDDLE - 3));
+            first.add(knownDryTuft(helper, colony, MIDDLE + 10, MIDDLE + 3));
+            colony.field().setOnForTests(true);
+            before[0] = colony.getCount(WorkerAntEntity.CASTE);
+            clock.skipTo(colony, TestClock.Phase.NIGHT);
+        });
+        helper.runAfterDelay(1100, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            AntColoniesMod.LOGGER.info("[away-test] 4g step 4, no hostile there: {}{}", colony.field().describe(), colony.danger().describe(level));
+            for (BlockPos tuft : first) {
+                helper.assertTrue(level.getBlockState(tuft).isAir(), "the tufts by the remembered place should be eaten (no hole closes for a sighting): " + tuft);
+            }
+            helper.assertTrue(colony.danger().lostOutOfSight() == 0 && colony.getCount(WorkerAntEntity.CASTE) == before[0],
+                    "nobody should be lost where no hostile really is: " + colony.danger().describe(level));
+            helper.assertTrue(colony.danger().lossChance(level, place, null) == 0, "no loss chance without a hostile there");
+            // Now a husk really stands there, out of sight.
+            husk[0] = helper.spawn(EntityType.HUSK, MIDDLE + 12, SURFACE, MIDDLE);
+            husk[0].setNoAi(true);
+            husk[0].setPersistenceRequired();
+            helper.assertTrue(colony.danger().lossChance(level, place, null) >= 0.5, "a hostile there should make the full loss chance: "
+                    + colony.danger().lossChance(level, place, null));
+            int[][] spots = {{MIDDLE + 9, MIDDLE - 1}, {MIDDLE + 9, MIDDLE + 1}, {MIDDLE + 11, MIDDLE - 1}, {MIDDLE + 11, MIDDLE + 1}, {MIDDLE + 8, MIDDLE + 4}};
+            for (int[] spot : spots) {
+                second.add(knownDryTuft(helper, colony, spot[0], spot[1]));
+            }
+            before[1] = colony.getCount(WorkerAntEntity.CASTE);
+        });
+        helper.runAfterDelay(2400, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            int lost = colony.danger().lostOutOfSight();
+            AntColoniesMod.LOGGER.info("[away-test] 4g step 4, a husk there: {} lost, {}{}", lost, colony.field().describe(), colony.danger().describe(level));
+            helper.assertTrue(lost >= 1, "some numbers should be lost where a hostile really is: " + colony.danger().describe(level));
+            helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == before[1] - lost, "the headcount should drop by the lost: "
+                    + colony.getCount(WorkerAntEntity.CASTE) + ", was " + before[1] + ", lost " + lost);
+            boolean found = colony.danger().places().stream().anyMatch(p -> p.deaths() > 0);
+            AntColoniesMod.LOGGER.info("[away-test] 4g step 4: a body {}", found ? "was found (a death remembered)" : "was never found");
+            husk[0].discard();
+            helper.assertTrue(colony.danger().lossChance(level, place, null) == 0, "with the husk gone nobody should be lost there");
+            helper.succeed();
+        });
+    }
+
+    /**
+     * Brain step 4g, step 4, the harvester ants' patrol numbers (the user's decisions of 2026-10-18). 100 old worker
+     * numbers, no real workers, the queen frozen and the colony away. Remembered attacks 9 blocks out in all 8 compass
+     * directions, each with a husk really standing there out of sight. The dawn patrol of numbers checks its ways: some
+     * never come back (each way through danger, up to half), the headcount drops by as many, their ways shut for the
+     * day, and the away report counts them. The husks gone, the next morning's patrol all comes back.
+     */
+    @GameTest(template = "arena", timeoutTicks = 3600, skyAccess = true)
+    public static void antPatrolNumbersAreLostOutOfSightOnWaysThroughDanger(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        startAntColony(helper);
+        UUID[] queen = new UUID[1];
+        CompoundTag[] queenOnDisk = new CompoundTag[1];
+        List<net.minecraft.world.entity.Mob> husks = new ArrayList<>();
+        int[] before = new int[1];
+        int[] lostFirst = new int[1];
+        TestClock clock = TestClock.moving(helper, 0.0);
+        helper.onEachTick(() -> noRealWorkers(helper));
+        helper.runAfterDelay(15, () -> {
+            Colony colony = antColony(helper);
+            colony.population().setOnForTests(false); // no swapping: the numbers stay numbers
+            colony.population().addNewMembers(WorkerAntEntity.CASTE, level.getGameTime() - colony.profile().worker().builderUntilTicks() - 1200, 100);
+            for (int i = 0; i < 8; i++) {
+                double angle = i * Math.PI / 4;
+                int dx = (int) Math.round(Math.cos(angle) * 9);
+                int dz = (int) Math.round(Math.sin(angle) * 9);
+                BlockPos at = helper.absolutePos(new BlockPos(MIDDLE + dx, SURFACE, MIDDLE + dz));
+                colony.danger().hurt(level, at, "husk", true);
+                colony.danger().hurt(level, at, "husk", true);
+                net.minecraft.world.entity.Mob husk = helper.spawn(EntityType.HUSK, MIDDLE + dx, SURFACE, MIDDLE + dz);
+                husk.setNoAi(true);
+                husk.setPersistenceRequired();
+                husks.add(husk);
+            }
+            queen[0] = colony.getQueen(level).getUUID();
+            colony.away().setOnForTests(true);
+            colony.away().setGraceForTests(20L);
+            queenOnDisk[0] = freezeAndUnload(colony, level, colony.getQueen(level));
+            colony.away().setAwayForTests(true);
+            before[0] = colony.getCount(WorkerAntEntity.CASTE);
+        });
+        helper.runAfterDelay(60, () -> {
+            Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
+            clock.skipTo(8.0); // a dry morning in a hot biome: the patrol goes out
+            colony.setHeatForTests(2.0F);
+            colony.setRainForTests(false);
+            colony.patrol().setOnForTests(true);
+        });
+        helper.runAfterDelay(1500, () -> {
+            Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
+            int lost = colony.danger().lostOutOfSight();
+            AwayReport report = colony.away().report();
+            AntColoniesMod.LOGGER.info("[away-test] 4g step 4 patrol: {} lost, {}{}{}", lost, colony.patrol().describe(level), report.describe(),
+                    colony.danger().describe(level));
+            helper.assertTrue(colony.patrol().sentThisRound() > 0, "the dawn patrol should have gone out: " + colony.patrol().describe(level));
+            helper.assertTrue(lost >= 1, "some patrol numbers should be lost on ways through danger: " + colony.patrol().describe(level));
+            helper.assertTrue(report.get(AwayReport.What.LOST_IN_DANGER) == lost && report.get(AwayReport.What.PATROLLERS_LOST) >= lost,
+                    "the away report should count the lost: " + report.describe());
+            helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == before[0] - lost, "the headcount should drop by the lost: "
+                    + colony.getCount(WorkerAntEntity.CASTE) + ", was " + before[0]);
+            helper.assertTrue(colony.patrol().dangerToday(), "a lost patroller should count as danger met today");
+            lostFirst[0] = lost;
+            husks.forEach(net.minecraft.world.entity.Entity::discard);
+            clock.skipTo(0.0); // midnight: the round ends
+        });
+        helper.runAfterDelay(1560, () -> clock.skipTo(8.0)); // the next morning: a new day, a new patrol
+        helper.runAfterDelay(3000, () -> {
+            Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
+            AntColoniesMod.LOGGER.info("[away-test] 4g step 4 patrol, the next morning: {}{}", colony.patrol().describe(level), colony.danger().describe(level));
+            helper.assertTrue(colony.patrol().sentThisRound() > 0 && colony.patrol().backThisRound() > 0, "the next patrol should come back: "
+                    + colony.patrol().describe(level));
+            helper.assertTrue(colony.danger().lostOutOfSight() == lostFirst[0], "nobody should be lost once the husks are gone: "
+                    + colony.danger().describe(level));
+            colony.away().setAwayForTests(false);
+            loadAgain(level, queenOnDisk[0]);
+            helper.succeed();
+        });
+    }
+
     /** A tuft of dry grass (on a grass block) with 2 of its 4 pieces cut already, which the colony knows. */
     static BlockPos knownDryTuft(GameTestHelper helper, Colony colony, int x, int z) {
         BlockPos tuft = helper.absolutePos(new BlockPos(x, SURFACE, z));

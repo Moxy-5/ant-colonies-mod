@@ -391,8 +391,19 @@ public class FieldLife {
         double got = progress.getOrDefault(pos, 0.0) + sent * 20.0 / trip;
         int left = kind.pieces() - food.getPiecesCut(pos);
         long now = level.getGameTime();
+        // Brain step 4g, step 4: a trip to food near danger can be lost out of sight (species whose forager numbers go there).
+        double lossChance = 0;
+        DangerMap.Place[] lostTo = new DangerMap.Place[1];
+        SpeciesProfile.LostNumbers lost = colony.danger().lostNumbers();
+        if (got >= 1 && lost != null && lost.foragers() && !colony.danger().isEmpty()) {
+            lossChance = colony.danger().lossChance(level, pos, lostTo);
+        }
         while (got >= 1 && left > 0 && roomNow > 0) {
             got--;
+            if (lossChance > 0 && colony.random().nextDouble() < lossChance && lostTo[0] != null && colony.danger().lose(level, lostTo[0])) {
+                changedNow = true;
+                continue; // never came back: no piece
+            }
             roomNow--;
             left = kind.pieces() - food.cutByNumbers(level, pos, kind);
             food.countIn(false);

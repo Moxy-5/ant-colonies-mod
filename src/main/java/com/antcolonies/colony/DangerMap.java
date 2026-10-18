@@ -86,6 +86,8 @@ public class DangerMap {
     private final List<Place> places = new ArrayList<>();
     /** Places forgotten since the colony was loaded (for the list). */
     private int forgotten;
+    /** Worker numbers lost out of sight since the colony was loaded (step 4, for the list). */
+    private int lostOutOfSight;
     /** Counts every place added to, made or forgotten (the closed holes are worked out again when it changes). */
     private int version;
 
@@ -243,6 +245,98 @@ public class DangerMap {
         return numbers.keepAway() && (isDangerous(level, pos) || colony.trunkTrails().passesDanger(level, pos));
     }
 
+    // --- harm out of sight (step 4) ------------------------------------------------------------------------------------
+
+    @Nullable
+    public SpeciesProfile.LostNumbers lostNumbers() {
+        return colony.profile().colony().lost().orElse(null);
+    }
+
+    /**
+     * The chance a number's trip near {@code pos} is lost (step 4, the user's decisions of 2026-10-18): {@code per_point}
+     * for each point of danger within {@code reach}, at most {@code most}. In loaded land a remembered place counts only
+     * while a hostile is really there out of sight (nobody dies of a mere memory); in unloaded land the memory decides.
+     * {@code strongest} gets the strongest such place (where a lost member's body lies); may be null.
+     */
+    public double lossChance(ServerLevel level, BlockPos pos, @Nullable Place[] strongest) {
+        SpeciesProfile.DangerNumbers numbers = numbers();
+        SpeciesProfile.LostNumbers lost = lostNumbers();
+        if (numbers == null || lost == null || places.isEmpty()) {
+            return 0;
+        }
+        long now = level.getGameTime();
+        double sum = 0;
+        double most = 0;
+        for (Place place : places) {
+            if (flat(place.pos, pos) > numbers.reach() || atHome(place.pos)) {
+                continue;
+            }
+            if (level.isLoaded(place.pos) && !hostileAt(level, place)) {
+                continue;
+            }
+            double strength = strength(place, now);
+            sum += strength;
+            if (strongest != null && strength > most) {
+                most = strength;
+                strongest[0] = place;
+            }
+        }
+        return Math.min(lost.most(), sum * lost.perPoint());
+    }
+
+    /** Whether a hostile (a monster, a mob hunting insects, or a player where a player did harm) is really near this place now. */
+    private boolean hostileAt(ServerLevel level, Place place) {
+        double reach = numbers().reach();
+        net.minecraft.world.phys.AABB box = new net.minecraft.world.phys.AABB(place.pos).inflate(reach, 6, reach);
+        if ("player".equals(place.what) && !level.getEntitiesOfClass(net.minecraft.world.entity.player.Player.class, box,
+                player -> player.isAlive() && !player.isSpectator()).isEmpty()) {
+            return true;
+        }
+        return !level.getEntitiesOfClass(net.minecraft.world.entity.Mob.class, box,
+                mob -> mob.isAlive() && !(mob instanceof com.antcolonies.entity.AbstractAntEntity)
+                        && (mob instanceof net.minecraft.world.entity.monster.Enemy
+                                || mob.getTarget() instanceof com.antcolonies.entity.AbstractAntEntity
+                                || mob.getType().toShortString().equals(place.what))).isEmpty();
+    }
+
+    /**
+     * A worker number on a trip is lost at this dangerous place (step 4): it dies out of sight, its body lies there and
+     * may be found ({@link #bodyLost}). False if there was no worker number to lose.
+     */
+    public boolean lose(ServerLevel level, Place where) {
+        if (!colony.population().lostOutside(level)) {
+            return false;
+        }
+        lostOutOfSight++;
+        boolean found = bodyLost(level, where.pos, where.what);
+        AntColoniesMod.LOGGER.info("[danger] colony {}: a worker lost out of sight at {} ({}), body {}", colony.getId(),
+                where.pos.toShortString(), where.what, found ? "found" : "not found");
+        return true;
+    }
+
+    /**
+     * A number was lost at {@code where} (step 4): the colony remembers it as a death there only if nestmates find the
+     * body (the user's idea): certain near the nest, less likely each block farther out ({@code found_within},
+     * {@code found_drop_per_block}). True if it was found.
+     */
+    public boolean bodyLost(ServerLevel level, BlockPos where, String what) {
+        SpeciesProfile.LostNumbers lost = lostNumbers();
+        if (lost == null || numbers() == null) {
+            return false;
+        }
+        boolean found = colony.random().nextDouble() < lost.foundChance(flat(where, colony.getCenter()));
+        if (found) {
+            colony.away().note(level, AwayReport.What.BODIES_FOUND, 1);
+            add(level, where, numbers().killed(), what, true, true, "a lost member's body found");
+        }
+        return found;
+    }
+
+    /** Worker numbers lost out of sight since the colony was loaded (step 4). */
+    public int lostOutOfSight() {
+        return lostOutOfSight;
+    }
+
     /** Whether any place is remembered at all (a quick check before the costly ones). */
     public boolean isEmpty() {
         return places.isEmpty();
@@ -302,11 +396,12 @@ public class DangerMap {
 
     /** For the colony list: " | danger: 2 places (strongest 3.4 at 10, 64, -5: zombie, 1 killed), 1 forgotten", or empty. */
     public String describe(Level level) {
-        if (numbers() == null || places.isEmpty() && forgotten == 0) {
+        if (numbers() == null || places.isEmpty() && forgotten == 0 && lostOutOfSight == 0) {
             return "";
         }
+        String lost = lostOutOfSight > 0 ? ", " + lostOutOfSight + " lost out of sight" : "";
         if (places.isEmpty()) {
-            return " | danger: none remembered, " + forgotten + " forgotten";
+            return " | danger: none remembered, " + forgotten + " forgotten" + lost;
         }
         Place strongest = places.get(0);
         long now = level.getGameTime();
@@ -318,7 +413,7 @@ public class DangerMap {
         return " | danger: " + places.size() + (places.size() == 1 ? " place" : " places") + " (strongest "
                 + String.format("%.1f", strength(strongest, now)) + " at " + strongest.pos.toShortString() + ": " + strongest.what
                 + (strongest.deaths > 0 ? ", " + strongest.deaths + " killed" : "") + (atHome(strongest.pos) ? ", the nest's own ground" : "") + ")"
-                + (forgotten > 0 ? ", " + forgotten + " forgotten" : "");
+                + (forgotten > 0 ? ", " + forgotten + " forgotten" : "") + lost;
     }
 
     void save(CompoundTag tag) {

@@ -25,6 +25,15 @@
       "close_holes": true,
       "leave_from": 6.0,
       "new_hole_from": 7.0
+    },
+    "lost": {
+      "_note_lost": "Brain step 4g, step 4 (the user's decisions, 2026-10-18): a number's trip near remembered danger can be lost out of sight, per_point for each point of danger, at most most; in loaded land only while a hostile is really there, in unloaded land the memory decides. A lost member counts in the memory as a death only if nestmates find the body: certain within found_within blocks of the nest, found_drop_per_block less likely each block farther. My picks, to confirm.",
+      "per_point": 0.1,
+      "most": 0.5,
+      "patrollers": false,
+      "foragers": true,
+      "found_within": 6.0,
+      "found_drop_per_block": 0.03
     }
   },
   "worker": {

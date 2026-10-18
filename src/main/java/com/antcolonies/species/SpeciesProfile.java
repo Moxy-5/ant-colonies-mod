@@ -59,7 +59,7 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * how many workers on there is one nurse, two nurses, and so on (one number per nurse, smallest first).
      */
     public record ColonyNumbers(int maxWorkers, List<Integer> nursesFrom, int realCap, int crew, int watchRadius, int swapsPerSecond,
-            Optional<DangerNumbers> danger) {
+            Optional<DangerNumbers> danger, Optional<LostNumbers> lost) {
         public static final Codec<ColonyNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("max_workers").forGetter(ColonyNumbers::maxWorkers),
                 Codec.INT.listOf().fieldOf("nurses_from_workers").forGetter(ColonyNumbers::nursesFrom),
@@ -67,11 +67,12 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 Codec.INT.optionalFieldOf("crew", 10).forGetter(ColonyNumbers::crew),
                 Codec.INT.optionalFieldOf("watch_radius", 48).forGetter(ColonyNumbers::watchRadius),
                 Codec.INT.optionalFieldOf("swaps_per_second", 2).forGetter(ColonyNumbers::swapsPerSecond),
-                DangerNumbers.CODEC.optionalFieldOf("danger").forGetter(ColonyNumbers::danger)
+                DangerNumbers.CODEC.optionalFieldOf("danger").forGetter(ColonyNumbers::danger),
+                LostNumbers.CODEC.optionalFieldOf("lost").forGetter(ColonyNumbers::lost)
         ).apply(i, ColonyNumbers::new));
 
         public ColonyNumbers(int maxWorkers, List<Integer> nursesFrom, int realCap, int crew, int watchRadius, int swapsPerSecond) {
-            this(maxWorkers, nursesFrom, realCap, crew, watchRadius, swapsPerSecond, Optional.empty());
+            this(maxWorkers, nursesFrom, realCap, crew, watchRadius, swapsPerSecond, Optional.empty(), Optional.empty());
         }
 
         /**
@@ -93,6 +94,32 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 }
             }
             return nurses;
+        }
+    }
+
+    /**
+     * Harm out of sight (brain step 4g, step 4; the user's decisions of 2026-10-18): a number's trip that still goes near
+     * remembered danger can be lost. Its chance is {@code perPoint} for each point of danger there, at most {@code most}; in
+     * loaded land a remembered place counts only while a hostile is really there (nobody dies of a mere memory), in
+     * unloaded land the memory decides. Who can be lost: patrol numbers checking a way through danger ({@code patrollers})
+     * and forager numbers at food near danger ({@code foragers}: termites, whose foragers are not kept away from where a
+     * hostile was only seen). A lost member only counts in the danger memory (as a death) if its nestmates find the body:
+     * certain within {@code foundWithin} blocks of the nest's middle, {@code foundDropPerBlock} less likely each block
+     * farther out (the user's idea). My picks, to confirm: 10% a point, at most 50%; found for sure within 6, 3% less a block.
+     */
+    public record LostNumbers(double perPoint, double most, boolean patrollers, boolean foragers, double foundWithin, double foundDropPerBlock) {
+        public static final Codec<LostNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.DOUBLE.optionalFieldOf("per_point", 0.1).forGetter(LostNumbers::perPoint),
+                Codec.DOUBLE.optionalFieldOf("most", 0.5).forGetter(LostNumbers::most),
+                Codec.BOOL.optionalFieldOf("patrollers", false).forGetter(LostNumbers::patrollers),
+                Codec.BOOL.optionalFieldOf("foragers", false).forGetter(LostNumbers::foragers),
+                Codec.DOUBLE.optionalFieldOf("found_within", 6.0).forGetter(LostNumbers::foundWithin),
+                Codec.DOUBLE.optionalFieldOf("found_drop_per_block", 0.03).forGetter(LostNumbers::foundDropPerBlock)
+        ).apply(i, LostNumbers::new));
+
+        /** The chance a body lying {@code fromNest} blocks (sideways) from the nest's middle is found by nestmates. */
+        public double foundChance(double fromNest) {
+            return fromNest <= foundWithin ? 1.0 : Math.max(0.0, 1.0 - foundDropPerBlock * (fromNest - foundWithin));
         }
     }
 

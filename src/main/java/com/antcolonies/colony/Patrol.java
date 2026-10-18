@@ -38,8 +38,8 @@ import net.minecraft.world.phys.AABB;
  * most food, so a young colony with no trail yet is not sent the wrong way), at most one per compass point.
  *
  * <p><b>Real ones and numbers.</b> The real workers of the colony patrol as far as they go (builders first), the rest as
- * numbers, which take the walk's time and always come back safely (until danger memory, step 4g: nothing can hurt them
- * out of sight yet). Real patrollers walk the round themselves ({@code PatrolGoal}, the mind); this part only hands out
+ * numbers, which take the walk's time and come back safely unless their way runs through remembered danger where a
+ * hostile really is (brain step 4g, step 4: then one can be lost, see {@link #lostOnTheWay}). Real patrollers walk the round themselves ({@code PatrolGoal}, the mind); this part only hands out
  * the jobs and keeps count. The door ({@link Door}) then decides how many foragers go out.
  *
  * <p>Species-neutral: any colony whose profile has {@code food.patrol} (only the harvester ant now). Without one the
@@ -282,6 +282,42 @@ public class Patrol {
         reactToDanger(level);
     }
 
+    /**
+     * Brain step 4g, step 4: a patrol number checking way {@code way} through remembered danger may be lost out of sight
+     * (real patrollers are the ones that meet danger first). Its chance is that of the most dangerous spot along the
+     * way's line ({@link DangerMap#lossChance}), and its body lies at that dangerous place. A lost one counts as a killed
+     * patroller: its way is shut for the day, more patrol the hill (the caller reacts), fewer forage; the danger memory
+     * only learns of it if the body is found. True if it was lost.
+     */
+    private boolean lostOnTheWay(ServerLevel level, int way) {
+        SpeciesProfile.LostNumbers settings = colony.danger().lostNumbers();
+        if (settings == null || !settings.patrollers() || colony.danger().isEmpty() || way < 0 || way >= ways.size()) {
+            return false;
+        }
+        Way checked = ways.get(way);
+        BlockPos middle = colony.getCenter();
+        double worst = 0;
+        DangerMap.Place worstPlace = null;
+        for (int blocks = HILL_ROUND; blocks <= checked.reach; blocks += 2) {
+            BlockPos at = new BlockPos(middle.getX() + (int) Math.floor(Math.cos(checked.angle) * blocks), middle.getY(),
+                    middle.getZ() + (int) Math.floor(Math.sin(checked.angle) * blocks));
+            DangerMap.Place[] place = new DangerMap.Place[1];
+            double chance = colony.danger().lossChance(level, at, place);
+            if (chance > worst && place[0] != null) {
+                worst = chance;
+                worstPlace = place[0];
+            }
+        }
+        if (worstPlace == null || colony.random().nextDouble() >= worst || !colony.danger().lose(level, worstPlace)) {
+            return false;
+        }
+        lost++;
+        colony.away().note(level, AwayReport.What.PATROLLERS_LOST, 1);
+        AntColoniesMod.LOGGER.info("[patrol] colony {}: a patrol number was lost toward {}", colony.getId(), TrunkTrails.compass(checked.angle));
+        shut(level, new Job(way, checked.angle, checked.reach), Shut.LOST);
+        return true;
+    }
+
     private void shut(ServerLevel level, Job job, Shut why) {
         if (job.way() >= 0 && job.way() < ways.size()) {
             Way way = ways.get(job.way());
@@ -338,13 +374,21 @@ public class Patrol {
             // A round with nobody to send (a founding nest): its first workers patrol as soon as they are out.
             send(level, roundsToday <= 1 ? dawnSize() : laterSize(), false);
         }
+        boolean lostNow = false;
         for (Iterator<Out> it = numbers.iterator(); it.hasNext(); ) {
             Out out = it.next();
             if (out.backAt() <= now) {
                 it.remove();
+                if (lostOnTheWay(level, out.way())) {
+                    lostNow = true;
+                    continue; // never came back: its way stays shut for the day
+                }
                 cameBack(level, out.way());
                 colony.door().patrollerNumbersHome(1);
             }
+        }
+        if (lostNow) {
+            reactToDanger(level); // (after the walk through the numbers: it may send more out)
         }
         // A patroller still busy with something else after a while is passed over: someone else goes in its place.
         int replace = 0;

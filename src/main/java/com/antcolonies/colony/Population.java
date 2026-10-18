@@ -295,6 +295,30 @@ public class Population {
     }
 
     /**
+     * One worker number was lost out of sight in danger (brain step 4g, step 4): it dies, any age, and its body lies where
+     * it fell (not carried home). False if there was none inside to lose.
+     */
+    boolean lostOutside(ServerLevel level) {
+        String caste = WorkerAntEntity.CASTE;
+        TreeMap<Long, Integer> ages = inside.get(caste);
+        if (ages == null || ages.isEmpty()) {
+            return false;
+        }
+        int pick = colony.random().nextInt(Math.max(1, ages.values().stream().mapToInt(Integer::intValue).sum()));
+        for (Map.Entry<Long, Integer> entry : ages.entrySet()) {
+            pick -= entry.getValue();
+            if (pick < 0) {
+                takeInside(caste, entry.getKey(), 1);
+                break;
+            }
+        }
+        colony.setCount(caste, colony.getCount(caste) - 1);
+        colony.away().note(level, AwayReport.What.LOST_IN_DANGER, 1);
+        ColonyManager.get(level).markChanged();
+        return true;
+    }
+
+    /**
      * Bodies of numbers that died in the nest: laid in the refuse chamber (termites eat theirs), out of sight, now or
      * when the nest is loaded again (never touch unloaded land; see {@link NestLedger}).
      */

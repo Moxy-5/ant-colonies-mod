@@ -46,7 +46,9 @@ public class AwayReport {
         GALLERY_BLOCKS("blocks of gallery grown"),
         FILLED_IN("gallery branches filled in"),
         FILLED_BLOCKS("blocks of gallery packed with soil"),
-        DANGER_FORGOTTEN("dangerous places forgotten");
+        DANGER_FORGOTTEN("dangerous places forgotten"),
+        LOST_IN_DANGER("lost in danger"),
+        BODIES_FOUND("bodies of the lost found by nestmates");
 
         private final String label;
 

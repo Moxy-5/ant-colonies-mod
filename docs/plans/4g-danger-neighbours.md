@@ -64,6 +64,12 @@ Numbers marked "my pick" go in the species files and are to be confirmed by the 
 - The away report: "lost in danger".
 - Tests: an `away` test: a colony with a strong danger spot on its only trail, away a day: some numbers lost, the trail
   used less.
+- **BUILT 2026-10-18** (`DangerMap.lossChance`, `lose`, `bodyLost`; `Population.lostOutside`; `Patrol.lostOnTheWay`;
+  `FieldLife.work`; species file `colony.lost`; `docs/HISTORY.md`). The user's decisions changed the plan: only patrol
+  numbers (harvester ants) and forager numbers (termites) can be lost, never searchers; in loaded land only while a
+  hostile is really there; a death counts in the memory only if nestmates find the body (certain within 6 blocks of the
+  nest, 3% less a block farther; my picks, to confirm). Tests: two new `away` scenes (termites with and without a husk
+  by their food; harvester patrol numbers with husks on every way, then without).
 
 ## Step 5: neighbours
 - **Meetings:** any surface worker (not only patrollers) within 3 blocks of another colony's insect, or walking onto
