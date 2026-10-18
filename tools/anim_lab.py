@@ -43,6 +43,7 @@ import json, math, os, re, struct, sys, zlib
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import termite_models as tm  # noqa: E402  (the PNG writer, the canvas and its font)
+import body_plan  # noqa: E402  (what each model's parts are: tools/body_plan.py)
 
 PROJECT = os.path.normpath(os.path.join(HERE, '..'))
 ASSETS = os.path.join(PROJECT, 'src', 'main', 'resources', 'assets', 'antcolonies')
@@ -183,13 +184,16 @@ FACE_CORNERS = {'north': (0, 2, 6, 4), 'south': (1, 5, 7, 3), 'west': (0, 1, 3, 
 class Model:
     def __init__(self, name, bones=None):
         """The insect's model from the game's geo file, or from a list of bones (the motion library, tools/ant_motion.py,
-        works on the model before the file is written)."""
+        works on the model before the file is written). With a body plan (tools/body_plan.py), the bones are known by
+        their role names inside the lab: a geo file's bones are renamed to their roles as they are read (a list of
+        bones given here is the tools' own, already in role names)."""
         self.name = name
+        self.plan = body_plan.load(name)
         if bones is None:
             geo = json.load(open(os.path.join(ASSETS, 'geo', 'entity', f'{name}.geo.json'), encoding='utf-8'))
             g = geo['minecraft:geometry'][0]
             desc = g['description']
-            self.bones = g['bones']
+            self.bones = self.plan.model_to_roles(g['bones']) if self.plan else g['bones']
         else:
             desc, self.bones = {}, bones
         self.by = {b['name']: b for b in self.bones}
@@ -230,10 +234,28 @@ class Model:
             name = self.by[name].get('parent')
         return out
 
+    def leg_of(self, bone):
+        """The key of the leg (l1, ...) a bone belongs to, or None."""
+        if self.plan:
+            return self.plan.leg_of(bone)
+        m = re.match(r'leg_([lr])(\d)(_lower|_foot)?$', bone)
+        return m.group(1) + m.group(2) if m else None
+
+    def hip_of(self, key):
+        return self.plan.legs[key][0] if self.plan else f'leg_{key}'
+
+    def is_antenna(self, bone):
+        return bone in self.plan.antenna_bones() if self.plan else bone.startswith('antenna')
+
     def _find_feet(self):
         """Each leg's last bone (foot, else lower leg, else leg) and the rest corner of it that touches the ground."""
         legs = {}
-        for b in self.bones:
+        if self.plan:
+            for key, chain in self.plan.legs.items():
+                with_cubes = [b for b in chain if self.by.get(b, {}).get('cubes')]
+                if with_cubes:
+                    legs[key] = (0, with_cubes[-1])
+        for b in self.bones if not self.plan else ():
             m = re.match(r'leg_([lr])(\d)(_lower|_foot)?$', b['name'])
             if m and b.get('cubes'):
                 key = m.group(1) + m.group(2)
@@ -272,6 +294,22 @@ class Model:
     def posed(self, pose):
         """Every cube's 8 corners in the pose, with its face colours and bone."""
         return [(bn, [self.world(bn, p, pose) for p in corners], colours) for bn, corners, colours in self.cubes]
+
+    def centre(self, pose):
+        """The body's centre of weight seen from above (x, z) in a pose: the middle of every cube that is not a leg,
+        each weighed by its size (my pick: the parts are all equally dense; real legs weigh little)."""
+        total = sx = sz = 0.0
+        for bone, corners, _ in self.cubes:
+            if self.leg_of(bone) is not None:
+                continue
+            if pose:
+                corners = [self.world(bone, p, pose) for p in corners]
+            xs, ys, zs = zip(*corners)
+            v = max(1e-6, (max(xs) - min(xs)) * (max(ys) - min(ys)) * (max(zs) - min(zs)))
+            total += v
+            sx += v * sum(xs) / 8
+            sz += v * sum(zs) / 8
+        return (sx / total, sz / total) if total else (0.0, 0.0)
 
     def foot_tips(self, pose):
         return {key: self.world(bone, self.cubes[i][1][k], pose) for key, (bone, i, k) in self.feet.items()}
@@ -415,9 +453,52 @@ class Clip:
         return out
 
 
-def load_clips(stem):
+def load_clips(stem, model=None):
+    """The clips of an animation file; with the model they play on, their bones renamed to the model's role names."""
     data = json.load(open(os.path.join(ASSETS, 'animations', 'entity', f'{stem}.animation.json'), encoding='utf-8'))
-    return {name: Clip(name, a) for name, a in data['animations'].items()}
+    plan = model.plan if model is not None else None
+    return {name: Clip(name, plan.clip_to_roles(a) if plan else a) for name, a in data['animations'].items()}
+
+
+# --- balance: is the body's weight over its feet ---------------------------------------------------------------------
+def hull(points):
+    """The corners of the smallest convex shape round 2D points, anticlockwise (Andrew's monotone chain)."""
+    pts = sorted(set(points))
+    if len(pts) <= 2:
+        return pts
+
+    def half(seq):
+        out = []
+        for p in seq:
+            while len(out) >= 2 and ((out[-1][0] - out[-2][0]) * (p[1] - out[-2][1])
+                                     - (out[-1][1] - out[-2][1]) * (p[0] - out[-2][0])) <= 0:
+                out.pop()
+            out.append(p)
+        return out
+    lower, upper = half(pts), half(reversed(pts))
+    return lower[:-1] + upper[:-1]
+
+
+def support_margin(centre, feet):
+    """How far a point (x, z) lies inside the shape the feet on the ground stand round (units; negative: outside, by
+    that much). Fewer than 3 feet make no shape: the point is outside by its distance from them."""
+    shape = hull(feet)
+    if not shape:
+        return -1e9
+
+    def seg_dist(p, a, b):
+        ax, az = b[0] - a[0], b[1] - a[1]
+        f = max(0.0, min(1.0, ((p[0] - a[0]) * ax + (p[1] - a[1]) * az) / max(1e-12, ax * ax + az * az)))
+        return math.hypot(p[0] - a[0] - ax * f, p[1] - a[1] - az * f)
+    if len(shape) < 3:
+        return -min(seg_dist(centre, shape[0], shape[-1]), math.hypot(centre[0] - shape[0][0], centre[1] - shape[0][1]))
+    inside = True
+    near = 1e9
+    for a, b in zip(shape, shape[1:] + shape[:1]):
+        cross_ = (b[0] - a[0]) * (centre[1] - a[1]) - (b[1] - a[1]) * (centre[0] - a[0])
+        inside = inside and cross_ >= 0
+        near = min(near, seg_dist(centre, a, b))
+    return near if inside else -near
 
 
 # --- walking: what the feet do ---------------------------------------------------------------------------------------
@@ -773,8 +854,8 @@ def segment_points(corners, n=6):
     return [tuple(c + a[j] * (s / n - 0.5) * 0.9 for j, c in enumerate(centre)) for s in range(n + 1)]
 
 
-def is_leg(bone):
-    return bone.startswith('leg_')
+def is_leg(model, bone):
+    return model.leg_of(bone) is not None
 
 
 def check(model, clip, speed_bps=None, quiet=False):
@@ -857,6 +938,20 @@ def check(model, clip, speed_bps=None, quiet=False):
                             + ', '.join(f'{k} {d:.2f}' for k, d in duty.items())))
         out.append(('NOTE', 'touch-down moment in the cycle (tripod: L1 R2 L3 together, the others half a cycle off): '
                             + ', '.join(f'{k} {p:.2f}' if p is not None else f'{k} never' for k, p in phases.items())))
+        # Balance (2026-10-18): the body's centre of weight over the shape the feet on the ground stand round.
+        margins = []
+        for s in range(0, n + 1, 2):
+            feet = [(gait.tips[s][k][0], gait.tips[s][k][2]) for k in gait.legs if gait.down[k][s]]
+            margins.append(support_margin(model.centre(clip.pose(gait.times[s])), feet))
+        low = min(margins)
+        if low >= 0:
+            out.append(('NOTE', f"balance: the body's centre of weight stays over its feet all through the cycle "
+                                f'(at least {low:.2f} units inside the feet on the ground)'))
+        else:
+            share = sum(m < 0 for m in margins) / len(margins)
+            out.append(('NOTE', f"balance: the body's centre of weight is outside its feet for {share * 100:.0f}% of the "
+                                f'cycle (up to {-low:.2f} units; a fast runner can be, its speed carries it; a slow '
+                                'walker should not be)'))
     elif gait.legs:
         # Standing: no foot should move along the ground at all.
         for k in gait.legs:
@@ -868,8 +963,8 @@ def check(model, clip, speed_bps=None, quiet=False):
     # Sinking into the floor, clipping, loop seams, snaps: sampled through the clip.
     floor = gait.ground if model.feet else 0.0
     sunk = clipped = None
-    leg_cubes = [i for i, (b, _, _) in enumerate(model.cubes) if is_leg(b)]
-    body_cubes = [i for i, (b, _, _) in enumerate(model.cubes) if not is_leg(b) and not b.startswith('antenna')]
+    leg_cubes = [i for i, (b, _, _) in enumerate(model.cubes) if is_leg(model, b)]
+    body_cubes = [i for i, (b, _, _) in enumerate(model.cubes) if not is_leg(model, b) and not model.is_antenna(b)]
     for s in range(0, n + 1, 2):
         t = gait.times[s]
         posed = model.posed(clip.pose(t))
@@ -882,14 +977,14 @@ def check(model, clip, speed_bps=None, quiet=False):
         if clipped is None:
             for li in leg_cubes:
                 lb = posed[li][0]
-                root = lb.split('_')[0] + '_' + lb.split('_')[1]          # leg_l1: the hip, where the leg is meant to sit
+                root = model.hip_of(model.leg_of(lb))                      # the hip, where the leg is meant to sit
                 hip = model.world(root, model.by[root]['pivot'], clip.pose(t))
                 for p in segment_points(posed[li][1]):
                     if math.dist(p, hip) < 1.0:
                         continue
                     hit = next((posed[bi][0] for bi in body_cubes if inside_box(p, posed[bi][1], 0.08)), None)
                     if hit is None:
-                        hit = next((posed[oi][0] for oi in leg_cubes if posed[oi][0][:6] != lb[:6]
+                        hit = next((posed[oi][0] for oi in leg_cubes if model.leg_of(posed[oi][0]) != model.leg_of(lb)
                                     and inside_box(p, posed[oi][1], 0.03)), None)
                     if hit:
                         clipped = (lb, hit, t)
@@ -1019,11 +1114,11 @@ def main(argv):
         return
     if cmd == 'match':
         model = Model(args[2])
-        save(match(args[1], model, load_clips(opts.get('anim', args[2])), int(opts.get('cols', 4))),
+        save(match(args[1], model, load_clips(opts.get('anim', args[2]), model), int(opts.get('cols', 4))),
              os.path.basename(os.path.normpath(args[1])) + '_match.png')
         return
     model = Model(args[1])
-    clips = load_clips(opts.get('anim', args[1]))
+    clips = load_clips(opts.get('anim', args[1]), model)
     names = args[2:] or list(clips)
     speed = float(opts['speed']) if 'speed' in opts else None
     frames = int(opts.get('frames', 8))

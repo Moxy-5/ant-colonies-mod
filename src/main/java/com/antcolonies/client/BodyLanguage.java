@@ -1,8 +1,12 @@
 package com.antcolonies.client;
 
 import com.antcolonies.entity.AbstractAntEntity;
+import com.antcolonies.entity.body.BodyPlans;
 
+import java.util.List;
 import java.util.function.Function;
+
+import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.Mth;
@@ -28,30 +32,38 @@ public final class BodyLanguage {
     private static final float MAX_PITCH = 25.0F;
     /** The live layer only within this many blocks of the camera (my pick, to confirm). */
     public static final double NEAR = 32.0;
-    /** The waist's joints and their shares of the bend (petiole, postpetiole, the gaster's joint; my picks, to confirm). */
-    private static final String[] WAIST = {"petiole", "postpetiole", "abdomen"};
+    /**
+     * The waist's joints and their shares of the bend (petiole, postpetiole, the gaster's joint; my picks, to confirm)
+     * for a model with no body plan; a plan names its own ("waist", {@link BodyPlans}).
+     */
+    private static final List<String> WAIST = List.of("petiole", "postpetiole", "abdomen");
     private static final float[] WAIST_SHARE = {0.40F, 0.35F, 0.25F};
 
     private BodyLanguage() {
     }
 
-    /** Adds the live layer to the bones the clips have just set (called each frame by the model; bones: by name, or null). */
-    public static <T extends AbstractAntEntity> void apply(T insect, AnimationState<T> state, Function<String, GeoBone> bones) {
+    /**
+     * Adds the live layer to the bones the clips have just set (called each frame by the model; bones: by name, or null;
+     * plan: the model's body plan, or null).
+     */
+    public static <T extends AbstractAntEntity> void apply(T insect, AnimationState<T> state, Function<String, GeoBone> bones,
+            @Nullable BodyPlans.Plan plan) {
         Vec3 camera = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
         if (insect.position().distanceToSqr(camera) > NEAR * NEAR) {
             return;
         }
         float partialTick = state.getPartialTick();
-        headLook(insect, state, bones, partialTick);
-        waist(insect, bones, partialTick);
+        headLook(insect, state, bones, plan, partialTick);
+        waist(insect, bones, plan, partialTick);
     }
 
-    private static <T extends AbstractAntEntity> void headLook(T insect, AnimationState<T> state, Function<String, GeoBone> bones, float partialTick) {
+    private static <T extends AbstractAntEntity> void headLook(T insect, AnimationState<T> state, Function<String, GeoBone> bones,
+            @Nullable BodyPlans.Plan plan, float partialTick) {
         float weight = insect.getLookWeight(partialTick);
         if (weight <= 0.001F) {
             return;
         }
-        GeoBone head = bones.apply("head");
+        GeoBone head = bones.apply(plan != null ? plan.bone("head") : "head");
         EntityModelData data = state.getData(DataTickets.ENTITY_MODEL_DATA);
         if (head == null || data == null) {
             return;
@@ -83,18 +95,21 @@ public final class BodyLanguage {
      * animation file, which GeckoLib stores negated); a front turned right leaves the gaster pointing a little to the
      * right of the body's line behind (a negative Y in the file, stored negated).
      */
-    private static void waist(AbstractAntEntity insect, Function<String, GeoBone> bones, float partialTick) {
+    private static void waist(AbstractAntEntity insect, Function<String, GeoBone> bones, @Nullable BodyPlans.Plan plan,
+            float partialTick) {
         float pitch = insect.getWaistPitch(partialTick);
         float yaw = insect.getWaistYaw(partialTick);
         if (Math.abs(pitch) < 0.05F && Math.abs(yaw) < 0.05F) {
             return;
         }
-        for (int i = 0; i < WAIST.length; i++) {
-            GeoBone joint = bones.apply(WAIST[i]);
+        List<String> waist = plan != null ? plan.waist() : WAIST;
+        float[] shares = plan != null ? plan.waistShare() : WAIST_SHARE;
+        for (int i = 0; i < waist.size(); i++) {
+            GeoBone joint = bones.apply(waist.get(i));
             if (joint == null) {
                 continue;
             }
-            turnBy(joint, -pitch * WAIST_SHARE[i] * Mth.DEG_TO_RAD, yaw * WAIST_SHARE[i] * Mth.DEG_TO_RAD);
+            turnBy(joint, -pitch * shares[i] * Mth.DEG_TO_RAD, yaw * shares[i] * Mth.DEG_TO_RAD);
         }
     }
 }

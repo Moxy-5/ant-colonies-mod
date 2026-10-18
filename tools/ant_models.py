@@ -30,6 +30,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import termite_models as tm  # the PNG writer and the little box renderer
 import anim_lab as lab       # the animation lab: the model as the game builds it
 import ant_motion as mo      # the motion library: legs worked out from where the feet must be
+import body_plan            # what the model's parts are (role names to bone names)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, '..', 'src', 'main', 'resources', 'assets', 'antcolonies')
@@ -936,7 +937,8 @@ if __name__ == '__main__':
                         'visible_bounds_width': 3, 'visible_bounds_height': 2, 'visible_bounds_offset': [0, 0.5, 0]},
         'bones': worker}]}
     dump('geo/entity/worker_ant.geo.json', geo)
-    dump('animations/entity/worker_ant.animation.json', animations())
+    # The clips are made in role names; the body plan renames them to the model's bone names (tools/body_plan.py).
+    dump('animations/entity/worker_ant.animation.json', body_plan.load('worker_ant').animations_to_bones(animations()))
     make_texture(os.path.join(ROOT, 'textures', 'entity', 'worker_ant.png'))
     make_texture(os.path.join(ROOT, 'textures', 'entity', 'queen_ant.png'), QUEEN_TINT)
     render([('WORKER', model_boxes(worker)), ('QUEEN COLOURS', model_boxes(worker, tint=QUEEN_TINT))])
