@@ -1,0 +1,20 @@
+# Guard film: walking at the three speeds (slow, normal, fast) in one straight line, the walk changing between them
+# while the ant goes on (the change must wait for the moment both walks are at the same point of the step: no pop).
+# Run all guard films: python tools/guard_films.py run   (see that file's top comment)
+cmd time set noon
+cmd weather clear
+lens 30
+walker worker_ant -9.5 -60 0.5 -90
+log walk
+cmd tick freeze
+fov 10
+follow 0 0.15 -5 0 0
+go -4 -60 0 0.4
+burst slow 40 1
+go 2 -60 0 1.0
+burst normal 30 1
+go 10 -60 0 1.8
+burst fast 30 1
+log off
+follow off
+quit

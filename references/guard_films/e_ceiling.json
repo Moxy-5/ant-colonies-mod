@@ -1,0 +1,704 @@
+{
+ "pictures": [
+  "onto_ceiling_00.png",
+  "onto_ceiling_01.png",
+  "onto_ceiling_02.png",
+  "onto_ceiling_03.png",
+  "onto_ceiling_04.png",
+  "onto_ceiling_05.png",
+  "onto_ceiling_06.png",
+  "onto_ceiling_07.png",
+  "onto_ceiling_08.png",
+  "onto_ceiling_09.png",
+  "onto_ceiling_10.png",
+  "onto_ceiling_11.png",
+  "onto_ceiling_12.png",
+  "onto_ceiling_13.png",
+  "onto_ceiling_14.png",
+  "onto_ceiling_15.png",
+  "onto_ceiling_16.png",
+  "onto_ceiling_17.png",
+  "onto_ceiling_18.png",
+  "onto_ceiling_19.png",
+  "onto_ceiling_20.png",
+  "onto_ceiling_21.png",
+  "onto_ceiling_22.png",
+  "onto_ceiling_23.png",
+  "onto_ceiling_24.png",
+  "onto_ceiling_25.png",
+  "onto_ceiling_26.png",
+  "onto_ceiling_27.png",
+  "onto_ceiling_28.png",
+  "onto_ceiling_29.png",
+  "onto_ceiling_30.png",
+  "onto_ceiling_31.png",
+  "onto_ceiling_32.png",
+  "onto_ceiling_33.png",
+  "onto_ceiling_34.png",
+  "onto_ceiling_35.png",
+  "onto_ceiling_36.png",
+  "onto_ceiling_37.png",
+  "onto_ceiling_38.png",
+  "onto_ceiling_39.png",
+  "onto_ceiling_40.png",
+  "onto_ceiling_41.png",
+  "onto_ceiling_42.png",
+  "onto_ceiling_43.png",
+  "onto_ceiling_44.png",
+  "onto_ceiling_45.png",
+  "onto_ceiling_46.png",
+  "onto_ceiling_47.png",
+  "onto_ceiling_48.png",
+  "onto_ceiling_49.png",
+  "onto_ceiling_50.png",
+  "onto_ceiling_51.png",
+  "onto_ceiling_52.png",
+  "onto_ceiling_53.png",
+  "onto_ceiling_54.png",
+  "onto_ceiling_55.png",
+  "onto_ceiling_56.png",
+  "onto_ceiling_57.png",
+  "onto_ceiling_58.png",
+  "onto_ceiling_59.png",
+  "onto_ceiling_60.png",
+  "onto_ceiling_61.png",
+  "onto_ceiling_62.png",
+  "onto_ceiling_63.png",
+  "onto_ceiling_64.png",
+  "onto_ceiling_65.png",
+  "onto_ceiling_66.png",
+  "onto_ceiling_67.png",
+  "onto_ceiling_68.png",
+  "onto_ceiling_69.png",
+  "onto_ceiling_70.png",
+  "onto_ceiling_71.png",
+  "onto_ceiling_72.png",
+  "onto_ceiling_73.png",
+  "onto_ceiling_74.png",
+  "onto_ceiling_75.png",
+  "onto_ceiling_76.png",
+  "onto_ceiling_77.png",
+  "onto_ceiling_78.png",
+  "onto_ceiling_79.png",
+  "onto_ceiling_80.png",
+  "onto_ceiling_81.png",
+  "onto_ceiling_82.png",
+  "onto_ceiling_83.png",
+  "onto_ceiling_84.png",
+  "onto_ceiling_85.png",
+  "onto_ceiling_86.png",
+  "onto_ceiling_87.png",
+  "onto_ceiling_88.png",
+  "onto_ceiling_89.png",
+  "onto_ceiling_90.png",
+  "onto_ceiling_91.png",
+  "onto_ceiling_92.png",
+  "onto_ceiling_93.png",
+  "onto_ceiling_94.png",
+  "onto_ceiling_95.png",
+  "onto_ceiling_96.png",
+  "onto_ceiling_97.png",
+  "onto_ceiling_98.png",
+  "onto_ceiling_99.png",
+  "onto_ceiling_100.png",
+  "onto_ceiling_101.png",
+  "onto_ceiling_102.png",
+  "onto_ceiling_103.png",
+  "onto_ceiling_104.png",
+  "onto_ceiling_105.png",
+  "onto_ceiling_106.png",
+  "onto_ceiling_107.png",
+  "onto_ceiling_108.png",
+  "onto_ceiling_109.png",
+  "onto_ceiling_110.png",
+  "onto_ceiling_111.png",
+  "onto_ceiling_112.png",
+  "onto_ceiling_113.png",
+  "onto_ceiling_114.png",
+  "onto_ceiling_115.png",
+  "onto_ceiling_116.png",
+  "onto_ceiling_117.png",
+  "onto_ceiling_118.png",
+  "onto_ceiling_119.png",
+  "onto_ceiling_120.png",
+  "onto_ceiling_121.png",
+  "onto_ceiling_122.png",
+  "onto_ceiling_123.png",
+  "onto_ceiling_124.png",
+  "onto_ceiling_125.png",
+  "onto_ceiling_126.png",
+  "onto_ceiling_127.png",
+  "onto_ceiling_128.png",
+  "onto_ceiling_129.png",
+  "onto_ceiling_130.png",
+  "onto_ceiling_131.png",
+  "onto_ceiling_132.png",
+  "onto_ceiling_133.png",
+  "onto_ceiling_134.png",
+  "onto_ceiling_135.png",
+  "onto_ceiling_136.png",
+  "onto_ceiling_137.png",
+  "onto_ceiling_138.png",
+  "onto_ceiling_139.png",
+  "onto_ceiling_140.png",
+  "onto_ceiling_141.png",
+  "onto_ceiling_142.png",
+  "onto_ceiling_143.png",
+  "onto_ceiling_144.png",
+  "onto_ceiling_145.png",
+  "onto_ceiling_146.png",
+  "onto_ceiling_147.png",
+  "onto_ceiling_148.png",
+  "onto_ceiling_149.png",
+  "down_again_00.png",
+  "down_again_01.png",
+  "down_again_02.png",
+  "down_again_03.png",
+  "down_again_04.png",
+  "down_again_05.png",
+  "down_again_06.png",
+  "down_again_07.png",
+  "down_again_08.png",
+  "down_again_09.png",
+  "down_again_10.png",
+  "down_again_11.png",
+  "down_again_12.png",
+  "down_again_13.png",
+  "down_again_14.png",
+  "down_again_15.png",
+  "down_again_16.png",
+  "down_again_17.png",
+  "down_again_18.png",
+  "down_again_19.png",
+  "down_again_20.png",
+  "down_again_21.png",
+  "down_again_22.png",
+  "down_again_23.png",
+  "down_again_24.png",
+  "down_again_25.png",
+  "down_again_26.png",
+  "down_again_27.png",
+  "down_again_28.png",
+  "down_again_29.png",
+  "down_again_30.png",
+  "down_again_31.png",
+  "down_again_32.png",
+  "down_again_33.png",
+  "down_again_34.png",
+  "down_again_35.png",
+  "down_again_36.png",
+  "down_again_37.png",
+  "down_again_38.png",
+  "down_again_39.png",
+  "down_again_40.png",
+  "down_again_41.png",
+  "down_again_42.png",
+  "down_again_43.png",
+  "down_again_44.png",
+  "down_again_45.png",
+  "down_again_46.png",
+  "down_again_47.png",
+  "down_again_48.png",
+  "down_again_49.png",
+  "down_again_50.png",
+  "down_again_51.png",
+  "down_again_52.png",
+  "down_again_53.png",
+  "down_again_54.png",
+  "down_again_55.png",
+  "down_again_56.png",
+  "down_again_57.png",
+  "down_again_58.png",
+  "down_again_59.png",
+  "down_again_60.png",
+  "down_again_61.png",
+  "down_again_62.png",
+  "down_again_63.png",
+  "down_again_64.png",
+  "down_again_65.png",
+  "down_again_66.png",
+  "down_again_67.png",
+  "down_again_68.png",
+  "down_again_69.png",
+  "down_again_70.png",
+  "down_again_71.png",
+  "down_again_72.png",
+  "down_again_73.png",
+  "down_again_74.png",
+  "down_again_75.png",
+  "down_again_76.png",
+  "down_again_77.png",
+  "down_again_78.png",
+  "down_again_79.png"
+ ],
+ "size": [
+  240,
+  136
+ ],
+ "findings": {
+  "jump leg_r2": [
+   1,
+   0.124
+  ],
+  "jump at down_again_07": [
+   19,
+   0.334
+  ],
+  "jump leg_l2": [
+   1,
+   0.124
+  ],
+  "jump leg_l2_lower": [
+   1,
+   0.177
+  ],
+  "jump at onto_ceiling_22": [
+   8,
+   0.215
+  ],
+  "jump leg_l2_foot": [
+   1,
+   0.207
+  ],
+  "jump thorax": [
+   3,
+   0.165
+  ],
+  "jump at onto_ceiling_19": [
+   11,
+   0.076
+  ],
+  "jump at onto_ceiling_102": [
+   1,
+   0.09
+  ],
+  "inside head": [
+   5,
+   0.088
+  ],
+  "inside at onto_ceiling_101": [
+   7,
+   0.101
+  ],
+  "inside at onto_ceiling_102": [
+   6,
+   0.062
+  ],
+  "inside at down_again_03": [
+   7,
+   0.072
+  ],
+  "inside at down_again_04": [
+   11,
+   0.116
+  ],
+  "inside at down_again_05": [
+   11,
+   0.137
+  ],
+  "jump head": [
+   2,
+   0.259
+  ],
+  "inside mandible_r": [
+   5,
+   0.116
+  ],
+  "jump mandible_r": [
+   2,
+   0.29
+  ],
+  "inside antenna_l_1": [
+   2,
+   0.051
+  ],
+  "jump antenna_l_1": [
+   3,
+   0.236
+  ],
+  "inside antenna_l_2": [
+   5,
+   0.137
+  ],
+  "inside at onto_ceiling_100": [
+   2,
+   0.053
+  ],
+  "jump antenna_l_2": [
+   2,
+   0.334
+  ],
+  "inside mandible_l": [
+   5,
+   0.115
+  ],
+  "jump mandible_l": [
+   2,
+   0.29
+  ],
+  "inside antenna_r_1": [
+   2,
+   0.051
+  ],
+  "jump antenna_r_1": [
+   4,
+   0.236
+  ],
+  "jump at onto_ceiling_21": [
+   1,
+   0.125
+  ],
+  "inside antenna_r_2": [
+   5,
+   0.136
+  ],
+  "jump antenna_r_2": [
+   2,
+   0.328
+  ],
+  "jump leg_r3_lower": [
+   1,
+   0.173
+  ],
+  "inside leg_r3_foot": [
+   1,
+   0.014
+  ],
+  "inside at onto_ceiling_103": [
+   2,
+   0.031
+  ],
+  "jump leg_r3_foot": [
+   1,
+   0.195
+  ],
+  "jump leg_r1": [
+   1,
+   0.172
+  ],
+  "inside leg_r1_lower": [
+   4,
+   0.057
+  ],
+  "jump leg_r1_lower": [
+   2,
+   0.227
+  ],
+  "inside leg_r1_foot": [
+   5,
+   0.086
+  ],
+  "jump leg_r1_foot": [
+   2,
+   0.257
+  ],
+  "jump leg_l1": [
+   1,
+   0.172
+  ],
+  "inside leg_l1_lower": [
+   3,
+   0.067
+  ],
+  "jump leg_l1_lower": [
+   1,
+   0.227
+  ],
+  "inside leg_l1_foot": [
+   4,
+   0.098
+  ],
+  "jump leg_l1_foot": [
+   1,
+   0.257
+  ],
+  "jump petiole": [
+   4,
+   0.072
+  ],
+  "jump at down_again_03": [
+   3,
+   0.041
+  ],
+  "jump at down_again_06": [
+   3,
+   0.144
+  ],
+  "jump postpetiole": [
+   4,
+   0.096
+  ],
+  "inside abdomen": [
+   64,
+   0.091
+  ],
+  "inside at down_again_16": [
+   1,
+   0.089
+  ],
+  "inside at down_again_17": [
+   1,
+   0.09
+  ],
+  "inside at down_again_18": [
+   1,
+   0.09
+  ],
+  "inside at down_again_19": [
+   1,
+   0.09
+  ],
+  "inside at down_again_20": [
+   1,
+   0.09
+  ],
+  "inside at down_again_21": [
+   1,
+   0.09
+  ],
+  "inside at down_again_22": [
+   1,
+   0.09
+  ],
+  "inside at down_again_23": [
+   1,
+   0.09
+  ],
+  "inside at down_again_24": [
+   1,
+   0.09
+  ],
+  "inside at down_again_25": [
+   1,
+   0.09
+  ],
+  "inside at down_again_26": [
+   1,
+   0.09
+  ],
+  "inside at down_again_27": [
+   1,
+   0.09
+  ],
+  "inside at down_again_28": [
+   1,
+   0.09
+  ],
+  "inside at down_again_29": [
+   1,
+   0.09
+  ],
+  "inside at down_again_30": [
+   1,
+   0.091
+  ],
+  "inside at down_again_31": [
+   1,
+   0.091
+  ],
+  "inside at down_again_32": [
+   1,
+   0.091
+  ],
+  "inside at down_again_33": [
+   1,
+   0.091
+  ],
+  "inside at down_again_34": [
+   1,
+   0.091
+  ],
+  "inside at down_again_35": [
+   1,
+   0.091
+  ],
+  "inside at down_again_36": [
+   1,
+   0.091
+  ],
+  "inside at down_again_37": [
+   1,
+   0.091
+  ],
+  "inside at down_again_38": [
+   1,
+   0.091
+  ],
+  "inside at down_again_39": [
+   1,
+   0.091
+  ],
+  "inside at down_again_40": [
+   1,
+   0.091
+  ],
+  "inside at down_again_41": [
+   1,
+   0.091
+  ],
+  "inside at down_again_42": [
+   1,
+   0.091
+  ],
+  "inside at down_again_43": [
+   1,
+   0.091
+  ],
+  "inside at down_again_44": [
+   1,
+   0.091
+  ],
+  "inside at down_again_45": [
+   1,
+   0.091
+  ],
+  "inside at down_again_46": [
+   1,
+   0.091
+  ],
+  "inside at down_again_47": [
+   1,
+   0.091
+  ],
+  "inside at down_again_48": [
+   1,
+   0.091
+  ],
+  "inside at down_again_49": [
+   1,
+   0.091
+  ],
+  "inside at down_again_50": [
+   1,
+   0.091
+  ],
+  "inside at down_again_51": [
+   1,
+   0.091
+  ],
+  "inside at down_again_52": [
+   1,
+   0.091
+  ],
+  "inside at down_again_53": [
+   1,
+   0.091
+  ],
+  "inside at down_again_54": [
+   1,
+   0.091
+  ],
+  "inside at down_again_55": [
+   1,
+   0.091
+  ],
+  "inside at down_again_56": [
+   1,
+   0.091
+  ],
+  "inside at down_again_57": [
+   1,
+   0.091
+  ],
+  "inside at down_again_58": [
+   1,
+   0.091
+  ],
+  "inside at down_again_59": [
+   1,
+   0.091
+  ],
+  "inside at down_again_60": [
+   1,
+   0.091
+  ],
+  "inside at down_again_61": [
+   1,
+   0.091
+  ],
+  "inside at down_again_62": [
+   1,
+   0.09
+  ],
+  "inside at down_again_63": [
+   1,
+   0.09
+  ],
+  "inside at down_again_64": [
+   1,
+   0.09
+  ],
+  "inside at down_again_65": [
+   1,
+   0.09
+  ],
+  "inside at down_again_66": [
+   1,
+   0.09
+  ],
+  "inside at down_again_67": [
+   1,
+   0.09
+  ],
+  "inside at down_again_68": [
+   1,
+   0.09
+  ],
+  "inside at down_again_69": [
+   1,
+   0.09
+  ],
+  "inside at down_again_70": [
+   1,
+   0.09
+  ],
+  "inside at down_again_71": [
+   1,
+   0.09
+  ],
+  "inside at down_again_72": [
+   1,
+   0.09
+  ],
+  "inside at down_again_73": [
+   1,
+   0.09
+  ],
+  "inside at down_again_74": [
+   1,
+   0.09
+  ],
+  "inside at down_again_75": [
+   1,
+   0.089
+  ],
+  "inside at down_again_76": [
+   1,
+   0.089
+  ],
+  "inside at down_again_77": [
+   1,
+   0.089
+  ],
+  "inside at down_again_78": [
+   1,
+   0.089
+  ],
+  "inside at down_again_79": [
+   1,
+   0.089
+  ],
+  "jump abdomen": [
+   5,
+   0.218
+  ],
+  "jump at onto_ceiling_104": [
+   1,
+   0.098
+  ]
+ },
+ "body_findings": {
+  "tipped": 9
+ },
+ "known_bugs": "onto and off the ceiling the body tips 30 degrees a tick (a snap) with the head, antennae and front feet drawn inside the roof; back on the pit floor the gaster stays sunk 0.09 blocks into the floor (found 2026-10-18 by the first guard films)"
+}

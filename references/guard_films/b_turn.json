@@ -1,0 +1,260 @@
+{
+ "pictures": [
+  "left_above_00.png",
+  "left_above_01.png",
+  "left_above_02.png",
+  "left_above_03.png",
+  "left_above_04.png",
+  "left_above_05.png",
+  "left_above_06.png",
+  "left_above_07.png",
+  "left_above_08.png",
+  "left_above_09.png",
+  "left_above_10.png",
+  "left_above_11.png",
+  "left_above_12.png",
+  "left_above_13.png",
+  "left_above_14.png",
+  "left_above_15.png",
+  "left_above_16.png",
+  "left_above_17.png",
+  "left_above_18.png",
+  "left_above_19.png",
+  "left_above_20.png",
+  "left_above_21.png",
+  "left_above_22.png",
+  "left_above_23.png",
+  "left_above_24.png",
+  "left_above_25.png",
+  "left_above_26.png",
+  "left_above_27.png",
+  "left_above_28.png",
+  "left_above_29.png",
+  "right_34_000.png",
+  "right_34_001.png",
+  "right_34_002.png",
+  "right_34_003.png",
+  "right_34_004.png",
+  "right_34_005.png",
+  "right_34_006.png",
+  "right_34_007.png",
+  "right_34_008.png",
+  "right_34_009.png",
+  "right_34_010.png",
+  "right_34_011.png",
+  "right_34_012.png",
+  "right_34_013.png",
+  "right_34_014.png",
+  "right_34_015.png",
+  "right_34_016.png",
+  "right_34_017.png",
+  "right_34_018.png",
+  "right_34_019.png",
+  "right_34_020.png",
+  "right_34_021.png",
+  "right_34_022.png",
+  "right_34_023.png",
+  "right_34_024.png",
+  "right_34_025.png",
+  "right_34_026.png",
+  "right_34_027.png",
+  "right_34_028.png",
+  "right_34_029.png",
+  "right_34_030.png",
+  "right_34_031.png",
+  "right_34_032.png",
+  "right_34_033.png",
+  "right_34_034.png",
+  "right_34_035.png",
+  "right_34_036.png",
+  "right_34_037.png",
+  "right_34_038.png",
+  "right_34_039.png",
+  "right_34_040.png",
+  "right_34_041.png",
+  "right_34_042.png",
+  "right_34_043.png",
+  "right_34_044.png",
+  "right_34_045.png",
+  "right_34_046.png",
+  "right_34_047.png",
+  "right_34_048.png",
+  "right_34_049.png",
+  "back_above_00.png",
+  "back_above_01.png",
+  "back_above_02.png",
+  "back_above_03.png",
+  "back_above_04.png",
+  "back_above_05.png",
+  "back_above_06.png",
+  "back_above_07.png",
+  "back_above_08.png",
+  "back_above_09.png",
+  "back_above_10.png",
+  "back_above_11.png",
+  "back_above_12.png",
+  "back_above_13.png",
+  "back_above_14.png",
+  "back_above_15.png",
+  "back_above_16.png",
+  "back_above_17.png",
+  "back_above_18.png",
+  "back_above_19.png",
+  "back_above_20.png",
+  "back_above_21.png",
+  "back_above_22.png",
+  "back_above_23.png",
+  "back_above_24.png",
+  "back_above_25.png",
+  "back_above_26.png",
+  "back_above_27.png",
+  "back_above_28.png",
+  "back_above_29.png"
+ ],
+ "size": [
+  240,
+  136
+ ],
+ "findings": {
+  "jump leg_r2": [
+   4,
+   0.049
+  ],
+  "jump at left_above_12": [
+   8,
+   0.12
+  ],
+  "jump at left_above_17": [
+   6,
+   0.093
+  ],
+  "jump at left_above_21": [
+   8,
+   0.105
+  ],
+  "jump at back_above_12": [
+   9,
+   0.122
+  ],
+  "jump leg_r2_lower": [
+   6,
+   0.092
+  ],
+  "jump at left_above_16": [
+   7,
+   0.11
+  ],
+  "jump at back_above_13": [
+   1,
+   0.046
+  ],
+  "jump leg_r2_foot": [
+   6,
+   0.105
+  ],
+  "jump at left_above_26": [
+   3,
+   0.064
+  ],
+  "jump leg_l2": [
+   6,
+   0.052
+  ],
+  "jump at left_above_10": [
+   3,
+   0.088
+  ],
+  "jump at left_above_15": [
+   3,
+   0.074
+  ],
+  "jump at left_above_19": [
+   4,
+   0.098
+  ],
+  "jump at left_above_23": [
+   6,
+   0.101
+  ],
+  "jump at back_above_10": [
+   5,
+   0.092
+  ],
+  "jump at back_above_15": [
+   3,
+   0.083
+  ],
+  "jump leg_l2_lower": [
+   7,
+   0.087
+  ],
+  "jump at left_above_14": [
+   8,
+   0.111
+  ],
+  "jump leg_l2_foot": [
+   7,
+   0.101
+  ],
+  "jump leg_r3": [
+   3,
+   0.043
+  ],
+  "jump leg_r3_lower": [
+   2,
+   0.086
+  ],
+  "jump leg_r3_foot": [
+   4,
+   0.101
+  ],
+  "jump leg_r1": [
+   2,
+   0.052
+  ],
+  "jump at left_above_18": [
+   1,
+   0.045
+  ],
+  "jump leg_r1_lower": [
+   1,
+   0.095
+  ],
+  "jump leg_r1_foot": [
+   1,
+   0.111
+  ],
+  "jump leg_l1": [
+   3,
+   0.052
+  ],
+  "jump at left_above_20": [
+   3,
+   0.097
+  ],
+  "jump leg_l1_lower": [
+   5,
+   0.097
+  ],
+  "jump leg_l1_foot": [
+   6,
+   0.113
+  ],
+  "jump at left_above_25": [
+   1,
+   0.068
+  ],
+  "jump leg_l3": [
+   4,
+   0.047
+  ],
+  "jump leg_l3_lower": [
+   6,
+   0.102
+  ],
+  "jump leg_l3_foot": [
+   6,
+   0.122
+  ]
+ }
+}

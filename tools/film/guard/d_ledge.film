@@ -1,0 +1,18 @@
+# Guard film: off the edge of a wide ledge head first down its side onto the floor (over an outside edge from a floor,
+# not from a pillar top), then back up the wall and over the edge onto the ledge again.
+cmd time set noon
+cmd weather clear
+cmd fill -4 -60 -3 0 -59 3 stone
+lens 30
+walker worker_ant -2.5 -58 0.5 -90
+log ledge
+cmd tick freeze
+fov 10
+follow 0 0.15 -7 0 0
+go 4 -60 0
+burst off_edge 70 1
+go -2 -58 0
+burst back_up 80 1
+log off
+follow off
+quit

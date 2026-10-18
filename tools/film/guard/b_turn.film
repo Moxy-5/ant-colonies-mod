@@ -1,0 +1,24 @@
+# Guard film: turning on the spot both ways, seen from above and from three-quarters (drawn twice a tick, as a fast
+# screen shows it between ticks). The legs must step while it turns, and the body must turn smoothly, never in jumps
+# (docs/BUGS.md 36, the stutter).
+cmd time set noon
+cmd weather clear
+lens 30
+walker worker_ant 0.5 -60 0.5 -90
+log turn
+cmd tick freeze
+follow 0 1.9 0 0 90
+look -8 -60 0.5
+burst left_above 30 1
+look 0.5 -60 -8
+frames 2
+follow 0.65 0.55 0.65 135 30
+burst right_34 25 1
+frames 1
+look 8 -60 0.5
+follow 0 1.9 0 0 90
+burst back_above 30 1
+look off
+log off
+follow off
+quit
