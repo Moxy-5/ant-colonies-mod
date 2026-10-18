@@ -832,7 +832,10 @@ public class AwayTests {
                     stage[0] = 4;
                 }
                 case 4 -> { // the night's holes, the graze round them, the find
-                    if (++since[0] < 400) {
+                    // (the tuft eaten up takes the numbers a while: 400 ticks were not always enough, 2 runs in 4 cut 3 of
+                    // its 4 pieces by then, docs/BUGS.md 50; they get up to 2000, as in stage 9)
+                    boolean tuftEaten = colony.food().getPiecesCut(spot[0]) >= 4 || level.getBlockState(spot[0]).isAir();
+                    if (++since[0] < 400 || !tuftEaten && since[0] < 2000) {
                         return;
                     }
                     Set<BlockPos> tonight = galleries.tonight();

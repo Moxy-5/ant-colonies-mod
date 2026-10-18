@@ -132,9 +132,17 @@ public class TermiteForagingTests {
      * just past the end of the first arm. The first night (dry): one hole open per 6 foragers, the arm's end hole by the
      * bushes among them (food first). The next foraging time is a rainy day: more holes than on the dry night (half as many
      * again), the food hole again, and at least one hole that had no turn on the first night (the rested ones explore). All
-     * along, a hole that opens is always one whose turn it is. Last, the switch off brings back the 2 holes of before.
+     * along, a hole that opens is always one whose turn it is.
+     * Brain step 4g, step 3 (termites plug and close): the next night the food hole is opened by hand and a worker in it is
+     * killed by a zombie. At once the hole and every hole whose gallery runs within 6 blocks of the kill are closed (no
+     * turn, no hidden trip through the gallery there, no food fetched round it), the others not; the food hole is plugged
+     * from inside although it is foraging time. A day and a half on it is still closed; two days and a bit on (the death
+     * faded below 1) it is back in the turns and its food may be fetched. Then a death and a hurt more at the same place
+     * (once as strong as 6): the hole is left for good, saved, still closed once the memory is gone, and a new hole is
+     * opened on a gallery at least 7 blocks from the place, not closed. Last, the switch off brings back the 2
+     * holes of before.
      */
-    @GameTest(template = "arena", timeoutTicks = 12000, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 16000, skyAccess = true)
     public static void holesTakeTurnsNearFoodFirstAndMoreInTheRain(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
@@ -160,6 +168,7 @@ public class TermiteForagingTests {
         java.util.List<BlockPos> bushes = new java.util.ArrayList<>();
         java.util.Set<BlockPos> firstNight = new java.util.HashSet<>();
         java.util.Set<BlockPos> openBefore = new java.util.HashSet<>();
+        java.util.Set<BlockPos> holesBefore = new java.util.HashSet<>();
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
@@ -269,8 +278,100 @@ public class TermiteForagingTests {
                         helper.assertTrue(rainy.stream().anyMatch(hole -> !firstNight.contains(hole)),
                                 "no hole rested on the first night had a turn in the rain (no exploring)");
                         colony.setRainForTests(null);
-                        galleries.setSwitchForTests(false);
+                        clock.skipTo(colony, TestClock.Phase.NIGHT);
+                        since[0] = tick;
                         stage[0] = 6;
+                    }
+                }
+                case 6 -> { // brain step 4g, step 3: the next night a worker in the food hole killed by a zombie
+                    if (tick - since[0] >= 30) {
+                        com.antcolonies.entity.TermiteWorkerEntity victim = null;
+                        for (com.antcolonies.entity.TermiteWorkerEntity worker : TestIsolation.insectsOf(level, colony, com.antcolonies.entity.TermiteWorkerEntity.class)) {
+                            if (colony.roleOf(level, worker) != com.antcolonies.colony.ColonyRole.BUILDER) {
+                                victim = worker; // (the builders plug the holes)
+                            }
+                        }
+                        helper.assertTrue(victim != null, "no worker to be killed but the builders");
+                        level.setBlock(food[0], Blocks.AIR.defaultBlockState(), 3); // the food hole open
+                        victim.teleportTo(food[0].getX() + 0.5, food[0].getY(), food[0].getZ() + 0.5);
+                        net.minecraft.world.entity.monster.Zombie zombie = helper.spawn(net.minecraft.world.entity.EntityType.ZOMBIE,
+                                helper.relativePos(food[0].above(3)));
+                        victim.hurt(level.damageSources().mobAttack(zombie), 100.0F);
+                        zombie.discard();
+                        colony.alarm().calmForTests(); // (the alarm is tested elsewhere: here the foraging time goes on)
+                        helper.assertTrue(victim.isDeadOrDying(), "the worker in the food hole was not killed");
+                        helper.assertTrue(colony.danger().places().size() == 1 && colony.danger().places().get(0).deaths() == 1,
+                                "the death in the food hole is not remembered: " + colony.danger().describe(level));
+                        stage[0] = 7;
+                    }
+                }
+                case 7 -> { // at once: the hole and the holes whose gallery runs near the kill closed, the others not
+                    BlockPos spot = colony.danger().places().get(0).pos();
+                    helper.assertTrue(colony.closedHoles().isClosed(level, food[0]), "the hole where a worker was killed is not closed");
+                    helper.assertTrue(!galleries.holesInTurn(level).contains(food[0]), "the hole where a worker was killed still has its turn");
+                    int open = 0;
+                    for (NestPlan.ForagingTunnel tunnel : tunnels) {
+                        boolean near = flat(tunnel.hole(), spot) <= 6;
+                        for (BlockPos cell : tunnel.tunnel()) {
+                            if (flat(cell, spot) <= 6) {
+                                near = true;
+                                helper.assertTrue(colony.closedHoles().closesCell(cell), "a hidden trip may run through the gallery at "
+                                        + helper.relativePos(cell) + ", by the kill");
+                            }
+                        }
+                        helper.assertTrue(colony.closedHoles().isClosed(level, tunnel.hole()) == near, "the hole at " + helper.relativePos(tunnel.hole())
+                                + (near ? " is not closed, its gallery runs by the kill" : " is closed, far from the kill"));
+                        open += near ? 0 : 1;
+                    }
+                    helper.assertTrue(open > 0, "every hole was closed for one death at the end of an arm");
+                    for (BlockPos bush : bushes) {
+                        helper.assertTrue(!colony.mayForageAt(level, bush), "the dead bush at " + helper.relativePos(bush) + " by the kill may still be fetched");
+                    }
+                    helper.assertTrue(colony.closedHoles().describe(level).contains("closed for danger"), "the colony list does not tell the closed holes");
+                    since[0] = tick;
+                    stage[0] = 8;
+                }
+                case 8 -> { // plugged from inside, at foraging time; then a day and a half: still closed; two days and a bit: back
+                    if (!ForagingHoles.isOpen(level, food[0])) {
+                        AntColoniesMod.LOGGER.info("[turns-test] tick {}: the food hole plugged {} ticks after the kill", tick, tick - since[0]);
+                        colony.danger().ageForTests(36000L);
+                        helper.assertTrue(colony.closedHoles().isClosed(level, food[0]), "a day and a half after the death the food hole is open again: "
+                                + colony.danger().describe(level));
+                        colony.danger().ageForTests(14400L); // the death (4) halved a little more than twice: under 1
+                        helper.assertTrue(!colony.closedHoles().isClosed(level, food[0]) && galleries.holesInTurn(level).contains(food[0]),
+                                "two days and a bit after the death the food hole is not back in the turns: " + colony.danger().describe(level));
+                        helper.assertTrue(colony.mayForageAt(level, bushes.get(0)), "two days and a bit after the death the food there is still not fetched");
+                        tunnels.forEach(tunnel -> holesBefore.add(tunnel.hole()));
+                        colony.danger().hurt(level, food[0], "zombie", true); // hit again and again: once as strong as 6
+                        colony.danger().hurt(level, food[0], "zombie", false);
+                        since[0] = tick;
+                        stage[0] = 9;
+                    } else {
+                        helper.assertTrue(tick - since[0] < 3000, "the hole where a worker was killed was not plugged at foraging time");
+                    }
+                }
+                case 9 -> { // left for good: a new hole on the same gallery at least 7 blocks from the place
+                    BlockPos spot = colony.danger().places().get(0).pos();
+                    if (colony.closedHoles().left().contains(food[0]) && colony.closedHoles().opened() > 0) {
+                        java.util.List<BlockPos> added = tunnels.stream().map(NestPlan.ForagingTunnel::hole).filter(hole -> !holesBefore.contains(hole)).toList();
+                        AntColoniesMod.LOGGER.info("[turns-test] tick {}: left {}, new holes {}", tick,
+                                colony.closedHoles().left().stream().map(helper::relativePos).toList(), added.stream().map(helper::relativePos).toList());
+                        helper.assertTrue(added.size() == colony.closedHoles().opened(), "the new holes in place of the left ones are not among the holes: "
+                                + added.size() + " for " + colony.closedHoles().opened());
+                        for (BlockPos hole : added) {
+                            helper.assertTrue(flat(hole, spot) >= 7 && !colony.closedHoles().isClosed(level, hole), "the new hole at "
+                                    + helper.relativePos(hole) + " is within 7 blocks of the place hit again and again, or closed");
+                        }
+                        helper.assertTrue(com.antcolonies.colony.Colony.load(colony.save()).closedHoles().left().contains(food[0]),
+                                "the hole left for good was not saved");
+                        colony.danger().ageForTests(4 * 24000L); // the memory gone: the hole stays left
+                        helper.assertTrue(colony.closedHoles().isClosed(level, food[0]) && !galleries.holesInTurn(level).contains(food[0]),
+                                "the hole left for good has a turn again once the danger is forgotten");
+                        galleries.setSwitchForTests(false);
+                        stage[0] = 10;
+                    } else {
+                        helper.assertTrue(tick - since[0] < 400, "the hole hit again and again was not left for a new one: "
+                                + colony.closedHoles().describe(level) + ", " + colony.danger().describe(level));
                     }
                 }
                 default -> {
@@ -278,12 +379,17 @@ public class TermiteForagingTests {
             }
         });
         helper.succeedWhen(() -> {
-            helper.assertTrue(stage[0] == 6, "the test did not get through its foraging times (stage " + stage[0] + ")");
+            helper.assertTrue(stage[0] == 10, "the test did not get through its foraging times (stage " + stage[0] + ")");
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony.foragingHoles().tunnels(level).size() == 2, "with the switch off the colony did not go back to its 2 holes");
             helper.assertTrue(colony.nest().galleries().isInTurn(colony.foragingHoles().tunnels(level).get(1).hole()),
                     "with the switch off a hole may not open at foraging time");
         });
+    }
+
+    /** Blocks apart, sideways. */
+    private static double flat(BlockPos a, BlockPos b) {
+        return Math.hypot(a.getX() - b.getX(), a.getZ() - b.getZ());
     }
 
     /**

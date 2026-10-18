@@ -299,7 +299,7 @@ public class FieldLife {
         Map<BlockPos, Double> worth = new HashMap<>();
         // Termites underground step 4 (the user's pick, 2026-10-17): with the galleries the numbers graze only round the
         // holes open tonight, near or away, and eat from inside under the feeding spots.
-        List<BlockPos> galleries = colony.nest().galleries().isOn() ? colony.nest().galleries().holesInTurn() : null;
+        List<BlockPos> galleries = colony.nest().galleries().isOn() ? colony.nest().galleries().holesInTurn(level) : null;
         for (Map.Entry<BlockPos, Plant> entry : known.entrySet()) {
             Plant plant = entry.getValue();
             if (plant.kind() < 0 || plant.kind() >= kinds.size() || !outside && !plant.fromInside()

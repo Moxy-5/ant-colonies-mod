@@ -49,6 +49,12 @@ Numbers marked "my pick" go in the species files and are to be confirmed by the 
   again and again (strength once over 6, my pick), the hole is left and the galleries open a new hole on the same piece at
   least 6 blocks from the spot (my pick).
 - Tests: a minor at a hole killed by a zombie at night: the hole plugged and out of the turns; after the fade back in.
+- **BUILT 2026-10-18** (`colony/ClosedHoles`; `docs/HISTORY.md`). Changed from the plan while building (my picks, to
+  confirm): holes close within 6 blocks of an attack (the memory's `reach`, as far as the termites graze round a hole),
+  not 4; only a hurt or a kill closes a hole, not a hostile seen; a hole is left for good when it lies within 4 blocks of a
+  place once as strong as 6 (two deaths, or a death and a hurt, close together in time); the new hole is at least 7
+  blocks from the place (past the closing reach, so it opens), on the left hole's gallery if it has room, otherwise on the
+  nearest other gallery, never reached through the sealed stretch, never beside another hole.
 
 ## Step 4: harm out of sight (numbers can be lost)
 - The numbers avoid dangerous spots by the same rules (they go by the same trails and holes).

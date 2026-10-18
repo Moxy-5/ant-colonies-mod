@@ -24,7 +24,8 @@ import net.minecraft.world.phys.Vec3;
 /**
  * When the foraging time is over a worker plugs an open foraging hole from inside (builders; others when idle): it
  * walks to the end of the hole's tunnel, under the hole, never through the hole itself (so it is not shut out), and
- * packs it shut with soil. See {@link com.antcolonies.colony.ForagingHoles}.
+ * packs it shut with soil. A hole closed for danger is plugged at once, whatever the hour (brain step 4g,
+ * {@link com.antcolonies.colony.ClosedHoles}). See {@link com.antcolonies.colony.ForagingHoles}.
  */
 public class PlugHoleGoal extends Goal {
     /** Packing the soil into the hole takes this long: 2 seconds. */
@@ -70,7 +71,7 @@ public class PlugHoleGoal extends Goal {
     @Override
     public boolean canContinueToUse() {
         return colony != null && tunnel != null && ticks < GIVE_UP_TICKS && !ant.hasFullMandibles()
-                && colony.foragingHoles().wantsPlugging(ant.level()) && com.antcolonies.colony.ForagingHoles.isOpen(ant.level(), tunnel.hole());
+                && colony.foragingHoles().wantsPlugged(ant.level(), tunnel.hole()) && com.antcolonies.colony.ForagingHoles.isOpen(ant.level(), tunnel.hole());
     }
 
     @Override

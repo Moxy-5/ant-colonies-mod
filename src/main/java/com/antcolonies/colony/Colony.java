@@ -99,6 +99,7 @@ public class Colony {
     private final Door door;
     private final Recruits recruits;
     private final DangerMap danger;
+    private final ClosedHoles closedHoles;
     private final HiddenTrips hiddenTrips;
     private final FungusGarden garden;
     private final Mushrooms mushrooms;
@@ -136,6 +137,7 @@ public class Colony {
         this.door = new Door(this);
         this.recruits = new Recruits(this);
         this.danger = new DangerMap(this);
+        this.closedHoles = new ClosedHoles(this);
         this.hiddenTrips = new HiddenTrips(this);
         this.garden = new FungusGarden(this);
         this.mushrooms = new Mushrooms(this);
@@ -243,6 +245,11 @@ public class Colony {
     /** Where the colony's insects were hurt or killed, or saw hostile mobs (brain step 4g; species with {@code colony.danger}). */
     public DangerMap danger() {
         return danger;
+    }
+
+    /** The foraging holes the colony keeps closed where it was attacked (brain step 4g, step 3; species with {@code close_holes}). */
+    public ClosedHoles closedHoles() {
+        return closedHoles;
     }
 
     /**
@@ -539,6 +546,7 @@ public class Colony {
         door.tick(level);
         recruits.tick(level);
         danger.tick(level);
+        closedHoles.tick(level);
         field.tick(level, false);
         trunkTrails.tick(level, false);
         return true;
@@ -777,6 +785,7 @@ public class Colony {
         patrol.save(tag);
         spots.save(tag);
         danger.save(tag);
+        closedHoles.save(tag);
         door.save(tag);
         hill.save(tag);
         trails.save(tag);
@@ -818,6 +827,7 @@ public class Colony {
         colony.patrol.load(tag);
         colony.spots.load(tag);
         colony.danger.load(tag);
+        colony.closedHoles.load(tag);
 
         colony.door.load(tag);
         colony.hill.load(tag);

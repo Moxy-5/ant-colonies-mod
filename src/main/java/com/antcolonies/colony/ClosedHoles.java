@@ -32,7 +32,7 @@ import net.minecraft.world.level.Level;
  * hole like any other: it opens on its turn, as a rested one does.</li>
  * <li><b>Left:</b> with the galleries on, a hole within {@code merge_within} blocks of a place once as strong as
  * {@code leave_from} (attacked again and again) is left for good: never opened again. The galleries open a new hole on
- * the same gallery at least {@code new_hole_from} blocks from the place ({@link Galleries#openInstead}), if there is
+ * a gallery under it (or the nearest other) at least {@code new_hole_from} blocks from the place ({@link Galleries#openInstead}), if there is
  * room. (With the galleries off the colony has only its 2 holes: they are closed while the danger lasts, never left.)</li>
  * </ul>
  * Species with {@code colony.danger.close_holes}. The closed holes are worked out again once a second, and at once when

@@ -94,9 +94,10 @@ public class ForagingHoles {
     public List<WayOut> waysOut(Level level) {
         List<WayOut> ways = new java.util.ArrayList<>();
         for (NestPlan.ForagingTunnel tunnel : tunnels(level)) {
-            // A hole with a runway of sheeting over it leads into the runway, not outside.
+            // A hole with a runway of sheeting over it leads into the runway, not outside; a hole closed for danger (brain
+            // step 4g) is no way out even before it is plugged.
             if (isDug(level, tunnel) && isOpen(level, tunnel.hole()) && !colony.nest().foodWays().isSpent(tunnel.hole())
-                    && colony.nest().foodWays().runwayAt(tunnel.hole()) == null) {
+                    && colony.nest().foodWays().runwayAt(tunnel.hole()) == null && !colony.closedHoles().isClosed(level, tunnel.hole())) {
                 ways.add(new WayOut(tunnel.hole().above(), tunnel.side()));
             }
         }
@@ -139,12 +140,12 @@ public class ForagingHoles {
 
     /**
      * The foraging holes, and the middle hole while it needs plugging by day. Not a hole under a finished runway of
-     * sheeting: it stays open (the runway covers it).
+     * sheeting: it stays open (the runway covers it), unless it is closed for danger (brain step 4g).
      */
     private List<NestPlan.ForagingTunnel> holesToPlug(Level level) {
         List<NestPlan.ForagingTunnel> all = new java.util.ArrayList<>();
         for (NestPlan.ForagingTunnel tunnel : tunnels(level)) {
-            if (!hasFinishedRunway(level, tunnel.hole())) {
+            if (!hasFinishedRunway(level, tunnel.hole()) || colony.closedHoles().isClosed(level, tunnel.hole())) {
                 all.add(tunnel);
             }
         }
@@ -185,8 +186,12 @@ public class ForagingHoles {
     /**
      * Whether a worker may bite this hole open now: it is foraging time, it is the hole's turn (termites underground, see
      * {@link Galleries#isInTurn}), and the hole is closed with soil or its plug. A hole under a finished runway is always open.
+     * Never a hole closed for danger (brain step 4g, {@link ClosedHoles}), runway or not.
      */
     public boolean mayOpen(Level level, BlockPos hole) {
+        if (colony.closedHoles().isClosed(level, hole)) {
+            return false;
+        }
         boolean runway = hasFinishedRunway(level, hole);
         if (!(colony.isForagingTime(level) && colony.nest().galleries().isInTurn(hole) || runway) || !level.isLoaded(hole)) {
             return false;
@@ -233,6 +238,15 @@ public class ForagingHoles {
         return now - closedSince >= PLUG_GRACE_TICKS || !isAnyoneOutside(level);
     }
 
+    /**
+     * Whether this open hole should be plugged now: one closed for danger at once, whatever the hour (brain step 4g: real
+     * termites pack an attacked hole with soil straight away, even if that shuts some foragers out: they come home by
+     * another), the others once the foraging time is over ({@link #wantsPlugging}).
+     */
+    public boolean wantsPlugged(Level level, BlockPos hole) {
+        return colony.closedHoles().isClosed(level, hole) || wantsPlugging(level);
+    }
+
     /** Whether any member of the colony is outside the nest and the mound (checked once a second). */
     public boolean isAnyoneOutside(Level level) {
         long now = level.getGameTime();
@@ -248,14 +262,15 @@ public class ForagingHoles {
     /** An open hole for this worker to plug now (claimed for it, one worker to a hole), or null. */
     @Nullable
     public NestPlan.ForagingTunnel pickHoleToPlug(Level level, AbstractAntEntity ant) {
-        if (!wantsPlugging(level)) {
+        boolean all = wantsPlugging(level);
+        if (!all && !colony.closedHoles().anyClosed(level)) {
             return null;
         }
         long now = level.getGameTime();
         plugClaims.prune(now);
         plugging.keySet().removeIf(id -> !plugClaims.contains(id));
         for (NestPlan.ForagingTunnel tunnel : holesToPlug(level)) {
-            if (!isDug(level, tunnel) || !isOpen(level, tunnel.hole())) {
+            if (!isDug(level, tunnel) || !isOpen(level, tunnel.hole()) || !all && !colony.closedHoles().isClosed(level, tunnel.hole())) {
                 continue;
             }
             boolean taken = false;
@@ -469,7 +484,7 @@ public class ForagingHoles {
         for (BlockPos plant : plants) {
             if (!isRich(level, plant) || !colony.foodMap().knows(plant, null) || noRunwayUntil.containsKey(plant)
                     || sideways(plant, center) > reach || nearAny(plant, taken, FOOD_STILL_THERE)
-                    || colony.food().isFeedableFromInside(level, plant)) {
+                    || colony.food().isFeedableFromInside(level, plant) || colony.danger().avoids(level, plant)) {
                 continue;
             }
             double distance = Double.MAX_VALUE;
@@ -689,7 +704,8 @@ public class ForagingHoles {
         BlockPos best = null;
         double bestDistance = Double.MAX_VALUE;
         for (BlockPos plant : plants) {
-            if (!isRich(level, plant) || !colony.foodMap().knows(plant, null) || noRouteUntil.containsKey(plant)) {
+            if (!isRich(level, plant) || !colony.foodMap().knows(plant, null) || noRouteUntil.containsKey(plant)
+                    || colony.danger().avoids(level, plant)) { // (no gallery is dug toward where they were attacked: brain step 4g)
                 continue;
             }
             double fromNest = sideways(plant, center);

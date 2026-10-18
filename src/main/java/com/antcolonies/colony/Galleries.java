@@ -361,9 +361,10 @@ public class Galleries {
 
     /**
      * The holes open to the foragers this foraging time: the night's turns, the holes runways leave from, and the holes of
-     * pieces out to rich food whose food lasts (see {@link #isInTurn}). The numbers graze only round these (step 4).
+     * pieces out to rich food whose food lasts (see {@link #isInTurn}); never a hole closed for danger (brain step 4g,
+     * {@link ClosedHoles}). The numbers graze only round these (step 4).
      */
-    public List<BlockPos> holesInTurn() {
+    public List<BlockPos> holesInTurn(Level level) {
         List<BlockPos> list = new ArrayList<>(tonight);
         FoodWays ways = colony.nest().foodWays();
         for (FoodWays.Runway runway : ways.getRunways()) {
@@ -374,6 +375,7 @@ public class Galleries {
                 list.add(tunnel.tunnel().hole());
             }
         }
+        list.removeIf(hole -> colony.closedHoles().isClosed(level, hole));
         return list;
     }
 
@@ -667,6 +669,11 @@ public class Galleries {
             }
         });
         stopped.addAll(atFood(level));
+        for (Tip tip : tips) {
+            if (colony.closedHoles().isClosed(level, tip.way().hole())) {
+                stopped.add(tip.way().hole()); // (brain step 4g: no tip grows on from where the colony was attacked)
+            }
+        }
         if (colony.foragingHoles().isFoodWaiting()) {
             return; // food leads: rich food waits for a piece the workers do not allow yet
         }
@@ -691,7 +698,34 @@ public class Galleries {
         int keepOut = colony.profile().nest().foragingHoleDistance() + 1;
         TunnelRoute.Ground ground = new GroundReader(level, colony, colony.nest().nestCells(level));
         List<Tip> grown = grow(tip, tips, ground, center, keepOut, numbers, colony.random());
-        addGrown(level, tip, grown, false);
+        List<Tip> clear = clearOfAttacks(level, tip, grown);
+        if (clear.isEmpty() && !grown.isEmpty()) {
+            return; // the way on leads toward where the colony was attacked: not now (no dead end: it may grow there later)
+        }
+        addGrown(level, tip, clear, false);
+    }
+
+    /**
+     * Brain step 4g: the pieces {@code grown} from {@code tip} whose new blocks and hole all lie clear of where the colony
+     * was attacked ({@link DangerMap#isAttacked}): no gallery grows toward an attack while it is remembered.
+     */
+    private List<Tip> clearOfAttacks(ServerLevel level, Tip tip, List<Tip> grown) {
+        DangerMap danger = colony.danger();
+        if (grown.isEmpty() || danger.isEmpty() || !colony.closedHoles().isOn()) {
+            return grown;
+        }
+        List<Tip> clear = new ArrayList<>();
+        for (Tip piece : grown) {
+            List<BlockPos> cells = piece.way().tunnel();
+            boolean near = danger.isAttacked(level, piece.way().hole());
+            for (int i = tip.way().tunnel().size(); i < cells.size() && !near; i++) {
+                near = danger.isAttacked(level, cells.get(i));
+            }
+            if (!near) {
+                clear.add(piece);
+            }
+        }
+        return clear;
     }
 
     /** Whether the ground round a tip's end is loaded as far as its next piece may go. */
@@ -775,8 +809,8 @@ public class Galleries {
         List<BlockPos> grass = new ArrayList<>();
         for (BlockPos plant : colony.food().plants(level)) {
             SpeciesProfile.PlantFood food = colony.profile().food().plantFor(level.getBlockState(plant));
-            if (food != null && !food.rich() && colony.foodMap().knows(plant, null)) {
-                grass.add(plant);
+            if (food != null && !food.rich() && colony.foodMap().knows(plant, null) && !colony.danger().avoids(level, plant)) {
+                grass.add(plant); // (grass where the colony was attacked pulls no tip: brain step 4g)
             }
         }
         if (grass.isEmpty()) {
@@ -830,7 +864,11 @@ public class Galleries {
         AntColoniesMod.LOGGER.debug("[galleries] grass worth {} past the tip at {} pulls it toward {}, {}", Math.round(bestWorth),
                 end.toShortString(), Math.round(aimX), Math.round(aimZ));
         tips.set(tips.indexOf(best), aimed);
-        addGrown(level, aimed, grown, true);
+        List<Tip> clear = clearOfAttacks(level, aimed, grown);
+        if (clear.isEmpty() && !grown.isEmpty()) {
+            return true; // (the way to the grass runs toward an attack: not now)
+        }
+        addGrown(level, aimed, clear, true);
         return true;
     }
 
@@ -1422,6 +1460,101 @@ public class Galleries {
         return found;
     }
 
+    /** What came of looking for a new hole in place of a left one (brain step 4g, {@link #openInstead}). */
+    enum Instead {
+        OPENED, NO_ROOM, NOT_LOADED
+    }
+
+    /** A new hole is never laid out closer than this (blocks, sideways) to another hole. */
+    private static final double BESIDE = 2.0;
+
+    /**
+     * Brain step 4g, step 3: the hole at the end of {@code left} was left for good (attacked again and again at
+     * {@code spot}). A new hole is laid out as near the spot as may be but at least {@code from} blocks from it (sideways),
+     * by the rules of the holes along the tunnels, never beside another hole: on a gallery that runs under the left hole
+     * if one has room, otherwise on the nearest other gallery (a hole near the mound has no room on its own short piece).
+     * Real Macrotermes give up a raided foraging site and open new holes along the galleries round it.
+     */
+    Instead openInstead(ServerLevel level, NestPlan.ForagingTunnel left, BlockPos spot, double from) {
+        if (!isOn()) {
+            return Instead.NO_ROOM;
+        }
+        BlockPos under = left.tunnel().get(left.tunnel().size() - 1);
+        List<NestPlan.ForagingTunnel> bases = new ArrayList<>(colony.nest().ownForagingTunnels(level));
+        bases.addAll(arms);
+        colony.nest().foodWays().getNewTunnels().forEach(tunnel -> bases.add(tunnel.tunnel()));
+        List<BlockPos> taken = new ArrayList<>();
+        taken.add(colony.nest().getEntrance());
+        colony.foragingHoles().tunnels(level).forEach(tunnel -> taken.add(tunnel.hole()));
+        GroundReader ground = new GroundReader(level, colony, colony.nest().nestCells(level));
+        NestPlan.ForagingTunnel found = null;
+        boolean unloaded = false;
+        for (boolean same : new boolean[] {true, false}) { // the left hole's own galleries first
+            for (NestPlan.ForagingTunnel base : bases) {
+                if (base.tunnel().contains(under) != same) {
+                    continue;
+                }
+                if (!allLoaded(level, base)) {
+                    unloaded = true;
+                    continue;
+                }
+                NestPlan.ForagingTunnel one = holeInstead(base, ground, colony.getCenter(), colony.profile().nest().foragingHoleDistance(), spot,
+                        from, taken, cell -> colony.danger().isAttacked(level, cell));
+                if (one != null && (found == null || flat(one.hole(), spot) < flat(found.hole(), spot))) {
+                    found = one;
+                }
+            }
+            if (found != null) {
+                break;
+            }
+        }
+        if (found == null && unloaded) {
+            return Instead.NOT_LOADED;
+        }
+        if (found == null) {
+            AntColoniesMod.LOGGER.info("[galleries] no room for a new hole in place of the one at {}", left.hole().toShortString());
+            return Instead.NO_ROOM;
+        }
+        holes.add(found);
+        holesAlongSet.add(found.hole());
+        changed.run();
+        ColonyManager.get(level).markChanged();
+        AntColoniesMod.LOGGER.info("[galleries] a new hole at {} in place of the one left at {}, {} blocks from the attack",
+                found.hole().toShortString(), left.hole().toShortString(), Math.round(flat(found.hole(), spot)));
+        return Instead.OPENED;
+    }
+
+    /**
+     * A new hole along {@code base} in place of one left: over a tunnel block whose roof is the top block of the ground
+     * (where a hole may open), at least {@code nearest} blocks (sideways) from the middle, at least {@code from} from
+     * {@code spot} and the nearest such to it, not within {@link #BESIDE} of any hole in {@code taken}, and reached
+     * without passing a {@code sealed} block (the gallery is sealed where the colony was attacked: a hole past it would
+     * be closed at once). With the tunnel up to the block under it. Null if there is none. Pure (the gallery proof checks
+     * it on made-up landscapes).
+     */
+    @Nullable
+    static NestPlan.ForagingTunnel holeInstead(NestPlan.ForagingTunnel base, TunnelRoute.Ground ground, BlockPos center, int nearest,
+            BlockPos spot, double from, List<BlockPos> taken, java.util.function.Predicate<BlockPos> sealed) {
+        List<BlockPos> cells = base.tunnel();
+        NestPlan.ForagingTunnel best = null;
+        double bestOff = Double.MAX_VALUE;
+        for (int i = 0; i < cells.size() && !sealed.test(cells.get(i)); i++) {
+            BlockPos hole = cells.get(i).above();
+            double off = flat(hole, spot);
+            if (off < from || off >= bestOff || cells.contains(hole) || flat(hole, center) < nearest || nearAny(hole, taken, BESIDE)
+                    || sealed.test(hole)) {
+                continue;
+            }
+            Integer top = ground.groundTop(hole.getX(), hole.getZ());
+            if (top == null || top != hole.getY() || !ground.mayOpenHole(hole)) {
+                continue;
+            }
+            best = new NestPlan.ForagingTunnel(List.copyOf(cells.subList(0, i + 1)), hole.immutable(), base.side());
+            bestOff = off;
+        }
+        return best;
+    }
+
     private static boolean allLoaded(Level level, NestPlan.ForagingTunnel tunnel) {
         for (BlockPos cell : tunnel.tunnel()) {
             if (!level.isLoaded(cell)) {
@@ -1445,7 +1578,7 @@ public class Galleries {
         List<BlockPos> candidates = new ArrayList<>();
         if (away) {
             for (BlockPos hole : dugHoles) {
-                if (!ways.isSpent(hole) && ways.runwayAt(hole) == null) {
+                if (!ways.isSpent(hole) && ways.runwayAt(hole) == null && !colony.closedHoles().isClosed(level, hole)) {
                     candidates.add(hole);
                 }
             }
@@ -1455,8 +1588,10 @@ public class Galleries {
                 BlockPos hole = tunnel.hole();
                 if (level.isLoaded(hole) && ForagingHoles.isDug(level, tunnel) && !ways.isSpent(hole) && ways.runwayAt(hole) == null
                         && !candidates.contains(hole)) {
-                    candidates.add(hole);
                     dugHoles.add(hole.immutable());
+                    if (!colony.closedHoles().isClosed(level, hole)) { // (brain step 4g: an attacked hole has no turn)
+                        candidates.add(hole);
+                    }
                 }
             }
         }

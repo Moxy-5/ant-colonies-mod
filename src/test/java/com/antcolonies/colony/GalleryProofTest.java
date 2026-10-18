@@ -294,6 +294,7 @@ class GalleryProofTest {
         int landscapes = 0;
         int arms = 0;
         int holes = 0;
+        int insteads = 0;
         List<String> failures = new ArrayList<>();
         for (long seed = 1; seed <= LANDSCAPES; seed++) {
             Landscape land = new Landscape(seed);
@@ -353,6 +354,50 @@ class GalleryProofTest {
                     }
                 }
             }
+            // Brain step 4g, step 3: the first hole along an arm is left for good (attacked again and again beside it): a
+            // new hole on the same gallery ({@link Galleries#holeInstead}), at least 7 blocks from the attack, off the mound,
+            // not beside another hole; it is checked with the rest below (no tunnel open to the air, walked out and in).
+            NestPlan.ForagingTunnel attacked = all.stream().filter(tunnel -> !tunnels.contains(tunnel)).findFirst().orElse(null);
+            if (attacked != null) {
+                BlockPos spot = attacked.hole().east();
+                BlockPos under = attacked.tunnel().get(attacked.tunnel().size() - 1);
+                NestPlan.ForagingTunnel gallery = null;
+                for (NestPlan.ForagingTunnel base : tunnels) {
+                    if (base.tunnel().contains(under) && (gallery == null || base.tunnel().size() < gallery.tunnel().size())) {
+                        gallery = base;
+                    }
+                }
+                List<BlockPos> holesNow = new ArrayList<>(List.of(center));
+                all.forEach(tunnel -> holesNow.add(tunnel.hole()));
+                NestPlan.ForagingTunnel instead = gallery == null ? null : Galleries.holeInstead(gallery, land.ground(), center, 8, spot, 7.0, holesNow,
+                        cell -> Math.hypot(cell.getX() - spot.getX(), cell.getZ() - spot.getZ()) <= 6);
+                if (gallery == null) {
+                    failures.add(where + ": no gallery found under the hole at " + attacked.hole().toShortString());
+                } else if (instead != null) {
+                    insteads++;
+                    BlockPos hole = instead.hole();
+                    if (Math.hypot(hole.getX() - spot.getX(), hole.getZ() - spot.getZ()) < 7 || Math.hypot(hole.getX(), hole.getZ()) < 8
+                            || land.top(hole.getX(), hole.getZ()) != hole.getY()) {
+                        failures.add(where + ": the new hole at " + hole.toShortString() + " is too near the attack at " + spot.toShortString()
+                                + " or the mound, or not at the top of the ground");
+                    }
+                    for (BlockPos other : holesNow) {
+                        if (Math.hypot(hole.getX() - other.getX(), hole.getZ() - other.getZ()) < 2) {
+                            failures.add(where + ": the new hole at " + hole.toShortString() + " is beside the hole at " + other.toShortString());
+                        }
+                    }
+                    if (!gallery.tunnel().containsAll(instead.tunnel())) {
+                        failures.add(where + ": the new hole at " + hole.toShortString() + " is not on the left hole's gallery");
+                    }
+                    for (BlockPos cell : instead.tunnel()) {
+                        if (Math.hypot(cell.getX() - spot.getX(), cell.getZ() - spot.getZ()) <= 6) {
+                            failures.add(where + ": the way to the new hole at " + hole.toShortString() + " passes the attack at " + cell.toShortString());
+                        }
+                    }
+                    all.add(instead);
+                    holeCells.add(hole);
+                }
+            }
             land.dug.addAll(holeCells);
             for (NestPlan.ForagingTunnel tunnel : all) {
                 for (BlockPos cell : tunnel.tunnel()) {
@@ -379,12 +424,13 @@ class GalleryProofTest {
             }
         }
         System.out.println("[gallery proof] arms and holes: " + landscapes + " landscapes, " + arms + " arms, " + holes + " holes, "
-                + failures.size() + " failures");
+                + insteads + " new holes in place of left ones, " + failures.size() + " failures");
         failures.forEach(line -> System.out.println("[gallery proof] " + line));
         if (!failures.isEmpty()) {
             fail(failures.size() + " failures, first ones:\n" + String.join("\n", failures.subList(0, Math.min(15, failures.size()))));
         }
         assertTrue(arms >= 3 * landscapes, "too few arms planned to prove anything: " + arms + " on " + landscapes + " landscapes");
+        assertTrue(insteads >= landscapes / 2, "too few new holes in place of left ones to prove anything: " + insteads + " on " + landscapes + " landscapes");
     }
 
     /** How many landscapes the whole webs are grown on (each is many route plans and walks). */

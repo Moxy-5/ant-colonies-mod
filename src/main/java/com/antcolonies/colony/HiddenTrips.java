@@ -165,7 +165,8 @@ public class HiddenTrips implements HiddenWays {
     @Override
     public boolean isHidden(BlockPos cell) {
         ServerLevel level = cellsLevel;
-        return level != null && cells.contains(cell) && isClosed(level, cell);
+        // (not where the gallery runs near an attack, brain step 4g: the termites walk it for real, and can be seen and met there)
+        return level != null && cells.contains(cell) && isClosed(level, cell) && !colony.closedHoles().closesCell(cell);
     }
 
     @Override
