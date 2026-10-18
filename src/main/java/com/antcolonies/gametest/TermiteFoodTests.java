@@ -567,6 +567,7 @@ public class TermiteFoodTests {
         com.antcolonies.entity.TermiteWorkerEntity[] worker = {null};
         com.antcolonies.entity.TermiteSoldierEntity[] minor = {null};
         com.antcolonies.entity.TermiteWorkerEntity[] loner = {null};
+        java.util.UUID[] colonyId = {null};
         helper.runAfterDelay(5, () -> {
             worker[0] = helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE + 5, SURFACE, MIDDLE);
             minor[0] = helper.spawn(ModEntities.TERMITE_MINOR_SOLDIER.get(), MIDDLE - 5, SURFACE, MIDDLE);
@@ -578,6 +579,7 @@ public class TermiteFoodTests {
             helper.assertTrue(minor[0].getColonyId() != null, "the soldier joined no colony");
             net.minecraft.world.entity.player.Player player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
             net.minecraft.world.entity.player.Player creative = helper.makeMockPlayer(net.minecraft.world.level.GameType.CREATIVE);
+            colonyId[0] = worker[0].getColonyId();
             worker[0].hurt(level.damageSources().playerAttack(creative), 100.0F);
             minor[0].hurt(level.damageSources().playerAttack(player), 100.0F);
             loner[0].hurt(level.damageSources().playerAttack(creative), 100.0F);
@@ -589,6 +591,11 @@ public class TermiteFoodTests {
                         new net.minecraft.world.phys.AABB(dead.blockPosition()).inflate(2), body -> body.getType() == ModEntities.TERMITE_CORPSE.get());
                 helper.assertTrue(!bodies.isEmpty(), "no termite body where the " + dead.getType().getDescription().getString() + " died");
             }
+            // Brain step 4g: the colony remembers both deaths, by a player, as two dangerous places (10 blocks apart).
+            com.antcolonies.colony.Colony colony = com.antcolonies.colony.ColonyManager.get(level).getColony(colonyId[0]);
+            helper.assertTrue(colony != null && colony.danger().places().size() == 2
+                    && colony.danger().places().stream().allMatch(place -> place.deaths() == 1 && place.what().contains("player")),
+                    "the two deaths should be remembered: " + (colony == null ? "no colony" : colony.danger().describe(level)));
             helper.succeed();
         });
     }

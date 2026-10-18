@@ -37,6 +37,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
@@ -562,9 +563,33 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             if (colony != null) {
                 colony.alarm().memberHurt(serverLevel, attacker);
                 colony.patrol().danger(serverLevel, this, "hurt by " + attacker.getType().toShortString()); // a patroller turns back
+                // The danger memory (brain step 4g): the place is remembered, and a forager hurt near its spot gives it up.
+                colony.danger().hurt(serverLevel, blockPosition(), attacker.getType().toShortString(), isDeadOrDying());
+                BlockPos spot = colony.spots().spotOf(getUUID());
+                if (spot != null && colony.danger().numbers() != null && spot.distSqr(blockPosition()) <= Mth.square(colony.danger().numbers().reach())) {
+                    colony.spots().giveUp(getUUID());
+                }
             }
         }
         return hurt;
+    }
+
+    /**
+     * Once a second: a member out on the surface (under the open sky, outside the nest) that sees a hostile mob close by
+     * (a monster, or any mob hunting insects, such as a chicken after termites) tells the danger memory (brain step 4g).
+     */
+    private void lookForHostiles(ServerLevel level) {
+        Colony colony = getColonyId() == null ? null : getColony();
+        if (colony == null || colony.danger().numbers() == null || !level.canSeeSky(blockPosition())
+                || colony.nest().isInside(level, blockPosition())) {
+            return;
+        }
+        double within = colony.danger().numbers().seenWithin();
+        for (Mob mob : level.getEntitiesOfClass(Mob.class, getBoundingBox().inflate(within),
+                mob -> mob.isAlive() && !(mob instanceof AbstractAntEntity)
+                        && (mob instanceof net.minecraft.world.entity.monster.Enemy || mob.getTarget() instanceof AbstractAntEntity))) {
+            colony.danger().seen(level, blockPosition(), mob.getUUID(), mob.getType().toShortString());
+        }
     }
 
     /** The legs: plans routes (walk, climb, drop) and walks them. Goals only say where to go. */
@@ -841,6 +866,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             updateYouth();
             if (level() instanceof ServerLevel serverLevel) {
                 checkHeat(serverLevel);
+                lookForHostiles(serverLevel);
             }
         }
         // A forager home with a seed touches the ants waiting inside by the entrance as it walks in (Gordon's rule, see colony.Door).

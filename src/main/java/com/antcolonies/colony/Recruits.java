@@ -150,6 +150,10 @@ public class Recruits {
         if (told != null && near(told.patch(), where, numbers.patchRadius() + 2)) {
             recruits.remove(ant); // there: it found the patch it was told of
         }
+        if (colony.danger().avoids(level, where)) {
+            laying.remove(ant); // remembered danger there (brain step 4g): no nestmates are called to it
+            return;
+        }
         int food = patchFood(level, where, numbers);
         double distance = flat(where);
         if (food < numbers.needed(distance)) {
@@ -385,6 +389,11 @@ public class Recruits {
         }
         long now = level.getGameTime();
         recruits.values().removeIf(told -> told.until() <= now || told.until() > now + RECRUIT_TICKS);
+        if (!colony.danger().isEmpty()) {
+            // Brain step 4g: a patch that turned dangerous: its recruits are ordinary foragers again, its line is let go.
+            recruits.values().removeIf(told -> colony.danger().avoids(level, told.patch()));
+            lines.removeIf(line -> colony.danger().avoids(level, line.patch()));
+        }
         for (Map.Entry<UUID, Calling> call : new ArrayList<>(calling.entrySet())) {
             if (now >= call.getValue().until || call.getValue().until > now + CALL_TICKS) {
                 finish(level, call.getKey(), call.getValue()); // (its caller stopped ticking: died, or unloaded)

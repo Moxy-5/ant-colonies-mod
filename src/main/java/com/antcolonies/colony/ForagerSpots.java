@@ -237,6 +237,16 @@ public class ForagerSpots {
         return 0;
     }
 
+    /** This spot of the numbers is given up (danger there, brain step 4g): its holders search again. */
+    void dropHeld(Held spot) {
+        held.remove(spot);
+    }
+
+    /** A real forager gives up its spot (it was hurt near it, brain step 4g): it searches elsewhere from now on. */
+    public void giveUp(UUID ant) {
+        spots.remove(ant);
+    }
+
     /** The numbers' spots are held by no more than {@code foragers} forager numbers (some died or came out as real ones). */
     void trimHeld(int foragers) {
         int over = holders() - Math.max(0, foragers);

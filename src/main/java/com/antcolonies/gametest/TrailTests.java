@@ -196,12 +196,39 @@ public class TrailTests {
                     bare[0] += a.isBare(c) ? 1 : 0;
                 }
             }
+            // Brain step 4g, the danger memory, in the same scene (patrols off, so only the danger decides): a forager killed
+            // at the east food by a zombie, and one hurt on the hill by a player.
+            colony.patrol().setOnForTests(false);
+            colony.danger().hurt(level, eastFood, "zombie", true);
+            colony.danger().hurt(level, center[0], "player", false);
+            helper.assertTrue(colony.danger().places().size() == 2 && colony.danger().places().get(0).deaths() == 1,
+                    "the death and the hurt should be two remembered places: " + colony.danger().describe(level));
+            helper.assertTrue(!colony.mayForageAt(level, eastFood) && colony.mayForageAt(level, southFood),
+                    "the east food should be kept away from, the south food not: " + colony.danger().describe(level));
+            BlockPos pastIt = new BlockPos(center[0].getX() + FAR_OUT - 5, groundY + 1, center[0].getZ());
+            BlockPos nearHome = new BlockPos(center[0].getX() + 5, groundY + 1, center[0].getZ());
+            helper.assertTrue(colony.trunkTrails().passesDanger(level, pastIt) && !colony.mayForageAt(level, pastIt),
+                    "food out past the danger along the east trail should be kept away from (the trail runs through it)");
+            helper.assertTrue(colony.mayForageAt(level, nearHome) && colony.mayForageAt(level, new BlockPos(center[0].getX(), groundY + 1, center[0].getZ() + 3)),
+                    "the nest's own ground and the trail short of the danger should stay open: " + colony.danger().describe(level));
+            for (int i = 0; i < 30; i++) {
+                TrunkTrails.Trail picked = colony.trunkTrails().pickForSearch(level, colony.random());
+                helper.assertTrue(picked != null && Math.abs(picked.angle()) > Math.toRadians(30), "no searcher should be sent out the east trail");
+            }
+            helper.assertTrue(Colony.load(colony.save()).danger().places().size() == 2, "the danger memory should be saved");
+            colony.danger().ageForTests(45600L); // nearly two days: a death (4) halved nearly twice, still dangerous (over 1)
+            helper.assertTrue(!colony.mayForageAt(level, eastFood), "nearly two days on the east food should still be kept away from: " + colony.danger().describe(level));
+            colony.danger().ageForTests(14400L); // two and a half: no longer kept away from, still remembered
+            helper.assertTrue(colony.mayForageAt(level, eastFood) && colony.danger().places().size() == 2,
+                    "two and a half days on the east food should be open again, still remembered: " + colony.danger().describe(level));
+            colony.danger().ageForTests(24000L); // three and a half: forgotten at the colony's next look
             // Five days unused: their traffic no longer holds them out to the food, so their tips pull back.
             colony.trunkTrails().ageForTests(5 * 24000L);
         });
         helper.runAfterDelay(160, () -> {
             Colony colony = PopulationTests.antColony(helper);
             TrunkTrails trails = colony.trunkTrails();
+            helper.assertTrue(colony.danger().places().isEmpty(), "three and a half days on the danger should be forgotten: " + colony.danger().describe(level));
             helper.assertTrue(trails.trails().size() == 2, "five days unused the trails should still be there: " + trails.describe(level));
             for (TrunkTrails.Trail trail : trails.trails()) {
                 helper.assertTrue(trails.reachBlocks(trail) >= 10 && trails.reachBlocks(trail) <= 13,

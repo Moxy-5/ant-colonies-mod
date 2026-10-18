@@ -58,15 +58,21 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * The whole colony. {@code maxWorkers}: young grow into workers only while there are fewer. {@code nursesFrom}: from
      * how many workers on there is one nurse, two nurses, and so on (one number per nurse, smallest first).
      */
-    public record ColonyNumbers(int maxWorkers, List<Integer> nursesFrom, int realCap, int crew, int watchRadius, int swapsPerSecond) {
+    public record ColonyNumbers(int maxWorkers, List<Integer> nursesFrom, int realCap, int crew, int watchRadius, int swapsPerSecond,
+            Optional<DangerNumbers> danger) {
         public static final Codec<ColonyNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("max_workers").forGetter(ColonyNumbers::maxWorkers),
                 Codec.INT.listOf().fieldOf("nurses_from_workers").forGetter(ColonyNumbers::nursesFrom),
                 Codec.INT.optionalFieldOf("real_cap", 50).forGetter(ColonyNumbers::realCap),
                 Codec.INT.optionalFieldOf("crew", 10).forGetter(ColonyNumbers::crew),
                 Codec.INT.optionalFieldOf("watch_radius", 48).forGetter(ColonyNumbers::watchRadius),
-                Codec.INT.optionalFieldOf("swaps_per_second", 2).forGetter(ColonyNumbers::swapsPerSecond)
+                Codec.INT.optionalFieldOf("swaps_per_second", 2).forGetter(ColonyNumbers::swapsPerSecond),
+                DangerNumbers.CODEC.optionalFieldOf("danger").forGetter(ColonyNumbers::danger)
         ).apply(i, ColonyNumbers::new));
+
+        public ColonyNumbers(int maxWorkers, List<Integer> nursesFrom, int realCap, int crew, int watchRadius, int swapsPerSecond) {
+            this(maxWorkers, nursesFrom, realCap, crew, watchRadius, swapsPerSecond, Optional.empty());
+        }
 
         /**
          * With the brain's numbers at their defaults (see {@code Population}): at most {@code realCap} real mobs while a
@@ -88,6 +94,36 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
             }
             return nurses;
         }
+    }
+
+    /**
+     * The danger memory (brain step 4g, {@code colony.DangerMap}; the user's decisions of 2026-10-17). A member hurt by a
+     * living thing adds {@code hurt} to the place, one killed {@code killed}, a hostile mob seen within {@code seenWithin}
+     * blocks of a member on the surface {@code seen} (the same mob again only after {@code seenEveryTicks}); places within
+     * {@code mergeWithin} blocks are one, a place holds at most {@code most}. The strength halves every
+     * {@code halfLifeTicks}; below {@code forgetBelow} the place is forgotten. Ground within {@code reach} blocks of a place
+     * is dangerous while the strengths there add up to {@code dangerousFrom}; the nest's own ground (within {@code home}
+     * blocks of its middle) never is. {@code keepAway}: the foragers leave dangerous ground and the trails through it alone
+     * (harvester ants; termites plug their holes instead, step 3). My picks, to confirm: a death 4 (kept away from about 2
+     * days, remembered 3), a hurt 2, a sighting 1, halving every day.
+     */
+    public record DangerNumbers(double hurt, double killed, double seen, double seenWithin, int seenEveryTicks, double mergeWithin,
+            double reach, int halfLifeTicks, double forgetBelow, double dangerousFrom, double most, double home, boolean keepAway) {
+        public static final Codec<DangerNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.DOUBLE.optionalFieldOf("hurt", 2.0).forGetter(DangerNumbers::hurt),
+                Codec.DOUBLE.optionalFieldOf("killed", 4.0).forGetter(DangerNumbers::killed),
+                Codec.DOUBLE.optionalFieldOf("seen", 1.0).forGetter(DangerNumbers::seen),
+                Codec.DOUBLE.optionalFieldOf("seen_within", 4.0).forGetter(DangerNumbers::seenWithin),
+                Codec.INT.optionalFieldOf("seen_every_ticks", 1200).forGetter(DangerNumbers::seenEveryTicks),
+                Codec.DOUBLE.optionalFieldOf("merge_within", 4.0).forGetter(DangerNumbers::mergeWithin),
+                Codec.DOUBLE.optionalFieldOf("reach", 6.0).forGetter(DangerNumbers::reach),
+                Codec.INT.optionalFieldOf("half_life_ticks", 24000).forGetter(DangerNumbers::halfLifeTicks),
+                Codec.DOUBLE.optionalFieldOf("forget_below", 0.5).forGetter(DangerNumbers::forgetBelow),
+                Codec.DOUBLE.optionalFieldOf("dangerous_from", 1.0).forGetter(DangerNumbers::dangerousFrom),
+                Codec.DOUBLE.optionalFieldOf("most", 12.0).forGetter(DangerNumbers::most),
+                Codec.DOUBLE.optionalFieldOf("home", 6.0).forGetter(DangerNumbers::home),
+                Codec.BOOL.optionalFieldOf("keep_away", false).forGetter(DangerNumbers::keepAway)
+        ).apply(i, DangerNumbers::new));
     }
 
     /**

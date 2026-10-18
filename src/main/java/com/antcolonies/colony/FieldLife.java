@@ -303,7 +303,7 @@ public class FieldLife {
         for (Map.Entry<BlockPos, Plant> entry : known.entrySet()) {
             Plant plant = entry.getValue();
             if (plant.kind() < 0 || plant.kind() >= kinds.size() || !outside && !plant.fromInside()
-                    || !colony.foodMap().knows(entry.getKey(), null) || !colony.patrol().isOpen(level, entry.getKey())) {
+                    || !colony.foodMap().knows(entry.getKey(), null) || !colony.mayForageAt(level, entry.getKey())) {
                 continue;
             }
             int left = kinds.get(plant.kind()).pieces() - food.getPiecesCut(entry.getKey());
@@ -459,6 +459,10 @@ public class FieldLife {
             if (!colony.patrol().isOpen(level, spot.pos())) {
                 continue; // that way is shut today: its holders stay in
             }
+            if (colony.danger().avoids(level, spot.pos())) {
+                colony.spots().dropHeld(spot); // remembered danger there (brain step 4g): its holders search elsewhere
+                continue;
+            }
             List<BlockPos> near = new ArrayList<>();
             for (BlockPos pos : plantsNear(spot.pos(), wander)) {
                 Plant plant = known.get(pos);
@@ -538,7 +542,7 @@ public class FieldLife {
         for (BlockPos pos : plantsNear(centre, search.wander())) {
             Plant plant = known.get(pos);
             if (plant == null || plant.kind() < 0 || plant.kind() >= kinds.size() || kinds.get(plant.kind()).pieces() - food.getPiecesCut(pos) <= 0
-                    || !colony.patrol().isOpen(level, pos) || !colony.foodMap().mayScout(pos)) {
+                    || !colony.mayForageAt(level, pos) || !colony.foodMap().mayScout(pos)) {
                 continue;
             }
             double away = flat(pos, centre);

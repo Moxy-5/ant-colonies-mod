@@ -192,7 +192,7 @@ public class ScoutGoal extends Goal {
         }
         BlockPos middle = colony.getCenter();
         BlockPos own = colony.spots().spotOf(ant.getUUID());
-        if (own != null && level.hasChunkAt(own) && colony.patrol().isOpen(level, own) && colony.foodMap().mayScout(own)) {
+        if (own != null && level.hasChunkAt(own) && colony.mayForageAt(level, own) && colony.foodMap().mayScout(own)) {
             atOwnSpot = true;
             angle = Math.atan2(own.getZ() - middle.getZ(), own.getX() - middle.getX());
             from = Math.max(LEAST_OUT, flat(own));
@@ -231,7 +231,7 @@ public class ScoutGoal extends Goal {
             from = Math.min(Math.max(LEAST_OUT + 2, base), reachOfWay + search.stretch());
             out = from;
             BlockPos cell = groundCell(level, colony, angle, from, 2);
-            if (cell != null && colony.patrol().isOpen(level, cell)) {
+            if (cell != null && colony.mayForageAt(level, cell)) {
                 return cell;
             }
         }
@@ -266,7 +266,7 @@ public class ScoutGoal extends Goal {
         }
         BlockPos cell = new BlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z), z);
         BlockPos below = cell.below();
-        if (!colony.foodMap().mayScout(cell) || !colony.patrol().isOpen(level, cell)) {
+        if (!colony.foodMap().mayScout(cell) || !colony.mayForageAt(level, cell)) {
             return null;
         }
         if (Math.abs(cell.getY() - center.getY()) > 6 || !level.getFluidState(cell).isEmpty()

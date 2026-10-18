@@ -21,6 +21,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 
 /**
@@ -97,6 +98,7 @@ public class Colony {
     private final ForagerSpots spots;
     private final Door door;
     private final Recruits recruits;
+    private final DangerMap danger;
     private final HiddenTrips hiddenTrips;
     private final FungusGarden garden;
     private final Mushrooms mushrooms;
@@ -133,6 +135,7 @@ public class Colony {
         this.spots = new ForagerSpots(this);
         this.door = new Door(this);
         this.recruits = new Recruits(this);
+        this.danger = new DangerMap(this);
         this.hiddenTrips = new HiddenTrips(this);
         this.garden = new FungusGarden(this);
         this.mushrooms = new Mushrooms(this);
@@ -235,6 +238,19 @@ public class Colony {
     /** Recruiting to rich patches: the scent lines and the nestmates called out (species with {@code food.search.recruit}). */
     public Recruits recruits() {
         return recruits;
+    }
+
+    /** Where the colony's insects were hurt or killed, or saw hostile mobs (brain step 4g; species with {@code colony.danger}). */
+    public DangerMap danger() {
+        return danger;
+    }
+
+    /**
+     * Whether a forager may go for food at {@code pos} now: a patroller came back from that way ({@link Patrol#isOpen}),
+     * and the colony does not keep away from it for danger ({@link DangerMap#avoids}).
+     */
+    public boolean mayForageAt(Level level, BlockPos pos) {
+        return patrol.isOpen(level, pos) && !danger.avoids(level, pos);
     }
 
     /** Insects travelling unseen along the galleries (termites underground, step 2b). */
@@ -522,6 +538,7 @@ public class Colony {
         patrol.tick(level, false);
         door.tick(level);
         recruits.tick(level);
+        danger.tick(level);
         field.tick(level, false);
         trunkTrails.tick(level, false);
         return true;
@@ -759,6 +776,7 @@ public class Colony {
         hiddenTrips.save(tag);
         patrol.save(tag);
         spots.save(tag);
+        danger.save(tag);
         door.save(tag);
         hill.save(tag);
         trails.save(tag);
@@ -799,6 +817,7 @@ public class Colony {
         colony.hiddenTrips.load(tag);
         colony.patrol.load(tag);
         colony.spots.load(tag);
+        colony.danger.load(tag);
 
         colony.door.load(tag);
         colony.hill.load(tag);

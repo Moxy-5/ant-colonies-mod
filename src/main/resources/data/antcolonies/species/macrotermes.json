@@ -6,7 +6,22 @@
     "crew": 50,
     "watch_radius": 48,
     "swaps_per_second": 2,
-    "nurses_from_workers": [3, 8, 12, 20]
+    "nurses_from_workers": [3, 8, 12, 20],
+    "danger": {
+      "hurt": 2.0,
+      "killed": 4.0,
+      "seen": 1.0,
+      "seen_within": 4.0,
+      "seen_every_ticks": 1200,
+      "merge_within": 4.0,
+      "reach": 6.0,
+      "half_life_ticks": 24000,
+      "forget_below": 0.5,
+      "dangerous_from": 1.0,
+      "most": 12.0,
+      "home": 6.0,
+      "keep_away": false
+    }
   },
   "worker": {
     "meal_interval_ticks": 24000,

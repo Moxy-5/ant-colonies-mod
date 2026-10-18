@@ -45,7 +45,8 @@ public class AwayReport {
         GALLERY_TO_FOOD("gallery pieces grown toward food"),
         GALLERY_BLOCKS("blocks of gallery grown"),
         FILLED_IN("gallery branches filled in"),
-        FILLED_BLOCKS("blocks of gallery packed with soil");
+        FILLED_BLOCKS("blocks of gallery packed with soil"),
+        DANGER_FORGOTTEN("dangerous places forgotten");
 
         private final String label;
 

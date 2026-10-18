@@ -187,18 +187,52 @@ public class TrunkTrails {
      */
     @Nullable
     public Trail pickForSearch(Level level, net.minecraft.util.RandomSource random) {
-        double total = 0;
+        List<Trail> safe = new ArrayList<>();
         for (Trail trail : trails) {
+            if (!dangerAlong(level, trail, Math.max(0, trail.reach - 1))) {
+                safe.add(trail); // (a trail through remembered danger draws no searchers: brain step 4g)
+            }
+        }
+        double total = 0;
+        for (Trail trail : safe) {
             total += Math.max(0.5, strength(level, trail));
         }
         double pick = random.nextDouble() * total;
-        for (Trail trail : trails) {
+        for (Trail trail : safe) {
             pick -= Math.max(0.5, strength(level, trail));
             if (pick <= 0) {
                 return trail;
             }
         }
-        return trails.isEmpty() ? null : trails.get(trails.size() - 1);
+        return safe.isEmpty() ? null : safe.get(safe.size() - 1);
+    }
+
+    /**
+     * Brain step 4g: whether a forager going for {@code target} would walk the trail going that way through a dangerous
+     * place (see {@link DangerMap}), out to where it leaves the trail (never past the tip). False if no trail goes that way.
+     */
+    public boolean passesDanger(Level level, BlockPos target) {
+        SpeciesProfile.TrunkNumbers numbers = numbers();
+        if (numbers == null || trails.isEmpty() || colony.danger().isEmpty() || flat(target) <= numbers.start() + 1) {
+            return false;
+        }
+        Trail trail = nearest(angleOf(target), numbers);
+        return trail != null && trail.reach > 0 && dangerAlong(level, trail, Math.min(leaveAt(trail, target), trail.reach - 1));
+    }
+
+    /** Whether any column of the trail from its start out to {@code last} is a dangerous place. */
+    private boolean dangerAlong(Level level, Trail trail, int last) {
+        DangerMap danger = colony.danger();
+        if (danger.isEmpty()) {
+            return false;
+        }
+        BlockPos center = colony.getCenter();
+        for (int i = 0; i <= last && i < trail.columns.length; i++) {
+            if (danger.isDangerous(level, new BlockPos(center.getX() + trail.columns[i][0], center.getY(), center.getZ() + trail.columns[i][1]))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** How far out (blocks from the nest's middle) foragers have left this trail at most: its tip (its start if none yet). */
