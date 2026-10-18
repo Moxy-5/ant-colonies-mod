@@ -195,7 +195,7 @@
    0.027
   ],
   "jump abdomen": [
-   4,
+   5,
    0.151
   ],
   "jump at up_32": [
@@ -213,6 +213,10 @@
   "jump at down_26": [
    1,
    0.134
+  ],
+  "jump at down_60": [
+   1,
+   0.124
   ]
  },
  "body_findings": {},

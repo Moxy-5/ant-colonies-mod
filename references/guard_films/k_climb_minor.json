@@ -171,7 +171,7 @@
    0.163
   ],
   "jump at down_61": [
-   26,
+   25,
    0.285
   ],
   "jump leg_r2_lower": [
@@ -265,10 +265,6 @@
   "jump leg_l1": [
    2,
    0.13
-  ],
-  "jump leg_l1_lower": [
-   1,
-   0.094
   ],
   "jump leg_l3": [
    1,
