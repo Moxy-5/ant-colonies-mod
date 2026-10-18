@@ -124,6 +124,9 @@ public final class AntPathFinder {
             case OUT_FROM_UNDER -> List.of(to.cell().below());
             case OUT_OF_MOUTH -> mouthWay(from.cell(), to);
             case INTO_MOUTH -> mouthWay(to.cell(), from);
+            // A walk up off a slope onto the block beside passes the cell over the slope; down onto one, the cell over it.
+            case WALK -> to.cell().getY() > from.cell().getY() ? List.of(from.cell().above())
+                    : to.cell().getY() < from.cell().getY() ? List.of(to.cell().above()) : List.of();
             default -> List.of();
         };
     }
@@ -331,9 +334,11 @@ public final class AntPathFinder {
                     continue;
                 }
                 if (!map.isOpen(n)) {
-                    // Up the high side of a slope onto the block beside it (or onto a slope on that block).
+                    // Up the high side of a slope onto the block beside it (or onto a slope on that block). The body
+                    // rises into the cell over the slope on the way, so that must be open: a low comb under a ceiling
+                    // has room over it, but none to step up out of its cell (docs/BUGS.md 48).
                     BlockPos up = n.above();
-                    if (onSlope && Foothold.isValid(map, up, Direction.DOWN) && edgesMeet(map, c, d, up)) {
+                    if (onSlope && map.isOpen(c.above()) && Foothold.isValid(map, up, Direction.DOWN) && edgesMeet(map, c, d, up)) {
                         out.add(Foothold.floor(up), StepKind.WALK, 1.0);
                     }
                     continue;

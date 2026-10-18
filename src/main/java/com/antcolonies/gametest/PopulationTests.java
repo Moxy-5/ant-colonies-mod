@@ -457,8 +457,15 @@ public class PopulationTests {
                             .findFirst().orElse(null);
                     if (aged != null) {
                         var was = level.getBlockState(aged);
+                        // A worker standing in the comb's cell is lifted onto the new layer, never left sunk in the comb
+                        // (docs/BUGS.md 48: one was, and could not step up out of it).
+                        TermiteWorkerEntity standing = workers[0];
+                        standing.setPos(aged.getX() + 0.5, aged.getY() + com.antcolonies.block.FungusCombBlock.topOf(was), aged.getZ() + 0.5);
                         helper.assertTrue(colony.food().depositSeed(level, aged), "could not put forage on the comb at " + aged);
                         var now2 = level.getBlockState(aged);
+                        helper.assertTrue(standing.getY() >= aged.getY() + com.antcolonies.block.FungusCombBlock.topOf(now2) - 1.0E-6,
+                                "a worker on the comb was left sunk in it at " + standing.getY() + ", its top at "
+                                        + (aged.getY() + com.antcolonies.block.FungusCombBlock.topOf(now2)));
                         helper.assertTrue(com.antcolonies.block.FungusCombBlock.fresh(now2) == com.antcolonies.block.FungusCombBlock.fresh(was) + 1
                                 && com.antcolonies.block.FungusCombBlock.old(now2) == com.antcolonies.block.FungusCombBlock.old(was),
                                 "new forage should go on top as a fresh layer: " + was + " -> " + now2);

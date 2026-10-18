@@ -813,7 +813,8 @@ public class FoodStore {
 
     /**
      * The heap at {@code spot} grows by one layer (or a new one starts), without counting it: for a piece already
-     * counted (see {@link NestLedger}). False if that spot is full, or an egg or a young one lies there.
+     * counted (see {@link NestLedger}). False if that spot is full, or an egg or a young one lies there. Anyone standing
+     * in the cell is lifted onto the new layer, never left sunk in the heap (docs/BUGS.md 48).
      */
     boolean addLayerAt(Level level, BlockPos spot) {
         BlockState state = level.getBlockState(spot);
@@ -829,6 +830,12 @@ public class FoodStore {
                     : state.setValue(SeedPileBlock.LAYERS, state.getValue(SeedPileBlock.LAYERS) + 1), 3);
         } else {
             return false;
+        }
+        double top = spot.getY() + level.getBlockState(spot).getCollisionShape(level, spot).max(net.minecraft.core.Direction.Axis.Y);
+        for (net.minecraft.world.entity.LivingEntity living : level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class, new AABB(spot))) {
+            if (living.getBoundingBox().minY < top) {
+                Mound.liftOnto(level, living, spot, top);
+            }
         }
         return true;
     }

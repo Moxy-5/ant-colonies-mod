@@ -410,6 +410,31 @@ class AntPathFinderTest {
         assertNull(route(SHAFT_BOTTOM.east(2), onComb), "a comb taller than half a block under a ceiling leaves no room");
     }
 
+    /**
+     * Fungus comb half a block high under a ceiling, a block beside it with open space on top (docs/BUGS.md 48, the
+     * far-hay test: workers pushed for ever against the ceiling over the comb): the insect has room over the comb but
+     * none to step up out of its cell onto that block; with the cell over the comb open it may.
+     */
+    @Test
+    void noStepUpOffALowCombUnderACeiling() {
+        BlockPos comb = SHAFT_BOTTOM.east(8); // the room's east end, ceiling over it
+        BlockPos block = comb.east();
+        BlockPos onBlock = block.above();
+        flats.put(comb, 8);
+        solid.remove(onBlock); // open space on top of the block beside the comb
+        Route.Step up = new Route.Step(Foothold.floor(onBlock), StepKind.WALK);
+        List<Route.Step> moves = new ArrayList<>();
+        AntPathFinder.neighbours(map, Foothold.floor(comb), (to, kind, cost) -> moves.add(new Route.Step(to, kind)));
+        assertFalse(moves.contains(up), "it steps up off the comb into the ceiling: " + moves);
+        assertNotNull(AntPathFinder.whatChanged(map, Foothold.floor(comb), Foothold.floor(onBlock), StepKind.WALK),
+                "a walk planned up off the comb is still allowed with the ceiling over it");
+        solid.remove(comb.above());
+        moves.clear();
+        AntPathFinder.neighbours(map, Foothold.floor(comb), (to, kind, cost) -> moves.add(new Route.Step(to, kind)));
+        assertTrue(moves.contains(up), "with room over the comb it does not step up onto the block: " + moves);
+        assertNull(AntPathFinder.whatChanged(map, Foothold.floor(comb), Foothold.floor(onBlock), StepKind.WALK));
+    }
+
     @Test
     void somethingDroppedOnARampLandsOnIt() {
         stepWithARamp(1);
