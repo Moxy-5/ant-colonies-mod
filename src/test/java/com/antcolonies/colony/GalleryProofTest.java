@@ -4,8 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
@@ -15,6 +17,7 @@ import com.antcolonies.nav.AntPathFinder;
 import com.antcolonies.nav.CellMap;
 import com.antcolonies.nav.Foothold;
 import com.antcolonies.nav.Route;
+import com.antcolonies.species.SpeciesProfile;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -382,5 +385,164 @@ class GalleryProofTest {
             fail(failures.size() + " failures, first ones:\n" + String.join("\n", failures.subList(0, Math.min(15, failures.size()))));
         }
         assertTrue(arms >= 3 * landscapes, "too few arms planned to prove anything: " + arms + " on " + landscapes + " landscapes");
+    }
+
+    /** How many landscapes the whole webs are grown on (each is many route plans and walks). */
+    private static final int WEB_LANDSCAPES = 100;
+    /** How long a web is grown (blocks in all): the most a colony may have (max_length, about 2,400 workers at 1 block per 4). */
+    private static final int WEB_LENGTH = 600;
+
+    /**
+     * Termites underground, step 2a (the galleries grow tip by tip): on each landscape the arms are planned as in step 1,
+     * then the tips grow one piece at a time ({@link Galleries#pickTip}, {@link Galleries#grow}, each piece dug before
+     * the next, as in the game) until the web is {@link #WEB_LENGTH} blocks long or no tip can grow, and the holes are
+     * laid out along every piece. Checked: no piece dug near the middle; no tunnel block opens to the open air but at a
+     * hole; no hole past the reach (50); the tips fork; the web reaches out on every side of the mound on most
+     * landscapes (spread evenly); and from the shaft a termite walks out of every hole and back in with the real route
+     * finder and search budget (the long walks the game will ask of it).
+     */
+    @Test
+    void wholeWebsGrownTipByTipCanAllBeWalkedAndNeverOpenToTheSky() {
+        SpeciesProfile.GalleryNumbers numbers = new SpeciesProfile.GalleryNumbers(true, 16, 4, 6, 0.5, 6, 2);
+        int landscapes = 0;
+        int pieces = 0;
+        int forks = 0;
+        int holes = 0;
+        int allSides = 0;
+        int longest = 0;
+        List<String> failures = new ArrayList<>();
+        for (long seed = 1; seed <= WEB_LANDSCAPES; seed++) {
+            Landscape land = new Landscape(seed);
+            net.minecraft.util.RandomSource random = net.minecraft.util.RandomSource.create(seed);
+            int entrance = land.top(0, 0);
+            BlockPos center = new BlockPos(0, entrance, 0);
+            for (int y = entrance - 2; y <= entrance; y++) {
+                land.dug.add(new BlockPos(0, y, 0));
+            }
+            BlockPos start = new BlockPos(0, entrance - 2, 0);
+            Direction front = Direction.NORTH;
+            List<NestPlan.ForagingTunnel> own = new ArrayList<>();
+            for (Direction side : List.of(front.getCounterClockWise(), front.getClockWise())) {
+                TunnelRoute.Plan plan = TunnelRoute.straight(start, side, 8, 4, land.ground());
+                if (plan != null) {
+                    own.add(new NestPlan.ForagingTunnel(plan.cells(), plan.hole(), side));
+                    land.dug.addAll(plan.cells());
+                }
+            }
+            if (own.isEmpty()) {
+                continue;
+            }
+            landscapes++;
+            List<Direction> ways = new ArrayList<>();
+            own.forEach(tunnel -> ways.add(tunnel.side()));
+            ways.add(front);
+            ways.add(front.getOpposite());
+            List<NestPlan.ForagingTunnel> web = new ArrayList<>(Galleries.planArms(own, ways, land.ground(), center, 16, 9));
+            Set<BlockPos> ownCells = new HashSet<>();
+            own.forEach(tunnel -> ownCells.addAll(tunnel.tunnel()));
+            List<Galleries.Tip> tips = new ArrayList<>();
+            Set<BlockPos> webCells = new HashSet<>();
+            for (NestPlan.ForagingTunnel arm : web) {
+                land.dug.addAll(arm.tunnel());
+                arm.tunnel().stream().filter(cell -> !ownCells.contains(cell)).forEach(webCells::add);
+                tips.add(new Galleries.Tip(arm, Galleries.bearing(center, arm.hole()), 0, 8 + random.nextInt(5)));
+            }
+            Map<BlockPos, Integer> fails = new HashMap<>();
+            String where = "landscape " + seed;
+            while (webCells.size() < WEB_LENGTH) {
+                List<Galleries.Tip> order = new ArrayList<>(tips);
+                java.util.Collections.shuffle(order, new Random(seed * 1000 + webCells.size()));
+                Set<BlockPos> stopped = new HashSet<>();
+                fails.forEach((hole, count) -> {
+                    if (count >= 3) {
+                        stopped.add(hole);
+                    }
+                });
+                Galleries.Tip tip = Galleries.pickTip(order, center, numbers.reach(), stopped);
+                if (tip == null) {
+                    break;
+                }
+                List<Galleries.Tip> grown = Galleries.grow(tip, tips, land.ground(), center, 9, numbers, random);
+                if (grown.isEmpty()) {
+                    fails.merge(tip.way().hole(), 1, Integer::sum);
+                    continue;
+                }
+                forks += grown.size() > 1 ? 1 : 0;
+                tips.remove(tip);
+                tips.addAll(grown);
+                for (Galleries.Tip piece : grown) {
+                    pieces++;
+                    web.add(piece.way());
+                    List<BlockPos> fresh = piece.way().tunnel().subList(tip.way().tunnel().size(), piece.way().tunnel().size());
+                    for (BlockPos cell : fresh) {
+                        if (Math.hypot(cell.getX(), cell.getZ()) < 9) {
+                            failures.add(where + ": a piece digs " + cell.toShortString() + " near the middle");
+                        }
+                    }
+                    land.dug.addAll(fresh);
+                    webCells.addAll(fresh);
+                }
+            }
+            longest = Math.max(longest, webCells.size());
+            // The holes: each piece's own, and along every gallery.
+            List<BlockPos> taken = new ArrayList<>(List.of(center));
+            own.forEach(tunnel -> taken.add(tunnel.hole()));
+            web.forEach(tunnel -> taken.add(tunnel.hole()));
+            List<NestPlan.ForagingTunnel> all = new ArrayList<>(own);
+            all.addAll(web);
+            for (NestPlan.ForagingTunnel tunnel : new ArrayList<>(all)) {
+                all.addAll(Galleries.holesAlong(tunnel, land.ground(), center, 8, 4, taken));
+            }
+            holes += all.size();
+            Set<BlockPos> holeCells = new HashSet<>();
+            all.forEach(tunnel -> holeCells.add(tunnel.hole()));
+            boolean[] side = new boolean[4];
+            for (BlockPos hole : holeCells) {
+                double out = Math.hypot(hole.getX(), hole.getZ());
+                if (out > numbers.reach() + TunnelRoute.HOLE_REACH) {
+                    failures.add(where + ": a hole at " + hole.toShortString() + " is " + Math.round(out) + " blocks out, past the reach");
+                }
+                if (out >= 20) {
+                    side[Math.abs(hole.getX()) >= Math.abs(hole.getZ()) ? (hole.getX() > 0 ? 0 : 1) : (hole.getZ() > 0 ? 2 : 3)] = true;
+                }
+            }
+            allSides += side[0] && side[1] && side[2] && side[3] ? 1 : 0;
+            land.dug.addAll(holeCells);
+            for (NestPlan.ForagingTunnel tunnel : all) {
+                for (BlockPos cell : tunnel.tunnel()) {
+                    for (Direction way : Direction.values()) {
+                        BlockPos next = cell.relative(way);
+                        if (land.isOutsideAir(next) && !holeCells.contains(next) && !(cell.getX() == 0 && cell.getZ() == 0)) {
+                            failures.add(where + ": the tunnel block " + cell.toShortString() + " opens to the open air " + way);
+                        }
+                    }
+                }
+            }
+            CellMap map = land.cells();
+            for (NestPlan.ForagingTunnel tunnel : all) {
+                BlockPos hole = tunnel.hole();
+                java.util.function.Predicate<Foothold> outside = at -> at.isFloor() && at.cell().getY() == hole.getY() + 1
+                        && Math.abs(at.cell().getX() - hole.getX()) + Math.abs(at.cell().getZ() - hole.getZ()) == 1;
+                Route out = AntPathFinder.find(map, AntPathFinder.footholdsIn(map, start), outside, hole, AntPathFinder.DEFAULT_MAX_EXPANSIONS,
+                        AntPathFinder.StepCosts.NONE);
+                if (out == null) {
+                    Route big = AntPathFinder.find(map, AntPathFinder.footholdsIn(map, start), outside, hole, 400000, AntPathFinder.StepCosts.NONE);
+                    failures.add(where + ": no way out of the hole at " + hole.toShortString() + " (" + Math.round(Math.hypot(hole.getX(), hole.getZ()))
+                            + " blocks out) from the shaft" + (big == null ? ", none at all (cut off)" : ", but there is one with a bigger search ("
+                            + big.size() + " steps): the search budget runs out"));
+                } else if (AntPathFinder.find(map, out.end().cell(), start, AntPathFinder.DEFAULT_MAX_EXPANSIONS) == null) {
+                    failures.add(where + ": no way back in from the hole at " + hole.toShortString());
+                }
+            }
+        }
+        System.out.println("[gallery proof] whole webs: " + landscapes + " landscapes, " + pieces + " pieces, " + forks + " forks, "
+                + holes + " holes, the longest web " + longest + " blocks, out on every side on " + allSides + ", " + failures.size() + " failures");
+        failures.forEach(line -> System.out.println("[gallery proof] " + line));
+        if (!failures.isEmpty()) {
+            fail(failures.size() + " failures, first ones:\n" + String.join("\n", failures.subList(0, Math.min(15, failures.size()))));
+        }
+        assertTrue(forks >= landscapes, "too few forks: " + forks + " on " + landscapes + " landscapes");
+        assertTrue(allSides >= landscapes * 3 / 4, "the webs should reach out on every side of the mound on most landscapes: " + allSides
+                + " of " + landscapes);
     }
 }

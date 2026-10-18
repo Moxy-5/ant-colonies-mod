@@ -527,6 +527,12 @@ public class Colony {
      */
     public int foragingRadius() {
         int radius = Math.max(profile().food().radius(), trunkTrails.longestTip());
+        int galleries = nest.galleries().range();
+        if (galleries > 0) {
+            // Termites underground (step 2a): the range is the galleries, the farthest hole and the graze round it, in
+            // place of the size table.
+            return Math.max(radius, galleries);
+        }
         return profile().nest().newHoles().map(holes -> Math.max(radius, holes.reach(getCount(com.antcolonies.entity.WorkerAntEntity.CASTE)))).orElse(radius);
     }
 

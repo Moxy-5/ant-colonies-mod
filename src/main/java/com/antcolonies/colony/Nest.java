@@ -207,7 +207,7 @@ public class Nest {
             }
         }
         for (NestPlan.ForagingTunnel tunnel : getForagingTunnels(level)) {
-            next = firstDiggable(level, tunnel.tunnel());
+            next = firstDiggable(level, galleries.digCells(tunnel)); // (a gallery's piece: its own blocks, its parent comes first)
             if (next != null) {
                 return next;
             }

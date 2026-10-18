@@ -179,6 +179,7 @@ public class TermiteCathedralTests {
         TestClock clock = TestClock.moving(helper, 18.5); // a whole night first
         int[] lastLeft = {-1};
         boolean[] built = {false};
+        java.util.Map<java.util.UUID, Integer> royalDigTicks = new java.util.HashMap<>();
         helper.onEachTick(() -> {
             Colony colony = TermiteMoundTests.colony(helper);
             if (colony == null || colony.isFounding()) {
@@ -197,11 +198,17 @@ public class TermiteCathedralTests {
             }
             // The royal pair dig only while they found the colony (the full run of 2026-10-16: here the king, with workers
             // round him and no finished room, tried to dig the shaft for ever, 29 ms a tick of failed route searches).
+            // A dig begun while founding may run on a tick or two after the workers join: the game checks a running goal
+            // only every other tick (the run of 2026-10-17 caught that gap), so only longer counts.
             for (com.antcolonies.entity.AbstractAntEntity royal : TestIsolation.insectsOf(level, colony, com.antcolonies.entity.AbstractAntEntity.class)) {
                 if (royal instanceof com.antcolonies.entity.TermiteKingEntity || royal instanceof com.antcolonies.entity.TermiteQueenEntity) {
-                    helper.assertTrue(royal.goalSelector.getAvailableGoals().stream()
-                                    .noneMatch(g -> g.isRunning() && g.getGoal() instanceof com.antcolonies.entity.goal.DigGoal),
-                            "the " + royal.getType().getDescription().getString() + " digs, though the colony has workers");
+                    boolean digs = royal.goalSelector.getAvailableGoals().stream()
+                            .anyMatch(g -> g.isRunning() && g.getGoal() instanceof com.antcolonies.entity.goal.DigGoal);
+                    int ticks = digs ? royalDigTicks.merge(royal.getUUID(), 1, Integer::sum) : 0;
+                    if (!digs) {
+                        royalDigTicks.remove(royal.getUUID());
+                    }
+                    helper.assertTrue(ticks <= 3, "the " + royal.getType().getDescription().getString() + " digs, though the colony has workers");
                 }
             }
             // The test world has no random ticks: wet soil sets here at about the game's pace (a finished block in about 20

@@ -71,10 +71,34 @@ Planned with the user 2026-10-17 (the termite half of `docs/plans/long-trails.md
   nights, grazing (bare patches) spreading out instead of two worn circles.
 
 ## Step 2: galleries grow tip by tip
-- Builders extend gallery tips outward a few blocks at a time (soil to the mound, as all digging); new holes appear
-  along them. The range is the farthest tip (replaces the size table; up to about 50). Branching: a tip now and then
-  forks. Uses `TunnelRoute` for each piece, wall first with mud crust.
-- Hidden trips start here (galleries get long): number in, out at the far hole; breaking in shows them.
+**Decided with the user 2026-10-17** (real behaviour explained first): split into **2a** (the galleries grow, tested
+in-game) and **2b** (hidden trips).
+- **Reach by colony size:** more workers dig more: the galleries' total length grows with the workers (my pick: 1 block
+  of gallery per 4 workers, numbers counted; the step 1 arms are the least), no tip past about 50 blocks from the
+  middle (`reach`). A young colony stays close; a big old one (thousands) reaches 50. Fits the balance goal (termites
+  slow early, huge late).
+- **Spread evenly:** the shortest tip grows first, each piece about 4 blocks (`piece_length`), wandering a little
+  (my pick: up to 20 degrees) and steered away from the nearest other tip, so the web covers the ground round the mound
+  like spokes. Step 3 then pulls tips toward food.
+- **Forks every 8 to 12 blocks** of a tip's growth (my pick, rolled with the colony's dice): the tip splits in two,
+  about 30 degrees either side of its way.
+- One piece (or a fork's two) planned at a time, once everything planned is dug; dug like the rest of the nest (soil to
+  the mound), day and night; holes laid out along each new piece as in step 1, and they take turns.
+- **The range** (`Colony.foragingRadius`, scouts, the alarm's reach) is the farthest hole plus the graze round it
+  (`food_radius`), in place of the size table, while the switch is on. Today's new-hole tunnels to rich food keep
+  their own reach until step 3 makes them one system.
+- **Ready for the Matabele ants (M8, the user's reason for this update):** galleries stay 1 block under the ground (an
+  ant major can break the roof at a feeding spot); the holes in turn and the feeding spots stay on record for an ant
+  scout to read; in 2b the termites travelling as numbers show up as real ones when **anything** breaks in (player,
+  ant, any mob), species-neutral, so a raid finds real termites to fight and carry off.
+- **Tests:** the gallery proof grows whole webs (to 50 blocks) over its landscapes: every piece walkable out and back,
+  never open to the sky, no tip past the reach, every side of the mound reached, forks present; a game scene with a big
+  colony (numbers) on a full 65-wide ground: tips grow past the arms, a fork, holes along the new pieces, the total
+  length kept to the budget (a small colony stops growing).
+
+### 2b: hidden trips
+- A termite going into a long gallery (my pick: over about 12 blocks) becomes a number and comes out at the far hole
+  after the walk's time; breaking in (anything, see above) shows them where they would be along the way.
 
 ## Step 3: growing toward food
 - Food found from a hole pulls the nearest tip toward it; rich food gets its feeding gallery as today. Today's

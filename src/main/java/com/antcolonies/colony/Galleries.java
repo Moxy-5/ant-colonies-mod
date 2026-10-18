@@ -20,6 +20,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
 
 /**
@@ -43,6 +44,13 @@ import net.minecraft.world.level.Level;
  * foragers, more in the rain; the holes near food the colony knows (or with a remembered trail to food still there)
  * first, and {@code explore} go to the holes rested longest. Only those may be opened ({@link #isInTurn}); a hole with
  * a finished runway over it is not counted (it stays open under its runway).</li>
+ * <li><b>Step 2a, the galleries grow tip by tip</b> (the user's decisions of 2026-10-17): the arms' ends are the first
+ * tips. Once everything planned is dug, the shortest tip grows by a piece of about {@code piece_length} blocks,
+ * wandering a little and away from the other tips (the web spreads round the mound like spokes); after
+ * {@code fork_min} to {@code fork_max} blocks of growth a tip forks in two. The galleries in all may be as long as the
+ * colony's workers allow ({@code workers_per_block}; the arms are the least), no tip past {@code reach} blocks from the
+ * middle. A tip with no route on 3 tries stops (a dead end). Each piece is a gallery with a hole at its end, and holes
+ * are laid out along it as along the rest; the farthest hole sets the colony's range ({@link #range}).</li>
  * </ul>
  */
 public class Galleries {
@@ -53,12 +61,40 @@ public class Galleries {
     /** The numbers when the species file has none (only a test switching it on for a species without them). */
     private static final SpeciesProfile.GalleryNumbers DEFAULT = new SpeciesProfile.GalleryNumbers(true, 16, 4, 6, 0.5, 6, 2);
 
+    /** A tip with no route found this many times stops growing. */
+    private static final int TIP_TRIES = 3;
+    /** How many ways a piece may take are tried (the one farthest from the other tips is taken). */
+    private static final int WAYS_TRIED = 4;
+    /** The most a piece may turn away from straight out from the middle (degrees): galleries run outward. */
+    private static final double MOST_OFF_OUTWARD = 60.0;
+
+    /**
+     * A growing tip: the gallery that ends there ({@code way}, from the nest's shaft to the tip, its hole at the tip),
+     * the way it grows (degrees: 0 east, 90 south), the blocks grown since it last forked and when it forks next.
+     */
+    record Tip(NestPlan.ForagingTunnel way, double bearing, int sinceFork, int forkAt) {
+        BlockPos end() {
+            return way.tunnel().get(way.tunnel().size() - 1);
+        }
+    }
+
     private final Colony colony;
     /** Told when the arms or the holes change (the nest's list of tunnels is out of date). */
     private final Runnable changed;
     /** The arms out from the nest's own tunnels, each with the part of the tunnel it leaves from. Saved. */
     private List<NestPlan.ForagingTunnel> arms = List.of();
     private boolean armsPlanned;
+    /** Where each arm's own blocks start in its tunnel (the blocks before are its parent's), by the arm's hole. Saved. */
+    private final Map<BlockPos, Integer> newFrom = new HashMap<>();
+    /** The growing tips (step 2a). Saved. */
+    private final List<Tip> tips = new ArrayList<>();
+    private boolean tipsMade;
+    /** How long the first arms were (the galleries are never held shorter). Saved. */
+    private int baseLength;
+    /** Routes not found from each tip (by its hole); {@link #TIP_TRIES} and the tip stops. Not saved. */
+    private final Map<BlockPos, Integer> tipFails = new HashMap<>();
+    /** The holes along the tunnels (looked up by the digging). */
+    private final Set<BlockPos> holesAlongSet = new HashSet<>();
     /** The holes along the tunnels, each with the tunnel up to the block under it. Saved. */
     private final List<NestPlan.ForagingTunnel> holes = new ArrayList<>();
     /** The tunnels (by the hole at their end) whose holes along them are laid out. Saved. */
@@ -73,6 +109,8 @@ public class Galleries {
     /** Tests only: the switch, whatever the species file says (null: as the file says). */
     @Nullable
     private Boolean switchForTests;
+    @Nullable
+    private Integer reachForTests;
 
     Galleries(Colony colony, Runnable changed) {
         this.colony = colony;
@@ -142,6 +180,9 @@ public class Galleries {
         if (!armsPlanned) {
             planArms(level, own);
         }
+        if (armsPlanned) {
+            growTips(level);
+        }
         layOutHoles(level, own);
         boolean foraging = colony.isForagingTime(level);
         if (foraging && !inRound) {
@@ -179,6 +220,9 @@ public class Galleries {
         TunnelRoute.Ground ground = new GroundReader(level, colony, colony.nest().nestCells(level));
         List<NestPlan.ForagingTunnel> planned = planArms(own, ways, ground, center, numbers.armLength(), keepOut);
         arms = List.copyOf(planned);
+        for (NestPlan.ForagingTunnel arm : planned) {
+            newFrom.put(arm.hole(), leadInLength(own, arm));
+        }
         armsPlanned = true;
         changed.run();
         ColonyManager.get(level).markChanged();
@@ -211,6 +255,17 @@ public class Galleries {
             AntColoniesMod.LOGGER.debug("[galleries] an arm to the {}: {} new blocks, hole at {}", way, plan.cells().size(), plan.hole().toShortString());
         }
         return planned;
+    }
+
+    /** How many of an arm's first blocks are a nest tunnel's (its own blocks start after them). */
+    private static int leadInLength(List<NestPlan.ForagingTunnel> own, NestPlan.ForagingTunnel arm) {
+        Set<BlockPos> nest = new HashSet<>();
+        own.forEach(tunnel -> nest.addAll(tunnel.tunnel()));
+        int i = 0;
+        while (i < arm.tunnel().size() && nest.contains(arm.tunnel().get(i))) {
+            i++;
+        }
+        return i;
     }
 
     /** The part of a nest tunnel an arm leaves from: its blocks from the shaft up to the one {@code first} touches. */
@@ -251,6 +306,266 @@ public class Galleries {
         };
     }
 
+    // --- step 2a: the tips grow -------------------------------------------------------------------------------------
+
+    /** An arm's own blocks (not its parent's), the ones it digs. */
+    List<BlockPos> ownCells(NestPlan.ForagingTunnel arm) {
+        int from = Math.min(arm.tunnel().size(), newFrom.getOrDefault(arm.hole(), 0));
+        return arm.tunnel().subList(from, arm.tunnel().size());
+    }
+
+    /**
+     * The blocks the diggers look at for this foraging tunnel: an arm's own blocks (its parent comes before it in the
+     * list), none for a hole along a tunnel (its blocks are the tunnel's), every block for the rest.
+     */
+    public List<BlockPos> digCells(NestPlan.ForagingTunnel tunnel) {
+        if (!isOn()) {
+            return tunnel.tunnel();
+        }
+        if (holesAlongSet.contains(tunnel.hole())) {
+            return List.of();
+        }
+        return newFrom.containsKey(tunnel.hole()) ? ownCells(tunnel) : tunnel.tunnel();
+    }
+
+    /** How many blocks long the galleries are in all (the arms' own blocks). */
+    public int length() {
+        int length = 0;
+        for (NestPlan.ForagingTunnel arm : arms) {
+            length += ownCells(arm).size();
+        }
+        return length;
+    }
+
+    /** How long the galleries may be with the colony's workers now (never shorter than the first arms). */
+    public int lengthAllowed() {
+        return Math.max(baseLength, numbers().lengthFor(colony.getCount(com.antcolonies.entity.WorkerAntEntity.CASTE)));
+    }
+
+    /** How many tips are growing (for the tests and the colony list). */
+    public int tipCount() {
+        return tips.size();
+    }
+
+    /** Tests only: the farthest a tip may grow (null: the species file's reach), to keep a web inside a test's arena. */
+    public void setReachForTests(@Nullable Integer reach) {
+        reachForTests = reach;
+    }
+
+    private int tipReach() {
+        return reachForTests != null ? reachForTests : numbers().reach();
+    }
+
+    /** How far (blocks, sideways from the middle) the farthest hole of the galleries is; 0 while off or before there are any. */
+    public int reach() {
+        if (!isOn()) {
+            return 0;
+        }
+        BlockPos center = colony.getCenter();
+        double far = 0;
+        for (NestPlan.ForagingTunnel arm : arms) {
+            far = Math.max(far, flat(arm.hole(), center));
+        }
+        for (NestPlan.ForagingTunnel hole : holes) {
+            far = Math.max(far, flat(hole.hole(), center));
+        }
+        return (int) Math.round(far);
+    }
+
+    /** The colony's range with the galleries: the farthest hole and the graze round it (0: no galleries yet). */
+    public int range() {
+        int reach = reach();
+        return reach == 0 ? 0 : reach + numbers().foodRadius();
+    }
+
+    /** Once everything planned is dug and the colony may have more: the shortest tip grows by a piece (or forks). */
+    private void growTips(ServerLevel level) {
+        SpeciesProfile.GalleryNumbers numbers = numbers();
+        BlockPos center = colony.getCenter();
+        if (!tipsMade) {
+            tips.clear();
+            for (NestPlan.ForagingTunnel arm : arms) {
+                tips.add(new Tip(arm, bearing(center, arm.hole()), 0, forkAt(numbers, colony.random())));
+            }
+            baseLength = length();
+            tipsMade = true;
+            ColonyManager.get(level).markChanged();
+        }
+        if (tips.isEmpty() || length() >= lengthAllowed()) {
+            return;
+        }
+        for (NestPlan.ForagingTunnel arm : arms) {
+            for (BlockPos cell : ownCells(arm)) {
+                if (!level.isLoaded(cell) || !Nest.isDugOut(level, cell)) {
+                    return; // one piece at a time: the last ones are dug first
+                }
+            }
+        }
+        List<Tip> order = new ArrayList<>(tips);
+        shuffle(order, colony.random());
+        Set<BlockPos> stopped = new HashSet<>();
+        tipFails.forEach((hole, fails) -> {
+            if (fails >= TIP_TRIES) {
+                stopped.add(hole);
+            }
+        });
+        Tip tip = pickTip(order, center, tipReach(), stopped);
+        if (tip == null) {
+            return;
+        }
+        int around = numbers.pieceLength() + TunnelRoute.HOLE_REACH + 2;
+        BlockPos end = tip.end();
+        if (!level.isLoaded(end.offset(around, 0, around)) || !level.isLoaded(end.offset(-around, 0, -around))
+                || !level.isLoaded(end.offset(around, 0, -around)) || !level.isLoaded(end.offset(-around, 0, around))) {
+            return; // (later, once the ground out there is loaded)
+        }
+        int keepOut = colony.profile().nest().foragingHoleDistance() + 1;
+        TunnelRoute.Ground ground = new GroundReader(level, colony, colony.nest().nestCells(level));
+        if (reachForTests != null) {
+            numbers = new SpeciesProfile.GalleryNumbers(numbers.enabled(), numbers.armLength(), numbers.holeSpacing(), numbers.foragersPerHole(),
+                    numbers.rainMore(), numbers.foodRadius(), numbers.explore(), numbers.workersPerBlock(), numbers.maxLength(), reachForTests,
+                    numbers.pieceLength(), numbers.forkMin(), numbers.forkMax(), numbers.forkAngle(), numbers.wander());
+        }
+        List<Tip> grown = grow(tip, tips, ground, center, keepOut, numbers, colony.random());
+        if (grown.isEmpty()) {
+            int fails = tipFails.merge(tip.way().hole(), 1, Integer::sum);
+            if (fails >= TIP_TRIES) {
+                tips.remove(tip); // a dead end: stone, water, a cliff or the edge of the reach all round
+                ColonyManager.get(level).markChanged();
+                AntColoniesMod.LOGGER.debug("[galleries] the tip at {} stops: no way on", end.toShortString());
+            }
+            return;
+        }
+        tips.remove(tip);
+        tips.addAll(grown);
+        List<NestPlan.ForagingTunnel> all = new ArrayList<>(arms);
+        for (Tip piece : grown) {
+            all.add(piece.way());
+            newFrom.put(piece.way().hole(), tip.way().tunnel().size());
+        }
+        arms = List.copyOf(all);
+        changed.run();
+        ColonyManager.get(level).markChanged();
+        AntColoniesMod.LOGGER.debug("[galleries] the tip at {} grows{}: {} blocks of {} allowed", end.toShortString(),
+                grown.size() > 1 ? " and forks" : "", length(), lengthAllowed());
+    }
+
+    /**
+     * The tip that grows next: the shortest (nearest the middle, sideways) of those still short of {@code reach} and not
+     * {@code stopped}; the first in the list on a near tie (the caller shuffles it). Null if none may grow.
+     */
+    @Nullable
+    static Tip pickTip(List<Tip> tips, BlockPos center, int reach, Set<BlockPos> stopped) {
+        Tip best = null;
+        double bestDistance = Double.MAX_VALUE;
+        for (Tip tip : tips) {
+            double distance = flat(tip.way().hole(), center);
+            if (distance < reach - 1 && distance < bestDistance - 0.5 && !stopped.contains(tip.way().hole())) {
+                best = tip;
+                bestDistance = distance;
+            }
+        }
+        return best;
+    }
+
+    /**
+     * One piece of growth from {@code tip} (two when it is time to fork): each way wanders up to {@code wander} degrees,
+     * of a few tried the one farthest from the other tips is taken, never more than {@link #MOST_OFF_OUTWARD} off
+     * straight out; planned by {@link TunnelRoute} round the mound ({@code keepOut}) and kept within the reach. Each new
+     * tip's gallery is the old one with the piece on its end. Empty if no way on was found. Pure (the gallery proof
+     * grows whole webs with it on made-up landscapes).
+     */
+    static List<Tip> grow(Tip tip, List<Tip> tips, TunnelRoute.Ground ground, BlockPos center, int keepOut,
+            SpeciesProfile.GalleryNumbers numbers, RandomSource random) {
+        TunnelRoute.Ground outside = keepOutOf(ground, center, keepOut);
+        boolean fork = tip.sinceFork() + numbers.pieceLength() >= tip.forkAt();
+        double[] ways = fork ? new double[] {tip.bearing() - numbers.forkAngle(), tip.bearing() + numbers.forkAngle()}
+                : new double[] {tip.bearing()};
+        BlockPos end = tip.end();
+        double outward = bearing(center, end);
+        List<BlockPos> others = new ArrayList<>();
+        for (Tip other : tips) {
+            if (other != tip) {
+                others.add(other.way().hole());
+            }
+        }
+        List<Tip> grown = new ArrayList<>();
+        for (double way : ways) {
+            BlockPos target = null;
+            double targetWay = way;
+            double clearest = -1;
+            for (int i = 0; i < WAYS_TRIED; i++) {
+                double tried = way + (random.nextDouble() * 2 - 1) * numbers.wander();
+                double off = wrap(tried - outward);
+                if (Math.abs(off) > MOST_OFF_OUTWARD) {
+                    tried = outward + Math.signum(off) * MOST_OFF_OUTWARD;
+                }
+                // (aimed past the piece's length by the hole's reach: the route stops as soon as its hole is near the aim)
+                int aim = numbers.pieceLength() + TunnelRoute.HOLE_REACH;
+                BlockPos at = end.offset((int) Math.round(Math.cos(Math.toRadians(tried)) * aim), 0,
+                        (int) Math.round(Math.sin(Math.toRadians(tried)) * aim));
+                if (flat(at, center) > numbers.reach() + TunnelRoute.HOLE_REACH) {
+                    continue;
+                }
+                double clear = Double.MAX_VALUE;
+                for (BlockPos other : others) {
+                    clear = Math.min(clear, flat(at, other));
+                }
+                if (clear > clearest) {
+                    clearest = clear;
+                    target = at;
+                    targetWay = tried;
+                }
+            }
+            if (target == null) {
+                continue;
+            }
+            TunnelRoute.Plan plan = TunnelRoute.plan(List.of(end), target, outside, numbers.pieceLength() * 3);
+            if (plan == null || plan.cells().isEmpty() || flat(plan.hole(), center) > numbers.reach()) {
+                continue;
+            }
+            List<BlockPos> cells = new ArrayList<>(tip.way().tunnel());
+            cells.addAll(plan.cells());
+            BlockPos last = plan.cells().get(plan.cells().size() - 1);
+            double grewWay = flat(last, end) < 1 ? targetWay : bearing(end, last);
+            NestPlan.ForagingTunnel piece = new NestPlan.ForagingTunnel(List.copyOf(cells), plan.hole(), sideOf(grewWay));
+            grown.add(new Tip(piece, grewWay, fork ? 0 : tip.sinceFork() + plan.cells().size(),
+                    fork ? forkAt(numbers, random) : tip.forkAt()));
+            others.add(plan.hole());
+        }
+        return grown;
+    }
+
+    /** After how many blocks of growth a tip forks: {@code fork_min} to {@code fork_max}. */
+    private static int forkAt(SpeciesProfile.GalleryNumbers numbers, RandomSource random) {
+        return numbers.forkMin() + random.nextInt(Math.max(1, numbers.forkMax() - numbers.forkMin() + 1));
+    }
+
+    /** The way from {@code from} to {@code to}, in degrees (0 east, 90 south). */
+    static double bearing(BlockPos from, BlockPos to) {
+        return Math.toDegrees(Math.atan2(to.getZ() - from.getZ(), to.getX() - from.getX()));
+    }
+
+    /** An angle brought into -180 to 180 degrees. */
+    private static double wrap(double degrees) {
+        double d = degrees % 360.0;
+        return d > 180 ? d - 360 : d < -180 ? d + 360 : d;
+    }
+
+    /** The side (north, south, east, west) nearest a way in degrees. */
+    private static Direction sideOf(double degrees) {
+        return Direction.getNearest((float) Math.cos(Math.toRadians(degrees)), 0.0F, (float) Math.sin(Math.toRadians(degrees)));
+    }
+
+    private static <T> void shuffle(List<T> list, RandomSource random) {
+        for (int i = list.size() - 1; i > 0; i--) {
+            int j = random.nextInt(i + 1);
+            T swap = list.get(i);
+            list.set(i, list.get(j));
+            list.set(j, swap);
+        }
+    }
+
     // --- the holes along the tunnels -----------------------------------------------------------------------------
 
     /** Holes along every dug tunnel not laid out yet (the nest's own, the arms, the new tunnels to rich food). */
@@ -268,6 +583,7 @@ public class Galleries {
         }
         if (!fresh.isEmpty()) {
             holes.addAll(fresh);
+            fresh.forEach(hole -> holesAlongSet.add(hole.hole()));
             changed.run();
             ColonyManager.get(level).markChanged();
         }
@@ -397,7 +713,8 @@ public class Galleries {
         if (!isOn()) {
             return "";
         }
-        return " | galleries: " + arms.size() + " arms, " + colony.foragingHoles().tunnels(level).size() + " holes, "
+        return " | galleries: " + arms.size() + " pieces, " + tips.size() + " tips, " + length() + " of " + lengthAllowed()
+                + " blocks, reach " + reach() + ", " + colony.foragingHoles().tunnels(level).size() + " holes, "
                 + tonight.size() + " in turn" + (inRound ? "" : " (last time)");
     }
 
@@ -417,6 +734,26 @@ public class Galleries {
         out.put("lastTurn", turns);
         out.putLongArray("tonight", tonight.stream().mapToLong(BlockPos::asLong).toArray());
         out.putBoolean("inRound", inRound);
+        ListTag starts = new ListTag();
+        newFrom.forEach((hole, from) -> {
+            CompoundTag entry = new CompoundTag();
+            entry.putLong("hole", hole.asLong());
+            entry.putInt("from", from);
+            starts.add(entry);
+        });
+        out.put("newFrom", starts);
+        ListTag tipList = new ListTag();
+        for (Tip tip : tips) {
+            CompoundTag entry = new CompoundTag();
+            entry.putLong("hole", tip.way().hole().asLong());
+            entry.putDouble("bearing", tip.bearing());
+            entry.putInt("sinceFork", tip.sinceFork());
+            entry.putInt("forkAt", tip.forkAt());
+            tipList.add(entry);
+        }
+        out.put("tips", tipList);
+        out.putBoolean("tipsMade", tipsMade);
+        out.putInt("baseLength", baseLength);
         tag.put("galleries", out);
     }
 
@@ -440,6 +777,23 @@ public class Galleries {
             tonight.add(BlockPos.of(hole));
         }
         inRound = in.getBoolean("inRound");
+        holesAlongSet.clear();
+        holes.forEach(hole -> holesAlongSet.add(hole.hole()));
+        newFrom.clear();
+        for (Tag element : in.getList("newFrom", Tag.TAG_COMPOUND)) {
+            CompoundTag entry = (CompoundTag) element;
+            newFrom.put(BlockPos.of(entry.getLong("hole")), entry.getInt("from"));
+        }
+        tips.clear();
+        for (Tag element : in.getList("tips", Tag.TAG_COMPOUND)) {
+            CompoundTag entry = (CompoundTag) element;
+            BlockPos hole = BlockPos.of(entry.getLong("hole"));
+            arms.stream().filter(arm -> arm.hole().equals(hole)).findFirst().ifPresent(arm -> tips.add(
+                    new Tip(arm, entry.getDouble("bearing"), entry.getInt("sinceFork"), entry.getInt("forkAt"))));
+        }
+        tipsMade = in.getBoolean("tipsMade");
+        baseLength = in.getInt("baseLength");
+        tipFails.clear();
         changed.run();
     }
 

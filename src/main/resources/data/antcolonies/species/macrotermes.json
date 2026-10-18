@@ -76,14 +76,22 @@
     "crust_walls": true,
     "sheeting": { "max": 3, "max_length": 12 },
     "galleries": {
-      "_note": "Termites underground (docs/plans/termites-underground.md), the switch: enabled false brings back the 2 holes of before, both open every foraging time. Step 1, holes take turns: the tunnels reach out in 4 arms arm_length blocks from the middle; holes about hole_spacing blocks apart along every tunnel; each foraging time 1 hole open per foragers_per_hole foragers (at least 1), rain_more times as many again in the rain; holes with known food within food_radius blocks open first, explore of them (none if only 1 opens, 1 if 2 or 3) go to the holes rested longest (with no known food, all do). My picks, to confirm.",
+      "_note": "Termites underground (docs/plans/termites-underground.md), the switch: enabled false brings back the 2 holes of before, both open every foraging time. Step 1, holes take turns: the tunnels reach out in 4 arms arm_length blocks from the middle; holes about hole_spacing blocks apart along every tunnel; each foraging time 1 hole open per foragers_per_hole foragers (at least 1), rain_more times as many again in the rain; holes with known food within food_radius blocks open first, explore of them (none if only 1 opens, 1 if 2 or 3) go to the holes rested longest (with no known food, all do). Step 2a, galleries grow tip by tip: the galleries in all may be workers / workers_per_block blocks long, at most max_length (the arms are the least; a giant colony would otherwise fill the whole circle), no tip farther than reach blocks from the middle; the shortest tip grows first by piece_length blocks, wandering up to wander degrees and away from the other tips; a tip forks in two (fork_angle degrees either side) after fork_min to fork_max blocks of growth. My picks, to confirm.",
       "enabled": true,
       "arm_length": 16,
       "hole_spacing": 4,
       "foragers_per_hole": 6,
       "rain_more": 0.5,
       "food_radius": 6,
-      "explore": 2
+      "explore": 2,
+      "workers_per_block": 4,
+      "max_length": 600,
+      "reach": 50,
+      "piece_length": 4,
+      "fork_min": 8,
+      "fork_max": 12,
+      "fork_angle": 30,
+      "wander": 20
     }
   },
   "queen_body": {

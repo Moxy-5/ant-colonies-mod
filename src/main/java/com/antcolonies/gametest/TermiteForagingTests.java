@@ -286,6 +286,130 @@ public class TermiteForagingTests {
         });
     }
 
+    /**
+     * Termites underground, step 2a (the galleries grow tip by tip, the user's decisions of 2026-10-17). The same colony
+     * as above, by day (they dig underground day and night), tips kept within 26 blocks of the middle (the arena). With
+     * its 38 workers the colony's arms are already longer than its workers allow: no tip grows. Then 600 worker numbers
+     * join: the tips grow one piece at a time (each dug at once here) until the galleries are as long as the workers allow
+     * (a fork's second piece may go a little over), the tips fork, no hole lies past the reach, holes are laid out along
+     * the new pieces, and the colony's range is the galleries' (the farthest hole and the graze round it).
+     */
+    @GameTest(template = "arena", timeoutTicks = 6000, skyAccess = true)
+    public static void theGalleriesGrowTipByTipWithTheColony(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        int mid = 32;
+        int reach = 26;
+        for (int x = 0; x <= 64; x++) {
+            for (int z = 0; z <= 64; z++) {
+                for (int y = 0; y < SURFACE - 1; y++) {
+                    helper.setBlock(x, y, z, Blocks.DIRT);
+                }
+                helper.setBlock(x, SURFACE - 1, z, Blocks.GRASS_BLOCK);
+            }
+        }
+        helper.spawn(ModEntities.TERMITE_QUEEN.get(), mid, SURFACE, mid);
+        helper.runAfterDelay(5, () -> {
+            for (int i = 0; i < 8; i++) {
+                helper.spawn(ModEntities.TERMITE_WORKER.get(), mid - 2 + i % 4, SURFACE, mid - 3 - i / 4);
+            }
+        });
+        TestClock.still(helper, 12); // midday: the termites stay in, and dig
+        int[] stage = {0};
+        long[] since = {0};
+        int[] holesBefore = {0};
+        int[] lastLength = {-1};
+        int[] mostTips = {0};
+        helper.runAfterDelay(10, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
+            long now = level.getGameTime();
+            for (com.antcolonies.entity.TermiteWorkerEntity worker : TestIsolation.insectsOf(level, colony, com.antcolonies.entity.TermiteWorkerEntity.class)) {
+                worker.setGrownUpAt(now - colony.profile().worker().nurseUntilTicks() - 1000);
+            }
+            TermiteSoldierTests.digNestAtOnce(level, colony);
+            colony.population().addNewMembers(com.antcolonies.entity.WorkerAntEntity.CASTE, now - colony.profile().worker().builderUntilTicks() - 1000, 30);
+            colony.nest().galleries().setSwitchForTests(true);
+            colony.nest().galleries().setReachForTests(reach);
+            stage[0] = 1;
+        });
+        helper.onEachTick(() -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            if (colony == null || stage[0] == 0) {
+                return;
+            }
+            com.antcolonies.colony.Galleries galleries = colony.nest().galleries();
+            java.util.List<NestPlan.ForagingTunnel> tunnels = colony.foragingHoles().tunnels(level);
+            // Whatever is planned is dug at once (the digging itself is the other scenes'): the arms, then each new piece.
+            for (NestPlan.ForagingTunnel tunnel : tunnels) {
+                for (BlockPos cell : galleries.digCells(tunnel)) {
+                    if (!com.antcolonies.colony.Nest.isDugOut(level, cell)) {
+                        level.setBlock(cell, Blocks.AIR.defaultBlockState(), 3);
+                    }
+                }
+            }
+            long tick = helper.getTick();
+            if (tick % 200 == 0) {
+                AntColoniesMod.LOGGER.info("[web-test] tick {}: stage {}{}, range {}", tick, stage[0], galleries.describe(level), colony.foragingRadius());
+            }
+            switch (stage[0]) {
+                case 1 -> { // the arms planned and their tips made: the small colony's galleries stay as they are
+                    if (galleries.tipCount() >= 3) {
+                        since[0]++;
+                        helper.assertTrue(galleries.length() <= galleries.lengthAllowed(),
+                                "a colony of " + colony.getCount(com.antcolonies.entity.WorkerAntEntity.CASTE) + " workers grew its galleries past the arms:"
+                                        + galleries.describe(level));
+                        if (since[0] >= 300) {
+                            holesBefore[0] = tunnels.size();
+                            colony.population().addNewMembers(com.antcolonies.entity.WorkerAntEntity.CASTE, level.getGameTime() - 1000, 600);
+                            AntColoniesMod.LOGGER.info("[web-test] tick {}: 600 workers join, {} blocks allowed", tick, galleries.lengthAllowed());
+                            since[0] = 0;
+                            stage[0] = 2;
+                        }
+                    } else {
+                        helper.assertTrue(tick < 600, "no arms and tips:" + galleries.describe(level));
+                    }
+                }
+                case 2 -> { // growing
+                    mostTips[0] = Math.max(mostTips[0], galleries.tipCount()); // tips at the reach stop, so count the most at once
+                    int pieceLength = colony.profile().nest().galleries().orElseThrow().pieceLength();
+                    helper.assertTrue(galleries.length() <= galleries.lengthAllowed() + 2 * (pieceLength + 3),
+                            "the galleries grew past what the workers allow:" + galleries.describe(level));
+                    for (NestPlan.ForagingTunnel tunnel : tunnels) {
+                        double out = Math.hypot(tunnel.hole().getX() - colony.getCenter().getX(), tunnel.hole().getZ() - colony.getCenter().getZ());
+                        helper.assertTrue(out <= reach + 2.5, "a hole at " + helper.relativePos(tunnel.hole()) + " is " + Math.round(out)
+                                + " blocks out, past the reach of " + reach);
+                    }
+                    if (galleries.length() != lastLength[0]) {
+                        lastLength[0] = galleries.length();
+                        since[0] = 0;
+                    }
+                    if (galleries.length() >= galleries.lengthAllowed()) {
+                        stage[0] = 3;
+                    } else if (++since[0] >= 600) {
+                        // Stopped short of what the workers allow: only right if the tips are all out at the reach.
+                        helper.assertTrue(galleries.reach() >= reach - 3, "the galleries stopped growing short of what the workers allow and of the reach:"
+                                + galleries.describe(level));
+                        stage[0] = 3;
+                    }
+                }
+                default -> {
+                }
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(stage[0] == 3, "the galleries did not grow to what the workers allow (stage " + stage[0] + ")");
+            Colony colony = TermiteMoundTests.colony(helper);
+            com.antcolonies.colony.Galleries galleries = colony.nest().galleries();
+            helper.assertTrue(mostTips[0] > 4, "the tips never forked (at most " + mostTips[0] + " at once):" + galleries.describe(level));
+            helper.assertTrue(galleries.reach() > 20, "the galleries did not grow out past the arms:" + galleries.describe(level));
+            int holes = colony.foragingHoles().tunnels(level).size();
+            helper.assertTrue(holes > holesBefore[0] + 4, "no holes along the new pieces: " + holesBefore[0] + " before, " + holes + " now");
+            helper.assertTrue(colony.foragingRadius() >= galleries.range() && galleries.range() == galleries.reach() + 6,
+                    "the range should be the galleries' (farthest hole " + galleries.reach() + " and the graze): " + colony.foragingRadius());
+        });
+    }
+
     /** Termites head in before dawn: the last in-game hour or so of the night already counts as day for them. */
     @GameTest(template = "arena", timeoutTicks = 100)
     public static void theNightEndsForTermitesBeforeDawn(GameTestHelper helper) {
