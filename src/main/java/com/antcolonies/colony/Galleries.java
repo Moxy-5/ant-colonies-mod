@@ -745,7 +745,7 @@ public class Galleries {
         double most = 2.0 * (numbers().reach() + numbers().pieceLength()) + numbers.within() + 8;
         for (Colony other : ColonyManager.get(level).getColonies()) {
             if (other != colony && other.getSpecies().equals(colony.getSpecies()) && other.nest().galleries().isOn()
-                    && other.getCenter().distSqr(colony.getCenter()) <= most * most) {
+                    && colony.neighbours().canMeet(other) && other.getCenter().distSqr(colony.getCenter()) <= most * most) {
                 near.add(other);
             }
         }

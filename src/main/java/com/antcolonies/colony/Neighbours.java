@@ -18,6 +18,7 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
 
 /**
  * Brain step 4g, step 5: neighbours (the user's decisions in {@code docs/DESIGN.md}, "4g decisions"; plan
@@ -76,9 +77,22 @@ public class Neighbours {
     private final Map<UUID, Long> metAt = new HashMap<>();
     /** Places forgotten since the colony was loaded (for the list). */
     private int forgotten;
+    /** In a game test, the colony's own arena: colonies outside it are not neighbours (tests run side by side). */
+    @Nullable
+    private AABB testFence;
 
     Neighbours(Colony colony) {
         this.colony = colony;
+    }
+
+    /** Game tests only: colonies whose middle lies outside {@code area} are never met (null: no fence). */
+    public void setTestFence(@Nullable AABB area) {
+        testFence = area;
+    }
+
+    /** Whether {@code other} may be met at all (always, outside the game tests). */
+    public boolean canMeet(Colony other) {
+        return testFence == null || testFence.contains(other.getCenter().getCenter());
     }
 
     @Nullable

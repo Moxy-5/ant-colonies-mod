@@ -608,12 +608,12 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
                 other -> other.isAlive() && other.getColonyId() != null && !other.getColonyId().equals(getColonyId())
                         && other.distanceTo(this) <= within)) {
             Colony theirs = other.getColony();
-            if (theirs != null && theirs.getSpecies().equals(colony.getSpecies())) {
+            if (theirs != null && theirs.getSpecies().equals(colony.getSpecies()) && colony.neighbours().canMeet(theirs)) {
                 colony.neighbours().met(level, blockPosition(), theirs.getId(), other.getUUID());
             }
         }
         for (Colony theirs : ColonyManager.get(level).getColonies()) {
-            if (theirs != colony && theirs.getSpecies().equals(colony.getSpecies())
+            if (theirs != colony && theirs.getSpecies().equals(colony.getSpecies()) && colony.neighbours().canMeet(theirs)
                     && theirs.getCenter().distSqr(blockPosition()) <= Mth.square(theirs.trunkTrails().longestTip() + 2.0)
                     && theirs.trunkTrails().isOnTrail(blockPosition())) {
                 UUID trail = new UUID(theirs.getId().getMostSignificantBits() ^ getUUID().getMostSignificantBits(),
