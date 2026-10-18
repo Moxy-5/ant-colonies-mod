@@ -346,6 +346,7 @@ Ranked by value for the coming work (Matabele ants and fights first, then the sa
 - **Size:** small to medium. **Depends on:** B1.
 
 ### B11. The termites onto the motion library
+- **Planned with the user 2026-10-18:** `docs/plans/termite-walks.md` (not built yet).
 - **What:** the termites still walk with the old hand-set walk (`walk_legs` in `tools/termite_models.py`: feet slide,
   no stride note, the game guesses the playback speed), and have no turning, cleaning or digging clips
   (`hasWorkClips` is false for them). With B1 and B2 they get the planted-feet walks and turns in an afternoon.
