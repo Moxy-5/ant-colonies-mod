@@ -161,6 +161,12 @@ public class AntNavigator {
      * rather not make. Unlike the mind's costs they give way: when no route keeps to them, it is planned without them.
      */
     private AntPathFinder.StepCosts habits = AntPathFinder.StepCosts.NONE;
+    /** The insect's own pace on floors (ticks a step, averaged over its last steps; 0 before its first), for a hidden trip's time. */
+    private double pace;
+    /** While a hidden trip of this walk is under way: the route and the step it went under at (a break-in puts it back mid-way). */
+    @Nullable
+    private Route underRoute;
+    private int underFrom = -1;
 
     public AntNavigator(AbstractAntEntity ant) {
         this.ant = ant;
@@ -506,6 +512,9 @@ public class AntNavigator {
             arrive(map);
             return;
         }
+        if (stepTicks == 0 && leg == 0 && goUnder()) {
+            return; // out of the world along a hidden stretch of the galleries: it comes back at the far end
+        }
         Route.Step step = route.step(next);
         stepFrom = at;
         stepTo = step.to();
@@ -519,6 +528,10 @@ public class AntNavigator {
             return;
         }
         if (advance(map, at, step)) {
+            if (step.kind() == StepKind.WALK) {
+                double took = Math.min(40, stepTicks + 1);
+                pace = pace <= 0 ? took : pace * 0.9 + took * 0.1;
+            }
             at = step.to();
             next++;
             startLeg();
@@ -533,6 +546,88 @@ public class AntNavigator {
             return;
         }
         faceTheWayItGoes();
+    }
+
+    // --- Hidden trips (termites underground, step 2b): a long closed stretch of the galleries is travelled unseen ---
+
+    /**
+     * At the start of a step: if the route runs from here along at least {@link HiddenWays#shortest} steps of hidden way
+     * (the insect's colony's closed galleries), the stretch is handed to the hidden ways, which take the insect out of
+     * the world for as long as the walk takes at its own pace. Its route goes on from the stretch's far end (the last
+     * floor of it), where it is put back. True if it went.
+     */
+    private boolean goUnder() {
+        if (at == null || !at.isFloor()) {
+            return false;
+        }
+        HiddenWays ways = ant.hiddenWays();
+        if (ways == null || !ways.isHidden(at.cell())) {
+            return false;
+        }
+        int end = next - 1;
+        while (end + 1 < route.size() && route.step(end + 1).kind() != StepKind.FALL && ways.isHidden(route.step(end + 1).to().cell())) {
+            end++;
+        }
+        while (end > next - 1 && !route.step(end).to().isFloor()) {
+            end--;
+        }
+        if (end - (next - 1) < ways.shortest()) {
+            return false;
+        }
+        List<Foothold> run = new ArrayList<>();
+        run.add(at);
+        for (int i = next; i <= end; i++) {
+            run.add(route.step(i).to());
+        }
+        long ticks = Math.max(1, Math.round((run.size() - 1) * stepPace()));
+        Route walked = route;
+        int from = next - 1;
+        if (!ways.goUnder(ant, run, ticks)) {
+            return false;
+        }
+        underRoute = walked;
+        underFrom = from;
+        at = walked.step(end).to();
+        next = end + 1;
+        surface = Direction.DOWN;
+        startLeg();
+        stepTicks = 0;
+        arriveTicks = 0;
+        blockedTicks = 0;
+        return true;
+    }
+
+    /** Ticks a step takes this insect on a floor: its own pace once it has walked a few, else worked out from its speed. */
+    private double stepPace() {
+        if (pace > 0) {
+            return pace;
+        }
+        double perTick = 1.2 * ant.getAttributeValue(Attributes.MOVEMENT_SPEED) * speed;
+        return perTick <= 0.01 ? 20.0 : 1.0 / perTick;
+    }
+
+    /**
+     * Back in the world from a hidden trip, at the foothold {@code index} of its stretch ({@code where}): the far end, or
+     * mid-way when someone broke into the gallery. The walk goes on from there (if it is still the walk it went under on;
+     * after a game was loaded again it is a new insect with no walk, and just stands there).
+     */
+    public void cameUp(int index, Foothold where) {
+        if (route != null && route == underRoute && underFrom >= 0 && underFrom + index < route.size()
+                && route.step(underFrom + index).to().equals(where)) {
+            at = where;
+            next = underFrom + index + 1;
+        } else if (route == null) {
+            at = where;
+        }
+        underRoute = null;
+        underFrom = -1;
+        surface = Direction.DOWN;
+        attached = false;
+        startLeg();
+        stepTicks = 0;
+        arriveTicks = 0;
+        blockedTicks = 0;
+        blockedFrom = ant.position();
     }
 
     /** Moves the insect one tick along a step. True once the step is done (this tick's motion completes it). */

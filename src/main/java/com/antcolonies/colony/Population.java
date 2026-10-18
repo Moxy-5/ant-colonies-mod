@@ -434,7 +434,8 @@ public class Population {
         for (Map.Entry<String, Integer> entry : wanted.entrySet()) {
             String caste = entry.getKey();
             List<AbstractAntEntity> mobs = byCaste.getOrDefault(caste, List.of());
-            int have = mobs.size();
+            // The ones travelling unseen along the galleries are real ones too, out of the world for a while (HiddenTrips).
+            int have = mobs.size() + colony.hiddenTrips().travelling(caste);
             int want = entry.getValue();
             while (have < want && swaps > 0 && inside(caste) > 0) {
                 if (rooms == null) {

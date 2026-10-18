@@ -3,6 +3,8 @@ package com.antcolonies.gametest;
 import static com.antcolonies.gametest.TermiteMoundTests.MIDDLE;
 import static com.antcolonies.gametest.TermiteMoundTests.SURFACE;
 
+import org.jetbrains.annotations.Nullable;
+
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.FoodWays;
@@ -259,63 +261,18 @@ public class TermiteNewHoleTests {
     @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
     public static void foragersWalkALongGalleryOutAndBack(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        level.getServer().tickRateManager().setTickRate(2000.0F);
-        for (int x = 0; x <= MIDDLE + LONG_HAY_EAST + 6; x++) {
-            for (int z = 0; z < 25; z++) {
-                for (int y = 0; y < SURFACE - 1; y++) {
-                    helper.setBlock(x, y, z, Blocks.DIRT);
-                }
-                helper.setBlock(x, SURFACE - 1, z, Blocks.GRASS_BLOCK);
-            }
-        }
-        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
-        helper.runAfterDelay(5, () -> {
-            for (int i = 0; i < 16; i++) {
-                helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE - 4 + i % 8, SURFACE, MIDDLE - 2 - i / 8);
-            }
-        });
+        // The legs walking the whole gallery (what a break-in into a hidden trip leaves them to do): no hidden trips here.
+        LongGallery scene = new LongGallery(helper, false);
         StuckWatcher.Tracker watcher = StuckWatcher.watch(helper, () -> TermiteMoundTests.colony(helper));
-        BlockPos hay = helper.absolutePos(new BlockPos(MIDDLE + LONG_HAY_EAST, SURFACE, MIDDLE));
         TestClock clock = TestClock.moving(helper, 18.5);
-        FoodWays.NewTunnel[] tunnel = {null};
+        FoodWays.NewTunnel[] tunnel = scene.tunnel;
         // Each worker on its way home: 1 came out of the far hole, 2 seen in the middle of the tunnel since; and when it was last outside.
         java.util.Map<java.util.UUID, Integer> stage = new java.util.HashMap<>();
         java.util.Map<java.util.UUID, Integer> outAt = new java.util.HashMap<>();
         java.util.List<Integer> tripTicks = new java.util.ArrayList<>();
-        helper.runAfterDelay(10, () -> {
-            Colony colony = TermiteMoundTests.colony(helper);
-            helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
-            long now = level.getGameTime();
-            int i = 0;
-            for (TermiteWorkerEntity worker : level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds())) {
-                // 3 builders (they dig the feeding gallery), the rest old foragers.
-                worker.setGrownUpAt(now - (i++ < 3 ? colony.profile().worker().nurseUntilTicks() : colony.profile().worker().builderUntilTicks()) - 1000);
-            }
-            TermiteSoldierTests.digNestAtOnce(level, colony);
-            colony.population().addNewMembers(WorkerAntEntity.CASTE, now - 1000, 500);
-            level.setBlock(hay, Blocks.HAY_BLOCK.defaultBlockState(), 3);
-            colony.food().rescanPlantsSoon();
-            colony.foodMap().knowForTests(hay);
-        });
         helper.onEachTick(() -> {
             Colony colony = TermiteMoundTests.colony(helper);
-            if (colony == null || helper.getTick() < 20) {
-                return;
-            }
-            if (colony.food().getPiecesCut(hay) > 24) {
-                colony.food().setPiecesCutForTests(hay, 0); // a bigger stack of hay: it lasts the whole test
-            }
-            if (tunnel[0] == null) {
-                if (!colony.nest().foodWays().getNewTunnels().isEmpty()) {
-                    tunnel[0] = colony.nest().foodWays().getNewTunnels().get(0);
-                    for (BlockPos cell : tunnel[0].tunnel().tunnel()) {
-                        level.setBlock(cell, Blocks.AIR.defaultBlockState(), 3); // the ready-made gallery
-                    }
-                    AntColoniesMod.LOGGER.info("[long-walk] a tunnel of {} blocks dug at once, hole at {}", tunnel[0].tunnel().tunnel().size(),
-                            helper.relativePos(tunnel[0].tunnel().hole()));
-                } else {
-                    helper.assertTrue(helper.getTick() < 1000, "no tunnel was planned to the hay: " + colony.foragingHoles().describeNewHoles(level));
-                }
+            if (!scene.tick(colony)) {
                 return;
             }
             java.util.List<BlockPos> cells = tunnel[0].tunnel().tunnel();
@@ -364,6 +321,240 @@ public class TermiteNewHoleTests {
                 helper.succeed();
             }
         });
+    }
+
+    /** How many hidden trips must come out at the far end of their stretch (both ways) before the save and the break-in. */
+    private static final int HIDDEN_ARRIVALS = 3;
+
+    /**
+     * Termites underground, step 2b: hidden trips (the user's rule of 2026-10-17). In the long gallery, a termite whose
+     * route runs along a long closed stretch of the tunnel leaves the world and comes back at the far end after the
+     * walk's time: while it travels it is in no place in the world; its stretch is at least the species file's
+     * {@code hidden_trip} steps; its time is a walk's (2 to 20 ticks a step); when its trip ends it is back in the world
+     * where its stretch ends (or, if something broke in on the way, where it was by then); trips go both ways. Then the
+     * game is saved and loaded while some travel (they come out as they were, each once). Then a player breaks into the
+     * gallery (the roof over a traveller's stretch, ahead of it): every termite travelling there shows up where it would
+     * be by then, at once (within the colony's second), none left hidden; and they walk on (the stuck watcher).
+     */
+    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
+    public static void hiddenTripsGoUnseenAndShowUpWhereTheyAreWhenTheGalleryIsBrokenInto(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        LongGallery scene = new LongGallery(helper, true);
+        StuckWatcher.Tracker watcher = StuckWatcher.watch(helper, () -> TermiteMoundTests.colony(helper));
+        TestClock clock = TestClock.moving(helper, 18.5);
+        // Each traveller seen: where its stretch ends, whether it goes outward, when it is due, and where it would be last tick.
+        java.util.Map<java.util.UUID, BlockPos> endOf = new java.util.HashMap<>();
+        java.util.Map<java.util.UUID, Boolean> outwardOf = new java.util.HashMap<>();
+        java.util.Map<java.util.UUID, Long> dueAt = new java.util.HashMap<>();
+        java.util.Map<java.util.UUID, BlockPos> lastWhere = new java.util.HashMap<>();
+        java.util.Set<java.util.UUID> putBack = new java.util.HashSet<>();
+        java.util.Set<java.util.UUID> stillHidden = new java.util.HashSet<>();
+        int[] stage = {0}; // 0 trips both ways, 1 the save and load, 2 the break-in, 3 walking on
+        int[] arrivals = {0};
+        boolean[] outward = {false};
+        boolean[] homeward = {false};
+        java.util.List<java.util.UUID> loaded = new java.util.ArrayList<>();
+        long[] stageAt = {0};
+        int[] brokenBefore = {0};
+        helper.onEachTick(() -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            if (!scene.tick(colony)) {
+                return;
+            }
+            com.antcolonies.colony.HiddenTrips trips = colony.hiddenTrips();
+            long now = level.getGameTime();
+            BlockPos center = colony.getCenter();
+            int shortest = trips.shortest();
+            for (java.util.UUID id : trips.travellers()) {
+                helper.assertTrue(level.getEntity(id) == null, "a termite travelling unseen is still in the world");
+                java.util.List<BlockPos> run = trips.runOf(id);
+                if (!endOf.containsKey(id)) {
+                    long[] times = trips.timesOf(id);
+                    double perStep = (times[1] - times[0]) / (double) (run.size() - 1);
+                    helper.assertTrue(run.size() - 1 >= shortest, "a hidden stretch of only " + (run.size() - 1) + " steps (at least " + shortest + ")");
+                    helper.assertTrue(perStep >= 2 && perStep <= 20, "a hidden trip of " + String.format("%.1f", perStep) + " ticks a step: not a walk's pace");
+                    BlockPos end = run.get(run.size() - 1);
+                    endOf.put(id, end);
+                    outwardOf.put(id, end.distSqr(center) > run.get(0).distSqr(center));
+                    dueAt.put(id, times[1]);
+                    AntColoniesMod.LOGGER.info("[hidden-test] tick {}: a trip of {} steps, {} ticks a step, from {} to {}", helper.getTick(),
+                            run.size() - 1, String.format("%.1f", perStep), helper.relativePos(run.get(0)), helper.relativePos(end));
+                }
+                helper.assertTrue(now <= dueAt.get(id) + 60, "a hidden trip due out at " + dueAt.get(id) + " is still under way at " + now);
+                lastWhere.put(id, trips.whereNow(id, now));
+            }
+            // Every trip that has ended: the termite is back in the world, where its stretch ends, or where it was by then
+            // (a hole opening on its way or the player's break-in put it back early).
+            for (java.util.Iterator<java.util.Map.Entry<java.util.UUID, BlockPos>> it = endOf.entrySet().iterator(); it.hasNext(); ) {
+                java.util.Map.Entry<java.util.UUID, BlockPos> entry = it.next();
+                java.util.UUID id = entry.getKey();
+                if (trips.isTravelling(id)) {
+                    continue;
+                }
+                net.minecraft.world.entity.Entity back = level.getEntity(id);
+                helper.assertTrue(back != null, "a termite whose hidden trip ended is not back in the world");
+                BlockPos at = back.blockPosition();
+                BlockPos was = lastWhere.get(id);
+                boolean atEnd = at.distManhattan(entry.getValue()) <= 2;
+                helper.assertTrue(atEnd || (was != null && at.distManhattan(was) <= 2), "a termite came out of its hidden trip at "
+                        + helper.relativePos(at) + ", neither at its stretch's end " + helper.relativePos(entry.getValue())
+                        + " nor where it was by then " + (was == null ? "(unknown)" : helper.relativePos(was)));
+                if (atEnd && !putBack.contains(id)) {
+                    arrivals[0]++;
+                    if (outwardOf.get(id)) {
+                        outward[0] = true;
+                    } else {
+                        homeward[0] = true;
+                    }
+                }
+                loaded.remove(id);
+                it.remove();
+            }
+            switch (stage[0]) {
+                case 0 -> {
+                    if (arrivals[0] >= HIDDEN_ARRIVALS && outward[0] && homeward[0] && trips.travelling() > 0) {
+                        // The game saved and loaded while some travel: they come out as they were, each once.
+                        loaded.addAll(trips.travellers());
+                        Colony copy = Colony.load(colony.save());
+                        com.antcolonies.colony.ColonyManager.get(level).replaceForTests(copy);
+                        copy.hiddenTrips().setOnForTests(true);
+                        AntColoniesMod.LOGGER.info("[hidden-test] tick {} {}: saved and loaded with {} travelling", helper.getTick(), clock.describe(), loaded.size());
+                        stage[0] = 1;
+                        stageAt[0] = helper.getTick();
+                    }
+                }
+                case 1 -> {
+                    if (loaded.isEmpty()) {
+                        stage[0] = 2;
+                        stageAt[0] = helper.getTick();
+                    }
+                }
+                case 2 -> {
+                    // A traveller a quarter to two thirds of the way: the player digs out the roof over its stretch, ahead of it.
+                    for (java.util.UUID id : trips.travellers()) {
+                        long[] times = trips.timesOf(id);
+                        double done = (now - times[0]) / (double) (times[1] - times[0]);
+                        java.util.List<BlockPos> run = trips.runOf(id);
+                        if (done < 0.25 || done > 0.66 || run.size() < 16) {
+                            continue;
+                        }
+                        BlockPos under = null;
+                        for (int i = run.size() * 3 / 4; i < run.size() - 1 && under == null; i++) {
+                            if (!level.getBlockState(run.get(i).above()).isAir()) {
+                                under = run.get(i); // a cell with a roof of its own (not more tunnel above it)
+                            }
+                        }
+                        if (under == null) {
+                            continue;
+                        }
+                        level.setBlock(under.above(), Blocks.AIR.defaultBlockState(), 3);
+                        brokenBefore[0] = trips.brokenInto();
+                        for (java.util.UUID other : trips.travellers()) {
+                            if (trips.runOf(other).contains(under)) {
+                                putBack.add(other);
+                                stillHidden.add(other);
+                            }
+                        }
+                        AntColoniesMod.LOGGER.info("[hidden-test] tick {}: the roof over {} broken, {} travelling there", helper.getTick(),
+                                helper.relativePos(under), putBack.size());
+                        stage[0] = 3;
+                        stageAt[0] = helper.getTick();
+                        break;
+                    }
+                }
+                case 3 -> {
+                    // Once out, a termite put back may start a new hidden trip of its own later: only the trip broken into counts.
+                    stillHidden.removeIf(id -> !trips.isTravelling(id));
+                    helper.assertTrue(stillHidden.isEmpty() || helper.getTick() - stageAt[0] <= 25,
+                            "a termite still travelling unseen through a gallery broken into " + (helper.getTick() - stageAt[0]) + " ticks ago");
+                    if (helper.getTick() - stageAt[0] >= 400) {
+                        helper.assertTrue(trips.brokenInto() > brokenBefore[0], "no trip was counted as broken into");
+                        AntColoniesMod.LOGGER.info("[hidden-test] done: {} arrivals, {} put back by the break-in{}", arrivals[0], putBack.size(),
+                                trips.describe());
+                        helper.succeed();
+                    }
+                }
+                default -> {
+                }
+            }
+            if (helper.getTick() % 1000 == 0) {
+                AntColoniesMod.LOGGER.info("[hidden-test] tick {} {}: stage {}, {} arrivals (out {}, home {}){}, {} insect-ticks watched underground",
+                        helper.getTick(), clock.describe(), stage[0], arrivals[0], outward[0], homeward[0], trips.describe(), watcher.watchedTicks());
+            }
+        });
+    }
+
+    /**
+     * The long gallery (the long walk and the hidden trips): a big colony (16 real workers, 3 of them builders, the rest
+     * old foragers, and 500 numbers) knows of hay {@value #LONG_HAY_EAST} blocks east; once it has planned its tunnel
+     * there, the tunnel is dug out at once (a ready-made gallery). The hay lasts the whole test.
+     */
+    static final class LongGallery {
+        final GameTestHelper helper;
+        final BlockPos hay;
+        final FoodWays.NewTunnel[] tunnel = {null};
+
+        LongGallery(GameTestHelper helper, boolean hiddenTrips) {
+            this.helper = helper;
+            ServerLevel level = helper.getLevel();
+            level.getServer().tickRateManager().setTickRate(2000.0F);
+            for (int x = 0; x <= MIDDLE + LONG_HAY_EAST + 6; x++) {
+                for (int z = 0; z < 25; z++) {
+                    for (int y = 0; y < SURFACE - 1; y++) {
+                        helper.setBlock(x, y, z, Blocks.DIRT);
+                    }
+                    helper.setBlock(x, SURFACE - 1, z, Blocks.GRASS_BLOCK);
+                }
+            }
+            helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+            helper.runAfterDelay(5, () -> {
+                for (int i = 0; i < 16; i++) {
+                    helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE - 4 + i % 8, SURFACE, MIDDLE - 2 - i / 8);
+                }
+            });
+            hay = helper.absolutePos(new BlockPos(MIDDLE + LONG_HAY_EAST, SURFACE, MIDDLE));
+            helper.runAfterDelay(10, () -> {
+                Colony colony = TermiteMoundTests.colony(helper);
+                helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
+                long now = level.getGameTime();
+                int i = 0;
+                for (TermiteWorkerEntity worker : level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds())) {
+                    // 3 builders (they dig the feeding gallery), the rest old foragers.
+                    worker.setGrownUpAt(now - (i++ < 3 ? colony.profile().worker().nurseUntilTicks() : colony.profile().worker().builderUntilTicks()) - 1000);
+                }
+                TermiteSoldierTests.digNestAtOnce(level, colony);
+                colony.population().addNewMembers(WorkerAntEntity.CASTE, now - 1000, 500);
+                colony.hiddenTrips().setOnForTests(hiddenTrips);
+                level.setBlock(hay, Blocks.HAY_BLOCK.defaultBlockState(), 3);
+                colony.food().rescanPlantsSoon();
+                colony.foodMap().knowForTests(hay);
+            });
+        }
+
+        /** Each tick: the hay kept, the tunnel dug at once once it is planned. True once the tunnel is there. */
+        boolean tick(@Nullable Colony colony) {
+            ServerLevel level = helper.getLevel();
+            if (colony == null || helper.getTick() < 20) {
+                return false;
+            }
+            if (colony.food().getPiecesCut(hay) > 24) {
+                colony.food().setPiecesCutForTests(hay, 0); // a bigger stack of hay: it lasts the whole test
+            }
+            if (tunnel[0] == null) {
+                if (!colony.nest().foodWays().getNewTunnels().isEmpty()) {
+                    tunnel[0] = colony.nest().foodWays().getNewTunnels().get(0);
+                    for (BlockPos cell : tunnel[0].tunnel().tunnel()) {
+                        level.setBlock(cell, Blocks.AIR.defaultBlockState(), 3); // the ready-made gallery
+                    }
+                    AntColoniesMod.LOGGER.info("[long-walk] a tunnel of {} blocks dug at once, hole at {}", tunnel[0].tunnel().tunnel().size(),
+                            helper.relativePos(tunnel[0].tunnel().hole()));
+                } else {
+                    helper.assertTrue(helper.getTick() < 1000, "no tunnel was planned to the hay: " + colony.foragingHoles().describeNewHoles(level));
+                }
+                return false;
+            }
+            return true;
+        }
     }
 
     /** The cell of a feeding gallery next to the end of its tunnel (the gallery's way in). */

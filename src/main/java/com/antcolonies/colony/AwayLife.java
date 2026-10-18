@@ -158,6 +158,16 @@ public class AwayLife {
         }
     }
 
+    /**
+     * An insect that left the world another way while its colony goes out of range (a hidden trip, {@link HiddenTrips}):
+     * folded into the numbers at once with what it carries, as if it had walked home.
+     */
+    void foldInNow(ServerLevel level, AbstractAntEntity mob) {
+        long now = level.getGameTime();
+        long grownUpAt = mob.getGrownUpAt() == AbstractAntEntity.AGE_NOT_SET ? now : mob.getGrownUpAt();
+        foldIn(level, mob.getUUID(), new Frozen(Kind.ADULT, mob.nestCaste(), grownUpAt, loadOf(mob), 0, 0, null, now, false, mob.getLastMeal()));
+    }
+
     private static Load loadOf(AbstractAntEntity mob) {
         if (mob.isCarryingEgg()) {
             return Load.EGG;
@@ -205,6 +215,7 @@ public class AwayLife {
             }
         }
         if (isAway(level)) {
+            colony.hiddenTrips().tickAway(level);
             colony.population().tickAway(level);
             colony.life().tick(level, true);
             colony.patrol().tick(level, true);

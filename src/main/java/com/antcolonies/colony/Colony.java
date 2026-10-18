@@ -97,6 +97,7 @@ public class Colony {
     private final ForagerSpots spots;
     private final Door door;
     private final Recruits recruits;
+    private final HiddenTrips hiddenTrips;
     private final FungusGarden garden;
     private final Mushrooms mushrooms;
     private final Soldiers soldiers;
@@ -132,6 +133,7 @@ public class Colony {
         this.spots = new ForagerSpots(this);
         this.door = new Door(this);
         this.recruits = new Recruits(this);
+        this.hiddenTrips = new HiddenTrips(this);
         this.garden = new FungusGarden(this);
         this.mushrooms = new Mushrooms(this);
         this.soldiers = new Soldiers(this);
@@ -233,6 +235,11 @@ public class Colony {
     /** Recruiting to rich patches: the scent lines and the nestmates called out (species with {@code food.search.recruit}). */
     public Recruits recruits() {
         return recruits;
+    }
+
+    /** Insects travelling unseen along the galleries (termites underground, step 2b). */
+    public HiddenTrips hiddenTrips() {
+        return hiddenTrips;
     }
 
     /** How many foragers go out: the touches of the homecomers (Gordon's rule, species with {@code food.door}). */
@@ -508,6 +515,7 @@ public class Colony {
         foodMap.tick(level);
         foragingHoles.tick(level);
         nest.galleries().tick(level);
+        hiddenTrips.tick(level);
         food.barePatches().tick(level);
         population.tick(level);
         life.tick(level, false);
@@ -748,6 +756,7 @@ public class Colony {
         garden.save(tag);
         workerFood.save(tag);
         trunkTrails.save(tag);
+        hiddenTrips.save(tag);
         patrol.save(tag);
         spots.save(tag);
         door.save(tag);
@@ -787,6 +796,7 @@ public class Colony {
         colony.garden.load(tag);
         colony.workerFood.load(tag);
         colony.trunkTrails.load(tag);
+        colony.hiddenTrips.load(tag);
         colony.patrol.load(tag);
         colony.spots.load(tag);
 

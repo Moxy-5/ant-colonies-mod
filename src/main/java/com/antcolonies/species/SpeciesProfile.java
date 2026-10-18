@@ -883,7 +883,7 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * {@code explore} of them (none if only 1 opens, 1 if 2 or 3) go to the holes rested longest. My picks for the numbers, to confirm.
      */
     public record GalleryNumbers(boolean enabled, int armLength, int holeSpacing, int foragersPerHole, double rainMore, int foodRadius, int explore,
-            int workersPerBlock, int maxLength, int reach, int pieceLength, int forkMin, int forkMax, int forkAngle, int wander) {
+            int workersPerBlock, int maxLength, int reach, int pieceLength, int forkMin, int forkMax, int forkAngle, int wander, int hiddenTrip) {
         public static final Codec<GalleryNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.BOOL.optionalFieldOf("enabled", false).forGetter(GalleryNumbers::enabled),
                 Codec.INT.optionalFieldOf("arm_length", 16).forGetter(GalleryNumbers::armLength),
@@ -899,12 +899,13 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 Codec.INT.optionalFieldOf("fork_min", 8).forGetter(GalleryNumbers::forkMin),
                 Codec.INT.optionalFieldOf("fork_max", 12).forGetter(GalleryNumbers::forkMax),
                 Codec.INT.optionalFieldOf("fork_angle", 30).forGetter(GalleryNumbers::forkAngle),
-                Codec.INT.optionalFieldOf("wander", 20).forGetter(GalleryNumbers::wander)
+                Codec.INT.optionalFieldOf("wander", 20).forGetter(GalleryNumbers::wander),
+                Codec.INT.optionalFieldOf("hidden_trip", 12).forGetter(GalleryNumbers::hiddenTrip)
         ).apply(i, GalleryNumbers::new));
 
         /** Step 1's numbers only (growing with the step 2 defaults). */
         public GalleryNumbers(boolean enabled, int armLength, int holeSpacing, int foragersPerHole, double rainMore, int foodRadius, int explore) {
-            this(enabled, armLength, holeSpacing, foragersPerHole, rainMore, foodRadius, explore, 4, 600, 50, 4, 8, 12, 30, 20);
+            this(enabled, armLength, holeSpacing, foragersPerHole, rainMore, foodRadius, explore, 4, 600, 50, 4, 8, 12, 30, 20, 12);
         }
 
         /** How many blocks of gallery a colony with this many workers may have in all, at most max_length (0 when it does not grow). */

@@ -782,6 +782,19 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return mayGoOut() || colony == null || colony.nest().isInside(level(), cell);
     }
 
+    /**
+     * The hidden ways this insect's legs may travel unseen (its colony's closed galleries, termites underground step 2b,
+     * {@code colony.HiddenTrips}), or null: none, or an insect its colony does not count (a queen, a king).
+     */
+    @Nullable
+    public com.antcolonies.nav.HiddenWays hiddenWays() {
+        if (nestCaste() == null || !(level() instanceof ServerLevel serverLevel)) {
+            return null;
+        }
+        Colony colony = getColony();
+        return colony == null ? null : colony.hiddenTrips().ways(serverLevel);
+    }
+
     /** Tests only: the habits every walk gets (null: the usual ones, see {@link #walkHabits}). */
     @Nullable
     private AntPathFinder.StepCosts habitsForTests;

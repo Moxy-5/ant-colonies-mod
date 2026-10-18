@@ -131,7 +131,7 @@ public class Galleries {
         changed.run();
     }
 
-    private SpeciesProfile.GalleryNumbers numbers() {
+    SpeciesProfile.GalleryNumbers numbers() {
         return colony.profile().nest().galleries().orElse(DEFAULT);
     }
 
@@ -424,7 +424,7 @@ public class Galleries {
         if (reachForTests != null) {
             numbers = new SpeciesProfile.GalleryNumbers(numbers.enabled(), numbers.armLength(), numbers.holeSpacing(), numbers.foragersPerHole(),
                     numbers.rainMore(), numbers.foodRadius(), numbers.explore(), numbers.workersPerBlock(), numbers.maxLength(), reachForTests,
-                    numbers.pieceLength(), numbers.forkMin(), numbers.forkMax(), numbers.forkAngle(), numbers.wander());
+                    numbers.pieceLength(), numbers.forkMin(), numbers.forkMax(), numbers.forkAngle(), numbers.wander(), numbers.hiddenTrip());
         }
         List<Tip> grown = grow(tip, tips, ground, center, keepOut, numbers, colony.random());
         if (grown.isEmpty()) {

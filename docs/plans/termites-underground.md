@@ -99,6 +99,10 @@ in-game) and **2b** (hidden trips).
 ### 2b: hidden trips
 - A termite going into a long gallery (my pick: over about 12 blocks) becomes a number and comes out at the far hole
   after the walk's time; breaking in (anything, see above) shows them where they would be along the way.
+- **BUILT 2026-10-17** (`colony/HiddenTrips`, `nav/HiddenWays`, `AntNavigator.goUnder`/`cameUp`; switch
+  `nest.galleries.hidden_trip`, 0 = off). Not a number in the population: the same insect, taken out of the world and
+  put back (its job, load and route kept), counted among the real mobs meanwhile. Break-ins looked for once a second.
+  Game test `hiddenTripsGoUnseenAndShowUpWhereTheyAreWhenTheGalleryIsBrokenInto`. To be tried in-game with 2a.
 
 ## Step 3: growing toward food
 - Food found from a hole pulls the nearest tip toward it; rich food gets its feeding gallery as today. Today's
