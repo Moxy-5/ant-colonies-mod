@@ -189,8 +189,8 @@ public class TrunkTrails {
     public Trail pickForSearch(Level level, net.minecraft.util.RandomSource random) {
         List<Trail> safe = new ArrayList<>();
         for (Trail trail : trails) {
-            if (!dangerAlong(level, trail, Math.max(0, trail.reach - 1))) {
-                safe.add(trail); // (a trail through remembered danger draws no searchers: brain step 4g)
+            if (!dangerAlong(level, trail, Math.max(0, trail.reach - 1)) && !colony.neighbours().turnsFrom(level, trail.angle)) {
+                safe.add(trail); // (a trail through remembered danger, or toward a neighbour the colony yields to, draws no searchers: brain step 4g)
             }
         }
         double total = 0;
@@ -348,7 +348,7 @@ public class TrunkTrails {
         double angle = angleOf(plant);
         Trail trail = nearest(angle, numbers);
         if (trail == null) {
-            trail = maybeLayNewTrail(angle, now, numbers);
+            trail = maybeLayNewTrail(level, angle, now, numbers);
         }
         if (trail == null) {
             return null;
@@ -356,6 +356,9 @@ public class TrunkTrails {
         int column = leaveAt(trail, plant);
         while (column > 0 && !insideFence(trail, column)) {
             column--; // (a game test's trail stops at its arena's edge)
+        }
+        while (column > 0 && colony.neighbours().yieldsAt(level, columnPos(trail, column))) {
+            column--; // (brain step 4g, step 5: the tip is held short of where the colony yields to a neighbour)
         }
         for (int i = 0; i <= column; i++) {
             trail.wear[i] = Math.min(trail.wear[i] + 1, 1_000_000);
@@ -373,7 +376,7 @@ public class TrunkTrails {
      * direction (unless that is too near a trail already there).
      */
     @Nullable
-    private Trail maybeLayNewTrail(double angle, long now, SpeciesProfile.TrunkNumbers numbers) {
+    private Trail maybeLayNewTrail(Level level, double angle, long now, SpeciesProfile.TrunkNumbers numbers) {
         recent.removeIf(trip -> now - trip.time() > RECENT_TICKS || trip.time() > now);
         recent.add(new Trip(angle, now));
         while (recent.size() > MOST_RECENT) {
@@ -397,6 +400,9 @@ public class TrunkTrails {
             return null;
         }
         double mean = Math.atan2(sin, cos);
+        if (colony.neighbours().turnsFrom(level, mean)) {
+            return null; // (brain step 4g, step 5: no new trail toward a neighbour the colony yields to)
+        }
         for (Trail trail : trails) {
             if (difference(trail.angle, mean) <= spread) {
                 return null; // (the trips straddle a trail already there: they will go by it)
@@ -682,6 +688,32 @@ public class TrunkTrails {
             changed++;
         }
         return changed;
+    }
+
+    /** The block of this column of the trail at the nest's middle's height (for the memory's flat distances). */
+    private BlockPos columnPos(Trail trail, int column) {
+        return new BlockPos(colony.getCenter().getX() + trail.columns[column][0], colony.getCenter().getY(),
+                colony.getCenter().getZ() + trail.columns[column][1]);
+    }
+
+    /**
+     * Brain step 4g, step 5: whether {@code pos} stands on one of this colony's trunk trails, out to its tip (an ant of
+     * another colony walking here has stepped onto this colony's trail: a meeting).
+     */
+    public boolean isOnTrail(BlockPos pos) {
+        int x = pos.getX() - colony.getCenter().getX();
+        int z = pos.getZ() - colony.getCenter().getZ();
+        if (trails.isEmpty() || x * x + z * z > (longestTip() + 2) * (longestTip() + 2)) {
+            return false;
+        }
+        for (Trail trail : trails) {
+            for (int i = 0; i < trail.reach && i < trail.columns.length; i++) {
+                if (trail.columns[i][0] == x && trail.columns[i][1] == z) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /** Whether a bare column of a trail in use lies here. */

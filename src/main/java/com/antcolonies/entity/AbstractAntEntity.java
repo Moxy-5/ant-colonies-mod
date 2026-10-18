@@ -594,6 +594,37 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         }
     }
 
+    /**
+     * Once a second (brain step 4g, step 5): a member out on the surface that comes within {@code colony.neighbours.within}
+     * blocks of an insect of another colony of its species, or stands on such a colony's trunk trail, tells its colony of
+     * the meeting ({@code colony.Neighbours}; real harvester ant foragers meeting a neighbour's). Not danger: nobody is hurt.
+     */
+    private void lookForNeighbours(ServerLevel level) {
+        Colony colony = getColonyId() == null ? null : getColony();
+        if (colony == null || colony.neighbours().numbers() == null || !level.canSeeSky(blockPosition())
+                || colony.nest().isInside(level, blockPosition())) {
+            return;
+        }
+        double within = colony.neighbours().numbers().within();
+        for (AbstractAntEntity other : level.getEntitiesOfClass(AbstractAntEntity.class, getBoundingBox().inflate(within),
+                other -> other.isAlive() && other.getColonyId() != null && !other.getColonyId().equals(getColonyId())
+                        && other.distanceTo(this) <= within)) {
+            Colony theirs = other.getColony();
+            if (theirs != null && theirs.getSpecies().equals(colony.getSpecies()) && colony.neighbours().canMeet(theirs)) {
+                colony.neighbours().met(level, blockPosition(), theirs.getId(), other.getUUID());
+            }
+        }
+        for (Colony theirs : ColonyManager.get(level).getColonies()) {
+            if (theirs != colony && theirs.getSpecies().equals(colony.getSpecies()) && colony.neighbours().canMeet(theirs)
+                    && theirs.getCenter().distSqr(blockPosition()) <= Mth.square(theirs.trunkTrails().longestTip() + 2.0)
+                    && theirs.trunkTrails().isOnTrail(blockPosition())) {
+                UUID trail = new UUID(theirs.getId().getMostSignificantBits() ^ getUUID().getMostSignificantBits(),
+                        theirs.getId().getLeastSignificantBits() ^ getUUID().getLeastSignificantBits());
+                colony.neighbours().met(level, blockPosition(), theirs.getId(), trail); // (stepped onto their trail)
+            }
+        }
+    }
+
     /** The legs: plans routes (walk, climb, drop) and walks them. Goals only say where to go. */
     public AntNavigator getNavigator() {
         return navigator;
@@ -869,6 +900,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             if (level() instanceof ServerLevel serverLevel) {
                 checkHeat(serverLevel);
                 lookForHostiles(serverLevel);
+                lookForNeighbours(serverLevel);
             }
         }
         // A forager home with a seed touches the ants waiting inside by the entrance as it walks in (Gordon's rule, see colony.Door).

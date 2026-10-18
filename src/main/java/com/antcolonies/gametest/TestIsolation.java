@@ -41,6 +41,8 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * egg, larva and body of it, wherever it is.</li>
  * <li><b>Long trails</b> (2026-10-17): a trunk trail can reach 96 blocks and the arenas are about 45 apart, so each
  * colony's trails stop at its own arena's edge ({@code TrunkTrails.setTestFence}).</li>
+ * <li><b>Neighbours</b> (2026-10-18): termite galleries reach 50 blocks, so a colony met the next test's colony and walled
+ * its galleries off; a colony only meets colonies of its own arena ({@code Neighbours.setTestFence}).</li>
  * <li><b>Counting boxes</b> (in the tests themselves): a test that counts "the workers in my box" misses its own
  * foragers out searching past the box's edge and counts a neighbour's. Such checks count the colony's own insects
  * instead ({@link #insectsOf}).</li>
@@ -127,6 +129,7 @@ final class TestIsolation {
                 if (test != null) {
                     OWNERS.put(colony.getId(), test);
                     colony.trunkTrails().setTestFence(ARENAS.get(test)); // (its trails stop at its own arena's edge)
+                    colony.neighbours().setTestFence(ARENAS.get(test)); // (another test's colonies are not neighbours)
                 }
             }
         }

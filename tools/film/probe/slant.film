@@ -1,0 +1,16 @@
+# Probe (the user's report 2026-10-18): down a one-block step, then the route turns to the side. The body slid sideways
+# before it turned.
+cmd time set noon
+cmd weather clear
+cmd fill -4 -60 -3 0 -60 3 stone
+lens 30
+walker worker_ant -2.5 -59 -1.5 -90
+log slant
+cmd tick freeze
+fov 12
+follow 0 2.2 -1.6 0 55
+go 3 -60 3
+burst down_turn 130 1
+log off
+follow off
+quit

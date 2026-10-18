@@ -100,6 +100,9 @@ public class Colony {
     private final Recruits recruits;
     private final DangerMap danger;
     private final ClosedHoles closedHoles;
+    private final Neighbours neighbours;
+    /** When the colony was founded (game time; brain step 4g, step 5: old colonies yield to neighbours). Saved. */
+    private long bornAt = NOT_SET;
     private final HiddenTrips hiddenTrips;
     private final FungusGarden garden;
     private final Mushrooms mushrooms;
@@ -138,6 +141,7 @@ public class Colony {
         this.recruits = new Recruits(this);
         this.danger = new DangerMap(this);
         this.closedHoles = new ClosedHoles(this);
+        this.neighbours = new Neighbours(this);
         this.hiddenTrips = new HiddenTrips(this);
         this.garden = new FungusGarden(this);
         this.mushrooms = new Mushrooms(this);
@@ -250,6 +254,29 @@ public class Colony {
     /** The foraging holes the colony keeps closed where it was attacked (brain step 4g, step 3; species with {@code close_holes}). */
     public ClosedHoles closedHoles() {
         return closedHoles;
+    }
+
+    /** Where the colony met neighbouring colonies of its species, and which ways it yields (brain step 4g, step 5). */
+    public Neighbours neighbours() {
+        return neighbours;
+    }
+
+    /**
+     * How old the colony is, in game days since it was founded (an older save without a founding time counts from its
+     * first load; real colony age is what makes harvester ants yield to neighbours, Gordon and Kulig).
+     */
+    public double ageDays(Level level) {
+        return ageDaysAt(level.getGameTime());
+    }
+
+    /** The colony's age at game time {@code now}, in game days (0 before its first tick). */
+    public double ageDaysAt(long now) {
+        return bornAt == NOT_SET ? 0 : Math.max(0, now - bornAt) / 24000.0;
+    }
+
+    /** Game tests only: the colony was founded {@code days} game days ago. */
+    public void setAgeForTests(Level level, double days) {
+        bornAt = level.getGameTime() - Math.round(days * 24000.0);
     }
 
     /**
@@ -527,6 +554,9 @@ public class Colony {
         if (isQueenless() && isEmpty(level)) {
             return false;
         }
+        if (bornAt == NOT_SET || bornAt > level.getGameTime()) {
+            bornAt = level.getGameTime(); // (founded now, or an older save: counted from its first load)
+        }
         away.settle(level);
         garden.grow(level);
         mound.tick(level);
@@ -547,6 +577,7 @@ public class Colony {
         recruits.tick(level);
         danger.tick(level);
         closedHoles.tick(level);
+        neighbours.tick(level);
         field.tick(level, false);
         trunkTrails.tick(level, false);
         return true;
@@ -786,6 +817,8 @@ public class Colony {
         spots.save(tag);
         danger.save(tag);
         closedHoles.save(tag);
+        neighbours.save(tag);
+        tag.putLong("bornAt", bornAt);
         door.save(tag);
         hill.save(tag);
         trails.save(tag);
@@ -828,6 +861,8 @@ public class Colony {
         colony.spots.load(tag);
         colony.danger.load(tag);
         colony.closedHoles.load(tag);
+        colony.neighbours.load(tag);
+        colony.bornAt = tag.contains("bornAt") ? tag.getLong("bornAt") : NOT_SET;
 
         colony.door.load(tag);
         colony.hill.load(tag);
