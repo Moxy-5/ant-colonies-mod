@@ -37,7 +37,15 @@ public class AwayReport {
         SECOND_BATCH("second founding batches begun (the first workers all died)"),
         PATROLS("patrols sent"),
         PATROLLERS_LOST("patrollers lost"),
-        NO_FORAGING_DAYS("days with no foraging (no patroller came back)");
+        NO_FORAGING_DAYS("days with no foraging (no patroller came back)"),
+        FORAGING_NIGHTS("foraging nights"),
+        HOLES_OPENED("holes opened"),
+        FOUND_FROM_HOLES("food plants found from the holes"),
+        GALLERY_PIECES("gallery pieces grown"),
+        GALLERY_TO_FOOD("gallery pieces grown toward food"),
+        GALLERY_BLOCKS("blocks of gallery grown"),
+        FILLED_IN("gallery branches filled in"),
+        FILLED_BLOCKS("blocks of gallery packed with soil");
 
         private final String label;
 

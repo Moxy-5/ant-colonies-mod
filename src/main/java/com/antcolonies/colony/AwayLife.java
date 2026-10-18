@@ -216,6 +216,7 @@ public class AwayLife {
         }
         if (isAway(level)) {
             colony.hiddenTrips().tickAway(level);
+            colony.nest().galleries().tickAway(level);
             colony.population().tickAway(level);
             colony.life().tick(level, true);
             colony.patrol().tick(level, true);
@@ -311,6 +312,7 @@ public class AwayLife {
             long away = level.getGameTime() - awaySince;
             awaySince = Colony.NOT_SET;
             lastAwayFor = away;
+            colony.nest().galleries().cameBack(level);
             AntColoniesMod.LOGGER.info("[away] colony {} is back after {} ticks: {}", colony.getId(), away, describe(level));
             ColonyManager.get(level).markChanged();
         }

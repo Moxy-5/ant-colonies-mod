@@ -150,9 +150,33 @@ on *Reticulitermes* and *Coptotermes*, Macrotermes galleries being little mapped
   Matabele raids).
 
 ## Step 4: away and speed
-- The numbers forage from the galleries while away; galleries grow while away (`BuildLife`).
-- The plant scan only along the galleries (as the ant trails' step 4).
-- Then the switch is removed once the user is happy, with the old code it replaces.
+**BUILT 2026-10-17** (see `docs/HISTORY.md`). **Decided with the user 2026-10-17** (real behaviour explained first: a Macrotermes colony forages every suitable
+night whether anyone watches, through some of its holes, and its builders never stop: galleries are pushed out toward
+finds and backfilled where they led nowhere, so a long absence changes the web; new food is found by holes opened over
+fresh ground, not smelt from afar). All the real answers picked:
+- **Foraging from the night's holes:** near or away, the termite numbers graze only round the holes whose turn it is
+  (within the graze, `food_radius`), at foraging time (night, rain), plus the food under a feeding spot from inside
+  (day and night). While away the brain picks each night's holes from what it remembers (the holes it last saw dug,
+  the food it remembers near each), never reading unloaded land. The user: easiest for the Matabele raids, which go
+  for the night's holes; the night's holes stay on record (saved) for an ant scout.
+- **Growing while away: all the builders' time.** On return the builders' saved time (`BuildLife`) is spent out of
+  sight on the galleries too: once the nest's plan is dug, the next piece is planned (food first, as near: rich food,
+  then grass pulling a tip, then the even spreading) and dug, and so on, within the length budget (1 block per 4
+  workers) and the reach; ground not loaded waits for the real workers.
+- **Filling in on return: all at once.** Branches unused for 10 days (counted while away) are all packed with soil the
+  moment their ground is loaded and out of sight (not one per 10 seconds), as they would have been while away. A piece
+  the numbers foraged from while away counts as used.
+- **Explore holes find food while away, from the last look.** The brain keeps a picture of the plants round every hole
+  as last seen; a plant within the graze of a hole that opened while away becomes known, as a forager would have come
+  across it there. Only what was really there when last seen.
+- **The far holes (the user's idea from step 3, built inside step 4):** each night's explore holes are picked from the
+  outer half of the web first (rested longest), so the termites probe new ground at the edge, graze round and go back,
+  near or away; these are the holes the Matabele raids find.
+- **The away report** adds: gallery blocks dug (pieces, toward food), branches filled in (blocks), foraging nights
+  (holes opened), food found from new holes.
+- **The plant scan** looks only round the galleries: the young reach round the nest, a band round every hole (the
+  graze), round every tip (`pull_reach`), round every food the colony knows and round every real worker out.
+- **The switch** `nest.galleries.enabled` stays until the user says they are happy; then it goes, with the old code.
 
 ## Tests
 - After each step: `termitefood,mound,soldiers,away` on 6 servers; full run before merging (it touches shared parts).

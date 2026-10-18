@@ -354,7 +354,8 @@ public class FoodStore {
             grassTufts.clear();
             int radius = colony.searchReach(); // (out to where a searcher's drift may take it)
             int inner = Math.min(radius, food().radius() + food().search().map(SpeciesProfile.SearchNumbers::stretch).orElse(0));
-            if (!colony.trunkTrails().keepsTrails()) {
+            boolean galleries = colony.nest().galleries().range() > 0;
+            if (!colony.trunkTrails().keepsTrails() && !galleries) {
                 inner = radius;
             }
             for (int x = center.getX() - inner; x <= center.getX() + inner; x++) {
@@ -365,6 +366,18 @@ public class FoodStore {
             if (inner < radius) {
                 Set<Long> done = new HashSet<>();
                 int side = BAND + food().search().map(SpeciesProfile.SearchNumbers::wander).orElse(0);
+                if (galleries) {
+                    // Termites underground step 4: past the nest's own ground only along the galleries (round the holes,
+                    // the tips and the food the colony knows), and round the workers out (below).
+                    side = food().findRadius() + 1;
+                    for (int[] spot : colony.nest().galleries().scanSpots(level)) {
+                        for (int dx = -spot[2]; dx <= spot[2]; dx++) {
+                            for (int dz = -spot[2]; dz <= spot[2]; dz++) {
+                                scanOuter(level, spot[0] + dx, spot[1] + dz, inner, done);
+                            }
+                        }
+                    }
+                }
                 for (int[] column : colony.trunkTrails().columnsNear(side, radius)) {
                     scanOuter(level, center.getX() + column[0], center.getZ() + column[1], inner, done);
                 }

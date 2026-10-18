@@ -12,6 +12,7 @@ import java.util.Set;
 
 import org.jetbrains.annotations.Nullable;
 
+import com.antcolonies.AntColoniesMod;
 import com.antcolonies.entity.WorkerAntEntity;
 import com.antcolonies.species.SpeciesProfile;
 
@@ -68,6 +69,11 @@ public class FieldLife {
     private final Colony colony;
     /** The food plants the brain remembers. Saved. */
     private final Map<BlockPos, Plant> known = new HashMap<>();
+    /**
+     * Termites underground step 4: the plants the brain last saw round the galleries' holes that the colony does not know
+     * yet (its picture of the land); a hole opened while away finds those round it ({@link #findRound}). Saved.
+     */
+    private final Map<BlockPos, Plant> unknown = new HashMap<>();
     /** Plants the numbers cut at whose blocks do not show it yet: plant -> when it was last cut. Saved. */
     private final Map<BlockPos, Long> owed = new LinkedHashMap<>();
     /** A piece on its way from each plant (a fraction of a trip carried over to the next second). Not saved. */
@@ -127,21 +133,82 @@ public class FieldLife {
         SpeciesProfile.FoodNumbers numbers = colony.profile().food();
         List<BlockPos> exits = exits(level);
         boolean schedule = colony.keepsASchedule();
+        boolean picture = keepsAPicture();
         Set<BlockPos> seen = new HashSet<>();
         for (BlockPos pos : food.plants(level)) {
             SpeciesProfile.PlantFood plant = numbers.plantFor(level.getBlockState(pos));
-            // (searching alone the brain remembers every plant as its picture of the land: what is there, not what the
-            // colony knows; its numbers still only go for plants they find by searching, see forageAlone)
-            if (plant == null || !colony.foodMap().knows(pos, null) && !colony.foodMap().searchesAlone()) {
+            if (plant == null) {
                 continue;
             }
             BlockPos at = pos.immutable();
+            // (searching alone the brain remembers every plant as its picture of the land: what is there, not what the
+            // colony knows; its numbers still only go for plants they find by searching, see forageAlone)
+            if (!colony.foodMap().knows(pos, null) && !colony.foodMap().searchesAlone()) {
+                if (picture) {
+                    seen.add(at);
+                    unknown.put(at, new Plant(numbers.plants().indexOf(plant), (float) walk(at, exits), false));
+                }
+                continue;
+            }
             seen.add(at);
+            unknown.remove(at);
             boolean fromInside = schedule && plant.rich() && food.isFeedableFromInside(level, at);
             known.put(at, new Plant(numbers.plants().indexOf(plant), (float) walk(at, exits), fromInside));
         }
         known.keySet().removeIf(pos -> !seen.contains(pos) && level.isLoaded(pos) && numbers.plantFor(level.getBlockState(pos)) == null);
+        unknown.keySet().removeIf(pos -> known.containsKey(pos) || !picture
+                || !seen.contains(pos) && level.isLoaded(pos) && numbers.plantFor(level.getBlockState(pos)) == null);
         progress.keySet().retainAll(known.keySet());
+    }
+
+    /** Whether the brain keeps a picture of the plants round the galleries that the colony does not know yet (termites underground, step 4). */
+    private boolean keepsAPicture() {
+        return colony.foodMap().findsByLooking() && !colony.foodMap().searchesAlone() && colony.nest().galleries().isOn();
+    }
+
+    /**
+     * Termites underground step 4, while away: the holes opened tonight find the plants the brain last saw within
+     * {@code radius} blocks of them (a forager out of that hole would have come across them). The colony knows them
+     * now. Returns how many were found.
+     */
+    int findRound(ServerLevel level, java.util.Collection<BlockPos> holes, int radius) {
+        if (holes.isEmpty() || unknown.isEmpty()) {
+            return 0;
+        }
+        int found = 0;
+        for (Iterator<Map.Entry<BlockPos, Plant>> it = unknown.entrySet().iterator(); it.hasNext(); ) {
+            Map.Entry<BlockPos, Plant> entry = it.next();
+            BlockPos pos = entry.getKey();
+            boolean near = false;
+            for (BlockPos hole : holes) {
+                if (flat(pos, hole) <= radius && Math.abs(pos.getY() - hole.getY()) <= radius) {
+                    near = true;
+                    break;
+                }
+            }
+            if (near) {
+                colony.foodMap().learn(pos);
+                known.put(pos, entry.getValue());
+                it.remove();
+                found++;
+            }
+        }
+        if (found > 0) {
+            AntColoniesMod.LOGGER.debug("[away] colony {}: tonight's holes found {} plants", colony.getId(), found);
+            ColonyManager.get(level).markChanged();
+        }
+        return found;
+    }
+
+    /** The plants the brain remembers that the colony knows (for picking the night's holes while away). */
+    List<BlockPos> knownPlants() {
+        List<BlockPos> list = new ArrayList<>();
+        for (BlockPos pos : known.keySet()) {
+            if (colony.foodMap().knows(pos, null)) {
+                list.add(pos);
+            }
+        }
+        return list;
     }
 
     /** The colony's ways out, open or not: every foraging hole of the plan and the entrance. */
@@ -230,6 +297,9 @@ public class FieldLife {
         List<SpeciesProfile.PlantFood> kinds = colony.profile().food().plants();
         List<Map.Entry<BlockPos, Plant>> plants = new ArrayList<>();
         Map<BlockPos, Double> worth = new HashMap<>();
+        // Termites underground step 4 (the user's pick, 2026-10-17): with the galleries the numbers graze only round the
+        // holes open tonight, near or away, and eat from inside under the feeding spots.
+        List<BlockPos> galleries = colony.nest().galleries().isOn() ? colony.nest().galleries().holesInTurn() : null;
         for (Map.Entry<BlockPos, Plant> entry : known.entrySet()) {
             Plant plant = entry.getValue();
             if (plant.kind() < 0 || plant.kind() >= kinds.size() || !outside && !plant.fromInside()
@@ -251,10 +321,41 @@ public class FieldLife {
             if (free <= 0 || roomNow <= 0 || worked++ >= PLANTS_PER_SECOND) {
                 break;
             }
+            BlockPos hole = null;
+            if (galleries != null && !entry.getValue().fromInside()) {
+                hole = grazedFrom(entry.getKey(), galleries);
+                if (hole == null) {
+                    continue; // no hole open near it tonight
+                }
+            }
+            int before = returnedNow;
             free -= work(level, entry.getKey(), entry.getValue(), free, eyes, usedUp);
+            if (hole != null && returnedNow > before) {
+                colony.nest().galleries().noteForaged(hole, level.getGameTime());
+            }
         }
         forgetUsedUp(level, usedUp);
         return changedNow;
+    }
+
+    /**
+     * Termites underground step 4: the open hole (the night's turns, a runway's hole, a hole by rich food) nearest the
+     * plant within the graze ({@code food_radius}) that the numbers go out of, or null: no hole open near it, so the
+     * plant waits for a night its hole has its turn (as the real foragers graze only round the holes they opened).
+     */
+    @Nullable
+    private BlockPos grazedFrom(BlockPos plant, List<BlockPos> holes) {
+        int radius = colony.nest().galleries().numbers().foodRadius();
+        BlockPos best = null;
+        double bestDistance = Double.MAX_VALUE;
+        for (BlockPos hole : holes) {
+            double away = flat(plant, hole);
+            if (away <= radius + 0.5 && Math.abs(plant.getY() - hole.getY()) <= radius && away < bestDistance) {
+                best = hole;
+                bestDistance = away;
+            }
+        }
+        return best;
     }
 
     /** Room left in the food store this second (as last seen), and whether anything changed this second. */
@@ -560,6 +661,11 @@ public class FieldLife {
         onForTests = on;
     }
 
+    /** Whether the brain has this plant in its picture of the land round the holes, not yet known to the colony. For tests. */
+    public boolean seesUnknown(BlockPos plant) {
+        return unknown.containsKey(plant);
+    }
+
     /** Whether the brain remembers a plant here. For tests. */
     public boolean remembers(BlockPos plant) {
         return known.containsKey(plant);
@@ -601,6 +707,15 @@ public class FieldLife {
             plants.add(entry);
         });
         field.put("plants", plants);
+        ListTag pictureList = new ListTag();
+        unknown.forEach((pos, plant) -> {
+            CompoundTag entry = new CompoundTag();
+            entry.putLong("pos", pos.asLong());
+            entry.putInt("kind", plant.kind());
+            entry.putFloat("trip", plant.trip());
+            pictureList.add(entry);
+        });
+        field.put("unknown", pictureList);
         ListTag cuts = new ListTag();
         owed.forEach((pos, at) -> {
             CompoundTag entry = new CompoundTag();
@@ -614,12 +729,19 @@ public class FieldLife {
 
     void load(CompoundTag tag) {
         known.clear();
+        unknown.clear();
         owed.clear();
         CompoundTag field = tag.getCompound("field");
         ListTag plants = field.getList("plants", Tag.TAG_COMPOUND);
         for (int i = 0; i < plants.size(); i++) {
             CompoundTag entry = plants.getCompound(i);
             known.put(BlockPos.of(entry.getLong("pos")), new Plant(entry.getInt("kind"), entry.getFloat("trip"), entry.getBoolean("inside")));
+        }
+        unknown.clear();
+        ListTag pictureList = field.getList("unknown", Tag.TAG_COMPOUND);
+        for (int i = 0; i < pictureList.size(); i++) {
+            CompoundTag entry = pictureList.getCompound(i);
+            unknown.put(BlockPos.of(entry.getLong("pos")), new Plant(entry.getInt("kind"), entry.getFloat("trip"), false));
         }
         ListTag cuts = field.getList("owed", Tag.TAG_COMPOUND);
         for (int i = 0; i < cuts.size(); i++) {

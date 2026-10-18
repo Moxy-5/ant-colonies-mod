@@ -13,7 +13,7 @@
 set -u
 cd "$(dirname "$0")/.."
 
-shards="${1:-5}"
+shards="${1:-8}"
 start=$(date +%s)
 rm -rf run-test-shards/*/world
 mkdir -p run-test-shards

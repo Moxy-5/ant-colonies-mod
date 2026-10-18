@@ -317,6 +317,12 @@ public class ForagingHoles {
         return foodWaiting;
     }
 
+    /** The check below now, whatever the clock (termites underground step 4: the builders' time spent on return). */
+    void checkNewHolesNow(ServerLevel level) {
+        newHolesCheckedAt = Long.MIN_VALUE;
+        tick(level);
+    }
+
     /**
      * Every few seconds (from {@link Colony#tick}): a new hole whose food is gone is spent (plugged for good), and if
      * every new tunnel is dug and there may be more, a new tunnel is planned out to the nearest rich plant the colony

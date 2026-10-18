@@ -87,6 +87,16 @@ public class FoodMap {
         return own != null && own.contains(plant);
     }
 
+    /** The colony now knows this plant (a forager came across it while the colony was away, termites underground step 4). */
+    void learn(BlockPos plant) {
+        known.add(plant.immutable());
+    }
+
+    /** The plants the whole colony knows of (for the plant scan, which looks round them). */
+    java.util.Collection<BlockPos> knownPlants() {
+        return java.util.Collections.unmodifiableSet(known);
+    }
+
     /** How many plants the whole colony knows of. */
     public int knownCount() {
         return known.size();

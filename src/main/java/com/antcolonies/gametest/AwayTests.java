@@ -575,6 +575,8 @@ public class AwayTests {
             colony.population().setViewersForTests(List.of());
             TermiteSoldierTests.digNestAtOnce(level, colony);
             colony.population().addNewMembers(WorkerAntEntity.CASTE, level.getGameTime() - 250000, 60);
+            // Step 2c's rule with the 2 holes of before (the galleries' night holes have their own scene, step 4 below).
+            colony.nest().galleries().setSwitchForTests(false);
             int[][] spots = {{MIDDLE + 6, MIDDLE}, {MIDDLE - 6, MIDDLE}, {MIDDLE, MIDDLE + 6}, {MIDDLE, MIDDLE - 6}};
             for (int[] spot : spots) {
                 BlockPos tuft = helper.absolutePos(new BlockPos(spot[0], SURFACE, spot[1]));
@@ -683,6 +685,352 @@ public class AwayTests {
                     + ", was " + foodBefore[0]);
             helper.succeed();
         });
+    }
+
+    /**
+     * Termites underground step 4, away and speed (the user's answers, 2026-10-17). A Macrotermes colony with its nest
+     * and its 4 arms of gallery dug, 38 worker numbers (30 old enough to forage), the galleries reaching 26 blocks. By
+     * the farthest hole: a dry tuft the colony knows with 1 piece left, and one it does not know (the brain sees it
+     * round the hole: its picture of the land). Far from every hole: another known tuft. The queen is frozen and the
+     * colony goes away.
+     * <p>A night away: the night's holes are picked from the holes the brain remembers dug, the one by known food among
+     * them, the others from the outer half of the web first (the far holes); the numbers graze only round them (the far
+     * tuft is left, the one by the hole eaten up); the unknown tuft by the hole is found; the report counts the night,
+     * the holes and the find. Then 600 young builders join, and hay the colony knows lies far from every hole.
+     * <p>Back: the builders' time grows the galleries out of sight: a piece out to the hay first, then more, each dug,
+     * within the workers' budget and the reach; the report counts them.
+     * <p>Away again: 11 days go by, a known tuft with 1 piece left lies by a grown far piece, and at night the numbers
+     * eat it up from that piece's hole. Back: every far piece that led to no food is filled in at once (not one every 10
+     * seconds), the piece foraged from while away stays, and the report counts the fills.
+     */
+    @GameTest(template = "arena", timeoutTicks = 9000, skyAccess = true)
+    public static void aTermiteColonyAwayForagesFromTheNightsHolesAndGrowsItsGalleriesOnReturn(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        int mid = 32;
+        int reach = 26;
+        for (int x = 0; x <= 64; x++) {
+            for (int z = 0; z <= 64; z++) {
+                for (int y = 0; y < SURFACE - 1; y++) {
+                    helper.setBlock(x, y, z, Blocks.DIRT);
+                }
+                helper.setBlock(x, SURFACE - 1, z, Blocks.GRASS_BLOCK);
+            }
+        }
+        helper.spawn(ModEntities.TERMITE_QUEEN.get(), mid, SURFACE, mid);
+        TestClock clock = TestClock.still(helper, 12); // midday: the foragers stay in
+        helper.onEachTick(() -> noRealWorkers(helper));
+        Colony[] the = {null};
+        CompoundTag[] queenOnDisk = {null};
+        int[] stage = {0};
+        long[] since = {0};
+        BlockPos[] far = {null}; // the farthest hole
+        BlockPos[] spot = new BlockPos[5]; // the known tuft by it, the unknown tuft by it, the far known tuft, the hay, the tuft by a grown piece
+        BlockPos[] grown = {null}; // the grown far piece foraged from while away
+        int[] dugBefore = {0};
+        int[] lastLength = {-1};
+        long[] agedAt = {0};
+        int[] fillsBefore = {0};
+        Set<BlockPos> piecesBefore = new HashSet<>();
+        helper.runAfterDelay(10, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(colony != null, "no termite colony");
+            the[0] = colony;
+            colony.population().setOnForTests(false); // no swapping: the numbers stay numbers
+            colony.population().setViewersForTests(List.of());
+            long now = level.getGameTime();
+            colony.population().addNewMembers(WorkerAntEntity.CASTE, now - colony.profile().worker().builderUntilTicks() - 1000, 30);
+            colony.population().addNewMembers(WorkerAntEntity.CASTE, now - colony.profile().worker().nurseUntilTicks() - 1000, 8);
+            TermiteSoldierTests.digNestAtOnce(level, colony); // (the nest of a colony with workers, not the founders' chamber)
+            colony.nest().galleries().setSwitchForTests(true);
+            colony.nest().galleries().setReachForTests(reach);
+            colony.field().setOnForTests(true);
+            stage[0] = 1;
+        });
+        helper.onEachTick(() -> {
+            Colony colony = the[0];
+            if (colony == null || stage[0] == 0) {
+                return;
+            }
+            com.antcolonies.colony.Galleries galleries = colony.nest().galleries();
+            List<NestPlan.ForagingTunnel> tunnels = colony.foragingHoles().tunnels(level);
+            BlockPos center = colony.getCenter();
+            int graze = colony.profile().nest().galleries().orElseThrow().foodRadius();
+            int pieceLength = colony.profile().nest().galleries().orElseThrow().pieceLength();
+            List<BlockPos> holes = tunnels.stream().map(NestPlan.ForagingTunnel::hole).distinct().toList();
+            AwayReport report = colony.away().report();
+            long tick = helper.getTick();
+            if (tick % 200 == 0) {
+                AntColoniesMod.LOGGER.info("[step4-test] tick {}: stage {}{} | {}", tick, stage[0], galleries.describe(level), report.describe());
+            }
+            switch (stage[0]) {
+                case 1 -> { // the arms planned and dug (by the test, at once): then the tufts
+                    for (NestPlan.ForagingTunnel tunnel : tunnels) {
+                        for (BlockPos cell : galleries.digCells(tunnel)) {
+                            if (!com.antcolonies.colony.Nest.isDugOut(level, cell)) {
+                                level.setBlock(cell, Blocks.AIR.defaultBlockState(), 3);
+                            }
+                        }
+                    }
+                    if (galleries.tipCount() < 3 || !galleries.dugHolesForTests().containsAll(holes)) {
+                        helper.assertTrue(tick < 1500, "the arms were not planned and dug, or the brain does not remember their holes dug:"
+                                + galleries.describe(level) + " remembered " + galleries.dugHolesForTests().size() + " of " + holes.size());
+                        since[0] = 0;
+                        return;
+                    }
+                    if (++since[0] < 60) {
+                        return;
+                    }
+                    // The farthest hole with room beside it for a tuft no other hole grazes.
+                    for (BlockPos hole : holes.stream().sorted(java.util.Comparator.comparingDouble(hole -> -flat(hole, center))).toList()) {
+                        spot[0] = groundSpot(helper, colony, hole, 2, 4,
+                                at -> holes.stream().allMatch(other -> other.equals(hole) || flat(other, at) > graze + 0.5));
+                        if (spot[0] != null && flat(hole, center) >= galleries.reach() / 2.0) {
+                            far[0] = hole;
+                            break;
+                        }
+                    }
+                    helper.assertTrue(far[0] != null, "no room for a tuft by a far hole:" + galleries.describe(level));
+                    spot[1] = groundSpot(helper, colony, far[0], 2, 4, at -> flat(at, spot[0]) >= 2);
+                    spot[2] = groundSpot(helper, colony, center, 9, 20, at -> holes.stream().allMatch(hole -> flat(hole, at) > graze + 2.5));
+                    helper.assertTrue(spot[1] != null && spot[2] != null, "no room for the other tufts");
+                    for (int i = 0; i < 3; i++) {
+                        level.setBlock(spot[i], com.antcolonies.registry.ModBlocks.DRY_GRASS.get().defaultBlockState(), 3);
+                        colony.food().setPiecesCutForTests(spot[i], i == 0 ? 3 : 2);
+                        if (i != 1) {
+                            colony.foodMap().knowForTests(spot[i]);
+                        }
+                    }
+                    colony.food().rescanPlantsSoon();
+                    AntColoniesMod.LOGGER.info("[step4-test] tick {}: far hole {}, tufts {}", tick, helper.relativePos(far[0]),
+                            java.util.Arrays.stream(spot, 0, 3).map(helper::relativePos).toList());
+                    since[0] = 0;
+                    stage[0] = 2;
+                }
+                case 2 -> { // the brain has looked: then away
+                    if (!colony.field().remembers(spot[0]) || !colony.field().remembers(spot[2]) || !colony.field().seesUnknown(spot[1])) {
+                        helper.assertTrue(++since[0] < 600, "the brain did not see the tufts (known " + colony.field().remembers(spot[0]) + "/"
+                                + colony.field().remembers(spot[2]) + ", the unknown one in its picture " + colony.field().seesUnknown(spot[1]) + ")");
+                        return;
+                    }
+                    helper.assertTrue(!colony.foodMap().isKnown(spot[1]), "the colony should not know the tuft nobody found");
+                    colony.away().setOnForTests(true);
+                    colony.away().setGraceForTests(20L);
+                    queenOnDisk[0] = freezeAndUnload(colony, level, colony.getQueen(level));
+                    colony.away().setAwayForTests(true);
+                    since[0] = 0;
+                    stage[0] = 3;
+                }
+                case 3 -> { // away: a night
+                    if (!colony.away().isAway(level)) {
+                        helper.assertTrue(++since[0] < 400, "the colony did not go away");
+                        return;
+                    }
+                    clock.skipTo(colony, TestClock.Phase.NIGHT);
+                    lastLength[0] = galleries.length();
+                    since[0] = 0;
+                    stage[0] = 4;
+                }
+                case 4 -> { // the night's holes, the graze round them, the find
+                    if (++since[0] < 400) {
+                        return;
+                    }
+                    Set<BlockPos> tonight = galleries.tonight();
+                    AntColoniesMod.LOGGER.info("[step4-test] tick {}: tonight's holes {}, field {}", tick, tonight.stream().map(helper::relativePos).toList(),
+                            colony.field().describe());
+                    helper.assertTrue(!tonight.isEmpty() && galleries.dugHolesForTests().containsAll(tonight),
+                            "the night's holes while away should be picked from the holes remembered dug: " + tonight);
+                    helper.assertTrue(tonight.contains(far[0]), "the hole by the known tuft should open first: " + tonight);
+                    List<BlockPos> unfed = tonight.stream().filter(hole -> flat(hole, spot[0]) > graze && flat(hole, spot[2]) > graze).toList();
+                    boolean outerLeft = holes.stream().anyMatch(hole -> !hole.equals(far[0]) && flat(hole, center) >= galleries.reach() / 2.0);
+                    helper.assertTrue(unfed.isEmpty() || !outerLeft || unfed.stream().anyMatch(hole -> flat(hole, center) >= galleries.reach() / 2.0),
+                            "the holes opened to explore should come from the outer half first: " + unfed.stream().map(helper::relativePos).toList());
+                    // (eaten up: every piece cut; the block goes once the land is shown again)
+                    helper.assertTrue(colony.food().getPiecesCut(spot[0]) >= 4 || level.getBlockState(spot[0]).isAir(),
+                            "the known tuft by the open hole should be eaten up: cut " + colony.food().getPiecesCut(spot[0]));
+                    helper.assertTrue(colony.field().remembers(spot[2]) && colony.food().getPiecesCut(spot[2]) == 2,
+                            "the known tuft far from every hole should be left (no hole open near it): cut " + colony.food().getPiecesCut(spot[2]));
+                    helper.assertTrue(!colony.field().seesUnknown(spot[1]) && (colony.foodMap().isKnown(spot[1]) || level.getBlockState(spot[1]).isAir()
+                            || colony.food().getPiecesCut(spot[1]) > 2), "the tuft by the open hole should have been found");
+                    helper.assertTrue(report.get(AwayReport.What.FORAGING_NIGHTS) >= 1 && report.get(AwayReport.What.HOLES_OPENED) >= tonight.size()
+                            && report.get(AwayReport.What.FOUND_FROM_HOLES) >= 1, "the report should count the night, its holes and the find: "
+                            + report.describe());
+                    // 600 young builders join, and hay the colony knows lies far from every hole.
+                    clock.skipTo(colony, TestClock.Phase.DAY);
+                    colony.population().addNewMembers(WorkerAntEntity.CASTE, level.getGameTime() - colony.profile().worker().nurseUntilTicks() - 1000, 600);
+                    spot[3] = groundSpot(helper, colony, center, 17, 22, at -> holes.stream().allMatch(hole -> flat(hole, at) > 12) && flat(at, spot[2]) > 10);
+                    helper.assertTrue(spot[3] != null, "no room for the hay far from every hole");
+                    level.setBlock(spot[3], Blocks.HAY_BLOCK.defaultBlockState(), 3);
+                    colony.foodMap().knowForTests(spot[3]);
+                    since[0] = 0;
+                    stage[0] = 5;
+                }
+                case 5 -> { // the builders work the time away: then back
+                    if (++since[0] < 400) {
+                        return;
+                    }
+                    helper.assertTrue(galleries.length() == lastLength[0], "the galleries grew while away (the land is not loaded then):"
+                            + galleries.describe(level));
+                    dugBefore[0] = dugPieces(level, galleries);
+                    lastLength[0] = galleries.length();
+                    colony.away().setAwayForTests(false);
+                    loadAgain(level, queenOnDisk[0]);
+                    AntColoniesMod.LOGGER.info("[step4-test] tick {}: back, {} pieces dug", tick, dugBefore[0]);
+                    since[0] = 0;
+                    stage[0] = 6;
+                }
+                case 6 -> { // the galleries grow out of sight with the builders' time
+                    if (galleries.length() != lastLength[0]) {
+                        lastLength[0] = galleries.length();
+                        since[0] = 0;
+                        return;
+                    }
+                    if (++since[0] < 300) {
+                        return;
+                    }
+                    int pieces = report.get(AwayReport.What.GALLERY_PIECES);
+                    helper.assertTrue(pieces >= 2 && report.get(AwayReport.What.GALLERY_BLOCKS) >= pieces,
+                            "the builders' time should have grown the galleries on return: " + report.describe() + galleries.describe(level));
+                    helper.assertTrue(report.get(AwayReport.What.GALLERY_TO_FOOD) >= 1, "a piece should have grown out to the known hay first: "
+                            + report.describe());
+                    com.antcolonies.colony.FoodWays.NewTunnel toHay = colony.nest().foodWays().getNewTunnels().stream()
+                            .filter(tunnel -> tunnel.food().equals(spot[3])).findFirst().orElse(null);
+                    helper.assertTrue(toHay != null && galleries.hasPiece(toHay.tunnel().hole()), "no gallery piece out to the hay:"
+                            + galleries.describe(level));
+                    helper.assertTrue(galleries.digCells(galleries.pieceAt(toHay.tunnel().hole())).stream()
+                            .allMatch(cell -> com.antcolonies.colony.Nest.isDugOut(level, cell)), "the piece out to the hay should be dug out of sight");
+                    int dug = dugPieces(level, galleries);
+                    helper.assertTrue(dug >= dugBefore[0] + pieces - 1, "the pieces grown should be dug out of sight: " + dug + " dug, "
+                            + dugBefore[0] + " before, " + pieces + " grown");
+                    helper.assertTrue(galleries.length() <= galleries.lengthAllowed() + 2 * (pieceLength + 3),
+                            "the galleries grew past what the workers allow:" + galleries.describe(level));
+                    for (NestPlan.ForagingTunnel tunnel : tunnels) {
+                        helper.assertTrue(flat(tunnel.hole(), center) <= reach + 2.5, "a hole at " + helper.relativePos(tunnel.hole())
+                                + " lies past the reach of " + reach);
+                    }
+                    // Away again: a known tuft with 1 piece left by the farthest grown piece that leads on from no other.
+                    for (BlockPos piece : galleries.pieceHoles()) {
+                        piecesBefore.add(piece);
+                        if (!galleries.isFirstArm(piece) && galleries.isLeaf(piece) && !piece.equals(toHay.tunnel().hole())
+                                && (grown[0] == null || flat(piece, center) > flat(grown[0], center))) {
+                            grown[0] = piece;
+                        }
+                    }
+                    helper.assertTrue(grown[0] != null, "no grown far piece:" + galleries.describe(level));
+                    spot[4] = groundSpot(helper, colony, grown[0], 2, 3.5, at -> true);
+                    helper.assertTrue(spot[4] != null, "no room for a tuft by the grown piece " + helper.relativePos(grown[0]));
+                    level.setBlock(spot[4], com.antcolonies.registry.ModBlocks.DRY_GRASS.get().defaultBlockState(), 3);
+                    colony.food().setPiecesCutForTests(spot[4], 3);
+                    colony.foodMap().knowForTests(spot[4]);
+                    colony.food().rescanPlantsSoon();
+                    colony.population().addNewMembers(WorkerAntEntity.CASTE, level.getGameTime() - colony.profile().worker().builderUntilTicks() - 1000, 300);
+                    AntColoniesMod.LOGGER.info("[step4-test] tick {}: grown {}; a tuft by the piece to {}", tick, report.describe(), helper.relativePos(grown[0]));
+                    since[0] = 0;
+                    stage[0] = 7;
+                }
+                case 7 -> { // the brain has seen the tuft: away again
+                    if (!colony.field().remembers(spot[4])) {
+                        helper.assertTrue(++since[0] < 600, "the brain did not see the tuft by the grown piece");
+                        return;
+                    }
+                    queenOnDisk[0] = freezeAndUnload(colony, level, colony.getQueen(level));
+                    colony.away().setAwayForTests(true);
+                    since[0] = 0;
+                    stage[0] = 8;
+                }
+                case 8 -> { // away: 11 days go by, then a night
+                    if (!colony.away().isAway(level)) {
+                        helper.assertTrue(++since[0] < 400, "the colony did not go away again");
+                        return;
+                    }
+                    galleries.ageForTests(11 * 24000L);
+                    agedAt[0] = level.getGameTime();
+                    fillsBefore[0] = galleries.fills();
+                    clock.skipTo(colony, TestClock.Phase.NIGHT);
+                    since[0] = 0;
+                    stage[0] = 9;
+                }
+                case 9 -> { // the numbers eat the tuft from the grown piece's hole (the hay first, it is richer): then back
+                    boolean eaten = colony.food().getPiecesCut(spot[4]) >= 4 || level.getBlockState(spot[4]).isAir();
+                    if (++since[0] < 100 || !eaten && since[0] < 2000) {
+                        return;
+                    }
+                    helper.assertTrue(galleries.tonight().contains(grown[0]), "the grown piece's hole by known food should open: "
+                            + galleries.tonight().stream().map(helper::relativePos).toList());
+                    helper.assertTrue(colony.food().getPiecesCut(spot[4]) >= 4 || level.getBlockState(spot[4]).isAir(),
+                            "the tuft by the grown piece should be eaten up: cut " + colony.food().getPiecesCut(spot[4]));
+                    helper.assertTrue(galleries.fills() == fillsBefore[0], "nothing should be filled in while away (the land waits for the return)");
+                    clock.skipTo(colony, TestClock.Phase.DAY);
+                    colony.away().setAwayForTests(false);
+                    loadAgain(level, queenOnDisk[0]);
+                    since[0] = 0;
+                    stage[0] = 10;
+                }
+                case 10 -> { // back: every branch due filled in at once
+                    if (++since[0] < 200) {
+                        return;
+                    }
+                    AntColoniesMod.LOGGER.info("[step4-test] tick {}: back again, {} filled in{} | {}", tick, galleries.fills() - fillsBefore[0],
+                            galleries.describe(level), report.describe());
+                    helper.assertTrue(galleries.hasPiece(grown[0]), "the piece the numbers foraged from while away was filled in");
+                    int filled = galleries.fills() - fillsBefore[0];
+                    helper.assertTrue(filled >= 1 && report.get(AwayReport.What.FILLED_IN) == filled && report.get(AwayReport.What.FILLED_BLOCKS) > 0,
+                            "the branches due should be filled in on return and counted: " + filled + " filled; " + report.describe());
+                    for (BlockPos piece : galleries.pieceHoles()) {
+                        helper.assertTrue(!piecesBefore.contains(piece) || galleries.isFirstArm(piece) || galleries.lastUsed(piece) >= agedAt[0],
+                                "the piece to " + helper.relativePos(piece) + " led to no food for 11 days and was not filled in at once:"
+                                        + galleries.describe(level));
+                    }
+                    helper.succeed();
+                }
+                default -> {
+                }
+            }
+        });
+    }
+
+    private static double flat(BlockPos a, BlockPos b) {
+        return Math.hypot(a.getX() - b.getX(), a.getZ() - b.getZ());
+    }
+
+    /** How many gallery pieces are dug all through. */
+    private static int dugPieces(ServerLevel level, com.antcolonies.colony.Galleries galleries) {
+        int dug = 0;
+        for (BlockPos piece : galleries.pieceHoles()) {
+            if (galleries.digCells(galleries.pieceAt(piece)).stream().allMatch(cell -> com.antcolonies.colony.Nest.isDugOut(level, cell))) {
+                dug++;
+            }
+        }
+        return dug;
+    }
+
+    /**
+     * An open spot on the ground (air over a grass block, off every hole and tunnel, inside the arena) {@code minOut} to
+     * {@code maxOut} blocks from {@code from} that {@code ok} accepts, or null.
+     */
+    private static BlockPos groundSpot(GameTestHelper helper, Colony colony, BlockPos from, double minOut, double maxOut,
+            java.util.function.Predicate<BlockPos> ok) {
+        ServerLevel level = helper.getLevel();
+        int y = helper.absolutePos(new BlockPos(0, SURFACE, 0)).getY();
+        Set<Long> columns = new HashSet<>();
+        for (NestPlan.ForagingTunnel tunnel : colony.foragingHoles().tunnels(level)) {
+            columns.add(BlockPos.asLong(tunnel.hole().getX(), 0, tunnel.hole().getZ()));
+            tunnel.tunnel().forEach(cell -> columns.add(BlockPos.asLong(cell.getX(), 0, cell.getZ())));
+        }
+        AABB inside = helper.getBounds().inflate(-3, 0, -3);
+        for (double r = minOut; r <= maxOut; r += 0.5) {
+            for (int a = 0; a < 360; a += 7) {
+                BlockPos at = new BlockPos((int) Math.round(from.getX() + r * Math.cos(Math.toRadians(a))), y,
+                        (int) Math.round(from.getZ() + r * Math.sin(Math.toRadians(a))));
+                double out = flat(at, from);
+                if (out >= minOut && out <= maxOut && inside.contains(at.getX() + 0.5, inside.minY + 1, at.getZ() + 0.5)
+                        && !columns.contains(BlockPos.asLong(at.getX(), 0, at.getZ())) && level.getBlockState(at).isAir()
+                        && level.getBlockState(at.below()).is(Blocks.GRASS_BLOCK) && ok.test(at)) {
+                    return at;
+                }
+            }
+        }
+        return null;
     }
 
     /** A tuft of dry grass (on a grass block) with 2 of its 4 pieces cut already, which the colony knows. */

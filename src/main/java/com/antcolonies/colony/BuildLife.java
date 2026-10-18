@@ -121,7 +121,10 @@ public class BuildLife {
         if (!nestLeft && founders) {
             settleFounders(level, eyes, changes);
         }
-        if (!nestLeft && !moundLeft && !waited) {
+        // Termites underground step 4 (the user's pick, 2026-10-17): the time left once the nest and the mound are done
+        // grows the galleries, as the real builders never stop.
+        boolean galleriesLeft = work > 0 && !nestLeft && !moundLeft && !waited && !colony.isFounding() && growGalleries(level, eyes, changes);
+        if (!nestLeft && !moundLeft && !galleriesLeft && !waited) {
             if (work > 0) {
                 log("is done");
             }
@@ -229,6 +232,39 @@ public class BuildLife {
                 }
             } else if (colony.mound().isActive() && !founding) {
                 soil += TermiteMoundBlock.FINISHED; // a dug block gives the soil for a mound block (as Mound.takePellet)
+            }
+        }
+        return true;
+    }
+
+    /** At most this many gallery pieces are planned a second on return (each is dug before the next is planned). */
+    private static final int PIECES_PER_SECOND = 4;
+
+    /**
+     * Termites underground step 4: the galleries grow out of sight with the builders' time, a piece planned by the same
+     * rules as here ({@link Galleries#growNow}: food first, then the even spreading, within the workers' budget and the
+     * reach) and dug before the next. True if there is more (time ran out this second, or it waits); false once nothing
+     * more may grow now (the budget is spent, or the ground out there is not loaded: the real workers grow it later).
+     */
+    private boolean growGalleries(ServerLevel level, List<Vec3> eyes, int[] changes) {
+        Galleries galleries = colony.nest().galleries();
+        if (!galleries.isOn()) {
+            return false;
+        }
+        for (int i = 0; i < PIECES_PER_SECOND; i++) {
+            if (work <= 0 || changes[0] >= PER_SECOND) {
+                return true;
+            }
+            int[] grown = galleries.growNow(level);
+            if (grown[0] == 0) {
+                return false;
+            }
+            AwayReport report = colony.away().report();
+            report.add(AwayReport.What.GALLERY_PIECES, grown[0]);
+            report.add(AwayReport.What.GALLERY_TO_FOOD, grown[1]);
+            report.add(AwayReport.What.GALLERY_BLOCKS, grown[2]);
+            if (digNest(level, eyes, changes)) {
+                return true; // (time ran out, or a player can see where it goes)
             }
         }
         return true;
