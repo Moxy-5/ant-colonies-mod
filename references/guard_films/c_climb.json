@@ -166,14 +166,55 @@
    1,
    0.2
   ],
-  "jump abdomen": [
+  "jump petiole": [
    1,
-   0.1
+   0.042
   ],
-  "jump at up_65": [
+  "jump at down_51": [
    1,
-   0.1
+   0.042
+  ],
+  "inside abdomen": [
+   4,
+   0.031
+  ],
+  "inside at up_67": [
+   1,
+   0.023
+  ],
+  "inside at up_68": [
+   1,
+   0.031
+  ],
+  "inside at up_69": [
+   1,
+   0.01
+  ],
+  "inside at down_25": [
+   1,
+   0.027
+  ],
+  "jump abdomen": [
+   4,
+   0.151
+  ],
+  "jump at up_32": [
+   1,
+   0.151
+  ],
+  "jump at up_69": [
+   1,
+   0.091
+  ],
+  "jump at down_01": [
+   1,
+   0.08
+  ],
+  "jump at down_26": [
+   1,
+   0.134
   ]
  },
- "body_findings": {}
+ "body_findings": {},
+ "known_bugs": "the ant's gaster lies on the ground the hind feet walked, so crossing the edge it grazes the corner up to 0.03 blocks (half a pixel; a straight gaster across a corner, docs/BUGS.md 54)"
 }

@@ -744,8 +744,13 @@ public final class FilmDirector {
             var anim = controller.getCurrentAnimation().animation();
             double seconds = (ticks % anim.length()) / 20.0;
             // then the tick it was drawn at and the waist bend it was drawn with, to set beside the log
-            clipTimes.put(ant.getId(), String.format(java.util.Locale.ROOT, "%s %.4f drawn %d waist %.1f", anim.name(), seconds,
-                    ant.tickCount, ant.getWaistPitch(drawPartial)));
+            StringBuilder time = new StringBuilder(String.format(java.util.Locale.ROOT, "%s %.4f drawn %d waist %.1f", anim.name(),
+                    seconds, ant.tickCount, ant.getWaistPitch(drawPartial)));
+            // a longer spine (a termite's soft abdomen): every piece's bend
+            for (int p = 1; p < ant.getSpinePieces(); p++) {
+                time.append(String.format(java.util.Locale.ROOT, " %.1f", ant.getSpinePitch(p, drawPartial)));
+            }
+            clipTimes.put(ant.getId(), time.toString());
         } catch (ReflectiveOperationException | RuntimeException e) {
             clipTimes.put(ant.getId(), "- -");
         }

@@ -172,7 +172,7 @@
   ],
   "jump at down_61": [
    26,
-   0.267
+   0.285
   ],
   "jump leg_r2_lower": [
    1,
@@ -288,31 +288,31 @@
   ],
   "jump abdomen": [
    2,
-   0.22
+   0.219
   ],
   "jump abdomen_2": [
    2,
-   0.241
+   0.233
   ],
   "jump abdomen_3": [
-   3,
-   0.26
-  ],
-  "jump at down_63": [
-   4,
-   0.101
+   2,
+   0.254
   ],
   "jump abdomen_4": [
    3,
-   0.266
+   0.271
+  ],
+  "jump at down_63": [
+   3,
+   0.079
   ],
   "jump abdomen_5": [
    3,
-   0.264
+   0.285
   ],
   "jump abdomen_6": [
    3,
-   0.261
+   0.285
   ]
  },
  "body_findings": {

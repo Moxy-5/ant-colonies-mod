@@ -30,9 +30,11 @@ public final class EdgeOver {
     /**
      * How to draw it: the wall it faces and its tilt and heading (as in the usual climbing pose: tilt 0 lying on the
      * floor, 90 upright on the wall; heading 0 head up, 180 head down), and where the middle of its feet is drawn,
-     * from its position (blocks, world axes).
+     * from its position (blocks, world axes); and the tilt of the surface it comes from, measured the same way: its hind
+     * feet stand on it until the pose ends, and the rear behind them follows the ground they walked over, not the
+     * thorax, which leans across the edge ({@link Spine}).
      */
-    public record Pose(Direction wall, float tilt, float heading, Vec3 shift) {
+    public record Pose(Direction wall, float tilt, float heading, Vec3 shift, float fromTilt) {
     }
 
     private EdgeOver() {
@@ -236,7 +238,7 @@ public final class EdgeOver {
                 // walking up to the wall, the navigator already holds it to the wall, though its front feet (or head)
                 // have not got there yet: it is still drawn lying on the floor, as at the stretch's start, never tipped
                 // by the usual pose in one go (coming down, it can't be on the floor this early)
-                return new Pose(wall, 0.0F, 0.0F, Vec3.ZERO);
+                return new Pose(wall, 0.0F, 0.0F, Vec3.ZERO, 0.0F);
             }
             if (s <= -front || s >= hind) {
                 return null;
@@ -257,7 +259,8 @@ public final class EdgeOver {
             xB += down ? Mth.lerp(t, lift, 0.0) : Mth.lerp(t, halfWidth, offWall);
             Vec3 feet = corner.add(nA.scale(xA)).add(nB.scale(xB));
             float degrees = (float) Math.toDegrees(theta);
-            return new Pose(wall, down ? 90.0F - degrees : degrees, down ? 180.0F : 0.0F, feet.subtract(pos));
+            return new Pose(wall, down ? 90.0F - degrees : degrees, down ? 180.0F : 0.0F, feet.subtract(pos),
+                    down ? 90.0F : 0.0F);
         }
 
         /**
@@ -299,7 +302,7 @@ public final class EdgeOver {
             Vec3 feet = e.add(forward.scale(along)).add(normal.scale(off));
             float degrees = (float) (turned * 90.0);
             return new Pose(edge.out().getOpposite(), upAndOver ? 90.0F - degrees : degrees, upAndOver ? 0.0F : 180.0F,
-                    feet.subtract(pos));
+                    feet.subtract(pos), upAndOver ? 90.0F : 0.0F);
         }
     }
 }

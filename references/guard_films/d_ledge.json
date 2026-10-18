@@ -156,14 +156,39 @@
   136
  ],
  "findings": {
-  "jump abdomen": [
-   1,
-   0.1
+  "inside abdomen": [
+   4,
+   0.033
   ],
-  "jump at back_up_38": [
+  "inside at off_edge_47": [
    1,
-   0.1
+   0.026
+  ],
+  "inside at back_up_40": [
+   1,
+   0.023
+  ],
+  "inside at back_up_41": [
+   1,
+   0.033
+  ],
+  "inside at back_up_42": [
+   1,
+   0.01
+  ],
+  "jump abdomen": [
+   2,
+   0.134
+  ],
+  "jump at off_edge_48": [
+   1,
+   0.134
+  ],
+  "jump at back_up_43": [
+   1,
+   0.08
   ]
  },
- "body_findings": {}
+ "body_findings": {},
+ "known_bugs": "the ant's gaster lies on the ground the hind feet walked, so crossing the edge it grazes the corner up to 0.03 blocks (half a pixel; a straight gaster across a corner, docs/BUGS.md 54)"
 }

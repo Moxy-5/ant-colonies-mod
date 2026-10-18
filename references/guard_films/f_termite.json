@@ -357,8 +357,12 @@
  ],
  "findings": {
   "jump head": [
-   1,
+   2,
    0.103
+  ],
+  "jump at ramp_up_05": [
+   7,
+   0.098
   ],
   "jump at pillar_down_35": [
    8,
@@ -373,7 +377,7 @@
    0.062
   ],
   "jump mandible_r": [
-   1,
+   2,
    0.11
   ],
   "inside antenna_l_1": [
@@ -381,7 +385,7 @@
    0.026
   ],
   "jump antenna_l_1": [
-   1,
+   2,
    0.117
   ],
   "inside antenna_l_2": [
@@ -405,7 +409,7 @@
    0.042
   ],
   "jump antenna_l_2": [
-   2,
+   3,
    0.148
   ],
   "jump at pillar_down_36": [
@@ -417,7 +421,7 @@
    0.02
   ],
   "jump mandible_l": [
-   1,
+   2,
    0.11
   ],
   "inside antenna_r_1": [
@@ -425,7 +429,7 @@
    0.027
   ],
   "jump antenna_r_1": [
-   1,
+   2,
    0.114
   ],
   "inside antenna_r_2": [
@@ -445,7 +449,7 @@
    0.012
   ],
   "jump antenna_r_2": [
-   2,
+   3,
    0.143
   ],
   "inside leg_r3_lower": [
@@ -458,7 +462,7 @@
   ],
   "inside at ramp_up_68": [
    6,
-   0.044
+   0.04
   ],
   "inside at pillar_57": [
    3,
@@ -490,7 +494,7 @@
   ],
   "inside at pillar_58": [
    6,
-   0.044
+   0.04
   ],
   "inside leg_l3_foot": [
    4,
@@ -498,21 +502,33 @@
   ],
   "inside abdomen_3": [
    2,
-   0.016
+   0.015
   ],
   "inside abdomen_4": [
    4,
-   0.03
+   0.028
   ],
   "inside abdomen_5": [
    4,
-   0.044
+   0.04
+  ],
+  "jump abdomen_5": [
+   1,
+   0.07
+  ],
+  "jump at pillar_down_41": [
+   2,
+   0.088
   ],
   "inside abdomen_6": [
    4,
-   0.044
+   0.039
+  ],
+  "jump abdomen_6": [
+   1,
+   0.088
   ]
  },
  "body_findings": {},
- "known_bugs": "at the top of the ramps the termite's legs and gaster are drawn up to 0.06 blocks inside the ramp and the soil (found 2026-10-18 by the first guard films)"
+ "known_bugs": "at the top of the ramps the termite's legs and gaster are drawn up to 0.06 blocks inside the ramp and the soil (found 2026-10-18 by the first guard films); at the pillar's foot the navigator's dash after its turn (0.1 a tick, docs/BUGS.md 53) unrolls the abdomen in 2 ticks"
 }

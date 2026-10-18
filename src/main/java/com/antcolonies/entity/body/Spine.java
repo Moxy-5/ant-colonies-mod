@@ -10,11 +10,15 @@ import net.minecraft.util.Mth;
  * real insect's front turns first and the rest of the body follows the same path: an ant's waist bends while its gaster
  * is still on the old surface, a termite's soft abdomen curves along its length over the edge, and so would a
  * centipede's rings or a lizard's tail. Here the front's turns (pitch: up a wall or a ramp; yaw: round a turn) are added
- * up tick by tick and remembered with the distance walked, and each piece of the spine (the parts behind the thorax,
- * front to back, from the body plan, {@link BodyPlans.Piece}) lies the way the path lay, on average, over the stretch of
- * path it covers behind the body's middle. Its bend is how far the piece in front of it lies turned past it, held
- * within the joint's reach. Over an outside edge a piece hangs down only while its joints are still over the edge:
- * once they are on the new surface the piece lies on it too, never into the block. So the bend is the same at any
+ * up tick by tick. The parts between the body's middle and its hind feet are the thorax's and lean with it; the
+ * parts behind the hind feet follow the ground the hind feet walked over (since 2026-10-18, the user's pick: before,
+ * the whole rear followed the thorax's earlier tilt, and the thorax tips over an edge from when its front feet get
+ * there, so the rear pointed up into the air going head first over a top). So the ground under the hind feet is
+ * remembered with the distance walked: the front's own pitch, except across an edge or a corner, where the thorax
+ * leans from the old surface to the new one while the hind feet still stand on the old one. Each piece of the spine (the parts behind the
+ * thorax, front to back, from the body plan, {@link BodyPlans.Piece}) lies the way the path lay, on average, over the stretch of
+ * path it covers behind the body's middle (the up-and-down way: the ground there, or the thorax's line in front of the
+ * hind feet). Its bend is how far the piece in front of it lies turned past it, held within the joint's reach. So the bend is the same at any
  * speed, stays if the insect stops half way over an edge, and a turn where it stands turns the whole body (no bend);
  * standing still a second, a side bend eases out (it straightens itself), an up-and-down one stays (its rear still
  * lies over the edge).
@@ -25,7 +29,7 @@ import net.minecraft.util.Mth;
 public final class Spine {
     /** How many marks of the path are remembered (enough for the longest body at a walk). */
     private static final int MEMORY = 64;
-    /** The front's pitch and yaw along the path: the distance walked at each mark (blocks), and the front's pose there. */
+    /** Along the path: the distance walked at each mark (blocks), the ground's pitch under the hind feet then and the front's yaw. */
     private final double[] pathMark = new double[MEMORY];
     private final float[] pitchMark = new float[MEMORY];
     private final float[] yawMark = new float[MEMORY];
@@ -45,6 +49,8 @@ public final class Spine {
      * One tick.
      *
      * @param tipped   how far the front tipped up this tick (degrees)
+     * @param lean     how far the front now leans up past the ground under its hind feet (degrees; 0 but across an
+     *                 edge or a corner, while the thorax tips from the old surface to the new one)
      * @param turned   how far it turned right this tick (degrees)
      * @param moved    how far it moved (blocks; along a wall too)
      * @param scale    how long one model unit is drawn (blocks)
@@ -52,9 +58,10 @@ public final class Spine {
      * @param pieces   the spine's pieces, front to back (the body plan's)
      * @param tightest the tightest curve the path itself takes (model units across; a sharper turn is the body turning
      *                 on the spot)
+     * @param hind     how far its hind feet are behind its middle (model units)
      */
-    public void tick(float tipped, float turned, double moved, double scale, boolean restart, List<BodyPlans.Piece> pieces,
-            double tightest) {
+    public void tick(float tipped, float lean, float turned, double moved, double scale, boolean restart, List<BodyPlans.Piece> pieces,
+            double tightest, double hind) {
         frontPitch += tipped;
         frontYaw += turned;
         if (restart || marks == 0) {
@@ -77,7 +84,7 @@ public final class Spine {
             marks = Math.min(MEMORY, marks + 1);
         }
         pathMark[newestMark] = pathWalked;
-        pitchMark[newestMark] = frontPitch;
+        pitchMark[newestMark] = frontPitch - lean;
         yawMark[newestMark] = frontYaw;
         if (pitch.length != pieces.size()) {
             pitch = new float[pieces.size()];
@@ -85,19 +92,19 @@ public final class Spine {
             yaw = new float[pieces.size()];
             yawO = new float[pieces.size()];
         }
-        // Each piece lies the way the path lay where it is now: along the path its whole length took (the front's pose
-        // averaged over it), so at an inside corner (a wall up from the floor, the floor at the foot of a wall) it lies
-        // along the old surface and comes round bit by bit as it passes the corner. Over an outside edge it hangs down
-        // only while its joints are still over the edge (2026-10-16, seen in the climbing film by the user and me).
+        // Each piece lies the way the ground lay where it is now (averaged over its own body, from where it begins: the
+        // ant's waist piece by its gaster, its petiole and postpetiole bending it; in front of the hind feet the thorax's
+        // line), so at an inside corner (a wall up from the floor, the floor at the foot of a wall) it lies along
+        // the old surface and comes round bit by bit as it passes the corner, and over an outside edge it stays on the old
+        // surface until it gets there, then hangs down the new one.
         float ahead = frontPitch;
         float aheadYaw = frontYaw;
         for (int i = 0; i < pitch.length; i++) {
             BodyPlans.Piece piece = pieces.get(i);
             double hinge = pathWalked - piece.hinge() * scale;
-            float lies = averageMark(pitchMark, pathWalked - piece.to() * scale, hinge);
-            float joints = averageMark(pitchMark, pathWalked - piece.from() * scale, hinge);
+            float lies = groundUnder(piece.from(), piece.to(), ahead, hind, scale);
             float liesYaw = averageMark(yawMark, pathWalked - piece.to() * scale, hinge);
-            float bend = Math.max(ahead - lies, Math.min(ahead - joints, 0.0F));
+            float bend = ahead - lies;
             pitchO[i] = pitch[i];
             yawO[i] = yaw[i];
             pitch[i] = Mth.clamp(bend, -piece.maxPitch(), piece.maxPitch());
@@ -129,6 +136,21 @@ public final class Spine {
 
     public float frontYaw() {
         return frontYaw;
+    }
+
+    /**
+     * The up-and-down way a piece lies, from {@code near} to {@code far} behind the middle (model units): in front of the
+     * hind feet along the thorax's line ({@code ahead}, no bend there), behind them the way the ground lay where it is
+     * now, which the hind feet walked over {@code hind} earlier.
+     */
+    private float groundUnder(double near, double far, float ahead, double hind, double scale) {
+        double behind = far - Math.max(near, hind);
+        if (behind <= 0.0) {
+            return ahead;
+        }
+        double along = Math.max(0.0, Math.min(far, hind) - near);
+        float ground = averageMark(pitchMark, pathWalked - (far - hind) * scale, pathWalked - (Math.max(near, hind) - hind) * scale);
+        return (float) ((along * ahead + behind * ground) / (along + behind));
     }
 
     /**

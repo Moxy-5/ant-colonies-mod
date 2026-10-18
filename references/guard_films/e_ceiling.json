@@ -409,12 +409,16 @@
    0.257
   ],
   "jump petiole": [
-   4,
+   5,
    0.072
   ],
   "jump at onto_ceiling_104": [
-   2,
-   0.101
+   1,
+   0.038
+  ],
+  "jump at down_again_03": [
+   3,
+   0.06
   ],
   "jump at down_again_06": [
    3,
@@ -424,13 +428,13 @@
    4,
    0.096
   ],
-  "jump at down_again_03": [
-   2,
-   0.033
-  ],
   "inside abdomen": [
-   63,
+   64,
    0.091
+  ],
+  "inside at onto_ceiling_104": [
+   1,
+   0.012
   ],
   "inside at down_again_17": [
    1,
@@ -685,7 +689,7 @@
    0.089
   ],
   "jump abdomen": [
-   5,
+   4,
    0.218
   ]
  },

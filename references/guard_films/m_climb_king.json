@@ -283,8 +283,8 @@
    0.044
   ],
   "jump at down_113": [
-   8,
-   0.077
+   9,
+   0.067
   ],
   "jump wing_stubs": [
    1,
@@ -328,25 +328,29 @@
   ],
   "jump abdomen": [
    1,
-   0.052
+   0.049
   ],
   "jump abdomen_2": [
    1,
-   0.056
+   0.052
   ],
   "jump abdomen_3": [
    1,
-   0.063
+   0.054
   ],
   "jump abdomen_4": [
    1,
-   0.07
+   0.059
   ],
   "jump abdomen_5": [
    1,
-   0.077
+   0.064
+  ],
+  "jump abdomen_6": [
+   1,
+   0.067
   ]
  },
  "body_findings": {},
- "known_bugs": "coming head first down onto the floor the navigator stops it 3 ticks and turns it 180 degrees on the spot (old); going head first over the top its abdomen points up into the air, following the thorax's earlier tilt instead of the ground (the ant's gaster too, as approved in-game; the fix, following the ground under the hind feet, waits for the user)"
+ "known_bugs": "coming head first down onto the floor the navigator stops it 3 ticks and turns it 180 degrees on the spot (old, docs/BUGS.md 53)"
 }

@@ -4,7 +4,7 @@ Planned 2026-10-18 with the user ("lets get started on climbing done once for ev
 (from `brain-danger`, which holds the merged animation upgrade). Review: `docs/plans/animation-engine-upgrade-review.md`,
 M4 and B3.
 
-**Built 2026-10-18** (steps 1 to 5; details and results in `docs/HISTORY.md`, "Climbing done once for every body"): the abdomens have 6 segments, one per drawn plate, not 4; the three climbing scenes are `k_climb_minor`, `l_climb_major` and `m_climb_king`; two new problems at the foot of a wall fixed (`docs/BUGS.md` 52); two old ones left as known bugs (53, 54). Not tried in-game yet.
+**Built 2026-10-18** (steps 1 to 5; details and results in `docs/HISTORY.md`, "Climbing done once for every body"): the abdomens have 6 segments, one per drawn plate, not 4; the three climbing scenes are `k_climb_minor`, `l_climb_major` and `m_climb_king`; two new problems at the foot of a wall fixed (`docs/BUGS.md` 52); two old ones left as known bugs (53, 54); 54 fixed the same day with the user's OK (the rear follows the ground under the hind feet, the ant too). Not tried in-game yet.
 
 ## What is wrong today
 

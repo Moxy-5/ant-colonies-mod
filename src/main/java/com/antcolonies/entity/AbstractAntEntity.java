@@ -963,6 +963,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
      * worker at most 60 degrees up or down and 25 to the side.
      */
     private final Spine spine = new Spine();
+    /** Across an edge or a corner now: the tilt of the surface its hind feet still stand on (as the body's); else NaN. */
+    private float edgeFromTilt = Float.NaN;
 
     private void tickWaist() {
         // On a wall the body tips about its own side-to-side line only when the head points up or down the wall (the
@@ -970,7 +972,11 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         float tipped = (bodyTilt - bodyTiltO) * Mth.cos(bodyHeading * Mth.DEG_TO_RAD);
         // Turning right is a growing body yaw on a floor; on a wall the heading grows turning left.
         float turned = wallPose ? -Mth.wrapDegrees(bodyHeading - bodyHeadingO) : Mth.wrapDegrees(yBodyRot - yBodyRotO);
-        spine.tick(tipped + (slopePitch - slopePitchO), turned, moved, drawScale / 16.0, tickCount <= 2, rear, climb.tightestCurve());
+        // Across an edge the thorax leans from the old surface to the new one; the rear behind the hind feet follows the
+        // ground they walked over, the old surface until they are over the edge.
+        float lean = Float.isNaN(edgeFromTilt) ? 0.0F
+                : (bodyTilt - edgeFromTilt) * Mth.cos(bodyHeading * Mth.DEG_TO_RAD);
+        spine.tick(tipped + (slopePitch - slopePitchO), lean, turned, moved, drawScale / 16.0, tickCount <= 2, rear, climb.tightestCurve(), climb.hindFeet());
     }
 
     /** Client: how far the front has tipped up past the rear (degrees, the first piece's bend; see {@link #tickWaist}). */
@@ -981,6 +987,11 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     /** Client: how far the piece in front of this spine piece has tipped up past it (degrees, its bend). */
     public float getSpinePitch(int piece, float partialTick) {
         return spine.pitch(piece, partialTick);
+    }
+
+    /** Client: how many pieces its spine bends (for the in-game camera's log). */
+    public int getSpinePieces() {
+        return spine.pieces();
     }
 
     /** Client: how far the piece in front of this spine piece has turned right past it (degrees, its bend). */
@@ -1108,6 +1119,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         Direction surface = getSurface();
         float turn = isTurningSlowly() ? BODY_TURN_SPEED / 2.0F : BODY_TURN_SPEED;
         EdgeOver.Pose edge = overAnEdge();
+        edgeFromTilt = edge != null ? edge.fromTilt() : Float.NaN;
         if (edge != null) {
             goOverEdge(edge, turn);
             return;

@@ -13,8 +13,8 @@ import net.minecraft.util.Mth;
 
 /**
  * The spine (climbing done once for every body, 2026-10-18, {@code docs/plans/climbing-every-body.md}): for the ant's
- * waist it bends exactly as the old waist code did (the user approved the ant's climbing in-game on 2026-10-16), replayed
- * through the same climbs to the last bit; and a made-up body of 12 segments walked round a turn, up a wall and over its
+ * waist it turns exactly as the old waist code did (the user approved the ant's climbing in-game on 2026-10-16), replayed
+ * through the same climbs to the last bit; head first over a top the rear lies on the ground the hind feet walked; and a made-up body of 12 segments walked round a turn, up a wall and over its
  * top lies along the path it walked, every segment of it.
  */
 class SpineTest {
@@ -23,26 +23,28 @@ class SpineTest {
     }
 
     @Test
-    void theAntsWaistBendsExactlyAsBefore() {
-        List<List<Step>> climbs = List.of(upAWall(), overATop(), overABrink(), aTurn(), stopHalfWayOver(), randomWalk(1),
+    void theAntsWaistTurnsExactlyAsBefore() {
+        // Sideways the spine is the old waist word for word, on every climb (up and down it changed on purpose on
+        // 2026-10-18, the user's pick: the rear follows the ground the hind feet walked, not the front's own path).
+        List<List<Step>> climbs = List.of(upAWall(), aTurn(), overATop(), overABrink(), stopHalfWayOver(), randomWalk(1),
                 randomWalk(2), randomWalk(3));
         for (double drawScale : new double[] {0.65, 1.3}) {
             double scale = drawScale / 16.0;
             for (int c = 0; c < climbs.size(); c++) {
-                Spine spine = new Spine();
-                OldWaist old = new OldWaist();
-                int tick = 0;
-                for (Step step : climbs.get(c)) {
-                    spine.tick(step.tipped, step.turned, step.moved, scale, step.restart, List.of(BodyPlans.WORKER_WAIST), 3.0);
-                    old.tick(step.tipped, step.turned, step.moved, scale, step.restart);
-                    for (float partial : new float[] {0.0F, 0.37F, 1.0F}) {
-                        String where = "climb " + c + " scale " + drawScale + " tick " + tick;
-                        assertEquals(Float.floatToIntBits(old.pitch(partial)), Float.floatToIntBits(spine.pitch(0, partial)),
-                                where + ": pitch " + old.pitch(partial) + " was, now " + spine.pitch(0, partial));
-                        assertEquals(Float.floatToIntBits(old.yaw(partial)), Float.floatToIntBits(spine.yaw(0, partial)),
-                                where + ": yaw " + old.yaw(partial) + " was, now " + spine.yaw(0, partial));
+                for (double hind : new double[] {0.0, BodyPlans.WORKER_CLIMB.hindFeet()}) {
+                    Spine spine = new Spine();
+                    OldWaist old = new OldWaist();
+                    int tick = 0;
+                    for (Step step : climbs.get(c)) {
+                        spine.tick(step.tipped, 0.0F, step.turned, step.moved, scale, step.restart, List.of(BodyPlans.WORKER_WAIST), 3.0, hind);
+                        old.tick(step.tipped, step.turned, step.moved, scale, step.restart);
+                        for (float partial : new float[] {0.0F, 0.37F, 1.0F}) {
+                            String where = "climb " + c + " scale " + drawScale + " hind " + hind + " tick " + tick;
+                            assertEquals(Float.floatToIntBits(old.yaw(partial)), Float.floatToIntBits(spine.yaw(0, partial)),
+                                    where + ": yaw " + old.yaw(partial) + " was, now " + spine.yaw(0, partial));
+                        }
+                        tick++;
                     }
-                    tick++;
                 }
             }
         }
@@ -77,7 +79,7 @@ class SpineTest {
         float pitch = 0.0F;
         float yaw = 0.0F;
         for (Step step : walk) {
-            spine.tick(step.tipped, step.turned, step.moved, scale, step.restart, rings, 0.0001);
+            spine.tick(step.tipped, 0.0F, step.turned, step.moved, scale, step.restart, rings, 0.0001, 0.0);
             at += step.moved;
             pitch += step.tipped;
             yaw += step.turned;
@@ -112,10 +114,73 @@ class SpineTest {
         }
         Spine held = new Spine();
         for (Step step : walk) {
-            held.tick(step.tipped, step.turned, step.moved, scale, step.restart, stiff, 0.0001);
+            held.tick(step.tipped, 0.0F, step.turned, step.moved, scale, step.restart, stiff, 0.0001, 0.0);
             for (int i = 0; i < stiff.size(); i++) {
                 assertTrue(Math.abs(held.pitch(i, 1.0F)) <= 15.0F && Math.abs(held.yaw(i, 1.0F)) <= 8.0F, "joint " + i);
             }
+        }
+    }
+
+    @Test
+    void headFirstOverATopTheRearLiesOnTheGroundItWalked() {
+        // The user's pick (2026-10-18): going head first over a top, the thorax tips from when its front feet reach the
+        // edge until its hind feet are over it, and the parts behind the hind feet lie on the ground the hind feet walked
+        // over: on the top, each joint bends toward it as far as it reaches (never up in the air along the thorax's
+        // tilt, the old rule), and once over, the body hangs straight down the wall. A soft termite worker's abdomen of
+        // 6 segments with a real reach, and the ant's waist.
+        List<BodyPlans.Piece> abdomen = new ArrayList<>();
+        for (int i = 0; i < 6; i++) {
+            double hinge = 0.37 + 0.51 * i;
+            abdomen.add(new BodyPlans.Piece(List.of("abdomen_" + i), new float[] {1.0F}, hinge, hinge, hinge + 0.49, 15.0F, 6.0F));
+        }
+        record Body(List<BodyPlans.Piece> pieces, double front, double hind) {
+        }
+        for (Body body : List.of(new Body(abdomen, 2.76, 1.19),
+                new Body(List.of(BodyPlans.WORKER_WAIST), BodyPlans.WORKER_CLIMB.frontFeet(), BodyPlans.WORKER_CLIMB.hindFeet()))) {
+            List<BodyPlans.Piece> pieces = body.pieces();
+            double scale = 0.75 / 16.0;
+            double edge = 1.0;
+            Spine spine = new Spine();
+            Spine old = new Spine();
+            double at = 0.0;
+            float front = 0.0F;
+            float gained = 0.0F;
+            for (int t = 0; t < 110; t++) {
+                at += 0.02;
+                // how far over the thorax is: from its front feet at the edge to its hind feet there
+                double over = Mth.clamp((at + body.front() * scale - edge) / ((body.front() + body.hind()) * scale), 0.0, 1.0);
+                float now = (float) (-90.0 * over);
+                float tipped = now - front;
+                front = now;
+                boolean posed = over > 0.0 && over < 1.0;
+                spine.tick(tipped, posed ? front : 0.0F, 0.0F, 0.02, scale, t == 0, pieces, 3.0, body.hind());
+                old.tick(tipped, 0.0F, 0.0F, 0.02, scale, t == 0, pieces, 3.0, body.hind());
+                float ahead = front;
+                float oldAhead = front;
+                for (int i = 0; i < pieces.size(); i++) {
+                    BodyPlans.Piece piece = pieces.get(i);
+                    float before = ahead;
+                    ahead -= spine.pitch(i, 1.0F);
+                    oldAhead -= old.pitch(i, 1.0F);
+                    String where = "piece " + i + " tick " + t;
+                    if (over < 1.0 && piece.hinge() >= body.hind()) {
+                        // the hind feet still on the top and this piece wholly behind them: it bends toward the top
+                        float toward = Math.copySign(Math.max(0.0F, Math.abs(before) - piece.maxPitch()), before);
+                        assertEquals(toward, ahead, 0.01F, where + " lies at " + ahead + " over the top");
+                    }
+                    if (at - piece.to() * scale > edge + 0.001) {
+                        assertEquals(-90.0F, ahead, 0.01F, where + " off the wall");
+                    }
+                    // never higher into the air than the old rule put it
+                    assertTrue(ahead >= oldAhead - 0.01F, where + " now " + ahead + ", the old rule " + oldAhead);
+                    if (i == pieces.size() - 1) {
+                        gained = Math.max(gained, ahead - oldAhead);
+                    }
+                }
+            }
+            assertTrue(at > edge + pieces.get(pieces.size() - 1).to() * scale, "walked far enough");
+            // and the old rule raised the rear far more
+            assertTrue(gained > 20.0F, "the rear came down only " + gained + " below the old rule");
         }
     }
 
