@@ -96,10 +96,21 @@ it.** If a decision changes, ask the user first, then update it here. The short 
   - **A dead colony's comb:** the black antler-shaped fungus *Xylaria* takes over the comb of a dead colony (held back by living termites); a sign a mound is dead.
   - **Old mound soil:** old and dead mounds are richer soil, grass grows lusher and trees grow on them (the savanna's mound islands); long term, once mounds die and the world ages.
 
-### Giant savanna trees (M7.5, user, 2026-10-18; NOT planned in detail yet)
+### Giant savanna trees (M7.5, user, 2026-10-18; planned with the user 2026-10-18, steps in `docs/plans/m7.5-giant-trees.md`)
 - **Why (the user):** the current fallen trees (dead vanilla acacias, 1 block thick) don't feel big enough to be a Matabele home, and the insects can't be shrunk (they must stay fightable). So the **trees get bigger and thicker, keeping their real shapes**: giant savanna trees, "almost intimidating to enter".
 - **Why it is realistic:** at the insects' scale one block is about 2.3 cm (a 7 mm harvester worker is 0.3 blocks), so a real 50 cm fallen trunk would be about 20 blocks thick; a trunk 3 to 6 blocks thick is still smaller than what a real ant meets. Real savannas have giant thick-trunked trees: baobabs (trunks up to about 10 m, old ones hollow) and old camel thorn and umbrella thorn acacias (thick gnarled trunks, wide flat crowns).
 - **Ideas so far (Claude's, to plan with the user):** Minecraft's savanna trees removed from savannas by a biome modifier and replaced by ours (land already explored keeps its old trees). A **giant umbrella thorn** (trunk about 2 to 3 blocks thick forking into thick limbs, flat crown 20 to 30 blocks wide, thinner branch pieces at the tips) and a rare **giant baobab** (trunk about 5 to 7 blocks thick, short stubby branches, old ones hollow). **Dead stages:** a standing grey snag with peeling bark, termite mud climbing it from the base, the fall, and the **fallen hollow giant** (dark tunnels of rotten wood, frass, termite mud: Matabele in the hollows, termites eating from below, centipedes under the bark later). New blocks: real bark (living, and the bleached silver dead look the user liked best, now it can fit), rotten wood, frass (insect wood dust), peeling bark, thin branches. The current fallen branches and fallen trees fit into this (to decide).
+- **Decisions (user, 2026-10-18):**
+  - **Size "Huge":** a mature umbrella thorn has a trunk 4 to 5 blocks thick, about 30 to 40 tall, a flat crown 40 to 50 wide (placed in new land as structures, too big for normal tree features).
+  - **Three kinds:** umbrella thorn (common), camel thorn (darker, rounder crown, deeply cracked bark, grey velvety pods), baobab (rare, very thick, old ones hollow while alive).
+  - **Minecraft's savanna trees are replaced** in new land by ours **at every age** (seedlings, young thorny trees, mature, rare ancient giants); explored land keeps its trees.
+  - **Full life cycle:** trees grow from seedlings to giants in play, slowly (seedling to young in a few in-game days, mature in about 20 to 40, ancient after 100+; bone meal only on the young stages), and die and fall in play; new land also has every stage scattered in.
+  - **Death:** old age, fire, lightning, and a Macrotermes colony under a tree hollowing its heartwood (it dies sooner). No drought (later, with seasons), no elephants.
+  - **The fall:** the snag sheds its limbs as fallen branches over several days, then the trunk crashes down at once (dust, hurts what is under it) and lies as the hollow log; the stump stays.
+  - **Inside a fallen giant:** a central hollow sized by the tree's age, rotten wood and frass on the floor, side galleries from beetles and termites, darker deeper in.
+  - **Baobabs collapse** (real): a dead baobab slumps into a heap of fibrous rotten wood that dries and shrinks, food for termites and a home; no log.
+  - **Thorns hurt and slow** like a sweet berry bush (thorny twigs at crown edges and on young trees; none on big old trunks).
+  - **Old dead wood folded in:** our trees shed the fallen branches; the 1-block fallen trees are replaced by fallen young trees and giant limbs; dead wood takes the bleached silver look; termites eat it all as now.
 - **Matabele size with it (my pick, to confirm):** the major about 2.5 times a harvester worker (about 0.7 blocks long), minors about harvester size.
 - **Order:** after brain step 4g, before M8 step 1. Looks drawn in the model viewer for the user to pick before any building.
 
