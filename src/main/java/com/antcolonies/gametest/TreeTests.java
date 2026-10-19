@@ -155,7 +155,7 @@ public class TreeTests {
     private static final int TREE_MIDDLE = 32;
 
     /**
-     * New land: the savanna has none of Minecraft's savanna trees and our two structures exist; a grown camel thorn put
+     * New land: the savanna has none of Minecraft's savanna trees, rain falls there, and our two structures exist; a grown camel thorn put
      * in chunk by chunk (each chunk only its own part, as world generation does) is the whole tree, and where a pit
      * dips under one side of its foot the trunk goes down to the pit's floor.
      */
@@ -169,6 +169,16 @@ public class TreeTests {
                 if (id.equals("minecraft:trees_savanna") || id.equals("minecraft:trees_windswept_savanna")) {
                     helper.fail("the savanna still grows Minecraft's trees (" + id + ")");
                 }
+            }
+        }
+        // It rains in every savanna (Minecraft's never do; real ones have a rainy season), and they stay warm (rain, not snow).
+        for (var key : java.util.List.of(Biomes.SAVANNA, Biomes.SAVANNA_PLATEAU, Biomes.WINDSWEPT_SAVANNA)) {
+            Biome biome = level.registryAccess().registryOrThrow(Registries.BIOME).getOrThrow(key);
+            if (!biome.hasPrecipitation()) {
+                helper.fail(key.location() + " never rains");
+            }
+            if (biome.getBaseTemperature() < 1) {
+                helper.fail(key.location() + " is no longer hot: " + biome.getBaseTemperature());
             }
         }
         var structures = level.registryAccess().registryOrThrow(Registries.STRUCTURE);

@@ -33,4 +33,13 @@ public class ModFeatures {
      */
     public static final DeferredHolder<Feature<?>, GramaPatchFeature> GRAMA_PATCH =
             FEATURES.register("grama_patch", () -> new GramaPatchFeature(GramaPatchFeature.Config.CODEC));
+
+    /** Our own kinds of biome modifier. */
+    public static final DeferredRegister<com.mojang.serialization.MapCodec<? extends net.neoforged.neoforge.common.world.BiomeModifier>> BIOME_MODIFIERS =
+            DeferredRegister.create(net.neoforged.neoforge.registries.NeoForgeRegistries.Keys.BIOME_MODIFIER_SERIALIZERS, AntColoniesMod.MODID);
+
+    /** Lets it rain in savannas (data/antcolonies/neoforge/biome_modifier/savanna_rain.json). */
+    public static final DeferredHolder<com.mojang.serialization.MapCodec<? extends net.neoforged.neoforge.common.world.BiomeModifier>,
+            com.mojang.serialization.MapCodec<com.antcolonies.worldgen.RainModifier>> RAIN =
+            BIOME_MODIFIERS.register("rain", () -> com.antcolonies.worldgen.RainModifier.CODEC);
 }
