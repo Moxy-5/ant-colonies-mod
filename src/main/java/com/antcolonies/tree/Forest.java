@@ -123,6 +123,11 @@ public class Forest extends SavedData {
         public TreeStage placedStage;
         /** How far along its stage's slow change a dead tree is (step 5b, {@link TreeLife#deadStep}), and what is in the world. */
         public int step, placedStep;
+        /**
+         * Step 5c: a dead acacia due to fall has come down (in a storm, or after waiting {@link TreeLife#RAIN_WAIT} days);
+         * until then it stands shed. {@code toppling}: it is being drawn falling (its standing wood already taken away).
+         */
+        public boolean fell, toppling;
 
         public Tree(String kind, BlockPos foot, long seed, double age, TreeStage stage, double placedAge, long lastDay) {
             this.kind = kind;
@@ -137,6 +142,7 @@ public class Forest extends SavedData {
             if (stage != TreeStage.LIVING) {
                 died = DIED_UNKNOWN;
                 step = placedStep = TreeLife.fullStep(stage); // new land shows the stage's finished shape
+                fell = stage == TreeStage.FALLEN;
             }
         }
 
@@ -182,6 +188,8 @@ public class Forest extends SavedData {
             tag.putString("placedStage", placedStage.id);
             tag.putInt("step", step);
             tag.putInt("placedStep", placedStep);
+            tag.putBoolean("fell", fell);
+            tag.putBoolean("toppling", toppling);
             return tag;
         }
 
@@ -196,6 +204,8 @@ public class Forest extends SavedData {
                 t.placedStage = stage(tag.getString("placedStage"));
                 t.step = tag.getInt("step");
                 t.placedStep = tag.getInt("placedStep");
+                t.fell = tag.contains("fell") ? tag.getBoolean("fell") : t.placedStage == TreeStage.FALLEN;
+                t.toppling = tag.getBoolean("toppling");
             }
             return t;
         }
@@ -212,6 +222,9 @@ public class Forest extends SavedData {
     public int grownSteps, deaths, sprouted;
     /** Grown trees that died (step 5), and dead stages placed. */
     public int killed, deadSteps;
+
+    /** The trees being drawn falling right now (step 5c), by their foot. Not saved: one cut off by a stop is placed at once. */
+    private final Long2ObjectOpenHashMap<TreeFall> falls = new Long2ObjectOpenHashMap<>();
 
     /** The game tests: shapes are worked out at once rather than in the background. */
     public static boolean shapesAtOnce;
@@ -308,10 +321,13 @@ public class Forest extends SavedData {
 
     /** Called every tick: rain is written down, and once a second the trees due are brought up to date. */
     public static void tick(ServerLevel level) {
+        Forest forest = get(level);
+        if (!forest.falls.isEmpty()) {
+            forest.falls.values().removeIf(TreeFall::tick);
+        }
         if (level.getGameTime() % 20 != 7) {
             return;
         }
-        Forest forest = get(level);
         for (Queued q; (q = QUEUE.peek()) != null && q.dimension() == level.dimension(); ) {
             QUEUE.poll();
             q.tree().lastDay = today(level);
@@ -347,6 +363,10 @@ public class Forest extends SavedData {
             if (t.settled()) {
                 continue;
             }
+            if (t.dead() && !t.fell && t.died != DIED_UNKNOWN && stormFells(level, t)) {
+                t.fell = true; // the storm brings it down
+                setDirty();
+            }
             if (t.lastDay < today || !t.upToDate() || t.dead() && t.died != DIED_UNKNOWN && changesNow(t, time(level))) {
                 update(level, t, today);
             }
@@ -371,13 +391,50 @@ public class Forest extends SavedData {
 
     /** Whether a dead tree's stage or slow change has moved on since it was last brought up to date. */
     private static boolean changesNow(Tree t, double time) {
-        TreeKind kind = t.treeKind();
-        double daysDead = time - t.died;
-        return TreeLife.deadStage(kind, t.seed, daysDead) != t.stage || TreeLife.deadStep(kind, t.seed, daysDead) != t.step;
+        TreeStage stage = deadStageNow(t, time - t.died);
+        return stage != t.stage || stage != null && deadStepNow(t, stage, time - t.died) != t.step;
+    }
+
+    /** A dead tree's stage so many days after its death: one due to fall stands shed until it has come down (step 5c). */
+    static TreeStage deadStageNow(Tree t, double daysDead) {
+        TreeStage stage = TreeLife.deadStage(t.treeKind(), t.seed, daysDead);
+        if (t.fell) {
+            return TreeStage.FALLEN; // once down it stays down
+        }
+        if (stage == TreeStage.FALLEN) {
+            if (daysDead < TreeLife.stageFrom(t.treeKind(), t.seed, TreeStage.FALLEN) + TreeLife.RAIN_WAIT) {
+                return TreeStage.SHED;
+            }
+            t.fell = true; // it waited long enough: it comes down on a still day
+        }
+        return stage;
+    }
+
+    private static int deadStepNow(Tree t, TreeStage stage, double daysDead) {
+        if (stage == TreeStage.FALLEN) {
+            return 0;
+        }
+        return stage == TreeStage.SHED && TreeLife.deadStage(t.treeKind(), t.seed, daysDead) == TreeStage.FALLEN ? TreeLife.fullStep(stage)
+                : TreeLife.deadStep(t.treeKind(), t.seed, daysDead);
+    }
+
+    /**
+     * Step 5c: a dead acacia due to fall comes down in a storm: each second of rain over it a small chance, more in a
+     * thunderstorm (my picks: about a minute of rain, 20 seconds of thunder).
+     */
+    private static boolean stormFells(ServerLevel level, Tree t) {
+        if (!level.isRaining() || !level.getBiome(t.foot).value().hasPrecipitation()
+                || TreeLife.deadStage(t.treeKind(), t.seed, time(level) - t.died) != TreeStage.FALLEN) {
+            return false;
+        }
+        return level.getRandom().nextInt(level.isThundering() ? 20 : 60) == 0;
     }
 
     /** As {@link #update(ServerLevel, Tree, long)}, with the clock's time in days (with the part of the day). */
     public boolean update(ServerLevel level, Tree t, long today, double time) {
+        if (falls.containsKey(t.foot.asLong())) {
+            return true; // being drawn falling: it lands by itself
+        }
         if (!level.hasChunkAt(t.foot)) {
             return false;
         }
@@ -423,8 +480,8 @@ public class Forest extends SavedData {
         int stageSteps = 0;
         if (t.dead()) {
             double daysDead = Math.max(today, time) - t.died;
-            t.stage = TreeLife.deadStage(t.treeKind(), t.seed, daysDead);
-            t.step = t.stage == null ? 0 : TreeLife.deadStep(t.treeKind(), t.seed, daysDead);
+            t.stage = deadStageNow(t, daysDead);
+            t.step = t.stage == null ? 0 : deadStepNow(t, t.stage, daysDead);
             if (t.stage == null) {
                 // A baobab's dried heap is gone.
                 if (now != null) {
@@ -445,8 +502,66 @@ public class Forest extends SavedData {
         if (next == null || !loaded(level, next.box(t.foot)) || jump && !outOfSight(level, t, next)) {
             return false;
         }
+        if (t.stage == TreeStage.FALLEN && now != null && !t.toppling && !outOfSight(level, t, next)) {
+            topple(level, t, now, next);
+            return true;
+        }
         place(level, t, now, next);
         return true;
+    }
+
+    /** Step 5c: a dead tree starts falling in sight (drawn by {@link TreeFall}; it lands by itself, {@link #landed}). */
+    public void topple(ServerLevel level, Tree t, TreePlacer.Placed now, TreePlacer.Placed next) {
+        t.toppling = true;
+        setDirty();
+        falls.put(t.foot.asLong(), new TreeFall(level, this, t, now, next));
+    }
+
+    /** For testing (the command): a living grown tree dies now. Returns false if it is not living. */
+    public boolean killNow(ServerLevel level, Tree t) {
+        if (!t.living()) {
+            return false;
+        }
+        kill(t, today(level), "age");
+        return true;
+    }
+
+    /**
+     * For testing (the command): a grown acacia, living or dead but standing, is put at once into its shed shape and then
+     * falls in sight (drawn, wherever the players are). Returns false for a baobab, a fallen log or one already falling.
+     */
+    public boolean fellNow(ServerLevel level, Tree t) {
+        TreeKind kind = t.treeKind();
+        if (kind.isBaobab() || t.fell || t.toppling || falling(t) || t.placedAge < 0 || !level.hasChunkAt(t.foot)) {
+            return false;
+        }
+        TreePlacer.Placed now = TreePlacer.placed(t.kind, t.seed, t.placedAge, t.placedStage, t.placedStep);
+        TreePlacer.Placed shed = TreePlacer.placed(t.kind, t.seed, TreeLife.shapeAge(t.age), TreeStage.SHED);
+        TreePlacer.Placed lying = TreePlacer.placed(t.kind, t.seed, TreeLife.shapeAge(t.age), TreeStage.FALLEN);
+        if (t.living()) {
+            t.cause = "age";
+            killed++;
+        }
+        // Dead long enough to be due to fall today.
+        t.died = (long) Math.floor(time(level) - TreeLife.stageFrom(kind, t.seed, TreeStage.FALLEN));
+        t.stage = TreeStage.SHED;
+        t.step = TreeLife.fullStep(TreeStage.SHED);
+        place(level, t, now, shed);
+        t.fell = true;
+        t.stage = TreeStage.FALLEN;
+        t.step = 0;
+        topple(level, t, shed, lying);
+        return true;
+    }
+
+    /** Whether a tree is being drawn falling. */
+    public boolean falling(Tree t) {
+        return falls.containsKey(t.foot.asLong());
+    }
+
+    /** A falling tree hits the ground: the fallen log is placed. */
+    void landed(ServerLevel level, Tree t, TreePlacer.Placed now, TreePlacer.Placed next) {
+        place(level, t, now, next);
     }
 
     /** A grown tree dies (step 5): its dead stages start (the day it dies its leaves wither on the living shape). */
@@ -465,6 +580,9 @@ public class Forest extends SavedData {
 
     /** Brings the tree's shape in the world from what is there to its age now. */
     private void place(ServerLevel level, Tree t, TreePlacer.Placed now, TreePlacer.Placed next) {
+        if (t.stage == TreeStage.FALLEN && t.placedStage != TreeStage.FALLEN) {
+            TreeFall.clearWhereItLies(level, t.foot, now, next); // step 5c: what is soft where the log lands is smashed
+        }
         List<BlockPos> shed = new ArrayList<>();
         List<BlockPos> leaves = new ArrayList<>(), wood = new ArrayList<>();
         List<BlockState> leafStates = new ArrayList<>();
@@ -481,6 +599,10 @@ public class Forest extends SavedData {
         }
         fallingLeaves(level, leaves, leafStates, TreeLife.dice(t.seed, t.lastDay * 16 + t.step));
         fallingLimbs(level, wood);
+        if (t.stage == TreeStage.FALLEN && t.placedStage != TreeStage.FALLEN && !t.toppling) {
+            TreeFall.crushUnder(level, t.foot, next, java.util.Set.of()); // it fell out of sight: what lay where it lies is crushed all the same
+        }
+        t.toppling = false;
         t.placedAge = TreeLife.shapeAge(t.age);
         t.placedStage = t.stage;
         t.placedStep = t.step;

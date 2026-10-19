@@ -23,6 +23,27 @@ final class DeadWood {
     private DeadWood() {
     }
 
+    /**
+     * Which way a dead tree falls (step 5c, the user's pick, "real topple"): toward its heavier side, where most of the
+     * wood still on the shed tree hangs (above the stump, from 4 blocks up, mud-cased or bare). A tree whose weight sits right over its
+     * stump keeps the way its dice gave.
+     */
+    static double heavierSide(TreeVoxels shed, double fallback) {
+        double[] sum = new double[3];
+        shed.forEach((x, y, z, b) -> {
+            if (y >= 4 && (b.isWood() || b == TreePart.MUD)) { // wood under termite mud weighs the same
+                sum[0] += x;
+                sum[1] += z;
+                sum[2]++;
+            }
+        });
+        if (sum[2] == 0) {
+            return fallback;
+        }
+        double cx = sum[0] / sum[2], cz = sum[1] / sum[2];
+        return cx * cx + cz * cz < 0.25 ? fallback : Math.atan2(cz, cx);
+    }
+
     /** Dead wood: bark peels in patches; termite mud climbs the trunk from the ground. trunkTop: the trunk's tip height. */
     static void weather(TreeVoxels v, long seed, double trunkTop, double r0, TreeStage stage) {
         boolean muddy = stage != TreeStage.SNAG;

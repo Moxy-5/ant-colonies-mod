@@ -51,7 +51,10 @@ public class ColonyCommands {
                                 .executes(context -> stress(context.getSource(), IntegerArgumentType.getInteger(context, "count")))))
                 // The giant savanna trees in the tree book (M7.5 step 4): how many, and the nearest little ones with their
                 // place and age, to find a new seedling after rain or watch a young tree grow.
-                .then(Commands.literal("trees").executes(context -> trees(context.getSource())))
+                // Step 5, for testing: "kill" (the nearest grown tree dies now) and "fell" (the nearest acacia sheds and falls now).
+                .then(Commands.literal("trees").executes(context -> trees(context.getSource()))
+                        .then(Commands.literal("kill").executes(context -> treeDeath(context.getSource(), false)))
+                        .then(Commands.literal("fell").executes(context -> treeDeath(context.getSource(), true))))
                 .then(Commands.literal("perf").executes(context -> {
                     context.getSource().sendSuccess(() -> Component.literal(Perf.report()), false);
                     return 1;
@@ -426,6 +429,25 @@ public class ColonyCommands {
         long seconds = Math.max(0, colony.queenCare().getEggDue() - level.getGameTime()) / 20;
         String burst = colony.queenCare().getBurstLeft() > 0 ? ", burst: " + colony.queenCare().getBurstLeft() + " left" : "";
         return String.format(" (egg in %d:%02d%s)", seconds / 60, seconds % 60, burst);
+    }
+
+    /** Step 5, for testing: the nearest grown tree within 32 blocks dies now, or (fell) an acacia sheds and falls now. */
+    private static int treeDeath(CommandSourceStack source, boolean fell) {
+        ServerLevel level = source.getLevel();
+        com.antcolonies.tree.Forest forest = com.antcolonies.tree.Forest.get(level);
+        BlockPos at = BlockPos.containing(source.getPosition());
+        java.util.List<com.antcolonies.tree.Forest.Tree> near = forest.near(at, 32);
+        near.sort(Comparator.comparingDouble(t -> t.foot.distSqr(at)));
+        for (com.antcolonies.tree.Forest.Tree t : near) {
+            if (t.age < com.antcolonies.tree.TreeLife.YOUNG_END || t.placedAge < 0 || (fell ? !forest.fellNow(level, t) : !forest.killNow(level, t))) {
+                continue;
+            }
+            String what = t.kind.replace('_', ' ') + " at " + t.foot.getX() + " " + t.foot.getY() + " " + t.foot.getZ();
+            source.sendSuccess(() -> Component.literal(fell ? "The " + what + " creaks and falls." : "The " + what + " dies now: watch its leaves wither."), false);
+            return 1;
+        }
+        source.sendFailure(Component.literal(fell ? "No standing grown acacia within 32 blocks." : "No living grown tree within 32 blocks."));
+        return 0;
     }
 
     private static int trees(CommandSourceStack source) {

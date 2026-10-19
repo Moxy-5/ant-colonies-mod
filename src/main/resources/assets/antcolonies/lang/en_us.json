@@ -73,6 +73,7 @@
   "block.antcolonies.baobab_leaves": "Baobab Leaves",
   "block.antcolonies.baobab_dead_leaves": "Withered Baobab Leaves",
   "death.attack.antcolonies.falling_branch": "%1$s was hit by a falling branch",
+  "death.attack.antcolonies.falling_tree": "%1$s was crushed by a falling tree",
   "block.antcolonies.baobab_seedling": "Baobab Seedling",
   "block.antcolonies.thorny_twig": "Thorny Twig",
   "block.antcolonies.camel_thorn_pods": "Camel Thorn Pods",

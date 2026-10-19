@@ -164,6 +164,22 @@ public final class TreeLife {
         return stage == TreeStage.MUD || stage == TreeStage.SHED ? STEPS : 0;
     }
 
+    /**
+     * How long a dead acacia due to fall may stand waiting for a storm (step 5c, the user's pick, "real topple": rotten
+     * giants mostly come down in the wind and wet of a storm); after that it falls on a still day too.
+     */
+    public static final double RAIN_WAIT = 3;
+
+    /** The day after death a dead stage starts (-1: the kind has no such stage). */
+    public static double stageFrom(TreeKind kind, long seed, TreeStage stage) {
+        for (DeadStage s : deadStages(kind, seed)) {
+            if (s.stage() == stage) {
+                return s.from();
+            }
+        }
+        return -1;
+    }
+
     /** A dead stage and the day after death it starts (stage null: nothing is left). */
     public record DeadStage(TreeStage stage, double from) {
     }

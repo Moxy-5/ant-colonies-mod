@@ -268,7 +268,7 @@ final class UmbrellaShape {
                 }
                 fallPoints(gr, limb, fallAt);
             }
-            DeadWood.fallen(v, seed, gr.r0(), gr.k, gr.g, gr.old, fallAz, gr.trunkTip()[1],
+            DeadWood.fallen(v, seed, gr.r0(), gr.k, gr.g, gr.old, DeadWood.heavierSide(build(age, TreeStage.SHED), fallAz), gr.trunkTip()[1],
                     lengths.stream().mapToDouble(Double::doubleValue).toArray(), fallAt);
             return v;
         }

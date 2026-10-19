@@ -209,7 +209,7 @@ final class AcaciaShape {
             return v;
         }
         if (stage == TreeStage.FALLEN) {
-            buildFallen(v, gr);
+            buildFallen(v, gr, DeadWood.heavierSide(build(age, TreeStage.SHED), fallAz));
             return v;
         }
         TreePart[] blocks = gr.living ? LIVE : DEAD;
@@ -545,7 +545,7 @@ final class AcaciaShape {
     }
 
     /** The fallen hollow giant: the stump, the trunk lying beside it with its limb stubs, rotted out, with galleries. */
-    private void buildFallen(TreeVoxels v, Grown gr) {
+    private void buildFallen(TreeVoxels v, Grown gr, double fallAz) {
         double[] lengths = new double[limbs.size()];
         List<double[]> points = new ArrayList<>();
         for (int i = 0; i < limbs.size(); i++) {

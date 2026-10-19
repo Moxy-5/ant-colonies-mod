@@ -9,6 +9,7 @@ import com.antcolonies.AntColoniesMod;
 import com.antcolonies.block.FallenBranchBlock;
 import com.antcolonies.registry.TreeBlocks;
 import com.antcolonies.tree.Forest;
+import com.antcolonies.tree.TreeFall;
 import com.antcolonies.tree.TreeLife;
 import com.antcolonies.tree.TreeStage;
 import com.antcolonies.worldgen.TreePlacer;
@@ -509,6 +510,11 @@ public class TreeGrowthTests {
             double daysDead = time - t.died;
             TreeStage want = TreeLife.deadStage(kind, seed, daysDead);
             int step = TreeLife.deadStep(kind, seed, daysDead);
+            if (want == TreeStage.FALLEN && daysDead < TreeLife.stageFrom(kind, seed, TreeStage.FALLEN) + TreeLife.RAIN_WAIT) {
+                // Step 5c: due to fall, it stands shed waiting for a storm (none in the test) for up to 3 days.
+                want = TreeStage.SHED;
+                step = TreeLife.fullStep(TreeStage.SHED);
+            }
             double at = daysDead;
             helper.assertTrue(t.stage == want && t.placedStage == want && t.placedStep == step, at + " days after death: " + t.stage.id + " placed "
                     + t.placedStage.id + " step " + t.placedStep + ", not " + want.id + " step " + step);
@@ -560,6 +566,13 @@ public class TreeGrowthTests {
                     // The stump: wood round the foot (an old one is hollow, frass in the middle).
                     int stump = countNear(level, foot, 4, 0, 2, b -> b.is(TreeBlocks.TREE_WOOD));
                     helper.assertTrue(stump > 4, "no stump at the foot (" + stump + " wood blocks): " + column(level, foot));
+                    // Step 5c: it fell toward its heavier side, where most of the shed tree's wood hung.
+                    // (A snag whose weight sits right over its stump may go any way; TreeFallTest checks many trees.)
+                    double[] heavy = side(shedShape, 4, 0), lies = side(TreePlacer.placed("umbrella_thorn", seed, 1.0, TreeStage.FALLEN), 0, 3);
+                    double a = Math.atan2(heavy[1], heavy[0]), b = Math.atan2(lies[1], lies[0]);
+                    double off = Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
+                    helper.assertTrue(Math.hypot(heavy[0], heavy[1]) < 1 || off < Math.toRadians(45),
+                            "it fell " + Math.round(Math.toDegrees(off)) + " degrees away from its heavier side");
                 }
                 default -> {
                 }
@@ -571,6 +584,106 @@ public class TreeGrowthTests {
         clearAbove(helper, foot);
         forest.forgetInside(helper.getBounds());
         helper.succeed();
+    }
+
+    /**
+     * Step 5c, the fall in sight: a shed umbrella thorn creaks, then its standing wood swings over drawn by block
+     * displays (the blocks taken away), and crashes: the hollow log lies where the shape puts it. On the way it crushes
+     * what is under it: a chicken where the log comes down dies, a glass block in its path is smashed, a stone block stays
+     * (the log has a gap there). A fallen tree stays fallen.
+     */
+    @GameTest(template = "arena", timeoutTicks = 400, skyAccess = true)
+    public static void aFallingTreeCrushesWhatIsUnderIt(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        grassland(helper);
+        Forest.shapesAtOnce = true;
+        Forest forest = Forest.get(level);
+        long base = Forest.today(level);
+        long seed = 11;
+        BlockPos foot = helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE));
+        Forest.Tree t = forest.add(new Forest.Tree("umbrella_thorn", foot, seed, 1.0, TreeStage.SHED, -1, base));
+        forest.update(level, t, base);
+        helper.assertTrue(t.placedStage == TreeStage.SHED && t.placedAge == 1.0, "the shed tree was not placed: " + t.placedStage.id);
+        int standingHigh = countAround(level, foot, 9, 40, TreeGrowthTests::deadWood);
+        helper.assertTrue(standingHigh > 50, "the shed tree has only " + standingHigh + " dead wood blocks up high");
+        TreePlacer.Placed shed = TreePlacer.placed("umbrella_thorn", seed, 1.0, TreeStage.SHED);
+        TreePlacer.Placed lying = TreePlacer.placed("umbrella_thorn", seed, 1.0, TreeStage.FALLEN);
+        // Places on the log's line, out past the crown's middle: a chicken, a glass block and a stone block.
+        java.util.Set<Long> standing = new java.util.HashSet<>();
+        for (int i = 0; i < shed.size(); i++) {
+            standing.add(BlockPos.asLong(shed.xs()[i], shed.ys()[i], shed.zs()[i]));
+        }
+        List<BlockPos> spots = new ArrayList<>();
+        for (int i = 0; i < lying.size(); i++) {
+            int x = lying.xs()[i], y = lying.ys()[i], z = lying.zs()[i];
+            BlockPos at = foot.offset(x, y, z);
+            if (y == 1 && x * x + z * z >= 64 && x * x + z * z <= 225 && !standing.contains(BlockPos.asLong(x, y, z))
+                    && level.getBlockState(at).isAir() && level.getBlockState(at.above()).isAir()) {
+                boolean apart = true;
+                for (BlockPos o : spots) {
+                    apart &= o.distManhattan(at) >= 3;
+                }
+                if (apart) {
+                    spots.add(at);
+                }
+            }
+        }
+        helper.assertTrue(spots.size() >= 3, "only " + spots.size() + " places on the log's line");
+        BlockPos chickenAt = spots.get(0), glass = spots.get(1), stone = spots.get(2);
+        net.minecraft.world.entity.animal.Chicken chicken = net.minecraft.world.entity.EntityType.CHICKEN.create(level);
+        chicken.moveTo(chickenAt.getX() + 0.5, chickenAt.getY(), chickenAt.getZ() + 0.5, 0, 0);
+        chicken.setNoAi(true);
+        level.addFreshEntity(chicken);
+        level.setBlock(glass, Blocks.GLASS.defaultBlockState(), 3);
+        level.setBlock(stone, Blocks.STONE.defaultBlockState(), 3);
+        // It comes down now, in sight (a test has no player: the fall is started as the testing command does).
+        helper.assertTrue(forest.fellNow(level, t), "the shed tree would not fall");
+        helper.assertTrue(!forest.fellNow(level, t), "a falling tree was made to fall again");
+        helper.runAfterDelay(TreeFall.CREAK - 5, () -> {
+            int high = countAround(level, foot, 9, 40, TreeGrowthTests::deadWood);
+            helper.assertTrue(high == standingHigh, "the tree went before its creak was over: " + high + " of " + standingHigh);
+        });
+        helper.runAfterDelay(TreeFall.CREAK + 10, () -> {
+            int high = countAround(level, foot, 9, 40, TreeGrowthTests::deadWood);
+            helper.assertTrue(high == 0, high + " standing wood blocks left while it falls (they should be displays now)");
+            int drawn = level.getEntitiesOfClass(net.minecraft.world.entity.Display.BlockDisplay.class, new net.minecraft.world.phys.AABB(foot).inflate(40),
+                    d -> d.getTags().contains(TreeFall.TAG)).size();
+            helper.assertTrue(drawn > 50, "only " + drawn + " displays draw the falling tree");
+            helper.assertTrue(forest.falling(t), "the tree is not falling");
+        });
+        helper.runAfterDelay(TreeFall.CREAK + TreeFall.DROP + 10, () -> {
+            helper.assertTrue(!forest.falling(t) && t.placedStage == TreeStage.FALLEN && !t.toppling, "it did not land: " + t.placedStage.id);
+            int drawn = level.getEntitiesOfClass(net.minecraft.world.entity.Display.BlockDisplay.class, new net.minecraft.world.phys.AABB(foot).inflate(40),
+                    d -> d.getTags().contains(TreeFall.TAG)).size();
+            helper.assertTrue(drawn == 0, drawn + " displays left after the crash");
+            int log = countAround(level, foot, 0, 8, b -> deadWood(b) || b.is(TreeBlocks.ROTTEN_WOOD.get()));
+            helper.assertTrue(log > 150, "the fallen log is only " + log + " blocks");
+            helper.assertTrue(!chicken.isAlive(), "the chicken under the falling tree lived");
+            helper.assertTrue(!level.getBlockState(glass).is(Blocks.GLASS), "the glass in its way was not smashed");
+            helper.assertTrue(level.getBlockState(stone).is(Blocks.STONE), "the stone in its way was smashed");
+            // Fallen it stays, whatever the clock says.
+            forest.update(level, t, Forest.today(level));
+            helper.assertTrue(t.stage == TreeStage.FALLEN && t.placedStage == TreeStage.FALLEN, "it stood up again: " + t.stage.id);
+            chicken.discard();
+            clearAbove(helper, foot);
+            forest.forgetInside(helper.getBounds());
+            helper.succeed();
+        });
+    }
+
+    /** The mean place of a shape's wood (and mud on it) from the foot (from {@code minY} up, farther out than {@code minR}). */
+    private static double[] side(TreePlacer.Placed shape, int minY, int minR) {
+        double sx = 0, sz = 0, n = 0;
+        for (int i = 0; i < shape.size(); i++) {
+            int x = shape.xs()[i], z = shape.zs()[i];
+            BlockState st = shape.states()[i];
+            if (shape.ys()[i] >= minY && x * x + z * z > minR * minR && (deadWood(st) || st.is(com.antcolonies.registry.ModBlocks.MUD_CRUST.get()))) {
+                sx += x;
+                sz += z;
+                n++;
+            }
+        }
+        return n == 0 ? new double[] {0, 0} : new double[] {sx / n, sz / n};
     }
 
     /**

@@ -51,6 +51,11 @@ public class ModEvents {
     /** Chickens hunt termite workers out on the surface (step 6c; see {@link HuntTermitesGoal}). */
     @SubscribeEvent
     public static void onJoinLevel(EntityJoinLevelEvent event) {
+        if (event.loadedFromDisk() && event.getEntity().getTags().contains(com.antcolonies.tree.TreeFall.TAG)) {
+            // A falling tree's display left by a stop in the middle of its fall: the tree is placed fallen instead.
+            event.setCanceled(true);
+            return;
+        }
         if (!event.getLevel().isClientSide() && event.getEntity() instanceof Chicken chicken) {
             chicken.goalSelector.addGoal(3, new HuntTermitesGoal(chicken));
         }
