@@ -596,14 +596,14 @@ def branch(name, bark_tex, end_tex):
     drops_itself(name)
 
 
-def tapering_branch(name, bark_tex, end_tex, levels=13):
-    """A branch that tapers as the player builds it out (TaperingBranchBlock): level 0 is 90 percent of a block thick,
+def tapering_branch(name, bark_tex, end_tex, levels=11):
+    """A branch that tapers as the player builds it out (TaperingBranchBlock): level 0 is 75 percent of a block thick,
     each level 10 percent thinner; the blockstate's step counts 2 to a level. Same width as TaperingBranchBlock.width."""
     textures = {"particle": bark_tex, "side": bark_tex, "end": end_tex}
     turn = {"north": {}, "east": {"y": 90}, "south": {"y": 180}, "west": {"y": 270}, "up": {"x": 270}, "down": {"x": 90}}
     parts = []
     for level in range(levels):
-        w = 16 * 0.9 * 0.9 ** level
+        w = 16 * 0.75 * 0.9 ** level
         lo, hi = round((16 - w) / 2, 3), round(16 - (16 - w) / 2, 3)
         steps = f"{2 * level}|{2 * level + 1}"
         model(f"{name}_core_{level}", {"textures": textures, "elements": [{"from": [lo, lo, lo], "to": [hi, hi, hi], "faces": {
