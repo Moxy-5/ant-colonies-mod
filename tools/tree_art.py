@@ -596,6 +596,36 @@ def branch(name, bark_tex, end_tex):
     drops_itself(name)
 
 
+def tapering_branch(name, bark_tex, end_tex, levels=13):
+    """A branch that tapers as the player builds it out (TaperingBranchBlock): level 0 is 90 percent of a block thick,
+    each level 10 percent thinner; the blockstate's step counts 2 to a level. Same width as TaperingBranchBlock.width."""
+    textures = {"particle": bark_tex, "side": bark_tex, "end": end_tex}
+    turn = {"north": {}, "east": {"y": 90}, "south": {"y": 180}, "west": {"y": 270}, "up": {"x": 270}, "down": {"x": 90}}
+    parts = []
+    for level in range(levels):
+        w = 16 * 0.9 * 0.9 ** level
+        lo, hi = round((16 - w) / 2, 3), round(16 - (16 - w) / 2, 3)
+        steps = f"{2 * level}|{2 * level + 1}"
+        model(f"{name}_core_{level}", {"textures": textures, "elements": [{"from": [lo, lo, lo], "to": [hi, hi, hi], "faces": {
+            f: {"texture": "#side", "uv": [lo, lo, hi, hi]} for f in ("north", "south", "east", "west", "up", "down")}}]})
+        arm_faces = {f: {"texture": "#side", "uv": [lo, 0, hi, lo]} for f in ("east", "west", "up", "down")}
+        arm_faces["north"] = {"texture": "#end", "uv": [lo, lo, hi, hi], "cullface": "north"}
+        model(f"{name}_arm_{level}", {"textures": textures, "elements": [{"from": [lo, lo, 0], "to": [hi, hi, lo], "faces": arm_faces}]})
+        parts.append({"when": {"step": steps}, "apply": {"model": f"antcolonies:block/{name}_core_{level}"}})
+        for d, r in turn.items():
+            parts.append({"when": {d: "true", "step": steps}, "apply": dict({"model": f"antcolonies:block/{name}_arm_{level}"}, **r)})
+        if level == 0:
+            model(f"{name}_inventory", {"parent": "minecraft:block/block", "textures": textures, "elements": [{"from": [lo, lo, 0], "to": [hi, hi, 16], "faces": {
+                "north": {"texture": "#end", "uv": [lo, lo, hi, hi]}, "south": {"texture": "#end", "uv": [lo, lo, hi, hi]},
+                "east": {"texture": "#side", "uv": [0, lo, 16, hi]}, "west": {"texture": "#side", "uv": [0, lo, 16, hi]},
+                "up": {"texture": "#side", "uv": [lo, 0, hi, 16]}, "down": {"texture": "#side", "uv": [lo, 0, hi, 16]}}}]})
+    write_json(ASSETS / f"blockstates/{name}.json", {"multipart": parts})
+    item_from_block(name, f"{name}_inventory")
+    drops_itself(name)
+    for old in ("core", "arm"):
+        (ASSETS / f"models/block/{name}_{old}.json").unlink(missing_ok=True)
+
+
 def game_files():
     """Every block of the giant savanna trees: textures, models, blockstates, item models and loot."""
     for kind in KINDS:
@@ -607,7 +637,10 @@ def game_files():
         bark_tex, end_tex = f"antcolonies:block/{g}_bark", f"antcolonies:block/{g}_log_top"
         log(f"{g}_log", bark_tex, end_tex)
         log(f"{g}_wood", bark_tex, bark_tex)
-        branch(f"{g}_branch", bark_tex, end_tex)
+        if kind == "baobab":
+            branch(f"{g}_branch", bark_tex, end_tex)
+        else:
+            tapering_branch(f"{g}_branch", bark_tex, end_tex)
         single(f"{g}_leaves", {"parent": "minecraft:block/cube_all", "render_type": "minecraft:cutout_mipped",
                                "textures": {"all": f"antcolonies:block/{g}_leaves"}})
         # Leaves: themselves with shears or silk touch; otherwise now and then a seedling (1 in 20) or a stick (1 in 50).

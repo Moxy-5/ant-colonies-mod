@@ -1,0 +1,69 @@
+{
+  "textures": {
+    "particle": "antcolonies:block/umbrella_thorn_bark",
+    "side": "antcolonies:block/umbrella_thorn_bark",
+    "end": "antcolonies:block/umbrella_thorn_log_top"
+  },
+  "elements": [
+    {
+      "from": [
+        2.751,
+        2.751,
+        0
+      ],
+      "to": [
+        13.249,
+        13.249,
+        2.751
+      ],
+      "faces": {
+        "east": {
+          "texture": "#side",
+          "uv": [
+            2.751,
+            0,
+            13.249,
+            2.751
+          ]
+        },
+        "west": {
+          "texture": "#side",
+          "uv": [
+            2.751,
+            0,
+            13.249,
+            2.751
+          ]
+        },
+        "up": {
+          "texture": "#side",
+          "uv": [
+            2.751,
+            0,
+            13.249,
+            2.751
+          ]
+        },
+        "down": {
+          "texture": "#side",
+          "uv": [
+            2.751,
+            0,
+            13.249,
+            2.751
+          ]
+        },
+        "north": {
+          "texture": "#end",
+          "uv": [
+            2.751,
+            2.751,
+            13.249,
+            13.249
+          ],
+          "cullface": "north"
+        }
+      }
+    }
+  ]
+}

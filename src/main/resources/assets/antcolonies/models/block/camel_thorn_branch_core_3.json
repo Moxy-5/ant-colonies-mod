@@ -1,0 +1,77 @@
+{
+  "textures": {
+    "particle": "antcolonies:block/camel_thorn_bark",
+    "side": "antcolonies:block/camel_thorn_bark",
+    "end": "antcolonies:block/camel_thorn_log_top"
+  },
+  "elements": [
+    {
+      "from": [
+        2.751,
+        2.751,
+        2.751
+      ],
+      "to": [
+        13.249,
+        13.249,
+        13.249
+      ],
+      "faces": {
+        "north": {
+          "texture": "#side",
+          "uv": [
+            2.751,
+            2.751,
+            13.249,
+            13.249
+          ]
+        },
+        "south": {
+          "texture": "#side",
+          "uv": [
+            2.751,
+            2.751,
+            13.249,
+            13.249
+          ]
+        },
+        "east": {
+          "texture": "#side",
+          "uv": [
+            2.751,
+            2.751,
+            13.249,
+            13.249
+          ]
+        },
+        "west": {
+          "texture": "#side",
+          "uv": [
+            2.751,
+            2.751,
+            13.249,
+            13.249
+          ]
+        },
+        "up": {
+          "texture": "#side",
+          "uv": [
+            2.751,
+            2.751,
+            13.249,
+            13.249
+          ]
+        },
+        "down": {
+          "texture": "#side",
+          "uv": [
+            2.751,
+            2.751,
+            13.249,
+            13.249
+          ]
+        }
+      }
+    }
+  ]
+}
