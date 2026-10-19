@@ -251,8 +251,12 @@ final class AcaciaShape {
                 if (upto <= 0) {
                     continue;
                 }
-                Poly line = new Poly(end, br.tip);
-                TreeDraw.growing(v, line, new double[] {gr.r0 * TreeDraw.look.branchFrom, dead ? gr.r0 * 0.3 : TreeDraw.look.branchTip}, upto, !dead, b, 0);
+                if (tapered()) {
+                    taperedBranch(v, gr, end, br, upto, dead, b);
+                } else {
+                    Poly line = new Poly(end, br.tip);
+                    TreeDraw.growing(v, line, new double[] {gr.r0 * TreeDraw.look.branchFrom, dead ? gr.r0 * 0.3 : TreeDraw.look.branchTip}, upto, !dead, b, 0);
+                }
                 if (dead) {
                     continue;
                 }
@@ -291,10 +295,48 @@ final class AcaciaShape {
     private double[] limbRadii(Grown gr, Limb limb) {
         int count = limb.line.pts.length;
         double[] out = new double[count];
+        double from = tapered() ? TAPER_LIMB_FROM : TreeDraw.look.limbFrom, to = tapered() ? TAPER_LIMB_TO : TreeDraw.look.limbTo;
         for (int i = 0; i < count; i++) {
-            out[i] = gr.r0 * lerp(TreeDraw.look.limbFrom, TreeDraw.look.limbTo, (double) i / (count - 1));
+            out[i] = gr.r0 * lerp(from, to, (double) i / (count - 1));
         }
         return out;
+    }
+
+    /*
+     * The tapering wood (the user's idea, 2026-10-18, for the camel thorn: "the branches once they start that's the
+     * thickest possible part, then it gets a bit smaller each 2 blocks after until the skinniest part is not exposed at
+     * all and it's in the tree's leaves"). Real branches are thickest where they leave the limb and thinner after every
+     * stretch (the pipe model), and the thinnest wood is out among the leaves. So the limbs stay thick (round bark) up
+     * to the crown; each branch starts as thick as the limb's end allows and loses a little every 2 blocks, never thinner
+     * than the slimmest round bark, until it is inside the leaf pad round its tip, where it goes on as a thin branch.
+     */
+    private static final double TAPER_LIMB_FROM = 0.95, TAPER_LIMB_TO = 0.75;
+    /** A branch's radius where it leaves its limb (of the trunk's), what it loses every 2 blocks, the slimmest bark. */
+    private static final double TAPER_BRANCH_FROM = 0.6, TAPER_STEP = 0.12, TAPER_MIN = 0.8;
+    /** How far in from a branch's tip it is thin (of the leaf pad's radius): that much is inside the leaves. */
+    private static final double TAPER_THIN_IN = 0.6;
+
+    /** The tapering wood is the camel thorn's in the game (limb look A); the viewer's other limb looks keep theirs. */
+    private boolean tapered() {
+        return TreeDraw.look == TreeDraw.LimbLook.A;
+    }
+
+    /** A branch from its limb's end to its tip, tapering every 2 blocks, thin only inside the leaves. */
+    private void taperedBranch(TreeVoxels v, Grown gr, double[] end, Branch br, double upto, boolean dead, TreePart[] b) {
+        double thinFrom = Math.max(Math.min(2, br.length), br.length - kind.crown().padRadius() * TAPER_THIN_IN);
+        double[] dir = mul(sub(br.tip, end), 1 / Math.max(1e-6, br.length));
+        int n = Math.max(1, (int) Math.ceil(thinFrom / 2));
+        double[][] pts = new double[n + 1][];
+        double[] radii = new double[n + 1];
+        for (int i = 0; i <= n; i++) {
+            double d = thinFrom * i / n;
+            pts[i] = add(end, mul(dir, d));
+            radii[i] = Math.max(TAPER_MIN, gr.r0 * TAPER_BRANCH_FROM - TAPER_STEP * d / 2);
+        }
+        TreeDraw.growing(v, new Poly(pts), radii, Math.min(upto, thinFrom), !dead, b, 0);
+        if (upto > thinFrom) {
+            thinLine(v, pts[n], add(end, mul(dir, upto)), dead ? TreePart.DEAD_THIN : TreePart.THIN);
+        }
     }
 
     private void drawTrunk(TreeVoxels v, Grown gr, TreePart[] blocks) {

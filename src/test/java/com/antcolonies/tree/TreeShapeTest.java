@@ -142,7 +142,7 @@ class TreeShapeTest {
     @Test
     void grownTreesHaveThePickedSizes() {
         check("umbrella_thorn", 24, 30, 40, 52, 4, 5);
-        check("camel_thorn", 20, 30, 32, 46, 3, 5);
+        check("camel_thorn", 20, 30, 32, 46, 3, 6); // 6: a low fork with the thick tapering limbs (2026-10-18)
         check("baobab", 25, 33, 28, 42, 8, 14);
     }
 
