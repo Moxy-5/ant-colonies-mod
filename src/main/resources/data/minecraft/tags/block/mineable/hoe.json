@@ -2,8 +2,11 @@
   "replace": false,
   "values": [
     "antcolonies:umbrella_thorn_leaves",
+    "antcolonies:umbrella_thorn_dead_leaves",
     "antcolonies:camel_thorn_leaves",
+    "antcolonies:camel_thorn_dead_leaves",
     "antcolonies:baobab_leaves",
+    "antcolonies:baobab_dead_leaves",
     "antcolonies:baobab_fibre"
   ]
 }

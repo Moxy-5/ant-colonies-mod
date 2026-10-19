@@ -119,6 +119,51 @@ public final class TreeLife {
                 new DeadStage(TreeStage.SHED, shed), new DeadStage(TreeStage.FALLEN, fall));
     }
 
+    /** How many steps a dead tree's gradual changes go through (step 5b, my pick: 8 in a stage's time). */
+    public static final int STEPS = 8;
+
+    /**
+     * How far along a dead tree is in the slow change of the stage it stands in, from 0 to {@link #STEPS} (step 5b, the
+     * user's decisions): the day it dies the leaves turn brown and drop bit by bit, done within 9 tenths of the day;
+     * the termites' mud climbs the snag over the first 6 tenths of its mud stage; the limbs break off one by one over the
+     * first 8 tenths of the shedding stage; a baobab's dried heap shrinks over its whole stage. Other stages: 0.
+     */
+    public static int deadStep(TreeKind kind, long seed, double daysDead) {
+        List<DeadStage> stages = deadStages(kind, seed);
+        for (int i = stages.size() - 1; i >= 0; i--) {
+            DeadStage s = stages.get(i);
+            if (daysDead < s.from() || s.stage() == null) {
+                continue;
+            }
+            double over = slowPart(s.stage());
+            if (over == 0 || i + 1 >= stages.size()) {
+                return 0;
+            }
+            double f = (daysDead - s.from()) / ((stages.get(i + 1).from() - s.from()) * over);
+            return (int) Math.max(0, Math.min(STEPS, Math.floor(f * STEPS)));
+        }
+        return 0;
+    }
+
+    /** How much of a dead stage's time its slow change takes (0: none). */
+    public static double slowPart(TreeStage stage) {
+        return switch (stage) {
+            case LIVING -> 0.9;
+            case MUD -> 0.6;
+            case SHED -> 0.8;
+            case HEAP_DRY -> 1.0;
+            default -> 0;
+        };
+    }
+
+    /**
+     * The step at which a stage's shape is the stage's own finished shape (the snag fully mud-climbed, every limb down);
+     * 0 where the stage starts from its own shape (a living tree before it withers, a dried heap before it shrinks).
+     */
+    public static int fullStep(TreeStage stage) {
+        return stage == TreeStage.MUD || stage == TreeStage.SHED ? STEPS : 0;
+    }
+
     /** A dead stage and the day after death it starts (stage null: nothing is left). */
     public record DeadStage(TreeStage stage, double from) {
     }
@@ -137,8 +182,9 @@ public final class TreeLife {
     }
 
     /**
-     * How many days ago a tree of new land that stands in this dead stage died: somewhere inside the stage, by the
-     * world's dice (a fallen log: just fallen, as nothing changes on it after).
+     * How many days ago a tree of new land that stands in this dead stage died: somewhere inside the stage after its
+     * slow change is done (new land shows the stage's finished shape), by the world's dice (a fallen log: just fallen,
+     * as nothing changes on it after).
      */
     public static long daysDeadIn(TreeKind kind, long seed, TreeStage stage, double roll) {
         List<DeadStage> stages = deadStages(kind, seed);
@@ -147,7 +193,8 @@ public final class TreeLife {
                 double start = stages.get(i).from();
                 double end = i + 1 < stages.size() ? stages.get(i + 1).from() : start + 1;
                 // Whole days only (the book counts days), every one of them inside the stage.
-                long lo = (long) Math.ceil(start), hi = Math.max(lo, (long) Math.ceil(end) - 1);
+                double done = fullStep(stage) > 0 ? start + (end - start) * slowPart(stage) : start;
+                long lo = (long) Math.ceil(done), hi = Math.max(lo, (long) Math.ceil(end) - 1);
                 return lo + (long) Math.floor(roll * (hi - lo + 1));
             }
         }

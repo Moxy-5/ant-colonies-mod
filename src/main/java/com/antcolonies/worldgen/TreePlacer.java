@@ -7,16 +7,22 @@ import java.util.Map;
 import com.antcolonies.block.FallenBranchBlock;
 import com.antcolonies.block.MudCrustBlock;
 import com.antcolonies.block.TreeBranchBlock;
+import com.antcolonies.block.TreeLeavesBlock;
 import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.registry.TreeBlocks;
 import com.antcolonies.tree.TreeKind;
+import com.antcolonies.tree.TreeLife;
 import com.antcolonies.tree.TreePart;
 import com.antcolonies.tree.TreeShapes;
 import com.antcolonies.tree.TreeStage;
 import com.antcolonies.tree.TreeVoxels;
 
+import it.unimi.dsi.fastutil.longs.Long2DoubleOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongPredicate;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -80,18 +86,37 @@ public final class TreePlacer {
 
     /** The tree of this kind, seed, age and stage worked out into blocks (kept for a while). */
     public static Placed placed(String kindName, long seed, double age, TreeStage stage) {
-        String key = kindName + "|" + seed + "|" + age + "|" + stage.id;
+        return placed(kindName, seed, age, stage, TreeLife.fullStep(stage));
+    }
+
+    /**
+     * The tree of this kind, seed, age and stage, so many steps into its stage's slow change (step 5b, see
+     * {@link TreeLife#deadStep}: a dead tree's leaves withering and dropping, mud climbing, limbs breaking off, a dried
+     * heap shrinking), worked out into blocks (kept for a while).
+     */
+    public static Placed placed(String kindName, long seed, double age, TreeStage stage, int step) {
+        int s = stepOf(stage, step);
+        String key = key(kindName, seed, age, stage, s);
         synchronized (CACHE) {
             Placed p = CACHE.get(key);
             if (p != null) {
                 return p;
             }
         }
-        Placed p = work(kind(kindName), TreeShapes.build(kind(kindName), seed, age, stage), stage);
+        Placed p = s < 0 ? work(kind(kindName), TreeShapes.build(kind(kindName), seed, age, stage), stage) : between(kindName, seed, age, stage, s);
         synchronized (CACHE) {
             CACHE.put(key, p);
         }
         return p;
+    }
+
+    private static String key(String kindName, long seed, double age, TreeStage stage, int step) {
+        return kindName + "|" + seed + "|" + age + "|" + stage.id + (step >= 0 ? "|" + step : "");
+    }
+
+    /** The step of a slow change worked out, or -1 where it is the stage's own shape. */
+    private static int stepOf(TreeStage stage, int step) {
+        return !gradual(stage) || step == TreeLife.fullStep(stage) ? -1 : step;
     }
 
     private static final java.util.Set<String> WORKING = java.util.concurrent.ConcurrentHashMap.newKeySet();
@@ -100,8 +125,9 @@ public final class TreePlacer {
      * The tree worked out into blocks if it is ready; if not, it is worked out in the background (a grown giant's shape
      * takes tens of milliseconds, too long for one server tick) and this returns null: ask again later.
      */
-    public static Placed placedSoon(String kindName, long seed, double age, TreeStage stage) {
-        String key = kindName + "|" + seed + "|" + age + "|" + stage.id;
+    public static Placed placedSoon(String kindName, long seed, double age, TreeStage stage, int step) {
+        int s = stepOf(stage, step);
+        String key = key(kindName, seed, age, stage, s);
         synchronized (CACHE) {
             Placed p = CACHE.get(key);
             if (p != null) {
@@ -111,7 +137,7 @@ public final class TreePlacer {
         if (WORKING.add(key)) {
             net.minecraft.Util.backgroundExecutor().execute(() -> {
                 try {
-                    placed(kindName, seed, age, stage);
+                    placed(kindName, seed, age, stage, step);
                 } finally {
                     WORKING.remove(key);
                 }
@@ -177,6 +203,16 @@ public final class TreePlacer {
             }
             states.put(e.getLongKey(), plate);
         }
+        return build(states, k -> {
+            TreePart part = v.get(k);
+            return BlockPos.getY(k) <= 0 && part != null && part.isWood() && part != TreePart.FALLEN_BRANCH
+                    && part != TreePart.THIN && part != TreePart.DEAD_THIN
+                    && part != TreePart.LIMB && part != TreePart.DEAD_LIMB;
+        });
+    }
+
+    /** A worked-out tree from its blocks; {@code holding}: the ones that hold it up (the trunk goes down from them). */
+    private static Placed build(Long2ObjectOpenHashMap<BlockState> states, LongPredicate holding) {
         int n = states.size();
         int[] xs = new int[n], ys = new int[n], zs = new int[n];
         BlockState[] out = new BlockState[n];
@@ -188,10 +224,7 @@ public final class TreePlacer {
             ys[i] = BlockPos.getY(k);
             zs[i] = BlockPos.getZ(k);
             out[i] = e.getValue();
-            TreePart part = v.get(k);
-            holds[i] = ys[i] <= 0 && part != null && part.isWood() && part != TreePart.FALLEN_BRANCH
-                    && part != TreePart.THIN && part != TreePart.DEAD_THIN
-                    && part != TreePart.LIMB && part != TreePart.DEAD_LIMB;
+            holds[i] = holding.test(k);
             minX = Math.min(minX, xs[i]);
             minY = Math.min(minY, ys[i]);
             minZ = Math.min(minZ, zs[i]);
@@ -201,6 +234,246 @@ public final class TreePlacer {
             i++;
         }
         return new Placed(xs, ys, zs, out, holds, minX, minY, minZ, maxX, maxY, maxZ);
+    }
+
+    // ---------------------------------------------------------------- step 5b: a dead tree's slow changes
+
+    /** The stages with a slow change in steps (a dead tree's withering day, mud climbing, limbs breaking, a heap shrinking). */
+    private static boolean gradual(TreeStage stage) {
+        return stage == TreeStage.LIVING || stage == TreeStage.MUD || stage == TreeStage.SHED || stage == TreeStage.HEAP_DRY;
+    }
+
+    private static final Placed NOTHING = new Placed(new int[0], new int[0], new int[0], new BlockState[0], new boolean[0], 0, -1, 0, 0, 0, 0);
+
+    /** The order the blocks of a slow change change in. */
+    private enum Order {
+        /** From the ground up (termite mud climbing a snag), a ragged front. */
+        UP,
+        /** From the top down (a heap shrinking). */
+        DOWN,
+        /** A limb with its branches at a time (the limbs of a dead tree breaking off one by one). */
+        LIMBS
+    }
+
+    private static Placed between(String kindName, long seed, double age, TreeStage stage, int step) {
+        double f = step / (double) TreeLife.STEPS;
+        long salt = seed * 0x9E3779B97F4A7C15L + stage.ordinal();
+        return switch (stage) {
+            case LIVING -> withering(kind(kindName), placed(kindName, seed, age, TreeStage.LIVING), f);
+            case MUD -> blend(placed(kindName, seed, age, TreeStage.SNAG), placed(kindName, seed, age, TreeStage.MUD), f, Order.UP, salt);
+            case SHED -> blend(placed(kindName, seed, age, TreeStage.MUD), placed(kindName, seed, age, TreeStage.SHED), f, Order.LIMBS, salt);
+            // A dried heap shrinks to a low remnant by the end of its stage (then it is gone).
+            case HEAP_DRY -> blend(placed(kindName, seed, age, TreeStage.HEAP_DRY), NOTHING, 0.8 * f, Order.DOWN, salt);
+            default -> placed(kindName, seed, age, stage);
+        };
+    }
+
+    /**
+     * The day a tree dies: its leaves turn brown, each at its own moment, and drop a little later (real: a dead acacia's
+     * fine leaflets dry and fall within days; squeezed into the death day). {@code f} from 0 (green) to 1 (all dropped).
+     */
+    private static Placed withering(TreeKind kind, Placed living, double f) {
+        BlockState dead = block(kind.blocks().leaves().replace("_leaves", "_dead_leaves"));
+        Long2ObjectOpenHashMap<BlockState> out = new Long2ObjectOpenHashMap<>();
+        LongOpenHashSet holds = new LongOpenHashSet();
+        for (int i = 0; i < living.size(); i++) {
+            long k = BlockPos.asLong(living.xs()[i], living.ys()[i], living.zs()[i]);
+            BlockState state = living.states()[i];
+            if (state.getBlock() instanceof TreeLeavesBlock) {
+                double h = hash01(k);
+                // Each leaf browns at its own moment and drops 4 tenths of the day later.
+                if (f >= 0.6 * h + 0.4) {
+                    continue; // dropped
+                }
+                if (f >= 0.6 * h) {
+                    state = dead;
+                }
+            }
+            out.put(k, state);
+            if (living.holds()[i]) {
+                holds.add(k);
+            }
+        }
+        joinBranches(out);
+        return build(out, holds::contains);
+    }
+
+    /**
+     * Part way ({@code f}, 0 to 1) from one shape to the next: each block that differs changes at its own moment, in the
+     * {@code order} of the change.
+     */
+    private static Placed blend(Placed a, Placed b, double f, Order order, long salt) {
+        Long2ObjectOpenHashMap<BlockState> as = statesOf(a), bs = statesOf(b);
+        LongOpenHashSet ah = holdsOf(a), bh = holdsOf(b);
+        LongOpenHashSet keys = new LongOpenHashSet(as.keySet());
+        keys.addAll(bs.keySet());
+        LongArrayList diffs = new LongArrayList();
+        for (long k : keys) {
+            if (!java.util.Objects.equals(as.get(k), bs.get(k))) {
+                diffs.add(k);
+            }
+        }
+        Long2DoubleOpenHashMap when = order == Order.LIMBS ? byLimb(diffs, as, bs, salt) : byHeight(diffs, order == Order.UP, salt);
+        Long2ObjectOpenHashMap<BlockState> out = new Long2ObjectOpenHashMap<>();
+        LongOpenHashSet holds = new LongOpenHashSet();
+        for (long k : keys) {
+            boolean next = when.containsKey(k) && when.get(k) < f;
+            BlockState state = next ? bs.get(k) : as.get(k);
+            if (state == null) {
+                continue;
+            }
+            out.put(k, state);
+            if (next ? bh.contains(k) : ah.contains(k)) {
+                holds.add(k);
+            }
+        }
+        joinBranches(out);
+        return build(out, holds::contains);
+    }
+
+    /** Each changing block's moment (0 to 1) by its height, a little ragged. */
+    private static Long2DoubleOpenHashMap byHeight(LongArrayList diffs, boolean up, long salt) {
+        int lo = Integer.MAX_VALUE, hi = Integer.MIN_VALUE;
+        for (long k : diffs) {
+            lo = Math.min(lo, BlockPos.getY(k));
+            hi = Math.max(hi, BlockPos.getY(k));
+        }
+        Long2DoubleOpenHashMap when = new Long2DoubleOpenHashMap();
+        for (long k : diffs) {
+            int y = BlockPos.getY(k);
+            double rank = up ? y - lo : hi - y;
+            when.put(k, (rank + 0.9 * hash01(k ^ salt)) / (hi - lo + 1));
+        }
+        return when;
+    }
+
+    /**
+     * Each changing block's moment by its limb: the wood that goes up high falls apart into limbs (pieces joined to each
+     * other), which go one after another, spread evenly over the change in an order by the tree's dice; every other
+     * change (the fallen pieces on the ground, the plates and branch ends round a break) comes with the nearest limb.
+     */
+    private static Long2DoubleOpenHashMap byLimb(LongArrayList diffs, Long2ObjectOpenHashMap<BlockState> as,
+                                                 Long2ObjectOpenHashMap<BlockState> bs, long salt) {
+        LongOpenHashSet broken = new LongOpenHashSet();
+        for (long k : diffs) {
+            if (BlockPos.getY(k) >= 2 && as.containsKey(k) && !bs.containsKey(k)) {
+                broken.add(k);
+            }
+        }
+        // The limbs: pieces of broken wood touching each other (corners too).
+        java.util.List<LongArrayList> limbs = new java.util.ArrayList<>();
+        LongOpenHashSet seen = new LongOpenHashSet();
+        for (long start : broken) {
+            if (!seen.add(start)) {
+                continue;
+            }
+            LongArrayList limb = new LongArrayList();
+            LongArrayList todo = new LongArrayList();
+            todo.add(start);
+            while (!todo.isEmpty()) {
+                long k = todo.removeLong(todo.size() - 1);
+                limb.add(k);
+                int x = BlockPos.getX(k), y = BlockPos.getY(k), z = BlockPos.getZ(k);
+                for (int dx = -1; dx <= 1; dx++) {
+                    for (int dy = -1; dy <= 1; dy++) {
+                        for (int dz = -1; dz <= 1; dz++) {
+                            long n = BlockPos.asLong(x + dx, y + dy, z + dz);
+                            if (broken.contains(n) && seen.add(n)) {
+                                todo.add(n);
+                            }
+                        }
+                    }
+                }
+            }
+            limbs.add(limb);
+        }
+        // Their order: by the dice, spread evenly.
+        double[] hash = new double[limbs.size()];
+        Integer[] order = new Integer[limbs.size()];
+        double[][] middle = new double[limbs.size()][2];
+        for (int i = 0; i < limbs.size(); i++) {
+            long first = Long.MAX_VALUE;
+            for (long k : limbs.get(i)) {
+                first = Math.min(first, k);
+                middle[i][0] += BlockPos.getX(k);
+                middle[i][1] += BlockPos.getZ(k);
+            }
+            middle[i][0] /= limbs.get(i).size();
+            middle[i][1] /= limbs.get(i).size();
+            hash[i] = hash01(first ^ salt);
+            order[i] = i;
+        }
+        java.util.Arrays.sort(order, (p, q) -> Double.compare(hash[p], hash[q]));
+        double[] moment = new double[limbs.size()];
+        for (int rank = 0; rank < order.length; rank++) {
+            moment[order[rank]] = (rank + 0.5) / order.length;
+        }
+        Long2DoubleOpenHashMap when = new Long2DoubleOpenHashMap();
+        for (int i = 0; i < limbs.size(); i++) {
+            for (long k : limbs.get(i)) {
+                when.put(k, moment[i]);
+            }
+        }
+        for (long k : diffs) {
+            if (when.containsKey(k)) {
+                continue;
+            }
+            int best = -1;
+            double near = Double.MAX_VALUE;
+            for (int i = 0; i < limbs.size(); i++) {
+                double d = Math.hypot(BlockPos.getX(k) - middle[i][0], BlockPos.getZ(k) - middle[i][1]);
+                if (d < near) {
+                    near = d;
+                    best = i;
+                }
+            }
+            when.put(k, best < 0 ? hash01(k ^ salt) : moment[best]);
+        }
+        return when;
+    }
+
+    /** Thin branches reach only toward the wood and leaves still there (a break leaves no arm into the air). */
+    private static void joinBranches(Long2ObjectOpenHashMap<BlockState> states) {
+        for (Long2ObjectMap.Entry<BlockState> e : states.long2ObjectEntrySet()) {
+            BlockState state = e.getValue();
+            if (!(state.getBlock() instanceof TreeBranchBlock)) {
+                continue;
+            }
+            long k = e.getLongKey();
+            int x = BlockPos.getX(k), y = BlockPos.getY(k), z = BlockPos.getZ(k);
+            for (Direction d : Direction.values()) {
+                BlockState n = states.get(BlockPos.asLong(x + d.getStepX(), y + d.getStepY(), z + d.getStepZ()));
+                state = state.setValue(TreeBranchBlock.PROPERTY_BY_DIRECTION.get(d), n != null && TreeBranchBlock.joins(n));
+            }
+            e.setValue(state);
+        }
+    }
+
+    private static Long2ObjectOpenHashMap<BlockState> statesOf(Placed p) {
+        Long2ObjectOpenHashMap<BlockState> m = new Long2ObjectOpenHashMap<>();
+        for (int i = 0; i < p.size(); i++) {
+            m.put(BlockPos.asLong(p.xs()[i], p.ys()[i], p.zs()[i]), p.states()[i]);
+        }
+        return m;
+    }
+
+    private static LongOpenHashSet holdsOf(Placed p) {
+        LongOpenHashSet m = new LongOpenHashSet();
+        for (int i = 0; i < p.size(); i++) {
+            if (p.holds()[i]) {
+                m.add(BlockPos.asLong(p.xs()[i], p.ys()[i], p.zs()[i]));
+            }
+        }
+        return m;
+    }
+
+    /** A number from 0 to 1 (never 1) for a place: the same every time. */
+    private static double hash01(long k) {
+        long h = k * 0x9E3779B97F4A7C15L;
+        h ^= h >>> 31;
+        h *= 0xBF58476D1CE4E5B9L;
+        h ^= h >>> 29;
+        return (h >>> 11) * 0x1.0p-53;
     }
 
     /** The real block for a part of a tree of this kind (null: nothing). */
@@ -291,6 +564,12 @@ public final class TreePlacer {
      * Returns how many blocks changed.
      */
     public static int grow(LevelAccessor level, Placed from, Placed to, BlockPos foot, int flags, java.util.List<BlockPos> shed) {
+        return grow(level, from, to, foot, flags, shed, null);
+    }
+
+    /** As {@link #grow}, and every block that goes is told to {@code gone} (its place and what it was), if not null. */
+    public static int grow(LevelAccessor level, Placed from, Placed to, BlockPos foot, int flags, java.util.List<BlockPos> shed,
+                           java.util.function.BiConsumer<BlockPos, BlockState> gone) {
         Long2ObjectOpenHashMap<BlockState> old = new Long2ObjectOpenHashMap<>();
         if (from != null) {
             for (int i = 0; i < from.size(); i++) {
@@ -344,6 +623,9 @@ public final class TreePlacer {
             changed++;
             if (e.getValue().getBlock() instanceof TreeBranchBlock) {
                 shed.add(pos.immutable());
+            }
+            if (gone != null) {
+                gone.accept(pos.immutable(), e.getValue());
             }
         }
         return changed;

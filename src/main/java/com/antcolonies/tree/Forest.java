@@ -6,10 +6,12 @@ import java.util.Random;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import com.antcolonies.AntColoniesMod;
+import com.antcolonies.block.TreeBranchBlock;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.Population;
 import com.antcolonies.debug.Perf;
+import com.antcolonies.registry.TreeBlocks;
 import com.antcolonies.worldgen.FallenBranchFeature;
 import com.antcolonies.worldgen.TreePlacer;
 
@@ -21,6 +23,9 @@ import it.unimi.dsi.fastutil.longs.LongList;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.particles.BlockParticleOption;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -31,11 +36,16 @@ import net.minecraft.tags.BiomeTags;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.damagesource.DamageType;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.RotatedPillarBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -111,6 +121,8 @@ public class Forest extends SavedData {
         public String cause = "";
         /** The stage whose shape is in the world. */
         public TreeStage placedStage;
+        /** How far along its stage's slow change a dead tree is (step 5b, {@link TreeLife#deadStep}), and what is in the world. */
+        public int step, placedStep;
 
         public Tree(String kind, BlockPos foot, long seed, double age, TreeStage stage, double placedAge, long lastDay) {
             this.kind = kind;
@@ -124,6 +136,7 @@ public class Forest extends SavedData {
             this.lived = TreeLife.daysAt(Math.min(age, TreeShapes.ANCIENT));
             if (stage != TreeStage.LIVING) {
                 died = DIED_UNKNOWN;
+                step = placedStep = TreeLife.fullStep(stage); // new land shows the stage's finished shape
             }
         }
 
@@ -138,6 +151,11 @@ public class Forest extends SavedData {
         /** A fallen log: nothing more happens to it here (termites eating it come later). */
         boolean settled() {
             return stage == TreeStage.FALLEN && placedStage == TreeStage.FALLEN;
+        }
+
+        /** Whether the shape in the world is the one it should have now. */
+        boolean upToDate() {
+            return placedAge == TreeLife.shapeAge(age) && placedStage == stage && placedStep == step;
         }
 
         TreeKind treeKind() {
@@ -162,6 +180,8 @@ public class Forest extends SavedData {
             tag.putLong("died", died);
             tag.putString("cause", cause);
             tag.putString("placedStage", placedStage.id);
+            tag.putInt("step", step);
+            tag.putInt("placedStep", placedStep);
             return tag;
         }
 
@@ -174,6 +194,8 @@ public class Forest extends SavedData {
                 t.died = tag.getLong("died");
                 t.cause = tag.getString("cause");
                 t.placedStage = stage(tag.getString("placedStage"));
+                t.step = tag.getInt("step");
+                t.placedStep = tag.getInt("placedStep");
             }
             return t;
         }
@@ -322,7 +344,10 @@ public class Forest extends SavedData {
             if (System.nanoTime() - start > BUDGET_NANOS) {
                 break; // the rest next second
             }
-            if (!t.settled() && (t.lastDay < today || t.placedAge != TreeLife.shapeAge(t.age) || t.placedStage != t.stage)) {
+            if (t.settled()) {
+                continue;
+            }
+            if (t.lastDay < today || !t.upToDate() || t.dead() && t.died != DIED_UNKNOWN && changesNow(t, time(level))) {
                 update(level, t, today);
             }
         }
@@ -336,10 +361,27 @@ public class Forest extends SavedData {
      * false if its land is not loaded (it waits).
      */
     public boolean update(ServerLevel level, Tree t, long today) {
+        return update(level, t, today, today(level) == today ? time(level) : today);
+    }
+
+    /** The game's clock in days, with the part of today gone by (a dead tree's slow changes go by it). */
+    public static double time(ServerLevel level) {
+        return level.getDayTime() / 24000.0;
+    }
+
+    /** Whether a dead tree's stage or slow change has moved on since it was last brought up to date. */
+    private static boolean changesNow(Tree t, double time) {
+        TreeKind kind = t.treeKind();
+        double daysDead = time - t.died;
+        return TreeLife.deadStage(kind, t.seed, daysDead) != t.stage || TreeLife.deadStep(kind, t.seed, daysDead) != t.step;
+    }
+
+    /** As {@link #update(ServerLevel, Tree, long)}, with the clock's time in days (with the part of the day). */
+    public boolean update(ServerLevel level, Tree t, long today, double time) {
         if (!level.hasChunkAt(t.foot)) {
             return false;
         }
-        TreePlacer.Placed now = t.placedAge >= 0 ? soon(t, t.placedAge, t.placedStage) : null;
+        TreePlacer.Placed now = t.placedAge >= 0 ? soon(t, t.placedAge, t.placedStage, t.placedStep) : null;
         if (t.placedAge >= 0 && now == null) {
             return false; // its shape is being worked out
         }
@@ -380,7 +422,9 @@ public class Forest extends SavedData {
         }
         int stageSteps = 0;
         if (t.dead()) {
-            t.stage = TreeLife.deadStage(t.treeKind(), t.seed, today - t.died);
+            double daysDead = Math.max(today, time) - t.died;
+            t.stage = TreeLife.deadStage(t.treeKind(), t.seed, daysDead);
+            t.step = t.stage == null ? 0 : TreeLife.deadStep(t.treeKind(), t.seed, daysDead);
             if (t.stage == null) {
                 // A baobab's dried heap is gone.
                 if (now != null) {
@@ -392,11 +436,11 @@ public class Forest extends SavedData {
             stageSteps = Math.abs(TreeLife.stageIndex(t.treeKind(), t.stage) - TreeLife.stageIndex(t.treeKind(), t.placedStage));
         }
         setDirty();
-        if (TreeLife.shapeAge(t.age) == t.placedAge && t.stage == t.placedStage) {
+        if (t.upToDate()) {
             t.pendingDays = 0;
             return true;
         }
-        TreePlacer.Placed next = soon(t, t.age, t.stage);
+        TreePlacer.Placed next = soon(t, t.age, t.stage, t.step);
         boolean jump = t.dead() ? stageSteps > 1 : t.pendingDays > 1;
         if (next == null || !loaded(level, next.box(t.foot)) || jump && !outOfSight(level, t, next)) {
             return false;
@@ -414,20 +458,32 @@ public class Forest extends SavedData {
     }
 
     /** A tree's shape at an age and stage, if worked out (or being worked out in the background: null). */
-    private static TreePlacer.Placed soon(Tree t, double age, TreeStage stage) {
-        return shapesAtOnce ? TreePlacer.placed(t.kind, t.seed, TreeLife.shapeAge(age), stage)
-                : TreePlacer.placedSoon(t.kind, t.seed, TreeLife.shapeAge(age), stage);
+    private static TreePlacer.Placed soon(Tree t, double age, TreeStage stage, int step) {
+        return shapesAtOnce ? TreePlacer.placed(t.kind, t.seed, TreeLife.shapeAge(age), stage, step)
+                : TreePlacer.placedSoon(t.kind, t.seed, TreeLife.shapeAge(age), stage, step);
     }
 
     /** Brings the tree's shape in the world from what is there to its age now. */
     private void place(ServerLevel level, Tree t, TreePlacer.Placed now, TreePlacer.Placed next) {
         List<BlockPos> shed = new ArrayList<>();
-        TreePlacer.grow(level, now, next, t.foot, Block.UPDATE_ALL, shed);
-        if (t.placedStage != t.stage) {
+        List<BlockPos> leaves = new ArrayList<>(), wood = new ArrayList<>();
+        List<BlockState> leafStates = new ArrayList<>();
+        TreePlacer.grow(level, now, next, t.foot, Block.UPDATE_ALL, shed, t.dead() ? (pos, was) -> {
+            if (was.is(TreeBlocks.TREE_LEAVES)) {
+                leaves.add(pos);
+                leafStates.add(was);
+            } else if ((was.getBlock() instanceof RotatedPillarBlock || was.getBlock() instanceof TreeBranchBlock) && pos.getY() > t.foot.getY() + 2) {
+                wood.add(pos);
+            }
+        } : null);
+        if (t.placedStage != t.stage || t.placedStep != t.step) {
             deadSteps++;
         }
+        fallingLeaves(level, leaves, leafStates, TreeLife.dice(t.seed, t.lastDay * 16 + t.step));
+        fallingLimbs(level, wood);
         t.placedAge = TreeLife.shapeAge(t.age);
         t.placedStage = t.stage;
+        t.placedStep = t.step;
         t.pendingDays = 0;
         setDirty();
         if (!shed.isEmpty() && t.living()) {
@@ -435,6 +491,69 @@ public class Forest extends SavedData {
             BlockPos from = shed.get(TreeLife.dice(t.seed, t.lastDay + 7).nextInt(shed.size()));
             dropBranch(level, from, TreeLife.dice(t.seed, t.lastDay + 13));
         }
+    }
+
+    /** How hard a breaking limb hits what is under it (step 5b, my pick: 3 hearts; an insect dies). */
+    static final float LIMB_DAMAGE = 6;
+    /** The damage a falling branch does ({@code data/antcolonies/damage_type/falling_branch.json}). */
+    public static final ResourceKey<DamageType> FALLING_BRANCH = ResourceKey.create(Registries.DAMAGE_TYPE,
+            net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "falling_branch"));
+
+    /** A few bits of brown leaf drifting down where the withered leaves dropped (not every block: the air would be thick with them). */
+    private static void fallingLeaves(ServerLevel level, List<BlockPos> leaves, List<BlockState> states, Random dice) {
+        int shown = 0;
+        for (int i = 0; i < leaves.size() && shown < 60; i++) {
+            if (dice.nextInt(4) != 0) {
+                continue;
+            }
+            BlockPos pos = leaves.get(i);
+            level.sendParticles(new BlockParticleOption(ParticleTypes.FALLING_DUST, states.get(i)), pos.getX() + 0.5, pos.getY() + 0.3,
+                    pos.getZ() + 0.5, 2, 0.35, 0.2, 0.35, 0);
+            shown++;
+        }
+    }
+
+    /**
+     * Limbs breaking off a dead tree come down on what is under them: anything alive under the broken wood is hit once
+     * (real: a dead acacia's heavy limbs drop without warning).
+     */
+    private static void fallingLimbs(ServerLevel level, List<BlockPos> wood) {
+        if (wood.isEmpty()) {
+            return;
+        }
+        it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap columns = new it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap();
+        BoundingBox box = BoundingBox.encapsulatingPositions(wood).orElseThrow();
+        for (BlockPos pos : wood) {
+            long column = ChunkPos.asLong(pos.getX(), pos.getZ());
+            columns.put(column, Math.max(columns.getOrDefault(column, Integer.MIN_VALUE), pos.getY()));
+        }
+        AABB under = new AABB(box.minX() - 1, box.minY() - 40, box.minZ() - 1, box.maxX() + 2, box.maxY(), box.maxZ() + 2);
+        DamageSource source = new DamageSource(level.registryAccess().registryOrThrow(Registries.DAMAGE_TYPE).getHolderOrThrow(FALLING_BRANCH));
+        for (LivingEntity e : level.getEntitiesOfClass(LivingEntity.class, under, LivingEntity::isAlive)) {
+            BlockPos at = e.blockPosition();
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    long column = ChunkPos.asLong(at.getX() + dx, at.getZ() + dz);
+                    if (columns.containsKey(column) && columns.get(column) > at.getY() && openBetween(level, at, columns.get(column))) {
+                        e.hurt(source, LIMB_DAMAGE);
+                        dx = dz = 2; // once
+                    }
+                }
+            }
+        }
+    }
+
+    /** Whether nothing solid lies between something and the wood over it (a roof keeps a falling limb off). */
+    private static boolean openBetween(ServerLevel level, BlockPos at, int woodY) {
+        BlockPos.MutableBlockPos pos = at.mutable();
+        for (int y = at.getY() + 2; y < woodY; y++) {
+            pos.setY(y);
+            BlockState state = level.getBlockState(pos);
+            if (state.isSolid() && !state.is(TreeBlocks.TREE_WOOD) && !state.is(TreeBlocks.TREE_LEAVES)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** A little tree dies: a seedling dries and vanishes, a young one leaves a fallen branch. */

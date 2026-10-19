@@ -389,6 +389,14 @@ public class TreeGrowthTests {
         return n;
     }
 
+    private static boolean livingLeaves(BlockState s) {
+        return s.getBlock() instanceof com.antcolonies.block.TreeLeavesBlock && !deadLeaves(s);
+    }
+
+    private static boolean deadLeaves(BlockState s) {
+        return net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(s.getBlock()).getPath().endsWith("_dead_leaves");
+    }
+
     /** Blocks like this within {@code r} of the foot, from {@code minY} to {@code maxY} over it. */
     private static int countNear(ServerLevel level, BlockPos foot, int r, int minY, int maxY, java.util.function.Predicate<BlockState> like) {
         int n = 0;
@@ -463,18 +471,69 @@ public class TreeGrowthTests {
         forest.update(level, t, base + 1);
         helper.assertTrue(t.dead() && t.died == base + 1 && t.cause.equals("age"), "it did not die of old age: died " + t.died + " " + t.cause);
         helper.assertTrue(t.stage == TreeStage.LIVING && countAround(level, foot, 0, 40, TreeGrowthTests::leaves) == leafCount,
-                "the day it died it should still stand as it was (withering): " + t.stage.id);
+                "the moment it died it should still stand as it was: " + t.stage.id);
+        // Step 5b: through the day it dies, the leaves turn brown and drop bit by bit.
+        forest.update(level, t, base + 1, base + 1.5);
+        int green = countAround(level, foot, 0, 40, TreeGrowthTests::livingLeaves), brown = countAround(level, foot, 0, 40, TreeGrowthTests::deadLeaves);
+        helper.assertTrue(t.stage == TreeStage.LIVING && t.placedStep == TreeLife.STEPS / 2, "half a day after death: " + t.stage.id + " step " + t.placedStep);
+        helper.assertTrue(green < leafCount && brown > 0 && green + brown < leafCount,
+                "half a day after death: " + green + " green and " + brown + " brown leaves of " + leafCount);
+        forest.update(level, t, base + 1, base + 1.95);
+        int still = countAround(level, foot, 0, 40, TreeGrowthTests::leaves);
+        helper.assertTrue(still == 0, "the day it died is nearly over and " + still + " leaves still hang");
+        // A chicken under a limb that will break off (step 5b: a falling limb hits what is under it).
+        net.minecraft.world.entity.animal.Chicken chicken = null;
+        TreePlacer.Placed mudShape = TreePlacer.placed("umbrella_thorn", seed, 1.0, TreeStage.MUD);
+        TreePlacer.Placed shedShape = TreePlacer.placed("umbrella_thorn", seed, 1.0, TreeStage.SHED);
+        java.util.Set<Long> kept = new java.util.HashSet<>();
+        for (int i = 0; i < shedShape.size(); i++) {
+            kept.add(BlockPos.asLong(shedShape.xs()[i], shedShape.ys()[i], shedShape.zs()[i]));
+        }
+        for (int i = 0; i < mudShape.size() && chicken == null; i++) {
+            BlockPos under = foot.offset(mudShape.xs()[i], 0, mudShape.zs()[i]);
+            if (mudShape.ys()[i] < 8 || kept.contains(BlockPos.asLong(mudShape.xs()[i], mudShape.ys()[i], mudShape.zs()[i]))
+                    || !level.getBlockState(under).isAir() || !level.getBlockState(under.above()).isAir() || Math.abs(mudShape.xs()[i]) + Math.abs(mudShape.zs()[i]) < 6) {
+                continue;
+            }
+            chicken = net.minecraft.world.entity.EntityType.CHICKEN.create(level);
+            chicken.moveTo(under.getX() + 0.5, under.getY(), under.getZ() + 0.5, 0, 0);
+            chicken.setNoAi(true);
+            level.addFreshEntity(chicken);
+        }
+        helper.assertTrue(chicken != null, "no place under a limb that breaks off");
         java.util.EnumSet<TreeStage> seen = java.util.EnumSet.noneOf(TreeStage.class);
-        int snagWoodHigh = -1;
-        for (int d = 2; d <= 25; d++) {
-            forest.update(level, t, base + d);
-            TreeStage want = TreeLife.deadStage(kind, seed, d - 1);
-            helper.assertTrue(t.stage == want && t.placedStage == want, "day " + (d - 1) + " after death: " + t.stage.id + " placed "
-                    + t.placedStage.id + ", not " + want.id);
+        int snagWoodHigh = -1, firstMud = -1, lastMud = -1, lastHigh = Integer.MAX_VALUE, highChanges = 0;
+        TreeStage before = TreeStage.LIVING;
+        for (double time = base + 2; time <= base + 26; time += 0.25) {
+            forest.update(level, t, (long) Math.floor(time), time);
+            double daysDead = time - t.died;
+            TreeStage want = TreeLife.deadStage(kind, seed, daysDead);
+            int step = TreeLife.deadStep(kind, seed, daysDead);
+            double at = daysDead;
+            helper.assertTrue(t.stage == want && t.placedStage == want && t.placedStep == step, at + " days after death: " + t.stage.id + " placed "
+                    + t.placedStage.id + " step " + t.placedStep + ", not " + want.id + " step " + step);
+            if (before == TreeStage.MUD && want != TreeStage.MUD) {
+                helper.assertTrue(lastMud > 20 && firstMud < lastMud, "the mud did not climb: " + firstMud + " plates at first, " + lastMud + " at the end");
+            }
+            if (before == TreeStage.SHED && want != TreeStage.SHED) {
+                helper.assertTrue(highChanges >= 3, "the limbs did not break off one by one: the wood up high changed " + highChanges + " times");
+            }
+            before = want;
+            if (want == TreeStage.MUD) {
+                int mud = countAround(level, foot, 0, 30, b -> b.is(com.antcolonies.registry.ModBlocks.MUD_CRUST.get()));
+                firstMud = firstMud < 0 ? mud : firstMud;
+                lastMud = mud;
+            }
+            if (want == TreeStage.SHED) {
+                int high = countAround(level, foot, 12, 40, TreeGrowthTests::deadWood);
+                helper.assertTrue(high <= lastHigh, "dead wood up high grew back while shedding: " + high + " after " + lastHigh);
+                highChanges += high < lastHigh && lastHigh != Integer.MAX_VALUE ? 1 : 0;
+                lastHigh = high;
+            }
             if (!seen.add(want)) {
                 continue;
             }
-            // The first day of each stage.
+            // The first look at each stage.
             switch (want) {
                 case SNAG -> {
                     int left = countAround(level, foot, 0, 40, TreeGrowthTests::leaves);
@@ -484,17 +543,16 @@ public class TreeGrowthTests {
                     snagWoodHigh = countAround(level, foot, 12, 40, TreeGrowthTests::deadWood);
                     helper.assertTrue(snagWoodHigh > 50, "the snag has only " + snagWoodHigh + " dead wood blocks up high");
                 }
-                case MUD -> {
-                    int mud = countAround(level, foot, 0, 30, b -> b.is(com.antcolonies.registry.ModBlocks.MUD_CRUST.get()));
-                    helper.assertTrue(mud > 20, "only " + mud + " mud plates on the dead tree");
-                }
                 case SHED -> {
                     int high = countAround(level, foot, 12, 40, TreeGrowthTests::deadWood);
-                    helper.assertTrue(high < snagWoodHigh, "the limbs did not break off: " + high + " dead wood blocks up high, the snag had " + snagWoodHigh);
-                    int fallen = countAround(level, foot, 0, 1, b -> b.getBlock() instanceof FallenBranchBlock);
-                    helper.assertTrue(fallen > 0, "no fallen branches round the shed tree");
+                    helper.assertTrue(high <= snagWoodHigh, "more dead wood up high than the snag had: " + high + " after " + snagWoodHigh);
                 }
                 case FALLEN -> {
+                    helper.assertTrue(!chicken.isAlive() || chicken.getHealth() < chicken.getMaxHealth(), "the chicken under a breaking limb was not hit");
+                    chicken.discard();
+                    int fallen = countAround(level, foot, 0, 1, b -> b.getBlock() instanceof FallenBranchBlock);
+                    helper.assertTrue(lastHigh < snagWoodHigh, "the limbs did not break off: " + lastHigh + " dead wood blocks up high, the snag had " + snagWoodHigh);
+                    helper.assertTrue(fallen > 0 || seen.contains(TreeStage.FALLEN), "no fallen branches round the shed tree");
                     int standing = countAround(level, foot, 9, 40, TreeGrowthTests::deadWood);
                     helper.assertTrue(standing == 0, standing + " dead wood blocks still stand above the stump");
                     int log = countAround(level, foot, 0, 8, b -> deadWood(b) || b.is(TreeBlocks.ROTTEN_WOOD.get()));
@@ -535,13 +593,22 @@ public class TreeGrowthTests {
         helper.assertTrue(t.placedAge == 1.0, "the grown baobab was not placed");
         forest.kill(t, base, "test");
         java.util.EnumSet<TreeStage> seen = java.util.EnumSet.noneOf(TreeStage.class);
-        for (int d = 1; d <= 60; d++) {
-            forest.update(level, t, base + d);
+        int firstDry = -1, lastDry = Integer.MAX_VALUE;
+        for (double time = base + 1; time <= base + 60; time += 0.5) {
+            forest.update(level, t, (long) Math.floor(time), time);
             if (forest.at(foot) != t) {
                 break;
             }
+            double d = time - base;
             TreeStage want = TreeLife.deadStage(kind, seed, d);
             helper.assertTrue(t.stage == want && t.placedStage == want, "day " + d + ": " + t.stage.id + ", not " + want.id);
+            if (want == TreeStage.HEAP_DRY) {
+                // Step 5b: the dried heap shrinks from the top as it goes.
+                int dry = countAround(level, foot, 0, 20, b -> b.is(TreeBlocks.BAOBAB_FIBRE.get()));
+                helper.assertTrue(dry <= lastDry, "the dried heap grew: " + dry + " after " + lastDry);
+                firstDry = firstDry < 0 ? dry : firstDry;
+                lastDry = dry;
+            }
             if (seen.add(want) && want == TreeStage.HEAP) {
                 int heap = countAround(level, foot, 0, 20, b -> b.is(TreeBlocks.BAOBAB_FIBRE.get()));
                 helper.assertTrue(heap > 50, "the fibre heap is only " + heap + " blocks");
@@ -551,6 +618,7 @@ public class TreeGrowthTests {
         }
         helper.assertTrue(seen.containsAll(java.util.List.of(TreeStage.SLUMP, TreeStage.HEAP, TreeStage.HEAP_DRY)), "stages seen: " + seen);
         helper.assertTrue(forest.at(foot) == null, "the dried heap was never gone");
+        helper.assertTrue(lastDry < firstDry, "the dried heap did not shrink: " + firstDry + " blocks at first, " + lastDry + " at the end");
         int left = countAround(level, foot, 0, 30, b -> b.is(TreeBlocks.BAOBAB_FIBRE.get()) || b.is(TreeBlocks.TREE_WOOD));
         helper.assertTrue(left == 0, left + " blocks of the dead baobab are left");
         // A dead tree of new land: a mud-climbed snag, its death day worked out inside that stage.

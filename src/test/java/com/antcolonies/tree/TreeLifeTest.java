@@ -123,4 +123,37 @@ class TreeLifeTest {
             }
         }
     }
+    /**
+     * Step 5b: the slow changes start at nothing when their stage starts, only go forward, and are done before the next
+     * stage (the leaves all dropped before the snag, the mud up and the limbs down before the next stage, the heap
+     * shrunk as it goes); other stages have none.
+     */
+    @Test
+    void deadStepsGoForwardWithinTheirStage() {
+        for (String name : new String[] {"umbrella_thorn", "baobab"}) {
+            TreeKind kind = TreeKind.load(name);
+            for (long seed = 1; seed <= 100; seed++) {
+                java.util.List<TreeLife.DeadStage> stages = TreeLife.deadStages(kind, seed);
+                for (int i = 0; i + 1 < stages.size(); i++) {
+                    TreeStage stage = stages.get(i).stage();
+                    double from = stages.get(i).from(), to = stages.get(i + 1).from();
+                    boolean slow = stage == TreeStage.LIVING || stage == TreeStage.MUD || stage == TreeStage.SHED || stage == TreeStage.HEAP_DRY;
+                    int last = -1;
+                    for (int k = 0; k < 100; k++) {
+                        double d = from + (to - from) * k / 100.0;
+                        int step = TreeLife.deadStep(kind, seed, d);
+                        long s = seed;
+                        int before = last;
+                        assertTrue(step >= last && step >= 0 && step <= TreeLife.STEPS, () -> name + " seed " + s + " " + stage + " at " + d + ": " + step + " after " + before);
+                        assertTrue(slow || step == 0, () -> name + " " + stage + " has steps");
+                        last = step;
+                    }
+                    assertTrue(TreeLife.deadStep(kind, seed, from) == 0, name + " " + stage + " does not start at 0");
+                    if (slow && stage != TreeStage.HEAP_DRY) {
+                        assertTrue(TreeLife.deadStep(kind, seed, to - 0.05) == TreeLife.STEPS, name + " seed " + seed + " " + stage + " not done before the next stage");
+                    }
+                }
+            }
+        }
+    }
 }

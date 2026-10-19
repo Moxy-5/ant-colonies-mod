@@ -45,7 +45,7 @@ public final class TreeBlocks {
     /** One kind of tree's own blocks. */
     public record Kind(String name, DeferredBlock<RotatedPillarBlock> log, DeferredBlock<RotatedPillarBlock> wood,
                        DeferredBlock<TreeBranchBlock> branch, DeferredBlock<TreeLeavesBlock> leaves,
-                       DeferredBlock<TreeSeedlingBlock> seedling) {
+                       DeferredBlock<TreeSeedlingBlock> seedling, DeferredBlock<TreeLeavesBlock> deadLeaves) {
     }
 
     // Real wood: umbrella and camel thorn wood is very hard (camel thorn the hardest); a baobab's is soft, spongy and watery.
@@ -94,14 +94,21 @@ public final class TreeBlocks {
         DeferredBlock<TreeBranchBlock> branch = add(ModBlocks.BLOCKS.registerBlock(name + "_branch", TreeBranchBlock::new,
                 branchProperties(bark, hardness / 2)));
         DeferredBlock<TreeLeavesBlock> leaves = add(ModBlocks.BLOCKS.registerBlock(name + "_leaves", TreeLeavesBlock::new,
-                BlockBehaviour.Properties.of().mapColor(leafColour).strength(0.2F).sound(SoundType.GRASS).noOcclusion()
-                        .isValidSpawn((state, level, pos, type) -> false).isSuffocating((state, level, pos) -> false)
-                        .isViewBlocking((state, level, pos) -> false).isRedstoneConductor((state, level, pos) -> false)
-                        .ignitedByLava().pushReaction(PushReaction.DESTROY)));
+                leaves(leafColour)));
+        // A dead tree's withered leaves (step 5b): brown, dry, they drop within a day.
+        DeferredBlock<TreeLeavesBlock> deadLeaves = add(ModBlocks.BLOCKS.registerBlock(name + "_dead_leaves", TreeLeavesBlock::new,
+                leaves(MapColor.TERRACOTTA_BROWN)));
         DeferredBlock<TreeSeedlingBlock> seedling = add(ModBlocks.BLOCKS.registerBlock(name + "_seedling", TreeSeedlingBlock::new,
                 BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).noCollission().instabreak().sound(SoundType.GRASS)
                         .pushReaction(PushReaction.DESTROY)));
-        return new Kind(name, log, wood, branch, leaves, seedling);
+        return new Kind(name, log, wood, branch, leaves, seedling, deadLeaves);
+    }
+
+    private static BlockBehaviour.Properties leaves(MapColor colour) {
+        return BlockBehaviour.Properties.of().mapColor(colour).strength(0.2F).sound(SoundType.GRASS).noOcclusion()
+                .isValidSpawn((state, level, pos, type) -> false).isSuffocating((state, level, pos) -> false)
+                .isViewBlocking((state, level, pos) -> false).isRedstoneConductor((state, level, pos) -> false)
+                .ignitedByLava().pushReaction(PushReaction.DESTROY);
     }
 
     private static DeferredBlock<RotatedPillarBlock> pillar(String name, BlockBehaviour.Properties properties) {
@@ -138,6 +145,7 @@ public final class TreeBlocks {
             fire.setFlammable(kind.wood().get(), 5, 5);
             fire.setFlammable(kind.branch().get(), 5, 20);
             fire.setFlammable(kind.leaves().get(), 30, 60);
+            fire.setFlammable(kind.deadLeaves().get(), 60, 100);
         }
         fire.setFlammable(THORNY_TWIG.get(), 60, 100);
         fire.setFlammable(CAMEL_THORN_PODS.get(), 30, 60);

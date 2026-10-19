@@ -304,6 +304,8 @@ def fibre():
 # ---- Leaves and plants (None is a see-through pixel) ----
 
 LEAF = {"umbrella": (128, 156, 72), "camel": (124, 146, 108), "baobab": (64, 112, 44)}
+# A dead tree's withered leaves (M7.5 step 5b): the same leaflets dried to straw brown (the baobab's darker).
+DEAD_LEAF = {"umbrella": (158, 122, 68), "camel": (146, 118, 84), "baobab": (124, 90, 50)}
 
 
 def leaves(kind, look):
@@ -344,11 +346,11 @@ def leaves(kind, look):
     return img
 
 
-def leaves_c(kind):
+def leaves_c(kind, base=None):
     """C, between A (too dense, the user) and B (too thin): B's fine leaflets, more of them and fuller, about two thirds
-    leaf and one third sky; the baobab's hand-shaped leaves twice as many."""
+    leaf and one third sky; the baobab's hand-shaped leaves twice as many. {@code base}: another colour (withered)."""
     rng = random.Random(f"leafC{kind}")
-    base = LEAF[kind]
+    base = base or LEAF[kind]
     img = blank(None)
     if kind == "baobab":
         for _ in range(8):
@@ -619,6 +621,14 @@ def game_files():
                 {"condition": "minecraft:survives_explosion"}, {"condition": "minecraft:random_chance", "chance": 0.02}]}]}]}])
         cross(f"{g}_seedling", f"{g}_seedling")
         drops_itself(f"{g}_seedling")
+        # Withered leaves of a dead tree (step 5b): themselves with shears or silk touch, otherwise now and then a stick.
+        texture(f"{g}_dead_leaves", leaves_c(kind, DEAD_LEAF[kind]))
+        single(f"{g}_dead_leaves", {"parent": "minecraft:block/cube_all", "render_type": "minecraft:cutout_mipped",
+                                    "textures": {"all": f"antcolonies:block/{g}_dead_leaves"}})
+        loot(f"{g}_dead_leaves", [{"rolls": 1.0, "bonus_rolls": 0.0, "entries": [{"type": "minecraft:alternatives", "children": [
+            {"type": "minecraft:item", "name": f"antcolonies:{g}_dead_leaves", "conditions": [SHEARS_OR_SILK]},
+            {"type": "minecraft:item", "name": "minecraft:stick", "conditions": [
+                {"condition": "minecraft:survives_explosion"}, {"condition": "minecraft:random_chance", "chance": 0.02}]}]}]}])
     # Dead wood: bleached silver bark, the old dead wood's cut end.
     texture("bleached_bark", dead_bark_silver(0))
     texture("peeling_bleached_bark", peeling_bark())
