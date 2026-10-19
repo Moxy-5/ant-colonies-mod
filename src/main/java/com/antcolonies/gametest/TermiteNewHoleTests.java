@@ -717,6 +717,17 @@ public class TermiteNewHoleTests {
 
     private enum Food { LOG, STUMP, BRANCH, GIANT }
 
+    /** The giant log's underside: its bottom row and the blocks either side of it, 3 across. */
+    private static java.util.List<BlockPos> underside(java.util.List<BlockPos> log) {
+        java.util.List<BlockPos> under = new java.util.ArrayList<>();
+        for (BlockPos bottom : log) {
+            for (int dz = -1; dz <= 1; dz++) {
+                under.add(bottom.offset(0, 0, dz));
+            }
+        }
+        return under;
+    }
+
     /**
      * (60000 ticks, was 40000: once the stump was still on its last bitten stage when the time ran out, 2026-10-14; 90000
      * on the test clock, roadmap 3a: real nights and days from 18:30 for the log and the stump, the gallery dug through
@@ -873,8 +884,9 @@ public class TermiteNewHoleTests {
                         }
                         phase[0] = 2;
                         if (kind == Food.GIANT) {
-                            // The giant's bottom row nearly eaten (quicker): a cast comes soon.
-                            for (BlockPos block : log) {
+                            // The giant's whole underside (3 across: the gallery runs under all of it) nearly eaten (quicker):
+                            // a cast comes soon.
+                            for (BlockPos block : underside(log)) {
                                 BlockState wood = level.getBlockState(block);
                                 if (wood.hasProperty(com.antcolonies.block.DeadWoodBlock.EATEN)) {
                                     level.setBlock(block, wood.setValue(com.antcolonies.block.DeadWoodBlock.EATEN, com.antcolonies.block.DeadWoodBlock.MAX_EATEN), 3);
@@ -936,7 +948,7 @@ public class TermiteNewHoleTests {
                 }
             } else if (kind == Food.GIANT) {
                 // A block of the giant's underside eaten away by day is a mud cast, the rest of the log over it.
-                if (log.stream().anyMatch(b -> com.antcolonies.block.MudCastBlock.isCast(level.getBlockState(b)))) {
+                if (underside(log).stream().anyMatch(b -> com.antcolonies.block.MudCastBlock.isCast(level.getBlockState(b)))) {
                     helper.succeed();
                 }
             } else if (kind == Food.BRANCH) {
