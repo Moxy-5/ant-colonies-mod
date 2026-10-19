@@ -136,78 +136,6 @@
   136
  ],
  "findings": {
-  "jump leg_r2": [
-   1,
-   0.132
-  ],
-  "jump at down_turn_19": [
-   9,
-   0.229
-  ],
-  "jump leg_l2": [
-   1,
-   0.101
-  ],
-  "jump at down_turn_41": [
-   8,
-   0.215
-  ],
-  "jump thorax": [
-   2,
-   0.126
-  ],
-  "jump head": [
-   1,
-   0.145
-  ],
-  "jump mandible_r": [
-   1,
-   0.157
-  ],
-  "jump antenna_l_1": [
-   1,
-   0.119
-  ],
-  "jump antenna_l_2": [
-   1,
-   0.183
-  ],
-  "jump mandible_l": [
-   1,
-   0.152
-  ],
-  "jump antenna_r_1": [
-   1,
-   0.133
-  ],
-  "jump antenna_r_2": [
-   1,
-   0.229
-  ],
-  "jump leg_r3": [
-   1,
-   0.147
-  ],
-  "jump leg_l3_lower": [
-   1,
-   0.195
-  ],
-  "jump leg_l3_foot": [
-   1,
-   0.215
-  ],
-  "jump petiole": [
-   2,
-   0.134
-  ],
-  "jump at down_turn_20": [
-   2,
-   0.071
-  ],
-  "jump postpetiole": [
-   2,
-   0.149
-  ],
   "inside abdomen": [
    1,
    0.026
@@ -218,15 +146,16 @@
   ],
   "jump abdomen": [
    2,
-   0.189
+   0.156
   ],
   "jump at down_turn_27": [
    1,
    0.131
+  ],
+  "jump at down_turn_42": [
+   1,
+   0.156
   ]
  },
- "body_findings": {
-  "tipped": 1
- },
- "known_bugs": "older, not BUGS 56: at the top, going over the ridge's side edge after walking along it, the worker's tilt wobbles (16, 46, 36, 48 degrees) and its abdomen grazes the stone 0.03; at the foot the body settles flat fast (33 to 9 to 0 degrees in 2 ticks), as in c_climb (BUGS 57)"
+ "body_findings": {}
 }

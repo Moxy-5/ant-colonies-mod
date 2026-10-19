@@ -266,91 +266,46 @@
   136
  ],
  "findings": {
-  "jump leg_r2_lower": [
+  "jump leg_l2_lower": [
    1,
-   0.101
+   0.098
   ],
-  "jump at down_105": [
-   3,
-   0.118
+  "jump at down_103": [
+   2,
+   0.113
   ],
-  "jump leg_r2_foot": [
+  "jump leg_l2_foot": [
    1,
-   0.118
-  ],
-  "jump thorax": [
-   1,
-   0.044
-  ],
-  "jump at down_113": [
-   9,
-   0.067
-  ],
-  "jump wing_stubs": [
-   1,
-   0.045
-  ],
-  "jump head": [
-   1,
-   0.035
+   0.113
   ],
   "inside antenna_l_2": [
-   3,
-   0.029
-  ],
-  "inside at down_103": [
    2,
-   0.032
+   0.013
   ],
-  "inside at down_104": [
+  "inside at down_102": [
    2,
    0.027
   ],
-  "inside at down_105": [
-   1,
-   0.014
+  "inside at down_103": [
+   2,
+   0.013
   ],
   "inside antenna_r_2": [
-   2,
-   0.032
+   3,
+   0.031
   ],
-  "jump leg_l1": [
+  "inside at down_101": [
    1,
-   0.065
+   0.031
   ],
-  "jump at down_35": [
+  "jump leg_r1": [
    1,
-   0.065
+   0.066
   ],
-  "jump leg_l1_lower": [
+  "jump at down_33": [
    1,
-   0.117
-  ],
-  "jump abdomen": [
-   1,
-   0.049
-  ],
-  "jump abdomen_2": [
-   1,
-   0.052
-  ],
-  "jump abdomen_3": [
-   1,
-   0.054
-  ],
-  "jump abdomen_4": [
-   1,
-   0.059
-  ],
-  "jump abdomen_5": [
-   1,
-   0.064
-  ],
-  "jump abdomen_6": [
-   1,
-   0.067
+   0.066
   ]
  },
- "body_findings": {},
- "known_bugs": "coming head first down onto the floor the navigator stops it 3 ticks and turns it 180 degrees on the spot (old, docs/BUGS.md 53)"
+ "body_findings": {}
 }

@@ -146,6 +146,8 @@ public class AntNavigator {
     /** True while the motion is set exactly (holding a wall, going round an edge), not by walking. */
     private boolean attached;
     private Vec3 motion = Vec3.ZERO;
+    /** True when this tick's motion is only a hair's correction (see {@link #moveAttached}): it never turns the head. */
+    private boolean squaring;
     /** For noticing a blocked move: where the insect was when the clock started, and for how long it has not got further. */
     private Vec3 blockedFrom = Vec3.ZERO;
     private int blockedTicks;
@@ -485,6 +487,7 @@ public class AntNavigator {
         exact = false;
         inChannel = false;
         motion = Vec3.ZERO;
+        squaring = false;
         if (route == null) {
             stepFrom = at;
             stepTo = null;
@@ -804,8 +807,9 @@ public class AntNavigator {
         if (Math.abs(coord(ant.position(), axis) - pinned(from.cell(), wall)) >= out - CLEAR_OF_WALL_SLACK) {
             return true;
         }
-        Vec3 aim = with(ant.position(), axis, clear);
-        ant.getMoveControl().setWantedPosition(aim.x, aim.y, aim.z, speed);
+        // at the pace it came down (an exact motion, as on the wall): walking from a standstill made it creep out
+        // and then dash (docs/BUGS.md 53)
+        moveAttached(with(ant.position(), axis, clear));
         return false;
     }
 
@@ -1419,6 +1423,7 @@ public class AntNavigator {
             Vec3 squareUp = new Vec3(small(delta.x), small(delta.y), small(delta.z));
             if (squareUp.lengthSqr() > 0.0) {
                 motion = squareUp;
+                squaring = true;
                 return false;
             }
         }
@@ -1445,7 +1450,7 @@ public class AntNavigator {
      */
     private void faceTheWayItGoes() {
         if (surface == Direction.UP) {
-            if (attached && motion.horizontalDistanceSqr() > 1.0E-8) {
+            if (attached && !squaring && motion.horizontalDistanceSqr() > 1.0E-8) {
                 Direction left = ceilingRef.getCounterClockWise();
                 double sideways = motion.x * left.getStepX() + motion.z * left.getStepZ();
                 double away = -(motion.x * ceilingRef.getStepX() + motion.z * ceilingRef.getStepZ());
@@ -1455,14 +1460,21 @@ public class AntNavigator {
             }
             setYaw(ceilingRef.toYRot() + 180.0F + heading);
         } else if (surface.getAxis().isHorizontal()) {
-            setYaw(surface.toYRot());
-            if (attached && motion.lengthSqr() > 1.0E-8) {
+            if (attached && !squaring && motion.lengthSqr() > 1.0E-8) {
                 Direction left = surface.getCounterClockWise();
                 double sideways = motion.x * left.getStepX() + motion.z * left.getStepZ();
-                if (Math.abs(sideways) > 1.0E-5 || Math.abs(motion.y) > 1.0E-5) {
+                // only a motion mostly along the wall turns the head: the last bit of the way out over an edge onto
+                // the wall (across it) once had a drift of 0.00004 sideways in it, which put the head sideways for a
+                // tick and broke the pose over the edge (docs/BUGS.md 57)
+                if (sideways * sideways + motion.y * motion.y > 0.25 * motion.lengthSqr()) {
                     heading = (float) Math.toDegrees(Math.atan2(sideways, motion.y));
                 }
             }
+            // The yaw is the way the head points with the wall laid down flat in front of it: into the wall going up,
+            // out from it going down (docs/BUGS.md 53). Off the wall at its foot or over its top the body goes on the
+            // way it already faces, so the yaw never swings half round there (the drawn body on a wall is turned by
+            // the wall and the heading, not by this yaw).
+            setYaw(surface.toYRot() - heading);
         } else if (attached && motion.horizontalDistanceSqr() > 1.0E-8) {
             setYaw((float) (Mth.atan2(motion.z, motion.x) * 180.0 / Math.PI) - 90.0F);
         }

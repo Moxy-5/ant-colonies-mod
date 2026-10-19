@@ -217,6 +217,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     private int idleSeconds;
     /** Whether the navigator set the motion last tick (so the leftover ladder push can be cleared when it lets go). */
     private boolean wasAttached;
+    /** The navigator's exact motion on the last tick it held this insect to a surface (server). */
+    private Vec3 lastClimbMotion = Vec3.ZERO;
 
     // Client only: how the body is drawn, turned smoothly toward the synced surface and heading (see AntRenderer).
     // While on a wall (or tipping onto or off one) the body is drawn by these three angles instead of the body yaw:
@@ -916,8 +918,17 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         if (navigator.isAttached()) {
             // Holding a wall or going round an edge: the navigator decides the exact motion along the surface.
             setDeltaMovement(navigator.getClimbMotion());
+            lastClimbMotion = navigator.getClimbMotion();
         } else if (wasAttached) {
-            setDeltaMovement(Vec3.ZERO); // just let go of the wall: no leftover ladder push
+            // Just let go: no leftover ladder push. Let go onto a floor (at a wall's foot, over its top) it walks on at
+            // the pace it had along the floor, standing on it from this tick: from a standstill, and a tick in the air
+            // before the game noticed the floor, it crept and then dashed (docs/BUGS.md 53).
+            if (navigator.getSurface() == Direction.DOWN && !level().noCollision(this, getBoundingBox().move(0.0, -0.01, 0.0))) {
+                setDeltaMovement(lastClimbMotion.x, -0.0784, lastClimbMotion.z);
+                setOnGround(true);
+            } else {
+                setDeltaMovement(Vec3.ZERO);
+            }
         }
         wasAttached = navigator.isAttached();
     }

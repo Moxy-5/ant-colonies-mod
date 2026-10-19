@@ -157,8 +157,8 @@
  ],
  "findings": {
   "inside abdomen": [
-   4,
-   0.033
+   3,
+   0.039
   ],
   "inside at off_edge_47": [
    1,
@@ -170,11 +170,7 @@
   ],
   "inside at back_up_41": [
    1,
-   0.033
-  ],
-  "inside at back_up_42": [
-   1,
-   0.01
+   0.039
   ],
   "jump abdomen": [
    2,
@@ -184,9 +180,9 @@
    1,
    0.134
   ],
-  "jump at back_up_43": [
+  "jump at back_up_42": [
    1,
-   0.08
+   0.132
   ]
  },
  "body_findings": {},

@@ -146,14 +146,6 @@
   136
  ],
  "findings": {
-  "jump leg_r2_lower": [
-   1,
-   0.158
-  ],
-  "jump at up_28": [
-   2,
-   0.2
-  ],
   "jump leg_r3_foot": [
    1,
    0.19
@@ -166,17 +158,21 @@
    1,
    0.2
   ],
-  "jump petiole": [
+  "jump at up_28": [
    1,
-   0.042
+   0.2
   ],
-  "jump at down_51": [
+  "jump postpetiole": [
    1,
-   0.042
+   0.059
+  ],
+  "jump at down_57": [
+   2,
+   0.154
   ],
   "inside abdomen": [
-   4,
-   0.031
+   3,
+   0.036
   ],
   "inside at up_67": [
    1,
@@ -184,19 +180,15 @@
   ],
   "inside at up_68": [
    1,
-   0.031
+   0.036
   ],
-  "inside at up_69": [
+  "inside at down_24": [
    1,
-   0.01
-  ],
-  "inside at down_25": [
-   1,
-   0.027
+   0.026
   ],
   "jump abdomen": [
-   5,
-   0.151
+   4,
+   0.154
   ],
   "jump at up_32": [
    1,
@@ -204,19 +196,11 @@
   ],
   "jump at up_69": [
    1,
-   0.091
+   0.128
   ],
-  "jump at down_01": [
+  "jump at down_25": [
    1,
-   0.08
-  ],
-  "jump at down_26": [
-   1,
-   0.134
-  ],
-  "jump at down_60": [
-   1,
-   0.124
+   0.13
   ]
  },
  "body_findings": {},
