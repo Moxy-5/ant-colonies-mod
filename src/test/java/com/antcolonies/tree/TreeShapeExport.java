@@ -40,20 +40,19 @@ class TreeShapeExport {
         out.put("seeds", SEEDS);
         Map<String, String> trees = new LinkedHashMap<>();
         Map<String, String> shapes = new LinkedHashMap<>();
-        for (String[] k : KINDS) {
-            TreeKind kind = TreeKind.load(k[1]);
-            for (int seed = 1; seed <= SEEDS; seed++) {
-                shapes.put(k[0] + "|" + seed, kind.shapeFor(seed).name());
-                for (TreeStage stage : TreeShapes.stages(kind)) {
-                    double[] ages = stage == TreeStage.LIVING ? AGES : DEAD_AGES;
-                    for (double age : ages) {
-                        trees.put(k[0] + "|" + seed + "|" + num(age) + "|" + stage.id, encode(TreeShapes.build(kind, seed, age, stage)));
-                        if (kind.isBaobab() && stage == TreeStage.LIVING) {
-                            trees.put(k[0] + "|" + seed + "|" + num(age) + "|living-dry", encode(TreeShapes.build(kind, seed, age, stage, true)));
-                        }
-                    }
-                }
+        String[] looks = new String[TreeDraw.LimbLook.values().length];
+        for (TreeDraw.LimbLook look : TreeDraw.LimbLook.values()) {
+            looks[look.ordinal()] = look.name();
+        }
+        out.put("limbLooks", looks);
+        try {
+            for (TreeDraw.LimbLook look : TreeDraw.LimbLook.values()) {
+                TreeDraw.look = look;
+                // Look A (today's) keeps the old keys; the others end in "|look", only where they differ from A.
+                addTrees(trees, shapes, look == TreeDraw.LimbLook.A ? "" : "|" + look.name());
             }
+        } finally {
+            TreeDraw.look = TreeDraw.LimbLook.A;
         }
         out.put("shapes", shapes);
         out.put("trees", trees);
@@ -67,6 +66,31 @@ class TreeShapeExport {
         Files.createDirectories(file.getParent());
         Files.writeString(file, gson.toJson(out), StandardCharsets.UTF_8);
         System.out.println("wrote " + file.toAbsolutePath() + " (" + Files.size(file) / 1024 + " KB, " + trees.size() + " trees)");
+    }
+
+    private static void addTrees(Map<String, String> trees, Map<String, String> shapes, String suffix) {
+        for (String[] k : KINDS) {
+            TreeKind kind = TreeKind.load(k[1]);
+            for (int seed = 1; seed <= SEEDS; seed++) {
+                shapes.put(k[0] + "|" + seed, kind.shapeFor(seed).name());
+                for (TreeStage stage : TreeShapes.stages(kind)) {
+                    double[] ages = stage == TreeStage.LIVING ? AGES : DEAD_AGES;
+                    for (double age : ages) {
+                        String key = k[0] + "|" + seed + "|" + num(age) + "|";
+                        put(trees, key + stage.id, suffix, encode(TreeShapes.build(kind, seed, age, stage)));
+                        if (kind.isBaobab() && stage == TreeStage.LIVING) {
+                            put(trees, key + "living-dry", suffix, encode(TreeShapes.build(kind, seed, age, stage, true)));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private static void put(Map<String, String> trees, String key, String suffix, String tree) {
+        if (suffix.isEmpty() || !tree.equals(trees.get(key))) {
+            trees.put(key + suffix, tree);
+        }
     }
 
     /** A number written the way the viewer's JavaScript writes it (1, not 1.0). */

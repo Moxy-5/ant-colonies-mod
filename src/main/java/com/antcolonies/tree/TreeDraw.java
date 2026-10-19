@@ -6,8 +6,33 @@ package com.antcolonies.tree;
  * line of branch blocks, every step along one axis so the pieces always join face to face.
  */
 final class TreeDraw {
-    static final TreePart[] LIVE = {TreePart.BARK, TreePart.INNER, TreePart.THIN};
-    static final TreePart[] DEAD = {TreePart.DEAD_BARK, TreePart.DEAD_INNER, TreePart.DEAD_THIN};
+    static final TreePart[] LIVE = {TreePart.BARK, TreePart.INNER, TreePart.THIN, TreePart.LIMB};
+    static final TreePart[] DEAD = {TreePart.DEAD_BARK, TreePart.DEAD_INNER, TreePart.DEAD_THIN, TreePart.DEAD_LIMB};
+
+    /**
+     * How the limbs between the fork and the crown look, on trial in the tree viewer (the user's report 2026-10-18: the
+     * 1-block-thick limbs looked stringy). A is today's; the game keeps it until the user picks.
+     *
+     * @param thick    limbs stay thick out to the crown and branches start thicker (as a real umbrella thorn's)
+     * @param limbBlock wood about a block thick is the limb pipe (10 px), not bark cubes or a 6 px thin branch
+     * @param straight 1-block lines in longer straight runs with fewer, bigger steps
+     */
+    enum LimbLook {
+        A(false, false, false), B(true, false, false), C(false, true, false), D(true, true, false), E(true, true, true);
+
+        final boolean thick, limbBlock, straight;
+
+        LimbLook(boolean thick, boolean limbBlock, boolean straight) {
+            this.thick = thick;
+            this.limbBlock = limbBlock;
+            this.straight = straight;
+        }
+    }
+
+    /** The look in use: A in the game; the viewer's export draws every look in turn. */
+    static volatile LimbLook look = LimbLook.A;
+    /** With the limb pipe: narrower than this is a thin branch, wider than LIMB_MAX round bark (my picks). */
+    static final double LIMB_MIN = 0.45, LIMB_MAX = 1.25;
 
     private TreeDraw() {
     }
@@ -88,6 +113,49 @@ final class TreeDraw {
     }
 
     /**
+     * A one-block line from a to b in long straight runs (limb look E): it runs along its main axis and lets the other
+     * axes drift up to 1.5 blocks off the true line before stepping 2 at once, so a slanted line has half as many steps,
+     * each 2 high. Face to face all the way, like thinLine.
+     */
+    static void straightLine(TreeVoxels v, double[] a, double[] b, TreePart part) {
+        double[] ab = sub(b, a);
+        int m = 0;
+        for (int j = 1; j < 3; j++) {
+            if (Math.abs(ab[j]) > Math.abs(ab[m])) {
+                m = j;
+            }
+        }
+        int[] p = {(int) Math.round(a[0]), (int) Math.round(a[1]), (int) Math.round(a[2])};
+        int[] end = {(int) Math.round(b[0]), (int) Math.round(b[1]), (int) Math.round(b[2])};
+        v.put(p[0], p[1], p[2], part);
+        int sm = Integer.signum(end[m] - p[m]);
+        while (p[m] != end[m]) {
+            p[m] += sm;
+            v.put(p[0], p[1], p[2], part);
+            double t = ab[m] == 0 ? 1 : clamp((p[m] - a[m]) / ab[m], 0, 1);
+            for (int j = 0; j < 3; j++) {
+                if (j == m) {
+                    continue;
+                }
+                double off = a[j] + ab[j] * t - p[j];
+                if (Math.abs(off) >= 1.5) {
+                    int s = (int) Math.signum(off);
+                    for (int k = 0; k < 2; k++) {
+                        p[j] += s;
+                        v.put(p[0], p[1], p[2], part);
+                    }
+                }
+            }
+        }
+        for (int j = 0; j < 3; j++) {
+            while (p[j] != end[j]) {
+                p[j] += Integer.signum(end[j] - p[j]);
+                v.put(p[0], p[1], p[2], part);
+            }
+        }
+    }
+
+    /**
      * A round piece of wood from a to b, radius ra to rb: bark outside, wood inside; a thin line when narrow. flat: flat
      * (broken) ends instead of round joints; hollow: the share of the radius rotted out (lined with rotten wood). A solid
      * piece also gets a one-block core line along its axis (filling only empty blocks), so a piece narrowing to a point
@@ -95,6 +163,15 @@ final class TreeDraw {
      */
     static void seg(TreeVoxels v, double[] a, double[] b, double ra, double rb, TreePart[] blocks, boolean flat, double hollow) {
         TreePart outer = blocks[0], inner = blocks[1], thin = blocks[2];
+        if (look.limbBlock && Math.max(ra, rb) < LIMB_MAX) {
+            boolean pipe = Math.max(ra, rb) >= LIMB_MIN;
+            if (pipe && look.straight) {
+                straightLine(v, a, b, blocks[3]);
+            } else {
+                thinLine(v, a, b, pipe ? blocks[3] : thin);
+            }
+            return;
+        }
         if (Math.max(ra, rb) < 0.8) {
             thinLine(v, a, b, thin);
             return;

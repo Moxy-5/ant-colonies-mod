@@ -109,12 +109,14 @@
           <div class="pick"><span>Bark</span><div class="row" id="pick-bark"></div></div>
           <div class="pick"><span>Leaves</span><div class="row" id="pick-leaves"></div></div>
           <div class="pick"><span>Dead bark (all kinds)</span><div class="row" id="pick-dead"></div></div>
+          <div class="pick"><span>Limbs (all kinds, game shapes)</span><div class="row" id="pick-limbs"></div></div>
         </div>
         <p class="note" id="shape-note"></p>
       </div>
       <div class="toggles">
         <label><input type="checkbox" id="game"> Game shapes: the trees as the mod's own code makes them (step 2, real growth: seeds 1 to 4, the ages nearest the slider)</label>
         <label><input type="checkbox" id="cut"> Cut open (see inside)</label>
+        <label><input type="checkbox" id="bare"> Leaves off (to see the limbs)</label>
         <label><input type="checkbox" id="dry"> Dry season (baobab leafless, as it is most of the year)</label>
       </div>
       <div>
@@ -167,18 +169,25 @@ const REAL = {
     heapdry: "The heap dries and shrinks over time until it is gone.",
   },
 };
-let kind = "umbrella", age = 1, stage = "living", seed = 1, cut = false, dry = false;
+let kind = "umbrella", age = 1, stage = "living", seed = 1, cut = false, dry = false, bare = false;
 let game = !!(DATA && DATA.shapes);
 let picks = { shape: { umbrella: "A", camel: "A", baobab: "A" }, bark: { umbrella: "D", camel: "C", baobab: "B" },
               leaves: { umbrella: "C", camel: "C", baobab: "C" }, dead: "E" };
 try { const s = JSON.parse(localStorage.getItem("tree-picks-3") || "null"); if (s && s.shape) picks = s; } catch (e) {}
+if (!picks.limbs) picks.limbs = "A";
+// The limb looks on trial (the user's report 2026-10-18: the 1-block limbs looked stringy); only the game shapes have them.
+const LIMB_LOOKS = { A: "A today's: limbs taper to 1 block, bark cubes in steps",
+  B: "B thick limbs: limbs stay 3 wide out to the crown, branches start thicker",
+  C: "C limb pipe: today's thickness, but wood about a block thick is the new round limb pipe (10 px)",
+  D: "D thick + limb pipe: B's thick limbs, then the limb pipe, then thin branches",
+  E: "E thick + limb pipe + straighter: D with the pipes in long straight runs, fewer and bigger steps" };
 
 // ================= The tree shape maker =================
 // Voxels: block names; the textures are picked when drawing. Coordinates are blocks, y = 0 the first block above
 // the ground. Every random number is drawn in the same order whatever the age, so one seed is one tree at any age.
-const PRIO = { seedling: 1, thorns: 1, pods: 1, leaves: 2, thin: 3, deadthin: 3, fallenbranch: 3, frass: 4,
+const PRIO = { seedling: 1, thorns: 1, pods: 1, leaves: 2, thin: 3, deadthin: 3, fallenbranch: 3, limb: 3, deadlimb: 3, frass: 4,
                inner: 5, deadinner: 5, bark: 5, deadbark: 5, peeling: 5, fibre: 5, rotten: 5, mud: 6 };
-const KIND_OF = { slab: ["frass"], thin: ["thin", "deadthin", "fallenbranch"], cross: ["seedling", "thorns", "pods"] };
+const KIND_OF = { slab: ["frass"], thin: ["thin", "deadthin", "fallenbranch"], limb: ["limb", "deadlimb"], cross: ["seedling", "thorns", "pods"] };
 function shapeOf(b) { for (const k in KIND_OF) if (KIND_OF[k].includes(b)) return k; return b === "leaves" ? "leaf" : "cube"; }
 
 class Vox {
@@ -639,11 +648,12 @@ function gameTree() {
   const a = ages.reduce((b, x) => Math.abs(x - age) < Math.abs(b - age) ? x : b, ages[0]);
   const s = (seed - 1) % S.seeds + 1;
   const st = stage === "living" && kind === "baobab" && dry ? "living-dry" : stage;
-  const bytes = atob(S.trees[`${kind}|${s}|${a}|${st}`] || ""), v = new Vox();
+  const key = `${kind}|${s}|${a}|${st}`;
+  const bytes = atob(S.trees[`${key}|${picks.limbs}`] || S.trees[key] || ""), v = new Vox();
   const sb = n => n > 127 ? n - 256 : n;
   for (let i = 0; i + 3 < bytes.length; i += 4)
     v.set(sb(bytes.charCodeAt(i)), sb(bytes.charCodeAt(i + 1)), sb(bytes.charCodeAt(i + 2)), S.parts[bytes.charCodeAt(i + 3)]);
-  const out = { v, note: `game shapes: seed ${s}, ${S.shapes[kind + "|" + s]} shape, age ${a}` };
+  const out = { v, note: `game shapes: seed ${s}, ${S.shapes[kind + "|" + s]} shape, age ${a}, limbs ${picks.limbs}` };
   if (stage === "fallen") {
     const f = acaciaSkeleton(kind, s, 1, "A").fallAz, d = [Math.cos(f), 0, Math.sin(f)];
     let far = 0; v.each((x, y, z) => { far = Math.max(far, x * d[0] + z * d[2]); });
@@ -699,9 +709,9 @@ function plantMat(name) {
 function texName(b) {
   const deadKind = kind === "baobab" ? `bark_baobab_${picks.bark.baobab}` : `deadbark_${picks.dead}`;
   switch (b) {
-    case "bark": case "thin": return `bark_${kind}_${picks.bark[kind]}`;
+    case "bark": case "thin": case "limb": return `bark_${kind}_${picks.bark[kind]}`;
     case "inner": return `inner_${kind}`;
-    case "deadbark": case "deadthin": return deadKind;
+    case "deadbark": case "deadthin": case "deadlimb": return deadKind;
     case "deadinner": return "deadinner";
     case "leaves": return `leaves_${kind}_${picks.leaves[kind]}`;
     case "fallenbranch": return "branch";
@@ -738,7 +748,9 @@ function placeFigures(R) {
   ant(x - 1.2, -0.6, 0.3, 0xa8381e);
 }
 
-const geo = { cube: new THREE.BoxGeometry(1, 1, 1), half: new THREE.BoxGeometry(0.5, 0.5, 0.5), slab: new THREE.BoxGeometry(1, 0.25, 1) };
+// The limb pipe is 10 px of 16 across (the thin branch 8 here, 6 in the game's model).
+const geo = { cube: new THREE.BoxGeometry(1, 1, 1), half: new THREE.BoxGeometry(0.5, 0.5, 0.5), slab: new THREE.BoxGeometry(1, 0.25, 1),
+              limb: new THREE.BoxGeometry(0.625, 0.625, 0.625) };
 const planeA = new THREE.PlaneGeometry(1, 1).rotateY(Math.PI / 4), planeB = new THREE.PlaneGeometry(1, 1).rotateY(-Math.PI / 4);
 const SIDES = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 let current = null, bounds = null;
@@ -749,13 +761,13 @@ function build(reframe) {
   treeGroup.clear();
   const v = current.v;
   const solid = b => b && shapeOf(b) === "cube";
-  const woody = b => b && (shapeOf(b) === "cube" || shapeOf(b) === "thin");
+  const woody = b => b && (shapeOf(b) === "cube" || shapeOf(b) === "thin" || shapeOf(b) === "limb");
   const axis = current.cutAxis || [1, 0, 0];
   const lists = {};
   const push = (key, p) => (lists[key] = lists[key] || []).push(p);
   let count = 0, minY = 1e9, maxY = -1e9, maxR = 0;
   v.each((x, y, z, b) => {
-    if (y < 0) return;
+    if (y < 0 || (bare && (b === "leaves" || b === "thorns" || b === "pods"))) return;
     count++;
     maxY = Math.max(maxY, y); maxR = Math.max(maxR, Math.hypot(x, z));
     if (cut && (current.cutAxis ? (axis[2] * x - axis[0] * z) > 0.5 : z > 0)) return;
@@ -766,7 +778,15 @@ function build(reframe) {
       push(s + "|" + name, [x, y, z]);
     } else if (s === "slab") push("slab|" + name, [x, y - 0.375, z]);
     else if (s === "cross") push("cross|" + name, [x, y, z]);
-    else {
+    else if (s === "limb") {
+      // A round pipe joined to the wood round it: an arm to every log or limb next to it (a thin branch reaches in itself).
+      push("limb|" + name, [x, y, z]);
+      for (const d of SIDES) {
+        const n = v.get(x + d[0], y + d[1], z + d[2]);
+        if (!n || !(shapeOf(n) === "cube" || shapeOf(n) === "limb") || (shapeOf(n) === "limb" && d[0] + d[1] + d[2] < 0)) continue;
+        push("limb|" + name, [x + d[0] * 0.5, y + d[1] * 0.5, z + d[2] * 0.5]);
+      }
+    } else {
       push("thin|" + name, [x, y, z]);
       for (const d of SIDES) {
         const n = v.get(x + d[0], y + d[1], z + d[2]);
@@ -779,7 +799,7 @@ function build(reframe) {
   for (const key in lists) {
     const [s, name] = key.split("|"), ps = lists[key];
     const meshes = s === "cross" ? [new THREE.InstancedMesh(planeA, plantMat(name), ps.length), new THREE.InstancedMesh(planeB, plantMat(name), ps.length)]
-      : [new THREE.InstancedMesh(s === "thin" ? geo.half : s === "slab" ? geo.slab : geo.cube, mats(name, s === "leaf"), ps.length)];
+      : [new THREE.InstancedMesh(s === "thin" ? geo.half : s === "limb" ? geo.limb : s === "slab" ? geo.slab : geo.cube, mats(name, s === "leaf"), ps.length)];
     for (const mesh of meshes) {
       ps.forEach((p, i) => { m4.makeTranslation(p[0], p[1], p[2]); mesh.setMatrixAt(i, m4); });
       mesh.instanceMatrix.needsUpdate = true;
@@ -874,15 +894,18 @@ function sync() {
   buttons(document.getElementById("pick-bark"), [["A", "A"], ["B", "B"], ["C", "C"], ["D", "D"]], x => picks.bark[kind] === x, x => { picks.bark[kind] = x; save(); refresh(false); });
   buttons(document.getElementById("pick-leaves"), [["A", "A"], ["B", "B"], ["C", "C"]], x => picks.leaves[kind] === x, x => { picks.leaves[kind] = x; save(); refresh(false); });
   buttons(document.getElementById("pick-dead"), [["E", "E silver"], ["D", "D grey"]], x => picks.dead === x, x => { picks.dead = x; save(); refresh(false); });
-  document.getElementById("shape-note").innerHTML = `Shape A: ${SHAPES[kind].A}<br>Shape B: ${SHAPES[kind].B}<br>Bark: A Minecraft-simple, B field detail, C soft painted, D chunky plates. Leaves: A dense, B thin, C in between (the new default). Dead bark: E the bleached silver you liked, D the grey-brown in the game now.`;
+  buttons(document.getElementById("pick-limbs"), Object.keys(LIMB_LOOKS).map(x => [x, x]), x => picks.limbs === x,
+    x => { picks.limbs = x; if (DATA && DATA.shapes) game = true; save(); refresh(false); });
+  document.getElementById("shape-note").innerHTML = `Shape A: ${SHAPES[kind].A}<br>Shape B: ${SHAPES[kind].B}<br>Bark: A Minecraft-simple, B field detail, C soft painted, D chunky plates. Leaves: A dense, B thin, C in between (the new default). Dead bark: E the bleached silver you liked, D the grey-brown in the game now.<br>Limbs (they turn Game shapes on):<br>${Object.values(LIMB_LOOKS).join("<br>")}`;
   const real = REAL[kind][stage] || REAL[kind].living;
   document.getElementById("real").textContent = age < 0.06 ? "A seedling: in the real savanna most seedlings are eaten or burnt; the few that survive take years to get above the grass." : real;
   document.getElementById("cut").checked = cut;
   document.getElementById("dry").checked = dry;
+  document.getElementById("bare").checked = bare;
   document.getElementById("game").checked = game;
   document.getElementById("game").disabled = !(DATA && DATA.shapes);
   document.getElementById("summary").textContent =
-    KINDS.map(k => `${k.name}: shape ${picks.shape[k.id]}, bark ${picks.bark[k.id]}, leaves ${picks.leaves[k.id]}`).join("\n") + `\nDead bark: ${picks.dead}`;
+    KINDS.map(k => `${k.name}: shape ${picks.shape[k.id]}, bark ${picks.bark[k.id]}, leaves ${picks.leaves[k.id]}`).join("\n") + `\nDead bark: ${picks.dead}\nLimbs: ${picks.limbs}`;
   flat();
 }
 function refresh(reframe) { sync(); build(reframe); }
@@ -904,6 +927,7 @@ document.getElementById("age").addEventListener("input", e => {
 });
 document.getElementById("cut").addEventListener("change", e => { cut = e.target.checked; build(false); });
 document.getElementById("dry").addEventListener("change", e => { dry = e.target.checked; build(false); });
+document.getElementById("bare").addEventListener("change", e => { bare = e.target.checked; build(false); });
 document.getElementById("game").addEventListener("change", e => { game = e.target.checked; build(true); });
 document.getElementById("v-over").addEventListener("click", () => view("over"));
 document.getElementById("v-player").addEventListener("click", () => view("player"));

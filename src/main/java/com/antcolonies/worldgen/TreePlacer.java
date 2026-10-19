@@ -164,7 +164,8 @@ public final class TreePlacer {
             out[i] = e.getValue();
             TreePart part = v.get(k);
             holds[i] = ys[i] <= 0 && part != null && part.isWood() && part != TreePart.FALLEN_BRANCH
-                    && part != TreePart.THIN && part != TreePart.DEAD_THIN;
+                    && part != TreePart.THIN && part != TreePart.DEAD_THIN
+                    && part != TreePart.LIMB && part != TreePart.DEAD_LIMB;
             minX = Math.min(minX, xs[i]);
             minY = Math.min(minY, ys[i]);
             minZ = Math.min(minZ, zs[i]);
@@ -183,8 +184,8 @@ public final class TreePlacer {
             case THORNS -> TreeBlocks.THORNY_TWIG.get().defaultBlockState();
             case PODS -> TreeBlocks.CAMEL_THORN_PODS.get().defaultBlockState();
             case LEAVES -> block(kind.blocks().leaves());
-            case THIN -> block(kind.blocks().branch());
-            case DEAD_THIN -> TreeBlocks.BLEACHED_BRANCH.get().defaultBlockState();
+            case THIN, LIMB -> block(kind.blocks().branch());
+            case DEAD_THIN, DEAD_LIMB -> TreeBlocks.BLEACHED_BRANCH.get().defaultBlockState();
             case FALLEN_BRANCH -> ModBlocks.FALLEN_BRANCH.get().defaultBlockState();
             case FRASS -> TreeBlocks.FRASS.get().defaultBlockState();
             case INNER -> block(kind.blocks().log());

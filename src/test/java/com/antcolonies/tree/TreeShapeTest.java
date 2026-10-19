@@ -82,6 +82,20 @@ class TreeShapeTest {
         }
     }
 
+    /** Every limb look on trial in the tree viewer (the user's pick, 2026-10-18) stands and grows by the same rules. */
+    @Test
+    void everyLimbLookStandsAndGrows() {
+        try {
+            for (TreeDraw.LimbLook look : TreeDraw.LimbLook.values()) {
+                TreeDraw.look = look;
+                nothingFloats();
+                aGrowingTreeOnlyAddsWood();
+            }
+        } finally {
+            TreeDraw.look = TreeDraw.LimbLook.A;
+        }
+    }
+
     /** An ancient tree is the grown one thicker: the grown trunk's bark is still wood (rotten inside, or an old baobab's door). */
     @Test
     void anAncientTreeKeepsItsTrunk() {

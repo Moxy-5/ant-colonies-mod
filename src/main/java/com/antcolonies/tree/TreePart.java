@@ -9,7 +9,9 @@ public enum TreePart {
     SEEDLING("seedling", 1), THORNS("thorns", 1), PODS("pods", 1), LEAVES("leaves", 2),
     THIN("thin", 3), DEAD_THIN("deadthin", 3), FALLEN_BRANCH("fallenbranch", 3), FRASS("frass", 4),
     INNER("inner", 5), DEAD_INNER("deadinner", 5), BARK("bark", 5), DEAD_BARK("deadbark", 5), PEELING("peeling", 5),
-    FIBRE("fibre", 5), ROTTEN("rotten", 5), MUD("mud", 6);
+    FIBRE("fibre", 5), ROTTEN("rotten", 5), MUD("mud", 6),
+    /** A limb a block thick, a round pipe thicker than a thin branch (a limb look on trial in the tree viewer). */
+    LIMB("limb", 3), DEAD_LIMB("deadlimb", 3);
 
     /** The viewer's name for it. */
     public final String id;
