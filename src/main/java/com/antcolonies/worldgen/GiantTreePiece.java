@@ -67,5 +67,7 @@ public class GiantTreePiece extends StructurePiece {
     public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random,
                             BoundingBox box, ChunkPos chunkPos, BlockPos pivot) {
         TreePlacer.place(level, TreePlacer.placed(pick.kind(), pick.seed(), pick.age(), pick.stage()), foot, box, Block.UPDATE_CLIENTS);
+        // The tree goes into the tree book (M7.5 step 4), so it grows from here (once, whichever of its chunks is first).
+        com.antcolonies.tree.Forest.queue(level.getLevel(), pick.kind(), foot, pick.seed(), pick.age(), pick.stage());
     }
 }

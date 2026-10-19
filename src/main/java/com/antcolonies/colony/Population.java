@@ -59,7 +59,7 @@ public class Population {
     /** How far (blocks) from every player a real mob outside the nest must be to go into the numbers while watched. */
     private static final double FAR_FROM_PLAYERS = 24.0;
     /** How far (blocks) a player sees an insect at all (farther than this counts as out of sight). */
-    private static final double SIGHT = 64.0;
+    public static final double SIGHT = 64.0;
     /** How many more minors come out while the alarm is up at a break-in (level 3 or more), beyond the ones with posts. */
     private static final int BREACH_MINORS = 6;
 

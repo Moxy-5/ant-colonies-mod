@@ -23,7 +23,8 @@ public final class Perf {
         INSECTS("insects (vanilla body, goals)"),
         WALKING("walking (navigator)"),
         ROUTES("route searches"),
-        BRAIN("colony brain");
+        BRAIN("colony brain"),
+        TREES("giant trees growing");
 
         final String label;
 
@@ -132,7 +133,7 @@ public final class Perf {
             out.append(String.format("  %s: %.2f ms\n", part.label, ms(nanos.getOrDefault(part, 0L)) / ticks));
         }
         if (insects > 0) {
-            out.append(String.format("  per insect: %.3f ms\n", ms(ours - nanos.getOrDefault(Part.BRAIN, 0L)) / ticks / insects));
+            out.append(String.format("  per insect: %.3f ms\n", ms(ours - nanos.getOrDefault(Part.BRAIN, 0L) - nanos.getOrDefault(Part.TREES, 0L)) / ticks / insects));
         }
         out.append(String.format("Route searches: %.1f a second, %d failed, %.0f steps each, longest %.1f ms",
                 searches / (ticks / 20.0), failedSearches, searches == 0 ? 0.0 : (double) expansions / searches, ms(longestSearchNanos)));

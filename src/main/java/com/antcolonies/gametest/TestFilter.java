@@ -49,7 +49,7 @@ public final class TestFilter {
         // The body (the animation engine): naps and the other things the server decides about how an insect holds itself.
         CATEGORIES.put("body", List.of(BodyTests.class));
         // The giant savanna trees (M7.5): their blocks, later their shapes, growth and fall.
-        CATEGORIES.put("trees", List.of(TreeTests.class));
+        CATEGORIES.put("trees", List.of(TreeTests.class, TreeGrowthTests.class));
         // Performance (only when named, never in a full run).
         CATEGORIES.put("stress", List.of(StressTests.class));
     }
