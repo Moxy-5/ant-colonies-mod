@@ -315,6 +315,11 @@ final class TreeDraw {
     }
 
     /** As {@link #growing}, tapering as if grown out to {@code taperOver} but only drawn up to {@code upto}. */
+    static void growing(TreeVoxels v, Poly p, double[] radii, double upto, double taperOver, boolean taper, TreePart[] blocks, double hollow) {
+        growing(v, p, radii, upto, taperOver, taper, blocks, hollow, 0.35);
+    }
+
+    /** The whole: tapering as if grown out to taperOver, drawn up to upto, the growing tip never thinner than tipMin. */
     static void growing(TreeVoxels v, Poly p, double[] radii, double upto, double taperOver, boolean taper, TreePart[] blocks, double hollow,
             double tipMin) {
         if (upto <= 1e-6) {
