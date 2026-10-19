@@ -70,6 +70,7 @@ A Minecraft mod where ants and termites live as real colonies: they dig, build, 
 4a. **Brain leftovers (M8.5, user, 2026-10-17):** brain steps 4d (the timetable with real ants near the player), 4e (drawn-only ants far off) and 4f (scouting unloaded land by biome guess) moved out of the brain to after the first fights. The brain is done once 4g is finished.
 5. Flying queens (M9): winged queens fly, score the land (food, biome, soil, distance to other colonies) and settle; species-neutral, termite royal pairs use it too.
 6. Other species on the same framework.
+7. **Future big plan (user, 2026-10-19; ideas, `docs/DESIGN.md` "Future big plan"):** after M9 the mod may split: this one a savanna overhaul, the shared framework kept for every mod; the red harvester ant's future to plan with the user; then a **jungle** mod or update, separate from the savanna one, with leafcutter ants and their real enemies (army ants, phorid flies, garden mould, armadillos, anteaters, guest ants).
 - **Balance goal (user, "like League"):** ants are strong early, great mid game, and fall off late to the termites; Macrotermes are weak early and scale very hard (like real life: a slow, fragile start, then a huge colony and mound). The termite mound should keep growing over many hours of play.
 
 ## Milestones

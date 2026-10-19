@@ -162,6 +162,19 @@ it.** If a decision changes, ask the user first, then update it here. The short 
 ### Later species (NOT version 1)
 - Leafcutter ants (cut leaf pieces, farm fungus) and army ants (living bivouacs, raiding swarms).
 
+### Future big plan: splitting the mod, then the jungle (user, 2026-10-19; ideas, nothing decided or built)
+- **The split (the user's idea):** after M9, this mod becomes a **savanna overhaul** (Macrotermes, Matabele ants, the giant trees, savanna life, M8.7). The shared framework (colony brain, legs, body, species profiles, the tools) is kept so each mod reuses it; each mod plugs its own species' thinking into the brain through hooks, so the savanna mod needs no leafcutter thinking and the reverse.
+- **The red harvester ant after the split: still to plan with the user** (which mod it goes to, its own biome mod, plains and badlands, or kept here; what of its open backlog, M6.5, goes with it).
+- **The jungle (a separate mod or update, after the savanna one):** leafcutter ants (*Atta*, *Acromyrmex*; real home Central and South America, Minecraft's jungle fits). Real points to plan from:
+  - Huge colonies (a mature *Atta* nest: millions of workers, hundreds of chambers, a soil mound many metres across; about 100 to 120 real mobs wanted, `perf-targets`), castes from tiny minims to majors with axe-like heads, leaves cut and carried on trails to fungus gardens, refuse chambers.
+  - **Army ants (*Nomamyrmex esenbeckii*)** raiding *Atta* nests: underground battles, majors blocking the tunnels (the jungle's Matabele vs termites).
+  - **Phorid flies** laying eggs in leaf carriers' heads; **minims riding on the leaves** to swat them (hitchhikers).
+  - **Garden disease:** the mould *Escovopsis*; *Acromyrmex* workers carry antibiotic-making bacteria; sick garden weeded out to the refuse.
+  - **Big predators:** armadillos digging in, giant anteaters and tamanduas licking up workers for about a minute a nest before the soldiers drive them off.
+  - **Thieves and parasites:** guest ants (*Megalomyrmex*) eating the garden, the parasite ant *Acromyrmex insinuator* slipping its queens in.
+  - **Nuptial flight:** queens eaten by frogs, birds, lizards (and people: fried queens in Colombia).
+- Not for now: an Australian outback set (*Coptotermes acinaciformis*, magnetic termites) was talked about and set aside by the user (2026-10-19).
+
 ## Core systems
 
 ### Colony brain
