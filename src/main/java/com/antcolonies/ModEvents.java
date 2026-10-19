@@ -13,7 +13,6 @@ import com.antcolonies.block.DryGrassBlock;
 import com.antcolonies.block.GramaGrassBlock;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.debug.Perf;
-import com.antcolonies.worldgen.BranchShedding;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.goal.GroundShakes;
 import com.antcolonies.entity.goal.HuntTermitesGoal;
@@ -116,7 +115,6 @@ public class ModEvents {
                     }
                 }
             }
-            BranchShedding.tick(level);
             com.antcolonies.tree.Forest.tick(level);
         }
     }

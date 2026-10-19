@@ -25,7 +25,7 @@ import net.minecraft.world.phys.shapes.VoxelShape;
  * block is a food plant of its own, so several work along one branch) and, like real termites, plaster mud over the wood
  * they are eating: it goes through 4 {@link #EATEN} stages, thinner and more mud-covered each time, and the last piece
  * leaves nothing. It lies at world generation in savannas and acacias shed new ones now and then (see
- * {@code worldgen.FallenBranchFeature} and {@code worldgen.BranchShedding}). Nothing bumps into it (it is thin, like a
+ * {@code worldgen.FallenBranchFeature} and {@code tree.BranchShedding}). Nothing bumps into it (it is thin, like a
  * twig in the grass); it needs solid ground under it (or a casing of termite mud).
  */
 public class FallenBranchBlock extends Block implements EatenInStages {

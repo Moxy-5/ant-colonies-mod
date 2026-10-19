@@ -237,6 +237,8 @@ public class Forest extends SavedData {
     public int grownSteps, deaths, sprouted;
     /** Grown trees that died (step 5), and dead stages placed. */
     public int killed, deadSteps;
+    /** Step 6b: dead branches the grown trees have dropped (for the stopwatch and the tests). */
+    public int shed;
 
     /** The trees being drawn falling right now (step 5c), by their foot. Not saved: one cut off by a stop is placed at once. */
     private final Long2ObjectOpenHashMap<TreeFall> falls = new Long2ObjectOpenHashMap<>();
@@ -398,6 +400,14 @@ public class Forest extends SavedData {
             if (t.settled()) {
                 continue;
             }
+            if (t.living() && t.placedAge >= 0 && BranchShedding.stormShakes(level, t.age, t.foot)) {
+                // Step 6b: a thunderstorm shakes a dead branch out of a grown tree's crown.
+                TreePlacer.Placed now = soon(t, t.placedAge, t.placedStage, t.placedStep, t.placedTermites);
+                if (now != null && loaded(level, now.box(t.foot))
+                        && BranchShedding.shed(level, t.foot, now, new Random(level.getRandom().nextLong()), true)) {
+                    shed++;
+                }
+            }
             if (t.dead() && !t.fell && t.died != DIED_UNKNOWN && stormFells(level, t)) {
                 t.fell = true; // the storm brings it down
                 setDirty();
@@ -514,6 +524,12 @@ public class Forest extends SavedData {
             t.age = next;
             t.pendingDays++;
             grownSteps++;
+            // Step 6b: a grown tree drops a dead branch under its crown now and then (more when old).
+            Random shedDice = TreeLife.dice(t.seed, t.lastDay * 31 + 17);
+            if (now != null && shedDice.nextDouble() < BranchShedding.chance(t.age)
+                    && BranchShedding.shed(level, t.foot, now, shedDice, t.lastDay == today)) {
+                shed++;
+            }
         }
         int stageSteps = 0;
         if (t.dead()) {

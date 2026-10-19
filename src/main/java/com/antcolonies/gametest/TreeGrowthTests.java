@@ -466,6 +466,26 @@ public class TreeGrowthTests {
         helper.assertTrue(t.placedAge == 1.0, "the grown tree was not placed");
         int leafCount = countAround(level, foot, 0, 40, TreeGrowthTests::leaves);
         helper.assertTrue(leafCount > 300, "the grown tree has only " + leafCount + " leaves");
+        // Step 6b: a grown tree sheds dead branches under its own crown, at most 3 lying there; young trees none.
+        helper.assertTrue(com.antcolonies.tree.BranchShedding.chance(0.3) == 0 && com.antcolonies.tree.BranchShedding.chance(1.0) >= 0.3
+                && com.antcolonies.tree.BranchShedding.chance(com.antcolonies.tree.TreeShapes.ANCIENT) >= 0.99, "the shedding chances");
+        TreePlacer.Placed upright = TreePlacer.placed("umbrella_thorn", seed, 1.0, TreeStage.LIVING);
+        int dropped = 0;
+        for (int i = 0; i < 12; i++) {
+            if (com.antcolonies.tree.BranchShedding.shed(level, foot, upright, new java.util.Random(i), false)) {
+                dropped++;
+            }
+        }
+        int lying = com.antcolonies.tree.BranchShedding.lyingUnder(level, foot, upright);
+        helper.assertTrue(dropped >= 1 && lying == dropped && lying <= com.antcolonies.tree.BranchShedding.MAX_UNDER_TREE,
+                "the grown tree dropped " + dropped + " branches, " + lying + " lie under it");
+        for (BlockPos pos : BlockPos.betweenClosed(foot.offset(upright.minX(), -2, upright.minZ()), foot.offset(upright.maxX(), 2, upright.maxZ()))) {
+            if (level.getBlockState(pos).getBlock() instanceof com.antcolonies.block.FallenBranchBlock) {
+                helper.assertTrue(level.getBlockState(pos.below()).isFaceSturdy(level, pos.below(), net.minecraft.core.Direction.UP),
+                        "a shed branch does not lie on the ground at " + pos);
+                level.setBlock(pos, Blocks.AIR.defaultBlockState(), 2); // cleared for the rest of the test
+            }
+        }
         double life = TreeLife.lifespan(kind, seed);
         helper.assertTrue(life >= 150 && life <= 250, "an umbrella thorn's lifespan is " + life);
         // It has lived nearly all its days: it dies of old age on the next one.

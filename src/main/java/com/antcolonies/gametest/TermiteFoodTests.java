@@ -26,7 +26,6 @@ import com.antcolonies.registry.ModEntities;
 import com.antcolonies.species.Species;
 import com.antcolonies.species.SpeciesProfile;
 import com.antcolonies.species.SpeciesProfiles;
-import com.antcolonies.worldgen.BranchShedding;
 import com.antcolonies.worldgen.FallenBranchFeature;
 import com.antcolonies.worldgen.FallenTreeFeature;
 
@@ -421,20 +420,7 @@ public class TermiteFoodTests {
             helper.assertTrue(colony.food().getPiecesCut(half) == pieces / 2 + 1, "a half-eaten branch counts "
                     + colony.food().getPiecesCut(half) + " pieces cut after one more");
 
-            // Acacias shed branches from natural leaves, not from leaves a player placed.
-            BlockPos under = helper.absolutePos(new BlockPos(MIDDLE - 6, SURFACE, MIDDLE - 6));
-            for (BlockPos pos : BlockPos.betweenClosed(under.offset(-3, 4, -3), under.offset(3, 4, 3))) {
-                level.setBlock(pos, Blocks.ACACIA_LEAVES.defaultBlockState().setValue(net.minecraft.world.level.block.LeavesBlock.PERSISTENT, true), 2);
-            }
-            helper.assertTrue(!BranchShedding.tryShed(level, under.getX(), under.getZ(), level.getRandom()), "placed leaves shed a branch");
-            for (BlockPos pos : BlockPos.betweenClosed(under.offset(-3, 4, -3), under.offset(3, 4, 3))) {
-                level.setBlock(pos, Blocks.ACACIA_LEAVES.defaultBlockState(), 2); // natural (distance 7, would decay: not ticked here)
-            }
-            boolean shed = false;
-            for (int i = 0; i < 20 && !shed; i++) {
-                shed = BranchShedding.tryShed(level, under.getX(), under.getZ(), level.getRandom());
-            }
-            helper.assertTrue(shed, "a natural acacia shed no branch");
+            // (Shedding moved to the giant trees in M7.5 step 6b: checked in TreeGrowthTests.)
             helper.succeed();
         });
     }
