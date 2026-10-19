@@ -16,6 +16,10 @@ python tools/model_viewer.py comb [out.html]   (default references/comb_viewer.h
 
 Third scene, the grama grasses for the harvester ants (2026-10-16, grama_art.py; its own template, grama_viewer.template.html):
 python tools/model_viewer.py grama [out.html]   (default references/grama_viewer.html)
+
+Fourth scene, the giant savanna trees (M7.5 step 0, 2026-10-18, tree_art.py for the textures; its own template,
+tree_viewer.template.html, which also holds the tree shape maker: every kind, age and dead stage from one seed):
+python tools/model_viewer.py trees [out.html]   (default references/tree_viewer.html)
 """
 import base64
 import json
@@ -156,7 +160,25 @@ def grama_page(out):
     print("wrote", out)
 
 
+def trees_page(out):
+    """The tree looks: every block texture (two looks where there is a choice); the shapes are made in the page."""
+    import tree_art
+    data = {}
+    for name, img in tree_art.all_textures().items():
+        if isinstance(img, tuple):
+            data[name] = file_uri(img[1])
+        else:
+            data[name] = uri(png([[px if px is not None else (0, 0, 0, 0) for px in row] for row in img]))
+    template = (Path(__file__).resolve().parent / "tree_viewer.template.html").read_text(encoding="utf-8")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")
+    print("wrote", out)
+
+
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "trees":
+        trees_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/tree_viewer.html")
+        return
     if len(sys.argv) > 1 and sys.argv[1] == "grama":
         grama_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/grama_viewer.html")
         return

@@ -1,0 +1,372 @@
+"""Draws the block looks for the giant savanna trees (M7.5, planned with the user 2026-10-18, docs/DESIGN.md "Giant
+savanna trees", docs/plans/m7.5-giant-trees.md), in two looks where there is a choice, for the user to pick in the tree
+viewer (python tools/model_viewer.py trees). Once looks are picked this file will also write the game's textures.
+
+Real trees (what the textures follow):
+- Umbrella thorn (Vachellia tortilis): grey to near-black bark, rough, cut by long fissures, the young stems
+  red-brown; reddish-brown heartwood; tiny feathery leaflets in flat, see-through layers; paired long straight white
+  spines with small hooked thorns between them.
+- Camel thorn (Vachellia erioloba): very deeply furrowed dark grey bark broken into plates; very hard dark red-brown
+  heartwood; denser grey-green crown; thick grey velvety half-moon pods.
+- Baobab (Adansonia digitata): smooth grey to pinkish-brown bark in folds, with lichen spots; pale spongy, watery wood
+  that rots into a heap of fibres; hand-shaped dark green leaves, leafless most of the year.
+- Dead wood: bark weathers to silver-grey (the user's favourite, E) or stays the darker in-game grey-brown (D) and
+  peels in strips; inside, heart-rot leaves soft rotten wood, and beetle larvae and termites leave frass (wood dust).
+
+Looks: A "Minecraft-simple" (close to vanilla acacia, few details), B "Field detail" (the real bark's fissures, plates
+and folds; the leaflets one by one).
+
+Needs no extra libraries. Used by tools/model_viewer.py (trees).
+"""
+import math
+import random
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+TEXTURES = ROOT / "src/main/resources/assets/antcolonies/textures/block"
+S = 16
+KINDS = ["umbrella", "camel", "baobab"]
+LOOKS = ["A", "B"]
+
+
+def clamp(c):
+    return max(0, min(255, round(c)))
+
+
+def shade(color, f):
+    return tuple(clamp(c * f) for c in color[:3])
+
+
+def mix(a, b, t):
+    return tuple(clamp(a[i] + (b[i] - a[i]) * t) for i in range(3))
+
+
+def noise(seed, cells=4):
+    """Smooth value noise that tiles across block edges: a function (x, y) -> 0..1."""
+    rng = random.Random(seed)
+    grid = [[rng.random() for _ in range(cells)] for _ in range(cells)]
+
+    def at(x, y):
+        fx, fy = x / S * cells, y / S * cells
+        x0, y0 = int(fx) % cells, int(fy) % cells
+        x1, y1 = (x0 + 1) % cells, (y0 + 1) % cells
+        tx, ty = fx - int(fx), fy - int(fy)
+        tx, ty = tx * tx * (3 - 2 * tx), ty * ty * (3 - 2 * ty)
+        top = grid[y0][x0] + (grid[y0][x1] - grid[y0][x0]) * tx
+        bottom = grid[y1][x0] + (grid[y1][x1] - grid[y1][x0]) * tx
+        return top + (bottom - top) * ty
+    return at
+
+
+def blank(color=None):
+    return [[color] * S for _ in range(S)]
+
+
+def speckle(img, rng, amount=0.06):
+    return [[None if px is None else shade(px, 1 + rng.uniform(-amount, amount)) for px in row] for row in img]
+
+
+# ---- Bark (the grain runs up and down: y is along the trunk) ----
+
+def bark(kind, look):
+    rng = random.Random(f"bark{kind}{look}")
+    if kind == "umbrella":
+        base, dark, warm = (92, 84, 76), (44, 38, 34), (118, 72, 52)
+    elif kind == "camel":
+        base, dark, warm = (88, 84, 80), (30, 28, 27), (96, 64, 50)
+    else:
+        base, dark, warm = (150, 132, 118), (104, 90, 82), (168, 140, 124)
+    n = noise(f"n{kind}{look}", 4)
+    img = [[shade(base, 0.85 + 0.3 * n(x, y)) for x in range(S)] for y in range(S)]
+    if look == "A":
+        # Vanilla-style: a few straight dark lines down the trunk.
+        for x in rng.sample(range(S), 4 if kind != "baobab" else 2):
+            for y in range(S):
+                if rng.random() < 0.85:
+                    img[y][x] = shade(dark, 1.3 if kind != "baobab" else 1.0)
+        return speckle(img, rng, 0.05)
+    if kind == "umbrella":
+        # Long wandering fissures with red-brown in their depths, rough ridges between them.
+        for _ in range(5):
+            x = rng.uniform(0, S)
+            for y in range(S):
+                x += rng.choice([-1, 0, 0, 1]) * 0.6
+                xi = int(x) % S
+                img[y][xi] = dark
+                if rng.random() < 0.35:
+                    img[y][(xi + 1) % S] = warm
+        for _ in range(14):
+            img[rng.randrange(S)][rng.randrange(S)] = shade(base, 1.25)
+    elif kind == "camel":
+        # Deep furrows (two pixels wide, near black) and grey plates broken across.
+        cols = sorted(rng.sample(range(0, S, 2), 4))
+        for c in cols:
+            wobble = 0
+            for y in range(S):
+                wobble += rng.choice([-1, 0, 0, 0, 1])
+                wobble = max(-1, min(1, wobble))
+                for w in (0, 1):
+                    img[y][(c + wobble + w) % S] = dark
+        for y in rng.sample(range(S), 5):
+            x0 = rng.randrange(S)
+            for x in range(x0, x0 + rng.randint(2, 4)):
+                img[y][x % S] = shade(dark, 1.4)
+        for _ in range(10):
+            y, x = rng.randrange(S), rng.randrange(S)
+            if img[y][x] != dark:
+                img[y][x] = shade(base, 1.2)
+    else:
+        # Smooth folded bark: soft horizontal wrinkles, a few vertical folds, grey-green lichen spots.
+        for y in rng.sample(range(S), 5):
+            x0 = rng.randrange(S)
+            for x in range(x0, x0 + rng.randint(3, 7)):
+                img[y][x % S] = shade(base, 0.82)
+        for c in rng.sample(range(S), 2):
+            for y in range(S):
+                img[y][c] = mix(img[y][c], dark, 0.5)
+        for _ in range(4):
+            cx, cy = rng.randrange(S), rng.randrange(S)
+            for dx, dy in [(0, 0), (1, 0), (0, 1)]:
+                if rng.random() < 0.8:
+                    img[(cy + dy) % S][(cx + dx) % S] = (162, 164, 128)
+    return speckle(img, rng, 0.04)
+
+
+def wood_end(kind):
+    """The end of a cut or broken trunk: heartwood rings, sapwood, the bark rim."""
+    if kind == "umbrella":
+        heart, sap, rim = (128, 70, 50), (176, 128, 86), (60, 52, 46)
+    elif kind == "camel":
+        heart, sap, rim = (92, 44, 36), (150, 96, 70), (40, 36, 34)
+    else:
+        heart, sap, rim = (200, 182, 150), (214, 198, 166), (130, 114, 102)
+    rng = random.Random(f"end{kind}")
+    img = []
+    for y in range(S):
+        row = []
+        for x in range(S):
+            r = math.hypot(x - 7.5, y - 7.5)
+            if max(abs(x - 7.5), abs(y - 7.5)) > 7:
+                c = rim
+            elif r > 5.3:
+                c = sap
+            else:
+                c = shade(heart, 0.88 if int(r * 1.3) % 2 else 1.04)
+            row.append(c)
+        img.append(row)
+    if kind == "baobab":
+        for _ in range(26):
+            img[rng.randrange(1, 15)][rng.randrange(1, 15)] = (176, 156, 124)
+    return speckle(img, rng, 0.04)
+
+
+def wood_inner(kind):
+    """Wood inside a trunk, seen when it is cut open (grain up and down)."""
+    end = wood_end(kind)
+    base = end[8][8]
+    rng = random.Random(f"inner{kind}")
+    img = [[shade(base, 0.92 + 0.12 * math.sin(x * 1.7 + rng.random())) for x in range(S)] for _ in range(S)]
+    return speckle(img, rng, 0.05)
+
+
+# ---- Dead wood ----
+
+def dead_bark_silver(variant=0):
+    """E, the user's favourite: D's long strips in sun-bleached silver, with long cracks (as model_viewer.strips)."""
+    import model_viewer as mv
+    img = mv.strips("E", variant)
+    return [[img[x][S - 1 - y] for x in range(S)] for y in range(S)]  # grain up and down
+
+
+def dead_bark_grey():
+    """D, the dead wood in the game now (a dead version of Minecraft's savanna log)."""
+    return ("file", "dead_wood_0_0.png")
+
+
+def peeling_bark():
+    """Silver bark lifting in strips: pale bare wood where it has fallen off, dark shadow under the curled edges."""
+    rng = random.Random("peel")
+    img = dead_bark_silver(1)
+    bare = (206, 196, 172)
+    for _ in range(3):
+        x0, y0, w, h = rng.randrange(S), rng.randrange(S), rng.randint(3, 5), rng.randint(5, 9)
+        for y in range(y0, y0 + h):
+            for x in range(x0, x0 + w):
+                img[y % S][x % S] = shade(bare, rng.uniform(0.93, 1.05))
+            img[y % S][(x0 - 1) % S] = (54, 48, 42)
+        for x in range(x0, x0 + w):
+            img[(y0 + h) % S][x % S] = (70, 62, 54)
+    return img
+
+
+def dead_inner():
+    rng = random.Random("deadinner")
+    img = [[shade((176, 166, 146), 0.9 + 0.15 * math.sin(x * 2.1 + y * 0.15 + rng.random())) for x in range(S)] for y in range(S)]
+    return speckle(img, rng, 0.05)
+
+
+def rotten_wood():
+    """Heart-rot: soft red-brown crumbly wood, darker pits, white fungus threads."""
+    rng = random.Random("rot")
+    n = noise("rotn", 4)
+    img = [[mix((92, 50, 32), (150, 92, 56), n(x, y)) for x in range(S)] for y in range(S)]
+    for _ in range(18):
+        img[rng.randrange(S)][rng.randrange(S)] = (52, 30, 22)
+    for _ in range(3):
+        x, y = rng.uniform(0, S), rng.randrange(S)
+        for _ in range(rng.randint(4, 8)):
+            img[int(y) % S][int(x) % S] = (226, 218, 196)
+            x += rng.choice([-1, 1]) * 0.8
+            y += rng.choice([0, 1])
+    return speckle(img, rng, 0.06)
+
+
+def frass():
+    """Frass: fine pale wood dust and droppings left by beetle larvae and termites."""
+    rng = random.Random("frass")
+    img = [[shade((196, 170, 128), rng.uniform(0.85, 1.12)) for _ in range(S)] for _ in range(S)]
+    for _ in range(26):
+        img[rng.randrange(S)][rng.randrange(S)] = rng.choice([(150, 116, 80), (226, 206, 168), (120, 92, 64)])
+    return img
+
+
+def fibre():
+    """A collapsed baobab: tangled wet fibres, pale tan strings over darker soggy pulp."""
+    rng = random.Random("fibre")
+    img = [[shade((122, 96, 70), rng.uniform(0.85, 1.1)) for _ in range(S)] for _ in range(S)]
+    for _ in range(9):
+        x, y = rng.uniform(0, S), rng.uniform(0, S)
+        dx, dy = math.cos(a := rng.uniform(0, math.pi)), math.sin(a)
+        for _ in range(rng.randint(6, 12)):
+            img[int(y) % S][int(x) % S] = shade((206, 184, 140), rng.uniform(0.9, 1.08))
+            x, y = x + dx, y + dy * 0.6 + rng.uniform(-0.4, 0.4)
+    return img
+
+
+# ---- Leaves and plants (None is a see-through pixel) ----
+
+LEAF = {"umbrella": (128, 156, 72), "camel": (124, 146, 108), "baobab": (64, 112, 44)}
+
+
+def leaves(kind, look):
+    rng = random.Random(f"leaf{kind}{look}")
+    base = LEAF[kind]
+    img = blank(None)
+    if look == "A":
+        # Vanilla-style clumps: mostly filled, a few holes.
+        n = noise(f"ln{kind}", 4)
+        for y in range(S):
+            for x in range(S):
+                if rng.random() < (0.82 if kind != "baobab" else 0.75):
+                    img[y][x] = shade(base, 0.75 + 0.45 * n(x, y))
+        return img
+    if kind == "baobab":
+        # Hand-shaped leaves: five leaflets fanned from a point, dark glossy green.
+        for _ in range(5):
+            cx, cy = rng.randrange(S), rng.randrange(S)
+            for i in range(5):
+                a = -math.pi / 2 + (i - 2) * 0.6 + rng.uniform(-0.1, 0.1)
+                for t in range(1, 5):
+                    x, y = int(round(cx + math.cos(a) * t)) % S, int(round(cy + math.sin(a) * t)) % S
+                    img[y][x] = shade(base, 0.9 + 0.08 * t + rng.uniform(-0.05, 0.05))
+        return img
+    # Feathery leaves: thin dark stems with tiny paired leaflets either side; lots of sky between.
+    stem = shade(base, 0.6)
+    for _ in range(6 if kind == "umbrella" else 9):
+        x, y = rng.uniform(0, S), rng.uniform(0, S)
+        a = rng.uniform(0, math.pi * 2)
+        for t in range(rng.randint(5, 8)):
+            px, py = int(x) % S, int(y) % S
+            img[py][px] = stem
+            for side in (-1, 1):
+                lx, ly = int(x - math.sin(a) * side) % S, int(y + math.cos(a) * side) % S
+                if img[ly][lx] is None:
+                    img[ly][lx] = shade(base, rng.uniform(0.9, 1.2))
+            x, y = x + math.cos(a), y + math.sin(a)
+    return img
+
+
+def thorns():
+    """A thorny twig: a zigzag red-brown twig, a pair of long straight white spines at each joint, small hooks."""
+    img = blank(None)
+    twig, spine, hook = (110, 64, 46), (236, 232, 218), (60, 46, 40)
+    x = 7
+    for y in range(15, 0, -1):
+        img[y][x] = twig
+        if y % 4 == 1:
+            for t in range(1, 5):
+                if 0 <= x - t < S and y - t // 2 >= 0:
+                    img[y - t // 2][x - t] = spine
+                if 0 <= x + t < S and y - t // 2 >= 0:
+                    img[y - t // 2][x + t] = spine
+            x += 1 if (y // 4) % 2 else -1
+        elif y % 4 == 3:
+            img[y][x + 1] = hook
+    return img
+
+
+def seedling():
+    """A young umbrella thorn: a thin red stem, a few feathery leaves, the first white spines."""
+    img = blank(None)
+    rng = random.Random("seedling")
+    for y in range(8, 16):
+        img[y][8] = (120, 60, 44)
+    for cy, side in [(8, 1), (10, -1), (12, 1)]:
+        for t in range(1, 6):
+            img[cy - t // 3][8 + side * t] = (120, 60, 44) if t == 1 else shade(LEAF["umbrella"], rng.uniform(0.9, 1.15))
+            if t > 1 and rng.random() < 0.6:
+                img[cy - t // 3 - 1][8 + side * t] = shade(LEAF["umbrella"], rng.uniform(0.95, 1.2))
+    for y in (11, 13):
+        img[y][7] = img[y][9] = (236, 232, 218)
+    for x in range(5, 12):
+        img[7 - abs(x - 8) // 2][x] = shade(LEAF["umbrella"], 1.1)
+    return img
+
+
+def pods():
+    """Camel thorn pods: thick grey velvety half-moons, hanging two or three from a twig."""
+    img = blank(None)
+    stalk, fur, edge = (90, 70, 56), (160, 158, 146), (118, 116, 108)
+    for x in range(2, 14):
+        img[0][x] = stalk
+    for cx in (4, 11):
+        for t in range(10):
+            a = t / 9 * math.pi * 0.9
+            px, py = int(round(cx + math.cos(a + math.pi) * 2.5 + 2.5)), int(round(1 + math.sin(a) * 10))
+            for w in (-1, 0, 1):
+                if 0 <= px + w < S and 0 <= py < S:
+                    img[py][px + w] = fur if w <= 0 else edge
+    return img
+
+
+def savanna_grass():
+    """The ground: Minecraft's savanna grass colour, a little uneven."""
+    rng = random.Random("ground")
+    n = noise("groundn", 4)
+    return [[shade((176, 168, 82), 0.85 + 0.25 * n(x, y) + rng.uniform(-0.04, 0.04)) for x in range(S)] for y in range(S)]
+
+
+def all_textures():
+    """Every texture the tree viewer needs: name -> rows of pixels (or ("file", name) for one already in the game)."""
+    out = {}
+    for kind in KINDS:
+        for look in LOOKS:
+            out[f"bark_{kind}_{look}"] = bark(kind, look)
+            out[f"leaves_{kind}_{look}"] = leaves(kind, look)
+        out[f"end_{kind}"] = wood_end(kind)
+        out[f"inner_{kind}"] = wood_inner(kind)
+    out["deadbark_E"] = dead_bark_silver(0)
+    out["deadbark_D"] = dead_bark_grey()
+    out["peeling"] = peeling_bark()
+    out["deadinner"] = dead_inner()
+    out["rotten"] = rotten_wood()
+    out["frass"] = frass()
+    out["fibre"] = fibre()
+    out["thorns"] = thorns()
+    out["seedling"] = seedling()
+    out["pods"] = pods()
+    out["ground"] = savanna_grass()
+    out["mud"] = ("file", "mud_crust_dry_0.png")
+    out["branch"] = ("file", "fallen_branch_bark_0.png")
+    out["dead_end"] = ("file", "dead_wood_top_0.png")
+    return out
