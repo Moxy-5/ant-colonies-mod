@@ -297,7 +297,13 @@ final class TreeDraw {
      * never moves, the user's real growth).
      */
     static void growing(TreeVoxels v, Poly p, double[] radii, double upto, boolean taper, TreePart[] blocks, double hollow) {
-        growing(v, p, radii, upto, upto, taper, blocks, hollow);
+        growing(v, p, radii, upto, upto, taper, blocks, hollow, 0.35);
+    }
+
+    /** As above, a growing tip never thinner than tipMin (but never thicker than the grown wood there). */
+    static void growing(TreeVoxels v, Poly p, double[] radii, double upto, boolean taper, TreePart[] blocks, double hollow,
+            double tipMin) {
+        growing(v, p, radii, upto, upto, taper, blocks, hollow, tipMin);
     }
 
     /**
@@ -305,11 +311,12 @@ final class TreeDraw {
      * part of the limb as it grew, cut, never thicker than the whole (wood never jumps, step 5).
      */
     static void broken(TreeVoxels v, Poly p, double[] radii, double grown, double broken, TreePart[] blocks) {
-        growing(v, p, radii, Math.min(grown, broken), grown, true, blocks, 0);
+        growing(v, p, radii, Math.min(grown, broken), grown, true, blocks, 0, 0.35);
     }
 
     /** As {@link #growing}, tapering as if grown out to {@code taperOver} but only drawn up to {@code upto}. */
-    static void growing(TreeVoxels v, Poly p, double[] radii, double upto, double taperOver, boolean taper, TreePart[] blocks, double hollow) {
+    static void growing(TreeVoxels v, Poly p, double[] radii, double upto, double taperOver, boolean taper, TreePart[] blocks, double hollow,
+            double tipMin) {
         if (upto <= 1e-6) {
             return;
         }
@@ -336,8 +343,8 @@ final class TreeDraw {
                 }
                 double r0 = lerp(radii[i], radii[i + 1], f0), r1 = lerp(radii[i], radii[i + 1], f1);
                 if (!complete && taper) {
-                    r0 = Math.min(r0, lerp(radii[0], 0.35, e0 / taperOver));
-                    r1 = Math.min(r1, lerp(radii[0], 0.35, e1 / taperOver));
+                    r0 = Math.min(r0, Math.max(tipMin, lerp(radii[0], 0.35, e0 / taperOver)));
+                    r1 = Math.min(r1, Math.max(tipMin, lerp(radii[0], 0.35, e1 / taperOver)));
                 }
                 seg(v, mix(p.pts[i], p.pts[i + 1], f0), mix(p.pts[i], p.pts[i + 1], f1), r0, r1, blocks, false, hollow);
             }
