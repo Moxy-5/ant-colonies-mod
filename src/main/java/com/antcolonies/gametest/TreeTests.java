@@ -238,7 +238,74 @@ public class TreeTests {
                 helper.fail("the trunk does not reach down into the pit at y " + y + ": " + there);
             }
         }
+        newLandLitter(helper, foot);
         helper.succeed();
+    }
+
+    /**
+     * Step 6c: the dead wood new land lays round its trees. Under the grown camel thorn lie fallen branches, on the land
+     * (the pit's floor too), never in the trunk; old trees often have a fallen giant limb, baobabs never; a fallen young
+     * tree is dead wood only, with its stem.
+     */
+    private static void newLandLitter(GameTestHelper helper, BlockPos foot) {
+        var level = helper.getLevel();
+        var pick = new com.antcolonies.worldgen.GiantTreeStructure.Pick("camel_thorn", 5, 1, TreeStage.LIVING);
+        TreePlacer.Placed litter = com.antcolonies.worldgen.GiantTreePiece.litter(pick, foot, (x, z) -> {
+            for (int y = foot.getY() + 3; y > foot.getY() - 8; y--) {
+                if (!TreePlacer.isOpen(level.getBlockState(new BlockPos(x, y - 1, z)))) {
+                    return y;
+                }
+            }
+            return foot.getY();
+        });
+        int branch = 0;
+        for (int i = 0; i < litter.size(); i++) {
+            branch += litter.states()[i].getBlock() instanceof FallenBranchBlock ? 1 : 0;
+        }
+        if (branch < 2 || branch > 24) {
+            helper.fail("new land put " + branch + " blocks of fallen branch under a grown camel thorn (1 to 3 branches 2 or 3 long, more with a limb)");
+        }
+        int placed = TreePlacer.place(level, litter, foot, litter.box(foot), Block.UPDATE_CLIENTS);
+        if (placed == 0) {
+            helper.fail("none of the dead wood under the camel thorn was put down");
+        }
+        for (int i = 0; i < litter.size(); i++) {
+            BlockPos pos = foot.offset(litter.xs()[i], litter.ys()[i], litter.zs()[i]);
+            BlockState there = level.getBlockState(pos);
+            if (there.getBlock() instanceof FallenBranchBlock && !level.getBlockState(pos.below()).isFaceSturdy(level, pos.below(), Direction.UP)) {
+                helper.fail("a fallen branch of new land floats at " + pos);
+            }
+        }
+        int limbs = 0;
+        for (long seed = 0; seed < 40; seed++) {
+            if (hasDeadWood(TreePlacer.litter(com.antcolonies.tree.Litter.underTree(seed, 1.25, 20, 2, false)))) {
+                limbs++;
+            }
+            if (hasDeadWood(TreePlacer.litter(com.antcolonies.tree.Litter.underTree(seed, 1.25, 20, 2, true)))) {
+                helper.fail("a baobab of new land has a fallen giant limb (seed " + seed + ")");
+            }
+        }
+        if (limbs < 20 || limbs == 40) {
+            helper.fail(limbs + " of 40 ancient trees have a fallen giant limb under them (most, not all)");
+        }
+        var young = new com.antcolonies.worldgen.GiantTreeStructure.Pick("umbrella_thorn", 3, 0.3, TreeStage.FALLEN);
+        if (!com.antcolonies.worldgen.GiantTreePiece.fallenYoung(young)
+                || com.antcolonies.worldgen.GiantTreePiece.fallenYoung(new com.antcolonies.worldgen.GiantTreeStructure.Pick("umbrella_thorn", 3, 1, TreeStage.FALLEN))) {
+            helper.fail("a fallen young tree of new land is not told from a fallen giant");
+        }
+        if (!hasDeadWood(com.antcolonies.worldgen.GiantTreePiece.litter(young, foot, (x, z) -> foot.getY()))) {
+            helper.fail("a fallen young tree of new land has no stem");
+        }
+    }
+
+    /** Whether some of the dead wood is more than fallen branches (a limb or a stem). */
+    private static boolean hasDeadWood(TreePlacer.Placed placed) {
+        for (int i = 0; i < placed.size(); i++) {
+            if (!(placed.states()[i].getBlock() instanceof FallenBranchBlock)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

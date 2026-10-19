@@ -16,8 +16,8 @@ import net.minecraft.world.level.levelgen.feature.configurations.NoneFeatureConf
 
 /**
  * Lays a dead branch on the ground (see {@link FallenBranchBlock}): 2 or 3 blocks long, lying east-west or north-south,
- * thick end first. Used by world generation in savannas (data/antcolonies/neoforge/biome_modifier/fallen_branch.json)
- * and by acacias shedding branches ({@link BranchShedding}). The whole branch must fit on flat solid ground, in air or
+ * thick end first. Used by the giant trees dropping branches ({@code tree.BranchShedding}, {@code tree.Forest}); until
+ * M7.5 step 6c also by world generation in the open savanna. The whole branch must fit on flat solid ground, in air or
  * short plants (which it flattens); otherwise nothing is placed.
  */
 public class FallenBranchFeature extends Feature<NoneFeatureConfiguration> {

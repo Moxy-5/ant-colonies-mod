@@ -146,17 +146,7 @@ def main():
         "rolls": 1.0, "bonus_rolls": 0.0,
         "entries": [{"type": "minecraft:item", "name": "minecraft:stick"}],
         "conditions": [{"condition": "minecraft:survives_explosion"}]}]})
-    write_json(DATA / "worldgen/configured_feature/fallen_branch.json", {"type": "antcolonies:fallen_branch", "config": {}})
-    # About one branch every 2 chunks of savanna (my pick); acacias shed more over time (BranchShedding).
-    write_json(DATA / "worldgen/placed_feature/fallen_branch.json", {"feature": "antcolonies:fallen_branch", "placement": [
-        {"type": "minecraft:rarity_filter", "chance": 2},
-        {"type": "minecraft:in_square"},
-        {"type": "minecraft:heightmap", "heightmap": "MOTION_BLOCKING_NO_LEAVES"},
-        {"type": "minecraft:biome"},
-    ]})
-    write_json(DATA / "neoforge/biome_modifier/fallen_branch.json", {
-        "type": "neoforge:add_features", "biomes": "#minecraft:is_savanna",
-        "features": "antcolonies:fallen_branch", "step": "vegetal_decoration"})
+    # (Its savanna world generation was switched off in M7.5 step 6c: the giant trees bring their own dead wood.)
 
     # Preview: the 4 bark stages side by side, 8 times bigger.
     scale = 8
@@ -168,7 +158,7 @@ def main():
                     for sx in range(scale):
                         sheet[(1 + y) * scale + sy][(1 + n * 17 + x) * scale + sx] = px
     write_png(PREVIEW / "fallen_branch.png", sheet)
-    print("wrote the fallen branch textures, models, loot table and world generation")
+    print("wrote the fallen branch textures, models, loot table (no world generation since M7.5 step 6c)")
 
 
 if __name__ == "__main__":

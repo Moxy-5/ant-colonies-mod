@@ -20,9 +20,9 @@ import net.minecraft.world.level.levelgen.feature.configurations.NoneFeatureConf
  * A fallen dead acacia (user's idea): the stump it snapped off, 1 or 2 blocks of upright {@link DeadWoodBlock}, and
  * beside it the trunk lying on the ground, {@link #MIN_LENGTH} to {@link #MAX_LENGTH} blocks long, with a few dead
  * branches lying round the crown end where the tree's top crashed down. The trunk needs solid ground under it, but may
- * span a one-block dip (as a real one would, resting on its ends). Rare, in savannas only
- * (data/antcolonies/neoforge/biome_modifier/fallen_tree.json). Later, fallen trees are where Matabele ants nest and
- * giant centipedes hide (see CLAUDE.md, "Log life").
+ * span a one-block dip (as a real one would, resting on its ends). It was rare in savannas until M7.5 step 6c
+ * (2026-10-19), when the giant trees' fallen young trees and giant limbs replaced it in new land; the blocks stay in old
+ * worlds, and the game tests still lay one to check termites eat the old dead wood.
  */
 public class FallenTreeFeature extends Feature<NoneFeatureConfiguration> {
     public static final int MIN_LENGTH = 4;

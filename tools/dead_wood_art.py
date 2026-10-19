@@ -129,17 +129,7 @@ def main():
         "rolls": 1.0, "bonus_rolls": 0.0,
         "entries": [{"type": "minecraft:item", "name": "antcolonies:dead_wood"}],
         "conditions": [{"condition": "minecraft:survives_explosion"}]}]})
-    write_json(DATA / "worldgen/configured_feature/fallen_tree.json", {"type": "antcolonies:fallen_tree", "config": {}})
-    # Rare: about one fallen tree every 8 chunks of savanna (my pick).
-    write_json(DATA / "worldgen/placed_feature/fallen_tree.json", {"feature": "antcolonies:fallen_tree", "placement": [
-        {"type": "minecraft:rarity_filter", "chance": 8},
-        {"type": "minecraft:in_square"},
-        {"type": "minecraft:heightmap", "heightmap": "MOTION_BLOCKING_NO_LEAVES"},
-        {"type": "minecraft:biome"},
-    ]})
-    write_json(DATA / "neoforge/biome_modifier/fallen_tree.json", {
-        "type": "neoforge:add_features", "biomes": "#minecraft:is_savanna",
-        "features": "antcolonies:fallen_tree", "step": "vegetal_decoration"})
+    # (Its savanna world generation was switched off in M7.5 step 6c: the giant trees bring their own dead wood.)
 
     # Preview: side and end of each stage, 8 times bigger.
     scale = 8
@@ -151,7 +141,7 @@ def main():
                     for sx in range(scale):
                         sheet[(1 + y) * scale + sy][(1 + n * 17 + x) * scale + sx] = px
     write_png(PREVIEW / "dead_wood.png", sheet)
-    print("wrote the dead wood textures, models, loot table and world generation")
+    print("wrote the dead wood textures, models, loot table (no world generation since M7.5 step 6c)")
 
 
 if __name__ == "__main__":

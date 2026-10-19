@@ -304,6 +304,14 @@ public final class TreePlacer {
         return null;
     }
 
+    /**
+     * Dead wood lying loose on the ground, not part of any tree (M7.5 step 6c, {@code tree.Litter}): every block a loose
+     * piece, to be laid on the land with {@link #rest}.
+     */
+    public static Placed litter(TreeVoxels v) {
+        return work(kind("umbrella_thorn"), v, TreeStage.FALLEN);
+    }
+
     private static Placed work(TreeKind kind, TreeVoxels v, TreeStage stage) {
         Long2ObjectOpenHashMap<BlockState> states = new Long2ObjectOpenHashMap<>();
         Long2ObjectOpenHashMap<EnumSet<Direction>> plates = new Long2ObjectOpenHashMap<>();

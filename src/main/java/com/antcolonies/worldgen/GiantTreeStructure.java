@@ -3,6 +3,7 @@ package com.antcolonies.worldgen;
 import java.util.Optional;
 
 import com.antcolonies.registry.ModStructures;
+import com.antcolonies.tree.Litter;
 import com.antcolonies.tree.TreeKind;
 import com.antcolonies.tree.TreeShapes;
 import com.antcolonies.tree.TreeStage;
@@ -78,6 +79,10 @@ public class GiantTreeStructure extends Structure {
         if (size.equals("young")) {
             // Many more small ones than big: seedlings and young trees, most of them small (a reverse-J spread).
             double u = random.nextDouble();
+            if (!baobab && random.nextDouble() < Litter.FALLEN_YOUNG_SHARE) {
+                // Step 6c: a dead young acacia knocked over in the grass (a young baobab's soft wood rots away in months).
+                return new Pick(kind, seed, round(0.2 + 0.25 * u), TreeStage.FALLEN);
+            }
             return new Pick(kind, seed, round(0.03 + 0.42 * u * u), TreeStage.LIVING);
         }
         if (random.nextDouble() < DEAD_SHARE) {
@@ -119,12 +124,19 @@ public class GiantTreeStructure extends Structure {
             return Optional.empty();
         }
         BlockPos foot = new BlockPos(x, lowest, z);
-        if (pick.stage() == TreeStage.FALLEN) {
+        if (pick.stage() == TreeStage.FALLEN && !GiantTreePiece.fallenYoung(pick)) {
             pick = flatFall(context, foot, pick, random);
         }
         Pick chosen = pick;
-        TreePlacer.Placed tree = TreePlacer.placed(chosen.kind(), chosen.seed(), chosen.age(), chosen.stage());
-        return Optional.of(new GenerationStub(foot, builder -> builder.addPiece(new GiantTreePiece(chosen, foot, tree.box(foot)))));
+        TreePlacer.Placed tree = GiantTreePiece.fallenYoung(chosen) ? null : TreePlacer.placed(chosen.kind(), chosen.seed(), chosen.age(), chosen.stage());
+        // Step 6c: the dead wood lying round it (on the land as the world's shape makes it) widens the piece to take it in.
+        TreePlacer.Placed litter = GiantTreePiece.litter(chosen, foot, (lx, lz) -> height(context, lx, lz, Heightmap.Types.WORLD_SURFACE_WG));
+        net.minecraft.world.level.levelgen.structure.BoundingBox box = tree != null ? tree.box(foot) : litter.box(foot);
+        if (tree != null && litter.size() > 0) {
+            box = box.encapsulate(litter.box(foot));
+        }
+        net.minecraft.world.level.levelgen.structure.BoundingBox pieceBox = box;
+        return Optional.of(new GenerationStub(foot, builder -> builder.addPiece(new GiantTreePiece(chosen, foot, pieceBox))));
     }
 
     /**

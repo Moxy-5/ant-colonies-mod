@@ -86,14 +86,47 @@ public class GiantTreePiece extends StructurePiece {
         });
     }
 
+    /** Step 6c: a young tree of new land that is instead a dead young tree lying in the grass (no tree in the book). */
+    public static boolean fallenYoung(GiantTreeStructure.Pick pick) {
+        return pick.stage() == com.antcolonies.tree.TreeStage.FALLEN && pick.age() < com.antcolonies.tree.TreeLife.YOUNG_END;
+    }
+
+    /**
+     * Step 6c: the dead wood lying round a tree of new land (see {@link com.antcolonies.tree.Litter}), laid on the land
+     * given by {@code ground}: under a living tree its fallen branches and maybe a giant limb; a fallen young tree is all
+     * litter; a dead tree has its own fallen pieces already (nothing more).
+     */
+    public static TreePlacer.Placed litter(GiantTreeStructure.Pick pick, BlockPos foot, TreePlacer.Ground ground) {
+        com.antcolonies.tree.TreeVoxels v;
+        if (fallenYoung(pick)) {
+            v = com.antcolonies.tree.Litter.fallenYoung(pick.seed());
+        } else if (pick.stage() == com.antcolonies.tree.TreeStage.LIVING) {
+            com.antcolonies.tree.TreeKind kind = TreePlacer.kind(pick.kind());
+            TreePlacer.Placed tree = TreePlacer.placed(pick.kind(), pick.seed(), pick.age(), pick.stage());
+            double reach = Math.max(Math.max(-tree.minX(), tree.maxX()), Math.max(-tree.minZ(), tree.maxZ()));
+            v = com.antcolonies.tree.Litter.underTree(pick.seed(), pick.age(), reach, kind.trunk().radius(), kind.isBaobab());
+        } else {
+            v = new com.antcolonies.tree.TreeVoxels();
+        }
+        return TreePlacer.rest(TreePlacer.litter(v), foot, ground);
+    }
+
     @Override
     public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random,
                             BoundingBox box, ChunkPos chunkPos, BlockPos pivot) {
+        net.minecraft.world.level.levelgen.RandomState randomState = level.getLevel().getChunkSource().randomState();
+        TreePlacer.Placed litter = litter(pick, foot, (x, z) -> generator.getFirstFreeHeight(x, z,
+                net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE_WG, level, randomState));
+        if (fallenYoung(pick)) {
+            TreePlacer.place(level, litter, foot, box, Block.UPDATE_CLIENTS);
+            return; // only dead wood: nothing for the tree book
+        }
         TreePlacer.Placed tree = TreePlacer.placed(pick.kind(), pick.seed(), pick.age(), pick.stage());
         if (tree.lying() != null) {
             tree = lying(level, generator, tree);
         }
         TreePlacer.place(level, tree, foot, box, Block.UPDATE_CLIENTS);
+        TreePlacer.place(level, litter, foot, box, Block.UPDATE_CLIENTS);
         // The tree goes into the tree book (M7.5 step 4), so it grows from here (once, whichever of its chunks is first).
         com.antcolonies.tree.Forest.queue(level.getLevel(), pick.kind(), foot, pick.seed(), pick.age(), pick.stage());
     }
