@@ -482,36 +482,7 @@ final class AcaciaShape {
 
     /** Dead wood: bark peels in patches; termite mud climbs the trunk from the ground. */
     private void weather(TreeVoxels v, Grown gr, TreeStage stage) {
-        boolean muddy = stage != TreeStage.SNAG;
-        double mudTop = 4 + gr.trunkTip()[1] * 0.9;
-        v.forEach((x, y, z, b) -> {
-            if (b != TreePart.DEAD_BARK) {
-                return;
-            }
-            if (muddy) {
-                double a = Math.atan2(z, x);
-                double line = mudTop * (0.55 + 0.45 * (0.5 + 0.5 * Math.sin(a * 3 + seed))) + (stage == TreeStage.FALLEN ? -mudTop + 1.6 : 0);
-                if (y <= line && TreeRandom.hash(x, y, z, 31) < 0.85) {
-                    v.set(x, y, z, TreePart.MUD);
-                    v.markOverBark(x, y, z);
-                    return;
-                }
-            }
-            if (TreeRandom.hash(x, Math.floorDiv(y, 3), z, 33) < 0.22) {
-                v.set(x, y, z, TreePart.PEELING);
-            }
-        });
-        if (muddy && stage != TreeStage.FALLEN) {
-            // A collar of mud round the foot, where the termites come up.
-            double r = gr.r0 + 1.6;
-            for (int x = (int) Math.floor(-r - 1); x <= r + 1; x++) {
-                for (int z = (int) Math.floor(-r - 1); z <= r + 1; z++) {
-                    if (Math.hypot(x, z) <= r + 0.6 && v.get(x, 0, z) == null && TreeRandom.hash(x, 0, z, 35) < 0.7) {
-                        v.put(x, 0, z, TreePart.MUD);
-                    }
-                }
-            }
-        }
+        DeadWood.weather(v, seed, gr.trunkTip()[1], gr.r0, stage);
     }
 
     /** Where a limb's branches end now (or the limb's own tip while it has none yet): where its pieces fall. */
@@ -526,103 +497,18 @@ final class AcaciaShape {
 
     /** Fallen limbs round a dead tree: termite food (fallen branches and bigger pieces). */
     private void scatterFallen(TreeVoxels v, Grown gr, List<double[]> points) {
-        TreeRandom r = new TreeRandom(seed * 31 + 5);
-        for (double[] tip : points) {
-            double[] at = add(mul(tip, 0.75 + r.next() * 0.2), new double[] {(r.next() - 0.5) * 3, 0, (r.next() - 0.5) * 3});
-            double a = r.next() * TAU, l = (3 + r.next() * 4) * Math.max(0.4, gr.k);
-            double[] p0 = {at[0], 0, at[2]}, p1 = {at[0] + Math.cos(a) * l, 0, at[2] + Math.sin(a) * l};
-            if (r.next() < 0.35 && gr.k > 0.5) {
-                seg(v, add(p0, new double[] {0, 0.4, 0}), add(p1, new double[] {0, 0.4, 0}), 1.0, 0.85, DEAD, true, 0);
-            } else {
-                thinLine(v, p0, p1, TreePart.FALLEN_BRANCH);
-            }
-        }
+        DeadWood.scatterFallen(v, seed, gr.k, points);
     }
 
     /** The fallen hollow giant: the stump, the trunk lying beside it with its limb stubs, rotted out, with galleries. */
     private void buildFallen(TreeVoxels v, Grown gr) {
-        double r0 = gr.r0, k = gr.k;
-        TreeRandom r = new TreeRandom(seed * 977 + 13);
-        double hf = gr.g < 0.5 ? 0 : 0.4 + 0.25 * gr.old;
-        double[] d = {Math.cos(fallAz), 0, Math.sin(fallAz)};
-        double stumpH = 1.5 + 2 * r.next();
-        seg(v, new double[] {0, -1, 0}, new double[] {0, 1.5, 0}, r0 + (k > 0.25 ? 1.5 : 0.2), r0, DEAD);
-        seg(v, new double[] {0, -1, 0}, new double[] {0, stumpH + 2, 0}, r0, r0 * 0.97, DEAD, true, hf * 0.8);
-        v.forEach((x, y, z, b) -> {
-            if (y > stumpH + TreeRandom.hash(x, 0, z, 41) * 2.2) {
-                v.set(x, y, z, null);
-            }
-        });
-        double length = Math.max(3, gr.trunkTip()[1] + 1);
-        double lift = r0 - 0.75;
-        double[] a0 = add(mul(d, r0 + 1.6), new double[] {0, lift, 0}), b0 = add(a0, mul(d, length));
-        List<double[][]> logs = new ArrayList<>();
-        logs.add(new double[][] {a0, b0, {r0 * 0.97, r0 * 0.85}});
-        double[] side = {-d[2], 0, d[0]};
-        int keep = Math.min(3, limbs.size());
-        for (int i = 0; i < keep; i++) {
-            Limb limb = limbs.get(i);
-            double spread = (i - (keep - 1) / 2.0) * 0.55 + (r.next() - 0.5) * 0.3;
-            double[] ld = add(mul(d, Math.cos(spread)), mul(side, Math.sin(spread)));
-            double ll = gr.limbUpto(limb) * (0.6 + 0.3 * r.next()), ra = r0 * 0.7, rb = r0 * 0.5;
-            double[] s = sub(b0, new double[] {0, lift, 0}), e = add(s, mul(ld, ll));
-            logs.add(new double[][] {add(s, new double[] {0, Math.max(0.2, ra - 0.75), 0}), add(e, new double[] {0, Math.max(0.2, rb - 0.75), 0}), {ra, rb}});
-        }
-        for (double[][] log : logs) {
-            seg(v, log[0], log[1], log[2][0], log[2][1], DEAD, true, Math.max(log[2][0], log[2][1]) > 1.6 ? hf : 0);
-        }
-        // Galleries: beetle larvae and termites, out from the hollow through the wood, a few right through the bark.
-        if (k > 0.3) {
-            for (int i = 0; i < 10; i++) {
-                double[][] log = logs.get(i % logs.size());
-                double t = r.next();
-                double[] axis = sub(log[1], log[0]), c = add(log[0], mul(axis, t));
-                double rr = lerp(log[2][0], log[2][1], t);
-                if (rr < 1.4) {
-                    continue;
-                }
-                double ang = r.next() * TAU;
-                double[] u = {-axis[2], 0, axis[0]};
-                double ul = len(u) == 0 ? 1 : len(u);
-                double[] out = add(mul(u, Math.cos(ang) / ul), new double[] {0, Math.sin(ang), 0});
-                double[] p = add(c, mul(out, rr * hf * 0.9));
-                long steps = Math.round(rr * (0.6 + r.next() * 1.0));
-                for (int st = 0; st < steps; st++) {
-                    p = add(p, add(mul(out, 0.9), new double[] {(r.next() - 0.5) * 0.9, (r.next() - 0.5) * 0.6, (r.next() - 0.5) * 0.9}));
-                    int qx = (int) Math.round(p[0]), qy = (int) Math.round(p[1]), qz = (int) Math.round(p[2]);
-                    if (qy < 0) {
-                        break;
-                    }
-                    int[][] sides = {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
-                    for (int[] sd : sides) {
-                        if (v.get(qx + sd[0], qy + sd[1], qz + sd[2]) == TreePart.DEAD_INNER) {
-                            v.set(qx + sd[0], qy + sd[1], qz + sd[2], TreePart.ROTTEN);
-                        }
-                    }
-                    v.carve(qx, qy, qz);
-                }
-            }
-        }
-        // Frass on every floor of the hollow and the galleries.
-        List<int[]> floors = new ArrayList<>();
-        for (long hole : v.holes()) {
-            int x = net.minecraft.core.BlockPos.getX(hole), y = net.minecraft.core.BlockPos.getY(hole), z = net.minecraft.core.BlockPos.getZ(hole);
-            TreePart below = v.get(x, y - 1, z);
-            if (below != null && below != TreePart.FRASS && TreeRandom.hash(x, y, z, 51) < 0.85) {
-                floors.add(new int[] {x, y, z});
-            }
-        }
-        for (int[] p : floors) {
-            v.set(p[0], p[1], p[2], TreePart.FRASS);
-        }
-        weather(v, gr, TreeStage.FALLEN);
+        double[] lengths = new double[limbs.size()];
         List<double[]> points = new ArrayList<>();
-        for (Limb limb : limbs) {
-            limbFallPoints(gr, limb, points);
+        for (int i = 0; i < limbs.size(); i++) {
+            lengths[i] = gr.limbUpto(limbs.get(i));
+            limbFallPoints(gr, limbs.get(i), points);
         }
-        scatterFallen(v, gr, points);
-        // The galleries can cut a crumb of rotten wood loose at a log's end: it has crumbled away.
-        v.clearLoose();
+        DeadWood.fallen(v, seed, gr.r0, gr.k, gr.g, gr.old, fallAz, gr.trunkTip()[1], lengths, points);
     }
 
     private static double sq(double x) {

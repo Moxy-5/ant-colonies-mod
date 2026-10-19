@@ -21,17 +21,8 @@ public final class TreeShapes {
 
     /** leafless: a baobab in the dry season (no effect on the acacias, which keep their leaves). */
     public static TreeVoxels build(TreeKind kind, long seed, double age, TreeStage stage, boolean leafless) {
-        TreeVoxels v = kind.isBaobab() ? new BaobabShape(kind, seed).build(age, stage, leafless) : new AcaciaShape(kind, seed).build(age, stage);
-        v.clearLooseFoliage();
-        return v;
-    }
-
-    /**
-     * The new umbrella thorn on trial in the tree viewer (the user's redo from photos, 2026-10-18): the grown, living tree
-     * only, in one of its versions. Not used by the game yet.
-     */
-    static TreeVoxels buildNewUmbrella(TreeKind kind, long seed, UmbrellaShape.Version version) {
-        TreeVoxels v = new UmbrellaShape(kind, seed, version).build();
+        TreeVoxels v = kind.isBaobab() ? new BaobabShape(kind, seed).build(age, stage, leafless)
+                : kind.isUmbrella() ? new UmbrellaShape(kind, seed).build(age, stage) : new AcaciaShape(kind, seed).build(age, stage);
         v.clearLooseFoliage();
         return v;
     }

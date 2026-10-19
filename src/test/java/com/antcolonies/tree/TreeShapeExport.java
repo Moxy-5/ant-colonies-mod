@@ -60,16 +60,6 @@ class TreeShapeExport {
             TreeDraw.look = TreeDraw.LimbLook.A;
             TreeDraw.earlyGrowth = false;
         }
-        // The new umbrella thorn on trial (grown, living only): "umbrella|seed|1|living|N1" and so on.
-        String[] versions = new String[UmbrellaShape.Version.values().length];
-        TreeKind umbrella = TreeKind.load("umbrella_thorn");
-        for (UmbrellaShape.Version ver : UmbrellaShape.Version.values()) {
-            versions[ver.ordinal()] = ver.name();
-            for (int seed = 1; seed <= SEEDS; seed++) {
-                trees.put("umbrella|" + seed + "|1|living|" + ver.name(), encode(TreeShapes.buildNewUmbrella(umbrella, seed, ver)));
-            }
-        }
-        out.put("umbrellaVersions", versions);
         out.put("shapes", shapes);
         out.put("trees", trees);
         Gson gson = new GsonBuilder().create();
@@ -87,6 +77,9 @@ class TreeShapeExport {
     private static void addTrees(Map<String, String> trees, Map<String, String> shapes, String suffix, String fallback) {
         for (String[] k : KINDS) {
             TreeKind kind = TreeKind.load(k[1]);
+            if (kind.isUmbrella() && !suffix.isEmpty()) {
+                continue; // its own shape has no limb looks or growths to pick
+            }
             for (int seed = 1; seed <= SEEDS; seed++) {
                 shapes.put(k[0] + "|" + seed, kind.shapeFor(seed).name());
                 for (TreeStage stage : TreeShapes.stages(kind)) {

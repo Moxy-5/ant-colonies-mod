@@ -23,6 +23,9 @@ class TreeShapeTest {
     @Test
     void nothingFloats() {
         for (String name : KINDS) {
+            if (skipForLook(name)) {
+                continue;
+            }
             TreeKind kind = TreeKind.load(name);
             for (long seed = 1; seed <= 5; seed++) {
                 for (double age : AGES) {
@@ -58,6 +61,9 @@ class TreeShapeTest {
     @Test
     void aGrowingTreeOnlyAddsWood() {
         for (String name : KINDS) {
+            if (skipForLook(name)) {
+                continue;
+            }
             TreeKind kind = TreeKind.load(name);
             for (long seed = 1; seed <= 6; seed++) {
                 TreeVoxels before = null;
@@ -100,22 +106,9 @@ class TreeShapeTest {
         }
     }
 
-    /** The new umbrella thorn on trial (the user's redo from photos, 2026-10-18): every version stands, nothing floats. */
-    @Test
-    void theNewUmbrellaThornStands() {
-        TreeKind kind = TreeKind.load("umbrella_thorn");
-        for (UmbrellaShape.Version ver : UmbrellaShape.Version.values()) {
-            for (long seed = 1; seed <= 8; seed++) {
-                TreeVoxels v = TreeShapes.buildNewUmbrella(kind, seed, ver);
-                LongOpenHashSet standing = v.grounded();
-                long s = seed;
-                for (Long2ObjectMap.Entry<TreePart> e : v.entries()) {
-                    long k = e.getLongKey();
-                    assertTrue(standing.contains(k), () -> "new umbrella " + ver + " seed " + s + ": " + e.getValue().id
-                            + " floating at " + BlockPos.of(k).toShortString());
-                }
-            }
-        }
+    /** The limb looks on trial were for the old acacia shape: the umbrella thorn's own shape has no limb looks. */
+    private static boolean skipForLook(String name) {
+        return TreeDraw.look != TreeDraw.LimbLook.A && TreeKind.load(name).isUmbrella();
     }
 
     /** An ancient tree is the grown one thicker: the grown trunk's bark is still wood (rotten inside, or an old baobab's door). */
@@ -148,7 +141,7 @@ class TreeShapeTest {
     /** Grown trees: tall, wide and thick as picked with the user (DESIGN.md "Giant savanna trees"). */
     @Test
     void grownTreesHaveThePickedSizes() {
-        check("umbrella_thorn", 30, 40, 40, 50, 4, 5);
+        check("umbrella_thorn", 24, 30, 40, 52, 4, 5);
         check("camel_thorn", 20, 30, 32, 46, 3, 5);
         check("baobab", 25, 33, 28, 42, 8, 14);
     }

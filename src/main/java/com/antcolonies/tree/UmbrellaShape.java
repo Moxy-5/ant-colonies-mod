@@ -1,5 +1,6 @@
 package com.antcolonies.tree;
 
+import static com.antcolonies.tree.TreeDraw.DEAD;
 import static com.antcolonies.tree.TreeDraw.LIVE;
 import static com.antcolonies.tree.TreeDraw.add;
 import static com.antcolonies.tree.TreeDraw.clamp;
@@ -8,234 +9,521 @@ import static com.antcolonies.tree.TreeDraw.lerp;
 import static com.antcolonies.tree.TreeDraw.mix;
 import static com.antcolonies.tree.TreeDraw.mul;
 import static com.antcolonies.tree.TreeDraw.seg;
+import static com.antcolonies.tree.TreeDraw.smooth;
 import static com.antcolonies.tree.TreeDraw.sub;
 import static com.antcolonies.tree.TreeDraw.thinLine;
 
 import java.util.ArrayList;
 import java.util.List;
 
+import com.antcolonies.tree.TreeDraw.Poly;
+
 /**
- * The new umbrella thorn (the user's redo, 2026-10-18, from two photos of real Vachellia tortilis; only the grown tree so
- * far, on trial in the tree viewer, not in the game yet). A real umbrella thorn: a short thick trunk, often leaning, that
- * splits low into 2 to 4 big limbs; the limbs leave the fork at wide angles and sweep outward in long curves, some nearly
- * to the crown's edge, curling up into it only at their ends, and often split once; the crown is one wide, thin layer,
- * 2.5 to 3 times as wide as tall, its top gently domed, its underside flat and lumpy, the edges drooping, with thorny
- * twigs hanging from the rim. The thin wood all lives inside the crown.
+ * The umbrella thorn (the user's redo, 2026-10-18, from two photos of real Vachellia tortilis; version N4 picked by the
+ * user: "exactly what I was looking for"). A real umbrella thorn: a thick trunk, often leaning, to a fork about half
+ * its height; 3 or 4 big limbs leave the fork low and run far out sideways, curling up into the crown only at their
+ * ends, and often split once; the crown is one wide, thin layer, about twice as wide as the tree is tall, its top gently
+ * domed, its underside flat and lumpy, the edge drooping, with thorny twigs hanging from the rim. The thin wood all
+ * lives inside the crown.
  *
- * <p>The rule for Minecraft (the user: "I don't want the trees to look skinny"): no bare wood under the crown is thinner
- * than round bark about 3 blocks across; the limbs only become the limb pipe and the thin branches once they are in the
- * leaves. Limbs follow smooth curves, so they sweep instead of stepping.
+ * <p>The rule for Minecraft (the user: "I don't want the trees to look skinny"): no bare wood under a grown crown is
+ * thinner than round bark about 3 blocks across; the limbs only become the limb pipe and the thin branches once they
+ * are in the leaves. Limbs follow smooth curves, so they sweep instead of stepping.
+ *
+ * <p>Real growth (the user's decision): the skeleton is the grown tree's, made once from the seed; a younger tree is that
+ * skeleton grown only part of the way out from the ground, every piece of wood keeping its place and only lengthening at
+ * its tip and thickening. A young tree is a stem with a small flat crown, its low side twigs shaded out and dropped as it
+ * climbs; once the stem reaches the fork the limbs grow out sideways inside their leaves. Age: 0 a seedling, 1 grown, up
+ * to 1.25 ancient (thicker, the crown pushed a little out and up, the heart rotted hollow, often one limb dead).
+ * Dead trees (snag, mud-climbed, limbs shed, fallen) die the way every acacia does ({@link DeadWood}).
  */
 final class UmbrellaShape {
     private static final double TAU = Math.PI * 2;
-    /** The thinnest bare limb (radius in blocks): round bark, about 3 across. */
+    /** The thinnest bare limb of a grown tree (radius in blocks): round bark, about 3 across. */
     static final double LIMB_MIN = 1.3;
 
-    /**
-     * The versions to pick from (my picks of numbers, from the user's photos).
-     *
-     * @param height     the crown's top (blocks; a little more by seed)
-     * @param fork       the fork's height as a share of the crown's top
-     * @param limbsLo    fewest main limbs
-     * @param limbsHi    most main limbs
-     * @param rise       how steeply the limbs leave the fork (degrees above level)
-     * @param reach      where the limbs end, as a share of the crown's radius (a little more by limb)
-     * @param sag        how far a limb dips below a straight line before it curls up into the crown (blocks)
-     * @param thick      the crown's thickness in the middle
-     * @param dome       how much lower the crown's top is at the edge than in the middle
-     * @param smooth     a crown filled as one layer (true) or built of clumps with gaps under it (false)
-     */
-    enum Version {
-        // N1 after the user's pick (2026-10-18: "the base should be taller", the limbs reaching out into the leaves,
-        // the tree shorter from where the wood starts reaching out): a fork near half the height, limbs leaving it
-        // low and running far out sideways just under the crown. N4 the same with a taller trunk still.
-        N1(24, 0.46, 3, 4, 18, 0.72, 1.5, 5, 2, false),
-        N2(27, 0.42, 3, 5, 50, 0.6, 0.5, 4.5, 1.5, false),
-        N3(25, 0.34, 3, 4, 36, 0.6, 2, 5, 2, true),
-        N4(25, 0.56, 3, 4, 12, 0.75, 1, 5, 2, false);
+    // N4's numbers (my picks from the user's photos; the trial versions N1 to N3 are in docs/HISTORY.md).
+    /** The crown's top (blocks; up to 2.5 more by seed). */
+    private static final double HEIGHT = 25;
+    /** The fork's height as a share of the crown's top. */
+    private static final double FORK = 0.56;
+    private static final int LIMBS_LO = 3, LIMBS_HI = 4;
+    /** How steeply the limbs leave the fork (above level). */
+    private static final double RISE = Math.toRadians(12);
+    /** Where the limbs end, as a share of the crown's radius (up to 0.18 more by limb, at most 0.9). */
+    private static final double REACH = 0.75;
+    /** How far a limb dips below a straight line before it curls up into the crown (blocks). */
+    private static final double SAG = 1;
+    /** The crown's thickness in the middle, and how much lower its top is at the edge. */
+    private static final double THICK = 5, DOME = 2;
 
-        final double height, fork, rise, reach, sag, thick, dome;
-        final int limbsLo, limbsHi;
-        final boolean smooth;
+    private final TreeKind kind;
+    private final long seed;
+    private final double height, crownRadius, trunkRadius;
+    private final Poly trunk;
+    private final List<double[]> roots = new ArrayList<>();
+    private final List<Limb> limbs = new ArrayList<>();
+    private final double fallAz, deadRoll;
+    /** The farthest any wood reaches from the ground, along the tree: the grown tree is this far grown. */
+    private final double reach;
 
-        Version(double height, double fork, int limbsLo, int limbsHi, double rise, double reach, double sag, double thick, double dome, boolean smooth) {
-            this.height = height;
-            this.reach = reach;
-            this.fork = fork;
-            this.limbsLo = limbsLo;
-            this.limbsHi = limbsHi;
-            this.rise = Math.toRadians(rise);
-            this.sag = sag;
-            this.thick = thick;
-            this.dome = dome;
-            this.smooth = smooth;
+    private static final class Limb {
+        Poly line;
+        double[] radii;
+        /** How far along the wood from the ground it starts. */
+        double start;
+        double az, brk;
+        /** The limb it split from (null for a limb from the fork) and how far along that one it starts. */
+        Limb parent;
+        double alongParent;
+        final List<Branch> branches = new ArrayList<>();
+
+        double end() {
+            return start + line.length;
+        }
+
+        double[] tip() {
+            return line.pts[line.pts.length - 1];
         }
     }
 
-    private final TreeKind kind;
-    private final Version ver;
-    private final TreeRandom r;
-    private final double height, crownRadius, trunkRadius;
+    /** A branch in the crown: from a limb's end, the limb pipe to its middle, then a thin twig to its tip. */
+    private static final class Branch {
+        double[] from, mid, tip;
+        double start, l1, l2, brk;
+    }
 
-    UmbrellaShape(TreeKind kind, long seed, Version ver) {
+    UmbrellaShape(TreeKind kind, long seed) {
         this.kind = kind;
-        this.ver = ver;
-        r = new TreeRandom(seed * 7919 + kind.salt() + 977);
-        height = ver.height + r.next() * 2.5;
+        this.seed = seed;
+        // The random numbers come in the same order as in the shape the user picked in the tree viewer, so the grown
+        // tree is that one.
+        TreeRandom r = new TreeRandom(seed * 7919 + kind.salt() + 977);
+        height = HEIGHT + r.next() * 2.5;
         crownRadius = kind.crown().radius() - 1 + r.next() * 3;
         trunkRadius = kind.trunk().radius() + (r.next() - 0.5) * kind.trunk().radiusSpread() * 2;
-    }
-
-    /** The crown's top at a distance from the middle. */
-    double top(double d) {
-        return height - ver.dome * sq(d / crownRadius);
-    }
-
-    /** The crown's underside at a distance from the middle. */
-    double under(double d) {
-        return top(d) - lerp(ver.thick, 2.5, Math.pow(clamp(d / crownRadius, 0, 1), 1.6));
-    }
-
-    TreeVoxels build() {
-        TreeVoxels v = new TreeVoxels();
-        double fh = height * ver.fork;
+        double fh = height * FORK;
         double leanA = r.next() * TAU, leanD = 0.5 + r.next() * 1.5;
         double[] fork = {Math.cos(leanA) * leanD, fh, Math.sin(leanA) * leanD};
         double[] mid = {fork[0] * 0.35 + (r.next() - 0.5), fh * 0.5, fork[2] * 0.35 + (r.next() - 0.5)};
+        trunk = new Poly(new double[] {0, -1, 0}, mid, fork);
         double rFork = trunkRadius * 0.85;
-        // The trunk: a flared foot, then up to the fork with a gentle bend.
-        seg(v, new double[] {0, -1, 0}, new double[] {0, 1.5, 0}, trunkRadius + 1.4, trunkRadius, LIVE);
-        tube(v, new double[][] {{0, -1, 0}, mid, fork}, new double[] {trunkRadius, trunkRadius * 0.93, rFork});
-        int roots = 3 + (int) Math.floor(r.next() * 3);
-        for (int i = 0; i < roots; i++) {
-            double a = r.next() * TAU, l = 4 + r.next() * 5;
-            double[] d = {Math.cos(a), 0, Math.sin(a)};
-            seg(v, add(mul(d, trunkRadius * 0.7), new double[] {0, -0.2, 0}), add(mul(d, trunkRadius + l), new double[] {0, -0.6, 0}), 1.4, 0.45, LIVE);
+        int nr = 3 + (int) Math.floor(r.next() * 3);
+        for (int i = 0; i < nr; i++) {
+            roots.add(new double[] {r.next() * TAU, 4 + r.next() * 5});
         }
 
         // The big limbs from the fork, each sweeping out under the crown; some split once.
-        List<double[]> ends = new ArrayList<>();
-        List<Double> endAz = new ArrayList<>();
-        int n = ver.limbsLo + (int) Math.floor(r.next() * (ver.limbsHi - ver.limbsLo + 1));
+        int n = LIMBS_LO + (int) Math.floor(r.next() * (LIMBS_HI - LIMBS_LO + 1));
         double phase = r.next() * TAU;
         for (int i = 0; i < n; i++) {
             double az = phase + i * TAU / n + (r.next() - 0.5) * 0.7;
-            double reach = crownRadius * Math.min(0.9, ver.reach + r.next() * 0.18);
-            double rise = ver.rise + (r.next() - 0.5) * Math.toRadians(14);
+            double limbReach = crownRadius * Math.min(0.9, REACH + r.next() * 0.18);
+            double rise = RISE + (r.next() - 0.5) * Math.toRadians(14);
             double rStart = rFork * (0.62 + r.next() * 0.12);
             double[] start = add(fork, new double[] {Math.cos(az) * rFork * 0.4, 0, Math.sin(az) * rFork * 0.4});
-            double[][] curve = limbCurve(start, az, rise, reach, ver.sag * (0.7 + r.next() * 0.6));
+            double[][] curve = limbCurve(start, az, rise, limbReach, SAG * (0.7 + r.next() * 0.6));
             double split = r.next();
             double splitAt = 0.4 + r.next() * 0.25, splitTurn = (r.next() < 0.5 ? -1 : 1) * (0.35 + r.next() * 0.35);
-            double splitReach = Math.min(crownRadius * 0.85, reach * (0.85 + r.next() * 0.25));
-            limb(v, curve, rStart, ends, endAz, az);
+            double splitReach = Math.min(crownRadius * 0.85, limbReach * (0.85 + r.next() * 0.25));
+            Limb limb = limb(curve, rStart, trunk.length, az);
+            limbs.add(limb);
             if (split < 0.6) {
                 double[] from = bezier(curve, splitAt);
                 double rHere = Math.max(LIMB_MIN, lerp(rStart, LIMB_MIN, splitAt) * 0.85);
                 double az2 = az + splitTurn;
                 double[] tangent = sub(bezier(curve, splitAt + 0.05), from);
                 double el = Math.atan2(tangent[1], Math.hypot(tangent[0], tangent[2]));
-                double[][] c2 = limbCurve(from, az2, Math.max(Math.toRadians(15), el), splitReach - Math.hypot(from[0], from[2]) * 0.0, ver.sag * 0.5);
-                limb(v, c2, rHere, ends, endAz, az2);
+                double[][] c2 = limbCurve(from, az2, Math.max(Math.toRadians(15), el), splitReach, SAG * 0.5);
+                double along = alongCurve(limb, splitAt);
+                Limb child = limb(c2, rHere, limb.start + along, az2);
+                child.parent = limb;
+                child.alongParent = along;
+                limbs.add(child);
             }
         }
 
-        // In the crown: branches fan out from every limb end to fill its share of the crown, the first half the limb
-        // pipe, then thin twigs; every tip holds a clump of leaves.
-        List<double[]> tips = new ArrayList<>();
-        double sector = TAU / Math.max(1, ends.size()) * 1.4;
-        for (int e = 0; e < ends.size(); e++) {
-            double[] end = ends.get(e);
+        // In the crown: branches fan out from every limb end to fill its share of the crown.
+        double sector = TAU / Math.max(1, limbs.size()) * 1.4;
+        double far = 0;
+        for (Limb limb : limbs) {
+            double[] end = limb.tip();
             double endD = Math.hypot(end[0], end[2]);
             int b = 6 + (int) Math.floor(r.next() * 4);
-            tips.add(end);
+            far = Math.max(far, limb.end());
             for (int j = 0; j < b; j++) {
-                double a = endAz.get(e) + (r.next() - 0.5) * sector;
+                double a = limb.az + (r.next() - 0.5) * sector;
                 double d = clamp(lerp(endD * 0.45, crownRadius * 0.92, r.next()), 2, crownRadius * 0.92);
-                double y = lerp(under(d) + 1, top(d) - 1, 0.25 + r.next() * 0.5);
-                double[] tip = {Math.cos(a) * d, y, Math.sin(a) * d};
-                double[] m = mix(end, tip, 0.5);
-                double md = Math.hypot(m[0], m[2]);
-                m[1] = Math.max(m[1], under(md) + 1.2);
-                thinLine(v, end, m, TreePart.LIMB);
-                thinLine(v, m, tip, TreePart.THIN);
-                tips.add(tip);
-                tips.add(m);
+                double y = lerp(under(d, 0) + 1, top(d, 0) - 1, 0.25 + r.next() * 0.5);
+                Branch br = new Branch();
+                br.from = end;
+                br.tip = new double[] {Math.cos(a) * d, y, Math.sin(a) * d};
+                br.mid = mix(end, br.tip, 0.5);
+                double md = Math.hypot(br.mid[0], br.mid[2]);
+                br.mid[1] = Math.max(br.mid[1], under(md, 0) + 1.2);
+                br.start = limb.end();
+                br.l1 = len(sub(br.mid, end));
+                br.l2 = len(sub(br.tip, br.mid));
+                far = Math.max(far, br.start + br.l1 + br.l2);
+                limb.branches.add(br);
             }
         }
+        reach = far;
 
-        // The leaves.
+        // What only dead or ancient trees need, from their own dice so the living tree above stays the one picked.
+        TreeRandom d = new TreeRandom(seed * 131 + kind.salt() + 7);
+        for (Limb limb : limbs) {
+            limb.brk = 0.45 + d.next() * 0.4;
+            for (Branch br : limb.branches) {
+                br.brk = 0.3 + d.next() * 0.4;
+            }
+        }
+        deadRoll = d.next();
+        fallAz = d.next() * TAU;
+    }
+
+    /** The crown's top at a distance from the middle (an ancient crown a little higher). */
+    private double top(double dist, double old) {
+        return height + 1.5 * old - DOME * sq(dist / crownRadius);
+    }
+
+    /** The crown's underside at a distance from the middle. */
+    private double under(double dist, double old) {
+        return top(dist, old) - lerp(THICK, 2.5, Math.pow(clamp(dist / crownRadius, 0, 1), 1.6));
+    }
+
+    /** The tree at an age, grown out along its skeleton. */
+    private final class Grown {
+        final double g, old, k, s, tf;
+        final boolean living;
+
+        Grown(double age, boolean living) {
+            this.living = living;
+            g = clamp(age, 0, 1);
+            old = clamp((age - 1) / 0.25, 0, 1);
+            k = Math.pow(g, 1.5);
+            s = old > 0 || g >= 1 ? reach + 1 : reach * k;
+            // Girth comes sooner than height (a real young tree thickens every year), but a sapling stays slim.
+            tf = lerp(0.15, 1, Math.pow(g, 0.8));
+        }
+
+        double r0() {
+            return trunkRadius * tf + 0.5 * old;
+        }
+
+        double upto(Limb limb) {
+            return clamp(s - limb.start, 0, limb.line.length);
+        }
+
+        double[] radii(Limb limb) {
+            double[] out = new double[limb.radii.length];
+            for (int i = 0; i < out.length; i++) {
+                out[i] = limb.radii[i] * tf + 0.5 * old;
+            }
+            return out;
+        }
+
+        /** An ancient tree has often let one limb (and what grew from it) die. */
+        boolean deadLimb(Limb limb) {
+            Limb main = limb.parent == null ? limb : limb.parent;
+            return old > 0.5 && main == limbs.get(0) && deadRoll < 0.7;
+        }
+
+        double[] trunkTip() {
+            return trunk.at(Math.min(s, trunk.length));
+        }
+
+        /** Pushes a crown point out and up as the tree grows ancient. */
+        double[] aged(double[] c) {
+            if (old <= 0) {
+                return c;
+            }
+            double h = Math.max(1e-6, Math.hypot(c[0], c[2]));
+            return new double[] {c[0] + c[0] / h * 3 * old, c[1] + 1.5 * old, c[2] + c[2] / h * 3 * old};
+        }
+    }
+
+    TreeVoxels build(double age, TreeStage stage) {
+        TreeVoxels v = new TreeVoxels();
+        Grown gr = new Grown(age, stage == TreeStage.LIVING);
+        if (gr.g < 0.06) {
+            v.put(0, 0, 0, TreePart.SEEDLING);
+            return v;
+        }
+        List<double[]> fallAt = new ArrayList<>();
+        if (stage == TreeStage.FALLEN) {
+            List<Double> lengths = new ArrayList<>();
+            for (Limb limb : limbs) {
+                if (limb.parent == null) {
+                    lengths.add(gr.upto(limb));
+                }
+                fallPoints(gr, limb, fallAt);
+            }
+            DeadWood.fallen(v, seed, gr.r0(), gr.k, gr.g, gr.old, fallAz, gr.trunkTip()[1],
+                    lengths.stream().mapToDouble(Double::doubleValue).toArray(), fallAt);
+            return v;
+        }
+        TreePart[] blocks = gr.living ? LIVE : DEAD;
+        drawTrunk(v, gr, blocks);
+        if (gr.living && gr.s < trunk.length) {
+            youngTree(v, gr);
+            return v;
+        }
+        List<double[]> grownLeaves = new ArrayList<>(), growingLeaves = new ArrayList<>();
+        for (Limb limb : limbs) {
+            boolean dead = !gr.living || gr.deadLimb(limb);
+            TreePart[] b = dead ? DEAD : LIVE;
+            double lu = gr.upto(limb);
+            double broken = broken(gr, limb, stage, dead);
+            if (limb.parent != null) {
+                // A split limb grows from where it leaves its parent: none if the parent broke off below it.
+                double parentBroken = broken(gr, limb.parent, stage, dead);
+                if (parentBroken >= 0 && limb.alongParent > parentBroken) {
+                    continue;
+                }
+            }
+            if (broken >= 0) {
+                TreeDraw.growing(v, limb.line, gr.radii(limb), Math.min(lu, broken), lu < broken, b, 0);
+                if (stage == TreeStage.SHED) {
+                    fallPoints(gr, limb, fallAt);
+                }
+                continue;
+            }
+            TreeDraw.growing(v, limb.line, gr.radii(limb), lu, true, b, 0);
+            if (lu <= 0) {
+                continue;
+            }
+            if (lu < limb.line.length) {
+                // A growing limb: leaves round its tip and all along its upper part, so it grows inside its crown.
+                if (gr.living) {
+                    growingLeaves.add(limb.line.at(lu));
+                    for (double d = lu - 2.5; d > lu * 0.35; d -= 2.5) {
+                        growingLeaves.add(limb.line.at(d));
+                    }
+                }
+                continue;
+            }
+            if (gr.living && gr.g < 1 && gr.s < limb.end() + 6) {
+                // Its leaves along the limb stay until its branches have grown out round its end.
+                for (double d = lu - 2.5; d > lu * 0.35; d -= 2.5) {
+                    growingLeaves.add(limb.line.at(d));
+                }
+            }
+            double[] end = limb.tip();
+            if (gr.living) {
+                grownLeaves.add(gr.aged(end));
+            }
+            for (Branch br : limb.branches) {
+                double bu = clamp(gr.s - br.start, 0, br.l1 + br.l2);
+                if (dead) {
+                    bu = Math.min(bu, (br.l1 + br.l2) * br.brk);
+                }
+                if (bu <= 0) {
+                    continue;
+                }
+                TreePart pipe = dead ? TreePart.DEAD_LIMB : TreePart.LIMB, twig = dead ? TreePart.DEAD_THIN : TreePart.THIN;
+                double[] reached;
+                if (bu <= br.l1) {
+                    reached = mix(end, br.mid, bu / br.l1);
+                    thinLine(v, end, reached, pipe);
+                } else {
+                    thinLine(v, end, br.mid, pipe);
+                    reached = bu >= br.l1 + br.l2 ? br.tip : mix(br.mid, br.tip, (bu - br.l1) / br.l2);
+                    thinLine(v, br.mid, reached, twig);
+                }
+                if (dead) {
+                    continue;
+                }
+                boolean done = bu >= br.l1 + br.l2;
+                if (done && gr.old > 0) {
+                    thinLine(v, br.tip, gr.aged(br.tip), TreePart.THIN);
+                }
+                if (done) {
+                    grownLeaves.add(gr.aged(br.tip));
+                } else {
+                    growingLeaves.add(reached);
+                }
+                if (bu >= br.l1) {
+                    grownLeaves.add(gr.aged(br.mid));
+                }
+            }
+        }
+        if (gr.living) {
+            if (gr.s < trunk.length + 6) {
+                // The young crown over the stem stays a little while the limbs start out from under it.
+                bush(v, gr.trunkTip(), youngCrown(trunk.length), 0.12);
+            }
+            crown(v, gr, grownLeaves, growingLeaves);
+        } else {
+            DeadWood.weather(v, seed, gr.trunkTip()[1], gr.r0(), stage);
+            if (stage == TreeStage.SHED) {
+                DeadWood.scatterFallen(v, seed, gr.k, fallAt);
+            }
+        }
+        return v;
+    }
+
+    /** How far out a limb still holds (-1: whole): a shed snag's limbs broke off, an ancient tree's dead limb lost its tip. */
+    private static double broken(Grown gr, Limb limb, TreeStage stage, boolean dead) {
+        if (stage == TreeStage.SHED) {
+            return limb.line.length * limb.brk * 0.6;
+        }
+        return dead && gr.living ? limb.line.length * 0.85 : -1;
+    }
+
+    private void drawTrunk(TreeVoxels v, Grown gr, TreePart[] blocks) {
+        double r0 = gr.r0();
+        double hollow = gr.old > 0.5 ? 0.35 * gr.old : 0;
+        // The flared foot.
+        if (gr.k > 0.25) {
+            seg(v, new double[] {0, -1, 0}, new double[] {0, 1.5, 0}, r0 + 1.4 * smooth(0.25, 0.6, gr.k), r0, blocks, false, hollow);
+        }
+        double tf = gr.tf, add = 0.5 * gr.old;
+        TreeDraw.growing(v, trunk, new double[] {trunkRadius * tf + add, trunkRadius * 0.93 * tf + add, trunkRadius * 0.85 * tf + add},
+                Math.min(gr.s, trunk.length), true, blocks, hollow);
+        if (gr.k > 0.2) {
+            for (double[] rt : roots) {
+                double[] d = {Math.cos(rt[0]), 0, Math.sin(rt[0])};
+                seg(v, add(mul(d, r0 * 0.7), new double[] {0, -0.2, 0}), add(mul(d, r0 + rt[1] * gr.k), new double[] {0, -0.6, 0}),
+                        0.5 + 0.9 * gr.k, 0.45, blocks);
+            }
+        }
+    }
+
+    /** How wide the young crown is when the stem has grown this far. */
+    private double youngCrown(double s) {
+        return 1.6 + (crownRadius - 1.6) * clamp(s / reach, 0, 1) * 0.9;
+    }
+
+    /** The young tree: the stem with a small flat crown at its tip, and a few low twigs that are shaded out and dropped. */
+    private void youngTree(TreeVoxels v, Grown gr) {
+        double[] tip = gr.trunkTip();
+        double rc = youngCrown(gr.s);
+        double ry = Math.max(1.3, rc * 0.38);
+        double baseAt = Math.max(1, gr.s - ry * 1.6);
+        double[] base = trunk.at(baseAt), corner = trunk.cornerBefore(baseAt);
+        thinLine(v, corner, base, TreePart.THIN, true);
+        v.dropping = true;
+        for (int i = 0; i < Math.min(3, limbs.size()); i++) {
+            double az = limbs.get(i).az;
+            thinLine(v, base, new double[] {base[0] + Math.cos(az) * rc * 0.5, tip[1] + 1 - ry * 0.8, base[2] + Math.sin(az) * rc * 0.5}, TreePart.THIN);
+        }
+        v.dropping = false;
+        bush(v, tip, rc, 0.12);
+    }
+
+    /** A small flat-topped bush of leaves over a point (a young crown, a growing limb's tip), thorny under its rim. */
+    private static void bush(TreeVoxels v, double[] at, double rc, double thorns) {
+        int top = (int) Math.round(at[1]) + 1;
+        double ry = Math.max(1.3, rc * 0.38), cy = top - ry + 0.5;
+        List<int[]> placed = new ArrayList<>();
+        for (int x = (int) Math.floor(at[0] - rc - 1); x <= at[0] + rc + 1; x++) {
+            for (int z = (int) Math.floor(at[2] - rc - 1); z <= at[2] + rc + 1; z++) {
+                for (int y = (int) Math.floor(cy - ry); y <= top; y++) {
+                    double e = sq((x - at[0]) / rc) + sq((z - at[2]) / rc) + sq((y - cy) / ry);
+                    if (e > 1 || y < 1) {
+                        continue;
+                    }
+                    if (e > 0.7 && TreeRandom.hash(x, y, z, 91) > 0.55) {
+                        continue;
+                    }
+                    v.put(x, y, z, TreePart.LEAVES);
+                    placed.add(new int[] {x, y, z});
+                }
+            }
+        }
+        for (int[] p : placed) {
+            int x = p[0], y = p[1], z = p[2];
+            if (v.get(x, y - 1, z) == null && Math.hypot(x - at[0], z - at[2]) > rc * 0.6 && TreeRandom.hash(x, y, z, 92) < thorns) {
+                v.put(x, y - 1, z, TreePart.THORNS);
+            }
+        }
+    }
+
+    /**
+     * The crown: a flattened clump of leaves round every grown branch tip and middle and limb end, clipped between the
+     * domed top and the flat underside; smaller young bushes round the wood still growing; thorny twigs under the rim.
+     */
+    private void crown(TreeVoxels v, Grown gr, List<double[]> grownLeaves, List<double[]> growingLeaves) {
         TreeKind.Crown c = kind.crown();
-        double density = c.leafDensity();
-        for (double[] cen : tips) {
-            double rx = c.padRadius() * (0.6 + 0.4 * TreeRandom.hash((int) Math.round(cen[0]), 3, (int) Math.round(cen[2]), 3));
-            double ry = ver.thick * 0.45;
+        double density = c.leafDensity(), old = gr.old;
+        double rc = crownRadius + 3 * old;
+        double pad = lerp(0.5, 1, gr.k);
+        for (double[] cen : grownLeaves) {
+            double rx = pad * c.padRadius() * (0.6 + 0.4 * TreeRandom.hash((int) Math.round(cen[0]), 3, (int) Math.round(cen[2]), 3));
+            double ry = THICK * 0.45;
             for (int x = (int) Math.floor(cen[0] - rx); x <= Math.ceil(cen[0] + rx); x++) {
                 for (int z = (int) Math.floor(cen[2] - rx); z <= Math.ceil(cen[2] + rx); z++) {
                     double hd = Math.hypot(x, z);
-                    if (hd > crownRadius * (0.95 + 0.08 * TreeRandom.hash(x, 1, z, 6))) {
+                    if (hd > rc * (0.95 + 0.08 * TreeRandom.hash(x, 1, z, 6))) {
                         continue;
                     }
-                    double lumpTop = top(hd) + (TreeRandom.hash(x, 0, z, 5) < 0.3 ? 1 : 0);
-                    double lumpLow = under(hd) - (TreeRandom.hash(x, 2, z, 8) < 0.25 ? 1 : 0);
+                    // An ancient crown: the same shape pushed out at the edge and up.
+                    double d0 = Math.max(0, hd - 3 * old);
+                    double lumpTop = top(d0, old) + (TreeRandom.hash(x, 0, z, 5) < 0.3 ? 1 : 0);
+                    double lumpLow = under(d0, old) - (TreeRandom.hash(x, 2, z, 8) < 0.25 ? 1 : 0);
                     for (int y = (int) Math.floor(cen[1] - ry); y <= Math.ceil(cen[1] + ry); y++) {
                         double e = sq((x - cen[0]) / rx) + sq((z - cen[2]) / rx) + sq((y - cen[1]) / ry);
                         if (e > 1 || y > lumpTop || y < lumpLow) {
                             continue;
                         }
-                        leaf(v, x, y, z, e, density);
+                        if (TreeRandom.hash(x, y, z, 7) > density * (1 - 0.25 * e)) {
+                            continue;
+                        }
+                        v.put(x, y, z, TreePart.LEAVES);
                     }
                 }
             }
         }
-        if (ver.smooth) {
-            // One layer: every place under the top is filled down to the underside (with the leaves' holes).
-            int rr = (int) Math.ceil(crownRadius + 1);
-            for (int x = -rr; x <= rr; x++) {
-                for (int z = -rr; z <= rr; z++) {
-                    double hd = Math.hypot(x, z);
-                    if (hd > crownRadius * (0.93 + 0.07 * TreeRandom.hash(x, 1, z, 6))) {
-                        continue;
-                    }
-                    for (int y = (int) Math.ceil(under(hd) + 0.5); y <= top(hd); y++) {
-                        leaf(v, x, y, z, 0.5, density);
-                    }
-                }
-            }
+        double small = lerp(2, c.padRadius() * 0.7, gr.k);
+        for (double[] cen : growingLeaves) {
+            bush(v, cen, small, 0);
         }
-        // Thorny twigs hanging from the rim of the crown.
-        List<int[]> rim = new ArrayList<>();
+        // Thorny twigs hanging from the rim of the crown (a growing crown's rim is where its leaves reach now).
+        double[] far = {0};
+        if (gr.g < 1) {
+            v.forEach((x, y, z, p) -> {
+                if (p == TreePart.LEAVES) {
+                    far[0] = Math.max(far[0], Math.hypot(x, z));
+                }
+            });
+        }
+        double rim = gr.g < 1 ? far[0] * 0.7 : crownRadius * 0.75 + 3 * old;
+        List<int[]> twigs = new ArrayList<>();
         v.forEach((x, y, z, p) -> {
-            if (p == TreePart.LEAVES && v.get(x, y - 1, z) == null && Math.hypot(x, z) > crownRadius * 0.75
-                    && TreeRandom.hash(x, y, z, 92) < 0.2) {
-                rim.add(new int[] {x, y - 1, z});
+            if (p == TreePart.LEAVES && v.get(x, y - 1, z) == null && Math.hypot(x, z) > rim && TreeRandom.hash(x, y, z, 92) < 0.2) {
+                twigs.add(new int[] {x, y - 1, z});
             }
         });
-        for (int[] p : rim) {
+        for (int[] p : twigs) {
             v.put(p[0], p[1], p[2], TreePart.THORNS);
         }
-        return v;
     }
 
-    private static void leaf(TreeVoxels v, int x, int y, int z, double e, double density) {
-        if (TreeRandom.hash(x, y, z, 7) > density * (1 - 0.25 * e)) {
+    /** Where a limb's branches end now (or the limb's own tip while it has none yet): where its pieces fall. */
+    private void fallPoints(Grown gr, Limb limb, List<double[]> out) {
+        double lu = gr.upto(limb);
+        if (lu <= 0) {
             return;
         }
-        v.put(x, y, z, TreePart.LEAVES);
+        for (Branch br : limb.branches) {
+            double bu = clamp(gr.s - br.start, 0, br.l1 + br.l2);
+            out.add(bu <= 0 ? limb.line.at(lu) : bu <= br.l1 ? mix(br.from, br.mid, bu / br.l1) : mix(br.mid, br.tip, Math.min(1, (bu - br.l1) / br.l2)));
+        }
     }
 
     /**
      * A limb's curve (a cubic Bezier): out of its start at an angle above level, sagging on the way out, its end just
-     * inside the crown's underside, reach from the middle.
+     * inside the crown's underside, limbReach from the middle.
      */
-    private double[][] limbCurve(double[] start, double az, double rise, double reach, double sag) {
+    private double[][] limbCurve(double[] start, double az, double rise, double limbReach, double sag) {
         double[] dir = {Math.cos(az), 0, Math.sin(az)};
         double startD = start[0] * dir[0] + start[2] * dir[2];
-        double outD = Math.max(3, reach - startD);
-        double[] end = {Math.cos(az) * reach, 0, Math.sin(az) * reach};
+        double outD = Math.max(3, limbReach - startD);
+        double[] end = {Math.cos(az) * limbReach, 0, Math.sin(az) * limbReach};
         end[0] += start[0] - dir[0] * startD;
         end[2] += start[2] - dir[2] * startD;
-        end[1] = under(Math.hypot(end[0], end[2])) + 1;
+        end[1] = under(Math.hypot(end[0], end[2]), 0) + 1;
         double up = end[1] - start[1];
         double l1 = Math.hypot(outD, up) * 0.4;
         double[] p1 = add(start, new double[] {dir[0] * Math.cos(rise) * l1, Math.sin(rise) * l1, dir[2] * Math.cos(rise) * l1});
@@ -255,8 +543,8 @@ final class UmbrellaShape {
         return p;
     }
 
-    /** Draws a limb along its curve, round bark tapering to LIMB_MIN at its end; remembers the end. */
-    private void limb(TreeVoxels v, double[][] curve, double rStart, List<double[]> ends, List<Double> endAz, double az) {
+    /** A limb along its curve: round bark tapering to LIMB_MIN at its end, in pieces about 1.5 blocks long. */
+    private static Limb limb(double[][] curve, double rStart, double start, double az) {
         double length = 0;
         double[] prev = curve[0];
         for (int i = 1; i <= 20; i++) {
@@ -266,28 +554,25 @@ final class UmbrellaShape {
         }
         int steps = Math.max(2, (int) Math.ceil(length / 1.5));
         double[][] pts = new double[steps + 1][];
-        double[] radii = new double[steps + 1];
+        Limb limb = new Limb();
+        limb.radii = new double[steps + 1];
         for (int i = 0; i <= steps; i++) {
             double t = (double) i / steps;
             pts[i] = bezier(curve, t);
-            radii[i] = Math.max(LIMB_MIN, lerp(rStart, LIMB_MIN, Math.pow(t, 0.8)));
+            limb.radii[i] = Math.max(LIMB_MIN, lerp(rStart, LIMB_MIN, Math.pow(t, 0.8)));
         }
-        tube(v, pts, radii);
-        ends.add(curve[3]);
-        endAz.add(az);
+        limb.line = new Poly(pts);
+        limb.start = start;
+        limb.az = az;
+        return limb;
     }
 
-    /** Round bark along a line of points, radius given at each. */
-    private static void tube(TreeVoxels v, double[][] pts, double[] radii) {
-        for (int i = 0; i + 1 < pts.length; i++) {
-            double l = len(sub(pts[i + 1], pts[i]));
-            int pieces = Math.max(1, (int) Math.ceil(l / 2));
-            for (int q = 0; q < pieces; q++) {
-                double f0 = (double) q / pieces, f1 = (double) (q + 1) / pieces;
-                seg(v, mix(pts[i], pts[i + 1], f0), mix(pts[i], pts[i + 1], f1), lerp(radii[i], radii[i + 1], f0),
-                        lerp(radii[i], radii[i + 1], f1), LIVE);
-            }
-        }
+    /** How far along a limb's line the point at curve parameter t is (its points are evenly spaced in t). */
+    private static double alongCurve(Limb limb, double t) {
+        int steps = limb.line.pts.length - 1;
+        double i = clamp(t, 0, 1) * steps;
+        int lo = (int) Math.floor(i), hi = Math.min(steps, lo + 1);
+        return lerp(limb.line.cum[lo], limb.line.cum[hi], i - lo);
     }
 
     private static double sq(double x) {

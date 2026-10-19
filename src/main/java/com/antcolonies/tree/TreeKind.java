@@ -88,6 +88,11 @@ public record TreeKind(String form, int salt, Trunk trunk, Crown crown, List<Sha
         return form.equals("baobab");
     }
 
+    /** The umbrella thorn's own shape (the user's redo from photos, 2026-10-18, {@link UmbrellaShape}). */
+    public boolean isUmbrella() {
+        return form.equals("umbrella");
+    }
+
     /** Which of the two shapes a tree with this seed has (mixed by seed, about half each). */
     public Shape shapeFor(long seed) {
         return shapes.get(shapes.size() > 1 && new TreeRandom(seed * 31 + 17 + salt).next() >= 0.5 ? 1 : 0);
