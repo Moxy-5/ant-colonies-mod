@@ -911,10 +911,12 @@ public class AwayTests {
                         helper.assertTrue(flat(tunnel.hole(), center) <= reach + 2.5, "a hole at " + helper.relativePos(tunnel.hole())
                                 + " lies past the reach of " + reach);
                     }
-                    // Away again: a known tuft with 1 piece left by the farthest grown piece that leads on from no other.
+                    // Away again: a known tuft with 1 piece left by the farthest grown piece that leads on from no other, dug out
+                    // (one grown piece may still wait to be dug, see above, and a hole not dug never opens).
                     for (BlockPos piece : galleries.pieceHoles()) {
                         piecesBefore.add(piece);
-                        if (!galleries.isFirstArm(piece) && galleries.isLeaf(piece) && !piece.equals(toHay.tunnel().hole())
+                        boolean pieceDug = galleries.digCells(galleries.pieceAt(piece)).stream().allMatch(cell -> com.antcolonies.colony.Nest.isDugOut(level, cell));
+                        if (pieceDug && !galleries.isFirstArm(piece) && galleries.isLeaf(piece) && !piece.equals(toHay.tunnel().hole())
                                 && (grown[0] == null || flat(piece, center) > flat(grown[0], center))) {
                             grown[0] = piece;
                         }
