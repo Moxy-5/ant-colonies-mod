@@ -82,6 +82,12 @@
       { "block": "#minecraft:leaves", "pieces": 2, "only_decaying": true },
       { "block": "antcolonies:fallen_branch", "pieces": 8, "rich": true },
       { "block": "antcolonies:dead_wood", "pieces": 32, "foragers": 2, "rich": true },
+      { "block": "antcolonies:bleached_log", "pieces": 32, "foragers": 2, "rich": true },
+      { "block": "antcolonies:bleached_wood", "pieces": 32, "foragers": 2, "rich": true },
+      { "block": "antcolonies:peeling_bleached_log", "pieces": 32, "foragers": 2, "rich": true },
+      { "block": "antcolonies:bleached_branch", "pieces": 8, "rich": true },
+      { "block": "antcolonies:rotten_wood", "pieces": 16, "foragers": 2, "rich": true },
+      { "block": "antcolonies:baobab_fibre", "pieces": 16, "foragers": 2, "rich": true },
       { "block": "minecraft:hay_block", "pieces": 48, "foragers": 4, "rich": true }
     ],
     "piece": "antcolonies:forage",

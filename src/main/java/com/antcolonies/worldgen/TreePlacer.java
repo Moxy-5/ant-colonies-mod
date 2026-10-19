@@ -956,9 +956,13 @@ public final class TreePlacer {
 
     /**
      * Whether a block in the world is still the tree's own block of its shape: the block itself, or it charred or
-     * scorched by a fire (a scar is still the tree).
+     * scorched by a fire (a scar is still the tree). Wood termites have started eating (step 6d) is theirs now: the tree
+     * book leaves it alone (never grown over or taken away), as it does their mud casts.
      */
     public static boolean same(BlockState there, BlockState was) {
+        if (com.antcolonies.block.DeadTreeWoodBlock.isEaten(there)) {
+            return false;
+        }
         Block b = was.getBlock();
         return there.is(b) || there.getBlock() == charredOf(b) || there.getBlock() == scorchedOf(b);
     }

@@ -421,8 +421,55 @@ public class TermiteFoodTests {
                     + colony.food().getPiecesCut(half) + " pieces cut after one more");
 
             // (Shedding moved to the giant trees in M7.5 step 6b: checked in TreeGrowthTests.)
-            helper.succeed();
+            giantTreesDeadWood(helper, colony);
         });
+    }
+
+    /**
+     * M7.5 step 6d: the dead giant trees' wood is termite food like the old Dead Wood: a fallen branch under a crown of
+     * leaves is seen, a dead trunk standing taller than the food scan's stack is seen at its foot; a log block is worth
+     * as much as the old Dead Wood, soft rot less; it is eaten in stages, the last piece leaving it gone, and wood the
+     * termites started on is no longer the tree's own (the tree book leaves it alone).
+     */
+    private static void giantTreesDeadWood(GameTestHelper helper, Colony colony) {
+        ServerLevel level = helper.getLevel();
+        BlockPos shaded = helper.absolutePos(new BlockPos(MIDDLE + 6, SURFACE, MIDDLE + 6));
+        level.setBlock(shaded, ModBlocks.FALLEN_BRANCH.get().defaultBlockState(), 3);
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dz = -2; dz <= 2; dz++) {
+                level.setBlock(shaded.offset(dx, 5, dz), com.antcolonies.registry.TreeBlocks.UMBRELLA_THORN.leaves().get().defaultBlockState(), 3);
+            }
+        }
+        BlockPos snag = helper.absolutePos(new BlockPos(MIDDLE - 6, SURFACE, MIDDLE - 6));
+        for (int y = 0; y < 9; y++) {
+            level.setBlock(snag.above(y), com.antcolonies.registry.TreeBlocks.BLEACHED_LOG.get().defaultBlockState(), 3);
+        }
+        colony.food().rescanPlantsSoon();
+        java.util.List<BlockPos> plants = colony.food().plants(level);
+        helper.assertTrue(plants.contains(shaded), "a fallen branch under a crown of leaves is not seen as food");
+        helper.assertTrue(plants.contains(snag), "a dead trunk 9 tall is not seen at its foot");
+        BlockState log = com.antcolonies.registry.TreeBlocks.BLEACHED_LOG.get().defaultBlockState();
+        int logPieces = colony.food().piecesOf(log), deadWood = colony.food().piecesOf(ModBlocks.DEAD_WOOD.get().defaultBlockState());
+        int rot = colony.food().piecesOf(com.antcolonies.registry.TreeBlocks.ROTTEN_WOOD.get().defaultBlockState());
+        helper.assertTrue(logPieces == deadWood && colony.food().piecesOf(com.antcolonies.registry.TreeBlocks.BLEACHED_WOOD.get().defaultBlockState()) == deadWood
+                && rot > 0 && rot < logPieces && colony.food().piecesOf(com.antcolonies.registry.TreeBlocks.BLEACHED_BRANCH.get().defaultBlockState()) > 0,
+                "the dead trees' wood is worth " + logPieces + " (old Dead Wood " + deadWood + "), rot " + rot);
+        // The snag's top block eaten piece by piece (nothing of a nest beside it: it goes, no cast).
+        BlockPos top = snag.above(8);
+        java.util.UUID ant = java.util.UUID.randomUUID();
+        int stage = 0;
+        for (int cut = 1; cut <= logPieces; cut++) {
+            colony.food().clippedGrass(level, top, ant);
+            BlockState now = level.getBlockState(top);
+            if (cut < logPieces) {
+                stage = Math.max(stage, now.getValue(com.antcolonies.block.DeadWoodBlock.EATEN));
+                helper.assertTrue(!com.antcolonies.worldgen.TreePlacer.same(now, log) || stage == 0, "eaten wood is still the tree's own");
+            } else {
+                helper.assertTrue(!now.is(log.getBlock()), "the dead trunk's block is still there after its last piece: " + now);
+            }
+        }
+        helper.assertTrue(stage == com.antcolonies.block.DeadWoodBlock.MAX_EATEN, "the dead trunk's block only got to stage " + stage);
+        helper.succeed();
     }
 
     /**

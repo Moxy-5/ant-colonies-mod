@@ -1,7 +1,16 @@
 {
   "variants": {
-    "": {
+    "eaten=0": {
       "model": "antcolonies:block/baobab_fibre"
+    },
+    "eaten=1": {
+      "model": "antcolonies:block/baobab_fibre_eaten_1"
+    },
+    "eaten=2": {
+      "model": "antcolonies:block/baobab_fibre_eaten_2"
+    },
+    "eaten=3": {
+      "model": "antcolonies:block/baobab_fibre_eaten_3"
     }
   }
 }

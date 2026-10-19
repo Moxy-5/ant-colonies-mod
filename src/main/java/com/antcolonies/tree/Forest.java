@@ -967,7 +967,11 @@ public class Forest extends SavedData {
         return false;
     }
 
-    /** Whether a tree's trunk has been cut through at its foot (fewer than half its foot blocks still its own). */
+    /**
+     * Whether a tree's trunk has been cut through at its foot (fewer than half its foot blocks still its own). Termites
+     * eating a dead tree from its foot (step 6d) cut it too: a foot block eaten half through or more no longer holds
+     * (real termite-hollowed snags topple).
+     */
     private static boolean cutThrough(ServerLevel level, Tree t, TreePlacer.Placed now) {
         int foot = 0, there = 0;
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
@@ -978,7 +982,9 @@ public class Forest extends SavedData {
             }
             foot++;
             pos.set(t.foot.getX() + now.xs()[i], t.foot.getY(), t.foot.getZ() + now.zs()[i]);
-            if (TreePlacer.same(level.getBlockState(pos), now.states()[i])) {
+            BlockState state = level.getBlockState(pos);
+            if (TreePlacer.same(state, now.states()[i])
+                    || state.is(now.states()[i].getBlock()) && state.getValue(com.antcolonies.block.DeadWoodBlock.EATEN) < 2) {
                 there++;
             }
         }

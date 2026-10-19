@@ -705,7 +705,17 @@ public class TermiteNewHoleTests {
         eatenFromBelow(helper, true, Food.BRANCH);
     }
 
-    private enum Food { LOG, STUMP, BRANCH }
+    /**
+     * M7.5 step 6d: a fallen giant's log, 3 blocks thick (silver bark round a bleached core), is eaten the same way: a
+     * tunnel out, a feeding gallery under its underside, eaten from below by day, and a block eaten away leaves a mud
+     * cast (the bottom row is nearly eaten at dawn, as the stump's log is, so the test is quick).
+     */
+    @GameTest(template = "arena", timeoutTicks = 90000, skyAccess = true)
+    public static void aFallenGiantsLogIsEatenFromBelowByDayAndLeavesCasts(GameTestHelper helper) {
+        eatenFromBelow(helper, false, Food.GIANT);
+    }
+
+    private enum Food { LOG, STUMP, BRANCH, GIANT }
 
     /**
      * (60000 ticks, was 40000: once the stump was still on its last bitten stage when the time ran out, 2026-10-14; 90000
@@ -759,7 +769,20 @@ public class TermiteNewHoleTests {
             }
             TermiteSoldierTests.digNestAtOnce(level, colony);
             colony.population().addNewMembers(WorkerAntEntity.CASTE, level.getGameTime() - 1000, 500);
-            for (int i = 0; i < log.size(); i++) {
+            if (kind == Food.GIANT) {
+                // The rest of the giant's log round the bottom row: 3 wide, 3 high, bark outside, the core inside.
+                for (BlockPos bottom : log) {
+                    for (int dz = -1; dz <= 1; dz++) {
+                        for (int dy = 0; dy <= 2; dy++) {
+                            boolean core = dz == 0 && dy == 1;
+                            level.setBlock(bottom.offset(0, dy, dz), (core ? com.antcolonies.registry.TreeBlocks.BLEACHED_LOG
+                                    : com.antcolonies.registry.TreeBlocks.BLEACHED_WOOD).get().defaultBlockState()
+                                    .setValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS, net.minecraft.core.Direction.Axis.X), 3);
+                        }
+                    }
+                }
+            }
+            for (int i = 0; kind != Food.GIANT && i < log.size(); i++) {
                 level.setBlock(log.get(i), kind == Food.BRANCH
                         ? com.antcolonies.registry.ModBlocks.FALLEN_BRANCH.get().defaultBlockState()
                                 .setValue(com.antcolonies.block.FallenBranchBlock.AXIS, net.minecraft.core.Direction.Axis.X)
@@ -793,7 +816,7 @@ public class TermiteNewHoleTests {
             int eaten = 0;
             for (BlockPos wood : log) {
                 BlockState state = level.getBlockState(wood);
-                eaten += state.getBlock() instanceof com.antcolonies.block.DeadWoodBlock ? state.getValue(com.antcolonies.block.DeadWoodBlock.EATEN) * 10
+                eaten += state.hasProperty(com.antcolonies.block.DeadWoodBlock.EATEN) ? state.getValue(com.antcolonies.block.DeadWoodBlock.EATEN) * 10
                         + colony.food().getPiecesCut(wood)
                         : state.getBlock() instanceof com.antcolonies.block.FallenBranchBlock ? state.getValue(com.antcolonies.block.FallenBranchBlock.EATEN) * 10
                         + colony.food().getPiecesCut(wood) : 100;
@@ -849,6 +872,18 @@ public class TermiteNewHoleTests {
                             colony.field().setOnForTests(true); // (brain part 3: the 500 numbers forage too, by day only from inside)
                         }
                         phase[0] = 2;
+                        if (kind == Food.GIANT) {
+                            // The giant's bottom row nearly eaten (quicker): a cast comes soon.
+                            for (BlockPos block : log) {
+                                BlockState wood = level.getBlockState(block);
+                                if (wood.hasProperty(com.antcolonies.block.DeadWoodBlock.EATEN)) {
+                                    level.setBlock(block, wood.setValue(com.antcolonies.block.DeadWoodBlock.EATEN, com.antcolonies.block.DeadWoodBlock.MAX_EATEN), 3);
+                                    // (all but 2 of its pieces: eating from below by day is slow, and a cast must come within the day)
+                                    colony.food().setPiecesCutForTests(block, colony.food().piecesOf(wood) - 2);
+                                }
+                            }
+                            colony.food().rescanPlantsSoon();
+                        }
                         if (kind == Food.STUMP) {
                             // The stump on the log; it and every block of the log nearly eaten (quicker, and alike, so the
                             // block under the stump, nearest the hole, goes first). The stump only from the log's cast.
@@ -897,6 +932,11 @@ public class TermiteNewHoleTests {
                     helper.assertTrue(under.getValue(com.antcolonies.block.TermiteTunnelBlock.OPEN.get(net.minecraft.core.Direction.DOWN))
                             && under.getValue(com.antcolonies.block.TermiteTunnelBlock.OPEN.get(net.minecraft.core.Direction.UP)),
                             "the cast of the log does not join the gallery and the cast of the stump: " + under);
+                    helper.succeed();
+                }
+            } else if (kind == Food.GIANT) {
+                // A block of the giant's underside eaten away by day is a mud cast, the rest of the log over it.
+                if (log.stream().anyMatch(b -> com.antcolonies.block.MudCastBlock.isCast(level.getBlockState(b)))) {
                     helper.succeed();
                 }
             } else if (kind == Food.BRANCH) {

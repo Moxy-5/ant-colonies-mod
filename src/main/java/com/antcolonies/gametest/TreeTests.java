@@ -250,14 +250,7 @@ public class TreeTests {
     private static void newLandLitter(GameTestHelper helper, BlockPos foot) {
         var level = helper.getLevel();
         var pick = new com.antcolonies.worldgen.GiantTreeStructure.Pick("camel_thorn", 5, 1, TreeStage.LIVING);
-        TreePlacer.Placed litter = com.antcolonies.worldgen.GiantTreePiece.litter(pick, foot, (x, z) -> {
-            for (int y = foot.getY() + 3; y > foot.getY() - 8; y--) {
-                if (!TreePlacer.isOpen(level.getBlockState(new BlockPos(x, y - 1, z)))) {
-                    return y;
-                }
-            }
-            return foot.getY();
-        });
+        TreePlacer.Placed litter = com.antcolonies.worldgen.GiantTreePiece.litter(pick, foot, TreePlacer.ground(level, foot));
         int branch = 0;
         for (int i = 0; i < litter.size(); i++) {
             branch += litter.states()[i].getBlock() instanceof FallenBranchBlock ? 1 : 0;
@@ -267,7 +260,10 @@ public class TreeTests {
         }
         int placed = TreePlacer.place(level, litter, foot, litter.box(foot), Block.UPDATE_CLIENTS);
         if (placed == 0) {
-            helper.fail("none of the dead wood under the camel thorn was put down");
+            BlockPos first = foot.offset(litter.xs()[0], litter.ys()[0], litter.zs()[0]);
+            helper.fail("none of the " + litter.size() + " blocks of dead wood under the camel thorn was put down; the first, "
+                    + litter.states()[0] + " at " + litter.xs()[0] + "," + litter.ys()[0] + "," + litter.zs()[0] + ", finds "
+                    + level.getBlockState(first) + " over " + level.getBlockState(first.below()));
         }
         for (int i = 0; i < litter.size(); i++) {
             BlockPos pos = foot.offset(litter.xs()[i], litter.ys()[i], litter.zs()[i]);

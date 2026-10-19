@@ -444,6 +444,53 @@ public class FoodStore {
                 break;
             }
         }
+        if (isTreeTop(level.getBlockState(top.below()))) {
+            scanUnderCrown(level, top, far);
+        }
+    }
+
+    /** A giant tree's crown or trunk (or any tree's): what lies on the ground under it is looked for too. */
+    private static boolean isTreeTop(BlockState state) {
+        return state.is(com.antcolonies.registry.TreeBlocks.TREE_WOOD) || state.is(com.antcolonies.registry.TreeBlocks.TREE_LEAVES)
+                || state.is(net.minecraft.tags.BlockTags.LEAVES) || state.getBlock() instanceof com.antcolonies.block.TreeBranchBlock;
+    }
+
+    /**
+     * M7.5 step 6d: the food on the ground under a tree's crown or trunk (fallen branches it shed, a dead tree's foot
+     * eaten from below), which the top block of the column hides. Down from the column's top (no higher than rich food
+     * is counted) through the air, leaves and wood over the ground, to the ground; the food lying on it (and a dead
+     * trunk's lowest blocks, up to {@link #STACK_DEPTH}) counts. A dead tree standing taller than the stack is seen
+     * by its foot, where termites eat it.
+     */
+    private void scanUnderCrown(Level level, BlockPos top, boolean far) {
+        int from = Math.min(top.getY() - 1, center.getY() + RICH_HEIGHT), to = center.getY() - RICH_HEIGHT;
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos(top.getX(), from, top.getZ());
+        int run = 0; // food blocks in a row just over where the walk is now
+        for (int y = from; y >= to; y--) {
+            pos.setY(y);
+            BlockState state = level.getBlockState(pos);
+            SpeciesProfile.PlantFood plant = food().plantFor(state);
+            if (plant != null) {
+                run++;
+                continue;
+            }
+            boolean passable = state.isAir() || MudCrustBlock.isCrust(state) || isTreeTop(state) || !state.blocksMotion();
+            if (passable) {
+                run = 0;
+                continue;
+            }
+            // The ground: the food just over it counts (the lowest of a dead trunk, a fallen branch, a tuft).
+            for (int up = 1; up <= Math.min(run, STACK_DEPTH); up++) {
+                BlockPos food = new BlockPos(top.getX(), y + up, top.getZ());
+                SpeciesProfile.PlantFood p = food().plantFor(level.getBlockState(food));
+                int dy = food.getY() - center.getY();
+                if (p != null && (dy >= -1 && dy <= 4 || (p.rich() || far) && Math.abs(dy) <= RICH_HEIGHT)
+                        && !grassTufts.subList(Math.max(0, grassTufts.size() - STACK_DEPTH), grassTufts.size()).contains(food)) {
+                    grassTufts.add(food);
+                }
+            }
+            return;
+        }
     }
 
     /** Food stacked under the top food block of a column (a stump on a log, a stump 2 blocks tall) is seen this deep. */

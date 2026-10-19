@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "antcolonies:block/rotten_wood_eaten_1"
+  }
+}

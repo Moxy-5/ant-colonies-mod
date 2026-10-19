@@ -4,8 +4,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.antcolonies.AntColoniesMod;
+import com.antcolonies.block.BleachedBranchBlock;
+import com.antcolonies.block.DeadTreeWoodBlock;
 import com.antcolonies.block.FrassBlock;
 import com.antcolonies.block.HangingPodsBlock;
+import com.antcolonies.block.SoftDeadWoodBlock;
 import com.antcolonies.block.TaperingBranchBlock;
 import com.antcolonies.block.ThornyTwigBlock;
 import com.antcolonies.block.TreeBranchBlock;
@@ -65,12 +68,12 @@ public final class TreeBlocks {
             BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_LIGHT_GRAY).strength(0.2F).sound(SoundType.AZALEA_LEAVES)
                     .noCollission().noOcclusion().ignitedByLava().pushReaction(PushReaction.DESTROY)));
 
-    /** A dead tree's trunk with the bark weathered to silver (the user's pick, look E). */
-    public static final DeferredBlock<RotatedPillarBlock> BLEACHED_LOG = add(pillar("bleached_log", deadWood()));
-    public static final DeferredBlock<RotatedPillarBlock> BLEACHED_WOOD = add(pillar("bleached_wood", deadWood()));
+    /** A dead tree's trunk with the bark weathered to silver (the user's pick, look E); termites eat it in stages (step 6d). */
+    public static final DeferredBlock<DeadTreeWoodBlock> BLEACHED_LOG = add(ModBlocks.BLOCKS.registerBlock("bleached_log", DeadTreeWoodBlock::new, deadWood()));
+    public static final DeferredBlock<DeadTreeWoodBlock> BLEACHED_WOOD = add(ModBlocks.BLOCKS.registerBlock("bleached_wood", DeadTreeWoodBlock::new, deadWood()));
     /** A dead trunk with the bark lifting off in strips. */
-    public static final DeferredBlock<RotatedPillarBlock> PEELING_BLEACHED_LOG = add(pillar("peeling_bleached_log", deadWood()));
-    public static final DeferredBlock<TaperingBranchBlock> BLEACHED_BRANCH = add(ModBlocks.BLOCKS.registerBlock("bleached_branch", TaperingBranchBlock::new,
+    public static final DeferredBlock<DeadTreeWoodBlock> PEELING_BLEACHED_LOG = add(ModBlocks.BLOCKS.registerBlock("peeling_bleached_log", DeadTreeWoodBlock::new, deadWood()));
+    public static final DeferredBlock<BleachedBranchBlock> BLEACHED_BRANCH = add(ModBlocks.BLOCKS.registerBlock("bleached_branch", BleachedBranchBlock::new,
             branchProperties(MapColor.COLOR_LIGHT_GRAY, 1.0F)));
     /**
      * Bark burnt black (step 5d): a fire's scar on a living tree, and the whole of a tree killed by fire. Charcoal does
@@ -81,14 +84,14 @@ public final class TreeBlocks {
     public static final DeferredBlock<TreeBranchBlock> CHARRED_BRANCH = add(ModBlocks.BLOCKS.registerBlock("charred_branch", TreeBranchBlock::new,
             branchProperties(MapColor.COLOR_BLACK, 0.8F)));
     /** Heart-rot: soft crumbly wood inside an old trunk; insects dig it fast. */
-    public static final DeferredBlock<Block> ROTTEN_WOOD = add(ModBlocks.BLOCKS.registerSimpleBlock("rotten_wood",
+    public static final DeferredBlock<SoftDeadWoodBlock> ROTTEN_WOOD = add(ModBlocks.BLOCKS.registerBlock("rotten_wood", SoftDeadWoodBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_BROWN).strength(0.4F).sound(SoundType.WOOD).ignitedByLava()));
     /** Wood dust and droppings, a thin layer on the floor of hollows and galleries. */
     public static final DeferredBlock<FrassBlock> FRASS = add(ModBlocks.BLOCKS.registerBlock("frass", FrassBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.SAND).strength(0.1F).sound(SoundType.SAND).ignitedByLava()
                     .pushReaction(PushReaction.DESTROY)));
     /** What a dead baobab slumps into: a soggy heap of fibres (it leaves no log). */
-    public static final DeferredBlock<Block> BAOBAB_FIBRE = add(ModBlocks.BLOCKS.registerSimpleBlock("baobab_fibre",
+    public static final DeferredBlock<SoftDeadWoodBlock> BAOBAB_FIBRE = add(ModBlocks.BLOCKS.registerBlock("baobab_fibre", SoftDeadWoodBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_BROWN).strength(0.4F).sound(SoundType.WET_GRASS)));
 
     private TreeBlocks() {

@@ -599,6 +599,65 @@ def log(name, side, end):
     drops_itself(name)
 
 
+EATEN_STAGES = 4
+DEAD_WOOD_VARIANTS = 3   # the old Dead Wood's side versions (tools/dead_wood_art.py)
+MUD_COVER = [0.0, 0.25, 0.5, 0.75]   # as tools/dead_wood_art.py
+
+
+def mud_over(rows, stage):
+    """Termite mud spreading over a texture as it is eaten (the same blobs as the old Dead Wood's, tools/dead_wood_art.py)."""
+    mrng = random.Random(9)
+    blobs = [(mrng.uniform(0, 16), mrng.uniform(0, 16), mrng.uniform(1.8, 3.6)) for _ in range(24)]
+    out = [list(row) for row in rows]
+    cover = MUD_COVER[stage]
+    for y in range(S):
+        for x in range(S):
+            d = min(((min(abs(x - bx), 16 - abs(x - bx))) ** 2 + (min(abs(y - by), 16 - abs(y - by))) ** 2) ** 0.5 / r
+                    for bx, by, r in blobs)
+            if cover > 0 and d < cover * 1.25:
+                base = (104, 58, 38) if d > cover or mrng.random() < 0.15 else (138, 78, 50)
+                out[y][x] = tuple(clamp(c + mrng.randint(-6, 6)) for c in base)
+    return out
+
+
+def eaten_log(name, side, end, bark_all_round):
+    """A dead tree's log or wood eaten by termites in 4 stages (M7.5 step 6d): stage 0 its own look, then the old Dead
+    Wood's mud over silver, the cut end hollowed (or mud bark all round for wood), a version picked per block."""
+    model(name, {"parent": "minecraft:block/cube_column", "textures": {"side": side, "end": end}})
+    model(f"{name}_horizontal", {"parent": "minecraft:block/cube_column_horizontal", "textures": {"side": side, "end": end}})
+    variants = {}
+    turn = {"x": {"x": 90, "y": 90}, "y": {}, "z": {"x": 90}}
+    for axis in ("x", "y", "z"):
+        variants[f"axis={axis},eaten=0"] = dict({"model": f"antcolonies:block/{name}" + ("" if axis == "y" else "_horizontal")},
+                                                **({"x": 90, "y": 90} if axis == "x" else {"x": 90} if axis == "z" else {}))
+        for stage in range(1, EATEN_STAGES):
+            if bark_all_round:
+                models = [f"antcolonies:block/{name}_eaten_{stage}_{v}" for v in range(DEAD_WOOD_VARIANTS)]
+            else:
+                models = [f"antcolonies:block/dead_wood_{stage}_{v}" for v in range(DEAD_WOOD_VARIANTS)]
+            variants[f"axis={axis},eaten={stage}"] = [dict({"model": m}, **turn[axis]) for m in models]
+    if bark_all_round:
+        for stage in range(1, EATEN_STAGES):
+            for v in range(DEAD_WOOD_VARIANTS):
+                tex = f"antcolonies:block/dead_wood_{stage}_{v}"
+                model(f"{name}_eaten_{stage}_{v}", {"parent": "minecraft:block/cube_column", "textures": {"side": tex, "end": tex}})
+    write_json(ASSETS / f"blockstates/{name}.json", {"variants": variants})
+    item_from_block(name)
+    drops_itself(name)
+
+
+def eaten_single(name, rows):
+    """A soft dead block (heart-rot, baobab fibre) eaten by termites in 4 stages, mud spreading over it (step 6d)."""
+    variants = {}
+    for stage in range(EATEN_STAGES):
+        tex = name if stage == 0 else f"{name}_eaten_{stage}"
+        texture(tex, rows if stage == 0 else mud_over(rows, stage))
+        model(tex, {"parent": "minecraft:block/cube_all", "textures": {"all": f"antcolonies:block/{tex}"}})
+        variants[f"eaten={stage}"] = {"model": f"antcolonies:block/{tex}"}
+    write_json(ASSETS / f"blockstates/{name}.json", {"variants": variants})
+    item_from_block(name)
+
+
 def single(name, model_data, item=None):
     model(name, model_data)
     write_json(ASSETS / f"blockstates/{name}.json", {"variants": {"": {"model": f"antcolonies:block/{name}"}}})
@@ -701,9 +760,10 @@ def game_files():
     texture("bleached_bark", dead_bark_silver(0))
     texture("peeling_bleached_bark", peeling_bark())
     dead_end = "antcolonies:block/dead_wood_top_0"
-    log("bleached_log", "antcolonies:block/bleached_bark", dead_end)
-    log("bleached_wood", "antcolonies:block/bleached_bark", "antcolonies:block/bleached_bark")
-    log("peeling_bleached_log", "antcolonies:block/peeling_bleached_bark", dead_end)
+    # Eaten by termites in stages (step 6d), like the old Dead Wood.
+    eaten_log("bleached_log", "antcolonies:block/bleached_bark", dead_end, False)
+    eaten_log("bleached_wood", "antcolonies:block/bleached_bark", "antcolonies:block/bleached_bark", True)
+    eaten_log("peeling_bleached_log", "antcolonies:block/peeling_bleached_bark", dead_end, False)
     tapering_branch("bleached_branch", "antcolonies:block/bleached_bark", dead_end)
     # Burnt wood (step 5d): bark charred black by fire, on living scars and on a tree killed by fire.
     texture("charred_bark", charred_bark(0))
@@ -712,8 +772,7 @@ def game_files():
     log("charred_wood", "antcolonies:block/charred_bark", "antcolonies:block/charred_bark")
     branch("charred_branch", "antcolonies:block/charred_bark", "antcolonies:block/charred_log_top")
     for name, rows in (("rotten_wood", rotten_wood()), ("baobab_fibre", fibre())):
-        texture(name, rows)
-        single(name, {"parent": "minecraft:block/cube_all", "textures": {"all": f"antcolonies:block/{name}"}})
+        eaten_single(name, rows)
         drops_itself(name)
     texture("frass", frass())
     sides = {f: {"uv": [0, 14, 16, 16], "texture": "#texture", "cullface": f} for f in ("north", "south", "east", "west")}
