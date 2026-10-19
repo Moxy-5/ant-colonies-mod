@@ -442,14 +442,12 @@ public class ColonyCommands {
                 continue;
             }
             String what = t.age < com.antcolonies.tree.TreeLife.YOUNG ? "seedling" : "young";
-            out.append(String.format("
-  %s %s at %d %d %d, age %.2f%s", t.kind.replace('_', ' '), what, t.foot.getX(), t.foot.getY(), t.foot.getZ(),
+            out.append(String.format("\n  %s %s at %d %d %d, age %.2f%s", t.kind.replace('_', ' '), what, t.foot.getX(), t.foot.getY(), t.foot.getZ(),
                     t.age, t.placedAge < 0 ? " (not come up yet)" : ""));
             shown++;
         }
         if (shown == 0) {
-            out.append("
-  no seedlings or young trees within 128 blocks");
+            out.append("\n  no seedlings or young trees within 128 blocks");
         }
         source.sendSuccess(() -> Component.literal(out.toString()), false);
         return 1;
