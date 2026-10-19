@@ -49,6 +49,9 @@ public class ColonyCommands {
                         .then(Commands.literal("off").executes(context -> stress(context.getSource(), 0)))
                         .then(Commands.argument("count", IntegerArgumentType.integer(1, 500))
                                 .executes(context -> stress(context.getSource(), IntegerArgumentType.getInteger(context, "count")))))
+                // The giant savanna trees in the tree book (M7.5 step 4): how many, and the nearest little ones with their
+                // place and age, to find a new seedling after rain or watch a young tree grow.
+                .then(Commands.literal("trees").executes(context -> trees(context.getSource())))
                 .then(Commands.literal("perf").executes(context -> {
                     context.getSource().sendSuccess(() -> Component.literal(Perf.report()), false);
                     return 1;
@@ -423,5 +426,32 @@ public class ColonyCommands {
         long seconds = Math.max(0, colony.queenCare().getEggDue() - level.getGameTime()) / 20;
         String burst = colony.queenCare().getBurstLeft() > 0 ? ", burst: " + colony.queenCare().getBurstLeft() + " left" : "";
         return String.format(" (egg in %d:%02d%s)", seconds / 60, seconds % 60, burst);
+    }
+
+    private static int trees(CommandSourceStack source) {
+        ServerLevel level = source.getLevel();
+        com.antcolonies.tree.Forest forest = com.antcolonies.tree.Forest.get(level);
+        BlockPos at = BlockPos.containing(source.getPosition());
+        java.util.List<com.antcolonies.tree.Forest.Tree> near = forest.near(at, 128);
+        near.sort(Comparator.comparingDouble(t -> t.foot.distSqr(at)));
+        StringBuilder out = new StringBuilder(String.format("Tree book: %d trees (day %d; so far %d growth steps, %d little trees died, %d seedlings came up)",
+                forest.size(), com.antcolonies.tree.Forest.today(level), forest.grownSteps, forest.deaths, forest.sprouted));
+        int shown = 0;
+        for (com.antcolonies.tree.Forest.Tree t : near) {
+            if (!t.living() || t.age >= com.antcolonies.tree.TreeShapes.GROWN || shown >= 8) {
+                continue;
+            }
+            String what = t.age < com.antcolonies.tree.TreeLife.YOUNG ? "seedling" : "young";
+            out.append(String.format("
+  %s %s at %d %d %d, age %.2f%s", t.kind.replace('_', ' '), what, t.foot.getX(), t.foot.getY(), t.foot.getZ(),
+                    t.age, t.placedAge < 0 ? " (not come up yet)" : ""));
+            shown++;
+        }
+        if (shown == 0) {
+            out.append("
+  no seedlings or young trees within 128 blocks");
+        }
+        source.sendSuccess(() -> Component.literal(out.toString()), false);
+        return 1;
     }
 }
