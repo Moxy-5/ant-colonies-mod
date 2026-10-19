@@ -17,14 +17,14 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 
 /**
  * A branch that tapers as the player builds it out (the user's ask, 2026-10-19; umbrella and camel thorn and the dead bleached branches, not the baobab): the
- * first branch placed is 60 percent of a block thick, and every 2 branches placed on along it are 10 percent thinner
+ * first branch placed is 67 percent of a block thick, and every 2 branches placed on along it are 10 percent thinner
  * than the 2 before, like a real acacia limb thinning toward its twigs. {@link #STEP} counts how far along the chain
  * this branch is. Trees grown by the mod taper the same way out from their wood (TreePlacer).
  */
 public class TaperingBranchBlock extends TreeBranchBlock {
     public static final MapCodec<TaperingBranchBlock> CODEC = simpleCodec(TaperingBranchBlock::new);
-    /** How many thickness levels: level 0 is 60 percent of a block, each level 10 percent thinner (level 8 about 4 pixels). */
-    public static final int LEVELS = 9;
+    /** How many thickness levels: level 0 is 67 percent of a block, each level 10 percent thinner (level 9 about 4 pixels). */
+    public static final int LEVELS = 10;
     /** How far along the chain this branch is; 2 steps make a thickness level. */
     public static final IntegerProperty STEP = IntegerProperty.create("step", 0, LEVELS * 2 - 1);
     /** The last step, the thinnest; also the default (TreePlacer sets each grown branch's own step). */
@@ -55,9 +55,9 @@ public class TaperingBranchBlock extends TreeBranchBlock {
         registerDefaultState(defaultBlockState().setValue(STEP, MAX_STEP));
     }
 
-    /** A level's thickness in pixels: 60 percent of 16, then 10 percent less per level (tools/tree_art.py draws the same). */
+    /** A level's thickness in pixels: 67 percent of 16, then 10 percent less per level (tools/tree_art.py draws the same). */
     public static double width(int level) {
-        return 16 * 0.6 * Math.pow(0.9, level);
+        return 16 * 0.67 * Math.pow(0.9, level);
     }
 
     @Override
