@@ -32,6 +32,7 @@ public class AntColoniesMod {
     public AntColoniesMod(IEventBus modEventBus) {
         ModBlocks.BLOCKS.register(modEventBus);
         ModFeatures.FEATURES.register(modEventBus);
+        ModFeatures.BIOME_MODIFIERS.register(modEventBus);
         ModStructures.STRUCTURE_TYPES.register(modEventBus);
         ModStructures.STRUCTURE_PIECES.register(modEventBus);
         ModEntities.ENTITY_TYPES.register(modEventBus);
