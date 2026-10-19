@@ -62,6 +62,8 @@ final class UmbrellaShape {
      * RING_FULL of the way (about age 0.6); each side covers at most RING_WIDEN of the gap, so they never touch (the
      * grown crown joins them).
      */
+    /** An ancient crown's full ring of leaves starts this far out (of the crown's radius). */
+    private static final double ANCIENT_RING_INNER = 0.4;
     private static final double RING_FROM = 0.03, RING_FULL = 0.35, RING_WIDEN = 0.3;
 
     private final TreeKind kind;
@@ -492,6 +494,27 @@ final class UmbrellaShape {
                             continue;
                         }
                         v.put(x, y, z, TreePart.LEAVES);
+                    }
+                }
+            }
+        }
+        if (old > 0) {
+            // An ancient crown (the user's ask, 2026-10-18): its clumps have long since joined into one full, dense
+            // ring round the crown, also over a dead limb's gap, the neighbours' twigs grown into it.
+            int r = (int) Math.ceil(rc + 1);
+            for (int x = -r; x <= r; x++) {
+                for (int z = -r; z <= r; z++) {
+                    double hd = Math.hypot(x, z);
+                    if (hd < rc * ANCIENT_RING_INNER || hd > rc * (0.95 + 0.08 * TreeRandom.hash(x, 1, z, 6))) {
+                        continue;
+                    }
+                    double d0 = Math.max(0, hd - 3 * old);
+                    double lumpTop = top(d0, old) + (TreeRandom.hash(x, 0, z, 5) < 0.3 ? 1 : 0);
+                    double lumpLow = under(d0, old) - (TreeRandom.hash(x, 2, z, 8) < 0.25 ? 1 : 0);
+                    for (int y = (int) Math.ceil(lumpLow); y <= lumpTop; y++) {
+                        if (TreeRandom.hash(x, y, z, 7) < density) {
+                            v.put(x, y, z, TreePart.LEAVES);
+                        }
                     }
                 }
             }
