@@ -248,8 +248,7 @@ final class AcaciaShape {
                     continue;
                 }
                 Poly line = new Poly(end, br.tip);
-                double brStart = gr.r0 * (TreeDraw.look.thick ? 0.5 : 0.38);
-                TreeDraw.growing(v, line, new double[] {brStart, dead ? gr.r0 * 0.3 : 0.35}, upto, !dead, b, 0);
+                TreeDraw.growing(v, line, new double[] {gr.r0 * TreeDraw.look.branchFrom, dead ? gr.r0 * 0.3 : TreeDraw.look.branchTip}, upto, !dead, b, 0);
                 if (dead) {
                     continue;
                 }
@@ -289,7 +288,7 @@ final class AcaciaShape {
         int count = limb.line.pts.length;
         double[] out = new double[count];
         for (int i = 0; i < count; i++) {
-            out[i] = gr.r0 * (TreeDraw.look.thick ? lerp(0.78, 0.6, (double) i / (count - 1)) : lerp(0.72, 0.4, (double) i / (count - 1)));
+            out[i] = gr.r0 * lerp(TreeDraw.look.limbFrom, TreeDraw.look.limbTo, (double) i / (count - 1));
         }
         return out;
     }

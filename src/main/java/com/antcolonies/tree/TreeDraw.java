@@ -11,19 +11,30 @@ final class TreeDraw {
 
     /**
      * How the limbs between the fork and the crown look, on trial in the tree viewer (the user's report 2026-10-18: the
-     * 1-block-thick limbs looked stringy). A is today's; the game keeps it until the user picks.
+     * 1-block-thick limbs looked stringy; "don't make the trees look skinny"). A is today's; the game keeps it until the
+     * user picks. Thicknesses are shares of the trunk's radius.
      *
-     * @param thick    limbs stay thick out to the crown and branches start thicker (as a real umbrella thorn's)
+     * @param limbFrom  a limb's thickness at the fork
+     * @param limbTo    a limb's thickness where it reaches the crown
+     * @param branchFrom a crown branch's thickness where it leaves its limb
+     * @param branchTip a living crown branch's radius in blocks at its tip
      * @param limbBlock wood about a block thick is the limb pipe (10 px), not bark cubes or a 6 px thin branch
-     * @param straight 1-block lines in longer straight runs with fewer, bigger steps
+     * @param straight  1-block lines in longer straight runs with fewer, bigger steps
      */
     enum LimbLook {
-        A(false, false, false), B(true, false, false), C(false, true, false), D(true, true, false), E(true, true, true);
+        A(0.72, 0.4, 0.38, 0.35, false, false), B(0.78, 0.6, 0.5, 0.35, false, false), C(0.72, 0.4, 0.38, 0.35, true, false),
+        D(0.78, 0.6, 0.5, 0.35, true, false), E(0.78, 0.6, 0.5, 0.35, true, true),
+        // The user's ask 2026-10-18: three thicker still.
+        F(0.9, 0.75, 0.6, 0.35, true, false), G(1.0, 0.85, 0.7, 0.45, true, false), H(1.0, 0.95, 0.85, 0.6, true, false);
 
-        final boolean thick, limbBlock, straight;
+        final double limbFrom, limbTo, branchFrom, branchTip;
+        final boolean limbBlock, straight;
 
-        LimbLook(boolean thick, boolean limbBlock, boolean straight) {
-            this.thick = thick;
+        LimbLook(double limbFrom, double limbTo, double branchFrom, double branchTip, boolean limbBlock, boolean straight) {
+            this.limbFrom = limbFrom;
+            this.limbTo = limbTo;
+            this.branchFrom = branchFrom;
+            this.branchTip = branchTip;
             this.limbBlock = limbBlock;
             this.straight = straight;
         }
