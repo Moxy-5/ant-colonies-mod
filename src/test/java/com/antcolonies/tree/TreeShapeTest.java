@@ -82,17 +82,21 @@ class TreeShapeTest {
         }
     }
 
-    /** Every limb look on trial in the tree viewer (the user's pick, 2026-10-18) stands and grows by the same rules. */
+    /** Every limb look on trial in the tree viewer (the user's pick, 2026-10-18), with today's growth and the new one, stands and grows by the same rules. */
     @Test
     void everyLimbLookStandsAndGrows() {
         try {
-            for (TreeDraw.LimbLook look : TreeDraw.LimbLook.values()) {
-                TreeDraw.look = look;
-                nothingFloats();
-                aGrowingTreeOnlyAddsWood();
+            for (boolean early : new boolean[] {false, true}) {
+                TreeDraw.earlyGrowth = early;
+                for (TreeDraw.LimbLook look : TreeDraw.LimbLook.values()) {
+                    TreeDraw.look = look;
+                    nothingFloats();
+                    aGrowingTreeOnlyAddsWood();
+                }
             }
         } finally {
             TreeDraw.look = TreeDraw.LimbLook.A;
+            TreeDraw.earlyGrowth = false;
         }
     }
 

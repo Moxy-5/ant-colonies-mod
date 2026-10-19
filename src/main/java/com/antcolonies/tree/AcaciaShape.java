@@ -159,7 +159,9 @@ final class AcaciaShape {
             old = clamp((age - 1) / 0.25, 0, 1);
             k = Math.pow(g, 1.5);
             s = old > 0 ? reach + 1 : reach * k;
-            r0 = 0.35 + radiusGrowth * k + 0.5 * old;
+            // The new growth: girth comes sooner than height (a real young tree thickens every year), but a sapling stays slim.
+            double kr = TreeDraw.earlyGrowth ? lerp(k, Math.pow(g, 0.7), smooth(0.1, 0.45, g)) : k;
+            r0 = 0.35 + radiusGrowth * kr + 0.5 * old;
             ct = lerp(2.5, kind.crown().thickness(), k);
             flat = smooth(0.25, 0.8, g);
         }
@@ -211,7 +213,9 @@ final class AcaciaShape {
             return v;
         }
         TreePart[] blocks = gr.living ? LIVE : DEAD;
-        boolean young = gr.g < 0.45;
+        // The young form: a stem with a bush on top. With the new growth only until the trunk reaches the fork, then
+        // every limb grows from there inside its leaves.
+        boolean young = TreeDraw.earlyGrowth ? gr.s < trunk.length + 0.5 : gr.g < 0.45;
         drawTrunk(v, gr, blocks);
         if (young && gr.living) {
             youngTree(v, gr);
@@ -376,6 +380,12 @@ final class AcaciaShape {
                     // twigs shed later, as the real branches grow out).
                     double[] tip = limb.line.at(lu), end = limb.line.pts[limb.line.pts.length - 1];
                     centres.add(tip);
+                    if (TreeDraw.earlyGrowth) {
+                        // Leaves all along the young limb's upper part, so it grows inside its crown.
+                        for (double d = lu - 2.5; d > lu * 0.35; d -= 2.5) {
+                            centres.add(limb.line.at(d));
+                        }
+                    }
                     double out = Math.min(padBase * 0.8, 1 + 6 * lu / limb.line.length);
                     v.dropping = true;
                     for (Branch br : limb.branches) {

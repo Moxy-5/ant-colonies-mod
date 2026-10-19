@@ -46,13 +46,19 @@ class TreeShapeExport {
         }
         out.put("limbLooks", looks);
         try {
-            for (TreeDraw.LimbLook look : TreeDraw.LimbLook.values()) {
-                TreeDraw.look = look;
-                // Look A (today's) keeps the old keys; the others end in "|look", only where they differ from A.
-                addTrees(trees, shapes, look == TreeDraw.LimbLook.A ? "" : "|" + look.name());
+            for (boolean early : new boolean[] {false, true}) {
+                TreeDraw.earlyGrowth = early;
+                for (TreeDraw.LimbLook look : TreeDraw.LimbLook.values()) {
+                    TreeDraw.look = look;
+                    // Look A (today's) keeps the old keys; the others end in "|look"; the new growth adds "|g2". Each
+                    // only where it differs from what the viewer falls back to (look A of the same growth, else today's).
+                    String suffix = (look == TreeDraw.LimbLook.A ? "" : "|" + look.name()) + (early ? "|g2" : "");
+                    addTrees(trees, shapes, suffix, early && look != TreeDraw.LimbLook.A ? "|g2" : "");
+                }
             }
         } finally {
             TreeDraw.look = TreeDraw.LimbLook.A;
+            TreeDraw.earlyGrowth = false;
         }
         out.put("shapes", shapes);
         out.put("trees", trees);
@@ -68,7 +74,7 @@ class TreeShapeExport {
         System.out.println("wrote " + file.toAbsolutePath() + " (" + Files.size(file) / 1024 + " KB, " + trees.size() + " trees)");
     }
 
-    private static void addTrees(Map<String, String> trees, Map<String, String> shapes, String suffix) {
+    private static void addTrees(Map<String, String> trees, Map<String, String> shapes, String suffix, String fallback) {
         for (String[] k : KINDS) {
             TreeKind kind = TreeKind.load(k[1]);
             for (int seed = 1; seed <= SEEDS; seed++) {
@@ -77,9 +83,9 @@ class TreeShapeExport {
                     double[] ages = stage == TreeStage.LIVING ? AGES : DEAD_AGES;
                     for (double age : ages) {
                         String key = k[0] + "|" + seed + "|" + num(age) + "|";
-                        put(trees, key + stage.id, suffix, encode(TreeShapes.build(kind, seed, age, stage)));
+                        put(trees, key + stage.id, suffix, fallback, encode(TreeShapes.build(kind, seed, age, stage)));
                         if (kind.isBaobab() && stage == TreeStage.LIVING) {
-                            put(trees, key + "living-dry", suffix, encode(TreeShapes.build(kind, seed, age, stage, true)));
+                            put(trees, key + "living-dry", suffix, fallback, encode(TreeShapes.build(kind, seed, age, stage, true)));
                         }
                     }
                 }
@@ -87,8 +93,10 @@ class TreeShapeExport {
         }
     }
 
-    private static void put(Map<String, String> trees, String key, String suffix, String tree) {
-        if (suffix.isEmpty() || !tree.equals(trees.get(key))) {
+    /** Keeps a tree only where it differs from the one the viewer falls back to (key + fallback, else key). */
+    private static void put(Map<String, String> trees, String key, String suffix, String fallback, String tree) {
+        String back = trees.getOrDefault(key + fallback, trees.get(key));
+        if (suffix.isEmpty() || !tree.equals(back)) {
             trees.put(key + suffix, tree);
         }
     }

@@ -40,6 +40,14 @@ final class TreeDraw {
         }
     }
 
+    /**
+     * The new growth on trial in the tree viewer (the user's ask 2026-10-18: a young umbrella thorn and the first mature
+     * one looked like two different trees): the wood thickens sooner, and the limbs grow out of the fork as soon as the
+     * trunk reaches it, clothed in leaves along their way, with no separate young form. Off in the game until the user
+     * picks.
+     */
+    static volatile boolean earlyGrowth = false;
+
     /** The look in use: A in the game; the viewer's export draws every look in turn. */
     static volatile LimbLook look = LimbLook.A;
     /** With the limb pipe: narrower than this is a thin branch, wider than LIMB_MAX round bark (my picks). */
