@@ -10,8 +10,8 @@ import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
 /**
- * A seedling of a giant savanna tree (M7.5): a thin stem and its first leaves. It only stands for now; growing into a
- * young tree comes in M7.5 step 4.
+ * A seedling of a giant savanna tree (M7.5): a thin stem and its first leaves. One planted by a player goes into the
+ * tree book ({@link com.antcolonies.tree.Forest}) and grows from there, a little every day; bone meal speeds it up.
  */
 public class TreeSeedlingBlock extends BushBlock {
     public static final MapCodec<TreeSeedlingBlock> CODEC = simpleCodec(TreeSeedlingBlock::new);
@@ -24,6 +24,19 @@ public class TreeSeedlingBlock extends BushBlock {
     @Override
     protected MapCodec<? extends BushBlock> codec() {
         return CODEC;
+    }
+
+    @Override
+    public void setPlacedBy(net.minecraft.world.level.Level level, BlockPos pos, BlockState state,
+                            net.minecraft.world.entity.LivingEntity placer, net.minecraft.world.item.ItemStack stack) {
+        if (level instanceof net.minecraft.server.level.ServerLevel server) {
+            for (com.antcolonies.registry.TreeBlocks.Kind kind : com.antcolonies.registry.TreeBlocks.KINDS) {
+                if (kind.seedling().get() == this) {
+                    com.antcolonies.tree.Forest.get(server).addSeedling(kind.name(), pos, server.getRandom().nextLong() & 0xFFFFFFFFL,
+                            com.antcolonies.tree.Forest.today(server), true);
+                }
+            }
+        }
     }
 
     @Override

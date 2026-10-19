@@ -94,6 +94,32 @@ public final class TreePlacer {
         return p;
     }
 
+    private static final java.util.Set<String> WORKING = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /**
+     * The tree worked out into blocks if it is ready; if not, it is worked out in the background (a grown giant's shape
+     * takes tens of milliseconds, too long for one server tick) and this returns null: ask again later.
+     */
+    public static Placed placedSoon(String kindName, long seed, double age, TreeStage stage) {
+        String key = kindName + "|" + seed + "|" + age + "|" + stage.id;
+        synchronized (CACHE) {
+            Placed p = CACHE.get(key);
+            if (p != null) {
+                return p;
+            }
+        }
+        if (WORKING.add(key)) {
+            net.minecraft.Util.backgroundExecutor().execute(() -> {
+                try {
+                    placed(kindName, seed, age, stage);
+                } finally {
+                    WORKING.remove(key);
+                }
+            });
+        }
+        return null;
+    }
+
     private static Placed work(TreeKind kind, TreeVoxels v, TreeStage stage) {
         Long2ObjectOpenHashMap<BlockState> states = new Long2ObjectOpenHashMap<>();
         Long2ObjectOpenHashMap<EnumSet<Direction>> plates = new Long2ObjectOpenHashMap<>();
@@ -253,6 +279,94 @@ public final class TreePlacer {
             }
         }
         return placed;
+    }
+
+    /**
+     * Grows a tree in the world from one age to the next (M7.5 step 4): only the blocks that differ between the two
+     * shapes change. A new block goes only into air, grass, flowers or snow (soil for the roots), or where the old shape
+     * put this tree's own block that is still there; never into a player's block, a colony's block or another tree (a
+     * crown simply grows round what is in its way; my pick, to confirm). A block of the old shape the new one no longer
+     * has (a twig the young tree sheds, leaves moving out as the crown widens) goes, if it is still the tree's own. The
+     * places of shed wood are added to {@code shed}. {@code from} null: nothing of the tree is in the world yet.
+     * Returns how many blocks changed.
+     */
+    public static int grow(LevelAccessor level, Placed from, Placed to, BlockPos foot, int flags, java.util.List<BlockPos> shed) {
+        Long2ObjectOpenHashMap<BlockState> old = new Long2ObjectOpenHashMap<>();
+        if (from != null) {
+            for (int i = 0; i < from.size(); i++) {
+                old.put(BlockPos.asLong(from.xs()[i], from.ys()[i], from.zs()[i]), from.states()[i]);
+            }
+        }
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        int changed = 0;
+        it.unimi.dsi.fastutil.longs.LongOpenHashSet kept = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
+        for (int i = 0; i < to.size(); i++) {
+            long k = BlockPos.asLong(to.xs()[i], to.ys()[i], to.zs()[i]);
+            kept.add(k);
+            BlockState state = to.states()[i], was = old.get(k);
+            if (state.equals(was)) {
+                continue;
+            }
+            pos.set(foot.getX() + to.xs()[i], foot.getY() + to.ys()[i], foot.getZ() + to.zs()[i]);
+            BlockState there = level.getBlockState(pos);
+            boolean own = was != null && there.is(was.getBlock());
+            boolean ground = to.ys()[i] < 0;
+            if (!own && (ground ? !isSoil(there) && !isOpen(there) : !isOpen(there))) {
+                continue;
+            }
+            if (state.getBlock() instanceof FallenBranchBlock && !level.getBlockState(pos.below()).isFaceSturdy(level, pos.below(), Direction.UP)) {
+                continue;
+            }
+            level.setBlock(pos, state, flags);
+            changed++;
+            if (to.holds()[i] && (was == null || !own)) {
+                // The trunk widens over a dip in the ground: it goes down to meet it.
+                for (int d = 1; d <= MAX_FILL_DOWN; d++) {
+                    pos.move(Direction.DOWN);
+                    if (!isOpen(level.getBlockState(pos))) {
+                        break;
+                    }
+                    level.setBlock(pos, state, flags);
+                    changed++;
+                }
+            }
+        }
+        for (Long2ObjectMap.Entry<BlockState> e : old.long2ObjectEntrySet()) {
+            long k = e.getLongKey();
+            if (kept.contains(k)) {
+                continue;
+            }
+            pos.set(foot.getX() + BlockPos.getX(k), foot.getY() + BlockPos.getY(k), foot.getZ() + BlockPos.getZ(k));
+            if (!level.getBlockState(pos).is(e.getValue().getBlock())) {
+                continue;
+            }
+            level.setBlock(pos, Blocks.AIR.defaultBlockState(), flags);
+            changed++;
+            if (e.getValue().getBlock() instanceof TreeBranchBlock) {
+                shed.add(pos.immutable());
+            }
+        }
+        return changed;
+    }
+
+    /**
+     * Takes a tree out of the world (a little one that died): every block of its shape that is still its own goes.
+     * Returns how many.
+     */
+    public static int remove(LevelAccessor level, Placed tree, BlockPos foot, int flags) {
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        int removed = 0;
+        for (int i = 0; i < tree.size(); i++) {
+            if (tree.ys()[i] < 0) {
+                continue; // the roots stay in the ground
+            }
+            pos.set(foot.getX() + tree.xs()[i], foot.getY() + tree.ys()[i], foot.getZ() + tree.zs()[i]);
+            if (level.getBlockState(pos).is(tree.states()[i].getBlock())) {
+                level.setBlock(pos, Blocks.AIR.defaultBlockState(), flags);
+                removed++;
+            }
+        }
+        return removed;
     }
 
     /** Air, or a plant or snow a tree may grow through (grass, flowers, dry grass); never water. */

@@ -96,6 +96,22 @@ public class ModEvents {
                 }
             }
             BranchShedding.tick(level);
+            com.antcolonies.tree.Forest.tick(level);
+        }
+    }
+
+    /** Bone meal on a giant savanna tree's seedling or young tree grows it a day's step (M7.5 step 4, {@code Forest}). */
+    @SubscribeEvent
+    public static void onUseOnBlock(net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.RightClickBlock event) {
+        if (!(event.getLevel() instanceof ServerLevel level) || !event.getItemStack().is(net.minecraft.world.item.Items.BONE_MEAL)) {
+            return;
+        }
+        if (com.antcolonies.tree.Forest.get(level).boneMeal(level, event.getPos())) {
+            if (!event.getEntity().getAbilities().instabuild) {
+                event.getItemStack().shrink(1);
+            }
+            event.setCanceled(true);
+            event.setCancellationResult(net.minecraft.world.InteractionResult.SUCCESS);
         }
     }
 
