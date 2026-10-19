@@ -6,6 +6,7 @@ import java.util.Map;
 
 import com.antcolonies.block.FallenBranchBlock;
 import com.antcolonies.block.MudCrustBlock;
+import com.antcolonies.block.TaperingBranchBlock;
 import com.antcolonies.block.TreeBranchBlock;
 import com.antcolonies.block.TreeLeavesBlock;
 import com.antcolonies.registry.ModBlocks;
@@ -18,7 +19,9 @@ import com.antcolonies.tree.TreeStage;
 import com.antcolonies.tree.TreeVoxels;
 
 import it.unimi.dsi.fastutil.longs.Long2DoubleOpenHashMap;
+import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
+import it.unimi.dsi.fastutil.longs.LongArrayFIFOQueue;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
@@ -347,6 +350,7 @@ public final class TreePlacer {
                 }
             }
         }
+        taper(states);
         BlockState crust = ModBlocks.MUD_CRUST.get().defaultBlockState();
         for (Long2ObjectMap.Entry<EnumSet<Direction>> e : plates.long2ObjectEntrySet()) {
             if (states.containsKey(e.getLongKey())) {
@@ -757,6 +761,47 @@ public final class TreePlacer {
         h *= 0xBF58476D1CE4E5B9L;
         h ^= h >>> 29;
         return (h >>> 11) * 0x1.0p-53;
+    }
+
+    /**
+     * Tapering branches (TaperingBranchBlock) thin out away from the wood, as a player builds them: step 0 where a
+     * branch meets a log, one step more for each branch block along; a branch touching no log is the thinnest.
+     */
+    private static void taper(Long2ObjectOpenHashMap<BlockState> states) {
+        Long2IntOpenHashMap steps = new Long2IntOpenHashMap();
+        LongArrayFIFOQueue queue = new LongArrayFIFOQueue();
+        for (Long2ObjectMap.Entry<BlockState> e : states.long2ObjectEntrySet()) {
+            if (e.getValue().getBlock() instanceof TaperingBranchBlock) {
+                long k = e.getLongKey();
+                for (Direction d : Direction.values()) {
+                    BlockState n = states.get(BlockPos.offset(k, d));
+                    if (n != null && n.is(TreeBlocks.TREE_WOOD) && !(n.getBlock() instanceof TreeBranchBlock)) {
+                        steps.put(k, 0);
+                        queue.enqueue(k);
+                        break;
+                    }
+                }
+            }
+        }
+        while (!queue.isEmpty()) {
+            long k = queue.dequeueLong();
+            Block block = states.get(k).getBlock();
+            int next = steps.get(k) + 1;
+            for (Direction d : Direction.values()) {
+                long o = BlockPos.offset(k, d);
+                BlockState n = states.get(o);
+                if (n != null && n.is(block) && !steps.containsKey(o)) {
+                    steps.put(o, next);
+                    queue.enqueue(o);
+                }
+            }
+        }
+        for (Long2ObjectMap.Entry<BlockState> e : states.long2ObjectEntrySet()) {
+            if (e.getValue().getBlock() instanceof TaperingBranchBlock) {
+                int step = Math.min(steps.getOrDefault(e.getLongKey(), TaperingBranchBlock.MAX_STEP), TaperingBranchBlock.MAX_STEP);
+                e.setValue(e.getValue().setValue(TaperingBranchBlock.STEP, step));
+            }
+        }
     }
 
     /** The real block for a part of a tree of this kind (null: nothing). */

@@ -6,6 +6,7 @@ import java.util.List;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.block.FrassBlock;
 import com.antcolonies.block.HangingPodsBlock;
+import com.antcolonies.block.TaperingBranchBlock;
 import com.antcolonies.block.ThornyTwigBlock;
 import com.antcolonies.block.TreeBranchBlock;
 import com.antcolonies.block.TreeLeavesBlock;
@@ -49,9 +50,10 @@ public final class TreeBlocks {
     }
 
     // Real wood: umbrella and camel thorn wood is very hard (camel thorn the hardest); a baobab's is soft, spongy and watery.
-    public static final Kind UMBRELLA_THORN = kind("umbrella_thorn", MapColor.COLOR_GRAY, 2.0F, MapColor.PLANT);
-    public static final Kind CAMEL_THORN = kind("camel_thorn", MapColor.TERRACOTTA_GRAY, 2.5F, MapColor.TERRACOTTA_GREEN);
-    public static final Kind BAOBAB = kind("baobab", MapColor.TERRACOTTA_LIGHT_GRAY, 1.0F, MapColor.COLOR_GREEN);
+    // The two acacias' branches taper as the player builds them out (TaperingBranchBlock); the baobab's stay one size.
+    public static final Kind UMBRELLA_THORN = kind("umbrella_thorn", MapColor.COLOR_GRAY, 2.0F, MapColor.PLANT, true);
+    public static final Kind CAMEL_THORN = kind("camel_thorn", MapColor.TERRACOTTA_GRAY, 2.5F, MapColor.TERRACOTTA_GREEN, true);
+    public static final Kind BAOBAB = kind("baobab", MapColor.TERRACOTTA_LIGHT_GRAY, 1.0F, MapColor.COLOR_GREEN, false);
     public static final List<Kind> KINDS = List.of(UMBRELLA_THORN, CAMEL_THORN, BAOBAB);
 
     /** Thorny acacia twigs at the crown's edge and on young trees: slow and prick anything big, never insects. */
@@ -68,7 +70,7 @@ public final class TreeBlocks {
     public static final DeferredBlock<RotatedPillarBlock> BLEACHED_WOOD = add(pillar("bleached_wood", deadWood()));
     /** A dead trunk with the bark lifting off in strips. */
     public static final DeferredBlock<RotatedPillarBlock> PEELING_BLEACHED_LOG = add(pillar("peeling_bleached_log", deadWood()));
-    public static final DeferredBlock<TreeBranchBlock> BLEACHED_BRANCH = add(ModBlocks.BLOCKS.registerBlock("bleached_branch", TreeBranchBlock::new,
+    public static final DeferredBlock<TaperingBranchBlock> BLEACHED_BRANCH = add(ModBlocks.BLOCKS.registerBlock("bleached_branch", TaperingBranchBlock::new,
             branchProperties(MapColor.COLOR_LIGHT_GRAY, 1.0F)));
     /**
      * Bark burnt black (step 5d): a fire's scar on a living tree, and the whole of a tree killed by fire. Charcoal does
@@ -96,10 +98,11 @@ public final class TreeBlocks {
     static void init() {
     }
 
-    private static Kind kind(String name, MapColor bark, float hardness, MapColor leafColour) {
+    private static Kind kind(String name, MapColor bark, float hardness, MapColor leafColour, boolean tapering) {
         DeferredBlock<RotatedPillarBlock> log = add(pillar(name + "_log", wood(bark, hardness)));
         DeferredBlock<RotatedPillarBlock> wood = add(pillar(name + "_wood", wood(bark, hardness)));
-        DeferredBlock<TreeBranchBlock> branch = add(ModBlocks.BLOCKS.registerBlock(name + "_branch", TreeBranchBlock::new,
+        DeferredBlock<TreeBranchBlock> branch = add(ModBlocks.BLOCKS.<TreeBranchBlock>registerBlock(name + "_branch",
+                tapering ? TaperingBranchBlock::new : TreeBranchBlock::new,
                 branchProperties(bark, hardness / 2)));
         DeferredBlock<TreeLeavesBlock> leaves = add(ModBlocks.BLOCKS.registerBlock(name + "_leaves", TreeLeavesBlock::new,
                 leaves(leafColour)));
