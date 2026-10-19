@@ -39,22 +39,28 @@ final class UmbrellaShape {
      * @param limbsLo    fewest main limbs
      * @param limbsHi    most main limbs
      * @param rise       how steeply the limbs leave the fork (degrees above level)
+     * @param reach      where the limbs end, as a share of the crown's radius (a little more by limb)
      * @param sag        how far a limb dips below a straight line before it curls up into the crown (blocks)
      * @param thick      the crown's thickness in the middle
      * @param dome       how much lower the crown's top is at the edge than in the middle
      * @param smooth     a crown filled as one layer (true) or built of clumps with gaps under it (false)
      */
     enum Version {
-        N1(23, 0.28, 3, 4, 28, 3, 5, 2, false),
-        N2(27, 0.42, 3, 5, 50, 0.5, 4.5, 1.5, false),
-        N3(25, 0.34, 3, 4, 36, 2, 5, 2, true);
+        // N1 after the user's pick (2026-10-18: "the base should be taller", the limbs reaching out into the leaves,
+        // the tree shorter from where the wood starts reaching out): a fork near half the height, limbs leaving it
+        // low and running far out sideways just under the crown. N4 the same with a taller trunk still.
+        N1(24, 0.46, 3, 4, 18, 0.72, 1.5, 5, 2, false),
+        N2(27, 0.42, 3, 5, 50, 0.6, 0.5, 4.5, 1.5, false),
+        N3(25, 0.34, 3, 4, 36, 0.6, 2, 5, 2, true),
+        N4(25, 0.56, 3, 4, 12, 0.75, 1, 5, 2, false);
 
-        final double height, fork, rise, sag, thick, dome;
+        final double height, fork, rise, reach, sag, thick, dome;
         final int limbsLo, limbsHi;
         final boolean smooth;
 
-        Version(double height, double fork, int limbsLo, int limbsHi, double rise, double sag, double thick, double dome, boolean smooth) {
+        Version(double height, double fork, int limbsLo, int limbsHi, double rise, double reach, double sag, double thick, double dome, boolean smooth) {
             this.height = height;
+            this.reach = reach;
             this.fork = fork;
             this.limbsLo = limbsLo;
             this.limbsHi = limbsHi;
@@ -114,7 +120,7 @@ final class UmbrellaShape {
         double phase = r.next() * TAU;
         for (int i = 0; i < n; i++) {
             double az = phase + i * TAU / n + (r.next() - 0.5) * 0.7;
-            double reach = crownRadius * (0.6 + r.next() * 0.25);
+            double reach = crownRadius * Math.min(0.9, ver.reach + r.next() * 0.18);
             double rise = ver.rise + (r.next() - 0.5) * Math.toRadians(14);
             double rStart = rFork * (0.62 + r.next() * 0.12);
             double[] start = add(fork, new double[] {Math.cos(az) * rFork * 0.4, 0, Math.sin(az) * rFork * 0.4});
