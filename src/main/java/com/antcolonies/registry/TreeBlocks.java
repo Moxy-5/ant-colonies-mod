@@ -70,7 +70,7 @@ public final class TreeBlocks {
     public static final DeferredBlock<RotatedPillarBlock> BLEACHED_WOOD = add(pillar("bleached_wood", deadWood()));
     /** A dead trunk with the bark lifting off in strips. */
     public static final DeferredBlock<RotatedPillarBlock> PEELING_BLEACHED_LOG = add(pillar("peeling_bleached_log", deadWood()));
-    public static final DeferredBlock<TreeBranchBlock> BLEACHED_BRANCH = add(ModBlocks.BLOCKS.registerBlock("bleached_branch", TreeBranchBlock::new,
+    public static final DeferredBlock<TaperingBranchBlock> BLEACHED_BRANCH = add(ModBlocks.BLOCKS.registerBlock("bleached_branch", TaperingBranchBlock::new,
             branchProperties(MapColor.COLOR_LIGHT_GRAY, 1.0F)));
     /** Heart-rot: soft crumbly wood inside an old trunk; insects dig it fast. */
     public static final DeferredBlock<Block> ROTTEN_WOOD = add(ModBlocks.BLOCKS.registerSimpleBlock("rotten_wood",

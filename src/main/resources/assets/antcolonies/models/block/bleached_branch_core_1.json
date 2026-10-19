@@ -1,0 +1,77 @@
+{
+  "textures": {
+    "particle": "antcolonies:block/bleached_bark",
+    "side": "antcolonies:block/bleached_bark",
+    "end": "antcolonies:block/dead_wood_top_0"
+  },
+  "elements": [
+    {
+      "from": [
+        3.68,
+        3.68,
+        3.68
+      ],
+      "to": [
+        12.32,
+        12.32,
+        12.32
+      ],
+      "faces": {
+        "north": {
+          "texture": "#side",
+          "uv": [
+            3.68,
+            3.68,
+            12.32,
+            12.32
+          ]
+        },
+        "south": {
+          "texture": "#side",
+          "uv": [
+            3.68,
+            3.68,
+            12.32,
+            12.32
+          ]
+        },
+        "east": {
+          "texture": "#side",
+          "uv": [
+            3.68,
+            3.68,
+            12.32,
+            12.32
+          ]
+        },
+        "west": {
+          "texture": "#side",
+          "uv": [
+            3.68,
+            3.68,
+            12.32,
+            12.32
+          ]
+        },
+        "up": {
+          "texture": "#side",
+          "uv": [
+            3.68,
+            3.68,
+            12.32,
+            12.32
+          ]
+        },
+        "down": {
+          "texture": "#side",
+          "uv": [
+            3.68,
+            3.68,
+            12.32,
+            12.32
+          ]
+        }
+      }
+    }
+  ]
+}

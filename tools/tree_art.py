@@ -596,14 +596,14 @@ def branch(name, bark_tex, end_tex):
     drops_itself(name)
 
 
-def tapering_branch(name, bark_tex, end_tex, levels=11):
-    """A branch that tapers as the player builds it out (TaperingBranchBlock): level 0 is 75 percent of a block thick,
+def tapering_branch(name, bark_tex, end_tex, levels=9):
+    """A branch that tapers as the player builds it out (TaperingBranchBlock): level 0 is 60 percent of a block thick,
     each level 10 percent thinner; the blockstate's step counts 2 to a level. Same width as TaperingBranchBlock.width."""
     textures = {"particle": bark_tex, "side": bark_tex, "end": end_tex}
     turn = {"north": {}, "east": {"y": 90}, "south": {"y": 180}, "west": {"y": 270}, "up": {"x": 270}, "down": {"x": 90}}
     parts = []
     for level in range(levels):
-        w = 16 * 0.75 * 0.9 ** level
+        w = 16 * 0.6 * 0.9 ** level
         lo, hi = round((16 - w) / 2, 3), round(16 - (16 - w) / 2, 3)
         steps = f"{2 * level}|{2 * level + 1}"
         model(f"{name}_core_{level}", {"textures": textures, "elements": [{"from": [lo, lo, lo], "to": [hi, hi, hi], "faces": {
@@ -659,7 +659,7 @@ def game_files():
     log("bleached_log", "antcolonies:block/bleached_bark", dead_end)
     log("bleached_wood", "antcolonies:block/bleached_bark", "antcolonies:block/bleached_bark")
     log("peeling_bleached_log", "antcolonies:block/peeling_bleached_bark", dead_end)
-    branch("bleached_branch", "antcolonies:block/bleached_bark", dead_end)
+    tapering_branch("bleached_branch", "antcolonies:block/bleached_bark", dead_end)
     for name, rows in (("rotten_wood", rotten_wood()), ("baobab_fibre", fibre())):
         texture(name, rows)
         single(name, {"parent": "minecraft:block/cube_all", "textures": {"all": f"antcolonies:block/{name}"}})

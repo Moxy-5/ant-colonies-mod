@@ -16,19 +16,19 @@ import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
 /**
- * A branch that tapers as the player builds it out (the user's ask, 2026-10-19; umbrella and camel thorn only): the
- * first branch placed is 75 percent of a block thick, and every 2 branches placed on along it are 10 percent thinner
+ * A branch that tapers as the player builds it out (the user's ask, 2026-10-19; umbrella and camel thorn and the dead bleached branches, not the baobab): the
+ * first branch placed is 60 percent of a block thick, and every 2 branches placed on along it are 10 percent thinner
  * than the 2 before, like a real acacia limb thinning toward its twigs. {@link #STEP} counts how far along the chain
- * this branch is. Trees grown by the mod use the default step, about as thin as the old 6-pixel twig.
+ * this branch is. Trees grown by the mod taper the same way out from their wood (TreePlacer).
  */
 public class TaperingBranchBlock extends TreeBranchBlock {
     public static final MapCodec<TaperingBranchBlock> CODEC = simpleCodec(TaperingBranchBlock::new);
-    /** How many thickness levels: level 0 is 75 percent of a block, each level 10 percent thinner (level 10 about 4 pixels). */
-    public static final int LEVELS = 11;
+    /** How many thickness levels: level 0 is 60 percent of a block, each level 10 percent thinner (level 8 about 4 pixels). */
+    public static final int LEVELS = 9;
     /** How far along the chain this branch is; 2 steps make a thickness level. */
     public static final IntegerProperty STEP = IntegerProperty.create("step", 0, LEVELS * 2 - 1);
-    /** The step trees grown by the mod use: level 7, about 5.7 pixels, nearest the old 6-pixel twig. */
-    public static final int GROWN_STEP = 14;
+    /** The last step, the thinnest; also the default (TreePlacer sets each grown branch's own step). */
+    public static final int MAX_STEP = LEVELS * 2 - 1;
 
     private static final VoxelShape[][] SHAPES = new VoxelShape[LEVELS][64];
 
@@ -52,12 +52,12 @@ public class TaperingBranchBlock extends TreeBranchBlock {
 
     public TaperingBranchBlock(Properties properties) {
         super(properties);
-        registerDefaultState(defaultBlockState().setValue(STEP, GROWN_STEP));
+        registerDefaultState(defaultBlockState().setValue(STEP, MAX_STEP));
     }
 
-    /** A level's thickness in pixels: 75 percent of 16, then 10 percent less per level (tools/tree_art.py draws the same). */
+    /** A level's thickness in pixels: 60 percent of 16, then 10 percent less per level (tools/tree_art.py draws the same). */
     public static double width(int level) {
-        return 16 * 0.75 * Math.pow(0.9, level);
+        return 16 * 0.6 * Math.pow(0.9, level);
     }
 
     @Override
@@ -101,7 +101,7 @@ public class TaperingBranchBlock extends TreeBranchBlock {
                 }
             }
         }
-        int step = from < 0 ? 0 : Math.min(from + 1, LEVELS * 2 - 1);
+        int step = from < 0 ? 0 : Math.min(from + 1, MAX_STEP);
         return joined(context.getLevel(), pos, defaultBlockState().setValue(STEP, step));
     }
 }
