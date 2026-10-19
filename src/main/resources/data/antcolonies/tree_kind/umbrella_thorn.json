@@ -1,0 +1,43 @@
+{
+  "form": "acacia",
+  "salt": 1,
+  "trunk": {
+    "height": 34,
+    "height_spread": 4,
+    "radius": 2.3,
+    "radius_spread": 0.2,
+    "fork": [
+      0.2,
+      0.3
+    ]
+  },
+  "crown": {
+    "radius": 22,
+    "limbs": [
+      3,
+      5
+    ],
+    "bends": 2,
+    "dome": 0,
+    "thickness": 4.5,
+    "pad_radius": 6.5,
+    "leaf_density": 0.75,
+    "pods": false
+  },
+  "shapes": [
+    {
+      "name": "table"
+    },
+    {
+      "name": "tiers",
+      "tiers": true
+    }
+  ],
+  "blocks": {
+    "log": "antcolonies:umbrella_thorn_log",
+    "wood": "antcolonies:umbrella_thorn_wood",
+    "branch": "antcolonies:umbrella_thorn_branch",
+    "leaves": "antcolonies:umbrella_thorn_leaves",
+    "seedling": "antcolonies:umbrella_thorn_seedling"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "form": "acacia",
+  "salt": 3,
+  "trunk": {
+    "height": 27,
+    "height_spread": 3,
+    "radius": 2.2,
+    "radius_spread": 0.2,
+    "fork": [
+      0.12,
+      0.2
+    ]
+  },
+  "crown": {
+    "radius": 17,
+    "limbs": [
+      5,
+      7
+    ],
+    "bends": 3,
+    "dome": 7,
+    "thickness": 6.5,
+    "pad_radius": 7,
+    "leaf_density": 0.84,
+    "pods": true
+  },
+  "shapes": [
+    {
+      "name": "dome"
+    },
+    {
+      "name": "spreading",
+      "height_scale": 0.85,
+      "crown_scale": 1.3,
+      "dome_scale": 0.5
+    }
+  ],
+  "blocks": {
+    "log": "antcolonies:camel_thorn_log",
+    "wood": "antcolonies:camel_thorn_wood",
+    "branch": "antcolonies:camel_thorn_branch",
+    "leaves": "antcolonies:camel_thorn_leaves",
+    "seedling": "antcolonies:camel_thorn_seedling"
+  }
+}

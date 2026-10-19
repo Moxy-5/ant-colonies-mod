@@ -64,7 +64,7 @@
 <div class="wrap">
   <header>
     <h1>Giant Savanna Trees</h1>
-    <p>Step 0 of the giant trees: pick the looks before anything goes into the game. Every tree is made from one seed, so the same tree can be watched growing from a seedling to an ancient giant, dying, and falling. The little figures at the foot are for size: a player, a Matabele major and a harvester worker.</p>
+    <p>The giant trees. Step 0 picked the looks; step 2 shows the game's own shapes (the "Game shapes" switch), growing for real: wood never moves, it only lengthens and thickens. Every tree is made from one seed, so the same tree can be watched growing from a seedling to an ancient giant, dying, and falling. The little figures at the foot are for size: a player, a Matabele major and a harvester worker.</p>
   </header>
   <div class="bench">
     <div class="left">
@@ -113,6 +113,7 @@
         <p class="note" id="shape-note"></p>
       </div>
       <div class="toggles">
+        <label><input type="checkbox" id="game"> Game shapes: the trees as the mod's own code makes them (step 2, real growth: seeds 1 to 4, the ages nearest the slider)</label>
         <label><input type="checkbox" id="cut"> Cut open (see inside)</label>
         <label><input type="checkbox" id="dry"> Dry season (baobab leafless, as it is most of the year)</label>
       </div>
@@ -167,6 +168,7 @@ const REAL = {
   },
 };
 let kind = "umbrella", age = 1, stage = "living", seed = 1, cut = false, dry = false;
+let game = !!(DATA && DATA.shapes);
 let picks = { shape: { umbrella: "A", camel: "A", baobab: "A" }, bark: { umbrella: "D", camel: "C", baobab: "B" },
               leaves: { umbrella: "C", camel: "C", baobab: "C" }, dead: "E" };
 try { const s = JSON.parse(localStorage.getItem("tree-picks-3") || "null"); if (s && s.shape) picks = s; } catch (e) {}
@@ -631,7 +633,27 @@ function buildHeap(sk, dried) {
   return { v };
 }
 
+// The game's own shapes (written by ./gradlew test into build/tree_shapes.json, step 2): a few seeds at fixed ages.
+function gameTree() {
+  const S = DATA.shapes, ages = stage === "living" ? S.ages : S.deadAges;
+  const a = ages.reduce((b, x) => Math.abs(x - age) < Math.abs(b - age) ? x : b, ages[0]);
+  const s = (seed - 1) % S.seeds + 1;
+  const st = stage === "living" && kind === "baobab" && dry ? "living-dry" : stage;
+  const bytes = atob(S.trees[`${kind}|${s}|${a}|${st}`] || ""), v = new Vox();
+  const sb = n => n > 127 ? n - 256 : n;
+  for (let i = 0; i + 3 < bytes.length; i += 4)
+    v.set(sb(bytes.charCodeAt(i)), sb(bytes.charCodeAt(i + 1)), sb(bytes.charCodeAt(i + 2)), S.parts[bytes.charCodeAt(i + 3)]);
+  const out = { v, note: `game shapes: seed ${s}, ${S.shapes[kind + "|" + s]} shape, age ${a}` };
+  if (stage === "fallen") {
+    const f = acaciaSkeleton(kind, s, 1, "A").fallAz, d = [Math.cos(f), 0, Math.sin(f)];
+    let far = 0; v.each((x, y, z) => { far = Math.max(far, x * d[0] + z * d[2]); });
+    out.cutAxis = d; out.frame = { c: mul(d, far / 2), size: Math.max(6, far) };
+  }
+  return out;
+}
+
 function makeTree() {
+  if (game && DATA.shapes) return gameTree();
   if (kind === "baobab") return buildBaobab(baobabSkeleton(seed, age, picks.shape.baobab), stage);
   return buildAcacia(acaciaSkeleton(kind, seed, age, picks.shape[kind]), stage);
 }
@@ -764,7 +786,7 @@ function build(reframe) {
       treeGroup.add(mesh);
     }
   }
-  document.getElementById("count").textContent = `${count.toLocaleString()} blocks · ${maxY + 1} tall · ${Math.round(maxR * 2)} wide`;
+  document.getElementById("count").textContent = `${count.toLocaleString()} blocks · ${maxY + 1} tall · ${Math.round(maxR * 2)} wide` + (current.note ? ` · ${current.note}` : "");
   const R = kind === "baobab" ? baobabSkeleton(seed, age, picks.shape.baobab).R0 : acaciaSkeleton(kind, seed, age, picks.shape[kind]).R0;
   placeFigures(R);
   bounds = { h: maxY + 1, r: Math.max(2, maxR), R };
@@ -857,6 +879,8 @@ function sync() {
   document.getElementById("real").textContent = age < 0.06 ? "A seedling: in the real savanna most seedlings are eaten or burnt; the few that survive take years to get above the grass." : real;
   document.getElementById("cut").checked = cut;
   document.getElementById("dry").checked = dry;
+  document.getElementById("game").checked = game;
+  document.getElementById("game").disabled = !(DATA && DATA.shapes);
   document.getElementById("summary").textContent =
     KINDS.map(k => `${k.name}: shape ${picks.shape[k.id]}, bark ${picks.bark[k.id]}, leaves ${picks.leaves[k.id]}`).join("\n") + `\nDead bark: ${picks.dead}`;
   flat();
@@ -880,6 +904,7 @@ document.getElementById("age").addEventListener("input", e => {
 });
 document.getElementById("cut").addEventListener("change", e => { cut = e.target.checked; build(false); });
 document.getElementById("dry").addEventListener("change", e => { dry = e.target.checked; build(false); });
+document.getElementById("game").addEventListener("change", e => { game = e.target.checked; build(true); });
 document.getElementById("v-over").addEventListener("click", () => view("over"));
 document.getElementById("v-player").addEventListener("click", () => view("player"));
 document.getElementById("v-ant").addEventListener("click", () => view("ant"));

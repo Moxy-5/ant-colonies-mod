@@ -161,7 +161,8 @@ def grama_page(out):
 
 
 def trees_page(out):
-    """The tree looks: every block texture (two looks where there is a choice); the shapes are made in the page."""
+    """The tree looks: every block texture (two looks where there is a choice); the viewer's shapes are made in the page,
+    the game's own shapes (step 2) come from build/tree_shapes.json, written by ./gradlew test."""
     import tree_art
     data = {}
     for name, img in tree_art.all_textures().items():
@@ -169,6 +170,11 @@ def trees_page(out):
             data[name] = file_uri(img[1])
         else:
             data[name] = uri(png([[px if px is not None else (0, 0, 0, 0) for px in row] for row in img]))
+    shapes = ROOT / "build/tree_shapes.json"
+    if shapes.exists():
+        data["shapes"] = json.loads(shapes.read_text(encoding="utf-8"))
+    else:
+        print("no build/tree_shapes.json yet (run ./gradlew test): the page shows only the viewer's own shapes")
     template = (Path(__file__).resolve().parent / "tree_viewer.template.html").read_text(encoding="utf-8")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")

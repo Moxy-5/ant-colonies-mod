@@ -1,0 +1,154 @@
+package com.antcolonies.tree;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.junit.jupiter.api.Test;
+
+import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import net.minecraft.core.BlockPos;
+
+/**
+ * The tree shape maker's checks (M7.5 step 2): nothing floats, one seed is one tree, a tree only adds wood as it grows
+ * (real growth), an ancient tree keeps its trunk, and grown trees come out at the sizes picked with the user.
+ */
+class TreeShapeTest {
+    static final String[] KINDS = {"umbrella_thorn", "camel_thorn", "baobab"};
+    private static final double[] AGES = {0, 0.05, 0.1, 0.2, 0.3, 0.4, 0.44, 0.46, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2, 1.25};
+
+    @Test
+    void nothingFloats() {
+        for (String name : KINDS) {
+            TreeKind kind = TreeKind.load(name);
+            for (long seed = 1; seed <= 5; seed++) {
+                for (double age : AGES) {
+                    for (TreeStage stage : TreeShapes.stages(kind)) {
+                        TreeVoxels v = TreeShapes.build(kind, seed, age, stage);
+                        LongOpenHashSet standing = v.grounded();
+                        for (Long2ObjectMap.Entry<TreePart> e : v.entries()) {
+                            long k = e.getLongKey();
+                            assertTrue(standing.contains(k), () -> name + " seed " + " age " + age + " " + stage.id + ": " + e.getValue().id
+                                    + " floating at " + BlockPos.of(k).toShortString());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    void sameSeedSameTree() {
+        for (String name : KINDS) {
+            TreeKind kind = TreeKind.load(name);
+            for (TreeStage stage : TreeShapes.stages(kind)) {
+                TreeVoxels a = TreeShapes.build(kind, 7, 0.8, stage), b = TreeShapes.build(kind, 7, 0.8, stage);
+                assertEquals(a.size(), b.size());
+                for (Long2ObjectMap.Entry<TreePart> e : a.entries()) {
+                    assertEquals(e.getValue(), b.get(e.getLongKey()), name + " " + stage.id);
+                }
+            }
+        }
+    }
+
+    /** Real growth: every log block of a living tree is still wood a little later (except the side branches it drops). */
+    @Test
+    void aGrowingTreeOnlyAddsWood() {
+        for (String name : KINDS) {
+            TreeKind kind = TreeKind.load(name);
+            for (long seed = 1; seed <= 6; seed++) {
+                TreeVoxels before = null;
+                for (int step = 2; step <= 20; step++) {
+                    double age = step * 0.05;
+                    TreeVoxels now = TreeShapes.build(kind, seed, age, TreeStage.LIVING);
+                    if (before != null) {
+                        for (Long2ObjectMap.Entry<TreePart> e : before.entries()) {
+                            long k = e.getLongKey();
+                            if (!e.getValue().isLivingLog() || before.isDropped(k)) {
+                                continue;
+                            }
+                            TreePart later = now.get(k);
+                            long s = seed;
+                            assertTrue(later != null && later.isLivingLog(), () -> name + " seed " + s + " age " + age + ": the log at "
+                                    + BlockPos.of(k).toShortString() + " became " + (later == null ? "air" : later.id));
+                        }
+                    }
+                    before = now;
+                }
+            }
+        }
+    }
+
+    /** An ancient tree is the grown one thicker: the grown trunk's bark is still wood (rotten inside, or an old baobab's door). */
+    @Test
+    void anAncientTreeKeepsItsTrunk() {
+        for (String name : KINDS) {
+            TreeKind kind = TreeKind.load(name);
+            for (long seed = 1; seed <= 6; seed++) {
+                TreeVoxels grown = TreeShapes.build(kind, seed, TreeShapes.GROWN, TreeStage.LIVING);
+                TreeVoxels ancient = TreeShapes.build(kind, seed, TreeShapes.ANCIENT, TreeStage.LIVING);
+                for (Long2ObjectMap.Entry<TreePart> e : grown.entries()) {
+                    long k = e.getLongKey();
+                    int x = BlockPos.getX(k), y = BlockPos.getY(k), z = BlockPos.getZ(k);
+                    // The trunk's outside: bark open to the air at the side, from the foot to head height.
+                    boolean outside = grown.get(x + 1, y, z) == null || grown.get(x - 1, y, z) == null
+                            || grown.get(x, y, z + 1) == null || grown.get(x, y, z - 1) == null;
+                    if (e.getValue() != TreePart.BARK || !outside || y > 5 || y < 0 || Math.hypot(x, z) > 7) {
+                        continue;
+                    }
+                    TreePart later = ancient.get(k);
+                    if (ancient.holes().contains(k)) {
+                        continue; // carved out: an old baobab's door into its hollow
+                    }
+                    assertTrue(later != null && later.isWood(), name + " seed " + seed + ": trunk bark at " + BlockPos.of(k).toShortString() + " gone");
+                }
+            }
+        }
+    }
+
+    /** Grown trees: tall, wide and thick as picked with the user (DESIGN.md "Giant savanna trees"). */
+    @Test
+    void grownTreesHaveThePickedSizes() {
+        check("umbrella_thorn", 30, 40, 40, 50, 4, 5);
+        check("camel_thorn", 20, 30, 32, 46, 3, 5);
+        check("baobab", 25, 33, 28, 42, 8, 14);
+    }
+
+    private static void check(String name, int hLo, int hHi, int wLo, int wHi, int tLo, int tHi) {
+        TreeKind kind = TreeKind.load(name);
+        List<String> report = new ArrayList<>();
+        boolean ok = true;
+        for (long seed = 1; seed <= 20; seed++) {
+            int[] m = measure(TreeShapes.build(kind, seed, TreeShapes.GROWN, TreeStage.LIVING));
+            report.add(seed + ": " + m[0] + " tall, " + m[1] + " wide, trunk " + m[2]);
+            ok &= m[0] >= hLo && m[0] <= hHi && m[1] >= wLo && m[1] <= wHi && m[2] >= tLo && m[2] <= tHi;
+        }
+        System.out.println(name + " grown: " + String.join("; ", report));
+        assertTrue(ok, name + " sizes out of range: " + String.join("; ", report));
+    }
+
+    /** Height (blocks above the ground), crown width, trunk width at head height (blocks across, west to east). */
+    static int[] measure(TreeVoxels v) {
+        int top = 0, wide = 0;
+        for (Long2ObjectMap.Entry<TreePart> e : v.entries()) {
+            long k = e.getLongKey();
+            top = Math.max(top, BlockPos.getY(k) + 1);
+            if (e.getValue() == TreePart.LEAVES) {
+                wide = Math.max(wide, (int) Math.round(2 * Math.hypot(BlockPos.getX(k), BlockPos.getZ(k))));
+            }
+        }
+        int across = 0;
+        for (int dz = -1; dz <= 1; dz++) {
+            int run = 0;
+            for (int x = -15; x <= 15; x++) {
+                TreePart p = v.get(x, 4, dz);
+                run += p != null && p.isWood() ? 1 : 0;
+            }
+            across = Math.max(across, run);
+        }
+        return new int[] {top, wide, across};
+    }
+}
