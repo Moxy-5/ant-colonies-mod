@@ -60,6 +60,16 @@ class TreeShapeExport {
             TreeDraw.look = TreeDraw.LimbLook.A;
             TreeDraw.earlyGrowth = false;
         }
+        // The new umbrella thorn on trial (grown, living only): "umbrella|seed|1|living|N1" and so on.
+        String[] versions = new String[UmbrellaShape.Version.values().length];
+        TreeKind umbrella = TreeKind.load("umbrella_thorn");
+        for (UmbrellaShape.Version ver : UmbrellaShape.Version.values()) {
+            versions[ver.ordinal()] = ver.name();
+            for (int seed = 1; seed <= SEEDS; seed++) {
+                trees.put("umbrella|" + seed + "|1|living|" + ver.name(), encode(TreeShapes.buildNewUmbrella(umbrella, seed, ver)));
+            }
+        }
+        out.put("umbrellaVersions", versions);
         out.put("shapes", shapes);
         out.put("trees", trees);
         Gson gson = new GsonBuilder().create();

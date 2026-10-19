@@ -26,6 +26,16 @@ public final class TreeShapes {
         return v;
     }
 
+    /**
+     * The new umbrella thorn on trial in the tree viewer (the user's redo from photos, 2026-10-18): the grown, living tree
+     * only, in one of its versions. Not used by the game yet.
+     */
+    static TreeVoxels buildNewUmbrella(TreeKind kind, long seed, UmbrellaShape.Version version) {
+        TreeVoxels v = new UmbrellaShape(kind, seed, version).build();
+        v.clearLooseFoliage();
+        return v;
+    }
+
     /** The stages a kind goes through. */
     public static TreeStage[] stages(TreeKind kind) {
         return kind.isBaobab() ? TreeStage.BAOBAB : TreeStage.ACACIA;

@@ -100,6 +100,24 @@ class TreeShapeTest {
         }
     }
 
+    /** The new umbrella thorn on trial (the user's redo from photos, 2026-10-18): every version stands, nothing floats. */
+    @Test
+    void theNewUmbrellaThornStands() {
+        TreeKind kind = TreeKind.load("umbrella_thorn");
+        for (UmbrellaShape.Version ver : UmbrellaShape.Version.values()) {
+            for (long seed = 1; seed <= 8; seed++) {
+                TreeVoxels v = TreeShapes.buildNewUmbrella(kind, seed, ver);
+                LongOpenHashSet standing = v.grounded();
+                long s = seed;
+                for (Long2ObjectMap.Entry<TreePart> e : v.entries()) {
+                    long k = e.getLongKey();
+                    assertTrue(standing.contains(k), () -> "new umbrella " + ver + " seed " + s + ": " + e.getValue().id
+                            + " floating at " + BlockPos.of(k).toShortString());
+                }
+            }
+        }
+    }
+
     /** An ancient tree is the grown one thicker: the grown trunk's bark is still wood (rotten inside, or an old baobab's door). */
     @Test
     void anAncientTreeKeepsItsTrunk() {

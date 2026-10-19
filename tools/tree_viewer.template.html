@@ -111,6 +111,7 @@
           <div class="pick"><span>Dead bark (all kinds)</span><div class="row" id="pick-dead"></div></div>
           <div class="pick"><span>Limbs (all kinds, game shapes)</span><div class="row" id="pick-limbs"></div></div>
           <div class="pick"><span>Growth (acacias, game shapes)</span><div class="row" id="pick-growth"></div></div>
+          <div class="pick"><span>New umbrella thorn (from your photos, grown tree only)</span><div class="row" id="pick-umbrella"></div></div>
         </div>
         <p class="note" id="shape-note"></p>
       </div>
@@ -177,6 +178,12 @@ let picks = { shape: { umbrella: "A", camel: "A", baobab: "A" }, bark: { umbrell
 try { const s = JSON.parse(localStorage.getItem("tree-picks-3") || "null"); if (s && s.shape) picks = s; } catch (e) {}
 if (!picks.limbs) picks.limbs = "A";
 if (!picks.growth) picks.growth = "A";
+if (!picks.umbrella) picks.umbrella = "off";
+// The new umbrella thorn on trial (the user's redo from photos, 2026-10-18): only the grown, living tree so far.
+const UMBRELLA_NEW = { off: "off: the umbrella thorn in the game now",
+  N1: "N1 like photo 1: a low fork, 3-4 wide limbs sweeping out low, a clumpy wide dome",
+  N2: "N2 like photo 2: a taller trunk, limbs rising steeper like a vase, a thinner flat crown",
+  N3: "N3 in between, with the crown filled as one smooth layer" };
 // The limb looks on trial (the user's report 2026-10-18: the 1-block limbs looked stringy); only the game shapes have them.
 const LIMB_LOOKS = { A: "A today's: limbs taper to 1 block, bark cubes in steps",
   B: "B thick limbs: limbs stay 3 wide out to the crown, branches start thicker",
@@ -655,12 +662,13 @@ function gameTree() {
   const st = stage === "living" && kind === "baobab" && dry ? "living-dry" : stage;
   const key = `${kind}|${s}|${a}|${st}`;
   const L = picks.limbs === "A" ? "" : `|${picks.limbs}`;
-  const found = picks.growth === "B" ? S.trees[`${key}${L}|g2`] || S.trees[`${key}|g2`] || S.trees[key] : S.trees[`${key}${L}`] || S.trees[key];
+  const newU = kind === "umbrella" && stage === "living" && picks.umbrella !== "off" ? S.trees[`umbrella|${s}|1|living|${picks.umbrella}`] : null;
+  const found = newU ? newU : picks.growth === "B" ? S.trees[`${key}${L}|g2`] || S.trees[`${key}|g2`] || S.trees[key] : S.trees[`${key}${L}`] || S.trees[key];
   const bytes = atob(found || ""), v = new Vox();
   const sb = n => n > 127 ? n - 256 : n;
   for (let i = 0; i + 3 < bytes.length; i += 4)
     v.set(sb(bytes.charCodeAt(i)), sb(bytes.charCodeAt(i + 1)), sb(bytes.charCodeAt(i + 2)), S.parts[bytes.charCodeAt(i + 3)]);
-  const out = { v, note: `game shapes: seed ${s}, ${S.shapes[kind + "|" + s]} shape, age ${a}, limbs ${picks.limbs}, growth ${picks.growth}` };
+  const out = { v, note: `game shapes: seed ${s}, ${S.shapes[kind + "|" + s]} shape, age ${newU ? "1 (the new shape: grown tree only)" : a}, limbs ${picks.limbs}, growth ${picks.growth}${newU ? ", new umbrella " + picks.umbrella : ""}` };
   if (stage === "fallen") {
     const f = acaciaSkeleton(kind, s, 1, "A").fallAz, d = [Math.cos(f), 0, Math.sin(f)];
     let far = 0; v.each((x, y, z) => { far = Math.max(far, x * d[0] + z * d[2]); });
@@ -905,7 +913,9 @@ function sync() {
     x => { picks.limbs = x; if (DATA && DATA.shapes) game = true; save(); refresh(false); });
   buttons(document.getElementById("pick-growth"), [["A", "A today's"], ["B", "B new"]], x => picks.growth === x,
     x => { picks.growth = x; if (DATA && DATA.shapes) game = true; save(); refresh(false); });
-  document.getElementById("shape-note").innerHTML = `Shape A: ${SHAPES[kind].A}<br>Shape B: ${SHAPES[kind].B}<br>Bark: A Minecraft-simple, B field detail, C soft painted, D chunky plates. Leaves: A dense, B thin, C in between (the new default). Dead bark: E the bleached silver you liked, D the grey-brown in the game now.<br>Growth (turns Game shapes on): A today's, a young tree one stem with a bush on top until age 0.45, then the whole skeleton at once; B new, the wood thickens sooner and the limbs grow out of the fork as soon as the trunk reaches it, inside their leaves.<br>Limbs (they turn Game shapes on):<br>${Object.values(LIMB_LOOKS).join("<br>")}`;
+  buttons(document.getElementById("pick-umbrella"), Object.keys(UMBRELLA_NEW).map(x => [x, x]), x => picks.umbrella === x,
+    x => { picks.umbrella = x; if (DATA && DATA.shapes) game = true; save(); refresh(false); });
+  document.getElementById("shape-note").innerHTML = `Shape A: ${SHAPES[kind].A}<br>Shape B: ${SHAPES[kind].B}<br>Bark: A Minecraft-simple, B field detail, C soft painted, D chunky plates. Leaves: A dense, B thin, C in between (the new default). Dead bark: E the bleached silver you liked, D the grey-brown in the game now.<br>Growth (turns Game shapes on): A today's, a young tree one stem with a bush on top until age 0.45, then the whole skeleton at once; B new, the wood thickens sooner and the limbs grow out of the fork as soon as the trunk reaches it, inside their leaves.<br>New umbrella thorn (turns Game shapes on; only the grown tree so far, any age shows it):<br>${Object.values(UMBRELLA_NEW).join("<br>")}<br>Limbs (they turn Game shapes on):<br>${Object.values(LIMB_LOOKS).join("<br>")}`;
   const real = REAL[kind][stage] || REAL[kind].living;
   document.getElementById("real").textContent = age < 0.06 ? "A seedling: in the real savanna most seedlings are eaten or burnt; the few that survive take years to get above the grass." : real;
   document.getElementById("cut").checked = cut;
@@ -914,7 +924,7 @@ function sync() {
   document.getElementById("game").checked = game;
   document.getElementById("game").disabled = !(DATA && DATA.shapes);
   document.getElementById("summary").textContent =
-    KINDS.map(k => `${k.name}: shape ${picks.shape[k.id]}, bark ${picks.bark[k.id]}, leaves ${picks.leaves[k.id]}`).join("\n") + `\nDead bark: ${picks.dead}\nLimbs: ${picks.limbs}\nGrowth: ${picks.growth}`;
+    KINDS.map(k => `${k.name}: shape ${picks.shape[k.id]}, bark ${picks.bark[k.id]}, leaves ${picks.leaves[k.id]}`).join("\n") + `\nDead bark: ${picks.dead}\nLimbs: ${picks.limbs}\nGrowth: ${picks.growth}\nNew umbrella: ${picks.umbrella}`;
   flat();
 }
 function refresh(reframe) { sync(); build(reframe); }
