@@ -3,6 +3,7 @@ package com.antcolonies.tree;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.antcolonies.debug.Perf;
 import com.antcolonies.worldgen.TreePlacer;
 
 import net.minecraft.core.BlockPos;
@@ -44,7 +45,14 @@ public final class TreeFire {
             hit.add(p.immutable());
         }
         if (!hit.isEmpty()) {
-            Forest.get(level).inFire(level, hit);
+            boolean timed = Perf.begin(Perf.Part.TREES);
+            try {
+                Forest.get(level).inFire(level, hit);
+            } finally {
+                if (timed) {
+                    Perf.end();
+                }
+            }
         }
     }
 }

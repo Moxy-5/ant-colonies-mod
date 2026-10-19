@@ -24,7 +24,7 @@ public final class Perf {
         WALKING("walking (navigator)"),
         ROUTES("route searches"),
         BRAIN("colony brain"),
-        TREES("giant trees growing");
+        TREES("giant trees (growing, dying, falling, fire)");
 
         final String label;
 

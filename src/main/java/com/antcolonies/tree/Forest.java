@@ -350,7 +350,14 @@ public class Forest extends SavedData {
     public static void tick(ServerLevel level) {
         Forest forest = get(level);
         if (!forest.falls.isEmpty()) {
-            forest.falls.values().removeIf(TreeFall::tick);
+            boolean timed = Perf.begin(Perf.Part.TREES);
+            try {
+                forest.falls.values().removeIf(TreeFall::tick);
+            } finally {
+                if (timed) {
+                    Perf.end();
+                }
+            }
         }
         if (level.getGameTime() % 20 != 7) {
             return;

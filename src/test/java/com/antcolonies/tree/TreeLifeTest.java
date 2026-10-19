@@ -156,4 +156,36 @@ class TreeLifeTest {
             }
         }
     }
+
+    /**
+     * Step 5d to 5f, the odds by the tree's own dice: fire kills 1 in 10 just grown, 6 in 10 ancient, twice as many
+     * hollowed by termites (at most 9 in 10); lightning sets a fire 1 time in 2 and kills 1 in 3, 2 in 3 with termites.
+     */
+    @Test
+    void fireAndLightningOdds() {
+        int n = 20_000;
+        double grown = TreeShapes.GROWN, ancient = TreeShapes.ANCIENT;
+        double[][] cases = {{grown, 0, 0.1}, {ancient, 0, 0.6}, {grown, 1, 0.2}, {ancient, 1, 0.9}};
+        for (double[] c : cases) {
+            int dead = 0;
+            for (long seed = 1; seed <= n; seed++) {
+                if (TreeLife.fireKills(seed, seed % 97, c[0], c[1] > 0)) {
+                    dead++;
+                }
+            }
+            double share = dead / (double) n;
+            assertTrue(Math.abs(share - c[2]) < 0.02, "fire at age " + c[0] + " termites " + c[1] + ": " + share);
+        }
+        int lit = 0, killed = 0, killedHollow = 0;
+        for (long seed = 1; seed <= n; seed++) {
+            TreeLife.Strike s = TreeLife.strike(seed, seed % 89);
+            lit += s.lit() ? 1 : 0;
+            killed += s.kills() ? 1 : 0;
+            killedHollow += TreeLife.strike(seed, seed % 89, true).kills() ? 1 : 0;
+        }
+        assertTrue(Math.abs(lit / (double) n - 0.5) < 0.02, "lightning fires " + lit);
+        assertTrue(Math.abs(killed / (double) n - 1 / 3.0) < 0.02, "lightning kills " + killed);
+        assertTrue(Math.abs(killedHollow / (double) n - 2 / 3.0) < 0.02, "lightning kills hollow trees " + killedHollow);
+        assertTrue(!TreeLife.smoulders(grown) && TreeLife.smoulders(ancient), "only old trunks smoulder");
+    }
 }
