@@ -102,8 +102,12 @@ public final class TreePlacer {
     }
 
     public static final int FIXED = -1, LOOSE = -2, SLICES = 1000;
-    /** A fallen trunk never lies more steeply than 1 in 1: where the ground drops faster, it bridges (my pick, a rigid log). */
-    public static final int MAX_STEP = 1;
+    /**
+     * How far a fallen log may settle into the soil where the ground under it is uneven: none (a block of wood is never
+     * placed into the soil, so a bedded floor left the hollow's roof over a gap), and the thick hollow trunk by the stump
+     * stays open (a home for Matabele ants and other creatures, the user's plan 2026-10-19).
+     */
+    public static final int MAX_SINK = 0;
     /** How far up and down a column is searched for the ground a fallen log lies on. */
     static final int GROUND_SEARCH = 32;
 
@@ -113,63 +117,51 @@ public final class TreePlacer {
     }
 
     /**
-     * A fallen tree fitted to the land it lies on (the user's report 2026-10-19: on a slope fallen giants stood on walls of
-     * wood or floated). Real: a fallen trunk is rigid; it lies along the ground, resting on the high points and bridging a
-     * dip, and leans down a slope rather than standing on posts. Each slice of the trunk (1 block along the way it lies)
-     * rests on the highest ground under its middle line, never lower than 1 under its neighbour (it never lies more
-     * steeply than 1 in 1; where the ground drops faster, it bridges); the stump stays; loose pieces (broken limbs, fallen
-     * branches, also round a standing dead tree) lie on the ground under them; nothing goes down to meet the ground. A
-     * tree with nothing lying is returned as it is.
+     * A fallen tree fitted to the land it lies on (the user's reports 2026-10-19: on a slope fallen giants stood on walls of
+     * wood, then floated in places; the user's rule: every block touches the ground, the log keeping its shape). Real: an
+     * old hollow giant does not stay a stiff beam when it crashes onto uneven ground; it cracks and settles along the land.
+     * Each slice of a log (1 block along the way it lies) lies with its underside on the
+     * ground: as one piece where the ground under it is even, and where it is not, each column of it settles onto its own
+     * ground (each column keeps all its blocks, so the log keeps its full thickness, the hollow open). The stump stays;
+     * loose pieces (broken limbs, fallen branches, also round a standing dead tree) lie on the ground under them; nothing
+     * goes down to meet the ground. A tree with nothing lying is returned as it is.
      */
     public static Placed rest(Placed tree, BlockPos foot, Ground ground) {
         if (tree == null || tree.lying() == null) {
             return tree;
         }
         int[] slice = tree.lying().slice();
-        boolean[] core = tree.lying().core();
         int slices = 0;
         for (int sl : slice) {
             slices = Math.max(slices, sl + 1);
         }
-        int[] shift = new int[Math.max(0, slices)];
-        java.util.Arrays.fill(shift, Integer.MIN_VALUE);
-        boolean[] anyCore = new boolean[slices];
-        for (int i = 0; i < tree.size(); i++) {
-            if (slice[i] >= 0 && core[i]) {
-                anyCore[slice[i]] = true;
-            }
-        }
         it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap heights = new it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap();
         java.util.function.IntBinaryOperator at = (x, z) -> heights.computeIfAbsent(BlockPos.asLong(x, 0, z),
                 c -> ground.freeY(foot.getX() + x, foot.getZ() + z) - foot.getY());
+        // The underside of each slice's columns, then how far each must move to sit on the ground.
+        it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap bottom = new it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap();
+        bottom.defaultReturnValue(Integer.MAX_VALUE);
+        for (int i = 0; i < tree.size(); i++) {
+            if (slice[i] >= 0) {
+                long key = column(slice[i], tree.xs()[i], tree.zs()[i]);
+                bottom.put(key, Math.min(bottom.get(key), tree.ys()[i]));
+            }
+        }
+        int[] lowest = new int[slices], highest = new int[slices];
+        java.util.Arrays.fill(lowest, Integer.MAX_VALUE);
+        java.util.Arrays.fill(highest, Integer.MIN_VALUE);
+        it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap need = new it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap();
         for (int i = 0; i < tree.size(); i++) {
             int sl = slice[i];
-            if (sl < 0 || anyCore[sl] && !core[i]) {
+            if (sl < 0) {
                 continue;
             }
-            shift[sl] = Math.max(shift[sl], at.applyAsInt(tree.xs()[i], tree.zs()[i]));
-        }
-        // Each log rigid: no slice lower than 1 under its neighbours; the trunk's end by the stump held near the ground at
-        // the foot, each limb stub's start near the trunk's tip it broke from.
-        int tip = 0;
-        for (int log = 0; log * SLICES < slices; log++) {
-            int from = log * SLICES, to = Math.min(slices, from + SLICES);
-            int before = log == 0 ? 0 : tip, last = from - 1;
-            for (int sl = from; sl < to; sl++) {
-                if (shift[sl] == Integer.MIN_VALUE) {
-                    continue; // no block of the log in this slice
-                }
-                shift[sl] = Math.max(shift[sl], before - MAX_STEP);
-                before = shift[sl];
-                last = sl;
-            }
-            for (int sl = last - 1; sl >= from; sl--) {
-                if (shift[sl] != Integer.MIN_VALUE && shift[sl + 1] != Integer.MIN_VALUE) {
-                    shift[sl] = Math.max(shift[sl], shift[sl + 1] - MAX_STEP);
-                }
-            }
-            if (log == 0 && last >= from) {
-                tip = shift[last];
+            long key = column(sl, tree.xs()[i], tree.zs()[i]);
+            if (!need.containsKey(key)) {
+                int d = at.applyAsInt(tree.xs()[i], tree.zs()[i]) - bottom.get(key);
+                need.put(key, d);
+                lowest[sl] = Math.min(lowest[sl], d);
+                highest[sl] = Math.max(highest[sl], d);
             }
         }
         int n = tree.size();
@@ -179,7 +171,10 @@ public final class TreePlacer {
         for (int i = 0; i < n; i++) {
             int sl = slice[i];
             if (sl >= 0) {
-                ys[i] = tree.ys()[i] + shift[sl];
+                // The slice as one piece, its highest column bedded in by at most MAX_SINK; a column that would still hang
+                // settles onto its own ground.
+                int whole = Math.max(lowest[sl], highest[sl] - MAX_SINK);
+                ys[i] = tree.ys()[i] + Math.min(whole, need.get(column(sl, tree.xs()[i], tree.zs()[i])));
             } else if (sl == LOOSE) {
                 ys[i] = tree.ys()[i] + at.applyAsInt(tree.xs()[i], tree.zs()[i]);
             } else {
@@ -194,6 +189,11 @@ public final class TreePlacer {
             maxZ = Math.max(maxZ, tree.zs()[i]);
         }
         return new Placed(tree.xs(), ys, tree.zs(), tree.states(), holds, minX, minY, minZ, maxX, maxY, maxZ, null);
+    }
+
+    /** A key for one column of one slice of a lying log. */
+    private static long column(int slice, int x, int z) {
+        return ((long) slice << 40) ^ ((long) (x & 0xFFFFF) << 20) ^ (z & 0xFFFFF);
     }
 
     /**

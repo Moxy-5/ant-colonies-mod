@@ -675,8 +675,8 @@ public class TreeGrowthTests {
     /**
      * The user's report 2026-10-19: fallen giants on a slope stood on walls of wood or floated. A fallen log lies on the
      * land (TreePlacer.rest): fitted over made-up land (down a slope, up one, across one, over a cliff) no part of it goes
-     * down to meet the ground, its middle line never sinks into the ground, it never lies more steeply than 1 in 1 down,
-     * most of it touches the ground (all but the cliff, where it bridges), and its fallen branches lie on the ground. Then
+     * down to meet the ground, every column of it sits on the ground (none hangs, none sinks more than MAX_SINK) and keeps
+     * its full thickness (the user's rule, 2026-10-19), and its fallen branches lie on the ground. Then
      * a real tree falls down a real hill (its foot on the top) and up into a real bowl: no walls, little floating.
      */
     @GameTest(template = "arena", timeoutTicks = 400, skyAccess = true)
@@ -701,9 +701,8 @@ public class TreeGrowthTests {
                     TreePlacer.Placed lies = TreePlacer.rest(flat, origin, land);
                     helper.assertTrue(lies.lying() == null && TreePlacer.rest(lies, origin, land) == lies, what + ": fitted twice");
                     int[] slice = flat.lying().slice();
-                    boolean[] core = flat.lying().core();
-                    java.util.Map<Integer, Integer> shift = new java.util.HashMap<>();
-                    java.util.Map<Integer, Boolean> touches = new java.util.HashMap<>();
+                    // Each column of the log: its underside and its height, before and after.
+                    java.util.Map<Long, int[]> cols = new java.util.HashMap<>();
                     for (int i = 0; i < flat.size(); i++) {
                         int g = land.freeY(flat.xs()[i], flat.zs()[i]);
                         if (slice[i] == TreePlacer.LOOSE) {
@@ -713,24 +712,18 @@ public class TreeGrowthTests {
                             continue;
                         }
                         helper.assertTrue(!lies.holds()[i], what + ": a lying block goes down to meet the ground");
-                        int s = lies.ys()[i] - flat.ys()[i];
-                        helper.assertTrue(shift.getOrDefault(slice[i], s) == s, what + ": a slice of the log came apart");
-                        shift.put(slice[i], s);
-                        if (core[i]) {
-                            helper.assertTrue(s >= g, what + ": the log's middle sank into the ground in slice " + slice[i]);
-                            touches.merge(slice[i], s == g, Boolean::logicalOr);
-                        }
+                        long key = ((long) slice[i] << 40) ^ ((long) (flat.xs()[i] & 0xFFFFF) << 20) ^ (flat.zs()[i] & 0xFFFFF);
+                        int[] c = cols.computeIfAbsent(key, k -> new int[] {Integer.MAX_VALUE, Integer.MIN_VALUE, Integer.MAX_VALUE, Integer.MIN_VALUE, g});
+                        c[0] = Math.min(c[0], flat.ys()[i]);
+                        c[1] = Math.max(c[1], flat.ys()[i]);
+                        c[2] = Math.min(c[2], lies.ys()[i]);
+                        c[3] = Math.max(c[3], lies.ys()[i]);
                     }
-                    int slices = shift.keySet().stream().mapToInt(Integer::intValue).max().orElse(-1) + 1;
-                    for (int sl = 1; sl < slices; sl++) {
-                        if (shift.containsKey(sl) && shift.containsKey(sl - 1)) {
-                            int a = shift.get(sl - 1), b = shift.get(sl);
-                            helper.assertTrue(Math.abs(a - b) <= TreePlacer.MAX_STEP, what + ": the log bends " + (b - a) + " in one block at slice " + sl);
-                        }
-                    }
-                    long touching = touches.values().stream().filter(Boolean::booleanValue).count();
-                    if (l < 3) {
-                        helper.assertTrue(touching * 3 >= touches.size() * 2, what + ": only " + touching + " of " + touches.size() + " slices touch the ground");
+                    helper.assertTrue(!cols.isEmpty(), what + ": no log");
+                    for (int[] c : cols.values()) {
+                        helper.assertTrue(c[3] - c[2] == c[1] - c[0], what + ": a column of the log lost its thickness");
+                        helper.assertTrue(c[2] <= c[4], what + ": a column of the log hangs " + (c[2] - c[4]) + " over the ground");
+                        helper.assertTrue(c[2] >= c[4] - TreePlacer.MAX_SINK, what + ": a column of the log sank " + (c[4] - c[2]) + " into the ground");
                     }
                 }
             }
@@ -746,7 +739,7 @@ public class TreeGrowthTests {
 
     /**
      * A shed umbrella thorn on a hill's top ({@code hill}) or a bowl's floor falls in sight: once down, no column of its
-     * log stands taller than the log is thick (no wall of wood), and few columns hang over the ground.
+     * log stands taller than the log is thick (no wall of wood), and none hangs over the ground (the user's rule).
      */
     private static void fallOnLand(GameTestHelper helper, boolean hill) {
         ServerLevel level = helper.getLevel();
@@ -810,6 +803,8 @@ public class TreeGrowthTests {
                         if (deadWood(b) || b.is(TreeBlocks.ROTTEN_WOOD.get())) {
                             lowest = Math.min(lowest, y);
                             n++;
+                        } else if (b.is(TreeBlocks.FRASS.get())) {
+                            lowest = Math.min(lowest, y); // the hollow's floor, rotted to frass: part of the log
                         }
                     }
                     if (n == 0) {
@@ -822,7 +817,7 @@ public class TreeGrowthTests {
                         worst = column(level, foot.offset(x, lowest + 4, z));
                     }
                     pos.set(foot.getX() + x, foot.getY() + lowest - 1, foot.getZ() + z);
-                    if (level.getBlockState(pos).isAir() && level.getBlockState(pos.below()).isAir()) {
+                    if (level.getBlockState(pos).isAir()) {
                         hanging++;
                         if (hanging <= 6) {
                             hangs.append(" (").append(x).append(' ').append(lowest).append(' ').append(z).append(": ").append(column(level, pos)).append(')');
@@ -833,7 +828,7 @@ public class TreeGrowthTests {
             String where = hill ? "down the hill" : "up the bowl";
             helper.assertTrue(wood > 100, "the log " + where + " is only " + wood + " blocks");
             helper.assertTrue(tall == 0, tall + " columns of the log " + where + " are taller than the log is thick (" + thick + "), e.g. " + worst);
-            helper.assertTrue(hanging * 5 <= columns, hanging + " of " + columns + " columns of the log " + where + " hang 2 or more over the ground:" + hangs);
+            helper.assertTrue(hanging == 0, hanging + " of " + columns + " columns of the log " + where + " hang over the ground:" + hangs);
             for (int x = 0; x < 65; x++) {
                 for (int z = 0; z < 65; z++) {
                     for (int y = 0; y <= 50; y++) {

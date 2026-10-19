@@ -41,6 +41,13 @@ public class GiantTreeStructure extends Structure {
     static final double ANCIENT_SHARE = 0.15;
     /** The steepest a foot may be (blocks up and down under the trunk) before no tree stands there. */
     static final int MAX_UNEVEN = 6;
+    /**
+     * A tree lying fallen in new land lies on fairly flat ground (the user's wish 2026-10-19, a home for the insects): the
+     * land under its log may be at most this far above or below its foot, or another fallen tree is tried (my pick).
+     */
+    static final int FALLEN_UNEVEN = 3;
+    /** How many fallen trees are tried before a standing dead one takes the place. */
+    static final int FALLEN_TRIES = 4;
 
     private final String size;
 
@@ -112,8 +119,46 @@ public class GiantTreeStructure extends Structure {
             return Optional.empty();
         }
         BlockPos foot = new BlockPos(x, lowest, z);
-        TreePlacer.Placed tree = TreePlacer.placed(pick.kind(), pick.seed(), pick.age(), pick.stage());
-        return Optional.of(new GenerationStub(foot, builder -> builder.addPiece(new GiantTreePiece(pick, foot, tree.box(foot)))));
+        if (pick.stage() == TreeStage.FALLEN) {
+            pick = flatFall(context, foot, pick, random);
+        }
+        Pick chosen = pick;
+        TreePlacer.Placed tree = TreePlacer.placed(chosen.kind(), chosen.seed(), chosen.age(), chosen.stage());
+        return Optional.of(new GenerationStub(foot, builder -> builder.addPiece(new GiantTreePiece(chosen, foot, tree.box(foot)))));
+    }
+
+    /**
+     * A fallen tree whose log lies on fairly flat ground: its own, or another of the same kind and age (another fall's
+     * way), or, if none of {@link #FALLEN_TRIES} is, the tree still standing, shed of its limbs.
+     */
+    private static Pick flatFall(GenerationContext context, BlockPos foot, Pick pick, RandomSource random) {
+        for (int i = 0; i < FALLEN_TRIES; i++) {
+            Pick p = i == 0 ? pick : new Pick(pick.kind(), random.nextLong() & 0xFFFFFFFFL, pick.age(), TreeStage.FALLEN);
+            TreePlacer.Placed tree = TreePlacer.placed(p.kind(), p.seed(), p.age(), p.stage());
+            if (flatUnder(context, foot, tree)) {
+                return p;
+            }
+        }
+        return new Pick(pick.kind(), pick.seed(), pick.age(), TreeStage.SHED);
+    }
+
+    /** Whether the land under a fallen tree's log (every second column of it) is within {@link #FALLEN_UNEVEN} of its foot. */
+    private static boolean flatUnder(GenerationContext context, BlockPos foot, TreePlacer.Placed tree) {
+        if (tree.lying() == null) {
+            return true;
+        }
+        it.unimi.dsi.fastutil.longs.LongOpenHashSet seen = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
+        for (int i = 0; i < tree.size(); i++) {
+            int x = tree.xs()[i], z = tree.zs()[i];
+            if (tree.lying().slice()[i] < 0 || ((x + z) & 1) != 0 || !seen.add(BlockPos.asLong(x, 0, z))) {
+                continue;
+            }
+            int h = height(context, foot.getX() + x, foot.getZ() + z, Heightmap.Types.WORLD_SURFACE_WG);
+            if (Math.abs(h - foot.getY()) > FALLEN_UNEVEN) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static int height(GenerationContext context, int x, int z, Heightmap.Types type) {
