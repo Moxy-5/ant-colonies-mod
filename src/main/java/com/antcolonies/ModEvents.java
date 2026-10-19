@@ -188,6 +188,8 @@ public class ModEvents {
             event.accept(ModItems.FALLEN_BRANCH);
             event.accept(ModItems.DEAD_WOOD);
             event.accept(ModItems.MUD_CRUST);
+            // The giant savanna trees' blocks (M7.5).
+            ModItems.TREE_ITEMS.forEach(event::accept);
         }
         if (event.getTabKey() == CreativeModeTabs.INGREDIENTS) {
             event.accept(ModItems.FORAGE);

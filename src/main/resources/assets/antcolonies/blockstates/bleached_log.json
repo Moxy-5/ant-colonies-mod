@@ -1,0 +1,16 @@
+{
+  "variants": {
+    "axis=y": {
+      "model": "antcolonies:block/bleached_log"
+    },
+    "axis=z": {
+      "model": "antcolonies:block/bleached_log_horizontal",
+      "x": 90
+    },
+    "axis=x": {
+      "model": "antcolonies:block/bleached_log_horizontal",
+      "x": 90,
+      "y": 90
+    }
+  }
+}

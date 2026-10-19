@@ -1,0 +1,16 @@
+{
+  "variants": {
+    "axis=y": {
+      "model": "antcolonies:block/umbrella_thorn_log"
+    },
+    "axis=z": {
+      "model": "antcolonies:block/umbrella_thorn_log_horizontal",
+      "x": 90
+    },
+    "axis=x": {
+      "model": "antcolonies:block/umbrella_thorn_log_horizontal",
+      "x": 90,
+      "y": 90
+    }
+  }
+}

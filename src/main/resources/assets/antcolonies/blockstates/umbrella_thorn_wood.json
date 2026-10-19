@@ -1,0 +1,16 @@
+{
+  "variants": {
+    "axis=y": {
+      "model": "antcolonies:block/umbrella_thorn_wood"
+    },
+    "axis=z": {
+      "model": "antcolonies:block/umbrella_thorn_wood_horizontal",
+      "x": 90
+    },
+    "axis=x": {
+      "model": "antcolonies:block/umbrella_thorn_wood_horizontal",
+      "x": 90,
+      "y": 90
+    }
+  }
+}

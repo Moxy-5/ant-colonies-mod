@@ -1,5 +1,11 @@
 package com.antcolonies.registry;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import net.minecraft.world.level.block.Block;
+import net.neoforged.neoforge.registries.DeferredBlock;
+
 import com.antcolonies.AntColoniesMod;
 
 import net.minecraft.world.food.FoodProperties;
@@ -94,4 +100,13 @@ public class ModItems {
     public static final DeferredItem<DeferredSpawnEggItem> TERMITE_MAJOR_SOLDIER_SPAWN_EGG =
             ITEMS.register("termite_major_soldier_spawn_egg",
                     () -> new DeferredSpawnEggItem(ModEntities.TERMITE_MAJOR_SOLDIER, 0xB25E24, 0x18100B, new Item.Properties()));
+
+    /** The items of the giant savanna trees' blocks (M7.5), in creative tab order. */
+    public static final List<DeferredItem<BlockItem>> TREE_ITEMS = new ArrayList<>();
+
+    static {
+        for (DeferredBlock<? extends Block> block : TreeBlocks.ALL) {
+            TREE_ITEMS.add(ITEMS.registerSimpleBlockItem(block));
+        }
+    }
 }

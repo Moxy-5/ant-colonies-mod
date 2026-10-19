@@ -465,3 +465,189 @@ def all_textures():
     out["branch"] = ("file", "fallen_branch_bark_0.png")
     out["dead_end"] = ("file", "dead_wood_top_0.png")
     return out
+
+
+# --- The game's files (M7.5 step 1, the user's picks, docs/DESIGN.md "Giant savanna trees") --------------------------
+
+ASSETS = ROOT / "src/main/resources/assets/antcolonies"
+DATA = ROOT / "src/main/resources/data/antcolonies"
+GAME_NAMES = {"umbrella": "umbrella_thorn", "camel": "camel_thorn", "baobab": "baobab"}
+PICKED_BARK = {"umbrella": "D", "camel": "C", "baobab": "B"}  # the user's picks, 2026-10-18
+
+
+def picked_bark(kind):
+    look = PICKED_BARK[kind]
+    return bark_plates(kind) if look == "D" else bark_soft(kind) if look == "C" else bark(kind, look)
+
+
+def seedling_for(kind):
+    """The seedling in each kind's leaf colour; a baobab seedling has a green-grey stem and no spines."""
+    img = [list(row) for row in seedling()]
+    stem, spine = (120, 60, 44), (236, 232, 218)
+    for y in range(S):
+        for x in range(S):
+            px = img[y][x]
+            if px is None or kind == "umbrella":
+                continue
+            if px == spine:
+                img[y][x] = None if kind == "baobab" else spine
+            elif px == stem:
+                img[y][x] = (112, 116, 84) if kind == "baobab" else (96, 70, 58)
+            else:  # a leaf pixel: the same lightness in this kind's leaf colour
+                f = sum(px) / max(1, sum(LEAF["umbrella"]))
+                img[y][x] = shade(LEAF[kind], f)
+    return img
+
+
+def png(rows):
+    import struct
+    import zlib
+    raw = b"".join(b"\x00" + bytes(c for px in row for c in ((0, 0, 0, 0) if px is None else tuple(px)[:3] + (255,))) for row in rows)
+
+    def chunk(name, data):
+        return struct.pack(">I", len(data)) + name + data + struct.pack(">I", zlib.crc32(name + data) & 0xFFFFFFFF)
+
+    header = struct.pack(">IIBBBBB", len(rows[0]), len(rows), 8, 6, 0, 0, 0)
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b"")
+
+
+def write_json(path, data):
+    import json
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2) + chr(10), encoding="utf-8")
+
+
+def texture(name, rows):
+    out = ASSETS / f"textures/block/{name}.png"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_bytes(png(rows))
+
+
+def model(name, data):
+    write_json(ASSETS / f"models/block/{name}.json", data)
+
+
+def item_from_block(name, model_name=None):
+    write_json(ASSETS / f"models/item/{name}.json", {"parent": f"antcolonies:block/{model_name or name}"})
+
+
+def flat_item(name, tex):
+    write_json(ASSETS / f"models/item/{name}.json", {"parent": "minecraft:item/generated", "textures": {"layer0": f"antcolonies:block/{tex}"}})
+
+
+def loot(name, pools):
+    write_json(DATA / f"loot_table/blocks/{name}.json", {"type": "minecraft:block", "pools": pools})
+
+
+def drops_itself(name):
+    loot(name, [{"rolls": 1.0, "bonus_rolls": 0.0, "entries": [{"type": "minecraft:item", "name": f"antcolonies:{name}"}],
+                 "conditions": [{"condition": "minecraft:survives_explosion"}]}])
+
+
+SHEARS_OR_SILK = {"condition": "minecraft:any_of", "terms": [
+    {"condition": "minecraft:match_tool", "predicate": {"items": "minecraft:shears"}},
+    {"condition": "minecraft:match_tool", "predicate": {"predicates": {"minecraft:enchantments": [
+        {"enchantments": "minecraft:silk_touch", "levels": {"min": 1}}]}}}]}
+
+
+def log(name, side, end):
+    """A log (bark round the sides, the cut end on top and bottom, turned by how it was placed) and its blockstate."""
+    model(name, {"parent": "minecraft:block/cube_column", "textures": {"side": side, "end": end}})
+    model(f"{name}_horizontal", {"parent": "minecraft:block/cube_column_horizontal", "textures": {"side": side, "end": end}})
+    write_json(ASSETS / f"blockstates/{name}.json", {"variants": {
+        "axis=y": {"model": f"antcolonies:block/{name}"},
+        "axis=z": {"model": f"antcolonies:block/{name}_horizontal", "x": 90},
+        "axis=x": {"model": f"antcolonies:block/{name}_horizontal", "x": 90, "y": 90}}})
+    item_from_block(name)
+    drops_itself(name)
+
+
+def single(name, model_data, item=None):
+    model(name, model_data)
+    write_json(ASSETS / f"blockstates/{name}.json", {"variants": {"": {"model": f"antcolonies:block/{name}"}}})
+    if item is None:
+        item_from_block(name)
+    else:
+        flat_item(name, item)
+
+
+def cross(name, tex):
+    single(name, {"parent": "minecraft:block/cross", "render_type": "minecraft:cutout", "textures": {"cross": f"antcolonies:block/{tex}"}}, item=tex)
+
+
+def branch(name, bark_tex, end_tex):
+    """A thin branch, 6 pixels thick, joining every way it touches wood or leaves (like Minecraft's chorus plant)."""
+    textures = {"particle": bark_tex, "side": bark_tex, "end": end_tex}
+    model(f"{name}_core", {"textures": textures, "elements": [{"from": [5, 5, 5], "to": [11, 11, 11], "faces": {
+        f: {"texture": "#side", "uv": [5, 5, 11, 11]} for f in ("north", "south", "east", "west", "up", "down")}}]})
+    arm_faces = {f: {"texture": "#side", "uv": [5, 0, 11, 5]} for f in ("east", "west", "up", "down")}
+    arm_faces["north"] = {"texture": "#end", "uv": [5, 5, 11, 11], "cullface": "north"}
+    model(f"{name}_arm", {"textures": textures, "elements": [{"from": [5, 5, 0], "to": [11, 11, 5], "faces": arm_faces}]})
+    model(f"{name}_inventory", {"parent": "minecraft:block/block", "textures": textures, "elements": [{"from": [5, 5, 0], "to": [11, 11, 16], "faces": {
+        "north": {"texture": "#end", "uv": [5, 5, 11, 11]}, "south": {"texture": "#end", "uv": [5, 5, 11, 11]},
+        "east": {"texture": "#side", "uv": [0, 5, 16, 11]}, "west": {"texture": "#side", "uv": [0, 5, 16, 11]},
+        "up": {"texture": "#side", "uv": [5, 0, 11, 16]}, "down": {"texture": "#side", "uv": [5, 0, 11, 16]}}}]})
+    turn = {"north": {}, "east": {"y": 90}, "south": {"y": 180}, "west": {"y": 270}, "up": {"x": 270}, "down": {"x": 90}}
+    parts = [{"apply": {"model": f"antcolonies:block/{name}_core"}}]
+    for d, r in turn.items():
+        parts.append({"when": {d: "true"}, "apply": dict({"model": f"antcolonies:block/{name}_arm"}, **r)})
+    write_json(ASSETS / f"blockstates/{name}.json", {"multipart": parts})
+    item_from_block(name, f"{name}_inventory")
+    drops_itself(name)
+
+
+def game_files():
+    """Every block of the giant savanna trees: textures, models, blockstates, item models and loot."""
+    for kind in KINDS:
+        g = GAME_NAMES[kind]
+        texture(f"{g}_bark", picked_bark(kind))
+        texture(f"{g}_log_top", wood_end(kind))
+        texture(f"{g}_leaves", leaves_c(kind))
+        texture(f"{g}_seedling", seedling_for(kind))
+        bark_tex, end_tex = f"antcolonies:block/{g}_bark", f"antcolonies:block/{g}_log_top"
+        log(f"{g}_log", bark_tex, end_tex)
+        log(f"{g}_wood", bark_tex, bark_tex)
+        branch(f"{g}_branch", bark_tex, end_tex)
+        single(f"{g}_leaves", {"parent": "minecraft:block/cube_all", "render_type": "minecraft:cutout_mipped",
+                               "textures": {"all": f"antcolonies:block/{g}_leaves"}})
+        # Leaves: themselves with shears or silk touch; otherwise now and then a seedling (1 in 20) or a stick (1 in 50).
+        loot(f"{g}_leaves", [{"rolls": 1.0, "bonus_rolls": 0.0, "entries": [{"type": "minecraft:alternatives", "children": [
+            {"type": "minecraft:item", "name": f"antcolonies:{g}_leaves", "conditions": [SHEARS_OR_SILK]},
+            {"type": "minecraft:item", "name": f"antcolonies:{g}_seedling", "conditions": [
+                {"condition": "minecraft:survives_explosion"}, {"condition": "minecraft:random_chance", "chance": 0.05}]},
+            {"type": "minecraft:item", "name": "minecraft:stick", "conditions": [
+                {"condition": "minecraft:survives_explosion"}, {"condition": "minecraft:random_chance", "chance": 0.02}]}]}]}])
+        cross(f"{g}_seedling", f"{g}_seedling")
+        drops_itself(f"{g}_seedling")
+    # Dead wood: bleached silver bark, the old dead wood's cut end.
+    texture("bleached_bark", dead_bark_silver(0))
+    texture("peeling_bleached_bark", peeling_bark())
+    dead_end = "antcolonies:block/dead_wood_top_0"
+    log("bleached_log", "antcolonies:block/bleached_bark", dead_end)
+    log("bleached_wood", "antcolonies:block/bleached_bark", "antcolonies:block/bleached_bark")
+    log("peeling_bleached_log", "antcolonies:block/peeling_bleached_bark", dead_end)
+    branch("bleached_branch", "antcolonies:block/bleached_bark", dead_end)
+    for name, rows in (("rotten_wood", rotten_wood()), ("baobab_fibre", fibre())):
+        texture(name, rows)
+        single(name, {"parent": "minecraft:block/cube_all", "textures": {"all": f"antcolonies:block/{name}"}})
+        drops_itself(name)
+    texture("frass", frass())
+    sides = {f: {"uv": [0, 14, 16, 16], "texture": "#texture", "cullface": f} for f in ("north", "south", "east", "west")}
+    single("frass", {"parent": "minecraft:block/thin_block", "textures": {"particle": "antcolonies:block/frass", "texture": "antcolonies:block/frass"},
+                     "elements": [{"from": [0, 0, 0], "to": [16, 2, 16], "faces": dict({
+                         "down": {"uv": [0, 0, 16, 16], "texture": "#texture", "cullface": "down"},
+                         "up": {"uv": [0, 0, 16, 16], "texture": "#texture"}}, **sides)}]})
+    drops_itself("frass")
+    texture("thorny_twig", thorns())
+    cross("thorny_twig", "thorny_twig")
+    # A thorny twig gives itself only to shears or silk touch (my pick, to confirm); broken by hand it gives nothing.
+    loot("thorny_twig", [{"rolls": 1.0, "bonus_rolls": 0.0, "entries": [{"type": "minecraft:item", "name": "antcolonies:thorny_twig"}],
+                          "conditions": [SHEARS_OR_SILK]}])
+    texture("camel_thorn_pods", pods())
+    cross("camel_thorn_pods", "camel_thorn_pods")
+    drops_itself("camel_thorn_pods")
+    print("wrote the giant savanna tree blocks")
+
+
+if __name__ == "__main__":
+    game_files()

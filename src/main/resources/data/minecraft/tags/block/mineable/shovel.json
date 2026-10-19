@@ -1,4 +1,7 @@
 {
   "replace": false,
-  "values": [ "antcolonies:burrowed_dirt" ]
+  "values": [
+    "antcolonies:burrowed_dirt",
+    "antcolonies:frass"
+  ]
 }

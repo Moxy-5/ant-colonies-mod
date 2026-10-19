@@ -1,0 +1,11 @@
+{
+  "replace": false,
+  "values": [
+    "antcolonies:bleached_log",
+    "antcolonies:bleached_wood",
+    "antcolonies:peeling_bleached_log",
+    "antcolonies:bleached_branch",
+    "antcolonies:rotten_wood",
+    "antcolonies:baobab_fibre"
+  ]
+}

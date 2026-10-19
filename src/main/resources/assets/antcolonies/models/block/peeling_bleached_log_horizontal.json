@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column_horizontal",
+  "textures": {
+    "side": "antcolonies:block/peeling_bleached_bark",
+    "end": "antcolonies:block/dead_wood_top_0"
+  }
+}

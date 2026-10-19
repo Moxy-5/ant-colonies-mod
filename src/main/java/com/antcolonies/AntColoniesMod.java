@@ -10,11 +10,13 @@ import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.registry.ModEntities;
 import com.antcolonies.registry.ModFeatures;
 import com.antcolonies.registry.ModItems;
+import com.antcolonies.registry.TreeBlocks;
 import com.antcolonies.species.SpeciesProfiles;
 import com.mojang.logging.LogUtils;
 
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.AddReloadListenerEvent;
 import net.neoforged.neoforge.event.RegisterGameTestsEvent;
@@ -31,6 +33,8 @@ public class AntColoniesMod {
         ModFeatures.FEATURES.register(modEventBus);
         ModEntities.ENTITY_TYPES.register(modEventBus);
         ModItems.ITEMS.register(modEventBus);
+        // How the giant savanna trees' blocks burn (Minecraft's fire table is filled once, at start).
+        modEventBus.addListener((FMLCommonSetupEvent event) -> event.enqueueWork(TreeBlocks::setFlammable));
         // In-game tests: only loaded when the game is started in game-test mode.
         modEventBus.addListener((RegisterGameTestsEvent event) -> {
             event.register(NestTests.class);

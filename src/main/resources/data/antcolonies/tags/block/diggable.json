@@ -9,6 +9,9 @@
     "minecraft:mud",
     "minecraft:sand",
     "minecraft:red_sand",
-    "antcolonies:deep_soil"
+    "antcolonies:deep_soil",
+    "antcolonies:rotten_wood",
+    "antcolonies:frass",
+    "antcolonies:baobab_fibre"
   ]
 }

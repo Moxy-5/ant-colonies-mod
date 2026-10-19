@@ -152,6 +152,10 @@ public class ModBlocks {
                     .isSuffocating((state, level, pos) -> false).isViewBlocking((state, level, pos) -> false)
                     .pushReaction(PushReaction.DESTROY).randomTicks());
 
+    static {
+        TreeBlocks.init(); // the giant savanna trees' blocks (M7.5), registered with the rest
+    }
+
     private static BlockBehaviour.Properties grassProperties() {
         return BlockBehaviour.Properties.of().mapColor(MapColor.SAND).replaceable().noCollission().instabreak().sound(SoundType.GRASS)
                 .offsetType(BlockBehaviour.OffsetType.XZ).ignitedByLava().pushReaction(PushReaction.DESTROY).randomTicks();
