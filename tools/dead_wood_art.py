@@ -3,9 +3,9 @@ random per block, for each of the 4 eaten stages), end textures, block models, t
 upright as a stump), item model, loot table and the savanna world generation of fallen trees. Also draws a preview,
 references/termites/preview/dead_wood.png.
 
-The look is the user's pick (2026-10-14, "D" in tools/model_viewer.py): a dead version of Minecraft's savanna log, dark
-grey-brown bark in long strips along the trunk, so a fallen tree fits in beside the acacias round it (the user liked
-the bleached silver look best for realism, but it looked nothing like Minecraft's acacias). Macrotermes hollow a log
+The look: since M7.5 step 6 (user, 2026-10-19) the bleached silver bark of the dead giant trees ("E", the user's
+favourite, tools/tree_art.py's dead_bark_silver), so the old fallen trees match the new dead wood; before it was "D",
+a dead version of Minecraft's savanna log (the user's pick of 2026-10-14, when Minecraft's acacias still stood round it). Macrotermes hollow a log
 out from inside under a crust of mud plastered over the wood, so as it is eaten the outside gets more and more mud and
 the cut ends show a growing hollow core (the user: keep those stages).
 
@@ -24,7 +24,7 @@ PREVIEW = ROOT / "references/termites/preview"
 
 S = 16
 TONES = [(62, 56, 48), (84, 77, 67), (104, 95, 83), (122, 112, 98)]   # bark strips, darkest to lightest
-RIM = (70, 62, 52)                                                    # the bark round the cut end
+RIM = (118, 112, 103)                                                 # the silver bark round the cut end
 RINGS = [(132, 116, 96), (112, 98, 82)]
 MUD = (138, 78, 50)          # fresh termite mud (as on the fallen branch)
 MUD_DARK = (104, 58, 38)
@@ -57,21 +57,10 @@ def write_json(path, data):
 
 
 def bark(variant):
-    """16x16 bark, the strips running top to bottom (the model turns it to lie along the log): each column a run of
-    strips of different shades, so neighbouring blocks never repeat when each picks its own version."""
-    rng = random.Random(f"D{variant}")
-    img = [[None] * S for _ in range(S)]
-    for x in range(S):
-        tone = rng.randrange(1, 4)
-        y = 0
-        while y < S:
-            run = rng.randint(3, 9)
-            for i in range(run):
-                if y + i < S:
-                    img[y + i][x] = tuple(clamp(c * rng.uniform(0.95, 1.05)) for c in TONES[tone])
-            y += run
-            tone = max(0, min(3, tone + rng.choice([-2, -1, 1, 2])))
-    return img
+    """16x16 bleached silver bark, the strips running top to bottom (the model turns it to lie along the log), the
+    same as the dead giant trees' (tools/tree_art.py), one version per variant so neighbouring blocks never repeat."""
+    import tree_art
+    return [list(row) for row in tree_art.dead_bark_silver(variant)]
 
 
 def side(stage, variant):

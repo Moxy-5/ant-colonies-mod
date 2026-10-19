@@ -2,8 +2,8 @@
 (base, middle and tip, each in 4 stages, thinner as it is eaten), the blockstate, item model, loot table and the
 savanna world generation. Also draws a preview, references/termites/preview/fallen_branch.png.
 
-A dead acacia branch lying in the savanna is grey and weathered, with long cracks along the grain where the bark has
-gone. Macrotermes eat dead wood from under a crust of mud they plaster over it (soil sheeting), so as a branch is eaten
+A dead acacia branch lying in the savanna is bleached silver and weathered (the dead giant trees' look since M7.5
+step 6, user 2026-10-19), with long cracks along the grain where the bark has gone. Macrotermes eat dead wood from under a crust of mud they plaster over it (soil sheeting), so as a branch is eaten
 more and more of it is covered in reddish-brown mud and less wood is left.
 
 Needs no extra libraries (writes the PNGs itself). Run from the project folder:  python tools/fallen_branch_art.py
@@ -19,9 +19,9 @@ ASSETS = ROOT / "src/main/resources/assets/antcolonies"
 DATA = ROOT / "src/main/resources/data/antcolonies"
 PREVIEW = ROOT / "references/termites/preview"
 
-WOOD = (132, 122, 108)       # weathered grey-brown
-WOOD_LIGHT = (168, 158, 140)
-CRACK = (78, 68, 58)
+WOOD = (156, 150, 139)       # sun-bleached silver, as the dead giant trees' bark (tools/tree_art.py)
+WOOD_LIGHT = (184, 178, 167)
+CRACK = (70, 64, 58)
 MUD = (138, 78, 50)          # fresh termite mud, like the fresh mound soil
 MUD_DARK = (104, 58, 38)
 END_RING = [(186, 168, 136), (160, 140, 108)]
