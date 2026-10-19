@@ -167,9 +167,9 @@ const REAL = {
   },
 };
 let kind = "umbrella", age = 1, stage = "living", seed = 1, cut = false, dry = false;
-let picks = { shape: { umbrella: "A", camel: "A", baobab: "A" }, bark: { umbrella: "B", camel: "B", baobab: "B" },
+let picks = { shape: { umbrella: "A", camel: "A", baobab: "A" }, bark: { umbrella: "D", camel: "C", baobab: "B" },
               leaves: { umbrella: "C", camel: "C", baobab: "C" }, dead: "E" };
-try { const s = JSON.parse(localStorage.getItem("tree-picks-2") || "null"); if (s && s.shape) picks = s; } catch (e) {}
+try { const s = JSON.parse(localStorage.getItem("tree-picks-3") || "null"); if (s && s.shape) picks = s; } catch (e) {}
 
 // ================= The tree shape maker =================
 // Voxels: block names; the textures are picked when drawing. Coordinates are blocks, y = 0 the first block above
@@ -838,7 +838,7 @@ function buttons(el, list, isOn, onPick) {
     el.appendChild(b);
   }
 }
-function save() { try { localStorage.setItem("tree-picks-2", JSON.stringify(picks)); } catch (e) {} }
+function save() { try { localStorage.setItem("tree-picks-3", JSON.stringify(picks)); } catch (e) {} }
 
 function sync() {
   document.querySelectorAll("#kinds .choice").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.id === kind)));
