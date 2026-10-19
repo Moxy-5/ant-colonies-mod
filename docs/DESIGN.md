@@ -164,7 +164,7 @@ it.** If a decision changes, ask the user first, then update it here. The short 
 
 ### Future big plan: splitting the mod, then the jungle (user, 2026-10-19; ideas, nothing decided or built)
 - **The split (the user's idea):** after M9, this mod becomes a **savanna overhaul** (Macrotermes, Matabele ants, the giant trees, savanna life, M8.7). The shared framework (colony brain, legs, body, species profiles, the tools) is kept so each mod reuses it; each mod plugs its own species' thinking into the brain through hooks, so the savanna mod needs no leafcutter thinking and the reverse.
-- **The red harvester ant after the split: still to plan with the user** (which mod it goes to, its own biome mod, plains and badlands, or kept here; what of its open backlog, M6.5, goes with it).
+- **The red harvester ant after the split (user, 2026-10-19): its own North American desert mod, after the jungle** (below). What of its open backlog, M6.5, goes with it is planned then.
 - **The jungle (a separate mod or update, after the savanna one):** leafcutter ants (*Atta*, *Acromyrmex*; real home Central and South America, Minecraft's jungle fits). Real points to plan from:
   - Huge colonies (a mature *Atta* nest: millions of workers, hundreds of chambers, a soil mound many metres across; about 100 to 120 real mobs wanted, `perf-targets`), castes from tiny minims to majors with axe-like heads, leaves cut and carried on trails to fungus gardens, refuse chambers.
   - **Army ants (*Nomamyrmex esenbeckii*)** raiding *Atta* nests: underground battles, majors blocking the tunnels (the jungle's Matabele vs termites).
@@ -173,6 +173,11 @@ it.** If a decision changes, ask the user first, then update it here. The short 
   - **Big predators:** armadillos digging in, giant anteaters and tamanduas licking up workers for about a minute a nest before the soldiers drive them off.
   - **Thieves and parasites:** guest ants (*Megalomyrmex*) eating the garden, the parasite ant *Acromyrmex insinuator* slipping its queens in.
   - **Nuptial flight:** queens eaten by frogs, birds, lizards (and people: fried queens in Colombia).
+- **The North American desert (a separate mod, after the jungle; user, 2026-10-19):** the Sonoran and Chihuahuan deserts and the dry grassland at their edges, the real home of the red harvester ant (*Pogonomyrmex*), which moves there. Real points to plan from:
+  - **Horned lizards** (*Phrynosoma*): eat mostly harvester ants, licked up one by one beside the trails; their blood neutralises the ants' venom; some squirt blood from their eyes at coyotes.
+  - **Honeypot ants** (*Myrmecocystus*) as neighbours: living storage jars hanging in the nest; rival colonies hold tournaments (strutting, sizing each other up) instead of fighting; a much stronger colony raids the weaker, kills its queen and takes its brood and honeypots.
+  - **Kangaroo rats** competing for the seeds and burying seed caches; **antlion** pits; ant-eating spiders at the entrances.
+  - **The land:** cleared disks round the nests, pebble caps, fertile refuse piles with plants in rings round old nests, summer monsoon storms with flash floods and plugged entrances, mass nuptial flights right after the rain, heat pushing the midday rest to its limits.
 - Not for now: an Australian outback set (*Coptotermes acinaciformis*, magnetic termites) was talked about and set aside by the user (2026-10-19).
 
 ## Core systems
