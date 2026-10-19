@@ -30,5 +30,9 @@
     "branch": "antcolonies:baobab_branch",
     "leaves": "antcolonies:baobab_leaves",
     "seedling": "antcolonies:baobab_seedling"
-  }
+  },
+  "lifespan": [
+    1000,
+    2000
+  ]
 }

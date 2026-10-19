@@ -434,8 +434,8 @@ public class ColonyCommands {
         BlockPos at = BlockPos.containing(source.getPosition());
         java.util.List<com.antcolonies.tree.Forest.Tree> near = forest.near(at, 128);
         near.sort(Comparator.comparingDouble(t -> t.foot.distSqr(at)));
-        StringBuilder out = new StringBuilder(String.format("Tree book: %d trees (day %d; so far %d growth steps, %d little trees died, %d seedlings came up)",
-                forest.size(), com.antcolonies.tree.Forest.today(level), forest.grownSteps, forest.deaths, forest.sprouted));
+        StringBuilder out = new StringBuilder(String.format("Tree book: %d trees (day %d; so far %d growth steps, %d little trees died, %d seedlings came up, %d grown trees died)",
+                forest.size(), com.antcolonies.tree.Forest.today(level), forest.grownSteps, forest.deaths, forest.sprouted, forest.killed));
         int shown = 0;
         for (com.antcolonies.tree.Forest.Tree t : near) {
             if (!t.living() || t.age >= com.antcolonies.tree.TreeShapes.GROWN || shown >= 8) {
@@ -448,6 +448,20 @@ public class ColonyCommands {
         }
         if (shown == 0) {
             out.append("\n  no seedlings or young trees within 128 blocks");
+        }
+        // Step 5: the nearest dead trees, their stage and what killed them.
+        int dead = 0;
+        long today = com.antcolonies.tree.Forest.today(level);
+        for (com.antcolonies.tree.Forest.Tree t : near) {
+            if (!t.dead() || dead >= 6) {
+                continue;
+            }
+            String since = t.died == com.antcolonies.tree.Forest.DIED_UNKNOWN ? "dead in new land" : "died " + (today - t.died) + " days ago";
+            String cause = t.cause.isEmpty() ? "" : " (" + (t.cause.equals("age") ? "old age" : t.cause) + ")";
+            String stage = t.stage == com.antcolonies.tree.TreeStage.LIVING ? "withering" : t.stage.id;
+            out.append(String.format("\n  dead %s at %d %d %d: %s, %s%s", t.kind.replace('_', ' '), t.foot.getX(), t.foot.getY(), t.foot.getZ(),
+                    stage, since, cause));
+            dead++;
         }
         source.sendSuccess(() -> Component.literal(out.toString()), false);
         return 1;

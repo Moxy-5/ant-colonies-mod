@@ -56,7 +56,10 @@ import net.minecraft.world.phys.Vec3;
  * <li><b>4e, time away:</b> a tree whose land was not loaded catches up every day it missed (growing and dying) when its
  * land loads, placed out of sight at once; ground away gets the seedlings of the rain days it missed.</li>
  * </ul>
- * Living trees only for now: dead ones are written in but stand as they are (their life is step 5).
+ * <b>Step 5, death:</b> every tree has its own lifespan ({@link TreeLife#lifespan}); on the day it is reached the tree
+ * dies, and from then on its dead stages follow day by day ({@link TreeLife#deadStages}): acacias wither, stand as a
+ * snag, get termite mud, shed their limbs and fall; baobabs slump into a heap that dries and is gone. Each change is
+ * placed only where blocks differ, one stage at a time in sight, several only out of sight.
  */
 public class Forest extends SavedData {
     private static final String DATA_NAME = AntColoniesMod.MODID + "_forest";
@@ -78,6 +81,11 @@ public class Forest extends SavedData {
     /** Rain days remembered (for land away a long time). */
     private static final int RAIN_MEMORY = 400;
 
+    /** {@link Tree#died}: living. */
+    public static final long ALIVE = Long.MIN_VALUE;
+    /** {@link Tree#died}: dead in new land, the day worked out when it is first looked at. */
+    public static final long DIED_UNKNOWN = Long.MIN_VALUE + 1;
+
     /** New land's trees, written in by world generation threads, taken into the book on the server thread. */
     private static final ConcurrentLinkedQueue<Queued> QUEUE = new ConcurrentLinkedQueue<>();
 
@@ -95,6 +103,14 @@ public class Forest extends SavedData {
         public long lastDay;
         /** Days lived since its shape in the world was last brought up to date (more than 1: placed out of sight). */
         int pendingDays;
+        /** Days lived since it came up (step 5: it dies of old age when this reaches its lifespan). */
+        public double lived;
+        /** The day it died ({@link #ALIVE}: living; {@link #DIED_UNKNOWN}: dead in new land, the day not worked out yet). */
+        public long died = ALIVE;
+        /** What killed it: age, fire, lightning (empty while living). */
+        public String cause = "";
+        /** The stage whose shape is in the world. */
+        public TreeStage placedStage;
 
         public Tree(String kind, BlockPos foot, long seed, double age, TreeStage stage, double placedAge, long lastDay) {
             this.kind = kind;
@@ -104,10 +120,28 @@ public class Forest extends SavedData {
             this.stage = stage;
             this.placedAge = placedAge;
             this.lastDay = lastDay;
+            this.placedStage = stage;
+            this.lived = TreeLife.daysAt(Math.min(age, TreeShapes.ANCIENT));
+            if (stage != TreeStage.LIVING) {
+                died = DIED_UNKNOWN;
+            }
         }
 
         public boolean living() {
-            return stage == TreeStage.LIVING;
+            return stage == TreeStage.LIVING && died == ALIVE;
+        }
+
+        public boolean dead() {
+            return died != ALIVE;
+        }
+
+        /** A fallen log: nothing more happens to it here (termites eating it come later). */
+        boolean settled() {
+            return stage == TreeStage.FALLEN && placedStage == TreeStage.FALLEN;
+        }
+
+        TreeKind treeKind() {
+            return TreePlacer.kind(kind);
         }
 
         TreePlacer.Placed shape(double atAge) {
@@ -124,6 +158,10 @@ public class Forest extends SavedData {
             tag.putString("stage", stage.id);
             tag.putLong("day", lastDay);
             tag.putInt("pending", pendingDays);
+            tag.putDouble("lived", lived);
+            tag.putLong("died", died);
+            tag.putString("cause", cause);
+            tag.putString("placedStage", placedStage.id);
             return tag;
         }
 
@@ -131,6 +169,12 @@ public class Forest extends SavedData {
             Tree t = new Tree(tag.getString("kind"), BlockPos.of(tag.getLong("foot")), tag.getLong("seed"), tag.getDouble("age"),
                     stage(tag.getString("stage")), tag.getDouble("placed"), tag.getLong("day"));
             t.pendingDays = tag.getInt("pending");
+            if (tag.contains("lived")) {
+                t.lived = tag.getDouble("lived");
+                t.died = tag.getLong("died");
+                t.cause = tag.getString("cause");
+                t.placedStage = stage(tag.getString("placedStage"));
+            }
             return t;
         }
     }
@@ -144,6 +188,8 @@ public class Forest extends SavedData {
     private final Long2LongOpenHashMap regionDays = new Long2LongOpenHashMap();
     /** What happened, for the tests and the command: grown steps, deaths, seedlings come up. */
     public int grownSteps, deaths, sprouted;
+    /** Grown trees that died (step 5), and dead stages placed. */
+    public int killed, deadSteps;
 
     /** The game tests: shapes are worked out at once rather than in the background. */
     public static boolean shapesAtOnce;
@@ -276,7 +322,7 @@ public class Forest extends SavedData {
             if (System.nanoTime() - start > BUDGET_NANOS) {
                 break; // the rest next second
             }
-            if (t.living() && (t.lastDay < today || t.placedAge != TreeLife.shapeAge(t.age))) {
+            if (!t.settled() && (t.lastDay < today || t.placedAge != TreeLife.shapeAge(t.age) || t.placedStage != t.stage)) {
                 update(level, t, today);
             }
         }
@@ -293,7 +339,7 @@ public class Forest extends SavedData {
         if (!level.hasChunkAt(t.foot)) {
             return false;
         }
-        TreePlacer.Placed now = t.placedAge >= 0 ? soon(t, t.placedAge) : null;
+        TreePlacer.Placed now = t.placedAge >= 0 ? soon(t, t.placedAge, t.placedStage) : null;
         if (t.placedAge >= 0 && now == null) {
             return false; // its shape is being worked out
         }
@@ -307,8 +353,21 @@ public class Forest extends SavedData {
         if (t.lastDay > today) {
             t.lastDay = today; // the clock was set back
         }
+        if (t.died == DIED_UNKNOWN) {
+            // A dead tree of new land: it died some days ago, somewhere inside the stage it stands in.
+            double roll = TreeLife.dice(t.seed, -9).nextDouble();
+            t.died = today - TreeLife.daysDeadIn(t.treeKind(), t.seed, t.stage, roll);
+        }
         while (t.lastDay < today) {
             t.lastDay++;
+            if (t.dead()) {
+                continue; // its stage comes from the days since it died, below
+            }
+            t.lived++;
+            if (t.age >= TreeLife.YOUNG_END && t.lived >= TreeLife.lifespan(t.treeKind(), t.seed)) {
+                kill(t, t.lastDay, "age");
+                continue;
+            }
             Random dice = TreeLife.dice(t.seed, t.lastDay);
             double next = TreeLife.grow(t.age, TreeLife.speed(t.seed));
             if (dice.nextDouble() < TreeLife.deathChance(t.age, next)) {
@@ -319,32 +378,59 @@ public class Forest extends SavedData {
             t.pendingDays++;
             grownSteps++;
         }
+        int stageSteps = 0;
+        if (t.dead()) {
+            t.stage = TreeLife.deadStage(t.treeKind(), t.seed, today - t.died);
+            if (t.stage == null) {
+                // A baobab's dried heap is gone.
+                if (now != null) {
+                    TreePlacer.remove(level, now, t.foot, Block.UPDATE_ALL);
+                }
+                remove(t);
+                return true;
+            }
+            stageSteps = Math.abs(TreeLife.stageIndex(t.treeKind(), t.stage) - TreeLife.stageIndex(t.treeKind(), t.placedStage));
+        }
         setDirty();
-        if (TreeLife.shapeAge(t.age) == t.placedAge) {
+        if (TreeLife.shapeAge(t.age) == t.placedAge && t.stage == t.placedStage) {
             t.pendingDays = 0;
             return true;
         }
-        TreePlacer.Placed next = soon(t, t.age);
-        if (next == null || !loaded(level, next.box(t.foot)) || t.pendingDays > 1 && !outOfSight(level, t, next)) {
+        TreePlacer.Placed next = soon(t, t.age, t.stage);
+        boolean jump = t.dead() ? stageSteps > 1 : t.pendingDays > 1;
+        if (next == null || !loaded(level, next.box(t.foot)) || jump && !outOfSight(level, t, next)) {
             return false;
         }
         place(level, t, now, next);
         return true;
     }
 
-    /** A tree's shape at an age, if worked out (or being worked out in the background: null). */
-    private static TreePlacer.Placed soon(Tree t, double age) {
-        return shapesAtOnce ? t.shape(age) : TreePlacer.placedSoon(t.kind, t.seed, TreeLife.shapeAge(age), t.stage);
+    /** A grown tree dies (step 5): its dead stages start (the day it dies its leaves wither on the living shape). */
+    public void kill(Tree t, long day, String cause) {
+        t.died = day;
+        t.cause = cause;
+        killed++;
+        setDirty();
+    }
+
+    /** A tree's shape at an age and stage, if worked out (or being worked out in the background: null). */
+    private static TreePlacer.Placed soon(Tree t, double age, TreeStage stage) {
+        return shapesAtOnce ? TreePlacer.placed(t.kind, t.seed, TreeLife.shapeAge(age), stage)
+                : TreePlacer.placedSoon(t.kind, t.seed, TreeLife.shapeAge(age), stage);
     }
 
     /** Brings the tree's shape in the world from what is there to its age now. */
     private void place(ServerLevel level, Tree t, TreePlacer.Placed now, TreePlacer.Placed next) {
         List<BlockPos> shed = new ArrayList<>();
         TreePlacer.grow(level, now, next, t.foot, Block.UPDATE_ALL, shed);
+        if (t.placedStage != t.stage) {
+            deadSteps++;
+        }
         t.placedAge = TreeLife.shapeAge(t.age);
+        t.placedStage = t.stage;
         t.pendingDays = 0;
         setDirty();
-        if (!shed.isEmpty()) {
+        if (!shed.isEmpty() && t.living()) {
             // The twigs it shed (self-pruning) fall to the ground under them, one fallen branch (my pick).
             BlockPos from = shed.get(TreeLife.dice(t.seed, t.lastDay + 7).nextInt(shed.size()));
             dropBranch(level, from, TreeLife.dice(t.seed, t.lastDay + 13));

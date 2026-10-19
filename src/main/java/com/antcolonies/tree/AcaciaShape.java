@@ -228,13 +228,13 @@ final class AcaciaShape {
             double grown = gr.limbUpto(limb);
             if (stage == TreeStage.SHED) {
                 double broken = limb.line.length * limb.brk * 0.6;
-                TreeDraw.growing(v, limb.line, limbRadii(gr, limb), Math.min(grown, broken), grown < broken, b, 0);
+                TreeDraw.broken(v, limb.line, limbRadii(gr, limb), grown, broken, b);
                 limbFallPoints(gr, limb, fallAt);
                 continue;
             }
-            if (dead && gr.living) {
+            if (gr.deadLimb(limb)) {
                 double broken = limb.line.length * 0.85;
-                TreeDraw.growing(v, limb.line, limbRadii(gr, limb), Math.min(grown, broken), grown < broken, b, 0);
+                TreeDraw.broken(v, limb.line, limbRadii(gr, limb), grown, broken, b);
                 continue;
             }
             TreeDraw.growing(v, limb.line, limbRadii(gr, limb), grown, true, b, 0);

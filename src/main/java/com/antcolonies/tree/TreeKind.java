@@ -18,15 +18,18 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
  * @param form   which shape maker draws it: {@code acacia} (a trunk forking into limbs under a crown) or {@code baobab}
  * @param salt   mixed into the seed so two kinds with the same seed differ
  * @param shapes the kind's two shapes, mixed by each tree's seed (the user's pick)
+ * @param lifespan how many days a tree of this kind lives after it came up, from and to, each tree its own by its seed
+ *                 (step 5, the user's decision: real ratios, one game day about one tree-year)
  */
-public record TreeKind(String form, int salt, Trunk trunk, Crown crown, List<Shape> shapes, Blocks blocks) {
+public record TreeKind(String form, int salt, Trunk trunk, Crown crown, List<Shape> shapes, Blocks blocks, List<Integer> lifespan) {
     public static final Codec<TreeKind> CODEC = RecordCodecBuilder.create(i -> i.group(
             Codec.STRING.fieldOf("form").forGetter(TreeKind::form),
             Codec.INT.fieldOf("salt").forGetter(TreeKind::salt),
             Trunk.CODEC.fieldOf("trunk").forGetter(TreeKind::trunk),
             Crown.CODEC.fieldOf("crown").forGetter(TreeKind::crown),
             Shape.CODEC.listOf().fieldOf("shapes").forGetter(TreeKind::shapes),
-            Blocks.CODEC.fieldOf("blocks").forGetter(TreeKind::blocks)).apply(i, TreeKind::new));
+            Blocks.CODEC.fieldOf("blocks").forGetter(TreeKind::blocks),
+            Codec.INT.listOf().optionalFieldOf("lifespan", List.of(150, 250)).forGetter(TreeKind::lifespan)).apply(i, TreeKind::new));
 
     /**
      * The trunk. For an acacia: the tree's height, its spread either way, the trunk's radius, and where it forks (a share

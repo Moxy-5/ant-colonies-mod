@@ -370,4 +370,201 @@ public class TreeGrowthTests {
         forest.forgetInside(helper.getBounds());
         helper.succeed();
     }
+
+    // ---------------------------------------------------------------- step 5: death and the fall
+
+    /** How many blocks round a tree's foot (30 each way sideways, minY to maxY over it) are like this. */
+    private static int countAround(ServerLevel level, BlockPos foot, int minY, int maxY, java.util.function.Predicate<BlockState> like) {
+        int n = 0;
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        for (int x = -30; x <= 30; x++) {
+            for (int z = -30; z <= 30; z++) {
+                for (int y = minY; y <= maxY; y++) {
+                    if (like.test(level.getBlockState(pos.set(foot.getX() + x, foot.getY() + y, foot.getZ() + z)))) {
+                        n++;
+                    }
+                }
+            }
+        }
+        return n;
+    }
+
+    /** Blocks like this within {@code r} of the foot, from {@code minY} to {@code maxY} over it. */
+    private static int countNear(ServerLevel level, BlockPos foot, int r, int minY, int maxY, java.util.function.Predicate<BlockState> like) {
+        int n = 0;
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        for (int x = -r; x <= r; x++) {
+            for (int z = -r; z <= r; z++) {
+                for (int y = minY; y <= maxY; y++) {
+                    if (like.test(level.getBlockState(pos.set(foot.getX() + x, foot.getY() + y, foot.getZ() + z)))) {
+                        n++;
+                    }
+                }
+            }
+        }
+        return n;
+    }
+
+    /** Clears a big tree's blocks over the ground (a test with sky access would leave them standing over the next test). */
+    private static void clearAbove(GameTestHelper helper, BlockPos foot) {
+        ServerLevel level = helper.getLevel();
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        for (int x = -30; x <= 30; x++) {
+            for (int z = -30; z <= 30; z++) {
+                for (int y = 0; y <= 50; y++) {
+                    pos.set(foot.getX() + x, foot.getY() + y, foot.getZ() + z);
+                    BlockState there = level.getBlockState(pos);
+                    if (!there.isAir() && !there.is(Blocks.BARRIER)) {
+                        level.setBlock(pos, Blocks.AIR.defaultBlockState(), 2);
+                    }
+                }
+            }
+        }
+    }
+
+    private static boolean deadWood(BlockState s) {
+        return s.is(TreeBlocks.BLEACHED_WOOD.get()) || s.is(TreeBlocks.BLEACHED_LOG.get()) || s.is(TreeBlocks.PEELING_BLEACHED_LOG.get())
+                || s.is(TreeBlocks.BLEACHED_BRANCH.get());
+    }
+
+    private static boolean livingWood(BlockState s) {
+        return s.is(TreeBlocks.TREE_WOOD) && !deadWood(s);
+    }
+
+    private static boolean leaves(BlockState s) {
+        return s.is(TreeBlocks.TREE_LEAVES);
+    }
+
+    /**
+     * Step 5: a grown umbrella thorn that has lived its lifespan (150 to 250 days) dies of old age, and its dead stages
+     * follow day by day as decided: the day it dies it still stands as it was (withering), then a bare silver snag (no
+     * leaves, no living wood), termite mud climbing it, the limbs broken off and lying round it, and the fall: nothing
+     * stands above the stump and the hollow log lies on the ground. A fallen log then stays in the book as it is.
+     */
+    @GameTest(template = "arena", timeoutTicks = 300, skyAccess = true)
+    public static void aGrownTreeDiesOfOldAgeAndFalls(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        grassland(helper);
+        Forest.shapesAtOnce = true;
+        Forest forest = Forest.get(level);
+        long base = Forest.today(level);
+        long seed = 11;
+        com.antcolonies.tree.TreeKind kind = TreePlacer.kind("umbrella_thorn");
+        BlockPos foot = helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE));
+        Forest.Tree t = forest.add(new Forest.Tree("umbrella_thorn", foot, seed, 1.0, TreeStage.LIVING, -1, base));
+        forest.update(level, t, base);
+        helper.assertTrue(t.placedAge == 1.0, "the grown tree was not placed");
+        int leafCount = countAround(level, foot, 0, 40, TreeGrowthTests::leaves);
+        helper.assertTrue(leafCount > 300, "the grown tree has only " + leafCount + " leaves");
+        double life = TreeLife.lifespan(kind, seed);
+        helper.assertTrue(life >= 150 && life <= 250, "an umbrella thorn's lifespan is " + life);
+        // It has lived nearly all its days: it dies of old age on the next one.
+        t.lived = life - 0.5;
+        forest.update(level, t, base + 1);
+        helper.assertTrue(t.dead() && t.died == base + 1 && t.cause.equals("age"), "it did not die of old age: died " + t.died + " " + t.cause);
+        helper.assertTrue(t.stage == TreeStage.LIVING && countAround(level, foot, 0, 40, TreeGrowthTests::leaves) == leafCount,
+                "the day it died it should still stand as it was (withering): " + t.stage.id);
+        java.util.EnumSet<TreeStage> seen = java.util.EnumSet.noneOf(TreeStage.class);
+        int snagWoodHigh = -1;
+        for (int d = 2; d <= 25; d++) {
+            forest.update(level, t, base + d);
+            TreeStage want = TreeLife.deadStage(kind, seed, d - 1);
+            helper.assertTrue(t.stage == want && t.placedStage == want, "day " + (d - 1) + " after death: " + t.stage.id + " placed "
+                    + t.placedStage.id + ", not " + want.id);
+            if (!seen.add(want)) {
+                continue;
+            }
+            // The first day of each stage.
+            switch (want) {
+                case SNAG -> {
+                    int left = countAround(level, foot, 0, 40, TreeGrowthTests::leaves);
+                    helper.assertTrue(left == 0, "the snag still has " + left + " leaves");
+                    int living = countAround(level, foot, 0, 40, TreeGrowthTests::livingWood);
+                    helper.assertTrue(living == 0, "the snag still has " + living + " living wood blocks");
+                    snagWoodHigh = countAround(level, foot, 12, 40, TreeGrowthTests::deadWood);
+                    helper.assertTrue(snagWoodHigh > 50, "the snag has only " + snagWoodHigh + " dead wood blocks up high");
+                }
+                case MUD -> {
+                    int mud = countAround(level, foot, 0, 30, b -> b.is(com.antcolonies.registry.ModBlocks.MUD_CRUST.get()));
+                    helper.assertTrue(mud > 20, "only " + mud + " mud plates on the dead tree");
+                }
+                case SHED -> {
+                    int high = countAround(level, foot, 12, 40, TreeGrowthTests::deadWood);
+                    helper.assertTrue(high < snagWoodHigh, "the limbs did not break off: " + high + " dead wood blocks up high, the snag had " + snagWoodHigh);
+                    int fallen = countAround(level, foot, 0, 1, b -> b.getBlock() instanceof FallenBranchBlock);
+                    helper.assertTrue(fallen > 0, "no fallen branches round the shed tree");
+                }
+                case FALLEN -> {
+                    int standing = countAround(level, foot, 9, 40, TreeGrowthTests::deadWood);
+                    helper.assertTrue(standing == 0, standing + " dead wood blocks still stand above the stump");
+                    int log = countAround(level, foot, 0, 8, b -> deadWood(b) || b.is(TreeBlocks.ROTTEN_WOOD.get()));
+                    helper.assertTrue(log > 150, "the fallen log is only " + log + " blocks");
+                    // The stump: wood round the foot (an old one is hollow, frass in the middle).
+                    int stump = countNear(level, foot, 4, 0, 2, b -> b.is(TreeBlocks.TREE_WOOD));
+                    helper.assertTrue(stump > 4, "no stump at the foot (" + stump + " wood blocks): " + column(level, foot));
+                }
+                default -> {
+                }
+            }
+        }
+        helper.assertTrue(seen.containsAll(java.util.List.of(TreeStage.SNAG, TreeStage.MUD, TreeStage.SHED, TreeStage.FALLEN)),
+                "stages seen: " + seen);
+        helper.assertTrue(forest.at(foot) == t, "the fallen log left the book");
+        clearAbove(helper, foot);
+        forest.forgetInside(helper.getBounds());
+        helper.succeed();
+    }
+
+    /**
+     * Step 5: a dead baobab slumps, becomes a wet fibre heap, a dried heap, and then is gone: nothing of it left and its
+     * record ended. And a dead tree of new land (written in as a mud-climbed snag) gets a death day inside that stage, so
+     * it goes on from there; a saved and loaded dead tree is the same.
+     */
+    @GameTest(template = "arena", timeoutTicks = 300, skyAccess = true)
+    public static void aDeadBaobabSlumpsIntoAHeapAndIsGone(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        grassland(helper);
+        Forest.shapesAtOnce = true;
+        Forest forest = Forest.get(level);
+        long base = Forest.today(level);
+        long seed = 21;
+        com.antcolonies.tree.TreeKind kind = TreePlacer.kind("baobab");
+        BlockPos foot = helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE));
+        Forest.Tree t = forest.add(new Forest.Tree("baobab", foot, seed, 1.0, TreeStage.LIVING, -1, base));
+        forest.update(level, t, base);
+        helper.assertTrue(t.placedAge == 1.0, "the grown baobab was not placed");
+        forest.kill(t, base, "test");
+        java.util.EnumSet<TreeStage> seen = java.util.EnumSet.noneOf(TreeStage.class);
+        for (int d = 1; d <= 60; d++) {
+            forest.update(level, t, base + d);
+            if (forest.at(foot) != t) {
+                break;
+            }
+            TreeStage want = TreeLife.deadStage(kind, seed, d);
+            helper.assertTrue(t.stage == want && t.placedStage == want, "day " + d + ": " + t.stage.id + ", not " + want.id);
+            if (seen.add(want) && want == TreeStage.HEAP) {
+                int heap = countAround(level, foot, 0, 20, b -> b.is(TreeBlocks.BAOBAB_FIBRE.get()));
+                helper.assertTrue(heap > 50, "the fibre heap is only " + heap + " blocks");
+                int standing = countAround(level, foot, 12, 40, b -> b.is(TreeBlocks.TREE_WOOD));
+                helper.assertTrue(standing == 0, standing + " baobab wood blocks still stand over the heap");
+            }
+        }
+        helper.assertTrue(seen.containsAll(java.util.List.of(TreeStage.SLUMP, TreeStage.HEAP, TreeStage.HEAP_DRY)), "stages seen: " + seen);
+        helper.assertTrue(forest.at(foot) == null, "the dried heap was never gone");
+        int left = countAround(level, foot, 0, 30, b -> b.is(TreeBlocks.BAOBAB_FIBRE.get()) || b.is(TreeBlocks.TREE_WOOD));
+        helper.assertTrue(left == 0, left + " blocks of the dead baobab are left");
+        // A dead tree of new land: a mud-climbed snag, its death day worked out inside that stage.
+        BlockPos other = helper.absolutePos(new BlockPos(10, SURFACE, 10));
+        Forest.Tree snag = forest.add(new Forest.Tree("camel_thorn", other, 33, 0.8, TreeStage.MUD, -1, base));
+        helper.assertTrue(snag.dead() && snag.died == Forest.DIED_UNKNOWN, "a new land snag is not dead");
+        forest.update(level, snag, base);
+        helper.assertTrue(snag.died <= base && snag.stage == TreeStage.MUD && snag.placedStage == TreeStage.MUD,
+                "the new land snag's death day " + (snag.died - base) + " moved it to " + snag.stage.id);
+        Forest.Tree copy = Forest.Tree.load(snag.save());
+        helper.assertTrue(copy.died == snag.died && copy.placedStage == snag.placedStage && copy.lived == snag.lived,
+                "a saved and loaded dead tree differs");
+        clearAbove(helper, foot);
+        forest.forgetInside(helper.getBounds());
+        helper.succeed();
+    }
 }

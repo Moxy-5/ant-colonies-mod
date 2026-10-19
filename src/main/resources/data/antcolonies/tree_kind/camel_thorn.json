@@ -41,5 +41,9 @@
     "branch": "antcolonies:camel_thorn_branch",
     "leaves": "antcolonies:camel_thorn_leaves",
     "seedling": "antcolonies:camel_thorn_seedling"
-  }
+  },
+  "lifespan": [
+    300,
+    500
+  ]
 }

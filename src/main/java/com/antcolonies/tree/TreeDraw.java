@@ -105,12 +105,23 @@ final class TreeDraw {
 
     /** A thin branch from a to b, one block wide. With fillOnly it only fills empty blocks (a core line inside wood). */
     static void thinLine(TreeVoxels v, double[] a, double[] b, TreePart part, boolean fillOnly) {
+        thinLine(v, a, b, 1, part, fillOnly);
+    }
+
+    /**
+     * The first {@code upto} (0 to 1) of the one-block line from a to b: the same blocks as the whole line up to there, so
+     * a branch growing out or broken off is always part of its whole line (wood never moves, step 5).
+     */
+    static void thinLine(TreeVoxels v, double[] a, double[] b, double upto, TreePart part, boolean fillOnly) {
         int[] p = {(int) Math.round(a[0]), (int) Math.round(a[1]), (int) Math.round(a[2])};
         put(v, p[0], p[1], p[2], part, fillOnly);
         double[] ab = sub(b, a);
         int n = (int) Math.ceil(len(ab) * 3) + 1;
         for (int i = 1; i <= n; i++) {
             double f = (double) i / n;
+            if (f > upto + 1e-9) {
+                break;
+            }
             int[] q = {(int) Math.round(a[0] + ab[0] * f), (int) Math.round(a[1] + ab[1] * f), (int) Math.round(a[2] + ab[2] * f)};
             while (p[0] != q[0] || p[1] != q[1] || p[2] != q[2]) {
                 int axis = 0, best = -1;
@@ -286,10 +297,23 @@ final class TreeDraw {
      * never moves, the user's real growth).
      */
     static void growing(TreeVoxels v, Poly p, double[] radii, double upto, boolean taper, TreePart[] blocks, double hollow) {
+        growing(v, p, radii, upto, upto, taper, blocks, hollow);
+    }
+
+    /**
+     * A limb grown out to {@code grown} and broken off at {@code broken} (a shed snag, an ancient tree's dead limb): the
+     * part of the limb as it grew, cut, never thicker than the whole (wood never jumps, step 5).
+     */
+    static void broken(TreeVoxels v, Poly p, double[] radii, double grown, double broken, TreePart[] blocks) {
+        growing(v, p, radii, Math.min(grown, broken), grown, true, blocks, 0);
+    }
+
+    /** As {@link #growing}, tapering as if grown out to {@code taperOver} but only drawn up to {@code upto}. */
+    static void growing(TreeVoxels v, Poly p, double[] radii, double upto, double taperOver, boolean taper, TreePart[] blocks, double hollow) {
         if (upto <= 1e-6) {
             return;
         }
-        boolean complete = upto >= p.length - 1e-9;
+        boolean complete = taperOver >= p.length - 1e-9;
         for (int i = 0; i + 1 < p.pts.length; i++) {
             double d0 = p.cum[i], segLen = p.cum[i + 1] - d0;
             if (d0 >= upto) {
@@ -312,8 +336,8 @@ final class TreeDraw {
                 }
                 double r0 = lerp(radii[i], radii[i + 1], f0), r1 = lerp(radii[i], radii[i + 1], f1);
                 if (!complete && taper) {
-                    r0 = Math.min(r0, lerp(radii[0], 0.35, e0 / upto));
-                    r1 = Math.min(r1, lerp(radii[0], 0.35, e1 / upto));
+                    r0 = Math.min(r0, lerp(radii[0], 0.35, e0 / taperOver));
+                    r1 = Math.min(r1, lerp(radii[0], 0.35, e1 / taperOver));
                 }
                 seg(v, mix(p.pts[i], p.pts[i + 1], f0), mix(p.pts[i], p.pts[i + 1], f1), r0, r1, blocks, false, hollow);
             }

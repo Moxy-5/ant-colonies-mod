@@ -297,7 +297,7 @@ final class UmbrellaShape {
                 }
             }
             if (broken >= 0) {
-                TreeDraw.growing(v, limb.line, gr.radii(limb), Math.min(lu, broken), lu < broken, b, 0);
+                TreeDraw.broken(v, limb.line, gr.radii(limb), lu, broken, b);
                 if (stage == TreeStage.SHED) {
                     fallPoints(gr, limb, fallAt);
                 }
@@ -339,11 +339,11 @@ final class UmbrellaShape {
                 double[] reached;
                 if (bu <= br.l1) {
                     reached = mix(end, br.mid, bu / br.l1);
-                    thinLine(v, end, reached, pipe);
+                    thinLine(v, end, br.mid, bu / br.l1, pipe, false);
                 } else {
                     thinLine(v, end, br.mid, pipe);
                     reached = bu >= br.l1 + br.l2 ? br.tip : mix(br.mid, br.tip, (bu - br.l1) / br.l2);
-                    thinLine(v, br.mid, reached, twig);
+                    thinLine(v, br.mid, br.tip, Math.min(1, (bu - br.l1) / br.l2), twig, false);
                 }
                 if (dead) {
                     continue;
@@ -391,7 +391,7 @@ final class UmbrellaShape {
         if (stage == TreeStage.SHED) {
             return limb.line.length * limb.brk * 0.6;
         }
-        return dead && gr.living ? limb.line.length * 0.85 : -1;
+        return gr.deadLimb(limb) ? limb.line.length * 0.85 : -1;
     }
 
     private void drawTrunk(TreeVoxels v, Grown gr, TreePart[] blocks) {

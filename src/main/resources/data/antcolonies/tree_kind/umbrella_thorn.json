@@ -39,5 +39,9 @@
     "branch": "antcolonies:umbrella_thorn_branch",
     "leaves": "antcolonies:umbrella_thorn_leaves",
     "seedling": "antcolonies:umbrella_thorn_seedling"
-  }
+  },
+  "lifespan": [
+    150,
+    250
+  ]
 }

@@ -88,6 +88,44 @@ class TreeShapeTest {
         }
     }
 
+    /**
+     * Step 5, death: wood never jumps as a tree dies and goes through its dead stages: the snag's wood is where the
+     * living tree had wood, the mud-climbed snag's where the snag had it, and the shed tree's (above the pieces lying
+     * on the ground) where the mud-climbed one had it.
+     */
+    @Test
+    void deadWoodNeverJumps() {
+        TreeStage[] order = {TreeStage.LIVING, TreeStage.SNAG, TreeStage.MUD, TreeStage.SHED};
+        for (String name : new String[] {"umbrella_thorn", "camel_thorn"}) {
+            TreeKind kind = TreeKind.load(name);
+            for (long seed = 1; seed <= 6; seed++) {
+                for (double age : new double[] {0.5, 0.8, 1, 1.15, 1.25}) {
+                    TreeVoxels before = TreeShapes.build(kind, seed, age, order[0]);
+                    for (int i = 1; i < order.length; i++) {
+                        TreeVoxels now = TreeShapes.build(kind, seed, age, order[i]);
+                        int ground = order[i] == TreeStage.SHED ? 2 : 0;
+                        for (Long2ObjectMap.Entry<TreePart> e : now.entries()) {
+                            long k = e.getLongKey();
+                            if (!solid(e.getValue()) || BlockPos.getY(k) <= ground) {
+                                continue;
+                            }
+                            TreePart was = before.get(k);
+                            long s = seed;
+                            TreeStage st = order[i];
+                            assertTrue(was != null && solid(was), () -> name + " seed " + s + " age " + age + " " + st.id + ": "
+                                    + e.getValue().id + " at " + BlockPos.of(k).toShortString() + " where it had " + (was == null ? "air" : was.id));
+                        }
+                        before = now;
+                    }
+                }
+            }
+        }
+    }
+
+    private static boolean solid(TreePart p) {
+        return (p.isWood() || p == TreePart.MUD) && p != TreePart.FALLEN_BRANCH;
+    }
+
     /** Every limb look on trial in the tree viewer (the user's pick, 2026-10-18), with today's growth and the new one, stands and grows by the same rules. */
     @Test
     void everyLimbLookStandsAndGrows() {

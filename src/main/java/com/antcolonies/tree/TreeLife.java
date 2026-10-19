@@ -1,5 +1,6 @@
 package com.antcolonies.tree;
 
+import java.util.List;
 import java.util.Random;
 
 /**
@@ -52,7 +53,7 @@ public final class TreeLife {
     }
 
     /** How many days at normal speed it takes to reach this age. */
-    static double daysAt(double age) {
+    public static double daysAt(double age) {
         if (age < YOUNG) {
             return age / YOUNG * SEEDLING_DAYS;
         }
@@ -84,6 +85,84 @@ public final class TreeLife {
         b = Math.max(Math.min(to, TreeShapes.GROWN), YOUNG);
         risk += YOUNG_RISK * ((b - a) - (b * b - a * a) / 2);
         return 1 - Math.exp(-risk);
+    }
+
+    // ---------------------------------------------------------------- step 5: old age and the dead stages
+
+    /**
+     * How many days this tree lives after it came up (the user's decision, step 5: real ratios, each tree its own
+     * number from its kind's range by its seed; umbrella thorn 150 to 250, camel thorn 300 to 500, baobab 1,000 to
+     * 2,000).
+     */
+    public static double lifespan(TreeKind kind, long seed) {
+        List<Integer> range = kind.lifespan();
+        double from = range.get(0), to = range.get(range.size() - 1);
+        return from + (to - from) * new TreeRandom(seed * 4513 + 29).next();
+    }
+
+    /**
+     * The days after its death each dead stage starts, by the tree's own dice (the user's decisions, "real, squeezed";
+     * my picks inside them, to confirm). The day it dies its leaves wither on the living shape (the first entry, LIVING).
+     * Acacias: the bare snag from the next day for 2 to 4 days, termite mud climbing 3 to 6 days, the limbs breaking off
+     * 5 to 10 days, then the fall (11 to 21 days after death), the fallen log for good. Baobabs: standing dead under a day,
+     * slumping 1 to 2 days, a wet fibre heap 3 to 6, a dried heap shrinking 10 to 20, then gone (the last entry, null).
+     */
+    public static List<DeadStage> deadStages(TreeKind kind, long seed) {
+        Random r = dice(seed, -5);
+        if (kind.isBaobab()) {
+            double slump = 1, heap = slump + 1 + r.nextDouble(), dry = heap + 3 + 3 * r.nextDouble(), gone = dry + 10 + 10 * r.nextDouble();
+            return List.of(new DeadStage(TreeStage.LIVING, 0), new DeadStage(TreeStage.SLUMP, slump), new DeadStage(TreeStage.HEAP, heap),
+                    new DeadStage(TreeStage.HEAP_DRY, dry), new DeadStage(null, gone));
+        }
+        double snag = 1, mud = snag + 2 + 2 * r.nextDouble(), shed = mud + 3 + 3 * r.nextDouble(), fall = shed + 5 + 5 * r.nextDouble();
+        return List.of(new DeadStage(TreeStage.LIVING, 0), new DeadStage(TreeStage.SNAG, snag), new DeadStage(TreeStage.MUD, mud),
+                new DeadStage(TreeStage.SHED, shed), new DeadStage(TreeStage.FALLEN, fall));
+    }
+
+    /** A dead stage and the day after death it starts (stage null: nothing is left). */
+    public record DeadStage(TreeStage stage, double from) {
+    }
+
+    /** The stage a tree is in so many days after its death (null: a baobab heap gone). */
+    public static TreeStage deadStage(TreeKind kind, long seed, double daysDead) {
+        TreeStage at = TreeStage.LIVING;
+        for (DeadStage s : deadStages(kind, seed)) {
+            if (daysDead >= s.from()) {
+                at = s.stage();
+            } else {
+                break;
+            }
+        }
+        return at;
+    }
+
+    /**
+     * How many days ago a tree of new land that stands in this dead stage died: somewhere inside the stage, by the
+     * world's dice (a fallen log: just fallen, as nothing changes on it after).
+     */
+    public static long daysDeadIn(TreeKind kind, long seed, TreeStage stage, double roll) {
+        List<DeadStage> stages = deadStages(kind, seed);
+        for (int i = 0; i < stages.size(); i++) {
+            if (stages.get(i).stage() == stage) {
+                double start = stages.get(i).from();
+                double end = i + 1 < stages.size() ? stages.get(i + 1).from() : start + 1;
+                // Whole days only (the book counts days), every one of them inside the stage.
+                long lo = (long) Math.ceil(start), hi = Math.max(lo, (long) Math.ceil(end) - 1);
+                return lo + (long) Math.floor(roll * (hi - lo + 1));
+            }
+        }
+        return 0;
+    }
+
+    /** Where a stage comes in its kind's life (living 0, then the dead stages in order). */
+    public static int stageIndex(TreeKind kind, TreeStage stage) {
+        TreeStage[] stages = TreeShapes.stages(kind);
+        for (int i = 0; i < stages.length; i++) {
+            if (stages[i] == stage) {
+                return i;
+            }
+        }
+        return 0;
     }
 
     /** The shape's age for a tree's age: to the hundredth, so the shapes are worked out a few times, not every day. */
