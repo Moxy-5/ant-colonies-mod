@@ -21,13 +21,108 @@ public final class TreeShapes {
 
     /** leafless: a baobab in the dry season (no effect on the acacias, which keep their leaves). */
     public static TreeVoxels build(TreeKind kind, long seed, double age, TreeStage stage, boolean leafless) {
+        return build(kind, seed, age, stage, leafless, false);
+    }
+
+    /** hollowed: a tree over a fungus-growing termite colony, its lower trunk eaten hollow ({@link #hollowOut}, step 5f). */
+    public static TreeVoxels build(TreeKind kind, long seed, double age, TreeStage stage, boolean leafless, boolean hollowed) {
         TreeVoxels v = kind.isBaobab() ? new BaobabShape(kind, seed).build(age, stage, leafless)
                 : kind.isUmbrella() ? new UmbrellaShape(kind, seed).build(age, stage) : new AcaciaShape(kind, seed).build(age, stage);
         if (!kind.isBaobab() && (stage == TreeStage.SNAG || stage == TreeStage.MUD || stage == TreeStage.SHED)) {
             keepWithinLiving(v, build(kind, seed, age, TreeStage.LIVING), stage == TreeStage.SHED ? 2 : 0);
         }
+        if (hollowed && (stage == TreeStage.LIVING || stage == TreeStage.SNAG || stage == TreeStage.MUD || stage == TreeStage.SHED)) {
+            hollowOut(v, seed);
+        }
         v.clearLooseFoliage();
         return v;
+    }
+
+    /** How high up the trunk termites eat it hollow (my pick: the lower trunk, about 7 m). */
+    static final int HOLLOW_HEIGHT = 7;
+
+    /**
+     * Step 5f: the lower trunk eaten hollow by termites. Real: Macrotermes build at a tree's foot and eat its dead
+     * heartwood from below; the trunk stands as a shell of sound wood round a hollow lined with rotten wood, frass on its
+     * floor, and a hole at the foot where they came in. Layer by layer up the trunk to {@link #HOLLOW_HEIGHT}, or to where
+     * it forks or gets too thin for a hollow (my picks: the bark ring stays, a block of rotten wood inside it, the rest
+     * hollow; a grown trunk 5 wide gets a hollow 1 wide, an ancient one more).
+     */
+    static void hollowOut(TreeVoxels v, long seed) {
+        double cx = 0, cz = 0;
+        double door = new java.util.Random(seed * 31 + 7).nextDouble() * Math.PI * 2;
+        double[] first = null; // the lowest trunk layer's middle and radius, for the floor under it (the roots flare there)
+        for (int y = 1; y <= HOLLOW_HEIGHT; y++) {
+            java.util.List<int[]> trunk = new java.util.ArrayList<>();
+            double sx = 0, sz = 0;
+            for (int x = (int) Math.floor(cx) - 5; x <= (int) Math.ceil(cx) + 5; x++) {
+                for (int z = (int) Math.floor(cz) - 5; z <= (int) Math.ceil(cz) + 5; z++) {
+                    TreePart p = v.get(x, y, z);
+                    if (p != null && log(p) && (x - cx) * (x - cx) + (z - cz) * (z - cz) <= 25) {
+                        trunk.add(new int[] {x, z});
+                        sx += x;
+                        sz += z;
+                    }
+                }
+            }
+            if (trunk.size() < 9) {
+                break; // too thin for a hollow
+            }
+            cx = sx / trunk.size();
+            cz = sz / trunk.size();
+            double r = 0;
+            for (int[] b : trunk) {
+                r = Math.max(r, Math.hypot(b[0] - cx, b[1] - cz));
+            }
+            if (r < 1.9 || r > Math.sqrt(trunk.size() / Math.PI) + 1.5) {
+                break; // too thin for a hollow, or not one round trunk any more (the fork)
+            }
+            if (first == null) {
+                first = new double[] {cx, cz, r};
+            }
+            for (int[] b : trunk) {
+                eat(v, b[0], y, b[1], Math.hypot(b[0] - cx, b[1] - cz), r, false);
+            }
+        }
+        if (first == null) {
+            return;
+        }
+        // The floor (frass inside, at ground level among the roots) and the way in at the foot, on one side.
+        double r = first[2];
+        for (int x = (int) Math.floor(first[0]) - 3; x <= (int) Math.ceil(first[0]) + 3; x++) {
+            for (int z = (int) Math.floor(first[1]) - 3; z <= (int) Math.ceil(first[1]) + 3; z++) {
+                TreePart p = v.get(x, 0, z);
+                if (p != null && log(p)) {
+                    eat(v, x, 0, z, Math.hypot(x - first[0], z - first[1]), r, true);
+                }
+            }
+        }
+        for (int y = 0; y <= 1; y++) {
+            boolean out = false;
+            for (double t = 0; t <= 8 && !out; t += 0.5) {
+                int x = (int) Math.round(first[0] + t * Math.cos(door)), z = (int) Math.round(first[1] + t * Math.sin(door));
+                TreePart p = v.get(x, y, z);
+                if (p != null && log(p) || p == TreePart.ROTTEN) {
+                    v.set(x, y, z, y == 0 ? TreePart.FRASS : null);
+                } else if (t > r) {
+                    out = true; // through the trunk (and the root under the door)
+                }
+            }
+        }
+    }
+
+    /** One trunk block, {@code d} from the trunk's middle of radius {@code r}: eaten out, rotten, or left (the bark ring). */
+    private static void eat(TreeVoxels v, int x, int y, int z, double d, double r, boolean floor) {
+        if (d < r - 1.2) {
+            v.set(x, y, z, floor ? TreePart.FRASS : null);
+        } else if (d < r - 0.6 && v.get(x, y, z) != TreePart.MUD) {
+            v.set(x, y, z, TreePart.ROTTEN);
+        }
+    }
+
+    /** Trunk wood (or the mud over it), not a thin branch, a limb or a fallen piece. */
+    private static boolean log(TreePart p) {
+        return solid(p) && p != TreePart.THIN && p != TreePart.DEAD_THIN && p != TreePart.LIMB && p != TreePart.DEAD_LIMB;
     }
 
     /**

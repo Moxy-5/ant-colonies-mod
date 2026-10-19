@@ -186,7 +186,34 @@ public final class TreeLife {
 
     /** Whether the fire on a grown tree's trunk this day kills it (the tree's own dice for the day). */
     public static boolean fireKills(long seed, long day, double age) {
-        return dice(seed, day * 7919 + 5).nextDouble() < fireDeathChance(age);
+        return fireKills(seed, day, age, false);
+    }
+
+    /**
+     * As {@link #fireKills(long, long, double)}; a tree hollowed by termites (step 5f) dies twice as surely (my pick, at
+     * most 9 in 10): the fire gets into its hollow.
+     */
+    public static boolean fireKills(long seed, long day, double age, boolean termites) {
+        double chance = termites ? Math.min(0.9, 2 * fireDeathChance(age)) : fireDeathChance(age);
+        return dice(seed, day * 7919 + 5).nextDouble() < chance;
+    }
+
+    /**
+     * Step 5e: what a lightning strike does to a big tree, by its dice for the day: the side its scar runs down (an
+     * angle), whether it sets the trunk on fire (1 in 2) and whether it kills a living tree (1 in 3; my picks). Real: many
+     * struck savanna trees live on with a long scar down the trunk where the bark burst off.
+     */
+    public record Strike(double side, boolean lit, boolean kills) {
+    }
+
+    public static Strike strike(long seed, long day) {
+        return strike(seed, day, false);
+    }
+
+    /** As {@link #strike(long, long)}; a tree hollowed by termites (step 5f) is killed 2 in 3 (my pick). */
+    public static Strike strike(long seed, long day, boolean termites) {
+        Random r = dice(seed, day * 104729 + 11);
+        return new Strike(r.nextDouble() * Math.PI * 2, r.nextInt(2) == 0, r.nextInt(3) < (termites ? 2 : 1));
     }
 
     /** Whether a grown tree killed by fire has a hollow trunk that smoulders (my pick: from half way to ancient). */

@@ -128,6 +128,12 @@ public class Forest extends SavedData {
          * until then it stands shed. {@code toppling}: it is being drawn falling (its standing wood already taken away).
          */
         public boolean fell, toppling;
+        /**
+         * Step 5f: a fungus-growing termite colony's reach takes in its foot (once past young): its lower trunk is eaten
+         * hollow, it ages twice as fast, and fire and lightning kill it more surely. {@code placedTermites}: whether the
+         * shape in the world is the hollowed one.
+         */
+        public boolean termites, placedTermites;
 
         public Tree(String kind, BlockPos foot, long seed, double age, TreeStage stage, double placedAge, long lastDay) {
             this.kind = kind;
@@ -161,7 +167,7 @@ public class Forest extends SavedData {
 
         /** Whether the shape in the world is the one it should have now. */
         boolean upToDate() {
-            return placedAge == TreeLife.shapeAge(age) && placedStage == stage && placedStep == step;
+            return placedAge == TreeLife.shapeAge(age) && placedStage == stage && placedStep == step && placedTermites == termites;
         }
 
         TreeKind treeKind() {
@@ -169,7 +175,12 @@ public class Forest extends SavedData {
         }
 
         TreePlacer.Placed shape(double atAge) {
-            return TreePlacer.placed(kind, seed, TreeLife.shapeAge(atAge), stage);
+            return TreePlacer.placed(shapeKind(termites), seed, TreeLife.shapeAge(atAge), stage);
+        }
+
+        /** The name its shapes are kept under: its kind, hollowed by termites or not (step 5f). */
+        String shapeKind(boolean hollowed) {
+            return hollowed ? kind + TreePlacer.HOLLOWED : kind;
         }
 
         public CompoundTag save() {
@@ -190,6 +201,8 @@ public class Forest extends SavedData {
             tag.putInt("placedStep", placedStep);
             tag.putBoolean("fell", fell);
             tag.putBoolean("toppling", toppling);
+            tag.putBoolean("termites", termites);
+            tag.putBoolean("placedTermites", placedTermites);
             return tag;
         }
 
@@ -206,6 +219,8 @@ public class Forest extends SavedData {
                 t.placedStep = tag.getInt("placedStep");
                 t.fell = tag.contains("fell") ? tag.getBoolean("fell") : t.placedStage == TreeStage.FALLEN;
                 t.toppling = tag.getBoolean("toppling");
+                t.termites = tag.getBoolean("termites");
+                t.placedTermites = tag.getBoolean("placedTermites");
             }
             return t;
         }
@@ -451,7 +466,7 @@ public class Forest extends SavedData {
         if (!level.hasChunkAt(t.foot)) {
             return false;
         }
-        TreePlacer.Placed now = t.placedAge >= 0 ? soon(t, t.placedAge, t.placedStage, t.placedStep) : null;
+        TreePlacer.Placed now = t.placedAge >= 0 ? soon(t, t.placedAge, t.placedStage, t.placedStep, t.placedTermites) : null;
         if (t.placedAge >= 0 && now == null) {
             return false; // its shape is being worked out
         }
@@ -475,7 +490,10 @@ public class Forest extends SavedData {
             if (t.dead()) {
                 continue; // its stage comes from the days since it died, below
             }
-            t.lived++;
+            if (!t.termites && t.age >= TreeLife.YOUNG_END && termitesUnder(level, t.foot)) {
+                t.termites = true; // termites have come in from below: its heartwood is eaten from now on
+            }
+            t.lived += t.termites ? 2 : 1;
             if (t.age >= TreeLife.YOUNG_END && t.lived >= TreeLife.lifespan(t.treeKind(), t.seed)) {
                 kill(t, t.lastDay, "age");
                 continue;
@@ -510,7 +528,7 @@ public class Forest extends SavedData {
             t.pendingDays = 0;
             return true;
         }
-        TreePlacer.Placed next = soon(t, t.age, t.stage, t.step);
+        TreePlacer.Placed next = soon(t, t.age, t.stage, t.step, t.termites);
         boolean jump = t.dead() ? stageSteps > 1 : t.pendingDays > 1;
         if (next == null || !loaded(level, next.box(t.foot)) || jump && !outOfSight(level, t, next)) {
             return false;
@@ -548,9 +566,9 @@ public class Forest extends SavedData {
         if (kind.isBaobab() || t.fell || t.toppling || falling(t) || t.placedAge < 0 || !level.hasChunkAt(t.foot)) {
             return false;
         }
-        TreePlacer.Placed now = burnt(t, TreePlacer.placed(t.kind, t.seed, t.placedAge, t.placedStage, t.placedStep), t.placedStage);
-        TreePlacer.Placed shed = burnt(t, TreePlacer.placed(t.kind, t.seed, TreeLife.shapeAge(t.age), TreeStage.SHED), TreeStage.SHED);
-        TreePlacer.Placed lying = burnt(t, TreePlacer.placed(t.kind, t.seed, TreeLife.shapeAge(t.age), TreeStage.FALLEN), TreeStage.FALLEN);
+        TreePlacer.Placed now = burnt(t, TreePlacer.placed(t.shapeKind(t.placedTermites), t.seed, t.placedAge, t.placedStage, t.placedStep), t.placedStage);
+        TreePlacer.Placed shed = burnt(t, TreePlacer.placed(t.shapeKind(t.termites), t.seed, TreeLife.shapeAge(t.age), TreeStage.SHED), TreeStage.SHED);
+        TreePlacer.Placed lying = burnt(t, TreePlacer.placed(t.shapeKind(t.termites), t.seed, TreeLife.shapeAge(t.age), TreeStage.FALLEN), TreeStage.FALLEN);
         if (t.living()) {
             t.cause = "age";
             killed++;
@@ -586,9 +604,28 @@ public class Forest extends SavedData {
     }
 
     /** A tree's shape at an age and stage, if worked out (or being worked out in the background: null). */
-    private static TreePlacer.Placed soon(Tree t, double age, TreeStage stage, int step) {
-        return burnt(t, shapesAtOnce ? TreePlacer.placed(t.kind, t.seed, TreeLife.shapeAge(age), stage, step)
-                : TreePlacer.placedSoon(t.kind, t.seed, TreeLife.shapeAge(age), stage, step), stage);
+    private static TreePlacer.Placed soon(Tree t, double age, TreeStage stage, int step, boolean hollowed) {
+        String kind = t.shapeKind(hollowed);
+        return burnt(t, shapesAtOnce ? TreePlacer.placed(kind, t.seed, TreeLife.shapeAge(age), stage, step)
+                : TreePlacer.placedSoon(kind, t.seed, TreeLife.shapeAge(age), stage, step), stage);
+    }
+
+    /**
+     * Step 5f: whether a fungus-growing termite colony's foraging reach takes in this place (real: Macrotermes eat dead
+     * wood, the heartwood of the trees over their galleries and round their mound among it).
+     */
+    public static boolean termitesUnder(ServerLevel level, BlockPos foot) {
+        for (Colony colony : ColonyManager.get(level).getColonies()) {
+            if (colony.profile().garden().isEmpty()) {
+                continue;
+            }
+            double dx = colony.getCenter().getX() - foot.getX(), dz = colony.getCenter().getZ() - foot.getZ();
+            double reach = colony.foragingRadius();
+            if (dx * dx + dz * dz <= reach * reach) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Step 5d: a tree killed by fire stands and lies black (its dead wood charred) instead of silver. */
@@ -608,7 +645,7 @@ public class Forest extends SavedData {
             if (!t.living() || t.placedAge < 0 || falling(t)) {
                 continue;
             }
-            TreePlacer.Placed now = soon(t, t.placedAge, t.placedStage, t.placedStep);
+            TreePlacer.Placed now = soon(t, t.placedAge, t.placedStage, t.placedStep, t.placedTermites);
             if (now == null) {
                 continue;
             }
@@ -632,12 +669,113 @@ public class Forest extends SavedData {
                 continue;
             }
             fireDays.put(t.foot.asLong(), today);
-            if (TreeLife.fireKills(t.seed, today, t.age)) {
+            if (TreeLife.fireKills(t.seed, today, t.age, t.termites)) {
                 kill(t, today, "fire");
                 if (TreeLife.smoulders(t.age)) {
                     smoulders.put(t.foot.asLong(), new Smoulder(trunkTop(now, t.foot), time(level) + SMOULDER_DAYS));
                 }
             }
+        }
+    }
+
+    /** Step 5e: how far (sideways from its foot) a big tree pulls a lightning strike to its top (my pick). */
+    public static final int LIGHTNING_REACH = 24;
+    /** How tall (blocks over its foot) a tree must stand to draw lightning (my pick: a big tree). */
+    static final int LIGHTNING_HEIGHT = 10;
+
+    /**
+     * Step 5e: a lightning strike at {@code at}. The tallest big standing tree (living, or dead and still upright) whose
+     * foot is within {@link #LIGHTNING_REACH} pulls it to its top like a lightning rod (real: a lone tall tree is the
+     * classic target on the savanna) and is struck ({@link #struck}). Returns where the strike lands now, over the tree's
+     * highest block, or null if no tree draws it.
+     */
+    public BlockPos lightning(ServerLevel level, BlockPos at) {
+        Tree best = null;
+        TreePlacer.Placed bestShape = null;
+        int top = LIGHTNING_HEIGHT - 1, topX = 0, topZ = 0;
+        for (Tree t : near(at, LIGHTNING_REACH)) {
+            int dx = t.foot.getX() - at.getX(), dz = t.foot.getZ() - at.getZ();
+            if (dx * dx + dz * dz > LIGHTNING_REACH * LIGHTNING_REACH || t.placedAge < 0 || t.fell || t.toppling || falling(t)
+                    || t.placedStage == TreeStage.FALLEN || t.placedStage == TreeStage.HEAP || t.placedStage == TreeStage.HEAP_DRY) {
+                continue;
+            }
+            TreePlacer.Placed now = soon(t, t.placedAge, t.placedStage, t.placedStep, t.placedTermites);
+            if (now == null || !loaded(level, now.box(t.foot))) {
+                continue;
+            }
+            for (int i = 0; i < now.size(); i++) {
+                if (now.ys()[i] > top) {
+                    top = now.ys()[i];
+                    topX = now.xs()[i];
+                    topZ = now.zs()[i];
+                    best = t;
+                    bestShape = now;
+                }
+            }
+        }
+        if (best == null) {
+            return null;
+        }
+        BlockPos to = best.foot.offset(topX, top + 1, topZ);
+        struck(level, best, bestShape);
+        return to;
+    }
+
+    /**
+     * A big tree struck by lightning: a scar of charred bark down one side of its trunk, from the top of the trunk to the
+     * ground; 1 in 2 it sets the foot of the trunk on fire (which may kill it, {@link #inFire}); 1 in 3 a living one dies
+     * of the strike itself ({@link TreeLife#strike}).
+     */
+    private void struck(ServerLevel level, Tree t, TreePlacer.Placed now) {
+        long today = today(level);
+        TreeLife.Strike strike = TreeLife.strike(t.seed, today, t.termites);
+        double sx = Math.cos(strike.side()), sz = Math.sin(strike.side());
+        int height = trunkTop(now, t.foot).getY() - t.foot.getY();
+        // The trunk's outermost block on the struck side at each height.
+        int[] scar = new int[height];
+        double[] far = new double[height];
+        java.util.Arrays.fill(scar, -1);
+        for (int i = 0; i < now.size(); i++) {
+            int x = now.xs()[i], y = now.ys()[i], z = now.zs()[i];
+            if (y < 0 || y >= height || x * x + z * z > 25 || !now.states()[i].is(TreeBlocks.TREE_WOOD)) {
+                continue;
+            }
+            double d = x * sx + z * sz;
+            if (scar[y] < 0 || d > far[y]) {
+                scar[y] = i;
+                far[y] = d;
+            }
+        }
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        BlockPos foot = null;
+        for (int y = 0; y < height; y++) {
+            int i = scar[y];
+            if (i < 0) {
+                continue;
+            }
+            pos.set(t.foot.getX() + now.xs()[i], t.foot.getY() + y, t.foot.getZ() + now.zs()[i]);
+            BlockState there = level.getBlockState(pos);
+            if (TreePlacer.same(there, now.states()[i])) {
+                level.setBlock(pos, TreePlacer.charred(there), Block.UPDATE_CLIENTS);
+                if (foot == null) {
+                    foot = pos.immutable();
+                }
+            }
+        }
+        setDirty();
+        if (strike.lit() && foot != null) {
+            // The fire at the foot of the scar, on the ground beside it.
+            Direction out = Direction.getNearest(sx, 0, sz);
+            for (int up = 0; up <= 1; up++) {
+                BlockPos fire = foot.relative(out).above(up);
+                if (level.getBlockState(fire).isAir() && level.getBlockState(fire.below()).isFaceSturdy(level, fire.below(), Direction.UP)) {
+                    level.setBlock(fire, net.minecraft.world.level.block.Blocks.FIRE.defaultBlockState(), Block.UPDATE_ALL);
+                    break;
+                }
+            }
+        }
+        if (strike.kills() && t.living()) {
+            kill(t, today, "lightning");
         }
     }
 
@@ -701,6 +839,7 @@ public class Forest extends SavedData {
         t.placedAge = TreeLife.shapeAge(t.age);
         t.placedStage = t.stage;
         t.placedStep = t.step;
+        t.placedTermites = t.termites;
         t.pendingDays = 0;
         setDirty();
         if (!shed.isEmpty() && t.living()) {

@@ -64,6 +64,14 @@ public class ModEvents {
             event.setCanceled(true);
             return;
         }
+        if (!event.loadedFromDisk() && event.getLevel() instanceof ServerLevel level && event.getEntity() instanceof net.minecraft.world.entity.LightningBolt bolt
+                && !level.getBlockState(bolt.blockPosition().below()).is(net.minecraft.world.level.block.Blocks.LIGHTNING_ROD)) {
+            // Step 5e: a big savanna tree near the strike draws it to its top (a lightning rod still wins).
+            net.minecraft.core.BlockPos to = com.antcolonies.tree.Forest.get(level).lightning(level, bolt.blockPosition());
+            if (to != null) {
+                bolt.moveTo(net.minecraft.world.phys.Vec3.atBottomCenterOf(to));
+            }
+        }
         if (!event.getLevel().isClientSide() && event.getEntity() instanceof Chicken chicken) {
             chicken.goalSelector.addGoal(3, new HuntTermitesGoal(chicken));
         }

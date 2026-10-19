@@ -60,12 +60,19 @@ public final class TreePlacer {
     private TreePlacer() {
     }
 
-    /** A tree's kind by name (umbrella_thorn, camel_thorn, baobab), read once. */
+    /** A tree's kind by name (umbrella_thorn, camel_thorn, baobab), read once ({@link #HOLLOWED} on the name aside). */
     public static TreeKind kind(String name) {
+        String base = name.endsWith(HOLLOWED) ? name.substring(0, name.length() - HOLLOWED.length()) : name;
         synchronized (KINDS) {
-            return KINDS.computeIfAbsent(name, TreeKind::load);
+            return KINDS.computeIfAbsent(base, TreeKind::load);
         }
     }
+
+    /**
+     * Step 5f: put after a kind's name, the tree's shape is hollowed by termites ({@code TreeShapes.hollowOut}); kept
+     * apart from the plain shape everywhere a shape is kept.
+     */
+    public static final String HOLLOWED = "+termites";
 
     /**
      * A tree worked out into blocks, around its foot at (0, 0, 0): each block's place and state, which ones hold the
@@ -103,7 +110,7 @@ public final class TreePlacer {
                 return p;
             }
         }
-        Placed p = s < 0 ? work(kind(kindName), TreeShapes.build(kind(kindName), seed, age, stage), stage) : between(kindName, seed, age, stage, s);
+        Placed p = s < 0 ? work(kind(kindName), TreeShapes.build(kind(kindName), seed, age, stage, false, kindName.endsWith(HOLLOWED)), stage) : between(kindName, seed, age, stage, s);
         synchronized (CACHE) {
             CACHE.put(key, p);
         }

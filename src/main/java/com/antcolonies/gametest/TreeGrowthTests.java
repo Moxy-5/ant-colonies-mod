@@ -747,6 +747,107 @@ public class TreeGrowthTests {
         });
     }
 
+    /**
+     * Step 5e, lightning: a strike near a big tree is pulled to its top; a scar of charred bark runs down one side of the
+     * trunk, a fire is lit at its foot, and (by this tree's dice for the day) the strike kills it. A strike beyond the
+     * tree's reach stays where it was.
+     */
+    @GameTest(template = "arena", timeoutTicks = 100, skyAccess = true)
+    public static void lightningIsDrawnToABigTreeAndScarsIt(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        grassland(helper);
+        Forest.shapesAtOnce = true;
+        Forest forest = Forest.get(level);
+        long base = Forest.today(level);
+        long seed = 0;
+        for (long s = 1; s < 500 && seed == 0; s++) {
+            TreeLife.Strike strike = TreeLife.strike(s, base);
+            if (strike.lit() && strike.kills() && !TreeLife.fireKills(s, base, 1.0)) {
+                seed = s;
+            }
+        }
+        BlockPos foot = helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE));
+        Forest.Tree t = forest.add(new Forest.Tree("umbrella_thorn", foot, seed, 1.0, TreeStage.LIVING, -1, base));
+        forest.update(level, t, base);
+        helper.assertTrue(t.placedAge == 1.0, "the tree was not placed");
+        // Out of reach: it stays.
+        BlockPos far = helper.absolutePos(new BlockPos(62, SURFACE, 62));
+        net.minecraft.world.entity.LightningBolt missed = net.minecraft.world.entity.EntityType.LIGHTNING_BOLT.create(level);
+        missed.moveTo(net.minecraft.world.phys.Vec3.atBottomCenterOf(far));
+        level.addFreshEntity(missed);
+        helper.assertTrue(missed.blockPosition().equals(far), "a strike out of reach was moved to " + missed.blockPosition());
+        missed.discard();
+        helper.assertTrue(t.living(), "a strike out of reach hurt the tree");
+        // Within reach: drawn to the top.
+        net.minecraft.world.entity.LightningBolt bolt = net.minecraft.world.entity.EntityType.LIGHTNING_BOLT.create(level);
+        bolt.moveTo(net.minecraft.world.phys.Vec3.atBottomCenterOf(foot.offset(14, 0, 9)));
+        level.addFreshEntity(bolt);
+        int up = bolt.blockPosition().getY() - foot.getY();
+        int out = (int) Math.hypot(bolt.blockPosition().getX() - foot.getX(), bolt.blockPosition().getZ() - foot.getZ());
+        bolt.discard();
+        helper.assertTrue(up >= 10 && out <= 30, "the strike was not drawn to the tree's top: " + up + " up, " + out + " out");
+        int scar = countNear(level, foot, 5, 0, up, TreePlacer::isCharred);
+        helper.assertTrue(scar >= 5, "the scar down the trunk is only " + scar + " charred blocks");
+        int fires = countNear(level, foot, 6, 0, 2, b -> b.is(Blocks.FIRE));
+        helper.assertTrue(fires > 0, "no fire at the foot of the scar");
+        helper.assertTrue(t.dead() && "lightning".equals(t.cause), "the strike did not kill the tree: " + t.cause);
+        clearAbove(helper, foot);
+        forest.forgetInside(helper.getBounds());
+        helper.succeed();
+    }
+
+    /**
+     * Step 5f, termites: a grown tree is left alone until a fungus-growing termite colony's reach takes in its foot; from
+     * the next day its lower trunk is hollow (rotten wood inside the bark, frass on the floor, a way in at the foot), it
+     * ages two days a day, and fire and lightning kill it more surely.
+     */
+    @GameTest(template = "arena", timeoutTicks = 100, skyAccess = true)
+    public static void termitesHollowAGrownTreeAndAgeIt(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        grassland(helper);
+        Forest.shapesAtOnce = true;
+        Forest forest = Forest.get(level);
+        long base = Forest.today(level);
+        BlockPos foot = helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE));
+        Forest.Tree t = forest.add(new Forest.Tree("umbrella_thorn", foot, 5, 1.0, TreeStage.LIVING, -1, base));
+        forest.update(level, t, base);
+        helper.assertTrue(t.placedAge >= 0, "the tree was not placed");
+        java.util.function.Predicate<BlockState> rotten = b -> b.is(TreeBlocks.ROTTEN_WOOD.get());
+        java.util.function.Predicate<BlockState> frass = b -> b.is(TreeBlocks.FRASS.get());
+        double lived = t.lived;
+        forest.update(level, t, base + 1);
+        helper.assertTrue(!t.termites && t.lived == lived + 1, "with no termites near it aged " + (t.lived - lived) + " days in a day");
+        helper.assertTrue(countNear(level, foot, 4, 0, 7, rotten) == 0, "the trunk is hollow with no termites near");
+        // A termite colony 12 blocks off: its reach (24) takes in the tree's foot.
+        com.antcolonies.colony.Colony colony = com.antcolonies.colony.ColonyManager.get(level)
+                .createColony(com.antcolonies.species.Species.MACROTERMES, java.util.UUID.randomUUID(), foot.offset(10, 0, 7));
+        lived = t.lived;
+        forest.update(level, t, base + 2);
+        com.antcolonies.colony.ColonyManager.get(level).removeColony(colony.getId());
+        helper.assertTrue(t.termites && t.placedTermites, "the termites did not come into the tree");
+        helper.assertTrue(t.lived == lived + 2, "a tree with termites aged " + (t.lived - lived) + " days in a day, not 2");
+        int lining = countNear(level, foot, 4, 1, 7, rotten), floor = countNear(level, foot, 4, 0, 0, frass);
+        helper.assertTrue(lining >= 4 && floor >= 1, "the trunk is not hollow: " + lining + " rotten wood, " + floor + " frass; " + column(level, foot));
+        int open = 0;
+        for (int y = 1; y <= 5; y++) {
+            open += level.getBlockState(foot.above(y)).isAir() ? 1 : 0;
+        }
+        helper.assertTrue(open >= 3, "the trunk's middle is not hollow: " + column(level, foot.above(4)));
+        // Fire and lightning kill it more surely: the same dice, twice the odds or more.
+        int byFire = 0, byFireTermites = 0, byStrike = 0, byStrikeTermites = 0;
+        for (long day = 0; day < 2000; day++) {
+            byFire += TreeLife.fireKills(5, day, 1.0) ? 1 : 0;
+            byFireTermites += TreeLife.fireKills(5, day, 1.0, true) ? 1 : 0;
+            byStrike += TreeLife.strike(5, day).kills() ? 1 : 0;
+            byStrikeTermites += TreeLife.strike(5, day, true).kills() ? 1 : 0;
+        }
+        helper.assertTrue(byFireTermites > 1.6 * byFire && byStrikeTermites > 1.6 * byStrike,
+                "termites did not make fire (" + byFire + " to " + byFireTermites + ") or lightning (" + byStrike + " to " + byStrikeTermites + ") deadlier");
+        clearAbove(helper, foot);
+        forest.forgetInside(helper.getBounds());
+        helper.succeed();
+    }
+
     /** Lights a fire on open grass next to a tree's trunk (a side not yet burning); returns the trunk block beside it. */
     private static BlockPos lightBy(GameTestHelper helper, BlockPos foot) {
         ServerLevel level = helper.getLevel();
