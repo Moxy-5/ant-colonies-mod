@@ -52,18 +52,22 @@ public class TreeTests {
      */
     @GameTest(template = "arena", timeoutTicks = 100)
     public static void treeBlocksPlaceAndBranchesJoin(GameTestHelper helper) {
-        int x = 2;
+        int x = 2, z = 2;
         for (DeferredBlock<? extends Block> block : TreeBlocks.ALL) {
-            BlockPos pos = new BlockPos(x, SURFACE, 2);
+            if (x > 60) {
+                x = 2; // the next row
+                z += 3;
+            }
+            if (z > 8) {
+                helper.fail("too many tree blocks for three rows");
+            }
+            BlockPos pos = new BlockPos(x, SURFACE, z);
             BlockState state = block.get().defaultBlockState();
             if (block == TreeBlocks.CAMEL_THORN_PODS) {
                 helper.setBlock(pos.above(), TreeBlocks.CAMEL_THORN.leaves().get()); // pods hang from the crown
             }
             helper.setBlock(pos, state);
             x += 2;
-            if (x > 60) {
-                helper.fail("too many tree blocks for one row");
-            }
         }
         for (TreeBlocks.Kind kind : TreeBlocks.KINDS) {
             if (kind.leaves().get().defaultBlockState().isRandomlyTicking()) {

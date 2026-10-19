@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column_horizontal",
+  "textures": {
+    "side": "antcolonies:block/charred_bark",
+    "end": "antcolonies:block/charred_bark"
+  }
+}

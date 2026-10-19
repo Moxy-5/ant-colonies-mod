@@ -225,6 +225,16 @@ public class Forest extends SavedData {
 
     /** The trees being drawn falling right now (step 5c), by their foot. Not saved: one cut off by a stop is placed at once. */
     private final Long2ObjectOpenHashMap<TreeFall> falls = new Long2ObjectOpenHashMap<>();
+    /** Step 5d: the last day each tree's trunk was in a fire (its death rolled once a day), by its foot. Not saved. */
+    private final Long2LongOpenHashMap fireDays = new Long2LongOpenHashMap();
+    /** Step 5d: hollow trunks killed by fire, smouldering: where the smoke comes out, and until when (in days). Not saved. */
+    private final Long2ObjectOpenHashMap<Smoulder> smoulders = new Long2ObjectOpenHashMap<>();
+
+    private record Smoulder(BlockPos top, double until) {
+    }
+
+    /** How long a hollow trunk killed by fire smoulders (my pick: half a day). */
+    static final double SMOULDER_DAYS = 0.5;
 
     /** The game tests: shapes are worked out at once rather than in the background. */
     public static boolean shapesAtOnce;
@@ -313,6 +323,8 @@ public class Forest extends SavedData {
         for (Tree t : all()) {
             if (box.contains(Vec3.atCenterOf(t.foot))) {
                 remove(t);
+                smoulders.remove(t.foot.asLong());
+                fireDays.remove(t.foot.asLong());
             }
         }
     }
@@ -356,6 +368,7 @@ public class Forest extends SavedData {
                 sproutAround(level, player.blockPosition(), today);
             }
         }
+        smoulder(level);
         for (Tree t : all()) {
             if (System.nanoTime() - start > BUDGET_NANOS) {
                 break; // the rest next second
@@ -535,9 +548,9 @@ public class Forest extends SavedData {
         if (kind.isBaobab() || t.fell || t.toppling || falling(t) || t.placedAge < 0 || !level.hasChunkAt(t.foot)) {
             return false;
         }
-        TreePlacer.Placed now = TreePlacer.placed(t.kind, t.seed, t.placedAge, t.placedStage, t.placedStep);
-        TreePlacer.Placed shed = TreePlacer.placed(t.kind, t.seed, TreeLife.shapeAge(t.age), TreeStage.SHED);
-        TreePlacer.Placed lying = TreePlacer.placed(t.kind, t.seed, TreeLife.shapeAge(t.age), TreeStage.FALLEN);
+        TreePlacer.Placed now = burnt(t, TreePlacer.placed(t.kind, t.seed, t.placedAge, t.placedStage, t.placedStep), t.placedStage);
+        TreePlacer.Placed shed = burnt(t, TreePlacer.placed(t.kind, t.seed, TreeLife.shapeAge(t.age), TreeStage.SHED), TreeStage.SHED);
+        TreePlacer.Placed lying = burnt(t, TreePlacer.placed(t.kind, t.seed, TreeLife.shapeAge(t.age), TreeStage.FALLEN), TreeStage.FALLEN);
         if (t.living()) {
             t.cause = "age";
             killed++;
@@ -574,8 +587,90 @@ public class Forest extends SavedData {
 
     /** A tree's shape at an age and stage, if worked out (or being worked out in the background: null). */
     private static TreePlacer.Placed soon(Tree t, double age, TreeStage stage, int step) {
-        return shapesAtOnce ? TreePlacer.placed(t.kind, t.seed, TreeLife.shapeAge(age), stage, step)
-                : TreePlacer.placedSoon(t.kind, t.seed, TreeLife.shapeAge(age), stage, step);
+        return burnt(t, shapesAtOnce ? TreePlacer.placed(t.kind, t.seed, TreeLife.shapeAge(age), stage, step)
+                : TreePlacer.placedSoon(t.kind, t.seed, TreeLife.shapeAge(age), stage, step), stage);
+    }
+
+    /** Step 5d: a tree killed by fire stands and lies black (its dead wood charred) instead of silver. */
+    private static TreePlacer.Placed burnt(Tree t, TreePlacer.Placed shape, TreeStage stage) {
+        return "fire".equals(t.cause) && stage != TreeStage.LIVING ? TreePlacer.charred(shape) : shape;
+    }
+
+    /**
+     * Step 5d: a fire has charred or scorched these blocks (by {@link TreeFire}). A young tree it touches dies; a grown
+     * living tree whose trunk is in the fire (its lowest 4 blocks) may die, rolled once a day, more surely when old and
+     * hollow ({@link TreeLife#fireDeathChance}); a hollow one killed smoulders for half a day.
+     */
+    public void inFire(ServerLevel level, List<BlockPos> hit) {
+        BlockPos first = hit.get(0);
+        long today = today(level);
+        for (Tree t : near(first, 30)) {
+            if (!t.living() || t.placedAge < 0 || falling(t)) {
+                continue;
+            }
+            TreePlacer.Placed now = soon(t, t.placedAge, t.placedStage, t.placedStep);
+            if (now == null) {
+                continue;
+            }
+            BoundingBox box = now.box(t.foot);
+            boolean any = false, trunk = false;
+            for (BlockPos pos : hit) {
+                if (box.isInside(pos) && isPart(now, t.foot, pos, level.getBlockState(pos))) {
+                    any = true;
+                    int dy = pos.getY() - t.foot.getY(), dx = pos.getX() - t.foot.getX(), dz = pos.getZ() - t.foot.getZ();
+                    trunk |= dy <= 3 && dx * dx + dz * dz <= 16 && level.getBlockState(pos).is(TreeBlocks.TREE_WOOD);
+                }
+            }
+            if (!any) {
+                continue;
+            }
+            if (t.age < TreeLife.YOUNG_END) {
+                die(level, t, now); // a little tree's thin bark: the fire kills it
+                continue;
+            }
+            if (!trunk || fireDays.containsKey(t.foot.asLong()) && fireDays.get(t.foot.asLong()) >= today) {
+                continue;
+            }
+            fireDays.put(t.foot.asLong(), today);
+            if (TreeLife.fireKills(t.seed, today, t.age)) {
+                kill(t, today, "fire");
+                if (TreeLife.smoulders(t.age)) {
+                    smoulders.put(t.foot.asLong(), new Smoulder(trunkTop(now, t.foot), time(level) + SMOULDER_DAYS));
+                }
+            }
+        }
+    }
+
+    /** Whether a tree is smouldering (for the tests). */
+    public boolean smouldering(Tree t) {
+        return smoulders.containsKey(t.foot.asLong());
+    }
+
+    /** The top of a tree's trunk: its highest wood block within a block of its middle. */
+    private static BlockPos trunkTop(TreePlacer.Placed shape, BlockPos foot) {
+        int top = 0;
+        for (int i = 0; i < shape.size(); i++) {
+            if (Math.abs(shape.xs()[i]) <= 1 && Math.abs(shape.zs()[i]) <= 1 && shape.states()[i].is(TreeBlocks.TREE_WOOD)) {
+                top = Math.max(top, shape.ys()[i]);
+            }
+        }
+        return foot.above(top + 1);
+    }
+
+    /** Smoke out of the hollow trunks killed by fire, until their time is up. */
+    private void smoulder(ServerLevel level) {
+        if (smoulders.isEmpty()) {
+            return;
+        }
+        double time = time(level);
+        smoulders.values().removeIf(s -> s.until() < time);
+        for (Smoulder s : smoulders.values()) {
+            if (!level.hasChunkAt(s.top())) {
+                continue;
+            }
+            level.sendParticles(ParticleTypes.CAMPFIRE_COSY_SMOKE, s.top().getX() + 0.5, s.top().getY(), s.top().getZ() + 0.5, 2, 0.3, 0.1, 0.3, 0.005);
+            level.sendParticles(ParticleTypes.SMOKE, s.top().getX() + 0.5, s.top().getY() - 1, s.top().getZ() + 0.5, 4, 0.6, 0.6, 0.6, 0.01);
+        }
     }
 
     /** Brings the tree's shape in the world from what is there to its age now. */
@@ -717,7 +812,7 @@ public class Forest extends SavedData {
             }
             foot++;
             pos.set(t.foot.getX() + now.xs()[i], t.foot.getY(), t.foot.getZ() + now.zs()[i]);
-            if (level.getBlockState(pos).is(now.states()[i].getBlock())) {
+            if (TreePlacer.same(level.getBlockState(pos), now.states()[i])) {
                 there++;
             }
         }
@@ -782,7 +877,7 @@ public class Forest extends SavedData {
         int x = pos.getX() - foot.getX(), y = pos.getY() - foot.getY(), z = pos.getZ() - foot.getZ();
         for (int i = 0; i < shape.size(); i++) {
             if (shape.xs()[i] == x && shape.ys()[i] == y && shape.zs()[i] == z) {
-                return there.is(shape.states()[i].getBlock());
+                return TreePlacer.same(there, shape.states()[i]);
             }
         }
         return false;

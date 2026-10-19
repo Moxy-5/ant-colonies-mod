@@ -257,6 +257,41 @@ def peeling_bark():
     return img
 
 
+def charred_bark(variant=0):
+    """Step 5d: bark burnt black. Real charcoal on a trunk cracks into blocky checks (alligatoring): near-black blocks,
+    each a little different, with grey ash in the cracks between them, grain up and down."""
+    rng = random.Random(f"char{variant}")
+    img = [[(0, 0, 0)] * S for _ in range(S)]
+    x0 = 0
+    while x0 < S:
+        w = rng.randint(3, 5)
+        y0 = rng.randrange(4)
+        while y0 < S + 4:
+            h = rng.randint(3, 6)
+            base = shade((34, 30, 28), rng.uniform(0.75, 1.3))
+            for y in range(y0, y0 + h):
+                for x in range(x0, min(S, x0 + w)):
+                    edge = x == x0 or y == y0
+                    img[y % S][x] = (96, 90, 84) if edge and rng.random() < 0.8 else shade(base, rng.uniform(0.85, 1.12))
+            y0 += h
+        x0 += w
+    return speckle(img, rng, 0.04)
+
+
+def charred_end():
+    """A burnt log's cut end: black rings round a darker heart, a grey rim of ash."""
+    rng = random.Random("charend")
+    img = []
+    for y in range(S):
+        row = []
+        for x in range(S):
+            r = math.hypot(x - 7.5, y - 7.5)
+            c = (88, 82, 76) if r > 6.8 else shade((40, 34, 30), 0.85 + 0.25 * math.sin(r * 2.2))
+            row.append(c)
+        img.append(row)
+    return speckle(img, rng, 0.05)
+
+
 def dead_inner():
     rng = random.Random("deadinner")
     img = [[shade((176, 166, 146), 0.9 + 0.15 * math.sin(x * 2.1 + y * 0.15 + rng.random())) for x in range(S)] for y in range(S)]
@@ -637,6 +672,12 @@ def game_files():
     log("bleached_wood", "antcolonies:block/bleached_bark", "antcolonies:block/bleached_bark")
     log("peeling_bleached_log", "antcolonies:block/peeling_bleached_bark", dead_end)
     branch("bleached_branch", "antcolonies:block/bleached_bark", dead_end)
+    # Burnt wood (step 5d): bark charred black by fire, on living scars and on a tree killed by fire.
+    texture("charred_bark", charred_bark(0))
+    texture("charred_log_top", charred_end())
+    log("charred_log", "antcolonies:block/charred_bark", "antcolonies:block/charred_log_top")
+    log("charred_wood", "antcolonies:block/charred_bark", "antcolonies:block/charred_bark")
+    branch("charred_branch", "antcolonies:block/charred_bark", "antcolonies:block/charred_log_top")
     for name, rows in (("rotten_wood", rotten_wood()), ("baobab_fibre", fibre())):
         texture(name, rows)
         single(name, {"parent": "minecraft:block/cube_all", "textures": {"all": f"antcolonies:block/{name}"}})

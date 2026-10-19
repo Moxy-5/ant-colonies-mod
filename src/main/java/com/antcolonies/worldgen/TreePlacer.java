@@ -567,6 +567,87 @@ public final class TreePlacer {
         return grow(level, from, to, foot, flags, shed, null);
     }
 
+    // ---------------------------------------------------------------- step 5d: charred and scorched
+
+    /** The charred block a giant tree's wood turns to in a fire (null: not wood that chars). */
+    public static Block charredOf(Block b) {
+        if (b == TreeBlocks.CHARRED_LOG.get() || b == TreeBlocks.CHARRED_WOOD.get() || b == TreeBlocks.CHARRED_BRANCH.get()) {
+            return null;
+        }
+        if (b == TreeBlocks.BLEACHED_LOG.get() || b == TreeBlocks.PEELING_BLEACHED_LOG.get()) {
+            return TreeBlocks.CHARRED_LOG.get();
+        }
+        if (b == TreeBlocks.BLEACHED_WOOD.get()) {
+            return TreeBlocks.CHARRED_WOOD.get();
+        }
+        if (b == TreeBlocks.BLEACHED_BRANCH.get()) {
+            return TreeBlocks.CHARRED_BRANCH.get();
+        }
+        for (TreeBlocks.Kind k : TreeBlocks.KINDS) {
+            if (b == k.log().get()) {
+                return TreeBlocks.CHARRED_LOG.get();
+            }
+            if (b == k.wood().get()) {
+                return TreeBlocks.CHARRED_WOOD.get();
+            }
+            if (b == k.branch().get()) {
+                return TreeBlocks.CHARRED_BRANCH.get();
+            }
+        }
+        return null;
+    }
+
+    /** Whether a block is burnt wood. */
+    public static boolean isCharred(BlockState state) {
+        return state.is(TreeBlocks.CHARRED_LOG.get()) || state.is(TreeBlocks.CHARRED_WOOD.get()) || state.is(TreeBlocks.CHARRED_BRANCH.get());
+    }
+
+    /** A wood block charred (its axis or branch arms kept); itself if it does not char. */
+    public static BlockState charred(BlockState state) {
+        Block c = charredOf(state.getBlock());
+        return c == null ? state : c.withPropertiesOf(state);
+    }
+
+    /** The withered leaves green leaves turn to when scorched (null: not a giant tree's green leaves). */
+    public static Block scorchedOf(Block b) {
+        for (TreeBlocks.Kind k : TreeBlocks.KINDS) {
+            if (b == k.leaves().get()) {
+                return k.deadLeaves().get();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Whether a block in the world is still the tree's own block of its shape: the block itself, or it charred or
+     * scorched by a fire (a scar is still the tree).
+     */
+    public static boolean same(BlockState there, BlockState was) {
+        Block b = was.getBlock();
+        return there.is(b) || there.getBlock() == charredOf(b) || there.getBlock() == scorchedOf(b);
+    }
+
+    /** Charred shapes: a tree killed by fire stands and lies black, not silver (kept as long as their shape is). */
+    private static final Map<Placed, Placed> CHARRED = java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+
+    /** A shape with all its dead wood charred (a tree killed by fire, step 5d). */
+    public static Placed charred(Placed p) {
+        if (p == null) {
+            return null;
+        }
+        return CHARRED.computeIfAbsent(p, q -> {
+            BlockState[] states = q.states().clone();
+            for (int i = 0; i < states.length; i++) {
+                Block b = states[i].getBlock();
+                if (b == TreeBlocks.BLEACHED_LOG.get() || b == TreeBlocks.PEELING_BLEACHED_LOG.get() || b == TreeBlocks.BLEACHED_WOOD.get()
+                        || b == TreeBlocks.BLEACHED_BRANCH.get()) {
+                    states[i] = charred(states[i]);
+                }
+            }
+            return new Placed(q.xs(), q.ys(), q.zs(), states, q.holds(), q.minX(), q.minY(), q.minZ(), q.maxX(), q.maxY(), q.maxZ());
+        });
+    }
+
     /** As {@link #grow}, and every block that goes is told to {@code gone} (its place and what it was), if not null. */
     public static int grow(LevelAccessor level, Placed from, Placed to, BlockPos foot, int flags, java.util.List<BlockPos> shed,
                            java.util.function.BiConsumer<BlockPos, BlockState> gone) {
@@ -588,13 +669,16 @@ public final class TreePlacer {
             }
             pos.set(foot.getX() + to.xs()[i], foot.getY() + to.ys()[i], foot.getZ() + to.zs()[i]);
             BlockState there = level.getBlockState(pos);
-            boolean own = was != null && there.is(was.getBlock());
+            boolean own = was != null && same(there, was);
             boolean ground = to.ys()[i] < 0;
             if (!own && (ground ? !isSoil(there) && !isOpen(there) : !isOpen(there))) {
                 continue;
             }
             if (state.getBlock() instanceof FallenBranchBlock && !level.getBlockState(pos.below()).isFaceSturdy(level, pos.below(), Direction.UP)) {
                 continue;
+            }
+            if (own && isCharred(there) && charredOf(was.getBlock()) != null) {
+                state = charred(state); // a fire's scar stays as the wood changes (step 5d)
             }
             level.setBlock(pos, state, flags);
             changed++;
@@ -616,7 +700,7 @@ public final class TreePlacer {
                 continue;
             }
             pos.set(foot.getX() + BlockPos.getX(k), foot.getY() + BlockPos.getY(k), foot.getZ() + BlockPos.getZ(k));
-            if (!level.getBlockState(pos).is(e.getValue().getBlock())) {
+            if (!same(level.getBlockState(pos), e.getValue())) {
                 continue;
             }
             level.setBlock(pos, Blocks.AIR.defaultBlockState(), flags);
@@ -643,7 +727,7 @@ public final class TreePlacer {
                 continue; // the roots stay in the ground
             }
             pos.set(foot.getX() + tree.xs()[i], foot.getY() + tree.ys()[i], foot.getZ() + tree.zs()[i]);
-            if (level.getBlockState(pos).is(tree.states()[i].getBlock())) {
+            if (same(level.getBlockState(pos), tree.states()[i])) {
                 level.setBlock(pos, Blocks.AIR.defaultBlockState(), flags);
                 removed++;
             }

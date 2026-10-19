@@ -70,6 +70,14 @@ public final class TreeBlocks {
     public static final DeferredBlock<RotatedPillarBlock> PEELING_BLEACHED_LOG = add(pillar("peeling_bleached_log", deadWood()));
     public static final DeferredBlock<TreeBranchBlock> BLEACHED_BRANCH = add(ModBlocks.BLOCKS.registerBlock("bleached_branch", TreeBranchBlock::new,
             branchProperties(MapColor.COLOR_LIGHT_GRAY, 1.0F)));
+    /**
+     * Bark burnt black (step 5d): a fire's scar on a living tree, and the whole of a tree killed by fire. Charcoal does
+     * not burn away again.
+     */
+    public static final DeferredBlock<RotatedPillarBlock> CHARRED_LOG = add(pillar("charred_log", wood(MapColor.COLOR_BLACK, 1.5F)));
+    public static final DeferredBlock<RotatedPillarBlock> CHARRED_WOOD = add(pillar("charred_wood", wood(MapColor.COLOR_BLACK, 1.5F)));
+    public static final DeferredBlock<TreeBranchBlock> CHARRED_BRANCH = add(ModBlocks.BLOCKS.registerBlock("charred_branch", TreeBranchBlock::new,
+            branchProperties(MapColor.COLOR_BLACK, 0.8F)));
     /** Heart-rot: soft crumbly wood inside an old trunk; insects dig it fast. */
     public static final DeferredBlock<Block> ROTTEN_WOOD = add(ModBlocks.BLOCKS.registerSimpleBlock("rotten_wood",
             BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_BROWN).strength(0.4F).sound(SoundType.WOOD).ignitedByLava()));
@@ -137,20 +145,27 @@ public final class TreeBlocks {
         return TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, name));
     }
 
-    /** How easily each block catches fire and burns (like Minecraft's logs, leaves and plants); dry dead wood burns best. */
+    /**
+     * How easily each block catches fire and burns (the first number: how much it feeds a fire next to it; the second:
+     * how likely it burns away). Step 5d: a giant tree's wood and green leaves never burn away (0), they char and scorch
+     * instead ({@code tree/TreeFire}); withered leaves, twigs, pods and frass still burn like Minecraft's.
+     */
     public static void setFlammable() {
         FireBlock fire = (FireBlock) Blocks.FIRE;
         for (Kind kind : KINDS) {
-            fire.setFlammable(kind.log().get(), 5, 5);
-            fire.setFlammable(kind.wood().get(), 5, 5);
-            fire.setFlammable(kind.branch().get(), 5, 20);
-            fire.setFlammable(kind.leaves().get(), 30, 60);
+            fire.setFlammable(kind.log().get(), 5, 0);
+            fire.setFlammable(kind.wood().get(), 5, 0);
+            fire.setFlammable(kind.branch().get(), 5, 0);
+            fire.setFlammable(kind.leaves().get(), 30, 0);
             fire.setFlammable(kind.deadLeaves().get(), 60, 100);
         }
         fire.setFlammable(THORNY_TWIG.get(), 60, 100);
         fire.setFlammable(CAMEL_THORN_PODS.get(), 30, 60);
         for (DeferredBlock<? extends Block> dead : List.of(BLEACHED_LOG, BLEACHED_WOOD, PEELING_BLEACHED_LOG, BLEACHED_BRANCH, ROTTEN_WOOD)) {
-            fire.setFlammable(dead.get(), 10, 10);
+            fire.setFlammable(dead.get(), 10, 0);
+        }
+        for (DeferredBlock<? extends Block> charred : List.of(CHARRED_LOG, CHARRED_WOOD, CHARRED_BRANCH)) {
+            fire.setFlammable(charred.get(), 5, 0);
         }
         fire.setFlammable(FRASS.get(), 60, 100);
         fire.setFlammable(BAOBAB_FIBRE.get(), 5, 5);

@@ -170,6 +170,30 @@ public final class TreeLife {
      */
     public static final double RAIN_WAIT = 3;
 
+    /** How old a grown tree is: 0 just grown, 1 ancient (an acacia over 0.5 is hollow inside). */
+    public static double old(double age) {
+        return Math.max(0, Math.min(1, (age - TreeShapes.GROWN) / (TreeShapes.ANCIENT - TreeShapes.GROWN)));
+    }
+
+    /**
+     * Step 5d: the chance a fire on a grown tree's trunk kills it, rolled at most once a day (my picks): 1 in 10 just
+     * grown, 6 in 10 ancient. Real: thick bark lets a sound acacia live through a grass fire with a scar at its foot; in an
+     * old hollow trunk the fire gets inside and burns it out like a chimney.
+     */
+    public static double fireDeathChance(double age) {
+        return 0.1 + 0.5 * old(age);
+    }
+
+    /** Whether the fire on a grown tree's trunk this day kills it (the tree's own dice for the day). */
+    public static boolean fireKills(long seed, long day, double age) {
+        return dice(seed, day * 7919 + 5).nextDouble() < fireDeathChance(age);
+    }
+
+    /** Whether a grown tree killed by fire has a hollow trunk that smoulders (my pick: from half way to ancient). */
+    public static boolean smoulders(double age) {
+        return old(age) >= 0.5;
+    }
+
     /** The day after death a dead stage starts (-1: the kind has no such stage). */
     public static double stageFrom(TreeKind kind, long seed, TreeStage stage) {
         for (DeadStage s : deadStages(kind, seed)) {

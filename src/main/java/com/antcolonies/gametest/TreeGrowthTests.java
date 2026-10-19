@@ -15,6 +15,7 @@ import com.antcolonies.tree.TreeStage;
 import com.antcolonies.worldgen.TreePlacer;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
@@ -669,6 +670,98 @@ public class TreeGrowthTests {
             forest.forgetInside(helper.getBounds());
             helper.succeed();
         });
+    }
+
+    /**
+     * Step 5d, fire: a fire next to a giant tree chars its bark black and scorches its green leaves brown, and never
+     * burns them away. A young tree it touches dies. A grown tree whose trunk burns dies by its own dice for the day
+     * (once a day only): an ancient one killed smoulders and its dead stages are black, not silver; a younger grown one
+     * the dice spare lives on with a scar.
+     */
+    @GameTest(template = "arena", timeoutTicks = 200, skyAccess = true)
+    public static void fireCharsBarkKillsYoungTreesAndSomeGrownOnes(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        grassland(helper);
+        Forest.shapesAtOnce = true;
+        Forest forest = Forest.get(level);
+        long base = Forest.today(level);
+        long killedSeed = 0, sparedSeed = 0;
+        for (long s = 1; s < 500 && (killedSeed == 0 || sparedSeed == 0); s++) {
+            if (killedSeed == 0 && TreeLife.fireKills(s, base, 1.25)) {
+                killedSeed = s;
+            }
+            if (sparedSeed == 0 && !TreeLife.fireKills(s, base, 0.6)) {
+                sparedSeed = s;
+            }
+        }
+        helper.assertTrue(TreeLife.smoulders(1.25) && !TreeLife.smoulders(1.0), "only old hollow trunks should smoulder");
+        BlockPos oldFoot = helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE));
+        BlockPos sparedFoot = helper.absolutePos(new BlockPos(10, SURFACE, 10));
+        BlockPos youngFoot = helper.absolutePos(new BlockPos(54, SURFACE, 12));
+        Forest.Tree old = forest.add(new Forest.Tree("umbrella_thorn", oldFoot, killedSeed, 1.25, TreeStage.LIVING, -1, base));
+        Forest.Tree spared = forest.add(new Forest.Tree("umbrella_thorn", sparedFoot, sparedSeed, 0.6, TreeStage.LIVING, -1, base));
+        Forest.Tree young = forest.add(new Forest.Tree("camel_thorn", youngFoot, 3, 0.25, TreeStage.LIVING, -1, base));
+        for (Forest.Tree t : List.of(old, spared, young)) {
+            forest.update(level, t, base);
+            helper.assertTrue(t.placedAge >= 0, "a tree was not placed");
+        }
+        // A fire on the grass by each trunk.
+        BlockPos sparedBark = lightBy(helper, sparedFoot);
+        helper.assertTrue(TreePlacer.isCharred(level.getBlockState(sparedBark)), "the bark by the fire is not charred: " + level.getBlockState(sparedBark));
+        helper.assertTrue(spared.living(), "the dice should have spared this tree today");
+        lightBy(helper, sparedFoot); // a second fire the same day (on another side): no second roll
+        helper.assertTrue(spared.living(), "a second fire the same day rolled again");
+        lightBy(helper, youngFoot);
+        helper.assertTrue(forest.at(youngFoot) == null, "the young tree in the fire is still in the book");
+        int youngLeft = countNear(level, youngFoot, 6, 1, 12, b -> b.is(TreeBlocks.TREE_WOOD) || b.is(TreeBlocks.TREE_LEAVES));
+        helper.assertTrue(youngLeft == 0, youngLeft + " blocks of the burnt young tree are left");
+        lightBy(helper, oldFoot);
+        helper.assertTrue(old.dead() && "fire".equals(old.cause), "the ancient tree was not killed by the fire: " + old.cause);
+        helper.assertTrue(forest.smouldering(old), "the ancient hollow trunk does not smoulder");
+        // A fire under a green leaf of the spared tree (on a block, as a fire in thin air goes out at once) scorches it.
+        BlockPos leaf = null;
+        for (BlockPos pos : BlockPos.betweenClosed(sparedFoot.offset(-8, 3, -8), sparedFoot.offset(8, 20, 8))) {
+            if (livingLeaves(level.getBlockState(pos)) && level.getBlockState(pos.below()).isAir() && level.getBlockState(pos.below(2)).isAir()) {
+                leaf = pos.immutable();
+                break;
+            }
+        }
+        helper.assertTrue(leaf != null, "no green leaf over open air on the spared tree");
+        level.setBlock(leaf.below(2), Blocks.STONE.defaultBlockState(), 3);
+        level.setBlock(leaf.below(), Blocks.FIRE.defaultBlockState(), 3);
+        helper.assertTrue(deadLeaves(level.getBlockState(leaf)), "the leaf by the fire was not scorched: " + level.getBlockState(leaf));
+        BlockPos scar = sparedBark;
+        helper.runAfterDelay(100, () -> {
+            helper.assertTrue(TreePlacer.isCharred(level.getBlockState(scar)), "the charred bark burnt away: " + level.getBlockState(scar));
+            // The tree killed by fire stands black: its snag's dead wood is charred, none of it silver.
+            double snag = TreeLife.stageFrom(TreePlacer.kind("umbrella_thorn"), old.seed, TreeStage.SNAG);
+            forest.update(level, old, old.died + (long) Math.ceil(snag) + 1);
+            helper.assertTrue(old.placedStage == TreeStage.SNAG, "the burnt tree is not a snag: " + old.placedStage.id);
+            int black = countAround(level, oldFoot, 4, 40, TreePlacer::isCharred), silver = countAround(level, oldFoot, 4, 40, TreeGrowthTests::deadWood);
+            helper.assertTrue(black > 50 && silver == 0, "the burnt snag has " + black + " charred and " + silver + " silver wood blocks");
+            helper.assertTrue(spared.living(), "the spared tree died later");
+            clearAbove(helper, oldFoot);
+            clearAbove(helper, sparedFoot);
+            forest.forgetInside(helper.getBounds());
+            helper.succeed();
+        });
+    }
+
+    /** Lights a fire on open grass next to a tree's trunk (a side not yet burning); returns the trunk block beside it. */
+    private static BlockPos lightBy(GameTestHelper helper, BlockPos foot) {
+        ServerLevel level = helper.getLevel();
+        for (int r = 1; r <= 5; r++) {
+            for (Direction d : Direction.Plane.HORIZONTAL) {
+                BlockPos at = foot.relative(d, r);
+                BlockPos bark = at.relative(d.getOpposite());
+                BlockState b = level.getBlockState(bark);
+                if (level.getBlockState(at).isAir() && b.is(TreeBlocks.TREE_WOOD) && !TreePlacer.isCharred(b)) {
+                    level.setBlock(at, Blocks.FIRE.defaultBlockState(), 3);
+                    return bark;
+                }
+            }
+        }
+        throw new net.minecraft.gametest.framework.GameTestAssertException("no open grass next to unburnt bark at " + foot);
     }
 
     /** The mean place of a shape's wood (and mud on it) from the foot (from {@code minY} up, farther out than {@code minR}). */

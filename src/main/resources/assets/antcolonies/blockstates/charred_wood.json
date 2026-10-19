@@ -1,0 +1,16 @@
+{
+  "variants": {
+    "axis=y": {
+      "model": "antcolonies:block/charred_wood"
+    },
+    "axis=z": {
+      "model": "antcolonies:block/charred_wood_horizontal",
+      "x": 90
+    },
+    "axis=x": {
+      "model": "antcolonies:block/charred_wood_horizontal",
+      "x": 90,
+      "y": 90
+    }
+  }
+}

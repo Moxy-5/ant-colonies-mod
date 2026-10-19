@@ -37,6 +37,14 @@ import net.neoforged.neoforge.event.level.BlockEvent;
 
 @EventBusSubscriber(modid = AntColoniesMod.MODID)
 public class ModEvents {
+    /** Step 5d: a fire appearing next to a giant tree chars its bark and scorches its leaves. */
+    @SubscribeEvent
+    public static void onNeighborNotify(BlockEvent.NeighborNotifyEvent event) {
+        if (event.getLevel() instanceof ServerLevel level) {
+            com.antcolonies.tree.TreeFire.changed(level, event.getPos(), event.getState());
+        }
+    }
+
     @SubscribeEvent
     public static void onAttributes(EntityAttributeCreationEvent event) {
         event.put(ModEntities.WORKER_ANT.get(), WorkerAntEntity.createAttributes().build());

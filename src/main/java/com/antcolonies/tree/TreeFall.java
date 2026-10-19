@@ -224,7 +224,7 @@ public final class TreeFall {
                 continue;
             }
             pos.set(foot.getX() + from.xs()[i], foot.getY() + from.ys()[i], foot.getZ() + from.zs()[i]);
-            if (level.getBlockState(pos).is(from.states()[i].getBlock())) {
+            if (TreePlacer.same(level.getBlockState(pos), from.states()[i])) {
                 level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS);
             }
         }
