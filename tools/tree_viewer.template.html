@@ -168,8 +168,8 @@ const REAL = {
 };
 let kind = "umbrella", age = 1, stage = "living", seed = 1, cut = false, dry = false;
 let picks = { shape: { umbrella: "A", camel: "A", baobab: "A" }, bark: { umbrella: "B", camel: "B", baobab: "B" },
-              leaves: { umbrella: "B", camel: "B", baobab: "B" }, dead: "E" };
-try { const s = JSON.parse(localStorage.getItem("tree-picks") || "null"); if (s && s.shape) picks = s; } catch (e) {}
+              leaves: { umbrella: "C", camel: "C", baobab: "C" }, dead: "E" };
+try { const s = JSON.parse(localStorage.getItem("tree-picks-2") || "null"); if (s && s.shape) picks = s; } catch (e) {}
 
 // ================= The tree shape maker =================
 // Voxels: block names; the textures are picked when drawing. Coordinates are blocks, y = 0 the first block above
@@ -248,8 +248,8 @@ const LIVE = ["bark", "inner", "thin"], DEAD = ["deadbark", "deadinner", "deadth
 
 // ---- The acacias (umbrella thorn, camel thorn): one skeleton, every age and stage drawn from it ----
 const ACACIA = {
-  umbrella: { H: 34, Hr: 4, Rc: 22, R0: 2.3, fork: [0.2, 0.3], limbs: [3, 5], bends: 2, dome: 0, crownT: 4.5, dens: { A: 0.85, B: 0.62 } },
-  camel: { H: 27, Hr: 3, Rc: 17, R0: 2.2, fork: [0.12, 0.2], limbs: [5, 7], bends: 3, dome: 7, crownT: 6.5, dens: { A: 0.92, B: 0.74 } },
+  umbrella: { H: 34, Hr: 4, Rc: 22, R0: 2.3, fork: [0.2, 0.3], limbs: [3, 5], bends: 2, dome: 0, crownT: 4.5, dens: { A: 0.85, B: 0.62, C: 0.75 } },
+  camel: { H: 27, Hr: 3, Rc: 17, R0: 2.2, fork: [0.12, 0.2], limbs: [5, 7], bends: 3, dome: 7, crownT: 6.5, dens: { A: 0.92, B: 0.74, C: 0.84 } },
 };
 
 function acaciaSkeleton(kindId, seed, age, shape) {
@@ -608,7 +608,7 @@ function buildBaobab(sk, stageId) {
       const rx = 1 + 1.8 * sk.k, ry = 1.4;
       for (let x = Math.floor(e2[0] - rx); x <= e2[0] + rx; x++) for (let y = Math.floor(e2[1] - ry); y <= e2[1] + ry + 1; y++) for (let z = Math.floor(e2[2] - rx); z <= e2[2] + rx; z++) {
         const q = ((x - e2[0]) / rx) ** 2 + ((z - e2[2]) / rx) ** 2 + ((y - e2[1] - 0.5) / ry) ** 2;
-        const keep = sk.g < 0.45 ? q < 0.7 || hash(x, y, z, 71) < 0.55 : hash(x, y, z, 71) < (picks.leaves.baobab === "A" ? 0.7 : 0.5);
+        const keep = sk.g < 0.45 ? q < 0.7 || hash(x, y, z, 71) < 0.55 : hash(x, y, z, 71) < ({ A: 0.7, B: 0.5, C: 0.62 })[picks.leaves.baobab];
         if (q <= 1 && keep) v.put(x, y, z, "leaves");
       }
     }
@@ -838,7 +838,7 @@ function buttons(el, list, isOn, onPick) {
     el.appendChild(b);
   }
 }
-function save() { try { localStorage.setItem("tree-picks", JSON.stringify(picks)); } catch (e) {} }
+function save() { try { localStorage.setItem("tree-picks-2", JSON.stringify(picks)); } catch (e) {} }
 
 function sync() {
   document.querySelectorAll("#kinds .choice").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.id === kind)));
@@ -850,9 +850,9 @@ function sync() {
   const ab = [["A", "A"], ["B", "B"]];
   buttons(document.getElementById("pick-shape"), ab, x => picks.shape[kind] === x, x => { picks.shape[kind] = x; save(); refresh(true); });
   buttons(document.getElementById("pick-bark"), ab, x => picks.bark[kind] === x, x => { picks.bark[kind] = x; save(); refresh(false); });
-  buttons(document.getElementById("pick-leaves"), ab, x => picks.leaves[kind] === x, x => { picks.leaves[kind] = x; save(); refresh(false); });
+  buttons(document.getElementById("pick-leaves"), [["A", "A"], ["B", "B"], ["C", "C"]], x => picks.leaves[kind] === x, x => { picks.leaves[kind] = x; save(); refresh(false); });
   buttons(document.getElementById("pick-dead"), [["E", "E silver"], ["D", "D grey"]], x => picks.dead === x, x => { picks.dead = x; save(); refresh(false); });
-  document.getElementById("shape-note").innerHTML = `Shape A: ${SHAPES[kind].A}<br>Shape B: ${SHAPES[kind].B}<br>Bark and leaves: A is Minecraft-simple, B field detail. Dead bark: E the bleached silver you liked, D the grey-brown in the game now.`;
+  document.getElementById("shape-note").innerHTML = `Shape A: ${SHAPES[kind].A}<br>Shape B: ${SHAPES[kind].B}<br>Bark: A is Minecraft-simple, B field detail. Leaves: A dense, B thin, C in between (the new default). Dead bark: E the bleached silver you liked, D the grey-brown in the game now.`;
   const real = REAL[kind][stage] || REAL[kind].living;
   document.getElementById("real").textContent = age < 0.06 ? "A seedling: in the real savanna most seedlings are eaten or burnt; the few that survive take years to get above the grass." : real;
   document.getElementById("cut").checked = cut;

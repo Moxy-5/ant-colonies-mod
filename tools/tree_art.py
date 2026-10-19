@@ -286,6 +286,40 @@ def leaves(kind, look):
     return img
 
 
+def leaves_c(kind):
+    """C, between A (too dense, the user) and B (too thin): B's fine leaflets, more of them and fuller, about two thirds
+    leaf and one third sky; the baobab's hand-shaped leaves twice as many."""
+    rng = random.Random(f"leafC{kind}")
+    base = LEAF[kind]
+    img = blank(None)
+    if kind == "baobab":
+        for _ in range(8):
+            cx, cy = rng.randrange(S), rng.randrange(S)
+            for i in range(5):
+                a = -math.pi / 2 + (i - 2) * 0.6 + rng.uniform(-0.15, 0.15)
+                for t in range(1, 5):
+                    for w in (0, 1) if t > 1 else (0,):
+                        x = int(round(cx + math.cos(a) * t - math.sin(a) * w * 0.7)) % S
+                        y = int(round(cy + math.sin(a) * t + math.cos(a) * w * 0.7)) % S
+                        img[y][x] = shade(base, 0.85 + 0.08 * t + rng.uniform(-0.06, 0.06))
+    else:
+        stem = shade(base, 0.62)
+        for _ in range(10 if kind == "umbrella" else 12):
+            x, y = rng.uniform(0, S), rng.uniform(0, S)
+            a = rng.uniform(0, math.pi * 2)
+            for t in range(rng.randint(5, 8)):
+                img[int(y) % S][int(x) % S] = stem
+                for side in (-1, 1):
+                    for reach in (1, 2):
+                        if reach == 2 and rng.random() < 0.7:
+                            continue
+                        lx, ly = int(x - math.sin(a) * side * reach) % S, int(y + math.cos(a) * side * reach) % S
+                        if img[ly][lx] is None:
+                            img[ly][lx] = shade(base, rng.uniform(0.85, 1.2))
+                x, y = x + math.cos(a), y + math.sin(a)
+    return img
+
+
 def thorns():
     """A thorny twig: a zigzag red-brown twig, a pair of long straight white spines at each joint, small hooks."""
     img = blank(None)
@@ -353,6 +387,7 @@ def all_textures():
         for look in LOOKS:
             out[f"bark_{kind}_{look}"] = bark(kind, look)
             out[f"leaves_{kind}_{look}"] = leaves(kind, look)
+        out[f"leaves_{kind}_C"] = leaves_c(kind)
         out[f"end_{kind}"] = wood_end(kind)
         out[f"inner_{kind}"] = wood_inner(kind)
     out["deadbark_E"] = dead_bark_silver(0)
