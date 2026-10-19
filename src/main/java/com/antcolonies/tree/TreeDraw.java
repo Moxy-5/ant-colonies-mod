@@ -286,6 +286,12 @@ final class TreeDraw {
      * never moves, the user's real growth).
      */
     static void growing(TreeVoxels v, Poly p, double[] radii, double upto, boolean taper, TreePart[] blocks, double hollow) {
+        growing(v, p, radii, upto, taper, blocks, hollow, 0.35);
+    }
+
+    /** As above, a growing tip never thinner than tipMin (but never thicker than the grown wood there). */
+    static void growing(TreeVoxels v, Poly p, double[] radii, double upto, boolean taper, TreePart[] blocks, double hollow,
+            double tipMin) {
         if (upto <= 1e-6) {
             return;
         }
@@ -312,8 +318,8 @@ final class TreeDraw {
                 }
                 double r0 = lerp(radii[i], radii[i + 1], f0), r1 = lerp(radii[i], radii[i + 1], f1);
                 if (!complete && taper) {
-                    r0 = Math.min(r0, lerp(radii[0], 0.35, e0 / upto));
-                    r1 = Math.min(r1, lerp(radii[0], 0.35, e1 / upto));
+                    r0 = Math.min(r0, Math.max(tipMin, lerp(radii[0], 0.35, e0 / upto)));
+                    r1 = Math.min(r1, Math.max(tipMin, lerp(radii[0], 0.35, e1 / upto)));
                 }
                 seg(v, mix(p.pts[i], p.pts[i + 1], f0), mix(p.pts[i], p.pts[i + 1], f1), r0, r1, blocks, false, hollow);
             }
