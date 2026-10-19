@@ -139,7 +139,19 @@ public final class TreeFall {
             }
         }
         reach = far + 1;
-        end = Math.PI / 2 + Math.atan(Math.max(0, pivot.y - foot.getY() - 0.5) / Math.max(4, reach));
+        // It swings over until its top meets the log's far end where it lies (lower down a slope, higher up one).
+        double tipAlong = 0;
+        for (int i = 0; i < to.size(); i++) {
+            tipAlong = Math.max(tipAlong, to.xs()[i] * dx + to.zs()[i] * dz);
+        }
+        int tipY = Integer.MAX_VALUE;
+        for (int i = 0; i < to.size(); i++) {
+            if (to.xs()[i] * dx + to.zs()[i] * dz >= tipAlong - 3) {
+                tipY = Math.min(tipY, to.ys()[i]);
+            }
+        }
+        double land = foot.getY() + (tipY == Integer.MAX_VALUE ? 0 : tipY) + 0.5;
+        end = Mth.clamp(Math.PI / 2 + Math.atan((pivot.y - land) / Math.max(4, reach)), Math.PI / 4, Math.PI * 0.9);
     }
 
     /** Whether a block is shut in on every side by other swinging blocks (never seen, not drawn). */

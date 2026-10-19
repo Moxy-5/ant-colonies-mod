@@ -19,6 +19,11 @@ public final class TreeVoxels {
     private final LongOpenHashSet holes = new LongOpenHashSet();
     private final LongOpenHashSet dropped = new LongOpenHashSet();
     private final LongOpenHashSet overBark = new LongOpenHashSet();
+    /** A fallen tree: its lying logs (the trunk first, then its limb stubs), each {start x, z, end x, z}, and its stump's blocks. */
+    private java.util.List<double[]> lying;
+    private LongOpenHashSet stump;
+    /** Pieces lying loose on the ground round a dead tree (broken limbs, fallen branches): they lie on the land under them. */
+    private final LongOpenHashSet loose = new LongOpenHashSet();
 
     public interface Visitor {
         void visit(int x, int y, int z, TreePart part);
@@ -141,6 +146,49 @@ public final class TreeVoxels {
             }
         }
         return seen;
+    }
+
+    /**
+     * A fallen tree (step 5c): the blocks already in the shape are its stump, which stays where it stands; the logs added
+     * with {@link #addLog} lie on the ground where it lands (the placer fits them to the land).
+     */
+    void markStump() {
+        lying = new java.util.ArrayList<>();
+        stump = new LongOpenHashSet(parts.keySet());
+    }
+
+    /** One lying log of a fallen tree, from its start to its end (the trunk first, then the limb stubs from its tip). */
+    void addLog(double ax, double az, double bx, double bz) {
+        lying.add(new double[] {ax, az, bx, bz});
+    }
+
+    /** A fallen tree's lying logs ({start x, z, end x, z}, the trunk first), or null for a tree that is not lying. */
+    public java.util.List<double[]> lying() {
+        return lying;
+    }
+
+    /** The blocks in the shape now (to tell, later, which blocks were added after). */
+    LongOpenHashSet keys() {
+        return new LongOpenHashSet(parts.keySet());
+    }
+
+    /** Every block added since {@code before} is a loose piece on the ground. */
+    void markLooseSince(LongOpenHashSet before) {
+        for (long k : parts.keySet()) {
+            if (!before.contains(k)) {
+                loose.add(k);
+            }
+        }
+    }
+
+    /** Whether this block is a loose piece on the ground (see {@link #markLooseSince}). */
+    public boolean isLoose(long key) {
+        return loose.contains(key);
+    }
+
+    /** Whether this block is part of a fallen tree's stump. */
+    public boolean isStump(long key) {
+        return stump != null && stump.contains(key);
     }
 
     /** Clears leaves, thorns and pods that ended up cut off from the tree (a few loose leaves at a pad's thin edge). */

@@ -550,6 +550,7 @@ public class Forest extends SavedData {
 
     /** Step 5c: a dead tree starts falling in sight (drawn by {@link TreeFall}; it lands by itself, {@link #landed}). */
     public void topple(ServerLevel level, Tree t, TreePlacer.Placed now, TreePlacer.Placed next) {
+        next = TreePlacer.rest(next, t.foot, TreePlacer.ground(level, t.foot)); // the log lies on the land where it falls
         t.toppling = true;
         setDirty();
         falls.put(t.foot.asLong(), new TreeFall(level, this, t, now, next));
@@ -820,6 +821,9 @@ public class Forest extends SavedData {
 
     /** Brings the tree's shape in the world from what is there to its age now. */
     private void place(ServerLevel level, Tree t, TreePlacer.Placed now, TreePlacer.Placed next) {
+        // What lies (a fallen log, broken limbs) lies on the land where it is (the world's own shape fitted the same way).
+        now = TreePlacer.rest(now, t.foot, TreePlacer.ground(level, t.foot));
+        next = TreePlacer.rest(next, t.foot, TreePlacer.ground(level, t.foot));
         if (t.stage == TreeStage.FALLEN && t.placedStage != TreeStage.FALLEN) {
             TreeFall.clearWhereItLies(level, t.foot, now, next); // step 5c: what is soft where the log lands is smashed
         }

@@ -79,7 +79,7 @@ public final class TreePlacer {
      * tree up (the trunk goes down from them to meet the ground), and the mud plates beside the wood.
      */
     public record Placed(int[] xs, int[] ys, int[] zs, BlockState[] states, boolean[] holds, int minX, int minY, int minZ,
-                         int maxX, int maxY, int maxZ) {
+                         int maxX, int maxY, int maxZ, Lying lying) {
         public int size() {
             return states.length;
         }
@@ -89,6 +89,154 @@ public final class TreePlacer {
             return new BoundingBox(foot.getX() + minX, foot.getY() + minY - MAX_FILL_DOWN, foot.getZ() + minZ,
                     foot.getX() + maxX, foot.getY() + maxY, foot.getZ() + maxZ);
         }
+    }
+
+    /**
+     * What lies on the ground, by block: {@link #FIXED} (the standing tree or a fallen tree's stump, which stays where it
+     * stands), {@link #LOOSE} (a loose piece, which lies on the ground under it on its own), or the slice of a fallen log
+     * it is in: {@link #SLICES} times the log (the trunk 0, its limb stubs 1 to 3) plus the slice along that log from its
+     * start (1 block a slice). {@code core}: a block on its log's middle line (within a block of it), the ones that rest
+     * on the ground.
+     */
+    public record Lying(int[] slice, boolean[] core) {
+    }
+
+    public static final int FIXED = -1, LOOSE = -2, SLICES = 1000;
+    /** A fallen trunk never lies more steeply than 1 in 1: where the ground drops faster, it bridges (my pick, a rigid log). */
+    public static final int MAX_STEP = 1;
+    /** How far up and down a column is searched for the ground a fallen log lies on. */
+    static final int GROUND_SEARCH = 32;
+
+    /** Where the ground is: the first free block's height over the solid ground at a column (world coordinates). */
+    public interface Ground {
+        int freeY(int x, int z);
+    }
+
+    /**
+     * A fallen tree fitted to the land it lies on (the user's report 2026-10-19: on a slope fallen giants stood on walls of
+     * wood or floated). Real: a fallen trunk is rigid; it lies along the ground, resting on the high points and bridging a
+     * dip, and leans down a slope rather than standing on posts. Each slice of the trunk (1 block along the way it lies)
+     * rests on the highest ground under its middle line, never lower than 1 under its neighbour (it never lies more
+     * steeply than 1 in 1; where the ground drops faster, it bridges); the stump stays; loose pieces (broken limbs, fallen
+     * branches, also round a standing dead tree) lie on the ground under them; nothing goes down to meet the ground. A
+     * tree with nothing lying is returned as it is.
+     */
+    public static Placed rest(Placed tree, BlockPos foot, Ground ground) {
+        if (tree == null || tree.lying() == null) {
+            return tree;
+        }
+        int[] slice = tree.lying().slice();
+        boolean[] core = tree.lying().core();
+        int slices = 0;
+        for (int sl : slice) {
+            slices = Math.max(slices, sl + 1);
+        }
+        int[] shift = new int[Math.max(0, slices)];
+        java.util.Arrays.fill(shift, Integer.MIN_VALUE);
+        boolean[] anyCore = new boolean[slices];
+        for (int i = 0; i < tree.size(); i++) {
+            if (slice[i] >= 0 && core[i]) {
+                anyCore[slice[i]] = true;
+            }
+        }
+        it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap heights = new it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap();
+        java.util.function.IntBinaryOperator at = (x, z) -> heights.computeIfAbsent(BlockPos.asLong(x, 0, z),
+                c -> ground.freeY(foot.getX() + x, foot.getZ() + z) - foot.getY());
+        for (int i = 0; i < tree.size(); i++) {
+            int sl = slice[i];
+            if (sl < 0 || anyCore[sl] && !core[i]) {
+                continue;
+            }
+            shift[sl] = Math.max(shift[sl], at.applyAsInt(tree.xs()[i], tree.zs()[i]));
+        }
+        // Each log rigid: no slice lower than 1 under its neighbours; the trunk's end by the stump held near the ground at
+        // the foot, each limb stub's start near the trunk's tip it broke from.
+        int tip = 0;
+        for (int log = 0; log * SLICES < slices; log++) {
+            int from = log * SLICES, to = Math.min(slices, from + SLICES);
+            int before = log == 0 ? 0 : tip, last = from - 1;
+            for (int sl = from; sl < to; sl++) {
+                if (shift[sl] == Integer.MIN_VALUE) {
+                    continue; // no block of the log in this slice
+                }
+                shift[sl] = Math.max(shift[sl], before - MAX_STEP);
+                before = shift[sl];
+                last = sl;
+            }
+            for (int sl = last - 1; sl >= from; sl--) {
+                if (shift[sl] != Integer.MIN_VALUE && shift[sl + 1] != Integer.MIN_VALUE) {
+                    shift[sl] = Math.max(shift[sl], shift[sl + 1] - MAX_STEP);
+                }
+            }
+            if (log == 0 && last >= from) {
+                tip = shift[last];
+            }
+        }
+        int n = tree.size();
+        int[] ys = new int[n];
+        boolean[] holds = new boolean[n];
+        int minX = 0, minY = -1, minZ = 0, maxX = 0, maxY = 0, maxZ = 0;
+        for (int i = 0; i < n; i++) {
+            int sl = slice[i];
+            if (sl >= 0) {
+                ys[i] = tree.ys()[i] + shift[sl];
+            } else if (sl == LOOSE) {
+                ys[i] = tree.ys()[i] + at.applyAsInt(tree.xs()[i], tree.zs()[i]);
+            } else {
+                ys[i] = tree.ys()[i];
+                holds[i] = tree.holds()[i];
+            }
+            minX = Math.min(minX, tree.xs()[i]);
+            minY = Math.min(minY, ys[i]);
+            minZ = Math.min(minZ, tree.zs()[i]);
+            maxX = Math.max(maxX, tree.xs()[i]);
+            maxY = Math.max(maxY, ys[i]);
+            maxZ = Math.max(maxZ, tree.zs()[i]);
+        }
+        return new Placed(tree.xs(), ys, tree.zs(), tree.states(), holds, minX, minY, minZ, maxX, maxY, maxZ, null);
+    }
+
+    /**
+     * The ground in a loaded world, from the foot's height: down a column to the first block that is neither open nor a
+     * tree's own (wood, leaves, mud, fallen branches: a falling tree's own crown is not ground), or, where the foot's height
+     * is inside a hill, up to the first free block; water counts as ground (a log floats). A column in land not loaded
+     * counts as level with the foot.
+     */
+    public static Ground ground(net.minecraft.world.level.Level level, BlockPos foot) {
+        return (x, z) -> {
+            BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos(x, foot.getY(), z);
+            if (!level.hasChunkAt(pos)) {
+                return foot.getY();
+            }
+            if (isGround(level.getBlockState(pos))) {
+                for (int y = foot.getY() + 1; y <= foot.getY() + GROUND_SEARCH; y++) {
+                    pos.setY(y);
+                    if (!isGround(level.getBlockState(pos))) {
+                        return y;
+                    }
+                }
+                return foot.getY() + GROUND_SEARCH;
+            }
+            for (int y = foot.getY() - 1; y >= foot.getY() - GROUND_SEARCH; y--) {
+                pos.setY(y);
+                if (isGround(level.getBlockState(pos))) {
+                    return y + 1;
+                }
+            }
+            return foot.getY();
+        };
+    }
+
+    /** Ground a fallen log may lie on: solid and not a tree's own, or water. */
+    private static boolean isGround(BlockState state) {
+        return !state.getFluidState().isEmpty() || !isOpen(state) && !isTreeOwn(state);
+    }
+
+    /** A giant tree's own block (or any tree's leaves and logs): not ground for a fallen log to rest on. */
+    private static boolean isTreeOwn(BlockState state) {
+        return state.is(TreeBlocks.TREE_WOOD) || state.is(TreeBlocks.TREE_LEAVES) || state.is(BlockTags.LEAVES) || state.is(BlockTags.LOGS)
+                || state.getBlock() instanceof FallenBranchBlock || state.getBlock() instanceof MudCrustBlock
+                || state.getBlock() instanceof TreeBranchBlock;
     }
 
     /** The tree of this kind, seed, age and stage worked out into blocks (kept for a while). */
@@ -215,15 +363,72 @@ public final class TreePlacer {
             return BlockPos.getY(k) <= 0 && part != null && part.isWood() && part != TreePart.FALLEN_BRANCH
                     && part != TreePart.THIN && part != TreePart.DEAD_THIN
                     && part != TreePart.LIMB && part != TreePart.DEAD_LIMB;
-        });
+        }, v.lying() == null ? null : lying(v), v::isLoose);
+    }
+
+    /** Each block's slice of a fallen log (see {@link Lying}), coded as slice * 2, plus 1 for a block on its middle line. */
+    private static java.util.function.LongToIntFunction lying(TreeVoxels v) {
+        java.util.List<double[]> logs = v.lying();
+        LongOpenHashSet stumpColumns = new LongOpenHashSet();
+        for (Long2ObjectMap.Entry<TreePart> e : v.entries()) {
+            if (v.isStump(e.getLongKey())) {
+                stumpColumns.add(BlockPos.asLong(BlockPos.getX(e.getLongKey()), 0, BlockPos.getZ(e.getLongKey())));
+            }
+        }
+        return k -> {
+            TreePart part = v.get(k);
+            int x = BlockPos.getX(k), z = BlockPos.getZ(k);
+            if (v.isStump(k) || part == null && stumpColumns.contains(BlockPos.asLong(x, 0, z))) {
+                return FIXED; // the stump, and the mud plates on it
+            }
+            if (part == TreePart.FALLEN_BRANCH) {
+                return LOOSE;
+            }
+            // The log it belongs to: the nearest middle line.
+            int best = 0;
+            double bestD = Double.MAX_VALUE, bestT = 0, bestLen = 1;
+            for (int l = 0; l < logs.size(); l++) {
+                double[] g = logs.get(l);
+                double ux = g[2] - g[0], uz = g[3] - g[1], len = Math.max(1e-6, Math.hypot(ux, uz));
+                double t = Math.max(0, Math.min(len, ((x - g[0]) * ux + (z - g[1]) * uz) / len));
+                double d = Math.hypot(x - (g[0] + ux / len * t), z - (g[1] + uz / len * t));
+                if (d < bestD - 1e-9) {
+                    best = l;
+                    bestD = d;
+                    bestT = t;
+                    bestLen = len;
+                }
+            }
+            if (logs.isEmpty()) {
+                return FIXED;
+            }
+            int slice = best * SLICES + Math.min(SLICES - 1, (int) Math.floor(Math.min(bestT, bestLen)));
+            boolean core = part != null && part != TreePart.MUD && bestD <= 1.0;
+            return slice * 2 + (core ? 1 : 0);
+        };
     }
 
     /** A worked-out tree from its blocks; {@code holding}: the ones that hold it up (the trunk goes down from them). */
     private static Placed build(Long2ObjectOpenHashMap<BlockState> states, LongPredicate holding) {
+        return build(states, holding, null, k -> false);
+    }
+
+    /** As above; {@code lying} (null: not lying): a fallen tree's slices, coded as in {@link #lying(TreeVoxels)}. */
+    private static Placed build(Long2ObjectOpenHashMap<BlockState> states, LongPredicate holding, java.util.function.LongToIntFunction lying,
+                                LongPredicate marked) {
         int n = states.size();
         int[] xs = new int[n], ys = new int[n], zs = new int[n];
         BlockState[] out = new BlockState[n];
         boolean[] holds = new boolean[n];
+        LongOpenHashSet loose = loose(states);
+        for (long k : states.keySet()) {
+            if (marked.test(k)) {
+                loose.add(k);
+            }
+        }
+        boolean fits = lying != null || !loose.isEmpty();
+        int[] slice = fits ? new int[n] : null;
+        boolean[] core = fits ? new boolean[n] : null;
         int minX = 0, minY = -1, minZ = 0, maxX = 0, maxY = 0, maxZ = 0, i = 0;
         for (Long2ObjectMap.Entry<BlockState> e : states.long2ObjectEntrySet()) {
             long k = e.getLongKey();
@@ -231,7 +436,12 @@ public final class TreePlacer {
             ys[i] = BlockPos.getY(k);
             zs[i] = BlockPos.getZ(k);
             out[i] = e.getValue();
-            holds[i] = holding.test(k);
+            holds[i] = holding.test(k) && !loose.contains(k);
+            if (fits) {
+                int code = loose.contains(k) ? LOOSE : lying == null ? FIXED : lying.applyAsInt(k);
+                slice[i] = code < 0 ? code : code / 2;
+                core[i] = code >= 0 && code % 2 == 1;
+            }
             minX = Math.min(minX, xs[i]);
             minY = Math.min(minY, ys[i]);
             minZ = Math.min(minZ, zs[i]);
@@ -240,7 +450,58 @@ public final class TreePlacer {
             maxZ = Math.max(maxZ, zs[i]);
             i++;
         }
-        return new Placed(xs, ys, zs, out, holds, minX, minY, minZ, maxX, maxY, maxZ);
+        return new Placed(xs, ys, zs, out, holds, minX, minY, minZ, maxX, maxY, maxZ, fits ? new Lying(slice, core) : null);
+    }
+
+    /** How high a loose piece on the ground may reach (a thick fallen limb, a fallen branch). */
+    private static final int LOOSE_HEIGHT = 3;
+
+    /**
+     * The pieces lying loose on the ground round a dead tree (broken limbs, fallen branches): low blocks joined (face to
+     * face) neither to the tree's foot nor to its biggest piece (a fallen log). They rest on the ground under them.
+     */
+    private static LongOpenHashSet loose(Long2ObjectOpenHashMap<BlockState> states) {
+        LongOpenHashSet body = new LongOpenHashSet();
+        java.util.List<LongOpenHashSet> pieces = new java.util.ArrayList<>();
+        LongOpenHashSet seen = new LongOpenHashSet();
+        for (long start : states.keySet()) {
+            if (!seen.add(start)) {
+                continue;
+            }
+            LongOpenHashSet piece = new LongOpenHashSet();
+            LongArrayList todo = new LongArrayList();
+            todo.add(start);
+            boolean foot = false;
+            while (!todo.isEmpty()) {
+                long k = todo.removeLong(todo.size() - 1);
+                piece.add(k);
+                int x = BlockPos.getX(k), y = BlockPos.getY(k), z = BlockPos.getZ(k);
+                foot |= y <= 0 && x * x + z * z <= 16;
+                for (Direction d : Direction.values()) {
+                    long nb = BlockPos.asLong(x + d.getStepX(), y + d.getStepY(), z + d.getStepZ());
+                    if (states.containsKey(nb) && seen.add(nb)) {
+                        todo.add(nb);
+                    }
+                }
+            }
+            if (foot) {
+                body.addAll(piece);
+            } else {
+                pieces.add(piece);
+            }
+        }
+        LongOpenHashSet loose = new LongOpenHashSet();
+        LongOpenHashSet biggest = pieces.stream().max(java.util.Comparator.comparingInt(LongOpenHashSet::size)).orElse(null);
+        for (LongOpenHashSet piece : pieces) {
+            boolean low = true;
+            for (long k : piece) {
+                low &= BlockPos.getY(k) <= LOOSE_HEIGHT;
+            }
+            if (low && (piece != biggest || body.size() > piece.size())) {
+                loose.addAll(piece);
+            }
+        }
+        return loose;
     }
 
     // ---------------------------------------------------------------- step 5b: a dead tree's slow changes
@@ -250,7 +511,7 @@ public final class TreePlacer {
         return stage == TreeStage.LIVING || stage == TreeStage.MUD || stage == TreeStage.SHED || stage == TreeStage.HEAP_DRY;
     }
 
-    private static final Placed NOTHING = new Placed(new int[0], new int[0], new int[0], new BlockState[0], new boolean[0], 0, -1, 0, 0, 0, 0);
+    private static final Placed NOTHING = new Placed(new int[0], new int[0], new int[0], new BlockState[0], new boolean[0], 0, -1, 0, 0, 0, 0, null);
 
     /** The order the blocks of a slow change change in. */
     private enum Order {
@@ -302,7 +563,20 @@ public final class TreePlacer {
             }
         }
         joinBranches(out);
-        return build(out, holds::contains);
+        return build(out, holds::contains, null, looseOf(living)::contains);
+    }
+
+    /** The blocks of a worked-out tree that are loose pieces on the ground (see {@link Lying}). */
+    private static LongOpenHashSet looseOf(Placed p) {
+        LongOpenHashSet out = new LongOpenHashSet();
+        if (p.lying() != null) {
+            for (int i = 0; i < p.size(); i++) {
+                if (p.lying().slice()[i] == LOOSE) {
+                    out.add(BlockPos.asLong(p.xs()[i], p.ys()[i], p.zs()[i]));
+                }
+            }
+        }
+        return out;
     }
 
     /**
@@ -335,7 +609,9 @@ public final class TreePlacer {
             }
         }
         joinBranches(out);
-        return build(out, holds::contains);
+        LongOpenHashSet loose = looseOf(a);
+        loose.addAll(looseOf(b));
+        return build(out, holds::contains, null, loose::contains);
     }
 
     /** Each changing block's moment (0 to 1) by its height, a little ragged. */
@@ -651,7 +927,7 @@ public final class TreePlacer {
                     states[i] = charred(states[i]);
                 }
             }
-            return new Placed(q.xs(), q.ys(), q.zs(), states, q.holds(), q.minX(), q.minY(), q.minZ(), q.maxX(), q.maxY(), q.maxZ());
+            return new Placed(q.xs(), q.ys(), q.zs(), states, q.holds(), q.minX(), q.minY(), q.minZ(), q.maxX(), q.maxY(), q.maxZ(), q.lying());
         });
     }
 

@@ -63,10 +63,37 @@ public class GiantTreePiece extends StructurePiece {
         tag.putInt("z", foot.getZ());
     }
 
+    /** Trees with something lying (a fallen log, broken limbs round a dead one) fitted to their land, kept while their chunks are put in (each chunk would work it out the same). */
+    private static final java.util.Map<String, TreePlacer.Placed> FITTED = java.util.Collections.synchronizedMap(
+            new java.util.LinkedHashMap<>(32, 0.75F, true) {
+                @Override
+                protected boolean removeEldestEntry(java.util.Map.Entry<String, TreePlacer.Placed> eldest) {
+                    return size() > 16;
+                }
+            });
+
+    /**
+     * A dead tree in new land with what lies on the ground fitted to it (see {@link TreePlacer#rest}). The land's height comes from the
+     * world's shape itself, not from blocks, so every chunk of the tree gets the same answer even where the chunks next
+     * to it are not made yet.
+     */
+    private TreePlacer.Placed lying(WorldGenLevel level, ChunkGenerator generator, TreePlacer.Placed tree) {
+        String key = pick.kind() + "|" + pick.seed() + "|" + pick.age() + "|" + foot.asLong();
+        return FITTED.computeIfAbsent(key, k -> {
+            net.minecraft.world.level.levelgen.RandomState random = level.getLevel().getChunkSource().randomState();
+            return TreePlacer.rest(tree, foot, (x, z) -> generator.getFirstFreeHeight(x, z,
+                    net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE_WG, level, random));
+        });
+    }
+
     @Override
     public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random,
                             BoundingBox box, ChunkPos chunkPos, BlockPos pivot) {
-        TreePlacer.place(level, TreePlacer.placed(pick.kind(), pick.seed(), pick.age(), pick.stage()), foot, box, Block.UPDATE_CLIENTS);
+        TreePlacer.Placed tree = TreePlacer.placed(pick.kind(), pick.seed(), pick.age(), pick.stage());
+        if (tree.lying() != null) {
+            tree = lying(level, generator, tree);
+        }
+        TreePlacer.place(level, tree, foot, box, Block.UPDATE_CLIENTS);
         // The tree goes into the tree book (M7.5 step 4), so it grows from here (once, whichever of its chunks is first).
         com.antcolonies.tree.Forest.queue(level.getLevel(), pick.kind(), foot, pick.seed(), pick.age(), pick.stage());
     }

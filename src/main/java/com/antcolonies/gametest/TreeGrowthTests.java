@@ -673,6 +673,183 @@ public class TreeGrowthTests {
     }
 
     /**
+     * The user's report 2026-10-19: fallen giants on a slope stood on walls of wood or floated. A fallen log lies on the
+     * land (TreePlacer.rest): fitted over made-up land (down a slope, up one, across one, over a cliff) no part of it goes
+     * down to meet the ground, its middle line never sinks into the ground, it never lies more steeply than 1 in 1 down,
+     * most of it touches the ground (all but the cliff, where it bridges), and its fallen branches lie on the ground. Then
+     * a real tree falls down a real hill (its foot on the top) and up into a real bowl: no walls, little floating.
+     */
+    @GameTest(template = "arena", timeoutTicks = 400, skyAccess = true)
+    public static void aFallenTreeLiesOnTheSlopeDownhill(GameTestHelper helper) {
+        BlockPos origin = BlockPos.ZERO;
+        for (String kind : new String[] {"umbrella_thorn", "camel_thorn"}) {
+            for (long seed = 1; seed <= 4; seed++) {
+                TreePlacer.Placed flat = TreePlacer.placed(kind, seed, seed % 2 == 0 ? 1.0 : 1.2, TreeStage.FALLEN);
+                helper.assertTrue(flat.lying() != null, kind + " " + seed + ": a fallen tree with no lying");
+                double[] way = side(flat, 0, 3);
+                double len = Math.hypot(way[0], way[1]), dx = way[0] / len, dz = way[1] / len;
+                String[] names = {"down", "up", "across", "cliff"};
+                TreePlacer.Ground[] lands = {
+                    (x, z) -> -(int) Math.floor(Math.max(0, x * dx + z * dz) * 0.6),
+                    (x, z) -> (int) Math.floor(Math.max(0, x * dx + z * dz) * 0.5),
+                    (x, z) -> (int) Math.floor((-x * dz + z * dx) * 0.7),
+                    (x, z) -> x * dx + z * dz > 12 ? -10 : 0,
+                };
+                for (int l = 0; l < lands.length; l++) {
+                    String what = kind + " seed " + seed + " " + names[l];
+                    TreePlacer.Ground land = lands[l];
+                    TreePlacer.Placed lies = TreePlacer.rest(flat, origin, land);
+                    helper.assertTrue(lies.lying() == null && TreePlacer.rest(lies, origin, land) == lies, what + ": fitted twice");
+                    int[] slice = flat.lying().slice();
+                    boolean[] core = flat.lying().core();
+                    java.util.Map<Integer, Integer> shift = new java.util.HashMap<>();
+                    java.util.Map<Integer, Boolean> touches = new java.util.HashMap<>();
+                    for (int i = 0; i < flat.size(); i++) {
+                        int g = land.freeY(flat.xs()[i], flat.zs()[i]);
+                        if (slice[i] == TreePlacer.LOOSE) {
+                            helper.assertTrue(lies.ys()[i] == flat.ys()[i] + g, what + ": a loose piece not on the ground");
+                        }
+                        if (slice[i] < 0) {
+                            continue;
+                        }
+                        helper.assertTrue(!lies.holds()[i], what + ": a lying block goes down to meet the ground");
+                        int s = lies.ys()[i] - flat.ys()[i];
+                        helper.assertTrue(shift.getOrDefault(slice[i], s) == s, what + ": a slice of the log came apart");
+                        shift.put(slice[i], s);
+                        if (core[i]) {
+                            helper.assertTrue(s >= g, what + ": the log's middle sank into the ground in slice " + slice[i]);
+                            touches.merge(slice[i], s == g, Boolean::logicalOr);
+                        }
+                    }
+                    int slices = shift.keySet().stream().mapToInt(Integer::intValue).max().orElse(-1) + 1;
+                    for (int sl = 1; sl < slices; sl++) {
+                        if (shift.containsKey(sl) && shift.containsKey(sl - 1)) {
+                            int a = shift.get(sl - 1), b = shift.get(sl);
+                            helper.assertTrue(Math.abs(a - b) <= TreePlacer.MAX_STEP, what + ": the log bends " + (b - a) + " in one block at slice " + sl);
+                        }
+                    }
+                    long touching = touches.values().stream().filter(Boolean::booleanValue).count();
+                    if (l < 3) {
+                        helper.assertTrue(touching * 3 >= touches.size() * 2, what + ": only " + touching + " of " + touches.size() + " slices touch the ground");
+                    }
+                }
+            }
+        }
+        fallOnLand(helper, true);
+    }
+
+    /** The log falling up into a bowl (see {@link #aFallenTreeLiesOnTheSlopeDownhill}). */
+    @GameTest(template = "arena", timeoutTicks = 400, skyAccess = true)
+    public static void aFallenTreeLiesOnTheSlopeUphill(GameTestHelper helper) {
+        fallOnLand(helper, false);
+    }
+
+    /**
+     * A shed umbrella thorn on a hill's top ({@code hill}) or a bowl's floor falls in sight: once down, no column of its
+     * log stands taller than the log is thick (no wall of wood), and few columns hang over the ground.
+     */
+    private static void fallOnLand(GameTestHelper helper, boolean hill) {
+        ServerLevel level = helper.getLevel();
+        grassland(helper);
+        for (int x = 0; x < 65; x++) {
+            for (int z = 0; z < 65; z++) {
+                double r = Math.hypot(x - MIDDLE, z - MIDDLE);
+                int h = hill ? (int) Math.max(0, 12 - Math.floor(Math.max(0, r - 5) * 0.6)) : (int) Math.min(12, Math.floor(Math.max(0, r - 6) * 0.5));
+                for (int y = 0; y < h; y++) {
+                    BlockPos at = helper.absolutePos(new BlockPos(x, SURFACE + y, z));
+                    level.setBlock(at.below(), Blocks.DIRT.defaultBlockState(), 2);
+                    level.setBlock(at, Blocks.GRASS_BLOCK.defaultBlockState(), 2);
+                }
+            }
+        }
+        Forest.shapesAtOnce = true;
+        Forest forest = Forest.get(level);
+        long base = Forest.today(level);
+        long seed = 11;
+        BlockPos foot = helper.absolutePos(new BlockPos(MIDDLE, SURFACE + (hill ? 12 : 0), MIDDLE));
+        Forest.Tree t = forest.add(new Forest.Tree("umbrella_thorn", foot, seed, 1.0, TreeStage.SHED, -1, base));
+        forest.update(level, t, base);
+        helper.assertTrue(t.placedStage == TreeStage.SHED, "the shed tree was not placed");
+        if (hill) {
+            // The broken limbs lying round the standing dead tree, down the hill: on the ground, not on walls of wood.
+            int pieces = 0;
+            for (int x = -30; x <= 30; x++) {
+                for (int z = -30; z <= 30; z++) {
+                    if (x * x + z * z <= 49) {
+                        continue;
+                    }
+                    int n = 0;
+                    for (int y = -14; y < 0; y++) {
+                        BlockState b = level.getBlockState(foot.offset(x, y, z));
+                        n += deadWood(b) || b.is(TreeBlocks.ROTTEN_WOOD.get()) ? 1 : 0;
+                    }
+                    pieces += n;
+                    helper.assertTrue(n <= 3, "a broken limb down the hill stands on " + n + " blocks of wood: " + column(level, foot.offset(x, -4, z)));
+                }
+            }
+            helper.assertTrue(pieces > 0, "no broken limbs lie down the hill round the shed tree");
+        }
+        helper.assertTrue(forest.fellNow(level, t), "the shed tree would not fall");
+        helper.runAfterDelay(TreeFall.CREAK + TreeFall.DROP + 10, () -> {
+            helper.assertTrue(!forest.falling(t) && t.placedStage == TreeStage.FALLEN, "it did not land: " + t.placedStage.id);
+            TreePlacer.Placed flat = TreePlacer.placed("umbrella_thorn", seed, 1.0, TreeStage.FALLEN);
+            int thick = flat.maxY() + 2;
+            int columns = 0, tall = 0, hanging = 0, wood = 0;
+            String worst = "";
+            StringBuilder hangs = new StringBuilder();
+            BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+            for (int x = -30; x <= 30; x++) {
+                for (int z = -30; z <= 30; z++) {
+                    if (x * x + z * z <= 36) {
+                        continue; // the stump
+                    }
+                    int lowest = Integer.MAX_VALUE, n = 0;
+                    for (int y = -16; y <= 30; y++) {
+                        pos.set(foot.getX() + x, foot.getY() + y, foot.getZ() + z);
+                        BlockState b = level.getBlockState(pos);
+                        if (deadWood(b) || b.is(TreeBlocks.ROTTEN_WOOD.get())) {
+                            lowest = Math.min(lowest, y);
+                            n++;
+                        }
+                    }
+                    if (n == 0) {
+                        continue;
+                    }
+                    columns++;
+                    wood += n;
+                    if (n > thick) {
+                        tall++;
+                        worst = column(level, foot.offset(x, lowest + 4, z));
+                    }
+                    pos.set(foot.getX() + x, foot.getY() + lowest - 1, foot.getZ() + z);
+                    if (level.getBlockState(pos).isAir() && level.getBlockState(pos.below()).isAir()) {
+                        hanging++;
+                        if (hanging <= 6) {
+                            hangs.append(" (").append(x).append(' ').append(lowest).append(' ').append(z).append(": ").append(column(level, pos)).append(')');
+                        }
+                    }
+                }
+            }
+            String where = hill ? "down the hill" : "up the bowl";
+            helper.assertTrue(wood > 100, "the log " + where + " is only " + wood + " blocks");
+            helper.assertTrue(tall == 0, tall + " columns of the log " + where + " are taller than the log is thick (" + thick + "), e.g. " + worst);
+            helper.assertTrue(hanging * 5 <= columns, hanging + " of " + columns + " columns of the log " + where + " hang 2 or more over the ground:" + hangs);
+            for (int x = 0; x < 65; x++) {
+                for (int z = 0; z < 65; z++) {
+                    for (int y = 0; y <= 50; y++) {
+                        BlockPos at = helper.absolutePos(new BlockPos(x, SURFACE + y, z));
+                        if (!level.getBlockState(at).isAir() && !level.getBlockState(at).is(Blocks.BARRIER)) {
+                            level.setBlock(at, Blocks.AIR.defaultBlockState(), 2);
+                        }
+                    }
+                }
+            }
+            forest.forgetInside(helper.getBounds());
+            helper.succeed();
+        });
+    }
+
+    /**
      * Step 5d, fire: a fire next to a giant tree chars its bark black and scorches its green leaves brown, and never
      * burns them away. A young tree it touches dies. A grown tree whose trunk burns dies by its own dice for the day
      * (once a day only): an ancient one killed smoulders and its dead stages are black, not silver; a younger grown one

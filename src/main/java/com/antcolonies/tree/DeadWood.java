@@ -81,6 +81,7 @@ final class DeadWood {
     /** Fallen limbs round a dead tree: termite food (fallen branches and bigger pieces). k: how grown the tree is. */
     static void scatterFallen(TreeVoxels v, long seed, double k, List<double[]> points) {
         TreeRandom r = new TreeRandom(seed * 31 + 5);
+        it.unimi.dsi.fastutil.longs.LongOpenHashSet before = v.keys();
         for (double[] tip : points) {
             double[] at = add(mul(tip, 0.75 + r.next() * 0.2), new double[] {(r.next() - 0.5) * 3, 0, (r.next() - 0.5) * 3});
             double a = r.next() * TAU, l = (3 + r.next() * 4) * Math.max(0.4, k);
@@ -91,6 +92,7 @@ final class DeadWood {
                 thinLine(v, p0, p1, TreePart.FALLEN_BRANCH);
             }
         }
+        v.markLooseSince(before);
     }
 
     /**
@@ -117,6 +119,7 @@ final class DeadWood {
                 v.set(x, y, z, null);
             }
         });
+        v.markStump();
         double length = Math.max(3, trunkTop + 1);
         double lift = r0 - 0.75;
         double[] a0 = add(mul(d, r0 + 1.6), new double[] {0, lift, 0}), b0 = add(a0, mul(d, length));
@@ -133,6 +136,7 @@ final class DeadWood {
         }
         for (double[][] log : logs) {
             seg(v, log[0], log[1], log[2][0], log[2][1], DEAD, true, Math.max(log[2][0], log[2][1]) > 1.6 ? hf : 0);
+            v.addLog(log[0][0], log[0][2], log[1][0], log[1][2]);
         }
         // Galleries: beetle larvae and termites, out from the hollow through the wood, a few right through the bark.
         if (k > 0.3) {
