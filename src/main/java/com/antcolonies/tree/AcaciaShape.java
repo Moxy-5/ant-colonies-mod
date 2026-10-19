@@ -313,6 +313,8 @@ final class AcaciaShape {
     private static final double TAPER_LIMB_FROM = 0.95, TAPER_LIMB_TO = 0.75;
     /** A branch's radius where it leaves its limb (of the trunk's), what it loses every 2 blocks, the slimmest bark. */
     private static final double TAPER_BRANCH_FROM = 0.6, TAPER_STEP = 0.12, TAPER_MIN = 0.8;
+    /** The thick limbs show bare this high above the fork before the leaves begin (the user's ask, 2026-10-18). */
+    private static final double TAPER_LIMB_SHOWN = 4;
     /** How far in from a branch's tip it is thin (of the leaf pad's radius): that much is inside the leaves. */
     private static final double TAPER_THIN_IN = 0.6;
 
@@ -494,7 +496,7 @@ final class AcaciaShape {
                             if (domed) {
                                 clip = top - sq(hd / rc) * c.dome() * shape.domeScale() * gr.k + (TreeRandom.hash(x, 0, z, 5) < 0.4 ? 1 : 0);
                             }
-                            if (y > clip || y < 1) {
+                            if (y > clip || y < 1 || (tapered() && y < forkHeight + TAPER_LIMB_SHOWN)) {
                                 continue;
                             }
                             double h = TreeRandom.hash(x, y, z, 7);
