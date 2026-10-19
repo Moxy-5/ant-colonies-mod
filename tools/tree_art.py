@@ -132,6 +132,64 @@ def bark(kind, look):
     return speckle(img, rng, 0.04)
 
 
+BARK_COLOURS = {  # base, dark, light for the good-looking barks (C, D)
+    "umbrella": ((96, 86, 76), (52, 44, 40), (132, 118, 102)),
+    "camel": ((82, 76, 72), (36, 32, 30), (118, 110, 102)),
+    "baobab": ((152, 134, 120), (112, 96, 86), (186, 168, 152)),
+}
+
+
+def bark_soft(kind):
+    """C "soft painted" (the user wanted more good-looking options): smooth bands of colour running down the trunk,
+    gentle streaks and a few warm highlights; calm to look at from far, still bark close up."""
+    base, dark, light = BARK_COLOURS[kind]
+    rng = random.Random(f"soft{kind}")
+    phase = [rng.uniform(0, math.pi * 2) for _ in range(3)]
+    img = []
+    for y in range(S):
+        row = []
+        for x in range(S):
+            w = 0.5 + 0.25 * math.sin(x / S * math.pi * 4 + phase[0] + math.sin(y / S * math.pi * 2 + phase[1]) * 0.8)                 + 0.15 * math.sin(x / S * math.pi * 6 + phase[2])
+            c = mix(dark, light, clamp(w * 255) / 255)
+            row.append(mix(c, base, 0.35))
+        img.append(row)
+    for _ in range(3):
+        x, y0 = rng.randrange(S), rng.randrange(S)
+        for y in range(y0, y0 + rng.randint(4, 9)):
+            img[y % S][x] = mix(img[y % S][x], dark, 0.55)
+    for _ in range(6):
+        img[rng.randrange(S)][rng.randrange(S)] = shade(light, 1.08)
+    return speckle(img, rng, 0.025)
+
+
+def bark_plates(kind):
+    """D "chunky plates": bold blocky plates of bark with dark outlines, like Minecraft's spruce and oak logs;
+    the baobab's are long and smooth, the camel thorn's small and deep."""
+    base, dark, light = BARK_COLOURS[kind]
+    rng = random.Random(f"plates{kind}")
+    img = blank(dark)
+    width = {"umbrella": (3, 4), "camel": (2, 3), "baobab": (4, 6)}[kind]
+    height = {"umbrella": (4, 7), "camel": (3, 5), "baobab": (6, 12)}[kind]
+    x = 0
+    while x < S:
+        w = rng.randint(*width)
+        y = rng.randrange(S)
+        covered = 0
+        while covered < S:
+            h = rng.randint(*height)
+            tone = rng.uniform(0.88, 1.12)
+            for dy in range(h - 1):
+                for dx in range(w - 1):
+                    px, py = (x + dx) % S, (y + covered + dy) % S
+                    c = shade(base, tone)
+                    if dx == 0 or dy == 0:
+                        c = mix(c, light, 0.45)  # the lit top-left edge of each plate
+                    img[py][px] = c
+            covered += h
+        x += w
+    return speckle(img, rng, 0.03)
+
+
 def wood_end(kind):
     """The end of a cut or broken trunk: heartwood rings, sapwood, the bark rim."""
     if kind == "umbrella":
@@ -388,6 +446,8 @@ def all_textures():
             out[f"bark_{kind}_{look}"] = bark(kind, look)
             out[f"leaves_{kind}_{look}"] = leaves(kind, look)
         out[f"leaves_{kind}_C"] = leaves_c(kind)
+        out[f"bark_{kind}_C"] = bark_soft(kind)
+        out[f"bark_{kind}_D"] = bark_plates(kind)
         out[f"end_{kind}"] = wood_end(kind)
         out[f"inner_{kind}"] = wood_inner(kind)
     out["deadbark_E"] = dead_bark_silver(0)

@@ -849,10 +849,10 @@ function sync() {
   buttons(document.getElementById("stages"), stages, s => s === stage, s => { stage = s; refresh(true); });
   const ab = [["A", "A"], ["B", "B"]];
   buttons(document.getElementById("pick-shape"), ab, x => picks.shape[kind] === x, x => { picks.shape[kind] = x; save(); refresh(true); });
-  buttons(document.getElementById("pick-bark"), ab, x => picks.bark[kind] === x, x => { picks.bark[kind] = x; save(); refresh(false); });
+  buttons(document.getElementById("pick-bark"), [["A", "A"], ["B", "B"], ["C", "C"], ["D", "D"]], x => picks.bark[kind] === x, x => { picks.bark[kind] = x; save(); refresh(false); });
   buttons(document.getElementById("pick-leaves"), [["A", "A"], ["B", "B"], ["C", "C"]], x => picks.leaves[kind] === x, x => { picks.leaves[kind] = x; save(); refresh(false); });
   buttons(document.getElementById("pick-dead"), [["E", "E silver"], ["D", "D grey"]], x => picks.dead === x, x => { picks.dead = x; save(); refresh(false); });
-  document.getElementById("shape-note").innerHTML = `Shape A: ${SHAPES[kind].A}<br>Shape B: ${SHAPES[kind].B}<br>Bark: A is Minecraft-simple, B field detail. Leaves: A dense, B thin, C in between (the new default). Dead bark: E the bleached silver you liked, D the grey-brown in the game now.`;
+  document.getElementById("shape-note").innerHTML = `Shape A: ${SHAPES[kind].A}<br>Shape B: ${SHAPES[kind].B}<br>Bark: A Minecraft-simple, B field detail, C soft painted, D chunky plates. Leaves: A dense, B thin, C in between (the new default). Dead bark: E the bleached silver you liked, D the grey-brown in the game now.`;
   const real = REAL[kind][stage] || REAL[kind].living;
   document.getElementById("real").textContent = age < 0.06 ? "A seedling: in the real savanna most seedlings are eaten or burnt; the few that survive take years to get above the grass." : real;
   document.getElementById("cut").checked = cut;
