@@ -549,11 +549,12 @@ function buildBaobab(sk, stageId) {
   if (stageId === "heap" || stageId === "heapdry") return buildHeap(sk, stageId === "heapdry");
   if (sk.g < 0.45 && stageId === "living") {
     // Young baobab (made good-looking, the user 2026-10-18): one straight stem, a few short branches, a small round crown.
-    const top = Math.round(sk.Ht), rx = 2 + 2 * sk.g, ry = 1.6;
+    // The branches stay inside the crown, which closes over them (no bald patch on top).
+    const top = Math.round(sk.Ht), rx = 2 + 2 * sk.g, ry = 2;
     for (let y = 0; y <= top; y++) v.put(0, y, 0, "bark");
-    for (const br of sk.branches.slice(0, 4)) thinLine(v, [0, top, 0], [Math.cos(br.az) * rx * 0.6, top + 1.5, Math.sin(br.az) * rx * 0.6], "thin");
-    if (!dry) for (let x = -Math.ceil(rx); x <= rx; x++) for (let z = -Math.ceil(rx); z <= rx; z++) for (let y = top; y <= top + 3; y++) {
-      const e = (x / rx) ** 2 + (z / rx) ** 2 + ((y - top - 1.5) / ry) ** 2;
+    for (const br of sk.branches.slice(0, 4)) thinLine(v, [0, top, 0], [Math.cos(br.az) * rx * 0.55, top + 1, Math.sin(br.az) * rx * 0.55], "thin");
+    if (!dry) for (let x = -Math.ceil(rx); x <= rx; x++) for (let z = -Math.ceil(rx); z <= rx; z++) for (let y = top; y <= top + 4; y++) {
+      const e = (x / rx) ** 2 + (z / rx) ** 2 + ((y - top - 2) / ry) ** 2;
       if (e <= 1 && (e < 0.7 || hash(x, y, z, 93) < 0.55)) v.put(x, y, z, "leaves");
     }
     return { v };
