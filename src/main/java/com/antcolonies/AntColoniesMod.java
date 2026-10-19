@@ -9,6 +9,7 @@ import com.antcolonies.gametest.TestFilter;
 import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.registry.ModEntities;
 import com.antcolonies.registry.ModFeatures;
+import com.antcolonies.registry.ModStructures;
 import com.antcolonies.registry.ModItems;
 import com.antcolonies.registry.TreeBlocks;
 import com.antcolonies.species.SpeciesProfiles;
@@ -31,6 +32,8 @@ public class AntColoniesMod {
     public AntColoniesMod(IEventBus modEventBus) {
         ModBlocks.BLOCKS.register(modEventBus);
         ModFeatures.FEATURES.register(modEventBus);
+        ModStructures.STRUCTURE_TYPES.register(modEventBus);
+        ModStructures.STRUCTURE_PIECES.register(modEventBus);
         ModEntities.ENTITY_TYPES.register(modEventBus);
         ModItems.ITEMS.register(modEventBus);
         // How the giant savanna trees' blocks burn (Minecraft's fire table is filled once, at start).

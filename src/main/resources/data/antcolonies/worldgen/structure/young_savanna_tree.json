@@ -1,0 +1,8 @@
+{
+  "type": "antcolonies:giant_tree",
+  "size": "young",
+  "biomes": "#minecraft:is_savanna",
+  "spawn_overrides": {},
+  "step": "surface_structures",
+  "terrain_adaptation": "none"
+}

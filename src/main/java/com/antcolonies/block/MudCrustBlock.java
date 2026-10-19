@@ -5,6 +5,8 @@ import java.util.Map;
 
 import org.jetbrains.annotations.Nullable;
 
+import com.antcolonies.registry.TreeBlocks;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
@@ -160,7 +162,7 @@ public class MudCrustBlock extends Block {
 
     /**
      * Whether a plate over this cell still walls something off: the cell is open (a gallery, a hole) or holds the
-     * insects' food (wood they are eating under it). A cell filled again with soil or stone needs no wall.
+     * insects' food (wood they are eating under it, a dead tree's wood too). A cell filled again with soil or stone needs no wall.
      */
     private static boolean isNeeded(LevelReader level, BlockPos cell) {
         if (!level.hasChunkAt(cell)) {
@@ -168,7 +170,7 @@ public class MudCrustBlock extends Block {
         }
         BlockState state = level.getBlockState(cell);
         return !state.isCollisionShapeFullBlock(level, cell) || state.getBlock() instanceof DeadWoodBlock
-                || state.getBlock() instanceof FallenBranchBlock;
+                || state.getBlock() instanceof FallenBranchBlock || state.is(TreeBlocks.TERMITE_WOOD);
     }
 
     // --- Breaking: thin mud, a punch or two; harder as it dries ---

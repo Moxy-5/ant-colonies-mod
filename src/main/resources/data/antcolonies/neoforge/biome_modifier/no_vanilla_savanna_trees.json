@@ -1,0 +1,6 @@
+{
+  "type": "neoforge:remove_features",
+  "biomes": "#minecraft:is_savanna",
+  "features": ["minecraft:trees_savanna", "minecraft:trees_windswept_savanna"],
+  "steps": "vegetal_decoration"
+}

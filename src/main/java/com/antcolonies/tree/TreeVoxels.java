@@ -18,6 +18,7 @@ public final class TreeVoxels {
     private final Long2ObjectOpenHashMap<TreePart> parts = new Long2ObjectOpenHashMap<>();
     private final LongOpenHashSet holes = new LongOpenHashSet();
     private final LongOpenHashSet dropped = new LongOpenHashSet();
+    private final LongOpenHashSet overBark = new LongOpenHashSet();
 
     public interface Visitor {
         void visit(int x, int y, int z, TreePart part);
@@ -80,6 +81,16 @@ public final class TreeVoxels {
     /** Whether this block is one the tree drops as it grows (self-pruning). */
     public boolean isDropped(long key) {
         return dropped.contains(key);
+    }
+
+    /** Marks a block of mud as plastered over the bark there (not mud lying on the ground): the wood stays under it. */
+    void markOverBark(int x, int y, int z) {
+        overBark.add(key(x, y, z));
+    }
+
+    /** Whether this mud is plastered over the bark of the tree (so in the world it is dead wood with mud on it). */
+    public boolean isOverBark(long key) {
+        return overBark.contains(key);
     }
 
     public int size() {

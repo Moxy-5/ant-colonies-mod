@@ -483,6 +483,7 @@ final class AcaciaShape {
                 double line = mudTop * (0.55 + 0.45 * (0.5 + 0.5 * Math.sin(a * 3 + seed))) + (stage == TreeStage.FALLEN ? -mudTop + 1.6 : 0);
                 if (y <= line && TreeRandom.hash(x, y, z, 31) < 0.85) {
                     v.set(x, y, z, TreePart.MUD);
+                    v.markOverBark(x, y, z);
                     return;
                 }
             }

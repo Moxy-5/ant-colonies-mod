@@ -1,0 +1,122 @@
+package com.antcolonies.worldgen;
+
+import java.util.Optional;
+
+import com.antcolonies.registry.ModStructures;
+import com.antcolonies.tree.TreeKind;
+import com.antcolonies.tree.TreeShapes;
+import com.antcolonies.tree.TreeStage;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureType;
+
+/**
+ * A giant savanna tree in new land (M7.5 step 3): one tree, which may span several chunks (too big for Minecraft's
+ * normal tree features). Two of these are placed in savannas (data/antcolonies/worldgen/structure/): the <b>big</b>
+ * trees, grown, ancient and dead giants, spaced like the scattered big trees of a real savanna, their crowns rarely
+ * touching; and the <b>young</b> ones, seedlings and young thorny trees, many more, kept out from under the giants. A
+ * real savanna's trees by age: many young, fewer grown, a few ancient giants, and dead ones among them (a dead acacia
+ * stands, sheds and lies for years; a dead baobab slumps into fibre within months, so it is mostly found as a heap).
+ * The numbers are my picks, to confirm.
+ *
+ * @param size {@code big} or {@code young}
+ */
+public class GiantTreeStructure extends Structure {
+    public static final MapCodec<GiantTreeStructure> CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
+            settingsCodec(i),
+            Codec.STRING.fieldOf("size").forGetter(GiantTreeStructure::size)).apply(i, GiantTreeStructure::new));
+
+    /** Kinds by how common they are (my picks): umbrella thorn the common one, camel thorn, a rare baobab. */
+    static final String[] KINDS = {"umbrella_thorn", "camel_thorn", "baobab"};
+    static final int[] KIND_WEIGHTS = {6, 3, 1};
+    /** Of the big trees: how many are dead (my pick). */
+    static final double DEAD_SHARE = 0.28;
+    /** Of the living big trees: how many are ancient giants (my pick). */
+    static final double ANCIENT_SHARE = 0.15;
+    /** The steepest a foot may be (blocks up and down under the trunk) before no tree stands there. */
+    static final int MAX_UNEVEN = 6;
+
+    private final String size;
+
+    public GiantTreeStructure(StructureSettings settings, String size) {
+        super(settings);
+        this.size = size;
+    }
+
+    public String size() {
+        return size;
+    }
+
+    @Override
+    public StructureType<?> type() {
+        return ModStructures.GIANT_TREE.get();
+    }
+
+    /** One tree: its kind, its own seed, its age and its stage. */
+    public record Pick(String kind, long seed, double age, TreeStage stage) {
+    }
+
+    /** What tree stands at a new place, by the dice: the real spread of ages and stages (my picks). */
+    public static Pick pick(String size, RandomSource random) {
+        int roll = random.nextInt(KIND_WEIGHTS[0] + KIND_WEIGHTS[1] + KIND_WEIGHTS[2]);
+        String kind = roll < KIND_WEIGHTS[0] ? KINDS[0] : roll < KIND_WEIGHTS[0] + KIND_WEIGHTS[1] ? KINDS[1] : KINDS[2];
+        long seed = random.nextLong() & 0xFFFFFFFFL;
+        boolean baobab = kind.equals("baobab");
+        if (size.equals("young")) {
+            // Many more small ones than big: seedlings and young trees, most of them small (a reverse-J spread).
+            double u = random.nextDouble();
+            return new Pick(kind, seed, round(0.03 + 0.42 * u * u), TreeStage.LIVING);
+        }
+        if (random.nextDouble() < DEAD_SHARE) {
+            double age = round(0.6 + random.nextDouble() * (TreeShapes.ANCIENT - 0.6));
+            double r = random.nextDouble();
+            TreeStage stage = baobab ? (r < 0.2 ? TreeStage.SLUMP : r < 0.65 ? TreeStage.HEAP : TreeStage.HEAP_DRY)
+                    : r < 0.25 ? TreeStage.SNAG : r < 0.5 ? TreeStage.MUD : r < 0.75 ? TreeStage.SHED : TreeStage.FALLEN;
+            return new Pick(kind, seed, age, stage);
+        }
+        double age = random.nextDouble() < ANCIENT_SHARE ? 1 + random.nextDouble() * (TreeShapes.ANCIENT - 1) : 0.6 + random.nextDouble() * 0.4;
+        return new Pick(kind, seed, round(age), TreeStage.LIVING);
+    }
+
+    /** Ages to the hundredth: a tree is the same tree for every chunk, and few different ones are worked out. */
+    private static double round(double age) {
+        return Math.round(age * 100) / 100.0;
+    }
+
+    @Override
+    protected Optional<GenerationStub> findGenerationPoint(GenerationContext context) {
+        RandomSource random = context.random();
+        int x = context.chunkPos().getMinBlockX() + random.nextInt(16), z = context.chunkPos().getMinBlockZ() + random.nextInt(16);
+        Pick pick = pick(size, random);
+        TreeKind kind = TreePlacer.kind(pick.kind());
+        // Its foot: the lowest ground round the trunk (so the trunk sits in the ground, not over it); never in water.
+        int reach = pick.age() < 0.45 ? 0 : (int) Math.ceil(kind.trunk().radius() * (kind.isBaobab() ? 1 : 1.5));
+        int lowest = Integer.MAX_VALUE, highest = Integer.MIN_VALUE;
+        int[][] around = {{0, 0}, {reach, 0}, {-reach, 0}, {0, reach}, {0, -reach}};
+        for (int[] o : around) {
+            int surface = height(context, x + o[0], z + o[1], Heightmap.Types.WORLD_SURFACE_WG);
+            int floor = height(context, x + o[0], z + o[1], Heightmap.Types.OCEAN_FLOOR_WG);
+            if (surface != floor) {
+                return Optional.empty();
+            }
+            lowest = Math.min(lowest, surface);
+            highest = Math.max(highest, surface);
+        }
+        if (highest - lowest > MAX_UNEVEN) {
+            return Optional.empty();
+        }
+        BlockPos foot = new BlockPos(x, lowest, z);
+        TreePlacer.Placed tree = TreePlacer.placed(pick.kind(), pick.seed(), pick.age(), pick.stage());
+        return Optional.of(new GenerationStub(foot, builder -> builder.addPiece(new GiantTreePiece(pick, foot, tree.box(foot)))));
+    }
+
+    private static int height(GenerationContext context, int x, int z, Heightmap.Types type) {
+        return context.chunkGenerator().getFirstFreeHeight(x, z, type, context.heightAccessor(), context.randomState());
+    }
+}

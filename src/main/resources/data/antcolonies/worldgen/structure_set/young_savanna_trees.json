@@ -1,0 +1,10 @@
+{
+  "structures": [{"structure": "antcolonies:young_savanna_tree", "weight": 1}],
+  "placement": {
+    "type": "minecraft:random_spread",
+    "spacing": 3,
+    "separation": 1,
+    "salt": 482911038,
+    "exclusion_zone": {"other_set": "antcolonies:big_savanna_trees", "chunk_count": 2}
+  }
+}

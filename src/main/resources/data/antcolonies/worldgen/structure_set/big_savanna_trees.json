@@ -1,0 +1,9 @@
+{
+  "structures": [{"structure": "antcolonies:big_savanna_tree", "weight": 1}],
+  "placement": {
+    "type": "minecraft:random_spread",
+    "spacing": 6,
+    "separation": 3,
+    "salt": 482911037
+  }
+}
