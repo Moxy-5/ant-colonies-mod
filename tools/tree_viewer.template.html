@@ -320,7 +320,7 @@ function drawPolyline(v, pts, radii, blocks, upto = 1) {
 
 function trunk(v, sk, blocks, o = {}) {
   const { R0, k } = sk;
-  if (!o.noFlare) seg(v, [0, -1, 0], [0, 1.5, 0], R0 + (k > 0.25 ? 1.5 : 0.2), R0, blocks, o);
+  if (!o.noFlare && k > 0.25) seg(v, [0, -1, 0], [0, 1.5, 0], R0 + 1.5, R0, blocks, o);
   seg(v, [0, -1, 0], sk.mid, R0, R0 * 0.95, blocks, o);
   seg(v, sk.mid, sk.fork, R0 * 0.95, R0 * 0.85, blocks, o);
   if (sk.k > 0.2) for (const rt of sk.roots) {
@@ -358,12 +358,45 @@ function crownPads(v, sk, limb) {
   }
 }
 
+// Young trees (the user, 2026-10-18: "tone down the realism and be better looking"): one slim stem and a neat
+// small crown, a little umbrella or dome with a full middle and a ragged edge, a few thorny twigs under its rim.
+function youngCrown(v, sk) {
+  const umbrella = sk.kindId === "umbrella", Rc = sk.Rc, top = Math.round(sk.H);
+  const ry = Math.max(1.3, Rc * (umbrella ? 0.38 : 0.6)), cy = top - ry + 0.5;
+  const c = sk.limbs.reduce((a, l) => add(a, mul(l.pts[l.pts.length - 1], 1 / sk.limbs.length)), [0, 0, 0]);
+  for (let x = Math.floor(c[0] - Rc - 1); x <= c[0] + Rc + 1; x++) for (let z = Math.floor(c[2] - Rc - 1); z <= c[2] + Rc + 1; z++)
+    for (let y = Math.floor(cy - ry); y <= top; y++) {
+      const e = ((x - c[0]) / Rc) ** 2 + ((z - c[2]) / Rc) ** 2 + ((y - cy) / ry) ** 2;
+      if (e > 1 || y < 1) continue;
+      if (e > 0.7 && hash(x, y, z, 91) > 0.55) continue;
+      v.put(x, y, z, "leaves");
+    }
+  const rim = [];
+  v.each((x, y, z, b) => {
+    if (b === "leaves" && !v.get(x, y - 1, z) && Math.hypot(x - c[0], z - c[2]) > Rc * 0.6 && hash(x, y, z, 92) < 0.12) rim.push([x, y - 1, z]);
+  });
+  for (const p of rim) v.put(p[0], p[1], p[2], "thorns");
+}
+
+function youngTree(v, sk) {
+  const umbrella = sk.kindId === "umbrella", top = Math.round(sk.H);
+  const ry = Math.max(1.3, sk.Rc * (umbrella ? 0.38 : 0.6));
+  const c = sk.limbs.reduce((a, l) => add(a, mul(l.pts[l.pts.length - 1], 1 / sk.limbs.length)), [0, 0, 0]);
+  const base = [c[0] * 0.5, top - ry * 1.6, c[2] * 0.5];
+  thinLine(v, [0, 0, 0], [0, 1, 0], "thin");
+  thinLine(v, [0, 1, 0], base, "thin");
+  for (const l of sk.limbs.slice(0, 3)) thinLine(v, base, [base[0] + Math.cos(l.az) * sk.Rc * 0.5, top - ry * 0.8, base[2] + Math.sin(l.az) * sk.Rc * 0.5], "thin");
+  youngCrown(v, sk);
+}
+
 function buildAcacia(sk, stageId) {
   const v = new Vox();
   if (sk.g < 0.06) { v.put(0, 0, 0, "seedling"); return { v }; }
   if (stageId === "fallen") return buildFallen(sk);
   const living = stageId === "living";
   const blocks = living ? LIVE : DEAD;
+  const young = sk.g < 0.45;
+  if (young && living) { youngTree(v, sk); return { v }; }
   trunk(v, sk, blocks, { hollow: sk.old > 0.5 ? 0.35 * sk.old : 0 });
   for (const limb of sk.limbs) {
     const dead = !living || limb.dead, b = dead ? DEAD : LIVE;
@@ -376,14 +409,11 @@ function buildAcacia(sk, stageId) {
       const to = dead ? add(end, mul(sub(br.tip, end), br.brk)) : br.tip;
       seg(v, end, to, sk.R0 * 0.38, dead ? sk.R0 * 0.3 : 0.35, b);
       if (dead) continue;
-      for (const tw of br.twigs) thinLine(v, tw[0], tw[1], "thin");
+      if (!young) for (const tw of br.twigs) thinLine(v, tw[0], tw[1], "thin");
     }
-    if (!dead) crownPads(v, sk, limb);
+    if (!dead && !young) crownPads(v, sk, limb);
   }
-  if (sk.g < 0.6 && living) {
-    // Young trees: thorny all the way down their stems.
-    v.each((x, y, z, bl) => { if (bl === "thin" && hash(x, y, z, 11) < 0.3) for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (!v.get(x + dx, y, z + dz) && hash(x + dx, y, z + dz, 12) < 0.4) v.put(x + dx, y, z + dz, "thorns"); });
-  }
+  if (young && living) youngCrown(v, sk);
   if (sk.kindId === "camel" && living) hangPods(v);
   if (!living) weather(v, sk, stageId);
   if (stageId === "shed") scatterFallen(v, sk);
@@ -517,6 +547,17 @@ function buildBaobab(sk, stageId) {
   const v = new Vox();
   if (sk.g < 0.06) { v.put(0, 0, 0, "seedling"); return { v }; }
   if (stageId === "heap" || stageId === "heapdry") return buildHeap(sk, stageId === "heapdry");
+  if (sk.g < 0.45 && stageId === "living") {
+    // Young baobab (made good-looking, the user 2026-10-18): one straight stem, a few short branches, a small round crown.
+    const top = Math.round(sk.Ht), rx = 2 + 2 * sk.g, ry = 1.6;
+    for (let y = 0; y <= top; y++) v.put(0, y, 0, "bark");
+    for (const br of sk.branches.slice(0, 4)) thinLine(v, [0, top, 0], [Math.cos(br.az) * rx * 0.6, top + 1.5, Math.sin(br.az) * rx * 0.6], "thin");
+    if (!dry) for (let x = -Math.ceil(rx); x <= rx; x++) for (let z = -Math.ceil(rx); z <= rx; z++) for (let y = top; y <= top + 3; y++) {
+      const e = (x / rx) ** 2 + (z / rx) ** 2 + ((y - top - 1.5) / ry) ** 2;
+      if (e <= 1 && (e < 0.7 || hash(x, y, z, 93) < 0.55)) v.put(x, y, z, "leaves");
+    }
+    return { v };
+  }
   const slump = stageId === "slump";
   const Ht = slump ? sk.Ht * 0.62 : sk.Ht, hollow = slump || sk.old >= 0.4;
   for (let y = -1; y <= Math.ceil(Ht); y++) {
@@ -566,7 +607,8 @@ function buildBaobab(sk, stageId) {
       const rx = 1 + 1.8 * sk.k, ry = 1.4;
       for (let x = Math.floor(e2[0] - rx); x <= e2[0] + rx; x++) for (let y = Math.floor(e2[1] - ry); y <= e2[1] + ry + 1; y++) for (let z = Math.floor(e2[2] - rx); z <= e2[2] + rx; z++) {
         const q = ((x - e2[0]) / rx) ** 2 + ((z - e2[2]) / rx) ** 2 + ((y - e2[1] - 0.5) / ry) ** 2;
-        if (q <= 1 && hash(x, y, z, 71) < (picks.leaves.baobab === "A" ? 0.7 : 0.5)) v.put(x, y, z, "leaves");
+        const keep = sk.g < 0.45 ? q < 0.7 || hash(x, y, z, 71) < 0.55 : hash(x, y, z, 71) < (picks.leaves.baobab === "A" ? 0.7 : 0.5);
+        if (q <= 1 && keep) v.put(x, y, z, "leaves");
       }
     }
   }

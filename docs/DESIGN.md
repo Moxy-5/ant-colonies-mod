@@ -110,6 +110,7 @@ it.** If a decision changes, ask the user first, then update it here. The short 
   - **Inside a fallen giant:** a central hollow sized by the tree's age, rotten wood and frass on the floor, side galleries from beetles and termites, darker deeper in.
   - **Baobabs collapse** (real): a dead baobab slumps into a heap of fibrous rotten wood that dries and shrinks, food for termites and a home; no log.
   - **Thorns hurt and slow** like a sweet berry bush (thorny twigs at crown edges and on young trees; none on big old trunks).
+  - **Young trees good-looking before realistic (user, 2026-10-18, on the first tree viewer: "the young stage for every tree looks really ugly ... tone down the realism"):** a young tree is one slim stem with a few short branches and a neat small crown (a little umbrella, a dome, or the baobab's small round crown), a full middle with a ragged edge, a few thorny twigs only under the rim. The mature and ancient trees stay as they are ("the mature looks amazing").
   - **Old dead wood folded in:** our trees shed the fallen branches; the 1-block fallen trees are replaced by fallen young trees and giant limbs; dead wood takes the bleached silver look; termites eat it all as now.
 - **Matabele size with it (my pick, to confirm):** the major about 2.5 times a harvester worker (about 0.7 blocks long), minors about harvester size.
 - **Order:** after brain step 4g, before M8 step 1. Looks drawn in the model viewer for the user to pick before any building.
