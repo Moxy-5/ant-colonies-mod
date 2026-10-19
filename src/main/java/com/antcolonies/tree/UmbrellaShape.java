@@ -56,6 +56,13 @@ final class UmbrellaShape {
     private static final double SAG = 1;
     /** The crown's thickness in the middle, and how much lower its top is at the edge. */
     private static final double THICK = 5, DOME = 2;
+    /**
+     * The clumps widening (the user's ask, 2026-10-18): once the limbs have grown RING_FROM of the way out from the
+     * fork, each limb's leaves start widening sideways round the crown's circle toward the next limb's, widest at
+     * RING_FULL of the way (about age 0.6); each side covers at most RING_WIDEN of the gap, so they never touch (the
+     * grown crown joins them).
+     */
+    private static final double RING_FROM = 0.03, RING_FULL = 0.35, RING_WIDEN = 0.3;
 
     private final TreeKind kind;
     private final long seed;
@@ -270,7 +277,12 @@ final class UmbrellaShape {
             return v;
         }
         List<double[]> grownLeaves = new ArrayList<>(), growingLeaves = new ArrayList<>();
-        for (Limb limb : limbs) {
+        // Where each limb's leaves start in the two lists (they only grow, in limb order), for the ring between them.
+        int[] grownFrom = new int[limbs.size() + 1], growingFrom = new int[limbs.size() + 1];
+        for (int li = 0; li < limbs.size(); li++) {
+            grownFrom[li] = grownLeaves.size();
+            growingFrom[li] = growingLeaves.size();
+            Limb limb = limbs.get(li);
             boolean dead = !gr.living || gr.deadLimb(limb);
             TreePart[] b = dead ? DEAD : LIVE;
             double lu = gr.upto(limb);
@@ -348,7 +360,16 @@ final class UmbrellaShape {
                 }
             }
         }
+        grownFrom[limbs.size()] = grownLeaves.size();
+        growingFrom[limbs.size()] = growingLeaves.size();
         if (gr.living) {
+            List<List<double[]>> perLimb = new ArrayList<>();
+            for (int li = 0; li < limbs.size(); li++) {
+                List<double[]> mine = new ArrayList<>(grownLeaves.subList(grownFrom[li], grownFrom[li + 1]));
+                mine.addAll(growingLeaves.subList(growingFrom[li], growingFrom[li + 1]));
+                perLimb.add(mine);
+            }
+            ring(v, gr, perLimb);
             if (gr.s < trunk.length + 6) {
                 // The young crown over the stem stays a little while the limbs start out from under it.
                 bush(v, gr.trunkTip(), youngCrown(trunk.length), 0.12);
@@ -498,6 +519,94 @@ final class UmbrellaShape {
         for (int[] p : twigs) {
             v.put(p[0], p[1], p[2], TreePart.THORNS);
         }
+    }
+
+    /**
+     * The clumps widening toward a ring (the user's ask, 2026-10-18): a real umbrella thorn's limbs spread their leafy
+     * twigs sideways until the clumps join into one flat crown. From when the limbs reach out, each limb's clump widens
+     * round the crown's circle toward its neighbours', a little more every year, but stays apart from them: it only
+     * shows the crown will join up later.
+     */
+    private void ring(TreeVoxels v, Grown gr, List<List<double[]>> perLimb) {
+        double limbsEnd = 0;
+        for (Limb limb : limbs) {
+            limbsEnd = Math.max(limbsEnd, limb.end());
+        }
+        double out = (gr.s - trunk.length) / (limbsEnd - trunk.length); // how far the limbs have grown out
+        double fill = clamp((out - RING_FROM) / (RING_FULL - RING_FROM), 0, 1);
+        if (fill <= 0 || gr.g >= 1) {
+            return;
+        }
+        // Each leafy limb: {middle angle round the trunk, lowest angle, highest angle, distance out, height}.
+        List<double[]> arms = new ArrayList<>();
+        for (List<double[]> mine : perLimb) {
+            if (mine.isEmpty()) {
+                continue;
+            }
+            double sx = 0, sz = 0, dist = 0, y = 0;
+            for (double[] c : mine) {
+                double h = Math.max(1e-6, Math.hypot(c[0], c[2]));
+                sx += c[0] / h;
+                sz += c[2] / h;
+                dist += h;
+                y += c[1];
+            }
+            dist /= mine.size();
+            if (dist < 3) {
+                continue; // leaves still round the stem: nothing to spread round yet
+            }
+            double mid = Math.atan2(sz, sx), lo = 0, hi = 0;
+            for (double[] c : mine) {
+                double a = wrap(Math.atan2(c[2], c[0]) - mid);
+                lo = Math.min(lo, a);
+                hi = Math.max(hi, a);
+            }
+            arms.add(new double[] {mid, mid + lo, mid + hi, dist, y / mine.size()});
+        }
+        if (arms.size() < 2) {
+            return;
+        }
+        Integer[] order = new Integer[arms.size()];
+        for (int i = 0; i < order.length; i++) {
+            order[i] = i;
+        }
+        java.util.Arrays.sort(order, (p, q) -> Double.compare(arms.get(p)[0], arms.get(q)[0]));
+        double size = lerp(2, kind.crown().padRadius() * 0.7, gr.k);
+        for (int n = 0; n < order.length; n++) {
+            int i = order[n], j = order[(n + 1) % order.length];
+            double[] a = arms.get(i), b = arms.get(j);
+            double gap = ((b[1] - a[2]) % TAU + TAU) % TAU;
+            if (gap > TAU * 0.9 || gap < 0.15) {
+                continue; // overlapping already, or one clump wrapping round
+            }
+            widen(v, a[2], +1, gap, a, b, fill, size);
+            widen(v, b[1], -1, gap, b, a, fill, size);
+        }
+    }
+
+    /**
+     * One limb's clump widening round the crown's circle from its side edge (at angle a0) toward the next clump:
+     * overlapping bushes, smaller toward the front, so the wider clump stays one piece on the tree.
+     */
+    private static void widen(TreeVoxels v, double a0, int way, double gap, double[] me, double[] other, double fill, double size) {
+        double reach = gap * RING_WIDEN * fill;
+        int steps = (int) Math.ceil(reach * me[3] / 1.5);
+        for (int s = 1; s <= steps; s++) {
+            double t = reach * s / steps, f = t / (gap * RING_WIDEN); // f: how far out it widens, 0 to 1
+            double az = a0 + way * t;
+            double dist = lerp(me[3], other[3], t / gap), y = lerp(me[4], other[4], t / gap);
+            bush(v, new double[] {Math.cos(az) * dist, y, Math.sin(az) * dist}, size * lerp(0.85, 0.5, f), 0);
+        }
+    }
+
+    private static double wrap(double a) {
+        while (a > Math.PI) {
+            a -= TAU;
+        }
+        while (a < -Math.PI) {
+            a += TAU;
+        }
+        return a;
     }
 
     /** Where a limb's branches end now (or the limb's own tip while it has none yet): where its pieces fall. */
