@@ -1111,17 +1111,26 @@ public class Galleries {
     }
 
     /**
-     * Whether the workers allow this piece out to food now: the galleries with it no longer than they allow and one
-     * piece's length over (the length filled-in branches gave back may be used for food).
+     * Whether the workers allow this piece out to {@code food} now: the galleries with it no longer than they allow and
+     * one piece's length over (the length filled-in branches gave back may be used for food); for big dead wood (see
+     * {@link DeadWoodCall}) up to the call's {@code over_limit} more (the user's pick, 2026-10-19: a big find gets the
+     * diggers; the even spreading waits until the workers catch up, {@link #growTips}).
      */
-    boolean affords(Piece piece) {
+    boolean affords(ServerLevel level, Piece piece, BlockPos food) {
         int fresh = piece.tunnel().tunnel().size() - piece.from();
-        if (length() + fresh > lengthAllowed() + numbers().pieceLength()) {
-            AntColoniesMod.LOGGER.debug("[galleries] the way to the food at {} is {} blocks: more than the workers allow now ({} of {})",
-                    piece.tunnel().hole().toShortString(), fresh, length(), lengthAllowed());
-            return false;
+        int allowed = lengthAllowed() + numbers().pieceLength();
+        if (length() + fresh <= allowed) {
+            return true;
         }
-        return true;
+        SpeciesProfile.WoodCall call = numbers().woodCall();
+        if (call.overLimit() > 0 && length() + fresh <= allowed + call.overLimit() && woodCall.isBig(level, food, call)) {
+            AntColoniesMod.LOGGER.debug("[galleries] the way to the big dead wood at {} is {} blocks: past what the workers allow ({} of {}), dug all the same",
+                    food.toShortString(), fresh, length(), lengthAllowed());
+            return true;
+        }
+        AntColoniesMod.LOGGER.debug("[galleries] the way to the food at {} is {} blocks: more than the workers allow now ({} of {})",
+                piece.tunnel().hole().toShortString(), fresh, length(), lengthAllowed());
+        return false;
     }
 
     /**

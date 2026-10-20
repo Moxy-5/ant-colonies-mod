@@ -93,6 +93,18 @@ final class DeadWoodCall {
         return learnt;
     }
 
+    /**
+     * Whether {@code food} is part of dead wood big enough to call (at least the call's {@code min_blocks} blocks
+     * together): the way to it may go past the length the workers allow (a big find gets the diggers).
+     */
+    boolean isBig(ServerLevel level, BlockPos food, SpeciesProfile.WoodCall call) {
+        if (!level.isLoaded(food) || !isDeadWood(level.getBlockState(food))) {
+            return false;
+        }
+        Wood wood = measure(level, food, new HashSet<>());
+        return wood != null && wood.blocks() >= call.minBlocks();
+    }
+
     /** A piece of dead wood: how many blocks and its foot. */
     record Wood(int blocks, BlockPos foot) {
     }

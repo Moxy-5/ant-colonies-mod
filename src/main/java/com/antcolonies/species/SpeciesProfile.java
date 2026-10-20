@@ -986,15 +986,18 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * from afar (the smell of the wood and its fungi; they even judge a log's size from how it vibrates). Dead wood of at
      * least {@code minBlocks} blocks together (a standing dead giant, a fallen giant) is noticed from {@code reach} blocks
      * past any hole or tip, and from {@code bigReach} once it is {@code bigBlocks} blocks or more; the colony then knows
-     * it, and a gallery piece or a runway goes to it. {@code reach} 0: off. My numbers, to confirm.
+     * it, and a gallery piece or a runway goes to it. A big find gets the diggers (the user's pick, 2026-10-19): the way
+     * to such wood may take the galleries up to {@code overLimit} blocks past the length the workers allow (the even
+     * spreading waits until the workers catch up). {@code reach} 0: off. My numbers, to confirm.
      */
-    public record WoodCall(int minBlocks, int reach, int bigBlocks, int bigReach) {
-        public static final WoodCall DEFAULT = new WoodCall(20, 0, 100, 0);
+    public record WoodCall(int minBlocks, int reach, int bigBlocks, int bigReach, int overLimit) {
+        public static final WoodCall DEFAULT = new WoodCall(20, 0, 100, 0, 0);
         public static final Codec<WoodCall> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.optionalFieldOf("min_blocks", 20).forGetter(WoodCall::minBlocks),
                 Codec.INT.optionalFieldOf("reach", 16).forGetter(WoodCall::reach),
                 Codec.INT.optionalFieldOf("big_blocks", 100).forGetter(WoodCall::bigBlocks),
-                Codec.INT.optionalFieldOf("big_reach", 20).forGetter(WoodCall::bigReach)
+                Codec.INT.optionalFieldOf("big_reach", 20).forGetter(WoodCall::bigReach),
+                Codec.INT.optionalFieldOf("over_limit", 32).forGetter(WoodCall::overLimit)
         ).apply(i, WoodCall::new));
 
         /** How far wood of this many blocks is noticed from (0: too small, or off). */

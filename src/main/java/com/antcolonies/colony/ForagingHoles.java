@@ -405,7 +405,7 @@ public class ForagingHoles {
                 AntColoniesMod.LOGGER.debug("[new-hole] no gallery piece to the food at {}", food.toShortString());
                 return;
             }
-            if (!galleries.affords(piece)) {
+            if (!galleries.affords(level, piece, food)) {
                 foodWaiting = true; // food leads: the galleries grow no other way until the workers allow this piece
                 return;
             }
