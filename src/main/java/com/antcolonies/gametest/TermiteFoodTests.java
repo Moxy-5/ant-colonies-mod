@@ -704,13 +704,16 @@ public class TermiteFoodTests {
     /**
      * Big dead wood calls (the user's report, 2026-10-19: termites never found a standing dead giant 15 to 30 blocks out;
      * their pick: big dead wood is sensed from afar, as real termites smell and feel rotting wood through the soil): a
-     * colony with its galleries grown as long as its workers allow, which has never seen it, senses a dead trunk 3
-     * thick, 10 tall, 10 to 15 blocks from its nearest hole (at midday, nobody outside), and a gallery piece with its
-     * feeding gallery goes out to its foot past the length allowed (the user's pick, 2026-10-19: a big find gets the
-     * diggers; before, the colony sensed it and waited for ever), or from a hole near it a runway of mud. A fallen dead
-     * stem of 6 blocks, too small to call, is not sensed.
+     * colony with its galleries grown as long as its workers allow, which has never seen it, senses a real dead giant
+     * (a mud-climbed umbrella thorn, standing in a dip a block deep, its roots running on under the grass round it) 10
+     * to 15 blocks from its nearest hole (at midday, nobody outside), and a gallery piece with its feeding gallery goes
+     * out to its foot past the length allowed (the user's pick, 2026-10-19: a big find gets the diggers; before, the
+     * colony sensed it and waited for ever), or from a hole near it a runway of mud. The foot is wood lying open, not a
+     * buried root the colony never sees as food. Then by day the workers dig the feeding gallery down under it, every
+     * dug cell under soil counting as inside (a step down too: the user's report, 2026-10-19, they idled at the tunnel's
+     * end till night), and bite the tree from below. A fallen dead stem of 6 blocks, too small to call, is not sensed.
      */
-    @GameTest(template = "arena", timeoutTicks = 16000, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 30000, skyAccess = true)
     public static void aStandingDeadTreeIsSensedAndGetsAGalleryToItsFoot(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
@@ -732,8 +735,10 @@ public class TermiteFoodTests {
         TestClock.still(helper, 12); // midday: nobody goes out, so nothing is found by looking
         List<BlockPos> foot = new ArrayList<>();
         List<BlockPos> stem = new ArrayList<>();
+        List<BlockPos> wood = new ArrayList<>();
         int[] stage = {0};
         long[] placedAt = {0};
+        long[] wayAt = {0};
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
@@ -762,6 +767,7 @@ public class TermiteFoodTests {
                 // the dead giant: bleached log 3 thick and 10 tall, 10 to 15 blocks from the nearest hole (too far for a
                 // runway, so a gallery piece past the length allowed: a big find gets the diggers).
                 List<BlockPos> holes = colony.foragingHoles().tunnels(level).stream().map(NestPlan.ForagingTunnel::hole).toList();
+                List<BlockPos> dug = colony.foragingHoles().tunnels(level).stream().flatMap(t -> t.tunnel().stream()).toList();
                 BlockPos spot = null;
                 for (int x = 3; x <= 61 && spot == null; x++) {
                     for (int z = 3; z <= 61 && spot == null; z++) {
@@ -770,23 +776,38 @@ public class TermiteFoodTests {
                         for (BlockPos hole : holes) {
                             near = Math.min(near, Math.sqrt(Math.pow(hole.getX() - at.getX(), 2) + Math.pow(hole.getZ() - at.getZ(), 2)));
                         }
-                        if (near >= 10 && near <= 15 && Math.abs(x - (mid - 21)) + Math.abs(z - (mid - 10)) > 8) {
+                        boolean clear = dug.stream().noneMatch(cell -> Math.abs(cell.getX() - at.getX()) <= 7 && Math.abs(cell.getZ() - at.getZ()) <= 7);
+                        if (near >= 10 && near <= 15 && clear && Math.abs(x - (mid - 21)) + Math.abs(z - (mid - 10)) > 20) {
                             spot = new BlockPos(x, SURFACE, z);
                         }
                     }
                 }
                 helper.assertTrue(spot != null, "no spot 10 to 15 blocks from the nearest hole:" + galleries.describe(level));
-                for (int dx = -1; dx <= 1; dx++) {
-                    for (int dz = -1; dz <= 1; dz++) {
-                        for (int y = 0; y < 10; y++) {
-                            BlockPos at = helper.absolutePos(spot.offset(dx, y, dz));
-                            level.setBlock(at, com.antcolonies.registry.TreeBlocks.BLEACHED_LOG.get().defaultBlockState(), 3);
-                            if (y == 0) {
-                                foot.add(at);
-                            }
+                // A real dead giant as new land and the tree book make it: a mud-climbed umbrella thorn (its flared foot
+                // and roots in the soil, mud plates up its bark; the user's tree, 2026-10-19).
+                // It stands in a dip a block deep (as the user's did, 2026-10-19): the feeding gallery steps down from the
+                // tunnel to get under it.
+                for (int dx = -5; dx <= 5; dx++) {
+                    for (int dz = -5; dz <= 5; dz++) {
+                        if (dx * dx + dz * dz <= 25) {
+                            helper.setBlock(spot.getX() + dx, SURFACE - 1, spot.getZ() + dz, net.minecraft.world.level.block.Blocks.AIR);
+                            helper.setBlock(spot.getX() + dx, SURFACE - 2, spot.getZ() + dz, net.minecraft.world.level.block.Blocks.GRASS_BLOCK);
                         }
                     }
                 }
+                BlockPos treeFoot = helper.absolutePos(spot.below());
+                com.antcolonies.worldgen.TreePlacer.Placed tree = com.antcolonies.worldgen.TreePlacer.placed("umbrella_thorn", 3, 0.8,
+                        com.antcolonies.tree.TreeStage.MUD);
+                com.antcolonies.worldgen.TreePlacer.place(level, tree, treeFoot, tree.box(treeFoot), 3);
+                for (int i = 0; i < tree.size(); i++) {
+                    BlockPos at = treeFoot.offset(tree.xs()[i], tree.ys()[i], tree.zs()[i]);
+                    if (level.getBlockState(at).getBlock() instanceof com.antcolonies.block.EatenInStages) {
+                        wood.add(at.immutable());
+                    }
+                }
+                foot.addAll(wood);
+                com.antcolonies.AntColoniesMod.LOGGER.info("[dead-tree-test] a dead umbrella thorn of {} wood blocks at {}, galleries {} of {}",
+                        wood.size(), treeFoot.toShortString(), galleries.length(), galleries.lengthAllowed());
                 placedAt[0] = tick;
                 // A fallen dead stem, 6 blocks: too small to be sensed from afar.
                 for (int dx = 0; dx < 6; dx++) {
@@ -798,7 +819,7 @@ public class TermiteFoodTests {
                 helper.assertTrue(foot.stream().noneMatch(colony.foodMap()::isKnown), "the colony knew the dead tree before sensing it");
                 stage[0] = 2;
             }
-            if (stage[0] != 2) {
+            if (stage[0] < 2) {
                 helper.assertTrue(tick < 8000, "the galleries never grew as long as the workers allow: " + galleries.length() + " of "
                         + galleries.lengthAllowed());
                 return;
@@ -807,11 +828,44 @@ public class TermiteFoodTests {
             boolean way = colony.nest().foodWays().getNewTunnels().stream()
                     .anyMatch(tunnel -> foot.contains(tunnel.food()) && tunnel.gallery() != null && !tunnel.gallery().isEmpty())
                     || colony.nest().foodWays().getRunways().stream().anyMatch(runway -> foot.contains(runway.food()));
-            if (way) {
-                helper.succeed();
+            if (way && stage[0] == 2) {
+                stage[0] = 3;
+                wayAt[0] = tick;
+            }
+            if (stage[0] == 3) {
+                // By day (a still midday, nobody outside): the workers dig the feeding gallery up under the tree and eat it
+                // from below (the user's report, 2026-10-19: they dug the tunnel to the tree and then idled at its end).
+                com.antcolonies.colony.FoodWays.NewTunnel tunnel = colony.nest().foodWays().getNewTunnels().stream().filter(t -> foot.contains(t.food())).findFirst().orElse(null);
+                long eaten = wood.stream().filter(b -> {
+                    BlockState state = level.getBlockState(b);
+                    return !(state.getBlock() instanceof com.antcolonies.block.EatenInStages) || colony.food().getPiecesCut(b) > 0
+                            || state.hasProperty(com.antcolonies.block.DeadWoodBlock.EATEN) && state.getValue(com.antcolonies.block.DeadWoodBlock.EATEN) > 0;
+                }).count();
+                String gallery = tunnel == null ? "a runway" : tunnel.gallery().stream().filter(c -> com.antcolonies.colony.Nest.isDugOut(level, c)).count()
+                        + " of " + tunnel.gallery().size() + " gallery blocks dug, food " + tunnel.food().toShortString() + " " + level.getBlockState(tunnel.food());
+                if (tick % 1000 == 0) {
+                    com.antcolonies.AntColoniesMod.LOGGER.info("[dead-tree-test] {} ticks after the way: {}, {} wood blocks bitten", tick - wayAt[0], gallery, eaten);
+                }
+                if (tunnel != null && tick % 100 == 0) {
+                    // Every dug gallery cell under soil is inside, a step down under another gallery cell too (the user's
+                    // report, 2026-10-19: the lower step looked open to the sky, so by day nobody went down it to dig on).
+                    Set<BlockPos> cells = new HashSet<>(tunnel.gallery());
+                    for (BlockPos cell : tunnel.gallery()) {
+                        if (com.antcolonies.colony.Nest.isDugOut(level, cell) && !level.canSeeSky(cell)) {
+                            helper.assertTrue(colony.nest().isInside(level, cell), "the dug gallery cell " + cell.toShortString()
+                                    + (cells.contains(cell.above()) ? " (a step down under another)" : "") + " is under soil but not inside");
+                        }
+                    }
+                }
+                if (eaten > 0) {
+                    helper.succeed();
+                    return;
+                }
+                helper.assertTrue(tick < wayAt[0] + 12000, "by day nobody ate the dead tree from below: " + gallery + ", feedable from inside "
+                        + (tunnel != null && colony.food().isFeedableFromInside(level, tunnel.food())) + ", leaks " + colony.walls().getLeaks(level).size());
                 return;
             }
-            helper.assertTrue(tick < placedAt[0] + 5000 && tick < 15900, "no way out to the dead tree's foot:" + galleries.describe(level)
+            helper.assertTrue(tick < placedAt[0] + 5000, "no way out to the dead tree's foot:" + galleries.describe(level)
                     + colony.foragingHoles().describeNewHoles(level) + ", sensed " + foot.stream().filter(colony.foodMap()::isKnown).count()
                     + ", foot seen " + foot.stream().filter(colony.food().plants(level)::contains).count()
                     + ", food waiting " + colony.foragingHoles().isFoodWaiting() + colony.foragingHoles().whyNoRunway(level, foot.get(0)));

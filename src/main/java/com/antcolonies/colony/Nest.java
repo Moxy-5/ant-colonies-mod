@@ -879,11 +879,16 @@ public class Nest {
             Set<BlockPos> cells = nestCells(level);
             cells.add(center);
             // A feeding gallery cell is inside only while it has a roof (the food over it, the mud cast left of it, a
-            // branch cased in mud): once the roof is gone it is open to the sky.
+            // branch cased in mud): once the roof is gone it is open to the sky. Where the gallery steps down, the open cell
+            // over the lower step is the upper one, inside while it has its own roof: from the top down, so each knows (the
+            // user's report, 2026-10-19: by day the workers never went down the gallery's step under a dead tree, as it
+            // looked open to the sky, and idled in the tunnel till night).
             List<BlockPos> galleries = foodWays.galleryCells();
-            for (BlockPos gallery : galleries) {
+            List<BlockPos> topDown = new ArrayList<>(galleries);
+            topDown.sort((a, b) -> Integer.compare(b.getY(), a.getY()));
+            for (BlockPos gallery : topDown) {
                 if (level.isLoaded(gallery) && level.getBlockState(gallery.above()).getCollisionShape(level, gallery.above()).isEmpty()
-                        && !NestWalls.isWalkThroughFood(level, gallery.above())) {
+                        && !NestWalls.isWalkThroughFood(level, gallery.above()) && !cells.contains(gallery.above())) {
                     cells.remove(gallery);
                 }
             }

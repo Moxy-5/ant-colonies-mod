@@ -12,6 +12,7 @@ import org.jetbrains.annotations.Nullable;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.block.DeadTreeWoodBlock;
 import com.antcolonies.block.DeadWoodBlock;
+import com.antcolonies.block.MudCrustBlock;
 import com.antcolonies.block.SoftDeadWoodBlock;
 import com.antcolonies.species.SpeciesProfile;
 
@@ -128,7 +129,7 @@ final class DeadWoodCall {
             BlockPos below = pos.below();
             BlockState under = level.getBlockState(below);
             if (!isDeadWood(under) && under.isFaceSturdy(level, below, Direction.UP) && (foot == null || pos.getY() < foot.getY()
-                    || pos.getY() == foot.getY() && pos.distSqr(center) < foot.distSqr(center))) {
+                    || pos.getY() == foot.getY() && pos.distSqr(center) < foot.distSqr(center)) && isUncovered(level, pos)) {
                 foot = pos;
             }
             for (Direction side : Direction.values()) {
@@ -142,6 +143,25 @@ final class DeadWoodCall {
             }
         }
         return foot == null ? null : new Wood(blocks, foot);
+    }
+
+    /**
+     * Whether this wood lies open over the ground (only more of the wood, air, plants or mud plates over it), as the
+     * colony sees its food: not a root buried under the soil (the dip of 2026-10-19: a dead giant's roots ran on under
+     * the grass past the dip it stood in, the foot was learnt on a buried root the colony never saw as food, and no
+     * gallery went out to it).
+     */
+    private boolean isUncovered(ServerLevel level, BlockPos pos) {
+        BlockPos.MutableBlockPos over = pos.mutable();
+        for (int up = 1; up <= 2 * SPREAD; up++) {
+            over.setY(pos.getY() + up);
+            BlockState state = level.getBlockState(over);
+            if (!isDeadWood(state)) {
+                return state.isAir() || MudCrustBlock.isCrust(state) || !state.blocksMotion()
+                        || state.is(com.antcolonies.registry.TreeBlocks.TREE_WOOD) || state.is(com.antcolonies.registry.TreeBlocks.TREE_LEAVES);
+            }
+        }
+        return true;
     }
 
     /** Dead tree wood the colony eats: the dead giants' wood, rotten wood and baobab fibre, the old dead wood. */
