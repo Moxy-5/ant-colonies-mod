@@ -32,7 +32,7 @@ A smarter mind later uses it as its "act" building block (go, get there, or lear
    night soil, the patrol, standing by the queen, ...). Those without a "no way, leave it alone" memory get one: a
    small change in the game (an insect cut off from its work stops searching for a route every second), as the
    lesson of `docs/BUGS.md` 42 asks. Tests: the categories each goal touches, plus `away`.
-3. **One route search for several spots** (speed fix): a digger's stand spots and the carriers' spots searched in one
+3. **(BUILT 2026-10-20, `docs/HISTORY.md`)** **One route search for several spots** (speed fix): a digger's stand spots and the carriers' spots searched in one
    go instead of one after another; the insect goes to the nearest spot it can reach, as a real ant would. A small
    change in the game. Measured with `/antcolonies perf` before and after.
 4. **`ScoutGoal` in three** (termites scouting and telling, harvester ants searching alone, recruits following a scent
