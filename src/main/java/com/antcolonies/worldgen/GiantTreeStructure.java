@@ -103,6 +103,15 @@ public class GiantTreeStructure extends Structure {
 
     @Override
     protected Optional<GenerationStub> findGenerationPoint(GenerationContext context) {
+        long start = System.nanoTime();
+        try {
+            return plan(context);
+        } finally {
+            com.antcolonies.debug.Perf.newLand(com.antcolonies.debug.Perf.NewLand.PLANNING, System.nanoTime() - start);
+        }
+    }
+
+    private Optional<GenerationStub> plan(GenerationContext context) {
         RandomSource random = context.random();
         int x = context.chunkPos().getMinBlockX() + random.nextInt(16), z = context.chunkPos().getMinBlockZ() + random.nextInt(16);
         Pick pick = pick(size, random);

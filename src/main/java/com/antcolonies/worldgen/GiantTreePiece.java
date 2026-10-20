@@ -114,6 +114,15 @@ public class GiantTreePiece extends StructurePiece {
     @Override
     public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random,
                             BoundingBox box, ChunkPos chunkPos, BlockPos pivot) {
+        long start = System.nanoTime();
+        try {
+            putDown(level, generator, box);
+        } finally {
+            com.antcolonies.debug.Perf.newLand(com.antcolonies.debug.Perf.NewLand.PLACING, System.nanoTime() - start);
+        }
+    }
+
+    private void putDown(WorldGenLevel level, ChunkGenerator generator, BoundingBox box) {
         net.minecraft.world.level.levelgen.RandomState randomState = level.getLevel().getChunkSource().randomState();
         TreePlacer.Placed litter = litter(pick, foot, (x, z) -> generator.getFirstFreeHeight(x, z,
                 net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE_WG, level, randomState));

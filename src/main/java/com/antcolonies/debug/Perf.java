@@ -137,11 +137,56 @@ public final class Perf {
         }
         out.append(String.format("Route searches: %.1f a second, %d failed, %.0f steps each, longest %.1f ms",
                 searches / (ticks / 20.0), failedSearches, searches == 0 ? 0.0 : (double) expansions / searches, ms(longestSearchNanos)));
+        reportNewLand(out);
         return out.toString();
     }
 
     private static double ms(long nanos) {
         return nanos / 1_000_000.0;
+    }
+
+    /**
+     * New land (M7.5 step 7): the giant trees' share of world generation. It runs on the world's builder threads, not in
+     * the server tick, so it is counted apart (any thread, safely) and shown as its own lines: planning a tree (picking
+     * it and working out its shape, once per tree) and putting it down (once per chunk it reaches). Slow here means
+     * new land loads slowly, not a slow tick.
+     */
+    public enum NewLand {
+        PLANNING("planned"),
+        PLACING("put down, chunk by chunk");
+
+        final String label;
+        final java.util.concurrent.atomic.LongAdder count = new java.util.concurrent.atomic.LongAdder();
+        final java.util.concurrent.atomic.LongAdder total = new java.util.concurrent.atomic.LongAdder();
+        final java.util.concurrent.atomic.AtomicLong longest = new java.util.concurrent.atomic.AtomicLong();
+
+        NewLand(String label) {
+            this.label = label;
+        }
+    }
+
+    /** Counts one piece of new-land work that took this long (from any thread). */
+    public static void newLand(NewLand part, long tookNanos) {
+        part.count.increment();
+        part.total.add(tookNanos);
+        part.longest.accumulateAndGet(tookNanos, Math::max);
+    }
+
+    private static void reportNewLand(StringBuilder out) {
+        boolean any = false;
+        for (NewLand part : NewLand.values()) {
+            long n = part.count.sumThenReset();
+            long total = part.total.sumThenReset();
+            long longest = part.longest.getAndSet(0);
+            if (n == 0) {
+                continue;
+            }
+            if (!any) {
+                out.append("\nNew land, giant trees (world builder threads, not in the tick):");
+                any = true;
+            }
+            out.append(String.format("\n  %d %s, %.2f ms each, longest %.1f ms", n, part.label, ms(total) / n, ms(longest)));
+        }
     }
 
     /** The last report (every 5 seconds). */

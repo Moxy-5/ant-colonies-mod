@@ -23,6 +23,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.animal.Pig;
 import net.minecraft.world.level.biome.Biome;
@@ -202,12 +203,20 @@ public class TreeTests {
         BlockPos foot = helper.absolutePos(new BlockPos(TREE_MIDDLE, SURFACE, TREE_MIDDLE));
         TreePlacer.Placed tree = TreePlacer.placed("camel_thorn", 5, 1, TreeStage.LIVING);
         BoundingBox box = tree.box(foot);
+        long placing = 0, longestChunk = 0;
+        int chunks = 0;
         for (int cx = box.minX() >> 4; cx <= box.maxX() >> 4; cx++) {
             for (int cz = box.minZ() >> 4; cz <= box.maxZ() >> 4; cz++) {
                 BoundingBox chunk = new BoundingBox(cx << 4, box.minY(), cz << 4, (cx << 4) + 15, box.maxY(), (cz << 4) + 15);
+                long start = System.nanoTime();
                 TreePlacer.place(level, tree, foot, chunk, Block.UPDATE_CLIENTS);
+                long took = System.nanoTime() - start;
+                placing += took;
+                longestChunk = Math.max(longestChunk, took);
+                chunks++;
             }
         }
+        newLandSpeed(helper, placing, longestChunk, chunks);
         int missing = 0, above = 0;
         String first = "";
         for (int i = 0; i < tree.size(); i++) {
@@ -240,6 +249,47 @@ public class TreeTests {
         }
         newLandLitter(helper, foot);
         helper.succeed();
+    }
+
+    /**
+     * Step 7: how long new land's trees take. Trees of both structures are picked as new land picks them (the real
+     * spread of kinds, ages and dead stages) and worked out from nothing, and the grown camel thorn above was put down
+     * chunk by chunk; the times go to the log. The limits are far over what they take (a test server shares the PC with
+     * others), so only something badly slower fails: a tree's shape over half a second on average, a chunk's part of a
+     * tree over a tenth of a second.
+     */
+    private static void newLandSpeed(GameTestHelper helper, long placing, long longestChunk, int chunks) {
+        RandomSource random = RandomSource.create(7);
+        long shaping = 0, longestShape = 0;
+        int trees = 0;
+        String slowest = "";
+        for (String size : new String[] {"big", "young"}) {
+            for (int i = 0; i < 30; i++) {
+                var pick = com.antcolonies.worldgen.GiantTreeStructure.pick(size, random);
+                if (com.antcolonies.worldgen.GiantTreePiece.fallenYoung(pick)) {
+                    continue;
+                }
+                long start = System.nanoTime();
+                TreePlacer.placed(pick.kind(), pick.seed() + 1_000_000_007L * (i + 1), pick.age(), pick.stage()); // a seed no other test has worked out
+                long took = System.nanoTime() - start;
+                shaping += took;
+                trees++;
+                if (took > longestShape) {
+                    longestShape = took;
+                    slowest = pick.kind() + " age " + pick.age() + " " + pick.stage();
+                }
+            }
+        }
+        double shapeMs = shaping / 1e6 / trees, chunkMs = placing / 1e6 / chunks;
+        AntColoniesMod.LOGGER.info("[trees speed] {} new-land trees worked out, {} ms each, longest {} ms ({}); a grown camel thorn put down in {} chunks, {} ms each, longest {} ms",
+                trees, String.format("%.1f", shapeMs), String.format("%.1f", longestShape / 1e6), slowest, chunks,
+                String.format("%.2f", chunkMs), String.format("%.1f", longestChunk / 1e6));
+        if (shapeMs > 500) {
+            helper.fail("new land's trees take " + String.format("%.0f", shapeMs) + " ms each to work out (the slowest " + slowest + ")");
+        }
+        if (chunkMs > 100) {
+            helper.fail("putting a grown tree down takes " + String.format("%.0f", chunkMs) + " ms a chunk");
+        }
     }
 
     /**
