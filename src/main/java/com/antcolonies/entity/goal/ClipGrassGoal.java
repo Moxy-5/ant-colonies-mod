@@ -1,8 +1,6 @@
 package com.antcolonies.entity.goal;
 
 import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.function.Predicate;
 
 import org.jetbrains.annotations.Nullable;
@@ -36,10 +34,10 @@ public class ClipGrassGoal extends Goal {
     private static final int CLIP_TICKS = 50;
     /** If the ant can't get there in 30 seconds it leaves the grass to the others. */
     private static final int GIVE_UP_TICKS = 600;
-    /** Grass this ant found no way to is left alone for this long. */
-    private static final int UNREACHABLE_TICKS = 400;
 
     private final AbstractAntEntity ant;
+    /** The walk to the plant; a plant it found no way to is left alone for a while. */
+    private final Errand<BlockPos> errand;
     @Nullable
     private Colony colony;
     @Nullable
@@ -54,11 +52,10 @@ public class ClipGrassGoal extends Goal {
      */
     @Nullable
     private BlockPos via;
-    /** Grass this ant failed to reach: position -> game time until which it leaves it alone. */
-    private final Map<BlockPos, Long> unreachable = new HashMap<>();
 
     public ClipGrassGoal(AbstractAntEntity ant) {
         this.ant = ant;
+        this.errand = new Errand<>(ant);
         setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
     }
 
@@ -82,9 +79,7 @@ public class ClipGrassGoal extends Goal {
         if (!fromInside && !colony.door().mayGo(level, ant)) {
             return false; // waits by the entrance for the homecomers' touches (Gordon's rule, see colony.Door)
         }
-        long now = level.getGameTime();
-        unreachable.values().removeIf(until -> until <= now);
-        grass = colony.food().findGrass(level, ant.blockPosition(), unreachable.keySet(), ant.getUUID(), fromInside);
+        grass = colony.food().findGrass(level, ant.blockPosition(), errand.leftAlone(), ant.getUUID(), fromInside);
         if (grass == null || colony.recruits().passesBy(ant.getUUID(), grass)) {
             return false; // (a recruit on its way to its patch passes poorer food by)
         }
@@ -127,11 +122,12 @@ public class ClipGrassGoal extends Goal {
     public void start() {
         ticks = 0;
         clipping = 0;
+        errand.begin();
     }
 
     @Override
     public void stop() {
-        ant.getNavigator().stop();
+        errand.stop();
         if (colony != null) {
             colony.food().releaseGrass(ant.getUUID());
         }
@@ -151,19 +147,18 @@ public class ClipGrassGoal extends Goal {
             BlockPos at = ant.blockPosition();
             if (Math.abs(at.getX() - via.getX()) <= 1 && Math.abs(at.getZ() - via.getZ()) <= 1 && Math.abs(at.getY() - via.getY()) <= 2) {
                 via = null;
-                ant.getNavigator().stop();
-            } else if (ant.getNavigator().isDone() && !ant.getNavigator().moveTo(via, 1.0)) {
+                errand.stop();
+            } else if (!errand.walkOn(via, 1.0)) {
                 via = null; // no way onto the trail from here: straight to the plant
             } else {
                 return;
             }
         }
         ant.getLookControl().setLookAt(grass.getX() + 0.5, grass.getY() + 0.3, grass.getZ() + 0.5);
-        if (ant.getNavigator().isDone() && isNear(ant.blockPosition(), grass)) {
+        if (!errand.isWalking() && isNear(ant.blockPosition(), grass)) {
             clip(level);
-        } else if (ant.getNavigator().isDone() && !ant.getNavigator().moveTo(fromInside
+        } else if (!errand.goTo(grass.immutable(), fromInside
                 ? nearPlant(grass).and(at -> colony.nest().isInside(level, at.cell())) : nearPlant(grass), grass, 1.0)) {
-            unreachable.put(grass.immutable(), level.getGameTime() + UNREACHABLE_TICKS);
             ticks = GIVE_UP_TICKS; // no way to get there: let another ant have a go
         }
     }

@@ -37,6 +37,8 @@ public class EatGoal extends Goal {
     private static final int EAT_TICKS = 30;
 
     private final AbstractAntEntity ant;
+    /** The walk to the meal. */
+    private final Errand<BlockPos> errand;
     private final WorkerHunger hunger;
     @Nullable
     private Colony colony;
@@ -50,6 +52,7 @@ public class EatGoal extends Goal {
 
     public EatGoal(AbstractAntEntity ant, WorkerHunger hunger) {
         this.ant = ant;
+        this.errand = new Errand<>(ant);
         this.hunger = hunger;
         setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
     }
@@ -62,7 +65,7 @@ public class EatGoal extends Goal {
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
         meal = colony == null ? null : colony.workerFood().findMeal(level, ant, ant.getRandom());
-        if (meal == null || !ant.getNavigator().moveTo(meal.spot(), 1.0)) {
+        if (meal == null || !errand.setOff(meal.spot(), 1.0)) {
             nextTry = level.getGameTime() + RETRY_TICKS; // nothing to eat, or no way to it
             return false;
         }
@@ -80,11 +83,12 @@ public class EatGoal extends Goal {
         eatenFor = 0;
         eating = false;
         done = false;
+        errand.begin();
     }
 
     @Override
     public void stop() {
-        ant.getNavigator().stop();
+        errand.stop();
         if (eating) {
             finishMeal(); // interrupted with the food in its mandibles: it counts as eaten
         }
@@ -113,22 +117,20 @@ public class EatGoal extends Goal {
             return;
         }
         ticks++;
-        double dx = ant.getX() - (spot.getX() + 0.5);
-        double dz = ant.getZ() - (spot.getZ() + 0.5);
-        if (dx * dx + dz * dz <= REACH * REACH && Math.abs(ant.getY() - spot.getY()) < 1.5) {
+        if (errand.within(spot, REACH)) {
             ItemStack food = colony.workerFood().eatAt(level, ant, meal);
             if (!food.isEmpty()) {
                 ant.setCarriedSeed(food);
-                ant.getNavigator().stop();
+                errand.stop();
                 eating = true;
                 eatenFor = 0;
             } else {
                 meal = colony.workerFood().findMeal(level, ant, ant.getRandom()); // somebody else took the last of it there
-                if (meal == null || !ant.getNavigator().moveTo(meal.spot(), 1.0)) {
+                if (meal == null || !errand.setOff(meal.spot(), 1.0)) {
                     done = true;
                 }
             }
-        } else if (ant.getNavigator().isDone() && !ant.getNavigator().moveTo(spot, 1.0)) {
+        } else if (!errand.walkOn(spot, 1.0)) {
             done = true;
         }
     }

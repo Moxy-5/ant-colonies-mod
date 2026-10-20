@@ -33,6 +33,11 @@ public class SealEntranceGoal extends Goal {
     private static final int GIVE_UP_TICKS = 600;
 
     private final AbstractAntEntity ant;
+    /**
+     * The walk up the shaft; with no way there the sealing is left alone for a while (docs/BUGS.md 42: without it a
+     * cut-off insect searched for a route again every time it looked for work).
+     */
+    private final Errand<BlockPos> errand;
     @Nullable
     private Colony colony;
     @Nullable
@@ -42,6 +47,7 @@ public class SealEntranceGoal extends Goal {
 
     public SealEntranceGoal(AbstractAntEntity ant) {
         this.ant = ant;
+        this.errand = new Errand<>(ant);
         setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
     }
 
@@ -65,7 +71,7 @@ public class SealEntranceGoal extends Goal {
             return false;
         }
         stand = colony.nest().getEntrance().below();
-        return true;
+        return !errand.isLeftAlone(stand);
     }
 
     @Override
@@ -77,11 +83,12 @@ public class SealEntranceGoal extends Goal {
     public void start() {
         ticks = 0;
         packed = 0;
+        errand.begin();
     }
 
     @Override
     public void stop() {
-        ant.getNavigator().stop();
+        errand.stop();
         stand = null;
         colony = null;
     }
@@ -94,14 +101,14 @@ public class SealEntranceGoal extends Goal {
         ticks++;
         BlockPos hole = colony.nest().getEntrance();
         ant.getLookControl().setLookAt(Vec3.atCenterOf(hole));
-        if (!ant.blockPosition().equals(stand)) {
-            if (ant.getNavigator().isDone() && !ant.getNavigator().moveTo(stand, 1.0)) {
+        if (!errand.isIn(stand)) {
+            if (!errand.goTo(stand, stand, 1.0)) {
                 ticks = GIVE_UP_TICKS; // no way up the shaft
             }
             return;
         }
         // Clinging just under the hole: pack soil into it.
-        ant.getNavigator().stop();
+        errand.stop();
         BlockState soil = colony.profile().nest().plugState();
         if (++packed % PACK_INTERVAL == 0) {
             level.playSound(null, hole, soil.getSoundType().getPlaceSound(), SoundSource.BLOCKS, 0.4F, 1.2F);

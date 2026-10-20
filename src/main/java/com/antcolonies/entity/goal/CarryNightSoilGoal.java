@@ -32,6 +32,11 @@ public class CarryNightSoilGoal extends Goal {
     private static final int GIVE_UP_TICKS = 400;
 
     private final AbstractAntEntity ant;
+    /**
+     * The walk to the pile; a pile it found no way to is left alone for a while (docs/BUGS.md 42: without it a cut-off
+     * insect searched for a route again every time it looked for work).
+     */
+    private final Errand<BlockPos> errand;
     @Nullable
     private Colony colony;
     @Nullable
@@ -41,6 +46,7 @@ public class CarryNightSoilGoal extends Goal {
 
     public CarryNightSoilGoal(AbstractAntEntity ant) {
         this.ant = ant;
+        this.errand = new Errand<>(ant);
         setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
     }
 
@@ -55,6 +61,10 @@ public class CarryNightSoilGoal extends Goal {
             return false;
         }
         heap = colony.hill().nightSoil().claimPile(level, ant.getUUID());
+        if (heap != null && errand.isLeftAlone(heap)) {
+            colony.hill().nightSoil().release(ant.getUUID());
+            heap = null;
+        }
         return heap != null;
     }
 
@@ -68,11 +78,12 @@ public class CarryNightSoilGoal extends Goal {
     public void start() {
         ticks = 0;
         picking = 0;
+        errand.begin();
     }
 
     @Override
     public void stop() {
-        ant.getNavigator().stop();
+        errand.stop();
         if (colony != null) {
             colony.hill().nightSoil().release(ant.getUUID());
         }
@@ -88,15 +99,13 @@ public class CarryNightSoilGoal extends Goal {
         ticks++;
         Vec3 spot = Vec3.atCenterOf(heap);
         ant.getLookControl().setLookAt(spot);
-        double dx = ant.getX() - spot.x;
-        double dz = ant.getZ() - spot.z;
-        if (dx * dx + dz * dz > 1.3 * 1.3 || Math.abs(ant.getY() - heap.getY()) >= 1.5) {
-            if (ant.getNavigator().isDone() && !ant.getNavigator().moveTo(heap, 1.0)) {
+        if (!errand.within(heap, 1.3)) {
+            if (!errand.goTo(heap, heap, 1.0)) {
                 ticks = GIVE_UP_TICKS; // no way to the pile: let another ant have a go
             }
             return;
         }
-        ant.getNavigator().stop();
+        errand.stop();
         if (++picking >= PICK_TICKS) {
             BlockState pellet = colony.hill().nightSoil().takeLayer(level, heap, ant.getUUID());
             if (pellet != null) {

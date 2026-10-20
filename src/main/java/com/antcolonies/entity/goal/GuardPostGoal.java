@@ -1,8 +1,6 @@
 package com.antcolonies.entity.goal;
 
 import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.Map;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -37,8 +35,8 @@ public class GuardPostGoal extends Goal {
     private Colony colony;
     @Nullable
     private Soldiers.Post post;
-    /** Posts it found no way to: cell -> game time until which it leaves it alone. */
-    private final Map<BlockPos, Long> avoid = new HashMap<>();
+    /** The walk to its post; a post it found no way to is left alone for a minute ({@link #AVOID_TICKS}). */
+    private final Errand<BlockPos> errand;
     private long nextTry;
     private int repath;
     private int tries;
@@ -46,6 +44,7 @@ public class GuardPostGoal extends Goal {
 
     public GuardPostGoal(TermiteSoldierEntity soldier) {
         this.soldier = soldier;
+        this.errand = new Errand<>(soldier, AVOID_TICKS);
         setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
     }
 
@@ -63,13 +62,12 @@ public class GuardPostGoal extends Goal {
         if (colony == null) {
             return false;
         }
-        avoid.values().removeIf(until -> until <= now);
-        post = colony.soldiers().claimPost(level, soldier, avoid.keySet());
+        post = colony.soldiers().claimPost(level, soldier, errand.leftAlone());
         if (post == null) {
             nextTry = now + RETRY_TICKS;
             return false;
         }
-        if (!atPost() && !soldier.getNavigator().moveTo(post.cell(), 1.0)) {
+        if (!atPost() && !errand.setOff(post.cell(), 1.0)) {
             giveUp(level);
             return false;
         }
@@ -86,11 +84,12 @@ public class GuardPostGoal extends Goal {
         repath = 0;
         tries = 0;
         lost = false;
+        errand.begin();
     }
 
     @Override
     public void stop() {
-        soldier.getNavigator().stop();
+        errand.stop();
         // Stopped for something else (drumming, being fed): it keeps its post and comes back to it.
         post = null;
         colony = null;
@@ -102,17 +101,17 @@ public class GuardPostGoal extends Goal {
             return;
         }
         // Once a second: is it still a post, and still its own?
-        if (soldier.tickCount % 20 == soldier.getId() % 20 && !colony.soldiers().holds(level, soldier, post, avoid.keySet())) {
+        if (soldier.tickCount % 20 == soldier.getId() % 20 && !colony.soldiers().holds(level, soldier, post, errand.leftAlone())) {
             lost = true;
             return;
         }
         if (atPost()) {
-            soldier.getNavigator().stop();
+            errand.stop();
             faceOut();
             tries = 0;
-        } else if (soldier.getNavigator().isDone() && --repath <= 0) {
+        } else if (!errand.isWalking() && --repath <= 0) {
             repath = 40;
-            if (!soldier.getNavigator().moveTo(post.cell(), 1.0) && ++tries >= MAX_TRIES) {
+            if (!errand.setOff(post.cell(), 1.0) && ++tries >= MAX_TRIES) {
                 giveUp(level);
                 lost = true;
             }
@@ -141,7 +140,7 @@ public class GuardPostGoal extends Goal {
     /** It found no way to its post: it leaves that post alone for a while and gives it up to the others. */
     private void giveUp(ServerLevel level) {
         if (post != null) {
-            avoid.put(post.cell(), level.getGameTime() + AVOID_TICKS);
+            errand.leaveAlone(post.cell());
         }
         if (colony != null) {
             colony.soldiers().releasePost(soldier.getUUID());

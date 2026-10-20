@@ -1,8 +1,6 @@
 package com.antcolonies.entity.goal;
 
 import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
@@ -29,12 +27,13 @@ public class CarryEggGoal extends Goal {
     private static final double REACH = 0.7;
     /** After a minute the ant gives up. */
     private static final int GIVE_UP_TICKS = 1200;
-    /** An egg this ant found no way to is left alone for this long. */
-    private static final int UNREACHABLE_TICKS = 400;
-    /** After this many nursery spots with no route to them, the ant puts the egg down. */
-    private static final int MAX_FAILED_ROUTES = 4;
 
     private final AbstractAntEntity ant;
+    /**
+     * The walk to the egg and on to its spot; an egg it found no way to (by its id) is left alone for a while, and after
+     * a few nursery spots with no way to them the ant puts the egg down.
+     */
+    private final Errand<UUID> errand;
     @Nullable
     private Colony colony;
     /** The egg on its way to be picked up; null once the ant carries it. */
@@ -44,13 +43,11 @@ public class CarryEggGoal extends Goal {
     @Nullable
     private BlockPos spot;
     private int ticks;
-    private int failedRoutes;
     private boolean done;
-    /** Eggs this ant failed to reach: egg id -> game time until which it leaves them alone. */
-    private final Map<UUID, Long> unreachable = new HashMap<>();
 
     public CarryEggGoal(AbstractAntEntity ant) {
         this.ant = ant;
+        this.errand = new Errand<>(ant);
         setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
     }
 
@@ -78,9 +75,7 @@ public class CarryEggGoal extends Goal {
         if (colony == null) {
             return false;
         }
-        long now = level.getGameTime();
-        unreachable.values().removeIf(until -> until <= now);
-        egg = colony.brood().findLooseEgg(level, ant.blockPosition(), unreachable.keySet());
+        egg = colony.brood().findLooseEgg(level, ant.blockPosition(), errand.leftAlone());
         if (egg == null) {
             return false;
         }
@@ -96,18 +91,16 @@ public class CarryEggGoal extends Goal {
     @Override
     public void start() {
         ticks = 0;
-        failedRoutes = 0;
         done = false;
-        if (egg != null) {
-            ant.getNavigator().moveTo(egg.blockPosition(), 1.0);
-        } else {
-            walkToSpot();
+        errand.begin();
+        if (egg == null) {
+            walkToSpot(); // (to an egg: it sets off on its first tick, this same tick)
         }
     }
 
     @Override
     public void stop() {
-        ant.getNavigator().stop();
+        errand.stop();
         if (colony != null && egg != null) {
             colony.brood().releaseEgg(egg);
         }
@@ -140,56 +133,37 @@ public class CarryEggGoal extends Goal {
             return;
         }
         ant.getLookControl().setLookAt(egg);
-        double dx = ant.getX() - egg.getX();
-        double dz = ant.getZ() - egg.getZ();
-        if (dx * dx + dz * dz <= REACH * REACH && Math.abs(ant.getY() - egg.getY()) < 1.5) {
+        if (errand.within(egg, REACH)) {
             colony.brood().releaseEgg(egg);
             egg.discard();
             egg = null;
             ant.setCarryingEgg(true);
             level.playSound(null, ant.blockPosition(), SoundEvents.ITEM_PICKUP, SoundSource.NEUTRAL, 0.15F, 1.6F);
             spot = colony.brood().pickEggSpot(level, ant.getRandom());
-            if (spot == null) {
-                done = true; // no room in the nursery after all: stop() puts the egg down
-            } else {
-                walkToSpot();
-            }
-        } else if (ant.getNavigator().isDone() && !ant.getNavigator().moveTo(egg.blockPosition(), 1.0)) {
-            unreachable.put(egg.getUUID(), level.getGameTime() + UNREACHABLE_TICKS);
+            walkToSpot(); // (no room in the nursery after all: stop() puts the egg down)
+        } else if (!errand.goTo(egg.getUUID(), egg.blockPosition(), 1.0)) {
             done = true; // no way to get there: let another ant have a go
         }
     }
 
     /** Second leg: to a free spot in the nursery, where the ant puts the egg down. */
     private void bringEgg(ServerLevel level) {
-        double dx = ant.getX() - (spot.getX() + 0.5);
-        double dz = ant.getZ() - (spot.getZ() + 0.5);
-        if (dx * dx + dz * dz <= REACH * REACH && Math.abs(ant.getY() - spot.getY()) < 1.5) {
+        if (errand.within(spot, REACH)) {
             if (colony.brood().placeEgg(level, spot)) {
                 ant.setCarryingEgg(false);
                 done = true;
             } else {
                 spot = colony.brood().pickEggSpot(level, ant.getRandom()); // another egg lies there now
-                if (spot == null) {
-                    done = true;
-                } else {
-                    walkToSpot();
-                }
+                walkToSpot();
             }
-        } else if (ant.getNavigator().isDone()) {
+        } else if (!errand.isWalking()) {
             walkToSpot();
         }
     }
 
-    /** Plans the walk to the spot. If there is no route, tries other spots, and gives up after a few failures. */
+    /** Sets off to the spot. If there is no way there, tries other spots, and gives up after a few (or with none left). */
     private void walkToSpot() {
-        while (spot != null && !ant.getNavigator().moveTo(spot, 1.0)) {
-            if (++failedRoutes >= MAX_FAILED_ROUTES) {
-                done = true;
-                return;
-            }
-            spot = colony.brood().pickEggSpot(ant.level(), ant.getRandom());
-        }
+        spot = errand.setOffTo(spot, () -> colony.brood().pickEggSpot(ant.level(), ant.getRandom()), 1.0);
         if (spot == null) {
             done = true;
         }

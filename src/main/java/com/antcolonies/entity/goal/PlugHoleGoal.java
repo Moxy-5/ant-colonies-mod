@@ -35,6 +35,11 @@ public class PlugHoleGoal extends Goal {
     private static final int GIVE_UP_TICKS = 600;
 
     private final AbstractAntEntity ant;
+    /**
+     * The walk under the hole; a hole it found no way under is left alone for a while (docs/BUGS.md 42: without it a
+     * cut-off insect searched for a route again every time it looked for work).
+     */
+    private final Errand<BlockPos> errand;
     @Nullable
     private Colony colony;
     @Nullable
@@ -44,6 +49,7 @@ public class PlugHoleGoal extends Goal {
 
     public PlugHoleGoal(AbstractAntEntity ant) {
         this.ant = ant;
+        this.errand = new Errand<>(ant);
         setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
     }
 
@@ -58,8 +64,13 @@ public class PlugHoleGoal extends Goal {
         if (tunnel == null) {
             return false;
         }
+        if (errand.isLeftAlone(tunnel.hole())) {
+            colony.foragingHoles().releasePlug(ant.getUUID());
+            return false;
+        }
         // Up to the end of the tunnel from inside: never through the hole it is about to close.
-        if (!ant.getNavigator().moveTo(tunnel.end(), 1.0, AntPathFinder.StepCosts.forbid(List.of(tunnel.hole())))) {
+        if (!errand.setOff(tunnel.end(), 1.0, AntPathFinder.StepCosts.forbid(List.of(tunnel.hole())))) {
+            errand.leaveAlone(tunnel.hole());
             com.antcolonies.AntColoniesMod.LOGGER.debug("[plug] {} at {} found no way under the hole {} to {}", ant.getId(),
                     ant.blockPosition().toShortString(), tunnel.hole().toShortString(), tunnel.end().toShortString());
             colony.foragingHoles().releasePlug(ant.getUUID());
@@ -78,11 +89,12 @@ public class PlugHoleGoal extends Goal {
     public void start() {
         ticks = 0;
         packed = 0;
+        errand.begin();
     }
 
     @Override
     public void stop() {
-        ant.getNavigator().stop();
+        errand.stop();
         if (colony != null) {
             colony.foragingHoles().releasePlug(ant.getUUID());
         }
@@ -98,15 +110,15 @@ public class PlugHoleGoal extends Goal {
         ticks++;
         BlockPos hole = tunnel.hole();
         ant.getLookControl().setLookAt(Vec3.atCenterOf(hole));
-        if (!ant.blockPosition().equals(tunnel.end())) {
-            if (ant.getNavigator().isDone()
-                    && !ant.getNavigator().moveTo(tunnel.end(), 1.0, AntPathFinder.StepCosts.forbid(List.of(hole)))) {
+        if (!errand.isIn(tunnel.end())) {
+            if (!errand.walkOn(tunnel.end(), 1.0, AntPathFinder.StepCosts.forbid(List.of(hole)))) {
+                errand.leaveAlone(hole);
                 ticks = GIVE_UP_TICKS; // no way there from inside
             }
             return;
         }
         // Under the hole: pack soil into it.
-        ant.getNavigator().stop();
+        errand.stop();
         BlockState soil = colony.profile().nest().plugState();
         if (++packed % PACK_INTERVAL == 0) {
             level.playSound(null, hole, soil.getSoundType().getPlaceSound(), SoundSource.BLOCKS, 0.4F, 1.2F);

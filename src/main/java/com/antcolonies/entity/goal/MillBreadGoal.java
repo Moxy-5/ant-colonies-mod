@@ -35,6 +35,8 @@ public class MillBreadGoal extends Goal {
     private enum Leg { TO_PILE, TO_SPOT, MILLING }
 
     private final AbstractAntEntity ant;
+    /** The walks to the seeds and to the mill. */
+    private final Errand<BlockPos> errand;
     @Nullable
     private Colony colony;
     private Leg leg = Leg.TO_PILE;
@@ -48,6 +50,7 @@ public class MillBreadGoal extends Goal {
 
     public MillBreadGoal(AbstractAntEntity ant) {
         this.ant = ant;
+        this.errand = new Errand<>(ant);
         setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
     }
 
@@ -60,7 +63,7 @@ public class MillBreadGoal extends Goal {
         if (ant.isCarryingSeed() && ant.isSeedForBread()) {
             colony = ColonyManager.get(level).getColony(ant.getColonyId());
             target = colony == null ? null : colony.bakery().pickBreadSpot(level, ant.getRandom());
-            if (target == null || !ant.getNavigator().moveTo(target, 1.0)) {
+            if (!errand.setOff(target, 1.0)) {
                 if (colony != null) {
                     colony.bakery().releaseMilling(ant.getUUID());
                 }
@@ -80,7 +83,7 @@ public class MillBreadGoal extends Goal {
             return false;
         }
         target = colony.food().findSeedPile(level, ant.getRandom());
-        if (target == null || !ant.getNavigator().moveTo(target, 1.0)) {
+        if (!errand.setOff(target, 1.0)) {
             colony.bakery().releaseMilling(ant.getUUID());
             nextTry = level.getGameTime() + RETRY_TICKS; // no seeds, or no way to them
             return false;
@@ -99,11 +102,12 @@ public class MillBreadGoal extends Goal {
         ticks = 0;
         milled = 0;
         done = false;
+        errand.begin();
     }
 
     @Override
     public void stop() {
-        ant.getNavigator().stop();
+        errand.stop();
         if (colony != null) {
             colony.bakery().releaseMilling(ant.getUUID());
         }
@@ -133,7 +137,7 @@ public class MillBreadGoal extends Goal {
 
     /** First leg: to a heap of seeds in the food store, where the ant takes one. */
     private void walkToPile(ServerLevel level) {
-        if (near(target)) {
+        if (errand.within(target, REACH)) {
             ItemStack taken = colony.food().takeSeedAt(level, target, ant.getUUID(), colony.bakery().wantsRichBread());
             if (!taken.isEmpty()) {
                 ant.setCarriedSeed(taken);
@@ -141,27 +145,27 @@ public class MillBreadGoal extends Goal {
                 ColonyManager.get(level).markChanged();
                 target = colony.bakery().pickBreadSpot(level, ant.getRandom());
                 leg = Leg.TO_SPOT;
-                if (target == null || !ant.getNavigator().moveTo(target, 1.0)) {
+                if (!errand.setOff(target, 1.0)) {
                     done = true; // the seed goes back to the store
                 }
             } else {
                 target = colony.food().findSeedPile(level, ant.getRandom()); // somebody else took the last seed there
-                if (target == null || !ant.getNavigator().moveTo(target, 1.0)) {
+                if (!errand.setOff(target, 1.0)) {
                     done = true;
                 }
             }
-        } else if (ant.getNavigator().isDone() && !ant.getNavigator().moveTo(target, 1.0)) {
+        } else if (!errand.walkOn(target, 1.0)) {
             done = true;
         }
     }
 
     /** Second leg: to a spot in the nursery, where the ant starts milling. */
     private void walkToSpot(ServerLevel level) {
-        if (near(target)) {
-            ant.getNavigator().stop();
+        if (errand.within(target, REACH)) {
+            errand.stop();
             milled = 0;
             leg = Leg.MILLING;
-        } else if (ant.getNavigator().isDone() && !ant.getNavigator().moveTo(target, 1.0)) {
+        } else if (!errand.walkOn(target, 1.0)) {
             done = true;
         }
     }
@@ -185,20 +189,11 @@ public class MillBreadGoal extends Goal {
         } else {
             // That heap filled up meanwhile: walk to another spot.
             target = colony.bakery().pickBreadSpot(level, ant.getRandom());
-            if (target == null || !ant.getNavigator().moveTo(target, 1.0)) {
+            if (!errand.setOff(target, 1.0)) {
                 done = true; // the seed goes back to the store
             } else {
                 leg = Leg.TO_SPOT;
             }
         }
-    }
-
-    private boolean near(@Nullable BlockPos spot) {
-        if (spot == null) {
-            return false;
-        }
-        double dx = ant.getX() - (spot.getX() + 0.5);
-        double dz = ant.getZ() - (spot.getZ() + 0.5);
-        return dx * dx + dz * dz <= REACH * REACH && Math.abs(ant.getY() - spot.getY()) < 1.5;
     }
 }

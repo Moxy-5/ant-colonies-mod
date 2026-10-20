@@ -30,12 +30,15 @@ public class StandByQueenGoal extends Goal {
     private static final double COURT_RADIUS = 0.45;
 
     private final AbstractAntEntity ant;
+    /** The walk to the queen (and to its place in her court). */
+    private final Errand<BlockPos> errand;
     @Nullable
     private Colony colony;
     private int repath;
 
     public StandByQueenGoal(AbstractAntEntity ant) {
         this.ant = ant;
+        this.errand = new Errand<>(ant);
         setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
     }
 
@@ -60,11 +63,12 @@ public class StandByQueenGoal extends Goal {
     @Override
     public void start() {
         repath = 0;
+        errand.begin();
     }
 
     @Override
     public void stop() {
-        ant.getNavigator().stop();
+        errand.stop();
         colony = null;
     }
 
@@ -82,13 +86,10 @@ public class StandByQueenGoal extends Goal {
             return;
         }
         ant.getLookControl().setLookAt(queen);
-        double dx = ant.getX() - queen.getX();
-        double dz = ant.getZ() - queen.getZ();
-        boolean near = dx * dx + dz * dz <= NEAR * NEAR && Math.abs(ant.getY() - queen.getY()) < 1.5;
-        if (near) {
-            ant.getNavigator().stop();
-        } else if (ant.getNavigator().isDone() && --repath <= 0) {
-            ant.getNavigator().moveTo(queen.blockPosition(), 1.0);
+        if (errand.within(queen, NEAR)) {
+            errand.stop();
+        } else if (!errand.isWalking() && --repath <= 0) {
+            errand.setOff(queen.blockPosition(), 1.0);
             repath = 40; // not every tick if there is no way
         }
     }
@@ -105,15 +106,13 @@ public class StandByQueenGoal extends Goal {
         ant.getLookControl().setLookAt(mouth.x, mouth.y, mouth.z);
         double dx = ant.getX() - spot.x;
         double dz = ant.getZ() - spot.z;
-        double qx = ant.getX() - queen.getX();
-        double qz = ant.getZ() - queen.getZ();
         boolean there = dx * dx + dz * dz <= 0.3 * 0.3 && Math.abs(ant.getY() - queen.getY()) < 1.5;
-        boolean nearEnough = ant.getNavigator().isDone() && qx * qx + qz * qz <= NEAR * NEAR && Math.abs(ant.getY() - queen.getY()) < 1.5;
+        boolean nearEnough = !errand.isWalking() && errand.within(queen, NEAR);
         if (there || nearEnough && repath > 0) {
-            ant.getNavigator().stop();
-        } else if (ant.getNavigator().isDone() && --repath <= 0) {
-            if (!ant.getNavigator().moveTo(BlockPos.containing(spot.add(0, 0.1, 0)), 1.0)) {
-                ant.getNavigator().moveTo(queen.blockPosition(), 1.0);
+            errand.stop();
+        } else if (!errand.isWalking() && --repath <= 0) {
+            if (!errand.setOff(BlockPos.containing(spot.add(0, 0.1, 0)), 1.0)) {
+                errand.setOff(queen.blockPosition(), 1.0);
             }
             repath = 40; // not every tick if there is no way
         }

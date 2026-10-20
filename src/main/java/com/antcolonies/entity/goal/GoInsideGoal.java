@@ -23,6 +23,8 @@ public class GoInsideGoal extends Goal {
     private static final int RETRY_TICKS = 200;
 
     private final AbstractAntEntity ant;
+    /** The walk in (with no way in it waits a while before looking again, see {@link #nextTry}). */
+    private final Errand<BlockPos> errand;
     @Nullable
     private Colony colony;
     private int ticks;
@@ -31,6 +33,7 @@ public class GoInsideGoal extends Goal {
 
     public GoInsideGoal(AbstractAntEntity ant) {
         this.ant = ant;
+        this.errand = new Errand<>(ant);
         setFlags(EnumSet.of(Flag.MOVE));
     }
 
@@ -49,7 +52,7 @@ public class GoInsideGoal extends Goal {
         }
         // Not to a doorway (the entrance or a foraging hole): one that stops there blocks it from being plugged.
         Colony home = colony;
-        boolean going = ant.getNavigator().moveTo(at -> home.nest().isInside(level, at.cell()) && !home.foragingHoles().isDoorway(level, at.cell()),
+        boolean going = errand.setOff(at -> home.nest().isInside(level, at.cell()) && !home.foragingHoles().isDoorway(level, at.cell()),
                 colony.getCenter().below(), 1.0);
         if (!going) {
             nextTry = level.getGameTime() + RETRY_TICKS;
@@ -61,12 +64,13 @@ public class GoInsideGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        return colony != null && !ant.getNavigator().isDone() && ticks < GIVE_UP_TICKS;
+        return colony != null && errand.isWalking() && ticks < GIVE_UP_TICKS;
     }
 
     @Override
     public void start() {
         ticks = 0;
+        errand.begin();
     }
 
     @Override
@@ -76,7 +80,7 @@ public class GoInsideGoal extends Goal {
 
     @Override
     public void stop() {
-        ant.getNavigator().stop();
+        errand.stop();
         colony = null;
     }
 }

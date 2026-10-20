@@ -33,6 +33,11 @@ public class RepairHillGoal extends Goal {
     private static final int GIVE_UP_TICKS = 400;
 
     private final AbstractAntEntity ant;
+    /**
+     * The walk into the shaft; with no way there the repair is left alone for a while (docs/BUGS.md 42: without it a
+     * cut-off insect searched for a route again every time it looked for work).
+     */
+    private final Errand<BlockPos> errand;
     @Nullable
     private Colony colony;
     @Nullable
@@ -42,6 +47,7 @@ public class RepairHillGoal extends Goal {
 
     public RepairHillGoal(AbstractAntEntity ant) {
         this.ant = ant;
+        this.errand = new Errand<>(ant);
         setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
     }
 
@@ -57,6 +63,9 @@ public class RepairHillGoal extends Goal {
             return false;
         }
         soilSpot = colony.hill().getRepairSoilSpot();
+        if (errand.isLeftAlone(soilSpot)) {
+            return false;
+        }
         colony.hill().claimHillRepair(level, ant.getUUID());
         return true;
     }
@@ -70,11 +79,12 @@ public class RepairHillGoal extends Goal {
     public void start() {
         ticks = 0;
         scraped = 0;
+        errand.begin();
     }
 
     @Override
     public void stop() {
-        ant.getNavigator().stop();
+        errand.stop();
         soilSpot = null;
         colony = null;
     }
@@ -88,14 +98,14 @@ public class RepairHillGoal extends Goal {
         Vec3 spot = Vec3.atCenterOf(soilSpot);
         ant.getLookControl().setLookAt(spot);
 
-        if (!ant.blockPosition().equals(soilSpot)) {
-            if (ant.getNavigator().isDone() && !ant.getNavigator().moveTo(soilSpot, 1.0)) {
+        if (!errand.isIn(soilSpot)) {
+            if (!errand.goTo(soilSpot, soilSpot, 1.0)) {
                 ticks = GIVE_UP_TICKS; // no way into the shaft: let another ant have a go
             }
             return;
         }
 
-        ant.getNavigator().stop();
+        errand.stop();
         if (++scraped % SCRAPE_INTERVAL == 0) {
             BlockState dirt = Blocks.DIRT.defaultBlockState();
             level.playSound(null, soilSpot, dirt.getSoundType().getHitSound(), SoundSource.BLOCKS, 0.4F, 1.3F);

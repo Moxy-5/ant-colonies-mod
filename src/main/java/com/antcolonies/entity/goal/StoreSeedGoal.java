@@ -21,16 +21,15 @@ public class StoreSeedGoal extends Goal {
     private static final double REACH = 0.9;
     /** If the ant can't get there in a minute it drops the seed where it stands. */
     private static final int GIVE_UP_TICKS = 1200;
-    /** After this many spots with no route to them, the ant drops the seed. */
-    private static final int MAX_FAILED_ROUTES = 4;
 
     private final AbstractAntEntity ant;
+    /** The walk home to the store (after a few spots with no way to them, the ant drops the seed). */
+    private final Errand<BlockPos> errand;
     @Nullable
     private Colony colony;
     @Nullable
     private BlockPos spot;
     private int ticks;
-    private int failedRoutes;
     /**
      * Where the forager joins the trunk trail it came out by, on its way home (harvester ants; see
      * {@code TrunkTrails}); null once it is on it, or with no trail that way.
@@ -40,6 +39,7 @@ public class StoreSeedGoal extends Goal {
 
     public StoreSeedGoal(AbstractAntEntity ant) {
         this.ant = ant;
+        this.errand = new Errand<>(ant);
         setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
     }
 
@@ -67,9 +67,9 @@ public class StoreSeedGoal extends Goal {
     @Override
     public void start() {
         ticks = 0;
-        failedRoutes = 0;
+        errand.begin();
         via = ant.level() instanceof ServerLevel level && colony != null ? colony.trunkTrails().wayHome(level, ant.blockPosition()) : null;
-        if (via == null || !ant.getNavigator().moveTo(via, 1.0)) {
+        if (!errand.setOff(via, 1.0)) {
             via = null;
             walkToSpot();
         }
@@ -77,7 +77,7 @@ public class StoreSeedGoal extends Goal {
 
     @Override
     public void stop() {
-        ant.getNavigator().stop();
+        errand.stop();
         spot = null;
         via = null;
         colony = null;
@@ -98,42 +98,29 @@ public class StoreSeedGoal extends Goal {
             if (Math.abs(at.getX() - via.getX()) <= 1 && Math.abs(at.getZ() - via.getZ()) <= 1 && Math.abs(at.getY() - via.getY()) <= 2) {
                 via = null;
                 walkToSpot();
-            } else if (ant.getNavigator().isDone() && !ant.getNavigator().moveTo(via, 1.0)) {
+            } else if (!errand.walkOn(via, 1.0)) {
                 via = null;
                 walkToSpot();
             }
             return;
         }
-        double dx = ant.getX() - (spot.getX() + 0.5);
-        double dz = ant.getZ() - (spot.getZ() + 0.5);
-        double dy = ant.getY() - spot.getY();
-        if (dx * dx + dz * dz <= REACH * REACH && Math.abs(dy) < 1.5) {
+        if (errand.within(spot, REACH)) {
             if (colony.food().depositSeed(level, spot, ant.getCarriedSeed().is(com.antcolonies.registry.ModTags.RICH_SEEDS))) {
                 ant.setCarriedSeed(net.minecraft.world.item.ItemStack.EMPTY);
                 colony.food().releaseStorePlace(ant.getUUID());
                 ColonyManager.get(level).markChanged();
             } else {
                 spot = colony.food().pickFoodSpot(level, ant.getRandom()); // that heap is full
-                if (spot == null) {
-                    dropSeed();
-                } else {
-                    walkToSpot();
-                }
+                walkToSpot();
             }
-        } else if (ant.getNavigator().isDone()) {
+        } else if (!errand.isWalking()) {
             walkToSpot();
         }
     }
 
-    /** Plans the walk to the spot in the food store. If there is no route, tries other spots, and drops the seed after a few failures. */
+    /** Sets off to the spot in the food store. If there is no way there, tries other spots, and drops the seed after a few (or with none left). */
     private void walkToSpot() {
-        while (spot != null && !ant.getNavigator().moveTo(spot, 1.0)) {
-            if (++failedRoutes >= MAX_FAILED_ROUTES) {
-                dropSeed();
-                return;
-            }
-            spot = colony.food().pickFoodSpot(ant.level(), ant.getRandom());
-        }
+        spot = errand.setOffTo(spot, () -> colony.food().pickFoodSpot(ant.level(), ant.getRandom()), 1.0);
         if (spot == null) {
             dropSeed();
         }
@@ -142,7 +129,7 @@ public class StoreSeedGoal extends Goal {
     private void dropSeed() {
         if (ant.isCarryingSeed()) {
             com.antcolonies.AntColoniesMod.LOGGER.info("[seed] ant {} could not take its seed to the food store and dropped it at {} (after {} ticks, {} failed routes)",
-                    ant.getId(), ant.blockPosition().toShortString(), ticks, failedRoutes);
+                    ant.getId(), ant.blockPosition().toShortString(), ticks, errand.spotsWithNoWay());
             ant.spawnAtLocation(ant.getCarriedSeed());
             ant.setCarriedSeed(net.minecraft.world.item.ItemStack.EMPTY);
             Colony mine = ant.getColonyId() != null && ant.level() instanceof ServerLevel level ? ColonyManager.get(level).getColony(ant.getColonyId()) : null;

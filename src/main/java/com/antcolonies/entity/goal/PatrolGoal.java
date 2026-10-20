@@ -42,6 +42,8 @@ public class PatrolGoal extends Goal {
     private static final int AT_DOOR_TICKS = 100;
 
     private final AbstractAntEntity ant;
+    /** The walk round the hill, out along its way and home. */
+    private final Errand<BlockPos> errand;
     @Nullable
     private Colony colony;
     private final List<BlockPos> waypoints = new ArrayList<>();
@@ -54,6 +56,7 @@ public class PatrolGoal extends Goal {
 
     public PatrolGoal(AbstractAntEntity ant) {
         this.ant = ant;
+        this.errand = new Errand<>(ant);
         setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
     }
 
@@ -83,6 +86,7 @@ public class PatrolGoal extends Goal {
         calm = true;
         goingHome = false;
         waypoints.clear();
+        errand.begin();
         if (!(ant.level() instanceof ServerLevel level) || colony == null) {
             return;
         }
@@ -107,7 +111,7 @@ public class PatrolGoal extends Goal {
 
     @Override
     public void stop() {
-        ant.getNavigator().stop();
+        errand.stop();
         if (colony != null && ant.level() instanceof ServerLevel level && atDoor < 0 && colony.patrol().jobOf(ant.getUUID()) != null
                 && ticks >= GIVE_UP_TICKS) {
             colony.patrol().home(level, ant, calm); // gave up: counts as home
@@ -144,7 +148,7 @@ public class PatrolGoal extends Goal {
             BlockPos entrance = colony.nest().getEntrance();
             if (colony.nest().isInside(level, ant.blockPosition()) || near(ant.blockPosition(), entrance)) {
                 arriveHome(level);
-            } else if (ant.getNavigator().isDone() && !ant.getNavigator().moveTo(entrance, 1.0)) {
+            } else if (!errand.walkOn(entrance, 1.0)) {
                 arriveHome(level); // no way home from here: it gets in somehow
             }
             return;
@@ -153,11 +157,11 @@ public class PatrolGoal extends Goal {
         BlockPos target = waypoints.isEmpty() ? null : waypoints.get(0);
         if (target == null) {
             goingHome = true;
-            ant.getNavigator().stop();
+            errand.stop();
         } else if (near(ant.blockPosition(), target) || waypointTicks >= WAYPOINT_TICKS) {
             waypoints.remove(0);
             nextWaypoint(level);
-        } else if (ant.getNavigator().isDone() && !ant.getNavigator().moveTo(target, 1.0)) {
+        } else if (!errand.walkOn(target, 1.0)) {
             waypoints.remove(0); // no way there: on to the next
             nextWaypoint(level);
         }
@@ -165,8 +169,8 @@ public class PatrolGoal extends Goal {
 
     private void nextWaypoint(ServerLevel level) {
         waypointTicks = 0;
-        ant.getNavigator().stop();
-        while (!waypoints.isEmpty() && !ant.getNavigator().moveTo(waypoints.get(0), 1.0)) {
+        errand.stop();
+        while (!waypoints.isEmpty() && !errand.setOff(waypoints.get(0), 1.0)) {
             waypoints.remove(0);
         }
         if (waypoints.isEmpty()) {
@@ -185,7 +189,7 @@ public class PatrolGoal extends Goal {
             calm = false;
             goingHome = true;
             colony.patrol().danger(level, ant, "a hostile mob close");
-            ant.getNavigator().stop();
+            errand.stop();
             return;
         }
         boolean neighbours = !level.getEntitiesOfClass(AbstractAntEntity.class, ant.getBoundingBox().inflate(NEIGHBOUR_WITHIN),
@@ -194,7 +198,7 @@ public class PatrolGoal extends Goal {
             calm = false;
             goingHome = true;
             colony.patrol().neighbours(level, ant);
-            ant.getNavigator().stop();
+            errand.stop();
         }
         if (colony.patrol().turnedBack(ant.getUUID())) {
             calm = false; // hurt: AbstractAntEntity.hurt told the patrol
@@ -203,7 +207,7 @@ public class PatrolGoal extends Goal {
     }
 
     private void arriveHome(ServerLevel level) {
-        ant.getNavigator().stop();
+        errand.stop();
         if (colony.patrol().turnedBack(ant.getUUID())) {
             calm = false;
         }

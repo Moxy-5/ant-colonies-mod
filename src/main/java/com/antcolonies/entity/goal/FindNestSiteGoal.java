@@ -17,6 +17,8 @@ public class FindNestSiteGoal extends Goal {
     private static final int GIVE_UP_TICKS = 1200;
 
     private final AbstractAntEntity queen;
+    /** The walk to the spot. */
+    private final Errand<BlockPos> errand;
     /** The spot she walks to, or null when she is not looking for one. */
     private final Supplier<BlockPos> site;
     /** Founds her colony where she stands. */
@@ -25,6 +27,7 @@ public class FindNestSiteGoal extends Goal {
 
     public FindNestSiteGoal(AbstractAntEntity queen, Supplier<BlockPos> site, Runnable found) {
         this.queen = queen;
+        this.errand = new Errand<>(queen);
         this.site = site;
         this.found = found;
         setFlags(EnumSet.of(Flag.MOVE));
@@ -43,7 +46,8 @@ public class FindNestSiteGoal extends Goal {
     @Override
     public void start() {
         ticks = 0;
-        if (!queen.getNavigator().moveTo(site.get(), 1.0)) {
+        errand.begin();
+        if (!errand.setOff(site.get(), 1.0)) {
             found.run(); // no way there
         }
     }
@@ -56,10 +60,10 @@ public class FindNestSiteGoal extends Goal {
         }
         if (++ticks > GIVE_UP_TICKS) {
             found.run();
-        } else if (queen.getNavigator().isDone()) {
+        } else if (!errand.isWalking()) {
             double dx = queen.getX() - (target.getX() + 0.5);
             double dz = queen.getZ() - (target.getZ() + 0.5);
-            if (dx * dx + dz * dz <= 1.0 || !queen.getNavigator().moveTo(target, 1.0)) {
+            if (dx * dx + dz * dz <= 1.0 || !errand.setOff(target, 1.0)) {
                 found.run();
             }
         }
@@ -67,6 +71,6 @@ public class FindNestSiteGoal extends Goal {
 
     @Override
     public void stop() {
-        queen.getNavigator().stop();
+        errand.stop();
     }
 }

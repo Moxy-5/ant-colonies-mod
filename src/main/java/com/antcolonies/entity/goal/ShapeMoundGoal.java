@@ -35,6 +35,11 @@ public class ShapeMoundGoal extends Goal {
     private static final int GIVE_UP_TICKS = 600;
 
     private final AbstractAntEntity ant;
+    /**
+     * The walk to a foothold to work from; a job it found no way to is left alone for a while (docs/BUGS.md 42: without
+     * it a cut-off insect searched for a route again every time it looked for work).
+     */
+    private final Errand<BlockPos> errand;
     @Nullable
     private Colony colony;
     @Nullable
@@ -44,6 +49,7 @@ public class ShapeMoundGoal extends Goal {
 
     public ShapeMoundGoal(AbstractAntEntity ant) {
         this.ant = ant;
+        this.errand = new Errand<>(ant);
         setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
     }
 
@@ -58,7 +64,7 @@ public class ShapeMoundGoal extends Goal {
             return false;
         }
         spot = colony.mound().shaping().pickShapeJob(level, ant);
-        if (spot != null && !walkThere()) {
+        if (spot != null && (errand.isLeftAlone(spot) || !walkThere())) {
             colony.mound().shaping().releaseShapeJob(ant.getUUID());
             spot = null;
         }
@@ -74,9 +80,13 @@ public class ShapeMoundGoal extends Goal {
         return at -> MoundReach.canBuildFrom(level, colony, at, target, windows);
     }
 
+    /**
+     * Sets off to a foothold to work from. False if there is none it can get to: then the job is left alone for a
+     * while.
+     */
     private boolean walkThere() {
         ServerLevel level = (ServerLevel) ant.level();
-        return ant.getNavigator().moveTo(workFrom(level, spot), spot, 1.0);
+        return errand.setOff(workFrom(level, spot), spot, 1.0) || errand.leaveAlone(spot);
     }
 
     @Override
@@ -88,11 +98,12 @@ public class ShapeMoundGoal extends Goal {
     public void start() {
         ticks = 0;
         work = 0;
+        errand.begin();
     }
 
     @Override
     public void stop() {
-        ant.getNavigator().stop();
+        errand.stop();
         if (colony != null) {
             colony.mound().shaping().releaseShapeJob(ant.getUUID());
         }
@@ -110,7 +121,7 @@ public class ShapeMoundGoal extends Goal {
             spot = null; // done by someone else, or not wanted any more
             return;
         }
-        if (!ant.getNavigator().isDone()) {
+        if (errand.isWalking()) {
             return;
         }
         Foothold at = ant.getNavigator().getFoothold();

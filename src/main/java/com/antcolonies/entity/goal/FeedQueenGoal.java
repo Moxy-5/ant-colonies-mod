@@ -1,6 +1,7 @@
 package com.antcolonies.entity.goal;
 
 import java.util.EnumSet;
+import java.util.List;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -32,6 +33,8 @@ public class FeedQueenGoal extends Goal {
     private enum Leg { TO_PILE, SWALLOW, TO_QUEEN, PASS, BACK_TO_PILE }
 
     private final AbstractAntEntity ant;
+    /** The walks to the food, to the queen, and back. */
+    private final Errand<BlockPos> errand;
     @Nullable
     private Colony colony;
     private Leg leg = Leg.TO_PILE;
@@ -47,6 +50,7 @@ public class FeedQueenGoal extends Goal {
 
     public FeedQueenGoal(AbstractAntEntity ant) {
         this.ant = ant;
+        this.errand = new Errand<>(ant);
         setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
     }
 
@@ -72,7 +76,7 @@ public class FeedQueenGoal extends Goal {
             return false;
         }
         pile = colony.nurseFood().findFood(level, ant.getRandom());
-        if (pile == null || !ant.getNavigator().moveTo(pile, 1.0)) {
+        if (!errand.setOff(pile, 1.0)) {
             colony.queenCare().releaseFeeding(ant.getUUID());
             nextTry = level.getGameTime() + RETRY_TICKS; // no bread, or no way to it
             return false;
@@ -90,11 +94,12 @@ public class FeedQueenGoal extends Goal {
     public void start() {
         ticks = 0;
         done = false;
+        errand.begin();
     }
 
     @Override
     public void stop() {
-        ant.getNavigator().stop();
+        errand.stop();
         if (colony != null) {
             colony.queenCare().releaseFeeding(ant.getUUID());
         }
@@ -119,11 +124,11 @@ public class FeedQueenGoal extends Goal {
 
     /** First leg: to a heap of bread in the nursery, where the ant takes a piece. */
     private void walkToPile(ServerLevel level) {
-        if (near(pile)) {
+        if (errand.within(pile, REACH)) {
             ItemStack taken = colony.nurseFood().takeFoodAt(level, pile, true); // she gets the rich bread first
             if (!taken.isEmpty()) {
                 ColonyManager.get(level).markChanged();
-                ant.getNavigator().stop();
+                errand.stop();
                 if (MouthToMouth.on(colony)) {
                     ant.swallowToPassOn(taken); // it eats the nodule here and carries it in its crop
                     leg = Leg.SWALLOW;
@@ -134,11 +139,11 @@ public class FeedQueenGoal extends Goal {
                 }
             } else {
                 pile = colony.nurseFood().findFood(level, ant.getRandom()); // somebody else took the last piece there
-                if (pile == null || !ant.getNavigator().moveTo(pile, 1.0)) {
+                if (!errand.setOff(pile, 1.0)) {
                     done = true;
                 }
             }
-        } else if (ant.getNavigator().isDone() && !ant.getNavigator().moveTo(pile, 1.0)) {
+        } else if (!errand.walkOn(pile, 1.0)) {
             done = true;
         }
     }
@@ -163,21 +168,18 @@ public class FeedQueenGoal extends Goal {
         }
         if (ant.isFoodInCrop()) {
             if (MouthToMouth.atMouth(ant, queen, REACH + Math.max(0.0, queen.getBbWidth() / 2.0 - 0.15))) {
-                ant.getNavigator().stop();
+                errand.stop();
                 leg = Leg.PASS;
                 moment = 0;
-            } else if (ant.getNavigator().isDone() && !ant.getNavigator().moveTo(MouthToMouth.cellAtMouth(queen), 1.0)
-                    && !ant.getNavigator().moveTo(queen.blockPosition(), 1.0)) {
+            } else if (!errand.walkOn(List.of(MouthToMouth.cellAtMouth(queen), queen.blockPosition()), 1.0)) {
                 done = true;
             }
             return;
         }
         ant.getLookControl().setLookAt(queen);
-        double dx = ant.getX() - queen.getX();
-        double dz = ant.getZ() - queen.getZ();
-        if (dx * dx + dz * dz <= REACH * REACH && Math.abs(ant.getY() - queen.getY()) < 1.5) {
+        if (errand.within(queen, REACH)) {
             handOver(level);
-        } else if (ant.getNavigator().isDone() && !ant.getNavigator().moveTo(queen.blockPosition(), 1.0)) {
+        } else if (!errand.walkOn(queen.blockPosition(), 1.0)) {
             done = true;
         }
     }
@@ -206,7 +208,7 @@ public class FeedQueenGoal extends Goal {
         }
         // She wants no more right now: the bread goes back on a heap.
         pile = colony.nurseFood().pickReturnSpot(level, ant.getRandom());
-        if (pile == null || !ant.getNavigator().moveTo(pile, 1.0)) {
+        if (!errand.setOff(pile, 1.0)) {
             colony.nurseFood().putDownWhereItStands(level, ant); // nowhere to put it
             ant.setCarriedSeed(ItemStack.EMPTY);
             done = true;
@@ -217,10 +219,10 @@ public class FeedQueenGoal extends Goal {
 
     /** Third leg, only if the queen did not want the bread: back to a bread heap. */
     private void walkBack(ServerLevel level) {
-        if (near(pile)) {
+        if (errand.within(pile, REACH)) {
             if (!colony.nurseFood().putBack(level, pile, ant.isCarryingRichBread())) {
                 pile = colony.nurseFood().pickReturnSpot(level, ant.getRandom());
-                if (pile == null || !ant.getNavigator().moveTo(pile, 1.0)) {
+                if (!errand.setOff(pile, 1.0)) {
                     colony.nurseFood().putDownWhereItStands(level, ant);
                     ant.setCarriedSeed(ItemStack.EMPTY);
                     done = true;
@@ -230,19 +232,10 @@ public class FeedQueenGoal extends Goal {
             ant.setCarriedSeed(ItemStack.EMPTY);
             ColonyManager.get(level).markChanged();
             done = true;
-        } else if (ant.getNavigator().isDone() && !ant.getNavigator().moveTo(pile, 1.0)) {
+        } else if (!errand.walkOn(pile, 1.0)) {
             colony.nurseFood().putDownWhereItStands(level, ant);
             ant.setCarriedSeed(ItemStack.EMPTY);
             done = true;
         }
-    }
-
-    private boolean near(@Nullable BlockPos spot) {
-        if (spot == null) {
-            return false;
-        }
-        double dx = ant.getX() - (spot.getX() + 0.5);
-        double dz = ant.getZ() - (spot.getZ() + 0.5);
-        return dx * dx + dz * dz <= REACH * REACH && Math.abs(ant.getY() - spot.getY()) < 1.5;
     }
 }

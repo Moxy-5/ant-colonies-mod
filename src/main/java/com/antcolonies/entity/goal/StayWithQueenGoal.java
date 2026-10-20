@@ -22,13 +22,22 @@ public class StayWithQueenGoal extends Goal {
     private static final double STRAY_DISTANCE = 4.0;
 
     private final AbstractAntEntity king;
+    /**
+     * The walk to the queen; a place he found no way to is left alone for a while (docs/BUGS.md 42: without it a cut-
+     * off insect searched for a route again every time it looked for work).
+     */
+    private final Errand<BlockPos> errand;
 
     public StayWithQueenGoal(AbstractAntEntity king) {
         this.king = king;
+        this.errand = new Errand<>(king);
         setFlags(EnumSet.of(Flag.MOVE));
     }
 
-    /** The cell beside the middle of the chamber (to the side, as seen from its tunnel), or null if there is no chamber yet. */
+    /**
+     * The cell beside the middle of the chamber (to the side, as seen from its tunnel), or null if there is no chamber
+     * yet.
+     */
     @Nullable
     public static BlockPos spotBesideQueen(ServerLevel level, Colony colony) {
         NestPlan.Chamber home = colony.nest().getHomeChamber(level);
@@ -53,19 +62,20 @@ public class StayWithQueenGoal extends Goal {
         }
         BlockPos spot = spotBesideQueen(level, colony);
         if (spot != null) {
-            return !king.blockPosition().equals(spot) && king.getNavigator().moveTo(spot, 1.0);
+            return !errand.isIn(spot) && errand.setOffFor(spot, spot, 1.0);
         }
         AbstractAntEntity queen = colony.getQueen(level);
-        return queen != null && king.distanceTo(queen) > STRAY_DISTANCE && king.getNavigator().moveTo(queen.blockPosition(), 1.0);
+        return queen != null && king.distanceTo(queen) > STRAY_DISTANCE
+                && errand.setOffFor(queen.blockPosition(), queen.blockPosition(), 1.0);
     }
 
     @Override
     public boolean canContinueToUse() {
-        return !king.getNavigator().isDone();
+        return errand.isWalking();
     }
 
     @Override
     public void stop() {
-        king.getNavigator().stop();
+        errand.stop();
     }
 }

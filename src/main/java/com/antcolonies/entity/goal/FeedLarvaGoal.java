@@ -46,6 +46,8 @@ public class FeedLarvaGoal extends Goal {
     private enum Leg { TO_PILE, SWALLOW, TO_LARVA, PASS, BACK_TO_PILE }
 
     private final AbstractAntEntity ant;
+    /** The walks to the food, to the one it feeds, and back. */
+    private final Errand<BlockPos> errand;
     @Nullable
     private Colony colony;
     private Leg leg = Leg.TO_PILE;
@@ -66,6 +68,7 @@ public class FeedLarvaGoal extends Goal {
 
     public FeedLarvaGoal(AbstractAntEntity ant) {
         this.ant = ant;
+        this.errand = new Errand<>(ant);
         setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
     }
 
@@ -88,7 +91,7 @@ public class FeedLarvaGoal extends Goal {
             return false;
         }
         pile = colony.nurseFood().findFood(level, ant.getRandom());
-        if (pile == null || !ant.getNavigator().moveTo(pile, 1.0)) {
+        if (!errand.setOff(pile, 1.0)) {
             fed().releaseFeeder(ant.getUUID());
             nextTry = level.getGameTime() + RETRY_TICKS; // no bread, or no way to it
             return false;
@@ -139,11 +142,12 @@ public class FeedLarvaGoal extends Goal {
     public void start() {
         ticks = 0;
         done = false;
+        errand.begin();
     }
 
     @Override
     public void stop() {
-        ant.getNavigator().stop();
+        errand.stop();
         if (larva != null) {
             fed().releaseFeeder(ant.getUUID());
         }
@@ -170,11 +174,11 @@ public class FeedLarvaGoal extends Goal {
 
     /** First leg: to a heap of bread, where the ant takes a piece. */
     private void walkToPile(ServerLevel level) {
-        if (near(pile)) {
+        if (errand.within(pile, REACH)) {
             ItemStack taken = colony.nurseFood().takeFoodAt(level, pile, false); // plain bread; rich only if nothing else is left
             if (!taken.isEmpty()) {
                 ColonyManager.get(level).markChanged();
-                ant.getNavigator().stop();
+                errand.stop();
                 if (MouthToMouth.on(colony)) {
                     ant.swallowToPassOn(taken); // it eats the nodule here and carries it in its crop
                     leg = Leg.SWALLOW;
@@ -185,11 +189,11 @@ public class FeedLarvaGoal extends Goal {
                 }
             } else {
                 pile = colony.nurseFood().findFood(level, ant.getRandom()); // somebody else took the last piece there
-                if (pile == null || !ant.getNavigator().moveTo(pile, 1.0)) {
+                if (!errand.setOff(pile, 1.0)) {
                     done = true;
                 }
             }
-        } else if (ant.getNavigator().isDone() && !ant.getNavigator().moveTo(pile, 1.0)) {
+        } else if (!errand.walkOn(pile, 1.0)) {
             done = true;
         }
     }
@@ -242,20 +246,17 @@ public class FeedLarvaGoal extends Goal {
         }
         if (ant.isFoodInCrop()) {
             if (MouthToMouth.atMouth(ant, larva, reach())) {
-                ant.getNavigator().stop();
+                errand.stop();
                 leg = Leg.PASS;
                 moment = 0;
-            } else if ((ant.getNavigator().isDone() || !larva.blockPosition().equals(larvaCell) && ticks % 20 == 0)
+            } else if ((!errand.isWalking() || !larva.blockPosition().equals(larvaCell) && ticks % 20 == 0)
                     && !walkToLarva()) {
                 putBack(level);
             }
             return;
         }
         ant.getLookControl().setLookAt(larva);
-        double dx = ant.getX() - larva.getX();
-        double dz = ant.getZ() - larva.getZ();
-        double reach = reach();
-        if (dx * dx + dz * dz <= reach * reach && Math.abs(ant.getY() - larva.getY()) < 1.5) {
+        if (errand.within(larva, reach())) {
             fed().takeFood();
             level.sendParticles(new ItemParticleOption(ParticleTypes.ITEM, ant.getCarriedSeed().copy()), larva.getX(),
                     larva.getY() + 0.1, larva.getZ(), 3, 0.05, 0.03, 0.05, 0.02);
@@ -263,7 +264,7 @@ public class FeedLarvaGoal extends Goal {
             ant.setCarriedSeed(ItemStack.EMPTY);
             ColonyManager.get(level).markChanged();
             done = true;
-        } else if ((ant.getNavigator().isDone() || !larva.blockPosition().equals(larvaCell) && ticks % 20 == 0)
+        } else if ((!errand.isWalking() || !larva.blockPosition().equals(larvaCell) && ticks % 20 == 0)
                 && !walkToLarva()) {
             putBack(level);
         }
@@ -272,16 +273,13 @@ public class FeedLarvaGoal extends Goal {
     /** Plans the walk to where the larva (or soldier) is now (mouth to mouth: to its head, else beside it). */
     private boolean walkToLarva() {
         larvaCell = larva.blockPosition();
-        if (ant.isFoodInCrop() && ant.getNavigator().moveTo(MouthToMouth.cellAtMouth(larva), 1.0)) {
-            return true;
-        }
-        return ant.getNavigator().moveTo(larvaCell, 1.0);
+        return (ant.isFoodInCrop() && errand.setOff(MouthToMouth.cellAtMouth(larva), 1.0)) || errand.setOff(larvaCell, 1.0);
     }
 
     /** The larva is gone or full: the bread goes back on a heap. */
     private void putBack(ServerLevel level) {
         pile = colony.nurseFood().pickReturnSpot(level, ant.getRandom());
-        if (pile == null || !ant.getNavigator().moveTo(pile, 1.0)) {
+        if (!errand.setOff(pile, 1.0)) {
             colony.nurseFood().putDownWhereItStands(level, ant); // nowhere to put it
             ant.setCarriedSeed(ItemStack.EMPTY);
             done = true;
@@ -292,10 +290,10 @@ public class FeedLarvaGoal extends Goal {
 
     /** Third leg, only if the larva did not need the bread: back to a bread heap. */
     private void walkBack(ServerLevel level) {
-        if (near(pile)) {
+        if (errand.within(pile, REACH)) {
             if (!colony.nurseFood().putBack(level, pile, ant.isCarryingRichBread())) {
                 pile = colony.nurseFood().pickReturnSpot(level, ant.getRandom());
-                if (pile == null || !ant.getNavigator().moveTo(pile, 1.0)) {
+                if (!errand.setOff(pile, 1.0)) {
                     colony.nurseFood().putDownWhereItStands(level, ant);
                     ant.setCarriedSeed(ItemStack.EMPTY);
                     done = true;
@@ -305,19 +303,10 @@ public class FeedLarvaGoal extends Goal {
             ant.setCarriedSeed(ItemStack.EMPTY);
             ColonyManager.get(level).markChanged();
             done = true;
-        } else if (ant.getNavigator().isDone() && !ant.getNavigator().moveTo(pile, 1.0)) {
+        } else if (!errand.walkOn(pile, 1.0)) {
             colony.nurseFood().putDownWhereItStands(level, ant);
             ant.setCarriedSeed(ItemStack.EMPTY);
             done = true;
         }
-    }
-
-    private boolean near(@Nullable BlockPos spot) {
-        if (spot == null) {
-            return false;
-        }
-        double dx = ant.getX() - (spot.getX() + 0.5);
-        double dz = ant.getZ() - (spot.getZ() + 0.5);
-        return dx * dx + dz * dz <= REACH * REACH && Math.abs(ant.getY() - spot.getY()) < 1.5;
     }
 }

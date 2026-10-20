@@ -25,13 +25,20 @@ import net.minecraft.world.phys.Vec3;
  * another room) and packs it full of soil. The entrance hole is the only opening that stays.
  */
 public class SealGoal extends Goal {
-    /** Ticks between two packs of soil, and the share of a hole one pack closes (an ant on its own needs four packs). */
+    /**
+     * Ticks between two packs of soil, and the share of a hole one pack closes (an ant on its own needs four packs).
+     */
     private static final int PACK_INTERVAL = 10;
     private static final float PACK_SHARE = 0.25F;
     /** If the ant can't finish within 20 seconds it gives up (another ant, or later, will try). */
     private static final int GIVE_UP_TICKS = 400;
 
     private final AbstractAntEntity ant;
+    /**
+     * The walk to a spot to close the hole from; a hole it found no way to is left alone for a while (docs/BUGS.md 42:
+     * without it a cut-off insect searched for a route again every time it looked for work).
+     */
+    private final Errand<BlockPos> errand;
     @Nullable
     private Colony colony;
     @Nullable
@@ -44,6 +51,7 @@ public class SealGoal extends Goal {
 
     public SealGoal(AbstractAntEntity ant) {
         this.ant = ant;
+        this.errand = new Errand<>(ant);
         setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
     }
 
@@ -60,7 +68,8 @@ public class SealGoal extends Goal {
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
         leak = colony == null ? null : colony.walls().findLeak(level, ant.blockPosition());
-        if (leak == null) {
+        if (leak == null || errand.isLeftAlone(leak.hole())) {
+            leak = null;
             return false;
         }
         colony.walls().claimLeak(level, leak.hole(), ant.getUUID());
@@ -77,11 +86,12 @@ public class SealGoal extends Goal {
     public void start() {
         ticks = 0;
         packCooldown = PACK_INTERVAL;
+        errand.begin();
     }
 
     @Override
     public void stop() {
-        ant.getNavigator().stop();
+        errand.stop();
         if (colony != null && leak != null) {
             colony.walls().releaseLeak(leak.hole(), ant.getUUID());
         }
@@ -99,14 +109,15 @@ public class SealGoal extends Goal {
         BlockPos hole = leak.hole();
         ant.getLookControl().setLookAt(Vec3.atCenterOf(hole));
 
-        if (stand == null || !ant.blockPosition().equals(stand)) {
-            if (ant.getNavigator().isDone() && !walkToAPlugSpot(level, hole)) {
+        if (stand == null || !errand.isIn(stand)) {
+            if (!errand.isWalking() && !walkToAPlugSpot(level, hole)) {
+                errand.leaveAlone(hole);
                 ticks = GIVE_UP_TICKS; // no way to get there: let another ant have a go
             }
             return;
         }
 
-        ant.getNavigator().stop();
+        errand.stop();
         if (--packCooldown > 0) {
             return;
         }
@@ -127,7 +138,7 @@ public class SealGoal extends Goal {
     private boolean walkToAPlugSpot(ServerLevel level, BlockPos hole) {
         AntPathFinder.StepCosts notThroughTheHole = AntPathFinder.StepCosts.forbid(java.util.List.of(hole));
         for (BlockPos spot : colony.walls().plugSpots(level, hole)) {
-            if (ant.getNavigator().moveTo(spot, 1.0, notThroughTheHole)) {
+            if (errand.setOff(spot, 1.0, notThroughTheHole)) {
                 stand = spot;
                 return true;
             }

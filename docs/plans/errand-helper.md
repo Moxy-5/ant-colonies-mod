@@ -28,7 +28,7 @@ A smarter mind later uses it as its "act" building block (go, get there, or lear
 1. **The helper, and the first three goals moved onto it** (`GatherSeedGoal`, `CarryCorpseGoal`, `DigGoal`).
    Nothing changes in the game: the same rules, written once. *Risk: low.* Tests: `./gradlew build`, then a full run
    (digging is a shared system everything uses, CLAUDE.md's rule).
-2. **The other goals that walk to work** (carrying eggs, pellets and seeds, eating, feeding, milling, clipping,
+2. **(BUILT 2026-10-19, `docs/HISTORY.md`)** **The other goals that walk to work** (carrying eggs, pellets and seeds, eating, feeding, milling, clipping,
    night soil, the patrol, standing by the queen, ...). Those without a "no way, leave it alone" memory get one: a
    small change in the game (an insect cut off from its work stops searching for a route every second), as the
    lesson of `docs/BUGS.md` 42 asks. Tests: the categories each goal touches, plus `away`.

@@ -15,9 +15,15 @@ import net.minecraft.world.entity.ai.goal.Goal;
 /** Once the workers have finished the room, the queen walks down into it and settles in the middle. */
 public class QueenToRoomGoal extends Goal {
     private final AbstractAntEntity queen;
+    /**
+     * The walk down to the room; with no way there the room is left alone for a while (docs/BUGS.md 42: without it a
+     * cut-off insect searched for a route again every time it looked for work).
+     */
+    private final Errand<BlockPos> errand;
 
     public QueenToRoomGoal(AbstractAntEntity queen) {
         this.queen = queen;
+        this.errand = new Errand<>(queen);
         setFlags(EnumSet.of(Flag.MOVE));
     }
 
@@ -52,21 +58,19 @@ public class QueenToRoomGoal extends Goal {
             return false;
         }
         // Already sitting in the middle of the room: nothing to do.
-        double dx = queen.getX() - (room.getX() + 0.5);
-        double dz = queen.getZ() - (room.getZ() + 0.5);
-        if (queen.blockPosition().equals(room) && dx * dx + dz * dz < 0.25) {
+        if (errand.isIn(room) && errand.within(room, 0.5)) {
             return false;
         }
-        return queen.getNavigator().moveTo(room, 1.0);
+        return errand.setOffFor(room, room, 1.0);
     }
 
     @Override
     public boolean canContinueToUse() {
-        return !queen.getNavigator().isDone();
+        return errand.isWalking();
     }
 
     @Override
     public void stop() {
-        queen.getNavigator().stop();
+        errand.stop();
     }
 }
