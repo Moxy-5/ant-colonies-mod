@@ -139,6 +139,18 @@ public class FoodMap {
             seen.add(id);
             BlockPos at = ant.blockPosition();
             if (colony.nest().isInside(level, at)) {
+                if (!searchesAlone()) {
+                    // Inside it feels the food it touches (the wood over a feeding gallery, round a mud cast) and tells of
+                    // it at once: real termites follow the wood from inside, block after block up a dead trunk (the user's
+                    // ask, 2026-10-19: before, they ate the first blocks and stopped, knowing of no more by day).
+                    // (in reach: the 26 cells round it, where it can nibble from where it stands)
+                    for (BlockPos touched : BlockPos.betweenClosed(at.offset(-1, -1, -1), at.offset(1, 1, 1))) {
+                        if (!known.contains(touched) && (testArea == null || testArea.contains(touched.getCenter()))
+                                && colony.food().isFoodPlant(level.getBlockState(touched))) {
+                            known.add(touched.immutable());
+                        }
+                    }
+                }
                 if (searchesAlone()) {
                     // Searching alone it tells nobody, but remembers where it found food: it goes back out for it.
                     Set<BlockPos> own = found.get(id);

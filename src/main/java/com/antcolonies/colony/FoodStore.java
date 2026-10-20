@@ -476,20 +476,31 @@ public class FoodStore {
             }
             boolean passable = state.isAir() || MudCrustBlock.isCrust(state) || isTreeTop(state) || !state.blocksMotion();
             if (passable) {
+                // Wood over the colony's own feeding gallery or a mud cast left of eaten wood counts too, as the ground
+                // under it does: it is eaten from there, block after block up the trunk (the user's ask, 2026-10-19:
+                // before, the wood over the gallery was never listed and they stopped after the first blocks).
+                if (run > 0 && (MudCastBlock.isCast(state) || state.isAir() && colony.nest().isInside(level, pos))) {
+                    listOver(level, y, run, top, far);
+                }
                 run = 0;
                 continue;
             }
             // The ground: the food just over it counts (the lowest of a dead trunk, a fallen branch, a tuft).
-            for (int up = 1; up <= Math.min(run, STACK_DEPTH); up++) {
-                BlockPos food = new BlockPos(top.getX(), y + up, top.getZ());
-                SpeciesProfile.PlantFood p = food().plantFor(level.getBlockState(food));
-                int dy = food.getY() - center.getY();
-                if (p != null && (dy >= -1 && dy <= 4 || (p.rich() || far) && Math.abs(dy) <= RICH_HEIGHT)
-                        && !grassTufts.subList(Math.max(0, grassTufts.size() - STACK_DEPTH), grassTufts.size()).contains(food)) {
-                    grassTufts.add(food);
-                }
-            }
+            listOver(level, y, run, top, far);
             return;
+        }
+    }
+
+    /** The food just over {@code y} in this column ({@code run} blocks of it, the lowest {@link #STACK_DEPTH} counted). */
+    private void listOver(Level level, int y, int run, BlockPos top, boolean far) {
+        for (int up = 1; up <= Math.min(run, STACK_DEPTH); up++) {
+            BlockPos food = new BlockPos(top.getX(), y + up, top.getZ());
+            SpeciesProfile.PlantFood p = food().plantFor(level.getBlockState(food));
+            int dy = food.getY() - center.getY();
+            if (p != null && (dy >= -1 && dy <= 4 || (p.rich() || far) && Math.abs(dy) <= RICH_HEIGHT)
+                    && !grassTufts.subList(Math.max(0, grassTufts.size() - STACK_DEPTH), grassTufts.size()).contains(food)) {
+                grassTufts.add(food);
+            }
         }
     }
 
@@ -611,6 +622,14 @@ public class FoodStore {
                         net.minecraft.world.level.block.Block.getId(state));
             }
             level.setBlock(pos, cast, 3);
+            // Eaten through, the wood behind it is in reach from the new cast: the colony knows it at once and eats on
+            // into it, block after block up a dead trunk (the user's ask, 2026-10-19).
+            for (net.minecraft.core.Direction side : net.minecraft.core.Direction.values()) {
+                BlockPos beyond = pos.relative(side);
+                if (level.isLoaded(beyond) && isFoodPlant(level.getBlockState(beyond))) {
+                    colony.foodMap().learn(beyond);
+                }
+            }
         }
     }
 

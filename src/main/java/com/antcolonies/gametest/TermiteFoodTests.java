@@ -713,7 +713,7 @@ public class TermiteFoodTests {
      * dug cell under soil counting as inside (a step down too: the user's report, 2026-10-19, they idled at the tunnel's
      * end till night), and bite the tree from below. A fallen dead stem of 6 blocks, too small to call, is not sensed.
      */
-    @GameTest(template = "arena", timeoutTicks = 30000, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true)
     public static void aStandingDeadTreeIsSensedAndGetsAGalleryToItsFoot(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
@@ -739,6 +739,8 @@ public class TermiteFoodTests {
         int[] stage = {0};
         long[] placedAt = {0};
         long[] wayAt = {0};
+        int[] trunkFloor = {0};
+        long[] firstBite = {0};
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
@@ -796,6 +798,7 @@ public class TermiteFoodTests {
                     }
                 }
                 BlockPos treeFoot = helper.absolutePos(spot.below());
+                trunkFloor[0] = treeFoot.getY();
                 com.antcolonies.worldgen.TreePlacer.Placed tree = com.antcolonies.worldgen.TreePlacer.placed("umbrella_thorn", 3, 0.8,
                         com.antcolonies.tree.TreeStage.MUD);
                 com.antcolonies.worldgen.TreePlacer.place(level, tree, treeFoot, tree.box(treeFoot), 3);
@@ -836,15 +839,18 @@ public class TermiteFoodTests {
                 // By day (a still midday, nobody outside): the workers dig the feeding gallery up under the tree and eat it
                 // from below (the user's report, 2026-10-19: they dug the tunnel to the tree and then idled at its end).
                 com.antcolonies.colony.FoodWays.NewTunnel tunnel = colony.nest().foodWays().getNewTunnels().stream().filter(t -> foot.contains(t.food())).findFirst().orElse(null);
-                long eaten = wood.stream().filter(b -> {
+                List<BlockPos> bitten = wood.stream().filter(b -> {
                     BlockState state = level.getBlockState(b);
                     return !(state.getBlock() instanceof com.antcolonies.block.EatenInStages) || colony.food().getPiecesCut(b) > 0
                             || state.hasProperty(com.antcolonies.block.DeadWoodBlock.EATEN) && state.getValue(com.antcolonies.block.DeadWoodBlock.EATEN) > 0;
-                }).count();
+                }).toList();
+                long eaten = bitten.size();
+                int highest = bitten.stream().mapToInt(b -> b.getY() - trunkFloor[0]).max().orElse(-99);
                 String gallery = tunnel == null ? "a runway" : tunnel.gallery().stream().filter(c -> com.antcolonies.colony.Nest.isDugOut(level, c)).count()
                         + " of " + tunnel.gallery().size() + " gallery blocks dug, food " + tunnel.food().toShortString() + " " + level.getBlockState(tunnel.food());
                 if (tick % 1000 == 0) {
-                    com.antcolonies.AntColoniesMod.LOGGER.info("[dead-tree-test] {} ticks after the way: {}, {} wood blocks bitten", tick - wayAt[0], gallery, eaten);
+                    com.antcolonies.AntColoniesMod.LOGGER.info("[dead-tree-test] {} ticks after the way: {}, {} wood blocks bitten, the highest {} up the trunk",
+                            tick - wayAt[0], gallery, eaten, highest);
                 }
                 if (tunnel != null && tick % 100 == 0) {
                     // Every dug gallery cell under soil is inside, a step down under another gallery cell too (the user's
@@ -857,8 +863,36 @@ public class TermiteFoodTests {
                         }
                     }
                 }
-                if (eaten > 0) {
+                if (tick % 200 == 0) {
+                    // Hurried along: a test colony brings home about one piece every 100 ticks, so a block bitten into is
+                    // eaten down to its last piece at once; a real worker still takes that last bite, the cast is left,
+                    // and the wood over it has to be found and bitten by the workers themselves.
+                    for (BlockPos b : wood) {
+                        int cut = colony.food().getPiecesCut(b);
+                        int pieces = colony.food().piecesOf(level.getBlockState(b));
+                        if (cut > 0 && cut < pieces - 1) {
+                            colony.food().setPiecesCutForTests(b, pieces - 1);
+                        }
+                    }
+                }
+                if (eaten > 0 && firstBite[0] == 0) {
+                    firstBite[0] = tick;
+                }
+                if (highest >= 3) {
+                    // And on up into the tree (the user's ask, 2026-10-19): each piece eaten leaves a mud cast joined to the
+                    // gallery, the wood over it is eaten from the cast, and so on up the trunk, 3 blocks over its foot.
                     helper.succeed();
+                    return;
+                }
+                helper.assertTrue(firstBite[0] == 0 || tick < firstBite[0] + 40000, "they bit the dead tree but did not eat on up it: "
+                        + eaten + " wood blocks bitten, the highest " + highest + " over its foot, " + gallery + ", wants food " + colony.food().wantsSeeds(level)
+                        + ", wood feedable from inside " + wood.stream().filter(b -> colony.food().isFeedableFromInside(level, b)).count()
+                        + ", of those known " + wood.stream().filter(b -> colony.food().isFeedableFromInside(level, b) && colony.foodMap().isKnown(b)).count()
+                        + ", listed " + wood.stream().filter(b -> colony.food().isFeedableFromInside(level, b) && colony.food().plants(level).contains(b)).count()
+                        + ", unlisted " + wood.stream().filter(b -> colony.food().isFeedableFromInside(level, b) && colony.foodMap().isKnown(b) && !colony.food().plants(level).contains(b)).map(b -> (b.getY() - trunkFloor[0]) + " over " + level.getBlockState(b.below()).getBlock().getDescriptionId().replace("block.", "") + " under " + level.getBlockState(b.above()).getBlock().getDescriptionId().replace("block.", "")).toList()
+                        + ", pieces cut " + wood.stream().filter(b -> colony.food().getPiecesCut(b) > 0).map(b -> (b.getY() - trunkFloor[0]) + ":" + colony.food().getPiecesCut(b)).toList()
+                        + ", known " + wood.stream().filter(colony.foodMap()::isKnown).count() + ", listed " + wood.stream().filter(colony.food().plants(level)::contains).count());
+                if (firstBite[0] > 0) {
                     return;
                 }
                 helper.assertTrue(tick < wayAt[0] + 12000, "by day nobody ate the dead tree from below: " + gallery + ", feedable from inside "
