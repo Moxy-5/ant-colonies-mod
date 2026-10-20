@@ -303,6 +303,47 @@ class AntPathFinderTest {
         assertNull(route(new BlockPos(0, 64, 5), new BlockPos(0, 63, 5)));
     }
 
+    // --- One search for several spots (docs/plans/errand-helper.md, step 3) ---
+
+    private Route nearest(BlockPos from, List<BlockPos> spots, AntPathFinder.StepCosts costs) {
+        return AntPathFinder.find(map, List.of(Foothold.floor(from)), spots, AntPathFinder.DEFAULT_MAX_EXPANSIONS, costs);
+    }
+
+    @Test
+    void theNearestOfSeveralSpotsIsChosen() {
+        // From the tunnel: the room's near row, not its far corner, nor a spot up on the surface.
+        BlockPos from = SHAFT_BOTTOM.east(2);
+        BlockPos near = SHAFT_BOTTOM.east(4).north(1);
+        List<BlockPos> spots = List.of(SHAFT_BOTTOM.east(8).south(2), new BlockPos(5, 64, 5), near);
+        Route route = nearest(from, spots, AntPathFinder.StepCosts.NONE);
+        assertNotNull(route);
+        assertLegal(route);
+        assertEquals(Foothold.floor(near), route.end(), "the nearest spot, reached on its floor");
+        assertEquals(route(from, near).cost(), route.cost(), 1e-9, "as short as the way to that spot alone");
+    }
+
+    @Test
+    void spotsThatCannotBeReachedAreSkippedAndAllCutOffIsOneSearch() {
+        BlockPos pocket = new BlockPos(10, 50, 10);
+        BlockPos otherPocket = new BlockPos(-10, 50, -10);
+        solid.remove(pocket);
+        solid.remove(otherPocket);
+        BlockPos from = new BlockPos(0, 64, 5);
+        BlockPos room = SHAFT_BOTTOM.east(6);
+        // A sealed pocket, a solid block and a spot in the room: the room.
+        Route route = nearest(from, List.of(pocket, new BlockPos(0, 63, 5), room), AntPathFinder.StepCosts.NONE);
+        assertNotNull(route);
+        assertEquals(Foothold.floor(room), route.end());
+        // Only sealed pockets: no route, found out in one search (one after another, each pocket cost a whole search).
+        Set<Foothold> searched = new HashSet<>();
+        assertNull(nearest(from, List.of(pocket, otherPocket), (at, to, kind) -> {
+            searched.add(at);
+            return 0.0;
+        }));
+        assertTrue(searched.size() <= AntPathFinder.DEFAULT_MAX_EXPANSIONS, searched.size() + " footholds searched");
+        assertNull(nearest(from, List.of(), AntPathFinder.StepCosts.NONE), "no spots, no route");
+    }
+
     @Test
     void aSharedRouteKeepsItsSteps() {
         Route route = route(SHAFT_BOTTOM.east(5), new BlockPos(4, 64, 4));

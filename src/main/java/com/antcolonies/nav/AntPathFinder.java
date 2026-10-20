@@ -3,6 +3,7 @@ package com.antcolonies.nav;
 import com.antcolonies.debug.Perf;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -11,6 +12,7 @@ import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.function.Predicate;
+import java.util.function.ToDoubleFunction;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -191,6 +193,48 @@ public final class AntPathFinder {
     }
 
     /**
+     * A route from any of the {@code starts} into the nearest of the {@code goals} cells it can reach, each ending as in
+     * the search above (on the cell's floor if it has one): one search for a choice of spots (the free spots of a
+     * chamber, the spots to stand at to dig a block), where trying them one after another costs a search each, and a
+     * whole search each when none can be reached. Null if none of them can be reached (or none is open space).
+     */
+    @Nullable
+    public static Route find(CellMap map, List<Foothold> starts, Collection<BlockPos> goals, int maxExpansions, StepCosts costs) {
+        Map<BlockPos, Boolean> hasFloor = new HashMap<>();
+        int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE;
+        int maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE, maxZ = Integer.MIN_VALUE;
+        for (BlockPos goal : goals) {
+            BlockPos target = goal.immutable();
+            if (!map.isOpen(target) && !map.isSlope(target) && map.channelSides(target) == 0) {
+                continue;
+            }
+            hasFloor.put(target, Foothold.isValid(map, target, Direction.DOWN));
+            minX = Math.min(minX, target.getX());
+            minY = Math.min(minY, target.getY());
+            minZ = Math.min(minZ, target.getZ());
+            maxX = Math.max(maxX, target.getX());
+            maxY = Math.max(maxY, target.getY());
+            maxZ = Math.max(maxZ, target.getZ());
+        }
+        if (hasFloor.isEmpty()) {
+            return null;
+        }
+        Predicate<Foothold> isGoal = at -> {
+            Boolean floor = hasFloor.get(at.cell());
+            return floor != null && (at.isFloor() || !floor);
+        };
+        // Searched toward the box round the goals: never more than the way to the nearest of them, so the nearest is found.
+        final int x0 = minX, y0 = minY, z0 = minZ, x1 = maxX, y1 = maxY, z1 = maxZ;
+        return timed(map, starts, isGoal, cell -> outside(cell.getX(), x0, x1) + outside(cell.getY(), y0, y1)
+                + outside(cell.getZ(), z0, z1), maxExpansions, costs);
+    }
+
+    /** How far {@code at} lies outside the range {@code low} to {@code high} (0 inside it). */
+    private static int outside(int at, int low, int high) {
+        return at < low ? low - at : at > high ? at - high : 0;
+    }
+
+    /**
      * The general search: a route from any of the {@code starts} to the cheapest foothold {@code isGoal} accepts
      * (a mind can ask for "any cell of this room", "the nearest unexplored spot" and so on). {@code towards} is where
      * the goal roughly is, to search that way first.
@@ -198,12 +242,19 @@ public final class AntPathFinder {
     @Nullable
     public static Route find(CellMap map, List<Foothold> starts, Predicate<Foothold> isGoal, BlockPos towards,
             int maxExpansions, StepCosts costs) {
+        return timed(map, starts, isGoal, cell -> distance(cell, towards), maxExpansions, costs);
+    }
+
+    /** A search, timed by the stopwatch ({@code /antcolonies perf}). {@code estimate}: how far a cell is from the goal at least. */
+    @Nullable
+    private static Route timed(CellMap map, List<Foothold> starts, Predicate<Foothold> isGoal, ToDoubleFunction<BlockPos> estimate,
+            int maxExpansions, StepCosts costs) {
         boolean timed = Perf.begin(Perf.Part.ROUTES);
         long started = System.nanoTime();
         int[] steps = new int[1];
         Route route = null;
         try {
-            route = search(map, starts, isGoal, towards, maxExpansions, costs, steps);
+            route = search(map, starts, isGoal, estimate, maxExpansions, costs, steps);
             return route;
         } finally {
             if (timed) {
@@ -214,13 +265,13 @@ public final class AntPathFinder {
     }
 
     @Nullable
-    private static Route search(CellMap map, List<Foothold> starts, Predicate<Foothold> isGoal, BlockPos towards,
+    private static Route search(CellMap map, List<Foothold> starts, Predicate<Foothold> isGoal, ToDoubleFunction<BlockPos> estimate,
             int maxExpansions, StepCosts costs, int[] steps) {
         PriorityQueue<Node> open = new PriorityQueue<>((a, b) -> Double.compare(a.estimate, b.estimate));
         Map<Foothold, Double> bestCost = new HashMap<>();
         Set<Foothold> closed = new HashSet<>();
         for (Foothold start : starts) {
-            open.add(new Node(start, StepKind.START, 0.0, distance(start.cell(), towards), null));
+            open.add(new Node(start, StepKind.START, 0.0, estimate.applyAsDouble(start.cell()), null));
             bestCost.put(start, 0.0);
         }
         int expansions = 0;
@@ -246,7 +297,7 @@ public final class AntPathFinder {
                 Double known = bestCost.get(to);
                 if (known == null || cost < known) {
                     bestCost.put(to, cost);
-                    open.add(new Node(to, kind, cost, cost + distance(to.cell(), towards), current));
+                    open.add(new Node(to, kind, cost, cost + estimate.applyAsDouble(to.cell()), current));
                 }
             });
         }

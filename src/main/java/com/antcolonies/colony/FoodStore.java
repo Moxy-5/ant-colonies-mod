@@ -139,12 +139,18 @@ public class FoodStore {
         richSeeds = Math.min(richSeeds, food);
     }
 
-    /**
-     * A spot on the floor of the food store that can take one more seed, or null if the store is not ready or full.
-     * Most of the time it is a heap that already exists (so the heaps grow, not a thin layer everywhere).
-     */
+    /** A spot on the floor of the food store that can take one more seed (one of {@link #foodSpots}, at random), or null if the store is not ready or full. */
     @Nullable
     public BlockPos pickFoodSpot(Level level, RandomSource random) {
+        List<BlockPos> spots = foodSpots(level, random);
+        return spots.isEmpty() ? null : spots.get(random.nextInt(spots.size()));
+    }
+
+    /**
+     * The spots on the floor of the food store that can take one more seed, empty if the store is not ready or full.
+     * Most of the time they are the heaps that already exist (so the heaps grow, not a thin layer everywhere).
+     */
+    public List<BlockPos> foodSpots(Level level, RandomSource random) {
         List<BlockPos> growing = new ArrayList<>();
         List<BlockPos> empty = new ArrayList<>();
         Set<BlockPos> young = colony.brood().getBroodCells(level); // eggs and larvae may lie in the seed store where it is the queen's home (no nursery)
@@ -161,8 +167,7 @@ public class FoodStore {
         }
         // Fungus comb is always built onto comb that has room first (the fungus only grows where the comb is thick enough).
         boolean growFirst = pile instanceof FungusCombBlock || random.nextFloat() < 0.75F;
-        List<BlockPos> from = !growing.isEmpty() && (empty.isEmpty() || growFirst) ? growing : empty;
-        return from.isEmpty() ? null : from.get(random.nextInt(from.size()));
+        return !growing.isEmpty() && (empty.isEmpty() || growFirst) ? growing : empty;
     }
 
     /** The food numbers of this colony's species: what it gathers and where it keeps it. */

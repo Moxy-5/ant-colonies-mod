@@ -1,6 +1,8 @@
 package com.antcolonies.nav;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -110,6 +112,12 @@ public class AntNavigator {
     /** When the mind accepts any foothold that passes a test (anywhere within reach of a block, say); else null. */
     @Nullable
     private Predicate<Foothold> goalTest;
+    /**
+     * When the mind gave a choice of cells (the free spots of a chamber, say) and the walk goes to the nearest it can
+     * reach; else null. Only for the first plan: once it is found the goal is that one cell (planning again keeps to it).
+     */
+    @Nullable
+    private Collection<BlockPos> goalCells;
     /** When the mind handed over a route to walk ({@link #follow}); else null. Kept when the route is planned again. */
     @Nullable
     private Route shared;
@@ -190,7 +198,20 @@ public class AntNavigator {
      * the far side of it.
      */
     public boolean moveTo(BlockPos goal, double speed, AntPathFinder.StepCosts mindCosts) {
-        return begin(goal, null, null, null, speed, mindCosts);
+        return begin(goal, null, null, null, null, speed, mindCosts);
+    }
+
+    /**
+     * Starts walking to the nearest of these cells it can reach (one route search for them all); {@link #getGoal} then
+     * says which. False (and does nothing) if there is no route to any of them.
+     */
+    public boolean moveTo(Collection<BlockPos> goals, double speed) {
+        if (goals.isEmpty()) {
+            return false;
+        }
+        BlockPos here = ant.blockPosition();
+        BlockPos nearest = goals.stream().min(Comparator.comparingInt(cell -> cell.distManhattan(here))).orElseThrow();
+        return begin(nearest, null, null, goals, null, speed, AntPathFinder.StepCosts.NONE);
     }
 
     /**
@@ -198,7 +219,7 @@ public class AntNavigator {
      * False (and does nothing) if there is no route to it.
      */
     public boolean moveTo(Foothold goal, double speed) {
-        return begin(goal.cell(), goal, null, null, speed, AntPathFinder.StepCosts.NONE);
+        return begin(goal.cell(), goal, null, null, null, speed, AntPathFinder.StepCosts.NONE);
     }
 
     /**
@@ -206,7 +227,7 @@ public class AntNavigator {
      * can be reached), searching toward {@code towards} first. False (and does nothing) if there is none to walk to.
      */
     public boolean moveTo(Predicate<Foothold> isGoal, BlockPos towards, double speed) {
-        return begin(towards, null, isGoal, null, speed, AntPathFinder.StepCosts.NONE);
+        return begin(towards, null, isGoal, null, null, speed, AntPathFinder.StepCosts.NONE);
     }
 
     /**
@@ -215,7 +236,7 @@ public class AntNavigator {
      * onto it where it left it (or further on) and goes on along it. False if it cannot get onto it.
      */
     public boolean follow(Route shared, double speed) {
-        return begin(shared.end().cell(), null, null, shared, speed, AntPathFinder.StepCosts.NONE);
+        return begin(shared.end().cell(), null, null, null, shared, speed, AntPathFinder.StepCosts.NONE);
     }
 
     /** Stops walking. An insect on a wall keeps holding on where it is. */
@@ -233,13 +254,15 @@ public class AntNavigator {
 
     /**
      * A new walk: to the goal cell, or one exact foothold ({@code foothold}), or any foothold that passes {@code test}
-     * (searched toward the goal cell), or along a shared route; with the mind's costs for it. Plans the route at once.
+     * (searched toward the goal cell), or the nearest of {@code cells}, or along a shared route; with the mind's costs
+     * for it. Plans the route at once.
      */
-    private boolean begin(BlockPos goal, @Nullable Foothold foothold, @Nullable Predicate<Foothold> test, @Nullable Route shared,
-            double speed, AntPathFinder.StepCosts mindCosts) {
+    private boolean begin(BlockPos goal, @Nullable Foothold foothold, @Nullable Predicate<Foothold> test,
+            @Nullable Collection<BlockPos> cells, @Nullable Route shared, double speed, AntPathFinder.StepCosts mindCosts) {
         this.goal = goal.immutable();
         this.goalFoothold = foothold;
         this.goalTest = test;
+        this.goalCells = cells;
         this.shared = shared;
         this.sharedFrom = 0;
         this.speed = speed;
@@ -345,6 +368,11 @@ public class AntNavigator {
         return at;
     }
 
+    /** The cell this walk goes to (after a walk to the nearest of several cells: the one it chose). */
+    public BlockPos getGoal() {
+        return goal;
+    }
+
     /** The planned route (null when idle). */
     @Nullable
     public Route getPlannedRoute() {
@@ -413,6 +441,13 @@ public class AntNavigator {
         }
         failed = found == null;
         route = found;
+        if (goalCells != null) {
+            // The nearest of the cells is chosen: planning again keeps to it.
+            goalCells = null;
+            if (found != null) {
+                goal = found.end().cell();
+            }
+        }
         if (found != null && shared != null) {
             sharedOffset = found.size() - shared.size(); // the shared route's steps are the route's last ones
         }
@@ -430,6 +465,9 @@ public class AntNavigator {
     @Nullable
     private Route search(CellMap map, List<Foothold> starts, AntPathFinder.StepCosts costs) {
         if (shared == null) {
+            if (goalCells != null) {
+                return AntPathFinder.find(map, starts, goalCells, AntPathFinder.DEFAULT_MAX_EXPANSIONS, costs);
+            }
             return goalTest != null
                     ? AntPathFinder.find(map, starts, goalTest, goal, AntPathFinder.DEFAULT_MAX_EXPANSIONS, costs)
                     : goalFoothold == null

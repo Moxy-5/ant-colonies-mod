@@ -110,7 +110,8 @@ public class StoreSeedGoal extends Goal {
                 colony.food().releaseStorePlace(ant.getUUID());
                 ColonyManager.get(level).markChanged();
             } else {
-                spot = colony.food().pickFoodSpot(level, ant.getRandom()); // that heap is full
+                errand.notThere(spot); // that heap is full
+                spot = colony.food().pickFoodSpot(level, ant.getRandom());
                 walkToSpot();
             }
         } else if (!errand.isWalking()) {
@@ -118,9 +119,13 @@ public class StoreSeedGoal extends Goal {
         }
     }
 
-    /** Sets off to the spot in the food store. If there is no way there, tries other spots, and drops the seed after a few (or with none left). */
+    /**
+     * Sets off to the spot in the food store; with no way there, to the nearest other spot there is a way to. Drops the
+     * seed with none left. (The spot itself is picked at random round the store, not the nearest: seed heaps grow to a
+     * whole block, and heaps filling from the door inward would stand in the way.)
+     */
     private void walkToSpot() {
-        spot = errand.setOffTo(spot, () -> colony.food().pickFoodSpot(ant.level(), ant.getRandom()), 1.0);
+        spot = errand.setOffToNearest(spot, () -> colony.food().foodSpots(ant.level(), ant.getRandom()), 1.0);
         if (spot == null) {
             dropSeed();
         }

@@ -65,9 +65,9 @@ public class CarryCorpseGoal extends Goal {
         if (ant.isCarryingCorpse()) {
             // Carrying a body (something else interrupted the walk): carry on to the refuse chamber.
             colony = ColonyManager.get(level).getColony(ant.getColonyId());
-            spot = colony == null ? null : colony.refuse().pickDestination(level, ant.getRandom());
+            spot = null; // (start() sets off to the nearest free spot)
             corpse = null;
-            if (spot == null) {
+            if (colony == null || colony.refuse().destinations(level, ant.getRandom()).isEmpty()) {
                 putDown(level);
                 return false;
             }
@@ -158,7 +158,6 @@ public class CarryCorpseGoal extends Goal {
             corpse = null;
             ant.setCarryingCorpse(true);
             level.playSound(null, ant.blockPosition(), SoundEvents.ITEM_PICKUP, SoundSource.NEUTRAL, 0.15F, 0.8F);
-            spot = colony.refuse().pickDestination(level, ant.getRandom());
             walkToSpot(); // (no room after all: stop() puts the body down)
         } else if (!errand.goTo(corpse.getUUID(), corpse.blockPosition(), 1.0)) {
             done = true; // no way to get there: let another ant have a go
@@ -172,7 +171,8 @@ public class CarryCorpseGoal extends Goal {
                 ant.setCarryingCorpse(false);
                 done = true;
             } else {
-                spot = colony.refuse().pickDestination(level, ant.getRandom()); // another body lies there now (or the comb is full)
+                errand.notThere(spot); // another body lies there now (or the comb is full)
+                spot = null;
                 walkToSpot();
             }
         } else if (!errand.isWalking()) {
@@ -180,9 +180,12 @@ public class CarryCorpseGoal extends Goal {
         }
     }
 
-    /** Sets off to the spot. If there is no way there, tries other spots, and gives up after a few (or with none left). */
+    /**
+     * Sets off to the spot; without one, or with no way there, to the nearest free spot there is a way to (the refuse
+     * heap grows from the chamber's door inward). Gives up with none left.
+     */
     private void walkToSpot() {
-        spot = errand.setOffTo(spot, () -> colony.refuse().pickDestination(ant.level(), ant.getRandom()), 1.0);
+        spot = errand.setOffToNearest(spot, () -> colony.refuse().destinations(ant.level(), ant.getRandom()), 1.0);
         if (spot == null) {
             done = true;
         }

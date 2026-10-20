@@ -64,9 +64,15 @@ public class Refuse {
         return colony.nest().getRefuseCells(level).contains(pos);
     }
 
-    /** A free floor cell of the refuse chamber (one body to a cell), or null if there is none (not dug yet, or full). */
+    /** A free floor cell of the refuse chamber (one of {@link #corpseSpots}, at random), or null if there is none (not dug yet, or full). */
     @Nullable
     public BlockPos pickCorpseSpot(Level level, RandomSource random) {
+        List<BlockPos> free = corpseSpots(level);
+        return free.isEmpty() ? null : free.get(random.nextInt(free.size()));
+    }
+
+    /** The free floor cells of the refuse chamber (one body to a cell), empty if there is none. */
+    public List<BlockPos> corpseSpots(Level level) {
         Set<BlockPos> taken = new HashSet<>();
         for (AntCorpseEntity corpse : getCorpses(level)) {
             taken.add(corpse.blockPosition());
@@ -77,7 +83,7 @@ public class Refuse {
                 free.add(pos);
             }
         }
-        return free.isEmpty() ? null : free.get(random.nextInt(free.size()));
+        return free;
     }
 
     /** A worker sets its dead nestmate down at {@code spot}. False if another body lies there (the worker looks for another spot). */
@@ -111,6 +117,11 @@ public class Refuse {
     @Nullable
     public BlockPos pickDestination(Level level, RandomSource random) {
         return eatsOrBuries() ? colony.food().pickFoodSpot(level, random) : pickCorpseSpot(level, random);
+    }
+
+    /** Every spot {@link #pickDestination} picks from: the refuse chamber's free cells, or the comb's spots. */
+    public List<BlockPos> destinations(Level level, RandomSource random) {
+        return eatsOrBuries() ? colony.food().foodSpots(level, random) : corpseSpots(level);
     }
 
     /**

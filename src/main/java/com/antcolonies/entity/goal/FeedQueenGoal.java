@@ -1,7 +1,6 @@
 package com.antcolonies.entity.goal;
 
 import java.util.EnumSet;
-import java.util.List;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -171,7 +170,7 @@ public class FeedQueenGoal extends Goal {
                 errand.stop();
                 leg = Leg.PASS;
                 moment = 0;
-            } else if (!errand.walkOn(List.of(MouthToMouth.cellAtMouth(queen), queen.blockPosition()), 1.0)) {
+            } else if (!errand.walkOn(MouthToMouth.cellAtMouth(queen), 1.0) && !errand.walkOn(queen.blockPosition(), 1.0)) { // her mouth first
                 done = true;
             }
             return;

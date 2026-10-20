@@ -141,7 +141,7 @@ public class DigGoal extends Goal {
         // floor (the hill tunnels' workers stood just out of reach there and never bit, 2026-10-14).
         boolean touching = ant.blockPosition().distManhattan(target) == 1;
         if (!touching && ant.distanceToSqr(blockCenter) > REACH * REACH) {
-            // Walk to the open space next to the block (above it in the shaft, beside it in the tunnel).
+            // Walk to the open space next to the block (above it in the shaft, beside it in the tunnel): the nearest it can reach.
             ant.setActivity(AbstractAntEntity.ACTIVITY_NONE);
             if (!errand.isWalking()) {
                 List<BlockPos> stands = colony.nest().standSpotsFor(level, target);

@@ -386,13 +386,19 @@ public class Brood {
         larva.discard();
     }
 
+    /** A free spot for an egg (one of {@link #eggSpots}, at random), or null if there is none. */
+    @Nullable
+    public BlockPos pickEggSpot(Level level, RandomSource random) {
+        List<BlockPos> spots = eggSpots(level);
+        return spots.isEmpty() ? null : spots.get(random.nextInt(spots.size()));
+    }
+
     /**
-     * A free spot for an egg, or null if there is none: in the nursery if any of it is dug out, then in a garden room
+     * The free spots for an egg, empty if there is none: in the nursery if any of it is dug out, then in a garden room
      * (termites: on the fungus comb, or on the floor beside it), otherwise (or when those are full) on the floor of the
      * queen's room. The nursery and the gardens are the preferred places, not a must.
      */
-    @Nullable
-    public BlockPos pickEggSpot(Level level, RandomSource random) {
+    public List<BlockPos> eggSpots(Level level) {
         Set<BlockPos> taken = getBroodCells(level);
         Nest nest = colony.nest();
         for (List<BlockPos> cells : List.of(nest.getNurseryCells(level), nest.getGardenCells(level), nest.getHomeRoomCells(level))) {
@@ -412,10 +418,10 @@ public class Brood {
             // On the comb first, where the nymph will find its food.
             List<BlockPos> from = !onComb.isEmpty() ? onComb : free;
             if (!from.isEmpty()) {
-                return from.get(random.nextInt(from.size()));
+                return from;
             }
         }
-        return null;
+        return List.of();
     }
 
     /**

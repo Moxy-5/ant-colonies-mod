@@ -1,6 +1,9 @@
 package com.antcolonies.entity.goal;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -32,6 +35,8 @@ import net.minecraft.world.entity.Entity;
  * {@link #setOff} starts a walk now; {@link #walkOn} keeps one going (and sets off again once a walk is over);
  * {@link #goTo} is {@code walkOn} to a thing, which with no way there is left alone ({@link #leaveAlone}) and the goal
  * gives up; {@link #setOffFor} sets off to one at once, the same way. A goal's search for work skips what is left alone ({@link #leftAlone}, {@link #isLeftAlone}).
+ * To put a load down in a chamber, {@link #setOffToNearest} walks to the nearest free spot it can reach, with one route
+ * search for all the spots.
  *
  * @param <K> what a thing found no way to is remembered by (a block, an entity's id)
  */
@@ -50,6 +55,8 @@ public final class Errand<K> {
     private final Map<K, Long> noWay = new HashMap<>();
     /** Spots with no way to them in this errand (see {@link #setOffTo}). */
     private int spotsWithNoWay;
+    /** Spots this errand found no good (no way there, or they could not take the load): the next search skips them. */
+    private final Set<BlockPos> noGood = new HashSet<>();
 
     public Errand(AbstractAntEntity ant) {
         this(ant, LEAVE_ALONE_TICKS);
@@ -64,6 +71,7 @@ public final class Errand<K> {
     /** A new errand starts (the goal's start). */
     public void begin() {
         spotsWithNoWay = 0;
+        noGood.clear();
     }
 
     /**
@@ -144,17 +152,12 @@ public final class Errand<K> {
         return isWalking() || setOff(cell, speed, costs);
     }
 
-    /** Like {@link #walkOn(BlockPos, double)}, to the first of these cells there is a way to (spots to stand at to reach a thing). */
-    public boolean walkOn(List<BlockPos> cells, double speed) {
-        if (isWalking()) {
-            return true;
-        }
-        for (BlockPos cell : cells) {
-            if (setOff(cell, speed)) {
-                return true;
-            }
-        }
-        return false;
+    /**
+     * Like {@link #walkOn(BlockPos, double)}, to the nearest of these cells there is a way to (spots to stand at to reach
+     * a thing), with one route search for them all.
+     */
+    public boolean walkOn(Collection<BlockPos> cells, double speed) {
+        return isWalking() || ant.getNavigator().moveTo(cells, speed);
     }
 
     /** Like {@link #walkOn(BlockPos, double)}, to any foothold {@code where} accepts. */
@@ -170,8 +173,8 @@ public final class Errand<K> {
         return walkOn(cell, speed) || leaveAlone(thing);
     }
 
-    /** Like {@link #goTo(Object, BlockPos, double)}, to the first of these cells there is a way to. */
-    public boolean goTo(K thing, List<BlockPos> cells, double speed) {
+    /** Like {@link #goTo(Object, BlockPos, double)}, to the nearest of these cells there is a way to. */
+    public boolean goTo(K thing, Collection<BlockPos> cells, double speed) {
         return walkOn(cells, speed) || leaveAlone(thing);
     }
 
@@ -204,7 +207,43 @@ public final class Errand<K> {
         return spot;
     }
 
-    /** How many spots had no way to them in this errand (for the goals' log lines). */
+    /**
+     * Sets off at once to a spot to put a load down (a free cell of a chamber): to {@code spot} if there is one and a way
+     * there, otherwise to the nearest of {@code spots} there is a way to, with one route search for them all (a real ant
+     * puts its load down in the first free place it comes to; trying spots one after another cost a search each, and a
+     * whole search each when the chamber was cut off). Spots this errand found no good ({@link #notThere}) are skipped.
+     * The spot it set off to, or null (no way to any of them, or none left).
+     */
+    @Nullable
+    public BlockPos setOffToNearest(@Nullable BlockPos spot, Supplier<? extends Collection<BlockPos>> spots, double speed) {
+        if (spot != null) {
+            if (setOff(spot, speed)) {
+                return spot;
+            }
+            notThere(spot);
+        }
+        List<BlockPos> left = new ArrayList<>();
+        for (BlockPos cell : spots.get()) {
+            if (!noGood.contains(cell)) {
+                left.add(cell);
+            }
+        }
+        if (ant.getNavigator().moveTo(left, speed)) {
+            return ant.getNavigator().getGoal();
+        }
+        if (!left.isEmpty()) {
+            spotsWithNoWay++;
+        }
+        return null;
+    }
+
+    /** This spot is no good for this errand (no way there, or it could not take the load): {@link #setOffToNearest} skips it. */
+    public void notThere(BlockPos spot) {
+        noGood.add(spot.immutable());
+        spotsWithNoWay++;
+    }
+
+    /** How many spots had no way to them (or could not take the load) in this errand (for the goals' log lines). */
     public int spotsWithNoWay() {
         return spotsWithNoWay;
     }

@@ -59,9 +59,9 @@ public class CarryEggGoal extends Goal {
         if (ant.isCarryingEgg()) {
             // Carrying an egg (something else interrupted the walk): carry on to the nursery.
             colony = ColonyManager.get(level).getColony(ant.getColonyId());
-            spot = colony == null ? null : colony.brood().pickEggSpot(level, ant.getRandom());
+            spot = null; // (start() sets off to the nearest free spot)
             egg = null;
-            if (spot == null) {
+            if (colony == null || colony.brood().eggSpots(level).isEmpty()) {
                 putDown(level);
                 return false;
             }
@@ -139,7 +139,6 @@ public class CarryEggGoal extends Goal {
             egg = null;
             ant.setCarryingEgg(true);
             level.playSound(null, ant.blockPosition(), SoundEvents.ITEM_PICKUP, SoundSource.NEUTRAL, 0.15F, 1.6F);
-            spot = colony.brood().pickEggSpot(level, ant.getRandom());
             walkToSpot(); // (no room in the nursery after all: stop() puts the egg down)
         } else if (!errand.goTo(egg.getUUID(), egg.blockPosition(), 1.0)) {
             done = true; // no way to get there: let another ant have a go
@@ -153,7 +152,8 @@ public class CarryEggGoal extends Goal {
                 ant.setCarryingEgg(false);
                 done = true;
             } else {
-                spot = colony.brood().pickEggSpot(level, ant.getRandom()); // another egg lies there now
+                errand.notThere(spot); // another egg lies there now
+                spot = null;
                 walkToSpot();
             }
         } else if (!errand.isWalking()) {
@@ -161,9 +161,12 @@ public class CarryEggGoal extends Goal {
         }
     }
 
-    /** Sets off to the spot. If there is no way there, tries other spots, and gives up after a few (or with none left). */
+    /**
+     * Sets off to the spot; without one, or with no way there, to the nearest free spot there is a way to (eggs are laid
+     * down from the nursery's door inward). Gives up with none left.
+     */
     private void walkToSpot() {
-        spot = errand.setOffTo(spot, () -> colony.brood().pickEggSpot(ant.level(), ant.getRandom()), 1.0);
+        spot = errand.setOffToNearest(spot, () -> colony.brood().eggSpots(ant.level()), 1.0);
         if (spot == null) {
             done = true;
         }
