@@ -15,10 +15,54 @@ The user asked which file should get "treatment like the errand helper" next. An
   different orders that do not hold the same parts; a forgotten save line loses that part on reload.
 - The Matabele ant (M8) would be a third species getting all 35.
 
-The idea to plan with the user: shared parts every colony has, species parts plugged in (by the species profile or a
-small species hook); one list the brain ticks, saves and loads; a clean way to ask for a part a species may not have;
-old saved worlds still load; small steps, a full run each, nothing changing in-game; speed measured with the stress
-test before and after (averaged over every 5-second window of each stage over several runs: the numbers swing a lot).
+### Planned with the user 2026-10-20: colony parts
+The user's reasons (2026-10-20): (1) make the split into three mods (Apex part 2) easy and clean; (2) the Matabele ant's
+behaviour (scouts, raid columns, rescue, wound care, moving house) will be complicated, so it must plug in without
+touching the brain. The user left every pick to me ("just go with your picks whatever will make it the best and
+easiest to stop bugs from happening and push updates easier"); so these are my picks, agreed by the user.
+
+**Decisions**
+1. **A species chooses its parts in its species file**, a `parts` list (`red_harvester_ant.json`: `"parts": ["hill",
+   "bakery", "trunk_trails", ...]`), seen and changed without code. Each part is known by a name in a **parts
+   registry** (name -> how to make it); the shared parts every colony has (nest, food map, brood, population, away life,
+   danger map, door, ...) are not listed, they are always there. Why the registry: after the split the framework mod
+   holds the registry and its shared parts, and each species mod signs up its own parts (the mound, the fungus garden
+   and soldiers in the savanna mod; the hill and bakery in the desert mod), so the framework never names a species part.
+   A part name in a species file that nothing signed up stops the game loading with a clear message (no silent typo).
+2. **Asking for a part a species may not have is a yes/no**, `colony.part(Mound.KEY)` giving "none" for a harvester
+   colony, never a do-nothing stand-in (a stand-in hides mistakes: an ant "building a mound" that is not there). The
+   code that only runs for one species (most of the 91 `colony.mound()` calls are inside termite goals) asks once at
+   the top. A test fails if any part runs for a species that did not list it.
+3. **Old saved worlds keep loading**: each part saves under the same name as today; a part in an old save that the
+   species no longer has is skipped (and logged once), a listed part missing from a save starts fresh, as today.
+4. **Order:** the steps below, each a full run, nothing changing in-game until step 2 (and then only what a species
+   should never have had), speed measured before and after with the stress test (every 5-second window of each stage
+   averaged over 3 runs of the old code and 3 of the new: the numbers swing a lot).
+
+**Steps**
+1. **One parts list.** A small `ColonyPart` shape (name, tick, tick while away, save, load, its place in the tick
+   order); `Colony` holds one ordered list and ticks, saves and loads it in one loop each, in exactly today's tick
+   order (written down once, not in 4 or 5 places). Every species still gets every part in this step. New check: a
+   save-and-load test that fills every part with something, saves, loads and compares, so a forgotten save line can
+   never happen again. Nothing changes in-game.
+2. **Species pick their parts.** The `parts` lists in both species files and the registry; the harvester colony stops
+   making the termite parts (mound, fungus garden, mushrooms, soldiers, king care, hidden trips, closed holes,
+   galleries) and the termite colony the ant parts (hill, bakery, trunk trails, recruits, forager spots, patrol, ...).
+   The exact two lists are drawn up at the start of this step from what each part's own "do I apply?" check says today.
+3. **Ask before use.** The callers moved to the yes/no, a batch of goals or parts at a time, a category's tests after
+   each batch; the parts' own "do I apply to this species?" checks go once nothing needs them.
+4. **Colony news (my pick for the Matabele ant):** a small shared way for parts to hear what happened without knowing
+   who else is listening: "a member was hurt or killed here", "food found here", "a hole opened or closed", "a
+   neighbour met". Today such things are wired by hand from part to part (the danger map, closed holes, neighbours,
+   recruits). The Matabele parts (scouts reporting termite feeding spots, the raid caller, rescue) then plug in by
+   listening, and the brain needs no new line for them. Only the wiring that exists today is moved onto it; nothing new
+   happens in-game. To be checked with the user before it is built, as it is the one step not asked for.
+5. **Full run and speed.** The stress test before and after; the expected gain is small (each colony skips the parts it
+   does not have instead of each checking and returning); the main wins are fewer places for a bug and a new species
+   with no copied code.
+
+Then the split's own plan (`docs/plans/mod-split.md`) can draw the framework's wall along the registry: shared parts
+in, species parts out.
 
 After it: `colony/FoodStore.java` (1,077 lines, the seed granary and the fungus comb in one; 23 of the 57 colony files
 mix harvester-only and termite-only work). Smaller: errand helper step 4 (`ScoutGoal` in three); later, in the
