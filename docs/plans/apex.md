@@ -56,7 +56,7 @@ easiest to stop bugs from happening and push updates easier"); so these are my p
    neighbour met". Today such things are wired by hand from part to part (the danger map, closed holes, neighbours,
    recruits). The Matabele parts (scouts reporting termite feeding spots, the raid caller, rescue) then plug in by
    listening, and the brain needs no new line for them. Only the wiring that exists today is moved onto it; nothing new
-   happens in-game. To be checked with the user before it is built, as it is the one step not asked for.
+   happens in-game. **Agreed by the user 2026-10-20** ("I like that colony news"), who also saw the speed side: an ant waiting for something (a raider by a termite feeding spot) is told when it happens instead of checking every tick, so waiting costs next to nothing. Built so: a listener is called only when its news comes, and news is only sent while someone listens.
 5. **Full run and speed.** The stress test before and after; the expected gain is small (each colony skips the parts it
    does not have instead of each checking and returning); the main wins are fewer places for a bug and a new species
    with no copied code.
