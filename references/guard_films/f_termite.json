@@ -358,11 +358,11 @@
  "findings": {
   "jump head": [
    1,
-   0.103
+   0.148
   ],
   "jump at pillar_down_35": [
-   8,
-   0.148
+   9,
+   0.21
   ],
   "inside mandible_r": [
    1,
@@ -374,7 +374,7 @@
   ],
   "jump mandible_r": [
    1,
-   0.11
+   0.159
   ],
   "inside antenna_l_1": [
    1,
@@ -382,7 +382,7 @@
   ],
   "jump antenna_l_1": [
    1,
-   0.117
+   0.165
   ],
   "inside antenna_l_2": [
    5,
@@ -406,11 +406,11 @@
   ],
   "jump antenna_l_2": [
    2,
-   0.148
+   0.21
   ],
   "jump at pillar_down_36": [
-   2,
-   0.138
+   5,
+   0.153
   ],
   "inside mandible_l": [
    1,
@@ -418,7 +418,7 @@
   ],
   "jump mandible_l": [
    1,
-   0.11
+   0.159
   ],
   "inside antenna_r_1": [
    1,
@@ -426,7 +426,7 @@
   ],
   "jump antenna_r_1": [
    1,
-   0.114
+   0.161
   ],
   "inside antenna_r_2": [
    8,
@@ -445,8 +445,8 @@
    0.012
   ],
   "jump antenna_r_2": [
-   2,
-   0.143
+   1,
+   0.207
   ],
   "inside leg_r3_lower": [
    4,
@@ -478,7 +478,11 @@
   ],
   "jump leg_l1_lower": [
    1,
-   0.12
+   0.156
+  ],
+  "jump leg_l1_foot": [
+   1,
+   0.166
   ],
   "inside leg_l3_lower": [
    2,
@@ -496,25 +500,37 @@
    4,
    0.034
   ],
+  "jump abdomen_2": [
+   1,
+   0.08
+  ],
+  "jump at pillar_down_37": [
+   4,
+   0.101
+  ],
   "inside abdomen_3": [
    2,
    0.015
   ],
+  "jump abdomen_3": [
+   2,
+   0.092
+  ],
   "inside abdomen_4": [
    4,
    0.028
+  ],
+  "jump abdomen_4": [
+   2,
+   0.097
   ],
   "inside abdomen_5": [
    4,
    0.04
   ],
   "jump abdomen_5": [
-   1,
-   0.07
-  ],
-  "jump at pillar_down_41": [
    2,
-   0.088
+   0.101
   ],
   "inside abdomen_6": [
    4,
@@ -522,9 +538,11 @@
   ],
   "jump abdomen_6": [
    1,
-   0.088
+   0.084
   ]
  },
- "body_findings": {},
- "known_bugs": "at the top of the ramps the termite's legs and gaster are drawn up to 0.06 blocks inside the ramp and the soil (found 2026-10-18 by the first guard films); at the pillar's foot the navigator's dash after its turn (0.1 a tick, docs/BUGS.md 53) unrolls the abdomen in 2 ticks"
+ "body_findings": {
+  "tipped": 2
+ },
+ "known_bugs": "at the top of the ramps the termite's legs and gaster are drawn up to 0.06 blocks inside the ramp and the soil (found 2026-10-18 by the first guard films); at the pillar's foot its short body tips 30 degrees a tick round the corner as it walks on (BUGS 53: no more stop, turn and dash), its abdomen unrolling up to 0.1 blocks a tick"
 }

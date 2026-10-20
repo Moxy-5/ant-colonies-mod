@@ -166,40 +166,8 @@
   136
  ],
  "findings": {
-  "jump leg_r2": [
-   1,
-   0.163
-  ],
-  "jump at down_61": [
-   25,
-   0.285
-  ],
-  "jump leg_r2_lower": [
-   1,
-   0.162
-  ],
-  "jump leg_r2_foot": [
-   1,
-   0.156
-  ],
-  "jump leg_l2": [
-   1,
-   0.163
-  ],
-  "jump leg_l2_lower": [
-   1,
-   0.17
-  ],
-  "jump leg_l2_foot": [
-   1,
-   0.176
-  ],
-  "jump thorax": [
-   1,
-   0.201
-  ],
   "jump head": [
-   3,
+   2,
    0.142
   ],
   "jump at up_30": [
@@ -211,108 +179,80 @@
    0.184
   ],
   "jump mandible_r": [
-   2,
+   4,
    0.184
+  ],
+  "jump at down_56": [
+   5,
+   0.123
+  ],
+  "jump at down_57": [
+   6,
+   0.139
   ],
   "jump antenna_l_1": [
    4,
    0.143
   ],
-  "jump at down_57": [
-   3,
-   0.085
-  ],
   "jump antenna_l_2": [
-   3,
+   4,
    0.166
   ],
   "jump mandible_l": [
-   2,
+   4,
    0.184
   ],
   "jump antenna_r_1": [
-   2,
+   4,
    0.143
   ],
   "jump antenna_r_2": [
-   2,
+   3,
    0.173
   ],
-  "jump leg_r3": [
-   1,
-   0.228
-  ],
-  "jump leg_r3_lower": [
-   1,
-   0.258
-  ],
-  "jump leg_r3_foot": [
-   1,
-   0.267
-  ],
   "jump leg_r1": [
-   2,
-   0.13
-  ],
-  "jump leg_r1_lower": [
    1,
-   0.118
-  ],
-  "jump leg_r1_foot": [
-   1,
-   0.118
-  ],
-  "jump leg_l1": [
-   2,
-   0.13
-  ],
-  "jump leg_l3": [
-   1,
-   0.229
+   0.122
   ],
   "jump leg_l3_lower": [
-   2,
-   0.229
+   1,
+   0.163
   ],
   "jump at up_32": [
    8,
    0.171
   ],
   "jump leg_l3_foot": [
-   2,
-   0.24
+   1,
+   0.171
   ],
   "jump abdomen": [
-   2,
-   0.219
+   1,
+   0.119
   ],
   "jump abdomen_2": [
-   2,
-   0.233
+   1,
+   0.129
   ],
   "jump abdomen_3": [
-   2,
-   0.254
+   1,
+   0.143
   ],
   "jump abdomen_4": [
-   3,
-   0.271
-  ],
-  "jump at down_63": [
-   3,
-   0.079
+   1,
+   0.155
   ],
   "jump abdomen_5": [
-   3,
-   0.285
+   1,
+   0.164
   ],
   "jump abdomen_6": [
-   3,
-   0.285
+   1,
+   0.165
   ]
  },
  "body_findings": {
-  "tipped": 3
+  "tipped": 2
  },
- "known_bugs": "coming head first down onto the floor the navigator stops it 3 ticks and turns it 180 degrees on the spot, then it dashes on (0.09 a tick): the body jumps (old, before the spine); its short body tips up to 30 degrees a tick round the foot of a wall (real for a body a quarter block long)"
+ "known_bugs": "its short body tips up to 30 degrees a tick round the foot of a wall (real for a body a quarter block long); since BUGS 53 it walks on at the foot at its climbing pace, so the head's antennae and jaws swing up to 0.14 blocks a tick there"
 }
