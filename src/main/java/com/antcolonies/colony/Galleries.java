@@ -724,6 +724,14 @@ public class Galleries {
         shuffle(order, colony.random());
         Set<BlockPos> spreadStopped = new HashSet<>(stopped);
         spreadStopped.addAll(backfilled); // (a way that led nowhere is not explored again)
+        long now = level.getGameTime();
+        for (Tip each : tips) {
+            if (isDue(each.way().hole(), now)) {
+                // (nor one due to be filled in: it led nowhere for fill_days days; just back, the spreading would
+                // otherwise lead on from it before it is filled, and it could never fill, docs/BUGS.md 59)
+                spreadStopped.add(each.way().hole());
+            }
+        }
         Tip tip = pickTip(order, center, tipReach(), spreadStopped);
         if (tip == null || !loadedAround(level, tip.end(), numbers)) {
             return; // (later, once the ground out there is loaded)
@@ -1274,14 +1282,12 @@ public class Galleries {
         if (wallOffNeighbours(level, holeOf)) {
             return; // (one piece at a time)
         }
-        long unused = numbers().fillDays() * DAY;
         if (numbers().fillDays() <= 0) {
             return;
         }
         List<NestPlan.ForagingTunnel> due = new ArrayList<>();
         for (NestPlan.ForagingTunnel arm : arms) {
-            BlockPos hole = arm.hole();
-            if (!base.contains(hole) && isLeaf(hole) && !ways.isLiveNewHole(hole) && now - lastUsed.get(hole) >= unused) {
+            if (isDue(arm.hole(), now)) {
                 due.add(arm);
             }
         }
@@ -1307,6 +1313,16 @@ public class Galleries {
                 }
             }
         }
+    }
+
+    /**
+     * Whether the piece ending at this hole is due to be filled in: a far piece no other grows from, not one of the 4
+     * arms nor a tunnel out to food that lasts, that led to no food for {@code fill_days} days.
+     */
+    private boolean isDue(BlockPos hole, long now) {
+        Long at = lastUsed.get(hole);
+        return numbers().fillDays() > 0 && at != null && pieceAt(hole) != null && !base.contains(hole) && isLeaf(hole)
+                && !colony.nest().foodWays().isLiveNewHole(hole) && now - at >= numbers().fillDays() * DAY;
     }
 
     /** The piece ending at this hole and every piece it grew from were in use at {@code at}. */
