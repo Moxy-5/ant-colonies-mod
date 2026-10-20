@@ -588,6 +588,11 @@ public class Galleries {
         return tips.size();
     }
 
+    /** Whether the first arms are planned (for the tests). */
+    public boolean armsPlanned() {
+        return armsPlanned;
+    }
+
     /** Tests only: the farthest a tip may grow (null: the species file's reach), to keep a web inside a test's arena. */
     public void setReachForTests(@Nullable Integer reach) {
         reachForTests = reach;

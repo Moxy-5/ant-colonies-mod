@@ -291,6 +291,7 @@ public class TermiteNewHoleTests {
                     outAt.put(id, (int) helper.getTick());
                 } else if (stage.containsKey(id) && level.canSeeSky(at)) {
                     stage.remove(id); // out on the ground again: not on its way home
+                    AntColoniesMod.LOGGER.info("[long-walk] {} out under the sky at {}: not on its way home", worker.getId(), helper.relativePos(at));
                 } else if (stage.getOrDefault(id, 0) == 1 && middle.contains(at)) {
                     stage.put(id, 2); // on its way home underground
                 } else if (stage.getOrDefault(id, 0) == 2 && !cells.contains(at) && colony.nest().isInside(level, at)
@@ -311,6 +312,14 @@ public class TermiteNewHoleTests {
                         "a worker out of the far hole at tick " + outAt.get(going.getKey()) + " went into the tunnel and never got home");
             }
             if (helper.getTick() % 1000 == 0) {
+                for (TermiteWorkerEntity w : TestIsolation.insectsOf(level, colony, TermiteWorkerEntity.class)) {
+                    if (stage.containsKey(w.getUUID())) {
+                        // (for a next failure: where those on their way are, how far along the tunnel, what they do)
+                        AntColoniesMod.LOGGER.info("[long-walk] {} stage {} at {}, tunnel cell {} of {}, doing {}", w.getId(), stage.get(w.getUUID()),
+                                helper.relativePos(w.blockPosition()), cells.indexOf(w.blockPosition()), cells.size(),
+                                w.goalSelector.getAvailableGoals().stream().filter(g -> g.isRunning()).map(g -> g.getGoal().getClass().getSimpleName()).toList());
+                    }
+                }
                 AntColoniesMod.LOGGER.info("[long-walk] tick {} {}: hole {}, {} on their way home, trips {}, {} insect-ticks watched underground, {}",
                         helper.getTick(), clock.describe(), level.getBlockState(tunnel[0].tunnel().hole()), stage.size(), tripTicks,
                         watcher.watchedTicks(), colony.foragingHoles().describeNewHoles(level));
@@ -493,6 +502,8 @@ public class TermiteNewHoleTests {
         final GameTestHelper helper;
         final BlockPos hay;
         final FoodWays.NewTunnel[] tunnel = {null};
+        /** The tick the hay was put down, -1 before. */
+        final int[] hayAt = {-1};
 
         LongGallery(GameTestHelper helper, boolean hiddenTrips) {
             this.helper = helper;
@@ -525,9 +536,6 @@ public class TermiteNewHoleTests {
                 TermiteSoldierTests.digNestAtOnce(level, colony);
                 colony.population().addNewMembers(WorkerAntEntity.CASTE, now - 1000, 500);
                 colony.hiddenTrips().setOnForTests(hiddenTrips);
-                level.setBlock(hay, Blocks.HAY_BLOCK.defaultBlockState(), 3);
-                colony.food().rescanPlantsSoon();
-                colony.foodMap().knowForTests(hay);
             });
         }
 
@@ -535,6 +543,20 @@ public class TermiteNewHoleTests {
         boolean tick(@Nullable Colony colony) {
             ServerLevel level = helper.getLevel();
             if (colony == null || helper.getTick() < 20) {
+                return false;
+            }
+            if (hayAt[0] < 0) {
+                // The hay only once the arms are planned (docs/BUGS.md 51: with the arms planned first, the young web's
+                // range, 24, matched the food radius and the plant scan skipped the known hay 38 out; the test failed
+                // whenever the arms came first, about 1 run in 10).
+                helper.assertTrue(helper.getTick() < 600, "the galleries planned no arms");
+                if (!colony.nest().galleries().armsPlanned()) {
+                    return false;
+                }
+                level.setBlock(hay, Blocks.HAY_BLOCK.defaultBlockState(), 3);
+                colony.food().rescanPlantsSoon();
+                colony.foodMap().knowForTests(hay);
+                hayAt[0] = (int) helper.getTick();
                 return false;
             }
             if (colony.food().getPiecesCut(hay) > 24) {
@@ -549,7 +571,8 @@ public class TermiteNewHoleTests {
                     AntColoniesMod.LOGGER.info("[long-walk] a tunnel of {} blocks dug at once, hole at {}", tunnel[0].tunnel().tunnel().size(),
                             helper.relativePos(tunnel[0].tunnel().hole()));
                 } else {
-                    helper.assertTrue(helper.getTick() < 1000, "no tunnel was planned to the hay: " + colony.foragingHoles().describeNewHoles(level));
+                    helper.assertTrue(helper.getTick() - hayAt[0] < 1000, "no tunnel was planned to the hay: " + colony.foragingHoles().describeNewHoles(level)
+                            + ", hay in the plant scan " + colony.food().plants(level).contains(hay));
                 }
                 return false;
             }

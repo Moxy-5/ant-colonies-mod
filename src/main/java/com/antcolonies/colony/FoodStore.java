@@ -368,7 +368,9 @@ public class FoodStore {
                     scanColumn(level, x, z, false);
                 }
             }
-            if (inner < radius) {
+            // With the galleries, along them always: a young web's range can be the food radius itself, and the known food
+            // past it (out of the inner square) was then never scanned, so no piece was dug to it (docs/BUGS.md 51).
+            if (inner < radius || galleries) {
                 Set<Long> done = new HashSet<>();
                 int side = BAND + food().search().map(SpeciesProfile.SearchNumbers::wander).orElse(0);
                 if (galleries) {
