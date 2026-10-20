@@ -700,4 +700,98 @@ public class TermiteFoodTests {
         }
         helper.succeed();
     }
+
+    /**
+     * Big dead wood calls (the user's report, 2026-10-19: termites never found a standing dead giant 15 to 30 blocks out;
+     * their pick: big dead wood is sensed from afar, as real termites smell and feel rotting wood through the soil): a
+     * colony with its galleries grown, which has never seen it, senses a dead trunk 3 thick, 10 tall, 24 blocks out
+     * (at midday, nobody outside), and a gallery piece with its feeding gallery, or from a hole near it a runway of mud,
+     * goes out to its foot. A fallen dead stem of 6 blocks, too small to call, is not sensed.
+     */
+    @GameTest(template = "arena", timeoutTicks = 12000, skyAccess = true)
+    public static void aStandingDeadTreeIsSensedAndGetsAGalleryToItsFoot(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        int mid = 32;
+        for (int x = 0; x <= 64; x++) {
+            for (int z = 0; z <= 64; z++) {
+                for (int y = 0; y < SURFACE - 1; y++) {
+                    helper.setBlock(x, y, z, net.minecraft.world.level.block.Blocks.DIRT);
+                }
+                helper.setBlock(x, SURFACE - 1, z, net.minecraft.world.level.block.Blocks.GRASS_BLOCK);
+            }
+        }
+        helper.spawn(ModEntities.TERMITE_QUEEN.get(), mid, SURFACE, mid);
+        helper.runAfterDelay(5, () -> {
+            for (int i = 0; i < 8; i++) {
+                helper.spawn(ModEntities.TERMITE_WORKER.get(), mid - 2 + i % 4, SURFACE, mid - 3 - i / 4);
+            }
+        });
+        TestClock.still(helper, 12); // midday: nobody goes out, so nothing is found by looking
+        List<BlockPos> foot = new ArrayList<>();
+        List<BlockPos> stem = new ArrayList<>();
+        int[] stage = {0};
+        helper.runAfterDelay(10, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
+            long now = level.getGameTime();
+            TermiteSoldierTests.digNestAtOnce(level, colony);
+            colony.population().addNewMembers(WorkerAntEntity.CASTE, now - colony.profile().worker().builderUntilTicks() - 1000, 500);
+            colony.nest().galleries().setSwitchForTests(true);
+            stage[0] = 1;
+        });
+        helper.onEachTick(() -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            if (colony == null || stage[0] == 0) {
+                return;
+            }
+            com.antcolonies.colony.Galleries galleries = colony.nest().galleries();
+            for (NestPlan.ForagingTunnel tunnel : colony.foragingHoles().tunnels(level)) {
+                for (BlockPos cell : galleries.digCells(tunnel)) {
+                    if (!com.antcolonies.colony.Nest.isDugOut(level, cell)) {
+                        level.setBlock(cell, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 3);
+                    }
+                }
+            }
+            long tick = helper.getTick();
+            if (stage[0] == 1 && tick >= 1000) {
+                // The dead giant, standing between two of the first arms: bleached log 3 thick and 10 tall.
+                for (int dx = -1; dx <= 1; dx++) {
+                    for (int dz = -1; dz <= 1; dz++) {
+                        for (int y = 0; y < 10; y++) {
+                            BlockPos at = helper.absolutePos(new BlockPos(mid + 22 + dx, SURFACE + y, mid + 9 + dz));
+                            level.setBlock(at, com.antcolonies.registry.TreeBlocks.BLEACHED_LOG.get().defaultBlockState(), 3);
+                            if (y == 0) {
+                                foot.add(at);
+                            }
+                        }
+                    }
+                }
+                // A fallen dead stem, 6 blocks: too small to be sensed from afar.
+                for (int dx = 0; dx < 6; dx++) {
+                    BlockPos at = helper.absolutePos(new BlockPos(mid - 24 + dx, SURFACE, mid - 10));
+                    level.setBlock(at, com.antcolonies.registry.TreeBlocks.BLEACHED_LOG.get().defaultBlockState()
+                            .setValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS, net.minecraft.core.Direction.Axis.X), 3);
+                    stem.add(at);
+                }
+                helper.assertTrue(foot.stream().noneMatch(colony.foodMap()::isKnown), "the colony knew the dead tree before sensing it");
+                stage[0] = 2;
+            }
+            if (stage[0] != 2) {
+                return;
+            }
+            helper.assertTrue(stem.stream().noneMatch(colony.foodMap()::isKnown), "the small fallen stem was sensed from afar");
+            boolean way = colony.nest().foodWays().getNewTunnels().stream()
+                    .anyMatch(tunnel -> foot.contains(tunnel.food()) && tunnel.gallery() != null && !tunnel.gallery().isEmpty())
+                    || colony.nest().foodWays().getRunways().stream().anyMatch(runway -> foot.contains(runway.food()));
+            if (way) {
+                helper.succeed();
+                return;
+            }
+            helper.assertTrue(tick < 11900, "no way out to the dead tree's foot:" + galleries.describe(level)
+                    + colony.foragingHoles().describeNewHoles(level) + ", sensed " + foot.stream().filter(colony.foodMap()::isKnown).count()
+                    + ", foot seen " + foot.stream().filter(colony.food().plants(level)::contains).count()
+                    + ", food waiting " + colony.foragingHoles().isFoodWaiting() + colony.foragingHoles().whyNoRunway(level, foot.get(0)));
+        });
+    }
 }

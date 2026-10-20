@@ -140,7 +140,14 @@
       "wander": 20,
       "hidden_trip": 12,
       "fill_days": 10,
-      "pull_reach": 12
+      "pull_reach": 12,
+      "wood_call": {
+        "_note": "Big dead wood calls the galleries (the user's pick, 2026-10-19; real termites smell rotting wood and its fungi through the soil, and feel how big a log is from how it vibrates): dead wood of at least min_blocks blocks together (a standing dead giant, a fallen giant) is noticed from reach blocks past any dug hole or growing tip, from big_reach once it is big_blocks blocks or more; the colony then knows its foot, and a gallery piece (or a runway, from a hole near it) goes to it before the tips spread evenly. reach 0 = off. My numbers, to confirm.",
+        "min_blocks": 20,
+        "reach": 16,
+        "big_blocks": 100,
+        "big_reach": 20
+      }
     }
   },
   "queen_body": {

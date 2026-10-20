@@ -982,6 +982,37 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
     }
 
     /**
+     * Big dead wood calls the galleries (the user's pick, 2026-10-19): real termites sense rotting wood through the soil
+     * from afar (the smell of the wood and its fungi; they even judge a log's size from how it vibrates). Dead wood of at
+     * least {@code minBlocks} blocks together (a standing dead giant, a fallen giant) is noticed from {@code reach} blocks
+     * past any hole or tip, and from {@code bigReach} once it is {@code bigBlocks} blocks or more; the colony then knows
+     * it, and a gallery piece or a runway goes to it. {@code reach} 0: off. My numbers, to confirm.
+     */
+    public record WoodCall(int minBlocks, int reach, int bigBlocks, int bigReach) {
+        public static final WoodCall DEFAULT = new WoodCall(20, 0, 100, 0);
+        public static final Codec<WoodCall> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.INT.optionalFieldOf("min_blocks", 20).forGetter(WoodCall::minBlocks),
+                Codec.INT.optionalFieldOf("reach", 16).forGetter(WoodCall::reach),
+                Codec.INT.optionalFieldOf("big_blocks", 100).forGetter(WoodCall::bigBlocks),
+                Codec.INT.optionalFieldOf("big_reach", 20).forGetter(WoodCall::bigReach)
+        ).apply(i, WoodCall::new));
+
+        /** How far wood of this many blocks is noticed from (0: too small, or off). */
+        public int reachFor(int blocks) {
+            if (reach <= 0 || blocks < minBlocks) {
+                return 0;
+            }
+            double big = bigBlocks <= minBlocks ? 1.0 : Math.min(1.0, (blocks - minBlocks) / (double) (bigBlocks - minBlocks));
+            return (int) Math.round(reach + (bigReach - reach) * big);
+        }
+
+        /** The farthest any wood is noticed from. */
+        public int farthest() {
+            return reach <= 0 ? 0 : Math.max(reach, bigReach);
+        }
+    }
+
+    /**
      * Termites underground (the user's plan of 2026-10-17, {@code docs/plans/termites-underground.md}), behind a switch:
      * {@code enabled} turns it on (off: the 2 foraging holes of before, both open every foraging time). Step 1, holes
      * take turns (real Macrotermes: many small holes along the galleries, only some opened on a night, near food found
@@ -996,7 +1027,7 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      */
     public record GalleryNumbers(boolean enabled, int armLength, int holeSpacing, int foragersPerHole, double rainMore, int foodRadius, int explore,
             int workersPerBlock, int maxLength, int reach, int pieceLength, int forkMin, int forkMax, int forkAngle, int wander, int hiddenTrip,
-            int fillDays, int pullReach) {
+            int fillDays, int pullReach, WoodCall woodCall) {
         /** The first 16 numbers (a codec group holds at most 16), the step 3 ones at their defaults. */
         private static final com.mojang.serialization.MapCodec<GalleryNumbers> STEPS_1_TO_2 = RecordCodecBuilder.mapCodec(i -> i.group(
                 Codec.BOOL.optionalFieldOf("enabled", false).forGetter(GalleryNumbers::enabled),
@@ -1019,8 +1050,9 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
         public static final Codec<GalleryNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 STEPS_1_TO_2.forGetter(numbers -> numbers),
                 Codec.INT.optionalFieldOf("fill_days", 10).forGetter(GalleryNumbers::fillDays),
-                Codec.INT.optionalFieldOf("pull_reach", 12).forGetter(GalleryNumbers::pullReach)
-        ).apply(i, (numbers, fillDays, pullReach) -> numbers.withStep3(fillDays, pullReach)));
+                Codec.INT.optionalFieldOf("pull_reach", 12).forGetter(GalleryNumbers::pullReach),
+                WoodCall.CODEC.optionalFieldOf("wood_call", WoodCall.DEFAULT).forGetter(GalleryNumbers::woodCall)
+        ).apply(i, (numbers, fillDays, pullReach, woodCall) -> numbers.withStep3(fillDays, pullReach, woodCall)));
 
         /** Step 1's numbers only (growing with the step 2 and 3 defaults). */
         public GalleryNumbers(boolean enabled, int armLength, int holeSpacing, int foragersPerHole, double rainMore, int foodRadius, int explore) {
@@ -1031,24 +1063,24 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
         public GalleryNumbers(boolean enabled, int armLength, int holeSpacing, int foragersPerHole, double rainMore, int foodRadius, int explore,
                 int workersPerBlock, int maxLength, int reach, int pieceLength, int forkMin, int forkMax, int forkAngle, int wander, int hiddenTrip) {
             this(enabled, armLength, holeSpacing, foragersPerHole, rainMore, foodRadius, explore, workersPerBlock, maxLength, reach, pieceLength,
-                    forkMin, forkMax, forkAngle, wander, hiddenTrip, 10, 12);
+                    forkMin, forkMax, forkAngle, wander, hiddenTrip, 10, 12, WoodCall.DEFAULT);
         }
 
-        GalleryNumbers withStep3(int fillDays, int pullReach) {
+        GalleryNumbers withStep3(int fillDays, int pullReach, WoodCall woodCall) {
             return new GalleryNumbers(enabled, armLength, holeSpacing, foragersPerHole, rainMore, foodRadius, explore, workersPerBlock, maxLength,
-                    reach, pieceLength, forkMin, forkMax, forkAngle, wander, hiddenTrip, fillDays, pullReach);
+                    reach, pieceLength, forkMin, forkMax, forkAngle, wander, hiddenTrip, fillDays, pullReach, woodCall);
         }
 
         /** The same numbers with another reach (tests keep a web inside their arena). */
         public GalleryNumbers withReach(int reach) {
             return new GalleryNumbers(enabled, armLength, holeSpacing, foragersPerHole, rainMore, foodRadius, explore, workersPerBlock, maxLength,
-                    reach, pieceLength, forkMin, forkMax, forkAngle, wander, hiddenTrip, fillDays, pullReach);
+                    reach, pieceLength, forkMin, forkMax, forkAngle, wander, hiddenTrip, fillDays, pullReach, woodCall);
         }
 
         /** The same numbers with another wander (a tip pulled toward food goes straight for it). */
         public GalleryNumbers withWander(int wander) {
             return new GalleryNumbers(enabled, armLength, holeSpacing, foragersPerHole, rainMore, foodRadius, explore, workersPerBlock, maxLength,
-                    reach, pieceLength, forkMin, forkMax, forkAngle, wander, hiddenTrip, fillDays, pullReach);
+                    reach, pieceLength, forkMin, forkMax, forkAngle, wander, hiddenTrip, fillDays, pullReach, woodCall);
         }
 
         /** How many blocks of gallery a colony with this many workers may have in all, at most max_length (0 when it does not grow). */

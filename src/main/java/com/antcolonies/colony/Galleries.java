@@ -133,6 +133,8 @@ public class Galleries {
     /** Whether a foraging time is going on (its holes are picked). Saved. */
     private boolean inRound;
     private long tickedAt = Long.MIN_VALUE;
+    /** Listens for big dead wood round the holes and tips (not saved: it listens again soon after a load). */
+    private final DeadWoodCall woodCall;
     /** The holes of the first arms (they never fill in). Saved. */
     private final Set<BlockPos> base = new HashSet<>();
     /** Each piece's parent (by their holes; none for the first arms and pieces off the nest's own tunnels). Saved. */
@@ -174,6 +176,7 @@ public class Galleries {
     Galleries(Colony colony, Runnable changed) {
         this.colony = colony;
         this.changed = changed;
+        this.woodCall = new DeadWoodCall(colony);
     }
 
     /** Whether the switch is on for this colony (the species file's {@code nest.galleries.enabled}). */
@@ -315,6 +318,7 @@ public class Galleries {
             planArms(level, own);
         }
         if (armsPlanned) {
+            listenForWood(level);
             growTips(level);
         }
         layOutHoles(level, own);
@@ -636,6 +640,30 @@ public class Galleries {
     public int range() {
         int reach = reach();
         return reach == 0 ? 0 : reach + numbers().foodRadius();
+    }
+
+    /**
+     * Big dead wood calls (the user's pick, 2026-10-19, see {@link DeadWoodCall}): round the dug holes and the growing
+     * tips, dead wood big enough is sensed and the colony learns it, so a piece goes out to it before the tips spread.
+     */
+    private void listenForWood(ServerLevel level) {
+        SpeciesProfile.WoodCall call = numbers().woodCall();
+        if (call.farthest() <= 0) {
+            return;
+        }
+        List<BlockPos> from = new ArrayList<>();
+        for (NestPlan.ForagingTunnel tunnel : colony.foragingHoles().tunnels(level)) {
+            if (ForagingHoles.isDug(level, tunnel) && !colony.closedHoles().isClosed(level, tunnel.hole())) {
+                from.add(tunnel.hole());
+            }
+        }
+        for (Tip tip : tips) {
+            from.add(tip.end());
+        }
+        if (!woodCall.listen(level, from, call).isEmpty()) {
+            colony.food().rescanPlantsSoon();
+            ColonyManager.get(level).markChanged();
+        }
     }
 
     /** Once everything planned is dug and the colony may have more: the shortest tip grows by a piece (or forks). */
