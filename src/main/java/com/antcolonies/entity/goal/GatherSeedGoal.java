@@ -1,8 +1,6 @@
 package com.antcolonies.entity.goal;
 
 import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.Map;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -29,20 +27,19 @@ public class GatherSeedGoal extends Goal {
     private static final double REACH = 0.9;
     /** If the ant can't get there in 30 seconds it leaves the seed to the others. */
     private static final int GIVE_UP_TICKS = 600;
-    /** A seed this ant found no way to is left alone for this long. */
-    private static final int UNREACHABLE_TICKS = 400;
 
     private final AbstractAntEntity ant;
+    /** The walk to the seed; a seed it found no way to (by item entity id) is left alone for a while. */
+    private final Errand<Integer> errand;
     @Nullable
     private Colony colony;
     @Nullable
     private ItemEntity seed;
     private int ticks;
-    /** Seeds this ant failed to reach: item entity id -> game time until which it leaves them alone. */
-    private final Map<Integer, Long> unreachable = new HashMap<>();
 
     public GatherSeedGoal(AbstractAntEntity ant) {
         this.ant = ant;
+        this.errand = new Errand<>(ant);
         setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
     }
 
@@ -60,9 +57,7 @@ public class GatherSeedGoal extends Goal {
         if (!colony.door().mayGo(level, ant)) {
             return false; // waits by the entrance for the homecomers' touches (Gordon's rule, see colony.Door)
         }
-        long now = level.getGameTime();
-        unreachable.values().removeIf(until -> until <= now);
-        seed = colony.food().findSeed(level, ant.blockPosition(), unreachable.keySet());
+        seed = colony.food().findSeed(level, ant.blockPosition(), errand.leftAlone());
         if (seed == null || colony.recruits().passesBy(ant.getUUID(), seed.blockPosition())) {
             return false; // (a recruit on its way to its patch passes poorer food by)
         }
@@ -80,11 +75,12 @@ public class GatherSeedGoal extends Goal {
     @Override
     public void start() {
         ticks = 0;
+        errand.begin();
     }
 
     @Override
     public void stop() {
-        ant.getNavigator().stop();
+        errand.stop();
         if (colony != null && seed != null) {
             colony.food().releaseSeed(seed);
         }
@@ -99,13 +95,9 @@ public class GatherSeedGoal extends Goal {
         }
         ticks++;
         ant.getLookControl().setLookAt(seed);
-        double dx = ant.getX() - seed.getX();
-        double dz = ant.getZ() - seed.getZ();
-        double dy = ant.getY() - seed.getY();
-        if (dx * dx + dz * dz <= REACH * REACH && Math.abs(dy) < 1.5) {
+        if (errand.within(seed, REACH)) {
             take(level);
-        } else if (ant.getNavigator().isDone() && !ant.getNavigator().moveTo(seed.blockPosition(), 1.0)) {
-            unreachable.put(seed.getId(), level.getGameTime() + UNREACHABLE_TICKS);
+        } else if (!errand.goTo(seed.getId(), seed.blockPosition(), 1.0)) {
             ticks = GIVE_UP_TICKS; // no way to get there: let another ant have a go
         }
     }

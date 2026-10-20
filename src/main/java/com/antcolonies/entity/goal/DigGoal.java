@@ -1,6 +1,7 @@
 package com.antcolonies.entity.goal;
 
 import java.util.EnumSet;
+import java.util.List;
 import java.util.function.BooleanSupplier;
 
 import org.jetbrains.annotations.Nullable;
@@ -11,7 +12,6 @@ import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.Nest;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.AbstractAntEntity;
-import com.antcolonies.nav.AntNavigator;
 import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.registry.ModTags;
 
@@ -30,14 +30,14 @@ public class DigGoal extends Goal {
     private static final double REACH = 1.4;
     private static final int BITE_INTERVAL = 10;
     private static final int GIVE_UP_TICKS = 60;
-    /**
-     * A block this ant found no way to is left alone for this long, as in the other goals (the full run of 2026-10-16:
-     * a worker walled in planned a route to the colony's next block about once a second for minutes, each failed search
-     * up to 6000 steps; and the king in the user's mound cost 29 ms a tick that way).
-     */
-    private static final int UNREACHABLE_TICKS = 400;
 
     private final AbstractAntEntity ant;
+    /**
+     * The walk to a spot to dig the block from; a block it found no way to is left alone for a while, as in the other
+     * goals (the full run of 2026-10-16: a worker walled in planned a route to the colony's next block about once a
+     * second for minutes, each failed search up to 6000 steps; and the king in the user's mound cost 29 ms a tick that way).
+     */
+    private final Errand<BlockPos> errand;
     /** Lets an ant dig only some of the time (the queen stops once her room is finished). */
     private final BooleanSupplier allowed;
     @Nullable
@@ -46,8 +46,6 @@ public class DigGoal extends Goal {
     private BlockPos target;
     private int biteCooldown;
     private int stuckTicks;
-    /** Blocks this ant found no way to: block -> game time until which it leaves it alone. */
-    private final java.util.Map<BlockPos, Long> unreachable = new java.util.HashMap<>();
 
     /** Checked only when the ant starts digging (a worker's role), not while it digs. */
     private final BooleanSupplier mayStart;
@@ -58,6 +56,7 @@ public class DigGoal extends Goal {
 
     public DigGoal(AbstractAntEntity ant, BooleanSupplier allowed, BooleanSupplier mayStart) {
         this.ant = ant;
+        this.errand = new Errand<>(ant);
         this.allowed = allowed;
         this.mayStart = mayStart;
         setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
@@ -79,9 +78,7 @@ public class DigGoal extends Goal {
             return false;
         }
         target = colony == null ? null : colony.nest().findDigTarget(level, ant.getUUID());
-        long now = level.getGameTime();
-        unreachable.values().removeIf(until -> until <= now || until > now + UNREACHABLE_TICKS);
-        return target != null && !unreachable.containsKey(target);
+        return target != null && !errand.isLeftAlone(target);
     }
 
     /**
@@ -118,13 +115,14 @@ public class DigGoal extends Goal {
     public void start() {
         stuckTicks = 0;
         biteCooldown = BITE_INTERVAL;
+        errand.begin();
     }
 
     @Override
     public void stop() {
         // The crack overlay is left in place (the game fades it out by itself): the ant leaves to
         // carry a pellet and the block is still half dug.
-        ant.getNavigator().stop();
+        errand.stop();
         ant.setActivity(AbstractAntEntity.ACTIVITY_NONE);
         target = null;
         colony = null;
@@ -145,31 +143,24 @@ public class DigGoal extends Goal {
         if (!touching && ant.distanceToSqr(blockCenter) > REACH * REACH) {
             // Walk to the open space next to the block (above it in the shaft, beside it in the tunnel).
             ant.setActivity(AbstractAntEntity.ACTIVITY_NONE);
-            AntNavigator legs = ant.getNavigator();
-            if (legs.isDone()) {
-                boolean walking = false;
-                for (BlockPos stand : colony.nest().standSpotsFor(level, target)) {
-                    if (ant.mayBeAt(stand) && legs.moveTo(stand, 1.0)) { // by day a termite digs from inside only
-                        walking = true;
-                        break;
-                    }
-                }
-                if (!walking) {
+            if (!errand.isWalking()) {
+                List<BlockPos> stands = colony.nest().standSpotsFor(level, target);
+                // By day a termite digs from inside only.
+                if (!errand.goTo(target.immutable(), stands.stream().filter(ant::mayBeAt).toList(), 1.0)) {
                     stuckTicks = GIVE_UP_TICKS; // no way to get there: let another block (or ant) have a go
-                    unreachable.put(target.immutable(), level.getGameTime() + UNREACHABLE_TICKS);
                     com.antcolonies.AntColoniesMod.LOGGER.debug("[dig] {} found no way to {} from {} (stand spots {})", ant.getId(),
-                            target.toShortString(), ant.position(), colony.nest().standSpotsFor(level, target));
+                            target.toShortString(), ant.position(), stands);
                 } else if (++stuckTicks >= GIVE_UP_TICKS) {
                     // Arrived but still out of reach counts toward giving up.
                     com.antcolonies.AntColoniesMod.LOGGER.debug("[dig] {} gave up on {}: out of reach at {} on {} (stand spots {})", ant.getId(),
-                            target.toShortString(), ant.position(), legs.getFoothold(), colony.nest().standSpotsFor(level, target));
+                            target.toShortString(), ant.position(), ant.getNavigator().getFoothold(), stands);
                 }
             }
             return;
         }
 
         stuckTicks = 0;
-        ant.getNavigator().stop();
+        errand.stop();
         ant.setActivity(AbstractAntEntity.ACTIVITY_DIG);   // biting the soil loose (the body's dig clip)
         if (--biteCooldown <= 0) {
             biteCooldown = BITE_INTERVAL;

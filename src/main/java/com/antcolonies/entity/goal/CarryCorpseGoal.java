@@ -1,8 +1,6 @@
 package com.antcolonies.entity.goal;
 
 import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
@@ -31,14 +29,15 @@ public class CarryCorpseGoal extends Goal {
     private static final double REACH = 0.7;
     /** The way to the bottom of the nest is long: after two minutes the ant gives up. */
     private static final int GIVE_UP_TICKS = 2400;
-    /** A body this ant found no way to is left alone for this long. */
-    private static final int UNREACHABLE_TICKS = 400;
-    /** After this many chamber spots with no route to them, the ant puts the body down. */
-    private static final int MAX_FAILED_ROUTES = 4;
     /** How long (in ticks) a termite scrapes soil over an old body to bury it. */
     private static final int BURY_TICKS = 60;
 
     private final AbstractAntEntity ant;
+    /**
+     * The walk to the body and on to its spot; a body it found no way to (by its id) is left alone for a while, and after
+     * a few chamber spots with no way to them the ant puts the body down.
+     */
+    private final Errand<UUID> errand;
     @Nullable
     private Colony colony;
     /** The body on its way to be picked up; null once the ant carries it. */
@@ -48,15 +47,13 @@ public class CarryCorpseGoal extends Goal {
     @Nullable
     private BlockPos spot;
     private int ticks;
-    private int failedRoutes;
     /** Ticks spent burying the body (0: not burying). */
     private int burying;
     private boolean done;
-    /** Bodies this ant failed to reach: corpse id -> game time until which it leaves them alone. */
-    private final Map<UUID, Long> unreachable = new HashMap<>();
 
     public CarryCorpseGoal(AbstractAntEntity ant) {
         this.ant = ant;
+        this.errand = new Errand<>(ant);
         setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
     }
 
@@ -84,9 +81,7 @@ public class CarryCorpseGoal extends Goal {
         if (colony == null) {
             return false;
         }
-        long now = level.getGameTime();
-        unreachable.values().removeIf(until -> until <= now);
-        corpse = colony.refuse().findLooseCorpse(level, ant.blockPosition(), unreachable.keySet(), ant::mayBeAt);
+        corpse = colony.refuse().findLooseCorpse(level, ant.blockPosition(), errand.leftAlone(), ant::mayBeAt);
         if (corpse == null) {
             return false;
         }
@@ -102,19 +97,17 @@ public class CarryCorpseGoal extends Goal {
     @Override
     public void start() {
         ticks = 0;
-        failedRoutes = 0;
         burying = 0;
         done = false;
-        if (corpse != null) {
-            ant.getNavigator().moveTo(corpse.blockPosition(), 1.0);
-        } else {
-            walkToSpot();
+        errand.begin();
+        if (corpse == null) {
+            walkToSpot(); // (to a body: it sets off on its first tick, this same tick)
         }
     }
 
     @Override
     public void stop() {
-        ant.getNavigator().stop();
+        errand.stop();
         if (colony != null && corpse != null) {
             colony.refuse().releaseCorpse(corpse);
         }
@@ -147,12 +140,10 @@ public class CarryCorpseGoal extends Goal {
             return;
         }
         ant.getLookControl().setLookAt(corpse);
-        double dx = ant.getX() - corpse.getX();
-        double dz = ant.getZ() - corpse.getZ();
-        if (dx * dx + dz * dz <= REACH * REACH && Math.abs(ant.getY() - corpse.getY()) < 1.5
-                && colony.refuse().eatsOrBuries() && (burying > 0 || !colony.refuse().isFresh(corpse))) {
+        boolean there = errand.within(corpse, REACH);
+        if (there && colony.refuse().eatsOrBuries() && (burying > 0 || !colony.refuse().isFresh(corpse))) {
             // An old body: scraped over with soil where it lies.
-            ant.getNavigator().stop();
+            errand.stop();
             if (++burying % 15 == 0) {
                 level.playSound(null, corpse.blockPosition(), SoundEvents.GRAVEL_HIT, SoundSource.BLOCKS, 0.2F, 1.5F);
             }
@@ -161,54 +152,37 @@ public class CarryCorpseGoal extends Goal {
                 corpse = null;
                 done = true;
             }
-        } else if (dx * dx + dz * dz <= REACH * REACH && Math.abs(ant.getY() - corpse.getY()) < 1.5) {
+        } else if (there) {
             colony.refuse().releaseCorpse(corpse);
             corpse.discard();
             corpse = null;
             ant.setCarryingCorpse(true);
             level.playSound(null, ant.blockPosition(), SoundEvents.ITEM_PICKUP, SoundSource.NEUTRAL, 0.15F, 0.8F);
             spot = colony.refuse().pickDestination(level, ant.getRandom());
-            if (spot == null) {
-                done = true; // no room after all: stop() puts the body down
-            } else {
-                walkToSpot();
-            }
-        } else if (ant.getNavigator().isDone() && !ant.getNavigator().moveTo(corpse.blockPosition(), 1.0)) {
-            unreachable.put(corpse.getUUID(), level.getGameTime() + UNREACHABLE_TICKS);
+            walkToSpot(); // (no room after all: stop() puts the body down)
+        } else if (!errand.goTo(corpse.getUUID(), corpse.blockPosition(), 1.0)) {
             done = true; // no way to get there: let another ant have a go
         }
     }
 
     /** Second leg: down to a free spot in the refuse chamber, where the ant puts the body down (termites: onto the comb, where it is eaten). */
     private void bringCorpse(ServerLevel level) {
-        double dx = ant.getX() - (spot.getX() + 0.5);
-        double dz = ant.getZ() - (spot.getZ() + 0.5);
-        if (dx * dx + dz * dz <= REACH * REACH && Math.abs(ant.getY() - spot.getY()) < 1.5) {
+        if (errand.within(spot, REACH)) {
             if (colony.refuse().setDown(level, spot)) {
                 ant.setCarryingCorpse(false);
                 done = true;
             } else {
                 spot = colony.refuse().pickDestination(level, ant.getRandom()); // another body lies there now (or the comb is full)
-                if (spot == null) {
-                    done = true;
-                } else {
-                    walkToSpot();
-                }
+                walkToSpot();
             }
-        } else if (ant.getNavigator().isDone()) {
+        } else if (!errand.isWalking()) {
             walkToSpot();
         }
     }
 
-    /** Plans the walk to the spot. If there is no route, tries other spots, and gives up after a few failures. */
+    /** Sets off to the spot. If there is no way there, tries other spots, and gives up after a few (or with none left). */
     private void walkToSpot() {
-        while (spot != null && !ant.getNavigator().moveTo(spot, 1.0)) {
-            if (++failedRoutes >= MAX_FAILED_ROUTES) {
-                done = true;
-                return;
-            }
-            spot = colony.refuse().pickDestination(ant.level(), ant.getRandom());
-        }
+        spot = errand.setOffTo(spot, () -> colony.refuse().pickDestination(ant.level(), ant.getRandom()), 1.0);
         if (spot == null) {
             done = true;
         }
