@@ -73,3 +73,10 @@ termite and ant parts, `entity/AbstractAntEntity.java` (1,837 lines; every carri
 The termite stress test shows, in old and new code alike, bursts of failed route searches about once a second for a
 minute (800 to 1,300 steps each, up to 27 ms the longest); cause not found yet. Worth finding (a leave-alone memory is
 the likely fix, `docs/BUGS.md` 42).
+
+## Timing (user, 2026-10-21)
+The user leaves for California in 6 days, about 5 days of work left (weekly quota resets 2026-10-21 10 PM); "I don't
+want to rush the project, so whatever you think is best". My plan, agreed: part 1 (the brain, about 12 to 18 steps)
+and part 2 (the split, about 6 to 10 steps) at a careful pace, about 3 days; then part 3 (the termites, the Matabele
+ants' prey) with the days left. Everything merged into `master` with a full run before the trip, never a half-done
+branch left behind; the Matabele ants (M8) start after the trip.
