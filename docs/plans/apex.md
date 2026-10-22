@@ -84,13 +84,25 @@ easiest to stop bugs from happening and push updates easier"); so these are my p
    part's row in `ColonyParts` says what it hears and at which place (`ColonyPart.hears`), the colony signs its parts
    up when made. Moved over: the hurt insect (alarm, patrol, danger map, forager spots), the dying worker ant (patrol,
    forager spots, recruits), food found (forager spots, recruits), neighbours met (by insect, trail or gallery), each
-   in today's order. "A hole opened or closed" has no wiring today (parts ask when they need to): left for its first
-   listener in M8, my pick, to confirm. For the split: `DangerMap.avoids` still asks the trunk trails (a harvester
-   part) by name: a shared "may we forage here?" vote would take it out. Tests: `colony,away,termitefood,antnest,soldiers`
+   in today's order. "A hole opened or closed" has no wiring today (parts ask when they need to): now step 7 below.
+   `DangerMap.avoids` still asks the trunk trails (a harvester part) by name: now step 6 below. Tests: `colony,away,termitefood,antnest,soldiers`
    86 of 88, both failures passing 3 of 3 alone; the full run is step 5.
 5. **Full run and speed.** The stress test before and after; the expected gain is small (each colony skips the parts it
    does not have instead of each checking and returning); the main wins are fewer places for a bug and a new species
    with no copied code.
+
+**Before the split (found while building step 4, 2026-10-22; added at the user's ask, to plan with the user):**
+6. **"May we forage here?" asked of every part.** `DangerMap.avoids` (a shared part) still asks the neighbours, the
+   termites' "close the holes" rule and the harvester's trunk trails (`ColonyParts.TRUNK_TRAILS`) by name. After the
+   split the framework could not name a desert-mod part, so this has to change first: a shared question that each part
+   answers for itself, the way the news lets each part hear for itself (the danger map, the neighbours, the closed holes
+   and the trunk trails each say "keep off" or nothing). Same answers as today; nothing changes in-game.
+7. **The "a hole opened or closed" news.** One of the four agreed kinds, not built in step 4: no part tells another of
+   a hole today (each asks `isOpen` / `isClosed` when it needs to), so there was nothing to move. Built here so the
+   framework has it before the split: told wherever a colony plugs a hole, digs one open, or closes or leaves one for
+   danger (`ForagingHoles.plug`, the dig through a hole's plug, `ClosedHoles`, the galleries opening holes in turn),
+   including out of sight. With no listener yet it costs nothing (news nobody hears is not sent); its first listeners
+   come with M8 (a raid's end, termites coming back out).
 
 Then the split's own plan (`docs/plans/mod-split.md`) can draw the framework's wall along the registry: shared parts
 in, species parts out.
