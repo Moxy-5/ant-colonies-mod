@@ -143,9 +143,7 @@ easiest to stop bugs from happening and push updates easier"); so these are my p
    `DangerMap.avoids` and `ClosedHoles.isClosedIn` gone; the danger map, `Colony.mayForageAt`, the foraging holes and
    the galleries name no species part for these questions any more. Tests on 6 servers (the user's ask):
    `colony,antnest,away,termitefood,mound,soldiers,hills` 101 of 101; full run 139 of 141, the two failures the old
-   flakes beside other tests (`docs/BUGS.md` 55 and 62), each 3 of 3 alone. Speed not measured (the user stopped the
-   45-minute stress comparison: not a speed step, and the answers are the same lookups as before, only asked through a
-   list).
+   flakes beside other tests (`docs/BUGS.md` 55 and 62), each 3 of 3 alone. Speed (the user asked for a quick check after all): 3 stress runs of each, only the runs where every termite ticked compared (2 a side, see below): colony brain 0.40 ms a tick on `master`, 0.39 on the branch; the whole mod without route searches 1.90 before, 1.77 after; route searches swing 0.08 to 0.81 between runs (the known bursts): no change, as expected.
 8. **The rest of the shared code that names a species part** (found while planning step 6, 2026-10-22; to plan with
    the user). Steps 6 and 7 fix only the forage question and the holes. Counted on `master` 2026-10-22: about 81 code
    lines in 15 of the 22 shared colony files still name a harvester or termite part (`FieldLife` 12, `NestLife` 8,
@@ -163,6 +161,12 @@ After it: `colony/FoodStore.java` (1,077 lines, the seed granary and the fungus 
 mix harvester-only and termite-only work). Smaller: errand helper step 4 (`ScoutGoal` in three); later, in the
 termite and ant parts, `entity/AbstractAntEntity.java` (1,837 lines; every carried load its own switch, could be one
 "what I carry" slot).
+
+## Also found 2026-10-22 (the speed check of steps 6 and 7)
+In 1 stress run in 3, on `master` and the branch alike, most of the 61 or 101 real termites stop ticking a few
+seconds in (the stopwatch counts 12 to 15 insects ticking, the test counts all of them alive): their bodies are there
+but not run. Cause not looked for (a frozen insect, `AwayLife.freeze`, or the arena's chunks not ticking are guesses).
+Such runs must be left out of speed comparisons; whether it can happen in a real game is not known yet.
 
 ## Also found 2026-10-20
 The termite stress test shows, in old and new code alike, bursts of failed route searches about once a second for a
