@@ -1,4 +1,6 @@
 {
+  "_parts_note": "The colony parts this species has besides the ones every colony has (Project Apex, colony parts step 2; the names are signed up in colony/ColonyParts.java, a name nothing signed up stops the game loading with a message). Every colony has: nest, nest_walls, food_store, food_map, queen_care, brood, refuse, foraging_holes, foraging_trails, danger_map, neighbours, population, away_life, nest_ledger, nest_life, field_life, build_life, worker_food. The harvester ant adds its hill, the bakery (ant bread), trunk trails, patrollers, forager spots (site fidelity), the door (Gordon's rule) and recruiting to rich patches.",
+  "parts": ["hill", "bakery", "trunk_trails", "patrol", "forager_spots", "door", "recruits"],
   "colony": {
     "max_workers": 3000,
     "real_cap": 50,

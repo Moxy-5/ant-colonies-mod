@@ -55,6 +55,17 @@ easiest to stop bugs from happening and push updates easier"); so these are my p
    making the termite parts (mound, fungus garden, mushrooms, soldiers, king care, hidden trips, closed holes,
    galleries) and the termite colony the ant parts (hill, bakery, trunk trails, recruits, forager spots, patrol, ...).
    The exact two lists are drawn up at the start of this step from what each part's own "do I apply?" check says today.
+   **BUILT 2026-10-21** (same branch; details in `docs/HISTORY.md`): the registry `colony/ColonyParts` (the step 1
+   rows moved there, each kind shared or listed), `"parts"` in both species files, checked when they load. Shared (18):
+   nest, nest walls, food store, food map, queen care, brood, refuse, foraging holes, foraging trails, danger map,
+   neighbours, population, away life, nest ledger, nest life, field life, build life, worker food. Harvester: hill,
+   bakery, trunk trails, patrol, forager spots, door, recruits. Macrotermes: king care, mound, closed holes, hidden
+   trips, fungus garden, mushrooms, soldiers, alarm. (The door is listed, not shared; the foraging holes and trails are
+   shared: the harvester uses them too.) An unlisted part is never ticked, saved or loaded, but still made, for the old
+   getters. **For step 3:** stop making unlisted parts (`Colony`'s constructor makes every kind today and keeps the
+   unlisted ones in `unused`), give `Colony` a `part(ColonyParts.MOUND)` that is empty for a species without it, move
+   the callers over and drop the getters; `Colony.unusedPartsWrittenTo` and `AwayTests.partsAreTheSpecies` then become
+   the check that no part runs for a species that did not list it.
 3. **Ask before use.** The callers moved to the yes/no, a batch of goals or parts at a time, a category's tests after
    each batch; the parts' own "do I apply to this species?" checks go once nothing needs them.
 4. **Colony news (my pick for the Matabele ant):** a small shared way for parts to hear what happened without knowing

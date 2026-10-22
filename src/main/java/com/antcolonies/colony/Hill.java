@@ -68,6 +68,11 @@ public class Hill {
         this.nightSoil = new NightSoil(colony);
     }
 
+    /** Its colony (for the parts registry's tick row). */
+    Colony colony() {
+        return colony;
+    }
+
     /** The soil dug while the surface was shut, waiting near the top of the nest (see {@link NightSoil}). */
     public NightSoil nightSoil() {
         return nightSoil;

@@ -36,7 +36,21 @@ import net.minecraft.world.level.block.state.properties.Property;
 public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNumbers queen, BroodNumbers brood,
         FoodNumbers food, RefuseNumbers refuse, NestNumbers nest, Optional<QueenBody> queenBody, Optional<Founding> founding,
         Optional<MoundNumbers> mound, Optional<GardenNumbers> garden, Optional<Laying> laying, Optional<SoldierNumbers> soldiers,
-        Optional<AlarmNumbers> alarm, Optional<BodyLanguage> bodyLanguage) {
+        Optional<AlarmNumbers> alarm, Optional<BodyLanguage> bodyLanguage, List<String> parts) {
+
+    /** The numbers without a parts list (only the parts every colony has; see {@code colony.ColonyParts}). */
+    public SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNumbers queen, BroodNumbers brood, FoodNumbers food,
+            RefuseNumbers refuse, NestNumbers nest, Optional<QueenBody> queenBody, Optional<Founding> founding,
+            Optional<MoundNumbers> mound, Optional<GardenNumbers> garden, Optional<Laying> laying, Optional<SoldierNumbers> soldiers,
+            Optional<AlarmNumbers> alarm, Optional<BodyLanguage> bodyLanguage) {
+        this(colony, worker, queen, brood, food, refuse, nest, queenBody, founding, mound, garden, laying, soldiers, alarm, bodyLanguage, List.of());
+    }
+
+    /** The same numbers with this parts list. */
+    public SpeciesProfile withParts(List<String> parts) {
+        return new SpeciesProfile(colony, worker, queen, brood, food, refuse, nest, queenBody, founding, mound, garden, laying, soldiers, alarm,
+                bodyLanguage, List.copyOf(parts));
+    }
 
     /** The numbers without a body language section (the insects' bodies just walk and stand). */
     public SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNumbers queen, BroodNumbers brood, FoodNumbers food,
@@ -1523,7 +1537,8 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
             Laying.CODEC.optionalFieldOf("laying").forGetter(SpeciesProfile::laying),
             SoldierNumbers.CODEC.optionalFieldOf("soldiers").forGetter(SpeciesProfile::soldiers),
             AlarmNumbers.CODEC.optionalFieldOf("alarm").forGetter(SpeciesProfile::alarm),
-            BodyLanguage.CODEC.optionalFieldOf("body_language").forGetter(SpeciesProfile::bodyLanguage)
+            BodyLanguage.CODEC.optionalFieldOf("body_language").forGetter(SpeciesProfile::bodyLanguage),
+            Codec.STRING.listOf().optionalFieldOf("parts", List.of()).forGetter(SpeciesProfile::parts)
     ).apply(i, SpeciesProfile::new));
 
     /**
@@ -1542,5 +1557,6 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                     List.of(new LevelUnlock(1, 0), new LevelUnlock(6, 10), new LevelUnlock(12, 30), new LevelUnlock(20, 30))),
             Optional.empty(),
             Optional.of(new Founding(3, 400, 200, 8, 1, 2)),
-            Optional.empty());
+            Optional.empty())
+            .withParts(List.of("hill", "bakery", "trunk_trails", "patrol", "forager_spots", "door", "recruits"));
 }

@@ -1501,6 +1501,7 @@ public class AwayTests {
      * switches (never saved) must be set again on the copy by the caller.
      */
     static Colony saveAndLoad(GameTestHelper helper, Colony colony) {
+        partsAreTheSpecies(helper, colony);
         CompoundTag saved = colony.save();
         Colony copy = Colony.load(saved);
         CompoundTag again = copy.save();
@@ -1520,6 +1521,23 @@ public class AwayTests {
         return copy;
     }
 
+    /**
+     * Project Apex, colony parts step 2: the colony has the shared parts and the parts its species file lists, no others,
+     * and nothing was written into a part its species does not list (it would be lost on saving: the species then uses
+     * the part and must list it).
+     */
+    static void partsAreTheSpecies(GameTestHelper helper, Colony colony) {
+        Set<String> wanted = new HashSet<>(colony.profile().parts());
+        com.antcolonies.colony.ColonyParts.all().stream().filter(com.antcolonies.colony.ColonyParts.Type::shared)
+                .forEach(type -> wanted.add(type.name()));
+        Set<String> has = new HashSet<>();
+        colony.parts().forEach(part -> has.add(part.name()));
+        helper.assertTrue(has.equals(wanted), "a " + colony.getSpecies() + " colony should have the shared parts and the ones its species lists: has "
+                + has + ", wanted " + wanted);
+        List<String> written = colony.unusedPartsWrittenTo();
+        helper.assertTrue(written.isEmpty(), "a " + colony.getSpecies() + " colony wrote into parts its species file does not list: " + written);
+    }
+
     /** The parts of a colony saved into a tag of their own each, by name (the parts that are not saved left out). */
     static Map<String, String> partSaves(Colony colony) {
         Map<String, String> saves = new java.util.LinkedHashMap<>();
@@ -1536,7 +1554,7 @@ public class AwayTests {
     /**
      * Project Apex, colony parts step 1: every part is saved and loaded, with something in it. A copy of the colony is
      * loaded from its save (the live colony is left alone) and each part's test sample is put in, for the parts the
-     * scene leaves empty ({@code ColonyPart.sample}, in Colony's constructor); then no saved part may be empty (as a
+     * scene leaves empty ({@code ColonyPart.sample}, in {@code ColonyParts}); then no saved part may be empty (as a
      * new colony's), and each part of the copy, saved and loaded again, must save exactly the same. A part saving
      * nothing, or reading back something else, is named.
      */
@@ -1554,7 +1572,7 @@ public class AwayTests {
             }
         });
         helper.assertTrue(empty.isEmpty(), "every saved colony part should have something in it for the save and load check (give it a "
-                + "sample in Colony's constructor): empty " + empty);
+                + "sample in ColonyParts): empty " + empty);
         Map<String, String> again = partSaves(Colony.load(scratch.save()));
         List<String> differ = new ArrayList<>();
         mine.forEach((name, save) -> {

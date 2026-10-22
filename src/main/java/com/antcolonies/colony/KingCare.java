@@ -46,8 +46,11 @@ public class KingCare {
 
     /** Whether he wants a nodule: a day (the workers' meal interval) after his last one, in a colony whose royals get hungry. */
     public boolean wantsFood(ServerLevel level) {
+        if (!isAlive()) {
+            return false; // (no king: his clock is left alone; a new king starts it, see joined)
+        }
         updateClock(level);
-        return isAlive() && level.getGameTime() - lastFed >= colony.profile().worker().mealIntervalTicks();
+        return level.getGameTime() - lastFed >= colony.profile().worker().mealIntervalTicks();
     }
 
     /** A nurse (a real one or a number) has fed him. */

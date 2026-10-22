@@ -27,6 +27,18 @@ class SpeciesProfileTest {
     }
 
     @Test
+    void eachSpeciesListsItsOwnColonyParts() throws Exception {
+        // Project Apex, colony parts step 2: the parts besides the shared ones (the names are checked against the parts
+        // registry when the game loads the files).
+        assertEquals(java.util.List.of("hill", "bakery", "trunk_trails", "patrol", "forager_spots", "door", "recruits"),
+                read("red_harvester_ant").parts());
+        assertEquals(java.util.List.of("king_care", "mound", "closed_holes", "hidden_trips", "fungus_garden", "mushrooms", "soldiers", "alarm"),
+                read("macrotermes").parts());
+        assertEquals(read("red_harvester_ant").parts(), SpeciesProfile.RED_HARVESTER_ANT.parts(),
+                "the built-in harvester numbers (used when its file is broken) have the same parts as its file");
+    }
+
+    @Test
     void theRedHarvesterAntFileReadsAndItsNumbersMakeSense() throws Exception {
         SpeciesProfile profile = read("red_harvester_ant");
         assertTrue(profile.colony().maxWorkers() > 0);

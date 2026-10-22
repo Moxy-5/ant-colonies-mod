@@ -115,154 +115,102 @@ public class Colony {
     private final FieldLife field;
     private final BuildLife building;
     private final WorkerFood workerFood;
-    /** Every part above, in the order they are made and loaded (see the constructor). */
+    /** The parts this colony has (the shared ones and those its species lists), in the order they are made, saved and loaded. */
     private final List<ColonyPart<?>> parts;
+    /** The parts its species does not list: made for the old getters until step 3, never ticked, saved or loaded. */
+    private final List<ColonyPart<?>> unused;
     /** The parts that tick while the nest is loaded, in their tick order. */
     private final List<ColonyPart<?>> ticking;
     /** The parts that tick while the colony is away, in their tick order. */
     private final List<ColonyPart<?>> tickingAway;
+    /** Species and parts whose data in an old save was skipped (logged once each). */
+    private static final java.util.Set<String> skippedLogged = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     public Colony(UUID id, ResourceLocation species, UUID queenId, BlockPos center) {
         this.id = id;
         this.species = species;
         this.queenId = queenId;
         this.center = center;
-        // The parts, in the order they are made and loaded (the nest ledger loads after the food store and the bakery:
-        // an older save's owed food is counted into them). The order a part ticks in is its place, written here once
-        // beside the part (see ColonyPart; Project Apex, colony parts step 1).
-        List<ColonyPart<?>> parts = new ArrayList<>();
-        this.nest = add(parts, ColonyPart.of("nest", new Nest(this))
-                .ticks(90, (nest, level) -> nest.galleries().tick(level))
-                .ticksAway(20, (nest, level) -> nest.galleries().tickAway(level))
-                .saves(Nest::save, Nest::load));
-        this.walls = add(parts, ColonyPart.of("nest_walls", new NestWalls(this))
-                .notSaved("the claims on leaks and how far each is sealed start again after a load"));
-        this.hill = add(parts, ColonyPart.of("hill", new Hill(this))
-                .ticks(40, (hill, level) -> {
-                    if (mound().numbers() == null) {
-                        hill.nightSoil().tick(level);
-                    }
-                })
-                .saves(Hill::save, Hill::load)
-                .sample((hill, level) -> hill.nightSoil().fillForTests(level)));
-        this.food = add(parts, ColonyPart.of("food_store", new FoodStore(this))
-                .ticks(110, (food, level) -> food.barePatches().tick(level))
-                .saves(FoodStore::save, FoodStore::load));
-        this.foodMap = add(parts, ColonyPart.of("food_map", new FoodMap(this))
-                .ticks(70, FoodMap::tick)
-                .saves(FoodMap::save, FoodMap::load)
-                .sample((map, level) -> map.learn(new BlockPos(5, 60, 3))));
-        this.bakery = add(parts, ColonyPart.of("bakery", new Bakery(this))
-                .saves(Bakery::save, Bakery::load)
-                .sample((bakery, level) -> {
-                    bakery.countIn(true);
-                    bakery.countIn(false);
-                }));
-        this.queenCare = add(parts, ColonyPart.of("queen_care", new QueenCare(this))
-                .saves(QueenCare::save, QueenCare::load));
-        this.kingCare = add(parts, ColonyPart.of("king_care", new KingCare(this))
-                .saves(KingCare::save, KingCare::load));
-        this.brood = add(parts, ColonyPart.of("brood", new Brood(this))
-                .saves(Brood::save, Brood::load));
-        this.refuse = add(parts, ColonyPart.of("refuse", new Refuse(this))
-                .notSaved("only the workers' claims on dead ants"));
-        this.mound = add(parts, ColonyPart.of("mound", new Mound(this))
-                .ticks(30, Mound::tick)
-                .saves(Mound::save, Mound::load)
-                .sample(Mound::fillForTests));
-        this.foragingHoles = add(parts, ColonyPart.of("foraging_holes", new ForagingHoles(this))
-                .ticks(80, ForagingHoles::tick)
-                .notSaved("claims and short memories, worked out again after a load"));
-        this.trails = add(parts, ColonyPart.of("foraging_trails", new ForagingTrails(this))
-                .saves(ForagingTrails::save, ForagingTrails::load)
-                .sample(ForagingTrails::fillForTests));
-        this.trunkTrails = add(parts, ColonyPart.of("trunk_trails", new TrunkTrails(this))
-                .ticks(210, (trunk, level) -> trunk.tick(level, false))
-                .ticksAway(80, (trunk, level) -> trunk.tick(level, true))
-                .saves(TrunkTrails::save, TrunkTrails::load)
-                .sample(TrunkTrails::fillForTests));
-        this.patrol = add(parts, ColonyPart.of("patrol", new Patrol(this))
-                .ticks(140, (patrol, level) -> patrol.tick(level, false))
-                .ticksAway(50, (patrol, level) -> patrol.tick(level, true))
-                .saves(Patrol::save, Patrol::load)
-                .sample(Patrol::fillForTests));
-        this.spots = add(parts, ColonyPart.of("forager_spots", new ForagerSpots(this))
-                .saves(ForagerSpots::save, ForagerSpots::load)
-                .sample(ForagerSpots::fillForTests));
-        this.door = add(parts, ColonyPart.of("door", new Door(this))
-                .ticks(150, Door::tick)
-                .saves(Door::save, Door::load)
-                .sample(Door::fillForTests));
-        this.recruits = add(parts, ColonyPart.of("recruits", new Recruits(this))
-                .ticks(160, Recruits::tick)
-                .notSaved("a scent line fades within minutes"));
-        this.danger = add(parts, ColonyPart.of("danger_map", new DangerMap(this))
-                .ticks(170, DangerMap::tick)
-                .saves(DangerMap::save, DangerMap::load)
-                .sample(DangerMap::fillForTests));
-        this.closedHoles = add(parts, ColonyPart.of("closed_holes", new ClosedHoles(this))
-                .ticks(180, ClosedHoles::tick)
-                .saves(ClosedHoles::save, ClosedHoles::load)
-                .sample(ClosedHoles::fillForTests));
-        this.neighbours = add(parts, ColonyPart.of("neighbours", new Neighbours(this))
-                .ticks(190, Neighbours::tick)
-                .saves(Neighbours::save, Neighbours::load)
-                .sample(Neighbours::fillForTests));
-        this.hiddenTrips = add(parts, ColonyPart.of("hidden_trips", new HiddenTrips(this))
-                .ticks(100, HiddenTrips::tick)
-                .ticksAway(10, HiddenTrips::tickAway)
-                .saves(HiddenTrips::save, HiddenTrips::load)
-                .sample(HiddenTrips::fillForTests));
-        this.garden = add(parts, ColonyPart.of("fungus_garden", new FungusGarden(this))
-                .ticks(20, FungusGarden::grow)
-                .saves(FungusGarden::save, FungusGarden::load)
-                .sample(FungusGarden::fillForTests));
-        this.mushrooms = add(parts, ColonyPart.of("mushrooms", new Mushrooms(this))
-                .ticks(50, Mushrooms::tick)
-                .notSaved("only the weather at the last look and the last flush, for the colony list"));
-        this.soldiers = add(parts, ColonyPart.of("soldiers", new Soldiers(this))
-                .notSaved("the soldiers simply take their posts again after a load"));
-        this.alarm = add(parts, ColonyPart.of("alarm", new Alarm(this))
-                .ticks(60, Alarm::tick)
-                .saves(Alarm::save, Alarm::load)
-                .sample(Alarm::fillForTests));
-        this.population = add(parts, ColonyPart.of("population", new Population(this))
-                .ticks(120, Population::tick)
-                .ticksAway(30, Population::tickAway)
-                .saves(Population::save, Population::load));
-        this.away = add(parts, ColonyPart.of("away_life", new AwayLife(this))
-                .ticks(10, AwayLife::settle)
-                .saves(AwayLife::save, AwayLife::load));
-        this.ledger = add(parts, ColonyPart.of("nest_ledger", new NestLedger(this))
-                .saves(NestLedger::save, NestLedger::load));
-        this.life = add(parts, ColonyPart.of("nest_life", new NestLife(this))
-                .ticks(130, (life, level) -> life.tick(level, false))
-                .ticksAway(40, (life, level) -> life.tick(level, true))
-                .saves(NestLife::save, NestLife::load));
-        this.field = add(parts, ColonyPart.of("field_life", new FieldLife(this))
-                .ticks(200, (field, level) -> field.tick(level, false))
-                .ticksAway(60, (field, level) -> field.tick(level, true))
-                .saves(FieldLife::save, FieldLife::load)
-                .sample(FieldLife::fillForTests));
-        this.building = add(parts, ColonyPart.of("build_life", new BuildLife(this))
-                .ticksAway(70, BuildLife::tickAway)
-                .saves(BuildLife::save, BuildLife::load));
-        this.workerFood = add(parts, ColonyPart.of("worker_food", new WorkerFood(this))
-                .saves(WorkerFood::save, WorkerFood::load)
-                .sample(WorkerFood::fillForTests));
-        this.parts = List.copyOf(parts);
+        // Every kind of part from the registry, in the order they are made and loaded (ColonyParts; Project Apex, colony
+        // parts steps 1 and 2): the shared ones and those the species file lists are the colony's own; the rest are made
+        // only for the old getters (until step 3) and never ticked, saved or loaded.
+        java.util.Set<String> listed = java.util.Set.copyOf(profile().parts());
+        Map<ColonyParts.Type<?>, ColonyPart<?>> made = new LinkedHashMap<>();
+        List<ColonyPart<?>> own = new ArrayList<>();
+        List<ColonyPart<?>> others = new ArrayList<>();
+        for (ColonyParts.Type<?> type : ColonyParts.all()) {
+            ColonyPart<?> part = type.make(this);
+            made.put(type, part);
+            (type.shared() || listed.contains(type.name()) ? own : others).add(part);
+        }
+        this.nest = made(made, ColonyParts.NEST);
+        this.walls = made(made, ColonyParts.NEST_WALLS);
+        this.hill = made(made, ColonyParts.HILL);
+        this.food = made(made, ColonyParts.FOOD_STORE);
+        this.foodMap = made(made, ColonyParts.FOOD_MAP);
+        this.bakery = made(made, ColonyParts.BAKERY);
+        this.queenCare = made(made, ColonyParts.QUEEN_CARE);
+        this.kingCare = made(made, ColonyParts.KING_CARE);
+        this.brood = made(made, ColonyParts.BROOD);
+        this.refuse = made(made, ColonyParts.REFUSE);
+        this.mound = made(made, ColonyParts.MOUND);
+        this.foragingHoles = made(made, ColonyParts.FORAGING_HOLES);
+        this.trails = made(made, ColonyParts.FORAGING_TRAILS);
+        this.trunkTrails = made(made, ColonyParts.TRUNK_TRAILS);
+        this.patrol = made(made, ColonyParts.PATROL);
+        this.spots = made(made, ColonyParts.FORAGER_SPOTS);
+        this.door = made(made, ColonyParts.DOOR);
+        this.recruits = made(made, ColonyParts.RECRUITS);
+        this.danger = made(made, ColonyParts.DANGER_MAP);
+        this.closedHoles = made(made, ColonyParts.CLOSED_HOLES);
+        this.neighbours = made(made, ColonyParts.NEIGHBOURS);
+        this.hiddenTrips = made(made, ColonyParts.HIDDEN_TRIPS);
+        this.garden = made(made, ColonyParts.FUNGUS_GARDEN);
+        this.mushrooms = made(made, ColonyParts.MUSHROOMS);
+        this.soldiers = made(made, ColonyParts.SOLDIERS);
+        this.alarm = made(made, ColonyParts.ALARM);
+        this.population = made(made, ColonyParts.POPULATION);
+        this.away = made(made, ColonyParts.AWAY_LIFE);
+        this.ledger = made(made, ColonyParts.NEST_LEDGER);
+        this.life = made(made, ColonyParts.NEST_LIFE);
+        this.field = made(made, ColonyParts.FIELD_LIFE);
+        this.building = made(made, ColonyParts.BUILD_LIFE);
+        this.workerFood = made(made, ColonyParts.WORKER_FOOD);
+        this.parts = List.copyOf(own);
+        this.unused = List.copyOf(others);
         this.ticking = ColonyPart.ticking(this.parts);
         this.tickingAway = ColonyPart.tickingAway(this.parts);
     }
 
-    private static <T> T add(List<ColonyPart<?>> parts, ColonyPart<T> part) {
-        parts.add(part);
-        return part.part();
+    @SuppressWarnings("unchecked")
+    private static <T> T made(Map<ColonyParts.Type<?>, ColonyPart<?>> made, ColonyParts.Type<T> type) {
+        return ((ColonyPart<T>) made.get(type)).part();
     }
 
-    /** Every part of the colony, in the order they are made, saved and loaded (for the save and load test). */
+    /** The parts this colony has, in the order they are made, saved and loaded (for the save and load test). */
     public List<ColonyPart<?>> parts() {
         return parts;
+    }
+
+    /**
+     * Tests only: the parts this colony's species does not list that hold anything a fresh one would not (saved
+     * differently from a new part of the same kind). Empty while every species lists the parts it uses.
+     */
+    public List<String> unusedPartsWrittenTo() {
+        List<String> written = new ArrayList<>();
+        for (ColonyPart<?> part : unused) {
+            if (!part.isSaved()) {
+                continue;
+            }
+            CompoundTag now = new CompoundTag();
+            part.save(now);
+            CompoundTag fresh = new CompoundTag();
+            ColonyParts.byName(part.name()).orElseThrow().make(this).save(fresh);
+            if (!now.equals(fresh)) {
+                written.add(part.name());
+            }
+        }
+        return written;
     }
 
     /**
@@ -897,6 +845,14 @@ public class Colony {
         for (ColonyPart<?> part : parts) {
             part.save(tag);
         }
+        if (testSeeds != null) {
+            // Game test server: a part the species does not list should never hold anything (its data would be lost here).
+            for (String name : unusedPartsWrittenTo()) {
+                if (skippedLogged.add("written " + species + " " + name)) {
+                    com.antcolonies.AntColoniesMod.LOGGER.warn("[parts] a {} colony wrote into the part {}, which its species file does not list", species, name);
+                }
+            }
+        }
         return tag;
     }
 
@@ -917,6 +873,29 @@ public class Colony {
         for (ColonyPart<?> part : colony.parts) {
             part.load(tag); // (in the order they are made: see the constructor)
         }
+        colony.skipUnused(tag);
         return colony;
+    }
+
+    /**
+     * An older save holds every part, as every colony once had them all: a part this species no longer lists is skipped.
+     * Logged once per species and part when the save held more than a fresh part would (left-over defaults are not news).
+     */
+    private void skipUnused(CompoundTag tag) {
+        for (ColonyPart<?> part : unused) {
+            if (!part.isSaved()) {
+                continue;
+            }
+            CompoundTag fresh = new CompoundTag();
+            part.save(fresh); // (never loaded: as new)
+            boolean held = false;
+            for (String key : fresh.getAllKeys()) {
+                held |= tag.contains(key) && !tag.get(key).equals(fresh.get(key));
+            }
+            if (held && skippedLogged.add("skipped " + species + " " + part.name())) {
+                com.antcolonies.AntColoniesMod.LOGGER.info("[parts] a saved {} colony held data for the part {}, which its species file no longer lists: skipped",
+                        species, part.name());
+            }
+        }
     }
 }

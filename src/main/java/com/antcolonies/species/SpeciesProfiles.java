@@ -37,6 +37,8 @@ public class SpeciesProfiles extends SimpleJsonResourceReloadListener {
         files.forEach((id, json) -> SpeciesProfile.CODEC.parse(JsonOps.INSTANCE, json)
                 .resultOrPartial(error -> AntColoniesMod.LOGGER.error("Species profile {} is broken, using the built-in numbers: {}", id, error))
                 .ifPresent(profile -> loaded.put(id, profile)));
+        // A part name nothing signed up stops the loading here, with a clear message (Project Apex, colony parts step 2).
+        loaded.forEach((id, profile) -> com.antcolonies.colony.ColonyParts.checkSpecies(id, profile.parts()));
         profiles = Map.copyOf(loaded);
         synchronized (warned) {
             warned.clear();
