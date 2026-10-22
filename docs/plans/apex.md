@@ -90,6 +90,15 @@ easiest to stop bugs from happening and push updates easier"); so these are my p
 5. **Full run and speed.** The stress test before and after; the expected gain is small (each colony skips the parts it
    does not have instead of each checking and returning); the main wins are fewer places for a bug and a new species
    with no copied code.
+   **BUILT 2026-10-22** (branch `claude/colony-parts-step5-2c5f2c`: steps 1 to 4 together, step 4's branch
+   fast-forwarded in; not merged, waiting for the user's in-game test): full run on 8 servers **141 of 141**, 10
+   minutes. Speed, the stress test 3 runs of `master` and 3 of the branch taking turns, every 5-second window of each
+   stage averaged (153 windows a side): colony brain **0.170 ms a tick before, 0.163 after** (about 4 percent less,
+   within the noise); whole mod 1.72 before, 1.96 after, but the gap is all route searches (0.31 to 0.48 ms), the
+   bursts of failed searches noted below that land in some runs and not others, old and new alike (one run of each
+   had none; the worst stage of one new run was 2.6 ms of searches alone); without the route searches the mod is 1.41
+   before, 1.48 after, within the run-to-run swing. As expected: no speed gain to see; the wins are fewer places for
+   a bug and a new species with no copied code.
 
 **Before the split (found while building step 4, 2026-10-22; added at the user's ask, to plan with the user):**
 6. **"May we forage here?" asked of every part.** `DangerMap.avoids` (a shared part) still asks the neighbours, the
