@@ -136,8 +136,16 @@ easiest to stop bugs from happening and push updates easier"); so these are my p
    no food fetched through it) and **"may a gallery grow through here?"** (not toward where members were attacked),
    with a quick "is any hole kept shut?" for the plug search. Same answers; nothing changes in-game. **The hole news
    moves to M8**, designed with its first listener.
-   Steps 6 and 7 are built together on branch `claude/apex-questions` (from `master`), the categories they touch on 8
-   servers, then a full run on 8 servers; the user tests in-game before the merge.
+   Steps 6 and 7 are built together on branch `claude/apex-questions` (from `master`); the user tests in-game before
+   the merge.
+   **Steps 6 and 7 BUILT 2026-10-22** (branch `claude/apex-questions`, not merged; details in `docs/HISTORY.md`):
+   `colony/ColonyQuestions`, `ColonyPart.answers`, `colony.keepsOff` / `whoKeepsOff` / `isHoleKeptShut`;
+   `DangerMap.avoids` and `ClosedHoles.isClosedIn` gone; the danger map, `Colony.mayForageAt`, the foraging holes and
+   the galleries name no species part for these questions any more. Tests on 6 servers (the user's ask):
+   `colony,antnest,away,termitefood,mound,soldiers,hills` 101 of 101; full run 139 of 141, the two failures the old
+   flakes beside other tests (`docs/BUGS.md` 55 and 62), each 3 of 3 alone. Speed not measured (the user stopped the
+   45-minute stress comparison: not a speed step, and the answers are the same lookups as before, only asked through a
+   list).
 8. **The rest of the shared code that names a species part** (found while planning step 6, 2026-10-22; to plan with
    the user). Steps 6 and 7 fix only the forage question and the holes. Counted on `master` 2026-10-22: about 81 code
    lines in 15 of the 22 shared colony files still name a harvester or termite part (`FieldLife` 12, `NestLife` 8,
