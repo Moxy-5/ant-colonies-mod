@@ -216,6 +216,34 @@ easiest to stop bugs from happening and push updates easier"); so these are my p
    `DigGoal` (5), `GatherSeedGoal` (5), `GroomGoal` (2), `CarryPelletGoal`, `FeedLarvaGoal`, `DefendGoal`, `NapGoal`,
    `NoticeGoal` (1 each); and the species bodies (`TermiteKingEntity` 6, `TermiteSoldierEntity` 4, `AntLarvaEntity` 1),
    which move with their species.
+   **Planned with the user 2026-10-22** (the user's OK: three batches, my picks; branch `claude/apex-step9-642594` from
+   step 8). Counted again on the branch (comments, imports and the species game test scenes not counted). Corrections:
+   `ClipGrassGoal`, `GatherSeedGoal` and `StoreSeedGoal` are given to both species' workers (shared); `DefendGoal` and
+   `CarryPelletGoal` are one species' goals (move whole); `GroomGoal` and `NapGoal` are body language meant for every
+   species (shared). Found too: 4 lines in shared colony files ask "is this Macrotermes?" (`Brood` twice, `Population`,
+   `Refuse`), about 35 shared lines borrow the word "worker" from the harvester's body (`WorkerAntEntity.CASTE`) and 7
+   the word "king" from the termite king.
+   - **9a, the shared goals, the ant body and the event file** (about 45 lines): a forager's trip (scout, seeds, grass,
+     carrying in, the body's walk home) through questions, news and hooks any species uses: "must it wait for touches?"
+     (the door), "leave this food to a called nestmate?" (the recruits), news "set out", "trip over", "came home" (the
+     door, the recruits, the forager spots), the way along a trail (the trunk trails), where a search goes (the forager
+     spots), a place for a seed besides the store (the bakery); "alarmed?" for grooming, napping and noticing (the
+     alarm); news "a player stamped or broke a block nearby" (the alarm, from `ModEvents`); where dug soil goes (the
+     hill, the mound); the members the nurses feed besides the young (the soldiers); "on our trail?" for meeting a
+     neighbour (the trunk trails); the hidden ways (the hidden trips); the co-founder sealing the entrance (the king).
+   - **9b, the commands:** the `list` read-out asks each part to describe itself in its slot (same text, same order);
+     the termite-only commands (`mound`, `mushrooms`, `drum`, `alarm`, `queensize`) move into a termite commands file,
+     same names; `population`'s soldiers through the castes hook.
+   - **9c, species names in the shared colony files:** one shared word for "worker" and the king through his part; the
+     soldier ranks a plain caste name (saves unchanged); a table of each species' bodies in place of "is this
+     Macrotermes?"; the mound's block map through its hook (`MoundPlan.Part`, the tunnel blocks); the fungus comb, the
+     mud crust and the swelling termite queen as small shared shapes the termite blocks and bodies fill in, the comb's
+     ageing on return into the garden part.
+   - **Not in step 9:** registering blocks, items and mobs, the renderers, whole species files (the split's own job);
+     the termite pieces inside shared parts (galleries, foraging holes, the comb in the food store: part 3); errand
+     helper step 4 (`ScoutGoal` in three).
+   - **Checks** in scenes that exist (`AwayTests.partsAreTheSpecies` and others); each batch its categories, at the end
+     a full run on 6 servers (the user, 2026-10-22) and the stress test before and after. Nothing changes in-game.
 
 Then the split's own plan (`docs/plans/mod-split.md`) can draw the framework's wall along the registry: shared parts
 in, species parts out.
