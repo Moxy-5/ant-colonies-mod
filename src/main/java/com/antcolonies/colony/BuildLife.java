@@ -498,7 +498,7 @@ public class BuildLife {
     /** The block is dug out, quietly (nobody is there to hear it). */
     private void dig(ServerLevel level, BlockPos pos) {
         colony.nest().clearDigProgress(pos);
-        colony.part(ColonyParts.MOUND).ifPresent(mound -> mound.blockDug(level, pos));
+        colony.news().tell(level, ColonyNews.BLOCK_DUG, new ColonyNews.BlockDug(pos)); // (the mound counts its soil)
         level.removeBlock(pos, false);
     }
 

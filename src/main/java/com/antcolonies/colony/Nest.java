@@ -613,7 +613,7 @@ public class Nest {
             return colony.foragingHoles().mayOpen(level, pos);
         }
         return isSoil(level.getBlockState(pos)) || (pos.equals(center) && (isEntrancePlugged(level) && mayOpenEntrance(level) || isPlantInEntrance(level)))
-                || colony.part(ColonyParts.MOUND).map(mound -> mound.isClearJob(level, pos)).orElse(false) || foodWays.isRunwayPlant(level, pos);
+                || colony.questions().ask(level, ColonyQuestions.CLEAR_JOB, pos) || foodWays.isRunwayPlant(level, pos);
     }
 
     /**
@@ -647,7 +647,7 @@ public class Nest {
             spots.add(target.below());
         }
         // The mound's own soil in a shaft is cleared from below too (the old cap of a chimney that grew).
-        if (colony.part(ColonyParts.MOUND).map(mound -> mound.isClearJob(level, target)).orElse(false) && level.getBlockState(target.below()).isAir()) {
+        if (colony.questions().ask(level, ColonyQuestions.CLEAR_JOB, target) && level.getBlockState(target.below()).isAir()) {
             spots.add(target.below());
         }
         return spots;

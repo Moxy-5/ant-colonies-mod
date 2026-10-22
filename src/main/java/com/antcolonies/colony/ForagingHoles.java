@@ -131,7 +131,7 @@ public class ForagingHoles {
     @Nullable
     NestPlan.ForagingTunnel middleHole(Level level) {
         BlockPos entrance = colony.nest().getEntrance();
-        if (!colony.keepsASchedule() || !colony.part(ColonyParts.MOUND).map(Mound::isActive).orElse(false) || !level.isLoaded(entrance)
+        if (!colony.keepsASchedule() || !colony.buildsOverNestNow() || !level.isLoaded(entrance)
                 || !Nest.isDugOut(level, entrance.below()) || colony.nest().isEntranceCovered(level)) {
             return null;
         }

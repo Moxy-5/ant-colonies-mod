@@ -180,7 +180,7 @@ public class FoodStore {
      * (the ant then brings the seed straight to the mill, so nothing is put down without a store).
      */
     public boolean wantsSeeds(ServerLevel level) {
-        return hasStoreRoom(level) || colony.part(ColonyParts.BAKERY).map(bakery -> bakery.needsBread(level)).orElse(false);
+        return hasStoreRoom(level) || colony.questions().ask(level, ColonyQuestions.MORE_FOOD_WANTED, null);
     }
 
     /** Whether the food store has a place left that no seed on its way in is holding. */
@@ -360,7 +360,7 @@ public class FoodStore {
             int radius = colony.searchReach(); // (out to where a searcher's drift may take it)
             int inner = Math.min(radius, food().radius() + food().search().map(SpeciesProfile.SearchNumbers::stretch).orElse(0));
             boolean galleries = colony.nest().galleries().range() > 0;
-            if (!colony.part(ColonyParts.TRUNK_TRAILS).map(TrunkTrails::keepsTrails).orElse(false) && !galleries) {
+            if (!colony.questions().ask(level, ColonyQuestions.KEEPS_TRAILS, null) && !galleries) {
                 inner = radius;
             }
             for (int x = center.getX() - inner; x <= center.getX() + inner; x++) {
@@ -885,7 +885,9 @@ public class FoodStore {
         BlockState less = oneLayerLess(state);
         level.setBlock(pile, less, 3);
         if (less.isAir() && state.getBlock() instanceof FungusCombBlock) {
-            colony.part(ColonyParts.FUNGUS_GARDEN).ifPresent(garden -> garden.loseNodules(state.getValue(FungusCombBlock.NODULES)));
+            if (level instanceof ServerLevel server) {
+                colony.news().tell(server, ColonyNews.HEAP_GONE, new ColonyNews.HeapGone(pile, state.getValue(FungusCombBlock.NODULES)));
+            }
         }
     }
 
@@ -1021,7 +1023,9 @@ public class FoodStore {
         food = Math.max(0, food - 1);
         if (rich) {
             richSeeds--;
-            colony.part(ColonyParts.BAKERY).ifPresent(bakery -> bakery.addRichMiller(ant));
+        }
+        if (level instanceof ServerLevel server) {
+            colony.news().tell(server, ColonyNews.PIECE_TAKEN, new ColonyNews.PieceTaken(ant, rich)); // (a rich one: its miller makes rich bread)
         }
         return rich ? new ItemStack(Items.PUMPKIN_SEEDS) : cutPiece();
     }
@@ -1047,7 +1051,9 @@ public class FoodStore {
             return ItemStack.EMPTY;
         }
         ItemStack seed = takeSeedAt(level, pile, ant, false);
-        colony.part(ColonyParts.BAKERY).ifPresent(bakery -> bakery.removeRichMiller(ant)); // eaten, not milled
+        if (level instanceof ServerLevel server) {
+            colony.news().tell(server, ColonyNews.PIECE_EATEN, new ColonyNews.PieceEaten(ant)); // eaten, not milled
+        }
         if (!seed.isEmpty()) {
             seedsEaten++;
         }

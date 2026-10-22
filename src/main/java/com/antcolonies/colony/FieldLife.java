@@ -261,7 +261,7 @@ public class FieldLife {
         returnedNow = 0;
         placedNow = 0;
         boolean changed = forageWith(level, foragers);
-        colony.part(ColonyParts.DOOR).ifPresent(door -> door.numbersSecond(level, foragers, returnedNow, placedNow));
+        colony.news().tell(level, ColonyNews.NUMBERS_FORAGED, new ColonyNews.NumbersForaged(foragers, returnedNow, placedNow)); // (the door, Gordon's rule)
         return changed;
     }
 
@@ -273,14 +273,14 @@ public class FieldLife {
         out = 0;
         boolean alone = colony.foodMap().searchesAlone();
         if (alone) {
-            colony.part(ColonyParts.FORAGER_SPOTS).ifPresent(spots -> spots.trimHeld(foragers)); // (fewer forager numbers than spots held: some died or came out as real ones)
+            colony.news().tell(level, ColonyNews.FORAGER_NUMBERS, new ColonyNews.ForagerNumbers(foragers)); // (fewer forager numbers than spots held: some died or came out as real ones)
         }
         if (foragers <= 0 || known.isEmpty()) {
             progress.clear();
             return false;
         }
         boolean outside = colony.isForagingTime(level);
-        if (!outside && (alone || !colony.keepsASchedule() || colony.part(ColonyParts.ALARM).map(alarm -> alarm.keepsEveryoneIn(level)).orElse(false))) {
+        if (!outside && (alone || !colony.keepsASchedule() || colony.keepsEveryoneIn(level))) {
             progress.clear();
             return false; // the alarm keeps everyone in (searching alone: nothing to eat from inside)
         }
@@ -409,7 +409,7 @@ public class FieldLife {
             food.countIn(false);
             colony.ledger().addStore(1);
             returnedNow++;
-            colony.part(ColonyParts.TRUNK_TRAILS).ifPresent(trunk -> trunk.tripByNumbers(level, pos)); // their trip out and back wears the trail too
+            colony.news().tell(level, ColonyNews.NUMBERS_TRIP, new ColonyNews.NumbersTrip(pos)); // their trip out and back wears a trail too
             owed.put(pos, now);
             colony.away().note(level, AwayReport.What.FORAGED, 1);
             changedNow = true;
@@ -468,7 +468,7 @@ public class FieldLife {
             if (free <= 0 || roomNow <= 0) {
                 break;
             }
-            if (!colony.part(ColonyParts.PATROL).map(patrol -> patrol.isOpen(level, spot.pos())).orElse(true)) {
+            if (colony.questions().ask(level, ColonyQuestions.NOT_CLEARED, spot.pos())) {
                 continue; // that way is shut today: its holders stay in
             }
             if (colony.keepsOff(level, spot.pos())) {

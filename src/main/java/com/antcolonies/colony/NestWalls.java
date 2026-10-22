@@ -265,7 +265,7 @@ public class NestWalls {
         Set<BlockPos> nest = colony.nest().nestCells(level);
         Map<BlockPos, ?> mound = colony.moundParts(level);
         if (!nest.contains(target) || target.equals(center) || mound.containsKey(target) || colony.foragingHoles().isHole(level, target)
-                || colony.part(ColonyParts.MOUND).map(built -> built.getGalleries(level).contains(target)).orElse(false)) {
+                || colony.questions().ask(level, ColonyQuestions.STRUCTURE_TUNNEL, target)) {
             return true;
         }
         boolean allIn = true;

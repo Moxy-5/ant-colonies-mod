@@ -230,7 +230,17 @@ public class Colony {
 
     /** Whether this colony builds a termite mound (its species has the mound part and the profile's {@code mound} numbers). */
     public boolean buildsMound() {
-        return part(ColonyParts.MOUND).map(built -> built.numbers() != null).orElse(false);
+        return questions.ask(null, ColonyQuestions.BUILDS_OVER_NEST, null);
+    }
+
+    /** Whether everyone is kept in the nest now (the alarm at an attacker, {@link Alarm#keepsEveryoneIn}): asked of every part ({@link ColonyQuestions#KEEPS_EVERYONE_IN}). */
+    public boolean keepsEveryoneIn(Level level) {
+        return questions.ask(level, ColonyQuestions.KEEPS_EVERYONE_IN, null);
+    }
+
+    /** Whether the structure over the nest is being built now (a mound, past founding; {@link Mound#isActive}): asked of every part ({@link ColonyQuestions#BUILDING_OVER_NEST}). */
+    public boolean buildsOverNestNow() {
+        return questions.ask(null, ColonyQuestions.BUILDING_OVER_NEST, null);
     }
 
     /** The mound's blocks and what each is (none for a species without a mound; see {@link Mound#getParts}). */
@@ -386,7 +396,7 @@ public class Colony {
      * 2 or more ({@link Alarm#keepsEveryoneIn}): the foragers hurry home.
      */
     public boolean isForagingTime(net.minecraft.world.level.Level level) {
-        if (part(ColonyParts.ALARM).map(alarm -> alarm.keepsEveryoneIn(level)).orElse(false)) {
+        if (keepsEveryoneIn(level)) {
             return false;
         }
         Optional<SpeciesProfile.DayClock> clock = profile().food().dayClock();

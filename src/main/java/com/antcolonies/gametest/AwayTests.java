@@ -1540,11 +1540,21 @@ public class AwayTests {
         }
         // Colony parts step 4, the colony news: each kind is heard by the parts the colony has that used to be called by
         // hand, in the order they were called; a kind nobody hears is not sent at all.
-        Map<com.antcolonies.colony.ColonyNews.Kind<?>, List<String>> order = Map.of(
-                com.antcolonies.colony.ColonyNews.MEMBER_HURT, List.of("alarm", "patrol", "danger_map", "forager_spots"),
-                com.antcolonies.colony.ColonyNews.MEMBER_DIED, List.of("patrol", "forager_spots", "recruits"),
-                com.antcolonies.colony.ColonyNews.FOOD_FOUND, List.of("forager_spots", "recruits"),
-                com.antcolonies.colony.ColonyNews.NEIGHBOUR_MET, List.of("neighbours"));
+        Map<com.antcolonies.colony.ColonyNews.Kind<?>, List<String>> order = Map.ofEntries(
+                Map.entry(com.antcolonies.colony.ColonyNews.MEMBER_HURT, List.of("alarm", "patrol", "danger_map", "forager_spots")),
+                Map.entry(com.antcolonies.colony.ColonyNews.MEMBER_DIED, List.of("patrol", "forager_spots", "recruits")),
+                Map.entry(com.antcolonies.colony.ColonyNews.FOOD_FOUND, List.of("forager_spots", "recruits")),
+                Map.entry(com.antcolonies.colony.ColonyNews.NEIGHBOUR_MET, List.of("neighbours")),
+                // Step 8a: the rest of the shared code's tellings, each heard by the one part it used to name.
+                Map.entry(com.antcolonies.colony.ColonyNews.INTO_NUMBERS, List.of("forager_spots")),
+                Map.entry(com.antcolonies.colony.ColonyNews.OUT_OF_NUMBERS, List.of("forager_spots")),
+                Map.entry(com.antcolonies.colony.ColonyNews.FORAGER_NUMBERS, List.of("forager_spots")),
+                Map.entry(com.antcolonies.colony.ColonyNews.PIECE_TAKEN, List.of("bakery")),
+                Map.entry(com.antcolonies.colony.ColonyNews.PIECE_EATEN, List.of("bakery")),
+                Map.entry(com.antcolonies.colony.ColonyNews.HEAP_GONE, List.of("fungus_garden")),
+                Map.entry(com.antcolonies.colony.ColonyNews.NUMBERS_TRIP, List.of("trunk_trails")),
+                Map.entry(com.antcolonies.colony.ColonyNews.NUMBERS_FORAGED, List.of("door")),
+                Map.entry(com.antcolonies.colony.ColonyNews.BLOCK_DUG, List.of("mound")));
         for (Map.Entry<com.antcolonies.colony.ColonyNews.Kind<?>, List<String>> kind : order.entrySet()) {
             List<String> hearing = kind.getValue().stream().filter(has::contains).toList();
             helper.assertTrue(colony.news().listenersOf(kind.getKey()).equals(hearing) && colony.news().listens(kind.getKey()) == !hearing.isEmpty(),
@@ -1553,18 +1563,34 @@ public class AwayTests {
         }
         // Colony parts steps 6 and 7, the colony questions: each kind is answered by the parts the colony has that used
         // to be asked by name, in the order they were asked; a kind nobody answers is "no" at once.
-        Map<com.antcolonies.colony.ColonyQuestions.Kind<?>, List<String>> asked = Map.of(
-                com.antcolonies.colony.ColonyQuestions.KEEP_OFF, List.of("neighbours", "closed_holes", "danger_map", "trunk_trails"),
-                com.antcolonies.colony.ColonyQuestions.NOT_CLEARED, List.of("patrol"),
-                com.antcolonies.colony.ColonyQuestions.HOLE_KEPT_SHUT, List.of("closed_holes"),
-                com.antcolonies.colony.ColonyQuestions.ANY_HOLE_KEPT_SHUT, List.of("closed_holes"),
-                com.antcolonies.colony.ColonyQuestions.NO_GALLERY_THROUGH, List.of("closed_holes"));
+        Map<com.antcolonies.colony.ColonyQuestions.Kind<?>, List<String>> asked = Map.ofEntries(
+                Map.entry(com.antcolonies.colony.ColonyQuestions.KEEP_OFF, List.of("neighbours", "closed_holes", "danger_map", "trunk_trails")),
+                Map.entry(com.antcolonies.colony.ColonyQuestions.NOT_CLEARED, List.of("patrol")),
+                Map.entry(com.antcolonies.colony.ColonyQuestions.HOLE_KEPT_SHUT, List.of("closed_holes")),
+                Map.entry(com.antcolonies.colony.ColonyQuestions.ANY_HOLE_KEPT_SHUT, List.of("closed_holes")),
+                Map.entry(com.antcolonies.colony.ColonyQuestions.NO_GALLERY_THROUGH, List.of("closed_holes")),
+                // Step 8a: the rest of the shared code's yes/no asks, each answered by the one part it used to name.
+                Map.entry(com.antcolonies.colony.ColonyQuestions.KEEPS_EVERYONE_IN, List.of("alarm")),
+                Map.entry(com.antcolonies.colony.ColonyQuestions.BUILDS_OVER_NEST, List.of("mound")),
+                Map.entry(com.antcolonies.colony.ColonyQuestions.BUILDING_OVER_NEST, List.of("mound")),
+                Map.entry(com.antcolonies.colony.ColonyQuestions.CLEAR_JOB, List.of("mound")),
+                Map.entry(com.antcolonies.colony.ColonyQuestions.STRUCTURE_TUNNEL, List.of("mound")),
+                Map.entry(com.antcolonies.colony.ColonyQuestions.MORE_FOOD_WANTED, List.of("bakery")),
+                Map.entry(com.antcolonies.colony.ColonyQuestions.KEEPS_TRAILS, List.of("trunk_trails")),
+                Map.entry(com.antcolonies.colony.ColonyQuestions.NOTHING_TO_EAT_IN_STORE, List.of("fungus_garden")));
         for (Map.Entry<com.antcolonies.colony.ColonyQuestions.Kind<?>, List<String>> kind : asked.entrySet()) {
             List<String> answering = kind.getValue().stream().filter(has::contains).toList();
             helper.assertTrue(colony.questions().answerersOf(kind.getKey()).equals(answering) && colony.questions().answers(kind.getKey()) == !answering.isEmpty(),
                     "a " + colony.getSpecies() + " colony's question " + kind.getKey() + " should be answered by " + answering + ", not "
                             + colony.questions().answerersOf(kind.getKey()));
         }
+        // Step 8a: the answers are today's (the mound's own checks, the trunk trails' own switch).
+        helper.assertTrue(colony.buildsMound() == colony.part(com.antcolonies.colony.ColonyParts.MOUND).map(mound -> mound.numbers() != null).orElse(false)
+                && colony.buildsOverNestNow() == colony.part(com.antcolonies.colony.ColonyParts.MOUND).map(com.antcolonies.colony.Mound::isActive).orElse(false),
+                "a " + colony.getSpecies() + " colony should build a mound exactly when its mound part says so");
+        helper.assertTrue(colony.questions().ask(helper.getLevel(), com.antcolonies.colony.ColonyQuestions.KEEPS_TRAILS, null)
+                == colony.part(com.antcolonies.colony.ColonyParts.TRUNK_TRAILS).map(com.antcolonies.colony.TrunkTrails::keepsTrails).orElse(false),
+                "a " + colony.getSpecies() + " colony should keep trails exactly when its trunk trails say so");
     }
 
     /** The parts of a colony saved into a tag of their own each, by name (the parts that are not saved left out). */
