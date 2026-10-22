@@ -165,8 +165,19 @@ termite and ant parts, `entity/AbstractAntEntity.java` (1,837 lines; every carri
 ## Also found 2026-10-22 (the speed check of steps 6 and 7)
 In 1 stress run in 3, on `master` and the branch alike, most of the 61 or 101 real termites stop ticking a few
 seconds in (the stopwatch counts 12 to 15 insects ticking, the test counts all of them alive): their bodies are there
-but not run. Cause not looked for (a frozen insect, `AwayLife.freeze`, or the arena's chunks not ticking are guesses).
-Such runs must be left out of speed comparisons; whether it can happen in a real game is not known yet.
+but not run. **Cause found the same day (a test-only cause, not the colony code):** the game test server puts each
+test at a random place in the world and loads (with ticking) only the chunks under the 65 x 65 arena. The termite
+nest sits 12 blocks from the arena's west and north edges, and its gallery arms reach about 14 to 16 blocks, so the
+west and north arm ends lie outside the arena. When the arena's edge falls near the edge of its chunk (the random
+place decides it, about 1 run in 3), those arm ends are in a chunk Minecraft keeps but does not run; each worker that
+walks there stands still for the rest of the test. Proved with a log of every termite in a stalled run: all 48 that
+stopped stood at one spot 2 blocks west of the arena, in the chunk west of it, which reported "not ticking"; every
+termite that still moved stood in the arena's chunks. Fix (to agree with the user): load the chunks round the arena too
+in the stress test (and in any termite test whose arms leave the arena; the old gallery flakes, `docs/BUGS.md` 55 and
+59, may be this). In a real game the same thing can happen at the edge of the player's simulation distance: a worker
+walking into the outermost ring of loaded chunks stands still there without being written down as away
+(`AwayLife.freeze` only hears of chunks that unload), and keeps a real-mob place. Rare and harmless today; worth a
+look when real mobs are spawned only where the player can see.
 
 ## Also found 2026-10-20
 The termite stress test shows, in old and new code alike, bursts of failed route searches about once a second for a
