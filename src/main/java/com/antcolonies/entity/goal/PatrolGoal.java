@@ -8,6 +8,7 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.colony.ColonyParts;
 import com.antcolonies.colony.Patrol;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.species.SpeciesProfile;
@@ -46,6 +47,9 @@ public class PatrolGoal extends Goal {
     private final Errand<BlockPos> errand;
     @Nullable
     private Colony colony;
+    /** The colony's patrol (only a species that sends patrollers out has one). */
+    @Nullable
+    private Patrol patrol;
     private final List<BlockPos> waypoints = new ArrayList<>();
     private int ticks;
     private int waypointTicks;
@@ -67,15 +71,16 @@ public class PatrolGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        return colony != null && colony.patrol().jobOf(ant.getUUID()) != null;
+        patrol = colony == null ? null : colony.part(ColonyParts.PATROL).orElse(null);
+        return patrol != null && patrol.jobOf(ant.getUUID()) != null;
     }
 
     @Override
     public boolean canContinueToUse() {
-        if (colony == null || ticks >= GIVE_UP_TICKS + AT_DOOR_TICKS) {
+        if (colony == null || patrol == null || ticks >= GIVE_UP_TICKS + AT_DOOR_TICKS) {
             return false;
         }
-        return atDoor >= 0 ? atDoor < AT_DOOR_TICKS : colony.patrol().jobOf(ant.getUUID()) != null;
+        return atDoor >= 0 ? atDoor < AT_DOOR_TICKS : patrol.jobOf(ant.getUUID()) != null;
     }
 
     @Override
@@ -87,14 +92,14 @@ public class PatrolGoal extends Goal {
         goingHome = false;
         waypoints.clear();
         errand.begin();
-        if (!(ant.level() instanceof ServerLevel level) || colony == null) {
+        if (!(ant.level() instanceof ServerLevel level) || colony == null || patrol == null) {
             return;
         }
-        Patrol.Job job = colony.patrol().jobOf(ant.getUUID());
+        Patrol.Job job = patrol.jobOf(ant.getUUID());
         if (job == null) {
             return;
         }
-        colony.patrol().setsOff(ant.getUUID());
+        patrol.setsOff(ant.getUUID());
         // Round the hill, starting on the far side from its way and ending on its way's side.
         BlockPos center = colony.getCenter();
         for (int i = 1; i <= 4; i++) {
@@ -112,27 +117,28 @@ public class PatrolGoal extends Goal {
     @Override
     public void stop() {
         errand.stop();
-        if (colony != null && ant.level() instanceof ServerLevel level && atDoor < 0 && colony.patrol().jobOf(ant.getUUID()) != null
+        if (patrol != null && ant.level() instanceof ServerLevel level && atDoor < 0 && patrol.jobOf(ant.getUUID()) != null
                 && ticks >= GIVE_UP_TICKS) {
-            colony.patrol().home(level, ant, calm); // gave up: counts as home
+            patrol.home(level, ant, calm); // gave up: counts as home
         }
         if (colony != null && atDoor >= 0) {
-            colony.door().doneCarrying(ant);
+            colony.part(ColonyParts.DOOR).ifPresent(door -> door.doneCarrying(ant));
         }
         waypoints.clear();
         colony = null;
+        patrol = null;
     }
 
     @Override
     public void tick() {
-        if (colony == null || !(ant.level() instanceof ServerLevel level)) {
+        if (colony == null || patrol == null || !(ant.level() instanceof ServerLevel level)) {
             return;
         }
         ticks++;
         if (atDoor >= 0) {
             atDoor++;
             if (atDoor % 5 == 0 && calm) {
-                colony.door().homecomer(level, ant, false);
+                colony.part(ColonyParts.DOOR).ifPresent(door -> door.homecomer(level, ant, false));
             }
             return;
         }
@@ -143,7 +149,7 @@ public class PatrolGoal extends Goal {
         if (!goingHome && ticks % LOOK_EVERY == 0) {
             lookForTrouble(level);
         }
-        if (goingHome || colony.patrol().turnedBack(ant.getUUID())) {
+        if (goingHome || patrol.turnedBack(ant.getUUID())) {
             goingHome = true;
             BlockPos entrance = colony.nest().getEntrance();
             if (colony.nest().isInside(level, ant.blockPosition()) || near(ant.blockPosition(), entrance)) {
@@ -188,7 +194,7 @@ public class PatrolGoal extends Goal {
         if (danger) {
             calm = false;
             goingHome = true;
-            colony.patrol().danger(level, ant, "a hostile mob close");
+            patrol.danger(level, ant, "a hostile mob close");
             errand.stop();
             return;
         }
@@ -197,10 +203,10 @@ public class PatrolGoal extends Goal {
         if (neighbours) {
             calm = false;
             goingHome = true;
-            colony.patrol().neighbours(level, ant);
+            patrol.neighbours(level, ant);
             errand.stop();
         }
-        if (colony.patrol().turnedBack(ant.getUUID())) {
+        if (patrol.turnedBack(ant.getUUID())) {
             calm = false; // hurt: AbstractAntEntity.hurt told the patrol
             goingHome = true;
         }
@@ -208,10 +214,10 @@ public class PatrolGoal extends Goal {
 
     private void arriveHome(ServerLevel level) {
         errand.stop();
-        if (colony.patrol().turnedBack(ant.getUUID())) {
+        if (patrol.turnedBack(ant.getUUID())) {
             calm = false;
         }
-        colony.patrol().home(level, ant, calm);
+        patrol.home(level, ant, calm);
         atDoor = 0;
     }
 

@@ -13,6 +13,7 @@ import org.jetbrains.annotations.Nullable;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.colony.ColonyParts;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.AntCorpseEntity;
 import com.antcolonies.entity.AntEggEntity;
@@ -128,7 +129,7 @@ final class TestIsolation {
                 GameTestInfo test = testAt(colony.getCenter());
                 if (test != null) {
                     OWNERS.put(colony.getId(), test);
-                    colony.trunkTrails().setTestFence(ARENAS.get(test)); // (its trails stop at its own arena's edge)
+                    colony.part(ColonyParts.TRUNK_TRAILS).ifPresent(trunk -> trunk.setTestFence(ARENAS.get(test))); // (its trails stop at its own arena's edge)
                     colony.neighbours().setTestFence(ARENAS.get(test)); // (another test's colonies are not neighbours)
                 }
             }

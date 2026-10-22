@@ -8,6 +8,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.ColonyParts;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.nav.LevelCellMap;
 import com.antcolonies.species.SpeciesProfile;
@@ -140,7 +141,7 @@ public class NoticeGoal extends Goal {
             return false;
         }
         Colony colony = insect.getColony();
-        return colony == null || colony.alarm().level(level) == 0;
+        return colony == null || colony.part(ColonyParts.ALARM).map(alarm -> alarm.level(level)).orElse(0) == 0;
     }
 
     @Override

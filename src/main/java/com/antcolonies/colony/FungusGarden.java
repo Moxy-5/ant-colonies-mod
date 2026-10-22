@@ -57,11 +57,6 @@ public class FungusGarden implements NurseFood {
         this.colony = colony;
     }
 
-    /** Whether this colony's species keeps a fungus garden. */
-    public boolean exists() {
-        return colony.profile().garden().isPresent();
-    }
-
     /** The fungus comb blocks in the dug-out garden rooms. */
     public List<BlockPos> getCombs(Level level) {
         List<BlockPos> combs = new ArrayList<>();

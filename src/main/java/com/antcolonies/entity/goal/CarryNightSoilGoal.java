@@ -6,7 +6,9 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.colony.ColonyParts;
 import com.antcolonies.colony.ColonyRole;
+import com.antcolonies.colony.Hill;
 import com.antcolonies.colony.NightSoil;
 import com.antcolonies.entity.AbstractAntEntity;
 
@@ -39,6 +41,9 @@ public class CarryNightSoilGoal extends Goal {
     private final Errand<BlockPos> errand;
     @Nullable
     private Colony colony;
+    /** Its colony's hill (asked once in {@link #canUse}: only a species that lists the hill leaves night soil). */
+    @Nullable
+    private Hill hill;
     @Nullable
     private BlockPos heap;
     private int ticks;
@@ -57,12 +62,13 @@ public class CarryNightSoilGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        if (colony == null || colony.nest().isEntrancePlugged(level) || !colony.hill().hasMoundRoom(level)) {
+        hill = colony == null ? null : colony.part(ColonyParts.HILL).orElse(null);
+        if (hill == null || colony.nest().isEntrancePlugged(level) || !hill.hasMoundRoom(level)) {
             return false;
         }
-        heap = colony.hill().nightSoil().claimPile(level, ant.getUUID());
+        heap = hill.nightSoil().claimPile(level, ant.getUUID());
         if (heap != null && errand.isLeftAlone(heap)) {
-            colony.hill().nightSoil().release(ant.getUUID());
+            hill.nightSoil().release(ant.getUUID());
             heap = null;
         }
         return heap != null;
@@ -70,7 +76,7 @@ public class CarryNightSoilGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        return colony != null && heap != null && !ant.hasFullMandibles() && ticks < GIVE_UP_TICKS && ant.mayGoOut()
+        return colony != null && hill != null && heap != null && !ant.hasFullMandibles() && ticks < GIVE_UP_TICKS && ant.mayGoOut()
                 && NightSoil.layersAt(ant.level(), heap) > 0;
     }
 
@@ -84,16 +90,17 @@ public class CarryNightSoilGoal extends Goal {
     @Override
     public void stop() {
         errand.stop();
-        if (colony != null) {
-            colony.hill().nightSoil().release(ant.getUUID());
+        if (hill != null) {
+            hill.nightSoil().release(ant.getUUID());
         }
         heap = null;
         colony = null;
+        hill = null;
     }
 
     @Override
     public void tick() {
-        if (heap == null || colony == null || !(ant.level() instanceof ServerLevel level)) {
+        if (heap == null || colony == null || hill == null || !(ant.level() instanceof ServerLevel level)) {
             return;
         }
         ticks++;
@@ -107,7 +114,7 @@ public class CarryNightSoilGoal extends Goal {
         }
         errand.stop();
         if (++picking >= PICK_TICKS) {
-            BlockState pellet = colony.hill().nightSoil().takeLayer(level, heap, ant.getUUID());
+            BlockState pellet = hill.nightSoil().takeLayer(level, heap, ant.getUUID());
             if (pellet != null) {
                 level.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, pellet), spot.x, spot.y, spot.z, 4, 0.2, 0.2, 0.2, 0.05);
                 level.playSound(null, heap, pellet.getSoundType().getHitSound(), SoundSource.BLOCKS, 0.4F, 1.3F);

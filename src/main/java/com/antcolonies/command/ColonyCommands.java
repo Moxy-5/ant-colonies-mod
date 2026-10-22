@@ -6,8 +6,16 @@ import com.antcolonies.block.MoundPieceBlock;
 import com.antcolonies.block.MoundSoil;
 import com.antcolonies.block.TermiteMoundBlock;
 import com.antcolonies.block.TermitomycesBlock;
+import com.antcolonies.colony.Alarm;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.colony.ColonyParts;
+import com.antcolonies.colony.ForagerSpots;
+import com.antcolonies.colony.FungusGarden;
+import com.antcolonies.colony.HiddenTrips;
+import com.antcolonies.colony.Mound;
+import com.antcolonies.colony.Mushrooms;
+import com.antcolonies.colony.Soldiers;
 import com.antcolonies.debug.Perf;
 import com.antcolonies.entity.TermiteQueenEntity;
 import com.antcolonies.entity.TermiteSoldierEntity;
@@ -118,16 +126,17 @@ public class ColonyCommands {
         ServerLevel level = source.getLevel();
         BlockPos at = BlockPos.containing(source.getPosition());
         Colony colony = nearestTermiteColony(level, at);
-        if (colony == null || colony.alarm().numbers() == null) {
+        Alarm alarm = colony == null ? null : colony.part(ColonyParts.ALARM).filter(part -> part.numbers() != null).orElse(null);
+        if (alarm == null) {
             source.sendFailure(Component.literal("No termite colony within 64 blocks."));
             return 0;
         }
         if (to == 0) {
-            colony.alarm().calmForTests();
+            alarm.calmForTests();
         } else {
-            colony.alarm().raise(level, to, at, source.getEntity());
+            alarm.raise(level, to, at, source.getEntity());
         }
-        source.sendSuccess(() -> Component.literal("Alarm now" + colony.alarm().describe(level).replace(" | ", " ")), false);
+        source.sendSuccess(() -> Component.literal("Alarm now" + alarm.describe(level).replace(" | ", " ")), false);
         return 1;
     }
 
@@ -152,17 +161,19 @@ public class ColonyCommands {
     private static int mushrooms(CommandSourceStack source, int count, boolean giants) {
         ServerLevel level = source.getLevel();
         Colony colony = nearestTermiteColony(level, BlockPos.containing(source.getPosition()));
-        if (colony == null || !colony.garden().exists()) {
+        FungusGarden garden = colony == null ? null : colony.part(ColonyParts.FUNGUS_GARDEN).orElse(null);
+        Mushrooms mushrooms = colony == null ? null : colony.part(ColonyParts.MUSHROOMS).orElse(null);
+        if (garden == null || mushrooms == null) {
             source.sendFailure(Component.literal("No termite colony within 64 blocks."));
             return 0;
         }
-        int wanted = count > 0 ? count : colony.mushrooms().wanted(level);
+        int wanted = count > 0 ? count : mushrooms.wanted(level);
         if (wanted == 0) {
-            source.sendSuccess(() -> Component.literal("The garden is not healthy yet: it has " + colony.garden().countCombLayers(level)
+            source.sendSuccess(() -> Component.literal("The garden is not healthy yet: it has " + garden.countCombLayers(level)
                     + " layers of comb, mushrooms need " + colony.profile().garden().get().mushroomCombLayers() + ". None came up."), false);
             return 1;
         }
-        int sprouted = colony.mushrooms().sprout(level, wanted, giants);
+        int sprouted = mushrooms.sprout(level, wanted, giants);
         source.sendSuccess(() -> Component.literal(sprouted + " of " + wanted + " Termitomyces came up round the mound"
                 + (giants ? " (giants where they fit)" : "") + ". They grow on random ticks; bone meal or /antcolonies mushrooms grow speeds them up."), false);
         return 1;
@@ -195,7 +206,7 @@ public class ColonyCommands {
     /** The termite colony (one that builds a mound) nearest to {@code at} within 64 blocks, or null. */
     private static Colony nearestTermiteColony(ServerLevel level, BlockPos at) {
         return ColonyManager.get(level).getColonies().stream()
-                .filter(c -> c.mound().numbers() != null && c.getCenter().distSqr(at) <= 64 * 64)
+                .filter(c -> c.buildsMound() && c.getCenter().distSqr(at) <= 64 * 64)
                 .min(Comparator.comparingDouble(c -> c.getCenter().distSqr(at))).orElse(null);
     }
 
@@ -206,16 +217,17 @@ public class ColonyCommands {
             source.sendFailure(Component.literal("No termite colony within 64 blocks."));
             return 0;
         }
-        int max = colony.mound().numbers().maxHeight();
+        Mound mound = colony.part(ColonyParts.MOUND).orElseThrow(); // (a colony that builds a mound)
+        int max = mound.numbers().maxHeight();
         int h = Math.min(height, max);
         if (instant) {
-            colony.mound().buildInstantly(level, h);
+            mound.buildInstantly(level, h);
         } else {
-            colony.mound().setStage(level, h);
+            mound.setStage(level, h);
         }
         ColonyManager.get(level).markChanged();
         String done = instant ? "built at once" : "set: the termites build up to it, one stage after the other";
-        source.sendSuccess(() -> Component.literal("Mound stage " + h + " of " + max + " (" + colony.mound().wallsAt(h) + " blocks) " + done
+        source.sendSuccess(() -> Component.literal("Mound stage " + h + " of " + max + " (" + mound.wallsAt(h) + " blocks) " + done
                 + (colony.isFounding() ? ". The colony has no workers yet, so nobody builds." : ".")), false);
         return 1;
     }
@@ -240,7 +252,7 @@ public class ColonyCommands {
             colony.population().addNewMembers(caste, now - oldest * i / Math.max(1, added), 1);
         }
         StringBuilder soldiers = new StringBuilder();
-        var numbers = colony.soldiers().numbers();
+        var numbers = colony.part(ColonyParts.SOLDIERS).map(Soldiers::numbers).orElse(null);
         if (numbers != null) {
             int total = colony.getCount(caste);
             for (TermiteSoldierEntity.Rank rank : TermiteSoldierEntity.Rank.values()) {
@@ -319,8 +331,8 @@ public class ColonyCommands {
                     + " | " + colony.describeJobs(level)
                     + (colony.profile().food().makesBread()
                             ? " | food " + colony.food().getFood() + " (rich " + colony.food().getRichSeeds() + ", eaten " + colony.food().getSeedsEaten() + ")"
-                                    + " | bread " + colony.bakery().getBread() + " (rich " + colony.bakery().getRichBread() + ", milling " + colony.bakery().getMilling() + ")"
-                            : colony.garden().exists() ? garden(colony, level)
+                                    + part(colony, ColonyParts.BAKERY, bakery -> " | bread " + bakery.getBread() + " (rich " + bakery.getRichBread() + ", milling " + bakery.getMilling() + ")")
+                            : colony.has(ColonyParts.FUNGUS_GARDEN) ? garden(colony, level)
                             : " | food " + colony.food().getFood() + " pieces in the store")
                     + (colony.profile().laying().isPresent()
                             ? " | queen holds " + colony.queenCare().getQueenBread() + "/" + colony.profile().queen().meal() + " nodules" + nextEgg(colony, level)
@@ -328,13 +340,21 @@ public class ColonyCommands {
                                     + colony.profile().queen().richMeal() + incubation(colony, level))
                     + " | queen unfed " + unfedMinutes(colony, level) + " of " + colony.profile().queen().starveTicks() / 1200 + " min"
                     + " | eggs " + colony.brood().countEggs(level) + " | larvae " + colony.brood().countLarvae(level)
-                    + colony.soldiers().describe(level) + colony.alarm().describe(level) + colony.foodMap().describe() + colony.spots().describe() + colony.recruits().describe(level) + colony.trunkTrails()
-.describe(level) + colony.trails().describeMemory(level) + colony.danger().describe(level) + colony.closedHoles().describe(level) + colony.neighbours().describe(level)
+                    + part(colony, ColonyParts.SOLDIERS, soldiers -> soldiers.describe(level)) + part(colony, ColonyParts.ALARM, alarm -> alarm.describe(level))
+                    + colony.foodMap().describe() + part(colony, ColonyParts.FORAGER_SPOTS, ForagerSpots::describe)
+                    + part(colony, ColonyParts.RECRUITS, recruits -> recruits.describe(level)) + part(colony, ColonyParts.TRUNK_TRAILS, trunk -> trunk.describe(level))
+                    + colony.trails().describeMemory(level) + colony.danger().describe(level) + part(colony, ColonyParts.CLOSED_HOLES, closed -> closed.describe(level))
+                    + colony.neighbours().describe(level)
                     + " | dead ants " + colony.refuse().getCorpses(level).size() + " (refuse chamber " + colony.refuse().getRefuseCorpses(level).size() + ")"
                     + mound(colony, level) + foraging(colony, level);
             source.sendSuccess(() -> Component.literal(line), false);
         }
         return colonies.size();
+    }
+
+    /** A part's line for the list: nothing for a species without that part. */
+    private static <T> String part(Colony colony, ColonyParts.Type<T> type, java.util.function.Function<T, String> line) {
+        return colony.part(type).map(line).orElse("");
     }
 
     /**
@@ -343,30 +363,36 @@ public class ColonyCommands {
      * at a time).
      */
     private static String mound(Colony colony, ServerLevel level) {
-        if (colony.mound().numbers() == null) {
+        Mound mound = colony.part(ColonyParts.MOUND).filter(built -> built.numbers() != null).orElse(null);
+        if (mound == null) {
             return "";
         }
-        int h = colony.mound().getStage(level);
-        return String.format(" | mound stage %d (earned %d) of %d, %d/%d blocks finished, earned %.1f blocks", h, colony.mound().getEarnedStage(level),
-                colony.mound().numbers().maxHeight(), colony.mound().countFinished(level), colony.mound().wallsAt(h), colony.mound().getAllowance(level));
+        int h = mound.getStage(level);
+        return String.format(" | mound stage %d (earned %d) of %d, %d/%d blocks finished, earned %.1f blocks", h, mound.getEarnedStage(level),
+                mound.numbers().maxHeight(), mound.countFinished(level), mound.wallsAt(h), mound.getAllowance(level));
     }
 
     /** " | gardens 2 dug (planned 6), comb 14 layers on 5 blocks, nodules 3, mushrooms ..." for colonies with a fungus garden. */
     private static String garden(Colony colony, ServerLevel level) {
         java.util.Set<net.minecraft.core.BlockPos> cells = new java.util.HashSet<>(colony.nest().getGardenCells(level));
         long dug = colony.nest().getGardens(level).stream().filter(garden -> cells.containsAll(garden.room())).count();
+        FungusGarden comb = colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow(); // (only asked for a colony with a garden)
         return " | gardens " + dug + " dug (planned " + colony.nest().getGardens(level).size() + "), comb "
-                + colony.garden().countCombLayers(level) + " layers on " + colony.garden().getCombs(level).size() + " blocks, nodules "
-                + colony.garden().available(level) + mushrooms(colony, level);
+                + comb.countCombLayers(level) + " layers on " + comb.getCombs(level).size() + " blocks, nodules "
+                + comb.available(level) + mushrooms(colony, comb, level);
     }
 
     /** ", mushrooms after rain: 2 (last rain 2 came up)" or ", no mushrooms yet (comb 5 of 8 layers)". */
-    private static String mushrooms(Colony colony, ServerLevel level) {
-        int wanted = colony.mushrooms().wanted(level);
-        int last = colony.mushrooms().getLastFlush();
+    private static String mushrooms(Colony colony, FungusGarden comb, ServerLevel level) {
+        Mushrooms mushrooms = colony.part(ColonyParts.MUSHROOMS).orElse(null);
+        if (mushrooms == null) {
+            return "";
+        }
+        int wanted = mushrooms.wanted(level);
+        int last = mushrooms.getLastFlush();
         String lastRain = last < 0 ? "" : " (last rain " + last + " came up)";
         if (wanted == 0) {
-            return ", no mushrooms yet (comb " + colony.garden().countCombLayers(level) + " of "
+            return ", no mushrooms yet (comb " + comb.countCombLayers(level) + " of "
                     + colony.profile().garden().get().mushroomCombLayers() + " layers)" + lastRain;
         }
         return ", mushrooms after rain: " + wanted + lastRain;
@@ -395,9 +421,9 @@ public class ColonyCommands {
                     + " to " + SpeciesProfile.DayClock.clock(c.inBy()) + (rest > 0 ? ", resting " + SpeciesProfile.DayClock.clock(c.restStart(heat))
                     + " to " + SpeciesProfile.DayClock.clock(c.restStart(heat) + rest) : ", no midday rest")
                     + String.format(" (biome heat %.1f)", heat) + (c.notInRain() ? ", never in rain" : "") + ")"
-                    + colony.patrol().describe(level) + colony.door().describe(level)
-                    + (colony.hill().nightSoil().waiting(level) > 0 ? " | night soil in piles: " + colony.hill().nightSoil().waiting(level)
-                            + " of at most " + colony.hill().nightSoil().limit(level) + " pellets" : "");
+                    + part(colony, ColonyParts.PATROL, patrol -> patrol.describe(level)) + part(colony, ColonyParts.DOOR, door -> door.describe(level))
+                    + part(colony, ColonyParts.HILL, hill -> hill.nightSoil().waiting(level) > 0 ? " | night soil in piles: " + hill.nightSoil().waiting(level)
+                            + " of at most " + hill.nightSoil().limit(level) + " pellets" : "");
         }
         if (!colony.keepsASchedule() && holes == 0) {
             return "";
@@ -405,7 +431,7 @@ public class ColonyCommands {
         String when = String.join(", ", colony.profile().food().forageAt());
         String line = " | " + (colony.isForagingTime(level) ? "foraging now" : "staying in") + " (out at: " + when + ")";
         if (holes > 0) {
-            line += ", holes open " + colony.foragingHoles().countOpen(level) + " of " + colony.foragingHoles().tunnels(level).size(); line += colony.foragingHoles().describeNewHoles(level) + colony.foragingHoles().describeRunways(level) + colony.nest().galleries().describe(level) + colony.hiddenTrips().describe();
+            line += ", holes open " + colony.foragingHoles().countOpen(level) + " of " + colony.foragingHoles().tunnels(level).size(); line += colony.foragingHoles().describeNewHoles(level) + colony.foragingHoles().describeRunways(level) + colony.nest().galleries().describe(level) + part(colony, ColonyParts.HIDDEN_TRIPS, HiddenTrips::describe);
             if (colony.profile().food().regrowth().isPresent()) {
                 line += ", " + colony.food().barePatches().describe();
             }

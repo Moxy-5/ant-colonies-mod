@@ -8,6 +8,7 @@ import org.jetbrains.annotations.Nullable;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.colony.ColonyParts;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.entity.goal.DefendGoal;
 import com.antcolonies.entity.goal.GoInsideGoal;
@@ -196,16 +197,16 @@ public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurs
         if (colony == null) {
             return false;
         }
-        if (level() instanceof ServerLevel serverLevel && colony.alarm().isBusy(serverLevel, this)) {
+        if (level() instanceof ServerLevel serverLevel && colony.part(ColonyParts.ALARM).map(alarm -> alarm.isBusy(serverLevel, this)).orElse(false)) {
             return true;
         }
-        return rank == Rank.MINOR && colony.soldiers().minorsOut(level());
+        return rank == Rank.MINOR && colony.part(ColonyParts.SOLDIERS).map(soldiers -> soldiers.minorsOut(level())).orElse(false);
     }
 
     /** Whether its colony's alarm is up (it then has no time to wait for a nurse). */
     private boolean isAlarmed() {
         Colony colony = getColony();
-        return colony != null && colony.alarm().level(level()) >= 2;
+        return colony != null && colony.part(ColonyParts.ALARM).map(alarm -> alarm.level(level())).orElse(0) >= 2;
     }
 
     // Soldiers dig nothing and carry nothing.
@@ -377,7 +378,7 @@ public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurs
         if ((tickCount + getId()) % 5 == 0 && getColonyId() != null) {
             Colony colony = ColonyManager.get(serverLevel).getColony(getColonyId());
             if (colony != null) {
-                colony.alarm().listen(serverLevel, this);
+                colony.part(ColonyParts.ALARM).ifPresent(alarm -> alarm.listen(serverLevel, this));
             }
         }
     }

@@ -8,6 +8,7 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.colony.ColonyParts;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.AntLarvaEntity;
@@ -113,7 +114,7 @@ public class FeedLarvaGoal extends Goal {
                 hungry.add(young);
             }
         }
-        for (TermiteSoldierEntity soldier : colony.soldiers().getSoldiers(level)) {
+        for (TermiteSoldierEntity soldier : colony.part(ColonyParts.SOLDIERS).map(soldiers -> soldiers.getSoldiers(level)).orElse(List.of())) {
             if (soldier.wantsFood() && !soldier.hasFeeder(now)) {
                 hungry.add(soldier);
             }

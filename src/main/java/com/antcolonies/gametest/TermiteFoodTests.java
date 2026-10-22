@@ -15,6 +15,7 @@ import com.antcolonies.block.FallenBranchBlock;
 import com.antcolonies.block.FungusCombBlock;
 import com.antcolonies.block.SeedPileBlock;
 import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.ColonyParts;
 import com.antcolonies.colony.NestPlan;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.AntEggEntity;
@@ -141,7 +142,7 @@ public class TermiteFoodTests {
                 AntColoniesMod.LOGGER.info("[forage-test] tick {}: food {}, store cells {}, hay cut {}, bush cut {}, dig target {}{}{}", helper.getTick(),
                         colony[0].food().getFood(), colony[0].nest().getFoodStoreCells(level).size(),
                         colony[0].food().getPiecesCut(helper.absolutePos(hay)), colony[0].food().getPiecesCut(helper.absolutePos(bush)),
-                        colony[0].nest().findDigTarget(level), colony[0].alarm().describe(level), colony[0].foodMap().describe());
+                        colony[0].nest().findDigTarget(level), colony[0].part(ColonyParts.ALARM).orElseThrow().describe(level), colony[0].foodMap().describe());
             }
         });
 
@@ -182,11 +183,11 @@ public class TermiteFoodTests {
             // leaves the store when a worker eats old comb or an old layer crumbles away.)
             int stored = c.food().getFood();
             int eaten = c.food().getSeedsEaten();
-            int crumbled = c.garden().getLayersCrumbled();
+            int crumbled = c.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().getLayersCrumbled();
             helper.assertTrue(stored + eaten + crumbled + carried + lying == small + hayCut, "stored " + stored + " + eaten " + eaten
                     + " + crumbled " + crumbled + " + carried " + carried + " + lying " + lying + " is not the " + small + " small pieces + "
-                    + hayCut + " cut off the hay bale (nodules grown " + c.garden().getNodulesGrown() + ")");
-            helper.assertTrue(c.garden().getNodulesGrown() > 0, "no nodules grew on the comb");
+                    + hayCut + " cut off the hay bale (nodules grown " + c.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().getNodulesGrown() + ")");
+            helper.assertTrue(c.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().getNodulesGrown() > 0, "no nodules grew on the comb");
             // The comb lies in the garden rooms round the royal chamber; no side room, no forage or seed heaps.
             helper.assertTrue(c.nest().getSideRooms(level).isEmpty(), "termites planned a side room");
             helper.assertTrue(c.nest().getPlannedChambers(level).get(0).kind() == NestPlan.Kind.QUEEN, "the nest plan is not the royal chamber");
@@ -204,7 +205,7 @@ public class TermiteFoodTests {
             }
             helper.assertTrue(layers == stored, "the comb holds " + layers + " pieces, the colony counts " + stored);
             // The garden at work.
-            helper.assertTrue(c.garden().getNodulesGrown() > 0, "no nodule has grown yet");
+            helper.assertTrue(c.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().getNodulesGrown() > 0, "no nodule has grown yet");
             helper.assertTrue(c.queenCare().getEggsLaid() > 0, "the queen has laid no egg yet (she holds " + c.queenCare().getQueenBread() + " nodules)");
             helper.assertTrue(sawEggOnComb[0], "no egg was laid on the comb yet");
             Set<BlockPos> gardenCells = new HashSet<>(c.nest().getGardenCells(level));
@@ -307,7 +308,7 @@ public class TermiteFoodTests {
                     AntColoniesMod.LOGGER.info("[find-test] tick {}: finder alive {} at {} (inside {}, colony ours {}, last hurt by {}), found {}, holes {}{}",
                             helper.getTick(), f.isAlive(), f.blockPosition().toShortString(), colony.nest().isInside(level, f.blockPosition()),
                             colony.getId().equals(f.getColonyId()), f.getLastHurtByMob(), colony.foodMap().isFoundButUntold(spots[0]),
-                            colony.foragingHoles().waysOut(level).size(), colony.alarm().describe(level));
+                            colony.foragingHoles().waysOut(level).size(), colony.part(ColonyParts.ALARM).orElseThrow().describe(level));
                 }
                 // Brain part 3: the brain never remembers food nobody has found and told of.
                 helper.assertTrue(colony.foodMap().isKnown(spots[0]) || !colony.field().remembers(spots[0]),

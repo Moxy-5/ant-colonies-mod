@@ -231,7 +231,7 @@ public class AwayLife {
             case ADULT -> {
                 colony.population().foldIn(level, what.caste(), what.grownUpAt(), what.lastMeal());
                 colony.foodMap().wentHome(id);
-                colony.spots().intoNumbers(id);
+                colony.part(ColonyParts.FORAGER_SPOTS).ifPresent(spots -> spots.intoNumbers(id));
 
                 switch (what.load()) {
                     case SEED, RICH_SEED -> {
@@ -240,7 +240,7 @@ public class AwayLife {
                     }
                     case NURSE_FOOD, RICH_NURSE_FOOD -> {
                         if (colony.profile().food().makesBread()) {
-                            colony.bakery().countIn(what.load() == Load.RICH_NURSE_FOOD);
+                            colony.part(ColonyParts.BAKERY).ifPresent(bakery -> bakery.countIn(what.load() == Load.RICH_NURSE_FOOD));
                         }
                         colony.ledger().addNurseFood(1);
                     }
@@ -252,7 +252,7 @@ public class AwayLife {
             }
             case EGG -> colony.brood().addInside(Brood.Young.egg(what.left() < 0 ? -1 : Math.max(1, what.left() - frozenFor)));
             case LARVA -> {
-                boolean full = what.fed() >= colony.soldiers().mealFor(what.rank());
+                boolean full = what.fed() >= colony.brood().mealFor(what.rank());
                 long hungry = full || !colony.isHungerOn() ? what.left() : what.left() + frozenFor;
                 colony.brood().addInside(Brood.Young.larva(what.fed(), hungry, what.rank()));
             }

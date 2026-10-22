@@ -246,7 +246,7 @@ public class Nest {
                 return next;
             }
         }
-        return live ? colony.mound().findDigTarget(level, digger) : null;
+        return live ? colony.part(ColonyParts.MOUND).map(mound -> mound.findDigTarget(level, digger)).orElse(null) : null;
     }
 
     /** The garden rooms the colony wants dug now: the first, and one more for every few workers (the profile's {@code garden}). */
@@ -613,7 +613,7 @@ public class Nest {
             return colony.foragingHoles().mayOpen(level, pos);
         }
         return isSoil(level.getBlockState(pos)) || (pos.equals(center) && (isEntrancePlugged(level) && mayOpenEntrance(level) || isPlantInEntrance(level)))
-                || colony.mound().isClearJob(level, pos) || foodWays.isRunwayPlant(level, pos);
+                || colony.part(ColonyParts.MOUND).map(mound -> mound.isClearJob(level, pos)).orElse(false) || foodWays.isRunwayPlant(level, pos);
     }
 
     /**
@@ -647,7 +647,7 @@ public class Nest {
             spots.add(target.below());
         }
         // The mound's own soil in a shaft is cleared from below too (the old cap of a chimney that grew).
-        if (colony.mound().isClearJob(level, target) && level.getBlockState(target.below()).isAir()) {
+        if (colony.part(ColonyParts.MOUND).map(mound -> mound.isClearJob(level, target)).orElse(false) && level.getBlockState(target.below()).isAir()) {
             spots.add(target.below());
         }
         return spots;
@@ -764,7 +764,7 @@ public class Nest {
             if (layout != null) {
                 cells.addAll(layout.cells());
             }
-            cells.addAll(colony.mound().getGalleries(level)); // none for species without a mound
+            colony.part(ColonyParts.MOUND).ifPresent(mound -> cells.addAll(mound.getGalleries(level))); // none for species without a mound
         }
         for (NestPlan.ForagingTunnel tunnel : getForagingTunnels(level)) {
             cells.addAll(tunnel.tunnel());
@@ -916,7 +916,7 @@ public class Nest {
             }
             channels.addAll(casts.keySet());
             castGalleries = casts;
-            colony.mound().getParts(level).forEach((pos, part) -> {
+            colony.moundParts(level).forEach((pos, part) -> {
                 if (part == MoundPlan.Part.OPEN) {
                     // Only once roofed over: a young mound's shaft open to the sky is outside (termites coming home
                     // stopped in it, clinging to its walls above the plug, the user's bug of 2026-10-13).

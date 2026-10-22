@@ -10,6 +10,7 @@ import com.antcolonies.block.GiantTermitomycesBlock;
 import com.antcolonies.block.SeedPileBlock;
 import com.antcolonies.block.TermitomycesBlock;
 import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.ColonyParts;
 import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.registry.ModEntities;
 import com.antcolonies.registry.ModItems;
@@ -148,40 +149,40 @@ public class TermitomycesTests {
             }
             helper.assertTrue(c.nest().getGardenCells(level).size() >= 9, "the first garden is not dug: "
                     + c.nest().getGardenCells(level).size() + " cells");
-            c.mushrooms().setRainForTests(true);
+            c.part(ColonyParts.MUSHROOMS).orElseThrow().setRainForTests(true);
         });
-        helper.runAfterDelay(80, () -> colony[0].mushrooms().setRainForTests(false));
+        helper.runAfterDelay(80, () -> colony[0].part(ColonyParts.MUSHROOMS).orElseThrow().setRainForTests(false));
         helper.runAfterDelay(130, () -> {
             Colony c = colony[0];
-            helper.assertTrue(c.mushrooms().getLastFlush() == 0, "mushrooms came up with no comb in the garden: " + c.mushrooms().getLastFlush());
+            helper.assertTrue(c.part(ColonyParts.MUSHROOMS).orElseThrow().getLastFlush() == 0, "mushrooms came up with no comb in the garden: " + c.part(ColonyParts.MUSHROOMS).orElseThrow().getLastFlush());
             helper.assertTrue(mushroomsAround(level, helper).isEmpty(), "there are mushrooms round a mound without a garden");
             for (BlockPos cell : c.nest().getGardenCells(level)) {
                 level.setBlockAndUpdate(cell, ModBlocks.FUNGUS_COMB.get().defaultBlockState().setValue(SeedPileBlock.LAYERS, 4));
             }
-            helper.assertTrue(c.mushrooms().wanted(level) >= 5, "a garden with " + c.garden().countCombLayers(level)
-                    + " layers of comb should send up 5 or 6 mushrooms, not " + c.mushrooms().wanted(level));
-            c.mushrooms().setRainForTests(true);
+            helper.assertTrue(c.part(ColonyParts.MUSHROOMS).orElseThrow().wanted(level) >= 5, "a garden with " + c.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().countCombLayers(level)
+                    + " layers of comb should send up 5 or 6 mushrooms, not " + c.part(ColonyParts.MUSHROOMS).orElseThrow().wanted(level));
+            c.part(ColonyParts.MUSHROOMS).orElseThrow().setRainForTests(true);
         });
-        helper.runAfterDelay(180, () -> colony[0].mushrooms().setRainForTests(false));
+        helper.runAfterDelay(180, () -> colony[0].part(ColonyParts.MUSHROOMS).orElseThrow().setRainForTests(false));
         helper.runAfterDelay(230, () -> {
             Colony c = colony[0];
             List<BlockPos> mushrooms = mushroomsAround(level, helper);
-            helper.assertTrue(c.mushrooms().getLastFlush() >= 4, "too few mushrooms came up after the rain: " + c.mushrooms().getLastFlush()
-                    + " of " + c.mushrooms().wanted(level));
-            helper.assertTrue(mushrooms.size() == c.mushrooms().getLastFlush(), mushrooms.size() + " mushrooms round the mound, but "
-                    + c.mushrooms().getLastFlush() + " came up");
+            helper.assertTrue(c.part(ColonyParts.MUSHROOMS).orElseThrow().getLastFlush() >= 4, "too few mushrooms came up after the rain: " + c.part(ColonyParts.MUSHROOMS).orElseThrow().getLastFlush()
+                    + " of " + c.part(ColonyParts.MUSHROOMS).orElseThrow().wanted(level));
+            helper.assertTrue(mushrooms.size() == c.part(ColonyParts.MUSHROOMS).orElseThrow().getLastFlush(), mushrooms.size() + " mushrooms round the mound, but "
+                    + c.part(ColonyParts.MUSHROOMS).orElseThrow().getLastFlush() + " came up");
             BlockPos entrance = c.nest().getEntrance();
             for (BlockPos cell : mushrooms) {
                 helper.assertTrue(TermitomycesBlock.isGround(level.getBlockState(cell.below())), "a mushroom stands on " + level.getBlockState(cell.below()));
                 helper.assertTrue(level.canSeeSky(cell), "a mushroom came up under cover at " + cell.toShortString());
-                helper.assertTrue(!c.mound().getParts(level).containsKey(cell) && !c.nest().isInside(level, cell),
+                helper.assertTrue(!c.part(ColonyParts.MOUND).orElseThrow().getParts(level).containsKey(cell) && !c.nest().isInside(level, cell),
                         "a mushroom came up where the termites build or live at " + cell.toShortString());
                 double distance = Math.sqrt(Math.pow(cell.getX() - entrance.getX(), 2) + Math.pow(cell.getZ() - entrance.getZ(), 2));
                 helper.assertTrue(distance <= 13.0, "a mushroom came up too far out: " + distance);
             }
             // Giants sent up on purpose (as the command does) grow into giants three blocks tall.
             int giantsBefore = (int) mushrooms.stream().filter(cell -> level.getBlockState(cell).getValue(TermitomycesBlock.GIANT)).count();
-            int giants = c.mushrooms().sprout(level, 3, true);
+            int giants = c.part(ColonyParts.MUSHROOMS).orElseThrow().sprout(level, 3, true);
             helper.assertTrue(giants > 0, "no giant mushroom found a spot");
             int grown = 0;
             for (BlockPos cell : mushroomsAround(level, helper)) {

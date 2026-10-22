@@ -108,6 +108,20 @@ public class Brood {
         return colony.nest().getNurseryCells(level).contains(pos) || colony.nest().getGardenCells(level).contains(pos);
     }
 
+    /**
+     * How much a larva (or nymph) of this kind eats before it grows up: the profile's larva meal, or the bigger meal of
+     * the soldier it is growing into (in a colony with soldiers, see {@link Soldiers#mealFor}).
+     */
+    public int mealFor(@Nullable TermiteSoldierEntity.Rank rank) {
+        return colony.part(ColonyParts.SOLDIERS).map(soldiers -> soldiers.mealFor(rank)).orElse(colony.profile().brood().larvaMeal());
+    }
+
+    /** The kind of soldier a new nymph should grow into, or null: soldiers enough, or a species without them (see {@link Soldiers#rankForNewNymph}). */
+    @Nullable
+    public TermiteSoldierEntity.Rank soldierWanted(Level level) {
+        return colony.part(ColonyParts.SOLDIERS).map(soldiers -> soldiers.rankForNewNymph(level)).orElse(null);
+    }
+
     /** What an egg of this colony hatches into: an ant larva, or a termite nymph (a small pale termite). */
     private EntityType<AntLarvaEntity> youngType() {
         return colony.getSpecies().equals(Species.MACROTERMES) ? ModEntities.TERMITE_NYMPH.get() : ModEntities.ANT_LARVA.get();
@@ -118,11 +132,11 @@ public class Brood {
      * the nymph one that grows into a soldier (see {@link Soldiers#rankForNewNymph}).
      */
     public boolean hatchEgg(ServerLevel level, AntEggEntity egg) {
-        TermiteSoldierEntity.Rank rank = colony.soldiers().rankForNewNymph(level);
+        TermiteSoldierEntity.Rank rank = soldierWanted(level);
         AntLarvaEntity larva = new AntLarvaEntity(youngType(), level);
         larva.setColonyId(id);
         larva.setSoldierRank(rank);
-        larva.setMeal(colony.soldiers().mealFor(rank));
+        larva.setMeal(mealFor(rank));
         larva.moveTo(egg.getX(), egg.getY(), egg.getZ(), egg.getYRot(), 0.0F);
         level.addFreshEntity(larva);
         egg.discard();
@@ -133,7 +147,7 @@ public class Brood {
     public AntLarvaEntity spawnLarva(Level level, double x, double y, double z) {
         AntLarvaEntity larva = new AntLarvaEntity(youngType(), level);
         larva.setColonyId(id);
-        larva.setMeal(colony.soldiers().mealFor(null));
+        larva.setMeal(mealFor(null));
         larva.moveTo(x, y, z, colony.random().nextFloat() * 360.0F, 0.0F);
         level.addFreshEntity(larva);
         return larva;
@@ -199,7 +213,7 @@ public class Brood {
         int best = -1;
         for (int i = 0; i < inside.size(); i++) {
             Young young = inside.get(i);
-            if (young.isEgg() || young.fed() >= colony.soldiers().mealFor(young.rank())) {
+            if (young.isEgg() || young.fed() >= mealFor(young.rank())) {
                 continue;
             }
             if (best < 0 || young.fed() < inside.get(best).fed()
@@ -242,7 +256,7 @@ public class Brood {
             } else {
                 AntLarvaEntity larva = spawnLarva(level, at.x, at.y, at.z);
                 larva.setSoldierRank(young.rank());
-                larva.setMeal(colony.soldiers().mealFor(young.rank()));
+                larva.setMeal(mealFor(young.rank()));
                 larva.setFed(young.fed());
                 larva.setLastFed(now - young.left());
             }
@@ -302,7 +316,7 @@ public class Brood {
         }
         for (Young young : inside) {
             if (!young.isEgg()) {
-                hunger += Math.max(0, colony.soldiers().mealFor(young.rank()) - young.fed());
+                hunger += Math.max(0, mealFor(young.rank()) - young.fed());
             }
         }
         return hunger;
@@ -321,10 +335,10 @@ public class Brood {
             return hatchSoldier(level, larva, rank);
         }
         if (colony.getCount(WorkerAntEntity.CASTE) >= colony.profile().colony().maxWorkers()) {
-            TermiteSoldierEntity.Rank wanted = colony.soldiers().rankForNewNymph(level);
+            TermiteSoldierEntity.Rank wanted = soldierWanted(level);
             if (wanted != null) {
                 larva.setSoldierRank(wanted);
-                larva.setMeal(colony.soldiers().mealFor(wanted));
+                larva.setMeal(mealFor(wanted));
             }
             return false;
         }

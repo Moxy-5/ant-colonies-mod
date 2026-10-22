@@ -381,7 +381,7 @@ public class Galleries {
                 list.add(tunnel.tunnel().hole());
             }
         }
-        list.removeIf(hole -> colony.closedHoles().isClosed(level, hole));
+        list.removeIf(hole -> ClosedHoles.isClosedIn(colony, level, hole));
         return list;
     }
 
@@ -658,7 +658,7 @@ public class Galleries {
         }
         List<BlockPos> from = new ArrayList<>();
         for (NestPlan.ForagingTunnel tunnel : colony.foragingHoles().tunnels(level)) {
-            if (ForagingHoles.isDug(level, tunnel) && !colony.closedHoles().isClosed(level, tunnel.hole())) {
+            if (ForagingHoles.isDug(level, tunnel) && !ClosedHoles.isClosedIn(colony, level, tunnel.hole())) {
                 from.add(tunnel.hole());
             }
         }
@@ -705,7 +705,7 @@ public class Galleries {
         });
         stopped.addAll(atFood(level));
         for (Tip tip : tips) {
-            if (colony.closedHoles().isClosed(level, tip.way().hole())) {
+            if (ClosedHoles.isClosedIn(colony, level, tip.way().hole())) {
                 stopped.add(tip.way().hole()); // (brain step 4g: no tip grows on from where the colony was attacked)
             }
             if (yieldsAhead(level, tip)) {
@@ -757,7 +757,7 @@ public class Galleries {
      */
     private List<Tip> clearOfAttacks(ServerLevel level, Tip tip, List<Tip> grown) {
         DangerMap danger = colony.danger();
-        if (grown.isEmpty() || danger.isEmpty() || !colony.closedHoles().isOn()) {
+        if (grown.isEmpty() || danger.isEmpty() || !colony.part(ColonyParts.CLOSED_HOLES).map(ClosedHoles::isOn).orElse(false)) {
             return grown;
         }
         List<Tip> clear = new ArrayList<>();
@@ -1427,11 +1427,13 @@ public class Galleries {
                 return false; // never wall an insect in (docs/BUGS.md 8, 9, 24, 42)
             }
         }
-        HiddenTrips trips = colony.hiddenTrips();
-        for (java.util.UUID id : trips.travellers()) {
-            for (BlockPos cell : trips.runOf(id)) {
-                if (inside.contains(cell)) {
-                    return false;
+        HiddenTrips trips = colony.part(ColonyParts.HIDDEN_TRIPS).orElse(null);
+        if (trips != null) {
+            for (java.util.UUID id : trips.travellers()) {
+                for (BlockPos cell : trips.runOf(id)) {
+                    if (inside.contains(cell)) {
+                        return false;
+                    }
                 }
             }
         }
@@ -1807,7 +1809,7 @@ public class Galleries {
         List<BlockPos> candidates = new ArrayList<>();
         if (away) {
             for (BlockPos hole : dugHoles) {
-                if (!ways.isSpent(hole) && ways.runwayAt(hole) == null && !colony.closedHoles().isClosed(level, hole)) {
+                if (!ways.isSpent(hole) && ways.runwayAt(hole) == null && !ClosedHoles.isClosedIn(colony, level, hole)) {
                     candidates.add(hole);
                 }
             }
@@ -1818,7 +1820,7 @@ public class Galleries {
                 if (level.isLoaded(hole) && ForagingHoles.isDug(level, tunnel) && !ways.isSpent(hole) && ways.runwayAt(hole) == null
                         && !candidates.contains(hole)) {
                     dugHoles.add(hole.immutable());
-                    if (!colony.closedHoles().isClosed(level, hole)) { // (brain step 4g: an attacked hole has no turn)
+                    if (!ClosedHoles.isClosedIn(colony, level, hole)) { // (brain step 4g: an attacked hole has no turn)
                         candidates.add(hole);
                     }
                 }

@@ -5,6 +5,7 @@ import com.antcolonies.block.TermiteHoleBlock;
 import com.antcolonies.block.TermiteMoundBlock;
 import com.antcolonies.block.TermiteMouthBlock;
 import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.ColonyParts;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.species.Species;
 import com.antcolonies.entity.TermiteWorkerEntity;
@@ -53,7 +54,7 @@ public class TermiteMoundTests {
             // Both still needed on the 65 x 65 arenas (tried 2026-10-14: without either, the hay test failed in full runs
             // and passed alone): scouts and foragers stay in this test's arena, and only this test's enemies raise its alarm.
             found.foodMap().setTestArea(area.expandTowards(0, 16, 0)); // (taller: food up a slope may stand above the arena)
-            found.alarm().setTestArea(area);
+            found.part(ColonyParts.ALARM).orElseThrow().setTestArea(area);
         }
         return found;
     }

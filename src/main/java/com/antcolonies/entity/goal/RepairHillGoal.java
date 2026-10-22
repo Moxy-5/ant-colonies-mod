@@ -6,7 +6,9 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.colony.ColonyParts;
 import com.antcolonies.colony.ColonyRole;
+import com.antcolonies.colony.Hill;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.registry.ModBlocks;
 
@@ -59,14 +61,15 @@ public class RepairHillGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        if (colony == null || !colony.hill().needsHillRepair(level)) {
+        Hill hill = colony == null ? null : colony.part(ColonyParts.HILL).orElse(null);
+        if (hill == null || !hill.needsHillRepair(level)) {
             return false;
         }
-        soilSpot = colony.hill().getRepairSoilSpot();
+        soilSpot = hill.getRepairSoilSpot();
         if (errand.isLeftAlone(soilSpot)) {
             return false;
         }
-        colony.hill().claimHillRepair(level, ant.getUUID());
+        hill.claimHillRepair(level, ant.getUUID());
         return true;
     }
 

@@ -261,7 +261,7 @@ public class FieldLife {
         returnedNow = 0;
         placedNow = 0;
         boolean changed = forageWith(level, foragers);
-        colony.door().numbersSecond(level, foragers, returnedNow, placedNow);
+        colony.part(ColonyParts.DOOR).ifPresent(door -> door.numbersSecond(level, foragers, returnedNow, placedNow));
         return changed;
     }
 
@@ -273,14 +273,14 @@ public class FieldLife {
         out = 0;
         boolean alone = colony.foodMap().searchesAlone();
         if (alone) {
-            colony.spots().trimHeld(foragers); // (fewer forager numbers than spots held: some died or came out as real ones)
+            colony.part(ColonyParts.FORAGER_SPOTS).ifPresent(spots -> spots.trimHeld(foragers)); // (fewer forager numbers than spots held: some died or came out as real ones)
         }
         if (foragers <= 0 || known.isEmpty()) {
             progress.clear();
             return false;
         }
         boolean outside = colony.isForagingTime(level);
-        if (!outside && (alone || !colony.keepsASchedule() || colony.alarm().keepsEveryoneIn(level))) {
+        if (!outside && (alone || !colony.keepsASchedule() || colony.part(ColonyParts.ALARM).map(alarm -> alarm.keepsEveryoneIn(level)).orElse(false))) {
             progress.clear();
             return false; // the alarm keeps everyone in (searching alone: nothing to eat from inside)
         }
@@ -314,7 +314,7 @@ public class FieldLife {
         }
         plants.sort(Comparator.comparingDouble((Map.Entry<BlockPos, Plant> entry) -> -worth.get(entry.getKey())));
         List<Vec3> eyes = colony.population().viewersInSight(level);
-        double free = colony.door().numbersFree(level, foragers);
+        double free = colony.part(ColonyParts.DOOR).map(door -> door.numbersFree(level, foragers)).orElse((double) foragers);
         int worked = 0;
         List<BlockPos> usedUp = new ArrayList<>();
         for (Map.Entry<BlockPos, Plant> entry : plants) {
@@ -409,7 +409,7 @@ public class FieldLife {
             food.countIn(false);
             colony.ledger().addStore(1);
             returnedNow++;
-            colony.trunkTrails().tripByNumbers(level, pos); // their trip out and back wears the trail too
+            colony.part(ColonyParts.TRUNK_TRAILS).ifPresent(trunk -> trunk.tripByNumbers(level, pos)); // their trip out and back wears the trail too
             owed.put(pos, now);
             colony.away().note(level, AwayReport.What.FORAGED, 1);
             changedNow = true;
@@ -451,7 +451,8 @@ public class FieldLife {
      * searching they are out and bring nothing home (they come home with food, not empty: the user's decision).
      */
     private void forageAlone(ServerLevel level, int foragers) {
-        SpeciesProfile.SearchNumbers search = colony.spots().settings().orElse(null);
+        ForagerSpots spots = colony.part(ColonyParts.FORAGER_SPOTS).orElse(null);
+        SpeciesProfile.SearchNumbers search = spots == null ? null : spots.settings().orElse(null);
         if (search == null) {
             return;
         }
@@ -459,19 +460,19 @@ public class FieldLife {
         List<SpeciesProfile.PlantFood> kinds = colony.profile().food().plants();
         FoodStore food = colony.food();
         List<Vec3> eyes = colony.population().viewersInSight(level);
-        double free = colony.door().numbersFree(level, foragers);
+        double free = colony.part(ColonyParts.DOOR).map(door -> door.numbersFree(level, foragers)).orElse((double) foragers);
         int worked = 0;
         int wander = search.wander();
         List<BlockPos> usedUp = new ArrayList<>();
-        for (ForagerSpots.Held spot : new ArrayList<>(colony.spots().held())) {
+        for (ForagerSpots.Held spot : new ArrayList<>(spots.held())) {
             if (free <= 0 || roomNow <= 0) {
                 break;
             }
-            if (!colony.patrol().isOpen(level, spot.pos())) {
+            if (!colony.part(ColonyParts.PATROL).map(patrol -> patrol.isOpen(level, spot.pos())).orElse(true)) {
                 continue; // that way is shut today: its holders stay in
             }
             if (colony.danger().avoids(level, spot.pos())) {
-                colony.spots().dropHeld(spot); // remembered danger there (brain step 4g): its holders search elsewhere
+                spots.dropHeld(spot); // remembered danger there (brain step 4g): its holders search elsewhere
                 continue;
             }
             List<BlockPos> near = new ArrayList<>();
@@ -482,7 +483,7 @@ public class FieldLife {
                 }
             }
             if (near.isEmpty()) {
-                colony.spots().emptyHeld(spot); // nothing left there: its holders search again
+                spots.emptyHeld(spot); // nothing left there: its holders search again
                 continue;
             }
             near.sort(Comparator.comparingDouble(pos -> -FoodStore.worth(kinds.get(known.get(pos).kind()).pieces() - food.getPiecesCut(pos),
@@ -498,7 +499,7 @@ public class FieldLife {
             }
         }
         forgetUsedUp(level, usedUp);
-        int searchers = (int) Math.floor(Math.min(free, Math.max(0, foragers - colony.spots().holders())));
+        int searchers = (int) Math.floor(Math.min(free, Math.max(0, foragers - spots.holders())));
         if (searchers <= 0) {
             searchProgress = 0;
             return;
@@ -506,11 +507,11 @@ public class FieldLife {
         placedNow += searchers; // (out searching: they come home with food, not empty)
         out += searchers;
         int range = colony.foragingRadius();
-        double distance = Math.max(colony.spots().numbersStartOut(), range / 3.0);
+        double distance = Math.max(spots.numbersStartOut(), range / 3.0);
         searchProgress += searchers * 20.0 / (SEARCH_TICKS + 2.0 * distance * TICKS_PER_BLOCK);
         for (int searches = 0; searchProgress >= 1 && searches < SEARCHES_PER_SECOND; searches++) {
             searchProgress--;
-            searchOnce(level, search, range);
+            searchOnce(level, spots, search, range);
         }
         searchProgress = Math.min(searchProgress, 1.0);
     }
@@ -523,11 +524,11 @@ public class FieldLife {
      * block with each search that finds nothing and shrinks {@code drift_blocks} with each find (my picks): in rich land
      * it stays near home, where food runs out it stretches to the range plus the stretch, and near food is still found.
      */
-    private void searchOnce(ServerLevel level, SpeciesProfile.SearchNumbers search, int range) {
+    private void searchOnce(ServerLevel level, ForagerSpots spots, SpeciesProfile.SearchNumbers search, int range) {
         BlockPos middle = colony.getCenter();
         var random = colony.random();
-        TrunkTrails trails = colony.trunkTrails();
-        TrunkTrails.Trail trail = trails.keepsTrails() && random.nextInt(5) != 0 ? trails.pickForSearch(level, random) : null;
+        TrunkTrails trails = colony.part(ColonyParts.TRUNK_TRAILS).orElse(null);
+        TrunkTrails.Trail trail = trails != null && trails.keepsTrails() && random.nextInt(5) != 0 ? trails.pickForSearch(level, random) : null;
         double angle;
         double near;
         double far;
@@ -541,7 +542,7 @@ public class FieldLife {
             far = Math.max(near, range / 2.0); // the inner half of the range
         }
         int most = range + search.stretch();
-        far = Math.min(Math.max(far, colony.spots().numbersStartOut()), most);
+        far = Math.min(Math.max(far, spots.numbersStartOut()), most);
         near = Math.min(near, far);
         double distance = near + random.nextDouble() * (far - near);
         BlockPos centre = new BlockPos(middle.getX() + (int) Math.floor(Math.cos(angle) * distance), middle.getY(),
@@ -562,25 +563,26 @@ public class FieldLife {
                 bestDistance = away;
             }
         }
-        int band = Math.max(colony.spots().numbersStartOut(), range / 2);
+        int band = Math.max(spots.numbersStartOut(), range / 2);
         if (best != null) {
-            colony.spots().addHeld(best, 1, 0);
+            spots.addHeld(best, 1, 0);
             // A rich patch draws more of them out (recruiting, see Recruits), as many as are free to go.
-            int more = colony.recruits().numbersCalled(best, rememberedPatch(best));
-            int free = foragersInside(level) - colony.spots().holders();
+            Recruits recruits = colony.part(ColonyParts.RECRUITS).orElse(null);
+            int more = recruits == null ? 0 : recruits.numbersCalled(best, rememberedPatch(best));
+            int free = foragersInside(level) - spots.holders();
             if (more > 0 && free > 0) {
-                colony.spots().addHeld(best, Math.min(more, free), 0);
+                spots.addHeld(best, Math.min(more, free), 0);
             }
-            colony.spots().setNumbersStartOut(band - search.driftBlocks()); // a find: the band settles back
+            spots.setNumbersStartOut(band - search.driftBlocks()); // a find: the band settles back
         } else {
-            colony.spots().setNumbersStartOut(Math.min(band + 1, most)); // nothing: the band reaches a little farther
+            spots.setNumbersStartOut(Math.min(band + 1, most)); // nothing: the band reaches a little farther
         }
 
     }
 
     /** The food the colony remembers in the patch round {@code at}: the pieces left on remembered plants that count for recruiting. */
     private int rememberedPatch(BlockPos at) {
-        SpeciesProfile.RecruitNumbers numbers = colony.recruits().settings().orElse(null);
+        SpeciesProfile.RecruitNumbers numbers = colony.part(ColonyParts.RECRUITS).flatMap(Recruits::settings).orElse(null);
         if (numbers == null) {
             return 0;
         }

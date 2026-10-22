@@ -180,7 +180,7 @@ public class FoodStore {
      * (the ant then brings the seed straight to the mill, so nothing is put down without a store).
      */
     public boolean wantsSeeds(ServerLevel level) {
-        return hasStoreRoom(level) || colony.bakery().needsBread(level);
+        return hasStoreRoom(level) || colony.part(ColonyParts.BAKERY).map(bakery -> bakery.needsBread(level)).orElse(false);
     }
 
     /** Whether the food store has a place left that no seed on its way in is holding. */
@@ -312,7 +312,7 @@ public class FoodStore {
                 continue;
             }
             double trip = tripLength(pos, exits.isEmpty() ? List.of(center) : exits);
-            double byTrail = colony.trunkTrails().walkTo(pos); // (a cleared trail walks quicker: worth the walk)
+            double byTrail = colony.part(ColonyParts.TRUNK_TRAILS).map(trunk -> trunk.walkTo(pos)).orElse(-1.0); // (a cleared trail walks quicker: worth the walk)
             double worth = worth(plant.pieces() - getPiecesCut(pos), byTrail >= 0 ? Math.min(trip, byTrail) : trip, pos.distSqr(near));
             if (worth > bestWorth) {
                 best = pos;
@@ -360,7 +360,7 @@ public class FoodStore {
             int radius = colony.searchReach(); // (out to where a searcher's drift may take it)
             int inner = Math.min(radius, food().radius() + food().search().map(SpeciesProfile.SearchNumbers::stretch).orElse(0));
             boolean galleries = colony.nest().galleries().range() > 0;
-            if (!colony.trunkTrails().keepsTrails() && !galleries) {
+            if (!colony.part(ColonyParts.TRUNK_TRAILS).map(TrunkTrails::keepsTrails).orElse(false) && !galleries) {
                 inner = radius;
             }
             for (int x = center.getX() - inner; x <= center.getX() + inner; x++) {
@@ -385,7 +385,8 @@ public class FoodStore {
                         }
                     }
                 }
-                for (int[] column : colony.trunkTrails().columnsNear(side, radius)) {
+                int trailSide = side;
+                for (int[] column : colony.part(ColonyParts.TRUNK_TRAILS).map(trunk -> trunk.columnsNear(trailSide, radius)).orElse(List.of())) {
                     scanOuter(level, center.getX() + column[0], center.getZ() + column[1], inner, done);
                 }
                 AABB out = new AABB(center).inflate(radius + 2, 16, radius + 2);
@@ -575,8 +576,8 @@ public class FoodStore {
         BlockPos pos = grass.immutable();
         plantClaims.remove(ant);
         colony.trails().visited(level, pos, ant);
-        colony.spots().found(ant, pos); // it found food here: its spot now (site fidelity, species that search alone)
-        colony.recruits().found(level, ant, pos); // a rich patch: it lays a scent line home and calls nestmates out
+        colony.part(ColonyParts.FORAGER_SPOTS).ifPresent(spots -> spots.found(ant, pos)); // it found food here: its spot now (site fidelity, species that search alone)
+        colony.part(ColonyParts.RECRUITS).ifPresent(recruits -> recruits.found(level, ant, pos)); // a rich patch: it lays a scent line home and calls nestmates out
         BlockState before = level.getBlockState(pos);
         SpeciesProfile.PlantFood plant = food().plantFor(before);
         if (plant != null && before.getBlock() instanceof EatenInStages eaten) {
@@ -883,7 +884,7 @@ public class FoodStore {
         BlockState less = oneLayerLess(state);
         level.setBlock(pile, less, 3);
         if (less.isAir() && state.getBlock() instanceof FungusCombBlock) {
-            colony.garden().loseNodules(state.getValue(FungusCombBlock.NODULES));
+            colony.part(ColonyParts.FUNGUS_GARDEN).ifPresent(garden -> garden.loseNodules(state.getValue(FungusCombBlock.NODULES)));
         }
     }
 
@@ -1019,7 +1020,7 @@ public class FoodStore {
         food = Math.max(0, food - 1);
         if (rich) {
             richSeeds--;
-            colony.bakery().addRichMiller(ant);
+            colony.part(ColonyParts.BAKERY).ifPresent(bakery -> bakery.addRichMiller(ant));
         }
         return rich ? new ItemStack(Items.PUMPKIN_SEEDS) : cutPiece();
     }
@@ -1045,7 +1046,7 @@ public class FoodStore {
             return ItemStack.EMPTY;
         }
         ItemStack seed = takeSeedAt(level, pile, ant, false);
-        colony.bakery().removeRichMiller(ant); // eaten, not milled
+        colony.part(ColonyParts.BAKERY).ifPresent(bakery -> bakery.removeRichMiller(ant)); // eaten, not milled
         if (!seed.isEmpty()) {
             seedsEaten++;
         }

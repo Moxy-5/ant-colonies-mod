@@ -68,6 +68,11 @@ easiest to stop bugs from happening and push updates easier"); so these are my p
    the check that no part runs for a species that did not list it.
 3. **Ask before use.** The callers moved to the yes/no, a batch of goals or parts at a time, a category's tests after
    each batch; the parts' own "do I apply to this species?" checks go once nothing needs them.
+   **BUILT 2026-10-22** (same branch; details in `docs/HISTORY.md`): `Colony.part(type)` / `has(type)`, the constructor
+   makes only the shared and listed parts, the 15 getters gone (about 450 calls moved), each answer without the part
+   the one the part gave a species without its numbers. Only `FungusGarden.exists()` was a pure species check (gone);
+   the `numbers() == null` checks read the species file's numbers and stay. Old saves: an unlisted part's keys come
+   from a throwaway part made only while loading. Full run 139 of 141 (the two old seed flakes, both pass alone).
 4. **Colony news (my pick for the Matabele ant):** a small shared way for parts to hear what happened without knowing
    who else is listening: "a member was hurt or killed here", "food found here", "a hole opened or closed", "a
    neighbour met". Today such things are wired by hand from part to part (the danger map, closed holes, neighbours,

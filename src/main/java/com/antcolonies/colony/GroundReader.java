@@ -40,7 +40,7 @@ public final class GroundReader implements TunnelRoute.Ground {
     public GroundReader(Level level, Colony colony, Set<BlockPos> keepOut) {
         this.level = level;
         this.colony = colony;
-        this.mound = colony.mound().getParts(level);
+        this.mound = colony.moundParts(level);
         this.keepOut = keepOut;
     }
 

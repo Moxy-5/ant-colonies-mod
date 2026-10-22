@@ -7,7 +7,9 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.colony.ColonyParts;
 import com.antcolonies.colony.ColonyRole;
+import com.antcolonies.colony.Mound;
 import com.antcolonies.colony.MoundGrowth;
 import com.antcolonies.colony.MoundReach;
 import com.antcolonies.entity.AbstractAntEntity;
@@ -42,6 +44,9 @@ public class ShapeMoundGoal extends Goal {
     private final Errand<BlockPos> errand;
     @Nullable
     private Colony colony;
+    /** Its mound (asked once in {@link #canUse}: only a species that lists the mound shapes one). */
+    @Nullable
+    private Mound mound;
     @Nullable
     private BlockPos spot;
     private int ticks;
@@ -60,12 +65,13 @@ public class ShapeMoundGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        if (colony == null || !colony.mound().isActive()) {
+        mound = colony == null ? null : colony.part(ColonyParts.MOUND).orElse(null);
+        if (mound == null || !mound.isActive()) {
             return false;
         }
-        spot = colony.mound().shaping().pickShapeJob(level, ant);
+        spot = mound.shaping().pickShapeJob(level, ant);
         if (spot != null && (errand.isLeftAlone(spot) || !walkThere())) {
-            colony.mound().shaping().releaseShapeJob(ant.getUUID());
+            mound.shaping().releaseShapeJob(ant.getUUID());
             spot = null;
         }
         return spot != null;
@@ -73,10 +79,10 @@ public class ShapeMoundGoal extends Goal {
 
     /** Where it can do the job from: beside the soil for carving, else by the building rules. */
     private Predicate<Foothold> workFrom(ServerLevel level, BlockPos target) {
-        if (colony.mound().shaping().shapeJobAt(level, target) == MoundGrowth.Job.CARVE) {
+        if (mound.shaping().shapeJobAt(level, target) == MoundGrowth.Job.CARVE) {
             return at -> MoundReach.canCarveFrom(level, colony, at, target);
         }
-        boolean windows = colony.mound().mayOpenWindows(level);
+        boolean windows = mound.mayOpenWindows(level);
         return at -> MoundReach.canBuildFrom(level, colony, at, target, windows);
     }
 
@@ -91,7 +97,7 @@ public class ShapeMoundGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        return colony != null && spot != null && !ant.hasFullMandibles() && ticks < GIVE_UP_TICKS;
+        return colony != null && mound != null && spot != null && !ant.hasFullMandibles() && ticks < GIVE_UP_TICKS;
     }
 
     @Override
@@ -104,20 +110,21 @@ public class ShapeMoundGoal extends Goal {
     @Override
     public void stop() {
         errand.stop();
-        if (colony != null) {
-            colony.mound().shaping().releaseShapeJob(ant.getUUID());
+        if (mound != null) {
+            mound.shaping().releaseShapeJob(ant.getUUID());
         }
         spot = null;
         colony = null;
+        mound = null;
     }
 
     @Override
     public void tick() {
-        if (spot == null || colony == null || !(ant.level() instanceof ServerLevel level)) {
+        if (spot == null || colony == null || mound == null || !(ant.level() instanceof ServerLevel level)) {
             return;
         }
         ticks++;
-        if (colony.mound().shaping().shapeJobAt(level, spot) == null) {
+        if (mound.shaping().shapeJobAt(level, spot) == null) {
             spot = null; // done by someone else, or not wanted any more
             return;
         }
@@ -138,7 +145,7 @@ public class ShapeMoundGoal extends Goal {
                     spot.getX() + 0.5, spot.getY() + 0.5, spot.getZ() + 0.5, 3, 0.2, 0.2, 0.2, 0.05);
             level.playSound(null, spot, here.getSoundType().getHitSound(), SoundSource.BLOCKS, 0.3F, 1.3F);
         }
-        if (work >= WORK_TICKS && colony.mound().shaping().shape(level, spot, at.cell())) {
+        if (work >= WORK_TICKS && mound.shaping().shape(level, spot, at.cell())) {
             ColonyManager.get(level).markChanged();
             spot = null;
         }

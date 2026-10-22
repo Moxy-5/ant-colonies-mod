@@ -9,6 +9,7 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.colony.ColonyParts;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.colony.ForagerSpots;
 
@@ -125,7 +126,7 @@ public class ScoutGoal extends Goal {
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
         if (colony == null || !colony.foodMap().findsByLooking() || !colony.isForagingTime(level) || !colony.food().wantsSeeds(level)
-                || !colony.door().mayGo(level, ant)) {
+                || !colony.part(ColonyParts.DOOR).map(door -> door.mayGo(level, ant)).orElse(true)) {
             return false; // (a searcher waits for the homecomers' touches like any forager, see colony.Door)
         }
         alone = colony.foodMap().searchesAlone();
@@ -142,7 +143,7 @@ public class ScoutGoal extends Goal {
             spot = pickSpot(level, colony);
         }
         if (spot != null) {
-            colony.door().setOut(level, ant);
+            colony.part(ColonyParts.DOOR).ifPresent(door -> door.setOut(level, ant));
         }
         return spot != null;
     }
@@ -155,12 +156,17 @@ public class ScoutGoal extends Goal {
         UUID id = ant.getUUID();
         if (colony.foodMap().hasFound(id)) {
             BlockPos grass = colony.food().findGrass(level, ant.blockPosition(), Set.of(), id);
-            if (grass != null && !colony.recruits().passesBy(id, grass)) {
+            if (grass != null && !passesBy(id, grass)) {
                 return true;
             }
         }
         ItemEntity seed = colony.food().findSeed(level, ant.blockPosition(), Set.of());
-        return seed != null && !colony.recruits().passesBy(id, seed.blockPosition());
+        return seed != null && !passesBy(id, seed.blockPosition());
+    }
+
+    /** Whether this recruit passes the food by on its way to its patch (never in a colony without recruiting). */
+    private boolean passesBy(UUID id, BlockPos food) {
+        return colony.part(ColonyParts.RECRUITS).map(recruits -> recruits.passesBy(id, food)).orElse(false);
     }
 
     /** A random open spot on the ground in the colony's food area, outside the nest and the mound; null if none was hit. */
@@ -186,12 +192,13 @@ public class ScoutGoal extends Goal {
      */
     @Nullable
     private BlockPos planSearch(ServerLevel level, Colony colony) {
-        SpeciesProfile.SearchNumbers search = colony.spots().settings().orElse(null);
+        ForagerSpots spots = colony.part(ColonyParts.FORAGER_SPOTS).orElse(null);
+        SpeciesProfile.SearchNumbers search = spots == null ? null : spots.settings().orElse(null);
         if (search == null) {
             return null;
         }
         BlockPos middle = colony.getCenter();
-        BlockPos own = colony.spots().spotOf(ant.getUUID());
+        BlockPos own = spots.spotOf(ant.getUUID());
         if (own != null && level.hasChunkAt(own) && colony.mayForageAt(level, own) && colony.foodMap().mayScout(own)) {
             atOwnSpot = true;
             angle = Math.atan2(own.getZ() - middle.getZ(), own.getX() - middle.getX());
@@ -203,13 +210,13 @@ public class ScoutGoal extends Goal {
         atOwnSpot = false;
         int range = colony.foragingRadius();
         // It came home empty last time: another way this time.
-        ForagerSpots.Lead failed = colony.spots().leadOf(ant.getUUID());
-        TrunkTrails trails = colony.trunkTrails();
+        ForagerSpots.Lead failed = spots.leadOf(ant.getUUID());
+        TrunkTrails trails = colony.part(ColonyParts.TRUNK_TRAILS).orElse(null);
         // A young colony's foragers spread out every way: real Pogonomyrmex trunk trails only form as the colony grows
         // (Gordon), so a small colony's searchers pick a new way each trip instead of following its few trails.
-        boolean young = colony.door().isSmallColony(level);
+        boolean young = colony.part(ColonyParts.DOOR).map(door -> door.isSmallColony(level)).orElse(false);
         for (int tries = 0; tries < 8; tries++) {
-            TrunkTrails.Trail trail = !young && trails.keepsTrails() && ant.getRandom().nextInt(NEW_WAY) != 0
+            TrunkTrails.Trail trail = !young && trails != null && trails.keepsTrails() && ant.getRandom().nextInt(NEW_WAY) != 0
                     ? trails.pickForSearch(level, ant.getRandom()) : null;
             double base;
             if (trail != null && failed != null && Math.abs(Mth.wrapDegrees(Math.toDegrees(trail.angle() - failed.angle()))) < Math.toDegrees(ANOTHER_WAY)) {
@@ -272,7 +279,8 @@ public class ScoutGoal extends Goal {
         if (Math.abs(cell.getY() - center.getY()) > 6 || !level.getFluidState(cell).isEmpty()
                 || !level.getBlockState(cell).getCollisionShape(level, cell).isEmpty()
                 || !level.getBlockState(below).isFaceSturdy(level, below, Direction.UP)
-                || colony.nest().isInside(level, cell) || colony.mound().getParts(level).containsKey(cell)) {
+                || colony.nest().isInside(level, cell)
+                || colony.part(ColonyParts.MOUND).map(mound -> mound.getParts(level).containsKey(cell)).orElse(false)) {
             return null;
         }
         return cell;
@@ -297,7 +305,8 @@ public class ScoutGoal extends Goal {
     }
 
     private int giveUpTicks() {
-        return colony == null ? GIVE_UP_TICKS : colony.spots().settings().map(SpeciesProfile.SearchNumbers::giveUpTicks).orElse(GIVE_UP_TICKS);
+        return colony == null ? GIVE_UP_TICKS : colony.part(ColonyParts.FORAGER_SPOTS).flatMap(ForagerSpots::settings)
+                .map(SpeciesProfile.SearchNumbers::giveUpTicks).orElse(GIVE_UP_TICKS);
     }
 
     @Override
@@ -313,8 +322,8 @@ public class ScoutGoal extends Goal {
         line = null;
         lineStuck = 0;
         if (alone && colony != null && spot != null && ant.level() instanceof ServerLevel level) {
-            colony.spots().setSearching(ant.getUUID(), true);
-            line = colony.recruits().lineFor(level, ant.getUUID());
+            colony.part(ColonyParts.FORAGER_SPOTS).ifPresent(spots -> spots.setSearching(ant.getUUID(), true));
+            line = colony.part(ColonyParts.RECRUITS).map(recruits -> recruits.lineFor(level, ant.getUUID())).orElse(null);
             if (line != null) {
                 lineAt = nearestPoint(line); // called out: along the finder's scent line, from where it meets it
                 if (ant.getNavigator().moveTo(line.get(lineAt), 1.0)) {
@@ -322,7 +331,7 @@ public class ScoutGoal extends Goal {
                 }
                 line = null; // no way onto the line from here: as any forager to its spot
             }
-            via = colony.trunkTrails().wayOut(level, spot);
+            via = colony.part(ColonyParts.TRUNK_TRAILS).map(trunk -> trunk.wayOut(level, spot)).orElse(null);
             if (via != null && flat(ant.blockPosition()) >= flat(via) - 1.0) {
                 via = null; // already out past where it would leave the trail
             }
@@ -357,15 +366,15 @@ public class ScoutGoal extends Goal {
         ant.getNavigator().stop();
         line = null;
         if (alone && colony != null) {
-            colony.recruits().tripOver(ant.getUUID()); // (got there and took food, or did not: it was told once)
-            colony.spots().setSearching(ant.getUUID(), false);
+            colony.part(ColonyParts.RECRUITS).ifPresent(recruits -> recruits.tripOver(ant.getUUID())); // (got there and took food, or did not: it was told once)
+            colony.part(ColonyParts.FORAGER_SPOTS).ifPresent(spots -> spots.setSearching(ant.getUUID(), false));
             boolean closing = !colony.isForagingTime(ant.level());
             boolean gaveUp = ticks >= giveUpTicks();
             if (!found && !ant.hasFullMandibles() && arrived && (closing || gaveUp)) {
                 // Home empty: its next search goes another way, from near the nest again.
-                colony.spots().cameHomeEmpty(ant.getUUID(), angle);
+                colony.part(ColonyParts.FORAGER_SPOTS).ifPresent(spots -> spots.cameHomeEmpty(ant.getUUID(), angle));
                 if (gaveUp) {
-                    colony.door().endTrip(ant); // its trip is over: it goes in and waits for touches again
+                    colony.part(ColonyParts.DOOR).ifPresent(door -> door.endTrip(ant)); // its trip is over: it goes in and waits for touches again
                 }
             }
         }
@@ -438,13 +447,14 @@ public class ScoutGoal extends Goal {
                 return;
             }
         }
-        SpeciesProfile.SearchNumbers search = colony.spots().settings().orElse(null);
+        ForagerSpots spots = colony.part(ColonyParts.FORAGER_SPOTS).orElse(null);
+        SpeciesProfile.SearchNumbers search = spots == null ? null : spots.settings().orElse(null);
         if (search == null) {
             return;
         }
         searched++;
         if (atOwnSpot && searched >= search.spotTicks()) {
-            colony.spots().emptyAtSpot(ant.getUUID()); // nothing at its spot this time
+            spots.emptyAtSpot(ant.getUUID()); // nothing at its spot this time
             atOwnSpot = false;
         }
         double drifted = search.drifted(from, searched, reachOfWay);

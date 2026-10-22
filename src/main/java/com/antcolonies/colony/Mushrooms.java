@@ -62,14 +62,19 @@ public class Mushrooms {
             int wanted = wanted(level);
             lastFlush = sprout(level, wanted, false);
             AntColoniesMod.LOGGER.info("[mushrooms] the rain ended at colony {}: {} of {} mushrooms came up (comb {} layers)",
-                    colony.getId(), lastFlush, wanted, colony.garden().countCombLayers(level));
+                    colony.getId(), lastFlush, wanted, combLayers(level));
         }
+    }
+
+    /** The layers of comb in the garden (none without one). */
+    private int combLayers(Level level) {
+        return colony.part(ColonyParts.FUNGUS_GARDEN).map(garden -> garden.countCombLayers(level)).orElse(0);
     }
 
     /** How many mushrooms the garden sends up after a rain now (0 if it is not healthy yet). */
     public int wanted(Level level) {
         SpeciesProfile.GardenNumbers numbers = numbers();
-        return numbers == null ? 0 : numbers.mushroomsFor(colony.garden().countCombLayers(level));
+        return numbers == null ? 0 : numbers.mushroomsFor(combLayers(level));
     }
 
     /** How many came up after the last rain since the colony was loaded, -1 if no rain has ended since. */
@@ -136,7 +141,7 @@ public class Mushrooms {
 
     /** A cell the termites use or are about to build in: the mound's plan, the nest, a foraging hole. */
     private boolean isTermiteSpace(Level level, BlockPos cell) {
-        return colony.mound().getParts(level).containsKey(cell) || colony.nest().isInside(level, cell)
+        return colony.moundParts(level).containsKey(cell) || colony.nest().isInside(level, cell)
                 || colony.foragingHoles().isHole(level, cell);
     }
 

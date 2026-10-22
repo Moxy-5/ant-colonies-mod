@@ -73,6 +73,11 @@ public class ClosedHoles {
         return numbers != null && numbers.closeHoles();
     }
 
+    /** Whether this hole of {@code colony} is closed now (never in a species that does not close its holes). */
+    static boolean isClosedIn(Colony colony, Level level, BlockPos hole) {
+        return colony.part(ColonyParts.CLOSED_HOLES).map(closed -> closed.isClosed(level, hole)).orElse(false);
+    }
+
     /** Whether this foraging hole is closed now: near an attack, its gallery running near one, or left for good. */
     public boolean isClosed(Level level, BlockPos hole) {
         if (!isOn()) {

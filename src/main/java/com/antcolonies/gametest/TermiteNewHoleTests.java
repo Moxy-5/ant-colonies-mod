@@ -7,6 +7,7 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.ColonyParts;
 import com.antcolonies.colony.FoodWays;
 import com.antcolonies.colony.ForagingHoles;
 import com.antcolonies.colony.Nest;
@@ -370,7 +371,7 @@ public class TermiteNewHoleTests {
             if (!scene.tick(colony)) {
                 return;
             }
-            com.antcolonies.colony.HiddenTrips trips = colony.hiddenTrips();
+            com.antcolonies.colony.HiddenTrips trips = colony.part(ColonyParts.HIDDEN_TRIPS).orElseThrow();
             long now = level.getGameTime();
             BlockPos center = colony.getCenter();
             int shortest = trips.shortest();
@@ -426,7 +427,7 @@ public class TermiteNewHoleTests {
                         loaded.addAll(trips.travellers());
                         Colony copy = Colony.load(colony.save());
                         com.antcolonies.colony.ColonyManager.get(level).replaceForTests(copy);
-                        copy.hiddenTrips().setOnForTests(true);
+                        copy.part(ColonyParts.HIDDEN_TRIPS).orElseThrow().setOnForTests(true);
                         AntColoniesMod.LOGGER.info("[hidden-test] tick {} {}: saved and loaded with {} travelling", helper.getTick(), clock.describe(), loaded.size());
                         stage[0] = 1;
                         stageAt[0] = helper.getTick();
@@ -535,7 +536,7 @@ public class TermiteNewHoleTests {
                 }
                 TermiteSoldierTests.digNestAtOnce(level, colony);
                 colony.population().addNewMembers(WorkerAntEntity.CASTE, now - 1000, 500);
-                colony.hiddenTrips().setOnForTests(hiddenTrips);
+                colony.part(ColonyParts.HIDDEN_TRIPS).orElseThrow().setOnForTests(hiddenTrips);
             });
         }
 
@@ -668,7 +669,7 @@ public class TermiteNewHoleTests {
             if (since[0] % 1000 == 0) {
                 AntColoniesMod.LOGGER.info("[new-hole-test] slope: dug {} of {}, hole {}, may open {}, foraging time {}{}", tunnel[0].tunnel().tunnel().stream().filter(c -> Nest.isDugOut(level, c)).count(),
                         tunnel[0].tunnel().tunnel().size(), level.getBlockState(hole), colony.foragingHoles().mayOpen(level, hole), colony.isForagingTime(level),
-                        colony.alarm().describe(level));
+                        colony.part(ColonyParts.ALARM).orElseThrow().describe(level));
                 java.util.List<BlockPos> gallery = tunnel[0].gallery() == null ? java.util.List.of() : tunnel[0].gallery();
                 BlockPos next = colony.nest().findDigTarget(level);
                 java.util.List<BlockPos> cells = tunnel[0].tunnel().tunnel();

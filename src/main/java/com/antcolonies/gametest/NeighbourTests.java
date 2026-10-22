@@ -9,6 +9,7 @@ import java.util.UUID;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.ColonyParts;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.Galleries;
 import com.antcolonies.colony.NestPlan;
@@ -93,17 +94,17 @@ public class NeighbourTests {
                 PopulationTests.digNestAtOnce(level, colony);
                 colony.population().setOnForTests(false);
                 colony.population().setViewersForTests(List.of());
-                colony.patrol().setOnForTests(false);
+                colony.part(ColonyParts.PATROL).orElseThrow().setOnForTests(false);
             }
             both[0].setAgeForTests(level, 10);
             both[1].setAgeForTests(level, 0);
             // The old colony's east trail, out 10 blocks.
             BlockPos west = both[0].getCenter();
             for (int i = 0; i < 9; i++) {
-                both[0].trunkTrails().setOut(level, new BlockPos(west.getX() + 10, groundY, west.getZ()));
+                both[0].part(ColonyParts.TRUNK_TRAILS).orElseThrow().setOut(level, new BlockPos(west.getX() + 10, groundY, west.getZ()));
             }
-            helper.assertTrue(both[0].trunkTrails().trails().size() == 1, "the old colony should have its east trail: "
-                    + both[0].trunkTrails().describe(level));
+            helper.assertTrue(both[0].part(ColonyParts.TRUNK_TRAILS).orElseThrow().trails().size() == 1, "the old colony should have its east trail: "
+                    + both[0].part(ColonyParts.TRUNK_TRAILS).orElseThrow().describe(level));
             // One worker of each halfway, a block apart.
             int half = (WEST + EAST) / 2;
             met[0] = workerOf(helper, both[0], half, ROW);
@@ -128,7 +129,7 @@ public class NeighbourTests {
             helper.assertTrue(!old.mayForageAt(level, past) && old.mayForageAt(level, shortOf) && old.mayForageAt(level, south),
                     "the old colony should yield past the meeting (" + toMeeting + " blocks east) only: " + old.neighbours().describe(level));
             // Its east trail's tip is held short of the meeting place, and no searcher goes out that trail.
-            TrunkTrails trails = old.trunkTrails();
+            TrunkTrails trails = old.part(ColonyParts.TRUNK_TRAILS).orElseThrow();
             for (int i = 0; i < 5; i++) {
                 trails.setOut(level, new BlockPos(w.getX() + toMeeting + 6, groundY, w.getZ()));
             }
@@ -160,7 +161,7 @@ public class NeighbourTests {
             young.neighbours().met(level, at, old.getId(), UUID.randomUUID());
             helper.assertTrue(!young.mayForageAt(level, westward), "4 meetings should make a new colony yield: " + young.neighbours().describe(level));
             // No new trail toward the neighbour (food short of the meeting, on its side), but one the other way.
-            TrunkTrails trails = young.trunkTrails();
+            TrunkTrails trails = young.part(ColonyParts.TRUNK_TRAILS).orElseThrow();
             for (int i = 0; i < 10; i++) {
                 trails.setOut(level, new BlockPos(e.getX() - 8, groundY, e.getZ()));
             }
@@ -231,7 +232,7 @@ public class NeighbourTests {
             for (Colony colony : both) {
                 TermiteMoundTests.colony(helper); // (keeps the food map and the alarm in the arena; the first colony only)
                 colony.foodMap().setTestArea(helper.getBounds().expandTowards(0, 16, 0));
-                colony.alarm().setTestArea(helper.getBounds());
+                colony.part(ColonyParts.ALARM).orElseThrow().setTestArea(helper.getBounds());
                 for (com.antcolonies.entity.TermiteWorkerEntity worker : TestIsolation.insectsOf(level, colony, com.antcolonies.entity.TermiteWorkerEntity.class)) {
                     worker.setGrownUpAt(now - colony.profile().worker().nurseUntilTicks() - 1000);
                 }

@@ -9,6 +9,7 @@ import java.util.Set;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.block.GramaGrassBlock;
 import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.ColonyParts;
 import com.antcolonies.colony.Hill;
 import com.antcolonies.colony.Nest;
 import com.antcolonies.colony.ColonyManager;
@@ -99,14 +100,14 @@ public class NestTests {
                         pileProblem[0] = "loose soil off the night soil cells at " + pile.toShortString() + " (tick " + helper.getTick() + ")";
                     }
                 }
-                int waiting = colony.hill().nightSoil().waiting(level);
+                int waiting = colony.part(ColonyParts.HILL).orElseThrow().nightSoil().waiting(level);
                 int room = cells.size() * colony.profile().nest().nightSoil().layersPerCell();
                 if (waiting > room) {
                     pileProblem[0] = waiting + " pellets wait in piles that hold " + room + " (tick " + helper.getTick() + ")";
                 }
             }
             if (morningAt[0] >= 0) {
-                if (clearedAt[0] < 0 && colony.hill().nightSoil().waiting(level) == 0) {
+                if (clearedAt[0] < 0 && colony.part(ColonyParts.HILL).orElseThrow().nightSoil().waiting(level) == 0) {
                     clearedAt[0] = helper.getTick();
                     AntColoniesMod.LOGGER.info("[nest-test] tick {}: the night soil is carried up, {} ticks after morning", helper.getTick(), clearedAt[0] - morningAt[0]);
                 }
@@ -123,13 +124,13 @@ public class NestTests {
                     }
                 }
             }
-            if (nightFrom[0] >= 0 && dugWhenFull[0] < 0 && colony.hill().nightSoil().isFull(level)) {
+            if (nightFrom[0] >= 0 && dugWhenFull[0] < 0 && colony.part(ColonyParts.HILL).orElseThrow().nightSoil().isFull(level)) {
                 dugWhenFull[0] = dugBelowSurface(helper);
                 AntColoniesMod.LOGGER.info("[nest-test] tick {}: the night soil piles are full ({} pellets), the diggers rest",
-                        helper.getTick(), colony.hill().nightSoil().waiting(level));
+                        helper.getTick(), colony.part(ColonyParts.HILL).orElseThrow().nightSoil().waiting(level));
             }
             if (nightFrom[0] >= 0 && helper.getTick() - nightFrom[0] >= 3000) {
-                heaped[0] = colony.hill().nightSoil().waiting(level);
+                heaped[0] = colony.part(ColonyParts.HILL).orElseThrow().nightSoil().waiting(level);
                 if (dugWhenFull[0] >= 0) {
                     int dugSince = dugBelowSurface(helper) - dugWhenFull[0];
                     if (dugSince > 3) {
@@ -139,7 +140,7 @@ public class NestTests {
                 morningAt[0] = helper.getTick();
                 TestClock.still(helper, 7.0); // morning again
                 AntColoniesMod.LOGGER.info("[nest-test] tick {}: morning, {} pellets of night soil in piles (most {}, cells {})", helper.getTick(),
-                        heaped[0], colony.hill().nightSoil().limit(level), colony.nest().nightSoilCells(level).size());
+                        heaped[0], colony.part(ColonyParts.HILL).orElseThrow().nightSoil().limit(level), colony.nest().nightSoilCells(level).size());
             }
         });
 
@@ -173,8 +174,8 @@ public class NestTests {
             helper.assertTrue(heaped[0] > 0, "soil dug at night should lie in piles near the top of the nest: " + heaped[0]);
             helper.assertTrue(outsideAtNight[0] == null, "a worker was outside at midnight: " + outsideAtNight[0]);
             helper.assertTrue(pileProblem[0] == null, "night soil: " + pileProblem[0]);
-            helper.assertTrue(colony.hill().nightSoil().waiting(level) == 0,
-                    "the night soil should be carried up: " + colony.hill().nightSoil().waiting(level) + " left");
+            helper.assertTrue(colony.part(ColonyParts.HILL).orElseThrow().nightSoil().waiting(level) == 0,
+                    "the night soil should be carried up: " + colony.part(ColonyParts.HILL).orElseThrow().nightSoil().waiting(level) + " left");
             helper.assertTrue(clearedAt[0] >= 0 && clearedAt[0] - morningAt[0] <= 3000,
                     "the night soil should be carried up first thing in the morning, but it took " + (clearedAt[0] - morningAt[0]) + " ticks");
             AntColoniesMod.LOGGER.info("[nest-test] finished at tick {}: {}", helper.getTick(), describe(helper));
@@ -216,7 +217,7 @@ public class NestTests {
                 // empty the foragers search for seeds, a job, not strolling; in game tests the door rule that holds them
                 // in is off, so the searchers are not counted.)
                 List<WorkerAntEntity> outside = level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds(),
-                        w -> w.isAlive() && !colony.nest().isInside(level, w.blockPosition()) && !colony.spots().isSearching(w.getUUID()));
+                        w -> w.isAlive() && !colony.nest().isInside(level, w.blockPosition()) && !colony.part(ColonyParts.FORAGER_SPOTS).orElseThrow().isSearching(w.getUUID()));
                 if (!outside.isEmpty() || helper.getTick() < idleFrom[0] + 600) {
                     helper.assertTrue(helper.getTick() < idleFrom[0] + 8000, "with nothing to do every worker should be inside, but "
                             + outside.size() + " are out, e.g. at " + (outside.isEmpty() ? "-" : outside.get(0).blockPosition().toShortString()));
@@ -426,9 +427,9 @@ public class NestTests {
         sheep.moveTo(gap.getX() + 0.5, gap.getY(), gap.getZ() + 0.5);
         sheep.setNoAi(true);
         level.addFreshEntity(sheep);
-        helper.assertTrue(!colony.hill().placePellet(level, gap), "the pellet was set on top of a sheep");
+        helper.assertTrue(!colony.part(ColonyParts.HILL).orElseThrow().placePellet(level, gap), "the pellet was set on top of a sheep");
         sheep.discard();
-        helper.assertTrue(colony.hill().placePellet(level, gap), "the pellet was not set with ants standing in the gap");
+        helper.assertTrue(colony.part(ColonyParts.HILL).orElseThrow().placePellet(level, gap), "the pellet was not set with ants standing in the gap");
         helper.assertTrue(level.getBlockState(gap).is(ModBlocks.BURROWED_DIRT.get()), "no block was placed");
         for (WorkerAntEntity ant : crowd) {
             helper.assertTrue(ant.getY() >= gap.getY() + 1 - 0.01, "an ant is still inside the new block (y " + ant.getY() + ")");
@@ -638,7 +639,7 @@ public class NestTests {
                 return;
             }
             dropped[0] = true;
-            colony.patrol().setOnForTests(true);
+            colony.part(ColonyParts.PATROL).orElseThrow().setOnForTests(true);
             clock[0] = TestClock.moving(helper, 5.5); // the day clock opens at 6:00: a patrol first
             dropSeeds(helper, MIDDLE + 6, MIDDLE, 1);
             dropSeeds(helper, MIDDLE - 6, MIDDLE + 2, 1);
@@ -708,21 +709,21 @@ public class NestTests {
             if (!dropped[0] || colony == null) {
                 return;
             }
-            linesSeen[0] = Math.max(linesSeen[0], colony.recruits().lines().size());
+            linesSeen[0] = Math.max(linesSeen[0], colony.part(ColonyParts.RECRUITS).orElseThrow().lines().size());
             for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds(), AbstractAntEntity::isColonyWorker)) {
-                if (colony.recruits().isRecruited(ant.getUUID())) {
+                if (colony.part(ColonyParts.RECRUITS).orElseThrow().isRecruited(ant.getUUID())) {
                     called.add(ant.getUUID());
                 }
                 if (called.contains(ant.getUUID()) && ant.isCarryingSeed() && recruitCarrying.add(ant.getUUID())) {
-                    BlockPos spot = colony.spots().spotOf(ant.getUUID());
+                    BlockPos spot = colony.part(ColonyParts.FORAGER_SPOTS).orElseThrow().spotOf(ant.getUUID());
                     if (spot != null && spot.closerThan(helper.absolutePos(gramas[0]), 5)) {
                         recruitsAtThePatch[0]++;
                         AntColoniesMod.LOGGER.info("[seed-test] tick {}: a nestmate called out took food at the grama patch{}", helper.getTick(),
-                                colony.recruits().describe(level));
+                                colony.part(ColonyParts.RECRUITS).orElseThrow().describe(level));
                     }
                 }
             }
-            for (var line : colony.recruits().lines()) {
+            for (var line : colony.part(ColonyParts.RECRUITS).orElseThrow().lines()) {
                 helper.assertTrue(line.patch().closerThan(helper.absolutePos(gramas[0]), 5),
                         "a scent line was laid to " + line.patch().subtract(helper.absolutePos(BlockPos.ZERO)).toShortString() + ", not the grama patch");
             }
@@ -738,14 +739,14 @@ public class NestTests {
             if (dropTick[0] < 0) {
                 dropTick[0] = helper.getTick();
             }
-            if (firstBack[0] < 0 && colony.patrol().isRoundOn() && colony.patrol().backThisRound() > 0) {
+            if (firstBack[0] < 0 && colony.part(ColonyParts.PATROL).orElseThrow().isRoundOn() && colony.part(ColonyParts.PATROL).orElseThrow().backThisRound() > 0) {
                 firstBack[0] = helper.getTick();
                 AntColoniesMod.LOGGER.info("[seed-test] tick {}: the first patroller is back ({} ticks after the round began){}", helper.getTick(),
-                        helper.getTick() - dropTick[0], colony.patrol().describe(level));
+                        helper.getTick() - dropTick[0], colony.part(ColonyParts.PATROL).orElseThrow().describe(level));
             }
             if (firstOut[0] < 0) {
                 for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
-                    if (colony.door().isOut(ant.getUUID()) || ant.isCarryingSeed()) {
+                    if (colony.part(ColonyParts.DOOR).orElseThrow().isOut(ant.getUUID()) || ant.isCarryingSeed()) {
                         firstOut[0] = helper.getTick();
                         AntColoniesMod.LOGGER.info("[seed-test] tick {}: the first forager sets out", helper.getTick());
                         break;
@@ -758,7 +759,7 @@ public class NestTests {
                 Colony colony = colony(helper);
                 AntColoniesMod.LOGGER.info("[seed-test] tick {}: {} {}, food {}, seeds in the store {}, seeds anywhere {}{}",
                         helper.getTick(), clock[0].describe(), clock[0].phase(colony), colony.food().getFood(), seedsIn(level, storeBox(level, colony)),
-                        seedsIn(level, helper.getBounds()), colony.spots().describe());
+                        seedsIn(level, helper.getBounds()), colony.part(ColonyParts.FORAGER_SPOTS).orElseThrow().describe());
             }
         });
         // Brain step 4c, site fidelity: an ant that cut a piece off a tuft goes back to that same tuft for its next piece
@@ -779,7 +780,7 @@ public class NestTests {
             for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds(), AbstractAntEntity::isColonyWorker)) {
                 boolean now = ant.isCarryingSeed();
                 if (now && carrying.add(ant.getUUID())) {
-                    BlockPos spot = colony.spots().spotOf(ant.getUUID());
+                    BlockPos spot = colony.part(ColonyParts.FORAGER_SPOTS).orElseThrow().spotOf(ant.getUUID());
                     BlockPos before = spotAtLastPiece.put(ant.getUUID(), spot);
                     if (spot != null && spot.equals(before)) {
                         backToItsSpot[0]++;
@@ -807,10 +808,10 @@ public class NestTests {
                 helper.assertTrue(gramaCut[g] == ripePieces, "grama head " + g + " dried with only " + gramaCut[g] + " pieces cut");
                 gramaCutAll += gramaCut[g];
             }
-            helper.assertTrue(linesSeen[0] >= 1 && colony.recruits().calledOut() >= 1,
-                    "nobody laid a scent line home from the rich grama patch and called nestmates out" + colony.recruits().describe(level));
+            helper.assertTrue(linesSeen[0] >= 1 && colony.part(ColonyParts.RECRUITS).orElseThrow().calledOut() >= 1,
+                    "nobody laid a scent line home from the rich grama patch and called nestmates out" + colony.part(ColonyParts.RECRUITS).orElseThrow().describe(level));
             helper.assertTrue(recruitsAtThePatch[0] >= 1, "no nestmate called out took food at the grama patch (" + called.size() + " called)"
-                    + colony.recruits().describe(level));
+                    + colony.part(ColonyParts.RECRUITS).orElseThrow().describe(level));
             int expected = 5 + tufts.length * colony.food().piecesOf(Blocks.SHORT_GRASS.defaultBlockState()) + gramaCutAll + gramaShed[0];
             // The workers also feed the queen from the store: count what she has eaten too, and (searching alone takes
             // long enough for her egg to hatch, brain step 4c, and on real days to grow up) the bread fed to the larva.
@@ -879,12 +880,12 @@ public class NestTests {
             if (seedTakenAt[0] < 0 && colony.food().getFood() < 25) {
                 seedTakenAt[0] = level.getGameTime();
             }
-            if (breadAt[0] < 0 && colony.bakery().getBread() + colony.queenCare().getQueenBread() >= 1) {
+            if (breadAt[0] < 0 && colony.part(ColonyParts.BAKERY).orElseThrow().getBread() + colony.queenCare().getQueenBread() >= 1) {
                 breadAt[0] = level.getGameTime();
                 AntColoniesMod.LOGGER.info("[egg-test] tick {}: the first bread ({} seconds after the first seed was taken)", helper.getTick(),
                         (breadAt[0] - seedTakenAt[0]) / 20.0);
             }
-            if (!breadInNursery[0] && colony.bakery().getBread() > 0) {
+            if (!breadInNursery[0] && colony.part(ColonyParts.BAKERY).orElseThrow().getBread() > 0) {
                 for (BlockPos pos : colony.nest().getNurseryCells(level)) {
                     breadInNursery[0] |= level.getBlockState(pos).is(ModBlocks.BREAD_PILE.get());
                 }
@@ -947,7 +948,7 @@ public class NestTests {
             helper.assertTrue(colony.queenCare().getQueenBread() + larvaeFed == 5, "the queen was fed " + colony.queenCare().getQueenBread()
                     + " pieces of bread for the next egg and the larva " + larvaeFed + ", expected the 5 that were left between them");
             helper.assertTrue(colony.food().getFood() == 0 && seedsIn(level, storeBox(level, colony)) == 0, "seeds are left in the store");
-            helper.assertTrue(colony.bakery().getBread() == 0 && breadIn(level, helper.getBounds()) == 0, "bread is left in the nursery");
+            helper.assertTrue(colony.part(ColonyParts.BAKERY).orElseThrow().getBread() == 0 && breadIn(level, helper.getBounds()) == 0, "bread is left in the nursery");
             for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
                 helper.assertTrue(!ant.hasFullMandibles(), "an ant is still carrying something");
             }
@@ -1007,8 +1008,8 @@ public class NestTests {
                 previous = laid;
             }
             helper.assertTrue(colony.queenCare().getBurstLeft() == 0 && !colony.queenCare().isIncubating(), "the burst is not over");
-            helper.assertTrue(colony.queenCare().getQueenRich() == 0 && colony.bakery().getRichBread() == 0 && colony.food().getRichSeeds() == 0,
-                    "rich food is left: queen " + colony.queenCare().getQueenRich() + ", bread " + colony.bakery().getRichBread() + ", seeds " + colony.food().getRichSeeds());
+            helper.assertTrue(colony.queenCare().getQueenRich() == 0 && colony.part(ColonyParts.BAKERY).orElseThrow().getRichBread() == 0 && colony.food().getRichSeeds() == 0,
+                    "rich food is left: queen " + colony.queenCare().getQueenRich() + ", bread " + colony.part(ColonyParts.BAKERY).orElseThrow().getRichBread() + ", seeds " + colony.food().getRichSeeds());
         });
     }
 
@@ -1049,7 +1050,7 @@ public class NestTests {
             Colony colony = colony(helper);
             if (placed[0] && colony != null && helper.getTick() % 500 == 0) {
                 AntColoniesMod.LOGGER.info("[hatch-test] tick {}: eggs {}, larvae {} (hunger {}), bread {}, food {}, workers {}", helper.getTick(),
-                        colony.brood().countEggs(level), colony.brood().countLarvae(level), colony.brood().larvaHunger(level), colony.bakery().getBread(), colony.food().getFood(),
+                        colony.brood().countEggs(level), colony.brood().countLarvae(level), colony.brood().larvaHunger(level), colony.part(ColonyParts.BAKERY).orElseThrow().getBread(), colony.food().getFood(),
                         colony.getCount(WorkerAntEntity.CASTE));
             }
         });
@@ -1150,7 +1151,7 @@ public class NestTests {
             if (hungry[0] != null && helper.getTick() % 2000 == 0) {
                 AntColoniesMod.LOGGER.info("[hunger-test] tick {}: worker #{} at {}, hungry {}, alive {}, searching {}, goals {}", helper.getTick(), hungry[0].getId(),
                         hungry[0].blockPosition().subtract(helper.absolutePos(BlockPos.ZERO)).toShortString(), hungry[0].isHungry(), hungry[0].isAlive(),
-                        colony(helper) != null && colony(helper).spots().isSearching(hungry[0].getUUID()),
+                        colony(helper) != null && colony(helper).part(ColonyParts.FORAGER_SPOTS).orElseThrow().isSearching(hungry[0].getUUID()),
                         hungry[0].goalSelector.getAvailableGoals().stream().filter(g -> g.isRunning()).map(g -> g.getGoal().getClass().getSimpleName()).toList());
             }
         });
@@ -1564,7 +1565,7 @@ public class NestTests {
     }
 
     private static int seedsAccountedFor(Colony colony) {
-        return colony.food().getFood() + colony.bakery().getBread() + colony.queenCare().getQueenBread() + colony.profile().queen().meal() * colony.queenCare().getEggsLaid() + colony.food().getSeedsEaten();
+        return colony.food().getFood() + colony.part(ColonyParts.BAKERY).orElseThrow().getBread() + colony.queenCare().getQueenBread() + colony.profile().queen().meal() * colony.queenCare().getEggsLaid() + colony.food().getSeedsEaten();
     }
 
     private static void dropSeeds(GameTestHelper helper, int x, int z, int count) {
@@ -1623,16 +1624,16 @@ public class NestTests {
             }
             if (dropped[0] && helper.getTick() % 400 == 0) {
                 AntColoniesMod.LOGGER.info("[early-feed-test] tick {}: queen fed {}, bread {} (milling {}), food {}, eggs laid {}, eggs {}, larvae {}, seeds on the ground {}",
-                        helper.getTick(), colony.queenCare().getQueenBread(), colony.bakery().getBread(), colony.bakery().getMilling(), colony.food().getFood(), colony.queenCare().getEggsLaid(),
+                        helper.getTick(), colony.queenCare().getQueenBread(), colony.part(ColonyParts.BAKERY).orElseThrow().getBread(), colony.part(ColonyParts.BAKERY).orElseThrow().getMilling(), colony.food().getFood(), colony.queenCare().getEggsLaid(),
                         colony.brood().countEggs(level), colony.brood().countLarvae(level), seedsIn(level, helper.getBounds()) - colony.food().getFood());
                 if (helper.getTick() % 4000 == 0) {
-                    AntColoniesMod.LOGGER.info("[early-feed-test] tick {}: {}{} | {} | {} | {}", helper.getTick(), colony.describeJobs(level), colony.spots().describe(),
-                            colony.door().describe(level), colony.patrol().describe(level), carriers(helper));
+                    AntColoniesMod.LOGGER.info("[early-feed-test] tick {}: {}{} | {} | {} | {}", helper.getTick(), colony.describeJobs(level), colony.part(ColonyParts.FORAGER_SPOTS).orElseThrow().describe(),
+                            colony.part(ColonyParts.DOOR).orElseThrow().describe(level), colony.part(ColonyParts.PATROL).orElseThrow().describe(level), carriers(helper));
                     StringBuilder ants = new StringBuilder();
                     for (WorkerAntEntity worker : level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds().inflate(32))) {
                         ants.append(" #").append(worker.getId()).append(" at ").append(worker.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO)).toShortString())
-                                .append(colony.spots().isSearching(worker.getUUID()) ? " searching" : "")
-                                .append(colony.spots().spotOf(worker.getUUID()) != null ? " spot " + colony.spots().spotOf(worker.getUUID()).subtract(helper.absolutePos(BlockPos.ZERO)).toShortString() : "")
+                                .append(colony.part(ColonyParts.FORAGER_SPOTS).orElseThrow().isSearching(worker.getUUID()) ? " searching" : "")
+                                .append(colony.part(ColonyParts.FORAGER_SPOTS).orElseThrow().spotOf(worker.getUUID()) != null ? " spot " + colony.part(ColonyParts.FORAGER_SPOTS).orElseThrow().spotOf(worker.getUUID()).subtract(helper.absolutePos(BlockPos.ZERO)).toShortString() : "")
                                 .append(" ").append(worker.goalSelector.getAvailableGoals().stream().filter(g -> g.isRunning()).map(g -> g.getGoal().getClass().getSimpleName()).toList());
                     }
                     AntColoniesMod.LOGGER.info("[early-feed-test] tick {}: workers{}", helper.getTick(), ants);
@@ -1960,7 +1961,7 @@ public class NestTests {
         Colony colony = colony(helper);
         StringBuilder text = new StringBuilder();
         if (colony != null) {
-            BlockPos spot = colony.hill().pickMoundSpot(level, level.random, null);
+            BlockPos spot = colony.part(ColonyParts.HILL).orElseThrow().pickMoundSpot(level, level.random, null);
             text.append("mound spot ").append(spot == null ? "none" : spot.subtract(BlockPos.containing(origin)).toShortString());
             if (spot != null) {
                 BlockPos bottom = colony.getCenter().below(3);
@@ -2025,7 +2026,7 @@ public class NestTests {
                 item.setUnlimitedLifetime();
                 level.addFreshEntity(item);
             }
-            helper.assertTrue(colony.bakery().needsBread(level), "the scene needs bread wanted (or it does not test the bug)");
+            helper.assertTrue(colony.part(ColonyParts.BAKERY).orElseThrow().needsBread(level), "the scene needs bread wanted (or it does not test the bug)");
             TestClock.moving(helper, 6.5);
             AntColoniesMod.LOGGER.info("[full-store] tick {}: {} seeds stored, the store is full; {} grama seeds lying round the nest (5 a spot)",
                     helper.getTick(), stored, where.length * 5);
@@ -2055,7 +2056,7 @@ public class NestTests {
                     AntColoniesMod.LOGGER.info("[full-store] every seed lying round the nest fetched {} ticks after room was made", tick - roomAt[0]);
                     helper.succeed();
                 } else if (tick % 2000 == 0) {
-                    AntColoniesMod.LOGGER.info("[full-store] tick {}: {} seeds still lying{}", tick, lying, colony.spots().describe());
+                    AntColoniesMod.LOGGER.info("[full-store] tick {}: {} seeds still lying{}", tick, lying, colony.part(ColonyParts.FORAGER_SPOTS).orElseThrow().describe());
                 }
             }
         });

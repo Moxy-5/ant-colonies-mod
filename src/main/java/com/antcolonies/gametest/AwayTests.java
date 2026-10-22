@@ -16,6 +16,7 @@ import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.AwayReport;
 import com.antcolonies.colony.Brood;
 import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.ColonyParts;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.NestPlan;
 import com.antcolonies.colony.Population;
@@ -243,7 +244,7 @@ public class AwayTests {
         helper.runAfterDelay(500, () -> {
             Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
             AntColoniesMod.LOGGER.info("[away-test] 2b away: {}{} | food {}, bread {}, queen bread {}", colony.population().describe(level),
-                    colony.away().describe(level), colony.food().getFood(), colony.bakery().getBread(), colony.queenCare().getQueenBread());
+                    colony.away().describe(level), colony.food().getFood(), colony.part(ColonyParts.BAKERY).orElseThrow().getBread(), colony.queenCare().getQueenBread());
             helper.assertTrue(colony.away().isAway(level), "the colony should be away");
             helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == 303 && colony.population().inside(WorkerAntEntity.CASTE) == 303,
                     "the egg and the 2 larvae should have grown up into workers (303): " + colony.getCount(WorkerAntEntity.CASTE));
@@ -427,7 +428,7 @@ public class AwayTests {
                 Colony colony = antColony(helper);
                 AntColoniesMod.LOGGER.info("[away-test] 2c tick {}: food {}, cut {} {} {}{}{}", helper.getTick(), colony.food().getFood(),
                         hidden.stream().map(colony.food()::getPiecesCut).toList(), seen.stream().map(colony.food()::getPiecesCut).toList(),
-                        colony.away().report().describe(), colony.spots().describe(), colony.field().describe());
+                        colony.away().report().describe(), colony.part(ColonyParts.FORAGER_SPOTS).orElseThrow().describe(), colony.field().describe());
             }
         });
         helper.onEachTick(() -> {
@@ -435,7 +436,7 @@ public class AwayTests {
                 return;
             }
             Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElse(null);
-            if (colony != null && colony.patrol().backThisRound() == 0 && colony.away().report().get(AwayReport.What.FORAGED) > 0) {
+            if (colony != null && colony.part(ColonyParts.PATROL).orElseThrow().backThisRound() == 0 && colony.away().report().get(AwayReport.What.FORAGED) > 0) {
                 foragedBeforePatrol[0] = true;
             }
         });
@@ -499,16 +500,16 @@ public class AwayTests {
             clock.skipTo(8.0); // 8:00 in a hot biome, dry: out (the midday rest is 11:00 to 15:00)
             colony.setHeatForTests(2.0F);
             colony.setRainForTests(false);
-            colony.patrol().setOnForTests(true); // brain step 4b: a patrol first (the round begins as the patrol sees the day clock open)
+            colony.part(ColonyParts.PATROL).orElseThrow().setOnForTests(true); // brain step 4b: a patrol first (the round begins as the patrol sees the day clock open)
             patrolOn[0] = true;
         });
         helper.runAfterDelay(2660, () -> {
             Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
-            AntColoniesMod.LOGGER.info("[away-test] 4b: {}{}", colony.patrol().describe(level), colony.door().describe(level));
-            helper.assertTrue(colony.patrol().isRoundOn() && colony.patrol().numbersOut() > 0 && colony.patrol().realOut().isEmpty(),
-                    "the numbers should send a patrol of numbers first: " + colony.patrol().describe(level));
-            helper.assertTrue(colony.patrol().sentThisRound() == colony.profile().food().patrol().orElseThrow().dawnPatrol(colony.getCount(WorkerAntEntity.CASTE)),
-                    "the dawn patrol should be the share of the workers: " + colony.patrol().describe(level));
+            AntColoniesMod.LOGGER.info("[away-test] 4b: {}{}", colony.part(ColonyParts.PATROL).orElseThrow().describe(level), colony.part(ColonyParts.DOOR).orElseThrow().describe(level));
+            helper.assertTrue(colony.part(ColonyParts.PATROL).orElseThrow().isRoundOn() && colony.part(ColonyParts.PATROL).orElseThrow().numbersOut() > 0 && colony.part(ColonyParts.PATROL).orElseThrow().realOut().isEmpty(),
+                    "the numbers should send a patrol of numbers first: " + colony.part(ColonyParts.PATROL).orElseThrow().describe(level));
+            helper.assertTrue(colony.part(ColonyParts.PATROL).orElseThrow().sentThisRound() == colony.profile().food().patrol().orElseThrow().dawnPatrol(colony.getCount(WorkerAntEntity.CASTE)),
+                    "the dawn patrol should be the share of the workers: " + colony.part(ColonyParts.PATROL).orElseThrow().describe(level));
         });
         helper.runAfterDelay(4600, () -> {
             Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
@@ -652,18 +653,18 @@ public class AwayTests {
             more.add(knownDryTuft(helper, colony, MIDDLE - 6, MIDDLE + 6));
             clock.skipTo(colony, TestClock.Phase.NIGHT); // a dry night
             colony.setRainForTests(false);
-            colony.alarm().raise(level, 2, colony.getCenter(), null);
+            colony.part(ColonyParts.ALARM).orElseThrow().raise(level, 2, colony.getCenter(), null);
             foodBefore[0] = colony.food().getFood();
         });
         helper.runAfterDelay(3200, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
-            helper.assertTrue(colony.alarm().keepsEveryoneIn(level), "the alarm should still keep everyone in");
+            helper.assertTrue(colony.part(ColonyParts.ALARM).orElseThrow().keepsEveryoneIn(level), "the alarm should still keep everyone in");
             for (BlockPos tuft : more) {
                 helper.assertTrue(colony.field().remembers(tuft) && colony.food().getPiecesCut(tuft) == 2,
                         "nothing should be foraged while the alarm keeps everyone in: " + tuft + " cut " + colony.food().getPiecesCut(tuft));
             }
             // The alarm calms, but the food store is full (as the brain last saw it).
-            colony.alarm().calmForTests();
+            colony.part(ColonyParts.ALARM).orElseThrow().calmForTests();
             colony.food().setRoomForTests(0);
         });
         helper.runAfterDelay(3500, () -> {
@@ -1157,21 +1158,21 @@ public class AwayTests {
             clock.skipTo(8.0); // a dry morning in a hot biome: the patrol goes out
             colony.setHeatForTests(2.0F);
             colony.setRainForTests(false);
-            colony.patrol().setOnForTests(true);
+            colony.part(ColonyParts.PATROL).orElseThrow().setOnForTests(true);
         });
         helper.runAfterDelay(1500, () -> {
             Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
             int lost = colony.danger().lostOutOfSight();
             AwayReport report = colony.away().report();
-            AntColoniesMod.LOGGER.info("[away-test] 4g step 4 patrol: {} lost, {}{}{}", lost, colony.patrol().describe(level), report.describe(),
+            AntColoniesMod.LOGGER.info("[away-test] 4g step 4 patrol: {} lost, {}{}{}", lost, colony.part(ColonyParts.PATROL).orElseThrow().describe(level), report.describe(),
                     colony.danger().describe(level));
-            helper.assertTrue(colony.patrol().sentThisRound() > 0, "the dawn patrol should have gone out: " + colony.patrol().describe(level));
-            helper.assertTrue(lost >= 1, "some patrol numbers should be lost on ways through danger: " + colony.patrol().describe(level));
+            helper.assertTrue(colony.part(ColonyParts.PATROL).orElseThrow().sentThisRound() > 0, "the dawn patrol should have gone out: " + colony.part(ColonyParts.PATROL).orElseThrow().describe(level));
+            helper.assertTrue(lost >= 1, "some patrol numbers should be lost on ways through danger: " + colony.part(ColonyParts.PATROL).orElseThrow().describe(level));
             helper.assertTrue(report.get(AwayReport.What.LOST_IN_DANGER) == lost && report.get(AwayReport.What.PATROLLERS_LOST) >= lost,
                     "the away report should count the lost: " + report.describe());
             helper.assertTrue(colony.getCount(WorkerAntEntity.CASTE) == before[0] - lost, "the headcount should drop by the lost: "
                     + colony.getCount(WorkerAntEntity.CASTE) + ", was " + before[0]);
-            helper.assertTrue(colony.patrol().dangerToday(), "a lost patroller should count as danger met today");
+            helper.assertTrue(colony.part(ColonyParts.PATROL).orElseThrow().dangerToday(), "a lost patroller should count as danger met today");
             lostFirst[0] = lost;
             husks.forEach(net.minecraft.world.entity.Entity::discard);
             clock.skipTo(0.0); // midnight: the round ends
@@ -1179,9 +1180,9 @@ public class AwayTests {
         helper.runAfterDelay(1560, () -> clock.skipTo(8.0)); // the next morning: a new day, a new patrol
         helper.runAfterDelay(3000, () -> {
             Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
-            AntColoniesMod.LOGGER.info("[away-test] 4g step 4 patrol, the next morning: {}{}", colony.patrol().describe(level), colony.danger().describe(level));
-            helper.assertTrue(colony.patrol().sentThisRound() > 0 && colony.patrol().backThisRound() > 0, "the next patrol should come back: "
-                    + colony.patrol().describe(level));
+            AntColoniesMod.LOGGER.info("[away-test] 4g step 4 patrol, the next morning: {}{}", colony.part(ColonyParts.PATROL).orElseThrow().describe(level), colony.danger().describe(level));
+            helper.assertTrue(colony.part(ColonyParts.PATROL).orElseThrow().sentThisRound() > 0 && colony.part(ColonyParts.PATROL).orElseThrow().backThisRound() > 0, "the next patrol should come back: "
+                    + colony.part(ColonyParts.PATROL).orElseThrow().describe(level));
             helper.assertTrue(colony.danger().lostOutOfSight() == lostFirst[0], "nobody should be lost once the husks are gone: "
                     + colony.danger().describe(level));
             colony.away().setAwayForTests(false);
@@ -1204,7 +1205,7 @@ public class AwayTests {
     /** The comb blocks' layers by age and their nodules, added up: fresh, ripe, old, nodules, layers. */
     static int[] combTotals(ServerLevel level, Colony colony) {
         int[] totals = new int[5];
-        for (BlockPos pos : colony.garden().getCombs(level)) {
+        for (BlockPos pos : colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().getCombs(level)) {
             var state = level.getBlockState(pos);
             totals[0] += com.antcolonies.block.FungusCombBlock.fresh(state);
             totals[1] += com.antcolonies.block.FungusCombBlock.ripe(state);
@@ -1277,7 +1278,7 @@ public class AwayTests {
                 }
                 colony.food().depositSeed(level, spot);
             }
-            for (BlockPos comb : colony.garden().getCombs(level)) {
+            for (BlockPos comb : colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().getCombs(level)) {
                 if (com.antcolonies.block.FungusCombBlock.layers(level.getBlockState(comb)) < 4) {
                     continue; // (a comb not full yet stays all fresh)
                 }
@@ -1285,7 +1286,7 @@ public class AwayTests {
                 level.setBlock(comb, level.getBlockState(comb).setValue(com.antcolonies.block.FungusCombBlock.NODULES, 3)
                         .setValue(com.antcolonies.block.FungusCombBlock.OLD, 2).setValue(com.antcolonies.block.FungusCombBlock.FRESH, 1), 3);
             }
-            helper.assertTrue(colony.garden().getCombs(level).size() >= 5, "only " + colony.garden().getCombs(level).size() + " comb blocks");
+            helper.assertTrue(colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().getCombs(level).size() >= 5, "only " + colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().getCombs(level).size() + " comb blocks");
             helper.assertTrue(colony.food().getFood() == combTotals(level, colony)[4], "the food count " + colony.food().getFood()
                     + " is not the " + combTotals(level, colony)[4] + " layers of comb");
         });
@@ -1302,19 +1303,19 @@ public class AwayTests {
             theKing.teleportTo(theQueen.getX() + 1.0, theQueen.getY(), theQueen.getZ());
             king[0] = theKing.getUUID();
             kingHungrySince[0] = level.getGameTime() - colony.profile().worker().mealIntervalTicks() - 100;
-            colony.kingCare().setLastFed(kingHungrySince[0]);
-            helper.assertTrue(colony.kingCare().wantsFood(level), "the king should want a nodule");
+            colony.part(ColonyParts.KING_CARE).orElseThrow().setLastFed(kingHungrySince[0]);
+            helper.assertTrue(colony.part(ColonyParts.KING_CARE).orElseThrow().wantsFood(level), "the king should want a nodule");
             eggsLaid[0] = colony.queenCare().getEggsLaid();
             colony.queenCare().setQueenLastFed(level.getGameTime());
             int[] blocks = combTotals(level, colony);
-            helper.assertTrue(colony.garden().freshKnown() == blocks[0] && colony.garden().ripeKnown() == blocks[1]
-                    && colony.garden().oldKnown() == blocks[2], "the brain should have seen the comb as it is: " + java.util.Arrays.toString(blocks)
-                            + " vs " + colony.garden().freshKnown() + "/" + colony.garden().ripeKnown() + "/" + colony.garden().oldKnown());
+            helper.assertTrue(colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().freshKnown() == blocks[0] && colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().ripeKnown() == blocks[1]
+                    && colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().oldKnown() == blocks[2], "the brain should have seen the comb as it is: " + java.util.Arrays.toString(blocks)
+                            + " vs " + colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().freshKnown() + "/" + colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().ripeKnown() + "/" + colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().oldKnown());
             foodBefore[0] = colony.food().getFood();
-            grownBefore[0] = colony.garden().getNodulesGrown();
-            colony.garden().setAgeingSpeedForTests(100.0F);
-            colony.mound().setStage(level, 2);
-            helper.assertTrue(colony.mound().countFinished(level) == 0, "no mound built yet");
+            grownBefore[0] = colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().getNodulesGrown();
+            colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().setAgeingSpeedForTests(100.0F);
+            colony.part(ColonyParts.MOUND).orElseThrow().setStage(level, 2);
+            helper.assertTrue(colony.part(ColonyParts.MOUND).orElseThrow().countFinished(level) == 0, "no mound built yet");
             colony.away().setOnForTests(true);
             colony.away().setGraceForTests(20L);
             queenOnDisk[0] = freezeAndUnload(colony, level, theQueen);
@@ -1324,23 +1325,23 @@ public class AwayTests {
         helper.runAfterDelay(420, () -> {
             Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
             AntColoniesMod.LOGGER.info("[away-test] termites away: {}{} | known comb {}/{}/{}, nodules {}, food {}, queen food {}",
-                    colony.population().describe(level), colony.away().describe(level), colony.garden().freshKnown(), colony.garden().ripeKnown(),
-                    colony.garden().oldKnown(), colony.life().nurseFoodLeft(level), colony.food().getFood(), colony.queenCare().getQueenBread());
+                    colony.population().describe(level), colony.away().describe(level), colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().freshKnown(), colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().ripeKnown(),
+                    colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().oldKnown(), colony.life().nurseFoodLeft(level), colony.food().getFood(), colony.queenCare().getQueenBread());
             helper.assertTrue(colony.away().isAway(level), "the colony should be away");
             var ledger = colony.ledger();
             helper.assertTrue(ledger.ripened() > 0, "fresh comb should have ripened while away: " + ledger.describe());
             helper.assertTrue(ledger.aged() > 0, "ripe comb should have gone old while away: " + ledger.describe());
-            helper.assertTrue(colony.garden().getNodulesGrown() > grownBefore[0], "nodules should have grown while away");
+            helper.assertTrue(colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().getNodulesGrown() > grownBefore[0], "nodules should have grown while away");
             helper.assertTrue(ledger.store() < 0 && colony.food().getFood() == foodBefore[0] + ledger.store(),
                     "old comb should have crumbled, out of the food count: " + colony.food().getFood() + " food, was " + foodBefore[0] + "; "
                             + ledger.describe());
-            int known = colony.garden().freshKnown() + colony.garden().ripeKnown() + colony.garden().oldKnown();
+            int known = colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().freshKnown() + colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().ripeKnown() + colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().oldKnown();
             helper.assertTrue(known == colony.food().getFood(), "the known ages (" + known + " layers) should add up to the "
                     + colony.food().getFood() + " counted");
             helper.assertTrue(ledger.nurseFood() < 0 && colony.queenCare().getQueenBread() + 2 * (colony.queenCare().getEggsLaid() - eggsLaid[0]) > 0,
                     "the nurses should have fed the queen nodules: " + ledger.describe() + ", she holds " + colony.queenCare().getQueenBread());
-            helper.assertTrue(colony.away().report().get(AwayReport.What.KING_FED) >= 1 && colony.kingCare().getLastFed() > kingHungrySince[0]
-                    && !colony.kingCare().wantsFood(level), "the nurses should have fed the king a nodule while away: " + colony.away().report().describe());
+            helper.assertTrue(colony.away().report().get(AwayReport.What.KING_FED) >= 1 && colony.part(ColonyParts.KING_CARE).orElseThrow().getLastFed() > kingHungrySince[0]
+                    && !colony.part(ColonyParts.KING_CARE).orElseThrow().wantsFood(level), "the nurses should have fed the king a nodule while away: " + colony.away().report().describe());
             helper.assertTrue(!colony.away().report().didKingStarve(), "the king should not starve");
             // The meals come due: the workers' and the soldiers'.
             long due = level.getGameTime() - colony.profile().worker().mealIntervalTicks() - 30;
@@ -1366,7 +1367,7 @@ public class AwayTests {
             helper.assertTrue(colony.queenCare().getEggsLaid() > eggsLaid[0], "the queen should have laid her stream while away");
             helper.assertTrue(colony.brood().youngInsideForTests().stream().anyMatch(Brood.Young::isEgg), "her eggs should be numbers: "
                     + colony.brood().youngInsideForTests());
-            int known = colony.garden().freshKnown() + colony.garden().ripeKnown() + colony.garden().oldKnown();
+            int known = colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().freshKnown() + colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().ripeKnown() + colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().oldKnown();
             helper.assertTrue(known == colony.food().getFood(), "after the meals the known ages (" + known + " layers) should still add up to the "
                     + colony.food().getFood() + " counted");
             // Brain part 3: the game is saved and loaded again while away; the loaded colony comes back below (the comb
@@ -1379,28 +1380,28 @@ public class AwayTests {
             colony.away().setOnForTests(true);
             colony.away().setGraceForTests(20L);
             colony.away().setAwayForTests(true);
-            helper.assertTrue(colony.garden().freshKnown() == original.garden().freshKnown() && colony.garden().ripeKnown() == original.garden().ripeKnown()
-                    && colony.garden().oldKnown() == original.garden().oldKnown() && colony.life().nurseFoodLeft(level) == original.life().nurseFoodLeft(level)
+            helper.assertTrue(colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().freshKnown() == original.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().freshKnown() && colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().ripeKnown() == original.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().ripeKnown()
+                    && colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().oldKnown() == original.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().oldKnown() && colony.life().nurseFoodLeft(level) == original.life().nurseFoodLeft(level)
                     && colony.food().getFood() == original.food().getFood() && colony.building().work() == original.building().work()
                     && colony.queenCare().getEggsLaid() == original.queenCare().getEggsLaid()
                     && colony.brood().insideCount() == original.brood().insideCount() && colony.population().hungry(level) == 0,
                     "the loaded colony should know its comb, nodules, food, eggs, young, meals and building time as before the save");
             // Back in range: what the brain counted is what the blocks must show once they have caught up.
             helper.assertTrue(!colony.ledger().isEmpty(), "the blocks should owe something");
-            helper.assertTrue(colony.mound().countFinished(level) == 0 && colony.building().hasWork(),
+            helper.assertTrue(colony.part(ColonyParts.MOUND).orElseThrow().countFinished(level) == 0 && colony.building().hasWork(),
                     "nothing of the mound should be built while away, but the builders' time counted: " + colony.building().work());
             colony.building().setWorkForTests(colony.building().work() + 100000); // (longer away than the test waits)
             // A pretend player looks at the mound's place from 7 blocks off.
             colony.population().setViewersForTests(List.of(Vec3.atCenterOf(colony.getCenter().offset(7, 2, 0))));
-            expected[0] = colony.garden().freshKnown();
-            expected[1] = colony.garden().ripeKnown();
-            expected[2] = colony.garden().oldKnown();
+            expected[0] = colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().freshKnown();
+            expected[1] = colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().ripeKnown();
+            expected[2] = colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().oldKnown();
             expected[3] = colony.life().nurseFoodLeft(level);
             expected[4] = colony.food().getFood();
-            grownBefore[0] = colony.garden().getNodulesGrown();
-            lostBefore[0] = colony.garden().getNodulesLost();
-            colony.garden().setAgeingSpeedForTests(0.0F); // (only nodules may still grow: counted below)
-            helper.assertTrue(colony.kingCare().getLastFed() == original.kingCare().getLastFed(), "the loaded colony should know when the king ate");
+            grownBefore[0] = colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().getNodulesGrown();
+            lostBefore[0] = colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().getNodulesLost();
+            colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().setAgeingSpeedForTests(0.0F); // (only nodules may still grow: counted below)
+            helper.assertTrue(colony.part(ColonyParts.KING_CARE).orElseThrow().getLastFed() == original.part(ColonyParts.KING_CARE).orElseThrow().getLastFed(), "the loaded colony should know when the king ate");
             colony.away().setAwayForTests(false);
             loadAgain(level, queenOnDisk[0]);
             loadAgain(level, kingOnDisk[0]);
@@ -1419,8 +1420,8 @@ public class AwayTests {
                 return;
             }
             int[] blocks = combTotals(level, colony);
-            int grown = colony.garden().getNodulesGrown() - grownBefore[0]; // (each turned a ripe layer old)
-            int lost = colony.garden().getNodulesLost() - lostBefore[0]; // (on comb eaten or crumbled right away)
+            int grown = colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().getNodulesGrown() - grownBefore[0]; // (each turned a ripe layer old)
+            int lost = colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().getNodulesLost() - lostBefore[0]; // (on comb eaten or crumbled right away)
             AntColoniesMod.LOGGER.info("[away-test] termites back: blocks {} (fresh, ripe, old, nodules, layers), counted {}, {} nodules grown since, {} lost",
                     java.util.Arrays.toString(blocks), java.util.Arrays.toString(expected), grown, lost);
             helper.assertTrue(blocks[4] == expected[4] && blocks[4] == colony.food().getFood(), "the comb should have " + expected[4]
@@ -1433,7 +1434,7 @@ public class AwayTests {
             Entity theKing = level.getEntity(king[0]);
             helper.assertTrue(theKing != null && theKing.isAlive() && colony.getCount(com.antcolonies.entity.TermiteKingEntity.CASTE) == 1,
                     "the king, fed while away, should be alive when his land loads: " + theKing);
-            colony.garden().setAgeingSpeedForTests(1.0F);
+            colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().setAgeingSpeedForTests(1.0F);
             phase[0] = 1;
             phase[1] = level.getGameTime();
         });
@@ -1445,20 +1446,20 @@ public class AwayTests {
         long since = level.getGameTime() - phase[1];
         AwayReport report = colony.away().report();
         if (phase[0] == 1 && since >= 60) {
-            AntColoniesMod.LOGGER.info("[away-test] 2d termites back, watched: mound {}, {}", colony.mound().countFinished(level),
+            AntColoniesMod.LOGGER.info("[away-test] 2d termites back, watched: mound {}, {}", colony.part(ColonyParts.MOUND).orElseThrow().countFinished(level),
                     colony.away().describe(level));
-            helper.assertTrue(colony.mound().countFinished(level) == 0 && report.get(AwayReport.What.MOUND_BUILT) == 0,
-                    "nothing of the mound should go up while a player looks: " + colony.mound().countFinished(level) + " built");
+            helper.assertTrue(colony.part(ColonyParts.MOUND).orElseThrow().countFinished(level) == 0 && report.get(AwayReport.What.MOUND_BUILT) == 0,
+                    "nothing of the mound should go up while a player looks: " + colony.part(ColonyParts.MOUND).orElseThrow().countFinished(level) + " built");
             colony.population().setViewersForTests(List.of());
             phase[0] = 2;
             phase[1] = level.getGameTime();
         } else if (phase[0] == 2 && (!colony.building().hasWork() || since >= 300)) {
-            int finished = colony.mound().countFinished(level);
-            AntColoniesMod.LOGGER.info("[away-test] 2d termites back: mound {} blocks, stage {}, {}", finished, colony.mound().getStage(level),
+            int finished = colony.part(ColonyParts.MOUND).orElseThrow().countFinished(level);
+            AntColoniesMod.LOGGER.info("[away-test] 2d termites back: mound {} blocks, stage {}, {}", finished, colony.part(ColonyParts.MOUND).orElseThrow().getStage(level),
                     colony.away().describe(level));
             helper.assertTrue(finished > 0 && report.get(AwayReport.What.MOUND_BUILT) > 0, "the mound should have gone up out of sight: "
                     + finished + " blocks, " + report.describe());
-            for (BlockPos pos : colony.mound().getParts(level).keySet()) {
+            for (BlockPos pos : colony.part(ColonyParts.MOUND).orElseThrow().getParts(level).keySet()) {
                 var state = level.getBlockState(pos);
                 if (state.getBlock() instanceof com.antcolonies.block.TermiteMoundBlock) {
                     helper.assertTrue(com.antcolonies.block.TermiteMoundBlock.isFinished(state)
@@ -1522,9 +1523,8 @@ public class AwayTests {
     }
 
     /**
-     * Project Apex, colony parts step 2: the colony has the shared parts and the parts its species file lists, no others,
-     * and nothing was written into a part its species does not list (it would be lost on saving: the species then uses
-     * the part and must list it).
+     * Project Apex, colony parts steps 2 and 3: the colony has the shared parts and the parts its species file lists, no
+     * others, and asking for a part gives one exactly when the colony has it (nothing is made for a part it does not list).
      */
     static void partsAreTheSpecies(GameTestHelper helper, Colony colony) {
         Set<String> wanted = new HashSet<>(colony.profile().parts());
@@ -1534,8 +1534,10 @@ public class AwayTests {
         colony.parts().forEach(part -> has.add(part.name()));
         helper.assertTrue(has.equals(wanted), "a " + colony.getSpecies() + " colony should have the shared parts and the ones its species lists: has "
                 + has + ", wanted " + wanted);
-        List<String> written = colony.unusedPartsWrittenTo();
-        helper.assertTrue(written.isEmpty(), "a " + colony.getSpecies() + " colony wrote into parts its species file does not list: " + written);
+        for (com.antcolonies.colony.ColonyParts.Type<?> type : com.antcolonies.colony.ColonyParts.all()) {
+            helper.assertTrue(colony.part(type).isPresent() == wanted.contains(type.name()) && colony.has(type) == wanted.contains(type.name()),
+                    "a " + colony.getSpecies() + " colony answers wrongly when asked for the part " + type.name());
+        }
     }
 
     /** The parts of a colony saved into a tag of their own each, by name (the parts that are not saved left out). */
@@ -1764,7 +1766,7 @@ public class AwayTests {
             helper.assertTrue(room != null, "the queen's room should be dug");
             colony.getQueen(level).teleportTo(room.getX() + 0.5, room.getY(), room.getZ() + 0.5);
             colony.population().addNewMembers(WorkerAntEntity.CASTE, level.getGameTime(), 30);
-            helper.assertTrue(colony.food().getFood() == 0 && colony.bakery().getBread() == 0, "the colony should have no food");
+            helper.assertTrue(colony.food().getFood() == 0 && colony.part(ColonyParts.BAKERY).orElseThrow().getBread() == 0, "the colony should have no food");
         });
         helper.runAfterDelay(40, () -> {
             Colony colony = byId(helper, id[0]);
@@ -1860,8 +1862,8 @@ public class AwayTests {
             royals[1] = theKing.getUUID();
             long now = level.getGameTime();
             colony.queenCare().setQueenLastFed(now - colony.profile().queen().starveTicks() + 200);
-            colony.kingCare().setLastFed(now - colony.profile().worker().mealIntervalTicks() - colony.profile().queen().starveTicks() + 300);
-            helper.assertTrue(!colony.kingCare().starves(level), "the king should not have starved yet");
+            colony.part(ColonyParts.KING_CARE).orElseThrow().setLastFed(now - colony.profile().worker().mealIntervalTicks() - colony.profile().queen().starveTicks() + 300);
+            helper.assertTrue(!colony.part(ColonyParts.KING_CARE).orElseThrow().starves(level), "the king should not have starved yet");
             colony.away().setOnForTests(true);
             colony.away().setGraceForTests(20L);
             unloaded.put(royals[0], freezeAndUnload(colony, level, theQueen));

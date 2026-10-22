@@ -110,7 +110,7 @@ public class WorkerFood {
         if (food == MealFood.STORE) {
             return colony.food().cutPiece();
         }
-        return new ItemStack(colony.garden().exists() ? ModItems.FUNGUS_NODULE.get() : ModItems.ANT_BREAD.get());
+        return new ItemStack(colony.has(ColonyParts.FUNGUS_GARDEN) ? ModItems.FUNGUS_NODULE.get() : ModItems.ANT_BREAD.get());
     }
 
     /**
@@ -141,7 +141,7 @@ public class WorkerFood {
 
     /** Whether the store has a piece the workers eat: any seed; for fungus comb, an old layer as far as the brain knows. */
     private boolean oldCombKnown() {
-        return !colony.garden().exists() || colony.garden().oldKnown() > 0;
+        return colony.part(ColonyParts.FUNGUS_GARDEN).map(garden -> garden.oldKnown() > 0).orElse(true);
     }
 
     /** Tests only: a sample in every saved number (the save and load check, {@code AwayTests.everyPartSavesAndLoads}). */

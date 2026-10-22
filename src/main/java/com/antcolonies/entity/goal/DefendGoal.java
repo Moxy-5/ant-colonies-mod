@@ -6,6 +6,7 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Alarm;
 import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.ColonyParts;
 import com.antcolonies.entity.TermiteSoldierEntity;
 
 import net.minecraft.core.BlockPos;
@@ -31,6 +32,9 @@ public class DefendGoal extends Goal {
     private final TermiteSoldierEntity soldier;
     @Nullable
     private Colony colony;
+    /** Its colony's alarm (asked once in {@link #canUse}: only a species that lists the alarm has one). */
+    @Nullable
+    private Alarm alarm;
     @Nullable
     private Alarm.Task task;
     @Nullable
@@ -54,7 +58,8 @@ public class DefendGoal extends Goal {
             return false;
         }
         colony = soldier.getColony();
-        task = colony == null ? null : colony.alarm().taskFor(level, soldier);
+        alarm = colony == null ? null : colony.part(ColonyParts.ALARM).orElse(null);
+        task = alarm == null ? null : alarm.taskFor(level, soldier);
         return task != null;
     }
 
@@ -74,15 +79,16 @@ public class DefendGoal extends Goal {
     public void stop() {
         soldier.getNavigator().stop();
         colony = null;
+        alarm = null;
         task = null;
     }
 
     @Override
     public void tick() {
-        if (colony == null || !(soldier.level() instanceof ServerLevel level)) {
+        if (colony == null || alarm == null || !(soldier.level() instanceof ServerLevel level)) {
             return;
         }
-        Alarm.Task now = colony.alarm().taskFor(level, soldier);
+        Alarm.Task now = alarm.taskFor(level, soldier);
         if (now == null) {
             task = null;
             return;

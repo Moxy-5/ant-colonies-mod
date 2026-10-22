@@ -245,7 +245,7 @@ public class DangerMap {
         if (numbers.closeHoles() && isAttacked(level, pos)) {
             return true; // (termites: no food is fetched where they were attacked, from outside or from inside)
         }
-        return numbers.keepAway() && (isDangerous(level, pos) || colony.trunkTrails().passesDanger(level, pos));
+        return numbers.keepAway() && (isDangerous(level, pos) || colony.part(ColonyParts.TRUNK_TRAILS).map(trunk -> trunk.passesDanger(level, pos)).orElse(false));
     }
 
     // --- harm out of sight (step 4) ------------------------------------------------------------------------------------

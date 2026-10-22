@@ -8,6 +8,7 @@ import java.util.function.IntBinaryOperator;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.ColonyParts;
 import com.antcolonies.colony.ForagingHoles;
 import com.antcolonies.colony.NestPlan;
 import com.antcolonies.colony.NestSite;
@@ -155,8 +156,8 @@ public class HillTests {
             if (colony == null) {
                 return;
             }
-            if (colony.mound().getStage(level) != stage[0]) {
-                colony.mound().setStage(level, stage[0]);
+            if (colony.part(ColonyParts.MOUND).orElseThrow().getStage(level) != stage[0]) {
+                colony.part(ColonyParts.MOUND).orElseThrow().setStage(level, stage[0]);
             }
             // Wet soil sets at once, the mound's and the footing under it.
             if (helper.getTick() % 20 == 0) {
@@ -171,10 +172,10 @@ public class HillTests {
             String missing = unbuilt(level, colony);
             if (stage[0] == 1 && missing.isEmpty()) {
                 stage[0] = 2;
-                stageOneParts[0] = colony.mound().getParts(level).size();
+                stageOneParts[0] = colony.part(ColonyParts.MOUND).orElseThrow().getParts(level).size();
                 AntColoniesMod.LOGGER.info("[hill-mound] tick {}: stage 1 built", helper.getTick());
-            } else if (stage[0] == 2 && missing.isEmpty() && colony.mound().getStage(level) == 2
-                    && colony.mound().getParts(level).size() > stageOneParts[0]) {
+            } else if (stage[0] == 2 && missing.isEmpty() && colony.part(ColonyParts.MOUND).orElseThrow().getStage(level) == 2
+                    && colony.part(ColonyParts.MOUND).orElseThrow().getParts(level).size() > stageOneParts[0]) {
                 helper.assertTrue(level.getBlockState(colony.getCenter()).isAir(), "the entrance is not open");
                 AntColoniesMod.LOGGER.info("[hill-mound] tick {}: stage 2 built", helper.getTick());
                 helper.succeed();
@@ -194,7 +195,7 @@ public class HillTests {
     private static String unbuilt(ServerLevel level, Colony colony) {
         StringBuilder missing = new StringBuilder();
         int count = 0;
-        for (var entry : colony.mound().getParts(level).entrySet()) {
+        for (var entry : colony.part(ColonyParts.MOUND).orElseThrow().getParts(level).entrySet()) {
             BlockPos pos = entry.getKey();
             net.minecraft.world.level.block.state.BlockState state = level.getBlockState(pos);
             boolean ok = switch (entry.getValue()) {

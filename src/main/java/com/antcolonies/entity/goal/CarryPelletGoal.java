@@ -7,6 +7,8 @@ import org.jetbrains.annotations.Nullable;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.colony.ColonyParts;
+import com.antcolonies.colony.Hill;
 import com.antcolonies.entity.AbstractAntEntity;
 
 import net.minecraft.core.BlockPos;
@@ -38,6 +40,9 @@ public class CarryPelletGoal extends Goal {
     private final Errand<BlockPos> errand;
     @Nullable
     private Colony colony;
+    /** Its colony's hill (asked once in {@link #canUse}: only a species that lists the hill carries soil onto one). */
+    @Nullable
+    private Hill hill;
     @Nullable
     private BlockPos spot;
     private int ticks;
@@ -56,18 +61,19 @@ public class CarryPelletGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        night = colony != null && surfaceShut(level) && colony.hill().hasMoundRoom(level);
+        hill = colony == null ? null : colony.part(ColonyParts.HILL).orElse(null);
+        night = hill != null && surfaceShut(level) && hill.hasMoundRoom(level);
         if (night) {
-            spot = colony.hill().nightSoil().pickPile(level);
+            spot = hill.nightSoil().pickPile(level);
             if (spot == null) {
                 ant.setCarriedBlock(null); // the piles are full: packed into the walls
                 return false;
             }
             return true;
         }
-        spot = colony == null ? null : colony.hill().pickMoundSpot(level, ant.getRandom(), ant.getUUID());
+        spot = hill == null ? null : hill.pickMoundSpot(level, ant.getRandom(), ant.getUUID());
         if (spot == null) {
-            // Colony gone, or the mound is finished: nowhere to put it, so let go.
+            // Colony gone (or no hill), or the mound is finished: nowhere to put it, so let go.
             ant.setCarriedBlock(null);
             return false;
         }
@@ -76,7 +82,7 @@ public class CarryPelletGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        return colony != null && spot != null && ant.isCarrying() && ant.level() instanceof ServerLevel level && night == surfaceShut(level);
+        return colony != null && hill != null && spot != null && ant.isCarrying() && ant.level() instanceof ServerLevel level && night == surfaceShut(level);
     }
 
     /** Whether this ant's soil cannot go out onto the hill now: the surface is shut to it, or the entrance is plugged. */
@@ -98,11 +104,12 @@ public class CarryPelletGoal extends Goal {
     @Override
     public void stop() {
         errand.stop();
-        if (colony != null) {
-            colony.hill().releaseMoundSpot(ant.getUUID());
+        if (hill != null) {
+            hill.releaseMoundSpot(ant.getUUID());
         }
         spot = null;
         colony = null;
+        hill = null;
     }
 
     @Override
@@ -122,10 +129,10 @@ public class CarryPelletGoal extends Goal {
         if (++ticks >= GIVE_UP_TICKS) {
             AntColoniesMod.LOGGER.info("[pellet] ant at {} gave up on spot {} after {} ticks (navigator done: {}, spot valid: {}, living things in the spot: {}, block there: {}, block below: {})",
                     ant.blockPosition().toShortString(), spot.toShortString(), ticks, ant.getNavigator().isDone(),
-                    colony.hill().isMoundSpotValid(level, spot), level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class, new AABB(spot)).size(),
+                    hill.isMoundSpotValid(level, spot), level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class, new AABB(spot)).size(),
                     level.getBlockState(spot), level.getBlockState(spot.below()));
             ant.setCarriedBlock(null);
-            colony.hill().pauseHillRepair(level); // a gap that can't be reached: don't keep fetching soil for it
+            hill.pauseHillRepair(level); // a gap that can't be reached: don't keep fetching soil for it
             return;
         }
         // A small height difference (a step up or down) doesn't matter.
@@ -138,11 +145,11 @@ public class CarryPelletGoal extends Goal {
 
     /** Sets off to the mound spot. If there is no way there, tries other spots, and lets the pellet go after a few (or with none left). */
     private void walkToSpot() {
-        spot = errand.setOffTo(spot, () -> colony.hill().pickMoundSpot(ant.level(), ant.getRandom(), ant.getUUID()), 1.0);
+        spot = errand.setOffTo(spot, () -> hill.pickMoundSpot(ant.level(), ant.getRandom(), ant.getUUID()), 1.0);
         if (spot == null) {
             if (errand.spotsWithNoWay() >= Errand.MOST_SPOTS) {
                 AntColoniesMod.LOGGER.info("[pellet] ant at {} found no route to {} mound spots", ant.blockPosition().toShortString(), errand.spotsWithNoWay());
-                colony.hill().pauseHillRepair(ant.level());
+                hill.pauseHillRepair(ant.level());
             }
             ant.setCarriedBlock(null);
         }
@@ -158,10 +165,10 @@ public class CarryPelletGoal extends Goal {
             return;
         }
         errand.stop();
-        boolean put = there && colony.hill().nightSoil().addLayer(level, spot);
+        boolean put = there && hill.nightSoil().addLayer(level, spot);
         if (there && !put) {
             // Somebody else's soil filled this pile meanwhile: another one, or packed into the walls if they are all full.
-            spot = colony.hill().nightSoil().pickPile(level);
+            spot = hill.nightSoil().pickPile(level);
             ticks = 0;
             if (spot != null) {
                 return;
@@ -193,16 +200,16 @@ public class CarryPelletGoal extends Goal {
         // (it can place the pellet from the next cell), and tries again when it is out of the way.
         if (ant.getBoundingBox().intersects(new AABB(spot))) {
             if (!errand.isWalking() && !stepAside(level)) {
-                spot = colony.hill().pickMoundSpot(level, ant.getRandom(), ant.getUUID());
+                spot = hill.pickMoundSpot(level, ant.getRandom(), ant.getUUID());
                 walkToSpot();
             }
             return;
         }
-        if (!colony.hill().placePellet(level, spot)) {
-            if (colony.hill().isMoundSpotValid(level, spot)) {
+        if (!hill.placePellet(level, spot)) {
+            if (hill.isMoundSpotValid(level, spot)) {
                 return; // someone is standing in the spot: wait a moment (the spot is ours, nobody else carries soil to it)
             }
-            spot = colony.hill().pickMoundSpot(level, ant.getRandom(), ant.getUUID());
+            spot = hill.pickMoundSpot(level, ant.getRandom(), ant.getUUID());
             walkToSpot();
             return;
         }

@@ -5,6 +5,7 @@ import java.util.EnumSet;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.ColonyParts;
 import com.antcolonies.colony.Soldiers;
 import com.antcolonies.entity.TermiteSoldierEntity;
 
@@ -33,6 +34,9 @@ public class GuardPostGoal extends Goal {
     private final TermiteSoldierEntity soldier;
     @Nullable
     private Colony colony;
+    /** Its colony's soldiers (asked once in {@link #canUse}: only a species that lists soldiers has posts). */
+    @Nullable
+    private Soldiers soldiers;
     @Nullable
     private Soldiers.Post post;
     /** The walk to its post; a post it found no way to is left alone for a minute ({@link #AVOID_TICKS}). */
@@ -62,7 +66,8 @@ public class GuardPostGoal extends Goal {
         if (colony == null) {
             return false;
         }
-        post = colony.soldiers().claimPost(level, soldier, errand.leftAlone());
+        soldiers = colony.part(ColonyParts.SOLDIERS).orElse(null);
+        post = soldiers == null ? null : soldiers.claimPost(level, soldier, errand.leftAlone());
         if (post == null) {
             nextTry = now + RETRY_TICKS;
             return false;
@@ -76,7 +81,7 @@ public class GuardPostGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        return colony != null && post != null && !lost;
+        return colony != null && soldiers != null && post != null && !lost;
     }
 
     @Override
@@ -93,15 +98,16 @@ public class GuardPostGoal extends Goal {
         // Stopped for something else (drumming, being fed): it keeps its post and comes back to it.
         post = null;
         colony = null;
+        soldiers = null;
     }
 
     @Override
     public void tick() {
-        if (colony == null || post == null || !(soldier.level() instanceof ServerLevel level)) {
+        if (colony == null || soldiers == null || post == null || !(soldier.level() instanceof ServerLevel level)) {
             return;
         }
         // Once a second: is it still a post, and still its own?
-        if (soldier.tickCount % 20 == soldier.getId() % 20 && !colony.soldiers().holds(level, soldier, post, errand.leftAlone())) {
+        if (soldier.tickCount % 20 == soldier.getId() % 20 && !soldiers.holds(level, soldier, post, errand.leftAlone())) {
             lost = true;
             return;
         }
@@ -142,8 +148,8 @@ public class GuardPostGoal extends Goal {
         if (post != null) {
             errand.leaveAlone(post.cell());
         }
-        if (colony != null) {
-            colony.soldiers().releasePost(soldier.getUUID());
+        if (soldiers != null) {
+            soldiers.releasePost(soldier.getUUID());
         }
         nextTry = level.getGameTime() + 20;
     }

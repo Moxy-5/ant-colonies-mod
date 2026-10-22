@@ -278,9 +278,10 @@ public class Recruits {
                         colony.profile().food().door().map(SpeciesProfile.DoorNumbers::touchReach).orElse(0.0)));
                 around = around.minmax(new AABB(colony.nest().getEntrance()).inflate(reach));
             }
+            Door door = colony.part(ColonyParts.DOOR).orElse(null);
             List<AbstractAntEntity> met = new ArrayList<>(level.getEntitiesOfClass(AbstractAntEntity.class, around,
                     other -> other != finder && other.isAlive() && other.isColonyWorker() && colony.getId().equals(other.getColonyId())
-                            && !other.hasFullMandibles() && !other.isCarryingSeed() && !colony.door().isOut(other.getUUID())
+                            && !other.hasFullMandibles() && !other.isCarryingSeed() && !(door != null && door.isOut(other.getUUID()))
                             && !recruits.containsKey(other.getUUID()) && !calling.containsKey(other.getUUID())
                             && colony.nest().isInside(level, other.blockPosition()) && other.mayDo(ColonyRole.FORAGER)));
             met.sort(Comparator.comparingDouble(other -> other.distanceToSqr(finder)));
@@ -289,7 +290,7 @@ public class Recruits {
                     break;
                 }
                 recruits.put(other.getUUID(), new Told(call.patch, now + RECRUIT_TICKS));
-                colony.spots().found(other.getUUID(), call.patch); // the patch is its spot now
+                colony.part(ColonyParts.FORAGER_SPOTS).ifPresent(spots -> spots.found(other.getUUID(), call.patch)); // the patch is its spot now
                 call.real++;
                 call.left--;
             }
@@ -302,11 +303,14 @@ public class Recruits {
     /** The call is over: any nestmates still wanted are forager numbers instead (they hold the patch as their spot and go out). */
     private void finish(ServerLevel level, UUID finder, Calling call) {
         calling.remove(finder);
-        int numberForagers = colony.field().foragersInside(level) - colony.spots().holders();
+        ForagerSpots spots = colony.part(ColonyParts.FORAGER_SPOTS).orElse(null);
+        int numberForagers = colony.field().foragersInside(level) - (spots == null ? 0 : spots.holders());
         int sent = Math.max(0, Math.min(call.left, numberForagers));
         if (sent > 0) {
-            colony.spots().addHeld(call.patch, sent, 0);
-            colony.door().recruitedNumbers(level, sent);
+            if (spots != null) {
+                spots.addHeld(call.patch, sent, 0);
+            }
+            colony.part(ColonyParts.DOOR).ifPresent(door -> door.recruitedNumbers(level, sent));
         }
         calls++;
         calledOut += call.real + sent;

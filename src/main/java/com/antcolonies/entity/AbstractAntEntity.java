@@ -8,6 +8,10 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import com.antcolonies.colony.ColonyParts;
+import com.antcolonies.colony.Door;
+import com.antcolonies.colony.ForagerSpots;
+import com.antcolonies.colony.Recruits;
 import com.antcolonies.nav.AntMoveControl;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
@@ -565,13 +569,14 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
                 && !(attacker instanceof AbstractAntEntity insect && getColonyId() != null && getColonyId().equals(insect.getColonyId()))) {
             Colony colony = getColony();
             if (colony != null) {
-                colony.alarm().memberHurt(serverLevel, attacker);
-                colony.patrol().danger(serverLevel, this, "hurt by " + attacker.getType().toShortString()); // a patroller turns back
+                colony.part(ColonyParts.ALARM).ifPresent(alarm -> alarm.memberHurt(serverLevel, attacker));
+                colony.part(ColonyParts.PATROL).ifPresent(patrol -> patrol.danger(serverLevel, this, "hurt by " + attacker.getType().toShortString())); // a patroller turns back
                 // The danger memory (brain step 4g): the place is remembered, and a forager hurt near its spot gives it up.
                 colony.danger().hurt(serverLevel, blockPosition(), attacker.getType().toShortString(), isDeadOrDying());
-                BlockPos spot = colony.spots().spotOf(getUUID());
+                ForagerSpots spots = colony.part(ColonyParts.FORAGER_SPOTS).orElse(null);
+                BlockPos spot = spots == null ? null : spots.spotOf(getUUID());
                 if (spot != null && colony.danger().numbers() != null && spot.distSqr(blockPosition()) <= Mth.square(colony.danger().numbers().reach())) {
-                    colony.spots().giveUp(getUUID());
+                    spots.giveUp(getUUID());
                 }
             }
         }
@@ -618,8 +623,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         }
         for (Colony theirs : ColonyManager.get(level).getColonies()) {
             if (theirs != colony && theirs.getSpecies().equals(colony.getSpecies()) && colony.neighbours().canMeet(theirs)
-                    && theirs.getCenter().distSqr(blockPosition()) <= Mth.square(theirs.trunkTrails().longestTip() + 2.0)
-                    && theirs.trunkTrails().isOnTrail(blockPosition())) {
+                    && theirs.part(ColonyParts.TRUNK_TRAILS).map(trunk -> theirs.getCenter().distSqr(blockPosition()) <= Mth.square(trunk.longestTip() + 2.0)
+                            && trunk.isOnTrail(blockPosition())).orElse(false)) {
                 UUID trail = new UUID(theirs.getId().getMostSignificantBits() ^ getUUID().getMostSignificantBits(),
                         theirs.getId().getLeastSignificantBits() ^ getUUID().getLeastSignificantBits());
                 colony.neighbours().met(level, blockPosition(), theirs.getId(), trail); // (stepped onto their trail)
@@ -852,7 +857,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             return null;
         }
         Colony colony = getColony();
-        return colony == null ? null : colony.hiddenTrips().ways(serverLevel);
+        return colony == null ? null : colony.part(ColonyParts.HIDDEN_TRIPS).map(trips -> trips.ways(serverLevel)).orElse(null);
     }
 
     /** Tests only: the habits every walk gets (null: the usual ones, see {@link #walkHabits}). */
@@ -908,11 +913,13 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         // A forager home with a seed touches the ants waiting inside by the entrance as it walks in (Gordon's rule, see colony.Door).
         if (tickCount % 5 == getId() % 5 && getColonyId() != null && level() instanceof ServerLevel serverLevel) {
             Colony colony = getColony();
-            if (colony != null && isCarryingSeed() && colony.door().isOn(serverLevel) && colony.nest().isInside(serverLevel, blockPosition())) {
-                colony.door().homecomer(serverLevel, this, true);
+            Door door = colony == null ? null : colony.part(ColonyParts.DOOR).orElse(null);
+            if (door != null && isCarryingSeed() && door.isOn(serverLevel) && colony.nest().isInside(serverLevel, blockPosition())) {
+                door.homecomer(serverLevel, this, true);
             }
-            if (colony != null && colony.recruits().isLaying(getUUID())) {
-                colony.recruits().layingTick(serverLevel, this); // home from a rich patch: its scent line, then its call (colony.Recruits)
+            Recruits recruits = colony == null ? null : colony.part(ColonyParts.RECRUITS).orElse(null);
+            if (recruits != null && recruits.isLaying(getUUID())) {
+                recruits.layingTick(serverLevel, this); // home from a rich patch: its scent line, then its call (colony.Recruits)
             }
         }
         if (navigator.isAttached()) {

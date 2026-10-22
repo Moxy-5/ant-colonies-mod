@@ -2,6 +2,7 @@ package com.antcolonies.entity;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.colony.ColonyParts;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.entity.goal.GoInsideGoal;
@@ -221,9 +222,9 @@ public class WorkerAntEntity extends AbstractAntEntity {
             Colony colony = manager.getColony(getColonyId());
             if (colony != null) {
                 dropLoadOnDeath(serverLevel, colony);
-                colony.patrol().died(serverLevel, getUUID()); // a patroller killed never comes back: its way stays shut today
-                colony.spots().died(getUUID()); // its spot is lost with it
-                colony.recruits().died(getUUID());
+                colony.part(ColonyParts.PATROL).ifPresent(patrol -> patrol.died(serverLevel, getUUID())); // a patroller killed never comes back: its way stays shut today
+                colony.part(ColonyParts.FORAGER_SPOTS).ifPresent(spots -> spots.died(getUUID())); // its spot is lost with it
+                colony.part(ColonyParts.RECRUITS).ifPresent(recruits -> recruits.died(getUUID()));
 
                 colony.setCount(CASTE, colony.getCount(CASTE) - 1);
                 manager.markChanged();

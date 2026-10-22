@@ -12,6 +12,7 @@ import java.util.UUID;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Alarm;
 import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.ColonyParts;
 import com.antcolonies.colony.ForagingHoles;
 import com.antcolonies.colony.NestPlan;
 import com.antcolonies.entity.AbstractAntEntity;
@@ -104,17 +105,17 @@ public class TermiteAlarmTests {
                     chicken[0].moveTo(spot.getX() + 0.5, spot.getY(), spot.getZ() + 0.5, 0.0F, 0.0F);
                     level.addFreshEntity(chicken[0]);
                     at[0] = tick;
-                    AntColoniesMod.LOGGER.info("[alarm-test] tick {}: a chicken at the hay; {}", tick, colony.alarm().describe(level));
+                    AntColoniesMod.LOGGER.info("[alarm-test] tick {}: a chicken at the hay; {}", tick, colony.part(ColonyParts.ALARM).orElseThrow().describe(level));
                 }
                 return;
             }
-            if (at[1] < 0 && colony.alarm().level(level) >= 2) {
+            if (at[1] < 0 && colony.part(ColonyParts.ALARM).orElseThrow().level(level) >= 2) {
                 at[1] = tick;
                 AntColoniesMod.LOGGER.info("[alarm-test] tick {}: alarm up {} ticks after the chicken came; {}", tick, tick - at[0],
-                        colony.alarm().describe(level));
+                        colony.part(ColonyParts.ALARM).orElseThrow().describe(level));
             }
             if (at[1] >= 0) {
-                if (colony.alarm().level(level) >= 2) { // (it calms down again after 30 seconds, and foraging starts again)
+                if (colony.part(ColonyParts.ALARM).orElseThrow().level(level) >= 2) { // (it calms down again after 30 seconds, and foraging starts again)
                     helper.assertFalse(colony.isForagingTime(level), "still foraging time with the alarm up");
                 }
             }
@@ -126,7 +127,7 @@ public class TermiteAlarmTests {
             if (tick % 500 == 0) {
                 AntColoniesMod.LOGGER.info("[alarm-test] tick {}: chicken {} health {}, minors {}; {}", tick, chicken[0].blockPosition().toShortString(),
                         chicken[0].getHealth(), minors.stream().map(m -> m.blockPosition().toShortString() + (m.isDrumming() ? " drumming" : "")).toList(),
-                        colony.alarm().describe(level));
+                        colony.part(ColonyParts.ALARM).orElseThrow().describe(level));
             }
         });
         helper.succeedWhen(() -> {
@@ -135,7 +136,7 @@ public class TermiteAlarmTests {
             helper.assertTrue(at[1] >= 0, "the alarm did not go up");
             // At least one: the first minor may kill the chicken (two bites) before the drumming reaches the others 15 blocks
             // off, and they go in behind the workers (a full run, 2026-10-14: only 1 of 3 had felt it, the chicken dead).
-            helper.assertTrue(minors.stream().anyMatch(minor -> colony.alarm().hasHeard(minor.getUUID())), "no minor felt the alarm");
+            helper.assertTrue(minors.stream().anyMatch(minor -> colony.part(ColonyParts.ALARM).orElseThrow().hasHeard(minor.getUUID())), "no minor felt the alarm");
             helper.assertFalse(biters.isEmpty(), "no minor has bitten the chicken");
             helper.assertFalse(chicken[0].isAlive(), "the chicken is still alive (" + chicken[0].getHealth() + " health)");
             boolean workerOut = !level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds().inflate(8),
@@ -182,8 +183,8 @@ public class TermiteAlarmTests {
                 level.setBlock(tunnel.hole(), Blocks.STONE.defaultBlockState(), 3); // no foraging holes yet: only the middle one
             }
             // A young mound still being built: its hollow shaft over the hole is not roofed over yet (open to the sky).
-            colony.mound().buildInstantly(level, 3);
-            for (java.util.Map.Entry<BlockPos, com.antcolonies.colony.MoundPlan.Part> part : colony.mound().getParts(level).entrySet()) {
+            colony.part(ColonyParts.MOUND).orElseThrow().buildInstantly(level, 3);
+            for (java.util.Map.Entry<BlockPos, com.antcolonies.colony.MoundPlan.Part> part : colony.part(ColonyParts.MOUND).orElseThrow().getParts(level).entrySet()) {
                 if (part.getValue() == com.antcolonies.colony.MoundPlan.Part.OPEN) {
                     for (BlockPos above = part.getKey().above(); above.getY() < part.getKey().getY() + 12; above = above.above()) {
                         level.setBlock(above, Blocks.AIR.defaultBlockState(), 3);
@@ -221,7 +222,7 @@ public class TermiteAlarmTests {
             }
             // Over when the chicken is dead, or when the minors have gone in behind the workers and left it outside
             // (real soldiers guard the foragers, then go in last and the hole is sealed).
-            if (at[1] < 0 && (!chicken[0].isAlive() || !colony.soldiers().minorsOut(level))) {
+            if (at[1] < 0 && (!chicken[0].isAlive() || !colony.part(ColonyParts.SOLDIERS).orElseThrow().minorsOut(level))) {
                 at[1] = tick;
             }
             if (at[1] >= 0 && at[2] < 0 && !colony.foragingHoles().isAnyoneOutside(level)) {
@@ -236,7 +237,7 @@ public class TermiteAlarmTests {
                                     .map(g -> g.getGoal().getClass().getSimpleName()).toList());
                 }
                 AntColoniesMod.LOGGER.info("[middle-hole] tick {} above {} part {} covered {} height {} workers:{}", tick,
-                        level.getBlockState(hole.above()), colony.mound().getParts(level).get(hole.above()), colony.nest().isEntranceCovered(level),
+                        level.getBlockState(hole.above()), colony.part(ColonyParts.MOUND).orElseThrow().getParts(level).get(hole.above()), colony.nest().isEntranceCovered(level),
                         level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, hole.getX(), hole.getZ()) - hole.getY(), all);
             }
             if (tick % 100 == 0) {
@@ -247,10 +248,10 @@ public class TermiteAlarmTests {
                                     .map(g -> g.getGoal().getClass().getSimpleName()).toList());
                 }
                 AntColoniesMod.LOGGER.info("[middle-hole] tick {}: chicken {}, alarm {}, foraging {}, hole {} ({}), wants plugging {}, anyone outside {}, minors out {}{}",
-                        tick, chicken[0].isAlive() ? "alive" : "dead", colony.alarm().level(level), colony.isForagingTime(level),
+                        tick, chicken[0].isAlive() ? "alive" : "dead", colony.part(ColonyParts.ALARM).orElseThrow().level(level), colony.isForagingTime(level),
                         ForagingHoles.isOpen(level, hole) ? "open" : "shut", level.getBlockState(hole).getBlock().getName().getString(),
                         colony.foragingHoles().wantsPlugging(level), colony.foragingHoles().isAnyoneOutside(level),
-                        colony.soldiers().minorsOut(level), near);
+                        colony.part(ColonyParts.SOLDIERS).orElseThrow().minorsOut(level), near);
             }
         });
         helper.succeedWhen(() -> {
@@ -262,7 +263,7 @@ public class TermiteAlarmTests {
             // there), and then it opens only into the mound's tunnels, no longer to the sky (by design it is then not plugged).
             helper.assertTrue(!ForagingHoles.isOpen(level, colony.nest().getEntrance()) || colony.nest().isEntranceCovered(level),
                     "the middle hole is still open to the sky");
-            helper.assertTrue(colony.alarm().level(level) >= 2 || helper.getTick() - at[2] <= 400,
+            helper.assertTrue(colony.part(ColonyParts.ALARM).orElseThrow().level(level) >= 2 || helper.getTick() - at[2] <= 400,
                     "the middle hole was only plugged " + (helper.getTick() - at[2]) + " ticks after everybody was in");
         });
     }
@@ -321,10 +322,10 @@ public class TermiteAlarmTests {
                 }
             }
             // As the game does it: the break is reported, then the block goes.
-            colony.alarm().blockBroken(level, breach[0], null);
+            colony.part(ColonyParts.ALARM).orElseThrow().blockBroken(level, breach[0], null);
             level.setBlock(breach[0], Blocks.AIR.defaultBlockState(), 3);
             AntColoniesMod.LOGGER.info("[alarm-test] tick {}: broke into the garden at {}; {}", helper.getTick(), breach[0].toShortString(),
-                    colony.alarm().describe(level));
+                    colony.part(ColonyParts.ALARM).orElseThrow().describe(level));
         });
         helper.onEachTick(() -> {
             Colony colony = TermiteMoundTests.colony(helper);
@@ -339,23 +340,23 @@ public class TermiteAlarmTests {
             if (helper.getTick() % 200 == 0) {
                 AntColoniesMod.LOGGER.info("[alarm-test] tick {}: soldiers {}; {}", helper.getTick(),
                         soldiers.stream().map(s -> s.getRank() + " " + s.blockPosition().toShortString() + (s.isDrumming() ? " drumming" : "")).toList(),
-                        colony.alarm().describe(level));
+                        colony.part(ColonyParts.ALARM).orElseThrow().describe(level));
             }
         });
         helper.succeedWhen(() -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null && breach[0] != null, "not broken into yet");
-            helper.assertTrue(colony.alarm().level(level) >= 3, "the alarm is not at 3");
-            helper.assertTrue(soldiers.stream().allMatch(soldier -> colony.alarm().hasHeard(soldier.getUUID())), "not every soldier felt the alarm");
+            helper.assertTrue(colony.part(ColonyParts.ALARM).orElseThrow().level(level) >= 3, "the alarm is not at 3");
+            helper.assertTrue(soldiers.stream().allMatch(soldier -> colony.part(ColonyParts.ALARM).orElseThrow().hasHeard(soldier.getUUID())), "not every soldier felt the alarm");
             Set<Long> times = new HashSet<>();
-            soldiers.forEach(soldier -> times.add(colony.alarm().heardAt(soldier.getUUID())));
+            soldiers.forEach(soldier -> times.add(colony.part(ColonyParts.ALARM).orElseThrow().heardAt(soldier.getUUID())));
             helper.assertTrue(times.size() >= 2, "every soldier felt it at the same moment (no spreading)");
             helper.assertTrue(minorInTheBreach[0], "no minor stood in the breach");
             helper.assertTrue(colony.profile().nest().isPlug(level.getBlockState(breach[0])), "the breach is not sealed");
             double farthestMinor = 0;
             double nearestMajor = Double.MAX_VALUE;
             for (TermiteSoldierEntity soldier : soldiers) {
-                Alarm.Task task = colony.alarm().taskFor(level, soldier);
+                Alarm.Task task = colony.part(ColonyParts.ALARM).orElseThrow().taskFor(level, soldier);
                 helper.assertTrue(task != null && task.cell() != null && soldier.blockPosition().equals(task.cell()),
                         soldier.getRank() + " at " + soldier.blockPosition().toShortString() + " is not at its spot " + (task == null ? null : task.cell()));
                 double distance = task.cell().distSqr(breach[0]);
@@ -383,31 +384,31 @@ public class TermiteAlarmTests {
             helper.assertTrue(colony != null, "no termite colony");
             TestClock.still(helper, 0.0); // midnight: foraging time
             colony.setCount(WorkerAntEntity.CASTE, 20);
-            helper.assertTrue(colony.soldiers().wanted(level, Rank.MINOR) == 2 && colony.soldiers().wanted(level, Rank.MAJOR) == 1,
+            helper.assertTrue(colony.part(ColonyParts.SOLDIERS).orElseThrow().wanted(level, Rank.MINOR) == 2 && colony.part(ColonyParts.SOLDIERS).orElseThrow().wanted(level, Rank.MAJOR) == 1,
                     "20 workers should want 2 minors and 1 major");
             TermiteSoldierTests.digNestAtOnce(level, colony);
             BlockPos chamber = colony.nest().getHomeChamber(level).center();
             // Three blocks of the royal chamber's walls: under it, over it, and a side wall.
             BlockPos side = Direction.Plane.HORIZONTAL.stream().map(direction -> chamber.relative(direction, 2))
-                    .filter(wall -> colony.alarm().isBreakIn(level, wall)).findFirst().orElseThrow();
+                    .filter(wall -> colony.part(ColonyParts.ALARM).orElseThrow().isBreakIn(level, wall)).findFirst().orElseThrow();
             BlockPos[] walls = {chamber.below(), chamber.above(), side};
             for (int i = 0; i < 3; i++) {
-                helper.assertTrue(colony.alarm().isBreakIn(level, walls[i]), "breaking " + walls[i].toShortString() + " is no break-in");
-                colony.alarm().blockBroken(level, walls[i], null);
-                helper.assertTrue(colony.alarm().level(level) == (i < 2 ? 3 : 4), "after " + (i + 1) + " break-ins the alarm is at "
-                        + colony.alarm().level(level));
+                helper.assertTrue(colony.part(ColonyParts.ALARM).orElseThrow().isBreakIn(level, walls[i]), "breaking " + walls[i].toShortString() + " is no break-in");
+                colony.part(ColonyParts.ALARM).orElseThrow().blockBroken(level, walls[i], null);
+                helper.assertTrue(colony.part(ColonyParts.ALARM).orElseThrow().level(level) == (i < 2 ? 3 : 4), "after " + (i + 1) + " break-ins the alarm is at "
+                        + colony.part(ColonyParts.ALARM).orElseThrow().level(level));
             }
             helper.assertFalse(colony.isForagingTime(level), "foraging during a level 4 alarm");
-            helper.assertTrue(colony.soldiers().wanted(level, Rank.MINOR) == 3 && colony.soldiers().wanted(level, Rank.MAJOR) == 1,
-                    "after a level 4 the colony should want 3 minors and 1 major, it wants " + colony.soldiers().wanted(level, Rank.MINOR) + " and "
-                            + colony.soldiers().wanted(level, Rank.MAJOR));
-            colony.alarm().raise(level, 1, chamber, null);
-            helper.assertTrue(colony.alarm().level(level) == 4, "footsteps lowered the alarm");
+            helper.assertTrue(colony.part(ColonyParts.SOLDIERS).orElseThrow().wanted(level, Rank.MINOR) == 3 && colony.part(ColonyParts.SOLDIERS).orElseThrow().wanted(level, Rank.MAJOR) == 1,
+                    "after a level 4 the colony should want 3 minors and 1 major, it wants " + colony.part(ColonyParts.SOLDIERS).orElseThrow().wanted(level, Rank.MINOR) + " and "
+                            + colony.part(ColonyParts.SOLDIERS).orElseThrow().wanted(level, Rank.MAJOR));
+            colony.part(ColonyParts.ALARM).orElseThrow().raise(level, 1, chamber, null);
+            helper.assertTrue(colony.part(ColonyParts.ALARM).orElseThrow().level(level) == 4, "footsteps lowered the alarm");
             Colony loaded = Colony.load(colony.save());
-            helper.assertTrue(loaded.alarm().level(level) == 4 && loaded.alarm().soldierBoost(level) > 1.0F, "the alarm was not kept after a reload");
+            helper.assertTrue(loaded.part(ColonyParts.ALARM).orElseThrow().level(level) == 4 && loaded.part(ColonyParts.ALARM).orElseThrow().soldierBoost(level) > 1.0F, "the alarm was not kept after a reload");
             // A block far from the nest and the mound is no break-in.
-            helper.assertFalse(colony.alarm().isBreakIn(level, chamber.offset(8, 0, 8)), "a block away from the nest counted as a break-in");
-            colony.alarm().calmForTests();
+            helper.assertFalse(colony.part(ColonyParts.ALARM).orElseThrow().isBreakIn(level, chamber.offset(8, 0, 8)), "a block away from the nest counted as a break-in");
+            colony.part(ColonyParts.ALARM).orElseThrow().calmForTests();
             helper.succeed();
         });
     }
@@ -437,16 +438,16 @@ public class TermiteAlarmTests {
         });
         helper.runAfterDelay(200, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
-            colony.alarm().raise(level, 1, colony.getCenter().above(), null);
+            colony.part(ColonyParts.ALARM).orElseThrow().raise(level, 1, colony.getCenter().above(), null);
             raised[0] = helper.getTick();
         });
         helper.onEachTick(() -> {
             Colony colony = TermiteMoundTests.colony(helper);
-            if (colony == null || raised[0] < 0 || colony.alarm().level(level) == 0) {
+            if (colony == null || raised[0] < 0 || colony.part(ColonyParts.ALARM).orElseThrow().level(level) == 0) {
                 return;
             }
             for (TermiteSoldierEntity minor : minors) {
-                Alarm.Task task = colony.alarm().taskFor(level, minor);
+                Alarm.Task task = colony.part(ColonyParts.ALARM).orElseThrow().taskFor(level, minor);
                 if (task != null && minor.blockPosition().equals(task.cell()) && minor.isDrumming()) {
                     drummedAtTheSpot.add(minor.getUUID());
                 }
@@ -456,7 +457,7 @@ public class TermiteAlarmTests {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null && raised[0] >= 0, "no footsteps yet");
             helper.assertTrue(drummedAtTheSpot.size() == 2, drummedAtTheSpot.size() + " minors came to look and drummed, not 2");
-            helper.assertTrue(colony.alarm().level(level) == 0, "the alarm has not calmed down");
+            helper.assertTrue(colony.part(ColonyParts.ALARM).orElseThrow().level(level) == 0, "the alarm has not calmed down");
         });
     }
 }

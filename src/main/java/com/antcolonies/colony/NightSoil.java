@@ -40,6 +40,8 @@ public class NightSoil {
     private static final int CLAIM_TICKS = 400;
 
     private final Colony colony;
+    /** The hill the piles go up onto. */
+    private final Hill hill;
     /** Pellets counted under the entrance by older saves, laid out as piles once there is room (see {@link #layOutOldHeap}). */
     private final List<BlockState> oldHeap = new ArrayList<>();
     /** The pile each carrier is on its way to: ant -> pile. Not saved. */
@@ -48,8 +50,9 @@ public class NightSoil {
     private record Claim(BlockPos pile, long until) {
     }
 
-    NightSoil(Colony colony) {
+    NightSoil(Colony colony, Hill hill) {
         this.colony = colony;
+        this.hill = hill;
     }
 
     private SpeciesProfile.NightSoil numbers() {
@@ -201,7 +204,7 @@ public class NightSoil {
      * walls, as the soil dug once the hill is finished is (otherwise they would lie in the way for good).
      */
     void tick(ServerLevel level) {
-        if (level.getGameTime() % 400 != 0 || colony.hill().hasMoundRoom(level)) {
+        if (level.getGameTime() % 400 != 0 || hill.hasMoundRoom(level)) {
             return;
         }
         int packed = 0;

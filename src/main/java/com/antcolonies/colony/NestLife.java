@@ -114,7 +114,7 @@ public class NestLife {
 
     /** How many founders dig: the queen, and the king with her (royal pairs). */
     int founders() {
-        return 1 + (colony.kingCare().isAlive() ? 1 : 0);
+        return 1 + (colony.part(ColonyParts.KING_CARE).map(KingCare::isAlive).orElse(false) ? 1 : 0);
     }
 
     /** Whether the founders still have digging (or closing in) to do while away. */
@@ -197,7 +197,7 @@ public class NestLife {
             changed |= foundWhileAway(level);
             changed |= digStoreAway(level);
             changed |= colony.queenCare().liveAway(level, queenHome, sealedIn, queenSize);
-            changed |= colony.kingCare().liveAway(level);
+            changed |= colony.part(ColonyParts.KING_CARE).map(king -> king.liveAway(level)).orElse(false);
             changed |= nurse(level);
             changed |= growNodules(level);
         } else {
@@ -229,7 +229,7 @@ public class NestLife {
             if (one.isEgg()) {
                 long left = one.left() < 0 ? numbers.hatchTicks() : one.left() - 20;
                 if (left <= 0) {
-                    young.set(i, Brood.Young.larva(0, 0, colony.soldiers().rankForNewNymph(level)));
+                    young.set(i, Brood.Young.larva(0, 0, colony.brood().soldierWanted(level)));
                     colony.away().note(level, AwayReport.What.HATCHED, 1);
                 } else {
                     young.set(i, Brood.Young.egg(left));
@@ -238,7 +238,7 @@ public class NestLife {
                 continue;
             }
             TermiteSoldierEntity.Rank rank = one.rank();
-            if (one.fed() < colony.soldiers().mealFor(rank)) {
+            if (one.fed() < colony.brood().mealFor(rank)) {
                 long hungry = colony.isHungerOn() ? one.left() + 20 : 0;
                 if (hungry >= numbers.larvaStarveTicks()) {
                     young.remove(i--);
@@ -252,7 +252,7 @@ public class NestLife {
                 continue;
             }
             if (rank == null && colony.getCount(WorkerAntEntity.CASTE) >= colony.profile().colony().maxWorkers()) {
-                TermiteSoldierEntity.Rank wanted = colony.soldiers().rankForNewNymph(level);
+                TermiteSoldierEntity.Rank wanted = colony.brood().soldierWanted(level);
                 if (wanted != null) {
                     young.set(i, Brood.Young.larva(one.fed(), 0, wanted)); // it eats the soldier's bigger meal first
                     changed = true;
@@ -312,21 +312,22 @@ public class NestLife {
         nurseWork = Math.min(nurseWork + nurses * 20.0 / NURSE_JOB_TICKS, Math.max(1, nurses));
         boolean changed = false;
         QueenCare queen = colony.queenCare();
-        Bakery bakery = colony.bakery();
+        Bakery bakery = colony.part(ColonyParts.BAKERY).orElse(null);
+        KingCare king = colony.part(ColonyParts.KING_CARE).orElse(null);
         while (nurseWork >= 1) {
             if (queen.wantsFoodAway(level, queenHome) && nurseFoodLeft(level) > 0) {
                 queen.feedQueen(level, takePiece(true));
                 colony.away().note(level, AwayReport.What.QUEEN_FED, 1);
-            } else if (colony.kingCare().wantsFood(level) && nurseFoodLeft(level) > 0) {
+            } else if (king != null && king.wantsFood(level) && nurseFoodLeft(level) > 0) {
                 takePiece(false);
-                colony.kingCare().fed(level);
+                king.fed(level);
                 colony.away().note(level, AwayReport.What.KING_FED, 1);
             } else if (colony.brood().hungriestInside() >= 0 && nurseFoodLeft(level) > 0) {
                 int larva = colony.brood().hungriestInside();
                 takePiece(false);
                 colony.brood().feedInside(larva);
                 colony.away().note(level, AwayReport.What.YOUNG_FED, 1);
-            } else if (bakery.needsBreadAway(level) && colony.food().getFood() > 0) {
+            } else if (bakery != null && bakery.needsBreadAway(level) && colony.food().getFood() > 0) {
                 boolean rich = colony.food().takeCounted(bakery.wantsRichBread());
                 bakery.countIn(rich);
                 colony.ledger().addNurseFood(1);
@@ -348,12 +349,13 @@ public class NestLife {
      */
     public int nurseFoodLeft(ServerLevel level) {
         if (colony.profile().food().makesBread()) {
-            return colony.bakery().getBread();
+            return colony.part(ColonyParts.BAKERY).map(Bakery::getBread).orElse(0);
         }
-        if (!colony.garden().exists()) {
+        FungusGarden garden = colony.part(ColonyParts.FUNGUS_GARDEN).orElse(null);
+        if (garden == null) {
             return 0;
         }
-        int nodules = colony.away().isHere(level) ? colony.garden().available(level) : colony.garden().seenNodules();
+        int nodules = colony.away().isHere(level) ? garden.available(level) : garden.seenNodules();
         return Math.max(0, nodules + colony.ledger().nurseFood());
     }
 
@@ -371,7 +373,7 @@ public class NestLife {
 
     /** Takes a piece the brain knows is there; returns whether it was rich bread ({@code wantRich}: rich first, for the queen). */
     private boolean takePiece(boolean wantRich) {
-        boolean rich = colony.profile().food().makesBread() && colony.bakery().takeCounted(wantRich);
+        boolean rich = colony.profile().food().makesBread() && colony.part(ColonyParts.BAKERY).map(bakery -> bakery.takeCounted(wantRich)).orElse(false);
         colony.ledger().addNurseFood(-1);
         return rich;
     }
@@ -385,8 +387,8 @@ public class NestLife {
      */
     private boolean growNodules(ServerLevel level) {
         SpeciesProfile.GardenNumbers numbers = colony.profile().garden().orElse(null);
-        FungusGarden garden = colony.garden();
-        if (numbers == null || garden.seenCombs() == 0) {
+        FungusGarden garden = colony.part(ColonyParts.FUNGUS_GARDEN).orElse(null);
+        if (numbers == null || garden == null || garden.seenCombs() == 0) {
             return false;
         }
         NestLedger ledger = colony.ledger();

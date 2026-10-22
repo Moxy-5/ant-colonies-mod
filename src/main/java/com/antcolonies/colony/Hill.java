@@ -65,7 +65,7 @@ public class Hill {
     Hill(Colony colony) {
         this.colony = colony;
         this.center = colony.getCenter();
-        this.nightSoil = new NightSoil(colony);
+        this.nightSoil = new NightSoil(colony, this);
     }
 
     /** Its colony (for the parts registry's tick row). */

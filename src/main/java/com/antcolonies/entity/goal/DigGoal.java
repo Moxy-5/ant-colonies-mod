@@ -9,6 +9,9 @@ import org.jetbrains.annotations.Nullable;
 import com.antcolonies.block.TermiteHoleBlock;
 import com.antcolonies.block.TermiteMoundBlock;
 import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.ColonyParts;
+import com.antcolonies.colony.Hill;
+import com.antcolonies.colony.Mound;
 import com.antcolonies.colony.Nest;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.AbstractAntEntity;
@@ -81,6 +84,11 @@ public class DigGoal extends Goal {
         return target != null && !errand.isLeftAlone(target);
     }
 
+    /** Whether its colony builds a termite mound (the dug soil goes there, not onto a hill). */
+    private boolean buildsMound() {
+        return colony.part(ColonyParts.MOUND).map(mound -> mound.numbers() != null).orElse(false);
+    }
+
     /**
      * The morning clear-out of a species with a hill (real Pogonomyrmex: the nest maintenance workers carry out the
      * soil dug in the night first thing each morning, before they dig on): while the surface is open, a builder
@@ -89,7 +97,8 @@ public class DigGoal extends Goal {
      * (a plug, a plant in it) is always bitten: that is how the surface opens.
      */
     private boolean soilWaits(ServerLevel level) {
-        if (!ant.canPlaceBlocks() || colony.mound().numbers() != null || !colony.hill().hasMoundRoom(level)) {
+        Hill hill = colony.part(ColonyParts.HILL).orElse(null);
+        if (!ant.canPlaceBlocks() || buildsMound() || hill == null || !hill.hasMoundRoom(level)) {
             return false;
         }
         boolean plugged = colony.nest().isEntrancePlugged(level);
@@ -97,9 +106,9 @@ public class DigGoal extends Goal {
             return false; // the entrance comes first
         }
         if (ant.mayGoOut() && !plugged) {
-            return colony.hill().nightSoil().hasFreePile(level, ant.getUUID());
+            return hill.nightSoil().hasFreePile(level, ant.getUUID());
         }
-        return colony.hill().nightSoil().isFull(level);
+        return hill.nightSoil().isFull(level);
     }
 
     @Override
@@ -186,10 +195,11 @@ public class DigGoal extends Goal {
         // Every bite leaves a soil pellet in the mandibles (grass and roots turn into plain dirt), as long as
         // the hill still has room for it. Once the hill is complete the soil is simply left behind. A termite mound
         // takes one pellet per layer of a mound block from each dug block (one dug block builds one mound block).
-        boolean mound = colony.mound().numbers() != null;
+        Mound mound = colony.part(ColonyParts.MOUND).filter(built -> built.numbers() != null).orElse(null);
+        Hill hill = colony.part(ColonyParts.HILL).orElse(null);
         // Grass cut away where a runway of sheeting runs gives no soil.
         if (ant.canPlaceBlocks() && !colony.nest().foodWays().isRunwayPlant(level, target)
-                && (mound ? colony.mound().takePellet(level, target, ant.getUUID()) : colony.hill().hasMoundRoom(level))) {
+                && (mound != null ? mound.takePellet(level, target, ant.getUUID()) : hill != null && hill.hasMoundRoom(level))) {
             ant.setCarriedBlock(state.is(Blocks.GRASS_BLOCK) || state.is(Blocks.ROOTED_DIRT) ? Blocks.DIRT.defaultBlockState()
                     : state.getBlock() instanceof TermiteMoundBlock || state.getBlock() instanceof TermiteHoleBlock
                             || state.getBlock() instanceof com.antcolonies.block.MudCrustBlock
@@ -206,7 +216,7 @@ public class DigGoal extends Goal {
             level.destroyBlockProgress(ant.getId(), target, 9);
         } else if (progress >= 1.0F) {
             colony.nest().clearDigProgress(target);
-            colony.mound().blockDug(level, target);
+            colony.part(ColonyParts.MOUND).ifPresent(built -> built.blockDug(level, target));
             level.destroyBlockProgress(ant.getId(), target, -1);
             if (colony.nest().foodWays().isRunwayPlant(level, target) && colony.profile().food().plantFor(state) != null) {
                 colony.food().cutAwayForTheForagers(level, target); // food in the way of a runway: left for the foragers

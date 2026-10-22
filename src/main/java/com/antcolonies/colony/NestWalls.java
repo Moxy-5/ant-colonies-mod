@@ -263,9 +263,9 @@ public class NestWalls {
             return true;
         }
         Set<BlockPos> nest = colony.nest().nestCells(level);
-        Map<BlockPos, ?> mound = colony.mound().getParts(level);
+        Map<BlockPos, ?> mound = colony.moundParts(level);
         if (!nest.contains(target) || target.equals(center) || mound.containsKey(target) || colony.foragingHoles().isHole(level, target)
-                || colony.mound().getGalleries(level).contains(target)) {
+                || colony.part(ColonyParts.MOUND).map(built -> built.getGalleries(level).contains(target)).orElse(false)) {
             return true;
         }
         boolean allIn = true;

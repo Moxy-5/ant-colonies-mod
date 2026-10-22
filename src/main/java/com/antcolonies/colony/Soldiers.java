@@ -79,7 +79,7 @@ public class Soldiers {
             return 0;
         }
         // After repeated break-ins (alarm level 4) the colony raises more soldiers for a while.
-        int workers = Math.round(colony.getCount(WorkerAntEntity.CASTE) * colony.alarm().soldierBoost(level));
+        int workers = Math.round(colony.getCount(WorkerAntEntity.CASTE) * colony.part(ColonyParts.ALARM).map(alarm -> alarm.soldierBoost(level)).orElse(1.0F));
         return rank == Rank.MINOR ? numbers.wantedMinors(workers) : numbers.wantedMajors(workers);
     }
 
@@ -316,7 +316,7 @@ public class Soldiers {
             return false;
         }
         return !colony.nest().isInside(level, cell) && !colony.foragingHoles().isHole(level, cell)
-                && !colony.mound().getParts(level).containsKey(cell);
+                && !colony.moundParts(level).containsKey(cell);
     }
 
     // --- holding posts ------------------------------------------------------------------------------------------

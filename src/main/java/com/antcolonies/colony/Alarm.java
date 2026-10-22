@@ -187,7 +187,7 @@ public class Alarm {
         heard.clear();
         lookers.clear();
         waveStart = time;
-        List<TermiteSoldierEntity> soldiers = new ArrayList<>(colony.soldiers().getSoldiers(world));
+        List<TermiteSoldierEntity> soldiers = new ArrayList<>(colony.part(ColonyParts.SOLDIERS).map(part -> part.getSoldiers(world)).orElse(List.of()));
         soldiers.sort(Comparator.comparingDouble(soldier -> soldier.blockPosition().distSqr(at)));
         if (to == 1) {
             for (TermiteSoldierEntity soldier : soldiers) {
@@ -233,7 +233,7 @@ public class Alarm {
 
     /** Whether breaking this block breaks into the colony's home: a block of the mound, or a wall of the dug-out nest. */
     public boolean isBreakIn(Level world, BlockPos pos) {
-        if (colony.mound().getParts(world).containsKey(pos)) {
+        if (colony.moundParts(world).containsKey(pos)) {
             return true;
         }
         Set<BlockPos> planned = colony.nest().nestCells(world);
@@ -267,7 +267,7 @@ public class Alarm {
     /** Whether the player stands on the mound: on a block of it, or right round the entrance. */
     private boolean isOnMound(Level world, Player player) {
         BlockPos feet = player.blockPosition();
-        Map<BlockPos, MoundPlan.Part> parts = colony.mound().getParts(world);
+        Map<BlockPos, MoundPlan.Part> parts = colony.moundParts(world);
         if (parts.containsKey(feet) || parts.containsKey(feet.below())) {
             return true;
         }
@@ -424,7 +424,7 @@ public class Alarm {
         if (now == 0 || spot == null) {
             return Map.of();
         }
-        List<TermiteSoldierEntity> soldiers = new ArrayList<>(colony.soldiers().getSoldiers(world));
+        List<TermiteSoldierEntity> soldiers = new ArrayList<>(colony.part(ColonyParts.SOLDIERS).map(part -> part.getSoldiers(world)).orElse(List.of()));
         soldiers.sort(Comparator.comparingDouble(soldier -> soldier.blockPosition().distSqr(spot)));
         Map<UUID, Task> out = new HashMap<>();
         if (now == 1) {

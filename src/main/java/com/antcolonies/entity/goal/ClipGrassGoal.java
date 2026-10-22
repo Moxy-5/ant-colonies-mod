@@ -7,6 +7,7 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.colony.ColonyParts;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.nav.Foothold;
@@ -76,18 +77,18 @@ public class ClipGrassGoal extends Goal {
         if (fromInside && !colony.keepsASchedule()) {
             return false;
         }
-        if (!fromInside && !colony.door().mayGo(level, ant)) {
+        if (!fromInside && !colony.part(ColonyParts.DOOR).map(door -> door.mayGo(level, ant)).orElse(true)) {
             return false; // waits by the entrance for the homecomers' touches (Gordon's rule, see colony.Door)
         }
         grass = colony.food().findGrass(level, ant.blockPosition(), errand.leftAlone(), ant.getUUID(), fromInside);
-        if (grass == null || colony.recruits().passesBy(ant.getUUID(), grass)) {
+        if (grass == null || colony.part(ColonyParts.RECRUITS).map(recruits -> recruits.passesBy(ant.getUUID(), grass)).orElse(false)) {
             return false; // (a recruit on its way to its patch passes poorer food by)
         }
         colony.food().claimGrass(level, grass, ant.getUUID());
         if (!fromInside) {
-            colony.door().setOut(level, ant);
+            colony.part(ColonyParts.DOOR).ifPresent(door -> door.setOut(level, ant));
         }
-        via = fromInside ? null : colony.trunkTrails().setOut(level, grass);
+        via = fromInside ? null : colony.part(ColonyParts.TRUNK_TRAILS).map(trunk -> trunk.setOut(level, grass)).orElse(null);
         if (via != null && flat(ant.blockPosition()) >= flat(via) - 1.0) {
             via = null; // already out past the trail's end for this plant (it was out in the field): straight there
         }
@@ -174,12 +175,13 @@ public class ClipGrassGoal extends Goal {
             level.playSound(null, grass, sound.getHitSound(), SoundSource.NEUTRAL, 0.2F, 1.6F);
         }
         if (clipping >= CLIP_TICKS) {
-            if (!colony.bakery().hasPlaceForASeed(level, ant.getUUID())) {
+            if (!colony.part(ColonyParts.BAKERY).map(bakery -> bakery.hasPlaceForASeed(level, ant.getUUID()))
+                    .orElseGet(() -> colony.food().claimStorePlace(level, ant.getUUID()))) {
                 ticks = GIVE_UP_TICKS; // nowhere to take a piece now (the store full, the mill busy): the plant is left
                 return;
             }
             ant.setCarriedSeed(colony.food().cutPiece());
-            ant.setSeedForBread(colony.bakery().isMilling(ant.getUUID())); // to the mill if the store has no room
+            ant.setSeedForBread(colony.part(ColonyParts.BAKERY).map(bakery -> bakery.isMilling(ant.getUUID())).orElse(false)); // to the mill if the store has no room
             colony.food().clippedGrass(level, grass, ant.getUUID());
             ColonyManager.get(level).markChanged();
             grass = null; // so stop() does not free the tuft again

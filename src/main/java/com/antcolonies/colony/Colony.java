@@ -29,12 +29,12 @@ import net.minecraft.world.phys.AABB;
  * Member counts are stored per caste (mostly virtual, not real mobs).
  *
  * <p>The colony itself holds who it is, its headcount and the workers' roles. Everything else lives in its parts, one
- * per subject: {@link #nest()} (the underground plan and digging), {@link #walls()} (sealing the nest), {@link #hill()},
- * {@link #food()} (seeds), {@link #bakery()} (ant bread), {@link #queenCare()} (feeding the queen and her eggs),
- * {@link #brood()} (eggs and larvae), {@link #refuse()} (dead ants), {@link #mound()} (the termite mound),
- * {@link #foragingHoles()} (the termites' ways out to forage), {@link #garden()} (the termites' fungus garden) and
- * {@link #soldiers()} (the termites' soldiers), {@link #alarm()} (their alarm) and {@link #population()} (the members that
- * are numbers inside the nest, and which are real mobs).
+ * per subject. Every colony has the shared ones, such as {@link #nest()} (the underground plan and digging), {@link #walls()}
+ * (sealing the nest), {@link #food()} (seeds), {@link #queenCare()} (feeding the queen and her eggs), {@link #brood()} (eggs
+ * and larvae), {@link #refuse()} (dead ants), {@link #foragingHoles()} (the termites' ways out to forage) and
+ * {@link #population()} (the members that are numbers inside the nest, and which are real mobs). The others belong to
+ * some species only (the ant hill and bread, the termite mound, fungus garden, soldiers and alarm, ...): the species file
+ * lists them, and code asks for one with {@link #part}, which is empty for a colony whose species does not list it.
  */
 public class Colony {
     /** "No time saved": a hunger clock that has not started yet. */
@@ -82,32 +82,17 @@ public class Colony {
 
     private final Nest nest;
     private final NestWalls walls;
-    private final Hill hill;
     private final FoodStore food;
     private final FoodMap foodMap;
-    private final Bakery bakery;
     private final QueenCare queenCare;
-    private final KingCare kingCare;
     private final Brood brood;
     private final Refuse refuse;
-    private final Mound mound;
     private final ForagingHoles foragingHoles;
     private final ForagingTrails trails;
-    private final TrunkTrails trunkTrails;
-    private final Patrol patrol;
-    private final ForagerSpots spots;
-    private final Door door;
-    private final Recruits recruits;
     private final DangerMap danger;
-    private final ClosedHoles closedHoles;
     private final Neighbours neighbours;
     /** When the colony was founded (game time; brain step 4g, step 5: old colonies yield to neighbours). Saved. */
     private long bornAt = NOT_SET;
-    private final HiddenTrips hiddenTrips;
-    private final FungusGarden garden;
-    private final Mushrooms mushrooms;
-    private final Soldiers soldiers;
-    private final Alarm alarm;
     private final Population population;
     private final AwayLife away;
     private final NestLedger ledger;
@@ -117,8 +102,8 @@ public class Colony {
     private final WorkerFood workerFood;
     /** The parts this colony has (the shared ones and those its species lists), in the order they are made, saved and loaded. */
     private final List<ColonyPart<?>> parts;
-    /** The parts its species does not list: made for the old getters until step 3, never ticked, saved or loaded. */
-    private final List<ColonyPart<?>> unused;
+    /** The parts this colony has, by kind (for {@link #part}). */
+    private final Map<ColonyParts.Type<?>, Object> byType = new java.util.IdentityHashMap<>();
     /** The parts that tick while the nest is loaded, in their tick order. */
     private final List<ColonyPart<?>> ticking;
     /** The parts that tick while the colony is away, in their tick order. */
@@ -131,44 +116,29 @@ public class Colony {
         this.species = species;
         this.queenId = queenId;
         this.center = center;
-        // Every kind of part from the registry, in the order they are made and loaded (ColonyParts; Project Apex, colony
-        // parts steps 1 and 2): the shared ones and those the species file lists are the colony's own; the rest are made
-        // only for the old getters (until step 3) and never ticked, saved or loaded.
+        // The shared kinds of part and those the species file lists, in the registry's order, which is the order they are
+        // made, saved and loaded (ColonyParts; Project Apex, colony parts steps 1 to 3). A kind the species does not list
+        // is not made at all: code that means something only for some species asks for it first (see part).
         java.util.Set<String> listed = java.util.Set.copyOf(profile().parts());
         Map<ColonyParts.Type<?>, ColonyPart<?>> made = new LinkedHashMap<>();
-        List<ColonyPart<?>> own = new ArrayList<>();
-        List<ColonyPart<?>> others = new ArrayList<>();
         for (ColonyParts.Type<?> type : ColonyParts.all()) {
-            ColonyPart<?> part = type.make(this);
-            made.put(type, part);
-            (type.shared() || listed.contains(type.name()) ? own : others).add(part);
+            if (type.shared() || listed.contains(type.name())) {
+                ColonyPart<?> part = type.make(this);
+                made.put(type, part);
+                byType.put(type, part.part());
+            }
         }
         this.nest = made(made, ColonyParts.NEST);
         this.walls = made(made, ColonyParts.NEST_WALLS);
-        this.hill = made(made, ColonyParts.HILL);
         this.food = made(made, ColonyParts.FOOD_STORE);
         this.foodMap = made(made, ColonyParts.FOOD_MAP);
-        this.bakery = made(made, ColonyParts.BAKERY);
         this.queenCare = made(made, ColonyParts.QUEEN_CARE);
-        this.kingCare = made(made, ColonyParts.KING_CARE);
         this.brood = made(made, ColonyParts.BROOD);
         this.refuse = made(made, ColonyParts.REFUSE);
-        this.mound = made(made, ColonyParts.MOUND);
         this.foragingHoles = made(made, ColonyParts.FORAGING_HOLES);
         this.trails = made(made, ColonyParts.FORAGING_TRAILS);
-        this.trunkTrails = made(made, ColonyParts.TRUNK_TRAILS);
-        this.patrol = made(made, ColonyParts.PATROL);
-        this.spots = made(made, ColonyParts.FORAGER_SPOTS);
-        this.door = made(made, ColonyParts.DOOR);
-        this.recruits = made(made, ColonyParts.RECRUITS);
         this.danger = made(made, ColonyParts.DANGER_MAP);
-        this.closedHoles = made(made, ColonyParts.CLOSED_HOLES);
         this.neighbours = made(made, ColonyParts.NEIGHBOURS);
-        this.hiddenTrips = made(made, ColonyParts.HIDDEN_TRIPS);
-        this.garden = made(made, ColonyParts.FUNGUS_GARDEN);
-        this.mushrooms = made(made, ColonyParts.MUSHROOMS);
-        this.soldiers = made(made, ColonyParts.SOLDIERS);
-        this.alarm = made(made, ColonyParts.ALARM);
         this.population = made(made, ColonyParts.POPULATION);
         this.away = made(made, ColonyParts.AWAY_LIFE);
         this.ledger = made(made, ColonyParts.NEST_LEDGER);
@@ -176,41 +146,34 @@ public class Colony {
         this.field = made(made, ColonyParts.FIELD_LIFE);
         this.building = made(made, ColonyParts.BUILD_LIFE);
         this.workerFood = made(made, ColonyParts.WORKER_FOOD);
-        this.parts = List.copyOf(own);
-        this.unused = List.copyOf(others);
+        this.parts = List.copyOf(made.values());
         this.ticking = ColonyPart.ticking(this.parts);
         this.tickingAway = ColonyPart.tickingAway(this.parts);
     }
 
     @SuppressWarnings("unchecked")
     private static <T> T made(Map<ColonyParts.Type<?>, ColonyPart<?>> made, ColonyParts.Type<T> type) {
-        return ((ColonyPart<T>) made.get(type)).part();
+        return ((ColonyPart<T>) made.get(type)).part(); // (a shared kind: every colony has it)
+    }
+
+    /**
+     * This colony's part of a kind its species may not have (a kind that is not shared, {@link ColonyParts}): the part,
+     * or empty when the species file does not list it (a harvester colony has no mound, a termite colony no bakery).
+     * Never a do-nothing stand-in: code that only means something for some species asks first (Project Apex, colony
+     * parts step 3, "ask before use").
+     */
+    public <T> Optional<T> part(ColonyParts.Type<T> type) {
+        return Optional.ofNullable(type.cast(byType.get(type)));
+    }
+
+    /** Whether this colony has a part of this kind (its species lists it, or every colony has it). */
+    public boolean has(ColonyParts.Type<?> type) {
+        return byType.containsKey(type);
     }
 
     /** The parts this colony has, in the order they are made, saved and loaded (for the save and load test). */
     public List<ColonyPart<?>> parts() {
         return parts;
-    }
-
-    /**
-     * Tests only: the parts this colony's species does not list that hold anything a fresh one would not (saved
-     * differently from a new part of the same kind). Empty while every species lists the parts it uses.
-     */
-    public List<String> unusedPartsWrittenTo() {
-        List<String> written = new ArrayList<>();
-        for (ColonyPart<?> part : unused) {
-            if (!part.isSaved()) {
-                continue;
-            }
-            CompoundTag now = new CompoundTag();
-            part.save(now);
-            CompoundTag fresh = new CompoundTag();
-            ColonyParts.byName(part.name()).orElseThrow().make(this).save(fresh);
-            if (!now.equals(fresh)) {
-                written.add(part.name());
-            }
-        }
-        return written;
     }
 
     /**
@@ -223,6 +186,16 @@ public class Colony {
         }
     }
 
+    /** Whether this colony builds a termite mound (its species has the mound part and the profile's {@code mound} numbers). */
+    public boolean buildsMound() {
+        return part(ColonyParts.MOUND).map(built -> built.numbers() != null).orElse(false);
+    }
+
+    /** The mound's blocks and what each is (none for a species without a mound; see {@link Mound#getParts}). */
+    public Map<BlockPos, MoundPlan.Part> moundParts(Level level) {
+        return part(ColonyParts.MOUND).map(built -> built.getParts(level)).orElse(Map.of());
+    }
+
     /** The underground nest: its plan, the next block to dig, and the dug-out cells of each room. */
     public Nest nest() {
         return nest;
@@ -233,10 +206,6 @@ public class Colony {
         return walls;
     }
 
-    /** The hill around the entrance. */
-    public Hill hill() {
-        return hill;
-    }
 
     /** Seeds: fetching, clipping, storing and taking them. */
     public FoodStore food() {
@@ -248,20 +217,12 @@ public class Colony {
         return foodMap;
     }
 
-    /** Ant bread: milling, storing and taking it. */
-    public Bakery bakery() {
-        return bakery;
-    }
 
     /** The queen: feeding her, her eggs and her hunger. */
     public QueenCare queenCare() {
         return queenCare;
     }
 
-    /** The king (termites): his hunger, here and away. */
-    public KingCare kingCare() {
-        return kingCare;
-    }
 
     /** Eggs and larvae. */
     public Brood brood() {
@@ -273,55 +234,23 @@ public class Colony {
         return refuse;
     }
 
-    /** The termite mound (only species whose profile has a {@code mound} build one; see {@link Mound#numbers}). */
-    public Mound mound() {
-        return mound;
-    }
 
-    /** The fungus garden: comb, nodules (only species whose profile has a {@code garden}). */
-    public FungusGarden garden() {
-        return garden;
-    }
 
-    /** The Termitomyces mushrooms a healthy garden sends up round the mound after rain. */
-    public Mushrooms mushrooms() {
-        return mushrooms;
-    }
 
     /** Where the foragers have been finding food lately and by which way out they went (the trails the minor soldiers line). */
     public ForagingTrails trails() {
         return trails;
     }
 
-    /** The lasting trunk trails out from the nest (species whose profile has {@code food.trails.trunk}). */
-    public TrunkTrails trunkTrails() {
-        return trunkTrails;
-    }
 
-    /** The patrollers: who goes out first each round, and where the foragers may go once they are back (species with {@code food.patrol}). */
-    public Patrol patrol() {
-        return patrol;
-    }
 
-    /** Where each forager last found food (site fidelity, species with {@code food.search}). */
-    public ForagerSpots spots() {
-        return spots;
-    }
 
-    /** Recruiting to rich patches: the scent lines and the nestmates called out (species with {@code food.search.recruit}). */
-    public Recruits recruits() {
-        return recruits;
-    }
 
     /** Where the colony's insects were hurt or killed, or saw hostile mobs (brain step 4g; species with {@code colony.danger}). */
     public DangerMap danger() {
         return danger;
     }
 
-    /** The foraging holes the colony keeps closed where it was attacked (brain step 4g, step 3; species with {@code close_holes}). */
-    public ClosedHoles closedHoles() {
-        return closedHoles;
-    }
 
     /** Where the colony met neighbouring colonies of its species, and which ways it yields (brain step 4g, step 5). */
     public Neighbours neighbours() {
@@ -351,28 +280,12 @@ public class Colony {
      * and the colony does not keep away from it for danger ({@link DangerMap#avoids}).
      */
     public boolean mayForageAt(Level level, BlockPos pos) {
-        return patrol.isOpen(level, pos) && !danger.avoids(level, pos);
+        return part(ColonyParts.PATROL).map(patrol -> patrol.isOpen(level, pos)).orElse(true) && !danger.avoids(level, pos);
     }
 
-    /** Insects travelling unseen along the galleries (termites underground, step 2b). */
-    public HiddenTrips hiddenTrips() {
-        return hiddenTrips;
-    }
 
-    /** How many foragers go out: the touches of the homecomers (Gordon's rule, species with {@code food.door}). */
-    public Door door() {
-        return door;
-    }
 
-    /** The soldiers: how many the colony wants, which nymphs grow into them, where they stand guard (species with soldiers). */
-    public Soldiers soldiers() {
-        return soldiers;
-    }
 
-    /** The alarm: its level, where the trouble is, and what each soldier does about it (species with an {@code alarm}). */
-    public Alarm alarm() {
-        return alarm;
-    }
 
     /** The members that are numbers inside the nest, and which ones are real mobs (the brain, part 1). */
     public Population population() {
@@ -411,10 +324,11 @@ public class Colony {
 
     /**
      * What the nurses feed the queen and the young: fungus nodules for a species with a fungus garden, ant bread
-     * otherwise.
+     * otherwise (null only for a species with neither part).
      */
     public NurseFood nurseFood() {
-        return garden.exists() ? garden : bakery;
+        return part(ColonyParts.FUNGUS_GARDEN).<NurseFood>map(garden -> garden)
+                .orElseGet(() -> part(ColonyParts.BAKERY).orElse(null));
     }
 
     /** The foraging holes and their tunnels (only species whose profile has {@code nest.foraging_holes}). */
@@ -430,7 +344,7 @@ public class Colony {
      * 2 or more ({@link Alarm#keepsEveryoneIn}): the foragers hurry home.
      */
     public boolean isForagingTime(net.minecraft.world.level.Level level) {
-        if (alarm.keepsEveryoneIn(level)) {
+        if (part(ColonyParts.ALARM).map(alarm -> alarm.keepsEveryoneIn(level)).orElse(false)) {
             return false;
         }
         Optional<SpeciesProfile.DayClock> clock = profile().food().dayClock();
@@ -637,7 +551,7 @@ public class Colony {
      * colony, see {@code nest.new_holes}).
      */
     public int foragingRadius() {
-        int radius = Math.max(profile().food().radius(), trunkTrails.longestTip());
+        int radius = Math.max(profile().food().radius(), part(ColonyParts.TRUNK_TRAILS).map(TrunkTrails::longestTip).orElse(0));
         int galleries = nest.galleries().range();
         if (galleries > 0) {
             // Termites underground (step 2a): the range is the galleries, the farthest hole and the graze round it, in
@@ -845,14 +759,6 @@ public class Colony {
         for (ColonyPart<?> part : parts) {
             part.save(tag);
         }
-        if (testSeeds != null) {
-            // Game test server: a part the species does not list should never hold anything (its data would be lost here).
-            for (String name : unusedPartsWrittenTo()) {
-                if (skippedLogged.add("written " + species + " " + name)) {
-                    com.antcolonies.AntColoniesMod.LOGGER.warn("[parts] a {} colony wrote into the part {}, which its species file does not list", species, name);
-                }
-            }
-        }
         return tag;
     }
 
@@ -880,9 +786,14 @@ public class Colony {
     /**
      * An older save holds every part, as every colony once had them all: a part this species no longer lists is skipped.
      * Logged once per species and part when the save held more than a fresh part would (left-over defaults are not news).
+     * To know such a part's save keys, a throwaway one is made here, only while loading, and never kept.
      */
     private void skipUnused(CompoundTag tag) {
-        for (ColonyPart<?> part : unused) {
+        for (ColonyParts.Type<?> type : ColonyParts.all()) {
+            if (has(type)) {
+                continue;
+            }
+            ColonyPart<?> part = type.make(this);
             if (!part.isSaved()) {
                 continue;
             }

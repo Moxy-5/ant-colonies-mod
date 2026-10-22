@@ -117,7 +117,7 @@ public class BuildLife {
         waited = false;
         int[] changes = {0};
         boolean nestLeft = work > 0 && (carryNightSoil(level, eyes, changes) || digNest(level, eyes, changes));
-        boolean moundLeft = work > 0 && colony.mound().isActive() && buildMound(level, eyes, changes);
+        boolean moundLeft = work > 0 && colony.part(ColonyParts.MOUND).map(Mound::isActive).orElse(false) && buildMound(level, eyes, changes);
         if (!nestLeft && founders) {
             settleFounders(level, eyes, changes);
         }
@@ -144,8 +144,8 @@ public class BuildLife {
      * player can see the pile or the hill).
      */
     private boolean carryNightSoil(ServerLevel level, List<Vec3> eyes, int[] changes) {
-        Hill hill = colony.hill();
-        if (colony.mound().numbers() != null || colony.isFounding()) {
+        Hill hill = colony.part(ColonyParts.HILL).orElse(null);
+        if (hill == null || colony.buildsMound() || colony.isFounding()) {
             return false;
         }
         while (work > 0 && hill.hasMoundRoom(level)) {
@@ -180,8 +180,8 @@ public class BuildLife {
 
     /** The nest's plan, dug in the real diggers' order. True if there is more to dig (time ran out, or it waits). */
     private boolean digNest(ServerLevel level, List<Vec3> eyes, int[] changes) {
-        boolean ants = colony.mound().numbers() == null;
-        Hill hill = colony.hill();
+        boolean ants = !colony.buildsMound();
+        Hill hill = colony.part(ColonyParts.HILL).orElse(null);
         while (work > 0) {
             if (changes[0] >= PER_SECOND) {
                 return true;
@@ -203,7 +203,7 @@ public class BuildLife {
             // Ants carry the soil up onto the hill while it has room (the first spot is looked at before the block is
             // dug). Founders leave theirs where it falls (they carry no soil, as when they dig here).
             boolean founding = colony.isFounding();
-            BlockPos heap = ants && !founding && hill.hasMoundRoom(level) ? hill.pickMoundSpot(level, colony.random(), null) : null;
+            BlockPos heap = ants && hill != null && !founding && hill.hasMoundRoom(level) ? hill.pickMoundSpot(level, colony.random(), null) : null;
             if (heap != null && !freeAndHidden(level, heap, eyes)) {
                 waited = true;
                 return true;
@@ -230,7 +230,7 @@ public class BuildLife {
                         heap = null; // a player can see the hill now: the rest of this block's soil is left behind
                     }
                 }
-            } else if (colony.mound().isActive() && !founding) {
+            } else if (colony.part(ColonyParts.MOUND).map(Mound::isActive).orElse(false) && !founding) {
                 soil += TermiteMoundBlock.FINISHED; // a dug block gives the soil for a mound block (as Mound.takePellet)
             }
         }
@@ -277,7 +277,10 @@ public class BuildLife {
      * digging and then from the galleries under the mound. True if there is more to build (time ran out, or it waits).
      */
     private boolean buildMound(ServerLevel level, List<Vec3> eyes, int[] changes) {
-        Mound mound = colony.mound();
+        Mound mound = colony.part(ColonyParts.MOUND).orElse(null);
+        if (mound == null) {
+            return false;
+        }
         for (int pass = 0; pass < MOUND_PASSES; pass++) {
             int before = changes[0];
             boolean left = false;
@@ -396,7 +399,7 @@ public class BuildLife {
     /** Takes this many pellets of soil, digging the next blocks of the galleries under the mound for more. False if there is none. */
     private boolean takeSoil(ServerLevel level, List<Vec3> eyes, int pellets) {
         while (soil < pellets) {
-            BlockPos next = colony.nest().firstDiggable(level, colony.mound().getGalleries(level));
+            BlockPos next = colony.nest().firstDiggable(level, colony.part(ColonyParts.MOUND).map(built -> built.getGalleries(level)).orElse(List.of()));
             if (next == null) {
                 return false;
             }
@@ -495,7 +498,7 @@ public class BuildLife {
     /** The block is dug out, quietly (nobody is there to hear it). */
     private void dig(ServerLevel level, BlockPos pos) {
         colony.nest().clearDigProgress(pos);
-        colony.mound().blockDug(level, pos);
+        colony.part(ColonyParts.MOUND).ifPresent(mound -> mound.blockDug(level, pos));
         level.removeBlock(pos, false);
     }
 

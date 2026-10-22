@@ -347,11 +347,12 @@ public class Population {
         int cap = realCap();
         watched = watched || crew() >= cap;
         int soldiers = 0;
-        if (colony.soldiers().numbers() != null) {
-            int alarm = colony.alarm().level(level);
+        Soldiers guards = colony.part(ColonyParts.SOLDIERS).filter(part -> part.numbers() != null).orElse(null);
+        if (guards != null) {
+            int alarm = colony.part(ColonyParts.ALARM).map(part -> part.level(level)).orElse(0);
             int soldierCap = cap / 4;
             for (TermiteSoldierEntity.Rank rank : TermiteSoldierEntity.Rank.values()) {
-                int posts = colony.soldiers().posts(level, rank).size();
+                int posts = guards.posts(level, rank).size();
                 if (rank == TermiteSoldierEntity.Rank.MINOR && alarm >= 3) {
                     posts += BREACH_MINORS;
                 }
@@ -459,7 +460,7 @@ public class Population {
             String caste = entry.getKey();
             List<AbstractAntEntity> mobs = byCaste.getOrDefault(caste, List.of());
             // The ones travelling unseen along the galleries are real ones too, out of the world for a while (HiddenTrips).
-            int have = mobs.size() + colony.hiddenTrips().travelling(caste);
+            int have = mobs.size() + colony.part(ColonyParts.HIDDEN_TRIPS).map(trips -> trips.travelling(caste)).orElse(0);
             int want = entry.getValue();
             while (have < want && swaps > 0 && inside(caste) > 0) {
                 if (rooms == null) {
@@ -528,7 +529,7 @@ public class Population {
         putInside(mob.nestCaste(), grownUpAt, 1);
         meals.add(mob.nestCaste(), mob.getLastMeal(), level.getGameTime());
         colony.foodMap().wentHome(mob.getUUID());
-        colony.spots().intoNumbers(mob.getUUID()); // its spot goes into the numbers' pool (site fidelity)
+        colony.part(ColonyParts.FORAGER_SPOTS).ifPresent(spots -> spots.intoNumbers(mob.getUUID())); // its spot goes into the numbers' pool (site fidelity)
         mob.discard();
     }
 
@@ -571,7 +572,7 @@ public class Population {
         takeInside(caste, minute, 1);
         level.addFreshEntity(mob);
         if (WorkerAntEntity.CASTE.equals(caste) && mob.mayDo(ColonyRole.FORAGER)) {
-            colony.spots().outOfNumbers(mob.getUUID()); // a forager takes a spot from the numbers' pool
+            colony.part(ColonyParts.FORAGER_SPOTS).ifPresent(spots -> spots.outOfNumbers(mob.getUUID())); // a forager takes a spot from the numbers' pool
         }
         return true;
 
@@ -655,7 +656,7 @@ public class Population {
     }
 
     private String soldiersInside() {
-        if (colony.soldiers().numbers() == null) {
+        if (colony.part(ColonyParts.SOLDIERS).map(Soldiers::numbers).isEmpty()) {
             return "";
         }
         return "; soldiers " + inside(TermiteSoldierEntity.Rank.MINOR.caste()) + " minor, " + inside(TermiteSoldierEntity.Rank.MAJOR.caste()) + " major";

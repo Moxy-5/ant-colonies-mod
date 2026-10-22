@@ -97,7 +97,7 @@ public class ForagingHoles {
             // A hole with a runway of sheeting over it leads into the runway, not outside; a hole closed for danger (brain
             // step 4g) is no way out even before it is plugged.
             if (isDug(level, tunnel) && isOpen(level, tunnel.hole()) && !colony.nest().foodWays().isSpent(tunnel.hole())
-                    && colony.nest().foodWays().runwayAt(tunnel.hole()) == null && !colony.closedHoles().isClosed(level, tunnel.hole())) {
+                    && colony.nest().foodWays().runwayAt(tunnel.hole()) == null && !ClosedHoles.isClosedIn(colony, level, tunnel.hole())) {
                 ways.add(new WayOut(tunnel.hole().above(), tunnel.side()));
             }
         }
@@ -131,7 +131,7 @@ public class ForagingHoles {
     @Nullable
     NestPlan.ForagingTunnel middleHole(Level level) {
         BlockPos entrance = colony.nest().getEntrance();
-        if (!colony.keepsASchedule() || !colony.mound().isActive() || !level.isLoaded(entrance)
+        if (!colony.keepsASchedule() || !colony.part(ColonyParts.MOUND).map(Mound::isActive).orElse(false) || !level.isLoaded(entrance)
                 || !Nest.isDugOut(level, entrance.below()) || colony.nest().isEntranceCovered(level)) {
             return null;
         }
@@ -145,7 +145,7 @@ public class ForagingHoles {
     private List<NestPlan.ForagingTunnel> holesToPlug(Level level) {
         List<NestPlan.ForagingTunnel> all = new java.util.ArrayList<>();
         for (NestPlan.ForagingTunnel tunnel : tunnels(level)) {
-            if (!hasFinishedRunway(level, tunnel.hole()) || colony.closedHoles().isClosed(level, tunnel.hole())) {
+            if (!hasFinishedRunway(level, tunnel.hole()) || ClosedHoles.isClosedIn(colony, level, tunnel.hole())) {
                 all.add(tunnel);
             }
         }
@@ -189,7 +189,7 @@ public class ForagingHoles {
      * Never a hole closed for danger (brain step 4g, {@link ClosedHoles}), runway or not.
      */
     public boolean mayOpen(Level level, BlockPos hole) {
-        if (colony.closedHoles().isClosed(level, hole)) {
+        if (ClosedHoles.isClosedIn(colony, level, hole)) {
             return false;
         }
         boolean runway = hasFinishedRunway(level, hole);
@@ -244,7 +244,7 @@ public class ForagingHoles {
      * another), the others once the foraging time is over ({@link #wantsPlugging}).
      */
     public boolean wantsPlugged(Level level, BlockPos hole) {
-        return colony.closedHoles().isClosed(level, hole) || wantsPlugging(level);
+        return ClosedHoles.isClosedIn(colony, level, hole) || wantsPlugging(level);
     }
 
     /** Whether any member of the colony is outside the nest and the mound (checked once a second). */
@@ -263,14 +263,14 @@ public class ForagingHoles {
     @Nullable
     public NestPlan.ForagingTunnel pickHoleToPlug(Level level, AbstractAntEntity ant) {
         boolean all = wantsPlugging(level);
-        if (!all && !colony.closedHoles().anyClosed(level)) {
+        if (!all && !colony.part(ColonyParts.CLOSED_HOLES).map(closed -> closed.anyClosed(level)).orElse(false)) {
             return null;
         }
         long now = level.getGameTime();
         plugClaims.prune(now);
         plugging.keySet().removeIf(id -> !plugClaims.contains(id));
         for (NestPlan.ForagingTunnel tunnel : holesToPlug(level)) {
-            if (!isDug(level, tunnel) || !isOpen(level, tunnel.hole()) || !all && !colony.closedHoles().isClosed(level, tunnel.hole())) {
+            if (!isDug(level, tunnel) || !isOpen(level, tunnel.hole()) || !all && !ClosedHoles.isClosedIn(colony, level, tunnel.hole())) {
                 continue;
             }
             boolean taken = false;
@@ -525,7 +525,7 @@ public class ForagingHoles {
     private RunwayRoute.Ground runwayGround(Level level, BlockPos hole) {
         GroundReader reader = new GroundReader(level, colony, colony.nest().nestCells(level));
         java.util.Set<BlockPos> nest = colony.nest().nestCells(level);
-        java.util.Map<BlockPos, ?> mound = colony.mound().getParts(level);
+        java.util.Map<BlockPos, ?> mound = colony.moundParts(level);
         java.util.Set<BlockPos> used = new java.util.HashSet<>();
         for (FoodWays.Runway runway : colony.nest().foodWays().getRunways()) {
             for (BlockPos cell : runway.cells()) {

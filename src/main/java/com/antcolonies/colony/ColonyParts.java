@@ -56,6 +56,12 @@ public final class ColonyParts {
             return shared;
         }
 
+        /** {@code part} as a part of this kind (it was made by this kind: see {@link Colony#part}). */
+        @SuppressWarnings("unchecked")
+        T cast(Object part) {
+            return (T) part;
+        }
+
         /** A new part of this kind for {@code colony}, with its ticks, save and load. */
         ColonyPart<T> make(Colony colony) {
             return rows.apply(ColonyPart.of(name, make.apply(colony)));
@@ -72,7 +78,7 @@ public final class ColonyParts {
             .notSaved("the claims on leaks and how far each is sealed start again after a load"));
     public static final Type<Hill> HILL = listed("hill", Hill::new, part -> part
             .ticks(40, (hill, level) -> {
-                if (hill.colony().mound().numbers() == null) {
+                if (!hill.colony().buildsMound()) {
                     hill.nightSoil().tick(level);
                 }
             })

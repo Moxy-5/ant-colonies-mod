@@ -3,6 +3,7 @@ package com.antcolonies.entity.goal;
 import java.util.EnumSet;
 
 import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.ColonyParts;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.species.SpeciesProfile;
 
@@ -50,7 +51,7 @@ public class NapGoal extends Goal {
             return false;
         }
         Colony colony = insect.getColony();
-        return colony == null || colony.nest().isInside(insect.level(), insect.blockPosition()) && colony.alarm().level(insect.level()) == 0;
+        return colony == null || colony.nest().isInside(insect.level(), insect.blockPosition()) && colony.part(ColonyParts.ALARM).map(alarm -> alarm.level(insect.level())).orElse(0) == 0;
     }
 
     @Override

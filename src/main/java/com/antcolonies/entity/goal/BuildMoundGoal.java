@@ -9,6 +9,8 @@ import com.antcolonies.AntColoniesMod;
 import com.antcolonies.block.TermiteTunnelBlock;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.colony.ColonyParts;
+import com.antcolonies.colony.Mound;
 import com.antcolonies.colony.MoundReach;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.nav.Foothold;
@@ -56,6 +58,9 @@ public class BuildMoundGoal extends Goal {
     private final AbstractAntEntity ant;
     @Nullable
     private Colony colony;
+    /** Its mound (asked once in {@link #canUse}: only a species that lists the mound builds one). */
+    @Nullable
+    private Mound mound;
     @Nullable
     private BlockPos spot;
     private Reach reach = Reach.INSIDE;
@@ -88,11 +93,11 @@ public class BuildMoundGoal extends Goal {
      * (windows only while the colony may open them); from outside, any foothold in the 26 cells round it; from far, any
      * within 2 blocks (outside only while it may go out).
      */
-    public static Predicate<Foothold> workFrom(AbstractAntEntity ant, Colony colony, BlockPos block, Reach reach) {
+    public static Predicate<Foothold> workFrom(AbstractAntEntity ant, Colony colony, Mound mound, BlockPos block, Reach reach) {
         Level level = ant.level();
         return switch (reach) {
             case INSIDE -> {
-                boolean windows = colony.mound().mayOpenWindows(level);
+                boolean windows = mound.mayOpenWindows(level);
                 yield at -> MoundReach.canBuildFrom(level, colony, at, block, windows);
             }
             case OUTSIDE -> withinReach(block);
@@ -114,7 +119,8 @@ public class BuildMoundGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        spot = colony == null || !colony.mound().isActive() ? null : colony.mound().pickBuildSpot(level, ant);
+        mound = colony == null ? null : colony.part(ColonyParts.MOUND).orElse(null);
+        spot = mound == null || !mound.isActive() ? null : mound.pickBuildSpot(level, ant);
         if (spot == null) {
             if (++looksWithoutSpot >= MAX_LOOKS_WITHOUT_SPOT) {
                 leaveSoilBehind(level);
@@ -137,7 +143,7 @@ public class BuildMoundGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        return colony != null && spot != null && ant.isCarrying();
+        return colony != null && mound != null && spot != null && ant.isCarrying();
     }
 
     @Override
@@ -151,21 +157,22 @@ public class BuildMoundGoal extends Goal {
     public void stop() {
         ant.getNavigator().stop();
         closeWindow();
-        if (colony != null) {
-            colony.mound().releaseBuildSpot(ant.getUUID());
+        if (mound != null) {
+            mound.releaseBuildSpot(ant.getUUID());
         }
         spot = null;
         colony = null;
+        mound = null;
     }
 
     @Override
     public void tick() {
-        if (spot == null || colony == null || !(ant.level() instanceof ServerLevel level)) {
+        if (spot == null || colony == null || mound == null || !(ant.level() instanceof ServerLevel level)) {
             return;
         }
         if (++ticks >= GIVE_UP_TICKS) {
             AntColoniesMod.LOGGER.info("[mound] termite at {} gave up on spot {} (navigator done: {}, still a spot: {}, reach {})",
-                    ant.blockPosition().toShortString(), spot.toShortString(), ant.getNavigator().isDone(), colony.mound().isBuildSpot(level, spot), reach);
+                    ant.blockPosition().toShortString(), spot.toShortString(), ant.getNavigator().isDone(), mound.isBuildSpot(level, spot), reach);
             closeWindow();
             spot = null;
             return;
@@ -186,7 +193,7 @@ public class BuildMoundGoal extends Goal {
     private boolean canWorkHere(Level level) {
         Foothold at = ant.getNavigator().getFoothold();
         return switch (reach) {
-            case INSIDE -> at != null && MoundReach.canBuildFrom(level, colony, at, spot, colony.mound().mayOpenWindows(level));
+            case INSIDE -> at != null && MoundReach.canBuildFrom(level, colony, at, spot, mound.mayOpenWindows(level));
             case OUTSIDE -> isWithinReach(ant, spot);
             case FAR -> MoundReach.isWithin(ant.blockPosition(), spot, 2);
         };
@@ -198,12 +205,12 @@ public class BuildMoundGoal extends Goal {
      */
     private void walkToSpot() {
         while (spot != null) {
-            boolean fallbacks = colony.mound().mayUseFallbacks(ant.level());
+            boolean fallbacks = mound.mayUseFallbacks(ant.level());
             for (Reach way : Reach.values()) {
                 if (way != Reach.INSIDE && !fallbacks || way == Reach.OUTSIDE && !ant.mayGoOut()) {
                     continue;
                 }
-                if (ant.getNavigator().moveTo(workFrom(ant, colony, spot, way), spot, 1.0)) {
+                if (ant.getNavigator().moveTo(workFrom(ant, colony, mound, spot, way), spot, 1.0)) {
                     if (way != Reach.INSIDE) {
                         AntColoniesMod.LOGGER.info("[mound] termite at {} builds {} from {} (no way from inside)",
                                 ant.blockPosition().toShortString(), spot.toShortString(), way.name().toLowerCase());
@@ -212,13 +219,13 @@ public class BuildMoundGoal extends Goal {
                     return;
                 }
             }
-            colony.mound().markUnreachable(ant.level(), spot);
+            mound.markUnreachable(ant.level(), spot);
             if (++failedRoutes >= MAX_FAILED_ROUTES) {
                 AntColoniesMod.LOGGER.debug("[mound] termite at {} found no way to mound spots from inside for now (last: {})", ant.blockPosition().toShortString(), spot.toShortString());
                 spot = null;
                 return;
             }
-            spot = colony.mound().pickBuildSpot(ant.level(), ant);
+            spot = mound.pickBuildSpot(ant.level(), ant);
         }
     }
 
@@ -238,7 +245,7 @@ public class BuildMoundGoal extends Goal {
         if (windowSide != null && ++windowTicks < WINDOW_TICKS) {
             return;
         }
-        if (colony.mound().addLayer(level, spot)) {
+        if (mound.addLayer(level, spot)) {
             BlockState now = level.getBlockState(spot);
             level.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, now),
                     spot.getX() + 0.5, spot.getY() + 0.5, spot.getZ() + 0.5, 6, 0.2, 0.2, 0.2, 0.05);
@@ -249,10 +256,10 @@ public class BuildMoundGoal extends Goal {
             spot = null;
             return;
         }
-        if (!colony.mound().isBuildSpot(level, spot)) {
+        if (!mound.isBuildSpot(level, spot)) {
             // Someone else finished it, or it can't take soil any more: another spot.
             closeWindow();
-            spot = colony.mound().pickBuildSpot(level, ant);
+            spot = mound.pickBuildSpot(level, ant);
             if (spot != null) {
                 walkToSpot();
             }

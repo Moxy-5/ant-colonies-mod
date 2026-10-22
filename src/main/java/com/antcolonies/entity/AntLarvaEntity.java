@@ -6,6 +6,7 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.colony.ColonyParts;
 import com.antcolonies.species.SpeciesProfile;
 
 import net.minecraft.nbt.CompoundTag;
@@ -195,7 +196,8 @@ public class AntLarvaEntity extends Entity implements FedByNurses {
             discard(); // the queen died
             return;
         }
-        setMeal(colony.soldiers().mealFor(getSoldierRank())); // (the profile can change with /reload)
+        setMeal(colony.part(ColonyParts.SOLDIERS).map(soldiers -> soldiers.mealFor(getSoldierRank()))
+                .orElse(colony.profile().brood().larvaMeal())); // (the profile can change with /reload)
         // The hunger clock only runs for a larva that still has to eat; a full one waiting to grow up has been fed.
         long now = level.getGameTime();
         if (lastFed == Colony.NOT_SET || isFull() || !colony.isHungerOn()) {
