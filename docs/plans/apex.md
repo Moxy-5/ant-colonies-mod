@@ -113,6 +113,16 @@ easiest to stop bugs from happening and push updates easier"); so these are my p
    including out of sight. With no listener yet it costs nothing (news nobody hears is not sent); its first listeners
    come with M8 (a raid's end, termites coming back out).
 
+8. **The rest of the shared code that names a species part** (found while planning step 6, 2026-10-22; to plan with
+   the user). Steps 6 and 7 fix only the forage question and the holes. Counted on `master` 2026-10-22: about 81 code
+   lines in 15 of the 22 shared colony files still name a harvester or termite part (`FieldLife` 12, `NestLife` 8,
+   `ForagingHoles` 7, `FoodStore` 7, `BuildLife` 7, `Galleries` 7, `Colony` 7, `Population` 6, `Nest` 4, and a few
+   more), plus about 50 lines in the goals (many of them goals that will move to a species mod with their part, so
+   they are fine). After the split the framework could not name those parts, so each line must become a question, a
+   piece of news or a hook a species part plugs into, or move into the species part. First a sorted list of every line
+   (which can be a question like step 6, which news, which a hook, which simply moves), planned with the user, then
+   built in batches. Nothing changes in-game.
+
 Then the split's own plan (`docs/plans/mod-split.md`) can draw the framework's wall along the registry: shared parts
 in, species parts out.
 
