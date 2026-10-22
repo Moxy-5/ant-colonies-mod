@@ -3,7 +3,6 @@ package com.antcolonies.colony;
 import java.util.List;
 
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.block.FungusCombBlock;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.TermiteQueenEntity;
 import com.antcolonies.entity.TermiteSoldierEntity;
@@ -38,12 +37,6 @@ public class NestLife {
     private final Colony colony;
     /** The nurses' work not done yet (jobs, a fraction of one carried over to the next second). Not saved. */
     private double nurseWork;
-    /** Nodule growth not come yet (a fraction of one carried over). Not saved. */
-    private double noduleGrowth;
-    /** The comb's ageing while away not come yet (fractions carried over): ripening, going old, crumbling. Not saved. */
-    private double ripening;
-    private double ageing;
-    private double crumbling;
     /** What the brain last saw of the queen while the nest was loaded: in her room, sealed in with the founders, how swollen. Saved. */
     private boolean queenHome;
     private boolean sealedIn;
@@ -114,7 +107,11 @@ public class NestLife {
 
     /** How many founders dig: the queen, and the king with her (royal pairs). */
     int founders() {
-        return 1 + (colony.part(ColonyParts.KING_CARE).map(KingCare::isAlive).orElse(false) ? 1 : 0);
+        int founders = 1;
+        for (ColonyHooks.CoFounders more : colony.hooks().all(ColonyHooks.CO_FOUNDERS)) {
+            founders += more.count();
+        }
+        return founders;
     }
 
     /** Whether the founders still have digging (or closing in) to do while away. */
@@ -197,9 +194,13 @@ public class NestLife {
             changed |= foundWhileAway(level);
             changed |= digStoreAway(level);
             changed |= colony.queenCare().liveAway(level, queenHome, sealedIn, queenSize);
-            changed |= colony.part(ColonyParts.KING_CARE).map(king -> king.liveAway(level)).orElse(false);
+            for (ColonyHooks.AwayWork work : colony.hooks().all(ColonyHooks.AWAY_BESIDE_QUEEN)) {
+                changed |= work.work(level); // (the termite king)
+            }
             changed |= nurse(level);
-            changed |= growNodules(level);
+            for (ColonyHooks.AwayWork work : colony.hooks().all(ColonyHooks.AWAY_AFTER_NURSES)) {
+                changed |= work.work(level); // (the fungus garden)
+            }
         } else {
             nurseWork = 0;
             changed |= feedYoungInside(level);
@@ -312,26 +313,21 @@ public class NestLife {
         nurseWork = Math.min(nurseWork + nurses * 20.0 / NURSE_JOB_TICKS, Math.max(1, nurses));
         boolean changed = false;
         QueenCare queen = colony.queenCare();
-        Bakery bakery = colony.part(ColonyParts.BAKERY).orElse(null);
-        KingCare king = colony.part(ColonyParts.KING_CARE).orElse(null);
+        List<ColonyHooks.NurseJob> feeds = colony.hooks().all(ColonyHooks.NURSE_FEEDS);
+        List<ColonyHooks.NurseJob> makes = colony.hooks().all(ColonyHooks.NURSE_MAKES);
         while (nurseWork >= 1) {
             if (queen.wantsFoodAway(level, queenHome) && nurseFoodLeft(level) > 0) {
                 queen.feedQueen(level, takePiece(true));
                 colony.away().note(level, AwayReport.What.QUEEN_FED, 1);
-            } else if (king != null && king.wantsFood(level) && nurseFoodLeft(level) > 0) {
-                takePiece(false);
-                king.fed(level);
-                colony.away().note(level, AwayReport.What.KING_FED, 1);
+            } else if (anyJob(level, feeds)) {
+                // (another member fed: the termite king)
             } else if (colony.brood().hungriestInside() >= 0 && nurseFoodLeft(level) > 0) {
                 int larva = colony.brood().hungriestInside();
                 takePiece(false);
                 colony.brood().feedInside(larva);
                 colony.away().note(level, AwayReport.What.YOUNG_FED, 1);
-            } else if (bakery != null && bakery.needsBreadAway(level) && colony.food().getFood() > 0) {
-                boolean rich = colony.food().takeCounted(bakery.wantsRichBread());
-                bakery.countIn(rich);
-                colony.ledger().addNurseFood(1);
-                colony.away().note(level, AwayReport.What.BREAD_MADE, 1);
+            } else if (anyJob(level, makes)) {
+                // (more nurse food made: the harvester's bread)
             } else {
                 break;
             }
@@ -341,6 +337,16 @@ public class NestLife {
         return changed;
     }
 
+    /** The first of these jobs that is wanted now is done: true if one was. */
+    private boolean anyJob(ServerLevel level, List<ColonyHooks.NurseJob> jobs) {
+        for (ColonyHooks.NurseJob job : jobs) {
+            if (job.job(level, this)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // --- the nurses' food ---------------------------------------------------------------------------------------
 
     /**
@@ -348,15 +354,8 @@ public class NestLife {
      * comb (in the world while the nest is loaded, as last seen while away) and what the ledger still owes the world.
      */
     public int nurseFoodLeft(ServerLevel level) {
-        if (colony.profile().food().makesBread()) {
-            return colony.part(ColonyParts.BAKERY).map(Bakery::getBread).orElse(0);
-        }
-        FungusGarden garden = colony.part(ColonyParts.FUNGUS_GARDEN).orElse(null);
-        if (garden == null) {
-            return 0;
-        }
-        int nodules = colony.away().isHere(level) ? garden.available(level) : garden.seenNodules();
-        return Math.max(0, nodules + colony.ledger().nurseFood());
+        NurseFood food = colony.nurseFood();
+        return food == null ? 0 : food.counted(level);
     }
 
     /**
@@ -373,67 +372,10 @@ public class NestLife {
 
     /** Takes a piece the brain knows is there; returns whether it was rich bread ({@code wantRich}: rich first, for the queen). */
     private boolean takePiece(boolean wantRich) {
-        boolean rich = colony.profile().food().makesBread() && colony.part(ColonyParts.BAKERY).map(bakery -> bakery.takeCounted(wantRich)).orElse(false);
+        NurseFood food = colony.nurseFood();
+        boolean rich = colony.profile().food().makesBread() && food != null && food.takeCounted(wantRich);
         colony.ledger().addNurseFood(-1);
         return rich;
-    }
-
-    // --- the fungus garden, while away --------------------------------------------------------------------------
-
-    /**
-     * The fungus garden while away, as in {@link FungusGarden#grow}, from the garden as last seen with what is owed to
-     * it since: fresh layers ripen, each comb block with a ripe layer and room for another nodule grows one about every
-     * {@code nodule_ticks} (that layer goes old), other ripe layers go old by themselves, and old layers crumble away.
-     */
-    private boolean growNodules(ServerLevel level) {
-        SpeciesProfile.GardenNumbers numbers = colony.profile().garden().orElse(null);
-        FungusGarden garden = colony.part(ColonyParts.FUNGUS_GARDEN).orElse(null);
-        if (numbers == null || garden == null || garden.seenCombs() == 0) {
-            return false;
-        }
-        NestLedger ledger = colony.ledger();
-        boolean changed = false;
-        float speed = garden.ageingSpeed();
-        ripening += garden.freshKnown() * speed * 20.0 / Math.max(20, numbers.ripenTicks());
-        while (ripening >= 1 && garden.freshKnown() > 0) {
-            ripening--;
-            ledger.addRipened(1);
-            colony.away().note(level, AwayReport.What.COMB_RIPENED, 1);
-            changed = true;
-        }
-        ripening = garden.freshKnown() > 0 ? ripening : 0;
-        int room = garden.seenCombs() * FungusCombBlock.MAX_NODULES - (garden.seenNodules() + ledger.nurseFood());
-        int canGrow = Math.min(garden.seenCombs(), Math.min(garden.ripeKnown(), room));
-        if (canGrow <= 0) {
-            noduleGrowth = 0;
-        } else {
-            noduleGrowth += canGrow * FungusGarden.chancePerSecond(numbers);
-            while (noduleGrowth >= 1 && canGrow-- > 0) {
-                noduleGrowth--;
-                ledger.addAged(1);
-                ledger.addNurseFood(1);
-                garden.grewAway();
-                colony.away().note(level, AwayReport.What.NODULES_GROWN, 1);
-                changed = true;
-            }
-        }
-        ageing += garden.ripeKnown() * speed * 20.0 / Math.max(20, numbers.oldTicks());
-        while (ageing >= 1 && garden.ripeKnown() > 0) {
-            ageing--;
-            ledger.addAged(1);
-            colony.away().note(level, AwayReport.What.COMB_AGED, 1);
-            changed = true;
-        }
-        ageing = garden.ripeKnown() > 0 ? ageing : 0;
-        crumbling += garden.oldKnown() * speed * 20.0 / Math.max(20, numbers.crumbleTicks());
-        while (crumbling >= 1 && garden.oldKnown() > 0) {
-            crumbling--;
-            ledger.addStore(-1);
-            colony.food().used(1);
-            changed = true;
-        }
-        crumbling = garden.oldKnown() > 0 ? crumbling : 0;
-        return changed;
     }
 
     void save(CompoundTag tag) {

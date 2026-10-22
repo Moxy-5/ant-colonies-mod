@@ -201,6 +201,21 @@ public class Bakery implements NurseFood {
         return true;
     }
 
+    @Override
+    public int counted(ServerLevel level) {
+        return getBread();
+    }
+
+    @Override
+    public void countedIn(boolean rich) {
+        countIn(rich);
+    }
+
+    @Override
+    public ItemStack piece() {
+        return new ItemStack(ModItems.ANT_BREAD.get());
+    }
+
     /** One more piece of bread, counted now; its heap layer is put down later (see {@link NestLedger}). */
     void countIn(boolean rich) {
         bread++;
@@ -214,7 +229,8 @@ public class Bakery implements NurseFood {
      * later, out of sight. Rich if {@code wantRich} and there is some, or if all of it is rich. Returns whether it was
      * rich. Call only while {@link #getBread} is above 0.
      */
-    boolean takeCounted(boolean wantRich) {
+    @Override
+    public boolean takeCounted(boolean wantRich) {
         richBread = Math.min(richBread, bread);
         boolean rich = richBread > 0 && (wantRich || bread <= richBread);
         bread = Math.max(0, bread - 1);
@@ -222,6 +238,18 @@ public class Bakery implements NurseFood {
             richBread--;
         }
         return rich;
+    }
+
+    /** A nurse's job while away (see {@link NestLife}): a seed milled into bread while there is less than is wanted. True if one was. */
+    boolean millAway(ServerLevel level) {
+        if (!needsBreadAway(level) || colony.food().getFood() <= 0) {
+            return false;
+        }
+        boolean rich = colony.food().takeCounted(wantsRichBread());
+        countIn(rich);
+        colony.ledger().addNurseFood(1);
+        colony.away().note(level, AwayReport.What.BREAD_MADE, 1);
+        return true;
     }
 
     /**

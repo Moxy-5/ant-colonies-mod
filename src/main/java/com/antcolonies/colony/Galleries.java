@@ -1429,14 +1429,9 @@ public class Galleries {
                 return false; // never wall an insect in (docs/BUGS.md 8, 9, 24, 42)
             }
         }
-        HiddenTrips trips = colony.part(ColonyParts.HIDDEN_TRIPS).orElse(null);
-        if (trips != null) {
-            for (java.util.UUID id : trips.travellers()) {
-                for (BlockPos cell : trips.runOf(id)) {
-                    if (inside.contains(cell)) {
-                        return false;
-                    }
-                }
+        for (ColonyHooks.HiddenAway away : colony.hooks().all(ColonyHooks.HIDDEN_AWAY)) {
+            if (away.anyWalksThrough(inside)) {
+                return false; // (an insect on a hidden trip walks through there)
             }
         }
         List<net.minecraft.world.phys.Vec3> eyes = colony.population().viewersInSight(level);

@@ -651,30 +651,10 @@ public class Mound {
         double top = spot.getY() + now.getCollisionShape(level, spot).max(Direction.Axis.Y);
         for (LivingEntity ant : inCell) {
             if (ant.getBoundingBox().minY < top) {
-                liftOnto(level, ant, spot, top);
+                NestWalls.liftOnto(level, ant, spot, top);
             }
         }
         return true;
-    }
-
-    /** Puts an insect in a cell that was just filled up on top of the new soil, or beside it if there is no room on top. */
-    static void liftOnto(Level level, LivingEntity ant, BlockPos spot, double top) {
-        BlockPos above = BlockPos.containing(ant.getX(), top, ant.getZ());
-        if (top < spot.getY() + 1.0 || level.getBlockState(above).getCollisionShape(level, above).isEmpty()) {
-            ant.setPos(ant.getX(), top, ant.getZ());
-        } else {
-            for (Direction side : Direction.Plane.HORIZONTAL) {
-                BlockPos beside = spot.relative(side);
-                if (level.getBlockState(beside).getCollisionShape(level, beside).isEmpty()) {
-                    ant.setPos(beside.getX() + 0.5, beside.getY(), beside.getZ() + 0.5);
-                    break;
-                }
-            }
-        }
-        ant.setDeltaMovement(0, 0, 0);
-        if (ant instanceof AbstractAntEntity insect) {
-            insect.getNavigator().stop();
-        }
     }
 
     // ---- soil ----

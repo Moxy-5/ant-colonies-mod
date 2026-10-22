@@ -11,6 +11,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.block.MudCrustBlock;
+import com.antcolonies.entity.AbstractAntEntity;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -614,5 +615,28 @@ public class NestWalls {
             }
         }
         return false;
+    }
+
+    /**
+     * Puts an insect in a cell that was just filled up on top of the new soil, or beside it if there is no room on top
+     * (a store's heap or the termites' mound blocks growing round it).
+     */
+    static void liftOnto(Level level, LivingEntity ant, BlockPos spot, double top) {
+        BlockPos above = BlockPos.containing(ant.getX(), top, ant.getZ());
+        if (top < spot.getY() + 1.0 || level.getBlockState(above).getCollisionShape(level, above).isEmpty()) {
+            ant.setPos(ant.getX(), top, ant.getZ());
+        } else {
+            for (Direction side : Direction.Plane.HORIZONTAL) {
+                BlockPos beside = spot.relative(side);
+                if (level.getBlockState(beside).getCollisionShape(level, beside).isEmpty()) {
+                    ant.setPos(beside.getX() + 0.5, beside.getY(), beside.getZ() + 0.5);
+                    break;
+                }
+            }
+        }
+        ant.setDeltaMovement(0, 0, 0);
+        if (ant instanceof AbstractAntEntity insect) {
+            insect.getNavigator().stop();
+        }
     }
 }

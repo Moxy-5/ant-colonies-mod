@@ -72,6 +72,16 @@ public class KingCare {
         return hungerRunsOut(level);
     }
 
+    /** A nurse's job while away (see {@link NestLife}): a piece of the nurses' food for him when he wants some. True if he was fed. */
+    boolean fedAway(ServerLevel level, NestLife life) {
+        if (!wantsFood(level) || !life.takeNurseFood(level)) {
+            return false;
+        }
+        fed(level);
+        colony.away().note(level, AwayReport.What.KING_FED, 1);
+        return true;
+    }
+
     /** Once a second while the colony is away: his clock runs on; true if he starved just now. */
     boolean liveAway(ServerLevel level) {
         if (!isAlive() || !hungerRunsOut(level)) {

@@ -113,13 +113,15 @@ public class Brood {
      * the soldier it is growing into (in a colony with soldiers, see {@link Soldiers#mealFor}).
      */
     public int mealFor(@Nullable TermiteSoldierEntity.Rank rank) {
-        return colony.part(ColonyParts.SOLDIERS).map(soldiers -> soldiers.mealFor(rank)).orElse(colony.profile().brood().larvaMeal());
+        ColonyHooks.Castes castes = colony.hooks().first(ColonyHooks.CASTES);
+        return castes == null ? colony.profile().brood().larvaMeal() : castes.mealFor(rank);
     }
 
     /** The kind of soldier a new nymph should grow into, or null: soldiers enough, or a species without them (see {@link Soldiers#rankForNewNymph}). */
     @Nullable
     public TermiteSoldierEntity.Rank soldierWanted(Level level) {
-        return colony.part(ColonyParts.SOLDIERS).map(soldiers -> soldiers.rankForNewNymph(level)).orElse(null);
+        ColonyHooks.Castes castes = colony.hooks().first(ColonyHooks.CASTES);
+        return castes == null ? null : castes.wanted(level);
     }
 
     /** What an egg of this colony hatches into: an ant larva, or a termite nymph (a small pale termite). */

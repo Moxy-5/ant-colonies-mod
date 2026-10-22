@@ -240,7 +240,10 @@ public class AwayLife {
                     }
                     case NURSE_FOOD, RICH_NURSE_FOOD -> {
                         if (colony.profile().food().makesBread()) {
-                            colony.part(ColonyParts.BAKERY).ifPresent(bakery -> bakery.countIn(what.load() == Load.RICH_NURSE_FOOD));
+                            NurseFood food = colony.nurseFood();
+                            if (food != null) {
+                                food.countedIn(what.load() == Load.RICH_NURSE_FOOD);
+                            }
                         }
                         colony.ledger().addNurseFood(1);
                     }

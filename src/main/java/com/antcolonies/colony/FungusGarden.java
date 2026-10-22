@@ -53,6 +53,11 @@ public class FungusGarden implements NurseFood {
     /** Tests only: how many times faster the comb ripens, goes old and crumbles. Not saved. */
     private float ageingSpeedForTests = 1.0F;
 
+    /** The colony whose garden this is. */
+    Colony colony() {
+        return colony;
+    }
+
     FungusGarden(Colony colony) {
         this.colony = colony;
     }
@@ -219,6 +224,18 @@ public class FungusGarden implements NurseFood {
     public int oldKnown() {
         NestLedger ledger = colony.ledger();
         return Math.max(0, seenOld + ledger.aged() + Math.min(0, ledger.store()));
+    }
+
+    /** The nodules on the comb as far as the brain knows: in the world while the nest is loaded, as last seen while away, with what the ledger still owes the world. */
+    @Override
+    public int counted(ServerLevel level) {
+        int nodules = colony.away().isHere(level) ? available(level) : seenNodules();
+        return Math.max(0, nodules + colony.ledger().nurseFood());
+    }
+
+    @Override
+    public ItemStack piece() {
+        return new ItemStack(ModItems.FUNGUS_NODULE.get());
     }
 
     /** How many nodules there were the last second the garden was loaded. */

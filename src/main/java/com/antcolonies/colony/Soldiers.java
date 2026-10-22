@@ -57,6 +57,9 @@ public class Soldiers {
     /** When the foraging time was seen to be over (from then on the minors wait for the workers). */
     private long foragingEndedAt = Colony.NOT_SET;
 
+    /** How many more minors come out while the alarm is up at a break-in (level 3 or more), beyond the ones with posts. */
+    private static final int BREACH_MINORS = 6;
+
     Soldiers(Colony colony) {
         this.colony = colony;
     }
@@ -405,5 +408,39 @@ public class Soldiers {
         }
         return line + " (" + byWays + " beside ways out, " + onTrails + " on trails)"
                 + (colony.isForagingTime(level) ? "" : ", waiting for the workers to come in") + colony.trails().describe(level);
+    }
+
+    /**
+     * How many real soldiers the colony wants now, by rank (see {@link Population#targets}): watched (a player near), as
+     * many as there are posts for them (a few more minors at a break-in), up to a quarter of the real cap; not watched,
+     * only while the alarm is up (2 or more: an enemy at the foragers). No more than the colony has, so the workers get
+     * the rest of the cap. Returns how many in all.
+     */
+    int wantReal(ServerLevel level, boolean watched, int cap, Map<String, Integer> wanted) {
+        if (numbers() == null) {
+            return 0;
+        }
+        int soldiers = 0;
+        int alarm = colony.part(ColonyParts.ALARM).map(part -> part.level(level)).orElse(0);
+        int soldierCap = cap / 4;
+        for (Rank rank : Rank.values()) {
+            int posts = posts(level, rank).size();
+            if (rank == Rank.MINOR && alarm >= 3) {
+                posts += BREACH_MINORS;
+            }
+            // (no more than the colony has, so the workers get the rest of the cap)
+            int want = watched || alarm >= 2 ? Math.min(Math.min(posts, colony.getCount(rank.caste())), soldierCap - soldiers) : 0;
+            wanted.put(rank.caste(), Math.max(0, want));
+            soldiers += Math.max(0, want);
+        }
+        return soldiers;
+    }
+
+    /** For the colony list: the soldiers that are numbers in the nest. */
+    String inside(Population population) {
+        if (numbers() == null) {
+            return "";
+        }
+        return "; soldiers " + population.inside(Rank.MINOR.caste()) + " minor, " + population.inside(Rank.MAJOR.caste()) + " major";
     }
 }

@@ -112,6 +112,8 @@ public class Colony {
     private final ColonyNews news = new ColonyNews();
     /** Yes/no questions the parts answer (colony parts steps 6 and 7, {@link ColonyQuestions}). */
     private final ColonyQuestions questions = new ColonyQuestions();
+    /** What the parts plug into the shared code's sockets (colony parts step 8b, {@link ColonyHooks}). */
+    private final ColonyHooks hooks = new ColonyHooks();
     /** Species and parts whose data in an old save was skipped (logged once each). */
     private static final java.util.Set<String> skippedLogged = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
@@ -154,7 +156,7 @@ public class Colony {
         this.ticking = ColonyPart.ticking(this.parts);
         this.tickingAway = ColonyPart.tickingAway(this.parts);
         for (ColonyPart<?> part : this.parts) {
-            part.signUp(news, questions); // (each part's row in ColonyParts says what news it hears and what it answers)
+            part.signUp(news, questions, hooks); // (each part's row in ColonyParts says what news it hears, what it answers and what it plugs in)
         }
     }
 
@@ -192,6 +194,15 @@ public class Colony {
      */
     public ColonyQuestions questions() {
         return questions;
+    }
+
+    /**
+     * The colony's hooks: the sockets in the shared code its parts plug their own answers and work into (the reach of
+     * its trails, its door, the structure over its nest, ...), without the shared code naming them (colony parts step 8b,
+     * {@link ColonyHooks}).
+     */
+    public ColonyHooks hooks() {
+        return hooks;
     }
 
     /**
@@ -245,7 +256,8 @@ public class Colony {
 
     /** The mound's blocks and what each is (none for a species without a mound; see {@link Mound#getParts}). */
     public Map<BlockPos, MoundPlan.Part> moundParts(Level level) {
-        return part(ColonyParts.MOUND).map(built -> built.getParts(level)).orElse(Map.of());
+        ColonyHooks.Structure structure = hooks.first(ColonyHooks.STRUCTURE);
+        return structure == null ? Map.of() : structure.parts(level);
     }
 
     /** The underground nest: its plan, the next block to dig, and the dug-out cells of each room. */
@@ -379,8 +391,7 @@ public class Colony {
      * otherwise (null only for a species with neither part).
      */
     public NurseFood nurseFood() {
-        return part(ColonyParts.FUNGUS_GARDEN).<NurseFood>map(garden -> garden)
-                .orElseGet(() -> part(ColonyParts.BAKERY).orElse(null));
+        return hooks.first(ColonyHooks.NURSE_FOOD);
     }
 
     /** The foraging holes and their tunnels (only species whose profile has {@code nest.foraging_holes}). */
@@ -603,7 +614,11 @@ public class Colony {
      * colony, see {@code nest.new_holes}).
      */
     public int foragingRadius() {
-        int radius = Math.max(profile().food().radius(), part(ColonyParts.TRUNK_TRAILS).map(TrunkTrails::longestTip).orElse(0));
+        int reached = profile().food().radius();
+        for (ColonyHooks.Reach reach : hooks.all(ColonyHooks.REACH)) {
+            reached = Math.max(reached, reach.reach()); // (the trunk trails' longest tip)
+        }
+        int radius = reached;
         int galleries = nest.galleries().range();
         if (galleries > 0) {
             // Termites underground (step 2a): the range is the galleries, the farthest hole and the graze round it, in

@@ -110,7 +110,8 @@ public class NestLedger {
             return false;
         }
         boolean changed = false;
-        List<BlockPos> combs = colony.part(ColonyParts.FUNGUS_GARDEN).map(garden -> garden.getCombs(level)).orElse(List.of());
+        ColonyHooks.Garden garden = colony.hooks().first(ColonyHooks.GARDEN);
+        List<BlockPos> combs = garden == null ? List.of() : garden.beds(level);
         for (int tries = 0; ripened > 0 && tries < PER_SECOND; tries++) {
             BlockPos spot = pick(level, combs, eyes, state -> FungusCombBlock.fresh(state) > 0);
             if (spot == null) {
@@ -305,7 +306,10 @@ public class NestLedger {
             }
             for (int i = 0; colony.profile().food().makesBread() && i < bread + richBread; i++) {
                 boolean rich = i < richBread;
-                colony.part(ColonyParts.BAKERY).ifPresent(bakery -> bakery.countIn(rich));
+                NurseFood food = colony.nurseFood();
+                if (food != null) {
+                    food.countedIn(rich);
+                }
             }
         }
     }

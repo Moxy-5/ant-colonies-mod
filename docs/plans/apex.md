@@ -206,6 +206,12 @@ easiest to stop bugs from happening and push updates easier"); so these are my p
    each part to describe itself), `ModEvents` (1 line, the alarm) and the shared ant body (`entity/AbstractAntEntity`,
    4 lines: the trunk trails, the hidden trips, the door, the recruits); and the species types still named in shared
    files (step 8's "left on purpose"). Each must go before the split. Nothing changes in-game.
+   Also the goals (counted 2026-10-22 when step 8 was built): about 60 lines in 18 goals name a species part. Most are
+   goals of one species that move with it (`ClipGrassGoal`, `PatrolGoal`, `MillBreadGoal`, `ShapeMoundGoal`,
+   `GuardPostGoal`, ...); the shared ones need questions or hooks: `ScoutGoal` (16 lines, errand helper step 4 anyway),
+   `DigGoal` (5), `GatherSeedGoal` (5), `GroomGoal` (2), `CarryPelletGoal`, `FeedLarvaGoal`, `DefendGoal`, `NapGoal`,
+   `NoticeGoal` (1 each); and the species bodies (`TermiteKingEntity` 6, `TermiteSoldierEntity` 4, `AntLarvaEntity` 1),
+   which move with their species.
 
 Then the split's own plan (`docs/plans/mod-split.md`) can draw the framework's wall along the registry: shared parts
 in, species parts out.

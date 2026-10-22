@@ -312,7 +312,8 @@ public class FoodStore {
                 continue;
             }
             double trip = tripLength(pos, exits.isEmpty() ? List.of(center) : exits);
-            double byTrail = colony.part(ColonyParts.TRUNK_TRAILS).map(trunk -> trunk.walkTo(pos)).orElse(-1.0); // (a cleared trail walks quicker: worth the walk)
+            ColonyHooks.Trails trails = colony.hooks().first(ColonyHooks.TRAILS);
+            double byTrail = trails == null ? -1.0 : trails.walkTo(pos); // (a cleared trail walks quicker: worth the walk)
             double worth = worth(plant.pieces() - getPiecesCut(pos), byTrail >= 0 ? Math.min(trip, byTrail) : trip, pos.distSqr(near));
             if (worth > bestWorth) {
                 best = pos;
@@ -386,7 +387,8 @@ public class FoodStore {
                     }
                 }
                 int trailSide = side;
-                for (int[] column : colony.part(ColonyParts.TRUNK_TRAILS).map(trunk -> trunk.columnsNear(trailSide, radius)).orElse(List.of())) {
+                ColonyHooks.Trails trails = colony.hooks().first(ColonyHooks.TRAILS);
+                for (int[] column : trails == null ? List.<int[]>of() : trails.columnsNear(trailSide, radius)) {
                     scanOuter(level, center.getX() + column[0], center.getZ() + column[1], inner, done);
                 }
                 AABB out = new AABB(center).inflate(radius + 2, 16, radius + 2);
@@ -924,7 +926,7 @@ public class FoodStore {
         double top = spot.getY() + level.getBlockState(spot).getCollisionShape(level, spot).max(net.minecraft.core.Direction.Axis.Y);
         for (net.minecraft.world.entity.LivingEntity living : level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class, new AABB(spot))) {
             if (living.getBoundingBox().minY < top) {
-                Mound.liftOnto(level, living, spot, top);
+                NestWalls.liftOnto(level, living, spot, top);
             }
         }
         return true;

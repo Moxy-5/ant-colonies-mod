@@ -60,8 +60,6 @@ public class Population {
     private static final double FAR_FROM_PLAYERS = 24.0;
     /** How far (blocks) a player sees an insect at all (farther than this counts as out of sight). */
     public static final double SIGHT = 64.0;
-    /** How many more minors come out while the alarm is up at a break-in (level 3 or more), beyond the ones with posts. */
-    private static final int BREACH_MINORS = 6;
 
     private final Colony colony;
     /** Caste -> (the minute they grew up -> how many). Saved. */
@@ -347,20 +345,8 @@ public class Population {
         int cap = realCap();
         watched = watched || crew() >= cap;
         int soldiers = 0;
-        Soldiers guards = colony.part(ColonyParts.SOLDIERS).filter(part -> part.numbers() != null).orElse(null);
-        if (guards != null) {
-            int alarm = colony.part(ColonyParts.ALARM).map(part -> part.level(level)).orElse(0);
-            int soldierCap = cap / 4;
-            for (TermiteSoldierEntity.Rank rank : TermiteSoldierEntity.Rank.values()) {
-                int posts = guards.posts(level, rank).size();
-                if (rank == TermiteSoldierEntity.Rank.MINOR && alarm >= 3) {
-                    posts += BREACH_MINORS;
-                }
-                // (no more than the colony has, so the workers get the rest of the cap)
-                int want = watched || alarm >= 2 ? Math.min(Math.min(posts, colony.getCount(rank.caste())), soldierCap - soldiers) : 0;
-                wanted.put(rank.caste(), Math.max(0, want));
-                soldiers += Math.max(0, want);
-            }
+        for (ColonyHooks.Castes castes : colony.hooks().all(ColonyHooks.CASTES)) {
+            soldiers += castes.wantReal(level, watched, cap, wanted); // (the termite soldiers, before the workers)
         }
         wanted.put(WorkerAntEntity.CASTE, watched ? Math.max(0, cap - soldiers) : Math.min(crew(), cap));
         return wanted;
@@ -460,7 +446,10 @@ public class Population {
             String caste = entry.getKey();
             List<AbstractAntEntity> mobs = byCaste.getOrDefault(caste, List.of());
             // The ones travelling unseen along the galleries are real ones too, out of the world for a while (HiddenTrips).
-            int have = mobs.size() + colony.part(ColonyParts.HIDDEN_TRIPS).map(trips -> trips.travelling(caste)).orElse(0);
+            int have = mobs.size();
+            for (ColonyHooks.HiddenAway away : colony.hooks().all(ColonyHooks.HIDDEN_AWAY)) {
+                have += away.travelling(caste);
+            }
             int want = entry.getValue();
             while (have < want && swaps > 0 && inside(caste) > 0) {
                 if (rooms == null) {
@@ -656,10 +645,11 @@ public class Population {
     }
 
     private String soldiersInside() {
-        if (colony.part(ColonyParts.SOLDIERS).map(Soldiers::numbers).isEmpty()) {
-            return "";
+        StringBuilder text = new StringBuilder();
+        for (ColonyHooks.Castes castes : colony.hooks().all(ColonyHooks.CASTES)) {
+            text.append(castes.inside(this));
         }
-        return "; soldiers " + inside(TermiteSoldierEntity.Rank.MINOR.caste()) + " minor, " + inside(TermiteSoldierEntity.Rank.MAJOR.caste()) + " major";
+        return text.toString();
     }
 
     // --- tests ----------------------------------------------------------------------------------------------------

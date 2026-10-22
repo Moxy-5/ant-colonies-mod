@@ -1584,6 +1584,35 @@ public class AwayTests {
                     "a " + colony.getSpecies() + " colony's question " + kind.getKey() + " should be answered by " + answering + ", not "
                             + colony.questions().answerersOf(kind.getKey()));
         }
+        // Steps 8b and 8c, the colony hooks: each socket is plugged by the parts the colony has that the shared code used
+        // to name, in the order it used them.
+        Map<com.antcolonies.colony.ColonyHooks.Kind<?>, List<String>> plugged = Map.ofEntries(
+                Map.entry(com.antcolonies.colony.ColonyHooks.REACH, List.of("trunk_trails")),
+                Map.entry(com.antcolonies.colony.ColonyHooks.TRAILS, List.of("trunk_trails")),
+                Map.entry(com.antcolonies.colony.ColonyHooks.DOOR_RULE, List.of("door")),
+                Map.entry(com.antcolonies.colony.ColonyHooks.CO_FOUNDERS, List.of("king_care")),
+                Map.entry(com.antcolonies.colony.ColonyHooks.NURSE_FOOD, List.of("fungus_garden", "bakery")),
+                Map.entry(com.antcolonies.colony.ColonyHooks.CASTES, List.of("soldiers")),
+                Map.entry(com.antcolonies.colony.ColonyHooks.HIDDEN_AWAY, List.of("hidden_trips")),
+                Map.entry(com.antcolonies.colony.ColonyHooks.STRUCTURE, List.of("mound")),
+                Map.entry(com.antcolonies.colony.ColonyHooks.GARDEN, List.of("fungus_garden")),
+                Map.entry(com.antcolonies.colony.ColonyHooks.AWAY_BUILDER, List.of("hill", "mound")),
+                Map.entry(com.antcolonies.colony.ColonyHooks.NUMBERS_SEARCH, List.of("forager_spots")),
+                Map.entry(com.antcolonies.colony.ColonyHooks.AWAY_BESIDE_QUEEN, List.of("king_care")),
+                Map.entry(com.antcolonies.colony.ColonyHooks.AWAY_AFTER_NURSES, List.of("fungus_garden")),
+                Map.entry(com.antcolonies.colony.ColonyHooks.NURSE_FEEDS, List.of("king_care")),
+                Map.entry(com.antcolonies.colony.ColonyHooks.NURSE_MAKES, List.of("bakery")));
+        for (Map.Entry<com.antcolonies.colony.ColonyHooks.Kind<?>, List<String>> kind : plugged.entrySet()) {
+            List<String> plugging = kind.getValue().stream().filter(has::contains).toList();
+            helper.assertTrue(colony.hooks().pluggedInto(kind.getKey()).equals(plugging),
+                    "a " + colony.getSpecies() + " colony's socket " + kind.getKey() + " should be plugged by " + plugging + ", not "
+                            + colony.hooks().pluggedInto(kind.getKey()));
+        }
+        // Step 8b: the nurses' food is today's (a fungus garden's nodules first, else the bread).
+        Object nurseFood = colony.part(com.antcolonies.colony.ColonyParts.FUNGUS_GARDEN).map(Object.class::cast)
+                .or(() -> colony.part(com.antcolonies.colony.ColonyParts.BAKERY).map(Object.class::cast)).orElse(null);
+        helper.assertTrue(colony.nurseFood() == nurseFood, "a " + colony.getSpecies() + " colony's nurses' food should be its "
+                + (nurseFood == null ? "nothing" : nurseFood.getClass().getSimpleName()) + ", not " + colony.nurseFood());
         // Step 8a: the answers are today's (the mound's own checks, the trunk trails' own switch).
         helper.assertTrue(colony.buildsMound() == colony.part(com.antcolonies.colony.ColonyParts.MOUND).map(mound -> mound.numbers() != null).orElse(false)
                 && colony.buildsOverNestNow() == colony.part(com.antcolonies.colony.ColonyParts.MOUND).map(com.antcolonies.colony.Mound::isActive).orElse(false),

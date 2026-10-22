@@ -110,7 +110,8 @@ public class WorkerFood {
         if (food == MealFood.STORE) {
             return colony.food().cutPiece();
         }
-        return new ItemStack(colony.has(ColonyParts.FUNGUS_GARDEN) ? ModItems.FUNGUS_NODULE.get() : ModItems.ANT_BREAD.get());
+        NurseFood nurseFood = colony.nurseFood();
+        return nurseFood == null ? new ItemStack(ModItems.ANT_BREAD.get()) : nurseFood.piece();
     }
 
     /**

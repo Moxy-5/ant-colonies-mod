@@ -159,7 +159,7 @@ public class MoundShaping {
                 double top = pos.getY() + filled.getCollisionShape(level, pos).max(Direction.Axis.Y);
                 for (LivingEntity ant : inCell) {
                     if (!(ant instanceof AbstractAntEntity insect && insect.getNavigator().isInChannel()) && ant.getBoundingBox().minY < top) {
-                        Mound.liftOnto(level, ant, pos, top);
+                        NestWalls.liftOnto(level, ant, pos, top);
                     }
                 }
             }

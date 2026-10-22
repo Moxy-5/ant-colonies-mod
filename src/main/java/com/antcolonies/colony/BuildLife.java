@@ -1,21 +1,15 @@
 package com.antcolonies.colony;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.block.MoundSoil;
-import com.antcolonies.block.TermiteMoundBlock;
 import com.antcolonies.entity.WorkerAntEntity;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -58,6 +52,9 @@ public class BuildLife {
     private int soil;
     /** Whether the last second's catch-up waited for something (a player looking, an insect in the way). Not saved. */
     private boolean waited;
+    /** This second's catch-up: the players' eyes and how many blocks changed so far. Not saved. */
+    private List<Vec3> eyes = List.of();
+    private int changes;
 
     BuildLife(Colony colony) {
         this.colony = colony;
@@ -101,9 +98,6 @@ public class BuildLife {
 
     // --- coming back ----------------------------------------------------------------------------------------------
 
-    /** Who claims a pile of night soil for the builder numbers (see {@link #carryNightSoil}). */
-    private static final java.util.UUID BUILDERS = new java.util.UUID(0L, 0x4255494cL);
-
     /**
      * Once a second while the whole nest is loaded and there is building time left (from {@link AwayLife#settle}): the
      * work is done, out of every player's sight ({@code eyes}). True if any block changed. Once nothing more may be
@@ -115,15 +109,17 @@ public class BuildLife {
             return false;
         }
         waited = false;
-        int[] changes = {0};
-        boolean nestLeft = work > 0 && (carryNightSoil(level, eyes, changes) || digNest(level, eyes, changes));
-        boolean moundLeft = work > 0 && colony.part(ColonyParts.MOUND).map(Mound::isActive).orElse(false) && buildMound(level, eyes, changes);
+        this.eyes = eyes;
+        changes = 0;
+        List<ColonyHooks.AwayBuilder> builders = colony.hooks().all(ColonyHooks.AWAY_BUILDER);
+        boolean nestLeft = work > 0 && (firstWork(level, builders) || digNest(level));
+        boolean moundLeft = work > 0 && afterWork(level, builders); // (the termite mound built up)
         if (!nestLeft && founders) {
-            settleFounders(level, eyes, changes);
+            settleFounders(level);
         }
         // Termites underground step 4 (the user's pick, 2026-10-17): the time left once the nest and the mound are done
         // grows the galleries, as the real builders never stop.
-        boolean galleriesLeft = work > 0 && !nestLeft && !moundLeft && !waited && !colony.isFounding() && growGalleries(level, eyes, changes);
+        boolean galleriesLeft = work > 0 && !nestLeft && !moundLeft && !waited && !colony.isFounding() && growGalleries(level);
         if (!nestLeft && !moundLeft && !galleriesLeft && !waited) {
             if (work > 0) {
                 log("is done");
@@ -131,59 +127,38 @@ public class BuildLife {
             work = 0; // nothing more to do: the builders had time to spare
             soil = 0; // (soil nobody needed was left in the galleries)
         }
-        return changes[0] > 0;
+        return changes > 0;
+    }
+
+    /** The species' work before the nest is dug further (the harvester's night soil carried up first). True if some still waits. */
+    private boolean firstWork(ServerLevel level, List<ColonyHooks.AwayBuilder> builders) {
+        for (ColonyHooks.AwayBuilder builder : builders) {
+            if (builder.first(level, this)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** The species' work once the nest is dug as far as it may be (the termite mound built up). True if some is left. */
+    private boolean afterWork(ServerLevel level, List<ColonyHooks.AwayBuilder> builders) {
+        for (ColonyHooks.AwayBuilder builder : builders) {
+            if (builder.after(level, this)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void log(String what) {
         AntColoniesMod.LOGGER.info("[away-build] colony {} {}: {} ticks of work left over, {} soil", colony.getId(), what, work, soil);
     }
 
-    /**
-     * The night soil first (as the real builders do each morning, see {@link NightSoil}): the piles near the top of
-     * the nest are carried up onto the hill before anything more is dug. True if some still waits (time ran out, or a
-     * player can see the pile or the hill).
-     */
-    private boolean carryNightSoil(ServerLevel level, List<Vec3> eyes, int[] changes) {
-        Hill hill = colony.part(ColonyParts.HILL).orElse(null);
-        if (hill == null || colony.buildsMound() || colony.isFounding()) {
-            return false;
-        }
-        while (work > 0 && hill.hasMoundRoom(level)) {
-            if (changes[0] >= PER_SECOND) {
-                return true;
-            }
-            BlockPos pile = hill.nightSoil().claimPile(level, BUILDERS);
-            if (pile == null) {
-                return false; // nothing waits
-            }
-            hill.nightSoil().release(BUILDERS);
-            if (!Population.outOfSight(level, pile, eyes)) {
-                waited = true;
-                return true;
-            }
-            BlockPos spot = hill.pickMoundSpot(level, colony.random(), null);
-            if (spot == null) {
-                return false;
-            }
-            if (!freeAndHidden(level, spot, eyes)) {
-                return true;
-            }
-            if (hill.nightSoil().takeLayer(level, pile, BUILDERS) == null || !hill.placePellet(level, spot)) {
-                return false;
-            }
-            work -= trip(pile, spot);
-            changes[0]++;
-            colony.away().report().add(AwayReport.What.HILL, 1);
-        }
-        return false;
-    }
-
     /** The nest's plan, dug in the real diggers' order. True if there is more to dig (time ran out, or it waits). */
-    private boolean digNest(ServerLevel level, List<Vec3> eyes, int[] changes) {
-        boolean ants = !colony.buildsMound();
-        Hill hill = colony.part(ColonyParts.HILL).orElse(null);
+    private boolean digNest(ServerLevel level) {
+        List<ColonyHooks.AwayBuilder> builders = colony.hooks().all(ColonyHooks.AWAY_BUILDER);
         while (work > 0) {
-            if (changes[0] >= PER_SECOND) {
+            if (changes >= PER_SECOND) {
                 return true;
             }
             BlockPos target = colony.nest().findPlannedDigTarget(level);
@@ -196,17 +171,17 @@ public class BuildLife {
             }
             if (target.equals(colony.getCenter()) && colony.nest().isPlantInEntrance(level)) {
                 colony.nest().clearPlantInEntrance(level, null); // (a plant in the entrance: bitten off, no soil)
-                changes[0]++;
+                changes++;
                 work -= BITE_TICKS;
                 continue;
             }
-            // Ants carry the soil up onto the hill while it has room (the first spot is looked at before the block is
-            // dug). Founders leave theirs where it falls (they carry no soil, as when they dig here).
-            boolean founding = colony.isFounding();
-            BlockPos heap = ants && hill != null && !founding && hill.hasMoundRoom(level) ? hill.pickMoundSpot(level, colony.random(), null) : null;
-            if (heap != null && !freeAndHidden(level, heap, eyes)) {
-                waited = true;
-                return true;
+            // Where the soil goes is the species' (ants: onto the hill, its spot looked at before the block is dug; termites:
+            // into the mound's soil).
+            for (ColonyHooks.AwayBuilder builder : builders) {
+                if (!builder.readyToDig(level, this, target)) {
+                    waited = true;
+                    return true;
+                }
             }
             if (!colony.walls().wallFirst(level, target)) {
                 waited = true; // a plate of mud could not go in yet
@@ -214,24 +189,11 @@ public class BuildLife {
             }
             int bites = bites(level, target);
             dig(level, target);
-            changes[0]++;
+            changes++;
             work -= (long) bites * BITE_TICKS;
             colony.away().report().add(AwayReport.What.DUG, 1);
-            if (ants) {
-                for (int i = 0; i < bites && heap != null; i++) {
-                    if (!hill.placePellet(level, heap)) {
-                        break;
-                    }
-                    work -= trip(target, heap);
-                    changes[0]++;
-                    colony.away().report().add(AwayReport.What.HILL, 1);
-                    heap = hill.hasMoundRoom(level) ? hill.pickMoundSpot(level, colony.random(), null) : null;
-                    if (heap != null && !freeAndHidden(level, heap, eyes)) {
-                        heap = null; // a player can see the hill now: the rest of this block's soil is left behind
-                    }
-                }
-            } else if (colony.part(ColonyParts.MOUND).map(Mound::isActive).orElse(false) && !founding) {
-                soil += TermiteMoundBlock.FINISHED; // a dug block gives the soil for a mound block (as Mound.takePellet)
+            for (ColonyHooks.AwayBuilder builder : builders) {
+                builder.dug(level, this, target, bites);
             }
         }
         return true;
@@ -246,13 +208,13 @@ public class BuildLife {
      * reach) and dug before the next. True if there is more (time ran out this second, or it waits); false once nothing
      * more may grow now (the budget is spent, or the ground out there is not loaded: the real workers grow it later).
      */
-    private boolean growGalleries(ServerLevel level, List<Vec3> eyes, int[] changes) {
+    private boolean growGalleries(ServerLevel level) {
         Galleries galleries = colony.nest().galleries();
         if (!galleries.isOn()) {
             return false;
         }
         for (int i = 0; i < PIECES_PER_SECOND; i++) {
-            if (work <= 0 || changes[0] >= PER_SECOND) {
+            if (work <= 0 || changes >= PER_SECOND) {
                 return true;
             }
             int[] grown = galleries.growNow(level);
@@ -263,156 +225,10 @@ public class BuildLife {
             report.add(AwayReport.What.GALLERY_PIECES, grown[0]);
             report.add(AwayReport.What.GALLERY_TO_FOOD, grown[1]);
             report.add(AwayReport.What.GALLERY_BLOCKS, grown[2]);
-            if (digNest(level, eyes, changes)) {
+            if (digNest(level)) {
                 return true; // (time ran out, or a player can see where it goes)
             }
         }
-        return true;
-    }
-
-    /**
-     * The termite mound, built up the way the real termites do: lowest first, a stage finished before the next one the
-     * colony has earned is started, each block the plan's own (soil, then carved where the plan has a tunnel; ramps,
-     * spire pieces and chimney mouths; pieces reshaped; soil cleared out of the shaft). The soil comes from the nest's
-     * digging and then from the galleries under the mound. True if there is more to build (time ran out, or it waits).
-     */
-    private boolean buildMound(ServerLevel level, List<Vec3> eyes, int[] changes) {
-        Mound mound = colony.part(ColonyParts.MOUND).orElse(null);
-        if (mound == null) {
-            return false;
-        }
-        for (int pass = 0; pass < MOUND_PASSES; pass++) {
-            int before = changes[0];
-            boolean left = false;
-            boolean noSoil = false;
-            Set<BlockPos> nestCells = colony.nest().nestCells(level);
-            List<Map.Entry<BlockPos, MoundPlan.Part>> parts = new ArrayList<>(mound.getParts(level).entrySet());
-            parts.sort(Comparator.comparingInt(entry -> entry.getKey().getY()));
-            for (Map.Entry<BlockPos, MoundPlan.Part> entry : parts) {
-                if (work <= 0 || changes[0] >= PER_SECOND) {
-                    return true;
-                }
-                BlockPos pos = entry.getKey();
-                MoundPlan.Part part = entry.getValue();
-                if (!level.isLoaded(pos)) {
-                    continue;
-                }
-                MoundGrowth.Job job = mound.jobAt(level, pos, part);
-                if (job == null) {
-                    continue;
-                }
-                left = true;
-                Outcome outcome = buildAt(level, eyes, mound, pos, part, job, nestCells);
-                if (outcome == Outcome.NO_SOIL) {
-                    noSoil = true; // no soil left to dig (the galleries are used up)
-                    break;
-                }
-                if (outcome == Outcome.DONE) {
-                    changes[0]++;
-                }
-            }
-            if (changes[0] == before && noSoil) {
-                return waited; // nothing to build with (the real termites would stand idle too), or it waits for a player to look away
-            }
-            if (changes[0] == before) {
-                // Nothing more could be done on this stage: the next one, if a taller one is earned. As with the real
-                // termites, a stage with a spot nobody can build moves on anyway (they would have stalled on it long ago).
-                if (!mound.nextStage(level, !waited)) {
-                    return left && waited;
-                }
-            }
-        }
-        return true;
-    }
-
-    private enum Outcome {
-        DONE, SKIPPED, NO_SOIL
-    }
-
-    private Outcome buildAt(ServerLevel level, List<Vec3> eyes, Mound mound, BlockPos pos, MoundPlan.Part part, MoundGrowth.Job job,
-            Set<BlockPos> nestCells) {
-        BlockPos hub = colony.getCenter().below(colony.nest().shaftDepth(level));
-        switch (job) {
-            case SOIL -> {
-                BlockPos spot = mound.spotIn(level, pos, nestCells);
-                if (spot == null) {
-                    return Outcome.SKIPPED; // what it stands on is not there yet
-                }
-                if (!freeAndHidden(level, spot, eyes)) {
-                    return Outcome.SKIPPED;
-                }
-                BlockState was = level.getBlockState(spot);
-                int pellets = TermiteMoundBlock.FINISHED - (was.getBlock() instanceof TermiteMoundBlock ? was.getValue(TermiteMoundBlock.LAYERS) : 0);
-                if (!takeSoil(level, eyes, pellets)) {
-                    return Outcome.NO_SOIL;
-                }
-                level.setBlock(spot, Mound.soil(setAge(mound, pos)), 3);
-                work -= pellets * trip(hub, spot);
-                colony.away().report().add(AwayReport.What.MOUND_BUILT, 1);
-            }
-            case PIECE -> {
-                if (!mound.isPieceSpot(level, pos, part) || !freeAndHidden(level, pos, eyes) || mound.shape() == null) {
-                    return Outcome.SKIPPED;
-                }
-                if (!takeSoil(level, eyes, 1)) {
-                    return Outcome.NO_SOIL;
-                }
-                BlockState piece = Mound.blockFor(mound.shape(), pos.subtract(colony.getCenter()));
-                piece = piece.setValue(MoundSoil.AGE, Math.max(1, piece.getValue(MoundSoil.AGE)));
-                level.setBlock(pos, Block.updateFromNeighbourShapes(piece, level, pos), 3);
-                work -= trip(hub, pos);
-                colony.away().report().add(AwayReport.What.MOUND_BUILT, 1);
-            }
-            case CARVE, RESHAPE -> {
-                if (!freeAndHidden(level, pos, eyes)
-                        || job == MoundGrowth.Job.RESHAPE && !Mound.isSoil(part) && !mound.hasPieceSupport(level, pos, part)
-                        || !mound.shaping().shape(level, pos, null)) {
-                    return Outcome.SKIPPED;
-                }
-                work -= SHAPE_TICKS + (long) TICKS_PER_BLOCK * hub.distManhattan(pos);
-            }
-            case CLEAR -> {
-                if (!freeAndHidden(level, pos, eyes)) {
-                    return Outcome.SKIPPED;
-                }
-                int bites = bites(level, pos);
-                if (part == MoundPlan.Part.OPEN) {
-                    dig(level, pos);
-                    soil += TermiteMoundBlock.FINISHED; // the shaft's old soil goes into the new blocks
-                } else if (!mound.shaping().shape(level, pos, null)) {
-                    return Outcome.SKIPPED;
-                }
-                work -= (long) bites * BITE_TICKS;
-            }
-        }
-        mound.shaped(level);
-        return Outcome.DONE;
-    }
-
-    /** The age a mound block built while away is put in with: the plan's own, but at least set (it has had time to dry). */
-    private int setAge(Mound mound, BlockPos pos) {
-        MoundPlan.Shape shape = mound.shape();
-        int age = shape == null ? 1 : shape.age().getOrDefault(pos.subtract(colony.getCenter()), 1);
-        return Math.max(1, Math.min(TermiteMoundBlock.OLDEST, age));
-    }
-
-    /** Takes this many pellets of soil, digging the next blocks of the galleries under the mound for more. False if there is none. */
-    private boolean takeSoil(ServerLevel level, List<Vec3> eyes, int pellets) {
-        while (soil < pellets) {
-            BlockPos next = colony.nest().firstDiggable(level, colony.part(ColonyParts.MOUND).map(built -> built.getGalleries(level)).orElse(List.of()));
-            if (next == null) {
-                return false;
-            }
-            if (!Population.outOfSight(level, next, eyes)) {
-                waited = true;
-                return false;
-            }
-            work -= (long) bites(level, next) * BITE_TICKS;
-            dig(level, next);
-            colony.away().report().add(AwayReport.What.DUG, 1);
-            soil += TermiteMoundBlock.FINISHED;
-        }
-        soil -= pellets;
         return true;
     }
 
@@ -428,7 +244,7 @@ public class BuildLife {
      * put in their chamber, and, while they are still alone, the entrance is packed shut behind them. Sets
      * {@link #waited} if a player can see it or something is in the way.
      */
-    private void settleFounders(ServerLevel level, List<Vec3> eyes, int[] changes) {
+    private void settleFounders(ServerLevel level) {
         Nest nest = colony.nest();
         List<BlockPos> left = nest.foundersDigLeft(level);
         if (left == null) {
@@ -449,7 +265,7 @@ public class BuildLife {
                 waited = true;
                 return;
             }
-            changes[0]++;
+            changes++;
         }
         NestPlan.Chamber home = nest.getHomeChamber(level);
         if (home == null) {
@@ -479,24 +295,85 @@ public class BuildLife {
                 ant.getNavigator().stop();
             }
             founder.moveTo(to.x, to.y, to.z, founder.getYRot(), 0.0F);
-            changes[0]++;
+            changes++;
         }
         BlockPos hole = nest.getEntrance();
         if (colony.isFounding() && colony.profile().nest().sealWhileFounding() && nest.isEntranceOpen(level)) {
-            if (!freeAndHidden(level, hole, eyes)) {
+            if (!freeAndHidden(level, hole)) {
                 waited = true;
                 return;
             }
             level.setBlock(hole, colony.profile().nest().plugState(), 3);
-            changes[0]++;
+            changes++;
         }
         colony.life().foundersSettled();
         AntColoniesMod.LOGGER.info("[away-build] colony {}: the founders are in their chamber at {}{}", colony.getId(), middle.toShortString(),
                 colony.isFounding() ? ", the hole shut" : "");
     }
 
+    // --- for the species' own building on return (ColonyHooks.AwayBuilder: the hill, the mound) -------------------------
+
+    /** The colony building. */
+    Colony colony() {
+        return colony;
+    }
+
+    /** Whether there is building time left to spend. */
+    boolean timeLeft() {
+        return work > 0;
+    }
+
+    /** Whether as many blocks have changed this second as may (the rest comes the next second). */
+    boolean secondFull() {
+        return changes >= PER_SECOND;
+    }
+
+    /** How many blocks have changed this second. */
+    int changesNow() {
+        return changes;
+    }
+
+    /** One more block changed this second. */
+    void changed() {
+        changes++;
+    }
+
+    /** {@code ticks} of the builders' time spent. */
+    void spend(long ticks) {
+        work -= ticks;
+    }
+
+    /** Whether a player can see {@code pos}: if so the catch-up waits (it is done out of every player's sight). */
+    boolean seen(ServerLevel level, BlockPos pos) {
+        if (!Population.outOfSight(level, pos, eyes)) {
+            waited = true;
+            return true;
+        }
+        return false;
+    }
+
+    /** Whether this second's catch-up has waited for something (a player looking, an insect in the way). */
+    boolean waited() {
+        return waited;
+    }
+
+    /** The catch-up waits this second (for something only the species' code saw). */
+    void waits() {
+        waited = true;
+    }
+
+    /** Pellets of soil dug and not built in yet (termites: for the mound). */
+    int soil() {
+        return soil;
+    }
+
+    /** {@code pellets} of soil more (negative: used). */
+    void addSoil(int pellets) {
+        soil += pellets;
+    }
+
     /** The block is dug out, quietly (nobody is there to hear it). */
-    private void dig(ServerLevel level, BlockPos pos) {
+    void dig(ServerLevel level, BlockPos pos) {
         colony.nest().clearDigProgress(pos);
         colony.news().tell(level, ColonyNews.BLOCK_DUG, new ColonyNews.BlockDug(pos)); // (the mound counts its soil)
         level.removeBlock(pos, false);
@@ -508,7 +385,7 @@ public class BuildLife {
     }
 
     /** Whether nobody stands in this cell (nobody is ever buried, docs/BUGS.md 9 and 6g) and no player can see it. */
-    private boolean freeAndHidden(ServerLevel level, BlockPos pos, List<Vec3> eyes) {
+    boolean freeAndHidden(ServerLevel level, BlockPos pos) {
         if (!level.getEntitiesOfClass(LivingEntity.class, new AABB(pos), LivingEntity::isAlive).isEmpty()
                 || !Population.outOfSight(level, pos, eyes)) {
             waited = true;

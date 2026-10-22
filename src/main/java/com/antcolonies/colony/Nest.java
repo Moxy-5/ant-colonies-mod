@@ -246,7 +246,8 @@ public class Nest {
                 return next;
             }
         }
-        return live ? colony.part(ColonyParts.MOUND).map(mound -> mound.findDigTarget(level, digger)).orElse(null) : null;
+        ColonyHooks.Structure structure = live ? colony.hooks().first(ColonyHooks.STRUCTURE) : null;
+        return structure == null ? null : structure.digTarget(level, digger);
     }
 
     /** The garden rooms the colony wants dug now: the first, and one more for every few workers (the profile's {@code garden}). */
@@ -764,7 +765,9 @@ public class Nest {
             if (layout != null) {
                 cells.addAll(layout.cells());
             }
-            colony.part(ColonyParts.MOUND).ifPresent(mound -> cells.addAll(mound.getGalleries(level))); // none for species without a mound
+            for (ColonyHooks.Structure structure : colony.hooks().all(ColonyHooks.STRUCTURE)) {
+                cells.addAll(structure.tunnels(level)); // (the mound's tunnels; none for species without one)
+            }
         }
         for (NestPlan.ForagingTunnel tunnel : getForagingTunnels(level)) {
             cells.addAll(tunnel.tunnel());

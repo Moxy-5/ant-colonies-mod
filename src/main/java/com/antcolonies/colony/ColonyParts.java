@@ -14,6 +14,7 @@ import java.util.function.UnaryOperator;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
 import net.minecraft.resources.ResourceLocation;
 
 /**
@@ -83,6 +84,7 @@ public final class ColonyParts {
     public static final Type<NestWalls> NEST_WALLS = shared("nest_walls", NestWalls::new, part -> part
             .notSaved("the claims on leaks and how far each is sealed start again after a load"));
     public static final Type<Hill> HILL = listed("hill", Hill::new, part -> part
+            .plugs(ColonyHooks.AWAY_BUILDER, 10, HillAwayBuilding::new) // the night soil and the dug soil heaped on the hill, on return
             .ticks(40, (hill, level) -> {
                 if (!hill.colony().buildsMound()) {
                     hill.nightSoil().tick(level);
@@ -104,6 +106,8 @@ public final class ColonyParts {
                 }
             })
             .hears(ColonyNews.PIECE_EATEN, 10, (bakery, level, news) -> bakery.removeRichMiller(news.ant())) // eaten, not milled
+            .plugs(ColonyHooks.NURSE_FOOD, 20, bakery -> bakery) // ant bread (after a garden's nodules, as before)
+            .plugs(ColonyHooks.NURSE_MAKES, 10, bakery -> (level, life) -> bakery.millAway(level)) // the nurses mill seeds into bread while away
             .answers(ColonyQuestions.MORE_FOOD_WANTED, 10, (bakery, level, nothing) -> bakery.needsBread((ServerLevel) level)) // bread still to mill
             .saves(Bakery::save, Bakery::load)
             .sample((bakery, level) -> {
@@ -113,6 +117,9 @@ public final class ColonyParts {
     public static final Type<QueenCare> QUEEN_CARE = shared("queen_care", QueenCare::new, part -> part
             .saves(QueenCare::save, QueenCare::load));
     public static final Type<KingCare> KING_CARE = listed("king_care", KingCare::new, part -> part
+            .plugs(ColonyHooks.CO_FOUNDERS, 10, king -> () -> king.isAlive() ? 1 : 0) // he digs beside the queen
+            .plugs(ColonyHooks.AWAY_BESIDE_QUEEN, 10, king -> king::liveAway) // his hunger clock runs on while away
+            .plugs(ColonyHooks.NURSE_FEEDS, 10, king -> king::fedAway) // the nurses feed him while away, after the queen
             .saves(KingCare::save, KingCare::load));
     public static final Type<Brood> BROOD = shared("brood", Brood::new, part -> part
             .saves(Brood::save, Brood::load));
@@ -121,10 +128,27 @@ public final class ColonyParts {
     public static final Type<Mound> MOUND = listed("mound", Mound::new, part -> part
             .ticks(30, Mound::tick)
             .hears(ColonyNews.BLOCK_DUG, 10, (mound, level, news) -> mound.blockDug(level, news.where()))
+            .plugs(ColonyHooks.AWAY_BUILDER, 20, MoundAwayBuilding::new) // the dug soil and the mound built up, on return
             .answers(ColonyQuestions.BUILDS_OVER_NEST, 10, (mound, level, nothing) -> mound.numbers() != null)
             .answers(ColonyQuestions.BUILDING_OVER_NEST, 10, (mound, level, nothing) -> mound.isActive())
             .answers(ColonyQuestions.CLEAR_JOB, 10, Mound::isClearJob) // its own soil where it must be hollow
             .answers(ColonyQuestions.STRUCTURE_TUNNEL, 10, (mound, level, pos) -> mound.getGalleries(level).contains(pos))
+            .plugs(ColonyHooks.STRUCTURE, 10, mound -> new ColonyHooks.Structure() {
+                @Override
+                public Map<BlockPos, MoundPlan.Part> parts(Level level) {
+                    return mound.getParts(level);
+                }
+
+                @Override
+                public List<BlockPos> tunnels(Level level) {
+                    return mound.getGalleries(level);
+                }
+
+                @Override
+                public BlockPos digTarget(Level level, java.util.UUID digger) {
+                    return mound.findDigTarget(level, digger);
+                }
+            })
             .saves(Mound::save, Mound::load)
             .sample(Mound::fillForTests));
     public static final Type<ForagingHoles> FORAGING_HOLES = shared("foraging_holes", ForagingHoles::new, part -> part
@@ -138,6 +162,18 @@ public final class ColonyParts {
             .ticksAway(80, (trunk, level) -> trunk.tick(level, true))
             .answers(ColonyQuestions.KEEP_OFF, 40, TrunkTrails::keepsOff) // the trail out there passes danger
             .answers(ColonyQuestions.KEEPS_TRAILS, 10, (trunk, level, nothing) -> trunk.keepsTrails())
+            .plugs(ColonyHooks.REACH, 10, trunk -> trunk::longestTip) // the range is the trails (long trails, 2026-10-17)
+            .plugs(ColonyHooks.TRAILS, 10, trunk -> new ColonyHooks.Trails() {
+                @Override
+                public double walkTo(BlockPos pos) {
+                    return trunk.walkTo(pos);
+                }
+
+                @Override
+                public List<int[]> columnsNear(int side, int radius) {
+                    return trunk.columnsNear(side, radius);
+                }
+            })
             .hears(ColonyNews.NUMBERS_TRIP, 10, (trunk, level, news) -> trunk.tripByNumbers(level, news.plant())) // their trip out and back wears the trail too
             .saves(TrunkTrails::save, TrunkTrails::load)
             .sample(TrunkTrails::fillForTests));
@@ -156,11 +192,13 @@ public final class ColonyParts {
             .hears(ColonyNews.INTO_NUMBERS, 10, (spots, level, news) -> spots.intoNumbers(news.member())) // its spot goes into the numbers' pool
             .hears(ColonyNews.OUT_OF_NUMBERS, 10, (spots, level, news) -> spots.outOfNumbers(news.member())) // a forager takes a spot from the numbers' pool
             .hears(ColonyNews.FORAGER_NUMBERS, 10, (spots, level, news) -> spots.trimHeld(news.foragers())) // fewer forager numbers than spots held: some died or came out as real ones
+            .plugs(ColonyHooks.NUMBERS_SEARCH, 10, SearchingAlone::new) // the numbers search alone and go back to their spots
             .saves(ForagerSpots::save, ForagerSpots::load)
             .sample(ForagerSpots::fillForTests));
     public static final Type<Door> DOOR = listed("door", Door::new, part -> part
             .ticks(150, Door::tick)
             .hears(ColonyNews.NUMBERS_FORAGED, 10, (door, level, news) -> door.numbersSecond(level, news.foragers(), news.returned(), news.placed()))
+            .plugs(ColonyHooks.DOOR_RULE, 10, door -> door::numbersFree) // Gordon's rule
             .saves(Door::save, Door::load)
             .sample(Door::fillForTests));
     public static final Type<Recruits> RECRUITS = listed("recruits", Recruits::new, part -> part
@@ -189,6 +227,17 @@ public final class ColonyParts {
             .saves(Neighbours::save, Neighbours::load)
             .sample(Neighbours::fillForTests));
     public static final Type<HiddenTrips> HIDDEN_TRIPS = listed("hidden_trips", HiddenTrips::new, part -> part
+            .plugs(ColonyHooks.HIDDEN_AWAY, 10, trips -> new ColonyHooks.HiddenAway() {
+                @Override
+                public int travelling(String caste) {
+                    return trips.travelling(caste);
+                }
+
+                @Override
+                public boolean anyWalksThrough(Set<BlockPos> cells) {
+                    return trips.anyWalksThrough(cells);
+                }
+            })
             .ticks(100, HiddenTrips::tick)
             .ticksAway(10, HiddenTrips::tickAway)
             .saves(HiddenTrips::save, HiddenTrips::load)
@@ -196,13 +245,37 @@ public final class ColonyParts {
     public static final Type<FungusGarden> FUNGUS_GARDEN = listed("fungus_garden", FungusGarden::new, part -> part
             .ticks(20, FungusGarden::grow)
             .hears(ColonyNews.HEAP_GONE, 10, (garden, level, news) -> garden.loseNodules(news.nodules())) // a comb eaten right down: its nodules go with it
+            .plugs(ColonyHooks.AWAY_AFTER_NURSES, 10, garden -> new GardenAway(garden)::grow) // nodules grow and the comb ages while away
             .answers(ColonyQuestions.NOTHING_TO_EAT_IN_STORE, 10, (garden, level, nothing) -> garden.oldKnown() <= 0) // no old layer as far as the brain knows
+            .plugs(ColonyHooks.NURSE_FOOD, 10, garden -> garden) // fungus nodules
+            .plugs(ColonyHooks.GARDEN, 10, garden -> garden::getCombs)
             .saves(FungusGarden::save, FungusGarden::load)
             .sample(FungusGarden::fillForTests));
     public static final Type<Mushrooms> MUSHROOMS = listed("mushrooms", Mushrooms::new, part -> part
             .ticks(50, Mushrooms::tick)
             .notSaved("only the weather at the last look and the last flush, for the colony list"));
     public static final Type<Soldiers> SOLDIERS = listed("soldiers", Soldiers::new, part -> part
+            .plugs(ColonyHooks.CASTES, 10, soldiers -> new ColonyHooks.Castes() {
+                @Override
+                public int mealFor(com.antcolonies.entity.TermiteSoldierEntity.Rank rank) {
+                    return soldiers.mealFor(rank);
+                }
+
+                @Override
+                public com.antcolonies.entity.TermiteSoldierEntity.Rank wanted(Level level) {
+                    return soldiers.rankForNewNymph(level);
+                }
+
+                @Override
+                public int wantReal(ServerLevel level, boolean watched, int cap, java.util.Map<String, Integer> wanted) {
+                    return soldiers.wantReal(level, watched, cap, wanted);
+                }
+
+                @Override
+                public String inside(Population population) {
+                    return soldiers.inside(population);
+                }
+            })
             .notSaved("the soldiers simply take their posts again after a load"));
     public static final Type<Alarm> ALARM = listed("alarm", Alarm::new, part -> part
             .ticks(60, Alarm::tick)
