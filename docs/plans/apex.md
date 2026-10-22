@@ -172,9 +172,8 @@ west and north arm ends lie outside the arena. When the arena's edge falls near 
 place decides it, about 1 run in 3), those arm ends are in a chunk Minecraft keeps but does not run; each worker that
 walks there stands still for the rest of the test. Proved with a log of every termite in a stalled run: all 48 that
 stopped stood at one spot 2 blocks west of the arena, in the chunk west of it, which reported "not ticking"; every
-termite that still moved stood in the arena's chunks. Fix (to agree with the user): load the chunks round the arena too
-in the stress test (and in any termite test whose arms leave the arena; the old gallery flakes, `docs/BUGS.md` 55 and
-59, may be this). In a real game the same thing can happen at the edge of the player's simulation distance: a worker
+termite that still moved stood in the arena's chunks. **Fixed the same day** (the user's OK): every test's ground within 32 blocks of its arena runs
+(`TestIsolation.GROUND_ROUND`); stress test 8 of 8 clean. The old gallery flakes (`docs/BUGS.md` 55) were not this. In a real game the same thing can happen at the edge of the player's simulation distance: a worker
 walking into the outermost ring of loaded chunks stands still there without being written down as away
 (`AwayLife.freeze` only hears of chunks that unload), and keeps a real-mob place. Rare and harmless today; worth a
 look when real mobs are spawned only where the player can see.
