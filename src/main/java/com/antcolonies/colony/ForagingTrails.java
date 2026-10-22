@@ -137,6 +137,11 @@ public class ForagingTrails {
         memory.replaceAll((exit, trail) -> new Memory(trail.patch(), trail.strength(), trail.at() - ticks));
     }
 
+    /** Tests only: a sample in every saved number (the save and load check, {@code AwayTests.everyPartSavesAndLoads}). */
+    public void fillForTests(net.minecraft.server.level.ServerLevel level) {
+        memory.put(new BlockPos(3, 60, 0), new Memory(new BlockPos(9, 60, 2), 2.5, level.getGameTime()));
+    }
+
     void save(net.minecraft.nbt.CompoundTag tag) {
         net.minecraft.nbt.ListTag list = new net.minecraft.nbt.ListTag();
         memory.forEach((exit, trail) -> {

@@ -783,6 +783,30 @@ public class Patrol {
 
     // --- saving -----------------------------------------------------------------------------------------------------
 
+    /** Tests only: a sample in every saved number (the save and load check, {@code AwayTests.everyPartSavesAndLoads}). */
+    public void fillForTests(ServerLevel level) {
+        long now = level.getGameTime();
+        roundOn = true;
+        anyBack = true;
+        roundStart = now;
+        roundClock = now + 100;
+        sent = 3;
+        back = 1;
+        lost = 1;
+        day = now / 24000;
+        roundsToday = 1;
+        openedToday = true;
+        dangerToday = true;
+        Way way = new Way(1.0, true, 6);
+        way.sent = 2;
+        way.back = 1;
+        way.shut = Shut.DANGER;
+        ways.add(way);
+        real.put(new UUID(1, 1), new Job(0, 1.0, 6));
+        numbers.add(new Out(0, now + 200));
+        shutToday.add(new ShutWay(2.0, Shut.NEIGHBOURS));
+    }
+
     void save(CompoundTag tag) {
         CompoundTag all = new CompoundTag();
         all.putBoolean("roundOn", roundOn);

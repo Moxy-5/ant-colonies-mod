@@ -799,6 +799,23 @@ public class TrunkTrails {
         return line.toString();
     }
 
+    /** Tests only: a sample in every saved number (the save and load check, {@code AwayTests.everyPartSavesAndLoads}). */
+    public void fillForTests(ServerLevel level) {
+        long now = level.getGameTime();
+        SpeciesProfile.TrunkNumbers numbers = numbers();
+        double angle = 0.5;
+        int[][] columns = columnsFor(angle, numbers == null ? 4 : numbers.start(), numbers == null ? colony.profile().food().radius() : numbers.mostLength());
+        int[] wear = new int[columns.length];
+        BitSet bare = new BitSet();
+        if (columns.length > 0) {
+            wear[0] = 3;
+            bare.set(0);
+        }
+        trails.add(new Trail(angle, columns, wear, bare, Math.min(2, columns.length), 1.5, now));
+        recent.add(new Trip(angle, now));
+        regrowing.add(new Regrow(5, 1, now + 1000));
+    }
+
     void save(CompoundTag tag) {
         CompoundTag all = new CompoundTag();
         ListTag list = new ListTag();

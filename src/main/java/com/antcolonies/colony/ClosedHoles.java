@@ -232,6 +232,13 @@ public class ClosedHoles {
                 + (left.isEmpty() ? "" : ", " + left.size() + " left (" + opened + (opened == 1 ? " new hole" : " new holes") + " instead)");
     }
 
+    /** Tests only: a sample in every saved number (the save and load check, {@code AwayTests.everyPartSavesAndLoads}). */
+    public void fillForTests(ServerLevel level) {
+        left.put(new BlockPos(8, 60, 0), new BlockPos(9, 60, 1));
+        waiting.add(new BlockPos(0, 60, 8));
+        opened = 1;
+    }
+
     void save(CompoundTag tag) {
         CompoundTag out = new CompoundTag();
         long[] holes = new long[left.size()];

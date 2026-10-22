@@ -710,6 +710,13 @@ public class FieldLife {
 
     // --- saving -----------------------------------------------------------------------------------------------------
 
+    /** Tests only: a sample in every saved number (the save and load check, {@code AwayTests.everyPartSavesAndLoads}). */
+    public void fillForTests(ServerLevel level) {
+        known.put(new BlockPos(11, 60, 0), new Plant(1, 2.5F, true));
+        unknown.put(new BlockPos(0, 60, 12), new Plant(0, 1.5F, false));
+        owed.put(new BlockPos(-9, 60, -9), level.getGameTime() + 300);
+    }
+
     void save(CompoundTag tag) {
         CompoundTag field = new CompoundTag();
         ListTag plants = new ListTag();

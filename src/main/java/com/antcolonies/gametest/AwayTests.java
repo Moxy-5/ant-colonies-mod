@@ -1515,8 +1515,55 @@ public class AwayTests {
             }
         }
         helper.assertTrue(differ.isEmpty(), "the colony loaded from its save should save the same: " + differ);
+        everyPartSavesAndLoads(helper, saved);
         ColonyManager.get(helper.getLevel()).replaceForTests(copy);
         return copy;
+    }
+
+    /** The parts of a colony saved into a tag of their own each, by name (the parts that are not saved left out). */
+    static Map<String, String> partSaves(Colony colony) {
+        Map<String, String> saves = new java.util.LinkedHashMap<>();
+        for (com.antcolonies.colony.ColonyPart<?> part : colony.parts()) {
+            if (part.isSaved()) {
+                CompoundTag own = new CompoundTag();
+                part.save(own);
+                saves.put(part.name(), canon(own));
+            }
+        }
+        return saves;
+    }
+
+    /**
+     * Project Apex, colony parts step 1: every part is saved and loaded, with something in it. A copy of the colony is
+     * loaded from its save (the live colony is left alone) and each part's test sample is put in, for the parts the
+     * scene leaves empty ({@code ColonyPart.sample}, in Colony's constructor); then no saved part may be empty (as a
+     * new colony's), and each part of the copy, saved and loaded again, must save exactly the same. A part saving
+     * nothing, or reading back something else, is named.
+     */
+    static void everyPartSavesAndLoads(GameTestHelper helper, CompoundTag saved) {
+        Colony scratch = Colony.load(saved);
+        for (com.antcolonies.colony.ColonyPart<?> part : scratch.parts()) {
+            part.fillForTests(helper.getLevel());
+        }
+        Map<String, String> blank = partSaves(new Colony(scratch.getId(), scratch.getSpecies(), scratch.getQueenId(), scratch.getCenter()));
+        Map<String, String> mine = partSaves(scratch);
+        List<String> empty = new ArrayList<>();
+        mine.forEach((name, save) -> {
+            if (save.equals(blank.get(name))) {
+                empty.add(name);
+            }
+        });
+        helper.assertTrue(empty.isEmpty(), "every saved colony part should have something in it for the save and load check (give it a "
+                + "sample in Colony's constructor): empty " + empty);
+        Map<String, String> again = partSaves(Colony.load(scratch.save()));
+        List<String> differ = new ArrayList<>();
+        mine.forEach((name, save) -> {
+            if (!save.equals(again.get(name))) {
+                differ.add(name + ": " + save + " -> " + again.get(name));
+            }
+        });
+        helper.assertTrue(differ.isEmpty(), "every colony part loaded from its save should save the same: " + differ);
+        AntColoniesMod.LOGGER.info("[parts-test] {}: all {} saved parts saved and loaded the same", scratch.getSpecies(), mine.size());
     }
 
     /** The colony with this id (also while its queen is frozen, or dead). */

@@ -308,6 +308,11 @@ public class Neighbours {
         return walled > 0 ? ", " + walled + (walled == 1 ? " gallery" : " galleries") + " walled off" : "";
     }
 
+    /** Tests only: a sample in every saved number (the save and load check, {@code AwayTests.everyPartSavesAndLoads}). */
+    public void fillForTests(ServerLevel level) {
+        meetings.add(new Meeting(new BlockPos(-10, 60, 3), 1.0, level.getGameTime(), new UUID(2, 2), 2, true));
+    }
+
     void save(CompoundTag tag) {
         ListTag list = new ListTag();
         for (Meeting meeting : meetings) {

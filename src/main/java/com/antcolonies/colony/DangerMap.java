@@ -419,6 +419,11 @@ public class DangerMap {
                 + (forgotten > 0 ? ", " + forgotten + " forgotten" : "") + lost;
     }
 
+    /** Tests only: a sample in every saved number (the save and load check, {@code AwayTests.everyPartSavesAndLoads}). */
+    public void fillForTests(ServerLevel level) {
+        places.add(new Place(new BlockPos(6, 60, -4), 1.5, level.getGameTime(), "minecraft:spider", 1, 2, 1.5));
+    }
+
     void save(CompoundTag tag) {
         ListTag list = new ListTag();
         for (Place place : places) {

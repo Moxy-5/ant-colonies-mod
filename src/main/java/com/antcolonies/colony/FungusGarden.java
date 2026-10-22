@@ -231,6 +231,15 @@ public class FungusGarden implements NurseFood {
         return seenNodules;
     }
 
+    /** Tests only: a sample in every saved number (the save and load check, {@code AwayTests.everyPartSavesAndLoads}). */
+    public void fillForTests(ServerLevel level) {
+        seenCombs = 3;
+        seenFresh = 2;
+        seenRipe = 1;
+        seenOld = 1;
+        seenNodules = 4;
+    }
+
     void save(net.minecraft.nbt.CompoundTag tag) {
         net.minecraft.nbt.CompoundTag seen = new net.minecraft.nbt.CompoundTag();
         seen.putInt("combs", seenCombs);

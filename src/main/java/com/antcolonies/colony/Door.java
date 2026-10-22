@@ -499,6 +499,14 @@ public class Door {
 
     // --- saving -----------------------------------------------------------------------------------------------------
 
+    /** Tests only: a sample in every saved number (the save and load check, {@code AwayTests.everyPartSavesAndLoads}). */
+    public void fillForTests(ServerLevel level) {
+        numbersOut = 2.5;
+        pendingTouches = 3;
+        window.add(new long[] {level.getGameTime(), 2});
+        returns.add(new long[] {level.getGameTime(), 1});
+    }
+
     void save(CompoundTag tag) {
         CompoundTag all = new CompoundTag();
         all.putDouble("numbersOut", numbersOut);

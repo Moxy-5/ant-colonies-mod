@@ -144,6 +144,13 @@ public class WorkerFood {
         return !colony.garden().exists() || colony.garden().oldKnown() > 0;
     }
 
+    /** Tests only: a sample in every saved number (the save and load check, {@code AwayTests.everyPartSavesAndLoads}). */
+    public void fillForTests(ServerLevel level) {
+        for (MealFood food : MealFood.values()) {
+            mealsLeft[food.ordinal()] = food.ordinal() + 2;
+        }
+    }
+
     void save(CompoundTag tag) {
         CompoundTag left = new CompoundTag();
         for (MealFood food : MealFood.values()) {

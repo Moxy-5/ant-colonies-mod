@@ -897,6 +897,13 @@ public class Mound {
                 .setValue(TermiteMoundBlock.LAYERS, TermiteMoundBlock.FINISHED).setValue(TermiteMoundBlock.AGE, age);
     }
 
+    /** Tests only: a sample in every saved number (the save and load check, {@code AwayTests.everyPartSavesAndLoads}). */
+    public void fillForTests(net.minecraft.server.level.ServerLevel level) {
+        allowance = 3.5;
+        updatedAt = level.getGameTime();
+        workStage = 2;
+    }
+
     void save(CompoundTag tag) {
         tag.putDouble("moundAllowance", allowance);
         tag.putLong("moundUpdated", updatedAt);

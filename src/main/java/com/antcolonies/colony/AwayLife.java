@@ -215,14 +215,7 @@ public class AwayLife {
             }
         }
         if (isAway(level)) {
-            colony.hiddenTrips().tickAway(level);
-            colony.nest().galleries().tickAway(level);
-            colony.population().tickAway(level);
-            colony.life().tick(level, true);
-            colony.patrol().tick(level, true);
-            colony.field().tick(level, true);
-            colony.building().tickAway(level);
-            colony.trunkTrails().tick(level, true);
+            colony.tickPartsAway(level);
             ColonyManager.get(level).markChanged();
         }
     }

@@ -531,6 +531,13 @@ public class Alarm {
                 + " soldiers alarmed)" + boost;
     }
 
+    /** Tests only: a sample in every saved number (the save and load check, {@code AwayTests.everyPartSavesAndLoads}). */
+    public void fillForTests(ServerLevel world) {
+        level = 1;
+        raisedAt = world.getGameTime();
+        boostUntil = world.getGameTime() + 200;
+    }
+
     void save(CompoundTag tag) {
         tag.putInt("alarmLevel", level);
         tag.putLong("alarmRaisedAt", raisedAt);

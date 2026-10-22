@@ -231,6 +231,11 @@ public class NightSoil {
         }
     }
 
+    /** Tests only: a sample in every saved number (the save and load check, {@code AwayTests.everyPartSavesAndLoads}). */
+    public void fillForTests(ServerLevel level) {
+        oldHeap.add(Blocks.DIRT.defaultBlockState());
+    }
+
     void save(CompoundTag tag) {
         ListTag list = new ListTag();
         for (BlockState pellet : oldHeap) {
