@@ -153,6 +153,59 @@ easiest to stop bugs from happening and push updates easier"); so these are my p
    piece of news or a hook a species part plugs into, or move into the species part. First a sorted list of every line
    (which can be a question like step 6, which news, which a hook, which simply moves), planned with the user, then
    built in batches. Nothing changes in-game.
+   **Planned with the user 2026-10-22** (the user's OK: three batches, my picks, the species code moved and not only
+   put behind a socket; branch `claude/apex-step8-e27231` from `claude/apex-questions`). Counted again on that branch:
+   **60 lines in 14 shared colony files** (`FieldLife` 11, `NestLife` 8, `BuildLife` 7, `FoodStore` 7, `Colony` 6,
+   `Population` 6, `Nest` 4, `AwayLife`, `Brood`, `NestLedger`, `WorkerFood` 2 each, `ForagingHoles`, `Galleries`,
+   `NestWalls` 1 each; the rest of the 81 were species files, which move with their species). Every line, by batch:
+   - **8a, questions and news** (step 6's and step 4's machinery, new kinds only):
+     - questions: "does the alarm keep everyone in?" (`Colony.isForagingTime`, `FieldLife.forageWith`; the alarm);
+       "not cleared yet?" (`FieldLife.forageAlone`, the patrol: the kind is step 6's); "does the colony build a mound?"
+       (`Colony.buildsMound`) and "is the mound being built now?" (`ForagingHoles.middleHole`; the mound); "is this a
+       block the builders want cleared?" (`Nest.canDig`, `Nest.standSpotsFor`; the mound); "is this cell a tunnel
+       built inside the structure?" (`NestWalls.wallFirst`; the mound); "is more food wanted in, past the store?"
+       (`FoodStore.wantsSeeds`; the bakery: bread to mill); "does the colony keep trails?" (`FoodStore.plants`; the
+       trunk trails); "is the store known to hold nothing the workers eat?" (`WorkerFood.oldCombKnown`; the garden).
+     - news: "a member went into the numbers" and "came out of them" (`AwayLife.foldIn`, `Population.goIn` and
+       `comeOut`; the forager spots); "nurse food counted in" (`AwayLife.foldIn`, `NestLedger` loading; the bakery);
+       "a rich piece taken for milling" and "a piece eaten" (`FoodStore`; the bakery's rich millers); "a comb eaten
+       away" (`FoodStore.takeOneLayer`; the garden's nodules); "the numbers made a trip" (`FieldLife.work`; the trunk
+       trails); "the numbers' foraging second" (`FieldLife.forage`; the door); "how many forager numbers there are"
+       (`FieldLife.forageWith`; the forager spots trim their held spots). "A block dug" (`BuildLife.dig`; the mound)
+       too.
+   - **8b, colony hooks that give answers** (new `colony/ColonyHooks`: a kind names what is asked, a part's row plugs
+     in its answer, `colony.hooks(kind)` in place order; a colony without the part gets today's default):
+     the colony's reach (`Colony.foragingRadius`; the trunk trails' longest tip); the walk by trail and the trail
+     columns to scan (`FoodStore`; the trunk trails); how many forager numbers may go out (`FieldLife`, twice; the
+     door); the founders beside the queen (`NestLife.founders`; the king); the nurses' food (`Colony.nurseFood`,
+     `NestLife.nurseFoodLeft` and `takePiece`, `WorkerFood.look`; the garden or the bakery, through `NurseFood`); a
+     young one's soldier meal and the soldier wanted (`Brood`; the soldiers); insects away on hidden trips
+     (`Population`, `Galleries`; the hidden trips); the structure over the nest, its blocks, tunnels and next dig
+     (`Colony.moundParts`, `Nest`, twice; the mound); the comb cells for ageing on return (`NestLedger`; the garden).
+   - **8c, the species work moved into its parts** (behind hooks that do work):
+     - `BuildLife` (building on return): the hill's night soil and heaping the dug soil (into the hill part) and the
+       whole mound building with its soil from the galleries (into the mound part); `BuildLife` keeps the builders'
+       time, the nest's digging, the galleries and the founders, and lends the moved code its helpers.
+     - `FieldLife` (the numbers forage): searching alone, going back to a spot, out along a trunk trail and the
+       recruits' call (into the forager spots part); `FieldLife` keeps the plants it remembers and the trips.
+     - `NestLife` (nest life while away): the king living and fed, the bakery milling bread, the garden growing its
+       nodules (into those parts, at the same moments in the same order); and `Population.targets`' soldiers at their
+       posts and the soldiers in the colony list (into the soldiers part).
+   - **Checks:** each batch adds checks in scenes that exist (no new scene) that the right part answers or hears,
+     as steps 4, 6 and 7 did (`AwayTests.partsAreTheSpecies` and others); after each batch its categories, at the end
+     a full run and the stress test before and after, on 6 servers (the user's ask). Same answers; nothing changes
+     in-game.
+   - **Left on purpose** (found while listing, for step 9 or later): shared files still name species *types* (not
+     parts): `MoundPlan.Part` in `Colony.moundParts` and its callers, `TermiteSoldierEntity.Rank` in `Brood` and
+     `Population`, `FungusCombBlock` and `TermiteMoundBlock` in `FoodStore`, `NestLedger`, `NestLife`, `BuildLife`,
+     `TermiteKingEntity` in `BuildLife`; and two termite-only pieces live inside shared parts: the galleries inside the
+     nest, the fungus comb inside the food store (`FoodStore` was already next after Apex part 1).
+9. **The commands, the event file and the ant body** (found planning step 8, 2026-10-22; the user's pick: its own
+   step, to plan with the user after step 8). Outside the colony folder, shared files that name species parts too:
+   the `/antcolonies` commands (`command/ColonyCommands`, about 15 lines, mostly the `list` read-out, which could ask
+   each part to describe itself), `ModEvents` (1 line, the alarm) and the shared ant body (`entity/AbstractAntEntity`,
+   4 lines: the trunk trails, the hidden trips, the door, the recruits); and the species types still named in shared
+   files (step 8's "left on purpose"). Each must go before the split. Nothing changes in-game.
 
 Then the split's own plan (`docs/plans/mod-split.md`) can draw the framework's wall along the registry: shared parts
 in, species parts out.
