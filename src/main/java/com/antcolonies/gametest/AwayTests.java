@@ -1538,6 +1538,19 @@ public class AwayTests {
             helper.assertTrue(colony.part(type).isPresent() == wanted.contains(type.name()) && colony.has(type) == wanted.contains(type.name()),
                     "a " + colony.getSpecies() + " colony answers wrongly when asked for the part " + type.name());
         }
+        // Colony parts step 4, the colony news: each kind is heard by the parts the colony has that used to be called by
+        // hand, in the order they were called; a kind nobody hears is not sent at all.
+        Map<com.antcolonies.colony.ColonyNews.Kind<?>, List<String>> order = Map.of(
+                com.antcolonies.colony.ColonyNews.MEMBER_HURT, List.of("alarm", "patrol", "danger_map", "forager_spots"),
+                com.antcolonies.colony.ColonyNews.MEMBER_DIED, List.of("patrol", "forager_spots", "recruits"),
+                com.antcolonies.colony.ColonyNews.FOOD_FOUND, List.of("forager_spots", "recruits"),
+                com.antcolonies.colony.ColonyNews.NEIGHBOUR_MET, List.of("neighbours"));
+        for (Map.Entry<com.antcolonies.colony.ColonyNews.Kind<?>, List<String>> kind : order.entrySet()) {
+            List<String> hearing = kind.getValue().stream().filter(has::contains).toList();
+            helper.assertTrue(colony.news().listenersOf(kind.getKey()).equals(hearing) && colony.news().listens(kind.getKey()) == !hearing.isEmpty(),
+                    "a " + colony.getSpecies() + " colony's news of " + kind.getKey() + " should be heard by " + hearing + ", not "
+                            + colony.news().listenersOf(kind.getKey()));
+        }
     }
 
     /** The parts of a colony saved into a tag of their own each, by name (the parts that are not saved left out). */

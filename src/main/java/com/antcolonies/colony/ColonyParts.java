@@ -27,6 +27,9 @@ import net.minecraft.resources.ResourceLocation;
  * (see {@link ColonyPart}). After the split into three mods (Apex part 2) the framework keeps this registry and its
  * shared parts, and each species mod signs up its own ({@link #register}).
  *
+ * <p>A part's row also says what colony news it hears ({@link ColonyPart#hears}, step 4): the places of each kind of
+ * news are its listeners' order (today's order, which the tellers used to call the parts in by hand).
+ *
  * <p>Which parts each species lists was worked out from each part's own "do I apply?" check (step 2): a part is only
  * listed for a species it does something for today. Until step 3 ("ask before use") every colony still makes every
  * part, so the old getters ({@link Colony#mound()}, ...) keep working; a part its species does not list is never ticked,
@@ -123,9 +126,14 @@ public final class ColonyParts {
     public static final Type<Patrol> PATROL = listed("patrol", Patrol::new, part -> part
             .ticks(140, (patrol, level) -> patrol.tick(level, false))
             .ticksAway(50, (patrol, level) -> patrol.tick(level, true))
+            .hears(ColonyNews.MEMBER_HURT, 20, (patrol, level, news) -> patrol.danger(level, news.member(), "hurt by " + news.by().getType().toShortString())) // a patroller turns back
+            .hears(ColonyNews.MEMBER_DIED, 10, (patrol, level, news) -> patrol.died(level, news.member())) // a patroller killed never comes back: its way stays shut today
             .saves(Patrol::save, Patrol::load)
             .sample(Patrol::fillForTests));
     public static final Type<ForagerSpots> FORAGER_SPOTS = listed("forager_spots", ForagerSpots::new, part -> part
+            .hears(ColonyNews.MEMBER_HURT, 40, (spots, level, news) -> spots.memberHurt(news.member().getUUID(), news.where())) // hurt near its spot: gives it up
+            .hears(ColonyNews.MEMBER_DIED, 20, (spots, level, news) -> spots.died(news.member())) // its spot is lost with it
+            .hears(ColonyNews.FOOD_FOUND, 10, (spots, level, news) -> spots.found(news.finder(), news.where())) // its spot now (site fidelity, species that search alone)
             .saves(ForagerSpots::save, ForagerSpots::load)
             .sample(ForagerSpots::fillForTests));
     public static final Type<Door> DOOR = listed("door", Door::new, part -> part
@@ -134,9 +142,12 @@ public final class ColonyParts {
             .sample(Door::fillForTests));
     public static final Type<Recruits> RECRUITS = listed("recruits", Recruits::new, part -> part
             .ticks(160, Recruits::tick)
+            .hears(ColonyNews.MEMBER_DIED, 30, (recruits, level, news) -> recruits.died(news.member()))
+            .hears(ColonyNews.FOOD_FOUND, 20, (recruits, level, news) -> recruits.found(level, news.finder(), news.where())) // a rich patch: it lays a scent line home and calls nestmates out
             .notSaved("a scent line fades within minutes"));
     public static final Type<DangerMap> DANGER_MAP = shared("danger_map", DangerMap::new, part -> part
             .ticks(170, DangerMap::tick)
+            .hears(ColonyNews.MEMBER_HURT, 30, (danger, level, news) -> danger.hurt(level, news.where(), news.by().getType().toShortString(), news.killed())) // the place is remembered
             .saves(DangerMap::save, DangerMap::load)
             .sample(DangerMap::fillForTests));
     public static final Type<ClosedHoles> CLOSED_HOLES = listed("closed_holes", ClosedHoles::new, part -> part
@@ -145,6 +156,7 @@ public final class ColonyParts {
             .sample(ClosedHoles::fillForTests));
     public static final Type<Neighbours> NEIGHBOURS = shared("neighbours", Neighbours::new, part -> part
             .ticks(190, Neighbours::tick)
+            .hears(ColonyNews.NEIGHBOUR_MET, 10, (neighbours, level, news) -> neighbours.met(level, news.where(), news.other(), news.who()))
             .saves(Neighbours::save, Neighbours::load)
             .sample(Neighbours::fillForTests));
     public static final Type<HiddenTrips> HIDDEN_TRIPS = listed("hidden_trips", HiddenTrips::new, part -> part
@@ -163,6 +175,7 @@ public final class ColonyParts {
             .notSaved("the soldiers simply take their posts again after a load"));
     public static final Type<Alarm> ALARM = listed("alarm", Alarm::new, part -> part
             .ticks(60, Alarm::tick)
+            .hears(ColonyNews.MEMBER_HURT, 10, (alarm, level, news) -> alarm.memberHurt(level, news.by())) // level 2 at the attacker
             .saves(Alarm::save, Alarm::load)
             .sample(Alarm::fillForTests));
     public static final Type<Population> POPULATION = shared("population", Population::new, part -> part

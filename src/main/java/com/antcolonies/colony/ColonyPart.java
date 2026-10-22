@@ -43,6 +43,17 @@ public final class ColonyPart<T> {
     private String notSavedBecause;
     @Nullable
     private BiConsumer<T, ServerLevel> sample;
+    /** The news this part hears (step 4), signed up when the colony is made ({@link #signUp}). */
+    private final List<Hears<T, ?>> hears = new ArrayList<>();
+
+    /** What a part does with a piece of news (colony parts step 4, {@link ColonyNews}). */
+    @FunctionalInterface
+    public interface Hearer<T, N> {
+        void hear(T part, ServerLevel level, N news);
+    }
+
+    private record Hears<T, N>(ColonyNews.Kind<N> kind, int place, Hearer<T, N> hearer) {
+    }
 
     private ColonyPart(String name, T part) {
         this.name = name;
@@ -79,6 +90,26 @@ public final class ColonyPart<T> {
     ColonyPart<T> notSaved(String why) {
         this.notSavedBecause = why;
         return this;
+    }
+
+    /**
+     * Hears every {@code kind} of news told in its colony ({@link ColonyNews}), at {@code place} among that kind's
+     * listeners (lower first, gaps of 10, as with the tick places). Called only when that news comes.
+     */
+    <N> ColonyPart<T> hears(ColonyNews.Kind<N> kind, int place, Hearer<T, N> hearer) {
+        hears.add(new Hears<>(kind, place, hearer));
+        return this;
+    }
+
+    /** Signs this part up to the news it hears (from {@link Colony}'s constructor, once the colony's parts are made). */
+    void signUp(ColonyNews news) {
+        for (Hears<T, ?> one : hears) {
+            signUp(news, one);
+        }
+    }
+
+    private <N> void signUp(ColonyNews news, Hears<T, N> one) {
+        news.listen(one.kind(), one.place(), name, (level, told) -> one.hearer().hear(part, level, told));
     }
 
     /**

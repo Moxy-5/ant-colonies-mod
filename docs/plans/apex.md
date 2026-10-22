@@ -79,6 +79,15 @@ easiest to stop bugs from happening and push updates easier"); so these are my p
    recruits). The Matabele parts (scouts reporting termite feeding spots, the raid caller, rescue) then plug in by
    listening, and the brain needs no new line for them. Only the wiring that exists today is moved onto it; nothing new
    happens in-game. **Agreed by the user 2026-10-20** ("I like that colony news"), who also saw the speed side: an ant waiting for something (a raider by a termite feeding spot) is told when it happens instead of checking every tick, so waiting costs next to nothing. Built so: a listener is called only when its news comes, and news is only sent while someone listens.
+   **BUILT 2026-10-22** (branch `claude/colony-news-d4bc74`, from step 3, not merged; details in `docs/HISTORY.md`):
+   `colony/ColonyNews` (`colony.news()`), kinds "a member hurt", "a member died", "food found", "a neighbour met"; a
+   part's row in `ColonyParts` says what it hears and at which place (`ColonyPart.hears`), the colony signs its parts
+   up when made. Moved over: the hurt insect (alarm, patrol, danger map, forager spots), the dying worker ant (patrol,
+   forager spots, recruits), food found (forager spots, recruits), neighbours met (by insect, trail or gallery), each
+   in today's order. "A hole opened or closed" has no wiring today (parts ask when they need to): left for its first
+   listener in M8, my pick, to confirm. For the split: `DangerMap.avoids` still asks the trunk trails (a harvester
+   part) by name: a shared "may we forage here?" vote would take it out. Tests: `colony,away,termitefood,antnest,soldiers`
+   86 of 88, both failures passing 3 of 3 alone; the full run is step 5.
 5. **Full run and speed.** The stress test before and after; the expected gain is small (each colony skips the parts it
    does not have instead of each checking and returning); the main wins are fewer places for a bug and a new species
    with no copied code.

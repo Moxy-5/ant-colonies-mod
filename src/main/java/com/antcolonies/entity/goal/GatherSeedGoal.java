@@ -6,6 +6,7 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.colony.ColonyNews;
 import com.antcolonies.colony.ColonyParts;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.AbstractAntEntity;
@@ -118,8 +119,7 @@ public class GatherSeedGoal extends Goal {
             seed.setItem(stack);
         }
         ant.setCarriedSeed(one);
-        colony.part(ColonyParts.FORAGER_SPOTS).ifPresent(spots -> spots.found(ant.getUUID(), seed.blockPosition())); // its spot now (site fidelity, species that search alone)
-        colony.part(ColonyParts.RECRUITS).ifPresent(recruits -> recruits.found(level, ant.getUUID(), seed.blockPosition())); // a rich patch: it lays a scent line home
+        colony.news().tell(level, ColonyNews.FOOD_FOUND, new ColonyNews.FoodFound(ant.getUUID(), seed.blockPosition())); // (its spot now; a rich patch: a scent line home)
 
         ant.setSeedForBread(colony.part(ColonyParts.BAKERY).map(bakery -> bakery.isMilling(ant.getUUID())).orElse(false)); // to the mill if the store has no room
         level.playSound(null, ant.blockPosition(), SoundEvents.ITEM_PICKUP, SoundSource.NEUTRAL, 0.15F, 1.6F);

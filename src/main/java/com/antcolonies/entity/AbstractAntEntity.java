@@ -10,11 +10,11 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.ColonyParts;
 import com.antcolonies.colony.Door;
-import com.antcolonies.colony.ForagerSpots;
 import com.antcolonies.colony.Recruits;
 import com.antcolonies.nav.AntMoveControl;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.colony.ColonyNews;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.debug.Perf;
 import com.antcolonies.entity.body.AntAnimationController;
@@ -569,15 +569,9 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
                 && !(attacker instanceof AbstractAntEntity insect && getColonyId() != null && getColonyId().equals(insect.getColonyId()))) {
             Colony colony = getColony();
             if (colony != null) {
-                colony.part(ColonyParts.ALARM).ifPresent(alarm -> alarm.memberHurt(serverLevel, attacker));
-                colony.part(ColonyParts.PATROL).ifPresent(patrol -> patrol.danger(serverLevel, this, "hurt by " + attacker.getType().toShortString())); // a patroller turns back
-                // The danger memory (brain step 4g): the place is remembered, and a forager hurt near its spot gives it up.
-                colony.danger().hurt(serverLevel, blockPosition(), attacker.getType().toShortString(), isDeadOrDying());
-                ForagerSpots spots = colony.part(ColonyParts.FORAGER_SPOTS).orElse(null);
-                BlockPos spot = spots == null ? null : spots.spotOf(getUUID());
-                if (spot != null && colony.danger().numbers() != null && spot.distSqr(blockPosition()) <= Mth.square(colony.danger().numbers().reach())) {
-                    spots.giveUp(getUUID());
-                }
+                // The colony news (colony parts step 4): the alarm, a patroller turning back, the danger memory and a
+                // forager hurt near its spot each hear it, if the colony has them (their rows in ColonyParts).
+                colony.news().tell(serverLevel, ColonyNews.MEMBER_HURT, new ColonyNews.MemberHurt(this, blockPosition(), attacker, isDeadOrDying()));
             }
         }
         return hurt;
@@ -618,7 +612,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
                         && other.distanceTo(this) <= within)) {
             Colony theirs = other.getColony();
             if (theirs != null && theirs.getSpecies().equals(colony.getSpecies()) && colony.neighbours().canMeet(theirs)) {
-                colony.neighbours().met(level, blockPosition(), theirs.getId(), other.getUUID());
+                colony.news().tell(level, ColonyNews.NEIGHBOUR_MET, new ColonyNews.NeighbourMet(blockPosition(), theirs.getId(), other.getUUID()));
             }
         }
         for (Colony theirs : ColonyManager.get(level).getColonies()) {
@@ -627,7 +621,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
                             && trunk.isOnTrail(blockPosition())).orElse(false)) {
                 UUID trail = new UUID(theirs.getId().getMostSignificantBits() ^ getUUID().getMostSignificantBits(),
                         theirs.getId().getLeastSignificantBits() ^ getUUID().getLeastSignificantBits());
-                colony.neighbours().met(level, blockPosition(), theirs.getId(), trail); // (stepped onto their trail)
+                colony.news().tell(level, ColonyNews.NEIGHBOUR_MET, new ColonyNews.NeighbourMet(blockPosition(), theirs.getId(), trail)); // (stepped onto their trail)
             }
         }
     }

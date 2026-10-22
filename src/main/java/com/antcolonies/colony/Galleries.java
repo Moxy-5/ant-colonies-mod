@@ -846,8 +846,9 @@ public class Galleries {
     private boolean galleriesMet(ServerLevel level, Colony other, BlockPos ours, BlockPos theirs, BlockPos piece) {
         java.util.UUID mine = colony.getId();
         java.util.UUID key = new java.util.UUID(other.getId().getMostSignificantBits() ^ piece.asLong(), other.getId().getLeastSignificantBits());
-        colony.neighbours().met(level, ours, other.getId(), key);
-        other.neighbours().met(level, theirs, mine, new java.util.UUID(mine.getMostSignificantBits() ^ piece.asLong(), mine.getLeastSignificantBits()));
+        colony.news().tell(level, ColonyNews.NEIGHBOUR_MET, new ColonyNews.NeighbourMet(ours, other.getId(), key));
+        other.news().tell(level, ColonyNews.NEIGHBOUR_MET, new ColonyNews.NeighbourMet(theirs, mine,
+                new java.util.UUID(mine.getMostSignificantBits() ^ piece.asLong(), mine.getLeastSignificantBits())));
         return colony.neighbours().yieldsAt(level, ours);
     }
 

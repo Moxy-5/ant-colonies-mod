@@ -108,6 +108,8 @@ public class Colony {
     private final List<ColonyPart<?>> ticking;
     /** The parts that tick while the colony is away, in their tick order. */
     private final List<ColonyPart<?>> tickingAway;
+    /** What happened, told to the parts that listen (colony parts step 4, {@link ColonyNews}). */
+    private final ColonyNews news = new ColonyNews();
     /** Species and parts whose data in an old save was skipped (logged once each). */
     private static final java.util.Set<String> skippedLogged = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
@@ -149,6 +151,9 @@ public class Colony {
         this.parts = List.copyOf(made.values());
         this.ticking = ColonyPart.ticking(this.parts);
         this.tickingAway = ColonyPart.tickingAway(this.parts);
+        for (ColonyPart<?> part : this.parts) {
+            part.signUp(news); // (each part's row in ColonyParts says what news it hears)
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -169,6 +174,14 @@ public class Colony {
     /** Whether this colony has a part of this kind (its species lists it, or every colony has it). */
     public boolean has(ColonyParts.Type<?> type) {
         return byType.containsKey(type);
+    }
+
+    /**
+     * The colony's news: tell it what happened (a member hurt, food found, ...) and the parts that listen hear it, without
+     * the teller naming them (colony parts step 4, {@link ColonyNews}).
+     */
+    public ColonyNews news() {
+        return news;
     }
 
     /** The parts this colony has, in the order they are made, saved and loaded (for the save and load test). */

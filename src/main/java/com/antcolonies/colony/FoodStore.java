@@ -576,8 +576,9 @@ public class FoodStore {
         BlockPos pos = grass.immutable();
         plantClaims.remove(ant);
         colony.trails().visited(level, pos, ant);
-        colony.part(ColonyParts.FORAGER_SPOTS).ifPresent(spots -> spots.found(ant, pos)); // it found food here: its spot now (site fidelity, species that search alone)
-        colony.part(ColonyParts.RECRUITS).ifPresent(recruits -> recruits.found(level, ant, pos)); // a rich patch: it lays a scent line home and calls nestmates out
+        if (level instanceof ServerLevel server) {
+            colony.news().tell(server, ColonyNews.FOOD_FOUND, new ColonyNews.FoodFound(ant, pos)); // (its spot now; a rich patch: a scent line home)
+        }
         BlockState before = level.getBlockState(pos);
         SpeciesProfile.PlantFood plant = food().plantFor(before);
         if (plant != null && before.getBlock() instanceof EatenInStages eaten) {

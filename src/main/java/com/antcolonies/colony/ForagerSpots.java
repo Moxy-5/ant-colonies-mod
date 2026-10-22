@@ -78,13 +78,19 @@ public class ForagerSpots {
     /** Searches that came home empty since the colony was loaded (for the colony list). Not saved. */
     private int emptyTrips;
 
+    /** The colony (null in the unit tests, which have none). */
+    @Nullable
+    private final Colony colony;
+
     ForagerSpots(Colony colony) {
-        this(() -> colony.profile().food().search());
+        this.numbers = () -> colony.profile().food().search();
+        this.colony = colony;
     }
 
     /** With these search numbers (the unit tests). */
     ForagerSpots(Supplier<Optional<SpeciesProfile.SearchNumbers>> numbers) {
         this.numbers = numbers;
+        this.colony = null;
     }
 
     /** The species' search numbers, if its foragers search alone with site fidelity. */
@@ -245,6 +251,18 @@ public class ForagerSpots {
     /** A real forager gives up its spot (it was hurt near it, brain step 4g): it searches elsewhere from now on. */
     public void giveUp(UUID ant) {
         spots.remove(ant);
+    }
+
+    /**
+     * A member was hurt at {@code where} (the colony news, {@link ColonyNews#MEMBER_HURT}): a forager hurt within the
+     * danger memory's {@code reach} of its own spot gives it up (brain step 4g).
+     */
+    void memberHurt(UUID ant, BlockPos where) {
+        BlockPos spot = spotOf(ant);
+        SpeciesProfile.DangerNumbers danger = colony == null ? null : colony.danger().numbers();
+        if (spot != null && danger != null && spot.distSqr(where) <= (double) danger.reach() * danger.reach()) {
+            giveUp(ant);
+        }
     }
 
     /** The numbers' spots are held by no more than {@code foragers} forager numbers (some died or came out as real ones). */
