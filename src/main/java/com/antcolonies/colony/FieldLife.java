@@ -471,7 +471,7 @@ public class FieldLife {
             if (!colony.part(ColonyParts.PATROL).map(patrol -> patrol.isOpen(level, spot.pos())).orElse(true)) {
                 continue; // that way is shut today: its holders stay in
             }
-            if (colony.danger().avoids(level, spot.pos())) {
+            if (colony.keepsOff(level, spot.pos())) {
                 spots.dropHeld(spot); // remembered danger there (brain step 4g): its holders search elsewhere
                 continue;
             }

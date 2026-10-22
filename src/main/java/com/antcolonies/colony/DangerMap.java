@@ -29,7 +29,7 @@ import net.minecraft.world.level.Level;
  * make it last longer (real colonies drift back once the danger is gone).
  *
  * <p>What the colony does about it is the species' own: harvester ants ({@code keep_away}) leave plants, spots, searches,
- * recruits and trunk trails through a dangerous place alone ({@link #avoids}; real <i>Pogonomyrmex</i> keep the memory
+ * recruits and trunk trails through a dangerous place alone ({@link #keepsOff}, with {@link Colony#keepsOff}; real <i>Pogonomyrmex</i> keep the memory
  * in the foragers and their trails: an attacked trail loses its traffic and fades). The nest's own ground is never
  * kept away from (a colony cannot leave its home; defending it comes with the fights, M8). Fall damage, fire, drowning
  * and starving are not danger here (hazards are their own later feature). Saved.
@@ -231,21 +231,14 @@ public class DangerMap {
     }
 
     /**
-     * Whether the colony's foragers keep away from {@code pos} now (species with {@code keep_away}): it is a dangerous
-     * place, or the trunk trail a forager would walk out to it passes one (see {@link TrunkTrails#passesDanger}).
+     * The danger map's answer to "keep off?" ({@link ColonyQuestions#KEEP_OFF}, asked by {@link Colony#keepsOff}): in a
+     * species with {@code keep_away}, {@code pos} is a dangerous place now. The other parts give their own answers: the
+     * neighbours (a neighbour yielded to), the termites' closed holes (where members were attacked), the harvester's
+     * trunk trails (the trail out there passes danger).
      */
-    public boolean avoids(Level level, BlockPos pos) {
-        if (colony.neighbours().yieldsAt(level, pos)) {
-            return true; // (step 5: past a place where the colony yields to a neighbour; not danger, but kept off the same way)
-        }
+    public boolean keepsOff(Level level, BlockPos pos) {
         SpeciesProfile.DangerNumbers numbers = numbers();
-        if (numbers == null || places.isEmpty()) {
-            return false;
-        }
-        if (numbers.closeHoles() && isAttacked(level, pos)) {
-            return true; // (termites: no food is fetched where they were attacked, from outside or from inside)
-        }
-        return numbers.keepAway() && (isDangerous(level, pos) || colony.part(ColonyParts.TRUNK_TRAILS).map(trunk -> trunk.passesDanger(level, pos)).orElse(false));
+        return numbers != null && !places.isEmpty() && numbers.keepAway() && isDangerous(level, pos);
     }
 
     // --- harm out of sight (step 4) ------------------------------------------------------------------------------------

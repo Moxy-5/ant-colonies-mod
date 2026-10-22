@@ -220,6 +220,15 @@ public class TrunkTrails {
         return trail != null && trail.reach > 0 && dangerAlong(level, trail, Math.min(leaveAt(trail, target), trail.reach - 1));
     }
 
+    /**
+     * The trunk trails' answer to "keep off?" ({@link ColonyQuestions#KEEP_OFF}, colony parts step 6): in a species with
+     * {@code keep_away}, the trail a forager would walk out to {@code target} passes a dangerous place.
+     */
+    public boolean keepsOff(Level level, BlockPos target) {
+        SpeciesProfile.DangerNumbers danger = colony.danger().numbers();
+        return danger != null && danger.keepAway() && passesDanger(level, target);
+    }
+
     /** Whether any column of the trail from its start out to {@code last} is a dangerous place. */
     private boolean dangerAlong(Level level, Trail trail, int last) {
         DangerMap danger = colony.danger();

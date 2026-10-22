@@ -28,7 +28,7 @@ import net.minecraft.world.level.Level;
  * that near one (the gallery is sealed there, so everything beyond it is cut off). A closed hole is plugged at once,
  * whatever the hour ({@link ForagingHoles#wantsPlugged}), never bitten open, no way out, has no turn
  * ({@link Galleries#pickTurns}) and draws no growing tip; no hidden trip runs through the gallery near the attack (the
- * insects walk it for real); the food round it is not fetched ({@link DangerMap#avoids}). Once the memory fades it is a
+ * insects walk it for real); the food round it is not fetched ({@link Colony#keepsOff}). Once the memory fades it is a
  * hole like any other: it opens on its turn, as a rested one does.</li>
  * <li><b>Left:</b> with the galleries on, a hole within {@code merge_within} blocks of a place once as strong as
  * {@code leave_from} (attacked again and again) is left for good: never opened again. The galleries open a new hole on
@@ -73,9 +73,20 @@ public class ClosedHoles {
         return numbers != null && numbers.closeHoles();
     }
 
-    /** Whether this hole of {@code colony} is closed now (never in a species that does not close its holes). */
-    static boolean isClosedIn(Colony colony, Level level, BlockPos hole) {
-        return colony.part(ColonyParts.CLOSED_HOLES).map(closed -> closed.isClosed(level, hole)).orElse(false);
+    /**
+     * The closed holes' answer to "keep off?" ({@link ColonyQuestions#KEEP_OFF}, colony parts step 6): no food is fetched
+     * where members were attacked, from outside or from inside (the rule was the danger map's until step 6).
+     */
+    public boolean keepsOff(Level level, BlockPos pos) {
+        return isOn() && colony.danger().isAttacked(level, pos);
+    }
+
+    /**
+     * The closed holes' answer to "may no gallery grow through here?" ({@link ColonyQuestions#NO_GALLERY_THROUGH}, step 7):
+     * not toward where members were attacked, while it is remembered.
+     */
+    public boolean keepsGalleriesOff(Level level, BlockPos cell) {
+        return isOn() && !colony.danger().isEmpty() && colony.danger().isAttacked(level, cell);
     }
 
     /** Whether this foraging hole is closed now: near an attack, its gallery running near one, or left for good. */

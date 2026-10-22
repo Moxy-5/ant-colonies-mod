@@ -106,13 +106,38 @@ easiest to stop bugs from happening and push updates easier"); so these are my p
    split the framework could not name a desert-mod part, so this has to change first: a shared question that each part
    answers for itself, the way the news lets each part hear for itself (the danger map, the neighbours, the closed holes
    and the trunk trails each say "keep off" or nothing). Same answers as today; nothing changes in-game.
-7. **The "a hole opened or closed" news.** One of the four agreed kinds, not built in step 4: no part tells another of
-   a hole today (each asks `isOpen` / `isClosed` when it needs to), so there was nothing to move. Built here so the
-   framework has it before the split: told wherever a colony plugs a hole, digs one open, or closes or leaves one for
-   danger (`ForagingHoles.plug`, the dig through a hole's plug, `ClosedHoles`, the galleries opening holes in turn),
-   including out of sight. With no listener yet it costs nothing (news nobody hears is not sent); its first listeners
-   come with M8 (a raid's end, termites coming back out).
-
+   **Planned with the user 2026-10-22** (the user's OK of the plan below; the picks are mine, agreed). Found while
+   planning: `Colony.mayForageAt` also names the harvester's patrol (`ColonyParts.PATROL`), so it changes too. Today
+   there are two questions, so there stay two: **"keep off?"** (lasting reasons: danger, neighbours, attacked ground;
+   asked from many places, also by termites eating from inside and by the numbers) and **"not cleared yet today?"**
+   (only the patrol: no patroller back from that way). "May we forage here?" is "no" to both. One question would
+   change things in-game (the recruits' scent lines would wait for the patrol), so not one.
+   - **How:** `colony/ColonyQuestions`, a small yes/no question kind like the news kinds; a part's row in `ColonyParts`
+     says what it answers and at which place (`ColonyPart.answers`), as it says what it hears; the colony signs its
+     parts up when made; a question is "yes" when any part says yes (asked in place order, the first yes ends it).
+   - **Who answers "keep off?":** the neighbours (past a place the colony yields to), the closed holes (where members
+     were attacked: the termites' rule moves out of the danger map into the termite part, with its `close_holes`
+     switch), the danger map (dangerous places, `keep_away`), the trunk trails (the trail out there passes danger,
+     `keep_away`). **"Not cleared yet today?":** the patrol. In today's order (cheapest first).
+   - `colony.keepsOff(level, pos)` in place of `colony.danger().avoids(...)`, which goes; `Colony.mayForageAt` asks the
+     two questions and names no part; `colony.whoKeepsOff(level, pos)` names the part that said yes, for the test
+     messages and the logs.
+   - **Checks** in scenes that exist (no new scene): the trail danger scene (`TrailTests`), the termite killed by the
+     bush (`TermiteForagingTests`) and the neighbours (`NeighbourTests`) say which part keeps off; the save and load
+     scenes check each colony's answerers are its own parts. Same answers as today; nothing changes in-game. One speed
+     check (the question is asked in the plant scans).
+7. **The hole questions** (was "the hole news"; changed with the user 2026-10-22). Found while planning: the hole news
+   has nobody to hear it, even in M8 (news stays inside one colony: the Matabele ants see termites, they cannot hear a
+   termite colony's news, so its first listener would be a termite part not designed yet, and building it now means
+   guessing its shape: does the harvester's sealed entrance count, is a hole "closed" before its plug is packed). What
+   really blocks the split round holes is a question: the shared foraging holes and galleries ask the termite part
+   `ClosedHoles` by name in 12 lines. So, on step 6's machinery, two more questions answered by the closed holes:
+   **"is this hole kept shut?"** (closed for danger or left for good: never opened, plugged at once, no turn, no tip,
+   no food fetched through it) and **"may a gallery grow through here?"** (not toward where members were attacked),
+   with a quick "is any hole kept shut?" for the plug search. Same answers; nothing changes in-game. **The hole news
+   moves to M8**, designed with its first listener.
+   Steps 6 and 7 are built together on branch `claude/apex-questions` (from `master`), the categories they touch on 8
+   servers, then a full run on 8 servers; the user tests in-game before the merge.
 8. **The rest of the shared code that names a species part** (found while planning step 6, 2026-10-22; to plan with
    the user). Steps 6 and 7 fix only the forage question and the holes. Counted on `master` 2026-10-22: about 81 code
    lines in 15 of the 22 shared colony files still name a harvester or termite part (`FieldLife` 12, `NestLife` 8,

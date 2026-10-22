@@ -78,7 +78,7 @@ final class DeadWoodCall {
                         continue;
                     }
                     Wood wood = measure(level, top.immutable(), measured);
-                    if (wood == null || colony.foodMap().knows(wood.foot(), null) || colony.danger().avoids(level, wood.foot())) {
+                    if (wood == null || colony.foodMap().knows(wood.foot(), null) || colony.keepsOff(level, wood.foot())) {
                         continue;
                     }
                     int reach = call.reachFor(wood.blocks());

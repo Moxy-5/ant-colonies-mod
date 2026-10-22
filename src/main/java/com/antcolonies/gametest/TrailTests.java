@@ -210,6 +210,12 @@ public class TrailTests {
             BlockPos nearHome = new BlockPos(center[0].getX() + 5, groundY + 1, center[0].getZ());
             helper.assertTrue(colony.part(ColonyParts.TRUNK_TRAILS).orElseThrow().passesDanger(level, pastIt) && !colony.mayForageAt(level, pastIt),
                     "food out past the danger along the east trail should be kept away from (the trail runs through it)");
+            // Colony parts step 6: each part answers "keep off?" for itself; the colony names the one that said yes.
+            helper.assertTrue("danger_map".equals(colony.whoKeepsOff(level, eastFood)),
+                    "the danger map should keep the foragers off the east food, not " + colony.whoKeepsOff(level, eastFood));
+            String pastWho = colony.danger().keepsOff(level, pastIt) ? "danger_map" : "trunk_trails";
+            helper.assertTrue(pastWho.equals(colony.whoKeepsOff(level, pastIt)),
+                    "the " + pastWho + " should keep the foragers off the food past the danger, not " + colony.whoKeepsOff(level, pastIt));
             helper.assertTrue(colony.mayForageAt(level, nearHome) && colony.mayForageAt(level, new BlockPos(center[0].getX(), groundY + 1, center[0].getZ() + 3)),
                     "the nest's own ground and the trail short of the danger should stay open: " + colony.danger().describe(level));
             for (int i = 0; i < 30; i++) {

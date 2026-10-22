@@ -128,6 +128,8 @@ public class NeighbourTests {
             BlockPos south = new BlockPos(w.getX(), groundY, w.getZ() + toMeeting + 2);
             helper.assertTrue(!old.mayForageAt(level, past) && old.mayForageAt(level, shortOf) && old.mayForageAt(level, south),
                     "the old colony should yield past the meeting (" + toMeeting + " blocks east) only: " + old.neighbours().describe(level));
+            helper.assertTrue("neighbours".equals(old.whoKeepsOff(level, past)),
+                    "the neighbours should keep the old colony off past the meeting (colony parts step 6), not " + old.whoKeepsOff(level, past));
             // Its east trail's tip is held short of the meeting place, and no searcher goes out that trail.
             TrunkTrails trails = old.part(ColonyParts.TRUNK_TRAILS).orElseThrow();
             for (int i = 0; i < 5; i++) {

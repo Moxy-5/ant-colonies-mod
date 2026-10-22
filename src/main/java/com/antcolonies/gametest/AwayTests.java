@@ -1551,6 +1551,20 @@ public class AwayTests {
                     "a " + colony.getSpecies() + " colony's news of " + kind.getKey() + " should be heard by " + hearing + ", not "
                             + colony.news().listenersOf(kind.getKey()));
         }
+        // Colony parts steps 6 and 7, the colony questions: each kind is answered by the parts the colony has that used
+        // to be asked by name, in the order they were asked; a kind nobody answers is "no" at once.
+        Map<com.antcolonies.colony.ColonyQuestions.Kind<?>, List<String>> asked = Map.of(
+                com.antcolonies.colony.ColonyQuestions.KEEP_OFF, List.of("neighbours", "closed_holes", "danger_map", "trunk_trails"),
+                com.antcolonies.colony.ColonyQuestions.NOT_CLEARED, List.of("patrol"),
+                com.antcolonies.colony.ColonyQuestions.HOLE_KEPT_SHUT, List.of("closed_holes"),
+                com.antcolonies.colony.ColonyQuestions.ANY_HOLE_KEPT_SHUT, List.of("closed_holes"),
+                com.antcolonies.colony.ColonyQuestions.NO_GALLERY_THROUGH, List.of("closed_holes"));
+        for (Map.Entry<com.antcolonies.colony.ColonyQuestions.Kind<?>, List<String>> kind : asked.entrySet()) {
+            List<String> answering = kind.getValue().stream().filter(has::contains).toList();
+            helper.assertTrue(colony.questions().answerersOf(kind.getKey()).equals(answering) && colony.questions().answers(kind.getKey()) == !answering.isEmpty(),
+                    "a " + colony.getSpecies() + " colony's question " + kind.getKey() + " should be answered by " + answering + ", not "
+                            + colony.questions().answerersOf(kind.getKey()));
+        }
     }
 
     /** The parts of a colony saved into a tag of their own each, by name (the parts that are not saved left out). */

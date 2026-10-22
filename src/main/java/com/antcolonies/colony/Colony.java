@@ -110,6 +110,8 @@ public class Colony {
     private final List<ColonyPart<?>> tickingAway;
     /** What happened, told to the parts that listen (colony parts step 4, {@link ColonyNews}). */
     private final ColonyNews news = new ColonyNews();
+    /** Yes/no questions the parts answer (colony parts steps 6 and 7, {@link ColonyQuestions}). */
+    private final ColonyQuestions questions = new ColonyQuestions();
     /** Species and parts whose data in an old save was skipped (logged once each). */
     private static final java.util.Set<String> skippedLogged = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
@@ -152,7 +154,7 @@ public class Colony {
         this.ticking = ColonyPart.ticking(this.parts);
         this.tickingAway = ColonyPart.tickingAway(this.parts);
         for (ColonyPart<?> part : this.parts) {
-            part.signUp(news); // (each part's row in ColonyParts says what news it hears)
+            part.signUp(news, questions); // (each part's row in ColonyParts says what news it hears and what it answers)
         }
     }
 
@@ -182,6 +184,33 @@ public class Colony {
      */
     public ColonyNews news() {
         return news;
+    }
+
+    /**
+     * The colony's questions: ask them and the parts that answer them say yes or no, without the one asking naming them
+     * (colony parts steps 6 and 7, {@link ColonyQuestions}).
+     */
+    public ColonyQuestions questions() {
+        return questions;
+    }
+
+    /**
+     * Whether the colony keeps its foragers off {@code pos} for a lasting reason (danger, a neighbour it yields to, where
+     * members were attacked): asked of every part ({@link ColonyQuestions#KEEP_OFF}).
+     */
+    public boolean keepsOff(Level level, BlockPos pos) {
+        return questions.ask(level, ColonyQuestions.KEEP_OFF, pos);
+    }
+
+    /** The name of the part that keeps the foragers off {@code pos}, or null (for the test messages and the logs). */
+    @Nullable
+    public String whoKeepsOff(Level level, BlockPos pos) {
+        return questions.whoSaysYes(level, ColonyQuestions.KEEP_OFF, pos);
+    }
+
+    /** Whether this foraging hole is kept shut now (for danger, termites): asked of every part ({@link ColonyQuestions#HOLE_KEPT_SHUT}). */
+    public boolean isHoleKeptShut(Level level, BlockPos hole) {
+        return questions.ask(level, ColonyQuestions.HOLE_KEPT_SHUT, hole);
     }
 
     /** The parts this colony has, in the order they are made, saved and loaded (for the save and load test). */
@@ -289,11 +318,11 @@ public class Colony {
     }
 
     /**
-     * Whether a forager may go for food at {@code pos} now: a patroller came back from that way ({@link Patrol#isOpen}),
-     * and the colony does not keep away from it for danger ({@link DangerMap#avoids}).
+     * Whether a forager may go for food at {@code pos} now: no part says it is not cleared yet today (the harvester's
+     * patrol: a patroller came back from that way) and none keeps the foragers off it ({@link #keepsOff}).
      */
     public boolean mayForageAt(Level level, BlockPos pos) {
-        return part(ColonyParts.PATROL).map(patrol -> patrol.isOpen(level, pos)).orElse(true) && !danger.avoids(level, pos);
+        return !questions.ask(level, ColonyQuestions.NOT_CLEARED, pos) && !keepsOff(level, pos);
     }
 
 

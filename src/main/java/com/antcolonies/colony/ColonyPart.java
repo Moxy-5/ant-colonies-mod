@@ -11,6 +11,7 @@ import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
 
 /**
  * One part of a colony (its nest, its food store, its alarm, ...) as the colony runs it: a name, what the part does once
@@ -45,6 +46,8 @@ public final class ColonyPart<T> {
     private BiConsumer<T, ServerLevel> sample;
     /** The news this part hears (step 4), signed up when the colony is made ({@link #signUp}). */
     private final List<Hears<T, ?>> hears = new ArrayList<>();
+    /** The questions this part answers (steps 6 and 7), signed up when the colony is made ({@link #signUp}). */
+    private final List<Answers<T, ?>> answers = new ArrayList<>();
 
     /** What a part does with a piece of news (colony parts step 4, {@link ColonyNews}). */
     @FunctionalInterface
@@ -53,6 +56,15 @@ public final class ColonyPart<T> {
     }
 
     private record Hears<T, N>(ColonyNews.Kind<N> kind, int place, Hearer<T, N> hearer) {
+    }
+
+    /** How a part answers a question (colony parts steps 6 and 7, {@link ColonyQuestions}): yes or no, only looking. */
+    @FunctionalInterface
+    public interface Answerer<T, Q> {
+        boolean yes(T part, Level level, Q asked);
+    }
+
+    private record Answers<T, Q>(ColonyQuestions.Kind<Q> kind, int place, Answerer<T, Q> answerer) {
     }
 
     private ColonyPart(String name, T part) {
@@ -101,11 +113,27 @@ public final class ColonyPart<T> {
         return this;
     }
 
-    /** Signs this part up to the news it hears (from {@link Colony}'s constructor, once the colony's parts are made). */
-    void signUp(ColonyNews news) {
+    /**
+     * Answers every {@code kind} of question asked in its colony ({@link ColonyQuestions}), at {@code place} among that
+     * kind's answerers (lower first, gaps of 10, as with the news).
+     */
+    <Q> ColonyPart<T> answers(ColonyQuestions.Kind<Q> kind, int place, Answerer<T, Q> answerer) {
+        answers.add(new Answers<>(kind, place, answerer));
+        return this;
+    }
+
+    /** Signs this part up to the news it hears and the questions it answers (from {@link Colony}'s constructor, once the colony's parts are made). */
+    void signUp(ColonyNews news, ColonyQuestions questions) {
         for (Hears<T, ?> one : hears) {
             signUp(news, one);
         }
+        for (Answers<T, ?> one : answers) {
+            signUp(questions, one);
+        }
+    }
+
+    private <Q> void signUp(ColonyQuestions questions, Answers<T, Q> one) {
+        questions.answer(one.kind(), one.place(), name, (level, asked) -> one.answerer().yes(part, level, asked));
     }
 
     private <N> void signUp(ColonyNews news, Hears<T, N> one) {

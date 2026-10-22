@@ -381,7 +381,7 @@ public class Galleries {
                 list.add(tunnel.tunnel().hole());
             }
         }
-        list.removeIf(hole -> ClosedHoles.isClosedIn(colony, level, hole));
+        list.removeIf(hole -> colony.isHoleKeptShut(level, hole));
         return list;
     }
 
@@ -658,7 +658,7 @@ public class Galleries {
         }
         List<BlockPos> from = new ArrayList<>();
         for (NestPlan.ForagingTunnel tunnel : colony.foragingHoles().tunnels(level)) {
-            if (ForagingHoles.isDug(level, tunnel) && !ClosedHoles.isClosedIn(colony, level, tunnel.hole())) {
+            if (ForagingHoles.isDug(level, tunnel) && !colony.isHoleKeptShut(level, tunnel.hole())) {
                 from.add(tunnel.hole());
             }
         }
@@ -705,7 +705,7 @@ public class Galleries {
         });
         stopped.addAll(atFood(level));
         for (Tip tip : tips) {
-            if (ClosedHoles.isClosedIn(colony, level, tip.way().hole())) {
+            if (colony.isHoleKeptShut(level, tip.way().hole())) {
                 stopped.add(tip.way().hole()); // (brain step 4g: no tip grows on from where the colony was attacked)
             }
             if (yieldsAhead(level, tip)) {
@@ -753,19 +753,20 @@ public class Galleries {
 
     /**
      * Brain step 4g: the pieces {@code grown} from {@code tip} whose new blocks and hole all lie clear of where the colony
-     * was attacked ({@link DangerMap#isAttacked}): no gallery grows toward an attack while it is remembered.
+     * was attacked: no gallery grows toward an attack while it is remembered (asked of every part, colony parts step 7,
+     * {@link ColonyQuestions#NO_GALLERY_THROUGH}: the termites' closed holes answer it).
      */
     private List<Tip> clearOfAttacks(ServerLevel level, Tip tip, List<Tip> grown) {
-        DangerMap danger = colony.danger();
-        if (grown.isEmpty() || danger.isEmpty() || !colony.part(ColonyParts.CLOSED_HOLES).map(ClosedHoles::isOn).orElse(false)) {
+        ColonyQuestions questions = colony.questions();
+        if (grown.isEmpty() || colony.danger().isEmpty() || !questions.answers(ColonyQuestions.NO_GALLERY_THROUGH)) {
             return grown;
         }
         List<Tip> clear = new ArrayList<>();
         for (Tip piece : grown) {
             List<BlockPos> cells = piece.way().tunnel();
-            boolean near = danger.isAttacked(level, piece.way().hole());
+            boolean near = questions.ask(level, ColonyQuestions.NO_GALLERY_THROUGH, piece.way().hole());
             for (int i = tip.way().tunnel().size(); i < cells.size() && !near; i++) {
-                near = danger.isAttacked(level, cells.get(i));
+                near = questions.ask(level, ColonyQuestions.NO_GALLERY_THROUGH, cells.get(i));
             }
             if (!near) {
                 clear.add(piece);
@@ -1019,7 +1020,7 @@ public class Galleries {
         List<BlockPos> grass = new ArrayList<>();
         for (BlockPos plant : colony.food().plants(level)) {
             SpeciesProfile.PlantFood food = colony.profile().food().plantFor(level.getBlockState(plant));
-            if (food != null && !food.rich() && colony.foodMap().knows(plant, null) && !colony.danger().avoids(level, plant)) {
+            if (food != null && !food.rich() && colony.foodMap().knows(plant, null) && !colony.keepsOff(level, plant)) {
                 grass.add(plant); // (grass where the colony was attacked pulls no tip: brain step 4g)
             }
         }
@@ -1810,7 +1811,7 @@ public class Galleries {
         List<BlockPos> candidates = new ArrayList<>();
         if (away) {
             for (BlockPos hole : dugHoles) {
-                if (!ways.isSpent(hole) && ways.runwayAt(hole) == null && !ClosedHoles.isClosedIn(colony, level, hole)) {
+                if (!ways.isSpent(hole) && ways.runwayAt(hole) == null && !colony.isHoleKeptShut(level, hole)) {
                     candidates.add(hole);
                 }
             }
@@ -1821,7 +1822,7 @@ public class Galleries {
                 if (level.isLoaded(hole) && ForagingHoles.isDug(level, tunnel) && !ways.isSpent(hole) && ways.runwayAt(hole) == null
                         && !candidates.contains(hole)) {
                     dugHoles.add(hole.immutable());
-                    if (!ClosedHoles.isClosedIn(colony, level, hole)) { // (brain step 4g: an attacked hole has no turn)
+                    if (!colony.isHoleKeptShut(level, hole)) { // (brain step 4g: an attacked hole has no turn)
                         candidates.add(hole);
                     }
                 }

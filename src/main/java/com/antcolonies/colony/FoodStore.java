@@ -308,7 +308,7 @@ public class FoodStore {
             // (a plant the numbers have used up out of sight still stands until it is out of every player's sight: skipped)
             if (plant == null || plant.pieces() - getPiecesCut(pos) <= 0 || busyGrass.contains(pos) || avoid.contains(pos) || foragersAt(pos) >= Math.max(1, plant.foragers())
                     || !colony.foodMap().knows(pos, ant) || fromInside && !isFeedableFromInside(level, pos)
-                    || (fromInside ? colony.danger().avoids(level, pos) : !colony.mayForageAt(level, pos))) { // (only where the patrollers came back from, never where the colony keeps away for danger)
+                    || (fromInside ? colony.keepsOff(level, pos) : !colony.mayForageAt(level, pos))) { // (only where the patrollers came back from, never where the colony keeps away for danger)
                 continue;
             }
             double trip = tripLength(pos, exits.isEmpty() ? List.of(center) : exits);

@@ -327,6 +327,8 @@ public class TermiteForagingTests {
                     helper.assertTrue(open > 0, "every hole was closed for one death at the end of an arm");
                     for (BlockPos bush : bushes) {
                         helper.assertTrue(!colony.mayForageAt(level, bush), "the dead bush at " + helper.relativePos(bush) + " by the kill may still be fetched");
+                        helper.assertTrue("closed_holes".equals(colony.whoKeepsOff(level, bush)), "the closed holes should keep the termites off the dead bush at "
+                                + helper.relativePos(bush) + " (colony parts step 6), not " + colony.whoKeepsOff(level, bush));
                     }
                     helper.assertTrue(colony.part(ColonyParts.CLOSED_HOLES).orElseThrow().describe(level).contains("closed for danger"), "the colony list does not tell the closed holes");
                     since[0] = tick;

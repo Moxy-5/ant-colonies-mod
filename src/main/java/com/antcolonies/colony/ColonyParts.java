@@ -28,7 +28,9 @@ import net.minecraft.resources.ResourceLocation;
  * shared parts, and each species mod signs up its own ({@link #register}).
  *
  * <p>A part's row also says what colony news it hears ({@link ColonyPart#hears}, step 4): the places of each kind of
- * news are its listeners' order (today's order, which the tellers used to call the parts in by hand).
+ * news are its listeners' order (today's order, which the tellers used to call the parts in by hand). And what colony
+ * questions it answers ({@link ColonyPart#answers}, steps 6 and 7): "keep off?" is asked of the neighbours, the closed
+ * holes, the danger map and the trunk trails in that order (the order the danger map used to ask them in).
  *
  * <p>Which parts each species lists was worked out from each part's own "do I apply?" check (step 2): a part is only
  * listed for a species it does something for today. Until step 3 ("ask before use") every colony still makes every
@@ -121,6 +123,7 @@ public final class ColonyParts {
     public static final Type<TrunkTrails> TRUNK_TRAILS = listed("trunk_trails", TrunkTrails::new, part -> part
             .ticks(210, (trunk, level) -> trunk.tick(level, false))
             .ticksAway(80, (trunk, level) -> trunk.tick(level, true))
+            .answers(ColonyQuestions.KEEP_OFF, 40, TrunkTrails::keepsOff) // the trail out there passes danger
             .saves(TrunkTrails::save, TrunkTrails::load)
             .sample(TrunkTrails::fillForTests));
     public static final Type<Patrol> PATROL = listed("patrol", Patrol::new, part -> part
@@ -128,6 +131,7 @@ public final class ColonyParts {
             .ticksAway(50, (patrol, level) -> patrol.tick(level, true))
             .hears(ColonyNews.MEMBER_HURT, 20, (patrol, level, news) -> patrol.danger(level, news.member(), "hurt by " + news.by().getType().toShortString())) // a patroller turns back
             .hears(ColonyNews.MEMBER_DIED, 10, (patrol, level, news) -> patrol.died(level, news.member())) // a patroller killed never comes back: its way stays shut today
+            .answers(ColonyQuestions.NOT_CLEARED, 10, (patrol, level, pos) -> !patrol.isOpen(level, pos)) // no patroller back from that way yet
             .saves(Patrol::save, Patrol::load)
             .sample(Patrol::fillForTests));
     public static final Type<ForagerSpots> FORAGER_SPOTS = listed("forager_spots", ForagerSpots::new, part -> part
@@ -148,15 +152,21 @@ public final class ColonyParts {
     public static final Type<DangerMap> DANGER_MAP = shared("danger_map", DangerMap::new, part -> part
             .ticks(170, DangerMap::tick)
             .hears(ColonyNews.MEMBER_HURT, 30, (danger, level, news) -> danger.hurt(level, news.where(), news.by().getType().toShortString(), news.killed())) // the place is remembered
+            .answers(ColonyQuestions.KEEP_OFF, 30, DangerMap::keepsOff) // a dangerous place
             .saves(DangerMap::save, DangerMap::load)
             .sample(DangerMap::fillForTests));
     public static final Type<ClosedHoles> CLOSED_HOLES = listed("closed_holes", ClosedHoles::new, part -> part
             .ticks(180, ClosedHoles::tick)
+            .answers(ColonyQuestions.KEEP_OFF, 20, ClosedHoles::keepsOff) // where members were attacked
+            .answers(ColonyQuestions.HOLE_KEPT_SHUT, 10, ClosedHoles::isClosed) // closed for danger or left for good
+            .answers(ColonyQuestions.ANY_HOLE_KEPT_SHUT, 10, (closed, level, nothing) -> closed.anyClosed(level))
+            .answers(ColonyQuestions.NO_GALLERY_THROUGH, 10, ClosedHoles::keepsGalleriesOff) // not toward an attack
             .saves(ClosedHoles::save, ClosedHoles::load)
             .sample(ClosedHoles::fillForTests));
     public static final Type<Neighbours> NEIGHBOURS = shared("neighbours", Neighbours::new, part -> part
             .ticks(190, Neighbours::tick)
             .hears(ColonyNews.NEIGHBOUR_MET, 10, (neighbours, level, news) -> neighbours.met(level, news.where(), news.other(), news.who()))
+            .answers(ColonyQuestions.KEEP_OFF, 10, Neighbours::yieldsAt) // past a place the colony yields to a neighbour
             .saves(Neighbours::save, Neighbours::load)
             .sample(Neighbours::fillForTests));
     public static final Type<HiddenTrips> HIDDEN_TRIPS = listed("hidden_trips", HiddenTrips::new, part -> part

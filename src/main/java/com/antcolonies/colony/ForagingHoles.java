@@ -97,7 +97,7 @@ public class ForagingHoles {
             // A hole with a runway of sheeting over it leads into the runway, not outside; a hole closed for danger (brain
             // step 4g) is no way out even before it is plugged.
             if (isDug(level, tunnel) && isOpen(level, tunnel.hole()) && !colony.nest().foodWays().isSpent(tunnel.hole())
-                    && colony.nest().foodWays().runwayAt(tunnel.hole()) == null && !ClosedHoles.isClosedIn(colony, level, tunnel.hole())) {
+                    && colony.nest().foodWays().runwayAt(tunnel.hole()) == null && !colony.isHoleKeptShut(level, tunnel.hole())) {
                 ways.add(new WayOut(tunnel.hole().above(), tunnel.side()));
             }
         }
@@ -145,7 +145,7 @@ public class ForagingHoles {
     private List<NestPlan.ForagingTunnel> holesToPlug(Level level) {
         List<NestPlan.ForagingTunnel> all = new java.util.ArrayList<>();
         for (NestPlan.ForagingTunnel tunnel : tunnels(level)) {
-            if (!hasFinishedRunway(level, tunnel.hole()) || ClosedHoles.isClosedIn(colony, level, tunnel.hole())) {
+            if (!hasFinishedRunway(level, tunnel.hole()) || colony.isHoleKeptShut(level, tunnel.hole())) {
                 all.add(tunnel);
             }
         }
@@ -189,7 +189,7 @@ public class ForagingHoles {
      * Never a hole closed for danger (brain step 4g, {@link ClosedHoles}), runway or not.
      */
     public boolean mayOpen(Level level, BlockPos hole) {
-        if (ClosedHoles.isClosedIn(colony, level, hole)) {
+        if (colony.isHoleKeptShut(level, hole)) {
             return false;
         }
         boolean runway = hasFinishedRunway(level, hole);
@@ -244,7 +244,7 @@ public class ForagingHoles {
      * another), the others once the foraging time is over ({@link #wantsPlugging}).
      */
     public boolean wantsPlugged(Level level, BlockPos hole) {
-        return ClosedHoles.isClosedIn(colony, level, hole) || wantsPlugging(level);
+        return colony.isHoleKeptShut(level, hole) || wantsPlugging(level);
     }
 
     /** Whether any member of the colony is outside the nest and the mound (checked once a second). */
@@ -263,14 +263,14 @@ public class ForagingHoles {
     @Nullable
     public NestPlan.ForagingTunnel pickHoleToPlug(Level level, AbstractAntEntity ant) {
         boolean all = wantsPlugging(level);
-        if (!all && !colony.part(ColonyParts.CLOSED_HOLES).map(closed -> closed.anyClosed(level)).orElse(false)) {
+        if (!all && !colony.questions().ask(level, ColonyQuestions.ANY_HOLE_KEPT_SHUT, null)) {
             return null;
         }
         long now = level.getGameTime();
         plugClaims.prune(now);
         plugging.keySet().removeIf(id -> !plugClaims.contains(id));
         for (NestPlan.ForagingTunnel tunnel : holesToPlug(level)) {
-            if (!isDug(level, tunnel) || !isOpen(level, tunnel.hole()) || !all && !ClosedHoles.isClosedIn(colony, level, tunnel.hole())) {
+            if (!isDug(level, tunnel) || !isOpen(level, tunnel.hole()) || !all && !colony.isHoleKeptShut(level, tunnel.hole())) {
                 continue;
             }
             boolean taken = false;
@@ -484,7 +484,7 @@ public class ForagingHoles {
         for (BlockPos plant : plants) {
             if (!isRich(level, plant) || !colony.foodMap().knows(plant, null) || noRunwayUntil.containsKey(plant)
                     || sideways(plant, center) > reach || nearAny(plant, taken, FOOD_STILL_THERE)
-                    || colony.food().isFeedableFromInside(level, plant) || colony.danger().avoids(level, plant)) {
+                    || colony.food().isFeedableFromInside(level, plant) || colony.keepsOff(level, plant)) {
                 continue;
             }
             double distance = Double.MAX_VALUE;
@@ -705,7 +705,7 @@ public class ForagingHoles {
         double bestDistance = Double.MAX_VALUE;
         for (BlockPos plant : plants) {
             if (!isRich(level, plant) || !colony.foodMap().knows(plant, null) || noRouteUntil.containsKey(plant)
-                    || colony.danger().avoids(level, plant)) { // (no gallery is dug toward where they were attacked: brain step 4g)
+                    || colony.keepsOff(level, plant)) { // (no gallery is dug toward where they were attacked: brain step 4g)
                 continue;
             }
             double fromNest = sideways(plant, center);
