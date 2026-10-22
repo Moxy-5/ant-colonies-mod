@@ -394,7 +394,15 @@ public class TermiteAlarmTests {
             BlockPos[] walls = {chamber.below(), chamber.above(), side};
             for (int i = 0; i < 3; i++) {
                 helper.assertTrue(colony.part(ColonyParts.ALARM).orElseThrow().isBreakIn(level, walls[i]), "breaking " + walls[i].toShortString() + " is no break-in");
-                colony.part(ColonyParts.ALARM).orElseThrow().blockBroken(level, walls[i], null);
+                if (i == 0) {
+                    // The first one broken by a player, as in the game (the break event, ModEvents.onBreak), not by
+                    // calling the alarm: the user's report of 2026-10-22, a broken mound and no drumming.
+                    net.minecraft.server.level.ServerPlayer player = helper.makeMockServerPlayerInLevel();
+                    player.moveTo(walls[i].getX() + 0.5, walls[i].getY() + 1, walls[i].getZ() + 0.5);
+                    helper.assertTrue(player.gameMode.destroyBlock(walls[i]), "the player could not break " + walls[i].toShortString());
+                } else {
+                    colony.part(ColonyParts.ALARM).orElseThrow().blockBroken(level, walls[i], null);
+                }
                 helper.assertTrue(colony.part(ColonyParts.ALARM).orElseThrow().level(level) == (i < 2 ? 3 : 4), "after " + (i + 1) + " break-ins the alarm is at "
                         + colony.part(ColonyParts.ALARM).orElseThrow().level(level));
             }
@@ -408,6 +416,17 @@ public class TermiteAlarmTests {
             helper.assertTrue(loaded.part(ColonyParts.ALARM).orElseThrow().level(level) == 4 && loaded.part(ColonyParts.ALARM).orElseThrow().soldierBoost(level) > 1.0F, "the alarm was not kept after a reload");
             // A block far from the nest and the mound is no break-in.
             helper.assertFalse(colony.part(ColonyParts.ALARM).orElseThrow().isBreakIn(level, chamber.offset(8, 0, 8)), "a block away from the nest counted as a break-in");
+            colony.part(ColonyParts.ALARM).orElseThrow().calmForTests();
+            // A player breaking a wall of the mound (the user's report of 2026-10-22): a break-in too.
+            colony.part(ColonyParts.MOUND).orElseThrow().buildInstantly(level, 3);
+            BlockPos moundWall = colony.moundParts(level).entrySet().stream()
+                    .filter(part -> part.getValue() == com.antcolonies.colony.MoundPlan.Part.WALL && !level.getBlockState(part.getKey()).isAir())
+                    .map(java.util.Map.Entry::getKey).max(java.util.Comparator.comparingInt(BlockPos::getY)).orElseThrow();
+            net.minecraft.server.level.ServerPlayer builder = helper.makeMockServerPlayerInLevel();
+            builder.moveTo(moundWall.getX() + 0.5, moundWall.getY() + 1, moundWall.getZ() + 0.5);
+            helper.assertTrue(builder.gameMode.destroyBlock(moundWall), "the player could not break the mound at " + moundWall.toShortString());
+            helper.assertTrue(colony.part(ColonyParts.ALARM).orElseThrow().level(level) == 3,
+                    "breaking the mound at " + moundWall.toShortString() + " left the alarm at " + colony.part(ColonyParts.ALARM).orElseThrow().level(level));
             colony.part(ColonyParts.ALARM).orElseThrow().calmForTests();
             helper.succeed();
         });
