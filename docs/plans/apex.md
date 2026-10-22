@@ -45,6 +45,12 @@ easiest to stop bugs from happening and push updates easier"); so these are my p
    order (written down once, not in 4 or 5 places). Every species still gets every part in this step. New check: a
    save-and-load test that fills every part with something, saves, loads and compares, so a forgotten save line can
    never happen again. Nothing changes in-game.
+   **BUILT 2026-10-21** (branch `claude/colony-parts-e4f872`, not merged; details and the kept differences in
+   `docs/HISTORY.md`): `colony/ColonyPart`, one row per part in `Colony`'s constructor with its two tick places
+   (loaded and away are different orders today, so each part has both), save and load or why not saved; the check in
+   the two `away` save-and-load scenes with a test sample for every part a scene leaves empty. For step 2: the part
+   names are already in the rows (`nest`, `food_store`, `mound`, ...), and the tick places travel with the part, so a
+   species mod's part can slot in by its place without the framework naming it.
 2. **Species pick their parts.** The `parts` lists in both species files and the registry; the harvester colony stops
    making the termite parts (mound, fungus garden, mushrooms, soldiers, king care, hidden trips, closed holes,
    galleries) and the termite colony the ant parts (hill, bakery, trunk trails, recruits, forager spots, patrol, ...).
