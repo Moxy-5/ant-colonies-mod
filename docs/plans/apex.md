@@ -200,6 +200,10 @@ easiest to stop bugs from happening and push updates easier"); so these are my p
      `Population`, `FungusCombBlock` and `TermiteMoundBlock` in `FoodStore`, `NestLedger`, `NestLife`, `BuildLife`,
      `TermiteKingEntity` in `BuildLife`; and two termite-only pieces live inside shared parts: the galleries inside the
      nest, the fungus comb inside the food store (`FoodStore` was already next after Apex part 1).
+   **BUILT 2026-10-22** on branch `claude/apex-step8-e27231` (8a `d8b413e`, 8b and 8c `a994164`; not merged, the
+   user tests in-game first): every line above as listed; no shared colony file names a species part any more (the
+   parts still named are only in species files). Full run on 6 servers 139 of 141 (BUGS 62 and 55, old flakes);
+   speed the same (colony brain 0.390 ms before, 0.396 after). Details in `docs/HISTORY.md`.
 9. **The commands, the event file and the ant body** (found planning step 8, 2026-10-22; the user's pick: its own
    step, to plan with the user after step 8). Outside the colony folder, shared files that name species parts too:
    the `/antcolonies` commands (`command/ColonyCommands`, about 15 lines, mostly the `list` read-out, which could ask
