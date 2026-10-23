@@ -7,6 +7,9 @@
 #   tools/run_game_tests.sh 8        the same over 8 servers (default 6, the user 2026-10-22)
 #   ANTCOLONIES_TESTS=antnest,away tools/run_game_tests.sh
 #                                    only those categories or tests (see gametest/TestFilter), still split
+#   ANTCOLONIES_MODS=savanna tools/run_game_tests.sh
+#                                    the framework with one species mod only (savanna or desert; both if not set),
+#                                    so only that mod's tests run (the split, step S9: each mod on its own)
 #
 # Each server ("shard") gets its own folder and world under run-test-shards/<n>/ and its share of the tests
 # (TestFilter.keepShard). One server runs everything on one thread, so n servers finish about n times sooner, as long
@@ -24,8 +27,8 @@ tasks=""
 for i in $(seq 1 "$shards"); do
     tasks="$tasks runGameTestShard$i"
 done
-echo "Game tests on $shards servers side by side${ANTCOLONIES_TESTS:+ (only: $ANTCOLONIES_TESTS)}; Gradle's output goes to run-test-shards/gradle.log"
-./gradlew $tasks -PtestShards="$shards" --continue > run-test-shards/gradle.log 2>&1
+echo "Game tests on $shards servers side by side${ANTCOLONIES_MODS:+ (mods: framework,$ANTCOLONIES_MODS)}${ANTCOLONIES_TESTS:+ (only: $ANTCOLONIES_TESTS)}; Gradle's output goes to run-test-shards/gradle.log"
+./gradlew $tasks -PtestShards="$shards" ${ANTCOLONIES_MODS:+-PspeciesMods="$ANTCOLONIES_MODS"} --continue > run-test-shards/gradle.log 2>&1
 gradle_exit=$?
 
 echo

@@ -22,6 +22,14 @@ evaluationDependsOn(':framework')
 evaluationDependsOn(':savanna')
 evaluationDependsOn(':desert')
 
+// Which species mods the game is started with (the split, step S9: each mod on its own). Both by default;
+// -PspeciesMods=savanna starts the framework with the savanna mod only, -PspeciesMods=desert with the desert mod only
+// (tools/run_game_tests.sh passes ANTCOLONIES_MODS on). The mods left out are not on the game's classpath at all.
+def speciesMods = (project.findProperty('speciesMods') ?: 'savanna,desert').toString().split(',')*.trim().findAll { it }
+speciesMods.each { if (!(it in ['savanna', 'desert'])) throw new GradleException("speciesMods: unknown mod '${it}' (savanna, desert)") }
+def withSavanna = 'savanna' in speciesMods
+def withDesert = 'desert' in speciesMods
+
 version = mod_version
 group = mod_group_id
 
@@ -47,10 +55,12 @@ neoForge {
     }
 
     // The savanna mod's access file, so the game started from here has the same Minecraft as the savanna mod is built on.
-    accessTransformers = project.files('savanna/src/main/resources/META-INF/accesstransformer.cfg')
+    if (withSavanna) {
+        accessTransformers = project.files('savanna/src/main/resources/META-INF/accesstransformer.cfg')
+    }
 
     // Every species mod's game tests (each mod's tests sit under its own name since the split, step S7).
-    def gameTestNamespaces = "${project.mod_id},${project.desert_mod_id}"
+    def gameTestNamespaces = ((withSavanna ? [project.mod_id] : []) + (withDesert ? [project.desert_mod_id] : [])).join(',')
 
     // Default run configurations.
     // These can be tweaked, removed, or duplicated as needed.
@@ -151,11 +161,15 @@ neoForge {
         "${framework_mod_id}" {
             sourceSet(project(':framework').sourceSets.main)
         }
-        "${mod_id}" {
-            sourceSet(project(':savanna').sourceSets.main)
+        if (withSavanna) {
+            "${mod_id}" {
+                sourceSet(project(':savanna').sourceSets.main)
+            }
         }
-        "${desert_mod_id}" {
-            sourceSet(project(':desert').sourceSets.main)
+        if (withDesert) {
+            "${desert_mod_id}" {
+                sourceSet(project(':desert').sourceSets.main)
+            }
         }
     }
 }
@@ -163,8 +177,12 @@ neoForge {
 dependencies {
     // Every mod's code and the libraries it needs (GeckoLib) on the game's classpath.
     implementation project(':framework')
-    implementation project(':savanna')
-    implementation project(':desert')
+    if (withSavanna) {
+        implementation project(':savanna')
+    }
+    if (withDesert) {
+        implementation project(':desert')
+    }
 }
 
 // The in-game camera starts clean each time (a new world, no old screenshots) with quiet, never-pausing settings.

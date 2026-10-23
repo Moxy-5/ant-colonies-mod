@@ -202,6 +202,7 @@ unchanged.
 **S9. Each mod on its own** (about 2 hours). Proof that the walls hold at run time too: the framework builds alone; the
 framework with savanna only (no desert) starts and passes every termite and tree test; the framework with desert only
 starts and passes the harvester tests. This is what makes the harvester's later departure a clean cut.
+**BUILT 2026-10-23** (round 4, `docs/HISTORY.md`): `-PspeciesMods=savanna` or `desert` on the root build (and `ANTCOLONIES_MODS=savanna` or `desert` for `tools/run_game_tests.sh`) starts the game with the framework and that one species mod only, the other left off the game's classpath (both by default, same commands as before). Checks: the framework builds alone, 70 of 70 unit tests, also in a copy of the repository holding only `framework\`; framework + savanna (the logs show no `desertcolonies`): every termite and tree category, 83 of 85 on 6 servers (8 minutes), the two failures the old flakes BUGS 62 (passed 3 of 3 rerun) and 55 (2 of 3 rerun, its known 1-in-3 failure alone, the same "too few meetings" message); framework + desert (only `colonyframework` and `desertcolonies` loaded): every harvester category, 58 of 58 on 6 servers (9 minutes); `./gradlew build` with both, 170 unit tests. No game code changed; nothing changes in-game.
 
 **S10. The full check and the merge** (about 2 hours). Full run, the stress test before and after (nothing is meant to
 get faster; checked once in case), guard films, notes (`CLAUDE.md` "Tech
