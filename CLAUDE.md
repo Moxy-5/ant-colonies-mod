@@ -190,6 +190,7 @@ A Minecraft mod where ants and termites live as real colonies: they dig, build, 
 - **M8 step 1 started 2026-10-23** (branch `claude/m8-matabele`): the Matabele ant's model in `tools/matabele_models.py`, three looks (A matt, B satin, C rust-brown tips) as major and minor in `python tools/model_viewer.py matabele`, with size sliders (the user plans big ants, size open); waiting for the user's pick of look and size; nothing in-game yet.
 - **M8 step 1, the Matabele model redrawn 2026-10-23** from the user's photo and Empires of the Undergrowth picture: longer, curved jaws, its own shape; looks A (the photo) and B (the game); the major starts at twice the termite major (1.5 blocks); waiting for the user's look.
 - **M8 step 1, Matabele jaws and face 2026-10-23:** thick hooked red toothed jaws held open, big eyes under a heavy brow, look C in the user's third picture's colours (charcoal, grey and brown); waiting for the user's look.
+- **M8 step 1, the Matabele look picked by the user 2026-10-23:** look A (glossy black, the photo), the others removed; the gaster now curves down in armoured bands to a downward sting; nothing in-game yet.
 
 ## Other notes files (read only when the task needs them)
 - `docs/DESIGN.md`: every design decision for the species and shared systems (read the section for a feature before working on it).

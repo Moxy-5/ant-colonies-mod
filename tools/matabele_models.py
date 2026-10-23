@@ -47,18 +47,13 @@ CELLS = {
     'tarsus':  (2, 1, 'noise'),
     'joint':   (3, 1, 'noise'),
     'sting':   (4, 1, 'noise'),
+    'rim':     (5, 1, 'glossy'),   # the shining back edge of each gaster plate
 }
 
-# The looks. shine: the light on the hard plates; hair: how much the gaster's fine hairs grey it.
+# The look (the user picked A, "like the photo", 2026-10-23; B, like Empires of the Undergrowth, and C, the third
+# picture's charcoal and brown, are in git history). shine: the light on the hard plates; hair: how much the gaster's
+# fine hairs grey it; mottle (C had it): patches of other tones on the plates, [(colour offset, chance), ...].
 LOOKS = {
-    'C': {'name': 'Like your third picture',
-          'note': 'dark charcoal plates patched with grey and warm brown, dark brown legs and antennae with tan tips and '
-                  'feet, dark red jaws, big dark eyes with a hard glint',
-          'shine': 0.35, 'hair': 0.05, 'mottle': [((18, 18, 20), 0.25), ((34, 14, 2), 0.25)],
-          'colours': {'head': (50, 46, 46), 'thorax': (52, 47, 46), 'waist': (52, 47, 46), 'gaster': (52, 47, 46),
-                      'leg': (62, 44, 32), 'antenna': (66, 46, 34), 'ring': (56, 40, 30), 'eye': (58, 60, 68),
-                      'jaw': (98, 30, 26), 'teeth': (80, 24, 22), 'tarsus': (150, 100, 60), 'joint': (44, 34, 28),
-                      'sting': (120, 84, 52)}},
     'A': {'name': 'Like the photo',
           'note': 'glossy black (the real ant, Daniel Kronauer\'s photo): the head, thorax and gaster shining, fine pale '
                   'hairs on the gaster, the jaws\' toothed edges, the feet and the antenna tips red-brown',
@@ -66,15 +61,7 @@ LOOKS = {
           'colours': {'head': (24, 23, 25), 'thorax': (26, 25, 27), 'waist': (26, 25, 27), 'gaster': (30, 29, 30),
                       'leg': (34, 28, 26), 'antenna': (36, 29, 26), 'ring': (52, 38, 30), 'eye': (12, 12, 14),
                       'jaw': (34, 24, 21), 'teeth': (112, 40, 26), 'tarsus': (78, 44, 30), 'joint': (22, 20, 21),
-                      'sting': (90, 52, 34)}},
-    'B': {'name': 'Like Empires of the Undergrowth',
-          'note': 'the game\'s ant: a blue-grey sheen on black, the antennae\'s whips and the feet ringed in pale grey, '
-                  'the jaws dark grey',
-          'shine': 1.3, 'hair': 0.1,
-          'colours': {'head': (34, 36, 44), 'thorax': (36, 38, 46), 'waist': (36, 38, 46), 'gaster': (38, 40, 48),
-                      'leg': (40, 42, 50), 'antenna': (44, 46, 54), 'ring': (150, 152, 160), 'eye': (14, 14, 18),
-                      'jaw': (52, 54, 62), 'teeth': (78, 78, 86), 'tarsus': (130, 132, 140), 'joint': (28, 30, 36),
-                      'sting': (90, 92, 100)}},
+                      'sting': (90, 52, 34), 'rim': (54, 52, 56)}},
 }
 
 
@@ -330,14 +317,41 @@ def model(minor=False):
         box([-1.45, 2.95, 2.4], [1.45, 6.05, 4.3], 'gaster'),
         box([-1.5, 3.4, 4.55], [1.5, 5.6, 5.0], 'gaster'),        # the girdle, the pinch
     ]))
-    bones.append(bone('abdomen', 'postpetiole', GIRDLE, [
-        box([-2.3, 2.7, 4.9], [2.3, 6.4, 9.0], 'gaster'),         # the big second segment
-        box([-2.45, 3.1, 5.4], [2.45, 6.0, 8.5], 'gaster'),       # its full sides
-        box([-1.7, 6.4, 5.4], [1.7, 6.7, 8.6], 'gaster'),         # the rounded back
-        box([-1.7, 2.45, 5.4], [1.7, 2.7, 8.6], 'gaster'),        # the belly
-        box([-1.8, 3.0, 8.95], [1.8, 5.9, 10.4], 'gaster'),
-        box([-1.2, 3.5, 10.35], [1.2, 5.3, 11.3], 'gaster'),
-        box([-0.6, 3.9, 11.25], [0.6, 4.9, 11.8], 'gaster'),      # the tip
-        box([-0.15, 4.25, 11.75], [0.15, 4.5, 12.5], 'sting'),    # the sting
-    ]))
+    bones.append(bone('abdomen', 'postpetiole', GIRDLE, gaster_cubes()))
     return bones
+
+
+# The gaster from its pinch to the sting, curving down (the user, 2026-10-23: "slightly curved and more intimidating";
+# real ponerines carry the gaster's tip turned down and under, the sting ready): each plate bent further down than the
+# one before, a shining rim on the back edge of each (the armoured bands of the real plates), the sting long and sharp.
+# (length, width, height, degrees down): the second segment on to the tip.
+GASTER_PLATES = [(4.4, 4.7, 3.9, 6.0), (1.8, 3.8, 3.2, 22.0), (1.3, 2.7, 2.3, 42.0), (0.9, 1.5, 1.3, 62.0)]
+STING = [(1.1, 0.55, 75.0), (1.1, 0.26, 86.0)]    # (length, thickness, degrees down): its base, then the point
+
+
+def tilted(centre, size, down, swatch):
+    """A box of size round centre, its back end turned down by down degrees (the model file's X turn: negative
+    lowers the back, as the head's positive turn lowers the front)."""
+    return box([c - v / 2 for c, v in zip(centre, size)], [c + v / 2 for c, v in zip(centre, size)], swatch, centre,
+               [-down, 0, 0])
+
+
+def gaster_cubes():
+    cubes, p = [], [GIRDLE[0], GIRDLE[1], GIRDLE[2] + 0.1]
+    for i, (length, w, h, down) in enumerate(GASTER_PLATES):
+        d = (0, -math.sin(math.radians(down)), math.cos(math.radians(down)))
+        c = [q + v * length / 2 for q, v in zip(p, d)]
+        cubes.append(tilted(c, (w, h, length), down, 'gaster'))
+        if i == 0:                                                   # the big segment rounded
+            cubes.append(tilted(c, (w + 0.3, h - 0.8, length - 0.8), down, 'gaster'))
+            cubes.append(tilted(c, (w - 1.2, h + 0.5, length - 0.8), down, 'gaster'))
+        if i < len(GASTER_PLATES) - 1:
+            rim = [q + v * (length / 2 - 0.15) for q, v in zip(c, d)]
+            cubes.append(tilted(rim, (w + 0.2, h + 0.2, 0.3), down, 'rim'))
+        p = [q + v * (length - 0.1) for q, v in zip(p, d)]
+    for length, thick, down in STING:
+        d = (0, -math.sin(math.radians(down)), math.cos(math.radians(down)))
+        c = [q + v * length / 2 for q, v in zip(p, d)]
+        cubes.append(tilted(c, (thick, thick, length), down, 'sting'))
+        p = [q + v * (length - 0.05) for q, v in zip(p, d)]
+    return cubes
