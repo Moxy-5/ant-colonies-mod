@@ -131,7 +131,7 @@ public class ForagingHoles {
     @Nullable
     NestPlan.ForagingTunnel middleHole(Level level) {
         BlockPos entrance = colony.nest().getEntrance();
-        if (!colony.keepsASchedule() || !colony.part(ColonyParts.MOUND).map(Mound::isActive).orElse(false) || !level.isLoaded(entrance)
+        if (!colony.keepsASchedule() || !colony.buildsOverNestNow() || !level.isLoaded(entrance)
                 || !Nest.isDugOut(level, entrance.below()) || colony.nest().isEntranceCovered(level)) {
             return null;
         }
@@ -591,13 +591,13 @@ public class ForagingHoles {
                         continue;
                     }
                     BlockState state = level.getBlockState(wall);
-                    if (!com.antcolonies.block.MudCrustBlock.hasFace(state, side.getOpposite())) {
+                    if (!com.antcolonies.block.FacedWall.hasFace(state, side.getOpposite())) {
                         continue;
                     }
                     any = true;
                     if (colony.random().nextInt(CRUMBLE_CHANCE) == 0) {
-                        BlockState less = state.setValue(com.antcolonies.block.MudCrustBlock.FACES.get(side.getOpposite()), false);
-                        boolean empty = com.antcolonies.block.MudCrustBlock.FACES.values().stream().noneMatch(less::getValue);
+                        BlockState less = com.antcolonies.block.FacedWall.withoutFace(state, side.getOpposite());
+                        boolean empty = com.antcolonies.block.FacedWall.hasNoFace(less);
                         level.levelEvent(net.minecraft.world.level.block.LevelEvent.PARTICLES_DESTROY_BLOCK, wall,
                                 net.minecraft.world.level.block.Block.getId(state));
                         if (empty) {
@@ -745,7 +745,7 @@ public class ForagingHoles {
      */
     private int foodReach(SpeciesProfile.NewHoles numbers) {
         Galleries galleries = colony.nest().galleries();
-        return galleries.isOn() ? galleries.foodReach() : numbers.reach(colony.getCount(com.antcolonies.entity.WorkerAntEntity.CASTE));
+        return galleries.isOn() ? galleries.foodReach() : numbers.reach(colony.getCount(Caste.WORKER));
     }
 
     /** The blocks of the dug foraging tunnels, where a new tunnel may start (the route planner picks the best). */

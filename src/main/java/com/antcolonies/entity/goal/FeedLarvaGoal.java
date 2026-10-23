@@ -8,12 +8,12 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
-import com.antcolonies.colony.ColonyParts;
+import com.antcolonies.colony.ColonyHooks;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.AntLarvaEntity;
 import com.antcolonies.entity.FedByNurses;
-import com.antcolonies.entity.TermiteSoldierEntity;
+
 import com.antcolonies.colony.Brood;
 
 import net.minecraft.core.BlockPos;
@@ -114,9 +114,11 @@ public class FeedLarvaGoal extends Goal {
                 hungry.add(young);
             }
         }
-        for (TermiteSoldierEntity soldier : colony.part(ColonyParts.SOLDIERS).map(soldiers -> soldiers.getSoldiers(level)).orElse(List.of())) {
-            if (soldier.wantsFood() && !soldier.hasFeeder(now)) {
-                hungry.add(soldier);
+        for (ColonyHooks.Castes castes : colony.hooks().all(ColonyHooks.CASTES)) { // (the termite soldiers)
+            for (Entity member : castes.fedByNurses(level)) {
+                if (member instanceof FedByNurses fed && fed.wantsFood() && !fed.hasFeeder(now)) {
+                    hungry.add(member);
+                }
             }
         }
         if (colony.getKing(level) instanceof FedByNurses king && king.wantsFood() && !king.hasFeeder(now)) {

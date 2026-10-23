@@ -7,7 +7,7 @@ import org.jetbrains.annotations.Nullable;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.ColonyNews;
-import com.antcolonies.colony.ColonyParts;
+
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.AbstractAntEntity;
 
@@ -56,15 +56,15 @@ public class GatherSeedGoal extends Goal {
         if (colony == null || !colony.isForagingTime(level)) {
             return false; // foragers only go out at foraging time (termites: at night and in the rain)
         }
-        if (!colony.part(ColonyParts.DOOR).map(door -> door.mayGo(level, ant)).orElse(true)) {
+        if (colony.mustWait(level, ant)) {
             return false; // waits by the entrance for the homecomers' touches (Gordon's rule, see colony.Door)
         }
         seed = colony.food().findSeed(level, ant.blockPosition(), errand.leftAlone());
-        if (seed == null || colony.part(ColonyParts.RECRUITS).map(recruits -> recruits.passesBy(ant.getUUID(), seed.blockPosition())).orElse(false)) {
+        if (seed == null || colony.passesBy(level, ant.getUUID(), seed.blockPosition())) {
             return false; // (a recruit on its way to its patch passes poorer food by)
         }
         colony.food().claimSeed(level, seed, ant.getUUID());
-        colony.part(ColonyParts.DOOR).ifPresent(door -> door.setOut(level, ant));
+        colony.news().tell(level, ColonyNews.SET_OUT, new ColonyNews.SetOut(ant));
         return true;
     }
 
@@ -106,8 +106,7 @@ public class GatherSeedGoal extends Goal {
 
     /** Takes one seed out of the pile on the ground. */
     private void take(ServerLevel level) {
-        if (!colony.part(ColonyParts.BAKERY).map(bakery -> bakery.hasPlaceForASeed(level, ant.getUUID()))
-                .orElseGet(() -> colony.food().claimStorePlace(level, ant.getUUID()))) {
+        if (!colony.claimPlaceForAPiece(level, ant.getUUID())) {
             ticks = GIVE_UP_TICKS; // nowhere to take it now (the store full, the mill busy): it stays where it lies
             return;
         }
@@ -121,7 +120,7 @@ public class GatherSeedGoal extends Goal {
         ant.setCarriedSeed(one);
         colony.news().tell(level, ColonyNews.FOOD_FOUND, new ColonyNews.FoodFound(ant.getUUID(), seed.blockPosition())); // (its spot now; a rich patch: a scent line home)
 
-        ant.setSeedForBread(colony.part(ColonyParts.BAKERY).map(bakery -> bakery.isMilling(ant.getUUID())).orElse(false)); // to the mill if the store has no room
+        ant.setSeedForBread(colony.pieceGoesToMill(ant.getUUID())); // to the mill if the store has no room
         level.playSound(null, ant.blockPosition(), SoundEvents.ITEM_PICKUP, SoundSource.NEUTRAL, 0.15F, 1.6F);
     }
 }

@@ -44,7 +44,7 @@ import net.minecraft.world.level.Level;
  * inside the nest and the mound, out of the sun. It joins the nearest termite colony when put down with a spawn egg,
  * and is born into its colony when a nymph grows up.
  */
-public class TermiteWorkerEntity extends AbstractAntEntity {
+public class TermiteWorkerEntity extends AbstractAntEntity implements ColonyBorn {
     /** Counted under the same caste name as ant workers (each colony has its own counts). */
     public static final String CASTE = WorkerAntEntity.CASTE;
     /** How close (in blocks) a termite colony must be for a new worker to join it. */
@@ -126,6 +126,7 @@ public class TermiteWorkerEntity extends AbstractAntEntity {
     }
 
     /** A worker that grew up from a nymph of this colony belongs to it from the start (and is counted). */
+    @Override
     public void joinColony(Colony colony) {
         setColonyId(colony.getId());
         colonyChecked = true;

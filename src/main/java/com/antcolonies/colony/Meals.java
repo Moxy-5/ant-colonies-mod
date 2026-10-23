@@ -8,8 +8,6 @@ import java.util.TreeMap;
 
 import org.jetbrains.annotations.Nullable;
 
-import com.antcolonies.entity.TermiteSoldierEntity;
-import com.antcolonies.entity.WorkerAntEntity;
 import com.antcolonies.species.SpeciesProfile;
 
 import net.minecraft.nbt.CompoundTag;
@@ -49,17 +47,13 @@ class Meals {
     /** What this caste eats, or null if it does not eat (workers whose profile says {@code eats: false}). */
     @Nullable
     Diet dietOf(String caste) {
-        if (WorkerAntEntity.CASTE.equals(caste)) {
+        if (Caste.WORKER.equals(caste)) {
             var worker = colony.profile().worker();
             return worker.eats() && worker.mealIntervalTicks() > 0 ? new Diet(worker.mealIntervalTicks(), worker.starveAfterTicks(), true) : null;
         }
         var soldiers = colony.profile().soldiers().orElse(null);
-        for (TermiteSoldierEntity.Rank rank : TermiteSoldierEntity.Rank.values()) {
-            if (rank.caste().equals(caste) && soldiers != null && soldiers.mealIntervalTicks() > 0) {
-                return new Diet(soldiers.mealIntervalTicks(), 0, false);
-            }
-        }
-        return null;
+        boolean soldier = colony.isOwnCaste(caste);
+        return soldier && soldiers != null && soldiers.mealIntervalTicks() > 0 ? new Diet(soldiers.mealIntervalTicks(), 0, false) : null;
     }
 
     private static long minute(long time) {

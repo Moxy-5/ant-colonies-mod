@@ -6,17 +6,11 @@ import java.util.function.BooleanSupplier;
 
 import org.jetbrains.annotations.Nullable;
 
-import com.antcolonies.block.TermiteHoleBlock;
-import com.antcolonies.block.TermiteMoundBlock;
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.ColonyParts;
-import com.antcolonies.colony.Hill;
-import com.antcolonies.colony.Mound;
-import com.antcolonies.colony.Nest;
+import com.antcolonies.colony.ColonyHooks;
+import com.antcolonies.colony.ColonyNews;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.AbstractAntEntity;
-import com.antcolonies.registry.ModBlocks;
-import com.antcolonies.registry.ModTags;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.BlockParticleOption;
@@ -84,31 +78,13 @@ public class DigGoal extends Goal {
         return target != null && !errand.isLeftAlone(target);
     }
 
-    /** Whether its colony builds a termite mound (the dug soil goes there, not onto a hill). */
-    private boolean buildsMound() {
-        return colony.part(ColonyParts.MOUND).map(mound -> mound.numbers() != null).orElse(false);
-    }
-
     /**
-     * The morning clear-out of a species with a hill (real Pogonomyrmex: the nest maintenance workers carry out the
-     * soil dug in the night first thing each morning, before they dig on): while the surface is open, a builder
-     * carries a waiting pile up before it digs ({@link CarryNightSoilGoal}); while it is shut, the diggers rest once
-     * the piles are as big as a morning's carrying ({@link com.antcolonies.colony.NightSoil#isFull}). The entrance
-     * (a plug, a plant in it) is always bitten: that is how the surface opens.
+     * Whether the dug soil waits to be dealt with before this builder digs on: asked of where the colony's soil goes
+     * ({@link ColonyHooks#DUG_SOIL}; the harvester's morning clear-out, {@link com.antcolonies.colony.Hill#soilWaits}).
      */
     private boolean soilWaits(ServerLevel level) {
-        Hill hill = colony.part(ColonyParts.HILL).orElse(null);
-        if (!ant.canPlaceBlocks() || buildsMound() || hill == null || !hill.hasMoundRoom(level)) {
-            return false;
-        }
-        boolean plugged = colony.nest().isEntrancePlugged(level);
-        if (colony.nest().isPlantInEntrance(level) || plugged && colony.nest().mayOpenEntrance(level)) {
-            return false; // the entrance comes first
-        }
-        if (ant.mayGoOut() && !plugged) {
-            return hill.nightSoil().hasFreePile(level, ant.getUUID());
-        }
-        return hill.nightSoil().isFull(level);
+        ColonyHooks.DugSoil soil = colony.hooks().first(ColonyHooks.DUG_SOIL);
+        return ant.canPlaceBlocks() && soil != null && soil.waits(level, ant);
     }
 
     @Override
@@ -194,16 +170,14 @@ public class DigGoal extends Goal {
 
         // Every bite leaves a soil pellet in the mandibles (grass and roots turn into plain dirt), as long as
         // the hill still has room for it. Once the hill is complete the soil is simply left behind. A termite mound
-        // takes one pellet per layer of a mound block from each dug block (one dug block builds one mound block).
-        Mound mound = colony.part(ColonyParts.MOUND).filter(built -> built.numbers() != null).orElse(null);
-        Hill hill = colony.part(ColonyParts.HILL).orElse(null);
+        // takes one pellet per layer of a mound block from each dug block (one dug block builds one mound block): asked of
+        // where the colony's soil goes ({@link ColonyHooks#DUG_SOIL}).
+        ColonyHooks.DugSoil soil = colony.hooks().first(ColonyHooks.DUG_SOIL);
         // Grass cut away where a runway of sheeting runs gives no soil.
         if (ant.canPlaceBlocks() && !colony.nest().foodWays().isRunwayPlant(level, target)
-                && (mound != null ? mound.takePellet(level, target, ant.getUUID()) : hill != null && hill.hasMoundRoom(level))) {
+                && soil != null && soil.takesPellet(level, target, ant.getUUID())) {
             ant.setCarriedBlock(state.is(Blocks.GRASS_BLOCK) || state.is(Blocks.ROOTED_DIRT) ? Blocks.DIRT.defaultBlockState()
-                    : state.getBlock() instanceof TermiteMoundBlock || state.getBlock() instanceof TermiteHoleBlock
-                            || state.getBlock() instanceof com.antcolonies.block.MudCrustBlock
-                            ? ModBlocks.TERMITE_MOUND.get().defaultBlockState() : state);
+                    : soil.pellet(state));
         }
 
         level.playSound(null, target, state.getSoundType().getHitSound(), SoundSource.BLOCKS, 0.4F, 1.3F);
@@ -216,7 +190,7 @@ public class DigGoal extends Goal {
             level.destroyBlockProgress(ant.getId(), target, 9);
         } else if (progress >= 1.0F) {
             colony.nest().clearDigProgress(target);
-            colony.part(ColonyParts.MOUND).ifPresent(built -> built.blockDug(level, target));
+            colony.news().tell(level, ColonyNews.BLOCK_DUG, new ColonyNews.BlockDug(target)); // (the mound counts its soil)
             level.destroyBlockProgress(ant.getId(), target, -1);
             if (colony.nest().foodWays().isRunwayPlant(level, target) && colony.profile().food().plantFor(state) != null) {
                 colony.food().cutAwayForTheForagers(level, target); // food in the way of a runway: left for the foragers

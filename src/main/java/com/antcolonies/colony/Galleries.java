@@ -580,7 +580,7 @@ public class Galleries {
 
     /** How long the galleries may be with the colony's workers now (never shorter than the first arms). */
     public int lengthAllowed() {
-        return Math.max(baseLength, numbers().lengthFor(colony.getCount(com.antcolonies.entity.WorkerAntEntity.CASTE)));
+        return Math.max(baseLength, numbers().lengthFor(colony.getCount(Caste.WORKER)));
     }
 
     /** How many tips are growing (for the tests and the colony list). */
@@ -1429,14 +1429,9 @@ public class Galleries {
                 return false; // never wall an insect in (docs/BUGS.md 8, 9, 24, 42)
             }
         }
-        HiddenTrips trips = colony.part(ColonyParts.HIDDEN_TRIPS).orElse(null);
-        if (trips != null) {
-            for (java.util.UUID id : trips.travellers()) {
-                for (BlockPos cell : trips.runOf(id)) {
-                    if (inside.contains(cell)) {
-                        return false;
-                    }
-                }
+        for (ColonyHooks.HiddenAway away : colony.hooks().all(ColonyHooks.HIDDEN_AWAY)) {
+            if (away.anyWalksThrough(inside)) {
+                return false; // (an insect on a hidden trip walks through there)
             }
         }
         List<net.minecraft.world.phys.Vec3> eyes = colony.population().viewersInSight(level);

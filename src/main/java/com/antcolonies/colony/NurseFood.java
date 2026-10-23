@@ -5,6 +5,7 @@ import org.jetbrains.annotations.Nullable;
 import com.antcolonies.entity.AbstractAntEntity;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -52,4 +53,24 @@ public interface NurseFood {
      * true if the piece was put down (otherwise it is lost, and that is logged).
      */
     boolean putDownWhereItStands(Level level, AbstractAntEntity ant);
+
+    // --- for the numbers (Project Apex step 8b: the shared nest life asks these in place of naming the bakery or the garden)
+
+    /** How many pieces there are as far as the brain knows (the count, or what was last seen with what is owed since). */
+    int counted(ServerLevel level);
+
+    /**
+     * One of the numbers takes a counted piece (its block comes off later, out of sight); returns whether it was rich
+     * ({@code wantRich}: rich first, for the queen). Food that is never rich only keeps its own count (the ledger's).
+     */
+    default boolean takeCounted(boolean wantRich) {
+        return false;
+    }
+
+    /** One more piece counted in now, brought in by the numbers (its block is put down later); food the ledger counts alone does nothing. */
+    default void countedIn(boolean rich) {
+    }
+
+    /** What a piece looks like in the jaws. */
+    ItemStack piece();
 }

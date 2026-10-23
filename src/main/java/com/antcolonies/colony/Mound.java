@@ -127,6 +127,20 @@ public class Mound {
         return shaping;
     }
 
+    /**
+     * " | mound stage 3 (earned 5) of 32, 30/36 blocks finished, earned 41.2 blocks" for the colony list, or nothing
+     * without the profile's mound numbers: the stage the termites build now, and the one the colony has earned (they
+     * get there one stage at a time).
+     */
+    public String describe(Level level) {
+        if (numbers() == null) {
+            return "";
+        }
+        int h = getStage(level);
+        return String.format(" | mound stage %d (earned %d) of %d, %d/%d blocks finished, earned %.1f blocks", h, getEarnedStage(level),
+                numbers().maxHeight(), countFinished(level), wallsAt(h), getAllowance(level));
+    }
+
     Colony colony() {
         return colony;
     }
@@ -305,6 +319,29 @@ public class Mound {
             }
         }
         return true;
+    }
+
+    /** A colony's mound cells (none for a species without a mound): {@link #getParts} through its part. */
+    public static Map<BlockPos, MoundPlan.Part> partsOf(Colony colony, Level level) {
+        return colony.part(ColonyParts.MOUND).map(mound -> mound.getParts(level)).orElse(Map.of());
+    }
+
+    /**
+     * The mound's cells inside the home ({@link Nest#isInside}): its hollow shaft once roofed over into {@code cells},
+     * its built mouths, tunnels and spire pieces into {@code channels}.
+     */
+    void addInside(Level level, java.util.Set<BlockPos> cells, java.util.Set<BlockPos> channels) {
+        getParts(level).forEach((pos, part) -> {
+            if (part == MoundPlan.Part.OPEN) {
+                // Only once roofed over: a young mound's shaft open to the sky is outside (termites coming home
+                // stopped in it, clinging to its walls above the plug, the user's bug of 2026-10-13).
+                if (level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, pos.getX(), pos.getZ()) > pos.getY() + 1) {
+                    cells.add(pos);
+                }
+            } else if (part == MoundPlan.Part.MOUTH || part == MoundPlan.Part.TUNNEL || part == MoundPlan.Part.SPIRE) {
+                channels.add(pos);
+            }
+        });
     }
 
     /** Every cell of the mound at its stage now, in world positions. Empty if the colony builds no mound. */
@@ -651,30 +688,10 @@ public class Mound {
         double top = spot.getY() + now.getCollisionShape(level, spot).max(Direction.Axis.Y);
         for (LivingEntity ant : inCell) {
             if (ant.getBoundingBox().minY < top) {
-                liftOnto(level, ant, spot, top);
+                NestWalls.liftOnto(level, ant, spot, top);
             }
         }
         return true;
-    }
-
-    /** Puts an insect in a cell that was just filled up on top of the new soil, or beside it if there is no room on top. */
-    static void liftOnto(Level level, LivingEntity ant, BlockPos spot, double top) {
-        BlockPos above = BlockPos.containing(ant.getX(), top, ant.getZ());
-        if (top < spot.getY() + 1.0 || level.getBlockState(above).getCollisionShape(level, above).isEmpty()) {
-            ant.setPos(ant.getX(), top, ant.getZ());
-        } else {
-            for (Direction side : Direction.Plane.HORIZONTAL) {
-                BlockPos beside = spot.relative(side);
-                if (level.getBlockState(beside).getCollisionShape(level, beside).isEmpty()) {
-                    ant.setPos(beside.getX() + 0.5, beside.getY(), beside.getZ() + 0.5);
-                    break;
-                }
-            }
-        }
-        ant.setDeltaMovement(0, 0, 0);
-        if (ant instanceof AbstractAntEntity insect) {
-            insect.getNavigator().stop();
-        }
     }
 
     // ---- soil ----

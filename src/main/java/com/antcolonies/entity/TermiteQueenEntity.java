@@ -38,7 +38,7 @@ import net.minecraft.world.phys.Vec3;
  * nurses, she lays a steady stream of eggs behind her, faster the bigger she is ({@code QueenCare.layInStream}). She
  * also keeps the colony's fungus garden growing (once a second). The colony dies with her.
  */
-public class TermiteQueenEntity extends AbstractAntEntity {
+public class TermiteQueenEntity extends AbstractAntEntity implements SwellingQueen {
     /** How far she has swollen: 0 = just founded (king-sized), 1 = full grown. Synced so the renderer can draw her. Saved. */
     private static final EntityDataAccessor<Float> DATA_SIZE =
             SynchedEntityData.defineId(TermiteQueenEntity.class, EntityDataSerializers.FLOAT);
@@ -82,6 +82,7 @@ public class TermiteQueenEntity extends AbstractAntEntity {
     }
 
     /** How far she has swollen, 0 (founding) to 1 (full grown). */
+    @Override
     public float getSize() {
         return entityData.get(DATA_SIZE);
     }

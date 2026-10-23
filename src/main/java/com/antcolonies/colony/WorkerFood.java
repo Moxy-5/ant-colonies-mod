@@ -93,7 +93,7 @@ public class WorkerFood {
         net.minecraft.world.level.block.state.BlockState before = level.getBlockState(meal.spot());
         ItemStack piece = meal.food() == MealFood.STORE ? colony.food().eatSeedAt(level, meal.spot(), worker.getUUID())
                 : colony.nurseFood().takeFoodAt(level, meal.spot(), false);
-        if (!piece.isEmpty() && meal.food() == MealFood.STORE && before.getBlock() instanceof com.antcolonies.block.FungusCombBlock) {
+        if (!piece.isEmpty() && meal.food() == MealFood.STORE && com.antcolonies.block.GardenBed.isBed(before)) {
             // Old comb is dry and crumbly: crumbs fall where it is chewed off.
             level.sendParticles(new net.minecraft.core.particles.BlockParticleOption(net.minecraft.core.particles.ParticleTypes.BLOCK, before),
                     meal.spot().getX() + 0.5, meal.spot().getY() + 0.05, meal.spot().getZ() + 0.5, 6, 0.25, 0.02, 0.25, 0.0);
@@ -110,7 +110,8 @@ public class WorkerFood {
         if (food == MealFood.STORE) {
             return colony.food().cutPiece();
         }
-        return new ItemStack(colony.has(ColonyParts.FUNGUS_GARDEN) ? ModItems.FUNGUS_NODULE.get() : ModItems.ANT_BREAD.get());
+        NurseFood nurseFood = colony.nurseFood();
+        return nurseFood == null ? new ItemStack(ModItems.ANT_BREAD.get()) : nurseFood.piece();
     }
 
     /**
@@ -141,7 +142,7 @@ public class WorkerFood {
 
     /** Whether the store has a piece the workers eat: any seed; for fungus comb, an old layer as far as the brain knows. */
     private boolean oldCombKnown() {
-        return colony.part(ColonyParts.FUNGUS_GARDEN).map(garden -> garden.oldKnown() > 0).orElse(true);
+        return !colony.questions().ask(null, ColonyQuestions.NOTHING_TO_EAT_IN_STORE, null);
     }
 
     /** Tests only: a sample in every saved number (the save and load check, {@code AwayTests.everyPartSavesAndLoads}). */

@@ -55,7 +55,7 @@ import software.bernie.geckolib.animation.RawAnimation;
  * For now they only bite chickens ({@link #bite}, a simple first version; fighting players and ants comes with M8).
  * They do not fit the termite tunnel blocks (only workers do).
  */
-public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurses {
+public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurses, ColonyBorn {
     /** The two kinds of soldier. Each is counted in the colony under its own caste name. */
     public enum Rank {
         MINOR("minor_soldier"), MAJOR("major_soldier");
@@ -74,6 +74,17 @@ public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurs
         /** Saved and synced as a byte: 0 = none (a worker), 1 = minor, 2 = major. */
         public byte id() {
             return (byte) (ordinal() + 1);
+        }
+
+        /** Apex step 9c: the rank counted under this caste name, or null (a worker, or none). */
+        @Nullable
+        public static Rank byCaste(@Nullable String caste) {
+            for (Rank rank : values()) {
+                if (rank.caste.equals(caste)) {
+                    return rank;
+                }
+            }
+            return null;
         }
 
         @Nullable
@@ -329,10 +340,17 @@ public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurs
     // --- the colony ---------------------------------------------------------------------------------------------
 
     /** A soldier that grew up from a nymph of this colony belongs to it from the start (and is counted). */
+    @Override
     public void joinColony(Colony colony) {
         setColonyId(colony.getId());
         colonyChecked = true;
         colony.setCount(rank.caste(), colony.getCount(rank.caste()) + 1);
+    }
+
+    /** It just had its last meal as a nymph. */
+    @Override
+    public void lastMealAsYoung(long now) {
+        setLastFed(now);
     }
 
     /** This soldier joins no colony (one a test walks around by hand). */

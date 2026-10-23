@@ -114,4 +114,13 @@ public class ModEntities {
                     .clientTrackingRange(6)
                     .updateInterval(20)
                     .build("termite_nymph"));
+
+    // Apex step 9c: each species' bodies, for the shared brood and population code (what eggs hatch into, the dead, each caste's mob).
+    static {
+        com.antcolonies.species.SpeciesBodies.register(com.antcolonies.species.Species.RED_HARVESTER_ANT, new com.antcolonies.species.SpeciesBodies(
+                ANT_LARVA, ANT_CORPSE, java.util.Map.of(WorkerAntEntity.CASTE, WORKER_ANT)));
+        com.antcolonies.species.SpeciesBodies.register(com.antcolonies.species.Species.MACROTERMES, new com.antcolonies.species.SpeciesBodies(
+                TERMITE_NYMPH, TERMITE_CORPSE, java.util.Map.of(TermiteWorkerEntity.CASTE, TERMITE_WORKER,
+                        TermiteSoldierEntity.Rank.MINOR.caste(), TERMITE_MINOR_SOLDIER, TermiteSoldierEntity.Rank.MAJOR.caste(), TERMITE_MAJOR_SOLDIER)));
+    }
 }

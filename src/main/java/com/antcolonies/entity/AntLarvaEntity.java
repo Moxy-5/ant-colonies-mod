@@ -6,7 +6,7 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
-import com.antcolonies.colony.ColonyParts;
+import com.antcolonies.colony.ColonyHooks;
 import com.antcolonies.species.SpeciesProfile;
 
 import net.minecraft.nbt.CompoundTag;
@@ -23,9 +23,9 @@ import net.minecraft.world.phys.Vec3;
 /**
  * A larva of one colony: what an egg turns into. It lies in the nursery, cannot move, and is fed ant bread by the
  * nurses. After its meal (the species profile's larva_meal) it grows into a worker (as soon as the colony has room for one).
- * A termite nymph may instead be growing into a soldier ({@link #getSoldierRank}, decided by the colony when it hatches,
- * see {@code Soldiers.rankForNewNymph}): it then eats the soldier's bigger meal and grows into a minor or a major
- * soldier. Saved with the world; disappears when its colony is gone.
+ * It may instead be growing into another of its species' castes ({@link #getGrowsInto}, a termite nymph into a soldier,
+ * decided by the colony when it hatches through its castes hook, {@code ColonyHooks.Castes}): it then eats that caste's
+ * meal and grows into one. Saved with the world; disappears when its colony is gone.
  */
 public class AntLarvaEntity extends Entity implements FedByNurses {
     /** How many pieces of bread this larva has eaten (drawn bigger the more it has eaten). Synced to the client. */
@@ -34,8 +34,11 @@ public class AntLarvaEntity extends Entity implements FedByNurses {
     /** How many pieces of bread it needs to grow up (from its colony's species profile). Synced, so the client can draw its size. */
     private static final EntityDataAccessor<Integer> DATA_MEAL =
             SynchedEntityData.defineId(AntLarvaEntity.class, EntityDataSerializers.INT);
-    /** What it grows into: 0 a worker, else a soldier ({@link TermiteSoldierEntity.Rank#id}). Synced (a nymph growing into a soldier gets a big head), saved. */
-    private static final EntityDataAccessor<Byte> DATA_SOLDIER =
+    /**
+     * What it grows into: 0 a worker, else its caste's number from the colony's castes hook ({@link Colony#casteNumber}).
+     * Synced (the species' renderer draws by it: a nymph growing into a soldier gets a big head), saved.
+     */
+    private static final EntityDataAccessor<Byte> DATA_GROWS_INTO =
             SynchedEntityData.defineId(AntLarvaEntity.class, EntityDataSerializers.BYTE);
 
     @Nullable
@@ -96,14 +99,20 @@ public class AntLarvaEntity extends Entity implements FedByNurses {
         return getFed() >= getMeal();
     }
 
-    /** The kind of soldier this nymph grows into, or null if it grows into a worker. */
-    @Nullable
-    public TermiteSoldierEntity.Rank getSoldierRank() {
-        return TermiteSoldierEntity.Rank.byId(entityData.get(DATA_SOLDIER));
+    /** Step 10: the number of the caste it grows into (0: a worker; {@link Colony#casteNumber}). The client has only this. */
+    public int getGrowsIntoNumber() {
+        return entityData.get(DATA_GROWS_INTO);
     }
 
-    public void setSoldierRank(@Nullable TermiteSoldierEntity.Rank rank) {
-        entityData.set(DATA_SOLDIER, rank == null ? 0 : rank.id());
+    /** The caste it grows into besides a worker (a soldier's caste name), or null: a worker. Asks its colony. */
+    @Nullable
+    public String getGrowsInto(Colony colony) {
+        return colony.casteOfNumber(getGrowsIntoNumber());
+    }
+
+    /** It grows into this caste of its colony (a soldier's caste name; null: a worker). */
+    public void setGrowsInto(Colony colony, @Nullable String caste) {
+        entityData.set(DATA_GROWS_INTO, colony.casteNumber(caste));
     }
 
     @Override
@@ -147,7 +156,7 @@ public class AntLarvaEntity extends Entity implements FedByNurses {
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         builder.define(DATA_FED, 0);
         builder.define(DATA_MEAL, SpeciesProfile.RED_HARVESTER_ANT.brood().larvaMeal());
-        builder.define(DATA_SOLDIER, (byte) 0);
+        builder.define(DATA_GROWS_INTO, (byte) 0);
     }
 
     @Override
@@ -155,7 +164,7 @@ public class AntLarvaEntity extends Entity implements FedByNurses {
         colonyId = tag.hasUUID("colony") ? tag.getUUID("colony") : null;
         setFed(tag.getInt("fed"));
         lastFed = tag.contains("lastFed") ? tag.getLong("lastFed") : Colony.NOT_SET;
-        entityData.set(DATA_SOLDIER, tag.getByte("soldier"));
+        entityData.set(DATA_GROWS_INTO, tag.getByte("soldier")); // (saved under its pre-step-10 word, so old worlds load)
     }
 
     @Override
@@ -165,7 +174,7 @@ public class AntLarvaEntity extends Entity implements FedByNurses {
         }
         tag.putInt("fed", getFed());
         tag.putLong("lastFed", lastFed);
-        tag.putByte("soldier", entityData.get(DATA_SOLDIER));
+        tag.putByte("soldier", entityData.get(DATA_GROWS_INTO));
     }
 
     /** The game time of this one's last server tick (not saved: after a load it has always just come back). */
@@ -196,8 +205,8 @@ public class AntLarvaEntity extends Entity implements FedByNurses {
             discard(); // the queen died
             return;
         }
-        setMeal(colony.part(ColonyParts.SOLDIERS).map(soldiers -> soldiers.mealFor(getSoldierRank()))
-                .orElse(colony.profile().brood().larvaMeal())); // (the profile can change with /reload)
+        ColonyHooks.Castes castes = colony.hooks().first(ColonyHooks.CASTES); // (the termite soldiers' own meals)
+        setMeal(castes != null ? castes.mealFor(getGrowsInto(colony)) : colony.profile().brood().larvaMeal()); // (the profile can change with /reload)
         // The hunger clock only runs for a larva that still has to eat; a full one waiting to grow up has been fed.
         long now = level.getGameTime();
         if (lastFed == Colony.NOT_SET || isFull() || !colony.isHungerOn()) {

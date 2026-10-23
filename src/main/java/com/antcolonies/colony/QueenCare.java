@@ -4,7 +4,6 @@ import java.util.UUID;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.entity.AbstractAntEntity;
-import com.antcolonies.entity.WorkerAntEntity;
 import com.antcolonies.species.SpeciesProfile;
 
 import net.minecraft.core.BlockPos;
@@ -210,7 +209,7 @@ public class QueenCare {
                 changed = true;
             }
         }
-        boolean raising = eggsLaid <= batchEggs(founding) && colony.getCount(WorkerAntEntity.CASTE) < founding.eggs();
+        boolean raising = eggsLaid <= batchEggs(founding) && colony.getCount(Caste.WORKER) < founding.eggs();
         if (raising && now % founding.feedIntervalTicks() < 20) {
             // The hungriest young one gets the next piece.
             colony.brood().getLarvae(level).stream().filter(young -> !young.isFull())
@@ -362,7 +361,7 @@ public class QueenCare {
                 }
                 changed = true;
             }
-            boolean raising = eggsLaid <= batchEggs(founding) && colony.getCount(WorkerAntEntity.CASTE) < founding.eggs();
+            boolean raising = eggsLaid <= batchEggs(founding) && colony.getCount(Caste.WORKER) < founding.eggs();
             if (raising && now % founding.feedIntervalTicks() < 20) {
                 int young = colony.brood().hungriestInside();
                 if (young >= 0) {

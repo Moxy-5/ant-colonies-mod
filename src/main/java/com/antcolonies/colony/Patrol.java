@@ -12,7 +12,6 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.entity.AbstractAntEntity;
-import com.antcolonies.entity.WorkerAntEntity;
 import com.antcolonies.species.SpeciesProfile;
 
 import net.minecraft.core.BlockPos;
@@ -370,7 +369,7 @@ public class Patrol {
         if (!roundOn) {
             return;
         }
-        if (sent == 0 && colony.getCount(WorkerAntEntity.CASTE) > 0) {
+        if (sent == 0 && colony.getCount(Caste.WORKER) > 0) {
             // A round with nobody to send (a founding nest): its first workers patrol as soon as they are out.
             send(level, roundsToday <= 1 ? dawnSize() : laterSize(), false);
         }
@@ -445,7 +444,7 @@ public class Patrol {
     }
 
     private int workers() {
-        return colony.getCount(WorkerAntEntity.CASTE);
+        return colony.getCount(Caste.WORKER);
     }
 
     private int dawnSize() {
@@ -503,7 +502,7 @@ public class Patrol {
         }
         long now = level.getGameTime();
         int workers = Math.max(1, workers());
-        int inside = colony.population().inside(WorkerAntEntity.CASTE);
+        int inside = colony.population().inside(Caste.WORKER);
         List<AbstractAntEntity> candidates = colony.away().nestLoaded(level) ? candidates(level) : List.of();
         if (candidates.isEmpty() && !passedOver.isEmpty() && inside <= 0) {
             passedOver.clear(); // nobody else: the busy ones get their turn again

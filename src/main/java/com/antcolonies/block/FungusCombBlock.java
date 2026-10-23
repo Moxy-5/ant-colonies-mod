@@ -23,7 +23,7 @@ import net.minecraft.world.level.block.state.properties.IntegerProperty;
  * chewed plant matter, just laid). New comb goes on top; it is eaten (or crumbles) from the bottom (see
  * {@code colony.FungusGarden}).
  */
-public class FungusCombBlock extends SeedPileBlock implements Slope {
+public class FungusCombBlock extends SeedPileBlock implements Slope, GardenBed {
     /** The comb is at most this many layers high (half a block), so a termite still fits on it in a room one block tall. */
     public static final int MAX_COMB_LAYERS = 4;
     public static final int MAX_NODULES = 3;
@@ -52,6 +52,11 @@ public class FungusCombBlock extends SeedPileBlock implements Slope {
     /** How high (in blocks) the top of the comb is over the floor: where an egg or a nymph lies on it. */
     public static double topOf(BlockState state) {
         return state.getValue(LAYERS) * 2.0 / 16.0;
+    }
+
+    @Override
+    public double restingHeight(BlockState state) {
+        return topOf(state);
     }
 
     @Override

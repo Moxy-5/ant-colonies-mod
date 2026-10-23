@@ -6,8 +6,11 @@ import java.util.Comparator;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
+
+import com.antcolonies.entity.AbstractAntEntity;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
@@ -73,6 +76,40 @@ public final class ColonyQuestions {
     public static final Kind<Void> ANY_HOLE_KEPT_SHUT = Kind.of("any_hole_kept_shut");
     /** Step 7: whether no gallery may grow through this cell now. */
     public static final Kind<BlockPos> NO_GALLERY_THROUGH = Kind.of("no_gallery_through");
+
+    // Step 8a: the rest of the shared code's yes/no asks of a species part, each now asked of whoever answers it.
+
+    /** Step 8a: whether everyone is kept in the nest now (an alarm at an attacker: the foragers hurry home); asked about nothing (null). */
+    public static final Kind<Void> KEEPS_EVERYONE_IN = Kind.of("keeps_everyone_in");
+    /** Step 8a: whether the colony builds a structure over its nest (a termite mound); asked about nothing (null). */
+    public static final Kind<Void> BUILDS_OVER_NEST = Kind.of("builds_over_nest");
+    /** Step 8a: whether that structure is being built now (the species builds one and the colony is past founding); asked about nothing (null). */
+    public static final Kind<Void> BUILDING_OVER_NEST = Kind.of("building_over_nest");
+    /** Step 8a: whether the builders want this block cleared out (the structure's own soil where it must be hollow). */
+    public static final Kind<BlockPos> CLEAR_JOB = Kind.of("clear_job");
+    /** Step 8a: whether this cell is one of the tunnels built inside the structure over the nest (it needs no walls of its own). */
+    public static final Kind<BlockPos> STRUCTURE_TUNNEL = Kind.of("structure_tunnel");
+    /** Step 8a: whether more food is wanted in even with the store full (seeds to mill into bread); asked about nothing (null). */
+    public static final Kind<Void> MORE_FOOD_WANTED = Kind.of("more_food_wanted");
+    /** Step 8a: whether the colony keeps lasting trails (trunk trails); asked about nothing (null). */
+    public static final Kind<Void> KEEPS_TRAILS = Kind.of("keeps_trails");
+    /** Step 8a: whether the store is known to hold nothing the workers eat (fungus comb with no old layer as far as the brain knows); asked about nothing (null). */
+    public static final Kind<Void> NOTHING_TO_EAT_IN_STORE = Kind.of("nothing_to_eat_in_store");
+
+    // Step 9a: the shared goals' and the ant body's yes/no asks of a species part.
+
+    /** Food a forager might go for, and the forager. */
+    public record FoodFor(UUID ant, BlockPos food) {
+    }
+
+    /** Step 9a: whether this forager must wait in the nest before it sets out (the harvester's door: not touched enough yet). */
+    public static final Kind<AbstractAntEntity> MUST_WAIT = Kind.of("must_wait");
+    /** Step 9a: whether this forager passes the food by (it was called out to a richer patch and is on its way there). */
+    public static final Kind<FoodFor> PASSES_BY = Kind.of("passes_by");
+    /** Step 9a: whether the colony is alarmed now (no grooming, napping or stopping to look at a player); asked about nothing (null). */
+    public static final Kind<Void> ALARMED = Kind.of("alarmed");
+    /** Step 9a: whether this place is on one of the colony's lasting trails (a neighbour stepping onto it meets the colony). */
+    public static final Kind<BlockPos> ON_TRAIL = Kind.of("on_trail");
 
     // --- answering and asking ------------------------------------------------------------------------------------------
 

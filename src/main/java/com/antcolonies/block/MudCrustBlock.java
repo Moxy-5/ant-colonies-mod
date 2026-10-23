@@ -40,7 +40,7 @@ import net.minecraft.world.phys.shapes.VoxelShape;
  * {@code Alarm#isBreakIn}). It dries with age like the mound soil (fresh, setting, dry, old). A plate whose cell is
  * filled again (soil, a stone, any full block that is not food) is no longer needed and crumbles away.
  */
-public class MudCrustBlock extends Block {
+public class MudCrustBlock extends Block implements FacedWall {
     public static final IntegerProperty AGE = MoundSoil.AGE;
     /** One plate per face: the one on {@code NORTH} walls off the cell to the north. */
     public static final Map<Direction, BooleanProperty> FACES = PipeBlock.PROPERTY_BY_DIRECTION;
@@ -86,6 +86,7 @@ public class MudCrustBlock extends Block {
     }
 
     /** The crust with one more plate (fresh mud if it was not a crust yet). */
+    @Override
     public BlockState withFace(BlockState state, Direction face) {
         BlockState crust = isCrust(state) ? state : defaultBlockState();
         return crust.setValue(FACES.get(face), true);

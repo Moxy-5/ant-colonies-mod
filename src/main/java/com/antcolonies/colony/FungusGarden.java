@@ -53,8 +53,85 @@ public class FungusGarden implements NurseFood {
     /** Tests only: how many times faster the comb ripens, goes old and crumbles. Not saved. */
     private float ageingSpeedForTests = 1.0F;
 
+    /** The colony whose garden this is. */
+    /** " | gardens 2 dug (planned 6), comb 14 layers on 5 blocks, nodules 3, mushrooms ..." for the colony list. */
+    public String describe(Level level) {
+        java.util.Set<BlockPos> cells = new java.util.HashSet<>(colony.nest().getGardenCells(level));
+        long dug = colony.nest().getGardens(level).stream().filter(garden -> cells.containsAll(garden.room())).count();
+        return " | gardens " + dug + " dug (planned " + colony.nest().getGardens(level).size() + "), comb "
+                + countCombLayers(level) + " layers on " + getCombs(level).size() + " blocks, nodules "
+                + available(level) + describeMushrooms(level);
+    }
+
+    /** ", mushrooms after rain: 2 (last rain 2 came up)" or ", no mushrooms yet (comb 5 of 8 layers)". */
+    private String describeMushrooms(Level level) {
+        Mushrooms mushrooms = colony.part(ColonyParts.MUSHROOMS).orElse(null);
+        if (mushrooms == null) {
+            return "";
+        }
+        int wanted = mushrooms.wanted(level);
+        int last = mushrooms.getLastFlush();
+        String lastRain = last < 0 ? "" : " (last rain " + last + " came up)";
+        if (wanted == 0) {
+            return ", no mushrooms yet (comb " + countCombLayers(level) + " of "
+                    + colony.profile().garden().get().mushroomCombLayers() + " layers)" + lastRain;
+        }
+        return ", mushrooms after rain: " + wanted + lastRain;
+    }
+
+    Colony colony() {
+        return colony;
+    }
+
     FungusGarden(Colony colony) {
         this.colony = colony;
+    }
+
+    /**
+     * Step 9c, moved from {@link NestLedger}: the layers that ripened and went old while away, put on combs out of every
+     * player's sight, at most {@code most} of each; a kind no comb is left to take is dropped.
+     */
+    ColonyHooks.Ages age(ServerLevel level, List<net.minecraft.world.phys.Vec3> eyes, ColonyHooks.Ages owed, int most) {
+        int ripened = owed.ripened();
+        int aged = owed.aged();
+        boolean changed = false;
+        List<BlockPos> combs = getCombs(level);
+        for (int tries = 0; ripened > 0 && tries < most; tries++) {
+            BlockPos spot = pickToAge(level, combs, eyes, state -> FungusCombBlock.fresh(state) > 0);
+            if (spot == null) {
+                ripened = combs.stream().anyMatch(pos -> FungusCombBlock.fresh(level.getBlockState(pos)) > 0) ? ripened : 0;
+                break;
+            }
+            level.setBlock(spot, FungusCombBlock.ripenOne(level.getBlockState(spot)), 3);
+            ripened--;
+            changed = true;
+        }
+        for (int tries = 0; aged > 0 && tries < most; tries++) {
+            BlockPos spot = pickToAge(level, combs, eyes, state -> FungusCombBlock.ripe(state) > 0);
+            if (spot == null) {
+                aged = combs.stream().anyMatch(pos -> FungusCombBlock.ripe(level.getBlockState(pos)) > 0) ? aged : 0;
+                break;
+            }
+            level.setBlock(spot, FungusCombBlock.ageOne(level.getBlockState(spot)), 3);
+            aged--;
+            changed = true;
+        }
+        return new ColonyHooks.Ages(ripened, aged, changed);
+    }
+
+    /** A comb out of every player's sight whose state passes {@code test}, or null. */
+    @Nullable
+    private BlockPos pickToAge(ServerLevel level, List<BlockPos> combs, List<net.minecraft.world.phys.Vec3> eyes,
+            java.util.function.Predicate<BlockState> test) {
+        List<BlockPos> fits = new ArrayList<>();
+        for (BlockPos pos : combs) {
+            BlockState state = level.getBlockState(pos);
+            if (state.getBlock() instanceof FungusCombBlock && test.test(state)
+                    && Population.outOfSight(level, net.minecraft.world.phys.Vec3.atCenterOf(pos), eyes)) {
+                fits.add(pos);
+            }
+        }
+        return fits.isEmpty() ? null : fits.get(colony.random().nextInt(fits.size()));
     }
 
     /** The fungus comb blocks in the dug-out garden rooms. */
@@ -219,6 +296,18 @@ public class FungusGarden implements NurseFood {
     public int oldKnown() {
         NestLedger ledger = colony.ledger();
         return Math.max(0, seenOld + ledger.aged() + Math.min(0, ledger.store()));
+    }
+
+    /** The nodules on the comb as far as the brain knows: in the world while the nest is loaded, as last seen while away, with what the ledger still owes the world. */
+    @Override
+    public int counted(ServerLevel level) {
+        int nodules = colony.away().isHere(level) ? available(level) : seenNodules();
+        return Math.max(0, nodules + colony.ledger().nurseFood());
+    }
+
+    @Override
+    public ItemStack piece() {
+        return new ItemStack(ModItems.FUNGUS_NODULE.get());
     }
 
     /** How many nodules there were the last second the garden was loaded. */

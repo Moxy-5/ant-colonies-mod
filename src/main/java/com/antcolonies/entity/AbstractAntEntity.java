@@ -8,9 +8,8 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import com.antcolonies.colony.ColonyParts;
-import com.antcolonies.colony.Door;
-import com.antcolonies.colony.Recruits;
+import com.antcolonies.colony.ColonyHooks;
+import com.antcolonies.colony.ColonyQuestions;
 import com.antcolonies.nav.AntMoveControl;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
@@ -617,8 +616,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         }
         for (Colony theirs : ColonyManager.get(level).getColonies()) {
             if (theirs != colony && theirs.getSpecies().equals(colony.getSpecies()) && colony.neighbours().canMeet(theirs)
-                    && theirs.part(ColonyParts.TRUNK_TRAILS).map(trunk -> theirs.getCenter().distSqr(blockPosition()) <= Mth.square(trunk.longestTip() + 2.0)
-                            && trunk.isOnTrail(blockPosition())).orElse(false)) {
+                    && theirs.questions().ask(level, ColonyQuestions.ON_TRAIL, blockPosition())) {
                 UUID trail = new UUID(theirs.getId().getMostSignificantBits() ^ getUUID().getMostSignificantBits(),
                         theirs.getId().getLeastSignificantBits() ^ getUUID().getLeastSignificantBits());
                 colony.news().tell(level, ColonyNews.NEIGHBOUR_MET, new ColonyNews.NeighbourMet(blockPosition(), theirs.getId(), trail)); // (stepped onto their trail)
@@ -851,7 +849,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             return null;
         }
         Colony colony = getColony();
-        return colony == null ? null : colony.part(ColonyParts.HIDDEN_TRIPS).map(trips -> trips.ways(serverLevel)).orElse(null);
+        ColonyHooks.HiddenAway hidden = colony == null ? null : colony.hooks().first(ColonyHooks.HIDDEN_AWAY);
+        return hidden == null ? null : hidden.ways(serverLevel);
     }
 
     /** Tests only: the habits every walk gets (null: the usual ones, see {@link #walkHabits}). */
@@ -904,16 +903,13 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
                 lookForNeighbours(serverLevel);
             }
         }
-        // A forager home with a seed touches the ants waiting inside by the entrance as it walks in (Gordon's rule, see colony.Door).
+        // A look round every few ticks: a forager home with a seed touches the ants waiting inside by the entrance as it
+        // walks in (Gordon's rule, the harvester's door), one home from a rich patch lays its scent line, then calls (its
+        // recruits).
         if (tickCount % 5 == getId() % 5 && getColonyId() != null && level() instanceof ServerLevel serverLevel) {
             Colony colony = getColony();
-            Door door = colony == null ? null : colony.part(ColonyParts.DOOR).orElse(null);
-            if (door != null && isCarryingSeed() && door.isOn(serverLevel) && colony.nest().isInside(serverLevel, blockPosition())) {
-                door.homecomer(serverLevel, this, true);
-            }
-            Recruits recruits = colony == null ? null : colony.part(ColonyParts.RECRUITS).orElse(null);
-            if (recruits != null && recruits.isLaying(getUUID())) {
-                recruits.layingTick(serverLevel, this); // home from a rich patch: its scent line, then its call (colony.Recruits)
+            if (colony != null) {
+                colony.news().tell(serverLevel, ColonyNews.MEMBER_ROUND, new ColonyNews.MemberRound(this));
             }
         }
         if (navigator.isAttached()) {

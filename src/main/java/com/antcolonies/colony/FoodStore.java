@@ -14,7 +14,7 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.block.EatenInStages;
 import com.antcolonies.block.MudCastBlock;
-import com.antcolonies.block.MudCrustBlock;
+import com.antcolonies.block.FacedWall;
 import com.antcolonies.block.SeedPileBlock;
 import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.species.SpeciesProfile;
@@ -180,7 +180,7 @@ public class FoodStore {
      * (the ant then brings the seed straight to the mill, so nothing is put down without a store).
      */
     public boolean wantsSeeds(ServerLevel level) {
-        return hasStoreRoom(level) || colony.part(ColonyParts.BAKERY).map(bakery -> bakery.needsBread(level)).orElse(false);
+        return hasStoreRoom(level) || colony.questions().ask(level, ColonyQuestions.MORE_FOOD_WANTED, null);
     }
 
     /** Whether the food store has a place left that no seed on its way in is holding. */
@@ -312,7 +312,8 @@ public class FoodStore {
                 continue;
             }
             double trip = tripLength(pos, exits.isEmpty() ? List.of(center) : exits);
-            double byTrail = colony.part(ColonyParts.TRUNK_TRAILS).map(trunk -> trunk.walkTo(pos)).orElse(-1.0); // (a cleared trail walks quicker: worth the walk)
+            ColonyHooks.Trails trails = colony.hooks().first(ColonyHooks.TRAILS);
+            double byTrail = trails == null ? -1.0 : trails.walkTo(pos); // (a cleared trail walks quicker: worth the walk)
             double worth = worth(plant.pieces() - getPiecesCut(pos), byTrail >= 0 ? Math.min(trip, byTrail) : trip, pos.distSqr(near));
             if (worth > bestWorth) {
                 best = pos;
@@ -360,7 +361,7 @@ public class FoodStore {
             int radius = colony.searchReach(); // (out to where a searcher's drift may take it)
             int inner = Math.min(radius, food().radius() + food().search().map(SpeciesProfile.SearchNumbers::stretch).orElse(0));
             boolean galleries = colony.nest().galleries().range() > 0;
-            if (!colony.part(ColonyParts.TRUNK_TRAILS).map(TrunkTrails::keepsTrails).orElse(false) && !galleries) {
+            if (!colony.questions().ask(level, ColonyQuestions.KEEPS_TRAILS, null) && !galleries) {
                 inner = radius;
             }
             for (int x = center.getX() - inner; x <= center.getX() + inner; x++) {
@@ -386,7 +387,8 @@ public class FoodStore {
                     }
                 }
                 int trailSide = side;
-                for (int[] column : colony.part(ColonyParts.TRUNK_TRAILS).map(trunk -> trunk.columnsNear(trailSide, radius)).orElse(List.of())) {
+                ColonyHooks.Trails trails = colony.hooks().first(ColonyHooks.TRAILS);
+                for (int[] column : trails == null ? List.<int[]>of() : trails.columnsNear(trailSide, radius)) {
                     scanOuter(level, center.getX() + column[0], center.getZ() + column[1], inner, done);
                 }
                 AABB out = new AABB(center).inflate(radius + 2, 16, radius + 2);
@@ -432,7 +434,7 @@ public class FoodStore {
         BlockPos top = new BlockPos(x, level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z), z);
         // The first air above any block (a thin branch over a gallery dug under it is no surface for MOTION_BLOCKING),
         // and mud plastered over food (a branch's casing, a log's top) does not hide it.
-        while (MudCrustBlock.isCrust(level.getBlockState(top.below()))) {
+        while (FacedWall.isWall(level.getBlockState(top.below()))) {
             top = top.below();
         }
         boolean found = false;
@@ -482,7 +484,7 @@ public class FoodStore {
                 run++;
                 continue;
             }
-            boolean passable = state.isAir() || MudCrustBlock.isCrust(state) || isTreeTop(state) || !state.blocksMotion();
+            boolean passable = state.isAir() || FacedWall.isWall(state) || isTreeTop(state) || !state.blocksMotion();
             if (passable) {
                 // Wood over the colony's own feeding gallery or a mud cast left of eaten wood counts too, as the ground
                 // under it does: it is eaten from there, block after block up the trunk (the user's ask, 2026-10-19:
@@ -814,12 +816,12 @@ public class FoodStore {
             return;
         }
         BlockState above = level.getBlockState(top);
-        if (!above.isAir() && !MudCrustBlock.isCrust(above) || MudCrustBlock.hasFace(above, net.minecraft.core.Direction.DOWN)
+        if (!above.isAir() && !FacedWall.isWall(above) || FacedWall.hasFace(above, net.minecraft.core.Direction.DOWN)
                 || colony.nest().nestCells(level).contains(top) || colony.foragingHoles().isHole(level, top)
                 || !level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class, new net.minecraft.world.phys.AABB(top)).isEmpty()) {
             return;
         }
-        level.setBlock(top, ModBlocks.MUD_CRUST.get().withFace(above, net.minecraft.core.Direction.DOWN), 3);
+        level.setBlock(top, colony.hooks().first(ColonyHooks.CRUST).withFace(above, net.minecraft.core.Direction.DOWN), 3);
     }
 
     /** Forgets the cuts made at this plant: it is counted by how eaten it looks again. For tests. */
@@ -885,7 +887,9 @@ public class FoodStore {
         BlockState less = oneLayerLess(state);
         level.setBlock(pile, less, 3);
         if (less.isAir() && state.getBlock() instanceof FungusCombBlock) {
-            colony.part(ColonyParts.FUNGUS_GARDEN).ifPresent(garden -> garden.loseNodules(state.getValue(FungusCombBlock.NODULES)));
+            if (level instanceof ServerLevel server) {
+                colony.news().tell(server, ColonyNews.HEAP_GONE, new ColonyNews.HeapGone(pile, state.getValue(FungusCombBlock.NODULES)));
+            }
         }
     }
 
@@ -922,7 +926,7 @@ public class FoodStore {
         double top = spot.getY() + level.getBlockState(spot).getCollisionShape(level, spot).max(net.minecraft.core.Direction.Axis.Y);
         for (net.minecraft.world.entity.LivingEntity living : level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class, new AABB(spot))) {
             if (living.getBoundingBox().minY < top) {
-                Mound.liftOnto(level, living, spot, top);
+                NestWalls.liftOnto(level, living, spot, top);
             }
         }
         return true;
@@ -1021,7 +1025,9 @@ public class FoodStore {
         food = Math.max(0, food - 1);
         if (rich) {
             richSeeds--;
-            colony.part(ColonyParts.BAKERY).ifPresent(bakery -> bakery.addRichMiller(ant));
+        }
+        if (level instanceof ServerLevel server) {
+            colony.news().tell(server, ColonyNews.PIECE_TAKEN, new ColonyNews.PieceTaken(ant, rich)); // (a rich one: its miller makes rich bread)
         }
         return rich ? new ItemStack(Items.PUMPKIN_SEEDS) : cutPiece();
     }
@@ -1047,7 +1053,9 @@ public class FoodStore {
             return ItemStack.EMPTY;
         }
         ItemStack seed = takeSeedAt(level, pile, ant, false);
-        colony.part(ColonyParts.BAKERY).ifPresent(bakery -> bakery.removeRichMiller(ant)); // eaten, not milled
+        if (level instanceof ServerLevel server) {
+            colony.news().tell(server, ColonyNews.PIECE_EATEN, new ColonyNews.PieceEaten(ant)); // eaten, not milled
+        }
         if (!seed.isEmpty()) {
             seedsEaten++;
         }

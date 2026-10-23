@@ -12,7 +12,6 @@ import com.antcolonies.AntColoniesMod;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.AntEggEntity;
 import com.antcolonies.entity.AntLarvaEntity;
-import com.antcolonies.entity.TermiteSoldierEntity;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -89,10 +88,10 @@ public class AwayLife {
      * it does not eat). Egg: ticks left to hatch ({@code -1}: not put in its place yet). Larva: its meals so far, how long
      * it had gone hungry, and the soldier it grows into. All as when it was frozen.
      */
-    record Frozen(Kind kind, String caste, long grownUpAt, Load load, long left, int fed, @Nullable TermiteSoldierEntity.Rank rank,
+    record Frozen(Kind kind, String caste, long grownUpAt, Load load, long left, int fed, @Nullable String growsInto,
             long frozenAt, boolean folded, long lastMeal) {
         Frozen fold() {
-            return new Frozen(kind, caste, grownUpAt, load, left, fed, rank, frozenAt, true, lastMeal);
+            return new Frozen(kind, caste, grownUpAt, load, left, fed, growsInto, frozenAt, true, lastMeal);
         }
     }
 
@@ -150,7 +149,7 @@ public class AwayLife {
             what = new Frozen(Kind.EGG, "", 0, Load.NONE, left, 0, null, now, false, Colony.NOT_SET);
         } else if (entity instanceof AntLarvaEntity larva && larva.isAlive()) {
             long hungry = larva.getLastFed() == Colony.NOT_SET ? 0 : Math.max(0, now - larva.getLastFed());
-            what = new Frozen(Kind.LARVA, "", 0, Load.NONE, hungry, larva.getFed(), larva.getSoldierRank(), now, false, Colony.NOT_SET);
+            what = new Frozen(Kind.LARVA, "", 0, Load.NONE, hungry, larva.getFed(), larva.getGrowsInto(colony), now, false, Colony.NOT_SET);
         }
         if (what != null) {
             frozen.put(entity.getUUID(), what);
@@ -231,7 +230,7 @@ public class AwayLife {
             case ADULT -> {
                 colony.population().foldIn(level, what.caste(), what.grownUpAt(), what.lastMeal());
                 colony.foodMap().wentHome(id);
-                colony.part(ColonyParts.FORAGER_SPOTS).ifPresent(spots -> spots.intoNumbers(id));
+                colony.news().tell(level, ColonyNews.INTO_NUMBERS, new ColonyNews.IntoNumbers(id));
 
                 switch (what.load()) {
                     case SEED, RICH_SEED -> {
@@ -240,7 +239,10 @@ public class AwayLife {
                     }
                     case NURSE_FOOD, RICH_NURSE_FOOD -> {
                         if (colony.profile().food().makesBread()) {
-                            colony.part(ColonyParts.BAKERY).ifPresent(bakery -> bakery.countIn(what.load() == Load.RICH_NURSE_FOOD));
+                            NurseFood food = colony.nurseFood();
+                            if (food != null) {
+                                food.countedIn(what.load() == Load.RICH_NURSE_FOOD);
+                            }
                         }
                         colony.ledger().addNurseFood(1);
                     }
@@ -252,9 +254,9 @@ public class AwayLife {
             }
             case EGG -> colony.brood().addInside(Brood.Young.egg(what.left() < 0 ? -1 : Math.max(1, what.left() - frozenFor)));
             case LARVA -> {
-                boolean full = what.fed() >= colony.brood().mealFor(what.rank());
+                boolean full = what.fed() >= colony.brood().mealFor(what.growsInto());
                 long hungry = full || !colony.isHungerOn() ? what.left() : what.left() + frozenFor;
-                colony.brood().addInside(Brood.Young.larva(what.fed(), hungry, what.rank()));
+                colony.brood().addInside(Brood.Young.larva(what.fed(), hungry, what.growsInto()));
             }
         }
     }
@@ -446,8 +448,8 @@ public class AwayLife {
             entry.putString("load", what.load().name());
             entry.putLong("left", what.left());
             entry.putInt("fed", what.fed());
-            if (what.rank() != null) {
-                entry.putString("rank", what.rank().name());
+            if (what.growsInto() != null) {
+                entry.putString("rank", Brood.savedAs(colony, what.growsInto()));
             }
             entry.putLong("frozenAt", what.frozenAt());
             entry.putBoolean("folded", what.folded());
@@ -470,10 +472,10 @@ public class AwayLife {
         ListTag list = away.getList("frozen", Tag.TAG_COMPOUND);
         for (int i = 0; i < list.size(); i++) {
             CompoundTag entry = list.getCompound(i);
-            TermiteSoldierEntity.Rank rank = entry.contains("rank") ? TermiteSoldierEntity.Rank.valueOf(entry.getString("rank")) : null;
+            String growsInto = entry.contains("rank") ? Brood.fromSaved(colony, entry.getString("rank")) : null;
             frozen.put(entry.getUUID("id"), new Frozen(Kind.valueOf(entry.getString("kind")), entry.getString("caste"),
                     entry.getLong("grownUpAt"), Load.valueOf(entry.getString("load")), entry.getLong("left"), entry.getInt("fed"),
-                    rank, entry.getLong("frozenAt"), entry.getBoolean("folded"),
+                    growsInto, entry.getLong("frozenAt"), entry.getBoolean("folded"),
                     entry.contains("lastMeal") ? entry.getLong("lastMeal") : Colony.NOT_SET));
         }
     }

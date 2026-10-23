@@ -11,9 +11,8 @@ import com.antcolonies.registry.ModItems;
 
 import com.antcolonies.block.DryGrassBlock;
 import com.antcolonies.block.GramaGrassBlock;
-import com.antcolonies.colony.Alarm;
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.ColonyParts;
+import com.antcolonies.colony.ColonyNews;
 import com.antcolonies.debug.Perf;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.goal.GroundShakes;
@@ -146,8 +145,8 @@ public class ModEvents {
     public static void onJump(LivingEvent.LivingJumpEvent event) {
         if (event.getEntity() instanceof Player player && player.level() instanceof ServerLevel level) {
             GroundShakes.hard(player); // termites nearby feel it (NoticeGoal)
-            for (Alarm alarm : alarmsNear(level, player.blockPosition())) {
-                alarm.footsteps(level, player);
+            for (Colony colony : coloniesNear(level, player.blockPosition())) {
+                colony.news().tell(level, ColonyNews.PLAYER_STAMPED, new ColonyNews.PlayerStamped(player)); // (the termites' alarm)
             }
         }
     }
@@ -164,20 +163,19 @@ public class ModEvents {
     @SubscribeEvent
     public static void onBreak(BlockEvent.BreakEvent event) {
         if (event.getLevel() instanceof ServerLevel level) {
-            for (Alarm alarm : alarmsNear(level, event.getPos())) {
-                alarm.blockBroken(level, event.getPos(), event.getPlayer());
+            for (Colony colony : coloniesNear(level, event.getPos())) {
+                colony.news().tell(level, ColonyNews.BLOCK_BROKEN, new ColonyNews.BlockBroken(event.getPos(), event.getPlayer())); // (the termites' alarm)
             }
         }
     }
 
-    /** The alarms of the colonies with one whose ground (the food radius and a bit) this spot is in. */
-    private static java.util.List<Alarm> alarmsNear(ServerLevel level, net.minecraft.core.BlockPos pos) {
+    /** The colonies whose ground (the food radius and a bit) this spot is in. */
+    private static java.util.List<Colony> coloniesNear(ServerLevel level, net.minecraft.core.BlockPos pos) {
         return ColonyManager.get(level).getColonies().stream()
                 .filter(colony -> {
                     double reach = colony.foragingRadius() + 8.0;
                     return colony.getCenter().distSqr(pos) <= reach * reach;
                 })
-                .flatMap(colony -> colony.part(ColonyParts.ALARM).filter(alarm -> alarm.numbers() != null).stream())
                 .toList();
     }
 

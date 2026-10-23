@@ -48,6 +48,8 @@ public final class ColonyPart<T> {
     private final List<Hears<T, ?>> hears = new ArrayList<>();
     /** The questions this part answers (steps 6 and 7), signed up when the colony is made ({@link #signUp}). */
     private final List<Answers<T, ?>> answers = new ArrayList<>();
+    /** What this part plugs into the shared code's sockets (step 8b), plugged in when the colony is made ({@link #signUp}). */
+    private final List<Plugs<T, ?>> plugs = new ArrayList<>();
 
     /** What a part does with a piece of news (colony parts step 4, {@link ColonyNews}). */
     @FunctionalInterface
@@ -65,6 +67,9 @@ public final class ColonyPart<T> {
     }
 
     private record Answers<T, Q>(ColonyQuestions.Kind<Q> kind, int place, Answerer<T, Q> answerer) {
+    }
+
+    private record Plugs<T, H>(ColonyHooks.Kind<H> kind, int place, java.util.function.Function<T, H> hook) {
     }
 
     private ColonyPart(String name, T part) {
@@ -122,14 +127,33 @@ public final class ColonyPart<T> {
         return this;
     }
 
-    /** Signs this part up to the news it hears and the questions it answers (from {@link Colony}'s constructor, once the colony's parts are made). */
-    void signUp(ColonyNews news, ColonyQuestions questions) {
+    /**
+     * Plugs {@code hook} (made from the part) into every {@code kind} of socket in the shared code ({@link ColonyHooks}),
+     * at {@code place} among that kind's hooks (lower first, gaps of 10, as with the news).
+     */
+    <H> ColonyPart<T> plugs(ColonyHooks.Kind<H> kind, int place, java.util.function.Function<T, H> hook) {
+        plugs.add(new Plugs<>(kind, place, hook));
+        return this;
+    }
+
+    /**
+     * Signs this part up to the news it hears and the questions it answers, and plugs in its hooks (from {@link Colony}'s
+     * constructor, once the colony's parts are made).
+     */
+    void signUp(ColonyNews news, ColonyQuestions questions, ColonyHooks hooks) {
         for (Hears<T, ?> one : hears) {
             signUp(news, one);
         }
         for (Answers<T, ?> one : answers) {
             signUp(questions, one);
         }
+        for (Plugs<T, ?> one : plugs) {
+            signUp(hooks, one);
+        }
+    }
+
+    private <H> void signUp(ColonyHooks hooks, Plugs<T, H> one) {
+        hooks.plug(one.kind(), one.place(), name, one.hook().apply(part));
     }
 
     private <Q> void signUp(ColonyQuestions questions, Answers<T, Q> one) {

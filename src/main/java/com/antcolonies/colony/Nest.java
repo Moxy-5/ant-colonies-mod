@@ -10,7 +10,7 @@ import java.util.Set;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.block.MudCrustBlock;
+import com.antcolonies.block.FacedWall;
 import com.antcolonies.block.SeedPileBlock;
 import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.registry.ModTags;
@@ -246,7 +246,8 @@ public class Nest {
                 return next;
             }
         }
-        return live ? colony.part(ColonyParts.MOUND).map(mound -> mound.findDigTarget(level, digger)).orElse(null) : null;
+        ColonyHooks.Structure structure = live ? colony.hooks().first(ColonyHooks.STRUCTURE) : null;
+        return structure == null ? null : structure.digTarget(level, digger);
     }
 
     /** The garden rooms the colony wants dug now: the first, and one more for every few workers (the profile's {@code garden}). */
@@ -255,7 +256,7 @@ public class Nest {
         if (garden.isEmpty()) {
             return List.of();
         }
-        int wanted = garden.get().roomsFor(colony.getCount(com.antcolonies.entity.WorkerAntEntity.CASTE));
+        int wanted = garden.get().roomsFor(colony.getCount(Caste.WORKER));
         return layout.gardens().subList(0, Math.min(wanted, layout.gardens().size()));
     }
 
@@ -613,7 +614,7 @@ public class Nest {
             return colony.foragingHoles().mayOpen(level, pos);
         }
         return isSoil(level.getBlockState(pos)) || (pos.equals(center) && (isEntrancePlugged(level) && mayOpenEntrance(level) || isPlantInEntrance(level)))
-                || colony.part(ColonyParts.MOUND).map(mound -> mound.isClearJob(level, pos)).orElse(false) || foodWays.isRunwayPlant(level, pos);
+                || colony.questions().ask(level, ColonyQuestions.CLEAR_JOB, pos) || foodWays.isRunwayPlant(level, pos);
     }
 
     /**
@@ -647,7 +648,7 @@ public class Nest {
             spots.add(target.below());
         }
         // The mound's own soil in a shaft is cleared from below too (the old cap of a chimney that grew).
-        if (colony.part(ColonyParts.MOUND).map(mound -> mound.isClearJob(level, target)).orElse(false) && level.getBlockState(target.below()).isAir()) {
+        if (colony.questions().ask(level, ColonyQuestions.CLEAR_JOB, target) && level.getBlockState(target.below()).isAir()) {
             spots.add(target.below());
         }
         return spots;
@@ -674,7 +675,7 @@ public class Nest {
      * an older gallery in the way of a new one).
      */
     static boolean isSoil(BlockState state) {
-        return state.is(ModTags.DIGGABLE) || MudCrustBlock.isCrust(state);
+        return state.is(ModTags.DIGGABLE) || FacedWall.isWall(state);
     }
 
     /** Open, or only a heap of seeds, bread or forage on the floor: the block is dug out. A chunk that is not loaded counts as not dug. */
@@ -764,7 +765,9 @@ public class Nest {
             if (layout != null) {
                 cells.addAll(layout.cells());
             }
-            colony.part(ColonyParts.MOUND).ifPresent(mound -> cells.addAll(mound.getGalleries(level))); // none for species without a mound
+            for (ColonyHooks.Structure structure : colony.hooks().all(ColonyHooks.STRUCTURE)) {
+                cells.addAll(structure.tunnels(level)); // (the mound's tunnels; none for species without one)
+            }
         }
         for (NestPlan.ForagingTunnel tunnel : getForagingTunnels(level)) {
             cells.addAll(tunnel.tunnel());
@@ -916,22 +919,19 @@ public class Nest {
             }
             channels.addAll(casts.keySet());
             castGalleries = casts;
-            colony.moundParts(level).forEach((pos, part) -> {
-                if (part == MoundPlan.Part.OPEN) {
-                    // Only once roofed over: a young mound's shaft open to the sky is outside (termites coming home
-                    // stopped in it, clinging to its walls above the plug, the user's bug of 2026-10-13).
-                    if (level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, pos.getX(), pos.getZ()) > pos.getY() + 1) {
-                        cells.add(pos);
-                    }
-                } else if (part == MoundPlan.Part.MOUTH || part == MoundPlan.Part.TUNNEL || part == MoundPlan.Part.SPIRE) {
-                    channels.add(pos);
-                }
-            });
+            ColonyHooks.Structure structure = colony.hooks().first(ColonyHooks.STRUCTURE); // (the mound's hollow shaft and channels)
+            if (structure != null) {
+                structure.addInside(level, cells, channels);
+            }
             inside = cells;
             insideChannels = channels;
             insideTick = now;
         }
-        return inside.contains(cell) || (insideChannels.contains(cell) && MoundReach.channelKind(level.getBlockState(cell)) != null);
+        if (inside.contains(cell)) {
+            return true;
+        }
+        ColonyHooks.Structure structure = insideChannels.contains(cell) ? colony.hooks().first(ColonyHooks.STRUCTURE) : null;
+        return structure != null && structure.isChannel(level.getBlockState(cell));
     }
 
     /** At most this many mud casts are joined to the galleries (a fallen tree is about 8 blocks). */
@@ -1062,7 +1062,7 @@ public class Nest {
      * even if the colony shrinks again.
      */
     public int levelsUnlocked(Level level) {
-        int now = colony.profile().nest().levelsFor(colony.getCount(com.antcolonies.entity.WorkerAntEntity.CASTE), colony.food().getFood());
+        int now = colony.profile().nest().levelsFor(colony.getCount(Caste.WORKER), colony.food().getFood());
         if (now > levelsUnlocked) {
             levelsUnlocked = now;
         }

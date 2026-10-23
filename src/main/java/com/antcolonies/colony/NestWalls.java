@@ -10,7 +10,8 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import com.antcolonies.block.MudCrustBlock;
+import com.antcolonies.block.FacedWall;
+import com.antcolonies.entity.AbstractAntEntity;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -169,7 +170,7 @@ public class NestWalls {
      * of the dug-out nest cells beside it.
      */
     public boolean isLeakOpen(Level level, BlockPos hole) {
-        if (!level.isLoaded(hole) || !MudCrustBlock.isCrust(level.getBlockState(hole))) {
+        if (!level.isLoaded(hole) || !FacedWall.isWall(level.getBlockState(hole))) {
             return isOpen(level, hole);
         }
         Set<BlockPos> nest = colony.nest().nestCells(level);
@@ -226,7 +227,7 @@ public class NestWalls {
             return false;
         }
         BlockState state = level.getBlockState(hole);
-        return MudCrustBlock.isCrust(state) ? !MudCrustBlock.hasFace(state, toward) : isOpen(level, hole);
+        return FacedWall.isWall(state) ? !FacedWall.hasFace(state, toward) : isOpen(level, hole);
     }
 
     /**
@@ -265,7 +266,7 @@ public class NestWalls {
         Set<BlockPos> nest = colony.nest().nestCells(level);
         Map<BlockPos, ?> mound = colony.moundParts(level);
         if (!nest.contains(target) || target.equals(center) || mound.containsKey(target) || colony.foragingHoles().isHole(level, target)
-                || colony.part(ColonyParts.MOUND).map(built -> built.getGalleries(level).contains(target)).orElse(false)) {
+                || colony.questions().ask(level, ColonyQuestions.STRUCTURE_TUNNEL, target)) {
             return true;
         }
         boolean allIn = true;
@@ -335,7 +336,7 @@ public class NestWalls {
         for (boolean needFloor : new boolean[] {true, false}) {
             for (Direction side : Direction.values()) {
                 BlockPos next = cell.relative(side);
-                if (out != null || side == Direction.DOWN || MudCrustBlock.hasFace(wall, side) || !level.isLoaded(next)) {
+                if (out != null || side == Direction.DOWN || FacedWall.hasFace(wall, side) || !level.isLoaded(next)) {
                     continue;
                 }
                 BlockState state = level.getBlockState(next);
@@ -362,13 +363,13 @@ public class NestWalls {
      */
     private void cutFood(Level level, BlockPos pos) {
         BlockState state = level.getBlockState(pos);
-        if (!state.isAir() && !MudCrustBlock.isCrust(state) && colony.profile().food().plantFor(state) != null) {
+        if (!state.isAir() && !FacedWall.isWall(state) && colony.profile().food().plantFor(state) != null) {
             colony.food().cutAwayForTheForagers(level, pos);
         }
     }
 
-    private static MudCrustBlock crust() {
-        return com.antcolonies.registry.ModBlocks.MUD_CRUST.get();
+    private FacedWall crust() {
+        return colony.hooks().first(ColonyHooks.CRUST); // (only reached for a species with crust walls)
     }
 
     /**
@@ -385,7 +386,7 @@ public class NestWalls {
             BlockPos cell = hole.relative(side);
             besideNest |= nest.contains(cell) && Nest.isDugOut(level, cell) && colony.nest().foodWays().runwayOf(cell) == null;
         }
-        if (!MudCrustBlock.isCrust(state) && (besideNest || !colony.profile().nest().crustWalls())) {
+        if (!FacedWall.isWall(state) && (besideNest || !colony.profile().nest().crustWalls())) {
             return colony.profile().nest().plugState();
         }
         // A crust gets the plates it lacks; a gap in a branch's casing (nothing of the nest right beside it) a new plate.
@@ -396,7 +397,7 @@ public class NestWalls {
                 wall = crust().withFace(wall, side);
             }
         }
-        return MudCrustBlock.isCrust(wall) ? wall : colony.profile().nest().plugState();
+        return FacedWall.isWall(wall) ? wall : colony.profile().nest().plugState();
     }
 
     /**
@@ -413,7 +414,7 @@ public class NestWalls {
         // Never bury anyone, same as with the hill. A plate of mud is no burial: nestmates there step out beside it.
         BlockState wall = wallFor(level, hole);
         List<LivingEntity> inside = level.getEntitiesOfClass(LivingEntity.class, new AABB(hole));
-        if (!inside.isEmpty() && MudCrustBlock.isCrust(wall) && nudgeOut(level, hole, wall)) {
+        if (!inside.isEmpty() && FacedWall.isWall(wall) && nudgeOut(level, hole, wall)) {
             inside = List.of();
         }
         if (!inside.isEmpty()) {
@@ -499,8 +500,10 @@ public class NestWalls {
         return !state.isCollisionShapeFullBlock(level, cell) && state.getFluidState().isEmpty();
     }
 
+    /** A nestmate of one of the species' own castes beyond the worker (a termite soldier, {@link Colony#isOwnCaste}). */
     private boolean isOwnSoldier(LivingEntity entity) {
-        return entity instanceof com.antcolonies.entity.TermiteSoldierEntity soldier && colony.getId().equals(soldier.getColonyId());
+        return entity instanceof com.antcolonies.entity.AbstractAntEntity ant && colony.getId().equals(ant.getColonyId())
+                && colony.isOwnCaste(ant.nestCaste());
     }
 
     /** Where a soldier in the hole is pushed to: an open cell beside it away from the nest (one to stand on first), else back into the nest. */
@@ -614,5 +617,28 @@ public class NestWalls {
             }
         }
         return false;
+    }
+
+    /**
+     * Puts an insect in a cell that was just filled up on top of the new soil, or beside it if there is no room on top
+     * (a store's heap or the termites' mound blocks growing round it).
+     */
+    static void liftOnto(Level level, LivingEntity ant, BlockPos spot, double top) {
+        BlockPos above = BlockPos.containing(ant.getX(), top, ant.getZ());
+        if (top < spot.getY() + 1.0 || level.getBlockState(above).getCollisionShape(level, above).isEmpty()) {
+            ant.setPos(ant.getX(), top, ant.getZ());
+        } else {
+            for (Direction side : Direction.Plane.HORIZONTAL) {
+                BlockPos beside = spot.relative(side);
+                if (level.getBlockState(beside).getCollisionShape(level, beside).isEmpty()) {
+                    ant.setPos(beside.getX() + 0.5, beside.getY(), beside.getZ() + 0.5);
+                    break;
+                }
+            }
+        }
+        ant.setDeltaMovement(0, 0, 0);
+        if (ant instanceof AbstractAntEntity insect) {
+            insect.getNavigator().stop();
+        }
     }
 }

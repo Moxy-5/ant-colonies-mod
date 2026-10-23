@@ -25,7 +25,7 @@ public class KingCare {
     }
 
     /** Whether the colony has a king who is alive as far as the brain knows. */
-    boolean isAlive() {
+    public boolean isAlive() {
         return colony.getCount(TermiteKingEntity.CASTE) > 0 && !starvedAway;
     }
 
@@ -70,6 +70,16 @@ public class KingCare {
             return false; // back in range: the brain looked after him while away (AwayLife.settle ends that first)
         }
         return hungerRunsOut(level);
+    }
+
+    /** A nurse's job while away (see {@link NestLife}): a piece of the nurses' food for him when he wants some. True if he was fed. */
+    boolean fedAway(ServerLevel level, NestLife life) {
+        if (!wantsFood(level) || !life.takeNurseFood(level)) {
+            return false;
+        }
+        fed(level);
+        colony.away().note(level, AwayReport.What.KING_FED, 1);
+        return true;
     }
 
     /** Once a second while the colony is away: his clock runs on; true if he starved just now. */

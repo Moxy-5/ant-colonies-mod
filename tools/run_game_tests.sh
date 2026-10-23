@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Runs the game tests on several test servers side by side (test health plan, docs/plans/test-health.md).
 #
-#   tools/run_game_tests.sh          every game test, split over 5 servers
-#   tools/run_game_tests.sh 8        the same over 8 servers
+#   tools/run_game_tests.sh          every game test, split over 6 servers
+#   tools/run_game_tests.sh 8        the same over 8 servers (default 6, the user 2026-10-22)
 #   ANTCOLONIES_TESTS=antnest,away tools/run_game_tests.sh
 #                                    only those categories or tests (see gametest/TestFilter), still split
 #
@@ -13,7 +13,7 @@
 set -u
 cd "$(dirname "$0")/.."
 
-shards="${1:-8}"
+shards="${1:-6}"
 start=$(date +%s)
 rm -rf run-test-shards/*/world
 mkdir -p run-test-shards

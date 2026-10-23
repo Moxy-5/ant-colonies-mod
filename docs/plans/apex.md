@@ -153,6 +153,125 @@ easiest to stop bugs from happening and push updates easier"); so these are my p
    piece of news or a hook a species part plugs into, or move into the species part. First a sorted list of every line
    (which can be a question like step 6, which news, which a hook, which simply moves), planned with the user, then
    built in batches. Nothing changes in-game.
+   **Planned with the user 2026-10-22** (the user's OK: three batches, my picks, the species code moved and not only
+   put behind a socket; branch `claude/apex-step8-e27231` from `claude/apex-questions`). Counted again on that branch:
+   **60 lines in 14 shared colony files** (`FieldLife` 11, `NestLife` 8, `BuildLife` 7, `FoodStore` 7, `Colony` 6,
+   `Population` 6, `Nest` 4, `AwayLife`, `Brood`, `NestLedger`, `WorkerFood` 2 each, `ForagingHoles`, `Galleries`,
+   `NestWalls` 1 each; the rest of the 81 were species files, which move with their species). Every line, by batch:
+   - **8a, questions and news** (step 6's and step 4's machinery, new kinds only):
+     - questions: "does the alarm keep everyone in?" (`Colony.isForagingTime`, `FieldLife.forageWith`; the alarm);
+       "not cleared yet?" (`FieldLife.forageAlone`, the patrol: the kind is step 6's); "does the colony build a mound?"
+       (`Colony.buildsMound`) and "is the mound being built now?" (`ForagingHoles.middleHole`; the mound); "is this a
+       block the builders want cleared?" (`Nest.canDig`, `Nest.standSpotsFor`; the mound); "is this cell a tunnel
+       built inside the structure?" (`NestWalls.wallFirst`; the mound); "is more food wanted in, past the store?"
+       (`FoodStore.wantsSeeds`; the bakery: bread to mill); "does the colony keep trails?" (`FoodStore.plants`; the
+       trunk trails); "is the store known to hold nothing the workers eat?" (`WorkerFood.oldCombKnown`; the garden).
+     - news: "a member went into the numbers" and "came out of them" (`AwayLife.foldIn`, `Population.goIn` and
+       `comeOut`; the forager spots); "nurse food counted in" (`AwayLife.foldIn`, `NestLedger` loading; the bakery);
+       "a rich piece taken for milling" and "a piece eaten" (`FoodStore`; the bakery's rich millers); "a comb eaten
+       away" (`FoodStore.takeOneLayer`; the garden's nodules); "the numbers made a trip" (`FieldLife.work`; the trunk
+       trails); "the numbers' foraging second" (`FieldLife.forage`; the door); "how many forager numbers there are"
+       (`FieldLife.forageWith`; the forager spots trim their held spots). "A block dug" (`BuildLife.dig`; the mound)
+       too.
+   - **8b, colony hooks that give answers** (new `colony/ColonyHooks`: a kind names what is asked, a part's row plugs
+     in its answer, `colony.hooks(kind)` in place order; a colony without the part gets today's default):
+     the colony's reach (`Colony.foragingRadius`; the trunk trails' longest tip); the walk by trail and the trail
+     columns to scan (`FoodStore`; the trunk trails); how many forager numbers may go out (`FieldLife`, twice; the
+     door); the founders beside the queen (`NestLife.founders`; the king); the nurses' food (`Colony.nurseFood`,
+     `NestLife.nurseFoodLeft` and `takePiece`, `WorkerFood.look`; the garden or the bakery, through `NurseFood`); a
+     young one's soldier meal and the soldier wanted (`Brood`; the soldiers); insects away on hidden trips
+     (`Population`, `Galleries`; the hidden trips); the structure over the nest, its blocks, tunnels and next dig
+     (`Colony.moundParts`, `Nest`, twice; the mound); the comb cells for ageing on return (`NestLedger`; the garden).
+   - **8c, the species work moved into its parts** (behind hooks that do work):
+     - `BuildLife` (building on return): the hill's night soil and heaping the dug soil (into the hill part) and the
+       whole mound building with its soil from the galleries (into the mound part); `BuildLife` keeps the builders'
+       time, the nest's digging, the galleries and the founders, and lends the moved code its helpers.
+     - `FieldLife` (the numbers forage): searching alone, going back to a spot, out along a trunk trail and the
+       recruits' call (into the forager spots part); `FieldLife` keeps the plants it remembers and the trips.
+     - `NestLife` (nest life while away): the king living and fed, the bakery milling bread, the garden growing its
+       nodules (into those parts, at the same moments in the same order); and `Population.targets`' soldiers at their
+       posts and the soldiers in the colony list (into the soldiers part).
+   - **Checks:** each batch adds checks in scenes that exist (no new scene) that the right part answers or hears,
+     as steps 4, 6 and 7 did (`AwayTests.partsAreTheSpecies` and others); after each batch its categories, at the end
+     a full run and the stress test before and after, on 6 servers (the user's ask). Same answers; nothing changes
+     in-game.
+   - **Left on purpose** (found while listing, for step 9 or later): shared files still name species *types* (not
+     parts): `MoundPlan.Part` in `Colony.moundParts` and its callers, `TermiteSoldierEntity.Rank` in `Brood` and
+     `Population`, `FungusCombBlock` and `TermiteMoundBlock` in `FoodStore`, `NestLedger`, `NestLife`, `BuildLife`,
+     `TermiteKingEntity` in `BuildLife`; and two termite-only pieces live inside shared parts: the galleries inside the
+     nest, the fungus comb inside the food store (`FoodStore` was already next after Apex part 1).
+   **BUILT 2026-10-22** on branch `claude/apex-step8-e27231` (8a `d8b413e`, 8b and 8c `a994164`; not merged, the
+   user tests in-game first): every line above as listed; no shared colony file names a species part any more (the
+   parts still named are only in species files). Full run on 6 servers 139 of 141 (BUGS 62 and 55, old flakes);
+   speed the same (colony brain 0.390 ms before, 0.396 after). Details in `docs/HISTORY.md`.
+9. **The commands, the event file and the ant body** (found planning step 8, 2026-10-22; the user's pick: its own
+   step, to plan with the user after step 8). Outside the colony folder, shared files that name species parts too:
+   the `/antcolonies` commands (`command/ColonyCommands`, about 15 lines, mostly the `list` read-out, which could ask
+   each part to describe itself), `ModEvents` (1 line, the alarm) and the shared ant body (`entity/AbstractAntEntity`,
+   4 lines: the trunk trails, the hidden trips, the door, the recruits); and the species types still named in shared
+   files (step 8's "left on purpose"). Each must go before the split. Nothing changes in-game.
+   Also the goals (counted 2026-10-22 when step 8 was built): about 60 lines in 18 goals name a species part. Most are
+   goals of one species that move with it (`ClipGrassGoal`, `PatrolGoal`, `MillBreadGoal`, `ShapeMoundGoal`,
+   `GuardPostGoal`, ...); the shared ones need questions or hooks: `ScoutGoal` (16 lines, errand helper step 4 anyway),
+   `DigGoal` (5), `GatherSeedGoal` (5), `GroomGoal` (2), `CarryPelletGoal`, `FeedLarvaGoal`, `DefendGoal`, `NapGoal`,
+   `NoticeGoal` (1 each); and the species bodies (`TermiteKingEntity` 6, `TermiteSoldierEntity` 4, `AntLarvaEntity` 1),
+   which move with their species.
+   **Planned with the user 2026-10-22** (the user's OK: three batches, my picks; branch `claude/apex-step9-642594` from
+   step 8). Counted again on the branch (comments, imports and the species game test scenes not counted). Corrections:
+   `ClipGrassGoal`, `GatherSeedGoal` and `StoreSeedGoal` are given to both species' workers (shared); `DefendGoal` and
+   `CarryPelletGoal` are one species' goals (move whole); `GroomGoal` and `NapGoal` are body language meant for every
+   species (shared). Found too: 4 lines in shared colony files ask "is this Macrotermes?" (`Brood` twice, `Population`,
+   `Refuse`), about 35 shared lines borrow the word "worker" from the harvester's body (`WorkerAntEntity.CASTE`) and 7
+   the word "king" from the termite king.
+   - **9a, the shared goals, the ant body and the event file** (about 45 lines): a forager's trip (scout, seeds, grass,
+     carrying in, the body's walk home) through questions, news and hooks any species uses: "must it wait for touches?"
+     (the door), "leave this food to a called nestmate?" (the recruits), news "set out", "trip over", "came home" (the
+     door, the recruits, the forager spots), the way along a trail (the trunk trails), where a search goes (the forager
+     spots), a place for a seed besides the store (the bakery); "alarmed?" for grooming, napping and noticing (the
+     alarm); news "a player stamped or broke a block nearby" (the alarm, from `ModEvents`); where dug soil goes (the
+     hill, the mound); the members the nurses feed besides the young (the soldiers); "on our trail?" for meeting a
+     neighbour (the trunk trails); the hidden ways (the hidden trips); the co-founder sealing the entrance (the king).
+   - **9b, the commands:** the `list` read-out asks each part to describe itself in its slot (same text, same order);
+     the termite-only commands (`mound`, `mushrooms`, `drum`, `alarm`, `queensize`) move into a termite commands file,
+     same names; `population`'s soldiers through the castes hook.
+   - **9c, species names in the shared colony files:** one shared word for "worker" and the king through his part; the
+     soldier ranks a plain caste name (saves unchanged); a table of each species' bodies in place of "is this
+     Macrotermes?"; the mound's block map through its hook (`MoundPlan.Part`, the tunnel blocks); the fungus comb, the
+     mud crust and the swelling termite queen as small shared shapes the termite blocks and bodies fill in, the comb's
+     ageing on return into the garden part.
+   - **Not in step 9:** registering blocks, items and mobs, the renderers, whole species files (the split's own job);
+     the termite pieces inside shared parts (galleries, foraging holes, the comb in the food store: part 3); errand
+     helper step 4 (`ScoutGoal` in three).
+   - **Checks** in scenes that exist (`AwayTests.partsAreTheSpecies` and others); each batch its categories, at the end
+     a full run on 6 servers (the user, 2026-10-22) and the stress test before and after. Nothing changes in-game.
+   **BUILT 2026-10-22** on branch `claude/apex-step9-642594` (9a, 9b and 9c's first half `1eb1a89`, 9c's second half
+   `84b5bc2`; not merged, the user tests in-game after step 10): every line above as listed. No shared goal, command or
+   colony file, `ModEvents` or the ant body names a species part, and no shared colony file names a species type
+   except the part 3 pieces (galleries and mud casts in `Nest` and `ForagingHoles`, the comb in `FoodStore`). New
+   shared pieces: `colony/Caste`, `species/SpeciesBodies`, `entity/ColonyBorn`, `entity/SwellingQueen`,
+   `block/FacedWall`, `block/GardenBed`, `command/TermiteCommands`, `colony/ForagerSearch` (in the forager spots).
+   Full run on 6 servers 139 of 141 (BUGS 62 and 55, old flakes; both 3 of 3 alone, before and after); speed the same within the noise (colony brain 0.401 ms before, 0.406 after; 6 stress runs a side). Details in
+   `docs/HISTORY.md`.
+10. **The shared young body names the termite soldier rank** (found building step 9c, 2026-10-22; to plan with the
+   user). `entity/AntLarvaEntity` is the young of both species (the harvester larva, the termite nymph), and it still
+   keeps "what it grows into" as a `TermiteSoldierEntity.Rank` (synced so a nymph growing into a soldier gets its big
+   head, saved as a byte `soldier`). Step 9c put a caste name in front of it (`getGrowsInto`, `setGrowsInto`), but the
+   body underneath still names the termite type, so the framework could not hold the young body after the split. Fix:
+   the castes hook gives each of its castes a small number for syncing and saving (the soldiers' today's 1 and 2, so
+   saved worlds keep loading), the larva keeps only that number and asks the colony for the caste, and the renderer
+   reads the number (the renderer stays with the species). Nothing changes in-game. Small (one body, about 10 lines,
+   plus the renderer's read). The other shared-body leftover, `AbstractAntEntity` naming the bread and the fungus
+   nodule as "nurse food it carries" (1 line), is the "what I carry" slot already listed below for part 3.
+   **BUILT 2026-10-22** on branch `claude/apex-step10` (from step 9, not merged; planned with the user, my picks: the
+   save word stays `soldier`, each caste's number written out in the hook, not its place in the list): the castes hook's
+   `numberOf` and `casteOf` (the soldiers' 1 and 2), `Colony.casteNumber` and `casteOfNumber`, the young body keeps
+   only the number and asks its colony (`getGrowsInto(colony)`), the nymph renderer reads the number. No shared file
+   names the soldier rank now (only the soldiers' own files, the registry rows and the renderer). Checks in
+   `AwayTests.partsAreTheSpecies` and `TermiteSoldierTests`; `soldiers,away,colony` 36 of 37 (the neighbours flake, BUGS 55, 3 of 3 alone) on 6 servers. Nothing
+   changes in-game. **Steps 6 to 10 confirmed in-game by the user 2026-10-22** ("everything is working"; tried on termites only: the user plans to take the red harvester ant out of this mod for other mods, and to rework its behaviour when those are planned).
+   Full run 139 of 141 on 6 servers (BUGS 62 and the half-built stage 14 test, both 3 of 3 alone); speed the same
+   within the noise (whole mod without route searches 1.85 ms on `master`, 1.82 on the branch). **Merged into `master`
+   2026-10-22 with the user's OK** (steps 6 to 10).
 
 Then the split's own plan (`docs/plans/mod-split.md`) can draw the framework's wall along the registry: shared parts
 in, species parts out.

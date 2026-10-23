@@ -5,9 +5,9 @@ import java.util.EnumSet;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.ColonyHooks;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.AbstractAntEntity;
-import com.antcolonies.entity.TermiteKingEntity;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.BlockParticleOption;
@@ -56,7 +56,9 @@ public class SealEntranceGoal extends Goal {
         if (!colony.profile().nest().sealWhileFounding()) {
             return false;
         }
-        boolean mine = ant instanceof TermiteKingEntity || colony.getCount(TermiteKingEntity.CASTE) == 0;
+        // A founder beside the queen (the termite king) seals it while there is one.
+        ColonyHooks.CoFounders founder = colony.hooks().first(ColonyHooks.CO_FOUNDERS);
+        boolean mine = founder == null || founder.isOne(ant) || colony.getCount(founder.caste()) == 0;
         return colony.isFounding() && mine && colony.nest().getHomeChamber(level) != null && colony.nest().findDigTarget(level) == null
                 && colony.nest().isEntranceOpen(level);
     }

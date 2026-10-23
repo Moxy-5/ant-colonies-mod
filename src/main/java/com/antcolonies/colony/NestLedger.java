@@ -1,7 +1,5 @@
 package com.antcolonies.colony;
 
-import com.antcolonies.block.FungusCombBlock;
-
 import java.util.List;
 
 import net.minecraft.core.BlockPos;
@@ -18,7 +16,7 @@ import net.minecraft.world.phys.Vec3;
  *
  * <p>Species-neutral: the food store (seed heaps or fungus comb), the nurses' food (bread heaps or fungus nodules, see
  * {@link NurseFood}) and the bodies of the dead; and for fungus comb, its layers' ages (layers that ripened and layers
- * that went old while away, see {@link FungusCombBlock}). Fungus comb: a layer put down goes on top, fresh; a layer
+ * that went old while away, put on by the garden, {@link ColonyHooks.Garden#age}). Fungus comb: a layer put down goes on top, fresh; a layer
  * taken off comes off the bottom, an old one.
  */
 public class NestLedger {
@@ -109,45 +107,16 @@ public class NestLedger {
         if (ripened == 0 && aged == 0) {
             return false;
         }
-        boolean changed = false;
-        List<BlockPos> combs = colony.part(ColonyParts.FUNGUS_GARDEN).map(garden -> garden.getCombs(level)).orElse(List.of());
-        for (int tries = 0; ripened > 0 && tries < PER_SECOND; tries++) {
-            BlockPos spot = pick(level, combs, eyes, state -> FungusCombBlock.fresh(state) > 0);
-            if (spot == null) {
-                ripened = combs.stream().anyMatch(pos -> FungusCombBlock.fresh(level.getBlockState(pos)) > 0) ? ripened : 0;
-                break;
-            }
-            level.setBlock(spot, FungusCombBlock.ripenOne(level.getBlockState(spot)), 3);
-            ripened--;
-            changed = true;
+        ColonyHooks.Garden garden = colony.hooks().first(ColonyHooks.GARDEN);
+        if (garden == null) {
+            ripened = 0; // (no beds to age)
+            aged = 0;
+            return false;
         }
-        for (int tries = 0; aged > 0 && tries < PER_SECOND; tries++) {
-            BlockPos spot = pick(level, combs, eyes, state -> FungusCombBlock.ripe(state) > 0);
-            if (spot == null) {
-                aged = combs.stream().anyMatch(pos -> FungusCombBlock.ripe(level.getBlockState(pos)) > 0) ? aged : 0;
-                break;
-            }
-            level.setBlock(spot, FungusCombBlock.ageOne(level.getBlockState(spot)), 3);
-            aged--;
-            changed = true;
-        }
-        ripened = Math.max(0, ripened);
-        aged = Math.max(0, aged);
-        return changed;
-    }
-
-    /** A comb out of every player's sight whose state passes {@code test}, or null. */
-    @org.jetbrains.annotations.Nullable
-    private BlockPos pick(ServerLevel level, List<BlockPos> combs, List<Vec3> eyes,
-            java.util.function.Predicate<net.minecraft.world.level.block.state.BlockState> test) {
-        List<BlockPos> fits = new java.util.ArrayList<>();
-        for (BlockPos pos : combs) {
-            var state = level.getBlockState(pos);
-            if (state.getBlock() instanceof FungusCombBlock && test.test(state) && Population.outOfSight(level, Vec3.atCenterOf(pos), eyes)) {
-                fits.add(pos);
-            }
-        }
-        return fits.isEmpty() ? null : fits.get(colony.random().nextInt(fits.size()));
+        ColonyHooks.Ages left = garden.age(level, eyes, new ColonyHooks.Ages(ripened, aged, false), PER_SECOND);
+        ripened = Math.max(0, left.ripened());
+        aged = Math.max(0, left.aged());
+        return left.changed();
     }
 
     private boolean applyBodies(ServerLevel level, List<Vec3> eyes) {
@@ -305,7 +274,10 @@ public class NestLedger {
             }
             for (int i = 0; colony.profile().food().makesBread() && i < bread + richBread; i++) {
                 boolean rich = i < richBread;
-                colony.part(ColonyParts.BAKERY).ifPresent(bakery -> bakery.countIn(rich));
+                NurseFood food = colony.nurseFood();
+                if (food != null) {
+                    food.countedIn(rich);
+                }
             }
         }
     }

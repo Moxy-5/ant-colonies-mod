@@ -82,6 +82,11 @@ public class ForagerSpots {
     @Nullable
     private final Colony colony;
 
+    /** The colony these spots are for. */
+    Colony colony() {
+        return colony;
+    }
+
     ForagerSpots(Colony colony) {
         this.numbers = () -> colony.profile().food().search();
         this.colony = colony;

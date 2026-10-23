@@ -391,7 +391,7 @@ public class TrunkTrails {
         while (recent.size() > MOST_RECENT) {
             recent.remove(0);
         }
-        if (trails.size() >= numbers.trailsFor(colony.getCount(com.antcolonies.entity.WorkerAntEntity.CASTE))) {
+        if (trails.size() >= numbers.trailsFor(colony.getCount(Caste.WORKER))) {
             return null;
         }
         double spread = Math.toRadians(numbers.spreadDegrees());
@@ -703,6 +703,15 @@ public class TrunkTrails {
     private BlockPos columnPos(Trail trail, int column) {
         return new BlockPos(colony.getCenter().getX() + trail.columns[column][0], colony.getCenter().getY(),
                 colony.getCenter().getZ() + trail.columns[column][1]);
+    }
+
+    /**
+     * Whether an ant of another colony at {@code pos} meets this colony: it is within the trails' reach and on one of
+     * them ({@link ColonyQuestions#ON_TRAIL}).
+     */
+    public boolean meetsAt(BlockPos pos) {
+        double reach = longestTip() + 2.0;
+        return colony.getCenter().distSqr(pos) <= reach * reach && isOnTrail(pos);
     }
 
     /**

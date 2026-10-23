@@ -12,7 +12,7 @@ import org.jetbrains.annotations.Nullable;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.block.DeadTreeWoodBlock;
 import com.antcolonies.block.DeadWoodBlock;
-import com.antcolonies.block.MudCrustBlock;
+import com.antcolonies.block.FacedWall;
 import com.antcolonies.block.SoftDeadWoodBlock;
 import com.antcolonies.species.SpeciesProfile;
 
@@ -157,7 +157,7 @@ final class DeadWoodCall {
             over.setY(pos.getY() + up);
             BlockState state = level.getBlockState(over);
             if (!isDeadWood(state)) {
-                return state.isAir() || MudCrustBlock.isCrust(state) || !state.blocksMotion()
+                return state.isAir() || FacedWall.isWall(state) || !state.blocksMotion()
                         || state.is(com.antcolonies.registry.TreeBlocks.TREE_WOOD) || state.is(com.antcolonies.registry.TreeBlocks.TREE_LEAVES);
             }
         }

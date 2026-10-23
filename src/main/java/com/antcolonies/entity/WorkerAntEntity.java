@@ -42,8 +42,8 @@ import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.level.Level;
 
 /** Worker ant: joins the nearest colony when spawned, then just wanders for now. */
-public class WorkerAntEntity extends AbstractAntEntity {
-    public static final String CASTE = "worker";
+public class WorkerAntEntity extends AbstractAntEntity implements ColonyBorn {
+    public static final String CASTE = com.antcolonies.colony.Caste.WORKER;
     /** How close (in blocks) a queen must be for a new worker to join her colony. */
     private static final double JOIN_RADIUS = 32.0;
 
@@ -127,6 +127,7 @@ public class WorkerAntEntity extends AbstractAntEntity {
     }
 
     /** A worker that hatched in this colony's nursery belongs to it from the start (and is counted). */
+    @Override
     public void joinColony(Colony colony) {
         setColonyId(colony.getId());
         colonyChecked = true;
