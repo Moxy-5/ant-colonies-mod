@@ -144,7 +144,14 @@ final class GalleryUpkeep {
             double sense = g.numbers().pieceLength() + TunnelRoute.HOLE_REACH + numbers.within();
             for (Colony other : others) {
                 BlockPos[] closest = GalleryWeb.closestTo(other, own, sense);
-                if (closest == null || !g.web.galleriesMet(level, other, closest[0], closest[1], arm.hole())) {
+                if (closest == null) {
+                    continue;
+                }
+                // (it yields at its own cell there, or the neighbour's gallery it senses lies in ground it yields: a tip
+                // stopped a block or two short of the meeting place, as the piece planned on toward it was never dug,
+                // still faces the neighbour; docs/BUGS.md 55)
+                boolean yields = g.web.galleriesMet(level, other, closest[0], closest[1], arm.hole());
+                if (!yields && !colony.neighbours().yieldsAt(level, closest[1])) {
                     continue;
                 }
                 BlockPos theirs = closest[1];
