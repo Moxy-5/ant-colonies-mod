@@ -3,7 +3,6 @@ package com.antcolonies.colony;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.entity.AbstractAntEntity;
-import com.antcolonies.registry.ModItems;
 import com.antcolonies.species.SpeciesProfile;
 import com.antcolonies.species.SpeciesProfile.MealFood;
 
@@ -111,7 +110,7 @@ public class WorkerFood {
             return colony.food().cutPiece();
         }
         NurseFood nurseFood = colony.nurseFood();
-        return nurseFood == null ? new ItemStack(ModItems.ANT_BREAD.get()) : nurseFood.piece();
+        return nurseFood == null ? ItemStack.EMPTY : nurseFood.piece(); // (none: a species with no nurse food, never today)
     }
 
     /**
@@ -145,7 +144,7 @@ public class WorkerFood {
         return !colony.questions().ask(null, ColonyQuestions.NOTHING_TO_EAT_IN_STORE, null);
     }
 
-    /** Tests only: a sample in every saved number (the save and load check, {@code AwayTests.everyPartSavesAndLoads}). */
+    /** Tests only: a sample in every saved number (the save and load check, {@code AwayKit.everyPartSavesAndLoads}). */
     public void fillForTests(ServerLevel level) {
         for (MealFood food : MealFood.values()) {
             mealsLeft[food.ordinal()] = food.ordinal() + 2;

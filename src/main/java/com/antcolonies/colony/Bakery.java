@@ -11,8 +11,8 @@ import org.jetbrains.annotations.Nullable;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.block.SeedPileBlock;
 import com.antcolonies.entity.AbstractAntEntity;
-import com.antcolonies.registry.ModBlocks;
-import com.antcolonies.registry.ModItems;
+import com.antcolonies.registry.DesertBlocks;
+import com.antcolonies.registry.DesertItems;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -147,7 +147,7 @@ public class Bakery implements NurseFood {
                 BlockState state = level.getBlockState(pos);
                 if (state.isAir() && !eggs.contains(pos)) {
                     empty.add(pos);
-                } else if (state.is(ModBlocks.BREAD_PILE.get()) && state.getValue(SeedPileBlock.LAYERS) < SeedPileBlock.MAX_LAYERS) {
+                } else if (state.is(DesertBlocks.BREAD_PILE.get()) && state.getValue(SeedPileBlock.LAYERS) < SeedPileBlock.MAX_LAYERS) {
                     growing.add(pos);
                 }
             }
@@ -192,8 +192,8 @@ public class Bakery implements NurseFood {
     private boolean addBreadAt(Level level, BlockPos spot) {
         BlockState state = level.getBlockState(spot);
         if (state.isAir()) {
-            level.setBlock(spot, ModBlocks.BREAD_PILE.get().defaultBlockState(), 3);
-        } else if (state.is(ModBlocks.BREAD_PILE.get()) && state.getValue(SeedPileBlock.LAYERS) < SeedPileBlock.MAX_LAYERS) {
+            level.setBlock(spot, DesertBlocks.BREAD_PILE.get().defaultBlockState(), 3);
+        } else if (state.is(DesertBlocks.BREAD_PILE.get()) && state.getValue(SeedPileBlock.LAYERS) < SeedPileBlock.MAX_LAYERS) {
             level.setBlock(spot, state.setValue(SeedPileBlock.LAYERS, state.getValue(SeedPileBlock.LAYERS) + 1), 3);
         } else {
             return false;
@@ -213,7 +213,7 @@ public class Bakery implements NurseFood {
 
     @Override
     public ItemStack piece() {
-        return new ItemStack(ModItems.ANT_BREAD.get());
+        return new ItemStack(DesertItems.ANT_BREAD.get());
     }
 
     /** One more piece of bread, counted now; its heap layer is put down later (see {@link NestLedger}). */
@@ -272,7 +272,7 @@ public class Bakery implements NurseFood {
     @Override
     public boolean removePieceAt(Level level, BlockPos spot) {
         BlockState state = level.getBlockState(spot);
-        if (!state.is(ModBlocks.BREAD_PILE.get())) {
+        if (!state.is(DesertBlocks.BREAD_PILE.get())) {
             return false;
         }
         int layers = state.getValue(SeedPileBlock.LAYERS);
@@ -297,7 +297,7 @@ public class Bakery implements NurseFood {
         for (List<BlockPos> cells : List.of(nest.getNurseryCells(level), nest.getHomeRoomCells(level), nest.getFoodStoreCells(level),
                 nest.getQueenRoomCells(level))) {
             for (BlockPos pos : cells) {
-                if (level.getBlockState(pos).is(ModBlocks.BREAD_PILE.get())) {
+                if (level.getBlockState(pos).is(DesertBlocks.BREAD_PILE.get())) {
                     piles.add(pos);
                 }
             }
@@ -312,7 +312,7 @@ public class Bakery implements NurseFood {
      */
     public ItemStack takeBreadAt(Level level, BlockPos pile, boolean wantRich) {
         BlockState state = level.getBlockState(pile);
-        if (!state.is(ModBlocks.BREAD_PILE.get())) {
+        if (!state.is(DesertBlocks.BREAD_PILE.get())) {
             return ItemStack.EMPTY;
         }
         int layers = state.getValue(SeedPileBlock.LAYERS);
@@ -323,7 +323,7 @@ public class Bakery implements NurseFood {
         if (rich) {
             richBread--;
         }
-        return new ItemStack(rich ? ModItems.RICH_ANT_BREAD.get() : ModItems.ANT_BREAD.get());
+        return new ItemStack(rich ? DesertItems.RICH_ANT_BREAD.get() : DesertItems.ANT_BREAD.get());
     }
 
     // As the nurses' food (see NurseFood): bread heaps.

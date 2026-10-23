@@ -33,7 +33,7 @@ import net.minecraft.world.phys.shapes.VoxelShape;
  * finished and has set ({@link #canBuildOn}). That gives the mound its slow, natural pace. Textures and models come
  * from {@code tools/termite_blocks.py}.
  */
-public class TermiteMoundBlock extends Block {
+public class TermiteMoundBlock extends Block implements PlugBlock {
     /** The layer on which the block is finished (layers 1 to 4 build it up a quarter at a time). */
     public static final int FINISHED = 5;
     public static final int OLDEST = MoundSoil.OLDEST;
@@ -54,6 +54,12 @@ public class TermiteMoundBlock extends Block {
     public TermiteMoundBlock(Properties properties) {
         super(properties);
         registerDefaultState(stateDefinition.any().setValue(LAYERS, 1).setValue(AGE, 0));
+    }
+
+    /** Packed into a hole finished and fresh, so it sets and hardens with age like the mound. */
+    @Override
+    public BlockState packedState() {
+        return defaultBlockState().setValue(LAYERS, FINISHED);
     }
 
     @Override

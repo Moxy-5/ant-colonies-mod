@@ -2,11 +2,11 @@ package com.antcolonies.worldgen;
 
 import java.util.Optional;
 
-import com.antcolonies.registry.ModStructures;
 import com.antcolonies.tree.Litter;
 import com.antcolonies.tree.TreeKind;
 import com.antcolonies.tree.TreeShapes;
 import com.antcolonies.tree.TreeStage;
+import com.antcolonies.registry.SavannaStructures;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
@@ -63,7 +63,7 @@ public class GiantTreeStructure extends Structure {
 
     @Override
     public StructureType<?> type() {
-        return ModStructures.GIANT_TREE.get();
+        return SavannaStructures.GIANT_TREE.get();
     }
 
     /** One tree: its kind, its own seed, its age and its stage. */

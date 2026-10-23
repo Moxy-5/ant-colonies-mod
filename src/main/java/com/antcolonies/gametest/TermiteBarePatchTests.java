@@ -9,8 +9,8 @@ import com.antcolonies.AntColoniesMod;
 import com.antcolonies.block.DryGrassBlock;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.NestPlan;
-import com.antcolonies.registry.ModBlocks;
-import com.antcolonies.registry.ModEntities;
+import com.antcolonies.registry.SavannaBlocks;
+import com.antcolonies.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -46,8 +46,8 @@ public class TermiteBarePatchTests {
                 helper.setBlock(x, SURFACE - 1, z, Blocks.GRASS_BLOCK);
             }
         }
-        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
-        helper.runAfterDelay(5, () -> helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE - 2, SURFACE, MIDDLE - 2));
+        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        helper.runAfterDelay(5, () -> helper.spawn(SavannaEntities.TERMITE_WORKER.get(), MIDDLE - 2, SURFACE, MIDDLE - 2));
         BlockPos[] tufts = new BlockPos[3]; // by the hole, far out, under a stone later
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
@@ -67,7 +67,7 @@ public class TermiteBarePatchTests {
                                 "the far tuft " + tuft.toShortString() + " is near a hole");
                     }
                 }
-                level.setBlock(tuft, ModBlocks.DRY_GRASS.get().defaultBlockState(), 3);
+                level.setBlock(tuft, SavannaBlocks.DRY_GRASS.get().defaultBlockState(), 3);
                 UUID forager = UUID.randomUUID();
                 for (int piece = 0; piece < 20 && !level.getBlockState(tuft).isAir(); piece++) {
                     colony.food().clippedGrass(level, tuft, forager);
@@ -76,20 +76,20 @@ public class TermiteBarePatchTests {
             }
             helper.assertTrue(level.getBlockState(tufts[0].below()).is(Blocks.COARSE_DIRT), "no bare ground by the hole");
             helper.assertTrue(level.getBlockState(tufts[1].below()).is(Blocks.GRASS_BLOCK), "bare ground far from the holes");
-            helper.assertTrue(colony.food().barePatches().waiting() == 3, "not 3 tufts waiting: " + colony.food().barePatches().describe());
+            helper.assertTrue(colony.part(com.antcolonies.colony.SavannaParts.BARE_PATCHES).orElseThrow().waiting() == 3, "not 3 tufts waiting: " + colony.part(com.antcolonies.colony.SavannaParts.BARE_PATCHES).orElseThrow().describe());
             level.setBlock(tufts[2], Blocks.STONE.defaultBlockState(), 3);
-            colony.food().barePatches().growBackSoonForTests(level);
+            colony.part(com.antcolonies.colony.SavannaParts.BARE_PATCHES).orElseThrow().growBackSoonForTests(level);
         });
         helper.runAfterDelay(400, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             for (int i = 0; i < 2; i++) {
-                helper.assertTrue(level.getBlockState(tufts[i]).is(ModBlocks.DRY_GRASS.get())
+                helper.assertTrue(level.getBlockState(tufts[i]).is(SavannaBlocks.DRY_GRASS.get())
                         && level.getBlockState(tufts[i]).getValue(DryGrassBlock.GROWTH) == DryGrassBlock.Growth.GREEN,
                         "no green tuft grew back at " + tufts[i].toShortString() + ": " + level.getBlockState(tufts[i]));
                 helper.assertTrue(level.getBlockState(tufts[i].below()).is(Blocks.GRASS_BLOCK), "the ground at " + tufts[i].toShortString() + " is not grass again");
             }
             helper.assertTrue(level.getBlockState(tufts[2]).is(Blocks.STONE), "the stone was replaced");
-            helper.assertTrue(colony.food().barePatches().waiting() == 0, "tufts still waiting: " + colony.food().barePatches().describe());
+            helper.assertTrue(colony.part(com.antcolonies.colony.SavannaParts.BARE_PATCHES).orElseThrow().waiting() == 0, "tufts still waiting: " + colony.part(com.antcolonies.colony.SavannaParts.BARE_PATCHES).orElseThrow().describe());
             helper.succeed();
         });
     }

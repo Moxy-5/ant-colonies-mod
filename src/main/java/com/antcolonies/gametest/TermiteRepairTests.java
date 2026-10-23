@@ -13,8 +13,8 @@ import com.antcolonies.block.TermiteMoundBlock;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.registry.ModTags;
 import com.antcolonies.colony.NestPlan;
-import com.antcolonies.registry.ModBlocks;
-import com.antcolonies.registry.ModEntities;
+import com.antcolonies.registry.SavannaBlocks;
+import com.antcolonies.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -40,12 +40,12 @@ public class TermiteRepairTests {
     public static void termitesSealOpeningsInTheirNestWithMoundSoil(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
-        TermiteMoundTests.deepGround(helper);
-        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        TestScenes.deepGround(helper);
+        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
         helper.runAfterDelay(5, () -> {
-            helper.spawn(ModEntities.TERMITE_KING.get(), MIDDLE + 2, SURFACE, MIDDLE + 1);
+            helper.spawn(SavannaEntities.TERMITE_KING.get(), MIDDLE + 2, SURFACE, MIDDLE + 1);
             for (int i = 0; i < 6; i++) {
-                helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE - 2 + i % 3, SURFACE, MIDDLE - 2 + i / 3);
+                helper.spawn(SavannaEntities.TERMITE_WORKER.get(), MIDDLE - 2 + i % 3, SURFACE, MIDDLE - 2 + i / 3);
             }
         });
         List<BlockPos> holes = new ArrayList<>(); // the cut blocks that touch the nest: these must be plugged
@@ -103,13 +103,13 @@ public class TermiteRepairTests {
             helper.assertTrue(colony != null && holes.size() == 3, "no colony or holes cut yet");
             for (BlockPos hole : holes) {
                 BlockState state = level.getBlockState(hole);
-                helper.assertTrue(state.is(ModBlocks.TERMITE_MOUND.get()) && TermiteMoundBlock.isFinished(state),
+                helper.assertTrue(state.is(SavannaBlocks.TERMITE_MOUND.get()) && TermiteMoundBlock.isFinished(state),
                         "the hole at " + hole + " holds " + state);
             }
             var leaks = colony.walls().getLeaks(level);
             helper.assertTrue(leaks.isEmpty(), "the nest still has openings: " + leaks);
             BlockState middle = level.getBlockState(colony.nest().getEntrance());
-            helper.assertFalse(middle.is(ModBlocks.BURROWED_DIRT.get()), "the middle hole is plugged with Burrowed Dirt");
+            helper.assertFalse(middle.is(ModTags.OLD_PLUGS), "the middle hole is plugged with Burrowed Dirt");
             AntColoniesMod.LOGGER.info("[repair-test] all sealed at tick {}", helper.getTick());
         });
     }

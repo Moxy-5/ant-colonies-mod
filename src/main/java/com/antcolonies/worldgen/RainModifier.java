@@ -1,6 +1,7 @@
 package com.antcolonies.worldgen;
 
-import com.antcolonies.registry.ModFeatures;
+import com.antcolonies.registry.SavannaFeatures;
+
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
@@ -30,6 +31,6 @@ public record RainModifier(HolderSet<Biome> biomes) implements BiomeModifier {
 
     @Override
     public MapCodec<? extends BiomeModifier> codec() {
-        return ModFeatures.RAIN.get();
+        return SavannaFeatures.RAIN.get();
     }
 }

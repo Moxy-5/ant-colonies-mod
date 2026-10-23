@@ -1,59 +1,47 @@
 package com.antcolonies.gametest;
 
-import static com.antcolonies.gametest.TermiteMoundTests.SURFACE;
+import static com.antcolonies.gametest.TestScenes.*;
+import static com.antcolonies.gametest.TestScenes.SURFACE;
 
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.ColonyParts;
-import com.antcolonies.colony.ColonyManager;
-import com.antcolonies.colony.Galleries;
-import com.antcolonies.colony.NestPlan;
+import com.antcolonies.colony.DesertParts;
 import com.antcolonies.colony.Neighbours;
 import com.antcolonies.colony.TrunkTrails;
 import com.antcolonies.entity.WorkerAntEntity;
-import com.antcolonies.registry.ModEntities;
+import com.antcolonies.registry.DesertEntities;
 import com.antcolonies.species.Species;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
+
 /**
  * Brain step 4g, step 5: neighbours ({@code colony.Neighbours}; the user's answers of 2026-10-18). Category {@code colony}.
+ * The red harvester ant's scene (the split, step S4; the termites' is in {@link TermiteNeighbourTests}).
  */
 @GameTestHolder(AntColoniesMod.MODID)
 @PrefixGameTestTemplate(false)
-public class NeighbourTests {
+public class HarvesterNeighbourTests {
     /** Where the two colonies' queens land (x, in the arena), on one line west to east, 30 blocks apart. */
     private static final int WEST = 12;
-    private static final int EAST = 42;
-    private static final int ROW = 12;
 
-    /** The colonies of this species in the test's arena with a living queen, west first. */
-    static List<Colony> colonies(GameTestHelper helper, ResourceLocation species) {
-        AABB area = helper.getBounds();
-        List<Colony> found = new ArrayList<>(ColonyManager.get(helper.getLevel()).getColonies().stream()
-                .filter(c -> area.contains(Vec3.atCenterOf(c.getCenter())) && c.getQueen(helper.getLevel()) != null && c.getSpecies().equals(species))
-                .toList());
-        found.sort(Comparator.comparingInt(c -> c.getCenter().getX()));
-        return found;
-    }
+    private static final int EAST = 42;
+
+    private static final int ROW = 12;
 
     /** A real worker of {@code colony}, out on the surface here (an old forager). */
     private static WorkerAntEntity workerOf(GameTestHelper helper, Colony colony, int x, int z) {
-        WorkerAntEntity ant = helper.spawn(ModEntities.WORKER_ANT.get(), x, SURFACE, z);
+        WorkerAntEntity ant = helper.spawn(DesertEntities.WORKER_ANT.get(), x, SURFACE, z);
         ant.comeOutOfNest(colony, helper.getLevel().getGameTime() - colony.profile().worker().builderUntilTicks() - 1000);
         return ant;
     }
@@ -79,8 +67,8 @@ public class NeighbourTests {
                 helper.setBlock(x, SURFACE - 1, z, Blocks.GRASS_BLOCK);
             }
         }
-        helper.spawn(ModEntities.QUEEN_ANT.get(), WEST, SURFACE, ROW);
-        helper.spawn(ModEntities.QUEEN_ANT.get(), EAST, SURFACE, ROW);
+        helper.spawn(DesertEntities.QUEEN_ANT.get(), WEST, SURFACE, ROW);
+        helper.spawn(DesertEntities.QUEEN_ANT.get(), EAST, SURFACE, ROW);
         Colony[] both = new Colony[2];
         WorkerAntEntity[] met = new WorkerAntEntity[3];
         int groundY = helper.absolutePos(new BlockPos(0, SURFACE, 0)).getY();
@@ -91,20 +79,20 @@ public class NeighbourTests {
             both[1] = found.get(1);
             for (Colony colony : both) {
                 colony.setHungerOn(false);
-                PopulationTests.digNestAtOnce(level, colony);
+                TestScenes.digNestAtOnce(level, colony);
                 colony.population().setOnForTests(false);
                 colony.population().setViewersForTests(List.of());
-                colony.part(ColonyParts.PATROL).orElseThrow().setOnForTests(false);
+                colony.part(DesertParts.PATROL).orElseThrow().setOnForTests(false);
             }
             both[0].setAgeForTests(level, 10);
             both[1].setAgeForTests(level, 0);
             // The old colony's east trail, out 10 blocks.
             BlockPos west = both[0].getCenter();
             for (int i = 0; i < 9; i++) {
-                both[0].part(ColonyParts.TRUNK_TRAILS).orElseThrow().setOut(level, new BlockPos(west.getX() + 10, groundY, west.getZ()));
+                both[0].part(DesertParts.TRUNK_TRAILS).orElseThrow().setOut(level, new BlockPos(west.getX() + 10, groundY, west.getZ()));
             }
-            helper.assertTrue(both[0].part(ColonyParts.TRUNK_TRAILS).orElseThrow().trails().size() == 1, "the old colony should have its east trail: "
-                    + both[0].part(ColonyParts.TRUNK_TRAILS).orElseThrow().describe(level));
+            helper.assertTrue(both[0].part(DesertParts.TRUNK_TRAILS).orElseThrow().trails().size() == 1, "the old colony should have its east trail: "
+                    + both[0].part(DesertParts.TRUNK_TRAILS).orElseThrow().describe(level));
             // One worker of each halfway, a block apart.
             int half = (WEST + EAST) / 2;
             met[0] = workerOf(helper, both[0], half, ROW);
@@ -131,7 +119,7 @@ public class NeighbourTests {
             helper.assertTrue("neighbours".equals(old.whoKeepsOff(level, past)),
                     "the neighbours should keep the old colony off past the meeting (colony parts step 6), not " + old.whoKeepsOff(level, past));
             // Its east trail's tip is held short of the meeting place, and no searcher goes out that trail.
-            TrunkTrails trails = old.part(ColonyParts.TRUNK_TRAILS).orElseThrow();
+            TrunkTrails trails = old.part(DesertParts.TRUNK_TRAILS).orElseThrow();
             for (int i = 0; i < 5; i++) {
                 trails.setOut(level, new BlockPos(w.getX() + toMeeting + 6, groundY, w.getZ()));
             }
@@ -163,7 +151,7 @@ public class NeighbourTests {
             young.neighbours().met(level, at, old.getId(), UUID.randomUUID());
             helper.assertTrue(!young.mayForageAt(level, westward), "4 meetings should make a new colony yield: " + young.neighbours().describe(level));
             // No new trail toward the neighbour (food short of the meeting, on its side), but one the other way.
-            TrunkTrails trails = young.part(ColonyParts.TRUNK_TRAILS).orElseThrow();
+            TrunkTrails trails = young.part(DesertParts.TRUNK_TRAILS).orElseThrow();
             for (int i = 0; i < 10; i++) {
                 trails.setOut(level, new BlockPos(e.getX() - 8, groundY, e.getZ()));
             }
@@ -189,107 +177,6 @@ public class NeighbourTests {
         helper.runAfterDelay(110, () -> {
             helper.assertTrue(both[0].neighbours().meetings().isEmpty(), "the faded meeting should be forgotten: " + both[0].neighbours().describe(level));
             helper.succeed();
-        });
-    }
-
-    /**
-     * Two Macrotermes colonies 44 blocks apart, their galleries growing toward each other (dug at once here): the west one
-     * old (10 game days), the east one just founded. Where their galleries come within 3 blocks both colonies count a
-     * meeting; the old one yields there at once (its tip stops, no piece is dug that way), the young one only after
-     * several meetings at one place, and then walls its piece off (packed with soil). The two webs never join: no cell of
-     * one comes within a block of the other's.
-     */
-    @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true, batch = "neighbour_termites")
-    public static void neighbouringTermitesWallOffTheirGalleries(GameTestHelper helper) {
-        ServerLevel level = helper.getLevel();
-        level.getServer().tickRateManager().setTickRate(2000.0F);
-        int west = 10;
-        int east = 54;
-        int row = 32;
-        for (int x = 0; x <= 64; x++) {
-            for (int z = 0; z <= 64; z++) {
-                for (int y = 0; y < SURFACE - 1; y++) {
-                    helper.setBlock(x, y, z, Blocks.DIRT);
-                }
-                helper.setBlock(x, SURFACE - 1, z, Blocks.GRASS_BLOCK);
-            }
-        }
-        helper.spawn(ModEntities.TERMITE_QUEEN.get(), west, SURFACE, row);
-        helper.spawn(ModEntities.TERMITE_QUEEN.get(), east, SURFACE, row);
-        helper.runAfterDelay(5, () -> {
-            for (int i = 0; i < 8; i++) {
-                helper.spawn(ModEntities.TERMITE_WORKER.get(), west - 2 + i % 4, SURFACE, row - 3 - i / 4);
-                helper.spawn(ModEntities.TERMITE_WORKER.get(), east - 2 + i % 4, SURFACE, row - 3 - i / 4);
-            }
-        });
-        TestClock.still(helper, 12); // midday: the termites stay in, and dig
-        Colony[] both = new Colony[2];
-        boolean[] started = {false};
-        helper.runAfterDelay(10, () -> {
-            List<Colony> found = colonies(helper, Species.MACROTERMES);
-            helper.assertTrue(found.size() == 2 && found.stream().noneMatch(Colony::isFounding), "there should be two termite colonies with workers: " + found.size());
-            both[0] = found.get(0);
-            both[1] = found.get(1);
-            long now = level.getGameTime();
-            for (Colony colony : both) {
-                TermiteMoundTests.colony(helper); // (keeps the food map and the alarm in the arena; the first colony only)
-                colony.foodMap().setTestArea(helper.getBounds().expandTowards(0, 16, 0));
-                colony.part(ColonyParts.ALARM).orElseThrow().setTestArea(helper.getBounds());
-                for (com.antcolonies.entity.TermiteWorkerEntity worker : TestIsolation.insectsOf(level, colony, com.antcolonies.entity.TermiteWorkerEntity.class)) {
-                    worker.setGrownUpAt(now - colony.profile().worker().nurseUntilTicks() - 1000);
-                }
-                TermiteSoldierTests.digNestAtOnce(level, colony);
-                colony.population().addNewMembers(WorkerAntEntity.CASTE, now - colony.profile().worker().builderUntilTicks() - 1000, 900);
-                Galleries.of(colony).setSwitchForTests(true);
-                Galleries.of(colony).setReachForTests(30);
-            }
-            both[0].setAgeForTests(level, 10);
-            both[1].setAgeForTests(level, 0);
-            started[0] = true;
-        });
-        helper.onEachTick(() -> {
-            if (!started[0]) {
-                return;
-            }
-            for (Colony colony : both) {
-                Galleries galleries = Galleries.of(colony);
-                for (NestPlan.ForagingTunnel tunnel : colony.foragingHoles().tunnels(level)) {
-                    for (BlockPos cell : galleries.digCells(tunnel)) {
-                        if (!com.antcolonies.colony.Nest.isDugOut(level, cell)) {
-                            level.setBlock(cell, Blocks.AIR.defaultBlockState(), 3);
-                        }
-                    }
-                }
-            }
-            Colony old = both[0];
-            Colony young = both[1];
-            // The webs never join.
-            for (NestPlan.ForagingTunnel tunnel : old.foragingHoles().tunnels(level)) {
-                for (BlockPos cell : tunnel.tunnel()) {
-                    BlockPos theirs = Galleries.of(young).galleryCellNear(cell, 1.0);
-                    helper.assertTrue(theirs == null, "the two colonies' galleries touch at " + helper.relativePos(cell) + " and " + (theirs == null ? null
-                            : helper.relativePos(theirs)));
-                }
-            }
-            long tick = helper.getTick();
-            if (tick % 500 == 0) {
-                AntColoniesMod.LOGGER.info("[neighbour-test] tick {}: old{}{} / young{}{}", tick, Galleries.of(old).describe(level), old.neighbours().describe(level),
-                        Galleries.of(young).describe(level), young.neighbours().describe(level));
-            }
-            boolean oldMet = !old.neighbours().meetings().isEmpty();
-            boolean youngMet = !young.neighbours().meetings().isEmpty();
-            if (oldMet && youngMet) {
-                helper.assertTrue(!old.neighbours().yielding(level).isEmpty(), "the old colony should yield at its first meeting: " + old.neighbours().describe(level));
-            }
-            int most = young.neighbours().meetings().stream().mapToInt(Neighbours.Meeting::count).max().orElse(0);
-            if (Galleries.of(young).walledOff() > 0) {
-                helper.assertTrue(most >= 4 || young.neighbours().meetings().size() > 1, "the young colony walled off its gallery after too few meetings: "
-                        + young.neighbours().describe(level));
-                helper.assertTrue(oldMet, "the old colony never felt the meeting: " + old.neighbours().describe(level));
-                helper.succeed();
-            }
-            helper.assertTrue(tick < 38000, "the young colony never walled off a gallery: old" + Galleries.of(old).describe(level)
-                    + old.neighbours().describe(level) + " / young" + Galleries.of(young).describe(level) + young.neighbours().describe(level));
         });
     }
 }

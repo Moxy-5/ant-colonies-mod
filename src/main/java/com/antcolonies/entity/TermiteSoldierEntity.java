@@ -8,7 +8,7 @@ import org.jetbrains.annotations.Nullable;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
-import com.antcolonies.colony.ColonyParts;
+import com.antcolonies.colony.SavannaParts;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.entity.goal.DefendGoal;
 import com.antcolonies.entity.goal.GoInsideGoal;
@@ -128,7 +128,7 @@ public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurs
     }
 
     @Override
-    protected ResourceLocation species() {
+    public ResourceLocation species() {
         return Species.MACROTERMES;
     }
 
@@ -208,16 +208,16 @@ public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurs
         if (colony == null) {
             return false;
         }
-        if (level() instanceof ServerLevel serverLevel && colony.part(ColonyParts.ALARM).map(alarm -> alarm.isBusy(serverLevel, this)).orElse(false)) {
+        if (level() instanceof ServerLevel serverLevel && colony.part(SavannaParts.ALARM).map(alarm -> alarm.isBusy(serverLevel, this)).orElse(false)) {
             return true;
         }
-        return rank == Rank.MINOR && colony.part(ColonyParts.SOLDIERS).map(soldiers -> soldiers.minorsOut(level())).orElse(false);
+        return rank == Rank.MINOR && colony.part(SavannaParts.SOLDIERS).map(soldiers -> soldiers.minorsOut(level())).orElse(false);
     }
 
     /** Whether its colony's alarm is up (it then has no time to wait for a nurse). */
     private boolean isAlarmed() {
         Colony colony = getColony();
-        return colony != null && colony.part(ColonyParts.ALARM).map(alarm -> alarm.level(level())).orElse(0) >= 2;
+        return colony != null && colony.part(SavannaParts.ALARM).map(alarm -> alarm.level(level())).orElse(0) >= 2;
     }
 
     // Soldiers dig nothing and carry nothing.
@@ -354,6 +354,7 @@ public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurs
     }
 
     /** This soldier joins no colony (one a test walks around by hand). */
+    @Override
     public void keepOutOfColonies() {
         colonyChecked = true;
     }
@@ -396,7 +397,7 @@ public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurs
         if ((tickCount + getId()) % 5 == 0 && getColonyId() != null) {
             Colony colony = ColonyManager.get(serverLevel).getColony(getColonyId());
             if (colony != null) {
-                colony.part(ColonyParts.ALARM).ifPresent(alarm -> alarm.listen(serverLevel, this));
+                colony.part(SavannaParts.ALARM).ifPresent(alarm -> alarm.listen(serverLevel, this));
             }
         }
     }
@@ -446,11 +447,6 @@ public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurs
     @Override
     protected boolean leavesBody() {
         return true;
-    }
-
-    @Override
-    protected net.minecraft.world.entity.EntityType<AntCorpseEntity> bodyType() {
-        return com.antcolonies.registry.ModEntities.TERMITE_CORPSE.get();
     }
 
     @Override

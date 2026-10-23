@@ -67,7 +67,7 @@ public class WorkerAntEntity extends AbstractAntEntity implements ColonyBorn {
     }
 
     @Override
-    protected net.minecraft.resources.ResourceLocation species() {
+    public net.minecraft.resources.ResourceLocation species() {
         return Species.RED_HARVESTER_ANT;
     }
 
@@ -183,6 +183,7 @@ public class WorkerAntEntity extends AbstractAntEntity implements ColonyBorn {
      * This worker joins no colony (an ant a test walks around by hand): otherwise it would join the nearest colony on
      * its first tick, which may be another test's colony nearby and spoil that test's headcount.
      */
+    @Override
     public void keepOutOfColonies() {
         colonyChecked = true;
     }

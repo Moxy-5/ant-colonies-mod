@@ -106,7 +106,7 @@ public class Door {
 
     /** Whether the door holds the foragers back (with the patrollers only: they open it each round). */
     public boolean isOn(Level level) {
-        if (numbers() == null || !colony.part(ColonyParts.PATROL).map(patrol -> patrol.isOn(level)).orElse(false)) {
+        if (numbers() == null || !colony.part(DesertParts.PATROL).map(patrol -> patrol.isOn(level)).orElse(false)) {
             return false;
         }
         return onForTests == null || onForTests;
@@ -145,18 +145,18 @@ public class Door {
         if (numbers == null || !isOn(level)) {
             return true;
         }
-        if (!colony.part(ColonyParts.PATROL).map(patrol -> patrol.mayForage(level)).orElse(true)) {
+        if (!colony.part(DesertParts.PATROL).map(patrol -> patrol.mayForage(level)).orElse(true)) {
             return false;
         }
         UUID id = ant.getUUID();
         if (trips.containsKey(id)) {
             return true;
         }
-        float share = colony.part(ColonyParts.PATROL).map(patrol -> patrol.foragerShareToday(level)).orElse(1.0F);
+        float share = colony.part(DesertParts.PATROL).map(patrol -> patrol.foragerShareToday(level)).orElse(1.0F);
         if (share < 1.0F && trips.size() >= Math.max(1, Math.round(realForagers * share))) {
             return false;
         }
-        if (colony.part(ColonyParts.RECRUITS).map(recruits -> recruits.isRecruited(id)).orElse(false)) {
+        if (colony.part(DesertParts.RECRUITS).map(recruits -> recruits.isRecruited(id)).orElse(false)) {
             return true; // called out by a forager home from a rich patch (see colony.Recruits): it follows the scent line
         }
         boolean small = isSmall(level, numbers);
@@ -258,7 +258,7 @@ public class Door {
 
     /** A recruiter called out {@code count} forager numbers to its patch (see {@link Recruits}): they go out now. */
     void recruitedNumbers(ServerLevel level, int count) {
-        if (isOn(level) && colony.part(ColonyParts.PATROL).map(patrol -> patrol.mayForage(level)).orElse(true)) {
+        if (isOn(level) && colony.part(DesertParts.PATROL).map(patrol -> patrol.mayForage(level)).orElse(true)) {
             numbersOut += count;
         }
     }
@@ -362,7 +362,7 @@ public class Door {
         if (!isOn(level)) {
             return foragers;
         }
-        if (!colony.part(ColonyParts.PATROL).map(patrol -> patrol.mayForage(level)).orElse(true)) {
+        if (!colony.part(DesertParts.PATROL).map(patrol -> patrol.mayForage(level)).orElse(true)) {
             return 0;
         }
         return Math.min(foragers, numbersOut);
@@ -380,7 +380,7 @@ public class Door {
             return;
         }
         long now = level.getGameTime();
-        if (!colony.part(ColonyParts.PATROL).map(patrol -> patrol.mayForage(level)).orElse(true)) {
+        if (!colony.part(DesertParts.PATROL).map(patrol -> patrol.mayForage(level)).orElse(true)) {
             numbersOut = 0;
             pendingTouches = 0;
             window.clear();
@@ -390,7 +390,7 @@ public class Door {
             returns.add(new long[] {now, returned});
         }
         numbersOut = step(numbers, foragers, numbersOut, placed, returned + pendingTouches, windowTouches(numbers, now),
-                isSmall(level, numbers), colony.part(ColonyParts.PATROL).map(patrol -> patrol.foragerShareToday(level)).orElse(1.0F));
+                isSmall(level, numbers), colony.part(DesertParts.PATROL).map(patrol -> patrol.foragerShareToday(level)).orElse(1.0F));
         int touchesNow = (returned + pendingTouches) * Math.max(1, numbers.touchesPerReturn());
         if (touchesNow > 0) {
             window.add(new long[] {now, touchesNow});
@@ -506,7 +506,7 @@ public class Door {
 
     // --- saving -----------------------------------------------------------------------------------------------------
 
-    /** Tests only: a sample in every saved number (the save and load check, {@code AwayTests.everyPartSavesAndLoads}). */
+    /** Tests only: a sample in every saved number (the save and load check, {@code AwayKit.everyPartSavesAndLoads}). */
     public void fillForTests(ServerLevel level) {
         numbersOut = 2.5;
         pendingTouches = 3;

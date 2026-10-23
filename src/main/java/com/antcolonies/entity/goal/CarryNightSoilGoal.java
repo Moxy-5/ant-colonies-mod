@@ -6,7 +6,7 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
-import com.antcolonies.colony.ColonyParts;
+import com.antcolonies.colony.DesertParts;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.colony.Hill;
 import com.antcolonies.colony.NightSoil;
@@ -62,7 +62,7 @@ public class CarryNightSoilGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        hill = colony == null ? null : colony.part(ColonyParts.HILL).orElse(null);
+        hill = colony == null ? null : colony.part(DesertParts.HILL).orElse(null);
         if (hill == null || colony.nest().isEntrancePlugged(level) || !hill.hasMoundRoom(level)) {
             return false;
         }

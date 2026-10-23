@@ -60,20 +60,20 @@ public final class TreeBlocks {
     public static final List<Kind> KINDS = List.of(UMBRELLA_THORN, CAMEL_THORN, BAOBAB);
 
     /** Thorny acacia twigs at the crown's edge and on young trees: slow and prick anything big, never insects. */
-    public static final DeferredBlock<ThornyTwigBlock> THORNY_TWIG = add(ModBlocks.BLOCKS.registerBlock("thorny_twig", ThornyTwigBlock::new,
+    public static final DeferredBlock<ThornyTwigBlock> THORNY_TWIG = add(SavannaBlocks.BLOCKS.registerBlock("thorny_twig", ThornyTwigBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).strength(0.2F).sound(SoundType.AZALEA).noCollission().noOcclusion()
                     .ignitedByLava().pushReaction(PushReaction.DESTROY)));
     /** Camel thorn pods hanging under the crown (looks only for now). */
-    public static final DeferredBlock<HangingPodsBlock> CAMEL_THORN_PODS = add(ModBlocks.BLOCKS.registerBlock("camel_thorn_pods", HangingPodsBlock::new,
+    public static final DeferredBlock<HangingPodsBlock> CAMEL_THORN_PODS = add(SavannaBlocks.BLOCKS.registerBlock("camel_thorn_pods", HangingPodsBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_LIGHT_GRAY).strength(0.2F).sound(SoundType.AZALEA_LEAVES)
                     .noCollission().noOcclusion().ignitedByLava().pushReaction(PushReaction.DESTROY)));
 
     /** A dead tree's trunk with the bark weathered to silver (the user's pick, look E); termites eat it in stages (step 6d). */
-    public static final DeferredBlock<DeadTreeWoodBlock> BLEACHED_LOG = add(ModBlocks.BLOCKS.registerBlock("bleached_log", DeadTreeWoodBlock::new, deadWood()));
-    public static final DeferredBlock<DeadTreeWoodBlock> BLEACHED_WOOD = add(ModBlocks.BLOCKS.registerBlock("bleached_wood", DeadTreeWoodBlock::new, deadWood()));
+    public static final DeferredBlock<DeadTreeWoodBlock> BLEACHED_LOG = add(SavannaBlocks.BLOCKS.registerBlock("bleached_log", DeadTreeWoodBlock::new, deadWood()));
+    public static final DeferredBlock<DeadTreeWoodBlock> BLEACHED_WOOD = add(SavannaBlocks.BLOCKS.registerBlock("bleached_wood", DeadTreeWoodBlock::new, deadWood()));
     /** A dead trunk with the bark lifting off in strips. */
-    public static final DeferredBlock<DeadTreeWoodBlock> PEELING_BLEACHED_LOG = add(ModBlocks.BLOCKS.registerBlock("peeling_bleached_log", DeadTreeWoodBlock::new, deadWood()));
-    public static final DeferredBlock<BleachedBranchBlock> BLEACHED_BRANCH = add(ModBlocks.BLOCKS.registerBlock("bleached_branch", BleachedBranchBlock::new,
+    public static final DeferredBlock<DeadTreeWoodBlock> PEELING_BLEACHED_LOG = add(SavannaBlocks.BLOCKS.registerBlock("peeling_bleached_log", DeadTreeWoodBlock::new, deadWood()));
+    public static final DeferredBlock<BleachedBranchBlock> BLEACHED_BRANCH = add(SavannaBlocks.BLOCKS.registerBlock("bleached_branch", BleachedBranchBlock::new,
             branchProperties(MapColor.COLOR_LIGHT_GRAY, 1.0F)));
     /**
      * Bark burnt black (step 5d): a fire's scar on a living tree, and the whole of a tree killed by fire. Charcoal does
@@ -81,17 +81,17 @@ public final class TreeBlocks {
      */
     public static final DeferredBlock<RotatedPillarBlock> CHARRED_LOG = add(pillar("charred_log", wood(MapColor.COLOR_BLACK, 1.5F)));
     public static final DeferredBlock<RotatedPillarBlock> CHARRED_WOOD = add(pillar("charred_wood", wood(MapColor.COLOR_BLACK, 1.5F)));
-    public static final DeferredBlock<TreeBranchBlock> CHARRED_BRANCH = add(ModBlocks.BLOCKS.registerBlock("charred_branch", TreeBranchBlock::new,
+    public static final DeferredBlock<TreeBranchBlock> CHARRED_BRANCH = add(SavannaBlocks.BLOCKS.registerBlock("charred_branch", TreeBranchBlock::new,
             branchProperties(MapColor.COLOR_BLACK, 0.8F)));
     /** Heart-rot: soft crumbly wood inside an old trunk; insects dig it fast. */
-    public static final DeferredBlock<SoftDeadWoodBlock> ROTTEN_WOOD = add(ModBlocks.BLOCKS.registerBlock("rotten_wood", SoftDeadWoodBlock::new,
+    public static final DeferredBlock<SoftDeadWoodBlock> ROTTEN_WOOD = add(SavannaBlocks.BLOCKS.registerBlock("rotten_wood", SoftDeadWoodBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_BROWN).strength(0.4F).sound(SoundType.WOOD).ignitedByLava()));
     /** Wood dust and droppings, a thin layer on the floor of hollows and galleries. */
-    public static final DeferredBlock<FrassBlock> FRASS = add(ModBlocks.BLOCKS.registerBlock("frass", FrassBlock::new,
+    public static final DeferredBlock<FrassBlock> FRASS = add(SavannaBlocks.BLOCKS.registerBlock("frass", FrassBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.SAND).strength(0.1F).sound(SoundType.SAND).ignitedByLava()
                     .pushReaction(PushReaction.DESTROY)));
     /** What a dead baobab slumps into: a soggy heap of fibres (it leaves no log). */
-    public static final DeferredBlock<SoftDeadWoodBlock> BAOBAB_FIBRE = add(ModBlocks.BLOCKS.registerBlock("baobab_fibre", SoftDeadWoodBlock::new,
+    public static final DeferredBlock<SoftDeadWoodBlock> BAOBAB_FIBRE = add(SavannaBlocks.BLOCKS.registerBlock("baobab_fibre", SoftDeadWoodBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_BROWN).strength(0.4F).sound(SoundType.WET_GRASS)));
 
     private TreeBlocks() {
@@ -104,15 +104,15 @@ public final class TreeBlocks {
     private static Kind kind(String name, MapColor bark, float hardness, MapColor leafColour, boolean tapering) {
         DeferredBlock<RotatedPillarBlock> log = add(pillar(name + "_log", wood(bark, hardness)));
         DeferredBlock<RotatedPillarBlock> wood = add(pillar(name + "_wood", wood(bark, hardness)));
-        DeferredBlock<TreeBranchBlock> branch = add(ModBlocks.BLOCKS.<TreeBranchBlock>registerBlock(name + "_branch",
+        DeferredBlock<TreeBranchBlock> branch = add(SavannaBlocks.BLOCKS.<TreeBranchBlock>registerBlock(name + "_branch",
                 tapering ? TaperingBranchBlock::new : TreeBranchBlock::new,
                 branchProperties(bark, hardness / 2)));
-        DeferredBlock<TreeLeavesBlock> leaves = add(ModBlocks.BLOCKS.registerBlock(name + "_leaves", TreeLeavesBlock::new,
+        DeferredBlock<TreeLeavesBlock> leaves = add(SavannaBlocks.BLOCKS.registerBlock(name + "_leaves", TreeLeavesBlock::new,
                 leaves(leafColour)));
         // A dead tree's withered leaves (step 5b): brown, dry, they drop within a day.
-        DeferredBlock<TreeLeavesBlock> deadLeaves = add(ModBlocks.BLOCKS.registerBlock(name + "_dead_leaves", TreeLeavesBlock::new,
+        DeferredBlock<TreeLeavesBlock> deadLeaves = add(SavannaBlocks.BLOCKS.registerBlock(name + "_dead_leaves", TreeLeavesBlock::new,
                 leaves(MapColor.TERRACOTTA_BROWN)));
-        DeferredBlock<TreeSeedlingBlock> seedling = add(ModBlocks.BLOCKS.registerBlock(name + "_seedling", TreeSeedlingBlock::new,
+        DeferredBlock<TreeSeedlingBlock> seedling = add(SavannaBlocks.BLOCKS.registerBlock(name + "_seedling", TreeSeedlingBlock::new,
                 BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).noCollission().instabreak().sound(SoundType.GRASS)
                         .pushReaction(PushReaction.DESTROY)));
         return new Kind(name, log, wood, branch, leaves, seedling, deadLeaves);
@@ -126,7 +126,7 @@ public final class TreeBlocks {
     }
 
     private static DeferredBlock<RotatedPillarBlock> pillar(String name, BlockBehaviour.Properties properties) {
-        return ModBlocks.BLOCKS.registerBlock(name, RotatedPillarBlock::new, properties);
+        return SavannaBlocks.BLOCKS.registerBlock(name, RotatedPillarBlock::new, properties);
     }
 
     private static BlockBehaviour.Properties wood(MapColor colour, float hardness) {

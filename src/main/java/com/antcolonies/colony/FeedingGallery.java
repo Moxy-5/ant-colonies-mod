@@ -56,6 +56,11 @@ final class FeedingGallery {
         public Map<BlockPos, BlockPos> joined(Level level, List<BlockPos> galleryCells, Set<BlockPos> inside) {
             return casts(level, galleryCells, inside);
         }
+
+        @Override
+        public net.minecraft.world.level.block.state.BlockState castFor(Level level, BlockPos pos, List<net.minecraft.core.Direction> open) {
+            return com.antcolonies.registry.SavannaBlocks.MUD_CAST.get().stateFor(level, pos, 0, open);
+        }
     };
 
     private FeedingGallery() {

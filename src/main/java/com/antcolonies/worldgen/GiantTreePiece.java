@@ -1,7 +1,7 @@
 package com.antcolonies.worldgen;
 
-import com.antcolonies.registry.ModStructures;
 import com.antcolonies.tree.TreeStage;
+import com.antcolonies.registry.SavannaStructures;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -24,13 +24,13 @@ public class GiantTreePiece extends StructurePiece {
     private final BlockPos foot;
 
     public GiantTreePiece(GiantTreeStructure.Pick pick, BlockPos foot, BoundingBox box) {
-        super(ModStructures.GIANT_TREE_PIECE.get(), 0, box);
+        super(SavannaStructures.GIANT_TREE_PIECE.get(), 0, box);
         this.pick = pick;
         this.foot = foot;
     }
 
     public GiantTreePiece(CompoundTag tag) {
-        super(ModStructures.GIANT_TREE_PIECE.get(), tag);
+        super(SavannaStructures.GIANT_TREE_PIECE.get(), tag);
         pick = new GiantTreeStructure.Pick(tag.getString("kind"), tag.getLong("seed"), tag.getDouble("age"), stage(tag.getString("stage")));
         foot = new BlockPos(tag.getInt("x"), tag.getInt("y"), tag.getInt("z"));
     }

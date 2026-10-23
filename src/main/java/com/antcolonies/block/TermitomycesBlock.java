@@ -1,7 +1,8 @@
 package com.antcolonies.block;
 
-import com.antcolonies.registry.ModBlocks;
-import com.antcolonies.registry.ModItems;
+import com.antcolonies.registry.SavannaBlocks;
+import com.antcolonies.registry.SavannaItems;
+
 import com.mojang.serialization.MapCodec;
 
 import net.minecraft.core.BlockPos;
@@ -107,7 +108,7 @@ public class TermitomycesBlock extends BushBlock implements BonemealableBlock {
      */
     public static void growOn(BlockState state, Level level, BlockPos pos) {
         int stage = state.getValue(STAGE);
-        if (stage == BUTTON && state.getValue(GIANT) && ModBlocks.GIANT_TERMITOMYCES.get().growAt(level, pos)) {
+        if (stage == BUTTON && state.getValue(GIANT) && SavannaBlocks.GIANT_TERMITOMYCES.get().growAt(level, pos)) {
             return;
         }
         if (stage == WILTED) {
@@ -145,6 +146,6 @@ public class TermitomycesBlock extends BushBlock implements BonemealableBlock {
 
     @Override
     public ItemStack getCloneItemStack(LevelReader level, BlockPos pos, BlockState state) {
-        return new ItemStack(ModItems.TERMITOMYCES.get());
+        return new ItemStack(SavannaItems.TERMITOMYCES.get());
     }
 }

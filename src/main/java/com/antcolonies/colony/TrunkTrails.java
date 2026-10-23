@@ -817,7 +817,7 @@ public class TrunkTrails {
         return line.toString();
     }
 
-    /** Tests only: a sample in every saved number (the save and load check, {@code AwayTests.everyPartSavesAndLoads}). */
+    /** Tests only: a sample in every saved number (the save and load check, {@code AwayKit.everyPartSavesAndLoads}). */
     public void fillForTests(ServerLevel level) {
         long now = level.getGameTime();
         SpeciesProfile.TrunkNumbers numbers = numbers();

@@ -4,7 +4,10 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.nav.Slope;
 
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
@@ -41,6 +44,48 @@ public class FungusCombBlock extends SeedPileBlock implements Slope, GardenBed {
     @Override
     public int maxLayers() {
         return MAX_COMB_LAYERS;
+    }
+
+    // --- as a heap in the food store (see SeedPileBlock) ------------------------------------------------------------
+
+    @Override
+    public boolean ages() {
+        return true; // built onto comb with room first: the fungus only grows where the comb is thick enough
+    }
+
+    @Override
+    public BlockState newHeap() {
+        return newComb(defaultBlockState());
+    }
+
+    @Override
+    public BlockState oneLayerMore(BlockState state) {
+        return withLayerOnTop(state); // the new layer goes on top, fresh
+    }
+
+    @Override
+    public BlockState oneLayerLess(BlockState state) {
+        BlockState less = withoutBottomLayer(state); // off its bottom, an old one first
+        return less == null ? Blocks.AIR.defaultBlockState() : less;
+    }
+
+    @Override
+    public boolean hasLayerToTake(BlockState state) {
+        return old(state) > 0; // the old workers eat old comb, from the bottom
+    }
+
+    @Override
+    public int growthOn(BlockState state) {
+        return state.getValue(NODULES);
+    }
+
+    @Override
+    public void laid(ServerLevel level, BlockPos spot) {
+        // Fresh comb laid: a soft wet squelch and a few dark specks.
+        level.playSound(null, spot, net.minecraft.sounds.SoundEvents.MUD_PLACE, net.minecraft.sounds.SoundSource.BLOCKS, 0.25F, 1.6F);
+        level.sendParticles(new net.minecraft.core.particles.BlockParticleOption(net.minecraft.core.particles.ParticleTypes.BLOCK,
+                level.getBlockState(spot)), spot.getX() + 0.5, spot.getY() + topOf(level.getBlockState(spot)),
+                spot.getZ() + 0.5, 4, 0.2, 0.02, 0.2, 0.0);
     }
 
     @Override

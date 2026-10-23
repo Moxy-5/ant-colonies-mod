@@ -1,5 +1,6 @@
 package com.antcolonies.entity;
 
+import com.antcolonies.colony.Caste;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.ColonyRole;
@@ -46,7 +47,7 @@ import net.minecraft.world.level.Level;
  */
 public class TermiteWorkerEntity extends AbstractAntEntity implements ColonyBorn {
     /** Counted under the same caste name as ant workers (each colony has its own counts). */
-    public static final String CASTE = WorkerAntEntity.CASTE;
+    public static final String CASTE = Caste.WORKER;
     /** How close (in blocks) a termite colony must be for a new worker to join it. */
     private static final double JOIN_RADIUS = 32.0;
 
@@ -70,7 +71,7 @@ public class TermiteWorkerEntity extends AbstractAntEntity implements ColonyBorn
     }
 
     @Override
-    protected net.minecraft.resources.ResourceLocation species() {
+    public net.minecraft.resources.ResourceLocation species() {
         return Species.MACROTERMES;
     }
 
@@ -121,6 +122,7 @@ public class TermiteWorkerEntity extends AbstractAntEntity implements ColonyBorn
      * This worker joins no colony (a termite a test walks around by hand): otherwise it would join the nearest termite
      * colony on its first tick, which may be another test's colony nearby.
      */
+    @Override
     public void keepOutOfColonies() {
         colonyChecked = true;
     }
@@ -214,11 +216,6 @@ public class TermiteWorkerEntity extends AbstractAntEntity implements ColonyBorn
     @Override
     protected boolean leavesBody() {
         return true;
-    }
-
-    @Override
-    protected net.minecraft.world.entity.EntityType<AntCorpseEntity> bodyType() {
-        return com.antcolonies.registry.ModEntities.TERMITE_CORPSE.get();
     }
 
     @Override

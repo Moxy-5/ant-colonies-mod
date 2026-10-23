@@ -2,7 +2,7 @@ package com.antcolonies.worldgen;
 
 import com.antcolonies.block.DeadWoodBlock;
 import com.antcolonies.block.FallenBranchBlock;
-import com.antcolonies.registry.ModBlocks;
+import com.antcolonies.registry.SavannaBlocks;
 import com.mojang.serialization.Codec;
 
 import net.minecraft.core.BlockPos;
@@ -47,7 +47,7 @@ public class FallenTreeFeature extends Feature<NoneFeatureConfiguration> {
             if (!isFree(level, stump) || !solid(level, stump.below()) || !trunkFits(level, trunkStart, way, length)) {
                 continue;
             }
-            BlockState wood = ModBlocks.DEAD_WOOD.get().defaultBlockState();
+            BlockState wood = SavannaBlocks.DEAD_WOOD.get().defaultBlockState();
             int stumpHeight = 1 + random.nextInt(2);
             for (int i = 0; i < stumpHeight && isFree(level, stump.above(i)); i++) {
                 level.setBlock(stump.above(i), wood.setValue(RotatedPillarBlock.AXIS, Direction.Axis.Y), flags);
@@ -76,7 +76,7 @@ public class FallenTreeFeature extends Feature<NoneFeatureConfiguration> {
         if (!isFree(level, start) || !isFree(level, tip) || !solid(level, start.below()) || !solid(level, tip.below())) {
             return;
         }
-        BlockState branch = ModBlocks.FALLEN_BRANCH.get().defaultBlockState().setValue(FallenBranchBlock.AXIS, way.getAxis());
+        BlockState branch = SavannaBlocks.FALLEN_BRANCH.get().defaultBlockState().setValue(FallenBranchBlock.AXIS, way.getAxis());
         level.setBlock(start, branch.setValue(FallenBranchBlock.PART, FallenBranchBlock.Part.BASE), flags);
         level.setBlock(tip, branch.setValue(FallenBranchBlock.PART, FallenBranchBlock.Part.TIP), flags);
     }

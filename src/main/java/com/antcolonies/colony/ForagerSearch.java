@@ -68,10 +68,10 @@ final class ForagerSearch implements ColonyHooks.LoneSearch {
         int range = colony.foragingRadius();
         // It came home empty last time: another way this time.
         ForagerSpots.Lead failed = spots.leadOf(ant.getUUID());
-        TrunkTrails trails = colony.part(ColonyParts.TRUNK_TRAILS).orElse(null);
+        TrunkTrails trails = colony.part(DesertParts.TRUNK_TRAILS).orElse(null);
         // A young colony's foragers spread out every way: real Pogonomyrmex trunk trails only form as the colony grows
         // (Gordon), so a small colony's searchers pick a new way each trip instead of following its few trails.
-        boolean young = colony.part(ColonyParts.DOOR).map(door -> door.isSmallColony(level)).orElse(false);
+        boolean young = colony.part(DesertParts.DOOR).map(door -> door.isSmallColony(level)).orElse(false);
         for (int tries = 0; tries < 8; tries++) {
             TrunkTrails.Trail trail = !young && trails != null && trails.keepsTrails() && ant.getRandom().nextInt(NEW_WAY) != 0
                     ? trails.pickForSearch(level, ant.getRandom()) : null;

@@ -13,7 +13,6 @@ import com.antcolonies.entity.AntEggEntity;
 import com.antcolonies.entity.AntLarvaEntity;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.ColonyBorn;
-import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.registry.ModEntities;
 import com.antcolonies.species.SpeciesBodies;
 

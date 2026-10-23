@@ -1,7 +1,7 @@
 package com.antcolonies.gametest;
 
-import static com.antcolonies.gametest.TermiteMoundTests.MIDDLE;
-import static com.antcolonies.gametest.TermiteMoundTests.SURFACE;
+import static com.antcolonies.gametest.TestScenes.MIDDLE;
+import static com.antcolonies.gametest.TestScenes.SURFACE;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -10,7 +10,7 @@ import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.TermiteWorkerEntity;
-import com.antcolonies.registry.ModEntities;
+import com.antcolonies.registry.SavannaEntities;
 
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -22,7 +22,7 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 /** Jobs by age (step 5b): a worker's age decides its usual job, and young workers are drawn paler. */
 @GameTestHolder(AntColoniesMod.MODID)
 @PrefixGameTestTemplate(false)
-public class JobsByAgeTests {
+public class TermiteJobsByAgeTests {
     /**
      * Six termite workers of three ages (two just grown up, two a few days old, two old): the young ones nurse, the
      * middle-aged ones build and the old ones forage. The young are pale, the others not, and the age is saved.
@@ -30,14 +30,14 @@ public class JobsByAgeTests {
     @GameTest(template = "arena", timeoutTicks = 400)
     public static void termiteWorkersTakeTheJobOfTheirAge(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        TermiteMoundTests.deepGround(helper);
-        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        TestScenes.deepGround(helper);
+        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
         List<TermiteWorkerEntity> workers = new ArrayList<>();
         long[] ages = {0, 1000, 100000, 150000, 200000, 300000};
         ColonyRole[] expected = {ColonyRole.NURSE, ColonyRole.NURSE, ColonyRole.BUILDER, ColonyRole.BUILDER, ColonyRole.FORAGER, ColonyRole.FORAGER};
         helper.runAfterDelay(5, () -> {
             for (int i = 0; i < ages.length; i++) {
-                workers.add(helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE - 2 + i % 3, SURFACE, MIDDLE - 2 + i / 3));
+                workers.add(helper.spawn(SavannaEntities.TERMITE_WORKER.get(), MIDDLE - 2 + i % 3, SURFACE, MIDDLE - 2 + i / 3));
             }
         });
         helper.runAfterDelay(20, () -> {

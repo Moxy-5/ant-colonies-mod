@@ -48,6 +48,10 @@ public class BarePatches {
         this.colony = colony;
     }
 
+    Colony colony() {
+        return colony;
+    }
+
     /**
      * A plant ({@code eaten}, as it was) has just been eaten away at {@code pos}: if it is one that grows back, it is
      * remembered, and if it stood near a foraging hole the grass block under it turns bare.
@@ -174,6 +178,11 @@ public class BarePatches {
     public void growBackSoonForTests(Level level) {
         tufts.replaceAll(tuft -> new Tuft(tuft.spot(), level.getGameTime(), tuft.madeBare()));
         nextCheck = 0;
+    }
+
+    /** Tests only: a sample in every saved number (the save and load check, {@code AwayKit.everyPartSavesAndLoads}). */
+    public void fillForTests(ServerLevel level) {
+        tufts.add(new Tuft(new BlockPos(4, 60, 5), 1234L, true));
     }
 
     void save(CompoundTag tag) {

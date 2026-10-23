@@ -12,6 +12,7 @@ import com.antcolonies.colony.ColonyHooks;
 import com.antcolonies.colony.ColonyQuestions;
 import com.antcolonies.nav.AntMoveControl;
 import com.antcolonies.colony.Colony;
+import com.antcolonies.registry.ModTags;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.ColonyNews;
 import com.antcolonies.colony.ColonyRole;
@@ -31,7 +32,6 @@ import com.antcolonies.species.SpeciesProfile;
 import com.antcolonies.species.SpeciesProfiles;
 import com.antcolonies.nav.Foothold;
 import com.antcolonies.nav.Slope;
-import com.antcolonies.registry.ModItems;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -301,15 +301,15 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
 
     /**
      * Whether the ant holds the nurses' food for the queen and the young: a piece of ant bread, plain or rich, or a
-     * termite's fungus nodule (on its way to the queen or a larva or nymph).
+     * termite's fungus nodule (on its way to the queen or a larva or nymph): {@link ModTags#NURSE_FOOD}.
      */
     public boolean isCarryingBread() {
-        return getCarriedSeed().is(ModItems.ANT_BREAD.get()) || isCarryingRichBread() || getCarriedSeed().is(ModItems.FUNGUS_NODULE.get());
+        return getCarriedSeed().is(ModTags.NURSE_FOOD) || isCarryingRichBread();
     }
 
-    /** Whether the piece of bread the ant holds is rich ant bread. */
+    /** Whether the piece of bread the ant holds is rich ant bread ({@link ModTags#RICH_NURSE_FOOD}). */
     public boolean isCarryingRichBread() {
-        return getCarriedSeed().is(ModItems.RICH_ANT_BREAD.get());
+        return getCarriedSeed().is(ModTags.RICH_NURSE_FOOD);
     }
 
     public void setCarriedSeed(ItemStack seed) {
@@ -436,9 +436,9 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return isAlive() && !hasFullMandibles() && getTarget() == null && !isPassenger();
     }
 
-    /** The kind of body this insect leaves (a dead ant; termites override it). */
+    /** The kind of body this insect leaves: its species' dead ({@link com.antcolonies.species.SpeciesBodies}). */
     protected net.minecraft.world.entity.EntityType<AntCorpseEntity> bodyType() {
-        return com.antcolonies.registry.ModEntities.ANT_CORPSE.get();
+        return com.antcolonies.species.SpeciesBodies.of(species()).corpse().get();
     }
 
     /**
@@ -487,6 +487,13 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
 
     /** How long (in seconds) before it counts as idle an ant looks for its own work at every chance (see {@link #looksForWork}). */
     private static final int LAST_LOOK_SECONDS = 2;
+
+    /**
+     * This insect joins no colony on its own (one a game test walks around by hand). The insects that join the nearest
+     * colony of their species by themselves (workers, soldiers) say how; the others never join one by themselves.
+     */
+    public void keepOutOfColonies() {
+    }
 
     /** Whether this insect is a worker that gets a role from its colony (builder, forager, nurse). Queens and kings don't. */
     protected boolean hasColonyRole() {
@@ -636,7 +643,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     }
 
     /** The species this insect is (for its profile while it has no colony). */
-    protected abstract ResourceLocation species();
+    public abstract ResourceLocation species();
 
     /** Server: this insect's species profile (its colony's, or its species' own while it has none). */
     public SpeciesProfile profile() {

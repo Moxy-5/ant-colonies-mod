@@ -9,9 +9,9 @@ import com.antcolonies.AntColoniesMod;
 import com.antcolonies.block.FungusCombBlock;
 import com.antcolonies.block.SeedPileBlock;
 import com.antcolonies.entity.AbstractAntEntity;
-import com.antcolonies.registry.ModBlocks;
-import com.antcolonies.registry.ModItems;
 import com.antcolonies.species.SpeciesProfile;
+import com.antcolonies.registry.SavannaBlocks;
+import com.antcolonies.registry.SavannaItems;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
@@ -65,7 +65,7 @@ public class FungusGarden implements NurseFood {
 
     /** ", mushrooms after rain: 2 (last rain 2 came up)" or ", no mushrooms yet (comb 5 of 8 layers)". */
     private String describeMushrooms(Level level) {
-        Mushrooms mushrooms = colony.part(ColonyParts.MUSHROOMS).orElse(null);
+        Mushrooms mushrooms = colony.part(SavannaParts.MUSHROOMS).orElse(null);
         if (mushrooms == null) {
             return "";
         }
@@ -138,7 +138,7 @@ public class FungusGarden implements NurseFood {
     public List<BlockPos> getCombs(Level level) {
         List<BlockPos> combs = new ArrayList<>();
         for (BlockPos pos : colony.nest().getGardenCells(level)) {
-            if (level.getBlockState(pos).is(ModBlocks.FUNGUS_COMB.get())) {
+            if (level.getBlockState(pos).is(SavannaBlocks.FUNGUS_COMB.get())) {
                 combs.add(pos);
             }
         }
@@ -228,7 +228,7 @@ public class FungusGarden implements NurseFood {
                 }
                 changed = true;
             }
-            if (state.is(ModBlocks.FUNGUS_COMB.get())) {
+            if (state.is(SavannaBlocks.FUNGUS_COMB.get())) {
                 combs++;
                 fresh += FungusCombBlock.fresh(state);
                 ripe += FungusCombBlock.ripe(state);
@@ -307,7 +307,7 @@ public class FungusGarden implements NurseFood {
 
     @Override
     public ItemStack piece() {
-        return new ItemStack(ModItems.FUNGUS_NODULE.get());
+        return new ItemStack(SavannaItems.FUNGUS_NODULE.get());
     }
 
     /** How many nodules there were the last second the garden was loaded. */
@@ -315,7 +315,7 @@ public class FungusGarden implements NurseFood {
         return seenNodules;
     }
 
-    /** Tests only: a sample in every saved number (the save and load check, {@code AwayTests.everyPartSavesAndLoads}). */
+    /** Tests only: a sample in every saved number (the save and load check, {@code AwayKit.everyPartSavesAndLoads}). */
     public void fillForTests(ServerLevel level) {
         seenCombs = 3;
         seenFresh = 2;
@@ -384,11 +384,11 @@ public class FungusGarden implements NurseFood {
     @Override
     public ItemStack takeFoodAt(Level level, BlockPos spot, boolean wantRich) {
         BlockState state = level.getBlockState(spot);
-        if (!state.is(ModBlocks.FUNGUS_COMB.get()) || state.getValue(FungusCombBlock.NODULES) == 0) {
+        if (!state.is(SavannaBlocks.FUNGUS_COMB.get()) || state.getValue(FungusCombBlock.NODULES) == 0) {
             return ItemStack.EMPTY;
         }
         level.setBlock(spot, state.setValue(FungusCombBlock.NODULES, state.getValue(FungusCombBlock.NODULES) - 1), 3);
-        return new ItemStack(ModItems.FUNGUS_NODULE.get());
+        return new ItemStack(SavannaItems.FUNGUS_NODULE.get());
     }
 
     @Override
@@ -406,7 +406,7 @@ public class FungusGarden implements NurseFood {
     @Override
     public boolean putBack(Level level, BlockPos spot, boolean rich) {
         BlockState state = level.getBlockState(spot);
-        if (!state.is(ModBlocks.FUNGUS_COMB.get()) || state.getValue(FungusCombBlock.NODULES) >= FungusCombBlock.MAX_NODULES) {
+        if (!state.is(SavannaBlocks.FUNGUS_COMB.get()) || state.getValue(FungusCombBlock.NODULES) >= FungusCombBlock.MAX_NODULES) {
             return false;
         }
         level.setBlock(spot, state.setValue(FungusCombBlock.NODULES, state.getValue(FungusCombBlock.NODULES) + 1), 3);

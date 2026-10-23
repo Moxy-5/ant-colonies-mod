@@ -12,8 +12,8 @@ import com.antcolonies.entity.WorkerAntEntity;
 import com.antcolonies.nav.Foothold;
 import com.antcolonies.nav.Route;
 import com.antcolonies.nav.StepKind;
-import com.antcolonies.registry.ModBlocks;
-import com.antcolonies.registry.ModEntities;
+import com.antcolonies.registry.DesertBlocks;
+import com.antcolonies.registry.DesertEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -38,7 +38,7 @@ public class NavigationTests {
     @GameTest(template = "arena", timeoutTicks = 5000, skyAccess = true)
     public static void queenWalksFromTheRoomUpToTheSurfaceAndBackDown(GameTestHelper helper) {
         buildNest(helper);
-        QueenAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.QUEEN_ANT.get(), MIDDLE + 8, SURFACE - 3, MIDDLE + 2);
+        QueenAntEntity ant = helper.spawnWithNoFreeWill(DesertEntities.QUEEN_ANT.get(), MIDDLE + 8, SURFACE - 3, MIDDLE + 2);
         BlockPos up = helper.absolutePos(new BlockPos(MIDDLE + 3, SURFACE, MIDDLE + 2));
         BlockPos down = helper.absolutePos(new BlockPos(MIDDLE + 8, SURFACE - 3, MIDDLE - 2));
         boolean[] wentUp = {false};
@@ -64,7 +64,7 @@ public class NavigationTests {
     @GameTest(template = "arena", timeoutTicks = 600, skyAccess = true)
     public static void antToldToGoToItsOwnCellSurvivesBeingMovedAway(GameTestHelper helper) {
         buildNest(helper);
-        WorkerAntEntity ant = TestAnts.loneAnt(helper, MIDDLE + 5, SURFACE, MIDDLE + 5);
+        WorkerAntEntity ant = DesertTests.loneAnt(helper, MIDDLE + 5, SURFACE, MIDDLE + 5);
         BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE + 5, SURFACE, MIDDLE + 5));
         helper.runAfterDelay(10, () -> {
             ant.getNavigator().moveTo(ant.blockPosition(), 1.0);
@@ -85,7 +85,7 @@ public class NavigationTests {
         }
         Route square = new Route(steps, 9.0);
         BlockPos farCorner = helper.absolutePos(new BlockPos(x0 + 3, SURFACE, z0 + 3));
-        WorkerAntEntity follower = TestAnts.loneAnt(helper, x0, SURFACE, z0);
+        WorkerAntEntity follower = DesertTests.loneAnt(helper, x0, SURFACE, z0);
         boolean[] movedOff = {false};
         boolean[] atFarCorner = {false};
         helper.runAfterDelay(10, () -> helper.assertTrue(follower.getNavigator().follow(square, 1.0), "no way onto the route " + square));
@@ -121,14 +121,14 @@ public class NavigationTests {
         buildNest(helper);
         helper.setBlock(MIDDLE + 6, SURFACE - 1, MIDDLE + 9, Blocks.AIR);
         helper.setBlock(MIDDLE - 6, SURFACE - 1, MIDDLE + 9, Blocks.AIR);
-        WorkerAntEntity inPit = TestAnts.loneAnt(helper, MIDDLE + 6.5F, (float) (SURFACE - 1), MIDDLE + 9.5F);
-        WorkerAntEntity abovePit = TestAnts.loneAnt(helper, MIDDLE - 5.5F, (float) SURFACE, MIDDLE + 9.5F);
+        WorkerAntEntity inPit = DesertTests.loneAnt(helper, MIDDLE + 6.5F, (float) (SURFACE - 1), MIDDLE + 9.5F);
+        WorkerAntEntity abovePit = DesertTests.loneAnt(helper, MIDDLE - 5.5F, (float) SURFACE, MIDDLE + 9.5F);
         BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE + 3, SURFACE, MIDDLE + 9));
         BlockPos otherGoal = helper.absolutePos(new BlockPos(MIDDLE - 3, SURFACE, MIDDLE + 9));
         helper.runAfterDelay(1, () -> abovePit.getNavigator().moveTo(otherGoal, 1.0));
         helper.runAfterDelay(10, () -> inPit.getNavigator().moveTo(goal, 1.0));
         watch(helper, inPit);
-        watch(helper, abovePit, false);
+        TestWatch.watch(helper, abovePit, false);
         helper.succeedWhen(() -> {
             helper.assertTrue(helper.getTick() > 20, "not started yet");
             helper.assertTrue(inPit.getNavigator().isDone() && !inPit.getNavigator().hasFailed() && inPit.blockPosition().equals(goal),
@@ -208,7 +208,7 @@ public class NavigationTests {
                 int y = standingY(helper, MIDDLE + dx, MIDDLE + dz);
                 float fx = MIDDLE + dx + (anywhereInCell ? 0.2F + 0.6F * random.nextFloat() : 0.5F);
                 float fz = MIDDLE + dz + (anywhereInCell ? 0.2F + 0.6F * random.nextFloat() : 0.5F);
-                ants.add(TestAnts.loneAnt(helper, fx, (float) y, fz));
+                ants.add(DesertTests.loneAnt(helper, fx, (float) y, fz));
                 starts.add(dx + "," + dz + " y" + y);
             }
         }
@@ -257,7 +257,7 @@ public class NavigationTests {
         for (int dx = -Hill.MOUND_RADIUS; dx <= Hill.MOUND_RADIUS; dx++) {
             for (int dz = -Hill.MOUND_RADIUS; dz <= Hill.MOUND_RADIUS; dz++) {
                 for (int h = 0; h < Hill.moundHeightAt(dx, dz); h++) {
-                    helper.setBlock(MIDDLE + dx, SURFACE + h, MIDDLE + dz, ModBlocks.BURROWED_DIRT.get());
+                    helper.setBlock(MIDDLE + dx, SURFACE + h, MIDDLE + dz, DesertBlocks.BURROWED_DIRT.get());
                 }
             }
         }
@@ -291,7 +291,7 @@ public class NavigationTests {
     @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
     public static void antWalksFromTheSurfaceDownToTheDeepestRoom(GameTestHelper helper) {
         buildNest(helper);
-        WorkerAntEntity ant = TestAnts.loneAnt(helper, MIDDLE - 3, SURFACE, MIDDLE + 3);
+        WorkerAntEntity ant = DesertTests.loneAnt(helper, MIDDLE - 3, SURFACE, MIDDLE + 3);
         BlockPos goal = chambers(helper).get(3).center();
         helper.runAfterDelay(10, () -> ant.getNavigator().moveTo(goal, 1.0));
         watch(helper, ant);
@@ -304,7 +304,7 @@ public class NavigationTests {
     public static void antWalksFromTheQueensRoomDownToTheRefuseChamberAndBack(GameTestHelper helper) {
         buildNest(helper);
         BlockPos start = chambers(helper).get(2).center().subtract(helper.absolutePos(BlockPos.ZERO));
-        WorkerAntEntity ant = TestAnts.loneAnt(helper, start.getX(), start.getY(), start.getZ());
+        WorkerAntEntity ant = DesertTests.loneAnt(helper, start.getX(), start.getY(), start.getZ());
         BlockPos deep = chambers(helper).get(3).center();
         BlockPos back = chambers(helper).get(2).center();
         boolean[] wentDown = {false};
@@ -324,7 +324,7 @@ public class NavigationTests {
     public static void antWalksFromTheDeepestRoomUpToTheSurface(GameTestHelper helper) {
         buildNest(helper);
         BlockPos start = chambers(helper).get(3).center().subtract(helper.absolutePos(BlockPos.ZERO));
-        WorkerAntEntity ant = TestAnts.loneAnt(helper, start.getX(), start.getY(), start.getZ());
+        WorkerAntEntity ant = DesertTests.loneAnt(helper, start.getX(), start.getY(), start.getZ());
         BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE + 3, SURFACE, MIDDLE + 2));
         helper.runAfterDelay(10, () -> ant.getNavigator().moveTo(goal, 1.0));
         watch(helper, ant);
@@ -349,7 +349,7 @@ public class NavigationTests {
         for (int level = 0; level < NestPlan.MAX_LEVELS; level++) {
             BlockPos start = chambers(helper).get(level).center().subtract(helper.absolutePos(BlockPos.ZERO));
             for (int[] goal : goals) {
-                ants.add(TestAnts.loneAnt(helper, start.getX(), start.getY(), start.getZ()));
+                ants.add(DesertTests.loneAnt(helper, start.getX(), start.getY(), start.getZ()));
                 targets.add(helper.absolutePos(new BlockPos(MIDDLE + goal[0], SURFACE, MIDDLE + goal[1])));
                 rooms.add("room " + level);
             }
@@ -362,7 +362,7 @@ public class NavigationTests {
             }
         });
         for (WorkerAntEntity ant : ants) {
-            watch(helper, ant, ant == ants.get(0));
+            TestWatch.watch(helper, ant, ant == ants.get(0));
             trackSteadiness(helper, ant);
         }
         helper.succeedWhen(() -> {
@@ -384,8 +384,8 @@ public class NavigationTests {
         buildNest(helper);
         buildHill(helper);
         BlockPos start = chambers(helper).get(1).center().subtract(helper.absolutePos(BlockPos.ZERO));
-        WorkerAntEntity ant = TestAnts.loneAnt(helper, start.getX(), start.getY(), start.getZ());
-        WorkerAntEntity stopped = TestAnts.loneAnt(helper, start.getX(), start.getY(), start.getZ());
+        WorkerAntEntity ant = DesertTests.loneAnt(helper, start.getX(), start.getY(), start.getZ());
+        WorkerAntEntity stopped = DesertTests.loneAnt(helper, start.getX(), start.getY(), start.getZ());
         BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE, SURFACE - 1, MIDDLE));
         BlockPos out = helper.absolutePos(new BlockPos(MIDDLE - 5, SURFACE, MIDDLE - 2));
         long[] arrived = {-1};
@@ -393,8 +393,8 @@ public class NavigationTests {
         long[] stoppedTick = {0};
         helper.runAfterDelay(10, () -> ant.getNavigator().moveTo(goal, 1.0));
         helper.runAfterDelay(10, () -> stopped.getNavigator().moveTo(out, 1.0));
-        watch(helper, ant, false);
-        watch(helper, stopped, false);
+        TestWatch.watch(helper, ant, false);
+        TestWatch.watch(helper, stopped, false);
         helper.onEachTick(() -> {
             double y = stopped.getY() - helper.absolutePos(BlockPos.ZERO).getY();
             if (Double.isNaN(stoppedAt[0]) && stopped.getNavigator().isClimbing() && y > SURFACE - 1.5 && y < SURFACE + 1) {
@@ -436,12 +436,12 @@ public class NavigationTests {
         Direction[] clung = new Direction[depths.length];
         long[] arrived = {-1, -1};
         for (int k = 0; k < depths.length; k++) {
-            ants[k] = TestAnts.loneAnt(helper, start.getX(), start.getY(), start.getZ());
+            ants[k] = DesertTests.loneAnt(helper, start.getX(), start.getY(), start.getZ());
             hangs[k] = helper.absolutePos(new BlockPos(MIDDLE, SURFACE - depths[k], MIDDLE));
             int which = k;
             // The second waits a little, so the two are not on the same stretch of wall at once.
             helper.runAfterDelay(10 + 100 * k, () -> ants[which].getNavigator().moveTo(hangs[which], 1.0));
-            watch(helper, ants[k], k == 0);
+            TestWatch.watch(helper, ants[k], k == 0);
         }
         helper.onEachTick(() -> {
             for (int k = 0; k < depths.length; k++) {
@@ -485,15 +485,15 @@ public class NavigationTests {
         for (Direction wall : Direction.Plane.HORIZONTAL) {
             for (Direction side : new Direction[] {wall.getClockWise(), wall.getCounterClockWise()}) {
                 BlockPos block = new BlockPos(3 + (i % 4) * 5, SURFACE, 3 + (i / 4) * 16);
-                helper.setBlock(block, ModBlocks.BURROWED_DIRT.get());
+                helper.setBlock(block, DesertBlocks.BURROWED_DIRT.get());
                 BlockPos start = block.relative(wall.getOpposite());
                 BlockPos end = start.relative(side).relative(wall);
                 Route route = new Route(List.of(
                         new Route.Step(new Foothold(helper.absolutePos(start), wall), StepKind.START),
                         new Route.Step(new Foothold(helper.absolutePos(end), side.getOpposite()), StepKind.ROUND_EDGE)), 1.2);
-                WorkerAntEntity ant = TestAnts.loneAnt(helper, start.getX(), start.getY(), start.getZ());
+                WorkerAntEntity ant = DesertTests.loneAnt(helper, start.getX(), start.getY(), start.getZ());
                 helper.runAfterDelay(10, () -> helper.assertTrue(ant.getNavigator().follow(route, 1.0), "no way onto the route " + route));
-                watch(helper, ant, false);
+                TestWatch.watch(helper, ant, false);
                 ants.add(ant);
                 ends.add(helper.absolutePos(end));
                 i++;
@@ -519,11 +519,11 @@ public class NavigationTests {
         buildNest(helper);
         NestPlan.Chamber store = chambers(helper).get(0);
         BlockPos corner = store.room().get(store.room().size() - 1).subtract(helper.absolutePos(BlockPos.ZERO));
-        WorkerAntEntity ant = TestAnts.loneAnt(helper, corner.getX(), corner.getY(), corner.getZ());
+        WorkerAntEntity ant = DesertTests.loneAnt(helper, corner.getX(), corner.getY(), corner.getZ());
         Foothold goal = Foothold.ceiling(store.center());
         long[] arrived = {-1};
         helper.runAfterDelay(10, () -> helper.assertTrue(ant.getNavigator().moveTo(goal, 1.0), "no route to the ceiling"));
-        watch(helper, ant, false);
+        TestWatch.watch(helper, ant, false);
         helper.succeedWhen(() -> {
             if (arrived[0] < 0 && helper.getTick() > 12 && ant.getNavigator().isDone()) {
                 helper.assertTrue(!ant.getNavigator().hasFailed(), "the walk to the ceiling failed");
@@ -553,9 +553,9 @@ public class NavigationTests {
         for (Direction out : Direction.Plane.HORIZONTAL) {
             BlockPos pillar = pillars[i++];
             BlockPos overhang = pillar.above().relative(out);
-            helper.setBlock(pillar, ModBlocks.BURROWED_DIRT.get());
-            helper.setBlock(pillar.above(), ModBlocks.BURROWED_DIRT.get());
-            helper.setBlock(overhang, ModBlocks.BURROWED_DIRT.get());
+            helper.setBlock(pillar, DesertBlocks.BURROWED_DIRT.get());
+            helper.setBlock(pillar.above(), DesertBlocks.BURROWED_DIRT.get());
+            helper.setBlock(overhang, DesertBlocks.BURROWED_DIRT.get());
             Direction side = out.getClockWise();
             BlockPos start = overhang.relative(out);
             BlockPos end = overhang.relative(side);
@@ -564,9 +564,9 @@ public class NavigationTests {
                     new Route.Step(Foothold.ceiling(helper.absolutePos(overhang.below())), StepKind.UNDER_EDGE),
                     new Route.Step(new Foothold(helper.absolutePos(end), side.getOpposite()), StepKind.OUT_FROM_UNDER)), 4.0);
             BlockPos ground = start.below();
-            WorkerAntEntity ant = TestAnts.loneAnt(helper, ground.getX(), ground.getY(), ground.getZ());
+            WorkerAntEntity ant = DesertTests.loneAnt(helper, ground.getX(), ground.getY(), ground.getZ());
             helper.runAfterDelay(10, () -> helper.assertTrue(ant.getNavigator().follow(route, 1.0), "no way onto the route " + route));
-            watch(helper, ant, false);
+            TestWatch.watch(helper, ant, false);
             ants.add(ant);
             ends.add(helper.absolutePos(end));
         }
@@ -589,12 +589,12 @@ public class NavigationTests {
     public static void antsOnTheShaftWallAndTheCeilingAreStillThereAfterAReload(GameTestHelper helper) {
         buildNest(helper);
         BlockPos start = chambers(helper).get(1).center().subtract(helper.absolutePos(BlockPos.ZERO));
-        WorkerAntEntity onWall = TestAnts.loneAnt(helper, start.getX(), start.getY(), start.getZ());
+        WorkerAntEntity onWall = DesertTests.loneAnt(helper, start.getX(), start.getY(), start.getZ());
         BlockPos wall = helper.absolutePos(new BlockPos(MIDDLE, SURFACE - 1, MIDDLE));
         helper.runAfterDelay(10, () -> onWall.getNavigator().moveTo(wall, 1.0));
         NestPlan.Chamber store = chambers(helper).get(0);
         BlockPos corner = store.room().get(0).subtract(helper.absolutePos(BlockPos.ZERO));
-        WorkerAntEntity onCeiling = TestAnts.loneAnt(helper, corner.getX(), corner.getY(), corner.getZ());
+        WorkerAntEntity onCeiling = DesertTests.loneAnt(helper, corner.getX(), corner.getY(), corner.getZ());
         Foothold ceiling = Foothold.ceiling(store.center());
         helper.runAfterDelay(10, () -> onCeiling.getNavigator().moveTo(ceiling, 1.0));
         java.util.function.Supplier<String> wallCheck = reloadOnceUp(helper, onWall,
@@ -619,7 +619,7 @@ public class NavigationTests {
         WorkerAntEntity[] copy = {null};
         double[] savedY = {0.0};
         long[] loadedAt = {0};
-        watch(helper, ant, false);
+        TestWatch.watch(helper, ant, false);
         helper.onEachTick(() -> {
             if (copy[0] != null) {
                 return;
@@ -632,7 +632,7 @@ public class NavigationTests {
                 tag.remove("UUID");
                 savedY[0] = ant.getY();
                 ant.discard();
-                WorkerAntEntity loaded = ModEntities.WORKER_ANT.get().create(helper.getLevel());
+                WorkerAntEntity loaded = DesertEntities.WORKER_ANT.get().create(helper.getLevel());
                 loaded.load(tag);
                 // Like the ant it replaces: no mind of its own (no job or stroll may move it) and no colony.
                 loaded.removeFreeWill();
@@ -678,88 +678,8 @@ public class NavigationTests {
         });
     }
 
-    /** Logs the ant's position and what its walker is doing every 4 ticks. */
-    /** Most climbing ticks in a row an ant may hang in mid-air, touching nothing (a short moment at the very top is fine). */
-    private static final int MAX_FLOATING_TICKS = 6;
-    /** Most ticks in a row an ant may lean on a wall while standing on the floor without touching it (a moment at the very top is fine). */
-    private static final int MAX_LEANING_TICKS = 8;
-
-    /** Most ticks in a row a walking ant may hang in the air on a wall without rising or sliding on anything (just a moment at a corner). */
-    private static final int MAX_HOVER_TICKS = 4;
-
     private static void watch(GameTestHelper helper, AbstractAntEntity ant) {
-        watch(helper, ant, true);
-    }
-
-    static void watch(GameTestHelper helper, AbstractAntEntity ant, boolean verbose) {
-        Vec3 origin = Vec3.atLowerCornerOf(helper.absolutePos(BlockPos.ZERO));
-        int[] floating = {0};
-        int[] leaning = {0};
-        int[] hovering = {0};
-        Vec3[] lastPos = {null};
-        helper.onEachTick(() -> {
-            // An ant on its way up that neither rises (nor crawls sideways along its wall) nor has anything under it
-            // hangs in the air: it must always be moving on.
-            boolean moved = lastPos[0] != null && ant.position().distanceTo(lastPos[0]) >= 0.01;
-            lastPos[0] = ant.position();
-            boolean hovers = ant.getNavigator().isClimbing() && !ant.getNavigator().isDone() && !moved
-                    && !ant.getNavigator().isMovingExactly() // holding still in a chimney mouth's tube, looking out
-                    && helper.getLevel().noCollision(ant, ant.getBoundingBox().move(0.0, -0.05, 0.0))
-                    && helper.getLevel().noCollision(ant, ant.getBoundingBox().move(0.0, 0.05, 0.0)); // a ceiling holds it too
-            hovering[0] = hovers ? hovering[0] + 1 : 0;
-            helper.assertTrue(hovering[0] <= MAX_HOVER_TICKS, "the ant hangs in the air without climbing at "
-                    + ant.position().subtract(Vec3.atLowerCornerOf(helper.absolutePos(BlockPos.ZERO))) + ", on " + ant.getNavigator().getFoothold()
-                    + ", step " + ant.getNavigator().getNextWaypoint() + " of route " + ant.getNavigator().getPlannedRoute());
-        });
-        helper.onEachTick(() -> {
-            // An ant standing on the floor away from any wall must walk, not lean against the wall: that looks like hovering.
-            boolean leansOnTheFloor = ant.getNavigator().isClimbing() && ant.onGround() && !ant.horizontalCollision;
-            leaning[0] = leansOnTheFloor ? leaning[0] + 1 : 0;
-            helper.assertTrue(leaning[0] <= MAX_LEANING_TICKS, "the ant leans against a wall it has not reached, at "
-                    + ant.position().subtract(Vec3.atLowerCornerOf(helper.absolutePos(BlockPos.ZERO))) + ", on " + ant.getNavigator().getFoothold()
-                    + ", route " + ant.getNavigator().getPlannedRoute());
-        });
-        helper.onEachTick(() -> {
-            // Holding nothing: no block's shape (as it is drawn) near the body. The drawn shape, not the collision: a
-            // termite climbs the outside of a chimney mouth it could also pass through. Not while it goes in or out by a
-            // chimney mouth's tube: that motion is exact, and the tube sticks up out of the block.
-            boolean hanging = ant.getNavigator().isClimbing() && !ant.getNavigator().isMovingExactly()
-                    && !touchesABlock(helper, ant.getBoundingBox().inflate(0.08));
-            floating[0] = hanging ? floating[0] + 1 : 0;
-            helper.assertTrue(floating[0] <= MAX_FLOATING_TICKS, "the ant is floating while climbing, at "
-                    + ant.position().subtract(Vec3.atLowerCornerOf(helper.absolutePos(BlockPos.ZERO))) + ", on " + ant.getNavigator().getFoothold()
-                    + ", route " + ant.getNavigator().getPlannedRoute());
-        });
-        helper.onEachTick(() -> {
-            if (verbose && helper.getTick() % 4 == 0 && helper.getTick() >= 8) {
-                Vec3 at = ant.position().subtract(origin);
-                List<BlockPos> route = ant.getNavigator().getRoute();
-                String next = route == null || ant.getNavigator().getNextWaypoint() >= route.size()
-                        ? "-" : route.get(ant.getNavigator().getNextWaypoint()).subtract(BlockPos.containing(origin)).toShortString();
-                AntColoniesMod.LOGGER.info("[nav-test] #{} t{} pos {},{},{} cell {} next {} climbing={} collided={} done={} failed={} attached={} motion={} y={}",
-                        ant.getId(), helper.getTick(), r(at.x), r(at.y), r(at.z),
-                        ant.blockPosition().subtract(BlockPos.containing(origin)).toShortString(), next,
-                        ant.getNavigator().isClimbing(), ant.horizontalCollision,
-                        ant.getNavigator().isDone(), ant.getNavigator().hasFailed(), ant.getNavigator().isAttached(), ant.getNavigator().getClimbMotion(), ant.getY());
-            }
-        });
-    }
-
-    /** Whether any block's shape (as it is drawn, not its collision for someone) reaches into the box. */
-    static boolean touchesABlock(GameTestHelper helper, net.minecraft.world.phys.AABB box) {
-        net.minecraft.server.level.ServerLevel level = helper.getLevel();
-        for (BlockPos pos : BlockPos.betweenClosed(BlockPos.containing(box.minX, box.minY, box.minZ), BlockPos.containing(box.maxX, box.maxY, box.maxZ))) {
-            for (net.minecraft.world.phys.AABB part : level.getBlockState(pos).getShape(level, pos).toAabbs()) {
-                if (part.move(pos).intersects(box)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    private static String r(double value) {
-        return String.format("%.3f", value);
+        TestWatch.watch(helper, ant, true);
     }
 
     private static List<String> relative(GameTestHelper helper, List<BlockPos> route) {

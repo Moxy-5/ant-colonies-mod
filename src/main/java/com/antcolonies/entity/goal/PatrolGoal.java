@@ -8,7 +8,7 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
-import com.antcolonies.colony.ColonyParts;
+import com.antcolonies.colony.DesertParts;
 import com.antcolonies.colony.Patrol;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.species.SpeciesProfile;
@@ -71,7 +71,7 @@ public class PatrolGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        patrol = colony == null ? null : colony.part(ColonyParts.PATROL).orElse(null);
+        patrol = colony == null ? null : colony.part(DesertParts.PATROL).orElse(null);
         return patrol != null && patrol.jobOf(ant.getUUID()) != null;
     }
 
@@ -122,7 +122,7 @@ public class PatrolGoal extends Goal {
             patrol.home(level, ant, calm); // gave up: counts as home
         }
         if (colony != null && atDoor >= 0) {
-            colony.part(ColonyParts.DOOR).ifPresent(door -> door.doneCarrying(ant));
+            colony.part(DesertParts.DOOR).ifPresent(door -> door.doneCarrying(ant));
         }
         waypoints.clear();
         colony = null;
@@ -138,7 +138,7 @@ public class PatrolGoal extends Goal {
         if (atDoor >= 0) {
             atDoor++;
             if (atDoor % 5 == 0 && calm) {
-                colony.part(ColonyParts.DOOR).ifPresent(door -> door.homecomer(level, ant, false));
+                colony.part(DesertParts.DOOR).ifPresent(door -> door.homecomer(level, ant, false));
             }
             return;
         }

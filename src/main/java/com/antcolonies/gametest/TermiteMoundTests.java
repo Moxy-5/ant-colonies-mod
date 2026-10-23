@@ -5,13 +5,13 @@ import com.antcolonies.block.TermiteHoleBlock;
 import com.antcolonies.block.TermiteMoundBlock;
 import com.antcolonies.block.TermiteMouthBlock;
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.ColonyParts;
+import com.antcolonies.colony.SavannaParts;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.species.Species;
+import com.antcolonies.entity.TermiteSoldierEntity;
 import com.antcolonies.entity.TermiteWorkerEntity;
-import com.antcolonies.entity.WorkerAntEntity;
-import com.antcolonies.registry.ModBlocks;
-import com.antcolonies.registry.ModEntities;
+import com.antcolonies.registry.SavannaBlocks;
+import com.antcolonies.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -31,18 +31,6 @@ public class TermiteMoundTests {
     static final int SURFACE = 12;
     static final int MIDDLE = 12;
 
-    /** Earth 12 blocks deep under grass over the whole test area (room for the nest and the galleries). */
-    static void deepGround(GameTestHelper helper) {
-        for (int x = 0; x < 25; x++) {
-            for (int z = 0; z < 25; z++) {
-                for (int y = 0; y < SURFACE - 1; y++) {
-                    helper.setBlock(x, y, z, Blocks.DIRT);
-                }
-                helper.setBlock(x, SURFACE - 1, z, Blocks.GRASS_BLOCK);
-            }
-        }
-    }
-
     /** The termite colony in this test area (one with a living queen). */
     static Colony colony(GameTestHelper helper) {
         net.minecraft.world.phys.AABB area = helper.getBounds();
@@ -54,7 +42,7 @@ public class TermiteMoundTests {
             // Both still needed on the 65 x 65 arenas (tried 2026-10-14: without either, the hay test failed in full runs
             // and passed alone): scouts and foragers stay in this test's arena, and only this test's enemies raise its alarm.
             found.foodMap().setTestArea(area.expandTowards(0, 16, 0)); // (taller: food up a slope may stand above the arena)
-            found.part(ColonyParts.ALARM).orElseThrow().setTestArea(area);
+            found.part(SavannaParts.ALARM).orElseThrow().setTestArea(area);
         }
         return found;
     }
@@ -77,41 +65,41 @@ public class TermiteMoundTests {
     public static void cathedralPiecesArePlacedByHand(GameTestHelper helper) {
         ground(helper);
         net.minecraft.world.entity.player.Player player = helper.makeMockPlayer(net.minecraft.world.level.GameType.CREATIVE);
-        net.minecraft.world.item.ItemStack spires = new net.minecraft.world.item.ItemStack(com.antcolonies.registry.ModItems.TERMITE_SPIRE.get(), 64);
+        net.minecraft.world.item.ItemStack spires = new net.minecraft.world.item.ItemStack(com.antcolonies.registry.SavannaItems.TERMITE_SPIRE.get(), 64);
         // A spire: five pieces in a column narrow to the tip.
         for (int y = 0; y < 6; y++) {
             place(helper, player, spires, new BlockPos(1, y, 1));
         }
         for (int y = 1; y <= 6; y++) {
             BlockState piece = helper.getBlockState(new BlockPos(1, y, 1));
-            helper.assertTrue(piece.is(ModBlocks.TERMITE_SPIRE.get()), "no spire piece at height " + y);
+            helper.assertTrue(piece.is(SavannaBlocks.TERMITE_SPIRE.get()), "no spire piece at height " + y);
             int expected = Math.min(com.antcolonies.block.TermiteSpireBlock.TIP, y - 1);
             helper.assertTrue(piece.getValue(com.antcolonies.block.TermiteSpireBlock.THICKNESS) == expected,
                     "spire piece " + y + " has thickness " + piece.getValue(com.antcolonies.block.TermiteSpireBlock.THICKNESS) + ", not " + expected);
         }
         // Two ramps: one rising east, and ahead of it one rising north: the first becomes an outer corner.
-        net.minecraft.world.item.ItemStack ramps = new net.minecraft.world.item.ItemStack(com.antcolonies.registry.ModItems.TERMITE_RAMP.get(), 64);
+        net.minecraft.world.item.ItemStack ramps = new net.minecraft.world.item.ItemStack(com.antcolonies.registry.SavannaItems.TERMITE_RAMP.get(), 64);
         player.setYRot(-90.0F); // looking east
         place(helper, player, ramps, new BlockPos(3, 0, 3));
         player.setYRot(180.0F); // looking north
         place(helper, player, ramps, new BlockPos(4, 0, 3));
         BlockState first = helper.getBlockState(new BlockPos(3, 1, 3));
         BlockState second = helper.getBlockState(new BlockPos(4, 1, 3));
-        helper.assertTrue(first.is(ModBlocks.TERMITE_RAMP.get()) && second.is(ModBlocks.TERMITE_RAMP.get()), "the ramps were not placed");
+        helper.assertTrue(first.is(SavannaBlocks.TERMITE_RAMP.get()) && second.is(SavannaBlocks.TERMITE_RAMP.get()), "the ramps were not placed");
         helper.assertTrue(first.getValue(com.antcolonies.block.TermiteRampBlock.FACING) == net.minecraft.core.Direction.EAST
                 && second.getValue(com.antcolonies.block.TermiteRampBlock.FACING) == net.minecraft.core.Direction.NORTH,
                 "the ramps do not rise the way the player looked");
         helper.assertTrue(first.getValue(com.antcolonies.block.TermiteRampBlock.SHAPE) == net.minecraft.world.level.block.state.properties.StairsShape.OUTER_LEFT,
                 "the ramps did not join into a corner (" + first.getValue(com.antcolonies.block.TermiteRampBlock.SHAPE) + ")");
         // A chimney mouth on top of a spire piece: slim; with soil beside it, a full block.
-        helper.setBlock(new BlockPos(4, 1, 1), ModBlocks.TERMITE_SPIRE.get());
-        place(helper, player, new net.minecraft.world.item.ItemStack(com.antcolonies.registry.ModItems.TERMITE_MOUTH.get()), new BlockPos(4, 1, 1));
+        helper.setBlock(new BlockPos(4, 1, 1), SavannaBlocks.TERMITE_SPIRE.get());
+        place(helper, player, new net.minecraft.world.item.ItemStack(com.antcolonies.registry.SavannaItems.TERMITE_MOUTH.get()), new BlockPos(4, 1, 1));
         BlockPos mouth = new BlockPos(4, 2, 1);
-        helper.assertTrue(helper.getBlockState(mouth).is(ModBlocks.TERMITE_MOUTH.get()) && helper.getBlockState(mouth).getValue(TermiteMouthBlock.SLIM),
+        helper.assertTrue(helper.getBlockState(mouth).is(SavannaBlocks.TERMITE_MOUTH.get()) && helper.getBlockState(mouth).getValue(TermiteMouthBlock.SLIM),
                 "a chimney mouth alone on a spire is not slim");
-        helper.setBlock(new BlockPos(5, 2, 1), ModBlocks.TERMITE_MOUND.get().defaultBlockState().setValue(TermiteMoundBlock.LAYERS, TermiteMoundBlock.FINISHED));
+        helper.setBlock(new BlockPos(5, 2, 1), SavannaBlocks.TERMITE_MOUND.get().defaultBlockState().setValue(TermiteMoundBlock.LAYERS, TermiteMoundBlock.FINISHED));
         helper.assertTrue(!helper.getBlockState(mouth).getValue(TermiteMouthBlock.SLIM), "a chimney mouth with soil beside it is still slim");
-        TermiteWorkerEntity termite = helper.spawnWithNoFreeWill(ModEntities.TERMITE_WORKER.get(), 0, 1, 0);
+        TermiteWorkerEntity termite = helper.spawnWithNoFreeWill(SavannaEntities.TERMITE_WORKER.get(), 0, 1, 0);
         BlockPos abs = helper.absolutePos(mouth);
         helper.assertTrue(helper.getBlockState(mouth).getCollisionShape(helper.getLevel(), abs, CollisionContext.of(termite)).isEmpty(),
                 "a termite cannot pass through the chimney mouth");
@@ -138,15 +126,15 @@ public class TermiteMoundTests {
         ground(helper);
         ServerLevel level = helper.getLevel();
         net.minecraft.world.entity.player.Player player = helper.makeMockPlayer(net.minecraft.world.level.GameType.CREATIVE);
-        net.minecraft.world.item.ItemStack tunnels = new net.minecraft.world.item.ItemStack(com.antcolonies.registry.ModItems.TERMITE_TUNNEL.get(), 64);
+        net.minecraft.world.item.ItemStack tunnels = new net.minecraft.world.item.ItemStack(com.antcolonies.registry.SavannaItems.TERMITE_TUNNEL.get(), 64);
         BlockPos a = new BlockPos(3, 1, 3);
         BlockPos b = a.east();
         BlockPos c = a.above();
         place(helper, player, tunnels, a.below());
         place(helper, player, tunnels, b.below());
         place(helper, player, tunnels, a);
-        helper.assertTrue(helper.getBlockState(a).is(ModBlocks.TERMITE_TUNNEL.get()) && helper.getBlockState(b).is(ModBlocks.TERMITE_TUNNEL.get())
-                && helper.getBlockState(c).is(ModBlocks.TERMITE_TUNNEL.get()), "the tunnel blocks were not placed");
+        helper.assertTrue(helper.getBlockState(a).is(SavannaBlocks.TERMITE_TUNNEL.get()) && helper.getBlockState(b).is(SavannaBlocks.TERMITE_TUNNEL.get())
+                && helper.getBlockState(c).is(SavannaBlocks.TERMITE_TUNNEL.get()), "the tunnel blocks were not placed");
         assertOpen(helper, a, "a tunnel with one beside it and one on top", net.minecraft.core.Direction.EAST, net.minecraft.core.Direction.UP);
         assertOpen(helper, b, "the tunnel beside it", net.minecraft.core.Direction.WEST);
         assertOpen(helper, c, "the tunnel on top", net.minecraft.core.Direction.DOWN);
@@ -171,7 +159,7 @@ public class TermiteMoundTests {
         assertOpen(helper, a, "after the tunnel beside it was broken", net.minecraft.core.Direction.EAST, net.minecraft.core.Direction.UP);
         BlockPos absA = helper.absolutePos(a);
         helper.assertTrue(helper.getBlockState(a).getLightBlock(level, absA) < level.getMaxLightLevel(), "no light gets into an open tunnel");
-        TermiteWorkerEntity termite = helper.spawnWithNoFreeWill(ModEntities.TERMITE_WORKER.get(), 0, 1, 0);
+        TermiteWorkerEntity termite = helper.spawnWithNoFreeWill(SavannaEntities.TERMITE_WORKER.get(), 0, 1, 0);
         helper.assertTrue(!helper.getBlockState(a).getCollisionShape(level, absA, CollisionContext.of(termite)).isEmpty(),
                 "a termite can pass through a tunnel block already");
         for (int i = 0; i < 20000 && helper.getBlockState(a).getValue(com.antcolonies.block.MoundSoil.AGE) < com.antcolonies.block.MoundSoil.OLDEST; i++) {
@@ -218,7 +206,7 @@ public class TermiteMoundTests {
     public static void aMoundBlockIsBuiltInLayersAndMustSetBeforeMoreIsStackedOnIt(GameTestHelper helper) {
         ground(helper);
         ServerLevel level = helper.getLevel();
-        TermiteMoundBlock mound = ModBlocks.TERMITE_MOUND.get();
+        TermiteMoundBlock mound = SavannaBlocks.TERMITE_MOUND.get();
         BlockPos pos = helper.absolutePos(new BlockPos(2, 1, 2));
         for (int layer = 1; layer <= TermiteMoundBlock.FINISHED; layer++) {
             helper.assertTrue(mound.addLayer(level, pos), "layer " + layer + " could not be added");
@@ -246,13 +234,13 @@ public class TermiteMoundTests {
         }
         BlockState old = level.getBlockState(pos);
         helper.assertTrue(old.getValue(TermiteMoundBlock.AGE) == TermiteMoundBlock.OLDEST && !old.isRandomlyTicking(), "the block did not end up old");
-        helper.assertTrue(TermiteMoundBlock.hardness(old) > TermiteMoundBlock.hardness(ModBlocks.TERMITE_MOUND.get().defaultBlockState()),
+        helper.assertTrue(TermiteMoundBlock.hardness(old) > TermiteMoundBlock.hardness(SavannaBlocks.TERMITE_MOUND.get().defaultBlockState()),
                 "old soil is not harder than wet soil");
         helper.assertTrue(mound.addLayer(level, pos.above()), "nothing could be built on a block that has set");
         // A finished block drops itself (this also fails if the loot table does not load); wet soil drops nothing.
         BlockState fresh = mound.defaultBlockState().setValue(TermiteMoundBlock.LAYERS, TermiteMoundBlock.FINISHED);
         helper.assertTrue(net.minecraft.world.level.block.Block.getDrops(fresh, level, pos, null).stream()
-                .anyMatch(stack -> stack.is(com.antcolonies.registry.ModItems.TERMITE_MOUND.get())), "a finished block drops nothing");
+                .anyMatch(stack -> stack.is(com.antcolonies.registry.SavannaItems.TERMITE_MOUND.get())), "a finished block drops nothing");
         helper.assertTrue(net.minecraft.world.level.block.Block.getDrops(mound.defaultBlockState(), level, pos, null).isEmpty(),
                 "a block still being built drops something");
         helper.succeed();
@@ -263,7 +251,7 @@ public class TermiteMoundTests {
     public static void aBlockOverAGapIsBuiltOutFromSetSoilBesideIt(GameTestHelper helper) {
         ground(helper);
         ServerLevel level = helper.getLevel();
-        TermiteMoundBlock mound = ModBlocks.TERMITE_MOUND.get();
+        TermiteMoundBlock mound = SavannaBlocks.TERMITE_MOUND.get();
         BlockState finished = mound.defaultBlockState().setValue(TermiteMoundBlock.LAYERS, TermiteMoundBlock.FINISHED);
         // A pillar two blocks high beside an empty space whose floor is one block lower (the gap).
         helper.setBlock(new BlockPos(2, 1, 2), finished);
@@ -277,9 +265,10 @@ public class TermiteMoundTests {
     }
 
     /**
-     * A termite walks through a chimney block into a room that is closed all round; an ant finds no way in. The route
-     * planner treats the chimney block as a doorway for termites only, and so does the block itself: termites walk
-     * through it, an ant (and so any other creature) bumps into it.
+     * A termite walks through a chimney block into a room that is closed all round; a minor soldier from no colony finds
+     * no way in. The route planner treats the chimney block as a doorway for the termites that pass the holes only, and
+     * so does the block itself: workers walk through it, a soldier (and so any other creature) bumps into it. (The
+     * outsider was a harvester ant until the split, step S4; an ant comes back with the Matabele ant, M8 step 1.)
      */
     @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
     public static void aTermiteWalksThroughAChimneyBlockIntoAClosedRoom(GameTestHelper helper) {
@@ -293,18 +282,18 @@ public class TermiteMoundTests {
                 }
             }
         }
-        helper.setBlock(new BlockPos(4, 1, 2), ModBlocks.TERMITE_HOLE.get());
+        helper.setBlock(new BlockPos(4, 1, 2), SavannaBlocks.TERMITE_HOLE.get());
         BlockPos inside = helper.absolutePos(new BlockPos(2, 1, 2));
-        TermiteWorkerEntity termite = helper.spawnWithNoFreeWill(ModEntities.TERMITE_WORKER.get(), 6, 1, 2);
-        WorkerAntEntity ant = TestAnts.loneAnt(helper, 6, 1, 4);
+        TermiteWorkerEntity termite = helper.spawnWithNoFreeWill(SavannaEntities.TERMITE_WORKER.get(), 6, 1, 2);
+        TermiteSoldierEntity outsider = TestAnts.lone(helper, SavannaEntities.TERMITE_MINOR_SOLDIER.get(), 6, 1, 4);
         BlockPos hole = helper.absolutePos(new BlockPos(4, 1, 2));
         BlockState state = helper.getLevel().getBlockState(hole);
         helper.assertTrue(state.getCollisionShape(helper.getLevel(), hole, CollisionContext.of(termite)).isEmpty(), "a termite bumps into the hole block");
-        helper.assertTrue(!state.getCollisionShape(helper.getLevel(), hole, CollisionContext.of(ant)).isEmpty(), "an ant walks through the hole block");
+        helper.assertTrue(!state.getCollisionShape(helper.getLevel(), hole, CollisionContext.of(outsider)).isEmpty(), "a soldier walks through the hole block");
         helper.assertTrue(!state.getCollisionShape(helper.getLevel(), hole, CollisionContext.empty()).isEmpty(), "the hole block is not solid for everyone else");
         helper.runAfterDelay(10, () -> {
             helper.assertTrue(termite.getNavigator().moveTo(inside, 1.0), "the termite found no route through the chimney block");
-            helper.assertTrue(!ant.getNavigator().moveTo(inside, 1.0), "the ant found a route into the closed room");
+            helper.assertTrue(!outsider.getNavigator().moveTo(inside, 1.0), "the soldier found a route into the closed room");
         });
         helper.succeedWhen(() -> helper.assertTrue(helper.getTick() > 20 && termite.blockPosition().equals(inside),
                 "the termite is at " + termite.blockPosition().subtract(inside) + " from the middle of the room"));
@@ -319,7 +308,7 @@ public class TermiteMoundTests {
     @GameTest(template = "arena", timeoutTicks = 3000, skyAccess = true)
     public static void aTermiteOnlyUsesTheChimneyMouthWhenThereIsNoOtherWay(GameTestHelper helper) {
         ground(helper);
-        BlockState soil = ModBlocks.TERMITE_MOUND.get().defaultBlockState().setValue(TermiteMoundBlock.LAYERS, TermiteMoundBlock.FINISHED);
+        BlockState soil = SavannaBlocks.TERMITE_MOUND.get().defaultBlockState().setValue(TermiteMoundBlock.LAYERS, TermiteMoundBlock.FINISHED);
         for (int y = 1; y <= 3; y++) {
             for (int x = 1; x <= 3; x++) {
                 for (int z = 1; z <= 3; z++) {
@@ -329,12 +318,12 @@ public class TermiteMoundTests {
                 }
             }
         }
-        helper.setBlock(new BlockPos(2, 3, 2), ModBlocks.TERMITE_HOLE.get());
+        helper.setBlock(new BlockPos(2, 3, 2), SavannaBlocks.TERMITE_HOLE.get());
         BlockPos side = new BlockPos(3, 1, 2);
         helper.setBlock(side, Blocks.AIR); // a way out at the foot of the chimney
         BlockPos bottom = helper.absolutePos(new BlockPos(2, 1, 2));
         BlockPos onTop = helper.absolutePos(new BlockPos(3, 4, 2));
-        TermiteWorkerEntity termite = helper.spawnWithNoFreeWill(ModEntities.TERMITE_WORKER.get(), 2, 1, 2);
+        TermiteWorkerEntity termite = helper.spawnWithNoFreeWill(SavannaEntities.TERMITE_WORKER.get(), 2, 1, 2);
         termite.setWalkHabitsForTests(com.antcolonies.nav.Doorway.avoidMouths(helper.getLevel()));
         int[] phase = {0};
         int[] peeked = new int[3];

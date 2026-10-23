@@ -4,8 +4,8 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.block.TermitomycesBlock;
-import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.species.SpeciesProfile;
+import com.antcolonies.registry.SavannaBlocks;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
@@ -68,7 +68,7 @@ public class Mushrooms {
 
     /** The layers of comb in the garden (none without one). */
     private int combLayers(Level level) {
-        return colony.part(ColonyParts.FUNGUS_GARDEN).map(garden -> garden.countCombLayers(level)).orElse(0);
+        return colony.part(SavannaParts.FUNGUS_GARDEN).map(garden -> garden.countCombLayers(level)).orElse(0);
     }
 
     /** How many mushrooms the garden sends up after a rain now (0 if it is not healthy yet). */
@@ -99,7 +99,7 @@ public class Mushrooms {
                 continue;
             }
             boolean giant = (giants || random.nextFloat() < numbers.giantMushroomChance()) && mayBeGiant(level, cell);
-            level.setBlock(cell, ModBlocks.TERMITOMYCES.get().defaultBlockState().setValue(TermitomycesBlock.GIANT, giant), 3);
+            level.setBlock(cell, SavannaBlocks.TERMITOMYCES.get().defaultBlockState().setValue(TermitomycesBlock.GIANT, giant), 3);
             level.sendParticles(ParticleTypes.WHITE_ASH, cell.getX() + 0.5, cell.getY() + 0.1, cell.getZ() + 0.5, 6, 0.2, 0.05, 0.2, 0.0);
             sprouted++;
         }
@@ -129,7 +129,7 @@ public class Mushrooms {
             return false;
         }
         BlockState here = level.getBlockState(cell);
-        if (!here.canBeReplaced() || !here.getFluidState().isEmpty() || here.is(ModBlocks.TERMITOMYCES.get())) {
+        if (!here.canBeReplaced() || !here.getFluidState().isEmpty() || here.is(SavannaBlocks.TERMITOMYCES.get())) {
             return false; // air, or grass a mushroom pushes aside
         }
         BlockPos ground = cell.below();
@@ -147,7 +147,7 @@ public class Mushrooms {
 
     /** Whether a giant may grow here: on earth (not on the mound), with room for its stalk and cap clear of the termites. */
     private boolean mayBeGiant(Level level, BlockPos cell) {
-        if (!level.getBlockState(cell.below()).is(BlockTags.DIRT) || !ModBlocks.GIANT_TERMITOMYCES.get().fitsAt(level, cell)) {
+        if (!level.getBlockState(cell.below()).is(BlockTags.DIRT) || !SavannaBlocks.GIANT_TERMITOMYCES.get().fitsAt(level, cell)) {
             return false;
         }
         return !isTermiteSpace(level, cell.above()) && !isTermiteSpace(level, cell.above(2));

@@ -187,7 +187,7 @@ public class Alarm {
         heard.clear();
         lookers.clear();
         waveStart = time;
-        List<TermiteSoldierEntity> soldiers = new ArrayList<>(colony.part(ColonyParts.SOLDIERS).map(part -> part.getSoldiers(world)).orElse(List.of()));
+        List<TermiteSoldierEntity> soldiers = new ArrayList<>(colony.part(SavannaParts.SOLDIERS).map(part -> part.getSoldiers(world)).orElse(List.of()));
         soldiers.sort(Comparator.comparingDouble(soldier -> soldier.blockPosition().distSqr(at)));
         if (to == 1) {
             for (TermiteSoldierEntity soldier : soldiers) {
@@ -424,7 +424,7 @@ public class Alarm {
         if (now == 0 || spot == null) {
             return Map.of();
         }
-        List<TermiteSoldierEntity> soldiers = new ArrayList<>(colony.part(ColonyParts.SOLDIERS).map(part -> part.getSoldiers(world)).orElse(List.of()));
+        List<TermiteSoldierEntity> soldiers = new ArrayList<>(colony.part(SavannaParts.SOLDIERS).map(part -> part.getSoldiers(world)).orElse(List.of()));
         soldiers.sort(Comparator.comparingDouble(soldier -> soldier.blockPosition().distSqr(spot)));
         Map<UUID, Task> out = new HashMap<>();
         if (now == 1) {
@@ -531,7 +531,7 @@ public class Alarm {
                 + " soldiers alarmed)" + boost;
     }
 
-    /** Tests only: a sample in every saved number (the save and load check, {@code AwayTests.everyPartSavesAndLoads}). */
+    /** Tests only: a sample in every saved number (the save and load check, {@code AwayKit.everyPartSavesAndLoads}). */
     public void fillForTests(ServerLevel world) {
         level = 1;
         raisedAt = world.getGameTime();

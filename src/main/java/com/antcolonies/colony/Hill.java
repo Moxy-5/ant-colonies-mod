@@ -9,7 +9,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.entity.AbstractAntEntity;
-import com.antcolonies.registry.ModBlocks;
+import com.antcolonies.registry.DesertBlocks;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -237,7 +237,7 @@ public class Hill {
     /** True if a block of the hill is still standing above this gap (so it is a gap in the hill, not just open ground). */
     private boolean isCoveredByHill(Level level, BlockPos gap, int height) {
         for (int y = gap.getY() + 1; y < center.getY() + height; y++) {
-            if (level.getBlockState(new BlockPos(gap.getX(), y, gap.getZ())).is(ModBlocks.BURROWED_DIRT.get())) {
+            if (level.getBlockState(new BlockPos(gap.getX(), y, gap.getZ())).is(DesertBlocks.BURROWED_DIRT.get())) {
                 return true;
             }
         }
@@ -295,7 +295,7 @@ public class Hill {
             nudgeOut(level, ant, pos);
         }
         // Whatever the ant dug, the mound is built of burrowed dirt (and it never slides away like sand).
-        level.setBlock(pos, ModBlocks.BURROWED_DIRT.get().defaultBlockState(), 3);
+        level.setBlock(pos, DesertBlocks.BURROWED_DIRT.get().defaultBlockState(), 3);
         return true;
     }
 }

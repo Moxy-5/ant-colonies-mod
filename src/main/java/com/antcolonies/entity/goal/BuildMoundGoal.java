@@ -9,7 +9,7 @@ import com.antcolonies.AntColoniesMod;
 import com.antcolonies.block.TermiteTunnelBlock;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
-import com.antcolonies.colony.ColonyParts;
+import com.antcolonies.colony.SavannaParts;
 import com.antcolonies.colony.Mound;
 import com.antcolonies.colony.MoundReach;
 import com.antcolonies.entity.AbstractAntEntity;
@@ -119,7 +119,7 @@ public class BuildMoundGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        mound = colony == null ? null : colony.part(ColonyParts.MOUND).orElse(null);
+        mound = colony == null ? null : colony.part(SavannaParts.MOUND).orElse(null);
         spot = mound == null || !mound.isActive() ? null : mound.pickBuildSpot(level, ant);
         if (spot == null) {
             if (++looksWithoutSpot >= MAX_LOOKS_WITHOUT_SPOT) {

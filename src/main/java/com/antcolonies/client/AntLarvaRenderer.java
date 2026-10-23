@@ -25,13 +25,13 @@ import net.minecraft.resources.ResourceLocation;
 public class AntLarvaRenderer extends EntityRenderer<AntLarvaEntity> {
     public static final ModelLayerLocation LAYER =
             new ModelLayerLocation(ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "ant_larva"), "main");
-    private static final ResourceLocation TEXTURE =
-            ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "textures/entity/ant_larva.png");
-
     private final ModelPart model;
+    private final ResourceLocation texture;
 
-    public AntLarvaRenderer(EntityRendererProvider.Context context) {
+    /** {@code texture}: the species' look of its young ({@link com.antcolonies.species.SpeciesBodies#youngLook}). */
+    public AntLarvaRenderer(EntityRendererProvider.Context context, ResourceLocation texture) {
         super(context);
+        this.texture = texture;
         this.model = context.bakeLayer(LAYER);
         this.shadowRadius = 0.0F;
     }
@@ -54,7 +54,7 @@ public class AntLarvaRenderer extends EntityRenderer<AntLarvaEntity> {
         pose.mulPose(Axis.YP.rotationDegrees(180.0F - larva.getYRot()));
         float size = 0.45F + 0.4F * Math.min(larva.getFed(), larva.getMeal()) / larva.getMeal();
         pose.scale(size, size, size);
-        VertexConsumer consumer = buffers.getBuffer(RenderType.entityCutoutNoCull(TEXTURE));
+        VertexConsumer consumer = buffers.getBuffer(RenderType.entityCutoutNoCull(texture));
         model.render(pose, consumer, light, OverlayTexture.NO_OVERLAY);
         pose.popPose();
         super.render(larva, yaw, partialTick, pose, buffers, light);
@@ -62,6 +62,6 @@ public class AntLarvaRenderer extends EntityRenderer<AntLarvaEntity> {
 
     @Override
     public ResourceLocation getTextureLocation(AntLarvaEntity larva) {
-        return TEXTURE;
+        return texture;
     }
 }

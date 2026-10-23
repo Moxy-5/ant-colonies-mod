@@ -2,6 +2,7 @@ package com.antcolonies.block;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.LevelReader;
@@ -38,6 +39,47 @@ public class SeedPileBlock extends Block {
     /** How many layers this heap may have at most (a full block for seeds, bread and forage). */
     public int maxLayers() {
         return MAX_LAYERS;
+    }
+
+    // --- the heap's own rules, for the colony's food store (the split, step S3: a heap whose layers age, the termites'
+    // fungus comb, overrides them, so the shared food store names no comb) ----------------------------------------------
+
+    /**
+     * Whether the heap's layers age (fungus comb): a piece is built onto a heap with room before a new one is started,
+     * a layer is only taken where one is ready ({@link #hasLayerToTake}), and never off a heap an egg or a young one lies on.
+     */
+    public boolean ages() {
+        return false;
+    }
+
+    /** A new heap: one layer. */
+    public BlockState newHeap() {
+        return defaultBlockState();
+    }
+
+    /** The heap with one more layer (call only with room for it). */
+    public BlockState oneLayerMore(BlockState state) {
+        return state.setValue(LAYERS, state.getValue(LAYERS) + 1);
+    }
+
+    /** The heap with one layer less, or air if it was the last. */
+    public BlockState oneLayerLess(BlockState state) {
+        int layers = state.getValue(LAYERS);
+        return layers <= 1 ? Blocks.AIR.defaultBlockState() : state.setValue(LAYERS, layers - 1);
+    }
+
+    /** Whether a layer may be taken off this heap to eat (any seed heap). */
+    public boolean hasLayerToTake(BlockState state) {
+        return true;
+    }
+
+    /** What grows on the heap and goes with it once it is eaten right down (fungus nodules), else 0. */
+    public int growthOn(BlockState state) {
+        return 0;
+    }
+
+    /** A layer was just laid at {@code spot}: its sound and look (nothing for seeds). */
+    public void laid(ServerLevel level, BlockPos spot) {
     }
 
     @Override

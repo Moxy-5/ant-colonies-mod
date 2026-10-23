@@ -5,15 +5,15 @@ import static com.antcolonies.gametest.TermiteMoundTests.SURFACE;
 
 import org.jetbrains.annotations.Nullable;
 
+import com.antcolonies.colony.Caste;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.ColonyParts;
+import com.antcolonies.colony.SavannaParts;
 import com.antcolonies.colony.FoodWays;
 import com.antcolonies.colony.ForagingHoles;
 import com.antcolonies.colony.Nest;
 import com.antcolonies.entity.TermiteWorkerEntity;
-import com.antcolonies.entity.WorkerAntEntity;
-import com.antcolonies.registry.ModEntities;
+import com.antcolonies.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -60,10 +60,10 @@ public class TermiteNewHoleTests {
                 helper.setBlock(x, SURFACE - 1, z, Blocks.GRASS_BLOCK);
             }
         }
-        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
         helper.runAfterDelay(5, () -> {
             for (int i = 0; i < 6; i++) {
-                helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE - 3 + i, SURFACE, MIDDLE - 2);
+                helper.spawn(SavannaEntities.TERMITE_WORKER.get(), MIDDLE - 3 + i, SURFACE, MIDDLE - 2);
             }
         });
         StuckWatcher.watch(helper, () -> TermiteMoundTests.colony(helper));
@@ -89,7 +89,7 @@ public class TermiteNewHoleTests {
                 worker.setGrownUpAt(middleAged);
             }
             TermiteSoldierTests.digNestAtOnce(level, colony);
-            colony.population().addNewMembers(WorkerAntEntity.CASTE, level.getGameTime() - 1000, 500);
+            colony.population().addNewMembers(Caste.WORKER, level.getGameTime() - 1000, 500);
             level.setBlock(hay, Blocks.HAY_BLOCK.defaultBlockState(), 3);
             colony.food().rescanPlantsSoon();
             colony.foodMap().knowForTests(hay);
@@ -371,7 +371,7 @@ public class TermiteNewHoleTests {
             if (!scene.tick(colony)) {
                 return;
             }
-            com.antcolonies.colony.HiddenTrips trips = colony.part(ColonyParts.HIDDEN_TRIPS).orElseThrow();
+            com.antcolonies.colony.HiddenTrips trips = colony.part(SavannaParts.HIDDEN_TRIPS).orElseThrow();
             long now = level.getGameTime();
             BlockPos center = colony.getCenter();
             int shortest = trips.shortest();
@@ -427,7 +427,7 @@ public class TermiteNewHoleTests {
                         loaded.addAll(trips.travellers());
                         Colony copy = Colony.load(colony.save());
                         com.antcolonies.colony.ColonyManager.get(level).replaceForTests(copy);
-                        copy.part(ColonyParts.HIDDEN_TRIPS).orElseThrow().setOnForTests(true);
+                        copy.part(SavannaParts.HIDDEN_TRIPS).orElseThrow().setOnForTests(true);
                         AntColoniesMod.LOGGER.info("[hidden-test] tick {} {}: saved and loaded with {} travelling", helper.getTick(), clock.describe(), loaded.size());
                         stage[0] = 1;
                         stageAt[0] = helper.getTick();
@@ -518,10 +518,10 @@ public class TermiteNewHoleTests {
                     helper.setBlock(x, SURFACE - 1, z, Blocks.GRASS_BLOCK);
                 }
             }
-            helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+            helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
             helper.runAfterDelay(5, () -> {
                 for (int i = 0; i < 16; i++) {
-                    helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE - 4 + i % 8, SURFACE, MIDDLE - 2 - i / 8);
+                    helper.spawn(SavannaEntities.TERMITE_WORKER.get(), MIDDLE - 4 + i % 8, SURFACE, MIDDLE - 2 - i / 8);
                 }
             });
             hay = helper.absolutePos(new BlockPos(MIDDLE + LONG_HAY_EAST, SURFACE, MIDDLE));
@@ -535,8 +535,8 @@ public class TermiteNewHoleTests {
                     worker.setGrownUpAt(now - (i++ < 3 ? colony.profile().worker().nurseUntilTicks() : colony.profile().worker().builderUntilTicks()) - 1000);
                 }
                 TermiteSoldierTests.digNestAtOnce(level, colony);
-                colony.population().addNewMembers(WorkerAntEntity.CASTE, now - 1000, 500);
-                colony.part(ColonyParts.HIDDEN_TRIPS).orElseThrow().setOnForTests(hiddenTrips);
+                colony.population().addNewMembers(Caste.WORKER, now - 1000, 500);
+                colony.part(SavannaParts.HIDDEN_TRIPS).orElseThrow().setOnForTests(hiddenTrips);
             });
         }
 
@@ -610,10 +610,10 @@ public class TermiteNewHoleTests {
                 helper.setBlock(x, top, z, Blocks.GRASS_BLOCK);
             }
         }
-        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
         helper.runAfterDelay(5, () -> {
             for (int i = 0; i < 6; i++) {
-                helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE - 3 + i, SURFACE, MIDDLE - 2);
+                helper.spawn(SavannaEntities.TERMITE_WORKER.get(), MIDDLE - 3 + i, SURFACE, MIDDLE - 2);
             }
         });
         java.util.List<BlockPos> tree = new java.util.ArrayList<>();
@@ -635,10 +635,10 @@ public class TermiteNewHoleTests {
                 worker.setGrownUpAt(middleAged);
             }
             TermiteSoldierTests.digNestAtOnce(level, colony);
-            colony.population().addNewMembers(WorkerAntEntity.CASTE, level.getGameTime() - 1000, 500);
+            colony.population().addNewMembers(Caste.WORKER, level.getGameTime() - 1000, 500);
             TestClock.still(helper, 0.0); // midnight: foraging time
             for (BlockPos wood : tree) {
-                level.setBlock(wood, com.antcolonies.registry.ModBlocks.DEAD_WOOD.get().defaultBlockState()
+                level.setBlock(wood, com.antcolonies.registry.SavannaBlocks.DEAD_WOOD.get().defaultBlockState()
                         .setValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS, net.minecraft.core.Direction.Axis.X), 3);
             }
             colony.food().rescanPlantsSoon();
@@ -669,7 +669,7 @@ public class TermiteNewHoleTests {
             if (since[0] % 1000 == 0) {
                 AntColoniesMod.LOGGER.info("[new-hole-test] slope: dug {} of {}, hole {}, may open {}, foraging time {}{}", tunnel[0].tunnel().tunnel().stream().filter(c -> Nest.isDugOut(level, c)).count(),
                         tunnel[0].tunnel().tunnel().size(), level.getBlockState(hole), colony.foragingHoles().mayOpen(level, hole), colony.isForagingTime(level),
-                        colony.part(ColonyParts.ALARM).orElseThrow().describe(level));
+                        colony.part(SavannaParts.ALARM).orElseThrow().describe(level));
                 java.util.List<BlockPos> gallery = tunnel[0].gallery() == null ? java.util.List.of() : tunnel[0].gallery();
                 BlockPos next = colony.nest().findDigTarget(level);
                 java.util.List<BlockPos> cells = tunnel[0].tunnel().tunnel();
@@ -773,10 +773,10 @@ public class TermiteNewHoleTests {
                 }
             }
         }
-        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
         helper.runAfterDelay(5, () -> {
             for (int i = 0; i < 6; i++) {
-                helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE - 3 + i, SURFACE, MIDDLE - 2);
+                helper.spawn(SavannaEntities.TERMITE_WORKER.get(), MIDDLE - 3 + i, SURFACE, MIDDLE - 2);
             }
         });
         StuckWatcher.watch(helper, () -> TermiteMoundTests.colony(helper));
@@ -803,7 +803,7 @@ public class TermiteNewHoleTests {
                 worker.setGrownUpAt(middleAged);
             }
             TermiteSoldierTests.digNestAtOnce(level, colony);
-            colony.population().addNewMembers(WorkerAntEntity.CASTE, level.getGameTime() - 1000, 500);
+            colony.population().addNewMembers(Caste.WORKER, level.getGameTime() - 1000, 500);
             if (kind == Food.GIANT) {
                 // The rest of the giant's log round the bottom row: 3 wide, 3 high, bark outside, the core inside.
                 for (BlockPos bottom : log) {
@@ -819,11 +819,11 @@ public class TermiteNewHoleTests {
             }
             for (int i = 0; kind != Food.GIANT && i < log.size(); i++) {
                 level.setBlock(log.get(i), kind == Food.BRANCH
-                        ? com.antcolonies.registry.ModBlocks.FALLEN_BRANCH.get().defaultBlockState()
+                        ? com.antcolonies.registry.SavannaBlocks.FALLEN_BRANCH.get().defaultBlockState()
                                 .setValue(com.antcolonies.block.FallenBranchBlock.AXIS, net.minecraft.core.Direction.Axis.X)
                                 .setValue(com.antcolonies.block.FallenBranchBlock.PART, i == 0 ? com.antcolonies.block.FallenBranchBlock.Part.BASE
                                         : i == log.size() - 1 ? com.antcolonies.block.FallenBranchBlock.Part.TIP : com.antcolonies.block.FallenBranchBlock.Part.MIDDLE)
-                        : com.antcolonies.registry.ModBlocks.DEAD_WOOD.get().defaultBlockState()
+                        : com.antcolonies.registry.SavannaBlocks.DEAD_WOOD.get().defaultBlockState()
                                 .setValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS, net.minecraft.core.Direction.Axis.X), 3);
             }
             if (kind == Food.BRANCH) {
@@ -834,7 +834,7 @@ public class TermiteNewHoleTests {
                         BlockPos foot = helper.absolutePos(new BlockPos(x, (onAStep && x >= logStart - 3 && z > MIDDLE ? SURFACE - 2 : SURFACE), z));
                         if (level.getBlockState(foot).isAir() && level.getBlockState(foot.above()).isAir()) {
                             net.minecraft.world.level.block.DoublePlantBlock.placeAt(level, x % 2 == 0 ? Blocks.TALL_GRASS.defaultBlockState()
-                                    : com.antcolonies.registry.ModBlocks.TALL_DRY_GRASS.get().defaultBlockState(), foot, 3);
+                                    : com.antcolonies.registry.SavannaBlocks.TALL_DRY_GRASS.get().defaultBlockState(), foot, 3);
                         }
                     }
                 }
@@ -923,7 +923,7 @@ public class TermiteNewHoleTests {
                         if (kind == Food.STUMP) {
                             // The stump on the log; it and every block of the log nearly eaten (quicker, and alike, so the
                             // block under the stump, nearest the hole, goes first). The stump only from the log's cast.
-                            BlockState wood = com.antcolonies.registry.ModBlocks.DEAD_WOOD.get().defaultBlockState()
+                            BlockState wood = com.antcolonies.registry.SavannaBlocks.DEAD_WOOD.get().defaultBlockState()
                                     .setValue(com.antcolonies.block.DeadWoodBlock.EATEN, com.antcolonies.block.DeadWoodBlock.MAX_EATEN);
                             for (BlockPos block : log) {
                                 if (level.getBlockState(block).getBlock() instanceof com.antcolonies.block.DeadWoodBlock) {

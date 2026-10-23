@@ -10,12 +10,12 @@ import com.antcolonies.AntColoniesMod;
 import com.antcolonies.block.FallenBranchBlock;
 import com.antcolonies.block.MudCrustBlock;
 import com.antcolonies.block.TreeBranchBlock;
-import com.antcolonies.entity.WorkerAntEntity;
-import com.antcolonies.registry.ModBlocks;
-import com.antcolonies.registry.ModEntities;
+import com.antcolonies.entity.TermiteWorkerEntity;
 import com.antcolonies.registry.TreeBlocks;
 import com.antcolonies.tree.TreeStage;
 import com.antcolonies.worldgen.TreePlacer;
+import com.antcolonies.registry.SavannaBlocks;
+import com.antcolonies.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -117,8 +117,8 @@ public class TreeTests {
     }
 
     /**
-     * A pig pushed through a row of thorny twigs is slowed and pricked (it loses health); a harvester ant pushed through
-     * the same row is never hurt (the spines are far bigger than an insect).
+     * A pig pushed through a row of thorny twigs is slowed and pricked (it loses health); a termite worker pushed through
+     * the same row is never hurt (the spines are far bigger than an insect; a harvester ant until the split, step S4).
      */
     @GameTest(template = "arena", timeoutTicks = 200)
     public static void thornyTwigsPrickBigAnimalsButNotInsects(GameTestHelper helper) {
@@ -127,8 +127,7 @@ public class TreeTests {
             helper.setBlock(new BlockPos(x, SURFACE, MIDDLE + 4), TreeBlocks.THORNY_TWIG.get());
         }
         Pig pig = helper.spawn(EntityType.PIG, MIDDLE - 4, SURFACE, MIDDLE);
-        WorkerAntEntity ant = helper.spawn(ModEntities.WORKER_ANT.get(), MIDDLE - 4, SURFACE, MIDDLE + 4);
-        ant.keepOutOfColonies();
+        TermiteWorkerEntity ant = TestAnts.loneWithAMind(helper, SavannaEntities.TERMITE_WORKER.get(), MIDDLE - 4, SURFACE, MIDDLE + 4);
         float pigHealth = pig.getHealth();
         float antHealth = ant.getHealth();
         helper.onEachTick(() -> {
@@ -142,7 +141,7 @@ public class TreeTests {
                 mob.setDeltaMovement(0.15, mob.getDeltaMovement().y, 0);
             }
             if (ant.getHealth() < antHealth) {
-                helper.fail("the thorns hurt an ant");
+                helper.fail("the thorns hurt an insect");
             }
         });
         helper.runAfterDelay(160, () -> {
@@ -150,7 +149,7 @@ public class TreeTests {
                 helper.fail("the pig went through the thorns unhurt");
             }
             if (ant.getHealth() < antHealth) {
-                helper.fail("the thorns hurt an ant");
+                helper.fail("the thorns hurt an insect");
             }
             helper.succeed();
         });
@@ -390,7 +389,7 @@ public class TreeTests {
         for (int round = 0; round < 40; round++) {
             for (BlockPos pos : crusts) {
                 BlockState state = level.getBlockState(pos);
-                if (state.is(ModBlocks.MUD_CRUST.get())) {
+                if (state.is(SavannaBlocks.MUD_CRUST.get())) {
                     state.randomTick(level, pos, random);
                 }
             }

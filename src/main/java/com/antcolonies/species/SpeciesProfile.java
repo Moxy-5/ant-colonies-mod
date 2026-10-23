@@ -7,9 +7,8 @@ import java.util.Optional;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.block.SeedPileBlock;
-import com.antcolonies.block.TermiteMoundBlock;
+import com.antcolonies.block.PlugBlock;
 import com.antcolonies.colony.NestPlan;
-import com.antcolonies.registry.ModBlocks;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
@@ -425,11 +424,29 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
             return id == null ? Items.WHEAT_SEEDS : BuiltInRegistries.ITEM.getOptional(id).orElse(Items.WHEAT_SEEDS);
         }
 
-        /** The heap block of the food store (the seed pile if the name is unknown or not a heap block). */
+        /**
+         * The heap block of the food store. A name that is no heap block stops the species files loading
+         * ({@link #checkPile}), so this is always one in the game.
+         */
         public SeedPileBlock pileBlock() {
             ResourceLocation id = ResourceLocation.tryParse(pile);
             Block block = id == null ? null : BuiltInRegistries.BLOCK.getOptional(id).orElse(null);
-            return block instanceof SeedPileBlock heap ? heap : ModBlocks.SEED_PILE.get();
+            if (block instanceof SeedPileBlock heap) {
+                return heap;
+            }
+            throw new IllegalStateException("The food store's heap block \"" + pile + "\" is not a heap block");
+        }
+
+        /**
+         * Checks the heap block when the species files load (the split, step S3: before, an unknown name quietly fell
+         * back to the harvester's seed pile), so a wrong name stops the loading with a clear message.
+         */
+        public void checkPile(ResourceLocation species) {
+            ResourceLocation id = ResourceLocation.tryParse(pile);
+            Block block = id == null ? null : BuiltInRegistries.BLOCK.getOptional(id).orElse(null);
+            if (!(block instanceof SeedPileBlock)) {
+                throw new IllegalStateException("The species file " + species + " names \"" + pile + "\" as its food store's \"pile\", which is no heap block");
+            }
         }
 
         /** The plant this block is as food, or null if it is none. */
@@ -879,7 +896,7 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      */
     public record NestNumbers(int maxLevels, boolean sealWhileFounding, boolean foundingChamber, List<String> sideRooms,
             int foragingHoles, int foragingHoleDistance, String plugBlock, List<LevelUnlock> levelUnlocks, Optional<NewHoles> newHoles,
-            boolean crustWalls, Optional<Sheeting> sheeting, NestPlan.RoomSizes roomSizes, NightSoil nightSoil, Optional<GalleryNumbers> galleries) {
+            boolean crustWalls, Optional<Sheeting> sheeting, NestPlan.RoomSizes roomSizes, NightSoilNumbers nightSoil, Optional<GalleryNumbers> galleries) {
         public static final Codec<NestNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("max_levels").forGetter(NestNumbers::maxLevels),
                 Codec.BOOL.fieldOf("seal_while_founding").forGetter(NestNumbers::sealWhileFounding),
@@ -887,19 +904,19 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 Codec.STRING.listOf().optionalFieldOf("side_rooms", List.of()).forGetter(NestNumbers::sideRooms),
                 Codec.INT.optionalFieldOf("foraging_holes", 0).forGetter(NestNumbers::foragingHoles),
                 Codec.INT.optionalFieldOf("foraging_hole_distance", 8).forGetter(NestNumbers::foragingHoleDistance),
-                Codec.STRING.optionalFieldOf("plug_block", "antcolonies:burrowed_dirt").forGetter(NestNumbers::plugBlock),
+                Codec.STRING.optionalFieldOf("plug_block", "minecraft:dirt").forGetter(NestNumbers::plugBlock),
                 LevelUnlock.CODEC.listOf().optionalFieldOf("level_unlocks", List.of()).forGetter(NestNumbers::levelUnlocks),
                 NewHoles.CODEC.optionalFieldOf("new_holes").forGetter(NestNumbers::newHoles),
                 Codec.BOOL.optionalFieldOf("crust_walls", false).forGetter(NestNumbers::crustWalls),
                 Sheeting.CODEC.optionalFieldOf("sheeting").forGetter(NestNumbers::sheeting),
                 NestPlan.RoomSizes.CODEC.optionalFieldOf("room_sizes", NestPlan.RoomSizes.DEFAULT).forGetter(NestNumbers::roomSizes),
-                NightSoil.CODEC.optionalFieldOf("night_soil", NightSoil.DEFAULT).forGetter(NestNumbers::nightSoil),
+                NightSoilNumbers.CODEC.optionalFieldOf("night_soil", NightSoilNumbers.DEFAULT).forGetter(NestNumbers::nightSoil),
                 GalleryNumbers.CODEC.optionalFieldOf("galleries").forGetter(NestNumbers::galleries)
         ).apply(i, NestNumbers::new));
 
         public NestNumbers(int maxLevels, boolean sealWhileFounding, boolean foundingChamber, List<String> sideRooms,
                 int foragingHoles, int foragingHoleDistance, String plugBlock, List<LevelUnlock> levelUnlocks, Optional<NewHoles> newHoles,
-                boolean crustWalls, Optional<Sheeting> sheeting, NestPlan.RoomSizes roomSizes, NightSoil nightSoil) {
+                boolean crustWalls, Optional<Sheeting> sheeting, NestPlan.RoomSizes roomSizes, NightSoilNumbers nightSoil) {
             this(maxLevels, sealWhileFounding, foundingChamber, sideRooms, foragingHoles, foragingHoleDistance, plugBlock, levelUnlocks, newHoles,
                     crustWalls, sheeting, roomSizes, nightSoil, Optional.empty());
         }
@@ -908,7 +925,7 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 int foragingHoles, int foragingHoleDistance, String plugBlock, List<LevelUnlock> levelUnlocks, Optional<NewHoles> newHoles,
                 boolean crustWalls, Optional<Sheeting> sheeting, NestPlan.RoomSizes roomSizes) {
             this(maxLevels, sealWhileFounding, foundingChamber, sideRooms, foragingHoles, foragingHoleDistance, plugBlock, levelUnlocks, newHoles,
-                    crustWalls, sheeting, roomSizes, NightSoil.DEFAULT);
+                    crustWalls, sheeting, roomSizes, NightSoilNumbers.DEFAULT);
         }
 
         public NestNumbers(int maxLevels, boolean sealWhileFounding, boolean foundingChamber, List<String> sideRooms,
@@ -956,21 +973,24 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
         }
 
         /**
-         * What a hole is packed with: the plug block (Burrowed Dirt if the name is unknown). Mound soil goes in finished
-         * and fresh, so it sets and hardens with age like the mound.
+         * What a hole is packed with: the plug block (dirt if the name is unknown), in the state it is packed in
+         * ({@link PlugBlock}: mound soil goes in finished and fresh, so it sets and hardens with age like the mound).
          */
         public BlockState plugState() {
             ResourceLocation id = ResourceLocation.tryParse(plugBlock);
             Block block = id == null ? null : BuiltInRegistries.BLOCK.getOptional(id).orElse(null);
-            if (block instanceof TermiteMoundBlock) {
-                return block.defaultBlockState().setValue(TermiteMoundBlock.LAYERS, TermiteMoundBlock.FINISHED);
+            if (block instanceof PlugBlock plug) {
+                return plug.packedState();
             }
-            return block == null || block.defaultBlockState().isAir() ? ModBlocks.BURROWED_DIRT.get().defaultBlockState() : block.defaultBlockState();
+            return block == null || block.defaultBlockState().isAir() ? net.minecraft.world.level.block.Blocks.DIRT.defaultBlockState() : block.defaultBlockState();
         }
 
-        /** Whether this block is a plug the workers packed: the plug block, or Burrowed Dirt (the plug of older saves). */
+        /**
+         * Whether this block is a plug the workers packed: the plug block, or one of {@link com.antcolonies.registry.ModTags#OLD_PLUGS}
+         * (Burrowed Dirt, the plug of older saves).
+         */
         public boolean isPlug(BlockState state) {
-            return state.is(plugState().getBlock()) || state.is(ModBlocks.BURROWED_DIRT.get());
+            return state.is(plugState().getBlock()) || state.is(com.antcolonies.registry.ModTags.OLD_PLUGS);
         }
     }
 
@@ -987,12 +1007,12 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * the surface opens. Diggers rest while the surface is shut once {@code perBuilder} pellets wait for each builder (more
      * than they could carry out in a morning). My picks, to confirm.
      */
-    public record NightSoil(int layersPerCell, int perBuilder) {
-        public static final NightSoil DEFAULT = new NightSoil(4, 12);
-        public static final Codec<NightSoil> CODEC = RecordCodecBuilder.create(i -> i.group(
-                Codec.INT.optionalFieldOf("layers_per_cell", DEFAULT.layersPerCell()).forGetter(NightSoil::layersPerCell),
-                Codec.INT.optionalFieldOf("per_builder", DEFAULT.perBuilder()).forGetter(NightSoil::perBuilder)
-        ).apply(i, NightSoil::new));
+    public record NightSoilNumbers(int layersPerCell, int perBuilder) {
+        public static final NightSoilNumbers DEFAULT = new NightSoilNumbers(4, 12);
+        public static final Codec<NightSoilNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.INT.optionalFieldOf("layers_per_cell", DEFAULT.layersPerCell()).forGetter(NightSoilNumbers::layersPerCell),
+                Codec.INT.optionalFieldOf("per_builder", DEFAULT.perBuilder()).forGetter(NightSoilNumbers::perBuilder)
+        ).apply(i, NightSoilNumbers::new));
     }
 
     /**

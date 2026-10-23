@@ -159,6 +159,7 @@
   },
   "nest": {
     "max_levels": 4,
+    "plug_block": "antcolonies:burrowed_dirt",
     "seal_while_founding": true,
     "founding_chamber": true,
     "room_sizes": {

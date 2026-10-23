@@ -4,7 +4,6 @@ import com.antcolonies.AntColoniesMod;
 import com.antcolonies.block.DeadWoodBlock;
 import com.antcolonies.block.DryGrassBlock;
 import com.antcolonies.block.FallenBranchBlock;
-import com.antcolonies.block.GramaGrassBlock;
 import com.antcolonies.block.FungusCombBlock;
 import com.antcolonies.block.MudCastBlock;
 import com.antcolonies.block.MudCrustBlock;
@@ -28,34 +27,9 @@ import net.minecraft.world.level.material.PushReaction;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
-public class ModBlocks {
+/** The savanna's blocks: the termites' mound, garden and food, the dry grass and dead wood, and the giant trees (the split, step S4). */
+public class SavannaBlocks {
     public static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(AntColoniesMod.MODID);
-
-    /** Dark packed soil that ants build their mounds from. Behaves like normal dirt. */
-    public static final DeferredBlock<Block> BURROWED_DIRT =
-            BLOCKS.registerSimpleBlock("burrowed_dirt", BlockBehaviour.Properties.ofFullCopy(Blocks.DIRT));
-
-    /** Darker soil under the topsoil, laid by world generation (see DeepSoilFeature). Diggable by ants. */
-    public static final DeferredBlock<Block> DEEP_SOIL = BLOCKS.registerSimpleBlock("deep_soil",
-            BlockBehaviour.Properties.ofFullCopy(Blocks.DIRT).mapColor(MapColor.COLOR_BROWN).strength(0.8F));
-
-    /** A heap of seeds in the food store: one layer per seed an ant delivers. */
-    public static final DeferredBlock<SeedPileBlock> SEED_PILE = BLOCKS.registerBlock("seed_pile", SeedPileBlock::new,
-            BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_YELLOW).strength(0.2F).sound(SoundType.SAND)
-                    .noCollission().noOcclusion().pushReaction(PushReaction.DESTROY));
-
-    /** A heap of ant bread (milled seeds) in the nursery: one layer per bread. Same block as the seed pile, other look. */
-    public static final DeferredBlock<SeedPileBlock> BREAD_PILE = BLOCKS.registerBlock("bread_pile", SeedPileBlock::new,
-            BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BROWN).strength(0.2F).sound(SoundType.SAND)
-                    .noCollission().noOcclusion().pushReaction(PushReaction.DESTROY));
-
-    /**
-     * Loose soil near the top of the nest: the night soil (pellets dug while the surface was shut), waiting to be carried
-     * up onto the hill in the morning. One layer per pellet. Same block as the seed pile (nothing collides with it), other look.
-     */
-    public static final DeferredBlock<SeedPileBlock> LOOSE_SOIL = BLOCKS.registerBlock("loose_soil", SeedPileBlock::new,
-            BlockBehaviour.Properties.of().mapColor(MapColor.DIRT).strength(0.2F).sound(SoundType.GRAVEL)
-                    .noCollission().noOcclusion().pushReaction(PushReaction.DESTROY));
 
     /**
      * A heap of forage (pieces of dead grass, leaves and twigs) in the termites' food store: one layer per piece a
@@ -82,8 +56,6 @@ public class ModBlocks {
     public static final DeferredBlock<TermiteHoleBlock> TERMITE_HOLE = BLOCKS.registerBlock("termite_hole", TermiteHoleBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_ORANGE).strength(1.5F, 3.0F).sound(SoundType.MUD_BRICKS)
                     .noOcclusion().isSuffocating((state, level, pos) -> false).isViewBlocking((state, level, pos) -> false));
-
-    // The cathedral mound's pieces (shaped, finished mound soil that ages like the mound block).
 
     /** A piece of a spire, in 5 thicknesses narrowing to a point (see TermiteSpireBlock). */
     public static final DeferredBlock<TermiteSpireBlock> TERMITE_SPIRE = BLOCKS.registerBlock("termite_spire", TermiteSpireBlock::new,
@@ -122,14 +94,6 @@ public class ModBlocks {
     public static final DeferredBlock<TallDryGrassBlock> TALL_DRY_GRASS = BLOCKS.registerBlock("tall_dry_grass", TallDryGrassBlock::new,
             grassProperties());
 
-    /** Blue grama, the shortgrass prairie's seed grass, in meadows on the plains (see GramaGrassBlock). */
-    public static final DeferredBlock<GramaGrassBlock> BLUE_GRAMA = BLOCKS.register("blue_grama",
-            () -> new GramaGrassBlock(grassProperties().mapColor(MapColor.PLANT), false, () -> ModItems.BLUE_GRAMA_SEEDS.get()));
-
-    /** Black grama, the desert grassland's seed grass, in bunches in the badlands, on sand too (see GramaGrassBlock). */
-    public static final DeferredBlock<GramaGrassBlock> BLACK_GRAMA = BLOCKS.register("black_grama",
-            () -> new GramaGrassBlock(grassProperties().mapColor(MapColor.COLOR_GRAY), true, () -> ModItems.BLACK_GRAMA_SEEDS.get()));
-
     /** A block of a dead branch lying on the ground, eaten by termites in stages (see FallenBranchBlock). */
     public static final DeferredBlock<FallenBranchBlock> FALLEN_BRANCH = BLOCKS.registerBlock("fallen_branch", FallenBranchBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GRAY).strength(0.5F).sound(SoundType.WOOD).noCollission()
@@ -155,6 +119,7 @@ public class ModBlocks {
     static {
         TreeBlocks.init(); // the giant savanna trees' blocks (M7.5), registered with the rest
     }
+
 
     private static BlockBehaviour.Properties grassProperties() {
         return BlockBehaviour.Properties.of().mapColor(MapColor.SAND).replaceable().noCollission().instabreak().sound(SoundType.GRASS)

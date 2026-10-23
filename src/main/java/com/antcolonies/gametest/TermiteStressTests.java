@@ -1,19 +1,19 @@
 package com.antcolonies.gametest;
 
-import static com.antcolonies.gametest.TermiteMoundTests.MIDDLE;
-import static com.antcolonies.gametest.TermiteMoundTests.SURFACE;
+import static com.antcolonies.gametest.TestScenes.MIDDLE;
+import static com.antcolonies.gametest.TestScenes.SURFACE;
 
 import java.util.ArrayList;
 import java.util.List;
 
+import com.antcolonies.colony.Caste;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.NestPlan;
 import com.antcolonies.debug.Perf;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.TermiteSoldierEntity;
-import com.antcolonies.entity.WorkerAntEntity;
-import com.antcolonies.registry.ModEntities;
+import com.antcolonies.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -28,19 +28,19 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * Performance step 1: measures, never fails on speed. A termite colony with its nest dug and a big crowd in its numbers
  * is run with 60 real termites, then 100 (the stress test, {@code /antcolonies stress}), building by day and then out
  * foraging; the stopwatch ({@link Perf}) writes its report to the log every 5 seconds, and each stage's last report is
- * logged as {@code [stress]}. Only runs when named ({@code ANTCOLONIES_TESTS=stresstests}), never in a full run.
+ * logged as {@code [stress]}. Only runs when named ({@code ANTCOLONIES_TESTS=stress}), never in a full run.
  */
 @GameTestHolder(AntColoniesMod.MODID)
 @PrefixGameTestTemplate(false)
-public class StressTests {
+public class TermiteStressTests {
     /** Ticks per stage (1.5 minutes: time to fill up, then a minute of measuring). */
     private static final int STAGE = 1800;
 
     @GameTest(template = "arena", timeoutTicks = 4 * STAGE + 200, skyAccess = true)
     public static void stressTermiteColony(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        TermiteMoundTests.deepGround(helper);
-        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        TestScenes.deepGround(helper);
+        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null, "no termite colony");
@@ -50,7 +50,7 @@ public class StressTests {
             // A pretend player 20 blocks off, watching (so soldiers come out to their posts too).
             colony.population().setViewersForTests(List.of(Vec3.atCenterOf(helper.absolutePos(new BlockPos(MIDDLE + 20, SURFACE + 2, MIDDLE)))));
             long now = level.getGameTime();
-            colony.population().addNewMembers(WorkerAntEntity.CASTE, now - 100000, 400);
+            colony.population().addNewMembers(Caste.WORKER, now - 100000, 400);
             colony.population().addNewMembers(TermiteSoldierEntity.Rank.MINOR.caste(), now, 30);
             colony.population().addNewMembers(TermiteSoldierEntity.Rank.MAJOR.caste(), now, 10);
             colony.population().setStress(60);

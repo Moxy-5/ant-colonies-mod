@@ -10,10 +10,10 @@ import com.antcolonies.block.GiantTermitomycesBlock;
 import com.antcolonies.block.SeedPileBlock;
 import com.antcolonies.block.TermitomycesBlock;
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.ColonyParts;
-import com.antcolonies.registry.ModBlocks;
-import com.antcolonies.registry.ModEntities;
-import com.antcolonies.registry.ModItems;
+import com.antcolonies.colony.SavannaParts;
+import com.antcolonies.registry.SavannaBlocks;
+import com.antcolonies.registry.SavannaItems;
+import com.antcolonies.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
@@ -50,7 +50,7 @@ public class TermitomycesTests {
             }
         }
         BlockPos small = helper.absolutePos(new BlockPos(1, 1, 1));
-        BlockState button = ModBlocks.TERMITOMYCES.get().defaultBlockState();
+        BlockState button = SavannaBlocks.TERMITOMYCES.get().defaultBlockState();
         level.setBlockAndUpdate(small, button);
         int[] expected = {TermitomycesBlock.CLOSED, TermitomycesBlock.OPEN};
         for (int stage : expected) {
@@ -73,8 +73,8 @@ public class TermitomycesTests {
 
         // Bone meal.
         level.setBlockAndUpdate(small, button);
-        helper.assertTrue(ModBlocks.TERMITOMYCES.get().isValidBonemealTarget(level, small, button), "bone meal does not work on a button");
-        ModBlocks.TERMITOMYCES.get().performBonemeal(level, level.getRandom(), small, button);
+        helper.assertTrue(SavannaBlocks.TERMITOMYCES.get().isValidBonemealTarget(level, small, button), "bone meal does not work on a button");
+        SavannaBlocks.TERMITOMYCES.get().performBonemeal(level, level.getRandom(), small, button);
         helper.assertTrue(stageAt(level, small) == TermitomycesBlock.CLOSED, "bone meal did not bring the button on");
         level.setBlockAndUpdate(small, Blocks.AIR.defaultBlockState());
 
@@ -84,13 +84,13 @@ public class TermitomycesTests {
         TermitomycesBlock.growOn(level.getBlockState(foot), level, foot);
         for (int part = GiantTermitomycesBlock.FOOT; part <= GiantTermitomycesBlock.TOP; part++) {
             BlockState state = level.getBlockState(foot.above(part));
-            helper.assertTrue(state.is(ModBlocks.GIANT_TERMITOMYCES.get()) && state.getValue(GiantTermitomycesBlock.PART) == part
+            helper.assertTrue(state.is(SavannaBlocks.GIANT_TERMITOMYCES.get()) && state.getValue(GiantTermitomycesBlock.PART) == part
                     && state.getValue(GiantTermitomycesBlock.STAGE) == GiantTermitomycesBlock.CLOSED,
                     "the giant button did not grow into a closed giant: part " + part + " is " + state);
         }
-        ModBlocks.GIANT_TERMITOMYCES.get().growOn(level, foot);
+        SavannaBlocks.GIANT_TERMITOMYCES.get().growOn(level, foot);
         BlockState top = level.getBlockState(foot.above(2));
-        helper.assertTrue(top.is(ModBlocks.GIANT_TERMITOMYCES.get()) && top.getValue(GiantTermitomycesBlock.STAGE) == GiantTermitomycesBlock.OPEN,
+        helper.assertTrue(top.is(SavannaBlocks.GIANT_TERMITOMYCES.get()) && top.getValue(GiantTermitomycesBlock.STAGE) == GiantTermitomycesBlock.OPEN,
                 "the giant's cap did not open: " + top);
         level.destroyBlock(foot.above(2), true);
         for (int part = 0; part < 3; part++) {
@@ -107,13 +107,13 @@ public class TermitomycesTests {
                 + level.getBlockState(foot));
 
         // Food, raw and cooked.
-        FoodProperties raw = new ItemStack(ModItems.TERMITOMYCES.get()).get(DataComponents.FOOD);
-        FoodProperties cooked = new ItemStack(ModItems.COOKED_TERMITOMYCES.get()).get(DataComponents.FOOD);
+        FoodProperties raw = new ItemStack(SavannaItems.TERMITOMYCES.get()).get(DataComponents.FOOD);
+        FoodProperties cooked = new ItemStack(SavannaItems.COOKED_TERMITOMYCES.get()).get(DataComponents.FOOD);
         helper.assertTrue(raw != null && cooked != null && cooked.nutrition() > raw.nutrition(), "the mushroom should be food, better cooked");
         for (var type : List.of(RecipeType.SMELTING, RecipeType.SMOKING, RecipeType.CAMPFIRE_COOKING)) {
-            ItemStack result = level.getRecipeManager().getRecipeFor(type, new SingleRecipeInput(new ItemStack(ModItems.TERMITOMYCES.get())), level)
+            ItemStack result = level.getRecipeManager().getRecipeFor(type, new SingleRecipeInput(new ItemStack(SavannaItems.TERMITOMYCES.get())), level)
                     .map(recipe -> recipe.value().getResultItem(level.registryAccess())).orElse(ItemStack.EMPTY);
-            helper.assertTrue(result.is(ModItems.COOKED_TERMITOMYCES.get()), "no " + type + " recipe cooks the mushroom");
+            helper.assertTrue(result.is(SavannaItems.COOKED_TERMITOMYCES.get()), "no " + type + " recipe cooks the mushroom");
         }
         helper.succeed();
     }
@@ -127,11 +127,11 @@ public class TermitomycesTests {
     @GameTest(template = "arena", timeoutTicks = 600, skyAccess = true)
     public static void aHealthyGardenSendsUpMushroomsWhenTheRainEnds(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        TermiteMoundTests.deepGround(helper);
-        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        TestScenes.deepGround(helper);
+        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
         helper.runAfterDelay(5, () -> {
             for (int i = 0; i < 4; i++) {
-                helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE - 2 + i % 2, SURFACE, MIDDLE - 2 + i / 2);
+                helper.spawn(SavannaEntities.TERMITE_WORKER.get(), MIDDLE - 2 + i % 2, SURFACE, MIDDLE - 2 + i / 2);
             }
         });
         Colony[] colony = {null};
@@ -149,47 +149,47 @@ public class TermitomycesTests {
             }
             helper.assertTrue(c.nest().getGardenCells(level).size() >= 9, "the first garden is not dug: "
                     + c.nest().getGardenCells(level).size() + " cells");
-            c.part(ColonyParts.MUSHROOMS).orElseThrow().setRainForTests(true);
+            c.part(SavannaParts.MUSHROOMS).orElseThrow().setRainForTests(true);
         });
-        helper.runAfterDelay(80, () -> colony[0].part(ColonyParts.MUSHROOMS).orElseThrow().setRainForTests(false));
+        helper.runAfterDelay(80, () -> colony[0].part(SavannaParts.MUSHROOMS).orElseThrow().setRainForTests(false));
         helper.runAfterDelay(130, () -> {
             Colony c = colony[0];
-            helper.assertTrue(c.part(ColonyParts.MUSHROOMS).orElseThrow().getLastFlush() == 0, "mushrooms came up with no comb in the garden: " + c.part(ColonyParts.MUSHROOMS).orElseThrow().getLastFlush());
+            helper.assertTrue(c.part(SavannaParts.MUSHROOMS).orElseThrow().getLastFlush() == 0, "mushrooms came up with no comb in the garden: " + c.part(SavannaParts.MUSHROOMS).orElseThrow().getLastFlush());
             helper.assertTrue(mushroomsAround(level, helper).isEmpty(), "there are mushrooms round a mound without a garden");
             for (BlockPos cell : c.nest().getGardenCells(level)) {
-                level.setBlockAndUpdate(cell, ModBlocks.FUNGUS_COMB.get().defaultBlockState().setValue(SeedPileBlock.LAYERS, 4));
+                level.setBlockAndUpdate(cell, SavannaBlocks.FUNGUS_COMB.get().defaultBlockState().setValue(SeedPileBlock.LAYERS, 4));
             }
-            helper.assertTrue(c.part(ColonyParts.MUSHROOMS).orElseThrow().wanted(level) >= 5, "a garden with " + c.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().countCombLayers(level)
-                    + " layers of comb should send up 5 or 6 mushrooms, not " + c.part(ColonyParts.MUSHROOMS).orElseThrow().wanted(level));
-            c.part(ColonyParts.MUSHROOMS).orElseThrow().setRainForTests(true);
+            helper.assertTrue(c.part(SavannaParts.MUSHROOMS).orElseThrow().wanted(level) >= 5, "a garden with " + c.part(SavannaParts.FUNGUS_GARDEN).orElseThrow().countCombLayers(level)
+                    + " layers of comb should send up 5 or 6 mushrooms, not " + c.part(SavannaParts.MUSHROOMS).orElseThrow().wanted(level));
+            c.part(SavannaParts.MUSHROOMS).orElseThrow().setRainForTests(true);
         });
-        helper.runAfterDelay(180, () -> colony[0].part(ColonyParts.MUSHROOMS).orElseThrow().setRainForTests(false));
+        helper.runAfterDelay(180, () -> colony[0].part(SavannaParts.MUSHROOMS).orElseThrow().setRainForTests(false));
         helper.runAfterDelay(230, () -> {
             Colony c = colony[0];
             List<BlockPos> mushrooms = mushroomsAround(level, helper);
-            helper.assertTrue(c.part(ColonyParts.MUSHROOMS).orElseThrow().getLastFlush() >= 4, "too few mushrooms came up after the rain: " + c.part(ColonyParts.MUSHROOMS).orElseThrow().getLastFlush()
-                    + " of " + c.part(ColonyParts.MUSHROOMS).orElseThrow().wanted(level));
-            helper.assertTrue(mushrooms.size() == c.part(ColonyParts.MUSHROOMS).orElseThrow().getLastFlush(), mushrooms.size() + " mushrooms round the mound, but "
-                    + c.part(ColonyParts.MUSHROOMS).orElseThrow().getLastFlush() + " came up");
+            helper.assertTrue(c.part(SavannaParts.MUSHROOMS).orElseThrow().getLastFlush() >= 4, "too few mushrooms came up after the rain: " + c.part(SavannaParts.MUSHROOMS).orElseThrow().getLastFlush()
+                    + " of " + c.part(SavannaParts.MUSHROOMS).orElseThrow().wanted(level));
+            helper.assertTrue(mushrooms.size() == c.part(SavannaParts.MUSHROOMS).orElseThrow().getLastFlush(), mushrooms.size() + " mushrooms round the mound, but "
+                    + c.part(SavannaParts.MUSHROOMS).orElseThrow().getLastFlush() + " came up");
             BlockPos entrance = c.nest().getEntrance();
             for (BlockPos cell : mushrooms) {
                 helper.assertTrue(TermitomycesBlock.isGround(level.getBlockState(cell.below())), "a mushroom stands on " + level.getBlockState(cell.below()));
                 helper.assertTrue(level.canSeeSky(cell), "a mushroom came up under cover at " + cell.toShortString());
-                helper.assertTrue(!c.part(ColonyParts.MOUND).orElseThrow().getParts(level).containsKey(cell) && !c.nest().isInside(level, cell),
+                helper.assertTrue(!c.part(SavannaParts.MOUND).orElseThrow().getParts(level).containsKey(cell) && !c.nest().isInside(level, cell),
                         "a mushroom came up where the termites build or live at " + cell.toShortString());
                 double distance = Math.sqrt(Math.pow(cell.getX() - entrance.getX(), 2) + Math.pow(cell.getZ() - entrance.getZ(), 2));
                 helper.assertTrue(distance <= 13.0, "a mushroom came up too far out: " + distance);
             }
             // Giants sent up on purpose (as the command does) grow into giants three blocks tall.
             int giantsBefore = (int) mushrooms.stream().filter(cell -> level.getBlockState(cell).getValue(TermitomycesBlock.GIANT)).count();
-            int giants = c.part(ColonyParts.MUSHROOMS).orElseThrow().sprout(level, 3, true);
+            int giants = c.part(SavannaParts.MUSHROOMS).orElseThrow().sprout(level, 3, true);
             helper.assertTrue(giants > 0, "no giant mushroom found a spot");
             int grown = 0;
             for (BlockPos cell : mushroomsAround(level, helper)) {
                 BlockState state = level.getBlockState(cell);
                 if (state.getValue(TermitomycesBlock.GIANT)) {
                     TermitomycesBlock.growOn(state, level, cell);
-                    helper.assertTrue(level.getBlockState(cell.above(2)).is(ModBlocks.GIANT_TERMITOMYCES.get()), "a giant button did not grow into a giant");
+                    helper.assertTrue(level.getBlockState(cell.above(2)).is(SavannaBlocks.GIANT_TERMITOMYCES.get()), "a giant button did not grow into a giant");
                     grown++;
                 }
             }
@@ -201,12 +201,12 @@ public class TermitomycesTests {
 
     private static int stageAt(ServerLevel level, BlockPos pos) {
         BlockState state = level.getBlockState(pos);
-        return state.is(ModBlocks.TERMITOMYCES.get()) ? state.getValue(TermitomycesBlock.STAGE) : -1;
+        return state.is(SavannaBlocks.TERMITOMYCES.get()) ? state.getValue(TermitomycesBlock.STAGE) : -1;
     }
 
     private static int mushroomItems(ServerLevel level, BlockPos pos) {
         return level.getEntitiesOfClass(ItemEntity.class, new AABB(pos).inflate(2.5)).stream()
-                .filter(item -> item.getItem().is(ModItems.TERMITOMYCES.get())).mapToInt(item -> item.getItem().getCount()).sum();
+                .filter(item -> item.getItem().is(SavannaItems.TERMITOMYCES.get())).mapToInt(item -> item.getItem().getCount()).sum();
     }
 
     private static void clearItems(ServerLevel level, BlockPos pos) {
@@ -219,7 +219,7 @@ public class TermitomycesTests {
         List<BlockPos> found = new java.util.ArrayList<>();
         for (BlockPos pos : BlockPos.betweenClosed(BlockPos.containing(bounds.minX, bounds.minY, bounds.minZ),
                 BlockPos.containing(bounds.maxX - 1, bounds.maxY - 1, bounds.maxZ - 1))) {
-            if (level.getBlockState(pos).is(ModBlocks.TERMITOMYCES.get())) {
+            if (level.getBlockState(pos).is(SavannaBlocks.TERMITOMYCES.get())) {
                 found.add(pos.immutable());
             }
         }

@@ -7,7 +7,7 @@ import org.jetbrains.annotations.Nullable;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
-import com.antcolonies.colony.ColonyParts;
+import com.antcolonies.colony.DesertParts;
 import com.antcolonies.colony.Hill;
 import com.antcolonies.entity.AbstractAntEntity;
 
@@ -61,7 +61,7 @@ public class CarryPelletGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        hill = colony == null ? null : colony.part(ColonyParts.HILL).orElse(null);
+        hill = colony == null ? null : colony.part(DesertParts.HILL).orElse(null);
         night = hill != null && surfaceShut(level) && hill.hasMoundRoom(level);
         if (night) {
             spot = hill.nightSoil().pickPile(level);

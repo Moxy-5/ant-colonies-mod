@@ -24,10 +24,10 @@ import net.minecraft.resources.ResourceLocation;
  * harvester's bakery, ...). A name in a species file that nothing signed up stops the species files loading, with the
  * known names in the message ({@link #checkSpecies}).
  *
- * <p>The kinds are signed up here in the order they are made and loaded (the nest ledger loads after the food store and
- * the bakery: an older save's owed food is counted into them); the order a part ticks in is its place, written beside it
- * (see {@link ColonyPart}). After the split into three mods (Apex part 2) the framework keeps this registry and its
- * shared parts, and each species mod signs up its own ({@link #register}).
+ * <p>The shared kinds are signed up here, then each species side signs up its own ({@link #register}: the savanna's in
+ * {@code SavannaParts}, the desert's in {@code DesertParts}, the split, step S3), in the order they are made and loaded;
+ * the order a part ticks in is its place, written beside it (see {@link ColonyPart}), so it does not depend on which
+ * file signed a part up.
  *
  * <p>A part's row also says what colony news it hears ({@link ColonyPart#hears}, step 4): the places of each kind of
  * news are its listeners' order (today's order, which the tellers used to call the parts in by hand). And what colony
@@ -79,393 +79,38 @@ public final class ColonyParts {
 
     public static final Type<Nest> NEST = shared("nest", Nest::new, part -> part
             .saves(Nest::save, Nest::load));
-    /** The split, step S2: termites underground, the web of galleries round the nest (was held by the nest; same ticks, same save). */
-    public static final Type<Galleries> GALLERIES = listed("galleries", Galleries::new, part -> part
-            .ticks(90, Galleries::tick)
-            .ticksAway(20, Galleries::tickAway)
-            .plugs(ColonyHooks.UNDERGROUND, 10, galleries -> galleries) // asked only while switched on (Colony#underground)
-            .plugs(ColonyHooks.FEEDING_WAYS, 10, galleries -> FeedingGallery.WAYS) // (switched on or not, as before)
-            .plugs(ColonyHooks.LIST_HOLES, 10, galleries -> galleries::describe)
-            .saves(Galleries::save, Galleries::load));
     public static final Type<NestWalls> NEST_WALLS = shared("nest_walls", NestWalls::new, part -> part
             .notSaved("the claims on leaks and how far each is sealed start again after a load"));
-    public static final Type<Hill> HILL = listed("hill", Hill::new, part -> part
-            .plugs(ColonyHooks.AWAY_BUILDER, 10, HillAwayBuilding::new) // the night soil and the dug soil heaped on the hill, on return
-            .plugs(ColonyHooks.LIST_DAY, 30, hill -> level -> hill.nightSoil().waiting(level) > 0 ? " | night soil in piles: " + hill.nightSoil().waiting(level)
-                    + " of at most " + hill.nightSoil().limit(level) + " pellets" : "")
-            .plugs(ColonyHooks.DUG_SOIL, 20, hill -> new ColonyHooks.DugSoil() { // a real digger's pellets go onto the hill while it has room
-                @Override
-                public boolean waits(ServerLevel level, com.antcolonies.entity.AbstractAntEntity digger) {
-                    return hill.soilWaits(level, digger); // the morning clear-out
-                }
-
-                @Override
-                public boolean takesPellet(ServerLevel level, BlockPos target, java.util.UUID digger) {
-                    return hill.hasMoundRoom(level);
-                }
-            })
-            .ticks(40, (hill, level) -> {
-                if (!hill.colony().buildsMound()) {
-                    hill.nightSoil().tick(level);
-                }
-            })
-            .saves(Hill::save, Hill::load)
-            .sample((hill, level) -> hill.nightSoil().fillForTests(level)));
     public static final Type<FoodStore> FOOD_STORE = shared("food_store", FoodStore::new, part -> part
-            .ticks(110, (food, level) -> food.barePatches().tick(level))
             .saves(FoodStore::save, FoodStore::load));
     public static final Type<FoodMap> FOOD_MAP = shared("food_map", FoodMap::new, part -> part
             .ticks(70, FoodMap::tick)
             .saves(FoodMap::save, FoodMap::load)
             .sample((map, level) -> map.learn(new BlockPos(5, 60, 3))));
-    public static final Type<Bakery> BAKERY = listed("bakery", Bakery::new, part -> part
-            .hears(ColonyNews.PIECE_TAKEN, 10, (bakery, level, news) -> {
-                if (news.rich()) {
-                    bakery.addRichMiller(news.ant()); // its miller makes rich bread
-                }
-            })
-            .hears(ColonyNews.PIECE_EATEN, 10, (bakery, level, news) -> bakery.removeRichMiller(news.ant())) // eaten, not milled
-            .plugs(ColonyHooks.NURSE_FOOD, 20, bakery -> bakery) // ant bread (after a garden's nodules, as before)
-            .plugs(ColonyHooks.LIST_STORE, 10, bakery -> level -> " | bread " + bakery.getBread() + " (rich " + bakery.getRichBread() + ", milling " + bakery.getMilling() + ")")
-            .plugs(ColonyHooks.MILL, 10, bakery -> new ColonyHooks.Mill() { // a forager's seed goes to the mill if the store has no room
-                @Override
-                public boolean hasPlace(ServerLevel level, java.util.UUID ant) {
-                    return bakery.hasPlaceForASeed(level, ant);
-                }
-
-                @Override
-                public boolean milling(java.util.UUID ant) {
-                    return bakery.isMilling(ant);
-                }
-            })
-            .plugs(ColonyHooks.NURSE_MAKES, 10, bakery -> (level, life) -> bakery.millAway(level)) // the nurses mill seeds into bread while away
-            .answers(ColonyQuestions.MORE_FOOD_WANTED, 10, (bakery, level, nothing) -> bakery.needsBread((ServerLevel) level)) // bread still to mill
-            .saves(Bakery::save, Bakery::load)
-            .sample((bakery, level) -> {
-                bakery.countIn(true);
-                bakery.countIn(false);
-            }));
     public static final Type<QueenCare> QUEEN_CARE = shared("queen_care", QueenCare::new, part -> part
             .saves(QueenCare::save, QueenCare::load));
-    public static final Type<KingCare> KING_CARE = listed("king_care", KingCare::new, part -> part
-            .plugs(ColonyHooks.CO_FOUNDERS, 10, king -> new ColonyHooks.CoFounders() { // he digs beside the queen and seals them in
-                @Override
-                public int count() {
-                    return king.isAlive() ? 1 : 0;
-                }
-
-                @Override
-                public boolean isOne(com.antcolonies.entity.AbstractAntEntity insect) {
-                    return insect instanceof com.antcolonies.entity.TermiteKingEntity;
-                }
-
-                @Override
-                public String caste() {
-                    return com.antcolonies.entity.TermiteKingEntity.CASTE;
-                }
-            })
-            .plugs(ColonyHooks.AWAY_BESIDE_QUEEN, 10, king -> king::liveAway) // his hunger clock runs on while away
-            .plugs(ColonyHooks.NURSE_FEEDS, 10, king -> king::fedAway) // the nurses feed him while away, after the queen
-            .saves(KingCare::save, KingCare::load));
     public static final Type<Brood> BROOD = shared("brood", Brood::new, part -> part
             .saves(Brood::save, Brood::load));
     public static final Type<Refuse> REFUSE = shared("refuse", Refuse::new, part -> part
             .notSaved("only the workers' claims on dead ants"));
-    public static final Type<Mound> MOUND = listed("mound", Mound::new, part -> part
-            .ticks(30, Mound::tick)
-            .hears(ColonyNews.BLOCK_DUG, 10, (mound, level, news) -> mound.blockDug(level, news.where()))
-            .plugs(ColonyHooks.AWAY_BUILDER, 20, MoundAwayBuilding::new) // the dug soil and the mound built up, on return
-            .plugs(ColonyHooks.DUG_SOIL, 10, mound -> new ColonyHooks.DugSoil() { // one pellet per layer of a mound block from each dug block
-                @Override
-                public boolean takesPellet(ServerLevel level, BlockPos target, java.util.UUID digger) {
-                    return mound.numbers() != null && mound.takePellet(level, target, digger);
-                }
-
-                @Override
-                public net.minecraft.world.level.block.state.BlockState pellet(net.minecraft.world.level.block.state.BlockState dug) {
-                    return dug.getBlock() instanceof com.antcolonies.block.TermiteMoundBlock || dug.getBlock() instanceof com.antcolonies.block.TermiteHoleBlock
-                            || dug.getBlock() instanceof com.antcolonies.block.MudCrustBlock
-                            ? com.antcolonies.registry.ModBlocks.TERMITE_MOUND.get().defaultBlockState() : dug;
-                }
-            })
-            .answers(ColonyQuestions.BUILDS_OVER_NEST, 10, (mound, level, nothing) -> mound.numbers() != null)
-            .answers(ColonyQuestions.BUILDING_OVER_NEST, 10, (mound, level, nothing) -> mound.isActive())
-            .answers(ColonyQuestions.CLEAR_JOB, 10, Mound::isClearJob) // its own soil where it must be hollow
-            .answers(ColonyQuestions.STRUCTURE_TUNNEL, 10, (mound, level, pos) -> mound.getGalleries(level).contains(pos))
-            .plugs(ColonyHooks.LIST_BUILDING, 10, mound -> mound::describe)
-            .plugs(ColonyHooks.CRUST, 10, mound -> com.antcolonies.registry.ModBlocks.MUD_CRUST.get())
-            .plugs(ColonyHooks.STRUCTURE, 10, mound -> new ColonyHooks.Structure() {
-                @Override
-                public Map<BlockPos, MoundPlan.Part> parts(Level level) {
-                    return mound.getParts(level);
-                }
-
-                @Override
-                public void addInside(Level level, Set<BlockPos> cells, Set<BlockPos> channels) {
-                    mound.addInside(level, cells, channels);
-                }
-
-                @Override
-                public boolean isChannel(net.minecraft.world.level.block.state.BlockState state) {
-                    return MoundReach.channelKind(state) != null;
-                }
-
-                @Override
-                public List<BlockPos> tunnels(Level level) {
-                    return mound.getGalleries(level);
-                }
-
-                @Override
-                public BlockPos digTarget(Level level, java.util.UUID digger) {
-                    return mound.findDigTarget(level, digger);
-                }
-            })
-            .saves(Mound::save, Mound::load)
-            .sample(Mound::fillForTests));
     public static final Type<ForagingHoles> FORAGING_HOLES = shared("foraging_holes", ForagingHoles::new, part -> part
             .ticks(80, ForagingHoles::tick)
             .notSaved("claims and short memories, worked out again after a load"));
     public static final Type<ForagingTrails> FORAGING_TRAILS = shared("foraging_trails", ForagingTrails::new, part -> part
             .saves(ForagingTrails::save, ForagingTrails::load)
             .sample(ForagingTrails::fillForTests));
-    public static final Type<TrunkTrails> TRUNK_TRAILS = listed("trunk_trails", TrunkTrails::new, part -> part
-            .ticks(210, (trunk, level) -> trunk.tick(level, false))
-            .ticksAway(80, (trunk, level) -> trunk.tick(level, true))
-            .answers(ColonyQuestions.KEEP_OFF, 40, TrunkTrails::keepsOff) // the trail out there passes danger
-            .answers(ColonyQuestions.KEEPS_TRAILS, 10, (trunk, level, nothing) -> trunk.keepsTrails())
-            .plugs(ColonyHooks.REACH, 10, trunk -> trunk::longestTip) // the range is the trails (long trails, 2026-10-17)
-            .plugs(ColonyHooks.TRAILS, 10, trunk -> new ColonyHooks.Trails() {
-                @Override
-                public double walkTo(BlockPos pos) {
-                    return trunk.walkTo(pos);
-                }
-
-                @Override
-                public List<int[]> columnsNear(int side, int radius) {
-                    return trunk.columnsNear(side, radius);
-                }
-
-                @Override
-                public BlockPos setOut(ServerLevel level, BlockPos plant) {
-                    return trunk.setOut(level, plant);
-                }
-
-                @Override
-                public BlockPos wayOut(ServerLevel level, BlockPos toward) {
-                    return trunk.wayOut(level, toward);
-                }
-
-                @Override
-                public BlockPos wayHome(ServerLevel level, BlockPos from) {
-                    return trunk.wayHome(level, from);
-                }
-            })
-            .plugs(ColonyHooks.LIST_SEARCH, 30, trunk -> trunk::describe)
-            .answers(ColonyQuestions.ON_TRAIL, 10, (trunk, level, pos) -> trunk.meetsAt(pos)) // a neighbour's ant on a trail meets this colony
-            .hears(ColonyNews.NUMBERS_TRIP, 10, (trunk, level, news) -> trunk.tripByNumbers(level, news.plant())) // their trip out and back wears the trail too
-            .saves(TrunkTrails::save, TrunkTrails::load)
-            .sample(TrunkTrails::fillForTests));
-    public static final Type<Patrol> PATROL = listed("patrol", Patrol::new, part -> part
-            .ticks(140, (patrol, level) -> patrol.tick(level, false))
-            .ticksAway(50, (patrol, level) -> patrol.tick(level, true))
-            .hears(ColonyNews.MEMBER_HURT, 20, (patrol, level, news) -> patrol.danger(level, news.member(), "hurt by " + news.by().getType().toShortString())) // a patroller turns back
-            .hears(ColonyNews.MEMBER_DIED, 10, (patrol, level, news) -> patrol.died(level, news.member())) // a patroller killed never comes back: its way stays shut today
-            .answers(ColonyQuestions.NOT_CLEARED, 10, (patrol, level, pos) -> !patrol.isOpen(level, pos)) // no patroller back from that way yet
-            .plugs(ColonyHooks.LIST_DAY, 10, patrol -> patrol::describe)
-            .saves(Patrol::save, Patrol::load)
-            .sample(Patrol::fillForTests));
-    public static final Type<ForagerSpots> FORAGER_SPOTS = listed("forager_spots", ForagerSpots::new, part -> part
-            .hears(ColonyNews.MEMBER_HURT, 40, (spots, level, news) -> spots.memberHurt(news.member().getUUID(), news.where())) // hurt near its spot: gives it up
-            .hears(ColonyNews.MEMBER_DIED, 20, (spots, level, news) -> spots.died(news.member())) // its spot is lost with it
-            .hears(ColonyNews.FOOD_FOUND, 10, (spots, level, news) -> spots.found(news.finder(), news.where())) // its spot now (site fidelity, species that search alone)
-            .hears(ColonyNews.INTO_NUMBERS, 10, (spots, level, news) -> spots.intoNumbers(news.member())) // its spot goes into the numbers' pool
-            .hears(ColonyNews.OUT_OF_NUMBERS, 10, (spots, level, news) -> spots.outOfNumbers(news.member())) // a forager takes a spot from the numbers' pool
-            .hears(ColonyNews.FORAGER_NUMBERS, 10, (spots, level, news) -> spots.trimHeld(news.foragers())) // fewer forager numbers than spots held: some died or came out as real ones
-            .plugs(ColonyHooks.NUMBERS_SEARCH, 10, SearchingAlone::new) // the numbers search alone and go back to their spots
-            .plugs(ColonyHooks.LIST_SEARCH, 10, spots -> level -> spots.describe())
-            .plugs(ColonyHooks.LONE_SEARCH, 10, ForagerSearch::new) // a real forager's search alone: its own spot, a trail or a new way
-            .hears(ColonyNews.SEARCH_STARTED, 10, (spots, level, news) -> spots.setSearching(news.ant(), true))
-            .hears(ColonyNews.SEARCH_OVER, 20, (spots, level, news) -> {
-                spots.setSearching(news.ant().getUUID(), false);
-                if (news.empty()) {
-                    spots.cameHomeEmpty(news.ant().getUUID(), news.angle()); // its next search goes another way, from near the nest again
-                }
-            })
-            .saves(ForagerSpots::save, ForagerSpots::load)
-            .sample(ForagerSpots::fillForTests));
-    public static final Type<Door> DOOR = listed("door", Door::new, part -> part
-            .ticks(150, Door::tick)
-            .hears(ColonyNews.NUMBERS_FORAGED, 10, (door, level, news) -> door.numbersSecond(level, news.foragers(), news.returned(), news.placed()))
-            .plugs(ColonyHooks.DOOR_RULE, 10, door -> door::numbersFree) // Gordon's rule
-            .plugs(ColonyHooks.LIST_DAY, 20, door -> door::describe)
-            .answers(ColonyQuestions.MUST_WAIT, 10, (door, level, ant) -> !door.mayGo((ServerLevel) level, ant)) // waits for the homecomers' touches
-            .hears(ColonyNews.SET_OUT, 10, (door, level, news) -> door.setOut(level, news.ant()))
-            .hears(ColonyNews.SEARCH_OVER, 30, (door, level, news) -> {
-                if (news.empty() && news.gaveUp()) {
-                    door.endTrip(news.ant()); // its trip is over: it goes in and waits for touches again
-                }
-            })
-            .hears(ColonyNews.MEMBER_ROUND, 10, (door, level, news) -> door.memberRound(level, news.member())) // a forager home with a seed touches the ants waiting inside
-            .saves(Door::save, Door::load)
-            .sample(Door::fillForTests));
-    public static final Type<Recruits> RECRUITS = listed("recruits", Recruits::new, part -> part
-            .ticks(160, Recruits::tick)
-            .hears(ColonyNews.MEMBER_DIED, 30, (recruits, level, news) -> recruits.died(news.member()))
-            .hears(ColonyNews.FOOD_FOUND, 20, (recruits, level, news) -> recruits.found(level, news.finder(), news.where())) // a rich patch: it lays a scent line home and calls nestmates out
-            .answers(ColonyQuestions.PASSES_BY, 10, (recruits, level, asked) -> recruits.passesBy(asked.ant(), asked.food())) // called out: poorer food on the way is passed by
-            .plugs(ColonyHooks.CALLED_OUT, 10, recruits -> recruits::lineFor)
-            .plugs(ColonyHooks.LIST_SEARCH, 20, recruits -> recruits::describe)
-            .hears(ColonyNews.SEARCH_OVER, 10, (recruits, level, news) -> recruits.tripOver(news.ant().getUUID())) // its call is used up
-            .hears(ColonyNews.MEMBER_ROUND, 20, (recruits, level, news) -> {
-                if (recruits.isLaying(news.member().getUUID())) {
-                    recruits.layingTick(level, news.member()); // home from a rich patch: its scent line, then its call
-                }
-            })
-            .notSaved("a scent line fades within minutes"));
     public static final Type<DangerMap> DANGER_MAP = shared("danger_map", DangerMap::new, part -> part
             .ticks(170, DangerMap::tick)
             .hears(ColonyNews.MEMBER_HURT, 30, (danger, level, news) -> danger.hurt(level, news.where(), news.by().getType().toShortString(), news.killed())) // the place is remembered
             .answers(ColonyQuestions.KEEP_OFF, 30, DangerMap::keepsOff) // a dangerous place
             .saves(DangerMap::save, DangerMap::load)
             .sample(DangerMap::fillForTests));
-    public static final Type<ClosedHoles> CLOSED_HOLES = listed("closed_holes", ClosedHoles::new, part -> part
-            .ticks(180, ClosedHoles::tick)
-            .answers(ColonyQuestions.KEEP_OFF, 20, ClosedHoles::keepsOff) // where members were attacked
-            .answers(ColonyQuestions.HOLE_KEPT_SHUT, 10, ClosedHoles::isClosed) // closed for danger or left for good
-            .answers(ColonyQuestions.ANY_HOLE_KEPT_SHUT, 10, (closed, level, nothing) -> closed.anyClosed(level))
-            .answers(ColonyQuestions.NO_GALLERY_THROUGH, 10, ClosedHoles::keepsGalleriesOff) // not toward an attack
-            .plugs(ColonyHooks.LIST_DANGER, 10, closed -> closed::describe)
-            .saves(ClosedHoles::save, ClosedHoles::load)
-            .sample(ClosedHoles::fillForTests));
     public static final Type<Neighbours> NEIGHBOURS = shared("neighbours", Neighbours::new, part -> part
             .ticks(190, Neighbours::tick)
             .hears(ColonyNews.NEIGHBOUR_MET, 10, (neighbours, level, news) -> neighbours.met(level, news.where(), news.other(), news.who()))
             .answers(ColonyQuestions.KEEP_OFF, 10, Neighbours::yieldsAt) // past a place the colony yields to a neighbour
             .saves(Neighbours::save, Neighbours::load)
             .sample(Neighbours::fillForTests));
-    public static final Type<HiddenTrips> HIDDEN_TRIPS = listed("hidden_trips", HiddenTrips::new, part -> part
-            .plugs(ColonyHooks.HIDDEN_AWAY, 10, trips -> new ColonyHooks.HiddenAway() {
-                @Override
-                public int travelling(String caste) {
-                    return trips.travelling(caste);
-                }
-
-                @Override
-                public boolean anyWalksThrough(Set<BlockPos> cells) {
-                    return trips.anyWalksThrough(cells);
-                }
-
-                @Override
-                public com.antcolonies.nav.HiddenWays ways(ServerLevel level) {
-                    return trips.ways(level);
-                }
-            })
-            .plugs(ColonyHooks.LIST_HOLES, 20, trips -> level -> trips.describe())
-            .ticks(100, HiddenTrips::tick)
-            .ticksAway(10, HiddenTrips::tickAway)
-            .saves(HiddenTrips::save, HiddenTrips::load)
-            .sample(HiddenTrips::fillForTests));
-    public static final Type<FungusGarden> FUNGUS_GARDEN = listed("fungus_garden", FungusGarden::new, part -> part
-            .ticks(20, FungusGarden::grow)
-            .hears(ColonyNews.HEAP_GONE, 10, (garden, level, news) -> garden.loseNodules(news.nodules())) // a comb eaten right down: its nodules go with it
-            .plugs(ColonyHooks.AWAY_AFTER_NURSES, 10, garden -> new GardenAway(garden)::grow) // nodules grow and the comb ages while away
-            .answers(ColonyQuestions.NOTHING_TO_EAT_IN_STORE, 10, (garden, level, nothing) -> garden.oldKnown() <= 0) // no old layer as far as the brain knows
-            .plugs(ColonyHooks.NURSE_FOOD, 10, garden -> garden) // fungus nodules
-            .plugs(ColonyHooks.GARDEN, 10, garden -> new ColonyHooks.Garden() {
-                @Override
-                public List<BlockPos> beds(Level level) {
-                    return garden.getCombs(level);
-                }
-
-                @Override
-                public ColonyHooks.Ages age(ServerLevel level, List<net.minecraft.world.phys.Vec3> eyes, ColonyHooks.Ages owed, int most) {
-                    return garden.age(level, eyes, owed, most);
-                }
-            })
-            .plugs(ColonyHooks.LIST_FOOD, 10, garden -> garden::describe)
-            .saves(FungusGarden::save, FungusGarden::load)
-            .sample(FungusGarden::fillForTests));
-    public static final Type<Mushrooms> MUSHROOMS = listed("mushrooms", Mushrooms::new, part -> part
-            .ticks(50, Mushrooms::tick)
-            .notSaved("only the weather at the last look and the last flush, for the colony list"));
-    public static final Type<Soldiers> SOLDIERS = listed("soldiers", Soldiers::new, part -> part
-            .plugs(ColonyHooks.CASTES, 10, soldiers -> new ColonyHooks.Castes() {
-                @Override
-                public List<String> castes() {
-                    return List.of(com.antcolonies.entity.TermiteSoldierEntity.Rank.MINOR.caste(), com.antcolonies.entity.TermiteSoldierEntity.Rank.MAJOR.caste());
-                }
-
-                @Override
-                public int mealFor(String caste) {
-                    return soldiers.mealFor(com.antcolonies.entity.TermiteSoldierEntity.Rank.byCaste(caste));
-                }
-
-                @Override
-                public String wanted(Level level) {
-                    com.antcolonies.entity.TermiteSoldierEntity.Rank rank = soldiers.rankForNewNymph(level);
-                    return rank == null ? null : rank.caste();
-                }
-
-                @Override
-                public String savedAs(String caste) {
-                    com.antcolonies.entity.TermiteSoldierEntity.Rank rank = com.antcolonies.entity.TermiteSoldierEntity.Rank.byCaste(caste);
-                    return rank == null ? null : rank.name(); // "MINOR", "MAJOR", as saved before step 9c
-                }
-
-                @Override
-                public String fromSaved(String word) {
-                    for (com.antcolonies.entity.TermiteSoldierEntity.Rank rank : com.antcolonies.entity.TermiteSoldierEntity.Rank.values()) {
-                        if (rank.name().equals(word)) {
-                            return rank.caste();
-                        }
-                    }
-                    return null;
-                }
-
-                @Override
-                public byte numberOf(String caste) {
-                    com.antcolonies.entity.TermiteSoldierEntity.Rank rank = com.antcolonies.entity.TermiteSoldierEntity.Rank.byCaste(caste);
-                    return rank == null ? 0 : rank.id(); // 1 minor, 2 major, as synced and saved before step 10
-                }
-
-                @Override
-                public String casteOf(int number) {
-                    com.antcolonies.entity.TermiteSoldierEntity.Rank rank = com.antcolonies.entity.TermiteSoldierEntity.Rank.byId(number);
-                    return rank == null ? null : rank.caste();
-                }
-
-                @Override
-                public int wantReal(ServerLevel level, boolean watched, int cap, java.util.Map<String, Integer> wanted) {
-                    return soldiers.wantReal(level, watched, cap, wanted);
-                }
-
-                @Override
-                public String inside(Population population) {
-                    return soldiers.inside(population);
-                }
-
-                @Override
-                public List<? extends net.minecraft.world.entity.Entity> fedByNurses(Level level) {
-                    return soldiers.getSoldiers(level); // fed head to head like the queen
-                }
-
-                @Override
-                public String addFor(int workers, long now) {
-                    return soldiers.addFor(workers, now);
-                }
-            })
-            .plugs(ColonyHooks.LIST_BROOD, 10, soldiers -> soldiers::describe)
-            .notSaved("the soldiers simply take their posts again after a load"));
-    public static final Type<Alarm> ALARM = listed("alarm", Alarm::new, part -> part
-            .ticks(60, Alarm::tick)
-            .hears(ColonyNews.MEMBER_HURT, 10, (alarm, level, news) -> alarm.memberHurt(level, news.by())) // level 2 at the attacker
-            .answers(ColonyQuestions.KEEPS_EVERYONE_IN, 10, (alarm, level, nothing) -> alarm.keepsEveryoneIn(level)) // the foragers hurry home
-            .plugs(ColonyHooks.LIST_BROOD, 20, alarm -> alarm::describe)
-            .answers(ColonyQuestions.ALARMED, 10, (alarm, level, nothing) -> alarm.level(level) != 0) // no grooming, napping or idle looking round
-            .hears(ColonyNews.PLAYER_STAMPED, 10, (alarm, level, news) -> alarm.footsteps(level, news.player())) // footsteps, the first level
-            .hears(ColonyNews.BLOCK_BROKEN, 10, (alarm, level, news) -> alarm.blockBroken(level, news.where(), news.breaker())) // a break-in, the third level
-            .saves(Alarm::save, Alarm::load)
-            .sample(Alarm::fillForTests));
     public static final Type<Population> POPULATION = shared("population", Population::new, part -> part
             .ticks(120, Population::tick)
             .ticksAway(30, Population::tickAway)
@@ -496,10 +141,6 @@ public final class ColonyParts {
 
     private static <T> Type<T> shared(String name, Function<Colony, T> make, UnaryOperator<ColonyPart<T>> rows) {
         return register(name, true, make, rows);
-    }
-
-    private static <T> Type<T> listed(String name, Function<Colony, T> make, UnaryOperator<ColonyPart<T>> rows) {
-        return register(name, false, make, rows);
     }
 
     /**

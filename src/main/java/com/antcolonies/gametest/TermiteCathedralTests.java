@@ -9,10 +9,10 @@ import com.antcolonies.block.TermiteMouthBlock;
 import com.antcolonies.block.TermiteSpireBlock;
 import com.antcolonies.block.TermiteTunnelBlock;
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.ColonyParts;
+import com.antcolonies.colony.SavannaParts;
 import com.antcolonies.colony.MoundGrowth;
 import com.antcolonies.colony.MoundPlan;
-import com.antcolonies.registry.ModEntities;
+import com.antcolonies.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -36,8 +36,8 @@ public class TermiteCathedralTests {
     /** What is still to do on the colony's mound at the stage it builds now, by kind (empty when it is all done). */
     static Map<String, Integer> jobsLeft(ServerLevel level, Colony colony) {
         Map<String, Integer> left = new TreeMap<>();
-        for (Map.Entry<BlockPos, MoundPlan.Part> entry : colony.part(ColonyParts.MOUND).orElseThrow().getParts(level).entrySet()) {
-            MoundGrowth.Job job = colony.part(ColonyParts.MOUND).orElseThrow().jobAt(level, entry.getKey(), entry.getValue());
+        for (Map.Entry<BlockPos, MoundPlan.Part> entry : colony.part(SavannaParts.MOUND).orElseThrow().getParts(level).entrySet()) {
+            MoundGrowth.Job job = colony.part(SavannaParts.MOUND).orElseThrow().jobAt(level, entry.getKey(), entry.getValue());
             if (job != null) {
                 left.merge(job.name().toLowerCase(), 1, Integer::sum);
             }
@@ -47,7 +47,7 @@ public class TermiteCathedralTests {
 
     /** Sides of the mound's tunnel blocks open to the air outside (windows not plugged again): there must be none. */
     static int openWindows(ServerLevel level, Colony colony) {
-        Map<BlockPos, MoundPlan.Part> parts = colony.part(ColonyParts.MOUND).orElseThrow().getParts(level);
+        Map<BlockPos, MoundPlan.Part> parts = colony.part(SavannaParts.MOUND).orElseThrow().getParts(level);
         int open = 0;
         for (Map.Entry<BlockPos, MoundPlan.Part> entry : parts.entrySet()) {
             BlockState state = level.getBlockState(entry.getKey());
@@ -68,8 +68,8 @@ public class TermiteCathedralTests {
     /** Logs every job left (where, what, what stands there) and what every worker is up to: for working out a stall. */
     static void describe(GameTestHelper helper, ServerLevel level, Colony colony) {
         BlockPos origin = helper.absolutePos(BlockPos.ZERO);
-        for (Map.Entry<BlockPos, MoundPlan.Part> entry : colony.part(ColonyParts.MOUND).orElseThrow().getParts(level).entrySet()) {
-            MoundGrowth.Job job = colony.part(ColonyParts.MOUND).orElseThrow().jobAt(level, entry.getKey(), entry.getValue());
+        for (Map.Entry<BlockPos, MoundPlan.Part> entry : colony.part(SavannaParts.MOUND).orElseThrow().getParts(level).entrySet()) {
+            MoundGrowth.Job job = colony.part(SavannaParts.MOUND).orElseThrow().jobAt(level, entry.getKey(), entry.getValue());
             if (job != null) {
                 AntColoniesMod.LOGGER.info("[cathedral-test]   left: {} {} at {} (from the entrance {}), now {}", job, entry.getValue(),
                         entry.getKey().subtract(origin).toShortString(), entry.getKey().subtract(colony.getCenter()).toShortString(), level.getBlockState(entry.getKey()));
@@ -92,12 +92,12 @@ public class TermiteCathedralTests {
     @GameTest(template = "arena", timeoutTicks = 120000, skyAccess = true, batch = "cathedral")
     public static void termitesBuildTheYoungCathedralFromInside(GameTestHelper helper) {
         helper.getLevel().getServer().tickRateManager().setTickRate(2000.0F);
-        TermiteMoundTests.deepGround(helper);
-        helper.spawn(ModEntities.TERMITE_QUEEN.get(), TermiteMoundTests.MIDDLE, TermiteMoundTests.SURFACE, TermiteMoundTests.MIDDLE);
+        TestScenes.deepGround(helper);
+        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), TermiteMoundTests.MIDDLE, TermiteMoundTests.SURFACE, TermiteMoundTests.MIDDLE);
         helper.runAfterDelay(5, () -> {
-            helper.spawn(ModEntities.TERMITE_KING.get(), TermiteMoundTests.MIDDLE + 2, TermiteMoundTests.SURFACE, TermiteMoundTests.MIDDLE + 1);
+            helper.spawn(SavannaEntities.TERMITE_KING.get(), TermiteMoundTests.MIDDLE + 2, TermiteMoundTests.SURFACE, TermiteMoundTests.MIDDLE + 1);
             for (int i = 0; i < 8; i++) {
-                helper.spawn(ModEntities.TERMITE_WORKER.get(), TermiteMoundTests.MIDDLE - 3 + i % 4, TermiteMoundTests.SURFACE,
+                helper.spawn(SavannaEntities.TERMITE_WORKER.get(), TermiteMoundTests.MIDDLE - 3 + i % 4, TermiteMoundTests.SURFACE,
                         TermiteMoundTests.MIDDLE - 3 + i / 4);
             }
         });
@@ -109,17 +109,17 @@ public class TermiteCathedralTests {
                 return;
             }
             ServerLevel level = helper.getLevel();
-            if (colony.part(ColonyParts.MOUND).orElseThrow().getEarnedStage(level) != YOUNG) {
-                colony.part(ColonyParts.MOUND).orElseThrow().setStage(level, YOUNG);
+            if (colony.part(SavannaParts.MOUND).orElseThrow().getEarnedStage(level) != YOUNG) {
+                colony.part(SavannaParts.MOUND).orElseThrow().setStage(level, YOUNG);
             }
             // Wet soil sets at once.
-            for (var entry : colony.part(ColonyParts.MOUND).orElseThrow().getParts(level).entrySet()) {
+            for (var entry : colony.part(SavannaParts.MOUND).orElseThrow().getParts(level).entrySet()) {
                 BlockState state = level.getBlockState(entry.getKey());
                 if (state.getBlock() instanceof TermiteMoundBlock && TermiteMoundBlock.isFinished(state) && state.getValue(TermiteMoundBlock.AGE) == 0) {
                     level.setBlockAndUpdate(entry.getKey(), state.setValue(TermiteMoundBlock.AGE, 1));
                 }
             }
-            int stage = colony.part(ColonyParts.MOUND).orElseThrow().getStage(level);
+            int stage = colony.part(SavannaParts.MOUND).orElseThrow().getStage(level);
             if (stage != lastStage[0] || helper.getTick() % 2000 == 0) {
                 AntColoniesMod.LOGGER.info("[cathedral-test] tick {}: building stage {}, left {}, windows open {}", helper.getTick(), stage,
                         jobsLeft(level, colony), openWindows(level, colony));
@@ -133,7 +133,7 @@ public class TermiteCathedralTests {
             ServerLevel level = helper.getLevel();
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null && !colony.isFounding(), "no colony with workers yet");
-            int stage = colony.part(ColonyParts.MOUND).orElseThrow().getStage(level);
+            int stage = colony.part(SavannaParts.MOUND).orElseThrow().getStage(level);
             helper.assertTrue(stage == YOUNG, "still building stage " + stage + " (left " + jobsLeft(level, colony) + ")");
             Map<String, Integer> left = jobsLeft(level, colony);
             helper.assertTrue(left.isEmpty(), "stage " + YOUNG + " is not finished: " + left);
@@ -168,12 +168,12 @@ public class TermiteCathedralTests {
     @GameTest(template = "arena", timeoutTicks = 240000, skyAccess = true, batch = "usermound")
     public static void termitesFinishTheUsersHalfBuiltStageFourteen(GameTestHelper helper) {
         helper.getLevel().getServer().tickRateManager().setTickRate(4000.0F);
-        TermiteMoundTests.deepGround(helper);
-        helper.spawn(ModEntities.TERMITE_QUEEN.get(), TermiteMoundTests.MIDDLE, TermiteMoundTests.SURFACE, TermiteMoundTests.MIDDLE);
+        TestScenes.deepGround(helper);
+        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), TermiteMoundTests.MIDDLE, TermiteMoundTests.SURFACE, TermiteMoundTests.MIDDLE);
         helper.runAfterDelay(5, () -> {
-            helper.spawn(ModEntities.TERMITE_KING.get(), TermiteMoundTests.MIDDLE + 2, TermiteMoundTests.SURFACE, TermiteMoundTests.MIDDLE + 1);
+            helper.spawn(SavannaEntities.TERMITE_KING.get(), TermiteMoundTests.MIDDLE + 2, TermiteMoundTests.SURFACE, TermiteMoundTests.MIDDLE + 1);
             for (int i = 0; i < 12; i++) {
-                helper.spawn(ModEntities.TERMITE_WORKER.get(), TermiteMoundTests.MIDDLE - 3 + i % 4, TermiteMoundTests.SURFACE,
+                helper.spawn(SavannaEntities.TERMITE_WORKER.get(), TermiteMoundTests.MIDDLE - 3 + i % 4, TermiteMoundTests.SURFACE,
                         TermiteMoundTests.MIDDLE - 3 + i / 4);
             }
         });
@@ -191,8 +191,8 @@ public class TermiteCathedralTests {
                 if (colony.nest().isEntrancePlugged(level)) {
                     return;
                 }
-                colony.part(ColonyParts.MOUND).orElseThrow().setSeedForTests(-1005795587942992884L);
-                colony.part(ColonyParts.MOUND).orElseThrow().setWorkStage(level, 14);
+                colony.part(SavannaParts.MOUND).orElseThrow().setSeedForTests(-1005795587942992884L);
+                colony.part(SavannaParts.MOUND).orElseThrow().setWorkStage(level, 14);
                 putUpTheUsersMound(level, colony);
                 built[0] = true;
                 AntColoniesMod.LOGGER.info("[user-mound-test] tick {}: the user's mound put up", helper.getTick());
@@ -214,7 +214,7 @@ public class TermiteCathedralTests {
             }
             // The test world has no random ticks: wet soil sets here at about the game's pace (a finished block in about 20
             // minutes at normal speed, see TermiteMoundBlock).
-            for (BlockPos pos : colony.part(ColonyParts.MOUND).orElseThrow().getParts(level).keySet()) {
+            for (BlockPos pos : colony.part(SavannaParts.MOUND).orElseThrow().getParts(level).keySet()) {
                 BlockState state = level.getBlockState(pos);
                 if (state.hasProperty(com.antcolonies.block.MoundSoil.AGE) && state.getValue(com.antcolonies.block.MoundSoil.AGE) == 0
                         && (!(state.getBlock() instanceof TermiteMoundBlock) || TermiteMoundBlock.isFinished(state))
@@ -229,7 +229,7 @@ public class TermiteCathedralTests {
                 Map<String, Integer> left = jobsLeft(level, colony);
                 int total = left.values().stream().mapToInt(Integer::intValue).sum();
                 AntColoniesMod.LOGGER.info("[user-mound-test] tick {} ({}): building stage {}, left {}, windows open {}", helper.getTick(),
-                        clock.describe(), colony.part(ColonyParts.MOUND).orElseThrow().getStage(level), left, openWindows(level, colony));
+                        clock.describe(), colony.part(SavannaParts.MOUND).orElseThrow().getStage(level), left, openWindows(level, colony));
                 if (helper.getTick() % 12000 == 9000) {
                     describe(helper, level, colony);
                 }

@@ -7,7 +7,7 @@ import org.jetbrains.annotations.Nullable;
 import com.antcolonies.colony.Bakery;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
-import com.antcolonies.colony.ColonyParts;
+import com.antcolonies.colony.DesertParts;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.AbstractAntEntity;
 
@@ -67,7 +67,7 @@ public class MillBreadGoal extends Goal {
         // Holding a seed for the mill (a forager's, or this goal was interrupted): carry on to a spot.
         if (ant.isCarryingSeed() && ant.isSeedForBread()) {
             colony = ColonyManager.get(level).getColony(ant.getColonyId());
-            bakery = colony == null ? null : colony.part(ColonyParts.BAKERY).orElse(null);
+            bakery = colony == null ? null : colony.part(DesertParts.BAKERY).orElse(null);
             target = bakery == null ? null : bakery.pickBreadSpot(level, ant.getRandom());
             if (!errand.setOff(target, 1.0)) {
                 if (bakery != null) {
@@ -85,7 +85,7 @@ public class MillBreadGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        bakery = colony == null ? null : colony.part(ColonyParts.BAKERY).orElse(null);
+        bakery = colony == null ? null : colony.part(DesertParts.BAKERY).orElse(null);
         if (bakery == null || colony.food().getFood() <= 0 || !bakery.claimMilling(level, ant.getUUID())) {
             return false;
         }

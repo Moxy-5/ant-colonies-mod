@@ -12,7 +12,7 @@ import com.antcolonies.block.MoundSoil;
 import com.antcolonies.block.TermiteMoundBlock;
 import com.antcolonies.block.TermiteTunnelBlock;
 import com.antcolonies.entity.AbstractAntEntity;
-import com.antcolonies.registry.ModBlocks;
+import com.antcolonies.registry.SavannaBlocks;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -137,7 +137,7 @@ public class MoundShaping {
             if (toward != null && !open.contains(toward) && MoundReach.isHollowInside(level, mound.colony(), from)) {
                 open.add(toward); // carved from the nest (or the shaft): it opens toward where the termite came from
             }
-            done = level.setBlockAndUpdate(pos, ModBlocks.TERMITE_TUNNEL.get().stateFor(level, pos, age, open));
+            done = level.setBlockAndUpdate(pos, SavannaBlocks.TERMITE_TUNNEL.get().stateFor(level, pos, age, open));
         } else if (job == MoundGrowth.Job.RESHAPE) {
             // A piece is filled up where it stands. Insects in it must not be buried: a player or an animal there stops
             // it (try again later); termites crawling up its channel keep a channel (it becomes a tunnel block instead
@@ -150,7 +150,7 @@ public class MoundShaping {
             if (mound.getParts(level).get(pos) == MoundPlan.Part.TUNNEL || !inCell.isEmpty() && plan != null
                     && Mound.blockFor(plan, pos.subtract(center)).getBlock() instanceof TermiteMoundBlock) {
                 // A piece (the bottom of a spire that moves up) becomes a tunnel block where it stands, joined to the channels round it.
-                filled = ModBlocks.TERMITE_TUNNEL.get().stateFor(level, pos, age, doorsOf(level, pos));
+                filled = SavannaBlocks.TERMITE_TUNNEL.get().stateFor(level, pos, age, doorsOf(level, pos));
             } else {
                 filled = Block.updateFromNeighbourShapes(Mound.blockFor(plan, pos.subtract(center)).setValue(MoundSoil.AGE, age), level, pos);
             }

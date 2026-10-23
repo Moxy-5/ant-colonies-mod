@@ -1,6 +1,7 @@
 package com.antcolonies.block;
 
-import com.antcolonies.registry.ModItems;
+import com.antcolonies.registry.SavannaItems;
+
 import com.mojang.serialization.MapCodec;
 
 import net.minecraft.core.BlockPos;
@@ -183,6 +184,6 @@ public class GiantTermitomycesBlock extends Block {
 
     @Override
     public ItemStack getCloneItemStack(LevelReader level, BlockPos pos, BlockState state) {
-        return new ItemStack(ModItems.TERMITOMYCES.get());
+        return new ItemStack(SavannaItems.TERMITOMYCES.get());
     }
 }

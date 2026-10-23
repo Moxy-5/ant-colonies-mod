@@ -1,82 +1,35 @@
 package com.antcolonies;
 
-import com.antcolonies.entity.QueenAntEntity;
-import com.antcolonies.entity.TermiteKingEntity;
-import com.antcolonies.entity.TermiteQueenEntity;
-import com.antcolonies.entity.TermiteSoldierEntity;
-import com.antcolonies.entity.TermiteWorkerEntity;
-import com.antcolonies.entity.WorkerAntEntity;
-import com.antcolonies.registry.ModEntities;
-import com.antcolonies.registry.ModItems;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.function.Consumer;
 
-import com.antcolonies.block.DryGrassBlock;
-import com.antcolonies.block.GramaGrassBlock;
+
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyNews;
 import com.antcolonies.debug.Perf;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.goal.GroundShakes;
-import com.antcolonies.entity.goal.HuntTermitesGoal;
 
-import net.minecraft.core.component.DataComponents;
-import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.animal.Chicken;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.CreativeModeTabs;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.component.BlockItemStateProperties;
+import net.minecraft.world.item.CreativeModeTab;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
-import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent;
-import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.living.LivingEvent;
 import net.neoforged.neoforge.event.entity.living.LivingFallEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
 
+/**
+ * The framework's game events: the colonies' clock, insects going out of range, the player's footsteps and break-ins
+ * told to the colonies near, the stopwatch, and the creative menu's rows (the split, step S4: each species' own events
+ * in {@link SavannaEvents} and {@link DesertEvents}).
+ */
 @EventBusSubscriber(modid = AntColoniesMod.MODID)
 public class ModEvents {
-    /** Step 5d: a fire appearing next to a giant tree chars its bark and scorches its leaves. */
-    @SubscribeEvent
-    public static void onNeighborNotify(BlockEvent.NeighborNotifyEvent event) {
-        if (event.getLevel() instanceof ServerLevel level) {
-            com.antcolonies.tree.TreeFire.changed(level, event.getPos(), event.getState());
-        }
-    }
-
-    @SubscribeEvent
-    public static void onAttributes(EntityAttributeCreationEvent event) {
-        event.put(ModEntities.WORKER_ANT.get(), WorkerAntEntity.createAttributes().build());
-        event.put(ModEntities.QUEEN_ANT.get(), QueenAntEntity.createAttributes().build());
-        event.put(ModEntities.TERMITE_KING.get(), TermiteKingEntity.createAttributes().build());
-        event.put(ModEntities.TERMITE_QUEEN.get(), TermiteQueenEntity.createAttributes().build());
-        event.put(ModEntities.TERMITE_WORKER.get(), TermiteWorkerEntity.createAttributes().build());
-        event.put(ModEntities.TERMITE_MINOR_SOLDIER.get(), TermiteSoldierEntity.createMinorAttributes().build());
-        event.put(ModEntities.TERMITE_MAJOR_SOLDIER.get(), TermiteSoldierEntity.createMajorAttributes().build());
-    }
-
-    /** Chickens hunt termite workers out on the surface (step 6c; see {@link HuntTermitesGoal}). */
-    @SubscribeEvent
-    public static void onJoinLevel(EntityJoinLevelEvent event) {
-        if (event.loadedFromDisk() && event.getEntity().getTags().contains(com.antcolonies.tree.TreeFall.TAG)) {
-            // A falling tree's display left by a stop in the middle of its fall: the tree is placed fallen instead.
-            event.setCanceled(true);
-            return;
-        }
-        if (!event.loadedFromDisk() && event.getLevel() instanceof ServerLevel level && event.getEntity() instanceof net.minecraft.world.entity.LightningBolt bolt
-                && !level.getBlockState(bolt.blockPosition().below()).is(net.minecraft.world.level.block.Blocks.LIGHTNING_ROD)) {
-            // Step 5e: a big savanna tree near the strike draws it to its top (a lightning rod still wins).
-            net.minecraft.core.BlockPos to = com.antcolonies.tree.Forest.get(level).lightning(level, bolt.blockPosition());
-            if (to != null) {
-                bolt.moveTo(net.minecraft.world.phys.Vec3.atBottomCenterOf(to));
-            }
-        }
-        if (!event.getLevel().isClientSide() && event.getEntity() instanceof Chicken chicken) {
-            chicken.goalSelector.addGoal(3, new HuntTermitesGoal(chicken));
-        }
-    }
-
     /**
      * One of a colony's insects goes out of range (its chunk stops being tracked, before Minecraft unloads it; one that
      * is killed or put away has a removal reason already): its colony writes down what it is (the brain, part 2, see
@@ -116,22 +69,6 @@ public class ModEvents {
                     }
                 }
             }
-            com.antcolonies.tree.Forest.tick(level);
-        }
-    }
-
-    /** Bone meal on a giant savanna tree's seedling or young tree grows it a day's step (M7.5 step 4, {@code Forest}). */
-    @SubscribeEvent
-    public static void onUseOnBlock(net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.RightClickBlock event) {
-        if (!(event.getLevel() instanceof ServerLevel level) || !event.getItemStack().is(net.minecraft.world.item.Items.BONE_MEAL)) {
-            return;
-        }
-        if (com.antcolonies.tree.Forest.get(level).boneMeal(level, event.getPos())) {
-            if (!event.getEntity().getAbilities().instabuild) {
-                event.getItemStack().shrink(1);
-            }
-            event.setCanceled(true);
-            event.setCancellationResult(net.minecraft.world.InteractionResult.SUCCESS);
         }
     }
 
@@ -179,69 +116,29 @@ public class ModEvents {
                 .toList();
     }
 
-    /** A grama seeds item that places a grown plant at this stage, named so it can be told apart (for testing). */
-    private static ItemStack grama(ItemStack stack, GramaGrassBlock.Stage stage, String name) {
-        stack.set(DataComponents.BLOCK_STATE, BlockItemStateProperties.EMPTY.with(GramaGrassBlock.STAGE, stage));
-        stack.set(DataComponents.ITEM_NAME, Component.translatable(name));
-        return stack;
+    // --- the creative menu: each species signs up its rows; they are added in the order of their places, so the rows of
+    // different species can sit between each other (the split, step S4: the menu kept in today's order) ---------------
+
+    private record TabRows(ResourceKey<CreativeModeTab> tab, int place, Consumer<BuildCreativeModeTabContentsEvent> rows) {
     }
 
-    /** A Dry Grass item that places the grass green (it dries out over a few days), named so it can be told apart. */
-    private static ItemStack greenGrass(ItemStack stack, String name) {
-        stack.set(DataComponents.BLOCK_STATE, BlockItemStateProperties.EMPTY.with(DryGrassBlock.GROWTH, DryGrassBlock.Growth.GREEN));
-        stack.set(DataComponents.ITEM_NAME, Component.translatable(name));
-        return stack;
+    private static final List<TabRows> TAB_ROWS = new ArrayList<>();
+
+    /**
+     * Signs up rows for a creative menu tab ({@code rows} adds them), at {@code place}: rows with a lower place come
+     * first. Called while the mod loads.
+     */
+    public static void addToCreativeTab(ResourceKey<CreativeModeTab> tab, int place, Consumer<BuildCreativeModeTabContentsEvent> rows) {
+        TAB_ROWS.add(new TabRows(tab, place, rows));
+        TAB_ROWS.sort(Comparator.comparingInt(TabRows::place));
     }
 
     @SubscribeEvent
     public static void onCreativeTab(BuildCreativeModeTabContentsEvent event) {
-        if (event.getTabKey() == CreativeModeTabs.NATURAL_BLOCKS) {
-            event.accept(ModItems.BURROWED_DIRT);
-            event.accept(ModItems.DEEP_SOIL);
-            event.accept(ModItems.SEED_PILE);
-            event.accept(ModItems.BREAD_PILE);
-            event.accept(ModItems.FORAGE_PILE);
-            event.accept(ModItems.FUNGUS_COMB);
-            event.accept(ModItems.TERMITE_MOUND);
-            event.accept(ModItems.TERMITE_HOLE);
-            event.accept(ModItems.TERMITE_SPIRE);
-            event.accept(ModItems.TERMITE_MOUTH);
-            event.accept(ModItems.TERMITE_RAMP);
-            event.accept(ModItems.TERMITE_TUNNEL);
-            // Dry Grass placed by hand is dry; the green ones are for watching it dry out.
-            event.accept(ModItems.DRY_GRASS);
-            event.accept(greenGrass(ModItems.DRY_GRASS.toStack(), "block.antcolonies.dry_grass.green"));
-            event.accept(ModItems.TALL_DRY_GRASS);
-            event.accept(greenGrass(ModItems.TALL_DRY_GRASS.toStack(), "block.antcolonies.tall_dry_grass.green"));
-            // Grama: the seeds (planted, they come up young), and grown plants for testing (leaves wait for rain; ripe for the ants).
-            event.accept(ModItems.BLUE_GRAMA_SEEDS);
-            event.accept(grama(ModItems.BLUE_GRAMA_SEEDS.toStack(), GramaGrassBlock.Stage.LEAVES, "block.antcolonies.blue_grama.leaves"));
-            event.accept(grama(ModItems.BLUE_GRAMA_SEEDS.toStack(), GramaGrassBlock.Stage.RIPE, "block.antcolonies.blue_grama.ripe"));
-            event.accept(ModItems.BLACK_GRAMA_SEEDS);
-            event.accept(grama(ModItems.BLACK_GRAMA_SEEDS.toStack(), GramaGrassBlock.Stage.LEAVES, "block.antcolonies.black_grama.leaves"));
-            event.accept(grama(ModItems.BLACK_GRAMA_SEEDS.toStack(), GramaGrassBlock.Stage.RIPE, "block.antcolonies.black_grama.ripe"));
-            event.accept(ModItems.FALLEN_BRANCH);
-            event.accept(ModItems.DEAD_WOOD);
-            event.accept(ModItems.MUD_CRUST);
-            // The giant savanna trees' blocks (M7.5).
-            ModItems.TREE_ITEMS.forEach(event::accept);
-        }
-        if (event.getTabKey() == CreativeModeTabs.INGREDIENTS) {
-            event.accept(ModItems.FORAGE);
-            event.accept(ModItems.FUNGUS_NODULE);
-        }
-        if (event.getTabKey() == CreativeModeTabs.FOOD_AND_DRINKS) {
-            event.accept(ModItems.TERMITOMYCES);
-            event.accept(ModItems.COOKED_TERMITOMYCES);
-        }
-        if (event.getTabKey() == CreativeModeTabs.SPAWN_EGGS) {
-            event.accept(ModItems.WORKER_ANT_SPAWN_EGG);
-            event.accept(ModItems.QUEEN_ANT_SPAWN_EGG);
-            event.accept(ModItems.TERMITE_QUEEN_SPAWN_EGG);
-            event.accept(ModItems.TERMITE_KING_SPAWN_EGG);
-            event.accept(ModItems.TERMITE_WORKER_SPAWN_EGG);
-            event.accept(ModItems.TERMITE_MINOR_SOLDIER_SPAWN_EGG);
-            event.accept(ModItems.TERMITE_MAJOR_SOLDIER_SPAWN_EGG);
+        for (TabRows rows : TAB_ROWS) {
+            if (event.getTabKey() == rows.tab()) {
+                rows.rows().accept(event);
+            }
         }
     }
 }

@@ -1,7 +1,7 @@
 package com.antcolonies.worldgen;
 
 import com.antcolonies.block.FallenBranchBlock;
-import com.antcolonies.registry.ModBlocks;
+import com.antcolonies.registry.SavannaBlocks;
 import com.mojang.serialization.Codec;
 
 import net.minecraft.core.BlockPos;
@@ -42,7 +42,7 @@ public class FallenBranchFeature extends Feature<NoneFeatureConfiguration> {
                 for (int i = 0; i < length; i++) {
                     FallenBranchBlock.Part part = i == 0 ? FallenBranchBlock.Part.BASE
                             : i == length - 1 ? FallenBranchBlock.Part.TIP : FallenBranchBlock.Part.MIDDLE;
-                    level.setBlock(start.relative(way, i), ModBlocks.FALLEN_BRANCH.get().defaultBlockState()
+                    level.setBlock(start.relative(way, i), SavannaBlocks.FALLEN_BRANCH.get().defaultBlockState()
                             .setValue(FallenBranchBlock.AXIS, way.getAxis()).setValue(FallenBranchBlock.PART, part), flags);
                 }
                 return true;

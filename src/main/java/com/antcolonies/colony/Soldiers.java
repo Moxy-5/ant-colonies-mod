@@ -81,7 +81,7 @@ public class Soldiers {
             return 0;
         }
         // After repeated break-ins (alarm level 4) the colony raises more soldiers for a while.
-        int workers = Math.round(colony.getCount(Caste.WORKER) * colony.part(ColonyParts.ALARM).map(alarm -> alarm.soldierBoost(level)).orElse(1.0F));
+        int workers = Math.round(colony.getCount(Caste.WORKER) * colony.part(SavannaParts.ALARM).map(alarm -> alarm.soldierBoost(level)).orElse(1.0F));
         return rank == Rank.MINOR ? numbers.wantedMinors(workers) : numbers.wantedMajors(workers);
     }
 
@@ -440,7 +440,7 @@ public class Soldiers {
             return 0;
         }
         int soldiers = 0;
-        int alarm = colony.part(ColonyParts.ALARM).map(part -> part.level(level)).orElse(0);
+        int alarm = colony.part(SavannaParts.ALARM).map(part -> part.level(level)).orElse(0);
         int soldierCap = cap / 4;
         for (Rank rank : Rank.values()) {
             int posts = posts(level, rank).size();

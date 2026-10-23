@@ -7,7 +7,7 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
-import com.antcolonies.colony.ColonyParts;
+import com.antcolonies.colony.SavannaParts;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.colony.Mound;
 import com.antcolonies.colony.MoundGrowth;
@@ -65,7 +65,7 @@ public class ShapeMoundGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        mound = colony == null ? null : colony.part(ColonyParts.MOUND).orElse(null);
+        mound = colony == null ? null : colony.part(SavannaParts.MOUND).orElse(null);
         if (mound == null || !mound.isActive()) {
             return false;
         }

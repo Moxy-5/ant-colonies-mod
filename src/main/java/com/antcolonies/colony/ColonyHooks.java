@@ -397,6 +397,9 @@ public final class ColonyHooks {
 
         /** The cells left of eaten food joined to these feeding gallery cells (inside), each with the gallery cell it eats from. */
         Map<BlockPos, BlockPos> joined(Level level, List<BlockPos> galleryCells, Set<BlockPos> inside);
+
+        /** The split, step S3: the cast left at {@code pos} of a block of food eaten away, open on these sides (the termites' mud cast). */
+        net.minecraft.world.level.block.state.BlockState castFor(Level level, BlockPos pos, List<net.minecraft.core.Direction> open);
     }
 
     // --- the kinds every colony may plug into (the framework's) ---------------------------------------------------------

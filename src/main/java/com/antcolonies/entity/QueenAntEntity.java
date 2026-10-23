@@ -50,7 +50,7 @@ public class QueenAntEntity extends AbstractAntEntity {
     }
 
     @Override
-    protected net.minecraft.resources.ResourceLocation species() {
+    public net.minecraft.resources.ResourceLocation species() {
         return Species.RED_HARVESTER_ANT;
     }
 

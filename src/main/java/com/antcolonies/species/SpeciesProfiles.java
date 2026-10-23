@@ -39,6 +39,7 @@ public class SpeciesProfiles extends SimpleJsonResourceReloadListener {
                 .ifPresent(profile -> loaded.put(id, profile)));
         // A part name nothing signed up stops the loading here, with a clear message (Project Apex, colony parts step 2).
         loaded.forEach((id, profile) -> com.antcolonies.colony.ColonyParts.checkSpecies(id, profile.parts()));
+        loaded.forEach((id, profile) -> profile.food().checkPile(id)); // and a food store heap that is no heap block (the split, S3)
         profiles = Map.copyOf(loaded);
         synchronized (warned) {
             warned.clear();

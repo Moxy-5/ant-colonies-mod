@@ -5,6 +5,7 @@ import static com.antcolonies.gametest.TermiteMoundTests.SURFACE;
 
 import java.util.List;
 
+import com.antcolonies.colony.Caste;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.block.MudCrustBlock;
 import com.antcolonies.colony.Colony;
@@ -12,8 +13,7 @@ import com.antcolonies.colony.FoodWays;
 import com.antcolonies.colony.ForagingHoles;
 import com.antcolonies.colony.NestPlan;
 import com.antcolonies.entity.TermiteWorkerEntity;
-import com.antcolonies.entity.WorkerAntEntity;
-import com.antcolonies.registry.ModEntities;
+import com.antcolonies.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -63,10 +63,10 @@ public class TermiteRunwayTests {
                 helper.setBlock(x, SURFACE - 1, z, Blocks.GRASS_BLOCK);
             }
         }
-        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
         helper.runAfterDelay(5, () -> {
             for (int i = 0; i < 8; i++) {
-                helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE - 4 + i, SURFACE, MIDDLE - 2);
+                helper.spawn(SavannaEntities.TERMITE_WORKER.get(), MIDDLE - 4 + i, SURFACE, MIDDLE - 2);
             }
         });
         int[] phase = {0}; // 0 setting up, 1 waiting for the plan, 2 building it, 3 by day, 4 hay gone, 5 crumbled
@@ -88,7 +88,7 @@ public class TermiteRunwayTests {
                 workers.get(i).setGrownUpAt(i % 2 == 0 ? builder : old);
             }
             TermiteSoldierTests.digNestAtOnce(level, colony);
-            colony.population().addNewMembers(WorkerAntEntity.CASTE, now - 1000, 500);
+            colony.population().addNewMembers(Caste.WORKER, now - 1000, 500);
             // The hole whose way out leads into the arena: the nest is in the arena's middle and its holes face a side
             // picked by the colony, so the hay past a hole facing north or west lay outside the arena, under its barrier
             // wall, unseen (the test failed now and then: 2026-10-14).

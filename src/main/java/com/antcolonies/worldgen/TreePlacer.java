@@ -9,7 +9,6 @@ import com.antcolonies.block.MudCrustBlock;
 import com.antcolonies.block.TaperingBranchBlock;
 import com.antcolonies.block.TreeBranchBlock;
 import com.antcolonies.block.TreeLeavesBlock;
-import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.registry.TreeBlocks;
 import com.antcolonies.tree.TreeKind;
 import com.antcolonies.tree.TreeLife;
@@ -17,6 +16,7 @@ import com.antcolonies.tree.TreePart;
 import com.antcolonies.tree.TreeShapes;
 import com.antcolonies.tree.TreeStage;
 import com.antcolonies.tree.TreeVoxels;
+import com.antcolonies.registry.SavannaBlocks;
 
 import it.unimi.dsi.fastutil.longs.Long2DoubleOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
@@ -359,7 +359,7 @@ public final class TreePlacer {
             }
         }
         taper(states);
-        BlockState crust = ModBlocks.MUD_CRUST.get().defaultBlockState();
+        BlockState crust = SavannaBlocks.MUD_CRUST.get().defaultBlockState();
         for (Long2ObjectMap.Entry<EnumSet<Direction>> e : plates.long2ObjectEntrySet()) {
             if (states.containsKey(e.getLongKey())) {
                 continue;
@@ -821,7 +821,7 @@ public final class TreePlacer {
             case LEAVES -> block(kind.blocks().leaves());
             case THIN, LIMB -> block(kind.blocks().branch());
             case DEAD_THIN, DEAD_LIMB -> TreeBlocks.BLEACHED_BRANCH.get().defaultBlockState();
-            case FALLEN_BRANCH -> ModBlocks.FALLEN_BRANCH.get().defaultBlockState();
+            case FALLEN_BRANCH -> SavannaBlocks.FALLEN_BRANCH.get().defaultBlockState();
             case FRASS -> TreeBlocks.FRASS.get().defaultBlockState();
             case INNER -> block(kind.blocks().log());
             case BARK -> block(kind.blocks().wood());
@@ -831,7 +831,7 @@ public final class TreePlacer {
             case FIBRE -> TreeBlocks.BAOBAB_FIBRE.get().defaultBlockState();
             case ROTTEN -> TreeBlocks.ROTTEN_WOOD.get().defaultBlockState();
             // Mud over bark: the dead wood stays under it (the plates go beside it); mud on the ground: plates only.
-            case MUD -> overBark ? TreeBlocks.BLEACHED_WOOD.get().defaultBlockState() : ModBlocks.MUD_CRUST.get().defaultBlockState();
+            case MUD -> overBark ? TreeBlocks.BLEACHED_WOOD.get().defaultBlockState() : SavannaBlocks.MUD_CRUST.get().defaultBlockState();
         };
     }
 
@@ -849,7 +849,7 @@ public final class TreePlacer {
         Direction.Axis axis = alongZ > alongX ? Direction.Axis.Z : Direction.Axis.X;
         int along = Math.max(alongX, alongZ);
         FallenBranchBlock.Part piece = along >= 2 ? FallenBranchBlock.Part.MIDDLE : FallenBranchBlock.Part.TIP;
-        return ModBlocks.FALLEN_BRANCH.get().defaultBlockState().setValue(FallenBranchBlock.AXIS, axis).setValue(FallenBranchBlock.PART, piece);
+        return SavannaBlocks.FALLEN_BRANCH.get().defaultBlockState().setValue(FallenBranchBlock.AXIS, axis).setValue(FallenBranchBlock.PART, piece);
     }
 
     /**

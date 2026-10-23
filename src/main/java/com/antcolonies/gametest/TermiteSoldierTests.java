@@ -8,11 +8,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import com.antcolonies.colony.Caste;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.block.FungusCombBlock;
 import com.antcolonies.block.SeedPileBlock;
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.ColonyParts;
+import com.antcolonies.colony.SavannaParts;
 import com.antcolonies.colony.NestPlan;
 import com.antcolonies.colony.Soldiers;
 import com.antcolonies.entity.AntEggEntity;
@@ -20,9 +21,8 @@ import com.antcolonies.entity.AntLarvaEntity;
 import com.antcolonies.entity.TermiteSoldierEntity;
 import com.antcolonies.entity.TermiteSoldierEntity.Rank;
 import com.antcolonies.entity.TermiteWorkerEntity;
-import com.antcolonies.entity.WorkerAntEntity;
-import com.antcolonies.registry.ModBlocks;
-import com.antcolonies.registry.ModEntities;
+import com.antcolonies.registry.SavannaBlocks;
+import com.antcolonies.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -57,22 +57,22 @@ public class TermiteSoldierTests {
     @GameTest(template = "arena", timeoutTicks = 400)
     public static void nymphsGrowIntoSoldiersWhenTheColonyNeedsThem(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        TermiteMoundTests.deepGround(helper);
-        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        TestScenes.deepGround(helper);
+        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
         AntLarvaEntity[] nymphs = new AntLarvaEntity[5];
         helper.runAfterDelay(5, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null, "no termite colony");
             var numbers = colony.profile().soldiers().orElseThrow();
             int workerMeal = colony.profile().brood().larvaMeal();
-            colony.setCount(WorkerAntEntity.CASTE, 10);
+            colony.setCount(Caste.WORKER, 10);
             nymphs[0] = hatch(helper, colony, 0);
             nymphs[1] = hatch(helper, colony, 1);
             helper.assertTrue(rank(colony, nymphs[0]) == Rank.MINOR, "with 10 workers the first nymph should grow into a minor: "
                     + rank(colony, nymphs[0]));
             helper.assertTrue(nymphs[0].getMeal() == numbers.minorMeal(), "the minor nymph's meal is " + nymphs[0].getMeal());
             helper.assertTrue(rank(colony, nymphs[1]) == null && nymphs[1].getMeal() == workerMeal, "the second nymph should grow into a worker");
-            colony.setCount(WorkerAntEntity.CASTE, 20); // 2 minors and 1 major wanted
+            colony.setCount(Caste.WORKER, 20); // 2 minors and 1 major wanted
             nymphs[2] = hatch(helper, colony, 2);
             nymphs[3] = hatch(helper, colony, 3);
             nymphs[4] = hatch(helper, colony, 4);
@@ -81,7 +81,7 @@ public class TermiteSoldierTests {
                     "the major: " + rank(colony, nymphs[3]) + ", meal " + nymphs[3].getMeal());
             helper.assertTrue(rank(colony, nymphs[4]) == null, "with every soldier on its way the next nymph grows into a worker");
             // Saved and read back, the major nymph is still one.
-            AntLarvaEntity copy = new AntLarvaEntity(ModEntities.TERMITE_NYMPH.get(), level);
+            AntLarvaEntity copy = new AntLarvaEntity(SavannaEntities.TERMITE_NYMPH.get(), level);
             copy.load(nymphs[3].saveWithoutId(new CompoundTag()));
             helper.assertTrue(rank(colony, copy) == Rank.MAJOR, "after a reload the major nymph is a " + rank(colony, copy));
             // Apex step 10: the young body keeps only the caste's number, synced and saved as before (2 a major, under
@@ -92,7 +92,7 @@ public class TermiteSoldierTests {
                     + saved.getByte("soldier") + ", minor " + nymphs[0].getGrowsIntoNumber() + ", worker " + nymphs[1].getGrowsIntoNumber());
             CompoundTag old = nymphs[1].saveWithoutId(new CompoundTag());
             old.putByte("soldier", (byte) 1); // a minor nymph as saved before step 10
-            AntLarvaEntity oldCopy = new AntLarvaEntity(ModEntities.TERMITE_NYMPH.get(), level);
+            AntLarvaEntity oldCopy = new AntLarvaEntity(SavannaEntities.TERMITE_NYMPH.get(), level);
             oldCopy.load(old);
             helper.assertTrue(rank(colony, oldCopy) == Rank.MINOR, "an old save's minor nymph loads as a " + rank(colony, oldCopy));
             // Fed their meals: they grow up.
@@ -102,15 +102,15 @@ public class TermiteSoldierTests {
         helper.runAfterDelay(60, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(!nymphs[0].isAlive() && !nymphs[3].isAlive(), "the fed soldier nymphs did not grow up");
-            List<TermiteSoldierEntity> soldiers = colony.part(ColonyParts.SOLDIERS).orElseThrow().getSoldiers(level);
+            List<TermiteSoldierEntity> soldiers = colony.part(SavannaParts.SOLDIERS).orElseThrow().getSoldiers(level);
             helper.assertTrue(soldiers.stream().filter(s -> s.getRank() == Rank.MINOR).count() == 1
                     && soldiers.stream().filter(s -> s.getRank() == Rank.MAJOR).count() == 1, "expected a minor and a major soldier, found "
                     + soldiers.stream().map(TermiteSoldierEntity::getRank).toList());
-            helper.assertTrue(colony.part(ColonyParts.SOLDIERS).orElseThrow().count(Rank.MINOR) == 1 && colony.part(ColonyParts.SOLDIERS).orElseThrow().count(Rank.MAJOR) == 1,
-                    "the colony counts " + colony.part(ColonyParts.SOLDIERS).orElseThrow().describe(level));
+            helper.assertTrue(colony.part(SavannaParts.SOLDIERS).orElseThrow().count(Rank.MINOR) == 1 && colony.part(SavannaParts.SOLDIERS).orElseThrow().count(Rank.MAJOR) == 1,
+                    "the colony counts " + colony.part(SavannaParts.SOLDIERS).orElseThrow().describe(level));
             // The colony now has all the workers it may have (and wants more soldiers at that size): the worker nymph
             // that has eaten its fill cannot grow into a worker, so it grows into a soldier instead.
-            colony.setCount(WorkerAntEntity.CASTE, colony.profile().colony().maxWorkers());
+            colony.setCount(Caste.WORKER, colony.profile().colony().maxWorkers());
             nymphs[1].setFed(nymphs[1].getMeal());
         });
         helper.runAfterDelay(100, () -> {
@@ -151,11 +151,11 @@ public class TermiteSoldierTests {
     public static void soldiersStandGuardAndANurseFeedsAHungrySoldier(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
-        TermiteMoundTests.deepGround(helper);
-        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        TestScenes.deepGround(helper);
+        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
         helper.runAfterDelay(5, () -> {
             for (int i = 0; i < 3; i++) {
-                helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE - 2 + i, SURFACE, MIDDLE - 2);
+                helper.spawn(SavannaEntities.TERMITE_WORKER.get(), MIDDLE - 2 + i, SURFACE, MIDDLE - 2);
             }
         });
         List<TermiteSoldierEntity> soldiers = new ArrayList<>();
@@ -171,13 +171,13 @@ public class TermiteSoldierTests {
             digNestAtOnce(level, colony);
             NestPlan.Chamber garden = colony.nest().getGardens(level).get(0);
             for (int i = 0; i < 3; i++) {
-                level.setBlock(garden.room().get(garden.room().size() - 1 - i), ModBlocks.FUNGUS_COMB.get().defaultBlockState()
+                level.setBlock(garden.room().get(garden.room().size() - 1 - i), SavannaBlocks.FUNGUS_COMB.get().defaultBlockState()
                         .setValue(SeedPileBlock.LAYERS, 2).setValue(FungusCombBlock.NODULES, FungusCombBlock.MAX_NODULES), 3);
             }
             List<BlockPos> room = colony.nest().getHomeChamber(level).room();
-            soldiers.add(put(level, ModEntities.TERMITE_MAJOR_SOLDIER.get(), room.get(0)));
-            soldiers.add(put(level, ModEntities.TERMITE_MAJOR_SOLDIER.get(), room.get(1)));
-            soldiers.add(put(level, ModEntities.TERMITE_MINOR_SOLDIER.get(), room.get(2)));
+            soldiers.add(put(level, SavannaEntities.TERMITE_MAJOR_SOLDIER.get(), room.get(0)));
+            soldiers.add(put(level, SavannaEntities.TERMITE_MAJOR_SOLDIER.get(), room.get(1)));
+            soldiers.add(put(level, SavannaEntities.TERMITE_MINOR_SOLDIER.get(), room.get(2)));
         });
         helper.runAfterDelay(40, () -> {
             // Joined, and the first major has gone without food for longer than a day.
@@ -198,20 +198,20 @@ public class TermiteSoldierTests {
             guarding[0] = allAtTheirPosts(level, colony, soldiers) == null ? guarding[0] + 1 : 0;
             if (helper.getTick() % 500 == 0) {
                 AntColoniesMod.LOGGER.info("[soldier-test] tick {}: {}; {}; hungry major fed at {}", helper.getTick(),
-                        allAtTheirPosts(level, colony, soldiers), colony.part(ColonyParts.SOLDIERS).orElseThrow().describe(level), soldiers.get(0).getLastFed());
+                        allAtTheirPosts(level, colony, soldiers), colony.part(SavannaParts.SOLDIERS).orElseThrow().describe(level), soldiers.get(0).getLastFed());
             }
         });
         helper.succeedWhen(() -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(hungrySince[0] >= 0, "not started");
             helper.assertTrue(soldiers.get(0).getLastFed() >= hungrySince[0] && !soldiers.get(0).wantsFood(),
-                    "no nurse has fed the hungry major yet (nodules " + colony.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().available(level) + ")");
+                    "no nurse has fed the hungry major yet (nodules " + colony.part(SavannaParts.FUNGUS_GARDEN).orElseThrow().available(level) + ")");
             String wrong = allAtTheirPosts(level, colony, soldiers);
             helper.assertTrue(wrong == null, wrong);
             helper.assertTrue(guarding[0] >= 60, "the soldiers have stood at their posts for only " + guarding[0] + " ticks");
             AntColoniesMod.LOGGER.info("[soldier-test] all at their posts at tick {}: {} (major posts {}, minor posts {}); hungry major fed at {}",
                     helper.getTick(), soldiers.stream().map(s -> s.getRank() + " " + s.blockPosition().toShortString()).toList(),
-                    colony.part(ColonyParts.SOLDIERS).orElseThrow().posts(level, Rank.MAJOR), colony.part(ColonyParts.SOLDIERS).orElseThrow().posts(level, Rank.MINOR), soldiers.get(0).getLastFed());
+                    colony.part(SavannaParts.SOLDIERS).orElseThrow().posts(level, Rank.MAJOR), colony.part(SavannaParts.SOLDIERS).orElseThrow().posts(level, Rank.MINOR), soldiers.get(0).getLastFed());
         });
     }
 
@@ -228,8 +228,8 @@ public class TermiteSoldierTests {
      * facing out; otherwise what is wrong.
      */
     private static String allAtTheirPosts(ServerLevel level, Colony colony, List<TermiteSoldierEntity> soldiers) {
-        List<Soldiers.Post> majorPosts = colony.part(ColonyParts.SOLDIERS).orElseThrow().posts(level, Rank.MAJOR);
-        List<Soldiers.Post> minorPosts = colony.part(ColonyParts.SOLDIERS).orElseThrow().posts(level, Rank.MINOR);
+        List<Soldiers.Post> majorPosts = colony.part(SavannaParts.SOLDIERS).orElseThrow().posts(level, Rank.MAJOR);
+        List<Soldiers.Post> minorPosts = colony.part(SavannaParts.SOLDIERS).orElseThrow().posts(level, Rank.MINOR);
         if (majorPosts.size() < 3 || minorPosts.size() < 2) {
             return "posts missing: majors " + majorPosts + ", minors " + minorPosts;
         }
@@ -300,11 +300,11 @@ public class TermiteSoldierTests {
     public static void minorsGuardTheHolesAndLineTheForagersTrailThenGoInLast(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
-        TermiteMoundTests.deepGround(helper);
-        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        TestScenes.deepGround(helper);
+        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
         helper.runAfterDelay(5, () -> {
             for (int i = 0; i < 5; i++) {
-                helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE - 2 + i, SURFACE, MIDDLE - 2);
+                helper.spawn(SavannaEntities.TERMITE_WORKER.get(), MIDDLE - 2 + i, SURFACE, MIDDLE - 2);
             }
         });
         List<TermiteSoldierEntity> minors = new ArrayList<>();
@@ -333,7 +333,7 @@ public class TermiteSoldierTests {
             level.setBlock(trail[1], Blocks.HAY_BLOCK.defaultBlockState(), 3);
             List<BlockPos> room = colony.nest().getHomeChamber(level).room();
             for (int i = 0; i < 5; i++) {
-                minors.add(put(level, ModEntities.TERMITE_MINOR_SOLDIER.get(), room.get(i)));
+                minors.add(put(level, SavannaEntities.TERMITE_MINOR_SOLDIER.get(), room.get(i)));
             }
         });
         helper.runAfterDelay(40, () -> {
@@ -352,14 +352,14 @@ public class TermiteSoldierTests {
                 String wrong = minorsOnTheirPostsOutside(level, colony, minors, trail);
                 at[0] = wrong == null ? (at[0] == 0 ? tick : at[0]) : 0;
                 if (tick % 500 == 0) {
-                    AntColoniesMod.LOGGER.info("[sentry-test] tick {}: {}; {}", tick, wrong, colony.part(ColonyParts.SOLDIERS).orElseThrow().describe(level));
+                    AntColoniesMod.LOGGER.info("[sentry-test] tick {}: {}; {}", tick, wrong, colony.part(SavannaParts.SOLDIERS).orElseThrow().describe(level));
                 }
                 // They stand guard a while, while a forager is out at the hay; then the night ends (4:00).
                 boolean foragerAtTheHay = !level.getEntitiesOfClass(TermiteWorkerEntity.class, new AABB(trail[1]).inflate(2),
                         worker -> colony.getId().equals(worker.getColonyId())).isEmpty();
                 if (!stoodGuard[0] && wrong == null && tick - at[0] >= 40 && foragerAtTheHay) {
                     AntColoniesMod.LOGGER.info("[sentry-test] tick {} ({}): the minors stand guard outside {}; {}", tick, clock[0].describe(),
-                            minors.stream().map(m -> m.blockPosition().toShortString()).toList(), colony.part(ColonyParts.SOLDIERS).orElseThrow().describe(level));
+                            minors.stream().map(m -> m.blockPosition().toShortString()).toList(), colony.part(SavannaParts.SOLDIERS).orElseThrow().describe(level));
                     stoodGuard[0] = true;
                     clock[0].skipTo(colony, TestClock.Phase.BEFORE_DAWN);
                 }
@@ -388,7 +388,7 @@ public class TermiteSoldierTests {
             boolean everybodyIn = !workerOut && minors.stream().allMatch(minor -> colony.nest().isInside(level, minor.blockPosition()));
             if (everybodyIn && phase[0] == 2) {
                 AntColoniesMod.LOGGER.info("[sentry-test] tick {}: everybody is in, {} ticks into the day; {}", tick, tick - at[1],
-                        colony.part(ColonyParts.SOLDIERS).orElseThrow().describe(level));
+                        colony.part(SavannaParts.SOLDIERS).orElseThrow().describe(level));
                 phase[0] = 3;
             }
         });
@@ -396,7 +396,7 @@ public class TermiteSoldierTests {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null && phase[0] > 0, "not started");
             helper.assertTrue(phase[0] == 3, phase[0] == 1 ? "the minors did not all stand guard outside: "
-                    + minorsOnTheirPostsOutside(level, colony, minors, trail) : "not everybody went in by day (" + colony.part(ColonyParts.SOLDIERS).orElseThrow().describe(level) + ")");
+                    + minorsOnTheirPostsOutside(level, colony, minors, trail) : "not everybody went in by day (" + colony.part(SavannaParts.SOLDIERS).orElseThrow().describe(level) + ")");
             helper.assertTrue(at[2] >= at[1], "no worker was outside when the day began");
             helper.assertTrue(at[3] > at[2], "a minor went in (tick " + at[3] + ") before the last worker (tick " + at[2] + ")");
             for (NestPlan.ForagingTunnel tunnel : colony.nest().getForagingTunnels(level)) {
@@ -410,7 +410,7 @@ public class TermiteSoldierTests {
      * first hole to the hay, on both sides of it; otherwise what is wrong.
      */
     private static String minorsOnTheirPostsOutside(ServerLevel level, Colony colony, List<TermiteSoldierEntity> minors, BlockPos[] trail) {
-        List<Soldiers.Post> outside = colony.part(ColonyParts.SOLDIERS).orElseThrow().posts(level, Rank.MINOR).stream().filter(post -> post.kind() != Soldiers.Kind.INSIDE).toList();
+        List<Soldiers.Post> outside = colony.part(SavannaParts.SOLDIERS).orElseThrow().posts(level, Rank.MINOR).stream().filter(post -> post.kind() != Soldiers.Kind.INSIDE).toList();
         if (outside.size() < 5 || outside.get(0).kind() != Soldiers.Kind.WAY_OUT || !outside.get(0).cell().closerThan(trail[0], 1.5)
                 || outside.stream().filter(post -> post.kind() == Soldiers.Kind.TRAIL).count() != 3) {
             return "the posts outside should be the first hole's, three on its trail and the second hole's: " + outside;

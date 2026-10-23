@@ -1,45 +1,40 @@
 package com.antcolonies.gametest;
 
-import com.antcolonies.entity.WorkerAntEntity;
-import com.antcolonies.registry.ModEntities;
+import com.antcolonies.entity.AbstractAntEntity;
 
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.world.entity.EntityType;
 
-/** Helpers for spawning ants in the game tests. */
+/**
+ * Helpers for spawning insects in the game tests, for every species (the split, step S4: each species' own lone insects
+ * are in its tests' sign-up, {@code SavannaTests} and {@code DesertTests}).
+ */
 final class TestAnts {
     private TestAnts() {
     }
 
     /**
-     * A worker ant with no mind of its own, for a test to walk around by hand. It joins no colony: the tests run side by
-     * side, and an ant that joined a neighbouring test's colony would spoil that test's headcount (a lone queen with
-     * workers is not founding any more, so she never seals herself in).
+     * An insect of this body with no mind of its own, for a test to walk around by hand. It joins no colony: the tests
+     * run side by side, and an insect that joined a neighbouring test's colony would spoil that test's headcount (a lone
+     * queen with workers is not founding any more, so she never seals herself in).
      */
-    static WorkerAntEntity loneAnt(GameTestHelper helper, int x, int y, int z) {
-        WorkerAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), x, y, z); // in the middle of the block, as before
-        ant.keepOutOfColonies();
-        return ant;
-    }
-
-    /** A termite worker with no mind of its own and no colony, for a test to walk around by hand (see {@link #loneAnt}). */
-    static com.antcolonies.entity.TermiteWorkerEntity loneTermite(GameTestHelper helper, int x, int y, int z) {
-        com.antcolonies.entity.TermiteWorkerEntity termite = helper.spawnWithNoFreeWill(ModEntities.TERMITE_WORKER.get(), x, y, z);
-        termite.keepOutOfColonies();
-        return termite;
-    }
-
-    /** A termite soldier of this kind with no colony, with its own mind (it wanders, drums when told), for a test to watch. */
-    static com.antcolonies.entity.TermiteSoldierEntity loneSoldier(GameTestHelper helper, boolean major, int x, int y, int z) {
-        com.antcolonies.entity.TermiteSoldierEntity soldier = helper.spawn(major ? ModEntities.TERMITE_MAJOR_SOLDIER.get()
-                : ModEntities.TERMITE_MINOR_SOLDIER.get(), x, y, z);
-        soldier.keepOutOfColonies();
-        return soldier;
+    static <T extends AbstractAntEntity> T lone(GameTestHelper helper, EntityType<T> body, int x, int y, int z) {
+        T insect = helper.spawnWithNoFreeWill(body, x, y, z); // in the middle of the block, as before
+        insect.keepOutOfColonies();
+        return insect;
     }
 
     /** The same at an exact spot (not the middle of a block). */
-    static WorkerAntEntity loneAnt(GameTestHelper helper, float x, float y, float z) {
-        WorkerAntEntity ant = helper.spawnWithNoFreeWill(ModEntities.WORKER_ANT.get(), x, y, z);
-        ant.keepOutOfColonies();
-        return ant;
+    static <T extends AbstractAntEntity> T lone(GameTestHelper helper, EntityType<T> body, float x, float y, float z) {
+        T insect = helper.spawnWithNoFreeWill(body, x, y, z);
+        insect.keepOutOfColonies();
+        return insect;
+    }
+
+    /** An insect of this body with no colony but with its own mind (it wanders, and so on), for a test to watch. */
+    static <T extends AbstractAntEntity> T loneWithAMind(GameTestHelper helper, EntityType<T> body, int x, int y, int z) {
+        T insect = helper.spawn(body, x, y, z);
+        insect.keepOutOfColonies();
+        return insect;
     }
 }

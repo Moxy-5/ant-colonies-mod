@@ -5,7 +5,7 @@ import java.util.EnumSet;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.ColonyParts;
+import com.antcolonies.colony.SavannaParts;
 import com.antcolonies.colony.Soldiers;
 import com.antcolonies.entity.TermiteSoldierEntity;
 
@@ -66,7 +66,7 @@ public class GuardPostGoal extends Goal {
         if (colony == null) {
             return false;
         }
-        soldiers = colony.part(ColonyParts.SOLDIERS).orElse(null);
+        soldiers = colony.part(SavannaParts.SOLDIERS).orElse(null);
         post = soldiers == null ? null : soldiers.claimPost(level, soldier, errand.leftAlone());
         if (post == null) {
             nextTry = now + RETRY_TICKS;

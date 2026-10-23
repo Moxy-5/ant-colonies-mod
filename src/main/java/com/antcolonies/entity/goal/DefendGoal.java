@@ -6,7 +6,7 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Alarm;
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.ColonyParts;
+import com.antcolonies.colony.SavannaParts;
 import com.antcolonies.entity.TermiteSoldierEntity;
 
 import net.minecraft.core.BlockPos;
@@ -58,7 +58,7 @@ public class DefendGoal extends Goal {
             return false;
         }
         colony = soldier.getColony();
-        alarm = colony == null ? null : colony.part(ColonyParts.ALARM).orElse(null);
+        alarm = colony == null ? null : colony.part(SavannaParts.ALARM).orElse(null);
         task = alarm == null ? null : alarm.taskFor(level, soldier);
         return task != null;
     }

@@ -31,13 +31,13 @@ import net.minecraft.resources.ResourceLocation;
 public class TermiteNymphRenderer extends EntityRenderer<AntLarvaEntity> {
     public static final ModelLayerLocation LAYER =
             new ModelLayerLocation(ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "termite_nymph"), "main");
-    private static final ResourceLocation TEXTURE =
-            ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "textures/entity/termite_nymph.png");
-
     private final ModelPart model;
+    private final ResourceLocation texture;
 
-    public TermiteNymphRenderer(EntityRendererProvider.Context context) {
+    /** {@code texture}: the termites' look of their young ({@link com.antcolonies.species.SpeciesBodies#youngLook}). */
+    public TermiteNymphRenderer(EntityRendererProvider.Context context, ResourceLocation texture) {
         super(context);
+        this.texture = texture;
         this.model = context.bakeLayer(LAYER);
         this.shadowRadius = 0.0F;
     }
@@ -77,7 +77,7 @@ public class TermiteNymphRenderer extends EntityRenderer<AntLarvaEntity> {
         TermiteSoldierEntity.Rank rank = TermiteSoldierEntity.Rank.byId(nymph.getGrowsIntoNumber()); // (the soldiers' caste numbers, 1 and 2)
         float size = 0.55F + (rank == TermiteSoldierEntity.Rank.MAJOR ? 0.6F : 0.35F) * grown;
         pose.scale(size, size, size);
-        VertexConsumer consumer = buffers.getBuffer(RenderType.entityCutoutNoCull(TEXTURE));
+        VertexConsumer consumer = buffers.getBuffer(RenderType.entityCutoutNoCull(texture));
         model.getChild("nymph").render(pose, consumer, light, OverlayTexture.NO_OVERLAY);
         if (rank != null && grown >= 0.5F) {
             model.getChild("soldier_head").render(pose, consumer, light, OverlayTexture.NO_OVERLAY);
@@ -88,6 +88,6 @@ public class TermiteNymphRenderer extends EntityRenderer<AntLarvaEntity> {
 
     @Override
     public ResourceLocation getTextureLocation(AntLarvaEntity nymph) {
-        return TEXTURE;
+        return texture;
     }
 }

@@ -1,6 +1,7 @@
 package com.antcolonies.block;
 
-import com.antcolonies.registry.ModBlocks;
+import com.antcolonies.registry.SavannaBlocks;
+
 import com.mojang.serialization.MapCodec;
 
 import net.minecraft.core.BlockPos;
@@ -112,7 +113,7 @@ public class DryGrassBlock extends BushBlock implements BonemealableBlock {
 
     @Override
     public void performBonemeal(ServerLevel level, RandomSource random, BlockPos pos, BlockState state) {
-        BlockState tall = ModBlocks.TALL_DRY_GRASS.get().defaultBlockState().setValue(GROWTH, state.getValue(GROWTH));
+        BlockState tall = SavannaBlocks.TALL_DRY_GRASS.get().defaultBlockState().setValue(GROWTH, state.getValue(GROWTH));
         if (tall.canSurvive(level, pos) && level.isEmptyBlock(pos.above())) {
             DoublePlantBlock.placeAt(level, tall, pos, 2);
         }

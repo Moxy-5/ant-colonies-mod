@@ -8,12 +8,11 @@ import com.antcolonies.block.TermiteMoundBlock;
 import com.antcolonies.block.TermiteSpireBlock;
 import com.antcolonies.block.TermiteTunnelBlock;
 import com.antcolonies.entity.TermiteWorkerEntity;
-import com.antcolonies.entity.WorkerAntEntity;
 import com.antcolonies.nav.Foothold;
 import com.antcolonies.nav.Route;
 import com.antcolonies.nav.StepKind;
-import com.antcolonies.registry.ModBlocks;
-import com.antcolonies.registry.ModEntities;
+import com.antcolonies.registry.SavannaBlocks;
+import com.antcolonies.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -44,7 +43,7 @@ public class TermiteTunnelTests {
     private static final BlockPos MOUTH = new BlockPos(10, 5, 10);
 
     private static BlockState soil() {
-        return ModBlocks.TERMITE_MOUND.get().defaultBlockState().setValue(TermiteMoundBlock.LAYERS, TermiteMoundBlock.FINISHED)
+        return SavannaBlocks.TERMITE_MOUND.get().defaultBlockState().setValue(TermiteMoundBlock.LAYERS, TermiteMoundBlock.FINISHED)
                 .setValue(TermiteMoundBlock.AGE, 2);
     }
 
@@ -67,14 +66,14 @@ public class TermiteTunnelTests {
                 }
             }
         }
-        BlockState tunnel = ModBlocks.TERMITE_TUNNEL.get().defaultBlockState().setValue(MoundSoil.AGE, 2);
+        BlockState tunnel = SavannaBlocks.TERMITE_TUNNEL.get().defaultBlockState().setValue(MoundSoil.AGE, 2);
         for (BlockPos pos : TUNNEL) {
             helper.setBlock(pos, tunnel);
         }
-        BlockState spire = ModBlocks.TERMITE_SPIRE.get().defaultBlockState().setValue(MoundSoil.AGE, 2);
+        BlockState spire = SavannaBlocks.TERMITE_SPIRE.get().defaultBlockState().setValue(MoundSoil.AGE, 2);
         helper.setBlock(BASE, spire.setValue(TermiteSpireBlock.THICKNESS, 0));
         helper.setBlock(THICK, spire.setValue(TermiteSpireBlock.THICKNESS, 1));
-        helper.setBlock(MOUTH, ModBlocks.TERMITE_MOUTH.get().defaultBlockState().setValue(MoundSoil.AGE, 2));
+        helper.setBlock(MOUTH, SavannaBlocks.TERMITE_MOUTH.get().defaultBlockState().setValue(MoundSoil.AGE, 2));
         // Join everything up the way it would be had it been built block by block.
         for (BlockPos rel : List.of(TUNNEL.get(0), TUNNEL.get(1), TUNNEL.get(2), TUNNEL.get(3), MOUTH)) {
             BlockPos pos = helper.absolutePos(rel);
@@ -97,8 +96,8 @@ public class TermiteTunnelTests {
     @GameTest(template = "arena", timeoutTicks = 3600, skyAccess = true)
     public static void aTermiteCrawlsUpInsideASpireAndComesOutOfItsMouth(GameTestHelper helper) {
         lumpWithATunnel(helper);
-        TermiteWorkerEntity termite = TestAnts.loneTermite(helper, 3, 1, 10);
-        NavigationTests.watch(helper, termite, false);
+        TermiteWorkerEntity termite = SavannaTests.loneTermite(helper, 3, 1, 10);
+        TestWatch.watch(helper, termite, false);
         BlockPos mouth = helper.absolutePos(MOUTH);
         BlockPos ground = helper.absolutePos(new BlockPos(16, 1, 10));
         BlockPos window = helper.absolutePos(TUNNEL.get(0));
@@ -182,21 +181,20 @@ public class TermiteTunnelTests {
     }
 
     /**
-     * An ant (and so anything that does not fit) finds no way into a termite tunnel or a mouth; nor do soldiers, too big
-     * for the tunnel blocks (a major and a minor), while a worker does crawl in.
+     * Soldiers, too big for the tunnel blocks (a major and a minor, and a minor from no colony standing still: anything
+     * that does not fit), find no way into a termite tunnel or a mouth, while a worker does crawl in. (The one standing
+     * still was a harvester ant until the split, step S4; an ant comes back with the Matabele ant, M8 step 1.)
      */
     @GameTest(template = "arena", timeoutTicks = 200, skyAccess = true)
-    public static void antsAndSoldiersFindNoWayIntoTermiteTunnels(GameTestHelper helper) {
+    public static void soldiersFindNoWayIntoTermiteTunnels(GameTestHelper helper) {
         lumpWithATunnel(helper);
-        WorkerAntEntity ant = TestAnts.loneAnt(helper, 3, 1, 10);
-        com.antcolonies.entity.TermiteSoldierEntity major = TestAnts.loneSoldier(helper, true, 3, 1, 12);
-        com.antcolonies.entity.TermiteSoldierEntity minor = TestAnts.loneSoldier(helper, false, 3, 1, 14);
-        TermiteWorkerEntity worker = TestAnts.loneTermite(helper, 3, 1, 8);
+        com.antcolonies.entity.TermiteSoldierEntity outsider = TestAnts.lone(helper, SavannaEntities.TERMITE_MINOR_SOLDIER.get(), 3, 1, 10);
+        com.antcolonies.entity.TermiteSoldierEntity major = SavannaTests.loneSoldier(helper, true, 3, 1, 12);
+        com.antcolonies.entity.TermiteSoldierEntity minor = SavannaTests.loneSoldier(helper, false, 3, 1, 14);
+        TermiteWorkerEntity worker = SavannaTests.loneTermite(helper, 3, 1, 8);
         helper.runAfterDelay(10, () -> {
             for (BlockPos cell : List.of(TUNNEL.get(1), TUNNEL.get(3), THICK, MOUTH)) {
-                helper.assertFalse(ant.getNavigator().moveTo(helper.absolutePos(cell), 1.0), "an ant found a way into " + cell);
-            }
-            for (BlockPos cell : List.of(TUNNEL.get(1), TUNNEL.get(3))) {
+                helper.assertFalse(outsider.getNavigator().moveTo(helper.absolutePos(cell), 1.0), "a soldier from no colony found a way into " + cell);
                 helper.assertFalse(major.getNavigator().moveTo(helper.absolutePos(cell), 1.0), "a major found a way into " + cell);
                 helper.assertFalse(minor.getNavigator().moveTo(helper.absolutePos(cell), 1.0), "a minor found a way into " + cell);
             }
@@ -212,7 +210,7 @@ public class TermiteTunnelTests {
     @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
     public static void aTermiteInATunnelIsStillThereAfterAReload(GameTestHelper helper) {
         lumpWithATunnel(helper);
-        TermiteWorkerEntity termite = TestAnts.loneTermite(helper, 3, 1, 10);
+        TermiteWorkerEntity termite = SavannaTests.loneTermite(helper, 3, 1, 10);
         BlockPos goal = helper.absolutePos(TUNNEL.get(3));
         helper.runAfterDelay(10, () -> helper.assertTrue(termite.getNavigator().moveTo(goal, 1.0), "no route into the tunnel"));
         TermiteWorkerEntity[] copy = {null};
@@ -231,7 +229,7 @@ public class TermiteTunnelTests {
                 tag.remove("UUID");
                 savedY[0] = termite.getY();
                 termite.discard();
-                TermiteWorkerEntity loaded = ModEntities.TERMITE_WORKER.get().create(helper.getLevel());
+                TermiteWorkerEntity loaded = SavannaEntities.TERMITE_WORKER.get().create(helper.getLevel());
                 loaded.load(tag);
                 loaded.removeFreeWill();
                 loaded.keepOutOfColonies();

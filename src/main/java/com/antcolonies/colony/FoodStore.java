@@ -1,7 +1,5 @@
 package com.antcolonies.colony;
 
-import com.antcolonies.block.FungusCombBlock;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -13,10 +11,10 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.block.EatenInStages;
-import com.antcolonies.block.MudCastBlock;
+import com.antcolonies.block.FoodCast;
 import com.antcolonies.block.FacedWall;
 import com.antcolonies.block.SeedPileBlock;
-import com.antcolonies.registry.ModBlocks;
+import com.antcolonies.registry.ModTags;
 import com.antcolonies.species.SpeciesProfile;
 
 import net.minecraft.core.BlockPos;
@@ -91,18 +89,10 @@ public class FoodStore {
      * the same last place, {@code docs/BUGS.md} 44). Not saved.
      */
     private final Claims<UUID> storeBound = new Claims<>();
-    /** Eaten grass growing back, and the bare patches round the holes. Saved. */
-    private final BarePatches barePatches;
 
     FoodStore(Colony colony) {
         this.colony = colony;
         this.center = colony.getCenter();
-        this.barePatches = new BarePatches(colony);
-    }
-
-    /** Eaten grass growing back, and the bare patches round the holes. */
-    public BarePatches barePatches() {
-        return barePatches;
     }
 
     public int getFood() {
@@ -165,8 +155,8 @@ public class FoodStore {
                 growing.add(pos); // (never under an egg or a nymph lying on a fungus comb)
             }
         }
-        // Fungus comb is always built onto comb that has room first (the fungus only grows where the comb is thick enough).
-        boolean growFirst = pile instanceof FungusCombBlock || random.nextFloat() < 0.75F;
+        // A heap that ages (fungus comb) is always built onto one with room first (the fungus only grows where the comb is thick enough).
+        boolean growFirst = pile.ages() || random.nextFloat() < 0.75F;
         return !growing.isEmpty() && (empty.isEmpty() || growFirst) ? growing : empty;
     }
 
@@ -460,10 +450,9 @@ public class FoodStore {
         }
     }
 
-    /** A giant tree's crown or trunk (or any tree's): what lies on the ground under it is looked for too. */
+    /** A giant tree's crown or trunk (or any tree's): what lies on the ground under it is looked for too ({@link ModTags#TREE_CROWNS}). */
     private static boolean isTreeTop(BlockState state) {
-        return state.is(com.antcolonies.registry.TreeBlocks.TREE_WOOD) || state.is(com.antcolonies.registry.TreeBlocks.TREE_LEAVES)
-                || state.is(net.minecraft.tags.BlockTags.LEAVES) || state.getBlock() instanceof com.antcolonies.block.TreeBranchBlock;
+        return state.is(ModTags.TREE_CROWNS);
     }
 
     /**
@@ -490,7 +479,7 @@ public class FoodStore {
                 // Wood over the colony's own feeding gallery or a mud cast left of eaten wood counts too, as the ground
                 // under it does: it is eaten from there, block after block up the trunk (the user's ask, 2026-10-19:
                 // before, the wood over the gallery was never listed and they stopped after the first blocks).
-                if (run > 0 && (MudCastBlock.isCast(state) || state.isAir() && colony.nest().isInside(level, pos))) {
+                if (run > 0 && (FoodCast.isCast(state) || state.isAir() && colony.nest().isInside(level, pos))) {
                     listOver(level, y, run, top, far);
                 }
                 run = 0;
@@ -543,7 +532,7 @@ public class FoodStore {
         Set<BlockPos> nest = null;
         for (net.minecraft.core.Direction direction : net.minecraft.core.Direction.values()) {
             BlockPos next = food.relative(direction);
-            if (colony.nest().isInside(level, next) && (Nest.isDugOut(level, next) || MudCastBlock.isCast(level.getBlockState(next)))) {
+            if (colony.nest().isInside(level, next) && (Nest.isDugOut(level, next) || FoodCast.isCast(level.getBlockState(next)))) {
                 if (nest == null) {
                     nest = colony.nest().nestCells(level);
                 }
@@ -627,7 +616,7 @@ public class FoodStore {
             } else {
                 level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
             }
-            barePatches.eatenAway(level, pos, state, eatenAt);
+            plantEaten(level, pos, state, eatenAt);
         } else {
             if (loud) {
                 level.levelEvent(net.minecraft.world.level.block.LevelEvent.PARTICLES_DESTROY_BLOCK, pos,
@@ -733,6 +722,13 @@ public class FoodStore {
         roomForTests = room;
     }
 
+    /** Tells the colony a plant is gone (grass that grows back is remembered, {@link ColonyNews#PLANT_EATEN}). */
+    private void plantEaten(Level level, BlockPos pos, BlockState state, long eatenAt) {
+        if (level instanceof ServerLevel server) {
+            colony.news().tell(server, ColonyNews.PLANT_EATEN, new ColonyNews.PlantEaten(pos.immutable(), state, eatenAt));
+        }
+    }
+
     /**
      * A food plant in the way of a wall or a runway is cut down by the builders: what is left of it (its pieces not cut
      * yet) is left lying on the spot as pieces for the foragers to carry in, so no food is lost, and the grass grows
@@ -749,7 +745,7 @@ public class FoodStore {
         grassClips.remove(pos);
         busyGrass.remove(pos);
         level.destroyBlock(pos, false);
-        barePatches.eatenAway(level, pos, state);
+        plantEaten(level, pos, state, level.getGameTime());
         if (left > 0) {
             ItemStack pieces = cutPiece();
             pieces.setCount(left);
@@ -785,12 +781,13 @@ public class FoodStore {
     /**
      * What is left of a food block eaten away by a species that plasters mud over what it eats (the profile's
      * {@code nest.crust_walls}: termites), or null for nothing: a whole block of wood leaves a mud cast (the user's
-     * choice, 2026-10-14; see {@link MudCastBlock}), and so does a branch cased in mud over a feeding gallery. The cast's
+     * choice, 2026-10-14; a {@link FoodCast} made by the feeding ways, {@link ColonyHooks.FeedingWays#castFor}), and so does a branch cased in mud over a feeding gallery. The cast's
      * channel opens toward the nest it was eaten from and joins the casts beside it.
      */
     @Nullable
     private BlockState castFor(Level level, BlockPos pos, BlockState food) {
-        if (!colony.profile().nest().crustWalls() || !(food.getBlock() instanceof EatenInStages)) {
+        ColonyHooks.FeedingWays ways = colony.hooks().first(ColonyHooks.FEEDING_WAYS);
+        if (!colony.profile().nest().crustWalls() || !(food.getBlock() instanceof EatenInStages) || ways == null) {
             return null;
         }
         List<net.minecraft.core.Direction> open = new java.util.ArrayList<>();
@@ -803,7 +800,7 @@ public class FoodStore {
         if (open.isEmpty() && !food.isCollisionShapeFullBlock(level, pos)) {
             return null; // a branch eaten out in the open leaves nothing
         }
-        return ModBlocks.MUD_CAST.get().stateFor(level, pos, 0, open);
+        return ways.castFor(level, pos, open);
     }
 
     /**
@@ -865,43 +862,26 @@ public class FoodStore {
             return false;
         }
         countIn(rich);
-        if (level instanceof net.minecraft.server.level.ServerLevel server && isComb()) {
-            // Fresh comb laid: a soft wet squelch and a few dark specks.
-            server.playSound(null, spot, net.minecraft.sounds.SoundEvents.MUD_PLACE, net.minecraft.sounds.SoundSource.BLOCKS, 0.25F, 1.6F);
-            server.sendParticles(new net.minecraft.core.particles.BlockParticleOption(net.minecraft.core.particles.ParticleTypes.BLOCK,
-                    level.getBlockState(spot)), spot.getX() + 0.5, spot.getY() + FungusCombBlock.topOf(level.getBlockState(spot)),
-                    spot.getZ() + 0.5, 4, 0.2, 0.02, 0.2, 0.0);
+        if (level instanceof net.minecraft.server.level.ServerLevel server) {
+            food().pileBlock().laid(server, spot); // (fresh comb: a squelch and a few specks)
         }
         return true;
     }
 
-    /** Whether the store is fungus comb (it ages: see {@link FungusCombBlock}). */
-    private boolean isComb() {
-        return food().pileBlock() instanceof FungusCombBlock;
-    }
-
     /**
-     * One layer off the heap at {@code pile} (whose state is {@code state}). A fungus comb eaten right down leaves no
-     * block, and its nodules go with it ({@link FungusGarden#loseNodules}).
+     * One layer off the heap at {@code pile} (whose state is {@code state}): fungus comb off its bottom, an old one
+     * first. A heap that ages eaten right down leaves no block, and what grew on it (fungus nodules) goes with it
+     * ({@link ColonyNews#HEAP_GONE}).
      */
     private void takeOneLayer(Level level, BlockPos pile, BlockState state) {
-        BlockState less = oneLayerLess(state);
+        SeedPileBlock heap = (SeedPileBlock) state.getBlock();
+        BlockState less = heap.oneLayerLess(state);
         level.setBlock(pile, less, 3);
-        if (less.isAir() && state.getBlock() instanceof FungusCombBlock) {
+        if (less.isAir() && heap.ages()) {
             if (level instanceof ServerLevel server) {
-                colony.news().tell(server, ColonyNews.HEAP_GONE, new ColonyNews.HeapGone(pile, state.getValue(FungusCombBlock.NODULES)));
+                colony.news().tell(server, ColonyNews.HEAP_GONE, new ColonyNews.HeapGone(pile, heap.growthOn(state)));
             }
         }
-    }
-
-    /** The heap with one layer less (fungus comb: off its bottom, an old one first), or air if it was the last. */
-    private BlockState oneLayerLess(BlockState state) {
-        if (state.getBlock() instanceof FungusCombBlock) {
-            BlockState less = FungusCombBlock.withoutBottomLayer(state);
-            return less == null ? Blocks.AIR.defaultBlockState() : less;
-        }
-        int layers = state.getValue(SeedPileBlock.LAYERS);
-        return layers <= 1 ? Blocks.AIR.defaultBlockState() : state.setValue(SeedPileBlock.LAYERS, layers - 1);
     }
 
     /**
@@ -916,11 +896,9 @@ public class FoodStore {
             return false; // an egg or a young one was put there meanwhile: the heap would bury it
         }
         if (state.isAir()) {
-            level.setBlock(spot, isComb() ? FungusCombBlock.newComb(pile.defaultBlockState()) : pile.defaultBlockState(), 3);
+            level.setBlock(spot, pile.newHeap(), 3);
         } else if (state.is(pile) && state.getValue(SeedPileBlock.LAYERS) < pile.maxLayers()) {
-            // (fungus comb: the new layer goes on top, fresh)
-            level.setBlock(spot, isComb() ? FungusCombBlock.withLayerOnTop(state)
-                    : state.setValue(SeedPileBlock.LAYERS, state.getValue(SeedPileBlock.LAYERS) + 1), 3);
+            level.setBlock(spot, pile.oneLayerMore(state), 3); // (fungus comb: the new layer goes on top, fresh)
         } else {
             return false;
         }
@@ -950,11 +928,11 @@ public class FoodStore {
     List<BlockPos> layersToTake(Level level) {
         List<BlockPos> heaps = new ArrayList<>();
         SeedPileBlock pile = food().pileBlock();
-        boolean comb = isComb();
-        Set<BlockPos> young = comb ? colony.brood().getBroodCells(level) : Set.of();
+        boolean ages = pile.ages();
+        Set<BlockPos> young = ages ? colony.brood().getBroodCells(level) : Set.of();
         for (BlockPos pos : colony.nest().getFoodStoreCells(level)) {
             BlockState state = level.getBlockState(pos);
-            if (state.is(pile) && (!comb || FungusCombBlock.old(state) > 0 && !young.contains(pos))) {
+            if (state.is(pile) && (!ages || pile.hasLayerToTake(state) && !young.contains(pos))) {
                 heaps.add(pos);
             }
         }
@@ -1050,7 +1028,7 @@ public class FoodStore {
      */
     public ItemStack eatSeedAt(Level level, BlockPos pile, UUID ant) {
         BlockState state = level.getBlockState(pile);
-        if (state.getBlock() instanceof FungusCombBlock && FungusCombBlock.old(state) <= 0) {
+        if (state.getBlock() instanceof SeedPileBlock heap && heap.ages() && !heap.hasLayerToTake(state)) {
             return ItemStack.EMPTY;
         }
         ItemStack seed = takeSeedAt(level, pile, ant, false);
@@ -1072,7 +1050,6 @@ public class FoodStore {
         CompoundTag clips = new CompoundTag();
         grassClips.forEach((pos, count) -> clips.putInt(Long.toString(pos.asLong()), count));
         tag.put("grassClips", clips);
-        barePatches.save(tag);
     }
 
     void load(CompoundTag tag) {
@@ -1085,6 +1062,5 @@ public class FoodStore {
         for (String key : clips.getAllKeys()) {
             grassClips.put(BlockPos.of(Long.parseLong(key)), clips.getInt(key));
         }
-        barePatches.load(tag);
     }
 }

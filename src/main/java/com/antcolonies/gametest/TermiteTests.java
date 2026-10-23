@@ -6,11 +6,10 @@ import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.TermiteKingEntity;
 import com.antcolonies.entity.TermiteQueenEntity;
 import com.antcolonies.entity.TermiteWorkerEntity;
-import com.antcolonies.entity.WorkerAntEntity;
 import com.antcolonies.entity.goal.StayWithQueenGoal;
-import com.antcolonies.registry.ModBlocks;
-import com.antcolonies.registry.ModEntities;
 import com.antcolonies.species.Species;
+import com.antcolonies.registry.SavannaBlocks;
+import com.antcolonies.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -32,15 +31,16 @@ public class TermiteTests {
     private static final int CHAMBER_CELLS = 3 + 3 + 9;
 
     /**
-     * A queen and a king are put down near each other (and a worker ant, who must not join them). The king joins her,
+     * A queen and a king are put down near each other (and a termite worker from no colony, who must not join them). The king joins her,
      * the pair dig the shaft, tunnel and royal chamber, the king closes the entrance from inside, and they settle in
      * the chamber: she in the middle, he beside her.
      */
     @GameTest(template = "arena", timeoutTicks = 20000, skyAccess = true)
     public static void royalPairDigsTheirChamberAndSealsTheEntrance(GameTestHelper helper) {
         foundColony(helper, true);
-        WorkerAntEntity[] ant = {null};
-        helper.runAfterDelay(5, () -> ant[0] = helper.spawn(ModEntities.WORKER_ANT.get(), MIDDLE - 3, SURFACE, MIDDLE));
+        // (A harvester ant until the split, step S4; an ant comes back with the Matabele ant, M8 step 1.)
+        TermiteWorkerEntity[] outsider = {null};
+        helper.runAfterDelay(5, () -> outsider[0] = TestAnts.loneWithAMind(helper, SavannaEntities.TERMITE_WORKER.get(), MIDDLE - 3, SURFACE, MIDDLE));
 
         helper.succeedWhen(() -> {
             ServerLevel level = helper.getLevel();
@@ -48,11 +48,11 @@ public class TermiteTests {
             helper.assertTrue(colony != null, "no termite colony yet");
             helper.assertTrue(colony.getSpecies().equals(Species.MACROTERMES), "the colony is " + colony.getSpecies());
             helper.assertTrue(colony.getCount(TermiteKingEntity.CASTE) == 1, "the colony has " + colony.getCount(TermiteKingEntity.CASTE) + " kings");
-            helper.assertTrue(ant[0] != null && !colony.getId().equals(ant[0].getColonyId()), "the worker ant joined the termites");
+            helper.assertTrue(outsider[0] != null && !colony.getId().equals(outsider[0].getColonyId()), "the worker from no colony joined the pair");
             helper.assertTrue(colony.nest().getPlannedChambers(level).size() == 1, "the founding nest should have 1 level");
             helper.assertTrue(colony.nest().findDigTarget(level) == null, "still digging: " + airBelowSurface(helper) + " of " + CHAMBER_CELLS);
             helper.assertTrue(airBelowSurface(helper) == CHAMBER_CELLS, airBelowSurface(helper) + " open cells, expected " + CHAMBER_CELLS);
-            helper.assertBlockPresent(ModBlocks.TERMITE_MOUND.get(), new BlockPos(MIDDLE, SURFACE, MIDDLE));
+            helper.assertBlockPresent(SavannaBlocks.TERMITE_MOUND.get(), new BlockPos(MIDDLE, SURFACE, MIDDLE));
             TermiteQueenEntity queen = (TermiteQueenEntity) colony.getQueen(level);
             BlockPos room = colony.nest().getFinishedRoomCenter(level);
             helper.assertTrue(queen.blockPosition().equals(room), "the queen is not in the middle of the chamber");
@@ -71,7 +71,7 @@ public class TermiteTests {
             ServerLevel level = helper.getLevel();
             Colony colony = colony(helper);
             helper.assertTrue(colony != null && colony.nest().findDigTarget(level) == null, "still digging");
-            helper.assertBlockPresent(ModBlocks.TERMITE_MOUND.get(), new BlockPos(MIDDLE, SURFACE, MIDDLE));
+            helper.assertBlockPresent(SavannaBlocks.TERMITE_MOUND.get(), new BlockPos(MIDDLE, SURFACE, MIDDLE));
             helper.assertTrue(colony.getQueen(level).blockPosition().equals(colony.nest().getFinishedRoomCenter(level)),
                     "the queen is not in the middle of the chamber");
         });
@@ -88,7 +88,7 @@ public class TermiteTests {
         foundColony(helper, true);
         boolean[] sealed = {false};
         helper.onEachTick(() -> {
-            if (!sealed[0] && helper.getBlockState(new BlockPos(MIDDLE, SURFACE, MIDDLE)).is(ModBlocks.TERMITE_MOUND.get())) {
+            if (!sealed[0] && helper.getBlockState(new BlockPos(MIDDLE, SURFACE, MIDDLE)).is(SavannaBlocks.TERMITE_MOUND.get())) {
                 sealed[0] = true;
                 AntColoniesMod.LOGGER.info("[termite-test] tick {}: sealed in", helper.getTick());
             }
@@ -117,7 +117,7 @@ public class TermiteTests {
     @GameTest(template = "arena", timeoutTicks = 400, skyAccess = true)
     public static void aSwollenQueenCanNoLongerWalk(GameTestHelper helper) {
         ground(helper);
-        TermiteQueenEntity queen = helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        TermiteQueenEntity queen = helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
         Vec3[] start = {null};
         helper.runAfterDelay(10, () -> {
             queen.setSize(0.6F);
@@ -146,9 +146,9 @@ public class TermiteTests {
     private static void foundColony(GameTestHelper helper, boolean withKing) {
         helper.getLevel().getServer().tickRateManager().setTickRate(2000.0F);
         ground(helper);
-        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
         if (withKing) {
-            helper.runAfterDelay(5, () -> helper.spawn(ModEntities.TERMITE_KING.get(), MIDDLE + 2, SURFACE, MIDDLE + 1));
+            helper.runAfterDelay(5, () -> helper.spawn(SavannaEntities.TERMITE_KING.get(), MIDDLE + 2, SURFACE, MIDDLE + 1));
         }
         helper.onEachTick(() -> {
             if (helper.getTick() % 400 == 0) {

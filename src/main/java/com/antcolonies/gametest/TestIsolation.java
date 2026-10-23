@@ -8,13 +8,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.BiConsumer;
 
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
-import com.antcolonies.colony.ColonyParts;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.AntCorpseEntity;
 import com.antcolonies.entity.AntEggEntity;
@@ -44,7 +44,7 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * the later tests. Now, when a test is done, every colony that was founded in its arena is removed, with every insect,
  * egg, larva and body of it, wherever it is.</li>
  * <li><b>Long trails</b> (2026-10-17): a trunk trail can reach 96 blocks and the arenas are about 45 apart, so each
- * colony's trails stop at its own arena's edge ({@code TrunkTrails.setTestFence}).</li>
+ * colony's trails stop at its own arena's edge ({@code TrunkTrails.setTestFence}, signed up by the desert's tests).</li>
  * <li><b>Neighbours</b> (2026-10-18): termite galleries reach 50 blocks, so a colony met the next test's colony and walled
  * its galleries off; a colony only meets colonies of its own arena ({@code Neighbours.setTestFence}).</li>
  * <li><b>Ground round the arena</b> (2026-10-22): the test server runs only the chunks under a test's arena, but a
@@ -66,6 +66,8 @@ final class TestIsolation {
     private static final Map<GameTestInfo, AABB> ARENAS = new HashMap<>();
     /** Each colony and the test in whose arena it was founded. */
     private static final Map<UUID, GameTestInfo> OWNERS = new HashMap<>();
+    /** Each species' own fences round a colony in its arena (the split, step S4: signed up by its tests, {@link #addFence}). */
+    private static final List<BiConsumer<Colony, AABB>> FENCES = new ArrayList<>();
     /** How far past its arena's edge a test's ground runs (blocks; a colony's food radius is 24, its gallery arms 16). */
     static final int GROUND_ROUND = 32;
     /** The loading ticket for the ground round the arenas (one per chunk, so a chunk two tests share runs while either does). */
@@ -74,6 +76,11 @@ final class TestIsolation {
     private static final Map<GameTestInfo, List<ChunkPos>> GROUND_HELD = new HashMap<>();
 
     private TestIsolation() {
+    }
+
+    /** A species' own fence round each colony founded in a test's arena (its tests' sign-up), given that arena's box. */
+    static void addFence(BiConsumer<Colony, AABB> fence) {
+        FENCES.add(fence);
     }
 
     /** Called once when the test server starts. */
@@ -172,7 +179,7 @@ final class TestIsolation {
                 GameTestInfo test = testAt(colony.getCenter());
                 if (test != null) {
                     OWNERS.put(colony.getId(), test);
-                    colony.part(ColonyParts.TRUNK_TRAILS).ifPresent(trunk -> trunk.setTestFence(ARENAS.get(test))); // (its trails stop at its own arena's edge)
+                    FENCES.forEach(fence -> fence.accept(colony, ARENAS.get(test))); // (e.g. its trails stop at its own arena's edge)
                     colony.neighbours().setTestFence(ARENAS.get(test)); // (another test's colonies are not neighbours)
                 }
             }

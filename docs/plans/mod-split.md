@@ -131,7 +131,7 @@ desert files (still one mod name); the language file, tags, loot tables and the 
 (still in one folder). Tests: the test kit made species-neutral (`TestAnts`, `TestFilter`: each species signs up its
 own test classes and categories); the 11 mixed test files split scene by scene into savanna and desert files, every
 check kept; the 4 scenes that used a harvester ant as an outsider use a termite from no colony (same meaning: an
-insect that does not belong, does not fit, is not pricked).
+insect that does not belong, does not fit, is not pricked). **S3 and S4 BUILT 2026-10-22** (round 2, `docs/HISTORY.md`): the species rows in `SavannaParts` and `DesertParts`, three starts (`AntColoniesMod`, `SavannaMod`, `DesertMod`), the registry and event files split, the test kit species-neutral (`TestScenes`, `TestWatch`, `AwayKit`, `TestAnts.lone`; each species signs up its tests in `gametest/SavannaTests` and `DesertTests`), the mixed tests split into `Termite*` and `Harvester*` files; the data stays in one folder, `python tools/wall_check.py --data` lists the 4 files naming both sides (to split by their entries at S6). Wall checker 36 to **0** files; full run on 6 servers 140 of 143 (12 minutes): the old flake BUGS 55; the save check expecting the bare patches as a new part (box 2, fixed, `away` all pass); and the termite half of the old noticing scene, `termitesFeelNoSneakingStepsButFreezeAtAJump`, which passed 2 of 2 alone (a new flaky test, proposed as a session of its own).
 
 **S5. Packages** (about 2 hours, mostly done by a script). Java's names for folders of code ("packages") must differ
 between mods (the mod loader refuses two mods sharing one), so the species code moves to `com.antcolonies.savanna.*`

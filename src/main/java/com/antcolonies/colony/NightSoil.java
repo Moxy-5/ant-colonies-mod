@@ -11,8 +11,8 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.block.SeedPileBlock;
-import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.species.SpeciesProfile;
+import com.antcolonies.registry.DesertBlocks;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -55,16 +55,21 @@ public class NightSoil {
         this.hill = hill;
     }
 
-    private SpeciesProfile.NightSoil numbers() {
+    /** Where the night soil may lie ({@link Nest#nightSoilCells}, with Loose Soil as its heap). */
+    public List<BlockPos> cells(Level level) {
+        return colony.nest().nightSoilCells(level, DesertBlocks.LOOSE_SOIL.get());
+    }
+
+    private SpeciesProfile.NightSoilNumbers numbers() {
         return colony.profile().nest().nightSoil();
     }
 
     /** How many pellets wait in the piles now. */
     public int waiting(Level level) {
         int layers = 0;
-        for (BlockPos cell : colony.nest().nightSoilCells(level)) {
+        for (BlockPos cell : cells(level)) {
             BlockState state = level.getBlockState(cell);
-            if (state.is(ModBlocks.LOOSE_SOIL.get())) {
+            if (state.is(DesertBlocks.LOOSE_SOIL.get())) {
                 layers += state.getValue(SeedPileBlock.LAYERS);
             }
         }
@@ -76,7 +81,7 @@ public class NightSoil {
      * at least one), and never more than the cells hold.
      */
     public int limit(ServerLevel level) {
-        int room = colony.nest().nightSoilCells(level).size() * numbers().layersPerCell();
+        int room = cells(level).size() * numbers().layersPerCell();
         return Math.min(room, numbers().perBuilder() * Math.max(1, colony.buildersNow(level)));
     }
 
@@ -97,7 +102,7 @@ public class NightSoil {
         }
         BlockPos best = null;
         int fewest = Integer.MAX_VALUE;
-        for (BlockPos cell : colony.nest().nightSoilCells(level)) {
+        for (BlockPos cell : cells(level)) {
             int layers = layersAt(level, cell);
             if (layers < numbers().layersPerCell() && layers < fewest) {
                 best = cell;
@@ -109,14 +114,14 @@ public class NightSoil {
 
     /** One more layer on this pile. False if it may not take one (full, or no longer a pile cell). */
     public boolean addLayer(ServerLevel level, BlockPos cell) {
-        if (!colony.nest().nightSoilCells(level).contains(cell) || isFull(level)) {
+        if (!cells(level).contains(cell) || isFull(level)) {
             return false;
         }
         int layers = layersAt(level, cell);
         if (layers >= numbers().layersPerCell()) {
             return false;
         }
-        level.setBlock(cell, ModBlocks.LOOSE_SOIL.get().defaultBlockState().setValue(SeedPileBlock.LAYERS, layers + 1), 3);
+        level.setBlock(cell, DesertBlocks.LOOSE_SOIL.get().defaultBlockState().setValue(SeedPileBlock.LAYERS, layers + 1), 3);
         return true;
     }
 
@@ -141,7 +146,7 @@ public class NightSoil {
         long now = level.getGameTime();
         carriers.values().removeIf(claim -> claim.until <= now);
         List<BlockPos> piles = new ArrayList<>();
-        for (BlockPos cell : colony.nest().nightSoilCells(level)) {
+        for (BlockPos cell : cells(level)) {
             if (layersAt(level, cell) > 0 && carriers.entrySet().stream()
                     .noneMatch(entry -> !entry.getKey().equals(ant) && entry.getValue().pile.equals(cell))) {
                 piles.add(cell);
@@ -160,7 +165,7 @@ public class NightSoil {
             return null;
         }
         level.setBlock(pile, layers <= 1 ? Blocks.AIR.defaultBlockState()
-                : ModBlocks.LOOSE_SOIL.get().defaultBlockState().setValue(SeedPileBlock.LAYERS, layers - 1), 3);
+                : DesertBlocks.LOOSE_SOIL.get().defaultBlockState().setValue(SeedPileBlock.LAYERS, layers - 1), 3);
         return Blocks.DIRT.defaultBlockState();
     }
 
@@ -172,7 +177,7 @@ public class NightSoil {
     /** The layers of loose soil in this cell (0 if none). */
     public static int layersAt(Level level, BlockPos cell) {
         BlockState state = level.getBlockState(cell);
-        return state.is(ModBlocks.LOOSE_SOIL.get()) ? state.getValue(SeedPileBlock.LAYERS) : 0;
+        return state.is(DesertBlocks.LOOSE_SOIL.get()) ? state.getValue(SeedPileBlock.LAYERS) : 0;
     }
 
     /**
@@ -180,7 +185,7 @@ public class NightSoil {
      * (as with soil dug while the piles are full).
      */
     private void layOutOldHeap(ServerLevel level) {
-        if (oldHeap.isEmpty() || colony.nest().nightSoilCells(level).isEmpty()) {
+        if (oldHeap.isEmpty() || cells(level).isEmpty()) {
             return;
         }
         int before = oldHeap.size();
@@ -208,7 +213,7 @@ public class NightSoil {
             return;
         }
         int packed = 0;
-        for (BlockPos cell : colony.nest().nightSoilCells(level)) {
+        for (BlockPos cell : cells(level)) {
             packed += layersAt(level, cell);
             if (layersAt(level, cell) > 0) {
                 level.setBlock(cell, Blocks.AIR.defaultBlockState(), 3);
@@ -227,14 +232,14 @@ public class NightSoil {
     /** Tests only: takes every pile away. */
     public void clearForTests(Level level) {
         oldHeap.clear();
-        for (BlockPos cell : colony.nest().nightSoilCells(level)) {
+        for (BlockPos cell : cells(level)) {
             if (layersAt(level, cell) > 0) {
                 level.setBlock(cell, Blocks.AIR.defaultBlockState(), 3);
             }
         }
     }
 
-    /** Tests only: a sample in every saved number (the save and load check, {@code AwayTests.everyPartSavesAndLoads}). */
+    /** Tests only: a sample in every saved number (the save and load check, {@code AwayKit.everyPartSavesAndLoads}). */
     public void fillForTests(ServerLevel level) {
         oldHeap.add(Blocks.DIRT.defaultBlockState());
     }

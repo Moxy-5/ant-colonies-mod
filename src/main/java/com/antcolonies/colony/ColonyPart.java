@@ -166,7 +166,7 @@ public final class ColonyPart<T> {
 
     /**
      * Tests only: how to put a sample into every number the part saves, for the save and load check
-     * ({@code AwayTests.everyPartSavesAndLoads}), when the test scenes leave the part empty.
+     * ({@code AwayKit.everyPartSavesAndLoads}), when the test scenes leave the part empty.
      */
     ColonyPart<T> sample(BiConsumer<T, ServerLevel> sample) {
         this.sample = sample;

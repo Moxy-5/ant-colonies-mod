@@ -23,7 +23,7 @@ import net.minecraft.world.level.block.state.BlockState;
  * <p>It is not part of the mound: once no wood is left on the casts joined to it (the whole log is eaten), nobody needs
  * it and it slowly crumbles away, a little at a time.
  */
-public class MudCastBlock extends TermiteTunnelBlock {
+public class MudCastBlock extends TermiteTunnelBlock implements FoodCast {
     /** On each random tick a cast nobody needs crumbles away with a chance of 1 in this (my pick: a few in-game days). */
     private static final int CRUMBLE_CHANCE = 12;
     /** At most this many joined casts are looked at for wood (a fallen tree is about 8 blocks). */

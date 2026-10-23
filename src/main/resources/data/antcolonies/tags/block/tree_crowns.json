@@ -1,0 +1,8 @@
+{
+  "replace": false,
+  "values": [
+    "#minecraft:leaves",
+    "#antcolonies:tree_wood",
+    "#antcolonies:tree_leaves"
+  ]
+}

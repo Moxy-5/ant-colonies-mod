@@ -3,13 +3,14 @@ package com.antcolonies.gametest;
 import static com.antcolonies.gametest.TermiteMoundTests.MIDDLE;
 import static com.antcolonies.gametest.TermiteMoundTests.SURFACE;
 
+import com.antcolonies.colony.Caste;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.ColonyParts;
+import com.antcolonies.colony.SavannaParts;
 import com.antcolonies.colony.ForagingHoles;
 import com.antcolonies.colony.NestPlan;
-import com.antcolonies.registry.ModBlocks;
-import com.antcolonies.registry.ModEntities;
+import com.antcolonies.registry.SavannaBlocks;
+import com.antcolonies.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -37,12 +38,12 @@ public class TermiteForagingTests {
     public static void termitesOpenTheirForagingHolesAtNightAndPlugThemByDay(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
-        TermiteMoundTests.deepGround(helper);
-        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        TestScenes.deepGround(helper);
+        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
         helper.runAfterDelay(5, () -> {
-            helper.spawn(ModEntities.TERMITE_KING.get(), MIDDLE + 2, SURFACE, MIDDLE + 1);
+            helper.spawn(SavannaEntities.TERMITE_KING.get(), MIDDLE + 2, SURFACE, MIDDLE + 1);
             for (int i = 0; i < 6; i++) {
-                helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE - 2 + i % 3, SURFACE, MIDDLE - 2 + i / 3);
+                helper.spawn(SavannaEntities.TERMITE_WORKER.get(), MIDDLE - 2 + i % 3, SURFACE, MIDDLE - 2 + i / 3);
             }
         });
         BlockPos bush = new BlockPos(MIDDLE + 5, SURFACE, MIDDLE + 5);
@@ -78,9 +79,9 @@ public class TermiteForagingTests {
                     helper.assertTrue(clock.phase(colony) == TestClock.Phase.DAY, "by sunset the holes (and the middle hole) were not all plugged with everybody inside");
                     // Every hole that was opened holds a plug of soil, and none is open (a hole whose turn never came is
                     // still the ground it was).
-                    boolean plugged = opened.stream().allMatch(h -> level.getBlockState(h).is(ModBlocks.TERMITE_MOUND.get()))
+                    boolean plugged = opened.stream().allMatch(h -> level.getBlockState(h).is(SavannaBlocks.TERMITE_MOUND.get()))
                             && holes.tunnels(level).stream().noneMatch(t -> ForagingHoles.isOpen(level, t.hole()))
-                            && (level.getBlockState(colony.nest().getEntrance()).is(ModBlocks.TERMITE_MOUND.get()) || colony.nest().isEntranceCovered(level));
+                            && (level.getBlockState(colony.nest().getEntrance()).is(SavannaBlocks.TERMITE_MOUND.get()) || colony.nest().isEntranceCovered(level));
                     if (plugged && !holes.isAnyoneOutside(level)) {
                         AntColoniesMod.LOGGER.info("[holes-test] tick {}: both holes plugged, everybody inside ({})", helper.getTick(), clock.describe());
                         phase[0] = 2;
@@ -156,10 +157,10 @@ public class TermiteForagingTests {
                 helper.setBlock(x, SURFACE - 1, z, Blocks.GRASS_BLOCK);
             }
         }
-        helper.spawn(ModEntities.TERMITE_QUEEN.get(), mid, SURFACE, mid);
+        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), mid, SURFACE, mid);
         helper.runAfterDelay(5, () -> {
             for (int i = 0; i < 8; i++) {
-                helper.spawn(ModEntities.TERMITE_WORKER.get(), mid - 2 + i % 4, SURFACE, mid - 3 - i / 4);
+                helper.spawn(SavannaEntities.TERMITE_WORKER.get(), mid - 2 + i % 4, SURFACE, mid - 3 - i / 4);
             }
         });
         TestClock clock = TestClock.moving(helper, 12);
@@ -179,7 +180,7 @@ public class TermiteForagingTests {
                 worker.setGrownUpAt(now - (i++ < 2 ? colony.profile().worker().nurseUntilTicks() : colony.profile().worker().builderUntilTicks()) - 1000);
             }
             TermiteSoldierTests.digNestAtOnce(level, colony);
-            colony.population().addNewMembers(com.antcolonies.entity.WorkerAntEntity.CASTE, now - colony.profile().worker().builderUntilTicks() - 1000, 30);
+            colony.population().addNewMembers(Caste.WORKER, now - colony.profile().worker().builderUntilTicks() - 1000, 30);
             com.antcolonies.colony.Galleries.of(colony).setSwitchForTests(true);
             stage[0] = 1;
         });
@@ -299,7 +300,7 @@ public class TermiteForagingTests {
                                 helper.relativePos(food[0].above(3)));
                         victim.hurt(level.damageSources().mobAttack(zombie), 100.0F);
                         zombie.discard();
-                        colony.part(ColonyParts.ALARM).orElseThrow().calmForTests(); // (the alarm is tested elsewhere: here the foraging time goes on)
+                        colony.part(SavannaParts.ALARM).orElseThrow().calmForTests(); // (the alarm is tested elsewhere: here the foraging time goes on)
                         helper.assertTrue(victim.isDeadOrDying(), "the worker in the food hole was not killed");
                         helper.assertTrue(colony.danger().places().size() == 1 && colony.danger().places().get(0).deaths() == 1,
                                 "the death in the food hole is not remembered: " + colony.danger().describe(level));
@@ -308,7 +309,7 @@ public class TermiteForagingTests {
                 }
                 case 7 -> { // at once: the hole and the holes whose gallery runs near the kill closed, the others not
                     BlockPos spot = colony.danger().places().get(0).pos();
-                    helper.assertTrue(colony.part(ColonyParts.CLOSED_HOLES).orElseThrow().isClosed(level, food[0]), "the hole where a worker was killed is not closed");
+                    helper.assertTrue(colony.part(SavannaParts.CLOSED_HOLES).orElseThrow().isClosed(level, food[0]), "the hole where a worker was killed is not closed");
                     helper.assertTrue(!galleries.holesInTurn(level).contains(food[0]), "the hole where a worker was killed still has its turn");
                     int open = 0;
                     for (NestPlan.ForagingTunnel tunnel : tunnels) {
@@ -316,11 +317,11 @@ public class TermiteForagingTests {
                         for (BlockPos cell : tunnel.tunnel()) {
                             if (flat(cell, spot) <= 6) {
                                 near = true;
-                                helper.assertTrue(colony.part(ColonyParts.CLOSED_HOLES).orElseThrow().closesCell(cell), "a hidden trip may run through the gallery at "
+                                helper.assertTrue(colony.part(SavannaParts.CLOSED_HOLES).orElseThrow().closesCell(cell), "a hidden trip may run through the gallery at "
                                         + helper.relativePos(cell) + ", by the kill");
                             }
                         }
-                        helper.assertTrue(colony.part(ColonyParts.CLOSED_HOLES).orElseThrow().isClosed(level, tunnel.hole()) == near, "the hole at " + helper.relativePos(tunnel.hole())
+                        helper.assertTrue(colony.part(SavannaParts.CLOSED_HOLES).orElseThrow().isClosed(level, tunnel.hole()) == near, "the hole at " + helper.relativePos(tunnel.hole())
                                 + (near ? " is not closed, its gallery runs by the kill" : " is closed, far from the kill"));
                         open += near ? 0 : 1;
                     }
@@ -330,7 +331,7 @@ public class TermiteForagingTests {
                         helper.assertTrue("closed_holes".equals(colony.whoKeepsOff(level, bush)), "the closed holes should keep the termites off the dead bush at "
                                 + helper.relativePos(bush) + " (colony parts step 6), not " + colony.whoKeepsOff(level, bush));
                     }
-                    helper.assertTrue(colony.part(ColonyParts.CLOSED_HOLES).orElseThrow().describe(level).contains("closed for danger"), "the colony list does not tell the closed holes");
+                    helper.assertTrue(colony.part(SavannaParts.CLOSED_HOLES).orElseThrow().describe(level).contains("closed for danger"), "the colony list does not tell the closed holes");
                     since[0] = tick;
                     stage[0] = 8;
                 }
@@ -338,10 +339,10 @@ public class TermiteForagingTests {
                     if (!ForagingHoles.isOpen(level, food[0])) {
                         AntColoniesMod.LOGGER.info("[turns-test] tick {}: the food hole plugged {} ticks after the kill", tick, tick - since[0]);
                         colony.danger().ageForTests(36000L);
-                        helper.assertTrue(colony.part(ColonyParts.CLOSED_HOLES).orElseThrow().isClosed(level, food[0]), "a day and a half after the death the food hole is open again: "
+                        helper.assertTrue(colony.part(SavannaParts.CLOSED_HOLES).orElseThrow().isClosed(level, food[0]), "a day and a half after the death the food hole is open again: "
                                 + colony.danger().describe(level));
                         colony.danger().ageForTests(14400L); // the death (4) halved a little more than twice: under 1
-                        helper.assertTrue(!colony.part(ColonyParts.CLOSED_HOLES).orElseThrow().isClosed(level, food[0]) && galleries.holesInTurn(level).contains(food[0]),
+                        helper.assertTrue(!colony.part(SavannaParts.CLOSED_HOLES).orElseThrow().isClosed(level, food[0]) && galleries.holesInTurn(level).contains(food[0]),
                                 "two days and a bit after the death the food hole is not back in the turns: " + colony.danger().describe(level));
                         helper.assertTrue(colony.mayForageAt(level, bushes.get(0)), "two days and a bit after the death the food there is still not fetched");
                         tunnels.forEach(tunnel -> holesBefore.add(tunnel.hole()));
@@ -355,26 +356,26 @@ public class TermiteForagingTests {
                 }
                 case 9 -> { // left for good: a new hole on the same gallery at least 7 blocks from the place
                     BlockPos spot = colony.danger().places().get(0).pos();
-                    if (colony.part(ColonyParts.CLOSED_HOLES).orElseThrow().left().contains(food[0]) && colony.part(ColonyParts.CLOSED_HOLES).orElseThrow().opened() > 0) {
+                    if (colony.part(SavannaParts.CLOSED_HOLES).orElseThrow().left().contains(food[0]) && colony.part(SavannaParts.CLOSED_HOLES).orElseThrow().opened() > 0) {
                         java.util.List<BlockPos> added = tunnels.stream().map(NestPlan.ForagingTunnel::hole).filter(hole -> !holesBefore.contains(hole)).toList();
                         AntColoniesMod.LOGGER.info("[turns-test] tick {}: left {}, new holes {}", tick,
-                                colony.part(ColonyParts.CLOSED_HOLES).orElseThrow().left().stream().map(helper::relativePos).toList(), added.stream().map(helper::relativePos).toList());
-                        helper.assertTrue(added.size() == colony.part(ColonyParts.CLOSED_HOLES).orElseThrow().opened(), "the new holes in place of the left ones are not among the holes: "
-                                + added.size() + " for " + colony.part(ColonyParts.CLOSED_HOLES).orElseThrow().opened());
+                                colony.part(SavannaParts.CLOSED_HOLES).orElseThrow().left().stream().map(helper::relativePos).toList(), added.stream().map(helper::relativePos).toList());
+                        helper.assertTrue(added.size() == colony.part(SavannaParts.CLOSED_HOLES).orElseThrow().opened(), "the new holes in place of the left ones are not among the holes: "
+                                + added.size() + " for " + colony.part(SavannaParts.CLOSED_HOLES).orElseThrow().opened());
                         for (BlockPos hole : added) {
-                            helper.assertTrue(flat(hole, spot) >= 7 && !colony.part(ColonyParts.CLOSED_HOLES).orElseThrow().isClosed(level, hole), "the new hole at "
+                            helper.assertTrue(flat(hole, spot) >= 7 && !colony.part(SavannaParts.CLOSED_HOLES).orElseThrow().isClosed(level, hole), "the new hole at "
                                     + helper.relativePos(hole) + " is within 7 blocks of the place hit again and again, or closed");
                         }
-                        helper.assertTrue(com.antcolonies.colony.Colony.load(colony.save()).part(ColonyParts.CLOSED_HOLES).orElseThrow().left().contains(food[0]),
+                        helper.assertTrue(com.antcolonies.colony.Colony.load(colony.save()).part(SavannaParts.CLOSED_HOLES).orElseThrow().left().contains(food[0]),
                                 "the hole left for good was not saved");
                         colony.danger().ageForTests(4 * 24000L); // the memory gone: the hole stays left
-                        helper.assertTrue(colony.part(ColonyParts.CLOSED_HOLES).orElseThrow().isClosed(level, food[0]) && !galleries.holesInTurn(level).contains(food[0]),
+                        helper.assertTrue(colony.part(SavannaParts.CLOSED_HOLES).orElseThrow().isClosed(level, food[0]) && !galleries.holesInTurn(level).contains(food[0]),
                                 "the hole left for good has a turn again once the danger is forgotten");
                         galleries.setSwitchForTests(false);
                         stage[0] = 10;
                     } else {
                         helper.assertTrue(tick - since[0] < 400, "the hole hit again and again was not left for a new one: "
-                                + colony.part(ColonyParts.CLOSED_HOLES).orElseThrow().describe(level) + ", " + colony.danger().describe(level));
+                                + colony.part(SavannaParts.CLOSED_HOLES).orElseThrow().describe(level) + ", " + colony.danger().describe(level));
                     }
                 }
                 default -> {
@@ -426,10 +427,10 @@ public class TermiteForagingTests {
                 helper.setBlock(x, SURFACE - 1, z, Blocks.GRASS_BLOCK);
             }
         }
-        helper.spawn(ModEntities.TERMITE_QUEEN.get(), mid, SURFACE, mid);
+        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), mid, SURFACE, mid);
         helper.runAfterDelay(5, () -> {
             for (int i = 0; i < 8; i++) {
-                helper.spawn(ModEntities.TERMITE_WORKER.get(), mid - 2 + i % 4, SURFACE, mid - 3 - i / 4);
+                helper.spawn(SavannaEntities.TERMITE_WORKER.get(), mid - 2 + i % 4, SURFACE, mid - 3 - i / 4);
             }
         });
         TestClock.still(helper, 12); // midday: the termites stay in, and dig
@@ -465,7 +466,7 @@ public class TermiteForagingTests {
                 worker.setGrownUpAt(now - colony.profile().worker().nurseUntilTicks() - 1000);
             }
             TermiteSoldierTests.digNestAtOnce(level, colony);
-            colony.population().addNewMembers(com.antcolonies.entity.WorkerAntEntity.CASTE, now - colony.profile().worker().builderUntilTicks() - 1000, 30);
+            colony.population().addNewMembers(Caste.WORKER, now - colony.profile().worker().builderUntilTicks() - 1000, 30);
             com.antcolonies.colony.Galleries.of(colony).setSwitchForTests(true);
             com.antcolonies.colony.Galleries.of(colony).setReachForTests(reach);
             level.setBlock(hay, Blocks.HAY_BLOCK.defaultBlockState(), 3);
@@ -500,7 +501,7 @@ public class TermiteForagingTests {
                     if (galleries.tipCount() >= 3) {
                         since[0]++;
                         helper.assertTrue(galleries.length() <= galleries.lengthAllowed(),
-                                "a colony of " + colony.getCount(com.antcolonies.entity.WorkerAntEntity.CASTE) + " workers grew its galleries past the arms:"
+                                "a colony of " + colony.getCount(Caste.WORKER) + " workers grew its galleries past the arms:"
                                         + galleries.describe(level));
                         helper.assertTrue(colony.nest().foodWays().getNewTunnels().isEmpty(),
                                 "a colony of 38 workers dug a piece out to the hay, more than its workers allow:" + galleries.describe(level));
@@ -509,7 +510,7 @@ public class TermiteForagingTests {
                                     + galleries.describe(level) + colony.foragingHoles().describeNewHoles(level));
                             holesBefore[0] = tunnels.size();
                             lengthAtStart[0] = galleries.length();
-                            colony.population().addNewMembers(com.antcolonies.entity.WorkerAntEntity.CASTE, level.getGameTime() - 1000, 600);
+                            colony.population().addNewMembers(Caste.WORKER, level.getGameTime() - 1000, 600);
                             AntColoniesMod.LOGGER.info("[web-test] tick {}: 600 workers join, {} blocks allowed", tick, galleries.lengthAllowed());
                             since[0] = 0;
                             stage[0] = 2;

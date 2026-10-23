@@ -21,37 +21,24 @@ import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
 
 /**
- * Draws a dead ant: a dark, dried-out body lying on its back with the six legs curled up in the air. The same model is
+ * Draws a dead ant (or termite, in its species' look): a dried-out body lying on its back with the six legs curled up in the air. The same model is
  * drawn smaller in the mandibles of the worker that carries it (see {@link PelletLayer}).
  */
 public class AntCorpseRenderer extends EntityRenderer<AntCorpseEntity> {
     public static final ModelLayerLocation LAYER =
             new ModelLayerLocation(ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "ant_corpse"), "main");
-    public static final ResourceLocation TEXTURE =
-            ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "textures/entity/ant_corpse.png");
-    /** A dead termite: the same shape, pale and dull (drawn by {@code tools/corpse_textures.py}). */
-    public static final ResourceLocation TERMITE_TEXTURE =
-            ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "textures/entity/termite_corpse.png");
     /** The corpse is drawn at the size of a living worker (the worker model is drawn at 0.65). */
     private static final float SIZE = 0.65F;
 
     private final ModelPart model;
     private final ResourceLocation texture;
 
-    public AntCorpseRenderer(EntityRendererProvider.Context context) {
-        this(context, TEXTURE);
-    }
-
+    /** {@code texture}: the species' look of its dead ({@link com.antcolonies.species.SpeciesBodies#corpseLook}). */
     public AntCorpseRenderer(EntityRendererProvider.Context context, ResourceLocation texture) {
         super(context);
         this.model = context.bakeLayer(LAYER);
         this.texture = texture;
         this.shadowRadius = 0.0F;
-    }
-
-    /** The renderer for a dead termite. */
-    public static AntCorpseRenderer termite(EntityRendererProvider.Context context) {
-        return new AntCorpseRenderer(context, TERMITE_TEXTURE);
     }
 
     /** The body lies on its back, the head toward -z, like the worker model; the feet of the legs point to the sky. */
@@ -73,12 +60,7 @@ public class AntCorpseRenderer extends EntityRenderer<AntCorpseEntity> {
         return LayerDefinition.create(mesh, 32, 32);
     }
 
-    /** Draws the corpse model with the pose already set (also used for the one a worker carries). */
-    public static void renderModel(ModelPart model, PoseStack pose, MultiBufferSource buffers, int light) {
-        renderModel(model, pose, buffers, light, TEXTURE);
-    }
-
-    /** As above, with the texture of the species. */
+    /** Draws the corpse model with the pose already set, in the species' look (also used for the one a worker carries). */
     public static void renderModel(ModelPart model, PoseStack pose, MultiBufferSource buffers, int light, ResourceLocation texture) {
         VertexConsumer consumer = buffers.getBuffer(RenderType.entityCutoutNoCull(texture));
         model.render(pose, consumer, light, OverlayTexture.NO_OVERLAY);

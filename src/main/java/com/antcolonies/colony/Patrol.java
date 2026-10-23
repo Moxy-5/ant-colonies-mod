@@ -186,7 +186,7 @@ public class Patrol {
         }
         // Round the hill; a small colony's patrollers walk all the near ground a young colony forages (my pick, so the
         // young colony is not slowed: every direction within the patrol's reach).
-        boolean small = level instanceof ServerLevel serverLevel && colony.part(ColonyParts.DOOR).map(door -> door.isSmallColony(serverLevel)).orElse(false);
+        boolean small = level instanceof ServerLevel serverLevel && colony.part(DesertParts.DOOR).map(door -> door.isSmallColony(serverLevel)).orElse(false);
         if (flat(food) <= (small ? reach() : HILL_ZONE)) {
             return true;
         }
@@ -230,7 +230,7 @@ public class Patrol {
         }
         if (calm) {
             cameBack(level, job.way());
-            colony.part(ColonyParts.DOOR).ifPresent(door -> door.homecomer(level, ant, false));
+            colony.part(DesertParts.DOOR).ifPresent(door -> door.homecomer(level, ant, false));
         }
         ColonyManager.get(level).markChanged();
     }
@@ -383,7 +383,7 @@ public class Patrol {
                     continue; // never came back: its way stays shut for the day
                 }
                 cameBack(level, out.way());
-                colony.part(ColonyParts.DOOR).ifPresent(door -> door.patrollerNumbersHome(1));
+                colony.part(DesertParts.DOOR).ifPresent(door -> door.patrollerNumbersHome(1));
             }
         }
         if (lostNow) {
@@ -424,7 +424,7 @@ public class Patrol {
                 seen.remove(entry.getKey());
                 if (entry.getValue().way() != Integer.MIN_VALUE) {
                     cameBack(level, entry.getValue().way());
-                    colony.part(ColonyParts.DOOR).ifPresent(door -> door.patrollerNumbersHome(1));
+                    colony.part(DesertParts.DOOR).ifPresent(door -> door.patrollerNumbersHome(1));
                 }
             }
         }
@@ -474,7 +474,7 @@ public class Patrol {
         lost = 0;
         roundStart = now;
         roundClock = colony.timeOfDay(level);
-        colony.part(ColonyParts.DOOR).ifPresent(Door::shut);
+        colony.part(DesertParts.DOOR).ifPresent(Door::shut);
         int size = roundsToday == 1 ? dawnSize() : laterSize();
         if (size > 0) {
             send(level, size, false);
@@ -491,7 +491,7 @@ public class Patrol {
         waitingToStart.clear();
         passedOver.clear();
         numbers.clear();
-        colony.part(ColonyParts.DOOR).ifPresent(Door::shut);
+        colony.part(DesertParts.DOOR).ifPresent(Door::shut);
         ColonyManager.get(level).markChanged();
     }
 
@@ -586,7 +586,7 @@ public class Patrol {
         int wanted = Math.min(MOST_WAYS, patrollers);
         int reach = reach();
         double spread = spread();
-        TrunkTrails trunk = colony.part(ColonyParts.TRUNK_TRAILS).orElse(null);
+        TrunkTrails trunk = colony.part(DesertParts.TRUNK_TRAILS).orElse(null);
         List<TrunkTrails.Trail> trails = trunk == null ? new ArrayList<>() : new ArrayList<>(trunk.trails());
         trails.sort(Comparator.comparingDouble((TrunkTrails.Trail trail) -> -trunk.strength(level, trail)));
         for (TrunkTrails.Trail trail : trails) {
@@ -783,7 +783,7 @@ public class Patrol {
 
     // --- saving -----------------------------------------------------------------------------------------------------
 
-    /** Tests only: a sample in every saved number (the save and load check, {@code AwayTests.everyPartSavesAndLoads}). */
+    /** Tests only: a sample in every saved number (the save and load check, {@code AwayKit.everyPartSavesAndLoads}). */
     public void fillForTests(ServerLevel level) {
         long now = level.getGameTime();
         roundOn = true;

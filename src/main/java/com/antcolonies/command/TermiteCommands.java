@@ -9,13 +9,13 @@ import com.antcolonies.block.TermitomycesBlock;
 import com.antcolonies.colony.Alarm;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
-import com.antcolonies.colony.ColonyParts;
+import com.antcolonies.colony.SavannaParts;
 import com.antcolonies.colony.FungusGarden;
 import com.antcolonies.colony.Mound;
 import com.antcolonies.colony.Mushrooms;
 import com.antcolonies.entity.TermiteQueenEntity;
 import com.antcolonies.entity.TermiteSoldierEntity;
-import com.antcolonies.registry.ModBlocks;
+import com.antcolonies.registry.SavannaBlocks;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 
 import java.util.Comparator;
@@ -102,7 +102,7 @@ public class TermiteCommands {
         ServerLevel level = source.getLevel();
         BlockPos at = BlockPos.containing(source.getPosition());
         Colony colony = nearestTermiteColony(level, at);
-        Alarm alarm = colony == null ? null : colony.part(ColonyParts.ALARM).filter(part -> part.numbers() != null).orElse(null);
+        Alarm alarm = colony == null ? null : colony.part(SavannaParts.ALARM).filter(part -> part.numbers() != null).orElse(null);
         if (alarm == null) {
             source.sendFailure(Component.literal("No termite colony within 64 blocks."));
             return 0;
@@ -137,8 +137,8 @@ public class TermiteCommands {
     private static int mushrooms(CommandSourceStack source, int count, boolean giants) {
         ServerLevel level = source.getLevel();
         Colony colony = nearestTermiteColony(level, BlockPos.containing(source.getPosition()));
-        FungusGarden garden = colony == null ? null : colony.part(ColonyParts.FUNGUS_GARDEN).orElse(null);
-        Mushrooms mushrooms = colony == null ? null : colony.part(ColonyParts.MUSHROOMS).orElse(null);
+        FungusGarden garden = colony == null ? null : colony.part(SavannaParts.FUNGUS_GARDEN).orElse(null);
+        Mushrooms mushrooms = colony == null ? null : colony.part(SavannaParts.MUSHROOMS).orElse(null);
         if (garden == null || mushrooms == null) {
             source.sendFailure(Component.literal("No termite colony within 64 blocks."));
             return 0;
@@ -172,7 +172,7 @@ public class TermiteCommands {
             TermitomycesBlock.growOn(level.getBlockState(pos), level, pos);
         }
         for (BlockPos pos : giants) {
-            ModBlocks.GIANT_TERMITOMYCES.get().growOn(level, pos);
+            SavannaBlocks.GIANT_TERMITOMYCES.get().growOn(level, pos);
         }
         int count = small.size() + giants.size();
         source.sendSuccess(() -> Component.literal(count + " Termitomyces moved on one stage."), false);
@@ -193,7 +193,7 @@ public class TermiteCommands {
             source.sendFailure(Component.literal("No termite colony within 64 blocks."));
             return 0;
         }
-        Mound mound = colony.part(ColonyParts.MOUND).orElseThrow(); // (a colony that builds a mound)
+        Mound mound = colony.part(SavannaParts.MOUND).orElseThrow(); // (a colony that builds a mound)
         int max = mound.numbers().maxHeight();
         int h = Math.min(height, max);
         if (instant) {

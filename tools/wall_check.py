@@ -8,11 +8,13 @@ harvester class; this checker does it instead. From S6 on the compiler takes ove
     python tools/wall_check.py            the framework files that name savanna or desert code, and what they name
     python tools/wall_check.py --strict   the same, failing (exit 1) if there is any (on from step S5)
     python tools/wall_check.py --sides    every file with the side it was sorted to
+    python tools/wall_check.py --data     the data and asset files that name both savanna and desert things (step S4:
+                                          the data stays in one folder, these few are split by their entries at S6)
 
 Which side a file is on:
   - by its package once it has moved (com.antcolonies.savanna.*, com.antcolonies.desert.*; step S5);
   - before that, by the lists below (the sorting of 2026-10-22, the plan's "What the map shows today"): the giant
-    trees' package, the termite and tree game tests, and the classes named in SAVANNA and DESERT;
+    trees' package, the termite and tree game tests, the harvester game tests, and the classes named in SAVANNA and DESERT;
   - every other file is the framework's.
 It also checks that the savanna and the desert never name each other. A class is "named" when its simple name appears
 as a word in the code (comments and strings left out), so a file that only mentions a species in a comment is fine.
@@ -38,12 +40,16 @@ MoundPieceBlock MoundSoil MudCastBlock MudCrustBlock SoftDeadWoodBlock TallDryGr
 TermiteMoundBlock TermiteMouthBlock TermiteRampBlock TermiteSpireBlock TermiteTunnelBlock TermitomycesBlock
 BleachedBranchBlock HangingPodsBlock TaperingBranchBlock ThornyTwigBlock TreeBranchBlock TreeLeavesBlock TreeSeedlingBlock
 TreeBlocks FallenBranchFeature FallenTreeFeature GiantTreePiece GiantTreeStructure RainModifier TreePlacer
+SavannaMod SavannaParts SavannaBlocks SavannaItems SavannaEntities SavannaFeatures SavannaStructures SavannaEvents
+SavannaClientEvents TreeCommands SavannaTests
 '''.split())
 
 DESERT = set('''
 Hill HillAwayBuilding Bakery TrunkTrails Patrol ForagerSpots ForagerSearch SearchingAlone Door Recruits NightSoil
 WorkerAntEntity QueenAntEntity MillBreadGoal PatrolGoal RepairHillGoal CarryNightSoilGoal CarryPelletGoal
 FindNestSiteGoal GramaGrassBlock GramaLife GramaPatchFeature DeepSoilFeature
+DesertMod DesertParts DesertBlocks DesertItems DesertEntities DesertFeatures DesertEvents DesertClientEvents
+DesertTests NestTests NavigationTests
 '''.split())
 
 WORD = re.compile(r'\b[A-Z][A-Za-z0-9_]*\b')
@@ -70,6 +76,8 @@ def side_of(name, path):
         return 'savanna'
     if path.startswith('gametest/') and re.match(r'Termit|Tree', name):
         return 'savanna'
+    if path.startswith('gametest/') and re.match(r'Harvester', name):
+        return 'desert'
     if name in DESERT:
         return 'desert'
     return 'framework'
@@ -82,8 +90,39 @@ def names_used(text):
     return set(WORD.findall(text))
 
 
+def registered(base, files):
+    """The names a side's registry files sign up ('seed_pile'), read from their register calls."""
+    found = set()
+    for name in files:
+        text = open(os.path.join(base, 'registry', name + '.java'), encoding='utf-8').read()
+        found |= set(re.findall(r'register\w*\(\s*"([a-z0-9_]+)"', text))
+    return found
+
+
+def data_report(base):
+    """Prints the data and asset files naming both sides' blocks, items or creatures."""
+    savanna = registered(base, ['SavannaBlocks', 'SavannaItems', 'SavannaEntities', 'TreeBlocks'])
+    desert = registered(base, ['DesertBlocks', 'DesertItems', 'DesertEntities'])
+    mixed = 0
+    for top in ('src/main/resources/data', 'src/main/resources/assets'):
+        for folder, _, names in os.walk(os.path.join(ROOT, top)):
+            for name in sorted(names):
+                if not name.endswith('.json'):
+                    continue
+                path = os.path.join(folder, name)
+                ids = set(re.findall(r'antcolonies[:.]([a-z0-9_]+)', open(path, encoding='utf-8').read()))
+                if ids & savanna and ids & desert:
+                    mixed += 1
+                    print(f'both      {os.path.relpath(path, ROOT).replace(os.sep, "/")}: '
+                          f'savanna {", ".join(sorted(ids & savanna)[:4])}...; desert {", ".join(sorted(ids & desert)[:4])}...')
+    print(f'{mixed} data files name both sides (split by their entries when the mods part, step S6)')
+    return 0
+
+
 def main():
     files, base = java_files()
+    if '--data' in sys.argv:
+        return data_report(base)
     sides = {name: side_of(name, path) for name, path in files.items()}
     if '--sides' in sys.argv:
         for name in sorted(files, key=lambda n: (sides[n], files[n])):

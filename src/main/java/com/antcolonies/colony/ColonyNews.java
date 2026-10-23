@@ -126,6 +126,13 @@ public final class ColonyNews {
     public record BlockDug(BlockPos where) {
     }
 
+    /**
+     * The split, step S3: a food plant ({@code eaten}, as it was) was eaten right down or cut away at {@code where}, at
+     * {@code eatenAt} (the numbers may have eaten it while its land was not loaded): grass that grows back is remembered.
+     */
+    public record PlantEaten(BlockPos where, net.minecraft.world.level.block.state.BlockState eaten, long eatenAt) {
+    }
+
     public static final Kind<IntoNumbers> INTO_NUMBERS = Kind.of("into_numbers");
     public static final Kind<OutOfNumbers> OUT_OF_NUMBERS = Kind.of("out_of_numbers");
     public static final Kind<PieceTaken> PIECE_TAKEN = Kind.of("piece_taken");
@@ -135,6 +142,7 @@ public final class ColonyNews {
     public static final Kind<NumbersForaged> NUMBERS_FORAGED = Kind.of("numbers_foraged");
     public static final Kind<ForagerNumbers> FORAGER_NUMBERS = Kind.of("forager_numbers");
     public static final Kind<BlockDug> BLOCK_DUG = Kind.of("block_dug");
+    public static final Kind<PlantEaten> PLANT_EATEN = Kind.of("plant_eaten");
 
     // Step 9a: the shared goals', the ant body's and the event file's tellings to a species part.
 

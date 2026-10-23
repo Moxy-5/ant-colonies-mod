@@ -2,7 +2,7 @@ package com.antcolonies.entity;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
-import com.antcolonies.colony.ColonyParts;
+import com.antcolonies.colony.SavannaParts;
 import com.antcolonies.colony.KingCare;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.entity.goal.DigGoal;
@@ -43,7 +43,7 @@ public class TermiteKingEntity extends AbstractAntEntity implements FedByNurses 
     }
 
     @Override
-    protected net.minecraft.resources.ResourceLocation species() {
+    public net.minecraft.resources.ResourceLocation species() {
         return Species.MACROTERMES;
     }
 
@@ -82,28 +82,28 @@ public class TermiteKingEntity extends AbstractAntEntity implements FedByNurses 
     @Override
     public boolean wantsFood() {
         Colony colony = colony();
-        return colony != null && level() instanceof ServerLevel serverLevel && colony.part(ColonyParts.KING_CARE).map(care -> care.wantsFood(serverLevel)).orElse(false);
+        return colony != null && level() instanceof ServerLevel serverLevel && colony.part(SavannaParts.KING_CARE).map(care -> care.wantsFood(serverLevel)).orElse(false);
     }
 
     @Override
     public void takeFood() {
         Colony colony = colony();
         if (colony != null && level() instanceof ServerLevel serverLevel) {
-            colony.part(ColonyParts.KING_CARE).ifPresent(care -> care.fed(serverLevel));
+            colony.part(SavannaParts.KING_CARE).ifPresent(care -> care.fed(serverLevel));
         }
     }
 
     /** The game time of his last meal (kept by his colony's brain; {@link Colony#NOT_SET} without a colony). */
     public long getLastFed() {
         Colony colony = colony();
-        return colony == null ? Colony.NOT_SET : colony.part(ColonyParts.KING_CARE).map(KingCare::getLastFed).orElse(Colony.NOT_SET);
+        return colony == null ? Colony.NOT_SET : colony.part(SavannaParts.KING_CARE).map(KingCare::getLastFed).orElse(Colony.NOT_SET);
     }
 
     /** For the tests: pretend his last meal was at this game time. */
     public void setLastFed(long gameTime) {
         Colony colony = colony();
         if (colony != null) {
-            colony.part(ColonyParts.KING_CARE).ifPresent(care -> care.setLastFed(gameTime));
+            colony.part(SavannaParts.KING_CARE).ifPresent(care -> care.setLastFed(gameTime));
         }
     }
 
@@ -130,7 +130,7 @@ public class TermiteKingEntity extends AbstractAntEntity implements FedByNurses 
         super.tick();
         if (tickCount % 20 == 0 && level() instanceof ServerLevel serverLevel) {
             Colony colony = colony();
-            if (colony != null && colony.part(ColonyParts.KING_CARE).map(care -> care.starves(serverLevel)).orElse(false)) {
+            if (colony != null && colony.part(SavannaParts.KING_CARE).map(care -> care.starves(serverLevel)).orElse(false)) {
                 hurt(damageSources().starve(), 1000.0F); // unfed for days (here, or while the colony was away): he dies
                 return;
             }
@@ -159,7 +159,7 @@ public class TermiteKingEntity extends AbstractAntEntity implements FedByNurses 
         if (colony != null) {
             setColonyId(colony.getId());
             colony.setCount(CASTE, 1);
-            colony.part(ColonyParts.KING_CARE).ifPresent(care -> care.joined(serverLevel));
+            colony.part(SavannaParts.KING_CARE).ifPresent(care -> care.joined(serverLevel));
             manager.markChanged();
         }
     }

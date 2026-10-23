@@ -329,7 +329,7 @@ public class ForagerSpots {
         spots.put(ant, new Spot(where.immutable(), empties));
     }
 
-    /** Tests only: a sample in every saved number (the save and load check, {@code AwayTests.everyPartSavesAndLoads}). */
+    /** Tests only: a sample in every saved number (the save and load check, {@code AwayKit.everyPartSavesAndLoads}). */
     public void fillForTests(net.minecraft.server.level.ServerLevel level) {
         spots.put(new UUID(4, 4), new Spot(new BlockPos(7, 60, 7), 1));
         leads.put(new UUID(5, 5), new Lead(0.75));

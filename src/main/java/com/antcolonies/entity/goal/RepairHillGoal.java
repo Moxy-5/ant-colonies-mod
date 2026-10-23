@@ -6,11 +6,11 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
-import com.antcolonies.colony.ColonyParts;
+import com.antcolonies.colony.DesertParts;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.colony.Hill;
 import com.antcolonies.entity.AbstractAntEntity;
-import com.antcolonies.registry.ModBlocks;
+import com.antcolonies.registry.DesertBlocks;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.BlockParticleOption;
@@ -61,7 +61,7 @@ public class RepairHillGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        Hill hill = colony == null ? null : colony.part(ColonyParts.HILL).orElse(null);
+        Hill hill = colony == null ? null : colony.part(DesertParts.HILL).orElse(null);
         if (hill == null || !hill.needsHillRepair(level)) {
             return false;
         }
@@ -116,7 +116,7 @@ public class RepairHillGoal extends Goal {
                     spot.x, spot.y, spot.z, 4, 0.2, 0.2, 0.2, 0.05);
         }
         if (scraped >= SCRAPE_TICKS) {
-            ant.setCarriedBlock(ModBlocks.BURROWED_DIRT.get().defaultBlockState());
+            ant.setCarriedBlock(DesertBlocks.BURROWED_DIRT.get().defaultBlockState());
         }
     }
 }

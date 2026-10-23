@@ -53,7 +53,7 @@ public class TermiteQueenEntity extends AbstractAntEntity implements SwellingQue
     }
 
     @Override
-    protected net.minecraft.resources.ResourceLocation species() {
+    public net.minecraft.resources.ResourceLocation species() {
         return Species.MACROTERMES;
     }
 

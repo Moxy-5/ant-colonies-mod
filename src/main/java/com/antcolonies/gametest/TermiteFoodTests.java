@@ -8,6 +8,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import com.antcolonies.colony.Caste;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.block.DeadWoodBlock;
 import com.antcolonies.block.DryGrassBlock;
@@ -15,20 +16,19 @@ import com.antcolonies.block.FallenBranchBlock;
 import com.antcolonies.block.FungusCombBlock;
 import com.antcolonies.block.SeedPileBlock;
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.ColonyParts;
+import com.antcolonies.colony.SavannaParts;
 import com.antcolonies.colony.NestPlan;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.AntEggEntity;
 import com.antcolonies.entity.AntLarvaEntity;
 import com.antcolonies.entity.TermiteQueenEntity;
-import com.antcolonies.entity.WorkerAntEntity;
-import com.antcolonies.registry.ModBlocks;
-import com.antcolonies.registry.ModEntities;
 import com.antcolonies.species.Species;
 import com.antcolonies.species.SpeciesProfile;
 import com.antcolonies.species.SpeciesProfiles;
 import com.antcolonies.worldgen.FallenBranchFeature;
 import com.antcolonies.worldgen.FallenTreeFeature;
+import com.antcolonies.registry.SavannaBlocks;
+import com.antcolonies.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
@@ -72,13 +72,13 @@ public class TermiteFoodTests {
     public static void termitesGatherDeadPlantsIntoTheirFungusGardenAndRaiseTheQueensEggsOnIt(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
-        TermiteMoundTests.deepGround(helper);
+        TestScenes.deepGround(helper);
         StuckWatcher.watch(helper, () -> TermiteMoundTests.colony(helper)); // the termites-underground safety net (2026-10-17)
-        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
         helper.runAfterDelay(5, () -> {
-            helper.spawn(ModEntities.TERMITE_KING.get(), MIDDLE + 2, SURFACE, MIDDLE + 1);
+            helper.spawn(SavannaEntities.TERMITE_KING.get(), MIDDLE + 2, SURFACE, MIDDLE + 1);
             for (int i = 0; i < 6; i++) {
-                helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE - 2 + i % 3, SURFACE, MIDDLE - 2 + i / 3);
+                helper.spawn(SavannaEntities.TERMITE_WORKER.get(), MIDDLE - 2 + i % 3, SURFACE, MIDDLE - 2 + i / 3);
             }
         });
         // The plants, a few blocks out from the mound, and the items on the ground.
@@ -89,9 +89,9 @@ public class TermiteFoodTests {
         BlockPos hay = new BlockPos(MIDDLE + 6, SURFACE, MIDDLE - 6);
         BlockPos greenGrass = new BlockPos(MIDDLE + 7, SURFACE, MIDDLE + 3);
         helper.setBlock(bush, Blocks.DEAD_BUSH);
-        DoublePlantBlock.placeAt(level, ModBlocks.TALL_DRY_GRASS.get().defaultBlockState(), helper.absolutePos(tallGrass), 3);
-        helper.setBlock(grassA, ModBlocks.DRY_GRASS.get());
-        helper.setBlock(grassB, ModBlocks.DRY_GRASS.get());
+        DoublePlantBlock.placeAt(level, SavannaBlocks.TALL_DRY_GRASS.get().defaultBlockState(), helper.absolutePos(tallGrass), 3);
+        helper.setBlock(grassA, SavannaBlocks.DRY_GRASS.get());
+        helper.setBlock(grassB, SavannaBlocks.DRY_GRASS.get());
         helper.setBlock(hay, Blocks.HAY_BLOCK);
         helper.setBlock(greenGrass, Blocks.SHORT_GRASS);
         List<ItemEntity> items = new ArrayList<>();
@@ -118,7 +118,7 @@ public class TermiteFoodTests {
             Colony c = colony[0];
             if (c != null && !c.isFounding()) {
                 if (helper.getTick() > 20 && firstWorkers[0] < 0) {
-                    firstWorkers[0] = c.getCount(WorkerAntEntity.CASTE);
+                    firstWorkers[0] = c.getCount(Caste.WORKER);
                 }
                 // Once she lies in her room she is full grown, so she lays fast.
                 if (c.getQueen(level) instanceof TermiteQueenEntity queen && queen.getSize() < 1.0F && c.queenCare().isQueenHome(level)) {
@@ -128,7 +128,7 @@ public class TermiteFoodTests {
                 for (Entity young : youngOf(level, helper, c)) {
                     BlockPos cell = young.blockPosition();
                     BlockState state = level.getBlockState(cell);
-                    if (state.is(ModBlocks.FUNGUS_COMB.get())) {
+                    if (state.is(SavannaBlocks.FUNGUS_COMB.get())) {
                         double top = cell.getY() + FungusCombBlock.topOf(state);
                         helper.assertTrue(young.getY() >= top - 0.01, young.getType().toShortString() + " lies inside the comb at " + cell.toShortString()
                                 + " (y " + young.getY() + ", comb top " + top + ")");
@@ -142,7 +142,7 @@ public class TermiteFoodTests {
                 AntColoniesMod.LOGGER.info("[forage-test] tick {}: food {}, store cells {}, hay cut {}, bush cut {}, dig target {}{}{}", helper.getTick(),
                         colony[0].food().getFood(), colony[0].nest().getFoodStoreCells(level).size(),
                         colony[0].food().getPiecesCut(helper.absolutePos(hay)), colony[0].food().getPiecesCut(helper.absolutePos(bush)),
-                        colony[0].nest().findDigTarget(level), colony[0].part(ColonyParts.ALARM).orElseThrow().describe(level), colony[0].foodMap().describe());
+                        colony[0].nest().findDigTarget(level), colony[0].part(SavannaParts.ALARM).orElseThrow().describe(level), colony[0].foodMap().describe());
             }
         });
 
@@ -162,8 +162,8 @@ public class TermiteFoodTests {
             helper.assertTrue(sapling.isAlive(), "the termites took the sapling");
             // Every piece cut so far is somewhere: in the store, in a termite's mandibles, or dropped on the ground.
             BlockPos hayAt = helper.absolutePos(hay);
-            int small = c.food().piecesOf(Blocks.DEAD_BUSH.defaultBlockState()) + c.food().piecesOf(ModBlocks.TALL_DRY_GRASS.get().defaultBlockState())
-                    + 2 * c.food().piecesOf(ModBlocks.DRY_GRASS.get().defaultBlockState()) + stacks.length;
+            int small = c.food().piecesOf(Blocks.DEAD_BUSH.defaultBlockState()) + c.food().piecesOf(SavannaBlocks.TALL_DRY_GRASS.get().defaultBlockState())
+                    + 2 * c.food().piecesOf(SavannaBlocks.DRY_GRASS.get().defaultBlockState()) + stacks.length;
             int hayCut = level.getBlockState(hayAt).is(Blocks.HAY_BLOCK) ? c.food().getPiecesCut(hayAt)
                     : c.food().piecesOf(Blocks.HAY_BLOCK.defaultBlockState());
             // (Only this colony's termites and food items: the tests next door have ants and seeds of their own.)
@@ -183,11 +183,11 @@ public class TermiteFoodTests {
             // leaves the store when a worker eats old comb or an old layer crumbles away.)
             int stored = c.food().getFood();
             int eaten = c.food().getSeedsEaten();
-            int crumbled = c.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().getLayersCrumbled();
+            int crumbled = c.part(SavannaParts.FUNGUS_GARDEN).orElseThrow().getLayersCrumbled();
             helper.assertTrue(stored + eaten + crumbled + carried + lying == small + hayCut, "stored " + stored + " + eaten " + eaten
                     + " + crumbled " + crumbled + " + carried " + carried + " + lying " + lying + " is not the " + small + " small pieces + "
-                    + hayCut + " cut off the hay bale (nodules grown " + c.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().getNodulesGrown() + ")");
-            helper.assertTrue(c.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().getNodulesGrown() > 0, "no nodules grew on the comb");
+                    + hayCut + " cut off the hay bale (nodules grown " + c.part(SavannaParts.FUNGUS_GARDEN).orElseThrow().getNodulesGrown() + ")");
+            helper.assertTrue(c.part(SavannaParts.FUNGUS_GARDEN).orElseThrow().getNodulesGrown() > 0, "no nodules grew on the comb");
             // The comb lies in the garden rooms round the royal chamber; no side room, no forage or seed heaps.
             helper.assertTrue(c.nest().getSideRooms(level).isEmpty(), "termites planned a side room");
             helper.assertTrue(c.nest().getPlannedChambers(level).get(0).kind() == NestPlan.Kind.QUEEN, "the nest plan is not the royal chamber");
@@ -196,16 +196,18 @@ public class TermiteFoodTests {
             int layers = 0;
             for (BlockPos pos : BlockPos.betweenClosed(helper.absolutePos(new BlockPos(0, 0, 0)), helper.absolutePos(new BlockPos(24, SURFACE + 2, 24)))) {
                 BlockState state = level.getBlockState(pos);
-                if (state.is(ModBlocks.FUNGUS_COMB.get())) {
+                if (state.is(SavannaBlocks.FUNGUS_COMB.get())) {
                     helper.assertTrue(gardens.contains(pos.immutable()), "fungus comb lies outside the garden rooms at " + pos.toShortString());
                     layers += state.getValue(SeedPileBlock.LAYERS);
                 } else {
-                    helper.assertTrue(!state.is(ModBlocks.SEED_PILE.get()) && !state.is(ModBlocks.FORAGE_PILE.get()), "termites made a seed or forage heap");
+                    // (the seed heap by its name, the harvester ant's block since the split, step S4)
+                    helper.assertTrue(!net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(state.getBlock()).equals(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(AntColoniesMod.MODID, "seed_pile"))
+                            && !state.is(SavannaBlocks.FORAGE_PILE.get()), "termites made a seed or forage heap");
                 }
             }
             helper.assertTrue(layers == stored, "the comb holds " + layers + " pieces, the colony counts " + stored);
             // The garden at work.
-            helper.assertTrue(c.part(ColonyParts.FUNGUS_GARDEN).orElseThrow().getNodulesGrown() > 0, "no nodule has grown yet");
+            helper.assertTrue(c.part(SavannaParts.FUNGUS_GARDEN).orElseThrow().getNodulesGrown() > 0, "no nodule has grown yet");
             helper.assertTrue(c.queenCare().getEggsLaid() > 0, "the queen has laid no egg yet (she holds " + c.queenCare().getQueenBread() + " nodules)");
             helper.assertTrue(sawEggOnComb[0], "no egg was laid on the comb yet");
             Set<BlockPos> gardenCells = new HashSet<>(c.nest().getGardenCells(level));
@@ -213,8 +215,8 @@ public class TermiteFoodTests {
                 helper.assertTrue(!egg.isPlaced() || gardenCells.contains(egg.blockPosition()), "an egg was put down outside the gardens at "
                         + egg.blockPosition().toShortString());
             }
-            helper.assertTrue(firstWorkers[0] >= 0 && c.getCount(WorkerAntEntity.CASTE) > firstWorkers[0], "no nymph has grown into a worker yet (workers "
-                    + c.getCount(WorkerAntEntity.CASTE) + ", nymphs " + c.brood().countLarvae(level) + ", eggs " + c.brood().countEggs(level) + ")");
+            helper.assertTrue(firstWorkers[0] >= 0 && c.getCount(Caste.WORKER) > firstWorkers[0], "no nymph has grown into a worker yet (workers "
+                    + c.getCount(Caste.WORKER) + ", nymphs " + c.brood().countLarvae(level) + ", eggs " + c.brood().countEggs(level) + ")");
         });
     }
 
@@ -248,11 +250,11 @@ public class TermiteFoodTests {
     public static void aWorkerFindsAHayBaleAndTheForagersGoForItRatherThanTheGrass(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
-        TermiteMoundTests.deepGround(helper);
-        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        TestScenes.deepGround(helper);
+        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
         helper.runAfterDelay(5, () -> {
             for (int i = 0; i < 5; i++) {
-                helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE - 2 + i, SURFACE, MIDDLE - 2);
+                helper.spawn(SavannaEntities.TERMITE_WORKER.get(), MIDDLE - 2 + i, SURFACE, MIDDLE - 2);
             }
         });
         BlockPos[] spots = new BlockPos[3]; // the hay, the grass by the first hole, the grass by the second
@@ -277,7 +279,7 @@ public class TermiteFoodTests {
                 level.setBlock(tunnel.hole(), Blocks.AIR.defaultBlockState(), 3);
                 // A tuft of grass right beside the hole, on the side away from the hay.
                 spots[1 + i] = tunnel.hole().above().relative(toHay.getOpposite(), 2);
-                level.setBlock(spots[1 + i], ModBlocks.DRY_GRASS.get().defaultBlockState(), 3);
+                level.setBlock(spots[1 + i], SavannaBlocks.DRY_GRASS.get().defaultBlockState(), 3);
             }
             spots[0] = tunnels.get(0).hole().above().relative(toHay, 11);
             level.setBlock(spots[0], Blocks.HAY_BLOCK.defaultBlockState(), 3);
@@ -288,7 +290,7 @@ public class TermiteFoodTests {
                     "the colony knew of the hay before anyone went near it");
             // (Put down now, while the holes are still open: by day they are plugged once everybody is in.)
             BlockPos beside = spots[0].relative(tunnels.get(0).side().getOpposite(), 2); // (toward the middle: over the ground)
-            finder[0] = ModEntities.TERMITE_WORKER.get().create(level);
+            finder[0] = SavannaEntities.TERMITE_WORKER.get().create(level);
             finder[0].moveTo(beside.getX() + 0.5, beside.getY(), beside.getZ() + 0.5, 0.0F, 0.0F);
             finder[0].joinColony(colony); // (on its own it joins the nearest colony, which can be a neighbouring test's)
             level.addFreshEntity(finder[0]);
@@ -308,7 +310,7 @@ public class TermiteFoodTests {
                     AntColoniesMod.LOGGER.info("[find-test] tick {}: finder alive {} at {} (inside {}, colony ours {}, last hurt by {}), found {}, holes {}{}",
                             helper.getTick(), f.isAlive(), f.blockPosition().toShortString(), colony.nest().isInside(level, f.blockPosition()),
                             colony.getId().equals(f.getColonyId()), f.getLastHurtByMob(), colony.foodMap().isFoundButUntold(spots[0]),
-                            colony.foragingHoles().waysOut(level).size(), colony.part(ColonyParts.ALARM).orElseThrow().describe(level));
+                            colony.foragingHoles().waysOut(level).size(), colony.part(SavannaParts.ALARM).orElseThrow().describe(level));
                 }
                 // Brain part 3: the brain never remembers food nobody has found and told of.
                 helper.assertTrue(colony.foodMap().isKnown(spots[0]) || !colony.field().remembers(spots[0]),
@@ -372,8 +374,8 @@ public class TermiteFoodTests {
 
     /** How many pieces were cut off the tuft at this spot (all of them if it is gone). */
     private static int grassCut(ServerLevel level, Colony colony, BlockPos tuft) {
-        return level.getBlockState(tuft).is(ModBlocks.DRY_GRASS.get()) ? colony.food().getPiecesCut(tuft)
-                : colony.food().piecesOf(ModBlocks.DRY_GRASS.get().defaultBlockState());
+        return level.getBlockState(tuft).is(SavannaBlocks.DRY_GRASS.get()) ? colony.food().getPiecesCut(tuft)
+                : colony.food().piecesOf(SavannaBlocks.DRY_GRASS.get().defaultBlockState());
     }
 
     /**
@@ -385,15 +387,15 @@ public class TermiteFoodTests {
     @GameTest(template = "arena", timeoutTicks = 200, skyAccess = true)
     public static void aFallenBranchIsEatenInStagesAndAcaciasShedThem(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        TermiteMoundTests.deepGround(helper);
-        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        TestScenes.deepGround(helper);
+        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
         helper.runAfterDelay(5, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null, "no termite colony");
             BlockPos start = helper.absolutePos(new BlockPos(MIDDLE + 6, SURFACE, MIDDLE - 6));
             helper.assertTrue(FallenBranchFeature.placeBranch(level, start, level.getRandom(), 3), "no branch fitted");
             BlockState base = level.getBlockState(start);
-            helper.assertTrue(base.is(ModBlocks.FALLEN_BRANCH.get()) && base.getValue(FallenBranchBlock.PART) == FallenBranchBlock.Part.BASE,
+            helper.assertTrue(base.is(SavannaBlocks.FALLEN_BRANCH.get()) && base.getValue(FallenBranchBlock.PART) == FallenBranchBlock.Part.BASE,
                     "the branch does not start with its thick end: " + base);
             int pieces = colony.food().piecesOf(base);
             helper.assertTrue(pieces == 8, "a branch block is worth " + pieces + " pieces");
@@ -416,7 +418,7 @@ public class TermiteFoodTests {
 
             // A block gnawed half away by someone else counts as half eaten.
             BlockPos half = helper.absolutePos(new BlockPos(MIDDLE - 6, SURFACE, MIDDLE + 6));
-            level.setBlock(half, ModBlocks.FALLEN_BRANCH.get().defaultBlockState().setValue(FallenBranchBlock.EATEN, 2), 3);
+            level.setBlock(half, SavannaBlocks.FALLEN_BRANCH.get().defaultBlockState().setValue(FallenBranchBlock.EATEN, 2), 3);
             colony.food().clippedGrass(level, half, ant);
             helper.assertTrue(colony.food().getPiecesCut(half) == pieces / 2 + 1, "a half-eaten branch counts "
                     + colony.food().getPiecesCut(half) + " pieces cut after one more");
@@ -435,7 +437,7 @@ public class TermiteFoodTests {
     private static void giantTreesDeadWood(GameTestHelper helper, Colony colony) {
         ServerLevel level = helper.getLevel();
         BlockPos shaded = helper.absolutePos(new BlockPos(MIDDLE + 6, SURFACE, MIDDLE + 6));
-        level.setBlock(shaded, ModBlocks.FALLEN_BRANCH.get().defaultBlockState(), 3);
+        level.setBlock(shaded, SavannaBlocks.FALLEN_BRANCH.get().defaultBlockState(), 3);
         for (int dx = -2; dx <= 2; dx++) {
             for (int dz = -2; dz <= 2; dz++) {
                 level.setBlock(shaded.offset(dx, 5, dz), com.antcolonies.registry.TreeBlocks.UMBRELLA_THORN.leaves().get().defaultBlockState(), 3);
@@ -450,7 +452,7 @@ public class TermiteFoodTests {
         helper.assertTrue(plants.contains(shaded), "a fallen branch under a crown of leaves is not seen as food");
         helper.assertTrue(plants.contains(snag), "a dead trunk 9 tall is not seen at its foot");
         BlockState log = com.antcolonies.registry.TreeBlocks.BLEACHED_LOG.get().defaultBlockState();
-        int logPieces = colony.food().piecesOf(log), deadWood = colony.food().piecesOf(ModBlocks.DEAD_WOOD.get().defaultBlockState());
+        int logPieces = colony.food().piecesOf(log), deadWood = colony.food().piecesOf(SavannaBlocks.DEAD_WOOD.get().defaultBlockState());
         int rot = colony.food().piecesOf(com.antcolonies.registry.TreeBlocks.ROTTEN_WOOD.get().defaultBlockState());
         helper.assertTrue(logPieces == deadWood && colony.food().piecesOf(com.antcolonies.registry.TreeBlocks.BLEACHED_WOOD.get().defaultBlockState()) == deadWood
                 && rot > 0 && rot < logPieces && colony.food().piecesOf(com.antcolonies.registry.TreeBlocks.BLEACHED_BRANCH.get().defaultBlockState()) > 0,
@@ -481,15 +483,15 @@ public class TermiteFoodTests {
     @GameTest(template = "arena", skyAccess = true)
     public static void mudCastsAndCrustsCrumbleOnceTheWoodIsGone(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        TermiteMoundTests.deepGround(helper);
+        TestScenes.deepGround(helper);
         BlockPos first = helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE));
         BlockPos second = first.east();
         BlockPos wood = second.east();
-        BlockState cast = ModBlocks.MUD_CAST.get().defaultBlockState();
+        BlockState cast = SavannaBlocks.MUD_CAST.get().defaultBlockState();
         level.setBlock(first, cast, 3);
         level.setBlock(second, cast, 3);
-        level.setBlock(wood, ModBlocks.DEAD_WOOD.get().defaultBlockState(), 3);
-        level.setBlock(wood.above(), ModBlocks.MUD_CRUST.get().withFace(Blocks.AIR.defaultBlockState(), net.minecraft.core.Direction.DOWN), 3);
+        level.setBlock(wood, SavannaBlocks.DEAD_WOOD.get().defaultBlockState(), 3);
+        level.setBlock(wood.above(), SavannaBlocks.MUD_CRUST.get().withFace(Blocks.AIR.defaultBlockState(), net.minecraft.core.Direction.DOWN), 3);
         helper.assertTrue(level.getBlockState(first).getValue(com.antcolonies.block.TermiteTunnelBlock.OPEN.get(net.minecraft.core.Direction.EAST)),
                 "two casts side by side do not join up: " + level.getBlockState(first));
         RandomSource random = RandomSource.create(1);
@@ -526,11 +528,11 @@ public class TermiteFoodTests {
     @GameTest(template = "arena", skyAccess = true)
     public static void aPlateOfMudIsNeverPutDownOnATermite(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        TermiteMoundTests.deepGround(helper);
-        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        TestScenes.deepGround(helper);
+        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
         helper.runAfterDelay(5, () -> {
-            helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE + 4, SURFACE, MIDDLE);
-            helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE - 4, SURFACE, MIDDLE);
+            helper.spawn(SavannaEntities.TERMITE_WORKER.get(), MIDDLE + 4, SURFACE, MIDDLE);
+            helper.spawn(SavannaEntities.TERMITE_WORKER.get(), MIDDLE - 4, SURFACE, MIDDLE);
         });
         helper.runAfterDelay(15, () -> {
             com.antcolonies.colony.Colony colony = TermiteMoundTests.colony(helper);
@@ -551,7 +553,7 @@ public class TermiteFoodTests {
             com.antcolonies.entity.TermiteWorkerEntity second = workers.get(1);
             BlockPos caught = second.blockPosition();
             second.moveTo(caught.getX() + 0.5, caught.getY(), caught.getZ() + 0.5);
-            level.setBlock(caught, ModBlocks.MUD_CRUST.get().withFace(Blocks.AIR.defaultBlockState(), net.minecraft.core.Direction.SOUTH), 3);
+            level.setBlock(caught, SavannaBlocks.MUD_CRUST.get().withFace(Blocks.AIR.defaultBlockState(), net.minecraft.core.Direction.SOUTH), 3);
             helper.assertTrue(second.getNavigator().moveTo(caught.north(4), 1.0), "a termite inside a plate's block found no route out");
             helper.succeed();
         });
@@ -564,26 +566,26 @@ public class TermiteFoodTests {
     @GameTest(template = "arena", skyAccess = true)
     public static void aFallenTreeLiesBesideItsStumpAndIsTermiteFood(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        TermiteMoundTests.deepGround(helper);
+        TestScenes.deepGround(helper);
         BlockPos stump = helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE));
         helper.assertTrue(FallenTreeFeature.placeTree(level, stump, level.getRandom(), 3), "no fallen tree fitted on flat ground");
         BlockState stumpState = level.getBlockState(stump);
-        helper.assertTrue(stumpState.is(ModBlocks.DEAD_WOOD.get())
+        helper.assertTrue(stumpState.is(SavannaBlocks.DEAD_WOOD.get())
                 && stumpState.getValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS) == net.minecraft.core.Direction.Axis.Y,
                 "no upright stump: " + stumpState);
         int lying = 0;
         for (BlockPos pos : BlockPos.betweenClosed(stump.offset(-8, 0, -8), stump.offset(8, 0, 8))) {
             BlockState state = level.getBlockState(pos);
-            if (state.is(ModBlocks.DEAD_WOOD.get()) && state.getValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS).isHorizontal()) {
+            if (state.is(SavannaBlocks.DEAD_WOOD.get()) && state.getValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS).isHorizontal()) {
                 lying++;
             }
         }
         helper.assertTrue(lying >= FallenTreeFeature.MIN_LENGTH && lying <= FallenTreeFeature.MAX_LENGTH, "the trunk is " + lying + " blocks long");
         SpeciesProfile.FoodNumbers food = SpeciesProfiles.get(Species.MACROTERMES).food();
-        SpeciesProfile.PlantFood wood = food.plantFor(ModBlocks.DEAD_WOOD.get().defaultBlockState());
-        helper.assertTrue(wood != null && wood.pieces() > food.plantFor(ModBlocks.FALLEN_BRANCH.get().defaultBlockState()).pieces()
+        SpeciesProfile.PlantFood wood = food.plantFor(SavannaBlocks.DEAD_WOOD.get().defaultBlockState());
+        helper.assertTrue(wood != null && wood.pieces() > food.plantFor(SavannaBlocks.FALLEN_BRANCH.get().defaultBlockState()).pieces()
                 && wood.foragers() > 1, "dead wood is not a big termite food");
-        BlockState eaten = ModBlocks.DEAD_WOOD.get().eatenTo(stumpState, wood.pieces() - 1, wood.pieces());
+        BlockState eaten = SavannaBlocks.DEAD_WOOD.get().eatenTo(stumpState, wood.pieces() - 1, wood.pieces());
         helper.assertTrue(eaten.getValue(DeadWoodBlock.EATEN) == DeadWoodBlock.MAX_EATEN, "nearly eaten dead wood is at stage " + eaten);
         helper.succeed();
     }
@@ -596,16 +598,16 @@ public class TermiteFoodTests {
     @GameTest(template = "arena", timeoutTicks = 300)
     public static void aTermiteKilledByAPlayerLeavesABody(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        TermiteMoundTests.deepGround(helper);
-        helper.spawn(ModEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        TestScenes.deepGround(helper);
+        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
         com.antcolonies.entity.TermiteWorkerEntity[] worker = {null};
         com.antcolonies.entity.TermiteSoldierEntity[] minor = {null};
         com.antcolonies.entity.TermiteWorkerEntity[] loner = {null};
         java.util.UUID[] colonyId = {null};
         helper.runAfterDelay(5, () -> {
-            worker[0] = helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE + 5, SURFACE, MIDDLE);
-            minor[0] = helper.spawn(ModEntities.TERMITE_MINOR_SOLDIER.get(), MIDDLE - 5, SURFACE, MIDDLE);
-            loner[0] = helper.spawn(ModEntities.TERMITE_WORKER.get(), MIDDLE, SURFACE, MIDDLE + 5);
+            worker[0] = helper.spawn(SavannaEntities.TERMITE_WORKER.get(), MIDDLE + 5, SURFACE, MIDDLE);
+            minor[0] = helper.spawn(SavannaEntities.TERMITE_MINOR_SOLDIER.get(), MIDDLE - 5, SURFACE, MIDDLE);
+            loner[0] = helper.spawn(SavannaEntities.TERMITE_WORKER.get(), MIDDLE, SURFACE, MIDDLE + 5);
             loner[0].keepOutOfColonies(); // a worker of no colony leaves a body too
         });
         helper.runAfterDelay(30, () -> {
@@ -622,7 +624,7 @@ public class TermiteFoodTests {
             for (net.minecraft.world.entity.LivingEntity dead : List.<net.minecraft.world.entity.LivingEntity>of(worker[0], minor[0], loner[0])) {
                 helper.assertTrue(dead.isRemoved(), "the " + dead.getType().getDescription().getString() + " is not dead");
                 List<com.antcolonies.entity.AntCorpseEntity> bodies = level.getEntitiesOfClass(com.antcolonies.entity.AntCorpseEntity.class,
-                        new net.minecraft.world.phys.AABB(dead.blockPosition()).inflate(2), body -> body.getType() == ModEntities.TERMITE_CORPSE.get());
+                        new net.minecraft.world.phys.AABB(dead.blockPosition()).inflate(2), body -> body.getType() == SavannaEntities.TERMITE_CORPSE.get());
                 helper.assertTrue(!bodies.isEmpty(), "no termite body where the " + dead.getType().getDescription().getString() + " died");
             }
             // Brain step 4g: the colony remembers both deaths, by a player, as two dangerous places (10 blocks apart).
@@ -655,13 +657,13 @@ public class TermiteFoodTests {
         for (int x = MIDDLE - 1; x <= MIDDLE + 5; x++) {
             helper.setBlock(x, SURFACE - 1, MIDDLE, Blocks.GRASS_BLOCK); // grass grows on soil
         }
-        BlockState green = ModBlocks.DRY_GRASS.get().defaultBlockState().setValue(DryGrassBlock.GROWTH, DryGrassBlock.Growth.GREEN);
+        BlockState green = SavannaBlocks.DRY_GRASS.get().defaultBlockState().setValue(DryGrassBlock.GROWTH, DryGrassBlock.Growth.GREEN);
         BlockPos shortAt = new BlockPos(MIDDLE, SURFACE, MIDDLE);
         BlockPos tallAt = new BlockPos(MIDDLE + 2, SURFACE, MIDDLE);
         BlockPos bonemealAt = new BlockPos(MIDDLE + 4, SURFACE, MIDDLE);
         helper.setBlock(shortAt, green);
         helper.setBlock(bonemealAt, green);
-        DoublePlantBlock.placeAt(level, ModBlocks.TALL_DRY_GRASS.get().defaultBlockState().setValue(DryGrassBlock.GROWTH, DryGrassBlock.Growth.GREEN),
+        DoublePlantBlock.placeAt(level, SavannaBlocks.TALL_DRY_GRASS.get().defaultBlockState().setValue(DryGrassBlock.GROWTH, DryGrassBlock.Growth.GREEN),
                 helper.absolutePos(tallAt), 3);
 
         SpeciesProfile.FoodNumbers food = SpeciesProfiles.get(Species.MACROTERMES).food();
@@ -672,7 +674,7 @@ public class TermiteFoodTests {
         // Bone meal: the green tuft grows into a green tall plant.
         BlockPos bonemeal = helper.absolutePos(bonemealAt);
         helper.assertTrue(BoneMealItem.growCrop(new ItemStack(Items.BONE_MEAL), level, bonemeal), "bone meal did nothing");
-        helper.assertTrue(level.getBlockState(bonemeal).is(ModBlocks.TALL_DRY_GRASS.get())
+        helper.assertTrue(level.getBlockState(bonemeal).is(SavannaBlocks.TALL_DRY_GRASS.get())
                 && level.getBlockState(bonemeal).getValue(DryGrassBlock.GROWTH) == DryGrassBlock.Growth.GREEN
                 && level.getBlockState(bonemeal.above()).getValue(DryGrassBlock.GROWTH) == DryGrassBlock.Growth.GREEN,
                 "bone meal did not grow a green tall plant: " + level.getBlockState(bonemeal) + " / " + level.getBlockState(bonemeal.above()));
@@ -727,10 +729,10 @@ public class TermiteFoodTests {
                 helper.setBlock(x, SURFACE - 1, z, net.minecraft.world.level.block.Blocks.GRASS_BLOCK);
             }
         }
-        helper.spawn(ModEntities.TERMITE_QUEEN.get(), mid, SURFACE, mid);
+        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), mid, SURFACE, mid);
         helper.runAfterDelay(5, () -> {
             for (int i = 0; i < 8; i++) {
-                helper.spawn(ModEntities.TERMITE_WORKER.get(), mid - 2 + i % 4, SURFACE, mid - 3 - i / 4);
+                helper.spawn(SavannaEntities.TERMITE_WORKER.get(), mid - 2 + i % 4, SURFACE, mid - 3 - i / 4);
             }
         });
         TestClock.still(helper, 12); // midday: nobody goes out, so nothing is found by looking
@@ -747,7 +749,7 @@ public class TermiteFoodTests {
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
             long now = level.getGameTime();
             TermiteSoldierTests.digNestAtOnce(level, colony);
-            colony.population().addNewMembers(WorkerAntEntity.CASTE, now - colony.profile().worker().builderUntilTicks() - 1000, 500);
+            colony.population().addNewMembers(Caste.WORKER, now - colony.profile().worker().builderUntilTicks() - 1000, 500);
             com.antcolonies.colony.Galleries.of(colony).setSwitchForTests(true);
             stage[0] = 1;
         });

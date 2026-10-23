@@ -17,8 +17,8 @@ import com.antcolonies.nav.Foothold;
 import com.antcolonies.nav.LevelCellMap;
 import com.antcolonies.nav.Route;
 import com.antcolonies.nav.StepKind;
-import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.species.SpeciesProfile.MoundNumbers;
+import com.antcolonies.registry.SavannaBlocks;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -36,13 +36,13 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * Termites on the outside of a cathedral mound: they walk up and down its ramps like slopes (no climbing), climb its
  * spire pieces hugging the narrower column (never floating where a full block's face would be) and go round them, and
  * roam all over a whole mound put up at once without ever getting stuck. Every walk is watched for floating, hovering
- * and leaning ({@link NavigationTests#watch}).
+ * and leaning ({@link TestWatch#watch}).
  */
 @GameTestHolder(AntColoniesMod.MODID)
 @PrefixGameTestTemplate(false)
 public class TermiteClimbingTests {
     private static BlockState soil() {
-        return ModBlocks.TERMITE_MOUND.get().defaultBlockState().setValue(TermiteMoundBlock.LAYERS, TermiteMoundBlock.FINISHED)
+        return SavannaBlocks.TERMITE_MOUND.get().defaultBlockState().setValue(TermiteMoundBlock.LAYERS, TermiteMoundBlock.FINISHED)
                 .setValue(TermiteMoundBlock.AGE, 2);
     }
 
@@ -63,7 +63,7 @@ public class TermiteClimbingTests {
     @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
     public static void termitesWalkUpAndDownRampsWithoutClimbing(GameTestHelper helper) {
         floor(helper, 13, 7);
-        BlockState ramp = ModBlocks.TERMITE_RAMP.get().defaultBlockState().setValue(TermiteRampBlock.FACING, Direction.EAST)
+        BlockState ramp = SavannaBlocks.TERMITE_RAMP.get().defaultBlockState().setValue(TermiteRampBlock.FACING, Direction.EAST)
                 .setValue(MoundSoil.AGE, 2);
         for (int z = 1; z <= 5; z++) {
             for (int x = 5; x <= 10; x++) {
@@ -77,8 +77,8 @@ public class TermiteClimbingTests {
         }
         BlockPos start = new BlockPos(1, 1, 3);
         BlockPos top = new BlockPos(9, 4, 3);
-        TermiteWorkerEntity termite = TestAnts.loneTermite(helper, start.getX(), start.getY(), start.getZ());
-        NavigationTests.watch(helper, termite, false);
+        TermiteWorkerEntity termite = SavannaTests.loneTermite(helper, start.getX(), start.getY(), start.getZ());
+        TestWatch.watch(helper, termite, false);
         int[] phase = {0};
         boolean[] climbed = {false};
         helper.onEachTick(() -> {
@@ -124,11 +124,11 @@ public class TermiteClimbingTests {
         BlockPos column = new BlockPos(3, 1, 3);
         helper.setBlock(column, soil());
         for (int t = TermiteSpireBlock.BASE; t <= TermiteSpireBlock.TIP; t++) {
-            helper.setBlock(column.above(1 + t), ModBlocks.TERMITE_SPIRE.get().defaultBlockState()
+            helper.setBlock(column.above(1 + t), SavannaBlocks.TERMITE_SPIRE.get().defaultBlockState()
                     .setValue(TermiteSpireBlock.THICKNESS, t).setValue(MoundSoil.AGE, 2));
         }
-        TermiteWorkerEntity termite = TestAnts.loneTermite(helper, 1, 1, 3);
-        NavigationTests.watch(helper, termite, false);
+        TermiteWorkerEntity termite = SavannaTests.loneTermite(helper, 1, 1, 3);
+        TestWatch.watch(helper, termite, false);
         ServerLevel level = helper.getLevel();
         Foothold onThin = new Foothold(helper.absolutePos(new BlockPos(2, 5, 3)), Direction.EAST);
         Foothold roundTheSide = new Foothold(helper.absolutePos(new BlockPos(3, 4, 4)), Direction.NORTH);
@@ -203,8 +203,8 @@ public class TermiteClimbingTests {
         int[][] starts = {{1, 1}, {12, 1}, {23, 1}, {1, 12}, {23, 12}, {1, 23}, {12, 23}, {23, 23}};
         List<TermiteWorkerEntity> termites = new ArrayList<>();
         for (int[] s : starts) {
-            TermiteWorkerEntity termite = TestAnts.loneTermite(helper, s[0], 1, s[1]);
-            NavigationTests.watch(helper, termite, false);
+            TermiteWorkerEntity termite = SavannaTests.loneTermite(helper, s[0], 1, s[1]);
+            TestWatch.watch(helper, termite, false);
             termites.add(termite);
         }
         // Every place on the mound a termite could be sent, by kind.

@@ -182,7 +182,7 @@ public class Galleries implements ColonyHooks.Underground {
     /** The split, step S2: this colony's galleries, or null (its species lists none: {@code "galleries"} in its parts). */
     @Nullable
     public static Galleries of(Colony colony) {
-        return colony.part(ColonyParts.GALLERIES).orElse(null);
+        return colony.part(SavannaParts.GALLERIES).orElse(null);
     }
 
     /** Whether the switch is on for this colony (the species file's {@code nest.galleries.enabled}). */

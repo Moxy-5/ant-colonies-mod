@@ -73,7 +73,7 @@ public class PelletLayer<T extends AbstractAntEntity> extends BlockAndItemGeoLay
             poseStack.translate(0.0F, 0.0F, -3.0F / 16.0F);
             poseStack.scale(CORPSE_SIZE, CORPSE_SIZE, CORPSE_SIZE);
             AntCorpseRenderer.renderModel(corpseModel, poseStack, bufferSource, packedLight,
-                    ant instanceof com.antcolonies.entity.TermiteWorkerEntity ? AntCorpseRenderer.TERMITE_TEXTURE : AntCorpseRenderer.TEXTURE);
+                    com.antcolonies.species.SpeciesBodies.of(ant.species()).corpseLook()); // a nestmate: its own species' dead
         } else if (stack == EGG_MARKER) {
             // The egg model stands on its foot point and is 6 pixels tall: lay it along the ant and centre it.
             poseStack.scale(EGG_SIZE, EGG_SIZE, EGG_SIZE);

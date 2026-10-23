@@ -119,7 +119,7 @@ final class SearchingAlone implements ColonyHooks.NumbersSearch {
     private void searchOnce(ServerLevel level, FieldLife field, Map<BlockPos, FieldLife.Plant> known, SpeciesProfile.SearchNumbers search, int range) {
         BlockPos middle = colony.getCenter();
         var random = colony.random();
-        TrunkTrails trails = colony.part(ColonyParts.TRUNK_TRAILS).orElse(null);
+        TrunkTrails trails = colony.part(DesertParts.TRUNK_TRAILS).orElse(null);
         TrunkTrails.Trail trail = trails != null && trails.keepsTrails() && random.nextInt(5) != 0 ? trails.pickForSearch(level, random) : null;
         double angle;
         double near;
@@ -159,7 +159,7 @@ final class SearchingAlone implements ColonyHooks.NumbersSearch {
         if (best != null) {
             spots.addHeld(best, 1, 0);
             // A rich patch draws more of them out (recruiting, see Recruits), as many as are free to go.
-            Recruits recruits = colony.part(ColonyParts.RECRUITS).orElse(null);
+            Recruits recruits = colony.part(DesertParts.RECRUITS).orElse(null);
             int more = recruits == null ? 0 : recruits.numbersCalled(best, rememberedPatch(known, best));
             int free = field.foragersInside(level) - spots.holders();
             if (more > 0 && free > 0) {
@@ -174,7 +174,7 @@ final class SearchingAlone implements ColonyHooks.NumbersSearch {
 
     /** The food the colony remembers in the patch round {@code at}: the pieces left on remembered plants that count for recruiting. */
     private int rememberedPatch(Map<BlockPos, FieldLife.Plant> known, BlockPos at) {
-        SpeciesProfile.RecruitNumbers numbers = colony.part(ColonyParts.RECRUITS).flatMap(Recruits::settings).orElse(null);
+        SpeciesProfile.RecruitNumbers numbers = colony.part(DesertParts.RECRUITS).flatMap(Recruits::settings).orElse(null);
         if (numbers == null) {
             return 0;
         }

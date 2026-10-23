@@ -12,7 +12,6 @@ import org.jetbrains.annotations.Nullable;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.block.FacedWall;
 import com.antcolonies.block.SeedPileBlock;
-import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.registry.ModTags;
 
 import net.minecraft.core.BlockPos;
@@ -423,8 +422,9 @@ public class Nest {
      * Where the night soil may lie (see {@link NightSoil}): the floor of the top level's tunnel, and the founding chamber
      * (its tunnel and room) once the queen has moved down out of it, every cell dug out, empty or already loose soil, on a
      * solid floor and without brood. Nearest the shaft first. Nothing of the traffic's way is blocked: nothing collides with it.
+     * {@code pile} is the night soil's heap block (a cell it lies on already counts).
      */
-    public List<BlockPos> nightSoilCells(Level level) {
+    public List<BlockPos> nightSoilCells(Level level, net.minecraft.world.level.block.Block pile) {
         NestLayout layout = getLayout(level);
         if (layout == null) {
             return List.of();
@@ -445,7 +445,7 @@ public class Nest {
                 return true;
             }
             BlockState state = level.getBlockState(pos);
-            if (state.is(ModBlocks.LOOSE_SOIL.get())) {
+            if (state.is(pile)) {
                 return false; // a pile already there is carried away wherever it lies
             }
             // Never on brood, and never on a block of the plan still to be dug (a stair going down: the diggers stand

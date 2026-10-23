@@ -22,9 +22,9 @@ import com.antcolonies.block.TermiteSpireBlock;
 import com.antcolonies.block.TermiteTunnelBlock;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.TermiteWorkerEntity;
-import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.registry.ModTags;
 import com.antcolonies.species.SpeciesProfile.MoundNumbers;
+import com.antcolonies.registry.SavannaBlocks;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -323,7 +323,7 @@ public class Mound {
 
     /** A colony's mound cells (none for a species without a mound): {@link #getParts} through its part. */
     public static Map<BlockPos, MoundPlan.Part> partsOf(Colony colony, Level level) {
-        return colony.part(ColonyParts.MOUND).map(mound -> mound.getParts(level)).orElse(Map.of());
+        return colony.part(SavannaParts.MOUND).map(mound -> mound.getParts(level)).orElse(Map.of());
     }
 
     /**
@@ -679,7 +679,7 @@ public class Mound {
             if (!level.setBlockAndUpdate(spot, Block.updateFromNeighbourShapes(piece, level, spot))) {
                 return false;
             }
-        } else if (!ModBlocks.TERMITE_MOUND.get().addLayer(level, spot)) {
+        } else if (!SavannaBlocks.TERMITE_MOUND.get().addLayer(level, spot)) {
             return false;
         }
         progressed(level);
@@ -897,12 +897,12 @@ public class Mound {
         int age = shape.age().getOrDefault(offset, 0);
         return switch (shape.parts().get(offset)) {
             case WALL -> soil(age);
-            case TUNNEL -> ModBlocks.TERMITE_TUNNEL.get().defaultBlockState().setValue(MoundSoil.AGE, age);
+            case TUNNEL -> SavannaBlocks.TERMITE_TUNNEL.get().defaultBlockState().setValue(MoundSoil.AGE, age);
             case OPEN -> Blocks.AIR.defaultBlockState();
-            case MOUTH -> ModBlocks.TERMITE_MOUTH.get().defaultBlockState().setValue(MoundSoil.AGE, age);
-            case SPIRE -> ModBlocks.TERMITE_SPIRE.get().defaultBlockState().setValue(MoundSoil.AGE, age)
+            case MOUTH -> SavannaBlocks.TERMITE_MOUTH.get().defaultBlockState().setValue(MoundSoil.AGE, age);
+            case SPIRE -> SavannaBlocks.TERMITE_SPIRE.get().defaultBlockState().setValue(MoundSoil.AGE, age)
                     .setValue(TermiteSpireBlock.THICKNESS, shape.thickness().get(offset));
-            case RAMP -> ModBlocks.TERMITE_RAMP.get().defaultBlockState().setValue(MoundSoil.AGE, age)
+            case RAMP -> SavannaBlocks.TERMITE_RAMP.get().defaultBlockState().setValue(MoundSoil.AGE, age)
                     .setValue(TermiteRampBlock.FACING, shape.facing().get(offset))
                     .setValue(TermiteRampBlock.SHAPE, shape.corner().get(offset));
         };
@@ -910,11 +910,11 @@ public class Mound {
 
     /** Finished mound soil of an age (0 fresh to 3 old). */
     static BlockState soil(int age) {
-        return ModBlocks.TERMITE_MOUND.get().defaultBlockState()
+        return SavannaBlocks.TERMITE_MOUND.get().defaultBlockState()
                 .setValue(TermiteMoundBlock.LAYERS, TermiteMoundBlock.FINISHED).setValue(TermiteMoundBlock.AGE, age);
     }
 
-    /** Tests only: a sample in every saved number (the save and load check, {@code AwayTests.everyPartSavesAndLoads}). */
+    /** Tests only: a sample in every saved number (the save and load check, {@code AwayKit.everyPartSavesAndLoads}). */
     public void fillForTests(net.minecraft.server.level.ServerLevel level) {
         allowance = 3.5;
         updatedAt = level.getGameTime();

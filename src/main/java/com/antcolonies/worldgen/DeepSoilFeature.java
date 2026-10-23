@@ -1,6 +1,7 @@
 package com.antcolonies.worldgen;
 
-import com.antcolonies.registry.ModBlocks;
+import com.antcolonies.registry.DesertBlocks;
+
 import com.mojang.serialization.Codec;
 
 import net.minecraft.core.BlockPos;
@@ -33,7 +34,7 @@ public class DeepSoilFeature extends Feature<NoneFeatureConfiguration> {
     public boolean place(FeaturePlaceContext<NoneFeatureConfiguration> context) {
         WorldGenLevel level = context.level();
         BlockPos origin = context.origin();
-        BlockState deepSoil = ModBlocks.DEEP_SOIL.get().defaultBlockState();
+        BlockState deepSoil = DesertBlocks.DEEP_SOIL.get().defaultBlockState();
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         boolean placed = false;
         for (int dx = 0; dx < 16; dx++) {

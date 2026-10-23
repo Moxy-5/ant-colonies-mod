@@ -547,7 +547,7 @@ public class TreeGrowthTests {
             }
             before = want;
             if (want == TreeStage.MUD) {
-                int mud = countAround(level, foot, 0, 30, b -> b.is(com.antcolonies.registry.ModBlocks.MUD_CRUST.get()));
+                int mud = countAround(level, foot, 0, 30, b -> b.is(com.antcolonies.registry.SavannaBlocks.MUD_CRUST.get()));
                 firstMud = firstMud < 0 ? mud : firstMud;
                 lastMud = mud;
             }
@@ -1063,7 +1063,7 @@ public class TreeGrowthTests {
         for (int i = 0; i < shape.size(); i++) {
             int x = shape.xs()[i], z = shape.zs()[i];
             BlockState st = shape.states()[i];
-            if (shape.ys()[i] >= minY && x * x + z * z > minR * minR && (deadWood(st) || st.is(com.antcolonies.registry.ModBlocks.MUD_CRUST.get()))) {
+            if (shape.ys()[i] >= minY && x * x + z * z > minR * minR && (deadWood(st) || st.is(com.antcolonies.registry.SavannaBlocks.MUD_CRUST.get()))) {
                 sx += x;
                 sz += z;
                 n++;

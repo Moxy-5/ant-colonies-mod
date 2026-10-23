@@ -1,7 +1,7 @@
 package com.antcolonies.gametest;
 
-import static com.antcolonies.gametest.TermiteMoundTests.MIDDLE;
-import static com.antcolonies.gametest.TermiteMoundTests.SURFACE;
+import static com.antcolonies.gametest.TestScenes.MIDDLE;
+import static com.antcolonies.gametest.TestScenes.SURFACE;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -9,13 +9,14 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+import com.antcolonies.colony.Caste;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.block.GramaGrassBlock;
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.ColonyParts;
+import com.antcolonies.colony.DesertParts;
 import com.antcolonies.colony.TrunkTrails;
 import com.antcolonies.entity.WorkerAntEntity;
-import com.antcolonies.registry.ModBlocks;
+import com.antcolonies.registry.DesertBlocks;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -33,7 +34,7 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  */
 @GameTestHolder(AntColoniesMod.MODID)
 @PrefixGameTestTemplate(false)
-public class TrailTests {
+public class HarvesterTrailTests {
     /** How far out (blocks) the test's food lies, east and south of the nest. */
     private static final int FOOD_OUT = 15;
     /** A trip this far out (blocks) moves the east trail's tip out (long trails). */
@@ -56,12 +57,12 @@ public class TrailTests {
     @GameTest(template = "arena", timeoutTicks = 600, skyAccess = true)
     public static void foragersWearLastingTrunkTrailsThatFadeAndGrowBack(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        PopulationTests.startAntColony(helper);
-        helper.onEachTick(() -> AwayTests.noRealWorkers(helper));
+        HarvesterPopulationTests.startAntColony(helper);
+        helper.onEachTick(() -> AwayKit.noRealWorkers(helper));
         BlockPos[] center = new BlockPos[1];
         int[] bare = new int[1];
         helper.runAfterDelay(15, () -> {
-            Colony colony = PopulationTests.antColony(helper);
+            Colony colony = HarvesterPopulationTests.antColony(helper);
             colony.population().setOnForTests(false); // (the numbers stay numbers)
             center[0] = colony.getCenter();
             int groundY = helper.absolutePos(new BlockPos(0, SURFACE - 1, 0)).getY();
@@ -75,7 +76,7 @@ public class TrailTests {
                     level.setBlock(south.above(), Blocks.POPPY.defaultBlockState(), 3);
                 }
             }
-            TrunkTrails trails = colony.part(ColonyParts.TRUNK_TRAILS).orElseThrow();
+            TrunkTrails trails = colony.part(DesertParts.TRUNK_TRAILS).orElseThrow();
             BlockPos eastFood = new BlockPos(center[0].getX() + FOOD_OUT, groundY + 1, center[0].getZ());
             BlockPos southFood = new BlockPos(center[0].getX(), groundY + 1, center[0].getZ() + FOOD_OUT);
             for (int i = 0; i < 7; i++) {
@@ -92,8 +93,8 @@ public class TrailTests {
             trails.ageForTests(60 * 20);
         });
         helper.runAfterDelay(40, () -> {
-            Colony colony = PopulationTests.antColony(helper);
-            TrunkTrails trails = colony.part(ColonyParts.TRUNK_TRAILS).orElseThrow();
+            Colony colony = HarvesterPopulationTests.antColony(helper);
+            TrunkTrails trails = colony.part(DesertParts.TRUNK_TRAILS).orElseThrow();
             int groundY = helper.absolutePos(new BlockPos(0, SURFACE - 1, 0)).getY();
             BlockPos eastFood = new BlockPos(center[0].getX() + FOOD_OUT, groundY + 1, center[0].getZ());
             BlockPos southFood = new BlockPos(center[0].getX(), groundY + 1, center[0].getZ() + FOOD_OUT);
@@ -104,7 +105,7 @@ public class TrailTests {
                 trails.setOut(level, southFood);
             }
             helper.assertTrue(trails.trails().size() == 1, "a young colony should keep 1 trail: " + trails.describe(level));
-            colony.population().addNewMembers(WorkerAntEntity.CASTE, level.getGameTime(), 1500);
+            colony.population().addNewMembers(Caste.WORKER, level.getGameTime(), 1500);
             trails.setOut(level, southFood);
             helper.assertTrue(trails.trails().size() == 2, "a big colony should lay a trail south: " + trails.describe(level));
             // Long trails (2026-10-17): a trip to food past the east trail's tip moves the tip out to it, and the colony's
@@ -129,8 +130,8 @@ public class TrailTests {
             trails.checkSoonForTests();
         });
         helper.runAfterDelay(85, () -> {
-            Colony colony = PopulationTests.antColony(helper);
-            AntColoniesMod.LOGGER.info("[trail-test] worn: {}", colony.part(ColonyParts.TRUNK_TRAILS).orElseThrow().describe(level));
+            Colony colony = HarvesterPopulationTests.antColony(helper);
+            AntColoniesMod.LOGGER.info("[trail-test] worn: {}", colony.part(DesertParts.TRUNK_TRAILS).orElseThrow().describe(level));
             int groundY = helper.absolutePos(new BlockPos(0, SURFACE - 1, 0)).getY();
             for (int t = 4; t <= FOOD_OUT; t++) {
                 BlockPos east = new BlockPos(center[0].getX() + t, groundY, center[0].getZ());
@@ -146,47 +147,47 @@ public class TrailTests {
             AABB eastTrail = new AABB(center[0]).expandTowards(FOOD_OUT + 1, 0, 0).inflate(1, 3, 1);
             helper.assertTrue(!level.getEntitiesOfClass(ItemEntity.class, eastTrail).isEmpty(), "the cut grass should leave its seeds lying");
             colony.population().setViewersForTests(List.of());
-            colony.part(ColonyParts.TRUNK_TRAILS).orElseThrow().checkSoonForTests();
-            colony.part(ColonyParts.PATROL).orElseThrow().setOnForTests(true); // brain step 4b: a new round, with its patrol (it sees the day clock open, 7:00)
+            colony.part(DesertParts.TRUNK_TRAILS).orElseThrow().checkSoonForTests();
+            colony.part(DesertParts.PATROL).orElseThrow().setOnForTests(true); // brain step 4b: a new round, with its patrol (it sees the day clock open, 7:00)
         });
         helper.runAfterDelay(110, () -> {
-            Colony colony = PopulationTests.antColony(helper);
-            List<String> ways = colony.part(ColonyParts.PATROL).orElseThrow().waysForTests();
-            AntColoniesMod.LOGGER.info("[trail-test] patrol: {} ways {}", colony.part(ColonyParts.PATROL).orElseThrow().describe(level), ways);
-            helper.assertTrue(colony.part(ColonyParts.PATROL).orElseThrow().isRoundOn() && ways.size() >= 2 && ways.get(0).endsWith("(trail)") && ways.get(1).endsWith("(trail)")
+            Colony colony = HarvesterPopulationTests.antColony(helper);
+            List<String> ways = colony.part(DesertParts.PATROL).orElseThrow().waysForTests();
+            AntColoniesMod.LOGGER.info("[trail-test] patrol: {} ways {}", colony.part(DesertParts.PATROL).orElseThrow().describe(level), ways);
+            helper.assertTrue(colony.part(DesertParts.PATROL).orElseThrow().isRoundOn() && ways.size() >= 2 && ways.get(0).endsWith("(trail)") && ways.get(1).endsWith("(trail)")
                     && ways.contains("east (trail)") && ways.contains("south (trail)"), "the patrol should walk the two trunk trails first: " + ways);
-            helper.assertTrue(colony.part(ColonyParts.PATROL).orElseThrow().sentThisRound() == colony.profile().food().patrol().orElseThrow().dawnPatrol(colony.getCount(WorkerAntEntity.CASTE)),
-                    "the dawn patrol should be the share of the workers: " + colony.part(ColonyParts.PATROL).orElseThrow().describe(level));
+            helper.assertTrue(colony.part(DesertParts.PATROL).orElseThrow().sentThisRound() == colony.profile().food().patrol().orElseThrow().dawnPatrol(colony.getCount(Caste.WORKER)),
+                    "the dawn patrol should be the share of the workers: " + colony.part(DesertParts.PATROL).orElseThrow().describe(level));
             int groundY = helper.absolutePos(new BlockPos(0, SURFACE - 1, 0)).getY();
-            helper.assertTrue(!colony.part(ColonyParts.PATROL).orElseThrow().isOpen(level, new BlockPos(center[0].getX() + FOOD_OUT, groundY + 1, center[0].getZ())),
+            helper.assertTrue(!colony.part(DesertParts.PATROL).orElseThrow().isOpen(level, new BlockPos(center[0].getX() + FOOD_OUT, groundY + 1, center[0].getZ())),
                     "nothing is open before a patroller is back");
-            colony.part(ColonyParts.PATROL).orElseThrow().bringNumbersHomeForTests();
+            colony.part(DesertParts.PATROL).orElseThrow().bringNumbersHomeForTests();
         });
         // (25 ticks: colonies think once a second, every 20 ticks; 15 ticks failed about 1 run in 4)
         helper.runAfterDelay(135, () -> {
-            Colony colony = PopulationTests.antColony(helper);
+            Colony colony = HarvesterPopulationTests.antColony(helper);
             int groundY = helper.absolutePos(new BlockPos(0, SURFACE - 1, 0)).getY();
             BlockPos eastFood = new BlockPos(center[0].getX() + FOOD_OUT, groundY + 1, center[0].getZ());
             BlockPos southFood = new BlockPos(center[0].getX(), groundY + 1, center[0].getZ() + FOOD_OUT);
-            helper.assertTrue(colony.part(ColonyParts.PATROL).orElseThrow().backThisRound() > 0 && colony.part(ColonyParts.PATROL).orElseThrow().isOpen(level, eastFood) && colony.part(ColonyParts.PATROL).orElseThrow().isOpen(level, southFood),
-                    "with the patrol back the trails should be open: " + colony.part(ColonyParts.PATROL).orElseThrow().describe(level));
-            colony.part(ColonyParts.PATROL).orElseThrow().patrollerKilledForTests(level, 0.0);
-            helper.assertTrue(!colony.part(ColonyParts.PATROL).orElseThrow().isOpen(level, eastFood) && colony.part(ColonyParts.PATROL).orElseThrow().isOpen(level, southFood),
-                    "a patroller killed east should shut the east trail only: " + colony.part(ColonyParts.PATROL).orElseThrow().describe(level));
-            helper.assertTrue(colony.part(ColonyParts.PATROL).orElseThrow().dangerToday() && colony.part(ColonyParts.PATROL).orElseThrow().foragerShareToday(level) < 1.0F,
+            helper.assertTrue(colony.part(DesertParts.PATROL).orElseThrow().backThisRound() > 0 && colony.part(DesertParts.PATROL).orElseThrow().isOpen(level, eastFood) && colony.part(DesertParts.PATROL).orElseThrow().isOpen(level, southFood),
+                    "with the patrol back the trails should be open: " + colony.part(DesertParts.PATROL).orElseThrow().describe(level));
+            colony.part(DesertParts.PATROL).orElseThrow().patrollerKilledForTests(level, 0.0);
+            helper.assertTrue(!colony.part(DesertParts.PATROL).orElseThrow().isOpen(level, eastFood) && colony.part(DesertParts.PATROL).orElseThrow().isOpen(level, southFood),
+                    "a patroller killed east should shut the east trail only: " + colony.part(DesertParts.PATROL).orElseThrow().describe(level));
+            helper.assertTrue(colony.part(DesertParts.PATROL).orElseThrow().dangerToday() && colony.part(DesertParts.PATROL).orElseThrow().foragerShareToday(level) < 1.0F,
                     "after a patroller is lost fewer foragers may go out today");
             Colony copy = Colony.load(colony.save());
-            copy.part(ColonyParts.PATROL).orElseThrow().setOnForTests(true);
-            helper.assertTrue(copy.part(ColonyParts.PATROL).orElseThrow().describe(level).equals(colony.part(ColonyParts.PATROL).orElseThrow().describe(level)) && !copy.part(ColonyParts.PATROL).orElseThrow().isOpen(level, eastFood),
-                    "the patrol should be saved: " + copy.part(ColonyParts.PATROL).orElseThrow().describe(level) + " / " + colony.part(ColonyParts.PATROL).orElseThrow().describe(level));
+            copy.part(DesertParts.PATROL).orElseThrow().setOnForTests(true);
+            helper.assertTrue(copy.part(DesertParts.PATROL).orElseThrow().describe(level).equals(colony.part(DesertParts.PATROL).orElseThrow().describe(level)) && !copy.part(DesertParts.PATROL).orElseThrow().isOpen(level, eastFood),
+                    "the patrol should be saved: " + copy.part(DesertParts.PATROL).orElseThrow().describe(level) + " / " + colony.part(DesertParts.PATROL).orElseThrow().describe(level));
             for (int t = 4; t <= FOOD_OUT; t++) {
                 BlockPos south = new BlockPos(center[0].getX(), groundY, center[0].getZ() + t);
                 helper.assertTrue(level.getBlockState(south).is(Blocks.COARSE_DIRT) && level.getBlockState(south.above()).isAir(),
                         "with nobody looking the south trail should wear bare " + t + " out");
             }
             // Saved and loaded with the colony.
-            List<TrunkTrails.Trail> before = colony.part(ColonyParts.TRUNK_TRAILS).orElseThrow().trails();
-            List<TrunkTrails.Trail> after = Colony.load(colony.save()).part(ColonyParts.TRUNK_TRAILS).orElseThrow().trails();
+            List<TrunkTrails.Trail> before = colony.part(DesertParts.TRUNK_TRAILS).orElseThrow().trails();
+            List<TrunkTrails.Trail> after = Colony.load(colony.save()).part(DesertParts.TRUNK_TRAILS).orElseThrow().trails();
             helper.assertTrue(after.size() == before.size(), "the trails should be saved: " + after.size());
             for (int i = 0; i < before.size(); i++) {
                 TrunkTrails.Trail a = before.get(i);
@@ -199,7 +200,7 @@ public class TrailTests {
             }
             // Brain step 4g, the danger memory, in the same scene (patrols off, so only the danger decides): a forager killed
             // at the east food by a zombie, and one hurt on the hill by a player.
-            colony.part(ColonyParts.PATROL).orElseThrow().setOnForTests(false);
+            colony.part(DesertParts.PATROL).orElseThrow().setOnForTests(false);
             colony.danger().hurt(level, eastFood, "zombie", true);
             colony.danger().hurt(level, center[0], "player", false);
             helper.assertTrue(colony.danger().places().size() == 2 && colony.danger().places().get(0).deaths() == 1,
@@ -208,7 +209,7 @@ public class TrailTests {
                     "the east food should be kept away from, the south food not: " + colony.danger().describe(level));
             BlockPos pastIt = new BlockPos(center[0].getX() + FAR_OUT - 5, groundY + 1, center[0].getZ());
             BlockPos nearHome = new BlockPos(center[0].getX() + 5, groundY + 1, center[0].getZ());
-            helper.assertTrue(colony.part(ColonyParts.TRUNK_TRAILS).orElseThrow().passesDanger(level, pastIt) && !colony.mayForageAt(level, pastIt),
+            helper.assertTrue(colony.part(DesertParts.TRUNK_TRAILS).orElseThrow().passesDanger(level, pastIt) && !colony.mayForageAt(level, pastIt),
                     "food out past the danger along the east trail should be kept away from (the trail runs through it)");
             // Colony parts step 6: each part answers "keep off?" for itself; the colony names the one that said yes.
             helper.assertTrue("danger_map".equals(colony.whoKeepsOff(level, eastFood)),
@@ -219,7 +220,7 @@ public class TrailTests {
             helper.assertTrue(colony.mayForageAt(level, nearHome) && colony.mayForageAt(level, new BlockPos(center[0].getX(), groundY + 1, center[0].getZ() + 3)),
                     "the nest's own ground and the trail short of the danger should stay open: " + colony.danger().describe(level));
             for (int i = 0; i < 30; i++) {
-                TrunkTrails.Trail picked = colony.part(ColonyParts.TRUNK_TRAILS).orElseThrow().pickForSearch(level, colony.random());
+                TrunkTrails.Trail picked = colony.part(DesertParts.TRUNK_TRAILS).orElseThrow().pickForSearch(level, colony.random());
                 helper.assertTrue(picked != null && Math.abs(picked.angle()) > Math.toRadians(30), "no searcher should be sent out the east trail");
             }
             helper.assertTrue(Colony.load(colony.save()).danger().places().size() == 2, "the danger memory should be saved");
@@ -230,11 +231,11 @@ public class TrailTests {
                     "two and a half days on the east food should be open again, still remembered: " + colony.danger().describe(level));
             colony.danger().ageForTests(24000L); // three and a half: forgotten at the colony's next look
             // Five days unused: their traffic no longer holds them out to the food, so their tips pull back.
-            colony.part(ColonyParts.TRUNK_TRAILS).orElseThrow().ageForTests(5 * 24000L);
+            colony.part(DesertParts.TRUNK_TRAILS).orElseThrow().ageForTests(5 * 24000L);
         });
         helper.runAfterDelay(160, () -> {
-            Colony colony = PopulationTests.antColony(helper);
-            TrunkTrails trails = colony.part(ColonyParts.TRUNK_TRAILS).orElseThrow();
+            Colony colony = HarvesterPopulationTests.antColony(helper);
+            TrunkTrails trails = colony.part(DesertParts.TRUNK_TRAILS).orElseThrow();
             helper.assertTrue(colony.danger().places().isEmpty(), "three and a half days on the danger should be forgotten: " + colony.danger().describe(level));
             helper.assertTrue(trails.trails().size() == 2, "five days unused the trails should still be there: " + trails.describe(level));
             for (TrunkTrails.Trail trail : trails.trails()) {
@@ -244,25 +245,25 @@ public class TrailTests {
             helper.assertTrue(trails.regrowing() > 0, "the bare ground past the tips should be growing back: " + trails.describe(level));
             helper.assertTrue(colony.foragingRadius() == colony.profile().food().radius(), "the range should shrink with the trails: " + colony.foragingRadius());
             // A week unused: they fade.
-            colony.part(ColonyParts.TRUNK_TRAILS).orElseThrow().ageForTests(7 * 24000L);
-            colony.part(ColonyParts.TRUNK_TRAILS).orElseThrow().checkSoonForTests();
+            colony.part(DesertParts.TRUNK_TRAILS).orElseThrow().ageForTests(7 * 24000L);
+            colony.part(DesertParts.TRUNK_TRAILS).orElseThrow().checkSoonForTests();
         });
         helper.runAfterDelay(185, () -> {
-            Colony colony = PopulationTests.antColony(helper);
-            helper.assertTrue(colony.part(ColonyParts.TRUNK_TRAILS).orElseThrow().trails().isEmpty(), "unused for a week the trails should fade: " + colony.part(ColonyParts.TRUNK_TRAILS).orElseThrow().describe(level));
-            helper.assertTrue(colony.part(ColonyParts.TRUNK_TRAILS).orElseThrow().regrowing() == bare[0] && bare[0] >= 2 * (FOOD_OUT - 3),
-                    "their " + bare[0] + " bare blocks should be growing back: " + colony.part(ColonyParts.TRUNK_TRAILS).orElseThrow().regrowing());
-            colony.part(ColonyParts.TRUNK_TRAILS).orElseThrow().growBackSoonForTests();
+            Colony colony = HarvesterPopulationTests.antColony(helper);
+            helper.assertTrue(colony.part(DesertParts.TRUNK_TRAILS).orElseThrow().trails().isEmpty(), "unused for a week the trails should fade: " + colony.part(DesertParts.TRUNK_TRAILS).orElseThrow().describe(level));
+            helper.assertTrue(colony.part(DesertParts.TRUNK_TRAILS).orElseThrow().regrowing() == bare[0] && bare[0] >= 2 * (FOOD_OUT - 3),
+                    "their " + bare[0] + " bare blocks should be growing back: " + colony.part(DesertParts.TRUNK_TRAILS).orElseThrow().regrowing());
+            colony.part(DesertParts.TRUNK_TRAILS).orElseThrow().growBackSoonForTests();
         });
         helper.runAfterDelay(225, () -> {
-            Colony colony = PopulationTests.antColony(helper);
+            Colony colony = HarvesterPopulationTests.antColony(helper);
             int groundY = helper.absolutePos(new BlockPos(0, SURFACE - 1, 0)).getY();
             for (int t = 4; t <= FOOD_OUT; t++) {
                 helper.assertTrue(level.getBlockState(new BlockPos(center[0].getX() + t, groundY, center[0].getZ())).is(Blocks.GRASS_BLOCK)
                         && level.getBlockState(new BlockPos(center[0].getX(), groundY, center[0].getZ() + t)).is(Blocks.GRASS_BLOCK),
                         "the bare ground should grow back to grass " + t + " out");
             }
-            helper.assertTrue(colony.part(ColonyParts.TRUNK_TRAILS).orElseThrow().regrowing() == 0, "nothing should be left to grow back: " + colony.part(ColonyParts.TRUNK_TRAILS).orElseThrow().regrowing());
+            helper.assertTrue(colony.part(DesertParts.TRUNK_TRAILS).orElseThrow().regrowing() == 0, "nothing should be left to grow back: " + colony.part(DesertParts.TRUNK_TRAILS).orElseThrow().regrowing());
             helper.succeed();
         });
     }
@@ -289,7 +290,7 @@ public class TrailTests {
     @GameTest(template = "arena", timeoutTicks = 72000, skyAccess = true, batch = "far_meadow")
     public static void aFarMeadowPastTheTrailsTipIsFoundRecruitedToAndPullsTheTrailOut(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        PopulationTests.startAntColony(helper);
+        HarvesterPopulationTests.startAntColony(helper);
         // Ground east of the nest out past the meadow (the arena's own ground is only 25 blocks across).
         for (int x = 25; x <= MIDDLE + MEADOW_TO + 6; x++) {
             for (int z = 0; z < 25; z++) {
@@ -310,32 +311,32 @@ public class TrailTests {
         Set<UUID> calledAtTheMeadow = new HashSet<>();
         int[] days = {0};
         helper.runAfterDelay(15, () -> {
-            Colony colony = PopulationTests.antColony(helper);
+            Colony colony = HarvesterPopulationTests.antColony(helper);
             for (BlockPos grama : meadow) {
-                helper.setBlock(grama, ModBlocks.BLUE_GRAMA.get().defaultBlockState().setValue(GramaGrassBlock.STAGE, GramaGrassBlock.Stage.RIPE));
+                helper.setBlock(grama, DesertBlocks.BLUE_GRAMA.get().defaultBlockState().setValue(GramaGrassBlock.STAGE, GramaGrassBlock.Stage.RIPE));
             }
             long now = level.getGameTime();
-            colony.population().addNewMembers(WorkerAntEntity.CASTE, now - 250000, 24); // old: foragers
-            colony.population().addNewMembers(WorkerAntEntity.CASTE, now - 100000, 6); // middle-aged: builders
+            colony.population().addNewMembers(Caste.WORKER, now - 250000, 24); // old: foragers
+            colony.population().addNewMembers(Caste.WORKER, now - 100000, 6); // middle-aged: builders
             // The old trail east: its food, 26 blocks out, is eaten (12 trips laid and held it).
             BlockPos center = colony.getCenter();
             BlockPos oldFood = new BlockPos(center.getX() + OLD_TIP, center.getY(), center.getZ());
             for (int i = 0; i < 12; i++) {
-                colony.part(ColonyParts.TRUNK_TRAILS).orElseThrow().setOut(level, oldFood);
+                colony.part(DesertParts.TRUNK_TRAILS).orElseThrow().setOut(level, oldFood);
             }
-            helper.assertTrue(colony.part(ColonyParts.TRUNK_TRAILS).orElseThrow().trails().size() == 1 && Math.abs(colony.part(ColonyParts.TRUNK_TRAILS).orElseThrow().longestTip() - OLD_TIP) <= 1,
-                    "the old trail east should reach " + OLD_TIP + " blocks: " + colony.part(ColonyParts.TRUNK_TRAILS).orElseThrow().describe(level));
+            helper.assertTrue(colony.part(DesertParts.TRUNK_TRAILS).orElseThrow().trails().size() == 1 && Math.abs(colony.part(DesertParts.TRUNK_TRAILS).orElseThrow().longestTip() - OLD_TIP) <= 1,
+                    "the old trail east should reach " + OLD_TIP + " blocks: " + colony.part(DesertParts.TRUNK_TRAILS).orElseThrow().describe(level));
             TestClock.moving(helper, 6.5);
             phase[0] = 1;
         });
         helper.onEachTick(() -> {
-            Colony colony = PopulationTests.antColony(helper);
+            Colony colony = HarvesterPopulationTests.antColony(helper);
             if (colony == null || phase[0] == 0) {
                 return;
             }
             long tick = helper.getTick();
             BlockPos center = colony.getCenter();
-            TrunkTrails trails = colony.part(ColonyParts.TRUNK_TRAILS).orElseThrow();
+            TrunkTrails trails = colony.part(DesertParts.TRUNK_TRAILS).orElseThrow();
             if (phase[0] == 1) {
                 if (phase[1] < 0) {
                     for (BlockPos grama : meadow) {
@@ -346,23 +347,23 @@ public class TrailTests {
                         }
                     }
                 }
-                for (var line : colony.part(ColonyParts.RECRUITS).orElseThrow().lines()) {
+                for (var line : colony.part(DesertParts.RECRUITS).orElseThrow().lines()) {
                     int out = line.patch().getX() - center.getX();
                     helper.assertTrue(out >= MEADOW_FROM - 5 && Math.abs(line.patch().getZ() - center.getZ()) <= MEADOW_SIDE + 5,
                             "a scent line was laid to " + line.patch().subtract(center).toShortString() + ", not the far meadow");
                 }
                 for (WorkerAntEntity ant : TestIsolation.insectsOf(level, colony, WorkerAntEntity.class)) {
-                    if (colony.part(ColonyParts.RECRUITS).orElseThrow().isRecruited(ant.getUUID())) {
+                    if (colony.part(DesertParts.RECRUITS).orElseThrow().isRecruited(ant.getUUID())) {
                         called.add(ant.getUUID());
                     }
-                    BlockPos spot = colony.part(ColonyParts.FORAGER_SPOTS).orElseThrow().spotOf(ant.getUUID());
+                    BlockPos spot = colony.part(DesertParts.FORAGER_SPOTS).orElseThrow().spotOf(ant.getUUID());
                     if (called.contains(ant.getUUID()) && ant.isCarryingSeed() && spot != null && spot.getX() - center.getX() >= MEADOW_FROM - 5
                             && calledAtTheMeadow.add(ant.getUUID())) {
                         AntColoniesMod.LOGGER.info("[far-meadow] tick {}: a nestmate called out took food at the meadow ({} so far){}", tick,
-                                calledAtTheMeadow.size(), colony.part(ColonyParts.RECRUITS).orElseThrow().describe(level));
+                                calledAtTheMeadow.size(), colony.part(DesertParts.RECRUITS).orElseThrow().describe(level));
                     }
                 }
-                if (phase[2] < 0 && !colony.part(ColonyParts.RECRUITS).orElseThrow().lines().isEmpty() && calledAtTheMeadow.size() >= 2) {
+                if (phase[2] < 0 && !colony.part(DesertParts.RECRUITS).orElseThrow().lines().isEmpty() && calledAtTheMeadow.size() >= 2) {
                     phase[2] = tick;
                 }
                 if (phase[3] < 0 && trails.longestTip() >= MEADOW_FROM - 1) {
@@ -377,7 +378,7 @@ public class TrailTests {
                         }
                     }
                     AntColoniesMod.LOGGER.info("[far-meadow] tick {}: {} | range {}{} | {} | small {} | out:{}", tick, trails.describe(level), colony.foragingRadius(),
-                            colony.part(ColonyParts.RECRUITS).orElseThrow().describe(level), colony.part(ColonyParts.FORAGER_SPOTS).orElseThrow().describe(), colony.part(ColonyParts.DOOR).orElseThrow().isSmallColony(level), out);
+                            colony.part(DesertParts.RECRUITS).orElseThrow().describe(level), colony.part(DesertParts.FORAGER_SPOTS).orElseThrow().describe(), colony.part(DesertParts.DOOR).orElseThrow().isSmallColony(level), out);
                 }
                 if (phase[1] >= 0 && phase[2] >= 0 && phase[3] >= 0) {
                     helper.assertTrue(colony.foragingRadius() >= MEADOW_FROM - 1, "the range should be the trail's tip: " + colony.foragingRadius());
@@ -386,7 +387,7 @@ public class TrailTests {
                     }
                     phase[4] = tick;
                     phase[0] = 2;
-                    AntColoniesMod.LOGGER.info("[far-meadow] tick {}: the meadow is gone | {}{}", tick, trails.describe(level), colony.part(ColonyParts.RECRUITS).orElseThrow().describe(level));
+                    AntColoniesMod.LOGGER.info("[far-meadow] tick {}: the meadow is gone | {}{}", tick, trails.describe(level), colony.part(DesertParts.RECRUITS).orElseThrow().describe(level));
                 }
                 return;
             }
@@ -397,8 +398,8 @@ public class TrailTests {
                 return;
             }
             if (days[0] >= 1) {
-                helper.assertTrue(colony.part(ColonyParts.RECRUITS).orElseThrow().lines().isEmpty(), "a day after the meadow is gone its scent line should have faded"
-                        + colony.part(ColonyParts.RECRUITS).orElseThrow().describe(level));
+                helper.assertTrue(colony.part(DesertParts.RECRUITS).orElseThrow().lines().isEmpty(), "a day after the meadow is gone its scent line should have faded"
+                        + colony.part(DesertParts.RECRUITS).orElseThrow().describe(level));
             }
             int tip = trails.longestTip();
             if (days[0] >= 1 && tip < MEADOW_FROM - 4) {
@@ -409,7 +410,7 @@ public class TrailTests {
             helper.assertTrue(days[0] < 7, "a week after the meadow was gone the trail's tip should have pulled back: " + trails.describe(level));
             days[0]++;
             trails.ageForTests(24000);
-            colony.part(ColonyParts.RECRUITS).orElseThrow().ageForTests(24000);
+            colony.part(DesertParts.RECRUITS).orElseThrow().ageForTests(24000);
             trails.checkSoonForTests();
         });
     }

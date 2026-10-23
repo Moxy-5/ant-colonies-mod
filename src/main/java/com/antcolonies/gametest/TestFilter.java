@@ -27,38 +27,20 @@ public final class TestFilter {
      * by running the category it touches. A new test class must be added to one of them.
      */
     static final Map<String, List<Class<?>>> CATEGORIES = new LinkedHashMap<>();
-    static {
-        // The legs: walking, climbing, ceilings, crawling through termite tunnels, reloads of climbing insects.
-        CATEGORIES.put("legs", List.of(NavigationTests.class, TermiteClimbingTests.class, TermiteTunnelTests.class));
-        // The harvester ant's nest: digging, the hill, seeds, bread, eggs and larvae, hunger, the dead.
-        CATEGORIES.put("antnest", List.of(NestTests.class));
-        // The termite mound: its blocks, the cathedral, doorways and chimney mouths, mending the nest.
-        CATEGORIES.put("mound", List.of(TermiteMoundTests.class, TermiteCathedralTests.class, TermiteRepairTests.class));
-        // Termite food: foraging and its holes, the garden, new holes, dead wood, runways, bare patches, mushrooms.
-        CATEGORIES.put("termitefood", List.of(TermiteFoodTests.class, TermiteForagingTests.class, TermiteNewHoleTests.class,
-                TermiteRunwayTests.class, TermiteBarePatchTests.class, TermitomycesTests.class));
-        // Soldiers and the alarm.
-        CATEGORIES.put("soldiers", List.of(TermiteSoldierTests.class, TermiteAlarmTests.class));
-        // The colony: founding, jobs by age, the virtual population, the lasting trails (brain part 4).
-        CATEGORIES.put("colony", List.of(TermiteTests.class, JobsByAgeTests.class, PopulationTests.class, TrailTests.class, NeighbourTests.class));
-        // Colonies that live while the player is away (the brain, part 2 on): going away and coming back, eating and
-        // raising the young as numbers, the termites' life while away.
-        CATEGORIES.put("away", List.of(AwayTests.class));
-        // Hills and uneven ground, for every planner.
-        CATEGORIES.put("hills", List.of(HillTests.class));
-        // The body (the animation engine): naps and the other things the server decides about how an insect holds itself.
-        CATEGORIES.put("body", List.of(BodyTests.class));
-        // The giant savanna trees (M7.5): their blocks, later their shapes, growth and fall.
-        CATEGORIES.put("trees", List.of(TreeTests.class, TreeGrowthTests.class));
-        // Performance (only when named, never in a full run).
-        CATEGORIES.put("stress", List.of(StressTests.class));
-    }
 
     private TestFilter() {
     }
 
     /**
-     * The stress tests (performance, {@link StressTests}) are long and only measure: they run only when named, never in
+     * Adds test classes to a category (the split, step S4: each species signs up its own, {@code SavannaTests} and
+     * {@code DesertTests}; two species may share a category, such as {@code away} or {@code hills}).
+     */
+    static void addCategory(String name, Class<?>... classes) {
+        CATEGORIES.computeIfAbsent(name, key -> new java.util.ArrayList<>()).addAll(List.of(classes));
+    }
+
+    /**
+     * The stress tests (performance, such as {@code TermiteStressTests}) are long and only measure: they run only when named, never in
      * a full run.
      */
     @SuppressWarnings("unchecked")
