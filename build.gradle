@@ -46,6 +46,23 @@ java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 // The root has no code of its own: nothing to pack.
 tasks.named('jar') { enabled = false }
 
+// No bug number used twice in docs/BUGS.md (branches merge the notes by keeping both sides' lines, .gitattributes;
+// new numbers come from tools/bug_number.py, the rule in CLAUDE.md, "Notes on branches").
+def checkBugNumbers = tasks.register('checkBugNumbers') {
+    def bugs = file('docs/BUGS.md')
+    inputs.file(bugs)
+    doLast {
+        def seen = [] as Set
+        def twice = []
+        (bugs.getText('UTF-8') =~ /(?m)^(\d+[a-z]?)\. /).each { all, name -> if (!seen.add(name)) twice << name }
+        if (twice) {
+            throw new GradleException("docs/BUGS.md: bug numbers used twice: ${twice.join(', ')}. Give the newer one a " +
+                    "new number from 'python tools/bug_number.py' and change every place that names it.")
+        }
+    }
+}
+tasks.named('check') { dependsOn checkBugNumbers }
+
 neoForge {
     version = project.neo_version
 

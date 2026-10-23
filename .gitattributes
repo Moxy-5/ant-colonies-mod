@@ -3,3 +3,10 @@
 # are changed when only line endings change.
 src/generated/**/.cache/* text eol=lf
 src/generated/**/*.json text eol=lf
+
+# The shared notes (the rule is in CLAUDE.md, "Notes on branches").
+# Many branches add lines to these at the same spot; "union" keeps the added lines of both sides instead of
+# stopping the merge. Add, don't rewrite: a line changed on both sides is kept twice, so look the merged notes over.
+docs/HISTORY.md merge=union
+docs/BUGS.md merge=union
+CLAUDE.md merge=union
