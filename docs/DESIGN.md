@@ -193,6 +193,15 @@ it.** If a decision changes, ask the user first, then update it here. The short 
   - **Help squeak:** a hurt ant squeaks as well as giving off the help smell; nestmates near turn toward it.
   - **The termite heap:** a pile of uneaten termite remains (heads, wings, hard bits) by the entrance, growing with every raid.
   - **Hurt rest in one spot:** hurt ants are carried to one room near the entrance to rest and be cared for (the user's pick; the least certain of these, real nests are hard to see inside).
+- **Moving house, details (questionnaire with the user, 2026-10-22; step 6):**
+  - **Only real causes** (replaces "now and then anyway" above): they move when raids near home keep coming back empty or thin (the termites plugging and moving their feeding away, so a colony beside a huge mound can still run dry), when the nest is attacked again and again, when it floods, or when it is too small. A colony beside rich termites that have not learned to avoid it stays. (Real moves are reported every few weeks to months; why is not measured, following the prey is the usual explanation.)
+  - **Compare, best wins** (borrowed from rock ants and honey bees; nobody has studied how Matabele ants choose): several scouts find sites (dead mounds, logs, ground) and rate them (space, dryness, termites near); good ones draw more scouts, the first to get enough wins.
+  - **Toward termites:** sites near feeding spots the colony has not raided dry rate higher; usually within the old raiding range, about 10 to 40 blocks.
+  - **No raids while moving, guarded:** big ants walk the column's sides; anyone disturbing it is stung harder than usual.
+  - **Queen in the middle** of the column, surrounded by workers.
+  - **Everything carried:** brood, the prey pile and the hurt (3-4 legs gone) go in the column; only the dead stay.
+  - **Stragglers fetched:** ants out raiding when the colony left come home to an empty nest; a few go back along the new trail to fetch them.
+  - **The old home stays:** empty with its termite heap, wearing down slowly; another Matabele colony can move into it later (dead mounds especially).
 - **Harvester ant fights (user, 2026-10-18, settles the old open question):** harvester ants fight **their own harvester neighbours** (real territory fights where trails meet: grappling, biting, stinging), on the same fight system after the Matabele. No harvester vs termite or harvester vs Matabele fights (they never meet in real life).
 
 ### Later species (NOT version 1)
