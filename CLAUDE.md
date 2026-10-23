@@ -2,6 +2,14 @@
 
 A Minecraft mod where ants and termites live as real colonies: they dig, build, gather food, grow, start new colonies, and fight each other. Inspired by Empires of the Undergrowth, but the player is down at ant level.
 
+## TEMPORARY RULE: autonomous mode (the user, 2026-10-22, until the user says stop)
+**Everything is handled autonomously by Claude until the user says to stop.** While this section is here:
+- Don't stop to ask the user for an OK between steps: build, test, fix, commit, push and hand off to the next linked session yourself. Report what you did in plain English as you go, but don't wait for an answer.
+- The split chain (`docs/plans/mod-split.md`): each step's session builds its step, runs only the quick checks (`./gradlew build`), commits, pushes, and starts a linked session for the next step. **That next session runs the full game test run first** (`tools/run_game_tests.sh 6`), which tests the step before; it fixes anything that step broke, then builds its own step.
+- A real bug found along the way gets its own linked session (on its own branch), so the step stays focused. Old flakes (`docs/BUGS.md` 55, 62) don't.
+- **Still the user's, even now:** the in-game test at the end of the split, the merge into `master`, deleting branches or worlds, and anything that would change what is seen in-game or limit a future species. Stop at those and report.
+- Remove this section when the user says stop.
+
 ## How to work with me
 - I have zero coding experience. You write all the code; I test in-game and report bugs.
 - **Realism is all I care about with this mod** (I'm a nerd about real ants and termites). When choosing how anything behaves, go with what the real species does; explain the real behaviour when suggesting options, and only offer simpler versions as a fallback.
