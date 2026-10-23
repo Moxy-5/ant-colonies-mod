@@ -93,6 +93,7 @@ legs tests on a savanna body (`apex.md` step 13, before the harvester ant leaves
   when there is no way each try is costly (the bursts left in the stress test). The fix used for other work since
   `docs/BUGS.md` 42 would make her try every 20 seconds instead, so once a way opens again she could take up to 18
   seconds longer to come back to the queen. Not built; yours to decide.
+  **The user's call, 2026-10-23: kept as it is for now, moved to M8.5 (polish), with the other speed work.**
 - **In-game:** nothing should change. T4 is the only step that could (if the fix makes a termite give up sooner on
   work it can't reach); if so I stop and ask before building it.
 - **Future features:** T1 and T3 make the Matabele ants easier (their numbers and their loads, dead termites and hurt
