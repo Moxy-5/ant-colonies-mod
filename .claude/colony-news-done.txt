@@ -1,3 +1,0 @@
-claude/colony-news-d4bc74
-6f7ad80a0f970b088318235b70e3729cf2786755
-(3ba611d holds all the code; 6f7ad80 only adds plan notes: steps 6 and 7 before the split)
