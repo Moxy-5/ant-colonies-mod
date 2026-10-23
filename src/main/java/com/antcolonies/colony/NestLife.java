@@ -4,7 +4,7 @@ import java.util.List;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.entity.AbstractAntEntity;
-import com.antcolonies.entity.TermiteQueenEntity;
+import com.antcolonies.entity.SwellingQueen;
 import com.antcolonies.species.SpeciesProfile;
 
 import net.minecraft.nbt.CompoundTag;
@@ -69,7 +69,7 @@ public class NestLife {
         }
         queenHome = colony.queenCare().isQueenHome(level);
         sealedIn = queenHome && !colony.nest().isEntranceOpen(level);
-        queenSize = queen instanceof TermiteQueenEntity termiteQueen ? termiteQueen.getSize() : 0.0F;
+        queenSize = queen instanceof SwellingQueen swelling ? swelling.getSize() : 0.0F;
         if (sealedIn) {
             foundingWorkLeft = 0;
             foundedAway = false; // (in their chamber, closed in: as it should be)

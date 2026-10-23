@@ -52,7 +52,7 @@ class Meals {
             return worker.eats() && worker.mealIntervalTicks() > 0 ? new Diet(worker.mealIntervalTicks(), worker.starveAfterTicks(), true) : null;
         }
         var soldiers = colony.profile().soldiers().orElse(null);
-        boolean soldier = colony.hooks().all(ColonyHooks.CASTES).stream().anyMatch(castes -> castes.castes().contains(caste));
+        boolean soldier = colony.isOwnCaste(caste);
         return soldier && soldiers != null && soldiers.mealIntervalTicks() > 0 ? new Diet(soldiers.mealIntervalTicks(), 0, false) : null;
     }
 

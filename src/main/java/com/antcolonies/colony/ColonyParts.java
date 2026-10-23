@@ -187,10 +187,21 @@ public final class ColonyParts {
             .answers(ColonyQuestions.CLEAR_JOB, 10, Mound::isClearJob) // its own soil where it must be hollow
             .answers(ColonyQuestions.STRUCTURE_TUNNEL, 10, (mound, level, pos) -> mound.getGalleries(level).contains(pos))
             .plugs(ColonyHooks.LIST_BUILDING, 10, mound -> mound::describe)
+            .plugs(ColonyHooks.CRUST, 10, mound -> com.antcolonies.registry.ModBlocks.MUD_CRUST.get())
             .plugs(ColonyHooks.STRUCTURE, 10, mound -> new ColonyHooks.Structure() {
                 @Override
                 public Map<BlockPos, MoundPlan.Part> parts(Level level) {
                     return mound.getParts(level);
+                }
+
+                @Override
+                public void addInside(Level level, Set<BlockPos> cells, Set<BlockPos> channels) {
+                    mound.addInside(level, cells, channels);
+                }
+
+                @Override
+                public boolean isChannel(net.minecraft.world.level.block.state.BlockState state) {
+                    return MoundReach.channelKind(state) != null;
                 }
 
                 @Override
@@ -354,7 +365,17 @@ public final class ColonyParts {
             .plugs(ColonyHooks.AWAY_AFTER_NURSES, 10, garden -> new GardenAway(garden)::grow) // nodules grow and the comb ages while away
             .answers(ColonyQuestions.NOTHING_TO_EAT_IN_STORE, 10, (garden, level, nothing) -> garden.oldKnown() <= 0) // no old layer as far as the brain knows
             .plugs(ColonyHooks.NURSE_FOOD, 10, garden -> garden) // fungus nodules
-            .plugs(ColonyHooks.GARDEN, 10, garden -> garden::getCombs)
+            .plugs(ColonyHooks.GARDEN, 10, garden -> new ColonyHooks.Garden() {
+                @Override
+                public List<BlockPos> beds(Level level) {
+                    return garden.getCombs(level);
+                }
+
+                @Override
+                public ColonyHooks.Ages age(ServerLevel level, List<net.minecraft.world.phys.Vec3> eyes, ColonyHooks.Ages owed, int most) {
+                    return garden.age(level, eyes, owed, most);
+                }
+            })
             .plugs(ColonyHooks.LIST_FOOD, 10, garden -> garden::describe)
             .saves(FungusGarden::save, FungusGarden::load)
             .sample(FungusGarden::fillForTests));

@@ -93,7 +93,7 @@ public class WorkerFood {
         net.minecraft.world.level.block.state.BlockState before = level.getBlockState(meal.spot());
         ItemStack piece = meal.food() == MealFood.STORE ? colony.food().eatSeedAt(level, meal.spot(), worker.getUUID())
                 : colony.nurseFood().takeFoodAt(level, meal.spot(), false);
-        if (!piece.isEmpty() && meal.food() == MealFood.STORE && before.getBlock() instanceof com.antcolonies.block.FungusCombBlock) {
+        if (!piece.isEmpty() && meal.food() == MealFood.STORE && com.antcolonies.block.GardenBed.isBed(before)) {
             // Old comb is dry and crumbly: crumbs fall where it is chewed off.
             level.sendParticles(new net.minecraft.core.particles.BlockParticleOption(net.minecraft.core.particles.ParticleTypes.BLOCK, before),
                     meal.spot().getX() + 0.5, meal.spot().getY() + 0.05, meal.spot().getZ() + 0.5, 6, 0.25, 0.02, 0.25, 0.0);

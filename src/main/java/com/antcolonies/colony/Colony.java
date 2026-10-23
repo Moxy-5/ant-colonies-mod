@@ -288,8 +288,11 @@ public class Colony {
         return hooks.first(ColonyHooks.TRAILS);
     }
 
-    /** The mound's blocks and what each is (none for a species without a mound; see {@link Mound#getParts}). */
-    public Map<BlockPos, MoundPlan.Part> moundParts(Level level) {
+    /**
+     * The blocks of the structure built over the nest (the termite mound, {@link ColonyHooks#STRUCTURE}), each with what
+     * it is to its builders; none for a species without one. Shared code only asks which cells are in it.
+     */
+    public Map<BlockPos, ?> moundParts(Level level) {
         ColonyHooks.Structure structure = hooks.first(ColonyHooks.STRUCTURE);
         return structure == null ? Map.of() : structure.parts(level);
     }
@@ -604,6 +607,11 @@ public class Colony {
         return level.getEntitiesOfClass(AbstractAntEntity.class, around,
                         king -> founder.isOne(king) && king.isAlive() && id.equals(king.getColonyId()))
                 .stream().findFirst().orElse(null);
+    }
+
+    /** Step 9c: whether this caste is one of the species' own castes beyond the worker (the termite soldiers, {@link ColonyHooks#CASTES}). */
+    public boolean isOwnCaste(@Nullable String caste) {
+        return caste != null && hooks.all(ColonyHooks.CASTES).stream().anyMatch(castes -> castes.castes().contains(caste));
     }
 
     /** How many founders beside the queen the colony counts (the termite king; none for a lone queen's species). */

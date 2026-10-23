@@ -8,7 +8,7 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import com.antcolonies.block.FungusCombBlock;
+import com.antcolonies.block.GardenBed;
 import com.antcolonies.entity.AntEggEntity;
 import com.antcolonies.entity.AntLarvaEntity;
 import com.antcolonies.entity.AbstractAntEntity;
@@ -293,7 +293,7 @@ public class Brood {
     }
 
     /** The word a young one's caste is saved under (the soldiers' "MINOR", "MAJOR", as before step 9c: old saves load). */
-    static String savedAs(Colony colony, String caste) {
+    public static String savedAs(Colony colony, String caste) {
         for (ColonyHooks.Castes castes : colony.hooks().all(ColonyHooks.CASTES)) {
             String word = castes.savedAs(caste);
             if (word != null) {
@@ -304,7 +304,7 @@ public class Brood {
     }
 
     /** The caste saved under this word ({@link #savedAs}). */
-    static String fromSaved(Colony colony, String word) {
+    public static String fromSaved(Colony colony, String word) {
         for (ColonyHooks.Castes castes : colony.hooks().all(ColonyHooks.CASTES)) {
             String caste = castes.fromSaved(word);
             if (caste != null) {
@@ -432,7 +432,7 @@ public class Brood {
                 BlockState state = level.getBlockState(pos);
                 if (state.isAir()) {
                     free.add(pos);
-                } else if (state.is(ModBlocks.FUNGUS_COMB.get())) {
+                } else if (GardenBed.isBed(state)) {
                     onComb.add(pos);
                 }
             }
@@ -446,7 +446,8 @@ public class Brood {
     }
 
     /**
-     * How high over the bottom of this cell an egg or a young one lies: on top of a fungus comb, otherwise on the floor.
+     * How high over the bottom of this cell an egg or a young one lies: on top of a garden bed (a fungus comb), otherwise
+     * on the floor.
      * -1 if nothing can be put there (a block in the way).
      */
     public static double restingHeight(Level level, BlockPos spot) {
@@ -454,7 +455,7 @@ public class Brood {
         if (state.isAir()) {
             return 0.0;
         }
-        return state.is(ModBlocks.FUNGUS_COMB.get()) ? FungusCombBlock.topOf(state) : -1.0;
+        return state.getBlock() instanceof GardenBed bed ? bed.restingHeight(state) : -1.0;
     }
 
     /** A worker puts its egg down at {@code spot}. False if another egg lies there (the worker looks for another spot). */

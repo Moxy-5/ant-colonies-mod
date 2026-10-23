@@ -14,7 +14,7 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.block.EatenInStages;
 import com.antcolonies.block.MudCastBlock;
-import com.antcolonies.block.MudCrustBlock;
+import com.antcolonies.block.FacedWall;
 import com.antcolonies.block.SeedPileBlock;
 import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.species.SpeciesProfile;
@@ -434,7 +434,7 @@ public class FoodStore {
         BlockPos top = new BlockPos(x, level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z), z);
         // The first air above any block (a thin branch over a gallery dug under it is no surface for MOTION_BLOCKING),
         // and mud plastered over food (a branch's casing, a log's top) does not hide it.
-        while (MudCrustBlock.isCrust(level.getBlockState(top.below()))) {
+        while (FacedWall.isWall(level.getBlockState(top.below()))) {
             top = top.below();
         }
         boolean found = false;
@@ -484,7 +484,7 @@ public class FoodStore {
                 run++;
                 continue;
             }
-            boolean passable = state.isAir() || MudCrustBlock.isCrust(state) || isTreeTop(state) || !state.blocksMotion();
+            boolean passable = state.isAir() || FacedWall.isWall(state) || isTreeTop(state) || !state.blocksMotion();
             if (passable) {
                 // Wood over the colony's own feeding gallery or a mud cast left of eaten wood counts too, as the ground
                 // under it does: it is eaten from there, block after block up the trunk (the user's ask, 2026-10-19:
@@ -816,12 +816,12 @@ public class FoodStore {
             return;
         }
         BlockState above = level.getBlockState(top);
-        if (!above.isAir() && !MudCrustBlock.isCrust(above) || MudCrustBlock.hasFace(above, net.minecraft.core.Direction.DOWN)
+        if (!above.isAir() && !FacedWall.isWall(above) || FacedWall.hasFace(above, net.minecraft.core.Direction.DOWN)
                 || colony.nest().nestCells(level).contains(top) || colony.foragingHoles().isHole(level, top)
                 || !level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class, new net.minecraft.world.phys.AABB(top)).isEmpty()) {
             return;
         }
-        level.setBlock(top, ModBlocks.MUD_CRUST.get().withFace(above, net.minecraft.core.Direction.DOWN), 3);
+        level.setBlock(top, colony.hooks().first(ColonyHooks.CRUST).withFace(above, net.minecraft.core.Direction.DOWN), 3);
     }
 
     /** Forgets the cuts made at this plant: it is counted by how eaten it looks again. For tests. */

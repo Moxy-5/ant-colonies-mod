@@ -10,7 +10,7 @@ import java.util.Set;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.block.MudCrustBlock;
+import com.antcolonies.block.FacedWall;
 import com.antcolonies.block.SeedPileBlock;
 import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.registry.ModTags;
@@ -675,7 +675,7 @@ public class Nest {
      * an older gallery in the way of a new one).
      */
     static boolean isSoil(BlockState state) {
-        return state.is(ModTags.DIGGABLE) || MudCrustBlock.isCrust(state);
+        return state.is(ModTags.DIGGABLE) || FacedWall.isWall(state);
     }
 
     /** Open, or only a heap of seeds, bread or forage on the floor: the block is dug out. A chunk that is not loaded counts as not dug. */
@@ -919,22 +919,19 @@ public class Nest {
             }
             channels.addAll(casts.keySet());
             castGalleries = casts;
-            colony.moundParts(level).forEach((pos, part) -> {
-                if (part == MoundPlan.Part.OPEN) {
-                    // Only once roofed over: a young mound's shaft open to the sky is outside (termites coming home
-                    // stopped in it, clinging to its walls above the plug, the user's bug of 2026-10-13).
-                    if (level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, pos.getX(), pos.getZ()) > pos.getY() + 1) {
-                        cells.add(pos);
-                    }
-                } else if (part == MoundPlan.Part.MOUTH || part == MoundPlan.Part.TUNNEL || part == MoundPlan.Part.SPIRE) {
-                    channels.add(pos);
-                }
-            });
+            ColonyHooks.Structure structure = colony.hooks().first(ColonyHooks.STRUCTURE); // (the mound's hollow shaft and channels)
+            if (structure != null) {
+                structure.addInside(level, cells, channels);
+            }
             inside = cells;
             insideChannels = channels;
             insideTick = now;
         }
-        return inside.contains(cell) || (insideChannels.contains(cell) && MoundReach.channelKind(level.getBlockState(cell)) != null);
+        if (inside.contains(cell)) {
+            return true;
+        }
+        ColonyHooks.Structure structure = insideChannels.contains(cell) ? colony.hooks().first(ColonyHooks.STRUCTURE) : null;
+        return structure != null && structure.isChannel(level.getBlockState(cell));
     }
 
     /** At most this many mud casts are joined to the galleries (a fallen tree is about 8 blocks). */

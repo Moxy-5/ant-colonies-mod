@@ -67,7 +67,7 @@ public final class MoundReach {
      * still empty but will be soil or a piece: that is outside air for now).
      */
     public static boolean isHollowInside(Level level, Colony colony, BlockPos cell) {
-        MoundPlan.Part part = colony.moundParts(level).get(cell);
+        MoundPlan.Part part = Mound.partsOf(colony, level).get(cell);
         return (part == null || part == MoundPlan.Part.OPEN) && colony.nest().isInside(level, cell)
                 && level.getBlockState(cell).getCollisionShape(level, cell).isEmpty();
     }
@@ -91,7 +91,7 @@ public final class MoundReach {
         if (side != null) {
             return MoundGrowth.canOpenWindow(kind, side) ? side : null;
         }
-        java.util.Map<BlockPos, MoundPlan.Part> parts = colony.moundParts(level);
+        java.util.Map<BlockPos, ?> parts = colony.moundParts(level);
         return MoundGrowth.windowPast(from, target, kind, pos -> isEmpty(level, pos) && !parts.containsKey(pos));
     }
 

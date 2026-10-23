@@ -87,6 +87,53 @@ public class FungusGarden implements NurseFood {
         this.colony = colony;
     }
 
+    /**
+     * Step 9c, moved from {@link NestLedger}: the layers that ripened and went old while away, put on combs out of every
+     * player's sight, at most {@code most} of each; a kind no comb is left to take is dropped.
+     */
+    ColonyHooks.Ages age(ServerLevel level, List<net.minecraft.world.phys.Vec3> eyes, ColonyHooks.Ages owed, int most) {
+        int ripened = owed.ripened();
+        int aged = owed.aged();
+        boolean changed = false;
+        List<BlockPos> combs = getCombs(level);
+        for (int tries = 0; ripened > 0 && tries < most; tries++) {
+            BlockPos spot = pickToAge(level, combs, eyes, state -> FungusCombBlock.fresh(state) > 0);
+            if (spot == null) {
+                ripened = combs.stream().anyMatch(pos -> FungusCombBlock.fresh(level.getBlockState(pos)) > 0) ? ripened : 0;
+                break;
+            }
+            level.setBlock(spot, FungusCombBlock.ripenOne(level.getBlockState(spot)), 3);
+            ripened--;
+            changed = true;
+        }
+        for (int tries = 0; aged > 0 && tries < most; tries++) {
+            BlockPos spot = pickToAge(level, combs, eyes, state -> FungusCombBlock.ripe(state) > 0);
+            if (spot == null) {
+                aged = combs.stream().anyMatch(pos -> FungusCombBlock.ripe(level.getBlockState(pos)) > 0) ? aged : 0;
+                break;
+            }
+            level.setBlock(spot, FungusCombBlock.ageOne(level.getBlockState(spot)), 3);
+            aged--;
+            changed = true;
+        }
+        return new ColonyHooks.Ages(ripened, aged, changed);
+    }
+
+    /** A comb out of every player's sight whose state passes {@code test}, or null. */
+    @Nullable
+    private BlockPos pickToAge(ServerLevel level, List<BlockPos> combs, List<net.minecraft.world.phys.Vec3> eyes,
+            java.util.function.Predicate<BlockState> test) {
+        List<BlockPos> fits = new ArrayList<>();
+        for (BlockPos pos : combs) {
+            BlockState state = level.getBlockState(pos);
+            if (state.getBlock() instanceof FungusCombBlock && test.test(state)
+                    && Population.outOfSight(level, net.minecraft.world.phys.Vec3.atCenterOf(pos), eyes)) {
+                fits.add(pos);
+            }
+        }
+        return fits.isEmpty() ? null : fits.get(colony.random().nextInt(fits.size()));
+    }
+
     /** The fungus comb blocks in the dug-out garden rooms. */
     public List<BlockPos> getCombs(Level level) {
         List<BlockPos> combs = new ArrayList<>();

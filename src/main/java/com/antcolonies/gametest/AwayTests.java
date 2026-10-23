@@ -1608,6 +1608,7 @@ public class AwayTests {
                 Map.entry(com.antcolonies.colony.ColonyHooks.HIDDEN_AWAY, List.of("hidden_trips")),
                 Map.entry(com.antcolonies.colony.ColonyHooks.STRUCTURE, List.of("mound")),
                 Map.entry(com.antcolonies.colony.ColonyHooks.GARDEN, List.of("fungus_garden")),
+                Map.entry(com.antcolonies.colony.ColonyHooks.CRUST, List.of("mound")), // step 9c
                 Map.entry(com.antcolonies.colony.ColonyHooks.AWAY_BUILDER, List.of("hill", "mound")),
                 Map.entry(com.antcolonies.colony.ColonyHooks.NUMBERS_SEARCH, List.of("forager_spots")),
                 Map.entry(com.antcolonies.colony.ColonyHooks.AWAY_BESIDE_QUEEN, List.of("king_care")),
@@ -1659,6 +1660,28 @@ public class AwayTests {
         colony.hooks().all(com.antcolonies.colony.ColonyHooks.CASTES).forEach(castes -> fed.addAll(castes.fedByNurses(helper.getLevel())));
         helper.assertTrue(fed.equals(colony.part(com.antcolonies.colony.ColonyParts.SOLDIERS).map(soldiers -> soldiers.getSoldiers(helper.getLevel()))
                 .orElse(List.of())), "a " + colony.getSpecies() + " colony's nurses should feed exactly its soldiers besides the queen and king");
+        // Step 9c: each species' bodies come from its table, as they did when the shared code asked "is this Macrotermes?".
+        boolean termites = colony.getSpecies().equals(com.antcolonies.species.Species.MACROTERMES);
+        com.antcolonies.species.SpeciesBodies bodies = com.antcolonies.species.SpeciesBodies.of(colony.getSpecies());
+        helper.assertTrue(bodies.typeFor(com.antcolonies.colony.Caste.WORKER) == (termites ? ModEntities.TERMITE_WORKER.get() : ModEntities.WORKER_ANT.get())
+                && bodies.corpse().get() == (termites ? ModEntities.TERMITE_CORPSE.get() : ModEntities.ANT_CORPSE.get())
+                && bodies.young().get() == (termites ? ModEntities.TERMITE_NYMPH.get() : ModEntities.ANT_LARVA.get()),
+                "a " + colony.getSpecies() + " colony's worker, body and young should be the species' own");
+        for (com.antcolonies.entity.TermiteSoldierEntity.Rank rank : com.antcolonies.entity.TermiteSoldierEntity.Rank.values()) {
+            String caste = rank.caste();
+            helper.assertTrue(colony.isOwnCaste(caste) == termites
+                    && bodies.typeFor(caste) == (!termites ? null : rank == com.antcolonies.entity.TermiteSoldierEntity.Rank.MINOR
+                            ? ModEntities.TERMITE_MINOR_SOLDIER.get() : ModEntities.TERMITE_MAJOR_SOLDIER.get())
+                    && (!termites || com.antcolonies.colony.Brood.savedAs(colony, caste).equals(rank.name()) // (saved as before)
+                            && com.antcolonies.colony.Brood.fromSaved(colony, rank.name()).equals(caste)),
+                    "a " + colony.getSpecies() + " colony's " + caste + " should be its own caste, body and save word exactly for termites");
+        }
+        helper.assertTrue(!colony.isOwnCaste(com.antcolonies.colony.Caste.WORKER) && !colony.isOwnCaste(null),
+                "a worker is never one of a species' own castes beyond the worker");
+        // Step 9c: the crust a colony plasters with is the mud crust, for the species that build a mound.
+        helper.assertTrue(colony.hooks().first(com.antcolonies.colony.ColonyHooks.CRUST)
+                == (colony.has(com.antcolonies.colony.ColonyParts.MOUND) ? com.antcolonies.registry.ModBlocks.MUD_CRUST.get() : null),
+                "a " + colony.getSpecies() + " colony should plaster with the mud crust exactly when it builds a mound");
     }
 
     /** The parts of a colony saved into a tag of their own each, by name (the parts that are not saved left out). */

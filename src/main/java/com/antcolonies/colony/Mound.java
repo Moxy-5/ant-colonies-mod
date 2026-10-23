@@ -321,6 +321,29 @@ public class Mound {
         return true;
     }
 
+    /** A colony's mound cells (none for a species without a mound): {@link #getParts} through its part. */
+    public static Map<BlockPos, MoundPlan.Part> partsOf(Colony colony, Level level) {
+        return colony.part(ColonyParts.MOUND).map(mound -> mound.getParts(level)).orElse(Map.of());
+    }
+
+    /**
+     * The mound's cells inside the home ({@link Nest#isInside}): its hollow shaft once roofed over into {@code cells},
+     * its built mouths, tunnels and spire pieces into {@code channels}.
+     */
+    void addInside(Level level, java.util.Set<BlockPos> cells, java.util.Set<BlockPos> channels) {
+        getParts(level).forEach((pos, part) -> {
+            if (part == MoundPlan.Part.OPEN) {
+                // Only once roofed over: a young mound's shaft open to the sky is outside (termites coming home
+                // stopped in it, clinging to its walls above the plug, the user's bug of 2026-10-13).
+                if (level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, pos.getX(), pos.getZ()) > pos.getY() + 1) {
+                    cells.add(pos);
+                }
+            } else if (part == MoundPlan.Part.MOUTH || part == MoundPlan.Part.TUNNEL || part == MoundPlan.Part.SPIRE) {
+                channels.add(pos);
+            }
+        });
+    }
+
     /** Every cell of the mound at its stage now, in world positions. Empty if the colony builds no mound. */
     public Map<BlockPos, MoundPlan.Part> getParts(Level level) {
         MoundNumbers numbers = numbers();

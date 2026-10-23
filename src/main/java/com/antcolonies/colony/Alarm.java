@@ -267,7 +267,7 @@ public class Alarm {
     /** Whether the player stands on the mound: on a block of it, or right round the entrance. */
     private boolean isOnMound(Level world, Player player) {
         BlockPos feet = player.blockPosition();
-        Map<BlockPos, MoundPlan.Part> parts = colony.moundParts(world);
+        Map<BlockPos, ?> parts = colony.moundParts(world);
         if (parts.containsKey(feet) || parts.containsKey(feet.below())) {
             return true;
         }

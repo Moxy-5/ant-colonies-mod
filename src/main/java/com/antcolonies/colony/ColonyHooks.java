@@ -155,8 +155,17 @@ public final class ColonyHooks {
 
     /** The structure built over the nest (the termite mound): its blocks, its tunnels and its next block to dig. */
     public interface Structure {
-        /** Its blocks and what each is. */
-        Map<BlockPos, MoundPlan.Part> parts(Level level);
+        /** Its blocks and what each is (to the species; shared code only asks which cells are in it). */
+        Map<BlockPos, ?> parts(Level level);
+
+        /**
+         * Step 9c: its cells that count as inside the home ({@link Nest#isInside}): its hollow cells (once roofed over)
+         * into {@code cells}, its built channels (tunnels, hollow spire pieces, mouths) into {@code channels}.
+         */
+        void addInside(Level level, Set<BlockPos> cells, Set<BlockPos> channels);
+
+        /** Step 9c: whether this block is a channel a member inside it is in (a tunnel block, a hollow spire piece, a mouth). */
+        boolean isChannel(BlockState state);
 
         /** Its tunnels, dug as part of the nest. */
         List<BlockPos> tunnels(Level level);
@@ -166,10 +175,20 @@ public final class ColonyHooks {
         BlockPos digTarget(Level level, @Nullable UUID digger);
     }
 
-    /** A food garden in the nest whose blocks age (the fungus comb): its blocks as known now. */
-    @FunctionalInterface
+    /** A food garden in the nest whose blocks age (the fungus comb). */
     public interface Garden {
+        /** Its blocks as known now. */
         List<BlockPos> beds(Level level);
+
+        /**
+         * Step 9c: puts the ageing owed from while away ({@link NestLedger}) on its beds out of every player's sight, at
+         * most {@code most} of each kind; returns what is still owed (none of a kind once no bed is left to take it).
+         */
+        Ages age(ServerLevel level, List<net.minecraft.world.phys.Vec3> eyes, Ages owed, int most);
+    }
+
+    /** Ageing owed to a garden's beds: layers ripened, layers gone old; {@code changed} when any block was changed. */
+    public record Ages(int ripened, int aged, boolean changed) {
     }
 
     /**
@@ -305,6 +324,8 @@ public final class ColonyHooks {
     public static final Kind<Structure> STRUCTURE = Kind.of("structure");
     /** Step 8b: a food garden whose blocks age (the fungus comb). */
     public static final Kind<Garden> GARDEN = Kind.of("garden");
+    /** Step 9c: the wall of plates a colony plasters with (the termites' mud crust), for species with crust walls. */
+    public static final Kind<com.antcolonies.block.FacedWall> CRUST = Kind.of("crust");
     /** Step 8c: the species' share of the building on return (the harvester's hill, the termite mound). */
     public static final Kind<AwayBuilder> AWAY_BUILDER = Kind.of("away_builder");
     /** Step 8c: the forager numbers searching alone (the harvester's forager spots). */

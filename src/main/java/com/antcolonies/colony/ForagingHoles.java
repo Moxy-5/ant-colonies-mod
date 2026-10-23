@@ -591,13 +591,13 @@ public class ForagingHoles {
                         continue;
                     }
                     BlockState state = level.getBlockState(wall);
-                    if (!com.antcolonies.block.MudCrustBlock.hasFace(state, side.getOpposite())) {
+                    if (!com.antcolonies.block.FacedWall.hasFace(state, side.getOpposite())) {
                         continue;
                     }
                     any = true;
                     if (colony.random().nextInt(CRUMBLE_CHANCE) == 0) {
-                        BlockState less = state.setValue(com.antcolonies.block.MudCrustBlock.FACES.get(side.getOpposite()), false);
-                        boolean empty = com.antcolonies.block.MudCrustBlock.FACES.values().stream().noneMatch(less::getValue);
+                        BlockState less = com.antcolonies.block.FacedWall.withoutFace(state, side.getOpposite());
+                        boolean empty = com.antcolonies.block.FacedWall.hasNoFace(less);
                         level.levelEvent(net.minecraft.world.level.block.LevelEvent.PARTICLES_DESTROY_BLOCK, wall,
                                 net.minecraft.world.level.block.Block.getId(state));
                         if (empty) {

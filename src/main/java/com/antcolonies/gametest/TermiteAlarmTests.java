@@ -419,7 +419,7 @@ public class TermiteAlarmTests {
             colony.part(ColonyParts.ALARM).orElseThrow().calmForTests();
             // A player breaking a wall of the mound (the user's report of 2026-10-22): a break-in too.
             colony.part(ColonyParts.MOUND).orElseThrow().buildInstantly(level, 3);
-            BlockPos moundWall = colony.moundParts(level).entrySet().stream()
+            BlockPos moundWall = com.antcolonies.colony.Mound.partsOf(colony, level).entrySet().stream()
                     .filter(part -> part.getValue() == com.antcolonies.colony.MoundPlan.Part.WALL && !level.getBlockState(part.getKey()).isAir())
                     .map(java.util.Map.Entry::getKey).max(java.util.Comparator.comparingInt(BlockPos::getY)).orElseThrow();
             net.minecraft.server.level.ServerPlayer builder = helper.makeMockServerPlayerInLevel();
