@@ -61,6 +61,7 @@ in-game test at the end (termites, a new world, about 30 minutes), then one merg
 **Where each step runs (the user, 2026-10-23):** T3 and T4 in a linked session on their own branch (`apex-t3-t4`), merged into `claude/apex-termites` before T5; T1, T2 and T5 here.
 
 **T1 BUILT 2026-10-23** (`SpeciesSection`, `SavannaNumbers`, `DesertNumbers`; every number the same before and after).
+**T2 BUILT 2026-10-23** (`Galleries` a hub of 455 lines, with `GalleryWeb`, `HoleTurns`, `GalleryUpkeep`, `GalleryCatchUp`; the feeding galleries, casts, mound building and comb were already behind sockets since the split, two termite names renamed; king, mound and sheeting kept as shared words, real in other species too).
 
 **Not in part 3:** the shared fight system and a shared "defender" (M8 builds it with the Matabele ant as the first
 fighter; the termite soldiers join it then); `ScoutGoal` in three (errand helper step 4, part 4 or M8's scouts); the
