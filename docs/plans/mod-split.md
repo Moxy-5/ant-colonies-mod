@@ -1,6 +1,11 @@
 # The split into three mods (Project Apex part 2, roadmap 3c)
 
-**Status:** planned with the user 2026-10-22, **waiting for the user's calls** (end of this file). Nothing built.
+**Status:** planned with the user 2026-10-22; **the user's calls made 2026-10-22: every recommendation taken**
+("Yes, go with your recommended calls"): the names "Colony Framework" (`colonyframework`), the savanna mod keeps
+`antcolonies` and "Ant & Termite Colonies", "Desert Colonies" (`desertcolonies`); the in-game changes that come with
+the split accepted (three mods in the list, the harvester's names in commands, item order within a tab); old
+harvester worlds forwarded; the species numbers moved in Apex part 3 (call 4 (a), `apex.md` step 12). The trip date
+is still to come from the user (it sets the stop rule). Nothing built.
 
 ## What the user decided (2026-10-22)
 - Three mods in **one repository**: three folders (Gradle subprojects: one build split into parts that are built and
@@ -183,7 +188,7 @@ stack" and folders, `docs/DESIGN.md` architecture, `docs/HISTORY.md`).
 12. **Checks:** the wall checker until S6, the compiler after; the census at S1, S5, S7, S10; the guard films and anim
    lab at S5 and S8; one speed check at S10.
 
-## Your calls (in ant terms)
+## Your calls (in ant terms; **decided 2026-10-22: every recommendation below taken**)
 1. **The names.** Three mods show up in the game's mod list. Names to pick:
    - the framework: my suggestion "Colony Framework" (`colonyframework`);
    - the savanna mod: keeps `antcolonies` (my pick 1, needed for old termite worlds); its shown name stays "Ant &

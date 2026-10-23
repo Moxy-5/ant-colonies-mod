@@ -284,7 +284,7 @@ calls). Found while planning it (the "ideas found along the way" rule):
    could not compile without them, so they move in the split itself: steps S2 and S3 of `mod-split.md`. Nothing
    changes in-game.
 
-**Before part 3 (the termites), unless the user picks it for the split (`mod-split.md`, your call 4):**
+**Before part 3 (the termites), its first step (the user's call 2026-10-22, `mod-split.md` call 4):**
 12. **Each species' numbers read by its own part.** `species/SpeciesProfile` (1,562 lines) holds every species' number
    groups (mound, galleries, garden, soldiers, alarm; door, patrol, search, recruits, trunk trails, night soil). Only
    numbers, so the wall holds, but a new species (the Matabele ant) would need an edit in the framework's reader. Fix:
