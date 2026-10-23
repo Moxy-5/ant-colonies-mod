@@ -175,6 +175,7 @@ A Minecraft mod where ants and termites live as real colonies: they dig, build, 
 - **Notes merge cleanly (2026-10-23):** union merge for the three shared notes, new bug numbers from `python tools/bug_number.py`, the build stops on a doubled number; the rule is in "Notes on branches" above. Merged into `master` (notes and tools only).
 - **Full run on `master` after the split and the two fix merges (2026-10-23): 143 of 143 on 6 servers, 23 minutes.**
 - **Apex part 3, the termites, planned 2026-10-23** (`docs/plans/apex-termites.md`, branch `claude/apex-termites`): T1 species numbers read by their own parts, T2 the galleries in four parts, T3 the last termite work out of the framework, T4 one "what I carry" slot, T5 the route search bursts, T6 the gallery flakes (BUGS 55, 62), T7 the full check; 4 rounds, one in-game test at the end, one merge; nothing changes in-game. Waiting for the user's go.
+- **Apex part 3 folded to 5 steps, 3 rounds (the user's ask, 2026-10-23):** T1 numbers; T2 galleries and the last termite work out of the framework; T3 the carry slot; T4 the route bursts; T5 the gallery flakes and the full check. Started 2026-10-23 (round 1: T1 + T2).
 
 ## Other notes files (read only when the task needs them)
 - `docs/DESIGN.md`: every design decision for the species and shared systems (read the section for a feature before working on it).

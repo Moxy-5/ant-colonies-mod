@@ -24,8 +24,8 @@ in-game test at the end (termites, a new world, about 30 minutes), then one merg
   dead termites and hurt nestmates: today that is two more flags and two more switches in the framework.
 - The termite stress test shows bursts of failed route searches about once a second for a minute (800 to 1,300 steps
   each, up to 27 ms), cause not found (`apex.md`, "Also found 2026-10-20").
-- `docs/BUGS.md` 65 (the alarm stuck on after a chicken fell into a hole) is a real bug: its own session, not a part 3
-  step (the autonomous-mode rule in `CLAUDE.md`).
+- `docs/BUGS.md` 65 (the alarm stuck on after a chicken fell into a hole): fixed in its own session and merged into
+  `master` 2026-10-23, merged into this branch before T1.
 
 ## The steps
 - **T1, each species' numbers read by its own part** (`apex.md` step 12). Each number group's reader moves next to its
@@ -34,30 +34,29 @@ in-game test at the end (termites, a new world, about 30 minutes), then one merg
   nest, danger, neighbours, body language) stay in the framework. The species files keep their exact layout; a wrong
   name still stops the game loading with a message. Check: every number read before and after is the same (a unit
   test reads both species files and compares).
-- **T2, the galleries in four parts** (`Galleries` 2,236 lines): the web (shape, tips, forks, growth toward food), the
-  holes' turns, the upkeep (filling in, walling off), the catch-up after coming back; one small hub keeps today's
-  questions and hooks answered. Save names unchanged. Check: the gallery proof (400 made-up landscapes) and the
-  `termitefood,away,hills` categories as today.
-- **T3, the last termite work out of the framework's shared parts:** the feeding galleries and mud casts behind the
-  existing `FeedingWays` socket in the savanna mod; the mound passes in `BuildLife` through the build hook; the comb's
-  line in `FoodStore` through the garden. Foraging holes themselves stay shared (many real species have several
-  entrances: leafcutters, later termites of other mods). Check: `grep` finds no termite-only word in framework code
-  lines, outside comments and the test kit.
-- **T4, one "what I carry" slot in the shared body:** every carried load (soil pellet, seed, bread, egg, body, forage,
+- **T2, the galleries in four parts, and the last termite work out of the framework** (`Galleries` 2,236 lines): the
+  web (shape, tips, forks, growth toward food), the holes' turns, the upkeep (filling in, walling off), the catch-up
+  after coming back; one small hub keeps today's questions and hooks answered; save names unchanged. With it, as both
+  are gallery work: the feeding galleries and mud casts behind the existing `FeedingWays` socket in the savanna mod,
+  the mound passes in `BuildLife` through the build hook, the comb's line in `FoodStore` through the garden. Foraging
+  holes themselves stay shared (many real species have several entrances: leafcutters, later termites of other
+  mods). Check: the gallery proof (400 made-up landscapes), `termitefood,away,hills`, and `grep` finds no
+  termite-only word in framework code lines outside comments and the test kit.
+- **T3, one "what I carry" slot in the shared body:** every carried load (soil pellet, seed, bread, egg, body, forage,
   nodule, ...) one row in a list the species fill, one synced slot, one save; the renderer draws the row's look. A
   new load (a dead termite, a hurt nestmate) is then a new row in the species mod. Save names kept so a carried load
   survives a reload. Check: the guard films (15 of 15 picture for picture the same) and `legs,soldiers,termitefood`.
-- **T5, the route search bursts:** find why the termite stress test searches and fails in bursts, and fix it the way
+- **T4, the route search bursts:** find why the termite stress test searches and fails in bursts, and fix it the way
   `docs/BUGS.md` 42 did (remember a target with no way and leave it alone for a while). Speed measured with
   `/antcolonies perf` and the stress test, before and after (6 runs a side). If the fix would change anything you
   could see (an insect giving up on work it does today), I stop and ask first.
-- **T6, the two old gallery flakes** (`docs/BUGS.md` 55 and 62): with T2 done, find why they fail beside other tests
-  (box 4 of the 4-box rule: a leak between tests, not a loosened check). Every full run then passes clean, with no
-  reruns alone.
-- **T7, the full check:** full run on 6 servers, the stress test and `/antcolonies perf` against `master`, guard films,
-  anim lab, the notes; then the user's in-game test and the merge.
+- **T5, the full check, with the two old gallery flakes** (`docs/BUGS.md` 55 and 62): with the galleries split, find
+  why they fail beside other tests (box 4 of the 4-box rule: a leak between tests, not a loosened check), so every
+  full run passes clean with no reruns alone; then the full run on 6 servers, the stress test and `/antcolonies perf`
+  against `master`, guard films, anim lab, the notes; then the user's in-game test and the merge.
 
-**Rounds:** 1 T1; 2 T2 + T3; 3 T4 + T5; 4 T6 + T7. One full run per round.
+**Rounds** (the user, 2026-10-23: fewer steps where two quick ones go together; 7 steps folded into 5): 1 T1 + T2;
+2 T3 + T4; 3 T5. One full run per round.
 
 **Not in part 3:** the shared fight system and a shared "defender" (M8 builds it with the Matabele ant as the first
 fighter; the termite soldiers join it then); `ScoutGoal` in three (errand helper step 4, part 4 or M8's scouts); the
@@ -66,6 +65,8 @@ legs tests on a savanna body (`apex.md` step 13, before the harvester ant leaves
 ## My picks (code-only; you may skip this list)
 - Rounds as in the split: one full run per round, one in-game test at the end, one merge; fastest without leaving a
   half-done branch.
+- 3 rounds, not 4: one full run fewer (about 20 minutes saved); each round still small enough to find a failure's
+  cause.
 - T1 first: it is the step the split left for part 3, and every later step's numbers then sit in the right mod.
 - Galleries in four parts by job, not by size, so each part has one reason to change.
 - Foraging holes stay in the framework (several entrances is common to many real species); only the termite-only
@@ -75,9 +76,9 @@ legs tests on a savanna body (`apex.md` step 13, before the harvester ant leaves
   M8 touches it except a dead mound (a new block state, not a mound rework).
 
 ## Your calls
-- **In-game:** nothing should change. T5 is the only step that could (if the fix makes a termite give up sooner on
+- **In-game:** nothing should change. T4 is the only step that could (if the fix makes a termite give up sooner on
   work it can't reach); if so I stop and ask before building it.
-- **Future features:** T1 and T4 make the Matabele ants easier (their numbers and their loads, dead termites and hurt
+- **Future features:** T1 and T3 make the Matabele ants easier (their numbers and their loads, dead termites and hurt
   nestmates, go in the savanna mod with no framework edit). Nothing here limits a future species.
 - **Your time:** one in-game test of about 30 minutes at the end (termites, a new world), same launch command as
   always (`./gradlew runClient` in `C:\Ant Mod`). Full runs take as long as today.
