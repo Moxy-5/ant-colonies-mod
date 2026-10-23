@@ -178,6 +178,7 @@ A Minecraft mod where ants and termites live as real colonies: they dig, build, 
 - **Apex part 3 folded to 5 steps, 3 rounds (the user's ask, 2026-10-23):** T1 numbers; T2 galleries and the last termite work out of the framework; T3 the carry slot; T4 the route bursts; T5 the gallery flakes and the full check. Started 2026-10-23 (round 1: T1 + T2).
 - **Apex part 3, T1 BUILT 2026-10-23** (branch `claude/apex-termites`): each species' numbers read by its own mod (`SpeciesSection`, `SavannaNumbers`, `DesertNumbers`), every number the same before and after; T3 and T4 moved to a linked session at the user's ask (branch `apex-t3-t4`), T2 next here.
 - **Apex part 3, T2 BUILT 2026-10-23** (branch `claude/apex-termites`): the galleries in a small hub and four parts (`GalleryWeb`, `HoleTurns`, `GalleryUpkeep`, `GalleryCatchUp`), save names kept; the framework's last termite names renamed (the rest was already behind sockets since the split); nothing changes in-game. Next: merge T3 + T4 from `claude/apex-t3-t4-2ba1d3`, then T5.
+- **Apex part 3, round 1 full run (T1 + T2), 2026-10-23: 142 of 143** on 6 servers (the old neighbours flake, BUGS 55, T5's work).
 
 ## Other notes files (read only when the task needs them)
 - `docs/DESIGN.md`: every design decision for the species and shared systems (read the section for a feature before working on it).
