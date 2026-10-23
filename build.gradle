@@ -107,8 +107,10 @@ neoForge {
                                 : project.file("tools/film/${name}").absolutePath }.join(',')
             if (project.hasProperty('filmWatch')) {
                 systemProperty 'antcolonies.film.watch', 'true'
-                systemProperty 'antcolonies.film.src', project.file('savanna/src/main/resources').absolutePath
-                systemProperty 'antcolonies.film.out', project.file('savanna/build/resources/main').absolutePath
+                // every mod's files are watched (each mod's own folder; tools/mod_paths.py knows the same list)
+                def modFolders = ['framework', 'savanna', 'desert']
+                systemProperty 'antcolonies.film.src', modFolders.collect { project.file("${it}/src/main/resources").absolutePath }.join(File.pathSeparator)
+                systemProperty 'antcolonies.film.out', modFolders.collect { project.file("${it}/build/resources/main").absolutePath }.join(File.pathSeparator)
                 systemProperty 'antcolonies.film.project', project.projectDir.absolutePath
             }
             // -PfilmDebug: the game listens for the debugger on port 5005, so tools/film.sh swap can swap changed Java

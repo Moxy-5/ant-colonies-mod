@@ -10,9 +10,9 @@ Run with Python 3 and Pillow from the project folder:  python tools/young_textur
 from pathlib import Path
 
 from PIL import Image
+import mod_paths  # noqa: E402  (where each mod's files are: tools/mod_paths.py)
 
 ROOT = Path(__file__).resolve().parent.parent
-ENTITY = ROOT / "savanna/src/main/resources/assets/antcolonies/textures/entity"
 
 # texture name -> (pale colour it is blended toward, how far: 0 = unchanged, 1 = all pale colour)
 YOUNG = {
@@ -22,7 +22,8 @@ YOUNG = {
 
 
 def pale(name, colour, amount):
-    img = Image.open(ENTITY / f"{name}.png").convert("RGBA")
+    entity = mod_paths.model_assets(name) / "textures/entity"   # the mod holding this model
+    img = Image.open(entity / f"{name}.png").convert("RGBA")
     out = img.copy()
     pixels = out.load()
     for y in range(out.height):
@@ -33,7 +34,7 @@ def pale(name, colour, amount):
             # Blend toward the pale colour but keep some of the shading, so the body's plates and joints still show.
             pixels[x, y] = (round(r + (colour[0] - r) * amount), round(g + (colour[1] - g) * amount),
                             round(b + (colour[2] - b) * amount), a)
-    out.save(ENTITY / f"{name}_young.png")
+    out.save(entity / f"{name}_young.png")
     print(f"wrote {name}_young.png")
 
 

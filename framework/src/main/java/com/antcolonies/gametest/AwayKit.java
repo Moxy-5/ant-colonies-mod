@@ -62,7 +62,7 @@ public final class AwayKit {
     }
 
     /** A species' own check of a colony's parts, run on every colony saved and loaded in a test (its tests' sign-up). */
-    public static void addPartsCheck(BiConsumer<GameTestHelper, Colony> check) {
+    public static synchronized void addPartsCheck(BiConsumer<GameTestHelper, Colony> check) {
         PARTS_CHECKS.add(check);
     }
 

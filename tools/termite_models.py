@@ -19,12 +19,13 @@ her face, front_above.png, side.png, top.png), each showing the king, the worker
 100% grown, all at the same scale, and walk.png with four moments of a step.
 """
 import json, math, os, random, struct, zlib
+import mod_paths  # noqa: E402  (where each mod's files are: tools/mod_paths.py)
 
 # Where the forebody (head, thorax, legs) joins the abdomen, in model pixels.
 FOREBODY_JOINT = (0, 1.7, 0.4)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.join(HERE, '..', 'savanna', 'src', 'main', 'resources', 'assets', 'antcolonies')
+ROOT = str(mod_paths.assets('savanna'))
 PREVIEW_DIR = os.path.join(HERE, '..', 'references', 'termites', 'preview')
 
 # --- texture: 64x64, 8x8 swatches, each a colour with a little noise -------------------------------------------

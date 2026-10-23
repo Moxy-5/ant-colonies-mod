@@ -14,9 +14,8 @@ import base64
 import json
 import os
 import uuid
+import mod_paths  # noqa: E402  (where each mod's files are: tools/mod_paths.py)
 
-ASSETS = os.path.join("savanna", "src", "main", "resources", "assets", "antcolonies")
-MOD_ID = "antcolonies"
 
 # Blockbench project, game model, texture, animation file
 PROJECTS = [
@@ -109,7 +108,7 @@ def keyframes(channel, frames):
 def convert(project_path, model, texture, animation_file):
     with open(project_path, encoding="utf-8") as f:
         project = json.load(f)
-    with open(os.path.join(ASSETS, "geo", "entity", model + ".geo.json"), encoding="utf-8") as f:
+    with open(os.path.join(mod_paths.model_assets(model), "geo", "entity", model + ".geo.json"), encoding="utf-8") as f:
         geometry = json.load(f)["minecraft:geometry"][0]
     description = geometry["description"]
 
@@ -141,7 +140,7 @@ def convert(project_path, model, texture, animation_file):
         parent = bone.get("parent")
         (nodes[parent]["children"] if parent else outliner).append(nodes[bone["name"]])
 
-    texture_path = os.path.join(ASSETS, "textures", "entity", texture + ".png")
+    texture_path = os.path.join(mod_paths.model_assets(model), "textures", "entity", texture + ".png")
     with open(texture_path, "rb") as f:
         png = base64.b64encode(f.read()).decode("ascii")
     width, height = description["texture_width"], description["texture_height"]
@@ -149,7 +148,7 @@ def convert(project_path, model, texture, animation_file):
         "path": os.path.abspath(texture_path),
         "name": texture + ".png",
         "folder": "entity",
-        "namespace": MOD_ID,
+        "namespace": mod_paths.namespace(mod_paths.model_mod(model)),
         "id": "0",
         "group": "",
         "width": width,
@@ -174,7 +173,7 @@ def convert(project_path, model, texture, animation_file):
         "source": "data:image/png;base64," + png,
     }]
 
-    with open(os.path.join(ASSETS, "animations", "entity", animation_file + ".animation.json"), encoding="utf-8") as f:
+    with open(os.path.join(mod_paths.model_assets(model), "animations", "entity", animation_file + ".animation.json"), encoding="utf-8") as f:
         animations_in = json.load(f)["animations"]
     animations = []
     for name, data in animations_in.items():
@@ -202,7 +201,7 @@ def convert(project_path, model, texture, animation_file):
     project.update({
         "name": model,
         "model_identifier": model,
-        "geckolib_modid": MOD_ID,
+        "geckolib_modid": mod_paths.namespace(mod_paths.model_mod(model)),
         "resolution": {"width": width, "height": height},
         "visible_box": [description.get("visible_bounds_width", 1), description.get("visible_bounds_height", 1),
                         description.get("visible_bounds_offset", [0, 0, 0])[1]],

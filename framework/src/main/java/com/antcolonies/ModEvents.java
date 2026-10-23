@@ -126,9 +126,10 @@ public class ModEvents {
 
     /**
      * Signs up rows for a creative menu tab ({@code rows} adds them), at {@code place}: rows with a lower place come
-     * first. Called while the mod loads.
+     * first. Called while the mod loads; the game starts its mods side by side, so two species can sign up at the
+     * same moment (synchronized: one at a time, BUGS 64).
      */
-    public static void addToCreativeTab(ResourceKey<CreativeModeTab> tab, int place, Consumer<BuildCreativeModeTabContentsEvent> rows) {
+    public static synchronized void addToCreativeTab(ResourceKey<CreativeModeTab> tab, int place, Consumer<BuildCreativeModeTabContentsEvent> rows) {
         TAB_ROWS.add(new TabRows(tab, place, rows));
         TAB_ROWS.sort(Comparator.comparingInt(TabRows::place));
     }

@@ -29,7 +29,7 @@ public record SpeciesBodies(Supplier<EntityType<AntLarvaEntity>> young, Supplier
     private static final Map<ResourceLocation, SpeciesBodies> BY_SPECIES = new LinkedHashMap<>();
 
     /** Fills in a species' row (once, while the mod loads). */
-    public static void register(ResourceLocation species, SpeciesBodies bodies) {
+    public static synchronized void register(ResourceLocation species, SpeciesBodies bodies) {
         BY_SPECIES.put(species, bodies);
     }
 

@@ -4,7 +4,8 @@
 #
 #   tools/film.sh watch [scenes]   start a film session that stays open (in the background), film the scenes, wait for
 #                                  the pictures. From then on it films them again by itself whenever an animation or
-#                                  model file (savanna/src/main/resources/assets/antcolonies) or a shot list changes.
+#                                  model file in any mod (<mod>/src/main/resources/assets: framework, savanna, desert,
+#                                  the list in tools/mod_paths.py and build.gradle) or a shot list changes.
 #   tools/film.sh shoot [scenes]   film again now (with new scenes if named, kept for later shoots) and wait for the
 #                                  pictures; starts the session first if none is open. After running the motion library,
 #                                  this is the one command: it waits for the reshoot of the new files.

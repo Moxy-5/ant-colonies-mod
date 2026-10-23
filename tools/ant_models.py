@@ -31,9 +31,10 @@ import termite_models as tm  # the PNG writer and the little box renderer
 import anim_lab as lab       # the animation lab: the model as the game builds it
 import ant_motion as mo      # the motion library: legs worked out from where the feet must be
 import body_plan            # what the model's parts are (role names to bone names)
+import mod_paths  # noqa: E402  (where each mod's files are: tools/mod_paths.py)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.join(HERE, '..', 'savanna', 'src', 'main', 'resources', 'assets', 'antcolonies')
+ROOT = str(mod_paths.assets('desert'))   # the harvester ant lives in the desert mod (tools/mod_paths.py)
 PREVIEW_DIR = os.path.join(HERE, '..', 'references', 'ants', 'preview')
 
 # The model is drawn in these units and then scaled down by SCALE (about 11 pixels long after scaling; the renderer

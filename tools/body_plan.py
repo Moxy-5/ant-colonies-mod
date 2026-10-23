@@ -2,7 +2,8 @@
 Body plans (2026-10-18, the animation engine upgrade review's B1, M3): one small file per model that says what its
 parts are, so every tool and the game read the parts from it instead of guessing from bone names.
 
-The files are savanna/src/main/resources/assets/antcolonies/body_plans/<model>.json (the game reads the same files). Each has:
+The files are <mod>/src/main/resources/assets/<mod name>/body_plans/<model>.json, in the mod that holds the model
+(tools/mod_paths.py finds it; the game reads the same files), each mod's plans listed in its own index.json. Each has:
   bones     the rename table: each part's ROLE name (left, used by the tools' code and every other section of the
             file) and the BONE name it has in the model (right). Today both are the same (the placeholder models'
             names); when the user's Blockbench model arrives with its own names, only the right-hand side changes and
@@ -47,9 +48,32 @@ import json, math, os, re, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROJECT = os.path.normpath(os.path.join(HERE, '..'))
-ASSETS = os.path.join(PROJECT, 'savanna', 'src', 'main', 'resources', 'assets', 'antcolonies')
-PLANS = os.path.join(ASSETS, 'body_plans')
-INDEX = os.path.join(PLANS, 'index.json')       # the list of plans (the game cannot list a folder inside the mod)
+sys.path.insert(0, HERE)
+import mod_paths  # noqa: E402  (which mod holds each model: tools/mod_paths.py)
+
+
+def assets(model):
+    """The assets folder of the mod holding a model."""
+    return mod_paths.model_assets(model)
+
+
+def plans_folder(mod):
+    return os.path.join(mod_paths.assets(mod), 'body_plans')
+
+
+def index_path(mod):
+    """A mod's list of plans (the game cannot list a folder inside the mod)."""
+    return os.path.join(plans_folder(mod), 'index.json')
+
+
+def plan_mods():
+    """The mods that have body plans."""
+    return [mod for mod in mod_paths.SEARCH if os.path.exists(index_path(mod))]
+
+
+def all_plans():
+    """Every plan listed in every mod's index.json, as (model, mod)."""
+    return [(model, mod) for mod in plan_mods() for model in json.load(open(index_path(mod), encoding='utf-8'))['plans']]
 
 
 class Plan:
@@ -131,19 +155,22 @@ _CACHE = {}
 
 
 def plan_path(model):
-    return os.path.join(PLANS, f'{model}.json')
+    return os.path.join(assets(model), 'body_plans', f'{model}.json')
 
 
 def load(model):
     """The body plan of a model (by its geo file's name), or None if it has none."""
     if model not in _CACHE:
-        path = plan_path(model)
+        try:
+            path = plan_path(model)
+        except FileNotFoundError:
+            path = ''   # no mod holds this model at all
         _CACHE[model] = Plan(json.load(open(path, encoding='utf-8'))) if os.path.exists(path) else None
     return _CACHE[model]
 
 
 def geo_bones(model):
-    geo = json.load(open(os.path.join(ASSETS, 'geo', 'entity', f'{model}.geo.json'), encoding='utf-8'))
+    geo = json.load(open(os.path.join(assets(model), 'geo', 'entity', f'{model}.geo.json'), encoding='utf-8'))
     return geo['minecraft:geometry'][0]['bones']
 
 
@@ -216,7 +243,7 @@ def measured(model):
     m = lab.Model(model)
     plan = m.plan
     walk = lab.load_clips(model, m).get('walk') if os.path.exists(
-        os.path.join(ASSETS, 'animations', 'entity', f'{model}.animation.json')) else None
+        os.path.join(assets(model), 'animations', 'entity', f'{model}.animation.json')) else None
     poses = [walk.pose(walk.length * i / 40) for i in range(40)] if walk else [{}]
     pairs = plan.pairs()
     front_keys = [k for k in plan.legs if plan.pair(k) == pairs[0]]
@@ -299,12 +326,12 @@ def measure(model):
 
 
 def check_all():
-    names = json.load(open(INDEX, encoding='utf-8'))['plans']
+    listed = all_plans()
     bad = 0
-    for model in names:
+    for model, mod in listed:
         plan = load(model)
-        if plan is None:
-            print(f'{model}: listed in index.json but has no plan file')
+        if plan is None or mod_paths.model_mod(model) != mod:
+            print(f'{model}: listed in the index.json of {mod} but has no plan file there')
             bad += 1
             continue
         found = problems(plan, geo_bones(model))
@@ -313,10 +340,11 @@ def check_all():
         for p in found:
             print('  ' + p)
         bad += len(found)
-    on_disk = {f[:-5] for f in os.listdir(PLANS) if f.endswith('.json') and f != 'index.json'}
-    for model in sorted(on_disk - set(names)):
-        print(f'{model}: a plan file not listed in index.json (the game would not read it)')
-        bad += 1
+    for mod in plan_mods():
+        on_disk = {f[:-5] for f in os.listdir(plans_folder(mod)) if f.endswith('.json') and f != 'index.json'}
+        for model in sorted(on_disk - {m for m, md in listed if md == mod}):
+            print(f'{model}: a plan file not listed in the index.json of {mod} (the game would not read it)')
+            bad += 1
     return bad
 
 
@@ -366,7 +394,7 @@ def starter(model):
 
 
 def write_plan(model, data):
-    os.makedirs(PLANS, exist_ok=True)
+    os.makedirs(os.path.dirname(plan_path(model)), exist_ok=True)
     text = json.dumps(data, indent=1)
     # Short lists on one line, so a leg reads as one line of the file.
     text = re.sub(r'\[\s*((?:"[^"]*",\s*)*"[^"]*")\s*\]', lambda m: '[' + re.sub(r',\s*', ', ', m.group(1)) + ']', text)
@@ -394,7 +422,7 @@ def rename_test(model='worker_ant'):
     a = lab.Model(model)
     b = lab.Model(model, bones=renamed.model_to_roles(geo))
     assert a.feet == b.feet and [c[:2] for c in a.cubes] == [c[:2] for c in b.cubes], 'the renamed model reads differently'
-    anims = json.load(open(os.path.join(ASSETS, 'animations', 'entity', f'{model}.animation.json'), encoding='utf-8'))
+    anims = json.load(open(os.path.join(assets(model), 'animations', 'entity', f'{model}.animation.json'), encoding='utf-8'))
     file_b = renamed.animations_to_bones({'animations': {n: plan.clip_to_roles(c) for n, c in anims['animations'].items()}})
     assert all(not set(c.get('bones', {})) & set(plan.to_bone.values()) for c in file_b['animations'].values()), \
         'a clip kept an old bone name'
@@ -415,9 +443,10 @@ if __name__ == '__main__':
         rename_test(*args[1:])
     elif args[:1] == ['new'] and len(args) == 2:
         write_plan(args[1], starter(args[1]))
-        print(f'wrote {plan_path(args[1])}; add "{args[1]}" to {INDEX}, then run measure {args[1]}')
+        print(f'wrote {plan_path(args[1])}; add "{args[1]}" to {index_path(mod_paths.model_mod(args[1]))}, '
+              f'then run measure {args[1]}')
     elif args[:1] == ['measure'] and len(args) == 2:
-        for name in json.load(open(INDEX, encoding='utf-8'))['plans'] if args[1] == 'all' else [args[1]]:
+        for name in [m for m, _ in all_plans()] if args[1] == 'all' else [args[1]]:
             measure(name)
     elif args[:1] in (['check'], []):
         sys.exit(1 if check_all() else 0)

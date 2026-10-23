@@ -23,8 +23,10 @@ import os, shutil, struct, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROJECT = os.path.normpath(os.path.join(HERE, '..'))
-# Each mod's classes (the split, step S6: framework and savanna, each a folder of its own; class names never clash).
-CLASSES = [os.path.join(PROJECT, mod, 'build', 'classes', 'java', 'main') for mod in ('framework', 'savanna')]
+sys.path.insert(0, HERE)
+import mod_paths  # noqa: E402  (where each mod's files are: tools/mod_paths.py)
+# Each mod's classes (the split: every mod a folder of its own, tools/mod_paths.py; class names never clash).
+CLASSES = [os.path.join(mod_paths.mod_folder(mod), 'build', 'classes', 'java', 'main') for mod in mod_paths.MODS]
 SNAPSHOT = os.path.join(PROJECT, 'run-film', 'film-watch', 'classes')
 
 

@@ -13,6 +13,7 @@ Looks (my picks, for the user to choose from):
   C  Bold pixels: the same story in chunkier pixels and stronger contrast, closer to vanilla Minecraft blocks.
 """
 import random
+import mod_paths  # noqa: E402  (where each mod's files are: tools/mod_paths.py)
 
 S = 16
 AGES = ["fresh", "ripe", "old"]
@@ -256,7 +257,7 @@ def nodule_elements(layers, nodules):
 def write_game_files(root):
     """Textures, models, the multipart blockstate and the item model of the fungus comb, in the picked look."""
     import json
-    assets = root / "savanna/src/main/resources/assets/antcolonies"
+    assets = mod_paths.assets("savanna")
     blocks = assets / "textures/block"
     models = assets / "models/block"
 

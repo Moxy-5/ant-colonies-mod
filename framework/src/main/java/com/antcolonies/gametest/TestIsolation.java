@@ -79,7 +79,7 @@ public final class TestIsolation {
     }
 
     /** A species' own fence round each colony founded in a test's arena (its tests' sign-up), given that arena's box. */
-    public static void addFence(BiConsumer<Colony, AABB> fence) {
+    public static synchronized void addFence(BiConsumer<Colony, AABB> fence) {
         FENCES.add(fence);
     }
 

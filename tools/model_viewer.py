@@ -31,9 +31,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import dead_wood_concepts as concepts  # noqa: E402
+import mod_paths  # noqa: E402  (where each mod's files are: tools/mod_paths.py)
 
 ROOT = Path(__file__).resolve().parent.parent
-TEXTURES = ROOT / "savanna/src/main/resources/assets/antcolonies/textures/block"
+TEXTURES = mod_paths.assets("savanna") / "textures/block"
 S = 16
 MUD = (138, 78, 50)
 MUD_DARK = (104, 58, 38)

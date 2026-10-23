@@ -8,11 +8,12 @@ with darker blotches. Needs no extra libraries (writes the PNG itself). Run from
 import random
 import struct
 import zlib
+import mod_paths  # noqa: E402  (where each mod's files are: tools/mod_paths.py)
 
 SIZE = 32
 BASE = (196, 184, 150)     # dull dried cream
 BLOTCH = (150, 138, 112)   # darker grey-brown patches
-OUT = "savanna/src/main/resources/assets/antcolonies/textures/entity/termite_corpse.png"
+OUT = str(mod_paths.assets("savanna") / "textures/entity/termite_corpse.png")
 
 
 def pixels():

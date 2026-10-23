@@ -12,10 +12,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from dead_wood_art import write_png  # noqa: E402
 from mud_crust_viewer import AGES, THICKNESS, crumbly  # noqa: E402
+import mod_paths  # noqa: E402  (where each mod's files are: tools/mod_paths.py)
 
 ROOT = Path(__file__).resolve().parent.parent
-ASSETS = ROOT / "savanna/src/main/resources/assets/antcolonies"
-DATA = ROOT / "savanna/src/main/resources/data/antcolonies"
+ASSETS = mod_paths.assets("savanna")
+DATA = mod_paths.data("savanna")
 VARIANTS = 3
 T = THICKNESS["C"]
 # How the plate model (on the north face) is turned to sit on each face, as vanilla glow lichen.

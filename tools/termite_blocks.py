@@ -30,9 +30,10 @@ Their shapes are worked out with the same sums as the game's code (MoundPieceBlo
 import json, math, os, random
 
 from PIL import Image, ImageDraw
+import mod_paths  # noqa: E402  (where each mod's files are: tools/mod_paths.py)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.join(HERE, '..', 'savanna', 'src', 'main', 'resources', 'assets', 'antcolonies')
+ROOT = str(mod_paths.assets('savanna'))
 TEXTURES = os.path.join(ROOT, 'textures', 'block')
 PREVIEW = os.path.join(HERE, '..', 'references', 'termites', 'preview', 'blocks.png')
 

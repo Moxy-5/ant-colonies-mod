@@ -15,10 +15,11 @@ import random
 from pathlib import Path
 
 from PIL import Image, ImageDraw
+import mod_paths  # noqa: E402  (where each mod's files are: tools/mod_paths.py)
 
 ROOT = Path(__file__).resolve().parent.parent
-ASSETS = ROOT / "savanna/src/main/resources/assets/antcolonies"
-DATA = ROOT / "savanna/src/main/resources/data/antcolonies"
+ASSETS = mod_paths.assets("savanna")
+DATA = mod_paths.data("savanna")
 BLOCKS = ASSETS / "textures/block"
 ITEMS = ASSETS / "textures/item"
 PREVIEW = ROOT / "references/termites/preview"

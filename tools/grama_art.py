@@ -28,10 +28,12 @@ import random
 import struct
 import zlib
 from pathlib import Path
+import mod_paths  # noqa: E402  (where each mod's files are: tools/mod_paths.py)
 
 ROOT = Path(__file__).resolve().parent.parent
-ASSETS = ROOT / "savanna/src/main/resources/assets/antcolonies"
-DATA = ROOT / "savanna/src/main/resources/data/antcolonies"
+ASSETS = mod_paths.assets("desert")   # grama is the desert mod's (tools/mod_paths.py)
+DATA = mod_paths.data("desert")
+NS = mod_paths.namespace("desert")   # the name inside the files: desertcolonies:block/...
 PICKED = "B"
 PREVIEW = ROOT / "references/ants/preview"
 S = 16
@@ -349,20 +351,20 @@ def game_files():
                 out.parent.mkdir(parents=True, exist_ok=True)
                 out.write_bytes(png(texture(kind, PICKED, stage, v)))
                 write_json(ASSETS / f"models/block/{tex}.json", {"parent": "minecraft:block/cross", "render_type": "minecraft:cutout",
-                                                                  "textures": {"cross": f"antcolonies:block/{tex}"}})
-                models.append({"model": f"antcolonies:block/{tex}"})
+                                                                  "textures": {"cross": f"{NS}:block/{tex}"}})
+                models.append({"model": f"{NS}:block/{tex}"})
             variants[f"stage={stage}"] = models
         write_json(ASSETS / f"blockstates/{name}.json", {"variants": variants})
         seeds = f"{name}_seeds"
         (ASSETS / f"textures/item/{seeds}.png").write_bytes(png(seeds_icon(kind)))
-        write_json(ASSETS / f"models/item/{seeds}.json", {"parent": "minecraft:item/generated", "textures": {"layer0": f"antcolonies:item/{seeds}"}})
+        write_json(ASSETS / f"models/item/{seeds}.json", {"parent": "minecraft:item/generated", "textures": {"layer0": f"{NS}:item/{seeds}"}})
         # Broken: a ripe plant gives 1 to 3 seeds; shears give nothing extra (it is never picked whole, it is grown from seed).
         write_json(DATA / f"loot_table/blocks/{name}.json", {"type": "minecraft:block", "pools": [{
             "rolls": 1.0, "bonus_rolls": 0.0,
-            "entries": [{"type": "minecraft:item", "name": f"antcolonies:{seeds}",
+            "entries": [{"type": "minecraft:item", "name": f"{NS}:{seeds}",
                          "functions": [{"function": "minecraft:set_count", "count": {"type": "minecraft:uniform", "min": 1, "max": 3}},
                                        {"function": "minecraft:explosion_decay"}]}],
-            "conditions": [{"condition": "minecraft:block_state_property", "block": f"antcolonies:{name}", "properties": {"stage": "ripe"}}]}]})
+            "conditions": [{"condition": "minecraft:block_state_property", "block": f"{NS}:{name}", "properties": {"stage": "ripe"}}]}]})
     # World generation (my picks, to confirm): a blue grama meadow 2 to 4 blocks out in 1 chunk in 6; black grama round
     # 1 or 2 dead bushes in 1 chunk in 3.
     stands = {
@@ -372,12 +374,12 @@ def game_files():
                          "bushes": {"type": "minecraft:uniform", "min_inclusive": 1, "max_inclusive": 2}}, 3, "#minecraft:is_badlands"),
     }
     for name, (config, rarity, biomes) in stands.items():
-        write_json(DATA / f"worldgen/configured_feature/{name}.json", {"type": "antcolonies:grama_patch", "config": dict({"block": f"antcolonies:{name}"}, **config)})
-        write_json(DATA / f"worldgen/placed_feature/{name}.json", {"feature": f"antcolonies:{name}", "placement": [
+        write_json(DATA / f"worldgen/configured_feature/{name}.json", {"type": f"{NS}:grama_patch", "config": dict({"block": f"{NS}:{name}"}, **config)})
+        write_json(DATA / f"worldgen/placed_feature/{name}.json", {"feature": f"{NS}:{name}", "placement": [
             {"type": "minecraft:rarity_filter", "chance": rarity}, {"type": "minecraft:in_square"},
             {"type": "minecraft:heightmap", "heightmap": "WORLD_SURFACE_WG"}, {"type": "minecraft:biome"}]})
         write_json(DATA / f"neoforge/biome_modifier/{name}.json", {"type": "neoforge:add_features", "biomes": biomes,
-                                                                    "features": f"antcolonies:{name}", "step": "vegetal_decoration"})
+                                                                    "features": f"{NS}:{name}", "step": "vegetal_decoration"})
     print("wrote the game files for", ", ".join(f"{k}_grama" for k in KINDS))
 
 

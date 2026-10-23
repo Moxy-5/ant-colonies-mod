@@ -13,10 +13,11 @@ import random
 import struct
 import zlib
 from pathlib import Path
+import mod_paths  # noqa: E402  (where each mod's files are: tools/mod_paths.py)
 
 ROOT = Path(__file__).resolve().parent.parent
-ASSETS = ROOT / "savanna/src/main/resources/assets/antcolonies"
-DATA = ROOT / "savanna/src/main/resources/data/antcolonies"
+ASSETS = mod_paths.assets("savanna")
+DATA = mod_paths.data("savanna")
 PREVIEW = ROOT / "references/termites/preview"
 
 WOOD = (156, 150, 139)       # sun-bleached silver, as the dead giant trees' bark (tools/tree_art.py)

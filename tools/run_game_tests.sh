@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Runs the game tests on several test servers side by side (test health plan, docs/plans/test-health.md).
+# Runs the game tests on several test servers side by side (test health plan, docs/plans/test-health.md). Since the
+# split every server loads all three mods (framework, savanna, desert) and runs both species mods' tests, from the
+# root folder as before.
 #
 #   tools/run_game_tests.sh          every game test, split over 6 servers
 #   tools/run_game_tests.sh 8        the same over 8 servers (default 6, the user 2026-10-22)

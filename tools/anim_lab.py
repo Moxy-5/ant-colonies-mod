@@ -73,9 +73,20 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import termite_models as tm  # noqa: E402  (the PNG writer, the canvas and its font)
 import body_plan  # noqa: E402  (what each model's parts are: tools/body_plan.py)
+import mod_paths  # noqa: E402  (which mod holds each model: tools/mod_paths.py)
 
 PROJECT = os.path.normpath(os.path.join(HERE, '..'))
-ASSETS = os.path.join(PROJECT, 'savanna', 'src', 'main', 'resources', 'assets', 'antcolonies')
+
+
+def model_file(name, *parts):
+    """A file of a model or clip set in the mod that holds it (a name no mod holds: where the savanna's would be, so
+    opening it gives the plain file-not-found error)."""
+    try:
+        base = mod_paths.model_assets(name)
+    except FileNotFoundError:
+        base = mod_paths.assets('savanna')
+    return os.path.join(base, *parts)
+
 OUT = os.path.join(PROJECT, 'references', 'anim_lab')
 
 # The renderer's scale for each model (client/ClientEvents.java and TermiteQueenModel.RENDER_SCALE).
@@ -226,14 +237,14 @@ class Model:
         self.name = name
         self.plan = body_plan.load(name)
         if bones is None:
-            geo = json.load(open(os.path.join(ASSETS, 'geo', 'entity', f'{name}.geo.json'), encoding='utf-8'))
+            geo = json.load(open(model_file(name, 'geo', 'entity', f'{name}.geo.json'), encoding='utf-8'))
             g = geo['minecraft:geometry'][0]
             desc = g['description']
             self.bones = self.plan.model_to_roles(g['bones']) if self.plan else g['bones']
         else:
             desc, self.bones = {}, bones
         self.by = {b['name']: b for b in self.bones}
-        tex_path = os.path.join(ASSETS, 'textures', 'entity', f'{name}.png')
+        tex_path = model_file(name, 'textures', 'entity', f'{name}.png')
         tex = read_png(tex_path) if os.path.exists(tex_path) else None
         tw, th = desc.get('texture_width', 64), desc.get('texture_height', 64)
         self.scale = RENDER_SCALE.get(name, 1.0)
@@ -578,7 +589,7 @@ class Clip:
 
 def load_clips(stem, model=None, plan=None):
     """The clips of an animation file; with the model they play on, their bones renamed to the model's role names."""
-    data = json.load(open(os.path.join(ASSETS, 'animations', 'entity', f'{stem}.animation.json'), encoding='utf-8'))
+    data = json.load(open(model_file(stem, 'animations', 'entity', f'{stem}.animation.json'), encoding='utf-8'))
     plan = model.plan if model is not None else plan
     return {name: Clip(name, plan.clip_to_roles(a) if plan else a) for name, a in data['animations'].items()}
 
@@ -1396,10 +1407,10 @@ def run_clips(cmd, name, anim, clips, names, speed, frames, jobs, fresh):
     if remember:
         code = (_bytes(os.path.abspath(__file__)) + _bytes(os.path.abspath(tm.__file__))
                 + _bytes(os.path.abspath(body_plan.__file__)))
-        model_bytes = (_bytes(os.path.join(ASSETS, 'geo', 'entity', f'{name}.geo.json'))
-                       + _bytes(os.path.join(ASSETS, 'textures', 'entity', f'{name}.png'))
+        model_bytes = (_bytes(model_file(name, 'geo', 'entity', f'{name}.geo.json'))
+                       + _bytes(model_file(name, 'textures', 'entity', f'{name}.png'))
                        + _bytes(body_plan.plan_path(name)))
-        with open(os.path.join(ASSETS, 'animations', 'entity', f'{anim}.animation.json'), encoding='utf-8') as f:
+        with open(model_file(anim, 'animations', 'entity', f'{anim}.animation.json'), encoding='utf-8') as f:
             raw = json.load(f)['animations']
     plans, updates = [], {'check': {}, 'draw': {}}
     for nm in names:
@@ -1485,7 +1496,7 @@ def main(argv):
              os.path.basename(os.path.normpath(args[1])) + '_match.png')
         return
     name, anim = args[1], opts.get('anim', args[1])
-    if not os.path.exists(os.path.join(ASSETS, 'geo', 'entity', f'{name}.geo.json')):
+    if not os.path.exists(model_file(name, 'geo', 'entity', f'{name}.geo.json')):
         Model(name)                      # no such model: the same error as ever
     clips = load_clips(anim, plan=body_plan.load(name))
     names = args[2:] or list(clips)

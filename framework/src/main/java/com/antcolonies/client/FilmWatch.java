@@ -31,8 +31,9 @@ import software.bernie.geckolib.cache.object.GeoBone;
  * camera does not quit but waits in the world, and shoots the scenes again (pictures, {@code times.txt} and
  * {@code checks.txt} exactly as a fresh launch makes them) when:
  * <ul>
- * <li>a file in {@code src/main/resources/assets/antcolonies} changes (the motion library rewriting the animation and
- * model files): the changed files are copied to where the running game reads them ({@code build/resources/main}), then
+ * <li>a file in any mod's {@code src/main/resources/assets} changes (the motion library rewriting the animation and
+ * model files): the changed files are copied to where the running game reads that mod's files
+ * ({@code <mod>/build/resources/main}), then
  * reloaded: animations and models only through GeckoLib's own cache (about a second), anything else (textures, ...)
  * through the game's full resource reload;</li>
  * <li>a shot list it films changes (no reload needed);</li>
@@ -49,12 +50,15 @@ import software.bernie.geckolib.cache.object.GeoBone;
 final class FilmWatch {
     private static final Logger LOG = LogUtils.getLogger();
     private static final boolean ENABLED = !FMLEnvironment.production && Boolean.getBoolean("antcolonies.film.watch");
-    /** The mod's resources as written by hand or by the tools, and the copy the running game reads. */
-    private static final Path SRC = path("antcolonies.film.src");
-    private static final Path OUT = path("antcolonies.film.out");
+    /**
+     * Each mod's resources as written by hand or by the tools, and the copy the running game reads, in pairs (the same
+     * order in both lists; one pair per mod since the split, tools/mod_paths.py).
+     */
+    private static final List<Path> SRCS = paths("antcolonies.film.src");
+    private static final List<Path> OUTS = paths("antcolonies.film.out");
     /** The project folder (shot lists named in a request are found from here). */
     private static final Path PROJECT = path("antcolonies.film.project");
-    private static final String ASSETS = "assets/antcolonies";
+    private static final String ASSETS = "assets";
     /** How often the files are looked at (client ticks), and how many looks in a row they must stay still first. */
     private static final int POLL = 10;
     private static final int STILL = 2;
@@ -89,6 +93,25 @@ final class FilmWatch {
         return value == null ? null : Path.of(value);
     }
 
+    /** A list of folders in one property, split as the system splits paths ({@code ;} on Windows). */
+    private static List<Path> paths(String property) {
+        String value = System.getProperty(property);
+        List<Path> paths = new ArrayList<>();
+        if (value != null) {
+            for (String part : value.split(java.io.File.pathSeparator)) {
+                if (!part.isBlank()) {
+                    paths.add(Path.of(part.trim()));
+                }
+            }
+        }
+        return paths;
+    }
+
+    /** Every mod's assets folder that is watched. */
+    private static List<Path> assetFolders() {
+        return SRCS.stream().map(src -> src.resolve(ASSETS)).toList();
+    }
+
     /**
      * Called by {@code FilmDirector} every client tick in the world: {@code filming} is true while it still has steps to
      * play. Notes requests and changes, and starts a new shoot once the last one is done.
@@ -100,7 +123,7 @@ final class FilmWatch {
         Path control = control(mc);
         if (assets == null) {
             // the first shoot (the scenes named at launch) is already running: remember what it films
-            assets = stamps(SRC == null ? null : SRC.resolve(ASSETS));
+            assets = stamps(assetFolders());
             sceneFiles = stamps(FilmDirector.sceneFiles());
             shooting = true;
             shootStart = System.currentTimeMillis();
@@ -175,7 +198,7 @@ final class FilmWatch {
     private static final List<String> answered = new ArrayList<>();
 
     private static Map<Path, String> allStamps() {
-        Map<Path, String> now = stamps(SRC == null ? null : SRC.resolve(ASSETS));
+        Map<Path, String> now = stamps(assetFolders());
         now.putAll(stamps(FilmDirector.sceneFiles()));
         return now;
     }
@@ -233,16 +256,20 @@ final class FilmWatch {
         }
         Map<Path, String> filmedScenes = sceneFiles;
         sceneFiles = stamps(FilmDirector.sceneFiles());
-        Map<Path, String> now = stamps(SRC == null ? null : SRC.resolve(ASSETS));
+        Map<Path, String> now = stamps(assetFolders());
         boolean full = false, gecko = false;
         for (Map.Entry<Path, String> file : now.entrySet()) {
             if (file.getValue().equals(assets.get(file.getKey()))) {
                 continue;
             }
-            Path relative = SRC.relativize(file.getKey());
+            int mod = 0;
+            while (mod < SRCS.size() - 1 && !file.getKey().startsWith(SRCS.get(mod))) {
+                mod++;
+            }
+            Path relative = SRCS.get(mod).relativize(file.getKey());
             String name = relative.toString().replace('\\', '/');
             try {
-                Path target = OUT.resolve(relative);
+                Path target = OUTS.get(mod).resolve(relative);
                 if (Files.exists(target) && Files.mismatch(file.getKey(), target) < 0) {
                     continue;   // written again with the same contents (the model tool rewrites its textures too)
                 }
@@ -252,7 +279,9 @@ final class FilmWatch {
             } catch (IOException e) {
                 LOG.warn("Film watch: cannot copy {}", name, e);
             }
-            if (name.startsWith(ASSETS + "/animations/") || name.startsWith(ASSETS + "/geo/")) {
+            // assets/<mod name>/animations/... or assets/<mod name>/geo/...
+            String[] parts = name.split("/");
+            if (parts.length > 2 && (parts[2].equals("animations") || parts[2].equals("geo"))) {
                 gecko = true;
             } else {
                 full = true;
@@ -296,11 +325,7 @@ final class FilmWatch {
         FilmDirector.reshoot();
     }
 
-    /** Each file's time and size in a folder or file list (empty when there is none). */
-    private static Map<Path, String> stamps(Path folder) {
-        return stamps(folder == null ? List.of() : List.of(folder));
-    }
-
+    /** Each file's time and size in a list of folders or files (empty when there are none). */
     private static Map<Path, String> stamps(List<Path> roots) {
         Map<Path, String> stamps = new HashMap<>();
         for (Path root : roots) {

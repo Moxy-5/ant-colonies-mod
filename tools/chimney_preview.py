@@ -25,9 +25,10 @@ from PIL import Image
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import termite_models as tm  # noqa: E402
+import mod_paths  # noqa: E402  (where each mod's files are: tools/mod_paths.py)
 
 ROOT = os.path.dirname(HERE)
-ASSETS = os.path.join(ROOT, 'savanna', 'src', 'main', 'resources', 'assets', 'antcolonies')
+ASSETS = str(mod_paths.assets('savanna'))
 OUT = os.path.join(ROOT, 'references', 'termites', 'preview')
 KEYS = os.path.join(ROOT, 'build', 'chimney', 'come_out.txt')
 
