@@ -75,7 +75,7 @@ import termite_models as tm  # noqa: E402  (the PNG writer, the canvas and its f
 import body_plan  # noqa: E402  (what each model's parts are: tools/body_plan.py)
 
 PROJECT = os.path.normpath(os.path.join(HERE, '..'))
-ASSETS = os.path.join(PROJECT, 'src', 'main', 'resources', 'assets', 'antcolonies')
+ASSETS = os.path.join(PROJECT, 'savanna', 'src', 'main', 'resources', 'assets', 'antcolonies')
 OUT = os.path.join(PROJECT, 'references', 'anim_lab')
 
 # The renderer's scale for each model (client/ClientEvents.java and TermiteQueenModel.RENDER_SCALE).

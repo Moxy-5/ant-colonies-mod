@@ -2,7 +2,7 @@
 Body plans (2026-10-18, the animation engine upgrade review's B1, M3): one small file per model that says what its
 parts are, so every tool and the game read the parts from it instead of guessing from bone names.
 
-The files are src/main/resources/assets/antcolonies/body_plans/<model>.json (the game reads the same files). Each has:
+The files are savanna/src/main/resources/assets/antcolonies/body_plans/<model>.json (the game reads the same files). Each has:
   bones     the rename table: each part's ROLE name (left, used by the tools' code and every other section of the
             file) and the BONE name it has in the model (right). Today both are the same (the placeholder models'
             names); when the user's Blockbench model arrives with its own names, only the right-hand side changes and
@@ -47,7 +47,7 @@ import json, math, os, re, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROJECT = os.path.normpath(os.path.join(HERE, '..'))
-ASSETS = os.path.join(PROJECT, 'src', 'main', 'resources', 'assets', 'antcolonies')
+ASSETS = os.path.join(PROJECT, 'savanna', 'src', 'main', 'resources', 'assets', 'antcolonies')
 PLANS = os.path.join(ASSETS, 'body_plans')
 INDEX = os.path.join(PLANS, 'index.json')       # the list of plans (the game cannot list a folder inside the mod)
 

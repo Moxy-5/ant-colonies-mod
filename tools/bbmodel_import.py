@@ -15,7 +15,7 @@ import json
 import os
 import uuid
 
-ASSETS = os.path.join("src", "main", "resources", "assets", "antcolonies")
+ASSETS = os.path.join("savanna", "src", "main", "resources", "assets", "antcolonies")
 MOD_ID = "antcolonies"
 
 # Blockbench project, game model, texture, animation file

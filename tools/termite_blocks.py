@@ -32,7 +32,7 @@ import json, math, os, random
 from PIL import Image, ImageDraw
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.join(HERE, '..', 'src', 'main', 'resources', 'assets', 'antcolonies')
+ROOT = os.path.join(HERE, '..', 'savanna', 'src', 'main', 'resources', 'assets', 'antcolonies')
 TEXTURES = os.path.join(ROOT, 'textures', 'block')
 PREVIEW = os.path.join(HERE, '..', 'references', 'termites', 'preview', 'blocks.png')
 

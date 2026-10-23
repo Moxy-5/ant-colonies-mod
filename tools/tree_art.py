@@ -23,7 +23,7 @@ import random
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-TEXTURES = ROOT / "src/main/resources/assets/antcolonies/textures/block"
+TEXTURES = ROOT / "savanna/src/main/resources/assets/antcolonies/textures/block"
 S = 16
 KINDS = ["umbrella", "camel", "baobab"]
 LOOKS = ["A", "B"]
@@ -506,8 +506,8 @@ def all_textures():
 
 # --- The game's files (M7.5 step 1, the user's picks, docs/DESIGN.md "Giant savanna trees") --------------------------
 
-ASSETS = ROOT / "src/main/resources/assets/antcolonies"
-DATA = ROOT / "src/main/resources/data/antcolonies"
+ASSETS = ROOT / "savanna/src/main/resources/assets/antcolonies"
+DATA = ROOT / "savanna/src/main/resources/data/antcolonies"
 GAME_NAMES = {"umbrella": "umbrella_thorn", "camel": "camel_thorn", "baobab": "baobab"}
 PICKED_BARK = {"umbrella": "D", "camel": "C", "baobab": "B"}  # the user's picks, 2026-10-18
 

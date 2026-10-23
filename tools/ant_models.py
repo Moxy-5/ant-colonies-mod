@@ -33,7 +33,7 @@ import ant_motion as mo      # the motion library: legs worked out from where th
 import body_plan            # what the model's parts are (role names to bone names)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.join(HERE, '..', 'src', 'main', 'resources', 'assets', 'antcolonies')
+ROOT = os.path.join(HERE, '..', 'savanna', 'src', 'main', 'resources', 'assets', 'antcolonies')
 PREVIEW_DIR = os.path.join(HERE, '..', 'references', 'ants', 'preview')
 
 # The model is drawn in these units and then scaled down by SCALE (about 11 pixels long after scaling; the renderer

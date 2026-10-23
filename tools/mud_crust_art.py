@@ -14,8 +14,8 @@ from dead_wood_art import write_png  # noqa: E402
 from mud_crust_viewer import AGES, THICKNESS, crumbly  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
-ASSETS = ROOT / "src/main/resources/assets/antcolonies"
-DATA = ROOT / "src/main/resources/data/antcolonies"
+ASSETS = ROOT / "savanna/src/main/resources/assets/antcolonies"
+DATA = ROOT / "savanna/src/main/resources/data/antcolonies"
 VARIANTS = 3
 T = THICKNESS["C"]
 # How the plate model (on the north face) is turned to sit on each face, as vanilla glow lichen.

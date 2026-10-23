@@ -7,3 +7,8 @@ pluginManagement {
 plugins {
     id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
 }
+
+// The mods of this repository (the split, docs/plans/mod-split.md): the colony framework and the savanna mod (which
+// until step S7 still holds the red harvester ant). The root project only runs the game with all of them.
+include 'framework'
+include 'savanna'

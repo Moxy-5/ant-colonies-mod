@@ -24,7 +24,7 @@ import json, math, os, random, struct, zlib
 FOREBODY_JOINT = (0, 1.7, 0.4)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.join(HERE, '..', 'src', 'main', 'resources', 'assets', 'antcolonies')
+ROOT = os.path.join(HERE, '..', 'savanna', 'src', 'main', 'resources', 'assets', 'antcolonies')
 PREVIEW_DIR = os.path.join(HERE, '..', 'references', 'termites', 'preview')
 
 # --- texture: 64x64, 8x8 swatches, each a colour with a little noise -------------------------------------------

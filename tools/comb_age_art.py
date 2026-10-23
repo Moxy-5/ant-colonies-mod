@@ -256,7 +256,7 @@ def nodule_elements(layers, nodules):
 def write_game_files(root):
     """Textures, models, the multipart blockstate and the item model of the fungus comb, in the picked look."""
     import json
-    assets = root / "src/main/resources/assets/antcolonies"
+    assets = root / "savanna/src/main/resources/assets/antcolonies"
     blocks = assets / "textures/block"
     models = assets / "models/block"
 

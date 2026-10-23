@@ -12,7 +12,7 @@ from pathlib import Path
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
-ENTITY = ROOT / "src/main/resources/assets/antcolonies/textures/entity"
+ENTITY = ROOT / "savanna/src/main/resources/assets/antcolonies/textures/entity"
 
 # texture name -> (pale colour it is blended toward, how far: 0 = unchanged, 1 = all pale colour)
 YOUNG = {

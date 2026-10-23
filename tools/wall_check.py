@@ -2,8 +2,10 @@
 The wall checker (2026-10-22, Project Apex part 2, the split, step S1; docs/plans/mod-split.md).
 
 The split puts the shared colony framework in a mod of its own, and the framework must not see species code. Until
-step S6 everything is still one mod, so the compiler cannot refuse a framework file that names a termite or a
-harvester class; this checker does it instead. From S6 on the compiler takes over and this tool is retired.
+step S6 everything was still one mod, so the compiler could not refuse a framework file that named a termite or a
+harvester class; this checker did it instead. Since S6 the framework is its own folder and mod (framework/), and the
+compiler refuses it. The savanna and the desert still share the savanna folder until step S7, so this checker still
+watches that they never name each other (and its --data report helps S7 split the data); after S7 it is retired.
 
     python tools/wall_check.py            the framework files that name savanna or desert code, and what they name
     python tools/wall_check.py --strict   the same, failing (exit 1) if there is any (on from step S5)
@@ -27,7 +29,7 @@ import re
 import sys
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
-SOURCES = ['src/main/java/com/antcolonies']
+SOURCES = ['framework/src/main/java/com/antcolonies', 'savanna/src/main/java/com/antcolonies']
 
 SAVANNA = set('''
 Alarm ClosedHoles FungusGarden GardenAway Galleries HiddenTrips KingCare Mound MoundAwayBuilding MoundGrowth MoundPlan
@@ -55,8 +57,11 @@ DesertTests NestTests NavigationTests
 WORD = re.compile(r'\b[A-Z][A-Za-z0-9_]*\b')
 
 
+FULL = {}  # simple name -> the file on disk (the sources sit in two folders since step S6)
+
+
 def java_files():
-    """Every Java file: simple name -> path from the source folder ('colony/Nest.java')."""
+    """Every Java file: simple name -> path from its source folder ('colony/Nest.java'), and the savanna's folder."""
     found = {}
     for source in SOURCES:
         base = os.path.join(ROOT, source)
@@ -64,7 +69,8 @@ def java_files():
             for name in names:
                 if name.endswith('.java'):
                     found[name[:-5]] = os.path.relpath(os.path.join(folder, name), base).replace(os.sep, '/')
-    return found, base
+                    FULL[name[:-5]] = os.path.join(folder, name)
+    return found, os.path.join(ROOT, SOURCES[1])
 
 
 def side_of(name, path):
@@ -90,21 +96,22 @@ def names_used(text):
     return set(WORD.findall(text))
 
 
-def registered(base, files):
+def registered(base, side, files):
     """The names a side's registry files sign up ('seed_pile'), read from their register calls."""
     found = set()
     for name in files:
-        text = open(os.path.join(base, 'registry', name + '.java'), encoding='utf-8').read()
+        text = open(os.path.join(base, side, 'registry', name + '.java'), encoding='utf-8').read()
         found |= set(re.findall(r'register\w*\(\s*"([a-z0-9_]+)"', text))
     return found
 
 
 def data_report(base):
     """Prints the data and asset files naming both sides' blocks, items or creatures."""
-    savanna = registered(base, ['SavannaBlocks', 'SavannaItems', 'SavannaEntities', 'TreeBlocks'])
-    desert = registered(base, ['DesertBlocks', 'DesertItems', 'DesertEntities'])
+    savanna = registered(base, 'savanna', ['SavannaBlocks', 'SavannaItems', 'SavannaEntities', 'TreeBlocks'])
+    desert = registered(base, 'desert', ['DesertBlocks', 'DesertItems', 'DesertEntities'])
     mixed = 0
-    for top in ('src/main/resources/data', 'src/main/resources/assets'):
+    for top in ('framework/src/main/resources/data', 'framework/src/main/resources/assets',
+                'savanna/src/main/resources/data', 'savanna/src/main/resources/assets'):
         for folder, _, names in os.walk(os.path.join(ROOT, top)):
             for name in sorted(names):
                 if not name.endswith('.json'):
@@ -115,7 +122,7 @@ def data_report(base):
                     mixed += 1
                     print(f'both      {os.path.relpath(path, ROOT).replace(os.sep, "/")}: '
                           f'savanna {", ".join(sorted(ids & savanna)[:4])}...; desert {", ".join(sorted(ids & desert)[:4])}...')
-    print(f'{mixed} data files name both sides (split by their entries when the mods part, step S6)')
+    print(f'{mixed} data files name both sides (split by their entries when the desert gets its own mod, step S7)')
     return 0
 
 
@@ -131,7 +138,7 @@ def main():
     allowed = {'framework': {'framework'}, 'savanna': {'framework', 'savanna'}, 'desert': {'framework', 'desert'}}
     breaks = []
     for name, path in sorted(files.items(), key=lambda item: item[1]):
-        text = open(os.path.join(base, path), encoding='utf-8').read()
+        text = open(FULL[name], encoding='utf-8').read()
         wrong = sorted(other for other in names_used(text)
                        if other in sides and other != name and sides[other] not in allowed[sides[name]])
         if wrong:

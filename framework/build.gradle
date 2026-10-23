@@ -1,0 +1,28 @@
+// The colony framework (the split, step S6, docs/plans/mod-split.md): the shared brain, legs, bodies and animations,
+// species profiles, foraging, trails, digging and the test kit, as a mod of its own ("colonyframework"). It depends on
+// no species mod, so the compiler refuses any framework file that names species code.
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev'
+    id 'idea'
+}
+
+apply from: rootProject.file('gradle/mod-common.gradle')
+
+base {
+    archivesName = framework_mod_id
+}
+
+neoForge {
+    mods {
+        "${framework_mod_id}" {
+            sourceSet(sourceSets.main)
+        }
+    }
+
+    // Puts Minecraft on the test classpath so tests can use BlockPos, Direction and so on.
+    unitTest {
+        enable()
+        testedMod = mods.getByName(framework_mod_id)
+    }
+}

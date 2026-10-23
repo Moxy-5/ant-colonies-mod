@@ -146,6 +146,23 @@ moved with git, so its history is kept); the framework gets its own mod name and
 `savanna` keeps `antcolonies` and, until S7, still holds the harvester. The root runs the game with both. The
 compiler now refuses any framework file that names species code. The framework signs up nothing in the game's lists
 except what is truly shared (the egg, see my picks).
+**BUILT 2026-10-23** (round 3, `docs/HISTORY.md`): the code moved with `git mv` into `framework\` and `savanna\` (two
+Gradle subprojects; the root only runs the game, with both mods, by the same commands and run folders; shared settings in
+`gradle/mod-common.gradle`); the framework's start `ColonyFrameworkMod` (`colonyframework`, "Colony Framework", its own
+log name), `SavannaMod` and `DesertMod` each with their own name constant and log (`antcolonies` both until S7);
+the framework signs up only the egg (`colonyframework:ant_egg`, its texture and name moved with it); the species ids out
+of the framework (`SavannaSpecies`, `DesertSpecies`); the framework's tags under its own name
+(`colonyframework:diggable`, `seeds`, `rich_seeds`, `nurse_food`, `rich_nurse_food`, `old_plugs`, `tree_crowns`): the
+framework's files list only Minecraft's things, the savanna mod adds its own to the same tags (the game joins them); the
+termite tags into `SavannaTags`. Found by the unit tests: the framework read the body plans from a fixed `antcolonies`
+folder of its own, which a separate mod cannot do; now each species mod signs its folder up (`BodyPlans.signUp`). The
+4 data files naming both sides: their framework part split off; the savanna and desert entries share the savanna's
+files until S7 gives the desert its own folder (one mod cannot hold two copies of one file). Five unit tests that read
+species files moved to the savanna. The wall checker keeps watching savanna against desert until S7 (the compiler
+guards the framework). Tools point at `savanna\src\mainesources` (S8 does the proper paths helper). Checks:
+`./gradlew build` with the 163 unit tests (70 framework, 93 savanna), `soldiers,legs` 29 of 29 on 6 servers (both mods
+load), anim lab unchanged (worker 0, termites only the old `peek` findings), guard films 15 of 15 scenes unchanged.
+Full run owed: done first by S7's session. S5's full run (by this session first): 142 of 143, the old flake BUGS 55.
 
 **S7. The desert mod** (about 2 to 3 hours). The harvester's code, models, textures, species file and tags into
 `desert\` under the desert mod's own name (`desertcolonies:worker_ant`, `desertcolonies:red_harvester_ant`, ...).

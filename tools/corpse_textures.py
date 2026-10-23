@@ -12,7 +12,7 @@ import zlib
 SIZE = 32
 BASE = (196, 184, 150)     # dull dried cream
 BLOTCH = (150, 138, 112)   # darker grey-brown patches
-OUT = "src/main/resources/assets/antcolonies/textures/entity/termite_corpse.png"
+OUT = "savanna/src/main/resources/assets/antcolonies/textures/entity/termite_corpse.png"
 
 
 def pixels():

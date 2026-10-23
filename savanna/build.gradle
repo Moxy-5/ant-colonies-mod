@@ -1,0 +1,40 @@
+// The savanna mod (the split, step S6, docs/plans/mod-split.md): the termites, the giant trees and (from M8) the
+// Matabele ants, on top of the colony framework. It keeps the mod name "antcolonies", so every termite, mound, garden
+// and tree thing keeps its saved name. Until step S7 it still holds the red harvester ant (com.antcolonies.desert).
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev'
+    id 'idea'
+}
+
+apply from: rootProject.file('gradle/mod-common.gradle')
+
+evaluationDependsOn(':framework')
+
+base {
+    archivesName = mod_id
+}
+
+neoForge {
+    // The giant trees' fall draws the falling tree with block displays moved from the code.
+    accessTransformers = project.files('src/main/resources/META-INF/accesstransformer.cfg')
+
+    mods {
+        "${framework_mod_id}" {
+            sourceSet(project(':framework').sourceSets.main)
+        }
+        "${mod_id}" {
+            sourceSet(sourceSets.main)
+        }
+    }
+
+    // Puts Minecraft on the test classpath so tests can use BlockPos, Direction and so on.
+    unitTest {
+        enable()
+        testedMod = mods.getByName(mod_id)
+    }
+}
+
+dependencies {
+    implementation project(':framework')
+}

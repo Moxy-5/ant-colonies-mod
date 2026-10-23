@@ -11,8 +11,8 @@ from pathlib import Path
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
-BLOCKS = ROOT / "src/main/resources/assets/antcolonies/textures/block"
-ITEMS = ROOT / "src/main/resources/assets/antcolonies/textures/item"
+BLOCKS = ROOT / "savanna/src/main/resources/assets/antcolonies/textures/block"
+ITEMS = ROOT / "savanna/src/main/resources/assets/antcolonies/textures/item"
 
 # Dry grass, light to dark, and the darker bits mixed in.
 STRAW = [(222, 200, 140), (205, 180, 118), (188, 160, 98), (170, 142, 84), (150, 124, 72)]

@@ -16,8 +16,8 @@ import zlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-ASSETS = ROOT / "src/main/resources/assets/antcolonies"
-DATA = ROOT / "src/main/resources/data/antcolonies"
+ASSETS = ROOT / "savanna/src/main/resources/assets/antcolonies"
+DATA = ROOT / "savanna/src/main/resources/data/antcolonies"
 PREVIEW = ROOT / "references/termites/preview"
 
 STAGES = ["green", "drying", "dry"]

@@ -23,17 +23,19 @@ import os, shutil, struct, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROJECT = os.path.normpath(os.path.join(HERE, '..'))
-CLASSES = os.path.join(PROJECT, 'build', 'classes', 'java', 'main')
+# Each mod's classes (the split, step S6: framework and savanna, each a folder of its own; class names never clash).
+CLASSES = [os.path.join(PROJECT, mod, 'build', 'classes', 'java', 'main') for mod in ('framework', 'savanna')]
 SNAPSHOT = os.path.join(PROJECT, 'run-film', 'film-watch', 'classes')
 
 
-def class_files(root):
+def class_files(roots):
     found = {}
-    for folder, _, files in os.walk(root):
-        for name in files:
-            if name.endswith('.class'):
-                path = os.path.join(folder, name)
-                found[os.path.relpath(path, root).replace('\\', '/')] = path
+    for root in ([roots] if isinstance(roots, str) else roots):
+        for folder, _, files in os.walk(root):
+            for name in files:
+                if name.endswith('.class'):
+                    path = os.path.join(folder, name)
+                    found[os.path.relpath(path, root).replace('\\', '/')] = path
     return found
 
 
@@ -99,7 +101,8 @@ def static_init(data):
 def snapshot():
     if os.path.isdir(SNAPSHOT):
         shutil.rmtree(SNAPSHOT)
-    shutil.copytree(CLASSES, SNAPSHOT)
+    for classes in CLASSES:
+        shutil.copytree(classes, SNAPSHOT, dirs_exist_ok=True)
     print('Remembered %d classes.' % len(class_files(SNAPSHOT)))
 
 

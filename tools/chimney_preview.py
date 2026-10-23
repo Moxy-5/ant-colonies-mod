@@ -27,7 +27,7 @@ sys.path.insert(0, HERE)
 import termite_models as tm  # noqa: E402
 
 ROOT = os.path.dirname(HERE)
-ASSETS = os.path.join(ROOT, 'src', 'main', 'resources', 'assets', 'antcolonies')
+ASSETS = os.path.join(ROOT, 'savanna', 'src', 'main', 'resources', 'assets', 'antcolonies')
 OUT = os.path.join(ROOT, 'references', 'termites', 'preview')
 KEYS = os.path.join(ROOT, 'build', 'chimney', 'come_out.txt')
 
