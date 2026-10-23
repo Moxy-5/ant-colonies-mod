@@ -138,12 +138,16 @@ public class TermiteForagingTests {
      * bushes among them (food first). The next foraging time is a rainy day: more holes than on the dry night (half as many
      * again), the food hole again, and at least one hole that had no turn on the first night (the rested ones explore). All
      * along, a hole that opens is always one whose turn it is.
-     * Brain step 4g, step 3 (termites plug and close): the next night the food hole is opened by hand and a worker in it is
-     * killed by a zombie. At once the hole and every hole whose gallery runs within 6 blocks of the kill are closed (no
-     * turn, no hidden trip through the gallery there, no food fetched round it), the others not; the food hole is plugged
-     * from inside although it is foraging time. A day and a half on it is still closed; two days and a bit on (the death
-     * faded below 1) it is back in the turns and its food may be fetched. Then a death and a hurt more at the same place
-     * (once as strong as 6): the hole is left for good, saved, still closed once the memory is gone, and a new hole is
+     * Brain step 4g, step 3 (termites plug and close), with BUGS 65 (the user's game): the next night the food hole is
+     * opened by hand and a chicken in it (the colony young, no soldiers) pecks a worker twice and kills it, and pecks a
+     * second worker once. Each worker counts once at its worst (a death and a hurt: 6, not 10) and the flurry is one
+     * attack; the alarm goes up. The chicken sits in the hole a while, then is killed: within the alarm's calm times the
+     * alarm settles, the colony forages again, and no hole is left for good. The hole and every hole whose gallery runs
+     * within 6 blocks of the kill are closed (no turn, no hidden trip through the gallery there, no food fetched round
+     * it), the others not; the food hole is plugged from inside although it is foraging time. A day and a half on it is
+     * still closed; two and a half days and a bit on (faded below 1) it is open and its food may be fetched, and the next
+     * night it is back in the turns.
+     * Then a death and a hurt more at the same place, a second attack: the hole is left for good, saved, still closed once the memory is gone, and a new hole is
      * opened on a gallery at least 7 blocks from the place, not closed. Last, the switch off brings back the 2
      * holes of before.
      */
@@ -174,6 +178,7 @@ public class TermiteForagingTests {
         java.util.Set<BlockPos> firstNight = new java.util.HashSet<>();
         java.util.Set<BlockPos> openBefore = new java.util.HashSet<>();
         java.util.Set<BlockPos> holesBefore = new java.util.HashSet<>();
+        net.minecraft.world.entity.animal.Chicken[] chickenBox = {null};
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
@@ -288,26 +293,71 @@ public class TermiteForagingTests {
                         stage[0] = 6;
                     }
                 }
-                case 6 -> { // brain step 4g, step 3: the next night a worker in the food hole killed by a zombie
+                case 6 -> { // brain step 4g, step 3: the next night a worker in the food hole pecked to death by a chicken
                     if (tick - since[0] >= 30) {
                         com.antcolonies.savanna.entity.TermiteWorkerEntity victim = null;
+                        com.antcolonies.savanna.entity.TermiteWorkerEntity other = null;
                         for (com.antcolonies.savanna.entity.TermiteWorkerEntity worker : TestIsolation.insectsOf(level, colony, com.antcolonies.savanna.entity.TermiteWorkerEntity.class)) {
                             if (colony.roleOf(level, worker) != com.antcolonies.colony.ColonyRole.BUILDER) {
+                                other = victim;
                                 victim = worker; // (the builders plug the holes)
                             }
                         }
-                        helper.assertTrue(victim != null, "no worker to be killed but the builders");
+                        helper.assertTrue(victim != null && other != null, "no two workers to be pecked but the builders");
+                        helper.assertTrue(TestIsolation.insectsOf(level, colony, com.antcolonies.savanna.entity.TermiteSoldierEntity.class).isEmpty(),
+                                "the young colony has soldiers (BUGS 65 is about one with none)");
                         level.setBlock(food[0], Blocks.AIR.defaultBlockState(), 3); // the food hole open
                         victim.teleportTo(food[0].getX() + 0.5, food[0].getY(), food[0].getZ() + 0.5);
-                        net.minecraft.world.entity.monster.Zombie zombie = helper.spawn(net.minecraft.world.entity.EntityType.ZOMBIE,
-                                helper.relativePos(food[0].above(3)));
-                        victim.hurt(level.damageSources().mobAttack(zombie), 100.0F);
-                        zombie.discard();
-                        colony.part(SavannaParts.ALARM).orElseThrow().calmForTests(); // (the alarm is tested elsewhere: here the foraging time goes on)
+                        other.teleportTo(food[0].getX() + 0.5, food[0].getY() - 1, food[0].getZ() + 0.5);
+                        // BUGS 65 (the user's game, 2026-10-23): the chicken ran a forager down and fell into the hole it fled to,
+                        // and within two seconds pecked it to death (3 pecks: a worker has 3 health, a peck takes 1) and pecked a
+                        // second worker once; it stayed there till the player killed it.
+                        net.minecraft.world.entity.animal.Chicken chicken = helper.spawn(net.minecraft.world.entity.EntityType.CHICKEN, helper.relativePos(food[0]));
+                        chicken.setNoAi(true);
+                        chickenBox[0] = chicken;
+                        for (int peck = 0; peck < 2; peck++) {
+                            victim.invulnerableTime = 0;
+                            victim.hurt(level.damageSources().mobAttack(chicken), 0.1F);
+                        }
+                        other.hurt(level.damageSources().mobAttack(chicken), 0.1F);
+                        victim.invulnerableTime = 0;
+                        victim.hurt(level.damageSources().mobAttack(chicken), 100.0F);
+                        helper.assertTrue(other.isAlive(), "the second worker pecked once was killed");
                         helper.assertTrue(victim.isDeadOrDying(), "the worker in the food hole was not killed");
                         helper.assertTrue(colony.danger().places().size() == 1 && colony.danger().places().get(0).deaths() == 1,
                                 "the death in the food hole is not remembered: " + colony.danger().describe(level));
+                        // Each worker counts once, at its worst: a death and a hurt (6), not a hurt for every peck (10); and the
+                        // whole flurry is one attack, so the hole is not left for good (that needs attacks again and again).
+                        com.antcolonies.species.SpeciesProfile.DangerNumbers numbers = colony.danger().numbers();
+                        helper.assertTrue(colony.danger().places().get(0).peak() <= numbers.killed() + numbers.hurt() + 0.01,
+                                "a worker pecked 3 times to death and one pecked once counted as more than a death and a hurt (BUGS 65): "
+                                        + colony.danger().describe(level) + ", once as strong as " + colony.danger().places().get(0).peak());
+                        helper.assertTrue(colony.danger().places().get(0).attacks() == 1, "one chicken's flurry of pecks counted as "
+                                + colony.danger().places().get(0).attacks() + " attacks (BUGS 65)");
+                        helper.assertTrue(colony.part(SavannaParts.ALARM).orElseThrow().level(level) >= 2, "the chicken's attack raised no alarm");
+                        since[0] = tick;
+                        stage[0] = 61;
+                    }
+                }
+                case 61 -> { // the chicken sits in the hole a while, then is killed: the alarm settles and the colony forages again
+                    net.minecraft.world.entity.animal.Chicken chicken = chickenBox[0];
+                    com.antcolonies.savanna.colony.Alarm alarm = colony.part(SavannaParts.ALARM).orElseThrow();
+                    if (chicken.isAlive()) {
+                        if (tick - since[0] >= 100) {
+                            chicken.kill();
+                            since[0] = tick;
+                            SavannaMod.LOGGER.info("[turns-test] tick {}: the chicken in the hole killed; {}", tick, alarm.describe(level));
+                        }
+                    } else if (alarm.level(level) == 0) {
+                        SavannaMod.LOGGER.info("[turns-test] tick {}: the alarm settled {} ticks after the chicken was killed", tick, tick - since[0]);
+                        helper.assertTrue(colony.isForagingTime(level), "the alarm settled at night but the colony does not forage again");
+                        helper.assertTrue(colony.part(SavannaParts.CLOSED_HOLES).orElseThrow().left().isEmpty(),
+                                "a hole was left for good for one worker killed (BUGS 65): " + colony.part(SavannaParts.CLOSED_HOLES).orElseThrow().describe(level));
                         stage[0] = 7;
+                    } else {
+                        com.antcolonies.species.SpeciesProfile.AlarmNumbers numbers = alarm.numbers();
+                        helper.assertTrue(tick - since[0] <= numbers.calmTicksFor(2) + numbers.calmTicksFor(1) + 100,
+                                "the alarm is still at " + alarm.level(level) + " " + (tick - since[0]) + " ticks after the chicken was killed (BUGS 65): " + alarm.describe(level));
                     }
                 }
                 case 7 -> { // at once: the hole and the holes whose gallery runs near the kill closed, the others not
@@ -340,21 +390,38 @@ public class TermiteForagingTests {
                 }
                 case 8 -> { // plugged from inside, at foraging time; then a day and a half: still closed; two days and a bit: back
                     if (!ForagingHoles.isOpen(level, food[0])) {
-                        SavannaMod.LOGGER.info("[turns-test] tick {}: the food hole plugged {} ticks after the kill", tick, tick - since[0]);
+                        SavannaMod.LOGGER.info("[turns-test] tick {}: the food hole plugged {} ticks after the alarm settled", tick, tick - since[0]);
                         colony.danger().ageForTests(36000L);
                         helper.assertTrue(colony.part(SavannaParts.CLOSED_HOLES).orElseThrow().isClosed(level, food[0]), "a day and a half after the death the food hole is open again: "
                                 + colony.danger().describe(level));
-                        colony.danger().ageForTests(14400L); // the death (4) halved a little more than twice: under 1
-                        helper.assertTrue(!colony.part(SavannaParts.CLOSED_HOLES).orElseThrow().isClosed(level, food[0]) && galleries.holesInTurn(level).contains(food[0]),
-                                "two days and a bit after the death the food hole is not back in the turns: " + colony.danger().describe(level));
-                        helper.assertTrue(colony.mayForageAt(level, bushes.get(0)), "two days and a bit after the death the food there is still not fetched");
+                        colony.danger().ageForTests(28800L); // the death and the hurt (6) halved a little more than 2.5 times: under 1
+                        helper.assertTrue(!colony.part(SavannaParts.CLOSED_HOLES).orElseThrow().isClosed(level, food[0]),
+                                "two and a half days and a bit after the death the food hole is still closed: " + colony.danger().describe(level));
+                        helper.assertTrue(colony.mayForageAt(level, bushes.get(0)), "two and a half days and a bit after the death the food there is still not fetched");
+                        // (tonight's turns were picked when the alarm settled, with the hole still closed: it opens on its next turn)
+                        clock.skipTo(colony, TestClock.Phase.DAY);
+                        since[0] = tick;
+                        stage[0] = 81;
+                    } else {
+                        helper.assertTrue(tick - since[0] < 3000, "the hole where a worker was killed was not plugged at foraging time");
+                    }
+                }
+                case 81 -> { // the day after: then the next night
+                    if (tick - since[0] >= 30) {
+                        clock.skipTo(colony, TestClock.Phase.NIGHT);
+                        since[0] = tick;
+                        stage[0] = 82;
+                    }
+                }
+                case 82 -> { // the next night the food hole is back in the turns; then hit again, a second attack
+                    if (tick - since[0] >= 30) {
+                        helper.assertTrue(galleries.holesInTurn(level).contains(food[0]), "the night after the danger faded the food hole is not back in the turns: "
+                                + galleries.tonight().stream().map(helper::relativePos).toList() + ", " + colony.danger().describe(level));
                         tunnels.forEach(tunnel -> holesBefore.add(tunnel.hole()));
-                        colony.danger().hurt(level, food[0], "zombie", true); // hit again and again: once as strong as 6
+                        colony.danger().hurt(level, food[0], "zombie", true); // hit again, a second attack: once as strong as 6
                         colony.danger().hurt(level, food[0], "zombie", false);
                         since[0] = tick;
                         stage[0] = 9;
-                    } else {
-                        helper.assertTrue(tick - since[0] < 3000, "the hole where a worker was killed was not plugged at foraging time");
                     }
                 }
                 case 9 -> { // left for good: a new hole on the same gallery at least 7 blocks from the place

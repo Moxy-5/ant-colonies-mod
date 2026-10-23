@@ -101,7 +101,7 @@ public final class ColonyParts {
             .sample(ForagingTrails::fillForTests));
     public static final Type<DangerMap> DANGER_MAP = shared("danger_map", DangerMap::new, part -> part
             .ticks(170, DangerMap::tick)
-            .hears(ColonyNews.MEMBER_HURT, 30, (danger, level, news) -> danger.hurt(level, news.where(), news.by().getType().toShortString(), news.killed())) // the place is remembered
+            .hears(ColonyNews.MEMBER_HURT, 30, (danger, level, news) -> danger.hurt(level, news.where(), news.by().getType().toShortString(), news.killed(), news.member().getUUID())) // the place is remembered (each member once an attack)
             .answers(ColonyQuestions.KEEP_OFF, 30, DangerMap::keepsOff) // a dangerous place
             .saves(DangerMap::save, DangerMap::load)
             .sample(DangerMap::fillForTests));

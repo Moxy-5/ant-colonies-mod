@@ -35,7 +35,8 @@ import net.minecraft.world.level.Level;
  * insects walk it for real); the food round it is not fetched ({@link Colony#keepsOff}). Once the memory fades it is a
  * hole like any other: it opens on its turn, as a rested one does.</li>
  * <li><b>Left:</b> with the galleries on, a hole within {@code merge_within} blocks of a place once as strong as
- * {@code leave_from} (attacked again and again) is left for good: never opened again. The galleries open a new hole on
+ * {@code leave_from} and attacked at least twice, on separate attacks ({@link DangerMap.Place#attacks}, BUGS 65: not
+ * one chicken's flurry of pecks), is left for good: never opened again. The galleries open a new hole on
  * a gallery under it (or the nearest other) at least {@code new_hole_from} blocks from the place ({@link Galleries#openInstead}), if there is
  * room. (With the galleries off the colony has only its 2 holes: they are closed while the danger lasts, never left.)</li>
  * </ul>

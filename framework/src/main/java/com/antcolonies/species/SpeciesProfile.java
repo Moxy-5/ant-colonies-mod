@@ -185,10 +185,12 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * blocks of its middle) never is. {@code keepAway}: the foragers leave dangerous ground and the trails through it alone
      * (harvester ants). {@code closeHoles}: the colony plugs and closes its foraging holes where its members were attacked
      * (termites, step 3: every hole within {@code reach} of an attack, and every hole whose gallery out from the nest runs
-     * that near one, until the danger fades); a place that was once as strong as {@code leaveFrom} is left for good: its
+     * that near one, until the danger fades); a place attacked again and again (at least 2 separate attacks, BUGS 65: one
+     * attack's hurts and deaths come less than {@code seenEveryTicks} apart) and once as strong as {@code leaveFrom} is left for good: its
      * holes within {@code mergeWithin} are never opened again, and a new hole is opened on the same gallery at least
      * {@code newHoleFrom} blocks from it. My picks, to confirm: a death 4 (kept away from about 2 days, remembered 3), a
-     * hurt 2, a sighting 1, halving every day; a hole left after 6 (two deaths, or a death and a hurt), its new hole 7 out.
+     * hurt 2, a sighting 1, halving every day; a hole left after 6 (two deaths, or a death and a hurt) over 2 attacks, its new hole 7 out. Each member counts once an
+     * attack, at its worst wound (BUGS 65).
      */
     public record DangerNumbers(double hurt, double killed, double seen, double seenWithin, int seenEveryTicks, double mergeWithin,
             double reach, int halfLifeTicks, double forgetBelow, double dangerousFrom, double most, double home, boolean keepAway,
