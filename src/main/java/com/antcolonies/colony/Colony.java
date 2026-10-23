@@ -614,6 +614,33 @@ public class Colony {
         return caste != null && hooks.all(ColonyHooks.CASTES).stream().anyMatch(castes -> castes.castes().contains(caste));
     }
 
+    /** Step 10: the number a young one growing into this caste is synced and saved as ({@link ColonyHooks.Castes#numberOf}); 0: a worker. */
+    public byte casteNumber(@Nullable String caste) {
+        if (caste != null) {
+            for (ColonyHooks.Castes castes : hooks.all(ColonyHooks.CASTES)) {
+                byte number = castes.numberOf(caste);
+                if (number != 0) {
+                    return number;
+                }
+            }
+        }
+        return 0;
+    }
+
+    /** Step 10: the caste a young one with this number grows into ({@link #casteNumber}), or null: a worker. */
+    @Nullable
+    public String casteOfNumber(int number) {
+        if (number != 0) {
+            for (ColonyHooks.Castes castes : hooks.all(ColonyHooks.CASTES)) {
+                String caste = castes.casteOf(number);
+                if (caste != null) {
+                    return caste;
+                }
+            }
+        }
+        return null;
+    }
+
     /** How many founders beside the queen the colony counts (the termite king; none for a lone queen's species). */
     public int coFounderCount() {
         ColonyHooks.CoFounders founder = hooks().first(ColonyHooks.CO_FOUNDERS);

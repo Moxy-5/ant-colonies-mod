@@ -89,7 +89,7 @@ public class Soldiers {
     public int nymphsToBe(Level level, Rank rank) {
         int count = 0;
         for (AntLarvaEntity nymph : colony.brood().getLarvae(level)) {
-            if (nymph.getSoldierRank() == rank) {
+            if (rank.caste().equals(nymph.getGrowsInto(colony))) {
                 count++;
             }
         }

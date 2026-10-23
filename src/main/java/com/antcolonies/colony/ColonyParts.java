@@ -417,6 +417,18 @@ public final class ColonyParts {
                 }
 
                 @Override
+                public byte numberOf(String caste) {
+                    com.antcolonies.entity.TermiteSoldierEntity.Rank rank = com.antcolonies.entity.TermiteSoldierEntity.Rank.byCaste(caste);
+                    return rank == null ? 0 : rank.id(); // 1 minor, 2 major, as synced and saved before step 10
+                }
+
+                @Override
+                public String casteOf(int number) {
+                    com.antcolonies.entity.TermiteSoldierEntity.Rank rank = com.antcolonies.entity.TermiteSoldierEntity.Rank.byId(number);
+                    return rank == null ? null : rank.caste();
+                }
+
+                @Override
                 public int wantReal(ServerLevel level, boolean watched, int cap, java.util.Map<String, Integer> wanted) {
                     return soldiers.wantReal(level, watched, cap, wanted);
                 }

@@ -74,7 +74,7 @@ public class TermiteNymphRenderer extends EntityRenderer<AntLarvaEntity> {
         pose.pushPose();
         pose.mulPose(Axis.YP.rotationDegrees(180.0F - nymph.getYRot()));
         float grown = (float) Math.min(nymph.getFed(), nymph.getMeal()) / nymph.getMeal();
-        TermiteSoldierEntity.Rank rank = nymph.getSoldierRank();
+        TermiteSoldierEntity.Rank rank = TermiteSoldierEntity.Rank.byId(nymph.getGrowsIntoNumber()); // (the soldiers' caste numbers, 1 and 2)
         float size = 0.55F + (rank == TermiteSoldierEntity.Rank.MAJOR ? 0.6F : 0.35F) * grown;
         pose.scale(size, size, size);
         VertexConsumer consumer = buffers.getBuffer(RenderType.entityCutoutNoCull(TEXTURE));

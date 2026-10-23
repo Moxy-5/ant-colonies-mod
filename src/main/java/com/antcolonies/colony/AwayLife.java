@@ -149,7 +149,7 @@ public class AwayLife {
             what = new Frozen(Kind.EGG, "", 0, Load.NONE, left, 0, null, now, false, Colony.NOT_SET);
         } else if (entity instanceof AntLarvaEntity larva && larva.isAlive()) {
             long hungry = larva.getLastFed() == Colony.NOT_SET ? 0 : Math.max(0, now - larva.getLastFed());
-            what = new Frozen(Kind.LARVA, "", 0, Load.NONE, hungry, larva.getFed(), larva.getGrowsInto(), now, false, Colony.NOT_SET);
+            what = new Frozen(Kind.LARVA, "", 0, Load.NONE, hungry, larva.getFed(), larva.getGrowsInto(colony), now, false, Colony.NOT_SET);
         }
         if (what != null) {
             frozen.put(entity.getUUID(), what);

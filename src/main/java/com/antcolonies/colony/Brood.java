@@ -136,7 +136,7 @@ public class Brood {
         String growsInto = soldierWanted(level);
         AntLarvaEntity larva = new AntLarvaEntity(youngType(), level);
         larva.setColonyId(id);
-        larva.setGrowsInto(growsInto);
+        larva.setGrowsInto(colony, growsInto);
         larva.setMeal(mealFor(growsInto));
         larva.moveTo(egg.getX(), egg.getY(), egg.getZ(), egg.getYRot(), 0.0F);
         level.addFreshEntity(larva);
@@ -256,7 +256,7 @@ public class Brood {
                 egg.setHatchAt(now + (young.left() < 0 ? colony.profile().brood().hatchTicks() : young.left()));
             } else {
                 AntLarvaEntity larva = spawnLarva(level, at.x, at.y, at.z);
-                larva.setGrowsInto(young.growsInto());
+                larva.setGrowsInto(colony, young.growsInto());
                 larva.setMeal(mealFor(young.growsInto()));
                 larva.setFed(young.fed());
                 larva.setLastFed(now - young.left());
@@ -353,14 +353,14 @@ public class Brood {
      * eats the soldier's bigger meal first). Soldiers are not held back by the workers' cap.
      */
     public boolean hatchLarva(ServerLevel level, AntLarvaEntity larva) {
-        String growsInto = larva.getGrowsInto();
+        String growsInto = larva.getGrowsInto(colony);
         if (growsInto != null) {
             return hatchSoldier(level, larva, growsInto);
         }
         if (colony.getCount(Caste.WORKER) >= colony.profile().colony().maxWorkers()) {
             String wanted = soldierWanted(level);
             if (wanted != null) {
-                larva.setGrowsInto(wanted);
+                larva.setGrowsInto(colony, wanted);
                 larva.setMeal(mealFor(wanted));
             }
             return false;

@@ -124,6 +124,16 @@ public final class ColonyHooks {
         String fromSaved(String word);
 
         /**
+         * Step 10: the small number a young one growing into this caste is synced and saved as (1 and up; 0 is a worker),
+         * or 0 if not one of these castes. Kept the same for good: saved young are read back by it.
+         */
+        byte numberOf(String caste);
+
+        /** Step 10: the caste with this number ({@link #numberOf}), or null if not one of these castes. */
+        @Nullable
+        String casteOf(int number);
+
+        /**
          * How many real mobs of these castes the colony wants now (of a real cap of {@code cap}; {@code watched}: a player
          * near), put into {@code wanted} by caste before the workers; returns how many in all (the workers get the rest).
          */

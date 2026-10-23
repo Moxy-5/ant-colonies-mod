@@ -28,6 +28,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
+import org.jetbrains.annotations.Nullable;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.EntityType;
@@ -67,22 +68,33 @@ public class TermiteSoldierTests {
             colony.setCount(WorkerAntEntity.CASTE, 10);
             nymphs[0] = hatch(helper, colony, 0);
             nymphs[1] = hatch(helper, colony, 1);
-            helper.assertTrue(nymphs[0].getSoldierRank() == Rank.MINOR, "with 10 workers the first nymph should grow into a minor: "
-                    + nymphs[0].getSoldierRank());
+            helper.assertTrue(rank(colony, nymphs[0]) == Rank.MINOR, "with 10 workers the first nymph should grow into a minor: "
+                    + rank(colony, nymphs[0]));
             helper.assertTrue(nymphs[0].getMeal() == numbers.minorMeal(), "the minor nymph's meal is " + nymphs[0].getMeal());
-            helper.assertTrue(nymphs[1].getSoldierRank() == null && nymphs[1].getMeal() == workerMeal, "the second nymph should grow into a worker");
+            helper.assertTrue(rank(colony, nymphs[1]) == null && nymphs[1].getMeal() == workerMeal, "the second nymph should grow into a worker");
             colony.setCount(WorkerAntEntity.CASTE, 20); // 2 minors and 1 major wanted
             nymphs[2] = hatch(helper, colony, 2);
             nymphs[3] = hatch(helper, colony, 3);
             nymphs[4] = hatch(helper, colony, 4);
-            helper.assertTrue(nymphs[2].getSoldierRank() == Rank.MINOR, "the second minor: " + nymphs[2].getSoldierRank());
-            helper.assertTrue(nymphs[3].getSoldierRank() == Rank.MAJOR && nymphs[3].getMeal() == numbers.majorMeal(),
-                    "the major: " + nymphs[3].getSoldierRank() + ", meal " + nymphs[3].getMeal());
-            helper.assertTrue(nymphs[4].getSoldierRank() == null, "with every soldier on its way the next nymph grows into a worker");
+            helper.assertTrue(rank(colony, nymphs[2]) == Rank.MINOR, "the second minor: " + rank(colony, nymphs[2]));
+            helper.assertTrue(rank(colony, nymphs[3]) == Rank.MAJOR && nymphs[3].getMeal() == numbers.majorMeal(),
+                    "the major: " + rank(colony, nymphs[3]) + ", meal " + nymphs[3].getMeal());
+            helper.assertTrue(rank(colony, nymphs[4]) == null, "with every soldier on its way the next nymph grows into a worker");
             // Saved and read back, the major nymph is still one.
             AntLarvaEntity copy = new AntLarvaEntity(ModEntities.TERMITE_NYMPH.get(), level);
             copy.load(nymphs[3].saveWithoutId(new CompoundTag()));
-            helper.assertTrue(copy.getSoldierRank() == Rank.MAJOR, "after a reload the major nymph is a " + copy.getSoldierRank());
+            helper.assertTrue(rank(colony, copy) == Rank.MAJOR, "after a reload the major nymph is a " + rank(colony, copy));
+            // Apex step 10: the young body keeps only the caste's number, synced and saved as before (2 a major, under
+            // "soldier"), so the renderer draws its big head and an old world's soldier nymphs load as they were.
+            CompoundTag saved = nymphs[3].saveWithoutId(new CompoundTag());
+            helper.assertTrue(copy.getGrowsIntoNumber() == 2 && saved.getByte("soldier") == 2 && nymphs[0].getGrowsIntoNumber() == 1
+                    && nymphs[1].getGrowsIntoNumber() == 0, "caste numbers: major " + copy.getGrowsIntoNumber() + ", saved "
+                    + saved.getByte("soldier") + ", minor " + nymphs[0].getGrowsIntoNumber() + ", worker " + nymphs[1].getGrowsIntoNumber());
+            CompoundTag old = nymphs[1].saveWithoutId(new CompoundTag());
+            old.putByte("soldier", (byte) 1); // a minor nymph as saved before step 10
+            AntLarvaEntity oldCopy = new AntLarvaEntity(ModEntities.TERMITE_NYMPH.get(), level);
+            oldCopy.load(old);
+            helper.assertTrue(rank(colony, oldCopy) == Rank.MINOR, "an old save's minor nymph loads as a " + rank(colony, oldCopy));
             // Fed their meals: they grow up.
             nymphs[0].setFed(nymphs[0].getMeal());
             nymphs[3].setFed(nymphs[3].getMeal());
@@ -103,12 +115,18 @@ public class TermiteSoldierTests {
         });
         helper.runAfterDelay(100, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
-            helper.assertTrue(nymphs[1].isAlive() && nymphs[1].getSoldierRank() == Rank.MINOR, "the full worker nymph at the worker limit should now grow into a minor: "
-                    + nymphs[1].getSoldierRank());
+            helper.assertTrue(nymphs[1].isAlive() && rank(colony, nymphs[1]) == Rank.MINOR, "the full worker nymph at the worker limit should now grow into a minor: "
+                    + rank(colony, nymphs[1]));
             helper.assertTrue(!nymphs[1].isFull() && nymphs[1].getMeal() == colony.profile().soldiers().orElseThrow().minorMeal(),
                     "it should eat the minor's meal first");
             helper.succeed();
         });
+    }
+
+    /** The soldier rank a nymph grows into, asked of its colony (null: a worker). */
+    @Nullable
+    private static Rank rank(Colony colony, AntLarvaEntity nymph) {
+        return Rank.byCaste(nymph.getGrowsInto(colony));
     }
 
     /** An egg of the colony laid next to the queen and hatched at once; the new nymph. */

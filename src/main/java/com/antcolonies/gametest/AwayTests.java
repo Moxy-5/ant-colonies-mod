@@ -1678,6 +1678,24 @@ public class AwayTests {
         }
         helper.assertTrue(!colony.isOwnCaste(com.antcolonies.colony.Caste.WORKER) && !colony.isOwnCaste(null),
                 "a worker is never one of a species' own castes beyond the worker");
+        // Step 10: the young body keeps only a caste's number from the castes hook, the soldiers' as synced and saved
+        // before (1 minor, 2 major); every caste its own number, there and back; a worker, or a species without, 0.
+        java.util.Set<Byte> numbers = new java.util.HashSet<>();
+        for (com.antcolonies.colony.ColonyHooks.Castes castes : colony.hooks().all(com.antcolonies.colony.ColonyHooks.CASTES)) {
+            for (String caste : castes.castes()) {
+                byte number = colony.casteNumber(caste);
+                helper.assertTrue(number != 0 && numbers.add(number) && caste.equals(colony.casteOfNumber(number)),
+                        "a " + colony.getSpecies() + " colony's " + caste + " should have its own caste number, not " + number);
+            }
+        }
+        for (com.antcolonies.entity.TermiteSoldierEntity.Rank rank : com.antcolonies.entity.TermiteSoldierEntity.Rank.values()) {
+            helper.assertTrue(colony.casteNumber(rank.caste()) == (termites ? rank.id() : 0)
+                    && java.util.Objects.equals(colony.casteOfNumber(rank.id()), termites ? rank.caste() : null),
+                    "a " + colony.getSpecies() + " colony's " + rank.caste() + " number should be " + (termites ? rank.id() : 0)
+                            + ", not " + colony.casteNumber(rank.caste()));
+        }
+        helper.assertTrue(colony.casteNumber(com.antcolonies.colony.Caste.WORKER) == 0 && colony.casteNumber(null) == 0
+                && colony.casteOfNumber(0) == null, "a worker's caste number is always 0");
         // Step 9c: the crust a colony plasters with is the mud crust, for the species that build a mound.
         helper.assertTrue(colony.hooks().first(com.antcolonies.colony.ColonyHooks.CRUST)
                 == (colony.has(com.antcolonies.colony.ColonyParts.MOUND) ? com.antcolonies.registry.ModBlocks.MUD_CRUST.get() : null),
