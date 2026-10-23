@@ -69,6 +69,7 @@ in-game test at the end (termites, a new world, about 30 minutes), then one merg
 
 **T1 BUILT 2026-10-23** (`SpeciesSection`, `SavannaNumbers`, `DesertNumbers`; every number the same before and after).
 **T2 BUILT 2026-10-23** (`Galleries` a hub of 455 lines, with `GalleryWeb`, `HoleTurns`, `GalleryUpkeep`, `GalleryCatchUp`; the feeding galleries, casts, mound building and comb were already behind sockets since the split, two termite names renamed; king, mound and sheeting kept as shared words, real in other species too).
+**T3 + T4 merged 2026-10-23** (from `claude/apex-t3-t4-2ba1d3`). **T5 BUILT 2026-10-23**: BUGS 55 fixed (a young colony that yields walls its piece off), BUGS 62 and the new 68 now name why when they fail; full run 142 of 143 (68); speed the same as `master`, failed route searches halved; guard films and anim lab unchanged. Waiting for the user's in-game test, then the merge.
 
 **Not in part 3:** the shared fight system and a shared "defender" (M8 builds it with the Matabele ant as the first
 fighter; the termite soldiers join it then); `ScoutGoal` in three (errand helper step 4, part 4 or M8's scouts); the
