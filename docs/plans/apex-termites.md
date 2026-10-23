@@ -46,10 +46,17 @@ in-game test at the end (termites, a new world, about 30 minutes), then one merg
   nodule, ...) one row in a list the species fill, one synced slot, one save; the renderer draws the row's look. A
   new load (a dead termite, a hurt nestmate) is then a new row in the species mod. Save names kept so a carried load
   survives a reload. Check: the guard films (15 of 15 picture for picture the same) and `legs,soldiers,termitefood`.
+  **BUILT 2026-10-23** (branch `claude/apex-t3-t4-2ba1d3`): `entity/load/LoadKind` (the rows), `CarriedLoad` (the one
+  slot), `FrameworkLoads` (the framework's five), `client/LoadLooks` and `CarriedLoadLayer` (the looks); save words kept.
 - **T4, the route search bursts:** find why the termite stress test searches and fails in bursts, and fix it the way
   `docs/BUGS.md` 42 did (remember a target with no way and leave it alone for a while). Speed measured with
   `/antcolonies perf` and the stress test, before and after (6 runs a side). If the fix would change anything you
   could see (an insect giving up on work it does today), I stop and ask first.
+  **BUILT 2026-10-23** (same branch): the main source was `ShapeMoundGoal`, a tunnel cell at the mound's foot that no
+  termite can carve from inside, searched for by every builder in turn every 20 s; now the legs know how close the
+  work places lie (`AntNavigator.moveTo` with a reach) and skip a search that cannot succeed, same result, no change
+  in behaviour. **Found, not fixed (your call below):** a nurse cut off from the queen (`StandByQueenGoal`) tries
+  again every 2 seconds, four failed full searches each time; the bursts left in the stress test are mostly hers.
 - **T5, the full check, with the two old gallery flakes** (`docs/BUGS.md` 55 and 62): with the galleries split, find
   why they fail beside other tests (box 4 of the 4-box rule: a leak between tests, not a loosened check), so every
   full run passes clean with no reruns alone; then the full run on 6 servers, the stress test and `/antcolonies perf`
@@ -76,6 +83,10 @@ legs tests on a savanna body (`apex.md` step 13, before the harvester ant leaves
   M8 touches it except a dead mound (a new block state, not a mound rework).
 
 ## Your calls
+- **A nurse cut off from her queen (found in T4, 2026-10-23):** today she tries to walk back every 2 seconds, and
+  when there is no way each try is costly (the bursts left in the stress test). The fix used for other work since
+  `docs/BUGS.md` 42 would make her try every 20 seconds instead, so once a way opens again she could take up to 18
+  seconds longer to come back to the queen. Not built; yours to decide.
 - **In-game:** nothing should change. T4 is the only step that could (if the fix makes a termite give up sooner on
   work it can't reach); if so I stop and ask before building it.
 - **Future features:** T1 and T3 make the Matabele ants easier (their numbers and their loads, dead termites and hurt
