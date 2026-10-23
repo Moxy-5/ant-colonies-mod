@@ -80,9 +80,25 @@ C:\Ant Mod\
   travel with it, so the tick order stays exactly today's.
 
 ## Steps
-Every step: `./gradlew build`, a full run on 6 servers (about 12 minutes), committed and pushed. Nothing changes
-in-game in any step. Block 1 (S0 to S5) still builds one mod and only gets the code ready; block 2 (S6 to S10) makes the
-three mods.
+**Rounds (the user, 2026-10-22: "go as fast as possible while still keeping the mod in a good spot"; the trip date
+no longer matters).** The steps below are built in 5 rounds; each round is one `./gradlew build`, one full run on 6
+servers (about 12 minutes), one commit and push. Nothing changes in-game in any round. While a round's full run goes,
+the next round is started, but not committed until that run passes. One in-game test at the end, one merge.
+- **Round 1: S2** (S0 and S1 done before it).
+- **Round 2: S3 + S4**, all the remaining moving behind hooks, the sign-ups and the tests sorted (the same kind of
+  careful moving; one full run checks it as well as two).
+- **Round 3: S5 + S6**, the packages renamed and the framework its own mod (from S6 the compiler refuses species code
+  in the framework, a stricter check than the wall checker, so the checker's `--strict` zero is only needed at the end
+  of the round).
+- **Round 4: S7 + S8 + S9**, the desert mod's name, tools and GitHub, each mod on its own (small jobs, none touch how
+  the insects behave).
+- **Round 5: S10**, the full check; **then the user's one in-game test** (about 30 minutes, termites only, a new
+  world) and **one merge into `master`** with the user's OK. `master` stays untouched until then.
+- **Not joined, on purpose:** rounds 3 and 4 (renaming the folders, making new mods and renaming the harvester at once
+  would make a failure very hard to trace), and no full run is skipped.
+
+The step texts below keep their old block headings and in-game test lines for the record; the rounds above replace
+them (no test 1 and no block 1 merge).
 
 ### Block 1: ready to cut (one mod still)
 **S0. Clean start** (15 minutes). This branch, `claude/apex-questions`, holds 10 commits that are not on `master`: the
@@ -151,14 +167,15 @@ stack" and folders, `docs/DESIGN.md` architecture, `docs/HISTORY.md`).
 **The user's in-game test 2** (about 30 minutes, termites only, a new world).
 **Then merge block 2 into `master`** with the user's OK.
 
-## Timing (and the trip)
+## Timing
+- **With the rounds (2026-10-22): about 2 days**, 5 full runs in place of 10, no waiting between rounds, one in-game
+  test. The old estimate, for the record:
 - About 11 to 14 hours of building for block 1 and 11 to 14 for block 2 (the census and the forwarding dropped saved
   about 3), plus 10 full runs (about 2 hours of PC time). At the pace of Apex steps 6 to 10 (five steps in one day)
   that is **about 3 days in all**: block 1
   with test 1 and its merge in about 1.5 days, block 2 with test 2 and its merge in about 1.5 to 2 days.
-- **Stop rule:** block 2 starts only if at least 2 full days are left before the trip. If not, block 1 stays merged
-  (a clean place to stop: one mod, the code ready to cut, nothing half-done) and block 2 waits until after the trip.
-- Apex part 3 (the termites) most likely waits until after the trip.
+- ~~**Stop rule:** block 2 starts only if at least 2 full days are left before the trip.~~ Dropped: the user, 2026-10-22,
+  "the trip date doesnt matter".
 
 ## My picks (code choices; you may skip this list)
 1. **Savanna keeps the name `antcolonies`**: every termite, mound, garden and tree block keeps its saved name, so
@@ -186,7 +203,7 @@ stack" and folders, `docs/DESIGN.md` architecture, `docs/HISTORY.md`).
    ecosystem); the shared fight system (M8 step 2) is built in the framework, so harvester neighbour fights (and the
    jungle's army ants later) reuse it.
 12. **Checks:** the wall checker until S6, the compiler after; the guard films and anim
-   lab at S5 and S8; one speed check at S10.
+   lab at the end of rounds 3 and 4; one speed check at S10.
 
 ## Your calls (in ant terms; **decided 2026-10-22: every recommendation below taken**)
 1. **The names.** Three mods show up in the game's mod list. Names to pick:
@@ -215,7 +232,8 @@ stack" and folders, `docs/DESIGN.md` architecture, `docs/HISTORY.md`).
      framework's reader. **(a) My recommendation:** move them in Apex part 3, as its first step, before M8 (keeps
      the split about half a day shorter); **(b)** move them in the split, as one more step. Your species files look
      the same either way.
-5. **Your time:** two in-game tests of about 20 to 30 minutes, after S5 and after S10, termites only; the same launch
+5. **Your time:** ~~two in-game tests, after S5 and after S10~~ **one in-game test of about 30 minutes at the end
+   (the rounds, the user's OK 2026-10-22)**, termites only; the same launch
    command (`./gradlew runClient` in `C:\Ant Mod`), your worlds where they are. Full runs take as long as today (same
    tests), in new worlds. And: **when exactly do you leave?** The stop rule above depends on it.
 
