@@ -36,7 +36,7 @@ class HarvesterProfileTest {
         // registry when the game loads the files).
         assertEquals(java.util.List.of("hill", "bakery", "trunk_trails", "patrol", "forager_spots", "door", "recruits"),
                 read("red_harvester_ant").parts());
-        assertEquals(read("red_harvester_ant").parts(), SpeciesProfile.RED_HARVESTER_ANT.parts(),
+        assertEquals(read("red_harvester_ant").parts(), HarvesterBuiltIn.NUMBERS.parts(),
                 "the built-in harvester numbers (used when its file is broken) have the same parts as its file");
     }
 
@@ -118,7 +118,7 @@ class HarvesterProfileTest {
 
     @Test
     void foragersGoOutWhenTheirProfileSays() {
-        SpeciesProfile.FoodNumbers ant = SpeciesProfile.RED_HARVESTER_ANT.food();
+        SpeciesProfile.FoodNumbers ant = HarvesterBuiltIn.NUMBERS.food();
         SpeciesProfile.FoodNumbers termite = new SpeciesProfile.FoodNumbers(24, "x", java.util.List.of(), "x", "x", 0, 0, java.util.List.of("night", "rain"), 0, java.util.Optional.empty());
         for (boolean day : new boolean[] {true, false}) {
             for (boolean rain : new boolean[] {true, false}) {
@@ -155,7 +155,7 @@ class HarvesterProfileTest {
 
     @Test
     void nursesAreCountedFromTheHeadcount() {
-        SpeciesProfile.ColonyNumbers colony = SpeciesProfile.RED_HARVESTER_ANT.colony();
+        SpeciesProfile.ColonyNumbers colony = HarvesterBuiltIn.NUMBERS.colony();
         assertEquals(0, colony.nurses(2));
         assertEquals(1, colony.nurses(3));
         assertEquals(1, colony.nurses(7));

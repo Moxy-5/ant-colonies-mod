@@ -7,7 +7,6 @@ import org.jetbrains.annotations.Nullable;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.ColonyHooks;
-import com.antcolonies.species.SpeciesProfile;
 
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -34,6 +33,8 @@ public class AntLarvaEntity extends Entity implements FedByNurses {
     /** How many pieces of bread it needs to grow up (from its colony's species profile). Synced, so the client can draw its size. */
     private static final EntityDataAccessor<Integer> DATA_MEAL =
             SynchedEntityData.defineId(AntLarvaEntity.class, EntityDataSerializers.INT);
+    /** The meal a larva wants until its colony tells it its own (once a second): 5, as before the split's clean-up. */
+    private static final int MEAL_UNTIL_TOLD = 5;
     /**
      * What it grows into: 0 a worker, else its caste's number from the colony's castes hook ({@link Colony#casteNumber}).
      * Synced (the species' renderer draws by it: a nymph growing into a soldier gets a big head), saved.
@@ -155,7 +156,7 @@ public class AntLarvaEntity extends Entity implements FedByNurses {
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         builder.define(DATA_FED, 0);
-        builder.define(DATA_MEAL, SpeciesProfile.RED_HARVESTER_ANT.brood().larvaMeal());
+        builder.define(DATA_MEAL, MEAL_UNTIL_TOLD);
         builder.define(DATA_GROWS_INTO, (byte) 0);
     }
 

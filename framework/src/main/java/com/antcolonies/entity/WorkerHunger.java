@@ -64,8 +64,12 @@ public class WorkerHunger {
         if (lastAte == Colony.NOT_SET || colony == null || !colony.workerFood().hungerRuns()) {
             lastAte = now; // the clock only runs for a worker in a colony whose workers get hungry
         }
+        if (colony == null) {
+            updateStarving(false); // no colony, no hunger (its clock was just set to now)
+            return;
+        }
         long hungry = now - lastAte;
-        SpeciesProfile.WorkerNumbers numbers = colony == null ? SpeciesProfile.RED_HARVESTER_ANT.worker() : colony.profile().worker();
+        SpeciesProfile.WorkerNumbers numbers = colony.profile().worker();
         updateStarving(hungry >= numbers.slowAfterTicks());
         if (hungry >= numbers.starveAfterTicks()) {
             worker.hurt(worker.damageSources().starve(), 1000.0F);

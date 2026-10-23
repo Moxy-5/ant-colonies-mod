@@ -6,10 +6,12 @@ import com.antcolonies.desert.registry.DesertBlocks;
 import com.antcolonies.desert.registry.DesertEntities;
 import com.antcolonies.desert.registry.DesertFeatures;
 import com.antcolonies.desert.registry.DesertItems;
+import com.antcolonies.desert.species.HarvesterBuiltIn;
 
 import org.slf4j.Logger;
 
 import com.antcolonies.entity.body.BodyPlans;
+import com.antcolonies.species.SpeciesProfiles;
 import com.mojang.logging.LogUtils;
 
 import net.neoforged.bus.api.IEventBus;
@@ -35,6 +37,8 @@ public class DesertMod {
         DesertEntities.ENTITY_TYPES.register(modEventBus);
         DesertItems.ITEMS.register(modEventBus);
         DesertParts.signUp();
+        // The harvester's numbers built into the code, for when its species file is missing or broken.
+        SpeciesProfiles.signUpBuiltIn(DesertSpecies.RED_HARVESTER_ANT, HarvesterBuiltIn.NUMBERS);
         DesertEvents.signUpCreativeTab();
         DesertTests.signUp();
         // In-game tests: only loaded when the game is started in game-test mode.

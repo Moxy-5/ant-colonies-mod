@@ -2,6 +2,7 @@ package com.antcolonies.species;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
@@ -26,6 +27,11 @@ public class SpeciesProfiles extends SimpleJsonResourceReloadListener {
     private static volatile Map<ResourceLocation, SpeciesProfile> profiles = Map.of();
     /** Species already warned about (no file), so the log is not flooded. */
     private static final Set<ResourceLocation> warned = new HashSet<>();
+    /**
+     * Each species' numbers as built into its mod's code ({@link #signUpBuiltIn}), for when its file is missing or broken,
+     * in the order signed up. Guarded by itself: species mods start side by side ({@code docs/BUGS.md} 64).
+     */
+    private static final Map<ResourceLocation, SpeciesProfile> builtIn = new LinkedHashMap<>();
 
     private SpeciesProfiles() {
         super(new Gson(), "species");
@@ -47,17 +53,39 @@ public class SpeciesProfiles extends SimpleJsonResourceReloadListener {
         ColonyFrameworkMod.LOGGER.info("Loaded {} species profiles: {}", loaded.size(), loaded.keySet());
     }
 
-    /** The profile of this species, or the red harvester ant's built-in numbers if it has none (logged once). */
+    /**
+     * A species mod's numbers built into its code (signed up at start), used when its file is missing or broken. The
+     * framework holds none of its own (the split's clean-up, 2026-10-23: it held the red harvester ant's).
+     */
+    public static void signUpBuiltIn(ResourceLocation species, SpeciesProfile numbers) {
+        synchronized (builtIn) {
+            builtIn.put(species, numbers);
+        }
+    }
+
+    /**
+     * The profile of this species: its file, else its own built-in numbers, else the first built-in numbers signed up
+     * (as before the clean-up, when every species without a good file got the red harvester ant's; logged once). With
+     * no built-in numbers at all the game stops with a message.
+     */
     public static SpeciesProfile get(ResourceLocation species) {
         SpeciesProfile profile = profiles.get(species);
         if (profile != null) {
             return profile;
         }
+        ResourceLocation from;
+        synchronized (builtIn) {
+            from = builtIn.containsKey(species) ? species : builtIn.keySet().stream().findFirst().orElse(null);
+            profile = from == null ? null : builtIn.get(from);
+        }
+        if (profile == null) {
+            throw new IllegalStateException("No species profile for " + species + " and no built-in numbers to fall back on; is its mod installed?");
+        }
         synchronized (warned) {
             if (warned.add(species)) {
-                ColonyFrameworkMod.LOGGER.warn("No species profile for {}, using the red harvester ant's built-in numbers", species);
+                ColonyFrameworkMod.LOGGER.warn("No species profile for {}, using the built-in numbers of {}", species, from);
             }
         }
-        return SpeciesProfile.RED_HARVESTER_ANT;
+        return profile;
     }
 }
