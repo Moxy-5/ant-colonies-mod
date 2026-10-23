@@ -321,6 +321,10 @@ look when real mobs are spawned only where the player can see.
 The termite stress test shows, in old and new code alike, bursts of failed route searches about once a second for a
 minute (800 to 1,300 steps each, up to 27 ms the longest); cause not found yet. Worth finding (a leave-alone memory is
 the likely fix, `docs/BUGS.md` 42).
+**Found 2026-10-23 (part 3, T4):** most bursts were builders searching for a mound job nobody can work from (fixed,
+no change in behaviour); the rest, a nurse cut off from the queen, is a "your call" in `docs/plans/apex-termites.md`.
+
+## Part 3, the termites: planned 2026-10-23 in `docs/plans/apex-termites.md` (steps 12 and the route bursts are in it)
 
 ## Timing (user, 2026-10-21)
 The user leaves for California in 6 days, about 5 days of work left (weekly quota resets 2026-10-21 10 PM); "I don't

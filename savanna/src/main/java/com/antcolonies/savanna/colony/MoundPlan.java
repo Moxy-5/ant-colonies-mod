@@ -14,7 +14,7 @@ import java.util.Set;
 
 import com.antcolonies.savanna.block.TermiteRampBlock;
 import com.antcolonies.savanna.block.TermiteSpireBlock;
-import com.antcolonies.species.SpeciesProfile.MoundNumbers;
+import com.antcolonies.savanna.species.SavannaNumbers.MoundNumbers;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;

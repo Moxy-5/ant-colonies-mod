@@ -124,7 +124,7 @@ public class WorkerFood {
                 mealsLeft[kind.ordinal()]--;
                 return true;
             }
-            boolean took = kind == MealFood.STORE ? oldCombKnown() && colony.food().eatForNumbers() : colony.life().takeNurseFood(level);
+            boolean took = kind == MealFood.STORE ? storeHasMeal() && colony.food().eatForNumbers() : colony.life().takeNurseFood(level);
             if (took) {
                 mealsLeft[kind.ordinal()] = Math.max(1, diet().workersPerPiece()) - 1;
                 piecesEaten[kind.ordinal()]++;
@@ -140,7 +140,7 @@ public class WorkerFood {
     }
 
     /** Whether the store has a piece the workers eat: any seed; for fungus comb, an old layer as far as the brain knows. */
-    private boolean oldCombKnown() {
+    private boolean storeHasMeal() {
         return !colony.questions().ask(null, ColonyQuestions.NOTHING_TO_EAT_IN_STORE, null);
     }
 

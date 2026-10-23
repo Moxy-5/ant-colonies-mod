@@ -26,7 +26,7 @@ import software.bernie.geckolib.loading.object.BakedAnimations;
 
 /**
  * The model and animation files the game window loads (the game tests never load them): every model drawn by
- * AntRenderer has the empty "carry" bone in its head, where PelletLayer draws a carried load, and the termites'
+ * AntRenderer has the empty "carry" bone in its head, where CarriedLoadLayer draws a carried load, and the termites'
  * animations read the way GeckoLib reads them and only move bones their models have (the worker ant's: the desert mod's
  * HarvesterModelFilesTest, since the split, step S7).
  */

@@ -18,7 +18,7 @@ import com.antcolonies.nav.Foothold;
 import com.antcolonies.nav.LevelCellMap;
 import com.antcolonies.nav.Route;
 import com.antcolonies.nav.StepKind;
-import com.antcolonies.species.SpeciesProfile.MoundNumbers;
+import com.antcolonies.savanna.species.SavannaNumbers.MoundNumbers;
 import com.antcolonies.savanna.registry.SavannaBlocks;
 
 import net.minecraft.core.BlockPos;

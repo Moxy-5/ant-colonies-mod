@@ -17,6 +17,7 @@ import org.jetbrains.annotations.Nullable;
 import com.antcolonies.desert.DesertMod;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.species.SpeciesProfile;
+import com.antcolonies.desert.species.DesertNumbers;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -278,7 +279,7 @@ public class Recruits {
             AABB around = finder.getBoundingBox().inflate(TOUCH);
             if (atTheDoor) {
                 double reach = Math.max(3, Math.max(colony.profile().worker().restNearEntrance(),
-                        colony.profile().food().door().map(SpeciesProfile.DoorNumbers::touchReach).orElse(0.0)));
+                        colony.profile().section(DesertNumbers.DOOR).map(DesertNumbers.DoorNumbers::touchReach).orElse(0.0)));
                 around = around.minmax(new AABB(colony.nest().getEntrance()).inflate(reach));
             }
             Door door = colony.part(DesertParts.DOOR).orElse(null);

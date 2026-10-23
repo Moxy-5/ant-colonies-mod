@@ -802,6 +802,25 @@ public class TreeGrowthTests {
             }
             helper.assertTrue(pieces > 0, "no broken limbs lie down the hill round the shed tree");
         }
+        if (!hill) {
+            // docs/BUGS.md 62: beside other tests the bowl's ground sometimes goes from under these three columns before the
+            // log lands on them (never alone): the log then hangs there. The first tick it is gone and the tests round it.
+            BlockPos[] spots = {foot.offset(5, 3, 19), foot.offset(6, 3, 19), foot.offset(5, 3, 20)};
+            boolean[] seen = {false};
+            helper.onEachTick(() -> {
+                if (seen[0] || helper.getTick() >= TreeFall.CREAK + TreeFall.DROP + 10) {
+                    return;
+                }
+                for (BlockPos spot : spots) {
+                    if (level.getBlockState(spot).isAir() || level.getBlockState(spot.above(2)).isAir()) {
+                        seen[0] = true;
+                        SavannaMod.LOGGER.warn("[bowl-ground] the ground under the log went at tick {} ({}), tests within 40 blocks: {}", helper.getTick(),
+                                column(level, spot), com.antcolonies.gametest.TestIsolation.describeTestsNear(spot, 40));
+                        return;
+                    }
+                }
+            });
+        }
         helper.assertTrue(forest.fellNow(level, t), "the shed tree would not fall");
         helper.runAfterDelay(TreeFall.CREAK + TreeFall.DROP + 10, () -> {
             helper.assertTrue(!forest.falling(t) && t.placedStage == TreeStage.FALLEN, "it did not land: " + t.placedStage.id);

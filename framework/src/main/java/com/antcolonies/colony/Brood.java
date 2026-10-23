@@ -423,7 +423,7 @@ public class Brood {
         Nest nest = colony.nest();
         for (List<BlockPos> cells : List.of(nest.getNurseryCells(level), nest.getGardenCells(level), nest.getHomeRoomCells(level))) {
             List<BlockPos> free = new ArrayList<>();
-            List<BlockPos> onComb = new ArrayList<>();
+            List<BlockPos> onBed = new ArrayList<>();
             for (BlockPos pos : cells) {
                 if (taken.contains(pos)) {
                     continue;
@@ -432,11 +432,11 @@ public class Brood {
                 if (state.isAir()) {
                     free.add(pos);
                 } else if (GardenBed.isBed(state)) {
-                    onComb.add(pos);
+                    onBed.add(pos);
                 }
             }
-            // On the comb first, where the nymph will find its food.
-            List<BlockPos> from = !onComb.isEmpty() ? onComb : free;
+            // On a garden bed first (the fungus comb), where the young will find their food.
+            List<BlockPos> from = !onBed.isEmpty() ? onBed : free;
             if (!from.isEmpty()) {
                 return from;
             }

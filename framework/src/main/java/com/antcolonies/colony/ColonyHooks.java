@@ -111,6 +111,14 @@ public final class ColonyHooks {
         /** How much a young one growing into this caste (null: a worker) eats before it grows up. */
         int mealFor(@Nullable String caste);
 
+        /**
+         * Apex part 3, T1: how often (ticks) a grown member of this caste eats, as a number in the nest too
+         * ({@link Meals}); 0: it does not eat (it lives on what it ate as a young one).
+         */
+        default int mealIntervalTicks(String caste) {
+            return 0;
+        }
+
         /** The caste a new young one should grow into, or null (soldiers enough). */
         @Nullable
         String wanted(Level level);
@@ -183,6 +191,14 @@ public final class ColonyHooks {
         /** Its next block for a digger to clear, or null. */
         @Nullable
         BlockPos digTarget(Level level, @Nullable UUID digger);
+
+        /**
+         * Apex part 3, T1: the share of walks that may go out or in by one of its mouths (a chimney's mouth, about 1 in
+         * 10); on the others the insect takes another way, such as a foraging hole. 1: any walk.
+         */
+        default float mouthTripChance() {
+            return 1.0F;
+        }
     }
 
     /** A food garden in the nest whose blocks age (the fungus comb). */

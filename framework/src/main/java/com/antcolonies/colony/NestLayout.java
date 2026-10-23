@@ -65,7 +65,7 @@ record NestLayout(List<NestPlan.Chamber> chambers, List<NestPlan.Chamber> sideRo
      */
     static NestPlan.RoomSizes sizesFor(Colony colony) {
         NestPlan.RoomSizes sizes = colony.profile().nest().roomSizes();
-        if (colony.profile().garden().isPresent() && !sizes.queen().equals(NestPlan.GARDEN_SIZE)) {
+        if (colony.profile().gardenRooms().isPresent() && !sizes.queen().equals(NestPlan.GARDEN_SIZE)) {
             ColonyFrameworkMod.LOGGER.warn("The royal chamber of {} stays 3x3 (its garden rooms are laid out round it), not {}",
                     colony.getSpecies(), sizes.queen());
             sizes = sizes.withQueen(NestPlan.GARDEN_SIZE);
@@ -100,7 +100,7 @@ record NestLayout(List<NestPlan.Chamber> chambers, List<NestPlan.Chamber> sideRo
          * level: the royal chamber), as many as the profile allows; none otherwise.
          */
         private List<NestPlan.Chamber> gardens(List<NestPlan.Chamber> chambers, Direction direction) {
-            var garden = colony.profile().garden();
+            var garden = colony.profile().gardenRooms();
             if (garden.isEmpty() || chambers.size() != 1 || chambers.get(0).kind() != NestPlan.Kind.QUEEN) {
                 return List.of();
             }

@@ -140,6 +140,14 @@ public final class Errand<K> {
     }
 
     /**
+     * Like {@link #setOff(Predicate, BlockPos, double)}, where {@code where} accepts no foothold more than {@code reach}
+     * blocks from {@code towards} each way: with none there it fails at once, without a route search.
+     */
+    public boolean setOff(Predicate<Foothold> where, BlockPos towards, int reach, double speed) {
+        return ant.getNavigator().moveTo(where, towards, reach, speed);
+    }
+
+    /**
      * One tick toward this cell: while a walk is under way it walks on; once it is over (arrived but still not there, or
      * knocked off) it sets off again. False if there is no way there from here.
      */

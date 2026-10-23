@@ -5,8 +5,9 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.block.TermitomycesBlock;
-import com.antcolonies.species.SpeciesProfile;
 import com.antcolonies.savanna.registry.SavannaBlocks;
+
+import com.antcolonies.savanna.species.SavannaNumbers;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
@@ -47,8 +48,8 @@ public class Mushrooms {
     }
 
     @Nullable
-    private SpeciesProfile.GardenNumbers numbers() {
-        return colony.profile().garden().orElse(null);
+    private SavannaNumbers.GardenNumbers numbers() {
+        return colony.profile().section(SavannaNumbers.GARDEN).orElse(null);
     }
 
     /** Called once a second (by the queen): when a rain has just ended, a healthy garden sends up its mushrooms. */
@@ -74,7 +75,7 @@ public class Mushrooms {
 
     /** How many mushrooms the garden sends up after a rain now (0 if it is not healthy yet). */
     public int wanted(Level level) {
-        SpeciesProfile.GardenNumbers numbers = numbers();
+        SavannaNumbers.GardenNumbers numbers = numbers();
         return numbers == null ? 0 : numbers.mushroomsFor(combLayers(level));
     }
 
@@ -88,7 +89,7 @@ public class Mushrooms {
      * with the profile's chance, or every one where a giant fits if {@code giants}. Returns how many came up.
      */
     public int sprout(ServerLevel level, int count, boolean giants) {
-        SpeciesProfile.GardenNumbers numbers = numbers();
+        SavannaNumbers.GardenNumbers numbers = numbers();
         if (numbers == null || count <= 0) {
             return 0;
         }

@@ -221,12 +221,12 @@ public class ClosedHoles {
                 waiting.remove(hole); // (its gallery was filled in meanwhile)
                 continue;
             }
-            Galleries.Instead instead = galleries.openInstead(level, tunnel, left.get(hole), numbers.newHoleFrom());
-            if (instead == Galleries.Instead.NOT_LOADED) {
+            HoleTurns.Instead instead = galleries.openInstead(level, tunnel, left.get(hole), numbers.newHoleFrom());
+            if (instead == HoleTurns.Instead.NOT_LOADED) {
                 continue;
             }
             waiting.remove(hole);
-            if (instead == Galleries.Instead.OPENED) {
+            if (instead == HoleTurns.Instead.OPENED) {
                 opened++;
             }
             ColonyManager.get(level).markChanged();

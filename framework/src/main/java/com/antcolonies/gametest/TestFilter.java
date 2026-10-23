@@ -115,7 +115,8 @@ public final class TestFilter {
     @SuppressWarnings("unchecked")
     private static void keepShard(MinecraftServer server) {
         String shard = System.getProperty("antcolonies.shard");
-        if (shard == null || shard.isBlank()) {
+        if (shard == null || shard.isBlank() || "1".equals(System.getenv("ANTCOLONIES_EVERY_SHARD"))) {
+            // (ANTCOLONIES_EVERY_SHARD=1: every server runs every chosen test, to repeat a flaky one n times at once)
             return;
         }
         String[] parts = shard.trim().split("/");

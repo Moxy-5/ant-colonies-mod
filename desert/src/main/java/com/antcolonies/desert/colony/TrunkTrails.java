@@ -16,6 +16,7 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.species.SpeciesProfile;
+import com.antcolonies.desert.species.DesertNumbers;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -41,7 +42,7 @@ import net.minecraft.world.phys.Vec3;
  * <p><b>A trail</b> is a direction from the nest's middle, saved as an angle, and the blocks (columns) along that line
  * from the hill's edge out to the longest a trail may get ({@code most_length}). Its <b>tip</b> is as far out as its trips
  * have gone (long trails, the user's decisions of 2026-10-17, {@code docs/plans/long-trails.md}): a trip to food past
- * the tip moves it out, and the tip pulls back where the traffic no longer holds it ({@link SpeciesProfile.TrunkNumbers#holds}:
+ * the tip moves it out, and the tip pulls back where the traffic no longer holds it ({@link DesertNumbers.TrunkNumbers#holds}:
  * a long trail needs more trips a day), the outer part's wear forgotten and its bare ground growing back. The colony's
  * reach is its longest trail's tip ({@link Colony#foragingRadius}). Each column counts the trips that walked over it (its <b>wear</b>); a
  * column walked by enough trips wears bare (the plants on it are cut, the ground turns to coarse dirt). Each trip also
@@ -145,8 +146,8 @@ public class TrunkTrails {
     }
 
     @Nullable
-    private SpeciesProfile.TrunkNumbers numbers() {
-        return colony.profile().food().trails().trunk().orElse(null);
+    private DesertNumbers.TrunkNumbers numbers() {
+        return colony.profile().section(DesertNumbers.TRUNK).orElse(null);
     }
 
     private SpeciesProfile.Trails strengthNumbers() {
@@ -178,7 +179,7 @@ public class TrunkTrails {
      */
     @Nullable
     public BlockPos wayOut(ServerLevel level, BlockPos toward) {
-        SpeciesProfile.TrunkNumbers numbers = numbers();
+        DesertNumbers.TrunkNumbers numbers = numbers();
         if (numbers == null || flat(toward) <= numbers.start() + 1) {
             return null;
         }
@@ -217,7 +218,7 @@ public class TrunkTrails {
      * place (see {@link DangerMap}), out to where it leaves the trail (never past the tip). False if no trail goes that way.
      */
     public boolean passesDanger(Level level, BlockPos target) {
-        SpeciesProfile.TrunkNumbers numbers = numbers();
+        DesertNumbers.TrunkNumbers numbers = numbers();
         if (numbers == null || trails.isEmpty() || colony.danger().isEmpty() || flat(target) <= numbers.start() + 1) {
             return false;
         }
@@ -251,7 +252,7 @@ public class TrunkTrails {
 
     /** How far out (blocks from the nest's middle) foragers have left this trail at most: its tip (its start if none yet). */
     public int reachBlocks(Trail trail) {
-        SpeciesProfile.TrunkNumbers numbers = numbers();
+        DesertNumbers.TrunkNumbers numbers = numbers();
         return trail.reach <= 0 ? (numbers == null ? 0 : numbers.start()) : (int) Math.round(columnOut(trail, trail.reach - 1));
     }
 
@@ -270,7 +271,7 @@ public class TrunkTrails {
      * {@code most} blocks out: the ground the colony looks over for food along its trails.
      */
     public List<int[]> columnsNear(int side, int most) {
-        SpeciesProfile.TrunkNumbers numbers = numbers();
+        DesertNumbers.TrunkNumbers numbers = numbers();
         List<int[]> columns = new ArrayList<>();
         if (numbers == null) {
             return columns;
@@ -312,7 +313,7 @@ public class TrunkTrails {
      * it, and a forager leaves the trail only for food worth the extra walk.
      */
     public double walkTo(BlockPos plant) {
-        SpeciesProfile.TrunkNumbers numbers = numbers();
+        DesertNumbers.TrunkNumbers numbers = numbers();
         if (numbers == null || flat(plant) <= numbers.start() + 1) {
             return -1;
         }
@@ -339,7 +340,7 @@ public class TrunkTrails {
      */
     @Nullable
     public BlockPos wayHome(ServerLevel level, BlockPos from) {
-        SpeciesProfile.TrunkNumbers numbers = numbers();
+        DesertNumbers.TrunkNumbers numbers = numbers();
         if (numbers == null || flat(from) <= numbers.start() + 2) {
             return null;
         }
@@ -354,7 +355,7 @@ public class TrunkTrails {
     /** Counts one trip toward {@code plant}; returns the trail it goes by, or null. */
     @Nullable
     private Trail trip(Level level, BlockPos plant) {
-        SpeciesProfile.TrunkNumbers numbers = numbers();
+        DesertNumbers.TrunkNumbers numbers = numbers();
         if (numbers == null || flat(plant) <= numbers.start() + 1) {
             return null;
         }
@@ -390,7 +391,7 @@ public class TrunkTrails {
      * direction (unless that is too near a trail already there).
      */
     @Nullable
-    private Trail maybeLayNewTrail(Level level, double angle, long now, SpeciesProfile.TrunkNumbers numbers) {
+    private Trail maybeLayNewTrail(Level level, double angle, long now, DesertNumbers.TrunkNumbers numbers) {
         recent.removeIf(trip -> now - trip.time() > RECENT_TICKS || trip.time() > now);
         recent.add(new Trip(angle, now));
         while (recent.size() > MOST_RECENT) {
@@ -432,7 +433,7 @@ public class TrunkTrails {
         return trail;
     }
 
-    private Trail newTrail(double angle, SpeciesProfile.TrunkNumbers numbers, long now, double strength) {
+    private Trail newTrail(double angle, DesertNumbers.TrunkNumbers numbers, long now, double strength) {
         int[][] columns = columnsFor(angle, numbers.start(), numbers.mostLength());
         return new Trail(angle, columns, new int[columns.length], new BitSet(columns.length), 0, strength, now);
     }
@@ -474,7 +475,7 @@ public class TrunkTrails {
 
     /** The trail whose line is nearest this direction, within the spread; null if none is. */
     @Nullable
-    private Trail nearest(double angle, SpeciesProfile.TrunkNumbers numbers) {
+    private Trail nearest(double angle, DesertNumbers.TrunkNumbers numbers) {
         double spread = Math.toRadians(numbers.spreadDegrees());
         Trail best = null;
         double bestDifference = spread;
@@ -553,7 +554,7 @@ public class TrunkTrails {
      * player can see it (or one of the colony's real workers is right there).
      */
     void tick(ServerLevel level, boolean away) {
-        SpeciesProfile.TrunkNumbers numbers = numbers();
+        DesertNumbers.TrunkNumbers numbers = numbers();
         if (numbers == null) {
             return;
         }
@@ -573,7 +574,7 @@ public class TrunkTrails {
     }
 
     /** Trails gone below the fade strength are forgotten; their bare columns grow back about the profile's regrow time later. */
-    private void fade(long now, SpeciesProfile.TrunkNumbers numbers, ServerLevel level) {
+    private void fade(long now, DesertNumbers.TrunkNumbers numbers, ServerLevel level) {
         SpeciesProfile.Trails strength = strengthNumbers();
         for (Iterator<Trail> it = trails.iterator(); it.hasNext(); ) {
             Trail trail = it.next();
@@ -596,7 +597,7 @@ public class TrunkTrails {
      * The tip of a trail pulls back to as far as its traffic holds ({@code holds} blocks out): the columns past it are
      * forgotten (no wear) and their bare ground grows back about the regrow time later, as a faded trail's does.
      */
-    private void pullBack(Trail trail, double holds, long now, SpeciesProfile.TrunkNumbers numbers, ServerLevel level) {
+    private void pullBack(Trail trail, double holds, long now, DesertNumbers.TrunkNumbers numbers, ServerLevel level) {
         int before = trail.reach;
         while (trail.reach > 0 && columnOut(trail, trail.reach - 1) > holds + 0.5) {
             int i = --trail.reach;
@@ -631,7 +632,7 @@ public class TrunkTrails {
     }
 
     /** Columns walked by enough trips wear bare (out of sight, or where a real worker is). Returns how many changed. */
-    private int wearBare(ServerLevel level, SpeciesProfile.TrunkNumbers numbers, List<Vec3> eyes, Set<Long> workers) {
+    private int wearBare(ServerLevel level, DesertNumbers.TrunkNumbers numbers, List<Vec3> eyes, Set<Long> workers) {
         int changed = 0;
         BlockState bareGround = numbers.bareGroundState();
         for (Trail trail : trails) {
@@ -679,7 +680,7 @@ public class TrunkTrails {
 
     /** The bare ground of faded trails whose time has come grows back to grass (out of sight; not on a trail in use). */
     private int growBack(ServerLevel level, long now, List<Vec3> eyes, int most) {
-        SpeciesProfile.TrunkNumbers numbers = numbers();
+        DesertNumbers.TrunkNumbers numbers = numbers();
         BlockState bareGround = numbers == null ? Blocks.COARSE_DIRT.defaultBlockState() : numbers.bareGroundState();
         int changed = 0;
         for (Iterator<Regrow> it = regrowing.iterator(); it.hasNext() && changed < most; ) {
@@ -825,7 +826,7 @@ public class TrunkTrails {
     /** Tests only: a sample in every saved number (the save and load check, {@code AwayKit.everyPartSavesAndLoads}). */
     public void fillForTests(ServerLevel level) {
         long now = level.getGameTime();
-        SpeciesProfile.TrunkNumbers numbers = numbers();
+        DesertNumbers.TrunkNumbers numbers = numbers();
         double angle = 0.5;
         int[][] columns = columnsFor(angle, numbers == null ? 4 : numbers.start(), numbers == null ? colony.profile().food().radius() : numbers.mostLength());
         int[] wear = new int[columns.length];
@@ -878,7 +879,7 @@ public class TrunkTrails {
         recent.clear();
         regrowing.clear();
         CompoundTag all = tag.getCompound("trunkTrails");
-        SpeciesProfile.TrunkNumbers numbers = numbers();
+        DesertNumbers.TrunkNumbers numbers = numbers();
         int start = numbers == null ? 4 : numbers.start();
         for (Tag t : all.getList("trails", Tag.TAG_COMPOUND)) {
             CompoundTag entry = (CompoundTag) t;

@@ -20,6 +20,7 @@ import org.jetbrains.annotations.Nullable;
 import com.antcolonies.desert.DesertMod;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.species.SpeciesProfile;
+import com.antcolonies.desert.species.DesertNumbers;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -147,8 +148,8 @@ public class Patrol {
     }
 
     @Nullable
-    private SpeciesProfile.PatrolNumbers numbers() {
-        return colony.profile().food().patrol().orElse(null);
+    private DesertNumbers.PatrolNumbers numbers() {
+        return colony.profile().section(DesertNumbers.PATROL).orElse(null);
     }
 
     /** Whether this colony sends patrollers before it forages (always in a game; the game tests turn it on where they test it). */
@@ -207,7 +208,7 @@ public class Patrol {
 
     /** The share of the foragers that may be out today: all of them, or fewer after danger met by a patroller. */
     public float foragerShareToday(Level level) {
-        SpeciesProfile.PatrolNumbers numbers = numbers();
+        DesertNumbers.PatrolNumbers numbers = numbers();
         return numbers == null || !isOn(level) || !dangerToday ? 1.0F : numbers.foragersAfterDanger();
     }
 
@@ -347,7 +348,7 @@ public class Patrol {
             return;
         }
         reinforced = true;
-        SpeciesProfile.PatrolNumbers numbers = numbers();
+        DesertNumbers.PatrolNumbers numbers = numbers();
         int extra = numbers == null ? 0 : Math.round(sent * numbers.extraOnDanger());
         if (extra > 0) {
             send(level, extra, true);
@@ -455,12 +456,12 @@ public class Patrol {
     }
 
     private int dawnSize() {
-        SpeciesProfile.PatrolNumbers numbers = numbers();
+        DesertNumbers.PatrolNumbers numbers = numbers();
         return numbers == null ? 0 : numbers.dawnPatrol(workers());
     }
 
     private int laterSize() {
-        SpeciesProfile.PatrolNumbers numbers = numbers();
+        DesertNumbers.PatrolNumbers numbers = numbers();
         return numbers == null ? 0 : numbers.laterPatrol(workers());
     }
 
@@ -664,14 +665,14 @@ public class Patrol {
 
     /** How far out (blocks from the nest's middle) a patroller goes along its way. */
     private int reach() {
-        SpeciesProfile.PatrolNumbers numbers = numbers();
+        DesertNumbers.PatrolNumbers numbers = numbers();
         int reach = numbers == null ? 10 : numbers.reach();
         return Math.max(HILL_ROUND + 1, Math.min(reach, colony.profile().food().radius()));
     }
 
     /** How far (radians) either side of a way's line counts as that way: the trunk trails' spread. */
     private double spread() {
-        return Math.toRadians(colony.profile().food().trails().trunk().map(trunk -> (double) trunk.spreadDegrees()).orElse(35.0));
+        return Math.toRadians(colony.profile().section(DesertNumbers.TRUNK).map(trunk -> (double) trunk.spreadDegrees()).orElse(35.0));
     }
 
     private double angleOf(BlockPos pos) {

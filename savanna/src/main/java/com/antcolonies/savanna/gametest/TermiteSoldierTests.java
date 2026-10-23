@@ -26,6 +26,8 @@ import com.antcolonies.savanna.entity.TermiteWorkerEntity;
 import com.antcolonies.savanna.registry.SavannaBlocks;
 import com.antcolonies.savanna.registry.SavannaEntities;
 
+import com.antcolonies.savanna.species.SavannaNumbers;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -65,7 +67,7 @@ public class TermiteSoldierTests {
         helper.runAfterDelay(5, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null, "no termite colony");
-            var numbers = colony.profile().soldiers().orElseThrow();
+            var numbers = colony.profile().section(SavannaNumbers.SOLDIERS).orElseThrow();
             int workerMeal = colony.profile().brood().larvaMeal();
             colony.setCount(Caste.WORKER, 10);
             nymphs[0] = hatch(helper, colony, 0);
@@ -119,7 +121,7 @@ public class TermiteSoldierTests {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(nymphs[1].isAlive() && rank(colony, nymphs[1]) == Rank.MINOR, "the full worker nymph at the worker limit should now grow into a minor: "
                     + rank(colony, nymphs[1]));
-            helper.assertTrue(!nymphs[1].isFull() && nymphs[1].getMeal() == colony.profile().soldiers().orElseThrow().minorMeal(),
+            helper.assertTrue(!nymphs[1].isFull() && nymphs[1].getMeal() == colony.profile().section(SavannaNumbers.SOLDIERS).orElseThrow().minorMeal(),
                     "it should eat the minor's meal first");
             helper.succeed();
         });
@@ -189,7 +191,7 @@ public class TermiteSoldierTests {
                 helper.assertTrue(colony.getId().equals(soldier.getColonyId()), "a soldier did not join the colony");
             }
             hungrySince[0] = level.getGameTime();
-            soldiers.get(0).setLastFed(hungrySince[0] - colony.profile().soldiers().orElseThrow().mealIntervalTicks() - 100);
+            soldiers.get(0).setLastFed(hungrySince[0] - colony.profile().section(SavannaNumbers.SOLDIERS).orElseThrow().mealIntervalTicks() - 100);
             helper.assertTrue(soldiers.get(0).wantsFood(), "the major is not hungry");
         });
         helper.onEachTick(() -> {
@@ -384,7 +386,7 @@ public class TermiteSoldierTests {
                 SavannaMod.LOGGER.info("[sentry-test] tick {}: the first minor is in, {} ticks into the day (the last worker came in {} ticks into it)",
                         tick, tick - at[1], at[2] - at[1]);
             }
-            if (phase[0] == 2 && tick - at[1] < colony.profile().soldiers().orElseThrow().escortHomeTicks() - 20) {
+            if (phase[0] == 2 && tick - at[1] < colony.profile().section(SavannaNumbers.SOLDIERS).orElseThrow().escortHomeTicks() - 20) {
                 helper.assertFalse(workerOut && minorIn, "a minor went in while a worker was still outside");
             }
             boolean everybodyIn = !workerOut && minors.stream().allMatch(minor -> colony.nest().isInside(level, minor.blockPosition()));

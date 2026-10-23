@@ -16,19 +16,22 @@ import org.junit.jupiter.api.Test;
 import com.antcolonies.colony.NestPlan;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
-import com.mojang.serialization.JsonOps;
 
 /**
  * Checks that the savanna's species profile files read without errors and hold sensible numbers (the red harvester
  * ant's checks moved to the desert mod's HarvesterProfileTest with its file, the split, step S7).
  */
 class SpeciesProfileTest {
-    private static SpeciesProfile read(String name) throws Exception {
+    private static JsonElement json(String name) throws Exception {
         try (InputStream in = SpeciesProfileTest.class.getResourceAsStream("/data/antcolonies/species/" + name + ".json")) {
             assertNotNull(in, "no file data/antcolonies/species/" + name + ".json");
-            JsonElement json = JsonParser.parseReader(new InputStreamReader(in, StandardCharsets.UTF_8));
-            return SpeciesProfile.CODEC.parse(JsonOps.INSTANCE, json).getOrThrow(error -> new AssertionError(name + ": " + error));
+            return JsonParser.parseReader(new InputStreamReader(in, StandardCharsets.UTF_8));
         }
+    }
+
+    private static SpeciesProfile read(String name) throws Exception {
+        SavannaNumbers.signUp(); // its own sections are read too (Apex part 3, T1)
+        return SpeciesProfile.read(json(name)).getOrThrow(error -> new AssertionError(name + ": " + error));
     }
 
     @Test
@@ -39,6 +42,21 @@ class SpeciesProfileTest {
                 read("macrotermes").parts());
     }
 
+    /** Apex part 3, T1: the savanna mod reads its own sections of the file, and a broken one breaks the whole file. */
+    @Test
+    void theSavannaModReadsItsOwnSectionsOfTheFile() throws Exception {
+        SpeciesProfile profile = read("macrotermes");
+        for (SpeciesSection<?> section : java.util.List.of(SavannaNumbers.QUEEN_BODY, SavannaNumbers.MOUND, SavannaNumbers.GARDEN,
+                SavannaNumbers.SOLDIERS, SavannaNumbers.ALARM, SavannaNumbers.GALLERIES, SavannaNumbers.REGROWTH)) {
+            assertTrue(profile.section(section).isPresent(), "the termite file's " + section + " is read");
+        }
+        assertEquals(profile.section(SavannaNumbers.GARDEN).orElseThrow().rooms(), profile.gardenRooms().orElseThrow().rooms(),
+                "the framework's garden rooms and the savanna's garden read the same object");
+        JsonElement broken = JsonParser.parseString(new com.google.gson.Gson().toJson(json("macrotermes")));
+        broken.getAsJsonObject().getAsJsonObject("mound").addProperty("max_height", "tall");
+        assertTrue(SpeciesProfile.read(broken).error().isPresent(), "a broken mound section breaks the file, as before");
+    }
+
     @Test
     void theMacrotermesFileReadsWithAOneLevelSealedNestAndASwellingQueen() throws Exception {
         SpeciesProfile profile = read("macrotermes");
@@ -46,17 +64,17 @@ class SpeciesProfileTest {
         assertEquals(NestPlan.RoomSizes.DEFAULT, profile.nest().roomSizes(), "no room sizes in the file: the default ones");
         assertTrue(profile.nest().sealWhileFounding());
         assertTrue(!profile.nest().foundingChamber(), "the termites' royal chamber is their founding nest");
-        assertTrue(profile.queenBody().isPresent(), "the termite queen should swell");
-        assertTrue(profile.queenBody().get().tooBigToWalkAt() > 0 && profile.queenBody().get().tooBigToWalkAt() <= 1);
+        assertTrue(profile.section(SavannaNumbers.QUEEN_BODY).isPresent(), "the termite queen should swell");
+        assertTrue(profile.section(SavannaNumbers.QUEEN_BODY).get().tooBigToWalkAt() > 0 && profile.section(SavannaNumbers.QUEEN_BODY).get().tooBigToWalkAt() <= 1);
         assertTrue(profile.founding().isPresent() && profile.founding().get().eggs() > 0, "termites raise a founding batch");
         // Food: dead plant material built into fungus comb in garden rooms round the royal chamber, no bread, no side room.
         assertEquals(java.util.List.of(), profile.nest().sideRooms(), "termites keep their food in the garden rooms, not a side room");
         assertTrue(!profile.food().makesBread(), "termites mill no bread");
         assertEquals("antcolonies:fungus_comb", profile.food().pile());
-        assertTrue(profile.garden().isPresent(), "termites keep a fungus garden");
-        assertEquals(1, profile.garden().get().roomsFor(1), "the first garden comes with the first worker");
-        assertEquals(0, profile.garden().get().roomsFor(0), "no garden while the colony is founding");
-        assertTrue(profile.garden().get().roomsFor(1000) <= com.antcolonies.colony.NestPlan.MAX_GARDENS);
+        assertTrue(profile.section(SavannaNumbers.GARDEN).isPresent(), "termites keep a fungus garden");
+        assertEquals(1, profile.section(SavannaNumbers.GARDEN).get().roomsFor(1), "the first garden comes with the first worker");
+        assertEquals(0, profile.section(SavannaNumbers.GARDEN).get().roomsFor(0), "no garden while the colony is founding");
+        assertTrue(profile.section(SavannaNumbers.GARDEN).get().roomsFor(1000) <= com.antcolonies.colony.NestPlan.MAX_GARDENS);
         assertFalse(profile.colony().nursesFrom().isEmpty(), "termites have nurses");
         // The queen lays a steady stream, faster as she swells.
         assertTrue(profile.laying().isPresent(), "the termite queen lays a steady stream of eggs");
@@ -71,17 +89,17 @@ class SpeciesProfileTest {
         assertEquals(java.util.List.of("night", "rain"), profile.food().forageAt());
         assertEquals(2, profile.nest().foragingHoles());
         assertTrue(profile.nest().foragingHoleDistance() > 7, "the foraging holes must lie beyond the foot of a full-grown mound");
-        assertTrue(profile.mound().isPresent() && profile.mound().get().chimneyTripChance() > 0 && profile.mound().get().chimneyTripChance() < 0.5F);
+        assertTrue(profile.section(SavannaNumbers.MOUND).isPresent() && profile.section(SavannaNumbers.MOUND).get().chimneyTripChance() > 0 && profile.section(SavannaNumbers.MOUND).get().chimneyTripChance() < 0.5F);
         // Soldiers: about 1 in 10, 3 minors to a major; a major needs a bigger meal than a minor, a minor more than a worker.
-        assertTrue(profile.soldiers().isPresent(), "termites have soldiers");
-        SpeciesProfile.SoldierNumbers soldiers = profile.soldiers().get();
+        assertTrue(profile.section(SavannaNumbers.SOLDIERS).isPresent(), "termites have soldiers");
+        SavannaNumbers.SoldierNumbers soldiers = profile.section(SavannaNumbers.SOLDIERS).get();
         assertTrue(soldiers.majorMeal() > soldiers.minorMeal() && soldiers.minorMeal() >= profile.brood().larvaMeal());
         assertTrue(soldiers.mealIntervalTicks() < soldiers.slowAfterTicks(), "a soldier gets hungry before it slows down");
         // The minors line the trail every few blocks, and wait for the workers well before the holes are plugged (30 seconds after the foraging).
         assertEquals(3, soldiers.sentrySpacing());
         assertTrue(soldiers.escortHomeTicks() > 0 && soldiers.escortHomeTicks() <= 300, "the minors must have time to get in before the holes are plugged");
         // The alarm: four levels, each calming down later than the one below; level 4 keeps everyone in for a whole day.
-        SpeciesProfile.AlarmNumbers alarm = profile.alarm().orElseThrow();
+        SavannaNumbers.AlarmNumbers alarm = profile.section(SavannaNumbers.ALARM).orElseThrow();
         for (int level = 1; level < 4; level++) {
             assertTrue(alarm.calmTicksFor(level) < alarm.calmTicksFor(level + 1), "level " + (level + 1) + " lasts longer than " + level);
         }
@@ -95,7 +113,7 @@ class SpeciesProfileTest {
      */
     @Test
     void aColonyWantsAboutOneSoldierInTenThreeMinorsToAMajor() throws Exception {
-        SpeciesProfile.SoldierNumbers soldiers = read("macrotermes").soldiers().orElseThrow();
+        SavannaNumbers.SoldierNumbers soldiers = read("macrotermes").section(SavannaNumbers.SOLDIERS).orElseThrow();
         assertEquals(0, soldiers.wantedMinors(5) + soldiers.wantedMajors(5), "no soldier in the founding batch");
         assertEquals(0, soldiers.wantedMinors(6));
         assertEquals(1, soldiers.wantedMinors(7), "the first minor from 7 workers");

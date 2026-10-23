@@ -6,6 +6,8 @@ import com.antcolonies.colony.NestLedger;
 import com.antcolonies.savanna.block.FungusCombBlock;
 import com.antcolonies.species.SpeciesProfile;
 
+import com.antcolonies.savanna.species.SavannaNumbers;
+
 import net.minecraft.server.level.ServerLevel;
 
 /**
@@ -33,7 +35,7 @@ final class GardenAway {
      * {@code nodule_ticks} (that layer goes old), other ripe layers go old by themselves, and old layers crumble away.
      */
     boolean grow(ServerLevel level) {
-        SpeciesProfile.GardenNumbers numbers = colony.profile().garden().orElse(null);
+        SavannaNumbers.GardenNumbers numbers = colony.profile().section(SavannaNumbers.GARDEN).orElse(null);
         if (numbers == null || garden.seenCombs() == 0) {
             return false;
         }

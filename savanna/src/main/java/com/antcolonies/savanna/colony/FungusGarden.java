@@ -14,9 +14,10 @@ import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.block.FungusCombBlock;
 import com.antcolonies.block.SeedPileBlock;
 import com.antcolonies.entity.AbstractAntEntity;
-import com.antcolonies.species.SpeciesProfile;
 import com.antcolonies.savanna.registry.SavannaBlocks;
 import com.antcolonies.savanna.registry.SavannaItems;
+
+import com.antcolonies.savanna.species.SavannaNumbers;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
@@ -79,7 +80,7 @@ public class FungusGarden implements NurseFood {
         String lastRain = last < 0 ? "" : " (last rain " + last + " came up)";
         if (wanted == 0) {
             return ", no mushrooms yet (comb " + countCombLayers(level) + " of "
-                    + colony.profile().garden().get().mushroomCombLayers() + " layers)" + lastRain;
+                    + colony.profile().section(SavannaNumbers.GARDEN).get().mushroomCombLayers() + " layers)" + lastRain;
         }
         return ", mushrooms after rain: " + wanted + lastRain;
     }
@@ -170,7 +171,7 @@ public class FungusGarden implements NurseFood {
      * anything changed.
      */
     public boolean grow(ServerLevel level) {
-        SpeciesProfile.GardenNumbers numbers = colony.profile().garden().orElse(null);
+        SavannaNumbers.GardenNumbers numbers = colony.profile().section(SavannaNumbers.GARDEN).orElse(null);
         if (numbers == null) {
             return false;
         }
@@ -274,7 +275,7 @@ public class FungusGarden implements NurseFood {
     }
 
     /** The chance each second that a comb block with room for it grows a nodule. */
-    static float chancePerSecond(SpeciesProfile.GardenNumbers numbers) {
+    static float chancePerSecond(SavannaNumbers.GardenNumbers numbers) {
         return 20.0F / Math.max(20, numbers.noduleTicks());
     }
 

@@ -17,6 +17,8 @@ import com.antcolonies.block.FacedWall;
 import com.antcolonies.savanna.block.SoftDeadWoodBlock;
 import com.antcolonies.species.SpeciesProfile;
 
+import com.antcolonies.savanna.species.SavannaNumbers;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
@@ -29,7 +31,7 @@ import net.minecraft.world.level.levelgen.Heightmap;
  * it, and judge a log's size from how it vibrates. Every so often the colony listens round its dug holes and growing
  * tips: dead tree wood lying on the ground or standing (the dead giants' bleached wood, rotten wood, baobab fibre, the
  * old dead wood) of at least the profile's {@code min_blocks} blocks together is noticed from its {@code reach} past a
- * hole or tip, farther for bigger wood ({@link SpeciesProfile.WoodCall}). The colony then knows the wood's foot (the
+ * hole or tip, farther for bigger wood ({@link SavannaNumbers.WoodCall}). The colony then knows the wood's foot (the
  * lowest block on the ground nearest the nest), so the plant scan looks there and a gallery piece out to it (or a runway
  * from a hole near it) comes before the tips spread evenly ({@link ForagingHoles}, {@link Galleries}).
  */
@@ -54,7 +56,7 @@ final class DeadWoodCall {
      * Listens for big dead wood round {@code from} (the dug holes and the growing tips), at most once a minute; wood
      * found is learnt by the colony's food map. Returns the feet of the wood newly learnt.
      */
-    List<BlockPos> listen(ServerLevel level, Collection<BlockPos> from, SpeciesProfile.WoodCall call) {
+    List<BlockPos> listen(ServerLevel level, Collection<BlockPos> from, SavannaNumbers.WoodCall call) {
         long now = level.getGameTime();
         List<BlockPos> learnt = new ArrayList<>();
         int far = call.farthest();
@@ -99,7 +101,7 @@ final class DeadWoodCall {
      * Whether {@code food} is part of dead wood big enough to call (at least the call's {@code min_blocks} blocks
      * together): the way to it may go past the length the workers allow (a big find gets the diggers).
      */
-    boolean isBig(ServerLevel level, BlockPos food, SpeciesProfile.WoodCall call) {
+    boolean isBig(ServerLevel level, BlockPos food, SavannaNumbers.WoodCall call) {
         if (!level.isLoaded(food) || !isDeadWood(level.getBlockState(food))) {
             return false;
         }

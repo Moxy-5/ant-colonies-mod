@@ -23,6 +23,8 @@ import com.antcolonies.savanna.entity.TermiteSoldierEntity;
 import com.antcolonies.savanna.entity.TermiteSoldierEntity.Rank;
 import com.antcolonies.species.SpeciesProfile;
 
+import com.antcolonies.savanna.species.SavannaNumbers;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
@@ -73,8 +75,8 @@ public class Soldiers {
 
     /** The soldier numbers of this colony's species, or null if it has no soldiers. */
     @Nullable
-    public SpeciesProfile.SoldierNumbers numbers() {
-        return colony.profile().soldiers().orElse(null);
+    public SavannaNumbers.SoldierNumbers numbers() {
+        return colony.profile().section(SavannaNumbers.SOLDIERS).orElse(null);
     }
 
     /** How many soldiers of this kind the colony has. */
@@ -84,7 +86,7 @@ public class Soldiers {
 
     /** How many soldiers of this kind the colony wants now (from how many workers it has, more after a level 4 alarm; none for a species without soldiers). */
     public int wanted(Level level, Rank rank) {
-        SpeciesProfile.SoldierNumbers numbers = numbers();
+        SavannaNumbers.SoldierNumbers numbers = numbers();
         if (numbers == null) {
             return 0;
         }
@@ -120,7 +122,7 @@ public class Soldiers {
 
     /** How many pieces of food a nymph growing into this (null: a worker) eats before it grows up. */
     public int mealFor(@Nullable Rank rank) {
-        SpeciesProfile.SoldierNumbers numbers = numbers();
+        SavannaNumbers.SoldierNumbers numbers = numbers();
         if (rank == null || numbers == null) {
             return colony.profile().brood().larvaMeal();
         }
@@ -132,7 +134,7 @@ public class Soldiers {
      * for it (", 2 minor soldiers, 1 major soldiers"); nothing without the profile's soldier numbers.
      */
     public String addFor(int workers, long now) {
-        SpeciesProfile.SoldierNumbers numbers = numbers();
+        SavannaNumbers.SoldierNumbers numbers = numbers();
         if (numbers == null) {
             return "";
         }
@@ -224,7 +226,7 @@ public class Soldiers {
      * workers.
      */
     public boolean minorsOut(Level level) {
-        SpeciesProfile.SoldierNumbers numbers = numbers();
+        SavannaNumbers.SoldierNumbers numbers = numbers();
         if (numbers == null) {
             return false;
         }
@@ -260,7 +262,7 @@ public class Soldiers {
             return outsidePosts;
         }
         outsideAt = now;
-        SpeciesProfile.SoldierNumbers numbers = numbers();
+        SavannaNumbers.SoldierNumbers numbers = numbers();
         List<ForagingHoles.WayOut> ways = colony.foragingHoles().waysOut(level);
         if (numbers == null || ways.isEmpty()) {
             outsidePosts = List.of();

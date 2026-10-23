@@ -20,6 +20,8 @@ import com.antcolonies.savanna.entity.TermiteSoldierEntity;
 import com.antcolonies.savanna.entity.TermiteSoldierEntity.Rank;
 import com.antcolonies.species.SpeciesProfile;
 
+import com.antcolonies.savanna.species.SavannaNumbers;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
@@ -115,13 +117,13 @@ public class Alarm {
 
     /** The alarm numbers of this colony's species, or null if it raises no alarm. */
     @Nullable
-    public SpeciesProfile.AlarmNumbers numbers() {
-        return colony.profile().alarm().orElse(null);
+    public SavannaNumbers.AlarmNumbers numbers() {
+        return colony.profile().section(SavannaNumbers.ALARM).orElse(null);
     }
 
     /** The alarm level now: 0 (calm) to 4. Drops a level each time its calm time has passed since it was last raised. */
     public int level(Level world) {
-        SpeciesProfile.AlarmNumbers numbers = numbers();
+        SavannaNumbers.AlarmNumbers numbers = numbers();
         if (numbers == null) {
             return 0;
         }
@@ -152,7 +154,7 @@ public class Alarm {
 
     /** How many times as many soldiers the colony wants now (more for a while after a level 4). */
     public float soldierBoost(Level world) {
-        SpeciesProfile.AlarmNumbers numbers = numbers();
+        SavannaNumbers.AlarmNumbers numbers = numbers();
         return numbers != null && boostUntil != Colony.NOT_SET && world.getGameTime() < boostUntil ? numbers.soldierBoost() : 1.0F;
     }
 
@@ -224,7 +226,7 @@ public class Alarm {
      * break-in: level 3 there; the {@code break_ins_for_level_4}-th within {@code break_in_window_ticks} makes it 4.
      */
     public void blockBroken(ServerLevel world, BlockPos pos, @Nullable Entity breaker) {
-        SpeciesProfile.AlarmNumbers numbers = numbers();
+        SavannaNumbers.AlarmNumbers numbers = numbers();
         if (numbers == null || !isBreakIn(world, pos)) {
             return;
         }

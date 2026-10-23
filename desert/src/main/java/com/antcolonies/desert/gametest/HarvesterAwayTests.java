@@ -27,6 +27,7 @@ import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.AntLarvaEntity;
 import com.antcolonies.desert.entity.WorkerAntEntity;
 import com.antcolonies.desert.registry.DesertEntities;
+import com.antcolonies.desert.species.DesertNumbers;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -502,7 +503,7 @@ public class HarvesterAwayTests {
             DesertMod.LOGGER.info("[away-test] 4b: {}{}", colony.part(DesertParts.PATROL).orElseThrow().describe(level), colony.part(DesertParts.DOOR).orElseThrow().describe(level));
             helper.assertTrue(colony.part(DesertParts.PATROL).orElseThrow().isRoundOn() && colony.part(DesertParts.PATROL).orElseThrow().numbersOut() > 0 && colony.part(DesertParts.PATROL).orElseThrow().realOut().isEmpty(),
                     "the numbers should send a patrol of numbers first: " + colony.part(DesertParts.PATROL).orElseThrow().describe(level));
-            helper.assertTrue(colony.part(DesertParts.PATROL).orElseThrow().sentThisRound() == colony.profile().food().patrol().orElseThrow().dawnPatrol(colony.getCount(Caste.WORKER)),
+            helper.assertTrue(colony.part(DesertParts.PATROL).orElseThrow().sentThisRound() == colony.profile().section(DesertNumbers.PATROL).orElseThrow().dawnPatrol(colony.getCount(Caste.WORKER)),
                     "the dawn patrol should be the share of the workers: " + colony.part(DesertParts.PATROL).orElseThrow().describe(level));
         });
         helper.runAfterDelay(4600, () -> {

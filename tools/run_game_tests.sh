@@ -10,6 +10,8 @@
 #   ANTCOLONIES_MODS=savanna tools/run_game_tests.sh
 #                                    the framework with one species mod only (savanna or desert; both if not set),
 #                                    so only that mod's tests run (the split, step S9: each mod on its own)
+#   ANTCOLONIES_TESTS=sometest ANTCOLONIES_EVERY_SHARD=1 tools/run_game_tests.sh
+#                                    every server runs every chosen test (a flaky test n times at once)
 #
 # Each server ("shard") gets its own folder and world under run-test-shards/<n>/ and its share of the tests
 # (TestFilter.keepShard). One server runs everything on one thread, so n servers finish about n times sooner, as long

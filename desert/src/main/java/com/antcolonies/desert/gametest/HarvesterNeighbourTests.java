@@ -105,7 +105,12 @@ public class HarvesterNeighbourTests {
             DesertMod.LOGGER.info("[neighbour-test] old{} / young{}", old.neighbours().describe(level), young.neighbours().describe(level));
             helper.assertTrue(old.neighbours().meetings().size() == 1 && young.neighbours().meetings().size() == 1,
                     "the two workers should each have told their colony of the meeting: " + old.neighbours().describe(level) + " / "
-                            + young.neighbours().describe(level));
+                            + young.neighbours().describe(level) + " | may meet: " + old.neighbours().canMeet(young) + ", "
+                            + young.neighbours().canMeet(old) + " | middles " + old.getCenter() + ", " + young.getCenter()
+                            + " | workers " + met[0].blockPosition() + " sky " + level.canSeeSky(met[0].blockPosition()) + " alive "
+                            + met[0].isAlive() + ", " + met[1].blockPosition() + " sky " + level.canSeeSky(met[1].blockPosition())
+                            + " alive " + met[1].isAlive() + " | tests near: "
+                            + com.antcolonies.gametest.TestIsolation.describeTestsNear(old.getCenter(), 40));
             helper.assertTrue(old.ageDays(level) >= 9.9 && young.ageDays(level) < 0.1, "the ages: " + old.ageDays(level) + ", " + young.ageDays(level));
             met[0].discard();
             met[1].discard();

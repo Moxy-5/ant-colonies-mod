@@ -22,6 +22,8 @@ import com.antcolonies.nav.Foothold;
 import com.antcolonies.nav.Route;
 import com.antcolonies.species.SpeciesProfile;
 
+import com.antcolonies.savanna.species.SavannaNumbers;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 
@@ -324,7 +326,7 @@ class GalleryProofTest {
             own.forEach(tunnel -> ways.add(tunnel.side()));
             ways.add(front);
             ways.add(front.getOpposite());
-            List<NestPlan.ForagingTunnel> planned = Galleries.planArms(own, ways, land.ground(), center, 16, 9);
+            List<NestPlan.ForagingTunnel> planned = GalleryWeb.planArms(own, ways, land.ground(), center, 16, 9);
             arms += planned.size();
             List<NestPlan.ForagingTunnel> tunnels = new ArrayList<>(own);
             tunnels.addAll(planned);
@@ -342,7 +344,7 @@ class GalleryProofTest {
             tunnels.forEach(tunnel -> taken.add(tunnel.hole()));
             List<NestPlan.ForagingTunnel> all = new ArrayList<>(tunnels);
             for (NestPlan.ForagingTunnel tunnel : tunnels) {
-                all.addAll(Galleries.holesAlong(tunnel, land.ground(), center, 8, 4, taken));
+                all.addAll(HoleTurns.holesAlong(tunnel, land.ground(), center, 8, 4, taken));
             }
             holes += all.size();
             Set<BlockPos> holeCells = new HashSet<>();
@@ -372,7 +374,7 @@ class GalleryProofTest {
                 }
                 List<BlockPos> holesNow = new ArrayList<>(List.of(center));
                 all.forEach(tunnel -> holesNow.add(tunnel.hole()));
-                NestPlan.ForagingTunnel instead = gallery == null ? null : Galleries.holeInstead(gallery, land.ground(), center, 8, spot, 7.0, holesNow,
+                NestPlan.ForagingTunnel instead = gallery == null ? null : HoleTurns.holeInstead(gallery, land.ground(), center, 8, spot, 7.0, holesNow,
                         cell -> Math.hypot(cell.getX() - spot.getX(), cell.getZ() - spot.getZ()) <= 6);
                 if (gallery == null) {
                     failures.add(where + ": no gallery found under the hole at " + attacked.hole().toShortString());
@@ -452,7 +454,7 @@ class GalleryProofTest {
      */
     @Test
     void wholeWebsGrownTipByTipCanAllBeWalkedAndNeverOpenToTheSky() {
-        SpeciesProfile.GalleryNumbers numbers = new SpeciesProfile.GalleryNumbers(true, 16, 4, 6, 0.5, 6, 2);
+        SavannaNumbers.GalleryNumbers numbers = new SavannaNumbers.GalleryNumbers(true, 16, 4, 6, 0.5, 6, 2);
         int landscapes = 0;
         int pieces = 0;
         int forks = 0;
@@ -488,20 +490,20 @@ class GalleryProofTest {
             own.forEach(tunnel -> ways.add(tunnel.side()));
             ways.add(front);
             ways.add(front.getOpposite());
-            List<NestPlan.ForagingTunnel> web = new ArrayList<>(Galleries.planArms(own, ways, land.ground(), center, 16, 9));
+            List<NestPlan.ForagingTunnel> web = new ArrayList<>(GalleryWeb.planArms(own, ways, land.ground(), center, 16, 9));
             Set<BlockPos> ownCells = new HashSet<>();
             own.forEach(tunnel -> ownCells.addAll(tunnel.tunnel()));
-            List<Galleries.Tip> tips = new ArrayList<>();
+            List<GalleryWeb.Tip> tips = new ArrayList<>();
             Set<BlockPos> webCells = new HashSet<>();
             for (NestPlan.ForagingTunnel arm : web) {
                 land.dug.addAll(arm.tunnel());
                 arm.tunnel().stream().filter(cell -> !ownCells.contains(cell)).forEach(webCells::add);
-                tips.add(new Galleries.Tip(arm, Galleries.bearing(center, arm.hole()), 0, 8 + random.nextInt(5)));
+                tips.add(new GalleryWeb.Tip(arm, GalleryWeb.bearing(center, arm.hole()), 0, 8 + random.nextInt(5)));
             }
             Map<BlockPos, Integer> fails = new HashMap<>();
             String where = "landscape " + seed;
             while (webCells.size() < WEB_LENGTH) {
-                List<Galleries.Tip> order = new ArrayList<>(tips);
+                List<GalleryWeb.Tip> order = new ArrayList<>(tips);
                 java.util.Collections.shuffle(order, new Random(seed * 1000 + webCells.size()));
                 Set<BlockPos> stopped = new HashSet<>();
                 fails.forEach((hole, count) -> {
@@ -509,11 +511,11 @@ class GalleryProofTest {
                         stopped.add(hole);
                     }
                 });
-                Galleries.Tip tip = Galleries.pickTip(order, center, numbers.reach(), stopped);
+                GalleryWeb.Tip tip = GalleryWeb.pickTip(order, center, numbers.reach(), stopped);
                 if (tip == null) {
                     break;
                 }
-                List<Galleries.Tip> grown = Galleries.grow(tip, tips, land.ground(), center, 9, numbers, random);
+                List<GalleryWeb.Tip> grown = GalleryWeb.grow(tip, tips, land.ground(), center, 9, numbers, random);
                 if (grown.isEmpty()) {
                     fails.merge(tip.way().hole(), 1, Integer::sum);
                     continue;
@@ -521,7 +523,7 @@ class GalleryProofTest {
                 forks += grown.size() > 1 ? 1 : 0;
                 tips.remove(tip);
                 tips.addAll(grown);
-                for (Galleries.Tip piece : grown) {
+                for (GalleryWeb.Tip piece : grown) {
                     pieces++;
                     web.add(piece.way());
                     List<BlockPos> fresh = piece.way().tunnel().subList(tip.way().tunnel().size(), piece.way().tunnel().size());
@@ -546,7 +548,7 @@ class GalleryProofTest {
                 BlockPos food = new BlockPos(fx, land.top(fx, fz) + 1, fz);
                 List<NestPlan.ForagingTunnel> from = new ArrayList<>(own);
                 from.addAll(web);
-                ColonyHooks.GalleryPiece piece = Galleries.planPiece(from, food, land.ground(), center, 9, numbers.reach() + 16);
+                ColonyHooks.GalleryPiece piece = GalleryWeb.planPiece(from, food, land.ground(), center, 9, numbers.reach() + 16);
                 if (piece == null) {
                     continue;
                 }
@@ -619,7 +621,7 @@ class GalleryProofTest {
             List<NestPlan.ForagingTunnel> all = new ArrayList<>(own);
             all.addAll(web);
             for (NestPlan.ForagingTunnel tunnel : new ArrayList<>(all)) {
-                all.addAll(Galleries.holesAlong(tunnel, land.ground(), center, 8, 4, taken));
+                all.addAll(HoleTurns.holesAlong(tunnel, land.ground(), center, 8, 4, taken));
             }
             holes += all.size();
             Set<BlockPos> holeCells = new HashSet<>();

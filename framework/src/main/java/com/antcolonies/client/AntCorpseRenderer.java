@@ -22,7 +22,7 @@ import net.minecraft.resources.ResourceLocation;
 
 /**
  * Draws a dead ant (or termite, in its species' look): a dried-out body lying on its back with the six legs curled up in the air. The same model is
- * drawn smaller in the mandibles of the worker that carries it (see {@link PelletLayer}).
+ * drawn smaller in the mandibles of the worker that carries it (see {@link CarriedLoadLayer}).
  */
 public class AntCorpseRenderer extends EntityRenderer<AntCorpseEntity> {
     public static final ModelLayerLocation LAYER =

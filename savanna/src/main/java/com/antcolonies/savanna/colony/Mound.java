@@ -26,8 +26,10 @@ import com.antcolonies.savanna.block.TermiteTunnelBlock;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.savanna.entity.TermiteWorkerEntity;
 import com.antcolonies.registry.ModTags;
-import com.antcolonies.species.SpeciesProfile.MoundNumbers;
+import com.antcolonies.savanna.species.SavannaNumbers.MoundNumbers;
 import com.antcolonies.savanna.registry.SavannaBlocks;
+
+import com.antcolonies.savanna.species.SavannaNumbers;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -168,7 +170,7 @@ public class Mound {
     /** The mound numbers of the colony's species, or null if it builds no mound. */
     @Nullable
     public MoundNumbers numbers() {
-        return colony.profile().mound().orElse(null);
+        return colony.profile().section(SavannaNumbers.MOUND).orElse(null);
     }
 
     /** True once there is building to do: the species builds a mound and the colony has workers. */

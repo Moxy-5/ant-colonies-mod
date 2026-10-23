@@ -6,6 +6,7 @@ import com.antcolonies.desert.registry.DesertBlocks;
 import com.antcolonies.desert.registry.DesertEntities;
 import com.antcolonies.desert.registry.DesertFeatures;
 import com.antcolonies.desert.registry.DesertItems;
+import com.antcolonies.desert.species.DesertNumbers;
 import com.antcolonies.desert.species.HarvesterBuiltIn;
 
 import org.slf4j.Logger;
@@ -36,6 +37,7 @@ public class DesertMod {
         DesertFeatures.FEATURES.register(modEventBus);
         DesertEntities.ENTITY_TYPES.register(modEventBus);
         DesertItems.ITEMS.register(modEventBus);
+        DesertNumbers.signUp(); // its own sections of the species file (Apex part 3, T1), before it loads
         DesertParts.signUp();
         // The harvester's numbers built into the code, for when its species file is missing or broken.
         SpeciesProfiles.signUpBuiltIn(DesertSpecies.RED_HARVESTER_ANT, HarvesterBuiltIn.NUMBERS);

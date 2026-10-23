@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 
 import com.antcolonies.savanna.colony.MoundPlan.Part;
 import com.antcolonies.savanna.colony.MoundPlan.Shape;
-import com.antcolonies.species.SpeciesProfile.MoundNumbers;
+import com.antcolonies.savanna.species.SavannaNumbers.MoundNumbers;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
