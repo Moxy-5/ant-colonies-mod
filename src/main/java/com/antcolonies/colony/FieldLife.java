@@ -162,7 +162,7 @@ public class FieldLife {
 
     /** Whether the brain keeps a picture of the plants round the galleries that the colony does not know yet (termites underground, step 4). */
     private boolean keepsAPicture() {
-        return colony.foodMap().findsByLooking() && !colony.foodMap().searchesAlone() && colony.nest().galleries().isOn();
+        return colony.foodMap().findsByLooking() && !colony.foodMap().searchesAlone() && colony.underground() != null;
     }
 
     /**
@@ -308,7 +308,8 @@ public class FieldLife {
         Map<BlockPos, Double> worth = new HashMap<>();
         // Termites underground step 4 (the user's pick, 2026-10-17): with the galleries the numbers graze only round the
         // holes open tonight, near or away, and eat from inside under the feeding spots.
-        List<BlockPos> galleries = colony.nest().galleries().isOn() ? colony.nest().galleries().holesInTurn(level) : null;
+        ColonyHooks.Underground web = colony.underground();
+        List<BlockPos> galleries = web != null ? web.holesInTurn(level) : null;
         for (Map.Entry<BlockPos, Plant> entry : known.entrySet()) {
             Plant plant = entry.getValue();
             if (plant.kind() < 0 || plant.kind() >= kinds.size() || !outside && !plant.fromInside()
@@ -340,7 +341,7 @@ public class FieldLife {
             int before = returnedNow;
             free -= work(level, entry.getKey(), entry.getValue(), free, eyes, usedUp);
             if (hole != null && returnedNow > before) {
-                colony.nest().galleries().noteForaged(hole, level.getGameTime());
+                web.noteForaged(hole, level.getGameTime());
             }
         }
         forgetUsedUp(level, usedUp);
@@ -354,7 +355,8 @@ public class FieldLife {
      */
     @Nullable
     private BlockPos grazedFrom(BlockPos plant, List<BlockPos> holes) {
-        int radius = colony.nest().galleries().numbers().foodRadius();
+        ColonyHooks.Underground web = colony.underground();
+        int radius = web == null ? 0 : web.grazeRadius();
         BlockPos best = null;
         double bestDistance = Double.MAX_VALUE;
         for (BlockPos hole : holes) {

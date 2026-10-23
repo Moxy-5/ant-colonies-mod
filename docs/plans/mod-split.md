@@ -118,7 +118,7 @@ part of their own (`galleries`, listed in `macrotermes.json`, saved where they a
 as they are); `Nest`, `ForagingHoles` and `BuildLife` reach them only through hooks and questions (Apex steps 6 to 8's
 machinery): "where are the hidden ways", "may a hole open here", "the builders' time on return". The feeding galleries,
 the mud casts and the tunnel blocks move with them. `TunnelRoute` and `RunwayRoute` (a route that follows the ground;
-no species in them) stay shared, ready for any species that digs or builds runways.
+no species in them) stay shared, ready for any species that digs or builds runways. **BUILT 2026-10-22** (round 1): the `galleries` part and the `Underground` and `FeedingWays` sockets (`docs/HISTORY.md`); wall checker 36 files; full run 138 of 141 on 6 servers, the socket check fixed, the other two the old flakes (BUGS 55, 2 of 6 alone as before; 62).
 
 **S3. The other leftovers** (about 2 to 3 hours). `FoodStore`'s comb, dead wood and bare patches through hooks; the
 species rows of `ColonyParts` signed up from a species file of code (still one mod); `SpeciesProfile`'s 2 lines;

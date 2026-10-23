@@ -204,6 +204,16 @@ public class Colony {
     }
 
     /**
+     * The split, step S2: the colony's web of galleries under the ground ({@link ColonyHooks#UNDERGROUND}, the termites'),
+     * or null when it has none or it is switched off.
+     */
+    @Nullable
+    public ColonyHooks.Underground underground() {
+        ColonyHooks.Underground web = hooks.first(ColonyHooks.UNDERGROUND);
+        return web != null && web.isOn() ? web : null;
+    }
+
+    /**
      * Whether the colony keeps its foragers off {@code pos} for a lasting reason (danger, a neighbour it yields to, where
      * members were attacked): asked of every part ({@link ColonyQuestions#KEEP_OFF}).
      */
@@ -699,7 +709,8 @@ public class Colony {
             reached = Math.max(reached, reach.reach()); // (the trunk trails' longest tip)
         }
         int radius = reached;
-        int galleries = nest.galleries().range();
+        ColonyHooks.Underground web = underground();
+        int galleries = web == null ? 0 : web.range();
         if (galleries > 0) {
             // Termites underground (step 2a): the range is the galleries, the farthest hole and the graze round it, in
             // place of the size table.

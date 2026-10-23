@@ -203,13 +203,13 @@ public class BuildLife {
 
     /**
      * Termites underground step 4: the galleries grow out of sight with the builders' time, a piece planned by the same
-     * rules as here ({@link Galleries#growNow}: food first, then the even spreading, within the workers' budget and the
+     * rules as here ({@link ColonyHooks.Underground#growNow}: food first, then the even spreading, within the workers' budget and the
      * reach) and dug before the next. True if there is more (time ran out this second, or it waits); false once nothing
      * more may grow now (the budget is spent, or the ground out there is not loaded: the real workers grow it later).
      */
     private boolean growGalleries(ServerLevel level) {
-        Galleries galleries = colony.nest().galleries();
-        if (!galleries.isOn()) {
+        ColonyHooks.Underground galleries = colony.underground();
+        if (galleries == null) {
             return false;
         }
         for (int i = 0; i < PIECES_PER_SECOND; i++) {

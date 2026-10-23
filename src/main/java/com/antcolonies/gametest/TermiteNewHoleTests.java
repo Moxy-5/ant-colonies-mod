@@ -83,7 +83,7 @@ public class TermiteNewHoleTests {
             // The food lies a set distance out, past the old 2 holes: with the arms of termites underground (step 1)
             // a hole along an arm may land near it, and the colony then uses that hole (a runway) and digs no new
             // tunnel. This scene is about the tunnel out to far food, so the arms are switched off here.
-            colony.nest().galleries().setSwitchForTests(false);
+            com.antcolonies.colony.Galleries.of(colony).setSwitchForTests(false);
             long middleAged = level.getGameTime() - colony.profile().worker().nurseUntilTicks() - 1000;
             for (TermiteWorkerEntity worker : level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds())) {
                 worker.setGrownUpAt(middleAged);
@@ -551,7 +551,7 @@ public class TermiteNewHoleTests {
                 // range, 24, matched the food radius and the plant scan skipped the known hay 38 out; the test failed
                 // whenever the arms came first, about 1 run in 10).
                 helper.assertTrue(helper.getTick() < 600, "the galleries planned no arms");
-                if (!colony.nest().galleries().armsPlanned()) {
+                if (!com.antcolonies.colony.Galleries.of(colony).armsPlanned()) {
                     return false;
                 }
                 level.setBlock(hay, Blocks.HAY_BLOCK.defaultBlockState(), 3);
@@ -629,7 +629,7 @@ public class TermiteNewHoleTests {
             // The food lies a set distance out, past the old 2 holes: with the arms of termites underground (step 1)
             // a hole along an arm may land near it, and the colony then uses that hole (a runway) and digs no new
             // tunnel. This scene is about the tunnel out to far food, so the arms are switched off here.
-            colony.nest().galleries().setSwitchForTests(false);
+            com.antcolonies.colony.Galleries.of(colony).setSwitchForTests(false);
             long middleAged = level.getGameTime() - colony.profile().worker().nurseUntilTicks() - 1000;
             for (TermiteWorkerEntity worker : level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds())) {
                 worker.setGrownUpAt(middleAged);
@@ -797,7 +797,7 @@ public class TermiteNewHoleTests {
             // The food lies a set distance out, past the old 2 holes: with the arms of termites underground (step 1)
             // a hole along an arm may land near it, and the colony then uses that hole (a runway) and digs no new
             // tunnel. This scene is about the tunnel out to far food, so the arms are switched off here.
-            colony.nest().galleries().setSwitchForTests(false);
+            com.antcolonies.colony.Galleries.of(colony).setSwitchForTests(false);
             long middleAged = level.getGameTime() - colony.profile().worker().nurseUntilTicks() - 1000;
             for (TermiteWorkerEntity worker : level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds())) {
                 worker.setGrownUpAt(middleAged);

@@ -65,7 +65,6 @@ public class Nest {
     private boolean allForagingTunnelsStale = true;
     /** The tunnels out to rich food, their feeding galleries and the runways of mud sheeting. Saved with the nest. */
     private final FoodWays foodWays;
-    private final Galleries galleries;
     /** The cells that count as inside (see {@link #isInside}), worked out at most once a tick. */
     private Set<BlockPos> inside = Set.of();
     /** The mound's planned channel cells (tunnels, spire pieces, mouths): inside only where the block is built. */
@@ -81,15 +80,15 @@ public class Nest {
             allForagingTunnelsStale = true;
             insideTick = Long.MIN_VALUE;
         });
-        this.galleries = new Galleries(colony, () -> {
-            allForagingTunnelsStale = true;
-            insideTick = Long.MIN_VALUE;
-        });
     }
 
-    /** Termites underground: the arms, the holes along the tunnels and whose turn it is (see {@link Galleries}). */
-    public Galleries galleries() {
-        return galleries;
+    /**
+     * The split, step S2: the colony's web of galleries changed its pieces or holes ({@link ColonyHooks.Underground}),
+     * so the list of foraging tunnels and what counts as inside are out of date.
+     */
+    public void waysChanged() {
+        allForagingTunnelsStale = true;
+        insideTick = Long.MIN_VALUE;
     }
 
     /** The tunnels out to rich food, their feeding galleries and the runways of mud sheeting (see {@link FoodWays}). */
@@ -206,13 +205,14 @@ public class Nest {
                 return next;
             }
         }
+        ColonyHooks.Underground web = colony.underground();
         for (NestPlan.ForagingTunnel tunnel : getForagingTunnels(level)) {
-            next = firstDiggable(level, galleries.digCells(tunnel)); // (a gallery's piece: its own blocks, its parent comes first)
+            next = firstDiggable(level, web == null ? tunnel.tunnel() : web.digCells(tunnel)); // (a gallery's piece: its own blocks, its parent comes first)
             if (next != null) {
                 return next;
             }
             // A piece out to rich food (they come first): its feeding gallery up under the food right after it.
-            FoodWays.NewTunnel toFood = galleries.isOn() ? foodWays.newTunnelAt(tunnel.hole()) : null;
+            FoodWays.NewTunnel toFood = web != null ? foodWays.newTunnelAt(tunnel.hole()) : null;
             if (toFood != null && toFood.gallery() != null && !foodWays.isSpent(tunnel.hole()) && ForagingHoles.isDug(level, tunnel)) {
                 next = firstDiggable(level, toFood.gallery());
                 if (next != null) {
@@ -798,10 +798,15 @@ public class Nest {
         }
         if (allForagingTunnelsStale) {
             List<NestPlan.ForagingTunnel> all = new ArrayList<>(foragingTunnels);
-            all.addAll(galleries.arms());
-            foodWays.getNewTunnels().stream().filter(tunnel -> !galleries.hasPiece(tunnel.tunnel().hole())) // (one of the pieces)
+            ColonyHooks.Underground web = colony.underground();
+            if (web != null) {
+                all.addAll(web.arms());
+            }
+            foodWays.getNewTunnels().stream().filter(tunnel -> web == null || !web.hasPiece(tunnel.tunnel().hole())) // (one of the pieces)
                     .forEach(tunnel -> all.add(tunnel.tunnel()));
-            all.addAll(galleries.holesAlong());
+            if (web != null) {
+                all.addAll(web.holesAlong());
+            }
             allForagingTunnels = List.copyOf(all);
             allForagingTunnelsStale = false;
         }
@@ -905,18 +910,10 @@ public class Nest {
                 }
             }
             Set<BlockPos> channels = new HashSet<>();
-            // The mud casts left of eaten wood, joined by their channels to a gallery: inside too (eaten on from there).
-            Map<BlockPos, BlockPos> casts = new HashMap<>();
-            java.util.ArrayDeque<BlockPos> queue = new java.util.ArrayDeque<>();
-            for (BlockPos gallery : galleries) {
-                if (cells.contains(gallery)) {
-                    joinCasts(level, gallery, gallery, casts, queue);
-                }
-            }
-            while (!queue.isEmpty() && casts.size() < MAX_CASTS) {
-                BlockPos cast = queue.poll();
-                joinCasts(level, cast, casts.get(cast), casts, queue);
-            }
+            // What is left of eaten food joined to a gallery (the termites' mud casts left of eaten wood): inside too
+            // (eaten on from there).
+            ColonyHooks.FeedingWays feeding = colony.hooks().first(ColonyHooks.FEEDING_WAYS);
+            Map<BlockPos, BlockPos> casts = feeding == null || galleries.isEmpty() ? Map.of() : feeding.joined(level, galleries, cells);
             channels.addAll(casts.keySet());
             castGalleries = casts;
             ColonyHooks.Structure structure = colony.hooks().first(ColonyHooks.STRUCTURE); // (the mound's hollow shaft and channels)
@@ -932,29 +929,6 @@ public class Nest {
         }
         ColonyHooks.Structure structure = insideChannels.contains(cell) ? colony.hooks().first(ColonyHooks.STRUCTURE) : null;
         return structure != null && structure.isChannel(level.getBlockState(cell));
-    }
-
-    /** At most this many mud casts are joined to the galleries (a fallen tree is about 8 blocks). */
-    private static final int MAX_CASTS = 256;
-
-    /** Adds the mud casts whose channels join the one at {@code from} (a gallery cell or a cast) to {@code casts}. */
-    private static void joinCasts(Level level, BlockPos from, BlockPos gallery, Map<BlockPos, BlockPos> casts,
-            java.util.ArrayDeque<BlockPos> queue) {
-        BlockState fromState = level.getBlockState(from);
-        boolean fromCast = com.antcolonies.block.MudCastBlock.isCast(fromState);
-        for (Direction side : Direction.values()) {
-            BlockPos next = from.relative(side);
-            if (casts.containsKey(next) || !level.isLoaded(next)) {
-                continue;
-            }
-            BlockState state = level.getBlockState(next);
-            if (com.antcolonies.block.MudCastBlock.isCast(state)
-                    && com.antcolonies.nav.Channel.has(com.antcolonies.block.TermiteTunnelBlock.openMask(state), side.getOpposite())
-                    && (!fromCast || com.antcolonies.nav.Channel.has(com.antcolonies.block.TermiteTunnelBlock.openMask(fromState), side))) {
-                casts.put(next.immutable(), gallery);
-                queue.add(next.immutable());
-            }
-        }
     }
 
     /**
@@ -1077,7 +1051,6 @@ public class Nest {
     void save(CompoundTag tag) {
         tag.putInt("nestLevelsUnlocked", levelsUnlocked);
         foodWays.save(tag);
-        galleries.save(tag);
         if (fittedTunnels != null) {
             ListTag fitted = new ListTag();
             for (NestPlan.ForagingTunnel tunnel : fittedTunnels) {
@@ -1102,7 +1075,6 @@ public class Nest {
         // A nest saved before nest stages existed digs all its levels, as it did then.
         levelsUnlocked = tag.contains("nestLevelsUnlocked") ? tag.getInt("nestLevelsUnlocked") : Integer.MAX_VALUE;
         foodWays.load(tag);
-        galleries.load(tag);
         fittedTunnels = null;
         if (tag.contains("fittedTunnels")) {
             List<NestPlan.ForagingTunnel> fitted = new ArrayList<>();

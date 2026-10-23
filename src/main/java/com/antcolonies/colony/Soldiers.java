@@ -189,7 +189,8 @@ public class Soldiers {
                 List<BlockPos> cells = tunnel.tunnel();
                 // Holes taking turns (termites underground): the nest's own tunnels are always guarded (its main ways
                 // in); out along the arms only the holes in use, not every plugged one.
-                if (!own.contains(tunnel) && !nest.galleries().isInTurn(tunnel.hole()) && !ForagingHoles.isOpen(level, tunnel.hole())) {
+                ColonyHooks.Underground web = colony.underground();
+                if (!own.contains(tunnel) && web != null && !web.isInTurn(tunnel.hole()) && !ForagingHoles.isOpen(level, tunnel.hole())) {
                     continue;
                 }
                 if (cells.size() >= 2) {

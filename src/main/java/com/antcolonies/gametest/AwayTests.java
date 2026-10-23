@@ -577,7 +577,7 @@ public class AwayTests {
             TermiteSoldierTests.digNestAtOnce(level, colony);
             colony.population().addNewMembers(WorkerAntEntity.CASTE, level.getGameTime() - 250000, 60);
             // Step 2c's rule with the 2 holes of before (the galleries' night holes have their own scene, step 4 below).
-            colony.nest().galleries().setSwitchForTests(false);
+            com.antcolonies.colony.Galleries.of(colony).setSwitchForTests(false);
             int[][] spots = {{MIDDLE + 6, MIDDLE}, {MIDDLE - 6, MIDDLE}, {MIDDLE, MIDDLE + 6}, {MIDDLE, MIDDLE - 6}};
             for (int[] spot : spots) {
                 BlockPos tuft = helper.absolutePos(new BlockPos(spot[0], SURFACE, spot[1]));
@@ -743,8 +743,8 @@ public class AwayTests {
             colony.population().addNewMembers(WorkerAntEntity.CASTE, now - colony.profile().worker().builderUntilTicks() - 1000, 30);
             colony.population().addNewMembers(WorkerAntEntity.CASTE, now - colony.profile().worker().nurseUntilTicks() - 1000, 8);
             TermiteSoldierTests.digNestAtOnce(level, colony); // (the nest of a colony with workers, not the founders' chamber)
-            colony.nest().galleries().setSwitchForTests(true);
-            colony.nest().galleries().setReachForTests(reach);
+            com.antcolonies.colony.Galleries.of(colony).setSwitchForTests(true);
+            com.antcolonies.colony.Galleries.of(colony).setReachForTests(reach);
             colony.field().setOnForTests(true);
             stage[0] = 1;
         });
@@ -753,7 +753,7 @@ public class AwayTests {
             if (colony == null || stage[0] == 0) {
                 return;
             }
-            com.antcolonies.colony.Galleries galleries = colony.nest().galleries();
+            com.antcolonies.colony.Galleries galleries = com.antcolonies.colony.Galleries.of(colony);
             List<NestPlan.ForagingTunnel> tunnels = colony.foragingHoles().tunnels(level);
             BlockPos center = colony.getCenter();
             int graze = colony.profile().nest().galleries().orElseThrow().foodRadius();
@@ -1066,7 +1066,7 @@ public class AwayTests {
             colony.population().setViewersForTests(List.of());
             TermiteSoldierTests.digNestAtOnce(level, colony);
             colony.population().addNewMembers(WorkerAntEntity.CASTE, level.getGameTime() - 250000, 60);
-            colony.nest().galleries().setSwitchForTests(false);
+            com.antcolonies.colony.Galleries.of(colony).setSwitchForTests(false);
             for (int i = 0; i < 6; i++) {
                 colony.danger().seen(level, place, UUID.randomUUID(), "husk"); // seen only: not an attack
             }
@@ -1628,7 +1628,10 @@ public class AwayTests {
                 Map.entry(com.antcolonies.colony.ColonyHooks.LIST_DANGER, List.of("closed_holes")),
                 Map.entry(com.antcolonies.colony.ColonyHooks.LIST_BUILDING, List.of("mound")),
                 Map.entry(com.antcolonies.colony.ColonyHooks.LIST_DAY, List.of("patrol", "door", "hill")),
-                Map.entry(com.antcolonies.colony.ColonyHooks.LIST_HOLES, List.of("hidden_trips")));
+                Map.entry(com.antcolonies.colony.ColonyHooks.LIST_HOLES, List.of("galleries", "hidden_trips")),
+                // split S2: the galleries a part of their own
+                Map.entry(com.antcolonies.colony.ColonyHooks.UNDERGROUND, List.of("galleries")),
+                Map.entry(com.antcolonies.colony.ColonyHooks.FEEDING_WAYS, List.of("galleries")));
         for (Map.Entry<com.antcolonies.colony.ColonyHooks.Kind<?>, List<String>> kind : plugged.entrySet()) {
             List<String> plugging = kind.getValue().stream().filter(has::contains).toList();
             helper.assertTrue(colony.hooks().pluggedInto(kind.getKey()).equals(plugging),

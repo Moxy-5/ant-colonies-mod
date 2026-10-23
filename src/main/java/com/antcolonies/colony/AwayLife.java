@@ -307,7 +307,10 @@ public class AwayLife {
             long away = level.getGameTime() - awaySince;
             awaySince = Colony.NOT_SET;
             lastAwayFor = away;
-            colony.nest().galleries().cameBack(level);
+            ColonyHooks.Underground web = colony.underground();
+            if (web != null) {
+                web.cameBack(level);
+            }
             AntColoniesMod.LOGGER.info("[away] colony {} is back after {} ticks: {}", colony.getId(), away, describe(level));
             ColonyManager.get(level).markChanged();
         }

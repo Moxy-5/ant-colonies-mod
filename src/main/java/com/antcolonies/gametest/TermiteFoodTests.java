@@ -748,7 +748,7 @@ public class TermiteFoodTests {
             long now = level.getGameTime();
             TermiteSoldierTests.digNestAtOnce(level, colony);
             colony.population().addNewMembers(WorkerAntEntity.CASTE, now - colony.profile().worker().builderUntilTicks() - 1000, 500);
-            colony.nest().galleries().setSwitchForTests(true);
+            com.antcolonies.colony.Galleries.of(colony).setSwitchForTests(true);
             stage[0] = 1;
         });
         helper.onEachTick(() -> {
@@ -756,7 +756,7 @@ public class TermiteFoodTests {
             if (colony == null || stage[0] == 0) {
                 return;
             }
-            com.antcolonies.colony.Galleries galleries = colony.nest().galleries();
+            com.antcolonies.colony.Galleries galleries = com.antcolonies.colony.Galleries.of(colony);
             for (NestPlan.ForagingTunnel tunnel : colony.foragingHoles().tunnels(level)) {
                 for (BlockPos cell : galleries.digCells(tunnel)) {
                     if (!com.antcolonies.colony.Nest.isDugOut(level, cell)) {

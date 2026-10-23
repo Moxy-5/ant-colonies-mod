@@ -17,7 +17,7 @@ import net.minecraft.world.level.block.state.BlockState;
 
 /**
  * The ways a nest reaches out to food (termites): the tunnels dug out to rich food after the nest was planned, each
- * with its feeding gallery up under the food ({@link FeedingGallery}), the holes of those tunnels whose food is gone,
+ * with its feeding gallery up under the food ({@link ColonyHooks.FeedingWays}), the holes of those tunnels whose food is gone,
  * and the runways of mud sheeting from a hole to food near it ({@link RunwayRoute}). The colony's foraging holes
  * ({@link ForagingHoles}) decide when to plan and drop them; this only keeps them, and is saved with the {@link Nest}
  * (same keys as when it was part of it). Species-neutral: a species without new holes or sheeting has none.
@@ -45,7 +45,7 @@ public class FoodWays {
 
     /**
      * A tunnel dug out to rich food after the nest was planned, and the food it leads to. {@code gallery}: the feeding
-     * gallery from the tunnel up under the food (see {@link FeedingGallery}), null until it is planned (once the tunnel
+     * gallery from the tunnel up under the food (see {@link ColonyHooks.FeedingWays}), null until it is planned (once the tunnel
      * is dug), empty if there is none (the food cannot be reached from below).
      */
     public record NewTunnel(NestPlan.ForagingTunnel tunnel, BlockPos food, @Nullable List<BlockPos> gallery) {

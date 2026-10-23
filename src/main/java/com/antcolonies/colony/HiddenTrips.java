@@ -122,8 +122,8 @@ public class HiddenTrips implements HiddenWays {
         if (onForTests != null) {
             return onForTests;
         }
-        Galleries galleries = colony.nest().galleries();
-        return galleries.isOn() && galleries.numbers().hiddenTrip() > 0;
+        Galleries galleries = Galleries.of(colony);
+        return galleries != null && galleries.isOn() && galleries.numbers().hiddenTrip() > 0;
     }
 
     /** Tests only: hidden trips on or off for this colony (null: with the galleries' switch). */
@@ -171,7 +171,8 @@ public class HiddenTrips implements HiddenWays {
 
     @Override
     public int shortest() {
-        return Math.max(1, colony.nest().galleries().numbers().hiddenTrip());
+        Galleries galleries = Galleries.of(colony);
+        return galleries == null ? 1 : Math.max(1, galleries.numbers().hiddenTrip());
     }
 
     @Override

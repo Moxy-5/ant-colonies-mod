@@ -543,7 +543,7 @@ class GalleryProofTest {
                 BlockPos food = new BlockPos(fx, land.top(fx, fz) + 1, fz);
                 List<NestPlan.ForagingTunnel> from = new ArrayList<>(own);
                 from.addAll(web);
-                Galleries.Piece piece = Galleries.planPiece(from, food, land.ground(), center, 9, numbers.reach() + 16);
+                ColonyHooks.GalleryPiece piece = Galleries.planPiece(from, food, land.ground(), center, 9, numbers.reach() + 16);
                 if (piece == null) {
                     continue;
                 }

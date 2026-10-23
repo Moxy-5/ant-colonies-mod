@@ -66,7 +66,7 @@ import net.minecraft.world.level.Level;
  * The 4 arms never fill in. The piece it forked from no longer spreads at random (that way led nowhere), only toward food.</li>
  * </ul>
  */
-public class Galleries {
+public class Galleries implements ColonyHooks.Underground {
     /** How often (ticks) the arms, the holes and the turns are looked at. */
     private static final int TICKS = 20;
     /** A remembered trail counts for its hole while known food lies this near (blocks) its patch. */
@@ -173,13 +173,20 @@ public class Galleries {
     @Nullable
     private Integer reachForTests;
 
-    Galleries(Colony colony, Runnable changed) {
+    Galleries(Colony colony) {
         this.colony = colony;
-        this.changed = changed;
+        this.changed = () -> colony.nest().waysChanged();
         this.woodCall = new DeadWoodCall(colony);
     }
 
+    /** The split, step S2: this colony's galleries, or null (its species lists none: {@code "galleries"} in its parts). */
+    @Nullable
+    public static Galleries of(Colony colony) {
+        return colony.part(ColonyParts.GALLERIES).orElse(null);
+    }
+
     /** Whether the switch is on for this colony (the species file's {@code nest.galleries.enabled}). */
+    @Override
     public boolean isOn() {
         if (switchForTests != null) {
             return switchForTests;
@@ -201,7 +208,8 @@ public class Galleries {
      * The arms and every piece grown from them (none while switched off). The pieces out to food whose food lasts come
      * first: the diggers take the tunnels in this order, so the way to found food is dug before the rest.
      */
-    List<NestPlan.ForagingTunnel> arms() {
+    @Override
+    public List<NestPlan.ForagingTunnel> arms() {
         if (!isOn()) {
             return List.of();
         }
@@ -213,6 +221,7 @@ public class Galleries {
     }
 
     /** Whether this hole is the end of one of the galleries' pieces (an arm, a piece grown from a tip, a piece out to food). */
+    @Override
     public boolean hasPiece(BlockPos hole) {
         return isOn() && pieceAt(hole) != null;
     }
@@ -277,7 +286,8 @@ public class Galleries {
     }
 
     /** The holes along the tunnels (none while switched off). */
-    List<NestPlan.ForagingTunnel> holesAlong() {
+    @Override
+    public List<NestPlan.ForagingTunnel> holesAlong() {
         return isOn() ? holes : List.of();
     }
 
@@ -287,6 +297,7 @@ public class Galleries {
      * hole of a tunnel dug out to rich food while that food lasts (the colony dug it for that food: it is opened every
      * foraging time, also when the tunnel is finished after the night's turns were picked).
      */
+    @Override
     public boolean isInTurn(BlockPos hole) {
         FoodWays ways = colony.nest().foodWays();
         return !isOn() || tonight.contains(hole) || ways.runwayAt(hole) != null || ways.isLiveNewHole(hole);
@@ -358,7 +369,8 @@ public class Galleries {
      * Step 4: the colony is back (from {@link AwayLife#settle}): for a while every branch due to fill in (10 days unused,
      * counted while away) is filled in as soon as it may be, as the real termites would have done meanwhile.
      */
-    void cameBack(ServerLevel level) {
+    @Override
+    public void cameBack(ServerLevel level) {
         if (isOn()) {
             catchUpUntil = level.getGameTime() + CATCH_UP_TICKS;
             upkeptAt = Long.MIN_VALUE;
@@ -370,6 +382,7 @@ public class Galleries {
      * pieces out to rich food whose food lasts (see {@link #isInTurn}); never a hole closed for danger (brain step 4g,
      * {@link ClosedHoles}). The numbers graze only round these (step 4).
      */
+    @Override
     public List<BlockPos> holesInTurn(Level level) {
         List<BlockPos> list = new ArrayList<>(tonight);
         FoodWays ways = colony.nest().foodWays();
@@ -386,8 +399,14 @@ public class Galleries {
     }
 
     /** Step 4: the numbers brought food in by this hole now (the piece it lies on counts as used). */
-    void noteForaged(BlockPos hole, long now) {
+    @Override
+    public void noteForaged(BlockPos hole, long now) {
         foragedFrom.put(hole.immutable(), now);
+    }
+
+    @Override
+    public int grazeRadius() {
+        return numbers().foodRadius();
     }
 
     /**
@@ -396,7 +415,8 @@ public class Galleries {
      * pulling a tip, then the even spreading; within the workers' budget and the reach). Returns the pieces planned, of
      * them those toward food, and the blocks of gallery they add ({0, 0, 0}: nothing may grow now).
      */
-    int[] growNow(ServerLevel level) {
+    @Override
+    public int[] growNow(ServerLevel level) {
         int[] none = {0, 0, 0};
         if (!isOn() || colony.isFounding()) {
             return none;
@@ -559,6 +579,7 @@ public class Galleries {
      * The blocks the diggers look at for this foraging tunnel: an arm's own blocks (its parent comes before it in the
      * list), none for a hole along a tunnel (its blocks are the tunnel's), every block for the rest.
      */
+    @Override
     public List<BlockPos> digCells(NestPlan.ForagingTunnel tunnel) {
         if (!isOn()) {
             return tunnel.tunnel();
@@ -623,7 +644,8 @@ public class Galleries {
      * {x, z, reach}: round every hole (the graze), round every growing tip (the grass that may pull it) and round every
      * plant the colony knows (rich food a piece may be dug to).
      */
-    List<int[]> scanSpots(Level level) {
+    @Override
+    public List<int[]> scanSpots(Level level) {
         List<int[]> spots = new ArrayList<>();
         if (!isOn()) {
             return spots;
@@ -642,6 +664,7 @@ public class Galleries {
     }
 
     /** The colony's range with the galleries: the farthest hole and the graze round it (0: no galleries yet). */
+    @Override
     public int range() {
         int reach = reach();
         return reach == 0 ? 0 : reach + numbers().foodRadius();
@@ -786,7 +809,7 @@ public class Galleries {
         }
         double most = 2.0 * (numbers().reach() + numbers().pieceLength()) + numbers.within() + 8;
         for (Colony other : ColonyManager.get(level).getColonies()) {
-            if (other != colony && other.getSpecies().equals(colony.getSpecies()) && other.nest().galleries().isOn()
+            if (other != colony && other.getSpecies().equals(colony.getSpecies()) && Galleries.of(other) != null && Galleries.of(other).isOn()
                     && colony.neighbours().canMeet(other) && other.getCenter().distSqr(colony.getCenter()) <= most * most) {
                 near.add(other);
             }
@@ -813,7 +836,7 @@ public class Galleries {
         BlockPos[] best = null;
         double bestDistance = Double.MAX_VALUE;
         for (BlockPos cell : cells) {
-            BlockPos theirs = other.nest().galleries().galleryCellNear(cell, within);
+            BlockPos theirs = Galleries.of(other).galleryCellNear(cell, within);
             if (theirs != null && theirs.distSqr(cell) < bestDistance) {
                 best = new BlockPos[] {cell, theirs};
                 bestDistance = theirs.distSqr(cell);
@@ -935,6 +958,7 @@ public class Galleries {
     }
 
     /** How many gallery pieces were walled off against neighbours (for the tests and the list). */
+    @Override
     public int walledOff() {
         return walledOff;
     }
@@ -1085,14 +1109,8 @@ public class Galleries {
 
     // --- step 3: pieces out to rich food --------------------------------------------------------------------------
 
-    /**
-     * A piece of gallery planned out to rich food: {@code tunnel} from the shaft (its first {@code from} blocks are the
-     * gallery it leaves from, {@code parent}'s, or one of the nest's own tunnels when {@code parent} is null).
-     */
-    record Piece(NestPlan.ForagingTunnel tunnel, int from, @Nullable BlockPos parent) {
-    }
-
     /** How far from the middle (blocks, sideways) food may lie for a piece to be dug out to it: the tips' reach. */
+    @Override
     public int foodReach() {
         return tipReach();
     }
@@ -1102,7 +1120,8 @@ public class Galleries {
      * workers allow it ({@link #affords}) and plans its feeding gallery), from the nearest dug gallery, or null: no route.
      */
     @Nullable
-    Piece pieceTo(ServerLevel level, BlockPos food) {
+    @Override
+    public ColonyHooks.GalleryPiece pieceTo(ServerLevel level, BlockPos food) {
         List<NestPlan.ForagingTunnel> from = new ArrayList<>(colony.nest().ownForagingTunnels(level));
         from.addAll(arms);
         List<NestPlan.ForagingTunnel> dug = new ArrayList<>();
@@ -1116,7 +1135,7 @@ public class Galleries {
         }
         int keepOut = colony.profile().nest().foragingHoleDistance() + 1;
         TunnelRoute.Ground ground = new GroundReader(level, colony, colony.nest().nestCells(level));
-        Piece piece = planPiece(dug, food, ground, colony.getCenter(), keepOut, tipReach() + 16);
+        ColonyHooks.GalleryPiece piece = planPiece(dug, food, ground, colony.getCenter(), keepOut, tipReach() + 16);
         return piece == null || takenHole(piece.tunnel().hole()) ? null : piece; // (never two pieces ending at one hole)
     }
 
@@ -1131,7 +1150,8 @@ public class Galleries {
      * {@link DeadWoodCall}) up to the call's {@code over_limit} more (the user's pick, 2026-10-19: a big find gets the
      * diggers; the even spreading waits until the workers catch up, {@link #growTips}).
      */
-    boolean affords(ServerLevel level, Piece piece, BlockPos food) {
+    @Override
+    public boolean affords(ServerLevel level, ColonyHooks.GalleryPiece piece, BlockPos food) {
         int fresh = piece.tunnel().tunnel().size() - piece.from();
         int allowed = lengthAllowed() + numbers().pieceLength();
         if (length() + fresh <= allowed) {
@@ -1154,7 +1174,7 @@ public class Galleries {
      * tunnel it leaves from before its own blocks. Null if there is no route. Pure (the gallery proof checks it).
      */
     @Nullable
-    static Piece planPiece(List<NestPlan.ForagingTunnel> from, BlockPos food, TunnelRoute.Ground ground, BlockPos center, int keepOut,
+    static ColonyHooks.GalleryPiece planPiece(List<NestPlan.ForagingTunnel> from, BlockPos food, TunnelRoute.Ground ground, BlockPos center, int keepOut,
             int maxLength) {
         List<BlockPos> starts = new ArrayList<>();
         from.forEach(tunnel -> starts.addAll(tunnel.tunnel()));
@@ -1176,14 +1196,15 @@ public class Galleries {
         cells.addAll(plan.cells());
         Direction side = Direction.getNearest(plan.hole().getX() - center.getX(), 0, plan.hole().getZ() - center.getZ());
         BlockPos parent = source == null ? null : source.hole();
-        return new Piece(new NestPlan.ForagingTunnel(List.copyOf(cells), plan.hole(), side), lead.size(), parent);
+        return new ColonyHooks.GalleryPiece(new NestPlan.ForagingTunnel(List.copyOf(cells), plan.hole(), side), lead.size(), parent);
     }
 
     /**
      * A piece out to rich food joins the web (its feeding spot is kept by {@link FoodWays}): a tip at its food. A piece
      * leaving from the end of a tip takes that tip's place. Uses the length filled-in branches gave back first.
      */
-    void addFoodPiece(ServerLevel level, Piece piece) {
+    @Override
+    public void addFoodPiece(ServerLevel level, ColonyHooks.GalleryPiece piece) {
         BlockPos hole = piece.tunnel().hole().immutable();
         BlockPos parent = piece.parent() != null && pieceAt(piece.parent()) != null ? piece.parent().immutable() : null;
         List<NestPlan.ForagingTunnel> all = new ArrayList<>(arms);

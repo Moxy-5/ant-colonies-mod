@@ -185,7 +185,7 @@ public class ForagingHoles {
 
     /**
      * Whether a worker may bite this hole open now: it is foraging time, it is the hole's turn (termites underground, see
-     * {@link Galleries#isInTurn}), and the hole is closed with soil or its plug. A hole under a finished runway is always open.
+     * {@link ColonyHooks.Underground#isInTurn}), and the hole is closed with soil or its plug. A hole under a finished runway is always open.
      * Never a hole closed for danger (brain step 4g, {@link ClosedHoles}), runway or not.
      */
     public boolean mayOpen(Level level, BlockPos hole) {
@@ -193,7 +193,8 @@ public class ForagingHoles {
             return false;
         }
         boolean runway = hasFinishedRunway(level, hole);
-        if (!(colony.isForagingTime(level) && colony.nest().galleries().isInTurn(hole) || runway) || !level.isLoaded(hole)) {
+        ColonyHooks.Underground web = colony.underground();
+        if (!(colony.isForagingTime(level) && (web == null || web.isInTurn(hole)) || runway) || !level.isLoaded(hole)) {
             return false;
         }
         BlockState state = level.getBlockState(hole);
@@ -396,10 +397,10 @@ public class ForagingHoles {
         if (food == null) {
             return;
         }
-        Galleries galleries = colony.nest().galleries();
-        if (galleries.isOn()) {
+        ColonyHooks.Underground galleries = colony.underground();
+        if (galleries != null) {
             // Step 3 of termites underground: the way to the food is a piece of the galleries, from the nearest dug one.
-            Galleries.Piece piece = galleries.pieceTo(level, food);
+            ColonyHooks.GalleryPiece piece = galleries.pieceTo(level, food);
             if (piece == null) {
                 noRouteUntil.put(food.immutable(), now + NO_ROUTE_TICKS);
                 AntColoniesMod.LOGGER.debug("[new-hole] no gallery piece to the food at {}", food.toShortString());
@@ -500,7 +501,8 @@ public class ForagingHoles {
         if (food == null) {
             return;
         }
-        java.util.Set<BlockPos> foodBlocks = FeedingGallery.foodBlocks(level, food, pos -> isRich(level, pos));
+        ColonyHooks.FeedingWays feeding = colony.hooks().first(ColonyHooks.FEEDING_WAYS);
+        java.util.Set<BlockPos> foodBlocks = feeding == null ? java.util.Set.of(food) : feeding.foodBlocks(level, food, pos -> isRich(level, pos));
         BlockPos target = food;
         free.sort(java.util.Comparator.comparingDouble(hole -> sideways(hole, target)));
         for (BlockPos hole : free) {
@@ -664,11 +666,13 @@ public class ForagingHoles {
     }
 
     /**
-     * The feeding gallery from this tunnel up under the food (see {@link FeedingGallery}): empty if it cannot be reached
-     * from below. Under whole blocks of food (a fallen tree, hay) and branches lying on the ground (cased in mud first).
+     * The feeding gallery from this tunnel up under the food (see {@link ColonyHooks.FeedingWays}): empty if it cannot be
+     * reached from below, or the species digs none. Under whole blocks of food (a fallen tree, hay) and branches lying on
+     * the ground (cased in mud first).
      */
     private List<BlockPos> planGallery(Level level, NestPlan.ForagingTunnel tunnel, BlockPos food) {
-        return FeedingGallery.plan(level, tunnel, food, ground(level),
+        ColonyHooks.FeedingWays feeding = colony.hooks().first(ColonyHooks.FEEDING_WAYS);
+        return feeding == null ? List.of() : feeding.plan(level, tunnel, food, ground(level),
                 pos -> isRich(level, pos) && (level.getBlockState(pos).isCollisionShapeFullBlock(level, pos)
                         || NestWalls.isWalkThroughFood(level, pos)));
     }
@@ -694,7 +698,7 @@ public class ForagingHoles {
         // With the galleries, holes lie every few blocks, so most food lies near one: food near a hole waits for a
         // runway only while one may still come; else it gets a short gallery piece with its feeding gallery (the user's
         // bug, 2026-10-17: known hay 15 to 25 blocks out with the 3 runways in use got neither, and was only bitten).
-        boolean galleriesOn = colony.nest().galleries().isOn();
+        boolean galleriesOn = colony.underground() != null;
         SpeciesProfile.Sheeting sheeting = colony.profile().nest().sheeting().orElse(null);
         List<BlockPos> runwayHoles = galleriesOn && sheeting != null
                 && colony.nest().foodWays().getRunways().size() < sheeting.max() ? runwayHoles(level) : List.of();
@@ -744,8 +748,8 @@ public class ForagingHoles {
      * far as their tips may grow (step 3: the reach grows with the web); else the reach for the colony's size.
      */
     private int foodReach(SpeciesProfile.NewHoles numbers) {
-        Galleries galleries = colony.nest().galleries();
-        return galleries.isOn() ? galleries.foodReach() : numbers.reach(colony.getCount(Caste.WORKER));
+        ColonyHooks.Underground galleries = colony.underground();
+        return galleries != null ? galleries.foodReach() : numbers.reach(colony.getCount(Caste.WORKER));
     }
 
     /** The blocks of the dug foraging tunnels, where a new tunnel may start (the route planner picks the best). */

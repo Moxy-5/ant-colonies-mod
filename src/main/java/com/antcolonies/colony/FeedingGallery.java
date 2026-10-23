@@ -12,6 +12,7 @@ import java.util.Set;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
 
 /**
  * A feeding gallery (the user's idea of 2026-10-14): real termites reach a fallen log through the soil and eat it from
@@ -35,7 +36,67 @@ final class FeedingGallery {
     /** At most this many cells are looked at for each joining passage. */
     private static final int MAX_SEARCH = 3000;
 
+    /** At most this many mud casts are joined to the galleries (a fallen tree is about 8 blocks). */
+    private static final int MAX_CASTS = 256;
+
+    /** The split, step S2: what the galleries part plugs into the shared nest ({@link ColonyHooks#FEEDING_WAYS}). */
+    static final ColonyHooks.FeedingWays WAYS = new ColonyHooks.FeedingWays() {
+        @Override
+        public Set<BlockPos> foodBlocks(Level level, BlockPos food, java.util.function.Predicate<BlockPos> isFood) {
+            return FeedingGallery.foodBlocks(level, food, isFood);
+        }
+
+        @Override
+        public List<BlockPos> plan(Level level, NestPlan.ForagingTunnel tunnel, BlockPos food, TunnelRoute.Ground ground,
+                java.util.function.Predicate<BlockPos> isFood) {
+            return FeedingGallery.plan(level, tunnel, food, ground, isFood);
+        }
+
+        @Override
+        public Map<BlockPos, BlockPos> joined(Level level, List<BlockPos> galleryCells, Set<BlockPos> inside) {
+            return casts(level, galleryCells, inside);
+        }
+    };
+
     private FeedingGallery() {
+    }
+
+    /**
+     * The mud casts left of eaten wood joined by their channels to a feeding gallery cell that is {@code inside} (see
+     * {@link Nest#isInside}), each with the gallery cell it is joined to: inside too, eaten on from there.
+     */
+    static Map<BlockPos, BlockPos> casts(Level level, List<BlockPos> galleryCells, Set<BlockPos> inside) {
+        Map<BlockPos, BlockPos> casts = new HashMap<>();
+        ArrayDeque<BlockPos> queue = new ArrayDeque<>();
+        for (BlockPos gallery : galleryCells) {
+            if (inside.contains(gallery)) {
+                joinCasts(level, gallery, gallery, casts, queue);
+            }
+        }
+        while (!queue.isEmpty() && casts.size() < MAX_CASTS) {
+            BlockPos cast = queue.poll();
+            joinCasts(level, cast, casts.get(cast), casts, queue);
+        }
+        return casts;
+    }
+
+    /** Adds the mud casts whose channels join the one at {@code from} (a gallery cell or a cast) to {@code casts}. */
+    private static void joinCasts(Level level, BlockPos from, BlockPos gallery, Map<BlockPos, BlockPos> casts, ArrayDeque<BlockPos> queue) {
+        BlockState fromState = level.getBlockState(from);
+        boolean fromCast = com.antcolonies.block.MudCastBlock.isCast(fromState);
+        for (Direction side : Direction.values()) {
+            BlockPos next = from.relative(side);
+            if (casts.containsKey(next) || !level.isLoaded(next)) {
+                continue;
+            }
+            BlockState state = level.getBlockState(next);
+            if (com.antcolonies.block.MudCastBlock.isCast(state)
+                    && com.antcolonies.nav.Channel.has(com.antcolonies.block.TermiteTunnelBlock.openMask(state), side.getOpposite())
+                    && (!fromCast || com.antcolonies.nav.Channel.has(com.antcolonies.block.TermiteTunnelBlock.openMask(fromState), side))) {
+                casts.put(next.immutable(), gallery);
+                queue.add(next.immutable());
+            }
+        }
     }
 
     /**

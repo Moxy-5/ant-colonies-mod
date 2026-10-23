@@ -186,8 +186,8 @@ public class ClosedHoles {
             return;
         }
         workOut(level);
-        Galleries galleries = colony.nest().galleries();
-        if (!galleries.isOn()) {
+        Galleries galleries = Galleries.of(colony);
+        if (galleries == null || !galleries.isOn()) {
             return;
         }
         for (DangerMap.Place place : colony.danger().hitHard()) {

@@ -29,7 +29,7 @@ import net.minecraft.world.phys.AABB;
  *
  * <p>The colony remembers the places where its insects met insects of another colony of its species (within
  * {@code within} blocks), or walked on another colony's trunk trail, and where its galleries came close to another
- * colony's (termites, {@link Galleries}). Each meeting adds 1 to its place; places close together are one; the strength
+ * colony's (termites, {@link ColonyHooks.Underground}). Each meeting adds 1 to its place; places close together are one; the strength
  * halves every {@code half_life_ticks} (by the clock, so it fades while away too) and is forgotten once weak. A colony
  * <b>yields</b> to a place once its strength reaches the meetings its age needs ({@link SpeciesProfile.NeighbourNumbers#needed}),
  * and keeps yielding until it has faded to half that:
@@ -304,7 +304,8 @@ public class Neighbours {
     }
 
     private String walled() {
-        int walled = colony.nest().galleries().walledOff();
+        ColonyHooks.Underground web = colony.hooks().first(ColonyHooks.UNDERGROUND); // (switched on or not, as before)
+        int walled = web == null ? 0 : web.walledOff();
         return walled > 0 ? ", " + walled + (walled == 1 ? " gallery" : " galleries") + " walled off" : "";
     }
 

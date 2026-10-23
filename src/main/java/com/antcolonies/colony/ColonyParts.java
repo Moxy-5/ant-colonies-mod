@@ -78,9 +78,15 @@ public final class ColonyParts {
     private static final Map<String, Type<?>> TYPES = new LinkedHashMap<>();
 
     public static final Type<Nest> NEST = shared("nest", Nest::new, part -> part
-            .ticks(90, (nest, level) -> nest.galleries().tick(level))
-            .ticksAway(20, (nest, level) -> nest.galleries().tickAway(level))
             .saves(Nest::save, Nest::load));
+    /** The split, step S2: termites underground, the web of galleries round the nest (was held by the nest; same ticks, same save). */
+    public static final Type<Galleries> GALLERIES = listed("galleries", Galleries::new, part -> part
+            .ticks(90, Galleries::tick)
+            .ticksAway(20, Galleries::tickAway)
+            .plugs(ColonyHooks.UNDERGROUND, 10, galleries -> galleries) // asked only while switched on (Colony#underground)
+            .plugs(ColonyHooks.FEEDING_WAYS, 10, galleries -> FeedingGallery.WAYS) // (switched on or not, as before)
+            .plugs(ColonyHooks.LIST_HOLES, 10, galleries -> galleries::describe)
+            .saves(Galleries::save, Galleries::load));
     public static final Type<NestWalls> NEST_WALLS = shared("nest_walls", NestWalls::new, part -> part
             .notSaved("the claims on leaks and how far each is sealed start again after a load"));
     public static final Type<Hill> HILL = listed("hill", Hill::new, part -> part
@@ -354,7 +360,7 @@ public final class ColonyParts {
                     return trips.ways(level);
                 }
             })
-            .plugs(ColonyHooks.LIST_HOLES, 10, trips -> level -> trips.describe())
+            .plugs(ColonyHooks.LIST_HOLES, 20, trips -> level -> trips.describe())
             .ticks(100, HiddenTrips::tick)
             .ticksAway(10, HiddenTrips::tickAway)
             .saves(HiddenTrips::save, HiddenTrips::load)

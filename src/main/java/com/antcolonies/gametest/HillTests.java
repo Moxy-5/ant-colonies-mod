@@ -335,7 +335,7 @@ public class HillTests {
             // This scene is about where the two holes open on the slope, not which holes take their turn tonight (a
             // small colony opens only one of them): the arms and turns are switched off here (they have their own
             // proof over 400 landscapes, GalleryProofTest, and their own scene in TermiteForagingTests).
-            colony.nest().galleries().setSwitchForTests(false);
+            com.antcolonies.colony.Galleries.of(colony).setSwitchForTests(false);
             TestClock.still(helper, 0.0); // midnight: foraging time
             ready[0] = true;
         });

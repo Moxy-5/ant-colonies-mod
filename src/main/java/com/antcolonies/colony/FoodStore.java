@@ -360,7 +360,8 @@ public class FoodStore {
             grassTufts.clear();
             int radius = colony.searchReach(); // (out to where a searcher's drift may take it)
             int inner = Math.min(radius, food().radius() + food().search().map(SpeciesProfile.SearchNumbers::stretch).orElse(0));
-            boolean galleries = colony.nest().galleries().range() > 0;
+            ColonyHooks.Underground web = colony.underground();
+            boolean galleries = web != null && web.range() > 0;
             if (!colony.questions().ask(level, ColonyQuestions.KEEPS_TRAILS, null) && !galleries) {
                 inner = radius;
             }
@@ -378,7 +379,7 @@ public class FoodStore {
                     // Termites underground step 4: past the nest's own ground only along the galleries (round the holes,
                     // the tips and the food the colony knows), and round the workers out (below).
                     side = food().findRadius() + 1;
-                    for (int[] spot : colony.nest().galleries().scanSpots(level)) {
+                    for (int[] spot : web.scanSpots(level)) {
                         for (int dx = -spot[2]; dx <= spot[2]; dx++) {
                             for (int dz = -spot[2]; dz <= spot[2]; dz++) {
                                 scanOuter(level, spot[0] + dx, spot[1] + dz, inner, done);

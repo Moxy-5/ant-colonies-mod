@@ -314,6 +314,91 @@ public final class ColonyHooks {
         boolean job(ServerLevel level, NestLife life);
     }
 
+    /**
+     * The split, step S2: a web of galleries under the ground round the nest whose holes take turns (the termites'
+     * galleries). The shared nest digs its pieces and holes as more foraging tunnels, opens only the holes in turn, and
+     * forages and reaches as far as the web; plugged in only while the web is switched on ({@link Colony#underground}).
+     */
+    public interface Underground {
+        /** Whether the web is switched on (the species file's switch, or a test's). */
+        boolean isOn();
+
+        /** Its pieces, as foraging tunnels after the nest's own (the pieces out to food first). */
+        List<NestPlan.ForagingTunnel> arms();
+
+        /** Whether this hole is the end of one of its pieces. */
+        boolean hasPiece(BlockPos hole);
+
+        /** The holes along its tunnels, each as a foraging tunnel up to the block under it. */
+        List<NestPlan.ForagingTunnel> holesAlong();
+
+        /** The blocks the diggers look at for this foraging tunnel (a piece's own blocks; none for a hole along a tunnel). */
+        List<BlockPos> digCells(NestPlan.ForagingTunnel tunnel);
+
+        /** Whether this hole may be opened this foraging time (its turn, a runway's hole, a tunnel out to food). */
+        boolean isInTurn(BlockPos hole);
+
+        /** The holes open to the foragers this foraging time (the numbers graze only round these). */
+        List<BlockPos> holesInTurn(Level level);
+
+        /** The numbers brought food in by this hole now. */
+        void noteForaged(BlockPos hole, long now);
+
+        /** How far round an open hole (blocks) the foragers graze. */
+        int grazeRadius();
+
+        /** The colony's range with the web: its farthest hole and the graze round it (0: none yet). */
+        int range();
+
+        /** Where to scan for plants past the nest's own ground, each as {x, z, reach}. */
+        List<int[]> scanSpots(Level level);
+
+        /** How many of its pieces were walled off against neighbours. */
+        int walledOff();
+
+        /** The colony is back from being away. */
+        void cameBack(ServerLevel level);
+
+        /** On return, one step of growth with the builders' time: {pieces, of them toward food, blocks} ({0, 0, 0}: none may grow). */
+        int[] growNow(ServerLevel level);
+
+        /** How far from the middle (blocks, sideways) food may lie for a piece to be dug out to it. */
+        int foodReach();
+
+        /** A piece out to rich food at {@code food} from the nearest dug gallery, or null: no route. */
+        @Nullable
+        GalleryPiece pieceTo(ServerLevel level, BlockPos food);
+
+        /** Whether the workers allow this piece now. */
+        boolean affords(ServerLevel level, GalleryPiece piece, BlockPos food);
+
+        /** The piece out to food joins the web. */
+        void addFoodPiece(ServerLevel level, GalleryPiece piece);
+    }
+
+    /**
+     * A piece of gallery planned out to rich food: {@code tunnel} from the shaft (its first {@code from} blocks are the
+     * gallery it leaves from, {@code parent}'s, or one of the nest's own tunnels when {@code parent} is null).
+     */
+    public record GalleryPiece(NestPlan.ForagingTunnel tunnel, int from, @Nullable BlockPos parent) {
+    }
+
+    /**
+     * The split, step S2: galleries dug up under food from below, and what is left of eaten food joined to them (the
+     * termites' feeding galleries and mud casts).
+     */
+    public interface FeedingWays {
+        /** The blocks of the food at {@code food} a feeding gallery may reach (the food round it, as far as it spreads). */
+        Set<BlockPos> foodBlocks(Level level, BlockPos food, java.util.function.Predicate<BlockPos> isFood);
+
+        /** The feeding gallery from this tunnel up under the food, or empty if it cannot be reached from below. */
+        List<BlockPos> plan(Level level, NestPlan.ForagingTunnel tunnel, BlockPos food, TunnelRoute.Ground ground,
+                java.util.function.Predicate<BlockPos> isFood);
+
+        /** The cells left of eaten food joined to these feeding gallery cells (inside), each with the gallery cell it eats from. */
+        Map<BlockPos, BlockPos> joined(Level level, List<BlockPos> galleryCells, Set<BlockPos> inside);
+    }
+
     // --- the kinds every colony may plug into (the framework's) ---------------------------------------------------------
 
     /** Step 8b: how far out the colony forages, past its food radius (the harvester's trunk trails: their longest tip). */
@@ -370,8 +455,12 @@ public final class ColonyHooks {
     public static final Kind<ListLine> LIST_BUILDING = Kind.of("list_building");
     /** After the day clock (the patrol, the door, the night soil). */
     public static final Kind<ListLine> LIST_DAY = Kind.of("list_day");
-    /** After the galleries (the hidden trips). */
+    /** After the holes, the new holes and the runways (the galleries, the hidden trips). */
     public static final Kind<ListLine> LIST_HOLES = Kind.of("list_holes");
+    /** The split, step S2: the web of galleries under the ground (the termites'). */
+    public static final Kind<Underground> UNDERGROUND = Kind.of("underground");
+    /** The split, step S2: feeding galleries up under food, and the mud casts joined to them (the termites'). */
+    public static final Kind<FeedingWays> FEEDING_WAYS = Kind.of("feeding_ways");
 
     // --- plugging in and asking ----------------------------------------------------------------------------------------
 

@@ -240,8 +240,8 @@ public class NeighbourTests {
                 }
                 TermiteSoldierTests.digNestAtOnce(level, colony);
                 colony.population().addNewMembers(WorkerAntEntity.CASTE, now - colony.profile().worker().builderUntilTicks() - 1000, 900);
-                colony.nest().galleries().setSwitchForTests(true);
-                colony.nest().galleries().setReachForTests(30);
+                Galleries.of(colony).setSwitchForTests(true);
+                Galleries.of(colony).setReachForTests(30);
             }
             both[0].setAgeForTests(level, 10);
             both[1].setAgeForTests(level, 0);
@@ -252,7 +252,7 @@ public class NeighbourTests {
                 return;
             }
             for (Colony colony : both) {
-                Galleries galleries = colony.nest().galleries();
+                Galleries galleries = Galleries.of(colony);
                 for (NestPlan.ForagingTunnel tunnel : colony.foragingHoles().tunnels(level)) {
                     for (BlockPos cell : galleries.digCells(tunnel)) {
                         if (!com.antcolonies.colony.Nest.isDugOut(level, cell)) {
@@ -266,15 +266,15 @@ public class NeighbourTests {
             // The webs never join.
             for (NestPlan.ForagingTunnel tunnel : old.foragingHoles().tunnels(level)) {
                 for (BlockPos cell : tunnel.tunnel()) {
-                    BlockPos theirs = young.nest().galleries().galleryCellNear(cell, 1.0);
+                    BlockPos theirs = Galleries.of(young).galleryCellNear(cell, 1.0);
                     helper.assertTrue(theirs == null, "the two colonies' galleries touch at " + helper.relativePos(cell) + " and " + (theirs == null ? null
                             : helper.relativePos(theirs)));
                 }
             }
             long tick = helper.getTick();
             if (tick % 500 == 0) {
-                AntColoniesMod.LOGGER.info("[neighbour-test] tick {}: old{}{} / young{}{}", tick, old.nest().galleries().describe(level), old.neighbours().describe(level),
-                        young.nest().galleries().describe(level), young.neighbours().describe(level));
+                AntColoniesMod.LOGGER.info("[neighbour-test] tick {}: old{}{} / young{}{}", tick, Galleries.of(old).describe(level), old.neighbours().describe(level),
+                        Galleries.of(young).describe(level), young.neighbours().describe(level));
             }
             boolean oldMet = !old.neighbours().meetings().isEmpty();
             boolean youngMet = !young.neighbours().meetings().isEmpty();
@@ -282,14 +282,14 @@ public class NeighbourTests {
                 helper.assertTrue(!old.neighbours().yielding(level).isEmpty(), "the old colony should yield at its first meeting: " + old.neighbours().describe(level));
             }
             int most = young.neighbours().meetings().stream().mapToInt(Neighbours.Meeting::count).max().orElse(0);
-            if (young.nest().galleries().walledOff() > 0) {
+            if (Galleries.of(young).walledOff() > 0) {
                 helper.assertTrue(most >= 4 || young.neighbours().meetings().size() > 1, "the young colony walled off its gallery after too few meetings: "
                         + young.neighbours().describe(level));
                 helper.assertTrue(oldMet, "the old colony never felt the meeting: " + old.neighbours().describe(level));
                 helper.succeed();
             }
-            helper.assertTrue(tick < 38000, "the young colony never walled off a gallery: old" + old.nest().galleries().describe(level)
-                    + old.neighbours().describe(level) + " / young" + young.nest().galleries().describe(level) + young.neighbours().describe(level));
+            helper.assertTrue(tick < 38000, "the young colony never walled off a gallery: old" + Galleries.of(old).describe(level)
+                    + old.neighbours().describe(level) + " / young" + Galleries.of(young).describe(level) + young.neighbours().describe(level));
         });
     }
 }
