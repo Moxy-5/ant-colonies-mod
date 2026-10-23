@@ -148,6 +148,27 @@ public class Hill {
     }
 
     /**
+     * The morning clear-out (real Pogonomyrmex: the nest maintenance workers carry out the soil dug in the night first
+     * thing each morning, before they dig on): while the surface is open, a builder carries a waiting pile up before it
+     * digs ({@link com.antcolonies.entity.goal.CarryNightSoilGoal}); while it is shut, the diggers rest once the piles
+     * are as big as a morning's carrying ({@link NightSoil#isFull}). The entrance (a plug, a plant in it) is always
+     * bitten: that is how the surface opens. Only while the hill has room.
+     */
+    public boolean soilWaits(ServerLevel level, AbstractAntEntity digger) {
+        if (colony.buildsMound() || !hasMoundRoom(level)) {
+            return false;
+        }
+        boolean plugged = colony.nest().isEntrancePlugged(level);
+        if (colony.nest().isPlantInEntrance(level) || plugged && colony.nest().mayOpenEntrance(level)) {
+            return false; // the entrance comes first
+        }
+        if (digger.mayGoOut() && !plugged) {
+            return nightSoil.hasFreePile(level, digger.getUUID());
+        }
+        return nightSoil.isFull(level);
+    }
+
+    /**
      * Whether a worker should fetch soil to mend the hill now: the nest is dug (until then the digging makes the soil),
      * the hill has a gap that no pellet is on its way to, and a repair has not just failed.
      */

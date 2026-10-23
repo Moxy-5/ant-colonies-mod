@@ -8,11 +8,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.jetbrains.annotations.Nullable;
+
 import com.antcolonies.entity.AbstractAntEntity;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
 
 /**
  * Colony news (Project Apex, colony parts step 4, {@code docs/plans/apex.md}; the user's OK of 2026-10-20): how a colony's
@@ -132,6 +135,43 @@ public final class ColonyNews {
     public static final Kind<NumbersForaged> NUMBERS_FORAGED = Kind.of("numbers_foraged");
     public static final Kind<ForagerNumbers> FORAGER_NUMBERS = Kind.of("forager_numbers");
     public static final Kind<BlockDug> BLOCK_DUG = Kind.of("block_dug");
+
+    // Step 9a: the shared goals', the ant body's and the event file's tellings to a species part.
+
+    /** A real forager sets out for food it found and claimed. */
+    public record SetOut(AbstractAntEntity ant) {
+    }
+
+    /** A real forager sets out to search (searching alone). */
+    public record SearchStarted(UUID ant) {
+    }
+
+    /**
+     * A real forager's search is over (it found food, or not): {@code empty}, it got to its search and came home with
+     * nothing, the search having gone out at {@code angle} (radians from the nest's middle); {@code gaveUp}, it searched
+     * as long as it may.
+     */
+    public record SearchOver(AbstractAntEntity ant, boolean empty, double angle, boolean gaveUp) {
+    }
+
+    /** A member's look round, every few ticks (a forager walking in with food touches the ants waiting by the entrance). */
+    public record MemberRound(AbstractAntEntity member) {
+    }
+
+    /** A player jumped (the ground shook) somewhere on the colony's ground. */
+    public record PlayerStamped(Player player) {
+    }
+
+    /** A block was broken at {@code where} on the colony's ground, by {@code breaker} (may be null). */
+    public record BlockBroken(BlockPos where, @Nullable Player breaker) {
+    }
+
+    public static final Kind<SetOut> SET_OUT = Kind.of("set_out");
+    public static final Kind<SearchStarted> SEARCH_STARTED = Kind.of("search_started");
+    public static final Kind<SearchOver> SEARCH_OVER = Kind.of("search_over");
+    public static final Kind<MemberRound> MEMBER_ROUND = Kind.of("member_round");
+    public static final Kind<PlayerStamped> PLAYER_STAMPED = Kind.of("player_stamped");
+    public static final Kind<BlockBroken> BLOCK_BROKEN = Kind.of("block_broken");
 
     // --- listening and telling -----------------------------------------------------------------------------------------
 

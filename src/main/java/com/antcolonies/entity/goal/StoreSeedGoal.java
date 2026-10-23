@@ -6,7 +6,7 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
-import com.antcolonies.colony.ColonyParts;
+import com.antcolonies.colony.ColonyHooks;
 import com.antcolonies.entity.AbstractAntEntity;
 
 import net.minecraft.core.BlockPos;
@@ -69,8 +69,8 @@ public class StoreSeedGoal extends Goal {
     public void start() {
         ticks = 0;
         errand.begin();
-        via = ant.level() instanceof ServerLevel level && colony != null
-                ? colony.part(ColonyParts.TRUNK_TRAILS).map(trunk -> trunk.wayHome(level, ant.blockPosition())).orElse(null) : null;
+        ColonyHooks.Trails trails = colony == null ? null : colony.lastingTrails();
+        via = ant.level() instanceof ServerLevel level && trails != null ? trails.wayHome(level, ant.blockPosition()) : null;
         if (!errand.setOff(via, 1.0)) {
             via = null;
             walkToSpot();

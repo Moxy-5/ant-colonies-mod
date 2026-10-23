@@ -1554,7 +1554,14 @@ public class AwayTests {
                 Map.entry(com.antcolonies.colony.ColonyNews.HEAP_GONE, List.of("fungus_garden")),
                 Map.entry(com.antcolonies.colony.ColonyNews.NUMBERS_TRIP, List.of("trunk_trails")),
                 Map.entry(com.antcolonies.colony.ColonyNews.NUMBERS_FORAGED, List.of("door")),
-                Map.entry(com.antcolonies.colony.ColonyNews.BLOCK_DUG, List.of("mound")));
+                Map.entry(com.antcolonies.colony.ColonyNews.BLOCK_DUG, List.of("mound")),
+                // step 9a: the shared goals' tellings
+                Map.entry(com.antcolonies.colony.ColonyNews.SET_OUT, List.of("door")),
+                Map.entry(com.antcolonies.colony.ColonyNews.SEARCH_STARTED, List.of("forager_spots")),
+                Map.entry(com.antcolonies.colony.ColonyNews.SEARCH_OVER, List.of("recruits", "forager_spots", "door")),
+                Map.entry(com.antcolonies.colony.ColonyNews.MEMBER_ROUND, List.of("door", "recruits")),
+                Map.entry(com.antcolonies.colony.ColonyNews.PLAYER_STAMPED, List.of("alarm")),
+                Map.entry(com.antcolonies.colony.ColonyNews.BLOCK_BROKEN, List.of("alarm")));
         for (Map.Entry<com.antcolonies.colony.ColonyNews.Kind<?>, List<String>> kind : order.entrySet()) {
             List<String> hearing = kind.getValue().stream().filter(has::contains).toList();
             helper.assertTrue(colony.news().listenersOf(kind.getKey()).equals(hearing) && colony.news().listens(kind.getKey()) == !hearing.isEmpty(),
@@ -1577,7 +1584,12 @@ public class AwayTests {
                 Map.entry(com.antcolonies.colony.ColonyQuestions.STRUCTURE_TUNNEL, List.of("mound")),
                 Map.entry(com.antcolonies.colony.ColonyQuestions.MORE_FOOD_WANTED, List.of("bakery")),
                 Map.entry(com.antcolonies.colony.ColonyQuestions.KEEPS_TRAILS, List.of("trunk_trails")),
-                Map.entry(com.antcolonies.colony.ColonyQuestions.NOTHING_TO_EAT_IN_STORE, List.of("fungus_garden")));
+                Map.entry(com.antcolonies.colony.ColonyQuestions.NOTHING_TO_EAT_IN_STORE, List.of("fungus_garden")),
+                // step 9a: the shared goals' asks
+                Map.entry(com.antcolonies.colony.ColonyQuestions.MUST_WAIT, List.of("door")),
+                Map.entry(com.antcolonies.colony.ColonyQuestions.PASSES_BY, List.of("recruits")),
+                Map.entry(com.antcolonies.colony.ColonyQuestions.ALARMED, List.of("alarm")),
+                Map.entry(com.antcolonies.colony.ColonyQuestions.ON_TRAIL, List.of("trunk_trails")));
         for (Map.Entry<com.antcolonies.colony.ColonyQuestions.Kind<?>, List<String>> kind : asked.entrySet()) {
             List<String> answering = kind.getValue().stream().filter(has::contains).toList();
             helper.assertTrue(colony.questions().answerersOf(kind.getKey()).equals(answering) && colony.questions().answers(kind.getKey()) == !answering.isEmpty(),
@@ -1601,7 +1613,21 @@ public class AwayTests {
                 Map.entry(com.antcolonies.colony.ColonyHooks.AWAY_BESIDE_QUEEN, List.of("king_care")),
                 Map.entry(com.antcolonies.colony.ColonyHooks.AWAY_AFTER_NURSES, List.of("fungus_garden")),
                 Map.entry(com.antcolonies.colony.ColonyHooks.NURSE_FEEDS, List.of("king_care")),
-                Map.entry(com.antcolonies.colony.ColonyHooks.NURSE_MAKES, List.of("bakery")));
+                Map.entry(com.antcolonies.colony.ColonyHooks.NURSE_MAKES, List.of("bakery")),
+                // step 9a: the shared goals' sockets
+                Map.entry(com.antcolonies.colony.ColonyHooks.LONE_SEARCH, List.of("forager_spots")),
+                Map.entry(com.antcolonies.colony.ColonyHooks.CALLED_OUT, List.of("recruits")),
+                Map.entry(com.antcolonies.colony.ColonyHooks.MILL, List.of("bakery")),
+                Map.entry(com.antcolonies.colony.ColonyHooks.DUG_SOIL, List.of("mound", "hill")),
+                // step 9b: the parts' words in the colony list, slot by slot, in the order the list wrote them
+                Map.entry(com.antcolonies.colony.ColonyHooks.LIST_STORE, List.of("bakery")),
+                Map.entry(com.antcolonies.colony.ColonyHooks.LIST_FOOD, List.of("fungus_garden")),
+                Map.entry(com.antcolonies.colony.ColonyHooks.LIST_BROOD, List.of("soldiers", "alarm")),
+                Map.entry(com.antcolonies.colony.ColonyHooks.LIST_SEARCH, List.of("forager_spots", "recruits", "trunk_trails")),
+                Map.entry(com.antcolonies.colony.ColonyHooks.LIST_DANGER, List.of("closed_holes")),
+                Map.entry(com.antcolonies.colony.ColonyHooks.LIST_BUILDING, List.of("mound")),
+                Map.entry(com.antcolonies.colony.ColonyHooks.LIST_DAY, List.of("patrol", "door", "hill")),
+                Map.entry(com.antcolonies.colony.ColonyHooks.LIST_HOLES, List.of("hidden_trips")));
         for (Map.Entry<com.antcolonies.colony.ColonyHooks.Kind<?>, List<String>> kind : plugged.entrySet()) {
             List<String> plugging = kind.getValue().stream().filter(has::contains).toList();
             helper.assertTrue(colony.hooks().pluggedInto(kind.getKey()).equals(plugging),
@@ -1620,6 +1646,19 @@ public class AwayTests {
         helper.assertTrue(colony.questions().ask(helper.getLevel(), com.antcolonies.colony.ColonyQuestions.KEEPS_TRAILS, null)
                 == colony.part(com.antcolonies.colony.ColonyParts.TRUNK_TRAILS).map(com.antcolonies.colony.TrunkTrails::keepsTrails).orElse(false),
                 "a " + colony.getSpecies() + " colony should keep trails exactly when its trunk trails say so");
+        // Step 9a: the answers and sockets are today's (the alarm's level, the king beside the queen, the soldiers fed by nurses).
+        helper.assertTrue(colony.isAlarmed(helper.getLevel())
+                == colony.part(com.antcolonies.colony.ColonyParts.ALARM).map(alarm -> alarm.level(helper.getLevel()) != 0).orElse(false),
+                "a " + colony.getSpecies() + " colony should be alarmed exactly when its alarm's level is above 0");
+        com.antcolonies.colony.ColonyHooks.CoFounders founder = colony.hooks().first(com.antcolonies.colony.ColonyHooks.CO_FOUNDERS);
+        helper.assertTrue(colony.has(com.antcolonies.colony.ColonyParts.KING_CARE) == (founder != null)
+                && (founder == null || founder.caste().equals(com.antcolonies.entity.TermiteKingEntity.CASTE)
+                        && founder.count() == (colony.part(com.antcolonies.colony.ColonyParts.KING_CARE).orElseThrow().isAlive() ? 1 : 0)),
+                "a " + colony.getSpecies() + " colony's founder beside the queen should be the termite king exactly when it cares for one");
+        List<net.minecraft.world.entity.Entity> fed = new java.util.ArrayList<>();
+        colony.hooks().all(com.antcolonies.colony.ColonyHooks.CASTES).forEach(castes -> fed.addAll(castes.fedByNurses(helper.getLevel())));
+        helper.assertTrue(fed.equals(colony.part(com.antcolonies.colony.ColonyParts.SOLDIERS).map(soldiers -> soldiers.getSoldiers(helper.getLevel()))
+                .orElse(List.of())), "a " + colony.getSpecies() + " colony's nurses should feed exactly its soldiers besides the queen and king");
     }
 
     /** The parts of a colony saved into a tag of their own each, by name (the parts that are not saved left out). */

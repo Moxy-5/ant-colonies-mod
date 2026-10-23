@@ -11,10 +11,6 @@ import java.util.TreeMap;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.entity.AbstractAntEntity;
-import com.antcolonies.entity.TermiteSoldierEntity;
-import com.antcolonies.entity.WorkerAntEntity;
-import com.antcolonies.registry.ModEntities;
-import com.antcolonies.species.Species;
 import com.antcolonies.species.SpeciesProfile;
 
 import net.minecraft.core.BlockPos;
@@ -188,7 +184,7 @@ public class Population {
     /** How many of this caste's numbers are of each job by age (young, middle-aged, old), for the colony list. */
     int[] insideByAge(long now) {
         int[] ages = new int[ColonyRole.values().length];
-        TreeMap<Long, Integer> workers = inside.get(WorkerAntEntity.CASTE);
+        TreeMap<Long, Integer> workers = inside.get(Caste.WORKER);
         if (workers != null) {
             workers.forEach((minute, count) -> ages[colony.profile().worker().roleForAge(now - minute).ordinal()] += count);
         }
@@ -226,7 +222,7 @@ public class Population {
      * the refuse chamber if there is room (its nestmates carried it there); termites eat their dead in the garden.
      */
     void growOld(ServerLevel level) {
-        TreeMap<Long, Integer> workers = inside.get(WorkerAntEntity.CASTE);
+        TreeMap<Long, Integer> workers = inside.get(Caste.WORKER);
         long lifespan = colony.profile().worker().lifespanTicks();
         if (workers == null || lifespan <= 0) {
             return;
@@ -250,14 +246,14 @@ public class Population {
                 deaths = Math.min(count, deaths);
             }
             if (deaths > 0) {
-                takeInside(WorkerAntEntity.CASTE, entry.getKey(), deaths);
+                takeInside(Caste.WORKER, entry.getKey(), deaths);
                 died += deaths;
             }
         }
         if (died == 0) {
             return;
         }
-        colony.setCount(WorkerAntEntity.CASTE, colony.getCount(WorkerAntEntity.CASTE) - died);
+        colony.setCount(Caste.WORKER, colony.getCount(Caste.WORKER) - died);
         colony.away().note(level, AwayReport.What.OLD_AGE, died);
         buried(level, died);
     }
@@ -287,7 +283,7 @@ public class Population {
         colony.setCount(caste, colony.getCount(caste) - died);
         colony.away().note(level, AwayReport.What.STARVED, died);
         com.antcolonies.AntColoniesMod.LOGGER.info("[meals] colony {}: {} {} numbers starved", colony.getId(), died, caste);
-        if (WorkerAntEntity.CASTE.equals(caste)) {
+        if (Caste.WORKER.equals(caste)) {
             buried(level, died);
         }
     }
@@ -297,7 +293,7 @@ public class Population {
      * it fell (not carried home). False if there was none inside to lose.
      */
     boolean lostOutside(ServerLevel level) {
-        String caste = WorkerAntEntity.CASTE;
+        String caste = Caste.WORKER;
         TreeMap<Long, Integer> ages = inside.get(caste);
         if (ages == null || ages.isEmpty()) {
             return false;
@@ -348,7 +344,7 @@ public class Population {
         for (ColonyHooks.Castes castes : colony.hooks().all(ColonyHooks.CASTES)) {
             soldiers += castes.wantReal(level, watched, cap, wanted); // (the termite soldiers, before the workers)
         }
-        wanted.put(WorkerAntEntity.CASTE, watched ? Math.max(0, cap - soldiers) : Math.min(crew(), cap));
+        wanted.put(Caste.WORKER, watched ? Math.max(0, cap - soldiers) : Math.min(crew(), cap));
         return wanted;
     }
 
@@ -560,7 +556,7 @@ public class Population {
         }
         takeInside(caste, minute, 1);
         level.addFreshEntity(mob);
-        if (WorkerAntEntity.CASTE.equals(caste) && mob.mayDo(ColonyRole.FORAGER)) {
+        if (Caste.WORKER.equals(caste) && mob.mayDo(ColonyRole.FORAGER)) {
             colony.news().tell(level, ColonyNews.OUT_OF_NUMBERS, new ColonyNews.OutOfNumbers(mob.getUUID())); // (a forager takes a spot from the numbers' pool)
         }
         return true;
@@ -577,7 +573,7 @@ public class Population {
         if (ages == null || ages.isEmpty()) {
             return null;
         }
-        long lifespan = WorkerAntEntity.CASTE.equals(caste) ? colony.profile().worker().lifespanTicks() : 0;
+        long lifespan = Caste.WORKER.equals(caste) ? colony.profile().worker().lifespanTicks() : 0;
         long now = level.getGameTime();
         Map<Long, Integer> from = ages;
         if (lifespan > 0) {
@@ -602,20 +598,10 @@ public class Population {
         return ages.firstKey();
     }
 
-    /** The mob a caste of this colony's species is. */
+    /** The mob a caste of this colony's species is (the species' bodies, {@link SpeciesBodies}). */
     @Nullable
     private EntityType<? extends AbstractAntEntity> typeFor(String caste) {
-        boolean termite = colony.getSpecies().equals(Species.MACROTERMES);
-        if (WorkerAntEntity.CASTE.equals(caste)) {
-            return termite ? ModEntities.TERMITE_WORKER.get() : ModEntities.WORKER_ANT.get();
-        }
-        if (TermiteSoldierEntity.Rank.MINOR.caste().equals(caste)) {
-            return ModEntities.TERMITE_MINOR_SOLDIER.get();
-        }
-        if (TermiteSoldierEntity.Rank.MAJOR.caste().equals(caste)) {
-            return ModEntities.TERMITE_MAJOR_SOLDIER.get();
-        }
-        return null;
+        return com.antcolonies.species.SpeciesBodies.of(colony.getSpecies()).typeFor(caste);
     }
 
     /**
@@ -634,7 +620,7 @@ public class Population {
 
     /** For the colony list: " | real 12 (wants 50), in the nest 340 (young 80, middle 200, old 60)". */
     public String describe(ServerLevel level) {
-        int real = colony.getMemberCount() - colony.getCount(com.antcolonies.entity.TermiteKingEntity.CASTE) - insideTotal();
+        int real = colony.getMemberCount() - colony.coFounderCount() - insideTotal();
         int wanted = lastWanted.values().stream().mapToInt(Integer::intValue).sum();
         int[] ages = insideByAge(level.getGameTime());
         int hungry = meals.hungry(level.getGameTime());

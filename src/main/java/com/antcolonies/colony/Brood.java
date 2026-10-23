@@ -11,12 +11,11 @@ import org.jetbrains.annotations.Nullable;
 import com.antcolonies.block.FungusCombBlock;
 import com.antcolonies.entity.AntEggEntity;
 import com.antcolonies.entity.AntLarvaEntity;
-import com.antcolonies.entity.TermiteSoldierEntity;
-import com.antcolonies.entity.TermiteWorkerEntity;
-import com.antcolonies.entity.WorkerAntEntity;
+import com.antcolonies.entity.AbstractAntEntity;
+import com.antcolonies.entity.ColonyBorn;
 import com.antcolonies.registry.ModBlocks;
 import com.antcolonies.registry.ModEntities;
-import com.antcolonies.species.Species;
+import com.antcolonies.species.SpeciesBodies;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
@@ -54,16 +53,16 @@ public class Brood {
     /**
      * One young as a number. An egg: {@code left} = ticks until it hatches ({@code -1}: not put in its place yet, the
      * clock starts in the nursery). A larva (or nymph): {@code fed} pieces eaten so far, {@code left} = how long it had
-     * gone hungry, and the soldier it grows into (null: a worker). Their clocks go on while they are numbers (step 2b,
-     * {@link NestLife}): eggs hatch, larvae are fed by the nurses that are numbers, grow up or starve.
+     * gone hungry, and the caste it grows into besides a worker (a soldier; null: a worker). Their clocks go on while they
+     * are numbers (step 2b, {@link NestLife}): eggs hatch, larvae are fed by the nurses that are numbers, grow up or starve.
      */
-    public record Young(boolean isEgg, long left, int fed, @Nullable TermiteSoldierEntity.Rank rank) {
+    public record Young(boolean isEgg, long left, int fed, @Nullable String growsInto) {
         public static Young egg(long hatchLeft) {
             return new Young(true, hatchLeft, 0, null);
         }
 
-        public static Young larva(int fed, long hungry, @Nullable TermiteSoldierEntity.Rank rank) {
-            return new Young(false, hungry, fed, rank);
+        public static Young larva(int fed, long hungry, @Nullable String growsInto) {
+            return new Young(false, hungry, fed, growsInto);
         }
     }
 
@@ -109,24 +108,24 @@ public class Brood {
     }
 
     /**
-     * How much a larva (or nymph) of this kind eats before it grows up: the profile's larva meal, or the bigger meal of
-     * the soldier it is growing into (in a colony with soldiers, see {@link Soldiers#mealFor}).
+     * How much a larva (or nymph) growing into this caste (null: a worker) eats before it grows up: the profile's larva
+     * meal, or the bigger meal of the soldier it is growing into (in a colony with soldiers, see {@link Soldiers#mealFor}).
      */
-    public int mealFor(@Nullable TermiteSoldierEntity.Rank rank) {
+    public int mealFor(@Nullable String growsInto) {
         ColonyHooks.Castes castes = colony.hooks().first(ColonyHooks.CASTES);
-        return castes == null ? colony.profile().brood().larvaMeal() : castes.mealFor(rank);
+        return castes == null ? colony.profile().brood().larvaMeal() : castes.mealFor(growsInto);
     }
 
-    /** The kind of soldier a new nymph should grow into, or null: soldiers enough, or a species without them (see {@link Soldiers#rankForNewNymph}). */
+    /** The caste a new nymph should grow into besides a worker, or null: soldiers enough, or a species without them (see {@link Soldiers#rankForNewNymph}). */
     @Nullable
-    public TermiteSoldierEntity.Rank soldierWanted(Level level) {
+    public String soldierWanted(Level level) {
         ColonyHooks.Castes castes = colony.hooks().first(ColonyHooks.CASTES);
         return castes == null ? null : castes.wanted(level);
     }
 
-    /** What an egg of this colony hatches into: an ant larva, or a termite nymph (a small pale termite). */
+    /** What an egg of this colony hatches into (an ant larva, a termite nymph: the species' bodies, {@link SpeciesBodies}). */
     private EntityType<AntLarvaEntity> youngType() {
-        return colony.getSpecies().equals(Species.MACROTERMES) ? ModEntities.TERMITE_NYMPH.get() : ModEntities.ANT_LARVA.get();
+        return SpeciesBodies.of(colony.getSpecies()).young().get();
     }
 
     /**
@@ -134,11 +133,11 @@ public class Brood {
      * the nymph one that grows into a soldier (see {@link Soldiers#rankForNewNymph}).
      */
     public boolean hatchEgg(ServerLevel level, AntEggEntity egg) {
-        TermiteSoldierEntity.Rank rank = soldierWanted(level);
+        String growsInto = soldierWanted(level);
         AntLarvaEntity larva = new AntLarvaEntity(youngType(), level);
         larva.setColonyId(id);
-        larva.setSoldierRank(rank);
-        larva.setMeal(mealFor(rank));
+        larva.setGrowsInto(growsInto);
+        larva.setMeal(mealFor(growsInto));
         larva.moveTo(egg.getX(), egg.getY(), egg.getZ(), egg.getYRot(), 0.0F);
         level.addFreshEntity(larva);
         egg.discard();
@@ -196,11 +195,11 @@ public class Brood {
         return inside;
     }
 
-    /** How many of the larvae (nymphs) that are numbers grow into this soldier (null: a worker). */
-    int insideGrowingInto(@Nullable TermiteSoldierEntity.Rank rank) {
+    /** How many of the larvae (nymphs) that are numbers grow into this caste (a soldier; null: a worker). */
+    int insideGrowingInto(@Nullable String caste) {
         int count = 0;
         for (Young young : inside) {
-            if (!young.isEgg() && young.rank() == rank) {
+            if (!young.isEgg() && java.util.Objects.equals(young.growsInto(), caste)) {
                 count++;
             }
         }
@@ -215,7 +214,7 @@ public class Brood {
         int best = -1;
         for (int i = 0; i < inside.size(); i++) {
             Young young = inside.get(i);
-            if (young.isEgg() || young.fed() >= mealFor(young.rank())) {
+            if (young.isEgg() || young.fed() >= mealFor(young.growsInto())) {
                 continue;
             }
             if (best < 0 || young.fed() < inside.get(best).fed()
@@ -229,7 +228,7 @@ public class Brood {
     /** The larva that is a number at this index gets a piece of food: its hunger clock starts over. */
     void feedInside(int index) {
         Young young = inside.get(index);
-        inside.set(index, Young.larva(young.fed() + 1, 0, young.rank()));
+        inside.set(index, Young.larva(young.fed() + 1, 0, young.growsInto()));
     }
 
     /**
@@ -257,8 +256,8 @@ public class Brood {
                 egg.setHatchAt(now + (young.left() < 0 ? colony.profile().brood().hatchTicks() : young.left()));
             } else {
                 AntLarvaEntity larva = spawnLarva(level, at.x, at.y, at.z);
-                larva.setSoldierRank(young.rank());
-                larva.setMeal(mealFor(young.rank()));
+                larva.setGrowsInto(young.growsInto());
+                larva.setMeal(mealFor(young.growsInto()));
                 larva.setFed(young.fed());
                 larva.setLastFed(now - young.left());
             }
@@ -275,8 +274,8 @@ public class Brood {
             entry.putBoolean("egg", young.isEgg());
             entry.putLong("left", young.left());
             entry.putInt("fed", young.fed());
-            if (young.rank() != null) {
-                entry.putString("rank", young.rank().name());
+            if (young.growsInto() != null) {
+                entry.putString("rank", savedAs(colony, young.growsInto()));
             }
             list.add(entry);
         }
@@ -288,9 +287,31 @@ public class Brood {
         net.minecraft.nbt.ListTag list = tag.getList("youngInside", net.minecraft.nbt.Tag.TAG_COMPOUND);
         for (int i = 0; i < list.size(); i++) {
             net.minecraft.nbt.CompoundTag entry = list.getCompound(i);
-            TermiteSoldierEntity.Rank rank = entry.contains("rank") ? TermiteSoldierEntity.Rank.valueOf(entry.getString("rank")) : null;
-            inside.add(new Young(entry.getBoolean("egg"), entry.getLong("left"), entry.getInt("fed"), rank));
+            String growsInto = entry.contains("rank") ? fromSaved(colony, entry.getString("rank")) : null;
+            inside.add(new Young(entry.getBoolean("egg"), entry.getLong("left"), entry.getInt("fed"), growsInto));
         }
+    }
+
+    /** The word a young one's caste is saved under (the soldiers' "MINOR", "MAJOR", as before step 9c: old saves load). */
+    static String savedAs(Colony colony, String caste) {
+        for (ColonyHooks.Castes castes : colony.hooks().all(ColonyHooks.CASTES)) {
+            String word = castes.savedAs(caste);
+            if (word != null) {
+                return word;
+            }
+        }
+        throw new IllegalStateException("no caste " + caste + " in " + colony.getSpecies());
+    }
+
+    /** The caste saved under this word ({@link #savedAs}). */
+    static String fromSaved(Colony colony, String word) {
+        for (ColonyHooks.Castes castes : colony.hooks().all(ColonyHooks.CASTES)) {
+            String caste = castes.fromSaved(word);
+            if (caste != null) {
+                return caste;
+            }
+        }
+        throw new IllegalArgumentException("no caste saved as " + word + " in " + colony.getSpecies());
     }
 
     /** Whether there are as many young (eggs and larvae, in the nursery or lying about) as there may be: the queen is not fed then. */
@@ -318,7 +339,7 @@ public class Brood {
         }
         for (Young young : inside) {
             if (!young.isEgg()) {
-                hunger += Math.max(0, mealFor(young.rank()) - young.fed());
+                hunger += Math.max(0, mealFor(young.growsInto()) - young.fed());
             }
         }
         return hunger;
@@ -332,65 +353,49 @@ public class Brood {
      * eats the soldier's bigger meal first). Soldiers are not held back by the workers' cap.
      */
     public boolean hatchLarva(ServerLevel level, AntLarvaEntity larva) {
-        TermiteSoldierEntity.Rank rank = larva.getSoldierRank();
-        if (rank != null) {
-            return hatchSoldier(level, larva, rank);
+        String growsInto = larva.getGrowsInto();
+        if (growsInto != null) {
+            return hatchSoldier(level, larva, growsInto);
         }
-        if (colony.getCount(WorkerAntEntity.CASTE) >= colony.profile().colony().maxWorkers()) {
-            TermiteSoldierEntity.Rank wanted = soldierWanted(level);
+        if (colony.getCount(Caste.WORKER) >= colony.profile().colony().maxWorkers()) {
+            String wanted = soldierWanted(level);
             if (wanted != null) {
-                larva.setSoldierRank(wanted);
+                larva.setGrowsInto(wanted);
                 larva.setMeal(mealFor(wanted));
             }
             return false;
         }
-        if (colony.population().hatchesIntoNumbers(level, WorkerAntEntity.CASTE, larva.position())) {
+        if (colony.population().hatchesIntoNumbers(level, Caste.WORKER, larva.position())) {
             // The colony has all the real workers it wants and nobody sees it: the new worker is one of the numbers.
-            colony.population().addNewMembers(WorkerAntEntity.CASTE, level.getGameTime(), 1);
+            colony.population().addNewMembers(Caste.WORKER, level.getGameTime(), 1);
             larva.discard();
             return true;
         }
-        if (colony.getSpecies().equals(Species.MACROTERMES)) {
-            TermiteWorkerEntity worker = ModEntities.TERMITE_WORKER.get().create(level);
-            if (worker == null) {
-                return false;
-            }
-            worker.moveTo(larva.getX(), larva.getY(), larva.getZ(), larva.getYRot(), 0.0F);
-            worker.joinColony(colony);
-            worker.setGrownUpAt(level.getGameTime()); // a young worker: a nurse first
-            level.addFreshEntity(worker);
-            larva.discard();
-            return true;
-        }
-        WorkerAntEntity worker = ModEntities.WORKER_ANT.get().create(level);
-        if (worker == null) {
-            return false;
-        }
-        worker.moveTo(larva.getX(), larva.getY(), larva.getZ(), larva.getYRot(), 0.0F);
-        worker.joinColony(colony);
-        worker.setGrownUpAt(level.getGameTime()); // a young worker: a nurse first
-        level.addFreshEntity(worker);
-        larva.discard();
-        return true;
+        return growUp(level, larva, Caste.WORKER); // a young worker: a nurse first
     }
 
     /** The nymph has eaten a soldier's meal: a soldier of this kind takes its place and joins the colony. */
-    private boolean hatchSoldier(ServerLevel level, AntLarvaEntity larva, TermiteSoldierEntity.Rank rank) {
-        if (colony.population().hatchesIntoNumbers(level, rank.caste(), larva.position())) {
-            colony.population().addNewMembers(rank.caste(), level.getGameTime(), 1);
+    private boolean hatchSoldier(ServerLevel level, AntLarvaEntity larva, String caste) {
+        if (colony.population().hatchesIntoNumbers(level, caste, larva.position())) {
+            colony.population().addNewMembers(caste, level.getGameTime(), 1);
             larva.discard();
             return true;
         }
-        TermiteSoldierEntity soldier = (rank == TermiteSoldierEntity.Rank.MAJOR ? ModEntities.TERMITE_MAJOR_SOLDIER : ModEntities.TERMITE_MINOR_SOLDIER)
-                .get().create(level);
-        if (soldier == null) {
+        return growUp(level, larva, caste);
+    }
+
+    /** The real mob of this caste (the species' body, {@link SpeciesBodies}) takes the young one's place and joins the colony. */
+    private boolean growUp(ServerLevel level, AntLarvaEntity larva, String caste) {
+        EntityType<? extends AbstractAntEntity> type = SpeciesBodies.of(colony.getSpecies()).typeFor(caste);
+        AbstractAntEntity grown = type == null ? null : type.create(level);
+        if (!(grown instanceof ColonyBorn born)) {
             return false;
         }
-        soldier.moveTo(larva.getX(), larva.getY(), larva.getZ(), larva.getYRot(), 0.0F);
-        soldier.joinColony(colony);
-        soldier.setGrownUpAt(level.getGameTime());
-        soldier.setLastFed(level.getGameTime()); // just had its last meal as a nymph
-        level.addFreshEntity(soldier);
+        grown.moveTo(larva.getX(), larva.getY(), larva.getZ(), larva.getYRot(), 0.0F);
+        born.joinColony(colony);
+        grown.setGrownUpAt(level.getGameTime());
+        born.lastMealAsYoung(level.getGameTime()); // (a soldier just had its last meal as a nymph)
+        level.addFreshEntity(grown);
         larva.discard();
         return true;
     }

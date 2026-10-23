@@ -127,6 +127,20 @@ public class Mound {
         return shaping;
     }
 
+    /**
+     * " | mound stage 3 (earned 5) of 32, 30/36 blocks finished, earned 41.2 blocks" for the colony list, or nothing
+     * without the profile's mound numbers: the stage the termites build now, and the one the colony has earned (they
+     * get there one stage at a time).
+     */
+    public String describe(Level level) {
+        if (numbers() == null) {
+            return "";
+        }
+        int h = getStage(level);
+        return String.format(" | mound stage %d (earned %d) of %d, %d/%d blocks finished, earned %.1f blocks", h, getEarnedStage(level),
+                numbers().maxHeight(), countFinished(level), wallsAt(h), getAllowance(level));
+    }
+
     Colony colony() {
         return colony;
     }

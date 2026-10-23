@@ -13,7 +13,6 @@ import org.jetbrains.annotations.Nullable;
 import com.antcolonies.entity.AntLarvaEntity;
 import com.antcolonies.entity.TermiteSoldierEntity;
 import com.antcolonies.entity.TermiteSoldierEntity.Rank;
-import com.antcolonies.entity.WorkerAntEntity;
 import com.antcolonies.species.SpeciesProfile;
 
 import net.minecraft.core.BlockPos;
@@ -82,7 +81,7 @@ public class Soldiers {
             return 0;
         }
         // After repeated break-ins (alarm level 4) the colony raises more soldiers for a while.
-        int workers = Math.round(colony.getCount(WorkerAntEntity.CASTE) * colony.part(ColonyParts.ALARM).map(alarm -> alarm.soldierBoost(level)).orElse(1.0F));
+        int workers = Math.round(colony.getCount(Caste.WORKER) * colony.part(ColonyParts.ALARM).map(alarm -> alarm.soldierBoost(level)).orElse(1.0F));
         return rank == Rank.MINOR ? numbers.wantedMinors(workers) : numbers.wantedMajors(workers);
     }
 
@@ -94,7 +93,7 @@ public class Soldiers {
                 count++;
             }
         }
-        return count + colony.brood().insideGrowingInto(rank);
+        return count + colony.brood().insideGrowingInto(rank.caste());
     }
 
     /**
@@ -118,6 +117,25 @@ public class Soldiers {
             return colony.profile().brood().larvaMeal();
         }
         return rank == Rank.MINOR ? numbers.minorMeal() : numbers.majorMeal();
+    }
+
+    /**
+     * For {@code /antcolonies population}: as many soldiers added to the numbers as {@code workers} want, and the words
+     * for it (", 2 minor soldiers, 1 major soldiers"); nothing without the profile's soldier numbers.
+     */
+    public String addFor(int workers, long now) {
+        SpeciesProfile.SoldierNumbers numbers = numbers();
+        if (numbers == null) {
+            return "";
+        }
+        StringBuilder soldiers = new StringBuilder();
+        for (Rank rank : Rank.values()) {
+            int want = rank == Rank.MINOR ? numbers.wantedMinors(workers) : numbers.wantedMajors(workers);
+            int more = Math.max(0, want - colony.getCount(rank.caste()));
+            colony.population().addNewMembers(rank.caste(), now, more);
+            soldiers.append(", ").append(more).append(" ").append(rank == Rank.MINOR ? "minor" : "major").append(" soldiers");
+        }
+        return soldiers.toString();
     }
 
     /** This colony's soldiers around the nest (loaded and alive). */

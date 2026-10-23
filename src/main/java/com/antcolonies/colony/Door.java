@@ -179,6 +179,13 @@ public class Door {
         trips.computeIfAbsent(id, key -> new Trip(level.getGameTime()));
     }
 
+    /** A member's look round every few ticks ({@link ColonyNews#MEMBER_ROUND}): one inside with a seed is a homecomer. */
+    public void memberRound(ServerLevel level, AbstractAntEntity member) {
+        if (member.isCarryingSeed() && isOn(level) && colony.nest().isInside(level, member.blockPosition())) {
+            homecomer(level, member, true);
+        }
+    }
+
     /**
      * A homecomer inside by the entrance (called every few ticks while it walks in): a forager with a seed it brought
      * from outside ({@code withFood}), or a patroller back safely. The first call ends its trip; each call touches the

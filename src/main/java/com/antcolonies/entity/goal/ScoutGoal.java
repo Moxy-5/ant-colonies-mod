@@ -8,12 +8,10 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.ColonyHooks;
 import com.antcolonies.colony.ColonyManager;
-import com.antcolonies.colony.ColonyParts;
+import com.antcolonies.colony.ColonyNews;
 import com.antcolonies.colony.ColonyRole;
-import com.antcolonies.colony.ForagerSpots;
-
-import com.antcolonies.colony.TrunkTrails;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.species.SpeciesProfile;
 
@@ -60,18 +58,10 @@ public class ScoutGoal extends Goal {
     private static final int GIVE_UP_TICKS = 600;
     /** How long (ticks) it stands and looks round at the spot (scouting and telling). */
     private static final int LOOK_TICKS = 40;
-    /** Searching alone with trails to walk out on, one search in this many goes a new way instead. My pick. */
-    private static final int NEW_WAY = 5;
     /** How long (ticks) a lone searcher feels about after each hop. My pick. */
     private static final int FEEL_TICKS = 20;
     /** How often (ticks) a lone searcher checks whether it has come across food. */
     private static final int CHECK_TICKS = 10;
-    /** After an empty trip the next new way is at least this far (radians) from the way that failed: 60 degrees. My pick. */
-    private static final double ANOTHER_WAY = Math.PI / 3.0;
-    /** A new way's search starts this many blocks or fewer past {@code LEAST_OUT + 2} from the nest's middle. My pick. */
-    private static final int NEAR_START = 2;
-    /** A search never starts nearer the nest's middle than this (the hill). */
-    private static final int LEAST_OUT = 4;
     /** A lone searcher that came across food stands by it this long (ticks), for cutting or gathering to take over. */
     private static final int STAY_BY_FOOD = 100;
 
@@ -126,7 +116,7 @@ public class ScoutGoal extends Goal {
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
         if (colony == null || !colony.foodMap().findsByLooking() || !colony.isForagingTime(level) || !colony.food().wantsSeeds(level)
-                || !colony.part(ColonyParts.DOOR).map(door -> door.mayGo(level, ant)).orElse(true)) {
+                || colony.mustWait(level, ant)) {
             return false; // (a searcher waits for the homecomers' touches like any forager, see colony.Door)
         }
         alone = colony.foodMap().searchesAlone();
@@ -143,7 +133,7 @@ public class ScoutGoal extends Goal {
             spot = pickSpot(level, colony);
         }
         if (spot != null) {
-            colony.part(ColonyParts.DOOR).ifPresent(door -> door.setOut(level, ant));
+            colony.news().tell(level, ColonyNews.SET_OUT, new ColonyNews.SetOut(ant));
         }
         return spot != null;
     }
@@ -166,7 +156,7 @@ public class ScoutGoal extends Goal {
 
     /** Whether this recruit passes the food by on its way to its patch (never in a colony without recruiting). */
     private boolean passesBy(UUID id, BlockPos food) {
-        return colony.part(ColonyParts.RECRUITS).map(recruits -> recruits.passesBy(id, food)).orElse(false);
+        return colony.passesBy(ant.level(), id, food);
     }
 
     /** A random open spot on the ground in the colony's food area, outside the nest and the mound; null if none was hit. */
@@ -185,64 +175,25 @@ public class ScoutGoal extends Goal {
     }
 
     /**
-     * Where a lone searcher searches this trip (see the class comment), or null if no open ground was hit: its own spot,
-     * or out along a trunk trail, or a new way (after an empty trip, not the way that failed). A new way's search starts
-     * just past the hill (6 to 8 blocks from the nest's middle) and drifts outward while it finds nothing, so the ground
-     * near the nest keeps being searched. Sets the search's direction and how far out it starts.
+     * Where a lone searcher searches this trip (see the class comment), or null if no open ground was hit, as the colony's
+     * lone search plans it (the harvester's forager spots, {@code colony.ForagerSearch}, Apex step 9a). Sets the search's
+     * direction, how far out it starts and how far its way reaches.
      */
     @Nullable
     private BlockPos planSearch(ServerLevel level, Colony colony) {
-        ForagerSpots spots = colony.part(ColonyParts.FORAGER_SPOTS).orElse(null);
-        SpeciesProfile.SearchNumbers search = spots == null ? null : spots.settings().orElse(null);
-        if (search == null) {
+        ColonyHooks.LoneSearch search = colony.hooks().first(ColonyHooks.LONE_SEARCH);
+        ColonyHooks.SearchPlan plan = search == null ? null
+                : search.plan(level, ant, (way, distance, jitter) -> groundCell(level, colony, way, distance, jitter));
+        if (plan == null) {
+            atOwnSpot = false;
             return null;
         }
-        BlockPos middle = colony.getCenter();
-        BlockPos own = spots.spotOf(ant.getUUID());
-        if (own != null && level.hasChunkAt(own) && colony.mayForageAt(level, own) && colony.foodMap().mayScout(own)) {
-            atOwnSpot = true;
-            angle = Math.atan2(own.getZ() - middle.getZ(), own.getX() - middle.getX());
-            from = Math.max(LEAST_OUT, flat(own));
-            out = from;
-            reachOfWay = Math.max(colony.foragingRadius(), (int) Math.ceil(from));
-            return own;
-        }
-        atOwnSpot = false;
-        int range = colony.foragingRadius();
-        // It came home empty last time: another way this time.
-        ForagerSpots.Lead failed = spots.leadOf(ant.getUUID());
-        TrunkTrails trails = colony.part(ColonyParts.TRUNK_TRAILS).orElse(null);
-        // A young colony's foragers spread out every way: real Pogonomyrmex trunk trails only form as the colony grows
-        // (Gordon), so a small colony's searchers pick a new way each trip instead of following its few trails.
-        boolean young = colony.part(ColonyParts.DOOR).map(door -> door.isSmallColony(level)).orElse(false);
-        for (int tries = 0; tries < 8; tries++) {
-            TrunkTrails.Trail trail = !young && trails != null && trails.keepsTrails() && ant.getRandom().nextInt(NEW_WAY) != 0
-                    ? trails.pickForSearch(level, ant.getRandom()) : null;
-            double base;
-            if (trail != null && failed != null && Math.abs(Mth.wrapDegrees(Math.toDegrees(trail.angle() - failed.angle()))) < Math.toDegrees(ANOTHER_WAY)) {
-                trail = null; // the way that failed last time: a new way instead
-            }
-            if (trail != null) {
-                angle = trail.angle() + (ant.getRandom().nextDouble() - 0.5) * 0.5;
-                base = trails.reachBlocks(trail) - ant.getRandom().nextInt(4);
-                // Out at the trail's tip, fanning out past it (not out to the colony's longest trail).
-                reachOfWay = Math.max(colony.profile().food().radius(), trails.reachBlocks(trail));
-            } else {
-                reachOfWay = range;
-                angle = failed == null ? ant.getRandom().nextDouble() * Mth.TWO_PI
-                        : failed.angle() + ANOTHER_WAY + ant.getRandom().nextDouble() * (Mth.TWO_PI - 2 * ANOTHER_WAY);
-                // Near the nest, then outward as it drifts (the user's decision of 2026-10-16: it used to start anywhere in
-                // the inner half of the range, and seeds 6 blocks from the nest lay unfound for a game day).
-                base = LEAST_OUT + 2 + ant.getRandom().nextInt(NEAR_START + 1);
-            }
-            from = Math.min(Math.max(LEAST_OUT + 2, base), reachOfWay + search.stretch());
-            out = from;
-            BlockPos cell = groundCell(level, colony, angle, from, 2);
-            if (cell != null && colony.mayForageAt(level, cell)) {
-                return cell;
-            }
-        }
-        return null;
+        atOwnSpot = plan.atOwnSpot();
+        angle = plan.angle();
+        from = plan.from();
+        out = from;
+        reachOfWay = plan.reachOfWay();
+        return plan.spot();
     }
 
     /**
@@ -280,7 +231,7 @@ public class ScoutGoal extends Goal {
                 || !level.getBlockState(cell).getCollisionShape(level, cell).isEmpty()
                 || !level.getBlockState(below).isFaceSturdy(level, below, Direction.UP)
                 || colony.nest().isInside(level, cell)
-                || colony.part(ColonyParts.MOUND).map(mound -> mound.getParts(level).containsKey(cell)).orElse(false)) {
+                || colony.moundParts(level).containsKey(cell)) {
             return null;
         }
         return cell;
@@ -305,8 +256,9 @@ public class ScoutGoal extends Goal {
     }
 
     private int giveUpTicks() {
-        return colony == null ? GIVE_UP_TICKS : colony.part(ColonyParts.FORAGER_SPOTS).flatMap(ForagerSpots::settings)
-                .map(SpeciesProfile.SearchNumbers::giveUpTicks).orElse(GIVE_UP_TICKS);
+        ColonyHooks.LoneSearch search = colony == null ? null : colony.hooks().first(ColonyHooks.LONE_SEARCH);
+        SpeciesProfile.SearchNumbers numbers = search == null ? null : search.settings();
+        return numbers == null ? GIVE_UP_TICKS : numbers.giveUpTicks();
     }
 
     @Override
@@ -322,8 +274,9 @@ public class ScoutGoal extends Goal {
         line = null;
         lineStuck = 0;
         if (alone && colony != null && spot != null && ant.level() instanceof ServerLevel level) {
-            colony.part(ColonyParts.FORAGER_SPOTS).ifPresent(spots -> spots.setSearching(ant.getUUID(), true));
-            line = colony.part(ColonyParts.RECRUITS).map(recruits -> recruits.lineFor(level, ant.getUUID())).orElse(null);
+            colony.news().tell(level, ColonyNews.SEARCH_STARTED, new ColonyNews.SearchStarted(ant.getUUID()));
+            ColonyHooks.CalledOut called = colony.hooks().first(ColonyHooks.CALLED_OUT);
+            line = called == null ? null : called.lineFor(level, ant.getUUID());
             if (line != null) {
                 lineAt = nearestPoint(line); // called out: along the finder's scent line, from where it meets it
                 if (ant.getNavigator().moveTo(line.get(lineAt), 1.0)) {
@@ -331,7 +284,8 @@ public class ScoutGoal extends Goal {
                 }
                 line = null; // no way onto the line from here: as any forager to its spot
             }
-            via = colony.part(ColonyParts.TRUNK_TRAILS).map(trunk -> trunk.wayOut(level, spot)).orElse(null);
+            ColonyHooks.Trails trails = colony.lastingTrails();
+            via = trails == null ? null : trails.wayOut(level, spot);
             if (via != null && flat(ant.blockPosition()) >= flat(via) - 1.0) {
                 via = null; // already out past where it would leave the trail
             }
@@ -365,18 +319,14 @@ public class ScoutGoal extends Goal {
     public void stop() {
         ant.getNavigator().stop();
         line = null;
-        if (alone && colony != null) {
-            colony.part(ColonyParts.RECRUITS).ifPresent(recruits -> recruits.tripOver(ant.getUUID())); // (got there and took food, or did not: it was told once)
-            colony.part(ColonyParts.FORAGER_SPOTS).ifPresent(spots -> spots.setSearching(ant.getUUID(), false));
-            boolean closing = !colony.isForagingTime(ant.level());
+        if (alone && colony != null && ant.level() instanceof ServerLevel level) {
+            boolean closing = !colony.isForagingTime(level);
             boolean gaveUp = ticks >= giveUpTicks();
-            if (!found && !ant.hasFullMandibles() && arrived && (closing || gaveUp)) {
-                // Home empty: its next search goes another way, from near the nest again.
-                colony.part(ColonyParts.FORAGER_SPOTS).ifPresent(spots -> spots.cameHomeEmpty(ant.getUUID(), angle));
-                if (gaveUp) {
-                    colony.part(ColonyParts.DOOR).ifPresent(door -> door.endTrip(ant)); // its trip is over: it goes in and waits for touches again
-                }
-            }
+            // Heard by the recruits (its call is used up: it got there and took food, or did not), the forager spots (home
+            // empty: its next search goes another way, from near the nest again) and the door (gave up: it goes in and
+            // waits for touches again).
+            boolean empty = !found && !ant.hasFullMandibles() && arrived && (closing || gaveUp);
+            colony.news().tell(level, ColonyNews.SEARCH_OVER, new ColonyNews.SearchOver(ant, empty, angle, gaveUp));
         }
         spot = null;
         via = null;
@@ -447,14 +397,14 @@ public class ScoutGoal extends Goal {
                 return;
             }
         }
-        ForagerSpots spots = colony.part(ColonyParts.FORAGER_SPOTS).orElse(null);
-        SpeciesProfile.SearchNumbers search = spots == null ? null : spots.settings().orElse(null);
+        ColonyHooks.LoneSearch lone = colony.hooks().first(ColonyHooks.LONE_SEARCH);
+        SpeciesProfile.SearchNumbers search = lone == null ? null : lone.settings();
         if (search == null) {
             return;
         }
         searched++;
         if (atOwnSpot && searched >= search.spotTicks()) {
-            spots.emptyAtSpot(ant.getUUID()); // nothing at its spot this time
+            lone.emptyAtSpot(ant.getUUID()); // nothing at its spot this time
             atOwnSpot = false;
         }
         double drifted = search.drifted(from, searched, reachOfWay);

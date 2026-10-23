@@ -745,7 +745,7 @@ public class ForagingHoles {
      */
     private int foodReach(SpeciesProfile.NewHoles numbers) {
         Galleries galleries = colony.nest().galleries();
-        return galleries.isOn() ? galleries.foodReach() : numbers.reach(colony.getCount(com.antcolonies.entity.WorkerAntEntity.CASTE));
+        return galleries.isOn() ? galleries.foodReach() : numbers.reach(colony.getCount(Caste.WORKER));
     }
 
     /** The blocks of the dug foraging tunnels, where a new tunnel may start (the route planner picks the best). */

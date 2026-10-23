@@ -25,7 +25,7 @@ public class KingCare {
     }
 
     /** Whether the colony has a king who is alive as far as the brain knows. */
-    boolean isAlive() {
+    public boolean isAlive() {
         return colony.getCount(TermiteKingEntity.CASTE) > 0 && !starvedAway;
     }
 

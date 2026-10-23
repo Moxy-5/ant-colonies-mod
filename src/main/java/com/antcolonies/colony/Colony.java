@@ -12,8 +12,6 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.entity.AbstractAntEntity;
-import com.antcolonies.entity.TermiteKingEntity;
-import com.antcolonies.entity.WorkerAntEntity;
 import com.antcolonies.species.SpeciesProfile;
 import com.antcolonies.species.SpeciesProfiles;
 
@@ -252,6 +250,42 @@ public class Colony {
     /** Whether the structure over the nest is being built now (a mound, past founding; {@link Mound#isActive}): asked of every part ({@link ColonyQuestions#BUILDING_OVER_NEST}). */
     public boolean buildsOverNestNow() {
         return questions.ask(null, ColonyQuestions.BUILDING_OVER_NEST, null);
+    }
+
+    /** Whether the colony is alarmed now ({@link Alarm#level} above 0): asked of every part ({@link ColonyQuestions#ALARMED}, Apex step 9a). */
+    public boolean isAlarmed(Level level) {
+        return questions.ask(level, ColonyQuestions.ALARMED, null);
+    }
+
+    /** Whether this forager must wait in the nest before it sets out (the harvester's door, {@link ColonyQuestions#MUST_WAIT}). */
+    public boolean mustWait(Level level, AbstractAntEntity forager) {
+        return questions.ask(level, ColonyQuestions.MUST_WAIT, forager);
+    }
+
+    /** Whether this forager passes the food by on its way to a patch it was called to ({@link ColonyQuestions#PASSES_BY}). */
+    public boolean passesBy(Level level, UUID forager, BlockPos food) {
+        return questions.ask(level, ColonyQuestions.PASSES_BY, new ColonyQuestions.FoodFor(forager, food));
+    }
+
+    /**
+     * Whether there is a place for this forager's piece, which it claims: at the mill if the colony has one (it takes
+     * the piece if the store has no room, {@link ColonyHooks#MILL}), otherwise in the store.
+     */
+    public boolean claimPlaceForAPiece(ServerLevel level, UUID forager) {
+        ColonyHooks.Mill mill = hooks.first(ColonyHooks.MILL);
+        return mill != null ? mill.hasPlace(level, forager) : food().claimStorePlace(level, forager);
+    }
+
+    /** Whether this forager's piece goes to the mill (the store had no room for it). */
+    public boolean pieceGoesToMill(UUID forager) {
+        ColonyHooks.Mill mill = hooks.first(ColonyHooks.MILL);
+        return mill != null && mill.milling(forager);
+    }
+
+    /** The colony's lasting trails (the harvester's trunk trails, {@link ColonyHooks#TRAILS}), or null. */
+    @Nullable
+    public ColonyHooks.Trails lastingTrails() {
+        return hooks.first(ColonyHooks.TRAILS);
     }
 
     /** The mound's blocks and what each is (none for a species without a mound; see {@link Mound#getParts}). */
@@ -554,17 +588,28 @@ public class Colony {
         return level.getEntity(queenId) instanceof AbstractAntEntity queen && queen.isAlive() ? queen : null;
     }
 
-    /** The king (termites), if he is loaded and alive: he stays beside the queen, so he is looked for round her. */
+    /**
+     * The founder beside the queen (the termite king, {@link ColonyHooks#CO_FOUNDERS}), if he is loaded and alive: he
+     * stays beside the queen, so he is looked for round her.
+     */
     @Nullable
     public AbstractAntEntity getKing(ServerLevel level) {
-        if (getCount(TermiteKingEntity.CASTE) <= 0) {
+        ColonyHooks.CoFounders founder = hooks().first(ColonyHooks.CO_FOUNDERS);
+        if (founder == null || getCount(founder.caste()) <= 0) {
             return null;
         }
         AbstractAntEntity queen = getQueen(level);
         net.minecraft.world.phys.AABB around = queen != null ? queen.getBoundingBox().inflate(16)
                 : new net.minecraft.world.phys.AABB(center).inflate(32);
-        return level.getEntitiesOfClass(TermiteKingEntity.class, around, king -> king.isAlive() && id.equals(king.getColonyId()))
+        return level.getEntitiesOfClass(AbstractAntEntity.class, around,
+                        king -> founder.isOne(king) && king.isAlive() && id.equals(king.getColonyId()))
                 .stream().findFirst().orElse(null);
+    }
+
+    /** How many founders beside the queen the colony counts (the termite king; none for a lone queen's species). */
+    public int coFounderCount() {
+        ColonyHooks.CoFounders founder = hooks().first(ColonyHooks.CO_FOUNDERS);
+        return founder == null ? 0 : getCount(founder.caste());
     }
 
     /**
@@ -584,7 +629,7 @@ public class Colony {
 
     /** Nobody left: no workers or soldiers, no eggs or young. */
     private boolean isEmpty(ServerLevel level) {
-        return getMemberCount() - getCount(com.antcolonies.entity.TermiteKingEntity.CASTE) <= 0 && brood().getEggs(level).isEmpty()
+        return getMemberCount() - coFounderCount() <= 0 && brood().getEggs(level).isEmpty()
                 && brood().getLarvae(level).isEmpty() && brood().insideCount() == 0;
     }
 
@@ -625,7 +670,7 @@ public class Colony {
             // place of the size table.
             return Math.max(radius, galleries);
         }
-        return profile().nest().newHoles().map(holes -> Math.max(radius, holes.reach(getCount(com.antcolonies.entity.WorkerAntEntity.CASTE)))).orElse(radius);
+        return profile().nest().newHoles().map(holes -> Math.max(radius, holes.reach(getCount(Caste.WORKER)))).orElse(radius);
     }
 
     /**
@@ -648,7 +693,7 @@ public class Colony {
 
     /** Whether the colony is still being founded: nobody yet but the queen (and her king, for termites). */
     public boolean isFounding() {
-        return !isQueenless() && getMemberCount() - getCount(TermiteKingEntity.CASTE) == 0;
+        return !isQueenless() && getMemberCount() - coFounderCount() == 0;
     }
 
     public boolean isHungerOn() {

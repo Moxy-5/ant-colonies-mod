@@ -5,8 +5,6 @@ import java.util.List;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.TermiteQueenEntity;
-import com.antcolonies.entity.TermiteSoldierEntity;
-import com.antcolonies.entity.WorkerAntEntity;
 import com.antcolonies.species.SpeciesProfile;
 
 import net.minecraft.nbt.CompoundTag;
@@ -238,8 +236,8 @@ public class NestLife {
                 changed = true;
                 continue;
             }
-            TermiteSoldierEntity.Rank rank = one.rank();
-            if (one.fed() < colony.brood().mealFor(rank)) {
+            String growsInto = one.growsInto();
+            if (one.fed() < colony.brood().mealFor(growsInto)) {
                 long hungry = colony.isHungerOn() ? one.left() + 20 : 0;
                 if (hungry >= numbers.larvaStarveTicks()) {
                     young.remove(i--);
@@ -247,13 +245,13 @@ public class NestLife {
                     colony.away().note(level, AwayReport.What.YOUNG_STARVED, 1);
                     AntColoniesMod.LOGGER.info("[nest] colony {}: a young one that is a number starved", colony.getId());
                 } else {
-                    young.set(i, Brood.Young.larva(one.fed(), hungry, rank));
+                    young.set(i, Brood.Young.larva(one.fed(), hungry, growsInto));
                 }
                 changed = true;
                 continue;
             }
-            if (rank == null && colony.getCount(WorkerAntEntity.CASTE) >= colony.profile().colony().maxWorkers()) {
-                TermiteSoldierEntity.Rank wanted = colony.brood().soldierWanted(level);
+            if (growsInto == null && colony.getCount(Caste.WORKER) >= colony.profile().colony().maxWorkers()) {
+                String wanted = colony.brood().soldierWanted(level);
                 if (wanted != null) {
                     young.set(i, Brood.Young.larva(one.fed(), 0, wanted)); // it eats the soldier's bigger meal first
                     changed = true;
@@ -261,7 +259,7 @@ public class NestLife {
                 continue;
             }
             young.remove(i--);
-            colony.population().addNewMembers(rank == null ? WorkerAntEntity.CASTE : rank.caste(), now, 1);
+            colony.population().addNewMembers(growsInto == null ? Caste.WORKER : growsInto, now, 1);
             colony.away().note(level, AwayReport.What.GREW_UP, 1);
             changed = true;
         }
@@ -298,7 +296,7 @@ public class NestLife {
      * {@link Colony#shareOut}).
      */
     private int nursesInside(ServerLevel level) {
-        int workers = colony.population().inside(WorkerAntEntity.CASTE);
+        int workers = colony.population().inside(Caste.WORKER);
         int[] ages = colony.population().insideByAge(level.getGameTime());
         return Colony.shareOut(workers, colony.profile().colony().nurses(workers), ages)[ColonyRole.NURSE.ordinal()];
     }

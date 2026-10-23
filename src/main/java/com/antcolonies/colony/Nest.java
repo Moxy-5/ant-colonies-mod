@@ -256,7 +256,7 @@ public class Nest {
         if (garden.isEmpty()) {
             return List.of();
         }
-        int wanted = garden.get().roomsFor(colony.getCount(com.antcolonies.entity.WorkerAntEntity.CASTE));
+        int wanted = garden.get().roomsFor(colony.getCount(Caste.WORKER));
         return layout.gardens().subList(0, Math.min(wanted, layout.gardens().size()));
     }
 
@@ -1065,7 +1065,7 @@ public class Nest {
      * even if the colony shrinks again.
      */
     public int levelsUnlocked(Level level) {
-        int now = colony.profile().nest().levelsFor(colony.getCount(com.antcolonies.entity.WorkerAntEntity.CASTE), colony.food().getFood());
+        int now = colony.profile().nest().levelsFor(colony.getCount(Caste.WORKER), colony.food().getFood());
         if (now > levelsUnlocked) {
             levelsUnlocked = now;
         }

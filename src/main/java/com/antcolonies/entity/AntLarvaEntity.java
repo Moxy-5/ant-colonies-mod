@@ -6,7 +6,7 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
-import com.antcolonies.colony.ColonyParts;
+import com.antcolonies.colony.ColonyHooks;
 import com.antcolonies.species.SpeciesProfile;
 
 import net.minecraft.nbt.CompoundTag;
@@ -100,6 +100,18 @@ public class AntLarvaEntity extends Entity implements FedByNurses {
     @Nullable
     public TermiteSoldierEntity.Rank getSoldierRank() {
         return TermiteSoldierEntity.Rank.byId(entityData.get(DATA_SOLDIER));
+    }
+
+    /** Apex step 9c: the caste it grows into besides a worker (a soldier's caste name), or null: a worker. */
+    @Nullable
+    public String getGrowsInto() {
+        TermiteSoldierEntity.Rank rank = getSoldierRank();
+        return rank == null ? null : rank.caste();
+    }
+
+    /** Apex step 9c: it grows into this caste (a soldier's caste name; null: a worker). */
+    public void setGrowsInto(@Nullable String caste) {
+        setSoldierRank(TermiteSoldierEntity.Rank.byCaste(caste));
     }
 
     public void setSoldierRank(@Nullable TermiteSoldierEntity.Rank rank) {
@@ -196,8 +208,8 @@ public class AntLarvaEntity extends Entity implements FedByNurses {
             discard(); // the queen died
             return;
         }
-        setMeal(colony.part(ColonyParts.SOLDIERS).map(soldiers -> soldiers.mealFor(getSoldierRank()))
-                .orElse(colony.profile().brood().larvaMeal())); // (the profile can change with /reload)
+        ColonyHooks.Castes castes = colony.hooks().first(ColonyHooks.CASTES); // (the termite soldiers' own meals)
+        setMeal(castes != null ? castes.mealFor(getGrowsInto()) : colony.profile().brood().larvaMeal()); // (the profile can change with /reload)
         // The hunger clock only runs for a larva that still has to eat; a full one waiting to grow up has been fed.
         long now = level.getGameTime();
         if (lastFed == Colony.NOT_SET || isFull() || !colony.isHungerOn()) {

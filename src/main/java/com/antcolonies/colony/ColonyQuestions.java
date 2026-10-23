@@ -6,8 +6,11 @@ import java.util.Comparator;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
+
+import com.antcolonies.entity.AbstractAntEntity;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
@@ -92,6 +95,21 @@ public final class ColonyQuestions {
     public static final Kind<Void> KEEPS_TRAILS = Kind.of("keeps_trails");
     /** Step 8a: whether the store is known to hold nothing the workers eat (fungus comb with no old layer as far as the brain knows); asked about nothing (null). */
     public static final Kind<Void> NOTHING_TO_EAT_IN_STORE = Kind.of("nothing_to_eat_in_store");
+
+    // Step 9a: the shared goals' and the ant body's yes/no asks of a species part.
+
+    /** Food a forager might go for, and the forager. */
+    public record FoodFor(UUID ant, BlockPos food) {
+    }
+
+    /** Step 9a: whether this forager must wait in the nest before it sets out (the harvester's door: not touched enough yet). */
+    public static final Kind<AbstractAntEntity> MUST_WAIT = Kind.of("must_wait");
+    /** Step 9a: whether this forager passes the food by (it was called out to a richer patch and is on its way there). */
+    public static final Kind<FoodFor> PASSES_BY = Kind.of("passes_by");
+    /** Step 9a: whether the colony is alarmed now (no grooming, napping or stopping to look at a player); asked about nothing (null). */
+    public static final Kind<Void> ALARMED = Kind.of("alarmed");
+    /** Step 9a: whether this place is on one of the colony's lasting trails (a neighbour stepping onto it meets the colony). */
+    public static final Kind<BlockPos> ON_TRAIL = Kind.of("on_trail");
 
     // --- answering and asking ------------------------------------------------------------------------------------------
 

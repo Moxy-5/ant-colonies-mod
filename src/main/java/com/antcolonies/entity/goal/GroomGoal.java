@@ -3,7 +3,6 @@ package com.antcolonies.entity.goal;
 import java.util.EnumSet;
 
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.ColonyParts;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.species.SpeciesProfile;
 
@@ -61,13 +60,13 @@ public class GroomGoal extends Goal {
             return false;
         }
         Colony colony = insect.getColony();
-        return colony == null || colony.part(ColonyParts.ALARM).map(alarm -> alarm.level(insect.level())).orElse(0) == 0;
+        return colony == null || !colony.isAlarmed(insect.level());
     }
 
     @Override
     public boolean canContinueToUse() {
         return ticksLeft > 0 && insect.onGround() && insect.hurtTime == 0 && !insect.isInWater()
-                && (insect.getColony() == null || insect.getColony().part(ColonyParts.ALARM).map(alarm -> alarm.level(insect.level())).orElse(0) == 0);
+                && (insect.getColony() == null || !insect.getColony().isAlarmed(insect.level()));
     }
 
     @Override

@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.entity.WorkerAntEntity;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -72,7 +71,7 @@ public class BuildLife {
 
     /** How many of the worker numbers are builders: the middle-aged ones (the colony shares out its jobs, see {@link Colony#shareOut}). */
     public int buildersInside(ServerLevel level) {
-        int workers = colony.population().inside(WorkerAntEntity.CASTE);
+        int workers = colony.population().inside(Caste.WORKER);
         if (workers <= 0) {
             return 0;
         }
@@ -279,8 +278,11 @@ public class BuildLife {
         if (queen != null) {
             founders.add(queen);
         }
-        founders.addAll(level.getEntitiesOfClass(com.antcolonies.entity.TermiteKingEntity.class, colony.nestArea().inflate(16.0),
-                king -> king.isAlive() && colony.getId().equals(king.getColonyId())));
+        ColonyHooks.CoFounders coFounder = colony.hooks().first(ColonyHooks.CO_FOUNDERS); // (the termite king)
+        if (coFounder != null) {
+            founders.addAll(level.getEntitiesOfClass(com.antcolonies.entity.AbstractAntEntity.class, colony.nestArea().inflate(16.0),
+                    king -> coFounder.isOne(king) && king.isAlive() && colony.getId().equals(king.getColonyId())));
+        }
         for (int i = 0; i < founders.size(); i++) {
             LivingEntity founder = founders.get(i);
             Vec3 to = spot.add(i == 0 ? 0.0 : 0.6, 0.0, 0.0); // (the king at her side)

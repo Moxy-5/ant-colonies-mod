@@ -13,7 +13,6 @@ import java.util.Set;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.entity.WorkerAntEntity;
 import com.antcolonies.species.SpeciesProfile;
 
 import net.minecraft.core.BlockPos;
@@ -244,7 +243,7 @@ public class FieldLife {
      * colony moves the next oldest over when it is short, as with the real workers, see {@link Colony#shareOut}).
      */
     int foragersInside(ServerLevel level) {
-        int workers = colony.population().inside(WorkerAntEntity.CASTE);
+        int workers = colony.population().inside(Caste.WORKER);
         if (workers <= 0) {
             return 0;
         }

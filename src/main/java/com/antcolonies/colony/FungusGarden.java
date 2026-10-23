@@ -54,6 +54,31 @@ public class FungusGarden implements NurseFood {
     private float ageingSpeedForTests = 1.0F;
 
     /** The colony whose garden this is. */
+    /** " | gardens 2 dug (planned 6), comb 14 layers on 5 blocks, nodules 3, mushrooms ..." for the colony list. */
+    public String describe(Level level) {
+        java.util.Set<BlockPos> cells = new java.util.HashSet<>(colony.nest().getGardenCells(level));
+        long dug = colony.nest().getGardens(level).stream().filter(garden -> cells.containsAll(garden.room())).count();
+        return " | gardens " + dug + " dug (planned " + colony.nest().getGardens(level).size() + "), comb "
+                + countCombLayers(level) + " layers on " + getCombs(level).size() + " blocks, nodules "
+                + available(level) + describeMushrooms(level);
+    }
+
+    /** ", mushrooms after rain: 2 (last rain 2 came up)" or ", no mushrooms yet (comb 5 of 8 layers)". */
+    private String describeMushrooms(Level level) {
+        Mushrooms mushrooms = colony.part(ColonyParts.MUSHROOMS).orElse(null);
+        if (mushrooms == null) {
+            return "";
+        }
+        int wanted = mushrooms.wanted(level);
+        int last = mushrooms.getLastFlush();
+        String lastRain = last < 0 ? "" : " (last rain " + last + " came up)";
+        if (wanted == 0) {
+            return ", no mushrooms yet (comb " + countCombLayers(level) + " of "
+                    + colony.profile().garden().get().mushroomCombLayers() + " layers)" + lastRain;
+        }
+        return ", mushrooms after rain: " + wanted + lastRain;
+    }
+
     Colony colony() {
         return colony;
     }

@@ -580,7 +580,7 @@ public class Galleries {
 
     /** How long the galleries may be with the colony's workers now (never shorter than the first arms). */
     public int lengthAllowed() {
-        return Math.max(baseLength, numbers().lengthFor(colony.getCount(com.antcolonies.entity.WorkerAntEntity.CASTE)));
+        return Math.max(baseLength, numbers().lengthFor(colony.getCount(Caste.WORKER)));
     }
 
     /** How many tips are growing (for the tests and the colony list). */

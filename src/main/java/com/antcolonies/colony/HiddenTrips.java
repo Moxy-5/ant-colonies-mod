@@ -451,7 +451,7 @@ public class HiddenTrips implements HiddenWays {
         body.putString("id", "antcolonies:termite_worker");
         List<Foothold> run = new ArrayList<>(List.of(new Foothold(new BlockPos(0, 58, 0), Direction.UP, true),
                 new Foothold(new BlockPos(1, 58, 0), Direction.UP, true)));
-        trips.add(new Trip(new UUID(3, 3), com.antcolonies.entity.WorkerAntEntity.CASTE, null, body, run, level.getGameTime(), level.getGameTime() + 100));
+        trips.add(new Trip(new UUID(3, 3), Caste.WORKER, null, body, run, level.getGameTime(), level.getGameTime() + 100));
     }
 
     void save(CompoundTag tag) {

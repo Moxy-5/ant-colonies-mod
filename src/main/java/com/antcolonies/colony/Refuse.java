@@ -9,7 +9,6 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.entity.AntCorpseEntity;
-import com.antcolonies.registry.ModEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
@@ -40,8 +39,7 @@ public class Refuse {
 
     /** Puts the body of a dead ant of this colony into the world, where it lies until a worker carries it away. */
     public AntCorpseEntity spawnCorpse(Level level, double x, double y, double z) {
-        AntCorpseEntity corpse = new AntCorpseEntity(colony.getSpecies().equals(com.antcolonies.species.Species.MACROTERMES)
-                ? ModEntities.TERMITE_CORPSE.get() : ModEntities.ANT_CORPSE.get(), level);
+        AntCorpseEntity corpse = new AntCorpseEntity(com.antcolonies.species.SpeciesBodies.of(colony.getSpecies()).corpse().get(), level);
         corpse.setColonyId(id);
         corpse.moveTo(x, y, z, colony.random().nextFloat() * 360.0F, 0.0F);
         level.addFreshEntity(corpse);

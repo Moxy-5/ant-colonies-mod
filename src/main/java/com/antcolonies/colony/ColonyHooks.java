@@ -11,10 +11,14 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import com.antcolonies.entity.TermiteSoldierEntity;
+import com.antcolonies.entity.AbstractAntEntity;
+import com.antcolonies.nav.HiddenWays;
+import com.antcolonies.species.SpeciesProfile;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 
 /**
@@ -67,6 +71,18 @@ public final class ColonyHooks {
 
         /** The columns (x and z from the nest's middle) within {@code side} of the trails, out to {@code radius}. */
         List<int[]> columnsNear(int side, int radius);
+
+        /** Step 9a: a real forager sets out for the food at {@code plant}: where it leaves the trail (its trip counted), or null. */
+        @Nullable
+        BlockPos setOut(ServerLevel level, BlockPos plant);
+
+        /** Step 9a: a real searcher sets out to search round {@code toward}: where it leaves the trail (not counted yet), or null. */
+        @Nullable
+        BlockPos wayOut(ServerLevel level, BlockPos toward);
+
+        /** Step 9a: a forager home with food from {@code from}: where it joins a trail home, or null. */
+        @Nullable
+        BlockPos wayHome(ServerLevel level, BlockPos from);
     }
 
     /** How many of the forager numbers may be out now (of {@code foragers}; Gordon's door rule for the harvester ant). */
@@ -75,20 +91,37 @@ public final class ColonyHooks {
         double free(ServerLevel level, int foragers);
     }
 
-    /** How many founders dig beside the queen (the king, in a royal pair). */
-    @FunctionalInterface
+    /** The founders beside the queen (the king, in a royal pair). */
     public interface CoFounders {
+        /** How many dig beside her (alive as far as the brain knows). */
         int count();
+
+        /** Step 9a: whether this insect is one of them. */
+        boolean isOne(AbstractAntEntity insect);
+
+        /** Step 9a: the caste they are counted under in the colony's headcount. */
+        String caste();
     }
 
     /** What castes a young one grows into besides a worker (soldiers): its meal, and the caste wanted for a new one. */
     public interface Castes {
-        /** How much a young one growing into this kind of soldier eats before it grows up. */
-        int mealFor(@Nullable TermiteSoldierEntity.Rank rank);
+        /** Step 9c: these castes' names (the soldiers' "minor_soldier", "major_soldier"). */
+        List<String> castes();
 
-        /** The kind of soldier a new young one should grow into, or null (soldiers enough). */
+        /** How much a young one growing into this caste (null: a worker) eats before it grows up. */
+        int mealFor(@Nullable String caste);
+
+        /** The caste a new young one should grow into, or null (soldiers enough). */
         @Nullable
-        TermiteSoldierEntity.Rank wanted(Level level);
+        String wanted(Level level);
+
+        /** Step 9c: the word a young one growing into this caste is saved under, or null if not one of these castes. */
+        @Nullable
+        String savedAs(String caste);
+
+        /** Step 9c: the caste saved under this word ({@link #savedAs}), or null if not one of these castes. */
+        @Nullable
+        String fromSaved(String word);
 
         /**
          * How many real mobs of these castes the colony wants now (of a real cap of {@code cap}; {@code watched}: a player
@@ -98,6 +131,14 @@ public final class ColonyHooks {
 
         /** For the colony list: how many of these castes are numbers in the nest ("; soldiers 3 minor, 1 major"), or "". */
         String inside(Population population);
+
+        /** For {@code /antcolonies population}: as many of them added as so many workers want, and the words for it. */
+        default String addFor(int workers, long now) {
+            return "";
+        }
+
+        /** Step 9a: the real members of these castes the nurses feed mouth to mouth (they ask with {@link com.antcolonies.entity.FedByNurses}). */
+        List<? extends Entity> fedByNurses(Level level);
     }
 
     /** Insects out of the world for a while on hidden trips (they are real ones, coming back). */
@@ -107,6 +148,9 @@ public final class ColonyHooks {
 
         /** Whether any of them walks through one of these cells on its way (never wall it in). */
         boolean anyWalksThrough(Set<BlockPos> cells);
+
+        /** Step 9a: the closed ways the colony's insects may walk out of the world on (their routes are planned along them). */
+        HiddenWays ways(ServerLevel level);
     }
 
     /** The structure built over the nest (the termite mound): its blocks, its tunnels and its next block to dig. */
@@ -167,6 +211,74 @@ public final class ColonyHooks {
         boolean work(ServerLevel level);
     }
 
+    /**
+     * Step 9a: a real forager's search when it searches alone (the harvester ant: brain step 4c, {@code ScoutGoal}): the
+     * numbers it searches by, where this trip's search goes, and a search round its own spot found empty.
+     */
+    public interface LoneSearch {
+        /** The numbers of a lone search ({@code food.search}). */
+        SpeciesProfile.SearchNumbers settings();
+
+        /** Where this trip's search goes, or null (no open ground was hit); {@code ground} finds open ground. */
+        @Nullable
+        SearchPlan plan(ServerLevel level, AbstractAntEntity ant, GroundPicker ground);
+
+        /** Nothing at its own spot this time. */
+        void emptyAtSpot(UUID ant);
+    }
+
+    /** An open cell on the ground {@code distance} blocks out from the nest's middle at {@code angle}, give or take {@code jitter}, or null. */
+    @FunctionalInterface
+    public interface GroundPicker {
+        @Nullable
+        BlockPos cell(double angle, double distance, int jitter);
+    }
+
+    /**
+     * A lone search planned: its centre, its direction (radians from the nest's middle), how far out it starts, how far
+     * its way reaches (its drift goes at most the stretch past it), and whether it is round the forager's own spot.
+     */
+    public record SearchPlan(BlockPos spot, double angle, double from, int reachOfWay, boolean atOwnSpot) {
+    }
+
+    /** Step 9a: the scent line a forager called out to a rich patch follows (nest end first), or null. */
+    @FunctionalInterface
+    public interface CalledOut {
+        @Nullable
+        List<BlockPos> lineFor(Level level, UUID ant);
+    }
+
+    /** Step 9a: a place for a forager's load besides the store (the harvester's mill). */
+    public interface Mill {
+        /** Whether there is a place for this forager's piece, at the mill or in the store (it claims it). */
+        boolean hasPlace(ServerLevel level, UUID ant);
+
+        /** Whether this forager's piece goes to the mill. */
+        boolean milling(UUID ant);
+    }
+
+    /** Step 9a: where the soil a real digger bites loose goes (the harvester's hill, the termite mound). */
+    public interface DugSoil {
+        /** Now and then while digging: whether the digger stops (soil waiting to be carried up first, or a rest). */
+        default boolean waits(ServerLevel level, AbstractAntEntity digger) {
+            return false;
+        }
+
+        /** A bite of {@code target}: whether its soil is taken up as a pellet. */
+        boolean takesPellet(ServerLevel level, BlockPos target, UUID digger);
+
+        /** The pellet a bite of {@code dug} gives (the termites' own mound blocks give plain mound soil). */
+        default BlockState pellet(BlockState dug) {
+            return dug;
+        }
+    }
+
+    /** Step 9b: a part's words in the colony list ({@code /antcolonies list}), in one of its slots ({@link #LIST_STORE}, ...). */
+    @FunctionalInterface
+    public interface ListLine {
+        String line(ServerLevel level);
+    }
+
     /** Step 8c: one more job for the nurses while away (see {@link NestLife}). True if it was wanted now and done. */
     @FunctionalInterface
     public interface NurseJob {
@@ -205,6 +317,30 @@ public final class ColonyHooks {
     public static final Kind<NurseJob> NURSE_FEEDS = Kind.of("nurse_feeds");
     /** Step 8c: the nurses making more food while away, once nobody is hungry (the harvester's bread milled). */
     public static final Kind<NurseJob> NURSE_MAKES = Kind.of("nurse_makes");
+    /** Step 9a: a real forager's lone search (the harvester's forager spots). */
+    public static final Kind<LoneSearch> LONE_SEARCH = Kind.of("lone_search");
+    /** Step 9a: the scent line a called-out forager follows (the harvester's recruits). */
+    public static final Kind<CalledOut> CALLED_OUT = Kind.of("called_out");
+    /** Step 9a: a place for a load besides the store (the harvester's bakery). */
+    public static final Kind<Mill> MILL = Kind.of("mill");
+    /** Step 9a: where a real digger's soil goes (the harvester's hill, the termite mound). */
+    public static final Kind<DugSoil> DUG_SOIL = Kind.of("dug_soil");
+    /** Step 9b, the colony list's slots: after the seed store (the bread). */
+    public static final Kind<ListLine> LIST_STORE = Kind.of("list_store");
+    /** In place of the store's line (the fungus garden). */
+    public static final Kind<ListLine> LIST_FOOD = Kind.of("list_food");
+    /** After the eggs and larvae (the soldiers, the alarm). */
+    public static final Kind<ListLine> LIST_BROOD = Kind.of("list_brood");
+    /** After the food map (the forager spots, the recruits, the trunk trails). */
+    public static final Kind<ListLine> LIST_SEARCH = Kind.of("list_search");
+    /** After the danger map (the closed holes). */
+    public static final Kind<ListLine> LIST_DANGER = Kind.of("list_danger");
+    /** After the dead ants (the mound). */
+    public static final Kind<ListLine> LIST_BUILDING = Kind.of("list_building");
+    /** After the day clock (the patrol, the door, the night soil). */
+    public static final Kind<ListLine> LIST_DAY = Kind.of("list_day");
+    /** After the galleries (the hidden trips). */
+    public static final Kind<ListLine> LIST_HOLES = Kind.of("list_holes");
 
     // --- plugging in and asking ----------------------------------------------------------------------------------------
 
