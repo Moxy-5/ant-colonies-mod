@@ -3,6 +3,8 @@ package com.antcolonies;
 import org.slf4j.Logger;
 
 import com.antcolonies.gametest.TestFilter;
+import com.antcolonies.entity.load.FrameworkLoads;
+import com.antcolonies.registry.ModDataSerializers;
 import com.antcolonies.registry.ModEntities;
 import com.antcolonies.species.SpeciesProfiles;
 import com.mojang.logging.LogUtils;
@@ -26,6 +28,9 @@ public class ColonyFrameworkMod {
 
     public ColonyFrameworkMod(IEventBus modEventBus) {
         ModEntities.ENTITY_TYPES.register(modEventBus);
+        // The one synced slot for what an insect carries, and the framework's rows of the load list (Apex part 3, T3).
+        ModDataSerializers.SERIALIZERS.register(modEventBus);
+        FrameworkLoads.signUp();
         // Only some game tests when ANTCOLONIES_TESTS is set (quick checks while working).
         NeoForge.EVENT_BUS.addListener((ServerAboutToStartEvent event) -> TestFilter.apply(event.getServer()));
         // Species profiles (data/<namespace>/species/*.json), loaded with the world's data and on /reload.
