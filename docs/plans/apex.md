@@ -244,6 +244,24 @@ easiest to stop bugs from happening and push updates easier"); so these are my p
      helper step 4 (`ScoutGoal` in three).
    - **Checks** in scenes that exist (`AwayTests.partsAreTheSpecies` and others); each batch its categories, at the end
      a full run on 6 servers (the user, 2026-10-22) and the stress test before and after. Nothing changes in-game.
+   **BUILT 2026-10-22** on branch `claude/apex-step9-642594` (9a, 9b and 9c's first half `1eb1a89`, 9c's second half
+   `84b5bc2`; not merged, the user tests in-game after step 10): every line above as listed. No shared goal, command or
+   colony file, `ModEvents` or the ant body names a species part, and no shared colony file names a species type
+   except the part 3 pieces (galleries and mud casts in `Nest` and `ForagingHoles`, the comb in `FoodStore`). New
+   shared pieces: `colony/Caste`, `species/SpeciesBodies`, `entity/ColonyBorn`, `entity/SwellingQueen`,
+   `block/FacedWall`, `block/GardenBed`, `command/TermiteCommands`, `colony/ForagerSearch` (in the forager spots).
+   Full run on 6 servers 139 of 141 (BUGS 62 and 55, old flakes; both 3 of 3 alone, before and after); speed the same within the noise (colony brain 0.401 ms before, 0.406 after; 6 stress runs a side). Details in
+   `docs/HISTORY.md`.
+10. **The shared young body names the termite soldier rank** (found building step 9c, 2026-10-22; to plan with the
+   user). `entity/AntLarvaEntity` is the young of both species (the harvester larva, the termite nymph), and it still
+   keeps "what it grows into" as a `TermiteSoldierEntity.Rank` (synced so a nymph growing into a soldier gets its big
+   head, saved as a byte `soldier`). Step 9c put a caste name in front of it (`getGrowsInto`, `setGrowsInto`), but the
+   body underneath still names the termite type, so the framework could not hold the young body after the split. Fix:
+   the castes hook gives each of its castes a small number for syncing and saving (the soldiers' today's 1 and 2, so
+   saved worlds keep loading), the larva keeps only that number and asks the colony for the caste, and the renderer
+   reads the number (the renderer stays with the species). Nothing changes in-game. Small (one body, about 10 lines,
+   plus the renderer's read). The other shared-body leftover, `AbstractAntEntity` naming the bread and the fungus
+   nodule as "nurse food it carries" (1 line), is the "what I carry" slot already listed below for part 3.
 
 Then the split's own plan (`docs/plans/mod-split.md`) can draw the framework's wall along the registry: shared parts
 in, species parts out.
