@@ -290,3 +290,5 @@ stack" and folders, `docs/DESIGN.md` architecture, `docs/HISTORY.md`).
   their walking tests; before it leaves, those scenes need a savanna body (a termite worker, later the Matabele ant).
   `apex.md` step 13.
 - **10 commits on this branch are not on `master`** (the test ground fix, the M8 design notes): step S0.
+
+**Confirmed in-game by the user 2026-10-23** ("everything works", termites only, a new world). One bug found on the way, not caused by the split: `docs/BUGS.md` 65.
