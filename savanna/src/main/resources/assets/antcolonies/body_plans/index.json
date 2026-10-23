@@ -1,4 +1,10 @@
 {
- "about": "Every body plan the game reads (it cannot list a folder inside the mod). Add a new plan here.",
- "plans": ["worker_ant", "termite_worker", "termite_king", "termite_queen", "termite_minor_soldier", "termite_major_soldier"]
+  "about": "Every body plan the game reads (it cannot list a folder inside the mod). Add a new plan here.",
+  "plans": [
+    "termite_worker",
+    "termite_king",
+    "termite_queen",
+    "termite_minor_soldier",
+    "termite_major_soldier"
+  ]
 }

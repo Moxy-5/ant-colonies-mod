@@ -1,8 +1,6 @@
 {
   "replace": false,
   "values": [
-    "antcolonies:ant_bread",
-    "antcolonies:rich_ant_bread",
     "antcolonies:fungus_nodule"
   ]
 }

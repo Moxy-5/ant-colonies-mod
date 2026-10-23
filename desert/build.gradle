@@ -1,0 +1,37 @@
+// The desert mod (the split, step S7, docs/plans/mod-split.md): the red harvester ant, on top of the colony framework,
+// as a mod of its own ("desertcolonies", "Desert Colonies"). It depends on the framework only, never on the savanna
+// mod, so the compiler refuses any desert file that names savanna code (and the reverse).
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev'
+    id 'idea'
+}
+
+apply from: rootProject.file('gradle/mod-common.gradle')
+
+evaluationDependsOn(':framework')
+
+base {
+    archivesName = desert_mod_id
+}
+
+neoForge {
+    mods {
+        "${framework_mod_id}" {
+            sourceSet(project(':framework').sourceSets.main)
+        }
+        "${desert_mod_id}" {
+            sourceSet(sourceSets.main)
+        }
+    }
+
+    // Puts Minecraft on the test classpath so tests can use BlockPos, Direction and so on.
+    unitTest {
+        enable()
+        testedMod = mods.getByName(desert_mod_id)
+    }
+}
+
+dependencies {
+    implementation project(':framework')
+}

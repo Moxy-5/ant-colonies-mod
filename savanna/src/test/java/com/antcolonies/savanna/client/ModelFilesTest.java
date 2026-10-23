@@ -26,8 +26,9 @@ import software.bernie.geckolib.loading.object.BakedAnimations;
 
 /**
  * The model and animation files the game window loads (the game tests never load them): every model drawn by
- * AntRenderer has the empty "carry" bone in its head, where PelletLayer draws a carried load, and the ant's animations
- * read the way GeckoLib reads them and only move bones its model has.
+ * AntRenderer has the empty "carry" bone in its head, where PelletLayer draws a carried load, and the termites'
+ * animations read the way GeckoLib reads them and only move bones their models have (the worker ant's: the desert mod's
+ * HarvesterModelFilesTest, since the split, step S7).
  */
 class ModelFilesTest {
     private static final String ASSETS = "/assets/antcolonies/";
@@ -52,7 +53,8 @@ class ModelFilesTest {
 
     @Test
     void everyModelHoldsItsLoadInItsHead() throws Exception {
-        for (String model : new String[] {"worker_ant", "termite_king", "termite_queen", "termite_worker", "termite_minor_soldier",
+        // (the worker ant's in the desert mod since the split, step S7: HarvesterModelFilesTest)
+        for (String model : new String[] {"termite_king", "termite_queen", "termite_worker", "termite_minor_soldier",
                 "termite_major_soldier"}) {
             assertEquals("head", bones(model).get("carry"), model + " has no carry bone in its head");
         }
@@ -92,20 +94,6 @@ class ModelFilesTest {
             if (soldier) {
                 assertTrue(animations.getAnimation("head_bang").loopType() == Animation.LoopType.LOOP,
                         "the head bang must loop while the soldier drums");
-            }
-        }
-    }
-
-    @Test
-    void theAntAnimationsReadAndMoveOnlyBonesTheAntHas() throws Exception {
-        BakedAnimations animations = KeyFramesAdapter.GEO_GSON.fromJson(
-                json("animations/entity/worker_ant.animation.json").getAsJsonObject("animations"), BakedAnimations.class);
-        Map<String, String> bones = bones("worker_ant");
-        for (String name : new String[] {"idle", "walk"}) {
-            Animation animation = animations.getAnimation(name);
-            assertNotNull(animation, "no " + name + " animation");
-            for (var bone : animation.boneAnimations()) {
-                assertTrue(bones.containsKey(bone.boneName()), name + " moves a bone the ant does not have: " + bone.boneName());
             }
         }
     }

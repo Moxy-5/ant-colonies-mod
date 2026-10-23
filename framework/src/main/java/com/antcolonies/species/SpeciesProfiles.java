@@ -17,7 +17,7 @@ import net.minecraft.util.profiling.ProfilerFiller;
 
 /**
  * Loads every species profile from {@code data/<namespace>/species/*.json} when the world starts and on {@code /reload}.
- * {@code data/antcolonies/species/red_harvester_ant.json} becomes the species {@code antcolonies:red_harvester_ant}.
+ * {@code data/desertcolonies/species/red_harvester_ant.json} becomes the species {@code desertcolonies:red_harvester_ant}.
  * Server side only (the client never needs the numbers).
  */
 public class SpeciesProfiles extends SimpleJsonResourceReloadListener {

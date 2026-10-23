@@ -4,8 +4,9 @@ The wall checker (2026-10-22, Project Apex part 2, the split, step S1; docs/plan
 The split puts the shared colony framework in a mod of its own, and the framework must not see species code. Until
 step S6 everything was still one mod, so the compiler could not refuse a framework file that named a termite or a
 harvester class; this checker did it instead. Since S6 the framework is its own folder and mod (framework/), and the
-compiler refuses it. The savanna and the desert still share the savanna folder until step S7, so this checker still
-watches that they never name each other (and its --data report helps S7 split the data); after S7 it is retired.
+compiler refuses it. Since step S7 the desert is its own folder and mod too (desert/), so the compiler also refuses a
+savanna file naming desert code or the reverse: the checker is retired (it still runs over the three folders and
+reads 0; --data is done, the data split with the desert mod).
 
     python tools/wall_check.py            the framework files that name savanna or desert code, and what they name
     python tools/wall_check.py --strict   the same, failing (exit 1) if there is any (on from step S5)
@@ -29,7 +30,7 @@ import re
 import sys
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
-SOURCES = ['framework/src/main/java/com/antcolonies', 'savanna/src/main/java/com/antcolonies']
+SOURCES = ['framework/src/main/java/com/antcolonies', 'savanna/src/main/java/com/antcolonies', 'desert/src/main/java/com/antcolonies']
 
 SAVANNA = set('''
 Alarm ClosedHoles FungusGarden GardenAway Galleries HiddenTrips KingCare Mound MoundAwayBuilding MoundGrowth MoundPlan
@@ -107,6 +108,9 @@ def registered(base, side, files):
 
 def data_report(base):
     """Prints the data and asset files naming both sides' blocks, items or creatures."""
+    if not os.path.isdir(os.path.join(base, 'desert')):
+        print('retired: since step S7 the desert has its own mod and data folder (desert/), nothing shares a file any more')
+        return 0
     savanna = registered(base, 'savanna', ['SavannaBlocks', 'SavannaItems', 'SavannaEntities', 'TreeBlocks'])
     desert = registered(base, 'desert', ['DesertBlocks', 'DesertItems', 'DesertEntities'])
     mixed = 0

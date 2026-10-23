@@ -1,6 +1,6 @@
 // The savanna mod (the split, step S6, docs/plans/mod-split.md): the termites, the giant trees and (from M8) the
 // Matabele ants, on top of the colony framework. It keeps the mod name "antcolonies", so every termite, mound, garden
-// and tree thing keeps its saved name. Until step S7 it still holds the red harvester ant (com.antcolonies.desert).
+// and tree thing keeps its saved name. The red harvester ant left for the desert mod at step S7 (desert\).
 plugins {
     id 'java-library'
     id 'net.neoforged.moddev'

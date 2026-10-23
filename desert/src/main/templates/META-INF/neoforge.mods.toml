@@ -1,0 +1,40 @@
+# The desert mod's file (the split, step S7, docs/plans/mod-split.md): the red harvester ant, on top of the colony
+# framework. Filled in from gradle.properties by gradle/mod-common.gradle.
+modLoader="javafml" #mandatory
+loaderVersion="${loader_version_range}" #mandatory
+license="${mod_license}"
+
+[[mods]] #mandatory
+modId="${desert_mod_id}" #mandatory
+version="${mod_version}" #mandatory
+displayName="${desert_mod_name}" #mandatory
+description='''
+The North American desert's ants as real colonies: the red harvester ant digs its deep spiral nest, gathers and mills
+seeds, raises its young and grows.
+'''
+
+[[dependencies.${desert_mod_id}]]
+    modId="neoforge"
+    type="required"
+    versionRange="[${neo_version},)"
+    ordering="NONE"
+    side="BOTH"
+[[dependencies.${desert_mod_id}]]
+    modId="minecraft"
+    type="required"
+    versionRange="${minecraft_version_range}"
+    ordering="NONE"
+    side="BOTH"
+[[dependencies.${desert_mod_id}]]
+    # The colony framework (the split, step S6): every species mod builds on it.
+    modId="${framework_mod_id}"
+    type="required"
+    versionRange="[${mod_version},)"
+    ordering="AFTER"
+    side="BOTH"
+[[dependencies.${desert_mod_id}]]
+    modId="geckolib"
+    type="required"
+    versionRange="[4.8,)"
+    ordering="NONE"
+    side="BOTH"

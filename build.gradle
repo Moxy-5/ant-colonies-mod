@@ -1,6 +1,6 @@
 // The root of the repository only runs the game (the split, step S6, docs/plans/mod-split.md): each mod is a folder
-// of its own (framework\ the colony framework "colonyframework", savanna\ the savanna mod "antcolonies", which until
-// step S7 still holds the red harvester ant), built and tested together. The commands and run folders are the same as
+// of its own (framework\ the colony framework "colonyframework", savanna\ the savanna mod "antcolonies", desert\ the
+// desert mod "desertcolonies" since step S7), built and tested together. The commands and run folders are the same as
 // before the split: ./gradlew build, runClient, runGameTestServer, runGameTestShard1..n (tools/run_game_tests.sh),
 // runFilm; the worlds stay in run\, run-test\, run-test-shards\ and run-film\.
 plugins {
@@ -20,6 +20,7 @@ tasks.named('wrapper', Wrapper).configure {
 
 evaluationDependsOn(':framework')
 evaluationDependsOn(':savanna')
+evaluationDependsOn(':desert')
 
 version = mod_version
 group = mod_group_id
@@ -48,19 +49,22 @@ neoForge {
     // The savanna mod's access file, so the game started from here has the same Minecraft as the savanna mod is built on.
     accessTransformers = project.files('savanna/src/main/resources/META-INF/accesstransformer.cfg')
 
+    // Every species mod's game tests (each mod's tests sit under its own name since the split, step S7).
+    def gameTestNamespaces = "${project.mod_id},${project.desert_mod_id}"
+
     // Default run configurations.
     // These can be tweaked, removed, or duplicated as needed.
     runs {
         client {
             client()
             // Comma-separated list of namespaces to load gametests from. Empty = all namespaces.
-            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+            systemProperty 'neoforge.enabledGameTestNamespaces', gameTestNamespaces
         }
 
         server {
             server()
             programArgument '--nogui'
-            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+            systemProperty 'neoforge.enabledGameTestNamespaces', gameTestNamespaces
         }
 
         // This run config launches GameTestServer and runs all registered gametests, then exits.
@@ -70,7 +74,7 @@ neoForge {
             type = "gameTestServer"
             // Its own folder, so test worlds never touch the real game's saves.
             gameDirectory = project.file('run-test')
-            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+            systemProperty 'neoforge.enabledGameTestNamespaces', gameTestNamespaces
         }
 
         // Tests side by side (tools/run_game_tests.sh): one more game test server per share of the tests, each in its
@@ -80,7 +84,7 @@ neoForge {
             register("gameTestShard${shard}") {
                 type = "gameTestServer"
                 gameDirectory = project.file("run-test-shards/${shard}")
-                systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+                systemProperty 'neoforge.enabledGameTestNamespaces', gameTestNamespaces
                 systemProperty 'antcolonies.shard', "${shard}/${testShards}"
             }
         }
@@ -148,6 +152,9 @@ neoForge {
         "${mod_id}" {
             sourceSet(project(':savanna').sourceSets.main)
         }
+        "${desert_mod_id}" {
+            sourceSet(project(':desert').sourceSets.main)
+        }
     }
 }
 
@@ -155,6 +162,7 @@ dependencies {
     // Every mod's code and the libraries it needs (GeckoLib) on the game's classpath.
     implementation project(':framework')
     implementation project(':savanna')
+    implementation project(':desert')
 }
 
 // The in-game camera starts clean each time (a new world, no old screenshots) with quiet, never-pausing settings.

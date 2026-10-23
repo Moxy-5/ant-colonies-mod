@@ -203,8 +203,8 @@ public class TermiteFoodTests {
                     helper.assertTrue(gardens.contains(pos.immutable()), "fungus comb lies outside the garden rooms at " + pos.toShortString());
                     layers += state.getValue(SeedPileBlock.LAYERS);
                 } else {
-                    // (the seed heap by its name, the harvester ant's block since the split, step S4)
-                    helper.assertTrue(!net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(state.getBlock()).equals(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "seed_pile"))
+                    // (any mod's seed heap, by its name: the harvester ant's block, in the desert mod since the split, step S7)
+                    helper.assertTrue(!net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath().equals("seed_pile")
                             && !state.is(SavannaBlocks.FORAGE_PILE.get()), "termites made a seed or forage heap");
                 }
             }

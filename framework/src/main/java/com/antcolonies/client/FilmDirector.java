@@ -64,7 +64,7 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  *
  * <p>A shot list is a text file, one step a line ({@code #} starts a comment):
  * <pre>
- * cmd summon antcolonies:worker_ant 0.5 -60 0.5 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+ * cmd summon desertcolonies:worker_ant 0.5 -60 0.5 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
  * camera 1.4 -59.7 0.5 90 15      the camera's x y z, turn and tilt (the player, a spectator, is put there)
  * lens 30                         the scene's lens (narrow for small insects); "fov" changes it for a moment only
  * wait 20                         client ticks
@@ -454,12 +454,25 @@ public final class FilmDirector {
         now.add("cmd kill @e[type=!player]");
         now.add("wait 25");                     // the death animation ends and the body (a corpse) is left
         now.add("cmd kill @e[type=!player]");   // the corpse too
-        now.add(String.format("cmd summon antcolonies:%s %s %s %s {NoAI:1b,Rotation:[90f,0f],CustomName:'\"film:%s\"'}",
-                type, AX, AY, AZ, clip));
+        now.add(String.format("cmd summon %s %s %s %s {NoAI:1b,Rotation:[90f,0f],CustomName:'\"film:%s\"'}",
+                insect(type), AX, AY, AZ, clip));
         now.add(camera(AX + 0.8, AY + 0.55, AZ + 0.8, 135, 22));   // seen while the game runs, so its clip starts
         now.add("wait 60");                     // (and the smoke of the kills has gone)
         now.add("cmd tick freeze");
         pushFront(now);
+    }
+
+    /**
+     * An insect's full name from a shot list's short one ({@code worker_ant} is {@code desertcolonies:worker_ant},
+     * {@code termite_king} is {@code antcolonies:termite_king}): each species mod signs its insects up under its own
+     * name since the split (step S7), so the camera looks the name up; a full name is used as it is.
+     */
+    private static String insect(String type) {
+        if (type.contains(":")) {
+            return type;
+        }
+        return net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.keySet().stream()
+                .filter(id -> id.getPath().equals(type)).map(Object::toString).sorted().findFirst().orElse(type);
     }
 
     /** The walker's name: not {@code film:...}, so it plays its usual clips (walking, climbing, turning). */
@@ -488,8 +501,8 @@ public final class FilmDirector {
         // seen from its first tick, so its clips start then (filmed after another scene the camera may already be
         // looking there, filmed alone it is not)
         now.add(camera(Double.parseDouble(x) + 0.8, Double.parseDouble(y) + 0.55, Double.parseDouble(z) + 0.8, 135, 22));
-        now.add(String.format("cmd summon antcolonies:%s %s %s %s {PersistenceRequired:1b,Rotation:[%sf,0f],CustomName:'\"%s\"',UUID:%s}",
-                type, x, y, z, yaw, WALKER, WALKER_ID));
+        now.add(String.format("cmd summon %s %s %s %s {PersistenceRequired:1b,Rotation:[%sf,0f],CustomName:'\"%s\"',UUID:%s}",
+                insect(type), x, y, z, yaw, WALKER, WALKER_ID));
         now.add("step 2");
         now.add("forget");
         now.add("step 40");

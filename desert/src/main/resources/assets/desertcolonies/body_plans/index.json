@@ -1,0 +1,6 @@
+{
+  "about": "Every body plan the game reads (it cannot list a folder inside the mod). Add a new plan here.",
+  "plans": [
+    "worker_ant"
+  ]
+}

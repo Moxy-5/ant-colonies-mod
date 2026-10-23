@@ -1,7 +1,6 @@
 {
   "replace": false,
   "values": [
-    "antcolonies:burrowed_dirt",
     "antcolonies:frass"
   ]
 }

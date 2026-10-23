@@ -1,6 +1,0 @@
-{
-  "parent": "minecraft:item/generated",
-  "textures": {
-    "layer0": "antcolonies:item/black_grama_seeds"
-  }
-}

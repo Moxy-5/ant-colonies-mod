@@ -2,7 +2,6 @@ package com.antcolonies.savanna.entity.body;
 
 import com.antcolonies.entity.body.*;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -32,7 +31,8 @@ class BodyPlansTest {
         BodyPlans.signUp(com.antcolonies.savanna.SavannaMod.class, "/assets/antcolonies/body_plans/");
     }
 
-    private static final String[] MODELS = {"worker_ant", "termite_worker", "termite_king", "termite_queen",
+    /** The savanna's models (the worker ant's plan is checked by the desert mod's HarvesterBodyPlansTest, step S7). */
+    private static final String[] MODELS = {"termite_worker", "termite_king", "termite_queen",
             "termite_minor_soldier", "termite_major_soldier"};
 
     @Test
@@ -51,10 +51,6 @@ class BodyPlansTest {
                 assertEquals("carry".equals(bone), BodyPlans.isHoldBone(bone), model + ": " + bone + " as the load's place");
             }
         }
-        BodyPlans.Plan worker = BodyPlans.of("worker_ant");
-        assertEquals(List.of("petiole", "postpetiole", "abdomen"), worker.waist());
-        assertArrayEquals(new float[] {0.40F, 0.35F, 0.25F}, worker.waistShare(), 1e-6F);
-        assertEquals("head", worker.bone("head"));
     }
 
     /**
@@ -64,25 +60,13 @@ class BodyPlansTest {
      */
     @Test
     void everyBodyClimbsWithItsOwnNumbers() {
-        BodyPlans.Plan worker = BodyPlans.of("worker_ant");
-        assertEquals(BodyPlans.WORKER_CLIMB, worker.climb());
-        BodyPlans.Piece waist = worker.spine().get(0);
-        assertEquals(BodyPlans.WORKER_WAIST.joints(), waist.joints());
-        assertArrayEquals(BodyPlans.WORKER_WAIST.shares(), waist.shares());
-        assertEquals(BodyPlans.WORKER_WAIST.hinge(), waist.hinge());
-        assertEquals(BodyPlans.WORKER_WAIST.from(), waist.from());
-        assertEquals(BodyPlans.WORKER_WAIST.to(), waist.to());
-        assertEquals(BodyPlans.WORKER_WAIST.maxPitch(), waist.maxPitch());
-        assertEquals(BodyPlans.WORKER_WAIST.maxYaw(), waist.maxYaw());
         BodyPlans.Climb sized = new BodyPlans.Climb(3.6, 2.85, 5.57, 5.57, 3.0, Double.NaN, Double.NaN);
         assertEquals(0.25, sized.liftFor(0.2F, 0.65F), 1e-6);
         assertEquals(0.17, sized.intoWallFor(0.3F, 0.65F), 1e-6);
         for (String model : MODELS) {
             BodyPlans.Plan plan = BodyPlans.of(model);
             assertTrue(!plan.spine().isEmpty(), model + ": no spine");
-            if (!model.equals("worker_ant")) {
-                assertTrue(plan.climb().hindFeet() != BodyPlans.WORKER_CLIMB.hindFeet(), model + ": the worker's feet");
-            }
+            assertTrue(plan.climb().hindFeet() != BodyPlans.WORKER_CLIMB.hindFeet(), model + ": the worker's feet");
         }
         BodyPlans.Plan major = BodyPlans.of("termite_major_soldier");
         assertEquals(0.4, major.climb().liftFor(0.3F, 0.75F), 1e-9);

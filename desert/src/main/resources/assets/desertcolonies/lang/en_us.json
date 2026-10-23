@@ -1,0 +1,23 @@
+{
+  "block.desertcolonies.burrowed_dirt": "Burrowed Dirt",
+  "entity.desertcolonies.worker_ant": "Worker Ant",
+  "entity.desertcolonies.queen_ant": "Queen Ant",
+  "item.desertcolonies.worker_ant_spawn_egg": "Worker Ant Spawn Egg",
+  "item.desertcolonies.queen_ant_spawn_egg": "Queen Ant Spawn Egg",
+  "block.desertcolonies.seed_pile": "Seed Pile",
+  "entity.desertcolonies.ant_larva": "Ant Larva",
+  "entity.desertcolonies.ant_corpse": "Dead Ant",
+  "block.desertcolonies.bread_pile": "Ant Bread Pile",
+  "block.desertcolonies.loose_soil": "Loose Soil",
+  "item.desertcolonies.ant_bread": "Ant Bread",
+  "item.desertcolonies.rich_ant_bread": "Rich Ant Bread",
+  "block.desertcolonies.deep_soil": "Deep Soil",
+  "block.desertcolonies.blue_grama": "Blue Grama",
+  "block.desertcolonies.blue_grama.leaves": "Blue Grama (grown)",
+  "block.desertcolonies.blue_grama.ripe": "Blue Grama (ripe)",
+  "block.desertcolonies.black_grama": "Black Grama",
+  "block.desertcolonies.black_grama.leaves": "Black Grama (grown)",
+  "block.desertcolonies.black_grama.ripe": "Black Grama (ripe)",
+  "item.desertcolonies.blue_grama_seeds": "Blue Grama Seeds",
+  "item.desertcolonies.black_grama_seeds": "Black Grama Seeds"
+}

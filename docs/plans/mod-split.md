@@ -159,7 +159,8 @@ folder of its own, which a separate mod cannot do; now each species mod signs it
 4 data files naming both sides: their framework part split off; the savanna and desert entries share the savanna's
 files until S7 gives the desert its own folder (one mod cannot hold two copies of one file). Five unit tests that read
 species files moved to the savanna. The wall checker keeps watching savanna against desert until S7 (the compiler
-guards the framework). Tools point at `savanna\src\mainesources` (S8 does the proper paths helper). Checks:
+guards the framework). Tools point at `savanna\src\main
+esources` (S8 does the proper paths helper). Checks:
 `./gradlew build` with the 163 unit tests (70 framework, 93 savanna), `soldiers,legs` 29 of 29 on 6 servers (both mods
 load), anim lab unchanged (worker 0, termites only the old `peek` findings), guard films 15 of 15 scenes unchanged.
 Full run owed: done first by S7's session. S5's full run (by this session first): 142 of 143, the old flake BUGS 55.
@@ -168,6 +169,29 @@ Full run owed: done first by S7's session. S5's full run (by this session first)
 `desert\` under the desert mod's own name (`desertcolonies:worker_ant`, `desertcolonies:red_harvester_ant`, ...).
 No forwarding of old names (the user's change, 2026-10-22): a world saved before this step loses its harvester
 things, as with any removed mod; termite and tree things keep their names.
+**BUILT 2026-10-23** (round 4, `docs/HISTORY.md`): the folder `desert\` (a third Gradle subproject, `desert/build.gradle`,
+its own mod file, `desert_mod_id=desertcolonies` and `desert_mod_name=Desert Colonies` in `gradle.properties`); the
+desert's 41 code files and 4 unit tests moved there with `git mv`, its 118 asset and data files (models, textures, the
+worker's geo, clips and body plan, blockstates, loot tables, grama and deep soil worldgen, the species file) moved to
+`assets/desertcolonies` and `data/desertcolonies`, every `antcolonies:` name inside them renamed `desertcolonies:`;
+`DesertMod.MODID` is `desertcolonies`. The 4 files naming both sides split by their entries: the framework's tags
+(`diggable`, `nurse_food`, `rich_nurse_food`, `seeds`, `old_plugs`) and Minecraft's `mineable/shovel` each have a savanna
+and a desert file (the game joins them), the name list (`en_us.json`, 21 harvester lines) and the body plan list
+(`index.json`) one per mod. The game test arena copied into the desert mod (`data/desertcolonies/structure/arena.nbt`,
+each mod's tests look in their own mod; my pick, so the desert can run alone, S9). The root runs the game with the
+three mods and the game tests of both species (`gameTestNamespaces`). The framework's built-in harvester numbers name
+`desertcolonies:seed_pile` and `burrowed_dirt`; the in-game camera looks an insect's name up in any mod
+(`FilmDirector.insect`, so the shot lists keep `ant worker_ant`), `h_crowd.film` summons `desertcolonies:worker_ant`;
+the termite garden test's "no seed heap" check matches any mod's `seed_pile`. Unit tests that read the worker ant's
+files moved with it, every check kept: `SpeciesProfileTest` split into the savanna's (termite checks) and the desert's
+`HarvesterProfileTest`; `WorkerAnimationsTest` moved; the worker's parts of `ModelFilesTest` and `BodyPlansTest` into
+`HarvesterModelFilesTest` and `HarvesterBodyPlansTest`. The compiler now guards all three walls (savanna and desert each
+see only the framework), so the wall checker is retired (`--strict` still reads 0, `--data` says retired). Checks:
+`./gradlew build` with 170 unit tests (framework 70, savanna 65, desert 35; 7 more than 163 because split tests became
+more, smaller ones). **No full run in this step** (the user's schedule, 2026-10-23: S8's session runs it, owed since S6).
+Left for S8: the tools that read or write the worker ant's or the grama's files still point at the savanna folder
+(`body_plan.py`, `anim_lab.py` through it, `grama_art.py`, `corpse_textures.py`, `young_textures.py`, `film.sh` and the
+root's film watch folder).
 
 **S8. Tools, scripts and GitHub** (about 2 to 3 hours). One small paths helper so every tool finds each model's files in
 its mod: the art scripts, the anim lab, the body plans, the model and tree viewers, the guard films, `film.sh`,
