@@ -1,7 +1,9 @@
-package com.antcolonies.gametest;
+package com.antcolonies.savanna.gametest;
 
-import static com.antcolonies.gametest.TermiteMoundTests.MIDDLE;
-import static com.antcolonies.gametest.TermiteMoundTests.SURFACE;
+import com.antcolonies.gametest.TestClock;
+import com.antcolonies.gametest.TestScenes;
+import static com.antcolonies.savanna.gametest.TermiteMoundTests.MIDDLE;
+import static com.antcolonies.savanna.gametest.TermiteMoundTests.SURFACE;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -9,12 +11,12 @@ import java.util.List;
 import java.util.Set;
 
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.block.TermiteMoundBlock;
+import com.antcolonies.savanna.block.TermiteMoundBlock;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.registry.ModTags;
 import com.antcolonies.colony.NestPlan;
-import com.antcolonies.registry.SavannaBlocks;
-import com.antcolonies.registry.SavannaEntities;
+import com.antcolonies.savanna.registry.SavannaBlocks;
+import com.antcolonies.savanna.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;

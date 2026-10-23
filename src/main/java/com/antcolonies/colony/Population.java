@@ -176,7 +176,7 @@ public class Population {
      * A real mob frozen in unloaded land is folded into the numbers (see {@link AwayLife}): it is counted already, so
      * only where it is changes, not the headcount.
      */
-    void foldIn(ServerLevel level, String caste, long grownUpAt, long lastMeal) {
+    public void foldIn(ServerLevel level, String caste, long grownUpAt, long lastMeal) {
         putInside(caste, grownUpAt, 1);
         meals.add(caste, lastMeal, level.getGameTime());
     }
@@ -386,7 +386,7 @@ public class Population {
     }
 
     /** Where the eyes are of every player who could see into the nest (the watch radius and the sight together). */
-    List<Vec3> viewersInSight(ServerLevel level) {
+    public List<Vec3> viewersInSight(ServerLevel level) {
         return viewers(level, numbers().watchRadius() + (int) SIGHT);
     }
 

@@ -1,5 +1,6 @@
-package com.antcolonies.entity;
+package com.antcolonies.desert.entity;
 
+import com.antcolonies.entity.AbstractAntEntity;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
@@ -8,7 +9,7 @@ import com.antcolonies.colony.GroundReader;
 import com.antcolonies.colony.NestSite;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.entity.goal.DigGoal;
-import com.antcolonies.entity.goal.FindNestSiteGoal;
+import com.antcolonies.desert.entity.goal.FindNestSiteGoal;
 import com.antcolonies.entity.goal.GroomGoal;
 import com.antcolonies.entity.goal.NapGoal;
 import com.antcolonies.entity.goal.QueenToRoomGoal;

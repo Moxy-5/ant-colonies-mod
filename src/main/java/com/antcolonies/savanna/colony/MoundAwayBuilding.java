@@ -1,13 +1,17 @@
-package com.antcolonies.colony;
+package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.AwayReport;
+import com.antcolonies.colony.BuildLife;
+import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.ColonyHooks;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import com.antcolonies.block.MoundSoil;
-import com.antcolonies.block.TermiteMoundBlock;
+import com.antcolonies.savanna.block.MoundSoil;
+import com.antcolonies.savanna.block.TermiteMoundBlock;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;

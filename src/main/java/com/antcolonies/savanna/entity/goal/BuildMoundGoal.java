@@ -1,4 +1,4 @@
-package com.antcolonies.entity.goal;
+package com.antcolonies.savanna.entity.goal;
 
 import java.util.EnumSet;
 import java.util.function.Predicate;
@@ -6,12 +6,12 @@ import java.util.function.Predicate;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.block.TermiteTunnelBlock;
+import com.antcolonies.savanna.block.TermiteTunnelBlock;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
-import com.antcolonies.colony.SavannaParts;
-import com.antcolonies.colony.Mound;
-import com.antcolonies.colony.MoundReach;
+import com.antcolonies.savanna.colony.SavannaParts;
+import com.antcolonies.savanna.colony.Mound;
+import com.antcolonies.savanna.colony.MoundReach;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.nav.Foothold;
 
@@ -28,12 +28,12 @@ import net.minecraft.world.level.block.state.BlockState;
 
 /**
  * A termite holding a soil pellet takes it to the mound and adds it to the next block being built (a layer of soil, or
- * a whole ramp, spire piece or chimney mouth; see {@link com.antcolonies.colony.Mound#pickBuildSpot}). It works from
+ * a whole ramp, spire piece or chimney mouth; see {@link com.antcolonies.savanna.colony.Mound#pickBuildSpot}). It works from
  * inside, by the rules of {@link MoundReach}: from the shaft or the nest, or from a tunnel's channel, where it bites a
  * small window to the outside, adds the soil beside it, and plugs the window again (windows only at night or in the
  * rain; by day it only builds what it can reach from the shaft). A spot it finds no way to from inside is left for a
  * while (the tunnel to it may not be carved yet) and it takes another. Only when the mound has not grown for a while
- * (see {@link com.antcolonies.colony.Mound#mayUseFallbacks}) does it fall back: from outside at night, then from 2 blocks
+ * (see {@link com.antcolonies.savanna.colony.Mound#mayUseFallbacks}) does it fall back: from outside at night, then from 2 blocks
  * away (for surprises like a player breaking the tunnels; the plan never needs them). With no spot free it keeps its
  * pellet until one is.
  */

@@ -1,11 +1,12 @@
-package com.antcolonies.block;
+package com.antcolonies.savanna.block;
 
+import com.antcolonies.block.FacedWall;
 import java.util.HashMap;
 import java.util.Map;
 
 import org.jetbrains.annotations.Nullable;
 
-import com.antcolonies.registry.TreeBlocks;
+import com.antcolonies.savanna.registry.TreeBlocks;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;

@@ -1,4 +1,4 @@
-package com.antcolonies.block;
+package com.antcolonies.savanna.block;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.entity.AbstractAntEntity;

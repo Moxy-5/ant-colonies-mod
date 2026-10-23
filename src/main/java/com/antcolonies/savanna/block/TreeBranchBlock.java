@@ -1,6 +1,6 @@
-package com.antcolonies.block;
+package com.antcolonies.savanna.block;
 
-import com.antcolonies.registry.TreeBlocks;
+import com.antcolonies.savanna.registry.TreeBlocks;
 import com.mojang.serialization.MapCodec;
 
 import net.minecraft.core.BlockPos;

@@ -1,21 +1,22 @@
-package com.antcolonies.gametest;
+package com.antcolonies.savanna.gametest;
 
-import static com.antcolonies.gametest.TermiteMoundTests.MIDDLE;
-import static com.antcolonies.gametest.TermiteMoundTests.SURFACE;
+import com.antcolonies.gametest.TestAnts;
+import static com.antcolonies.savanna.gametest.TermiteMoundTests.MIDDLE;
+import static com.antcolonies.savanna.gametest.TermiteMoundTests.SURFACE;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.block.FallenBranchBlock;
-import com.antcolonies.block.MudCrustBlock;
-import com.antcolonies.block.TreeBranchBlock;
-import com.antcolonies.entity.TermiteWorkerEntity;
-import com.antcolonies.registry.TreeBlocks;
-import com.antcolonies.tree.TreeStage;
-import com.antcolonies.worldgen.TreePlacer;
-import com.antcolonies.registry.SavannaBlocks;
-import com.antcolonies.registry.SavannaEntities;
+import com.antcolonies.savanna.block.FallenBranchBlock;
+import com.antcolonies.savanna.block.MudCrustBlock;
+import com.antcolonies.savanna.block.TreeBranchBlock;
+import com.antcolonies.savanna.entity.TermiteWorkerEntity;
+import com.antcolonies.savanna.registry.TreeBlocks;
+import com.antcolonies.savanna.tree.TreeStage;
+import com.antcolonies.savanna.worldgen.TreePlacer;
+import com.antcolonies.savanna.registry.SavannaBlocks;
+import com.antcolonies.savanna.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -264,8 +265,8 @@ public class TreeTests {
         String slowest = "";
         for (String size : new String[] {"big", "young"}) {
             for (int i = 0; i < 30; i++) {
-                var pick = com.antcolonies.worldgen.GiantTreeStructure.pick(size, random);
-                if (com.antcolonies.worldgen.GiantTreePiece.fallenYoung(pick)) {
+                var pick = com.antcolonies.savanna.worldgen.GiantTreeStructure.pick(size, random);
+                if (com.antcolonies.savanna.worldgen.GiantTreePiece.fallenYoung(pick)) {
                     continue;
                 }
                 long start = System.nanoTime();
@@ -298,8 +299,8 @@ public class TreeTests {
      */
     private static void newLandLitter(GameTestHelper helper, BlockPos foot) {
         var level = helper.getLevel();
-        var pick = new com.antcolonies.worldgen.GiantTreeStructure.Pick("camel_thorn", 5, 1, TreeStage.LIVING);
-        TreePlacer.Placed litter = com.antcolonies.worldgen.GiantTreePiece.litter(pick, foot, TreePlacer.ground(level, foot));
+        var pick = new com.antcolonies.savanna.worldgen.GiantTreeStructure.Pick("camel_thorn", 5, 1, TreeStage.LIVING);
+        TreePlacer.Placed litter = com.antcolonies.savanna.worldgen.GiantTreePiece.litter(pick, foot, TreePlacer.ground(level, foot));
         int branch = 0;
         for (int i = 0; i < litter.size(); i++) {
             branch += litter.states()[i].getBlock() instanceof FallenBranchBlock ? 1 : 0;
@@ -323,22 +324,22 @@ public class TreeTests {
         }
         int limbs = 0;
         for (long seed = 0; seed < 40; seed++) {
-            if (hasDeadWood(TreePlacer.litter(com.antcolonies.tree.Litter.underTree(seed, 1.25, 20, 2, false)))) {
+            if (hasDeadWood(TreePlacer.litter(com.antcolonies.savanna.tree.Litter.underTree(seed, 1.25, 20, 2, false)))) {
                 limbs++;
             }
-            if (hasDeadWood(TreePlacer.litter(com.antcolonies.tree.Litter.underTree(seed, 1.25, 20, 2, true)))) {
+            if (hasDeadWood(TreePlacer.litter(com.antcolonies.savanna.tree.Litter.underTree(seed, 1.25, 20, 2, true)))) {
                 helper.fail("a baobab of new land has a fallen giant limb (seed " + seed + ")");
             }
         }
         if (limbs < 20 || limbs == 40) {
             helper.fail(limbs + " of 40 ancient trees have a fallen giant limb under them (most, not all)");
         }
-        var young = new com.antcolonies.worldgen.GiantTreeStructure.Pick("umbrella_thorn", 3, 0.3, TreeStage.FALLEN);
-        if (!com.antcolonies.worldgen.GiantTreePiece.fallenYoung(young)
-                || com.antcolonies.worldgen.GiantTreePiece.fallenYoung(new com.antcolonies.worldgen.GiantTreeStructure.Pick("umbrella_thorn", 3, 1, TreeStage.FALLEN))) {
+        var young = new com.antcolonies.savanna.worldgen.GiantTreeStructure.Pick("umbrella_thorn", 3, 0.3, TreeStage.FALLEN);
+        if (!com.antcolonies.savanna.worldgen.GiantTreePiece.fallenYoung(young)
+                || com.antcolonies.savanna.worldgen.GiantTreePiece.fallenYoung(new com.antcolonies.savanna.worldgen.GiantTreeStructure.Pick("umbrella_thorn", 3, 1, TreeStage.FALLEN))) {
             helper.fail("a fallen young tree of new land is not told from a fallen giant");
         }
-        if (!hasDeadWood(com.antcolonies.worldgen.GiantTreePiece.litter(young, foot, (x, z) -> foot.getY()))) {
+        if (!hasDeadWood(com.antcolonies.savanna.worldgen.GiantTreePiece.litter(young, foot, (x, z) -> foot.getY()))) {
             helper.fail("a fallen young tree of new land has no stem");
         }
     }

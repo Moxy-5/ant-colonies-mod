@@ -1,9 +1,11 @@
-package com.antcolonies.entity;
+package com.antcolonies.savanna.entity;
 
+import com.antcolonies.entity.AbstractAntEntity;
+import com.antcolonies.entity.FedByNurses;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
-import com.antcolonies.colony.SavannaParts;
-import com.antcolonies.colony.KingCare;
+import com.antcolonies.savanna.colony.SavannaParts;
+import com.antcolonies.savanna.colony.KingCare;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.entity.goal.DigGoal;
 import com.antcolonies.entity.goal.QueenToRoomGoal;

@@ -1,4 +1,4 @@
-package com.antcolonies.tree;
+package com.antcolonies.savanna.tree;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -10,7 +10,7 @@ import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.worldgen.TreePlacer;
+import com.antcolonies.savanna.worldgen.TreePlacer;
 import com.mojang.math.Transformation;
 
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;

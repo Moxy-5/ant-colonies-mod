@@ -1,19 +1,20 @@
-package com.antcolonies.gametest;
+package com.antcolonies.savanna.gametest;
 
-import static com.antcolonies.gametest.TermiteMoundTests.MIDDLE;
-import static com.antcolonies.gametest.TermiteMoundTests.SURFACE;
+import com.antcolonies.gametest.TestClock;
+import static com.antcolonies.savanna.gametest.TermiteMoundTests.MIDDLE;
+import static com.antcolonies.savanna.gametest.TermiteMoundTests.SURFACE;
 
 import java.util.List;
 
 import com.antcolonies.colony.Caste;
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.block.MudCrustBlock;
+import com.antcolonies.savanna.block.MudCrustBlock;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.FoodWays;
 import com.antcolonies.colony.ForagingHoles;
 import com.antcolonies.colony.NestPlan;
-import com.antcolonies.entity.TermiteWorkerEntity;
-import com.antcolonies.registry.SavannaEntities;
+import com.antcolonies.savanna.entity.TermiteWorkerEntity;
+import com.antcolonies.savanna.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;

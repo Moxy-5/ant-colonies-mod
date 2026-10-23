@@ -1,5 +1,7 @@
-package com.antcolonies.colony;
+package com.antcolonies.desert.colony;
 
+import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.ColonyManager;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -12,7 +14,7 @@ import org.jetbrains.annotations.Nullable;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.block.SeedPileBlock;
 import com.antcolonies.species.SpeciesProfile;
-import com.antcolonies.registry.DesertBlocks;
+import com.antcolonies.desert.registry.DesertBlocks;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;

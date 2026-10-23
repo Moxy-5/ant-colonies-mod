@@ -1,6 +1,6 @@
-package com.antcolonies.worldgen;
+package com.antcolonies.desert.worldgen;
 
-import com.antcolonies.block.GramaGrassBlock;
+import com.antcolonies.desert.block.GramaGrassBlock;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 

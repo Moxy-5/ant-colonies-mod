@@ -38,11 +38,11 @@ public class NestLedger {
         this.colony = colony;
     }
 
-    void addStore(int layers) {
+    public void addStore(int layers) {
         store += layers;
     }
 
-    void addNurseFood(int pieces) {
+    public void addNurseFood(int pieces) {
         nurseFood += pieces;
     }
 
@@ -50,11 +50,11 @@ public class NestLedger {
         bodies += count;
     }
 
-    void addRipened(int layers) {
+    public void addRipened(int layers) {
         ripened += layers;
     }
 
-    void addAged(int layers) {
+    public void addAged(int layers) {
         aged += layers;
     }
 

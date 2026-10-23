@@ -1,21 +1,21 @@
-package com.antcolonies.command;
+package com.antcolonies.savanna.command;
 
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.block.GiantTermitomycesBlock;
-import com.antcolonies.block.MoundPieceBlock;
-import com.antcolonies.block.MoundSoil;
-import com.antcolonies.block.TermiteMoundBlock;
-import com.antcolonies.block.TermitomycesBlock;
-import com.antcolonies.colony.Alarm;
+import com.antcolonies.savanna.block.GiantTermitomycesBlock;
+import com.antcolonies.savanna.block.MoundPieceBlock;
+import com.antcolonies.savanna.block.MoundSoil;
+import com.antcolonies.savanna.block.TermiteMoundBlock;
+import com.antcolonies.savanna.block.TermitomycesBlock;
+import com.antcolonies.savanna.colony.Alarm;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
-import com.antcolonies.colony.SavannaParts;
-import com.antcolonies.colony.FungusGarden;
-import com.antcolonies.colony.Mound;
-import com.antcolonies.colony.Mushrooms;
-import com.antcolonies.entity.TermiteQueenEntity;
-import com.antcolonies.entity.TermiteSoldierEntity;
-import com.antcolonies.registry.SavannaBlocks;
+import com.antcolonies.savanna.colony.SavannaParts;
+import com.antcolonies.savanna.colony.FungusGarden;
+import com.antcolonies.savanna.colony.Mound;
+import com.antcolonies.savanna.colony.Mushrooms;
+import com.antcolonies.savanna.entity.TermiteQueenEntity;
+import com.antcolonies.savanna.entity.TermiteSoldierEntity;
+import com.antcolonies.savanna.registry.SavannaBlocks;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 
 import java.util.Comparator;

@@ -1,5 +1,12 @@
-package com.antcolonies.colony;
+package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.ColonyHooks;
+import com.antcolonies.colony.ColonyNews;
+import com.antcolonies.colony.ColonyPart;
+import com.antcolonies.colony.ColonyParts;
+import com.antcolonies.colony.ColonyQuestions;
+import com.antcolonies.colony.Population;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -35,12 +42,12 @@ public final class SavannaParts {
 
                 @Override
                 public boolean isOne(com.antcolonies.entity.AbstractAntEntity insect) {
-                    return insect instanceof com.antcolonies.entity.TermiteKingEntity;
+                    return insect instanceof com.antcolonies.savanna.entity.TermiteKingEntity;
                 }
 
                 @Override
                 public String caste() {
-                    return com.antcolonies.entity.TermiteKingEntity.CASTE;
+                    return com.antcolonies.savanna.entity.TermiteKingEntity.CASTE;
                 }
             })
             .plugs(ColonyHooks.AWAY_BESIDE_QUEEN, 10, king -> king::liveAway) // his hunger clock runs on while away
@@ -58,9 +65,9 @@ public final class SavannaParts {
 
                 @Override
                 public net.minecraft.world.level.block.state.BlockState pellet(net.minecraft.world.level.block.state.BlockState dug) {
-                    return dug.getBlock() instanceof com.antcolonies.block.TermiteMoundBlock || dug.getBlock() instanceof com.antcolonies.block.TermiteHoleBlock
-                            || dug.getBlock() instanceof com.antcolonies.block.MudCrustBlock
-                            ? com.antcolonies.registry.SavannaBlocks.TERMITE_MOUND.get().defaultBlockState() : dug;
+                    return dug.getBlock() instanceof com.antcolonies.savanna.block.TermiteMoundBlock || dug.getBlock() instanceof com.antcolonies.savanna.block.TermiteHoleBlock
+                            || dug.getBlock() instanceof com.antcolonies.savanna.block.MudCrustBlock
+                            ? com.antcolonies.savanna.registry.SavannaBlocks.TERMITE_MOUND.get().defaultBlockState() : dug;
                 }
             })
             .answers(ColonyQuestions.BUILDS_OVER_NEST, 10, (mound, level, nothing) -> mound.numbers() != null)
@@ -68,7 +75,7 @@ public final class SavannaParts {
             .answers(ColonyQuestions.CLEAR_JOB, 10, Mound::isClearJob) // its own soil where it must be hollow
             .answers(ColonyQuestions.STRUCTURE_TUNNEL, 10, (mound, level, pos) -> mound.getGalleries(level).contains(pos))
             .plugs(ColonyHooks.LIST_BUILDING, 10, mound -> mound::describe)
-            .plugs(ColonyHooks.CRUST, 10, mound -> com.antcolonies.registry.SavannaBlocks.MUD_CRUST.get())
+            .plugs(ColonyHooks.CRUST, 10, mound -> com.antcolonies.savanna.registry.SavannaBlocks.MUD_CRUST.get())
             .plugs(ColonyHooks.STRUCTURE, 10, mound -> new ColonyHooks.Structure() {
                 @Override
                 public Map<BlockPos, MoundPlan.Part> parts(Level level) {
@@ -155,29 +162,29 @@ public final class SavannaParts {
             .plugs(ColonyHooks.CASTES, 10, soldiers -> new ColonyHooks.Castes() {
                 @Override
                 public List<String> castes() {
-                    return List.of(com.antcolonies.entity.TermiteSoldierEntity.Rank.MINOR.caste(), com.antcolonies.entity.TermiteSoldierEntity.Rank.MAJOR.caste());
+                    return List.of(com.antcolonies.savanna.entity.TermiteSoldierEntity.Rank.MINOR.caste(), com.antcolonies.savanna.entity.TermiteSoldierEntity.Rank.MAJOR.caste());
                 }
 
                 @Override
                 public int mealFor(String caste) {
-                    return soldiers.mealFor(com.antcolonies.entity.TermiteSoldierEntity.Rank.byCaste(caste));
+                    return soldiers.mealFor(com.antcolonies.savanna.entity.TermiteSoldierEntity.Rank.byCaste(caste));
                 }
 
                 @Override
                 public String wanted(Level level) {
-                    com.antcolonies.entity.TermiteSoldierEntity.Rank rank = soldiers.rankForNewNymph(level);
+                    com.antcolonies.savanna.entity.TermiteSoldierEntity.Rank rank = soldiers.rankForNewNymph(level);
                     return rank == null ? null : rank.caste();
                 }
 
                 @Override
                 public String savedAs(String caste) {
-                    com.antcolonies.entity.TermiteSoldierEntity.Rank rank = com.antcolonies.entity.TermiteSoldierEntity.Rank.byCaste(caste);
+                    com.antcolonies.savanna.entity.TermiteSoldierEntity.Rank rank = com.antcolonies.savanna.entity.TermiteSoldierEntity.Rank.byCaste(caste);
                     return rank == null ? null : rank.name(); // "MINOR", "MAJOR", as saved before step 9c
                 }
 
                 @Override
                 public String fromSaved(String word) {
-                    for (com.antcolonies.entity.TermiteSoldierEntity.Rank rank : com.antcolonies.entity.TermiteSoldierEntity.Rank.values()) {
+                    for (com.antcolonies.savanna.entity.TermiteSoldierEntity.Rank rank : com.antcolonies.savanna.entity.TermiteSoldierEntity.Rank.values()) {
                         if (rank.name().equals(word)) {
                             return rank.caste();
                         }
@@ -187,13 +194,13 @@ public final class SavannaParts {
 
                 @Override
                 public byte numberOf(String caste) {
-                    com.antcolonies.entity.TermiteSoldierEntity.Rank rank = com.antcolonies.entity.TermiteSoldierEntity.Rank.byCaste(caste);
+                    com.antcolonies.savanna.entity.TermiteSoldierEntity.Rank rank = com.antcolonies.savanna.entity.TermiteSoldierEntity.Rank.byCaste(caste);
                     return rank == null ? 0 : rank.id(); // 1 minor, 2 major, as synced and saved before step 10
                 }
 
                 @Override
                 public String casteOf(int number) {
-                    com.antcolonies.entity.TermiteSoldierEntity.Rank rank = com.antcolonies.entity.TermiteSoldierEntity.Rank.byId(number);
+                    com.antcolonies.savanna.entity.TermiteSoldierEntity.Rank rank = com.antcolonies.savanna.entity.TermiteSoldierEntity.Rank.byId(number);
                     return rank == null ? null : rank.caste();
                 }
 

@@ -1,11 +1,12 @@
-package com.antcolonies;
+package com.antcolonies.desert;
 
-import com.antcolonies.colony.DesertParts;
-import com.antcolonies.gametest.DesertTests;
-import com.antcolonies.registry.DesertBlocks;
-import com.antcolonies.registry.DesertEntities;
-import com.antcolonies.registry.DesertFeatures;
-import com.antcolonies.registry.DesertItems;
+import com.antcolonies.AntColoniesMod;
+import com.antcolonies.desert.colony.DesertParts;
+import com.antcolonies.desert.gametest.DesertTests;
+import com.antcolonies.desert.registry.DesertBlocks;
+import com.antcolonies.desert.registry.DesertEntities;
+import com.antcolonies.desert.registry.DesertFeatures;
+import com.antcolonies.desert.registry.DesertItems;
 
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
@@ -28,8 +29,8 @@ public class DesertMod {
         DesertTests.signUp();
         // In-game tests: only loaded when the game is started in game-test mode.
         modEventBus.addListener((RegisterGameTestsEvent event) -> {
-            event.register(com.antcolonies.gametest.NestTests.class);
-            event.register(com.antcolonies.gametest.NavigationTests.class);
+            event.register(com.antcolonies.desert.gametest.NestTests.class);
+            event.register(com.antcolonies.desert.gametest.NavigationTests.class);
         });
     }
 }

@@ -1,5 +1,6 @@
-package com.antcolonies.block;
+package com.antcolonies.desert.block;
 
+import com.antcolonies.block.EatenInStages;
 import java.util.function.Supplier;
 
 import com.mojang.serialization.MapCodec;

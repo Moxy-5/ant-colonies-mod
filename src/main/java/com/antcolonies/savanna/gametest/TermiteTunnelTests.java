@@ -1,18 +1,20 @@
-package com.antcolonies.gametest;
+package com.antcolonies.savanna.gametest;
 
+import com.antcolonies.gametest.TestAnts;
+import com.antcolonies.gametest.TestWatch;
 import java.util.List;
 
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.block.MoundSoil;
-import com.antcolonies.block.TermiteMoundBlock;
-import com.antcolonies.block.TermiteSpireBlock;
-import com.antcolonies.block.TermiteTunnelBlock;
-import com.antcolonies.entity.TermiteWorkerEntity;
+import com.antcolonies.savanna.block.MoundSoil;
+import com.antcolonies.savanna.block.TermiteMoundBlock;
+import com.antcolonies.savanna.block.TermiteSpireBlock;
+import com.antcolonies.savanna.block.TermiteTunnelBlock;
+import com.antcolonies.savanna.entity.TermiteWorkerEntity;
 import com.antcolonies.nav.Foothold;
 import com.antcolonies.nav.Route;
 import com.antcolonies.nav.StepKind;
-import com.antcolonies.registry.SavannaBlocks;
-import com.antcolonies.registry.SavannaEntities;
+import com.antcolonies.savanna.registry.SavannaBlocks;
+import com.antcolonies.savanna.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -188,9 +190,9 @@ public class TermiteTunnelTests {
     @GameTest(template = "arena", timeoutTicks = 200, skyAccess = true)
     public static void soldiersFindNoWayIntoTermiteTunnels(GameTestHelper helper) {
         lumpWithATunnel(helper);
-        com.antcolonies.entity.TermiteSoldierEntity outsider = TestAnts.lone(helper, SavannaEntities.TERMITE_MINOR_SOLDIER.get(), 3, 1, 10);
-        com.antcolonies.entity.TermiteSoldierEntity major = SavannaTests.loneSoldier(helper, true, 3, 1, 12);
-        com.antcolonies.entity.TermiteSoldierEntity minor = SavannaTests.loneSoldier(helper, false, 3, 1, 14);
+        com.antcolonies.savanna.entity.TermiteSoldierEntity outsider = TestAnts.lone(helper, SavannaEntities.TERMITE_MINOR_SOLDIER.get(), 3, 1, 10);
+        com.antcolonies.savanna.entity.TermiteSoldierEntity major = SavannaTests.loneSoldier(helper, true, 3, 1, 12);
+        com.antcolonies.savanna.entity.TermiteSoldierEntity minor = SavannaTests.loneSoldier(helper, false, 3, 1, 14);
         TermiteWorkerEntity worker = SavannaTests.loneTermite(helper, 3, 1, 8);
         helper.runAfterDelay(10, () -> {
             for (BlockPos cell : List.of(TUNNEL.get(1), TUNNEL.get(3), THICK, MOUTH)) {

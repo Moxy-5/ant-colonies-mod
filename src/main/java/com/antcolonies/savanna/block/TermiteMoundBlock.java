@@ -1,5 +1,6 @@
-package com.antcolonies.block;
+package com.antcolonies.savanna.block;
 
+import com.antcolonies.block.PlugBlock;
 import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.core.BlockPos;

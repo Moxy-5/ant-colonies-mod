@@ -1,4 +1,4 @@
-package com.antcolonies.colony;
+package com.antcolonies.savanna.colony;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -14,9 +14,9 @@ import java.util.Set;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.block.TermiteSpireBlock;
-import com.antcolonies.colony.MoundPlan.Part;
-import com.antcolonies.colony.MoundPlan.Shape;
+import com.antcolonies.savanna.block.TermiteSpireBlock;
+import com.antcolonies.savanna.colony.MoundPlan.Part;
+import com.antcolonies.savanna.colony.MoundPlan.Shape;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;

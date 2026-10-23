@@ -1,4 +1,4 @@
-package com.antcolonies.tree;
+package com.antcolonies.savanna.tree;
 
 /**
  * What a block of a giant savanna tree's shape is made of (M7.5), before it is turned into a real block for the tree's

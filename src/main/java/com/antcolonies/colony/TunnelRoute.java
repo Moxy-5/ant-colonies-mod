@@ -27,7 +27,7 @@ public final class TunnelRoute {
     /** The most the ground may step up or down between two columns the tunnel runs through. */
     static final int MAX_STEP = 2;
     /** How far (blocks, sideways from the food) the hole may be from it: next to it, or one further. */
-    static final int HOLE_REACH = 2;
+    public static final int HOLE_REACH = 2;
     /** The route search gives up after looking at this many columns. */
     private static final int MAX_COLUMNS = 6000;
 

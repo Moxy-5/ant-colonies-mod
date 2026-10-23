@@ -814,7 +814,7 @@ public class Nest {
     }
 
     /** Only the nest plan's own foraging tunnels (not the arms, the new tunnels to food or the holes along them). */
-    List<NestPlan.ForagingTunnel> ownForagingTunnels(Level level) {
+    public List<NestPlan.ForagingTunnel> ownForagingTunnels(Level level) {
         getForagingTunnels(level);
         return foragingTunnels == null ? List.of() : foragingTunnels;
     }
@@ -942,7 +942,7 @@ public class Nest {
 
     /** The first block in the list that is diggable, has a place to stand next to it (see {@link #standSpotsFor}), and is safe to open. */
     @Nullable
-    BlockPos firstDiggable(Level level, List<BlockPos> cells) {
+    public BlockPos firstDiggable(Level level, List<BlockPos> cells) {
         Set<BlockPos> nestCells = null;
         for (BlockPos pos : cells) {
             if (!level.isLoaded(pos)) {
@@ -976,7 +976,7 @@ public class Nest {
     }
 
     /** How deep the entrance shaft goes for this nest: the depth of the room plan (the normal depth until it is known). */
-    int shaftDepth(Level level) {
+    public int shaftDepth(Level level) {
         NestLayout planned = getLayout(level);
         return planned == null ? SHAFT_DEPTH : planned.shaftDepth();
     }

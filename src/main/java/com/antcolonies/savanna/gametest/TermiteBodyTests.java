@@ -1,14 +1,15 @@
-package com.antcolonies.gametest;
+package com.antcolonies.savanna.gametest;
 
+import com.antcolonies.gametest.TestScenes;
 import static com.antcolonies.gametest.TestScenes.*;
 
 import java.util.List;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.entity.AbstractAntEntity;
-import com.antcolonies.entity.TermiteWorkerEntity;
+import com.antcolonies.savanna.entity.TermiteWorkerEntity;
 import com.antcolonies.entity.goal.GroundShakes;
-import com.antcolonies.registry.SavannaEntities;
+import com.antcolonies.savanna.registry.SavannaEntities;
 import com.antcolonies.species.SpeciesProfile;
 
 import net.minecraft.gametest.framework.GameTest;

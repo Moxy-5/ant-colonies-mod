@@ -1,18 +1,18 @@
-package com.antcolonies.gametest;
+package com.antcolonies.savanna.gametest;
 
-import static com.antcolonies.gametest.TermiteMoundTests.SURFACE;
+import static com.antcolonies.savanna.gametest.TermiteMoundTests.SURFACE;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.block.FallenBranchBlock;
-import com.antcolonies.registry.TreeBlocks;
-import com.antcolonies.tree.Forest;
-import com.antcolonies.tree.TreeFall;
-import com.antcolonies.tree.TreeLife;
-import com.antcolonies.tree.TreeStage;
-import com.antcolonies.worldgen.TreePlacer;
+import com.antcolonies.savanna.block.FallenBranchBlock;
+import com.antcolonies.savanna.registry.TreeBlocks;
+import com.antcolonies.savanna.tree.Forest;
+import com.antcolonies.savanna.tree.TreeFall;
+import com.antcolonies.savanna.tree.TreeLife;
+import com.antcolonies.savanna.tree.TreeStage;
+import com.antcolonies.savanna.worldgen.TreePlacer;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -392,7 +392,7 @@ public class TreeGrowthTests {
     }
 
     private static boolean livingLeaves(BlockState s) {
-        return s.getBlock() instanceof com.antcolonies.block.TreeLeavesBlock && !deadLeaves(s);
+        return s.getBlock() instanceof com.antcolonies.savanna.block.TreeLeavesBlock && !deadLeaves(s);
     }
 
     private static boolean deadLeaves(BlockState s) {
@@ -459,7 +459,7 @@ public class TreeGrowthTests {
         Forest forest = Forest.get(level);
         long base = Forest.today(level);
         long seed = 11;
-        com.antcolonies.tree.TreeKind kind = TreePlacer.kind("umbrella_thorn");
+        com.antcolonies.savanna.tree.TreeKind kind = TreePlacer.kind("umbrella_thorn");
         BlockPos foot = helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE));
         Forest.Tree t = forest.add(new Forest.Tree("umbrella_thorn", foot, seed, 1.0, TreeStage.LIVING, -1, base));
         forest.update(level, t, base);
@@ -467,20 +467,20 @@ public class TreeGrowthTests {
         int leafCount = countAround(level, foot, 0, 40, TreeGrowthTests::leaves);
         helper.assertTrue(leafCount > 300, "the grown tree has only " + leafCount + " leaves");
         // Step 6b: a grown tree sheds dead branches under its own crown, at most 3 lying there; young trees none.
-        helper.assertTrue(com.antcolonies.tree.BranchShedding.chance(0.3) == 0 && com.antcolonies.tree.BranchShedding.chance(1.0) >= 0.3
-                && com.antcolonies.tree.BranchShedding.chance(com.antcolonies.tree.TreeShapes.ANCIENT) >= 0.99, "the shedding chances");
+        helper.assertTrue(com.antcolonies.savanna.tree.BranchShedding.chance(0.3) == 0 && com.antcolonies.savanna.tree.BranchShedding.chance(1.0) >= 0.3
+                && com.antcolonies.savanna.tree.BranchShedding.chance(com.antcolonies.savanna.tree.TreeShapes.ANCIENT) >= 0.99, "the shedding chances");
         TreePlacer.Placed upright = TreePlacer.placed("umbrella_thorn", seed, 1.0, TreeStage.LIVING);
         int dropped = 0;
         for (int i = 0; i < 12; i++) {
-            if (com.antcolonies.tree.BranchShedding.shed(level, foot, upright, new java.util.Random(i), false)) {
+            if (com.antcolonies.savanna.tree.BranchShedding.shed(level, foot, upright, new java.util.Random(i), false)) {
                 dropped++;
             }
         }
-        int lying = com.antcolonies.tree.BranchShedding.lyingUnder(level, foot, upright);
-        helper.assertTrue(dropped >= 1 && lying == dropped && lying <= com.antcolonies.tree.BranchShedding.MAX_UNDER_TREE,
+        int lying = com.antcolonies.savanna.tree.BranchShedding.lyingUnder(level, foot, upright);
+        helper.assertTrue(dropped >= 1 && lying == dropped && lying <= com.antcolonies.savanna.tree.BranchShedding.MAX_UNDER_TREE,
                 "the grown tree dropped " + dropped + " branches, " + lying + " lie under it");
         for (BlockPos pos : BlockPos.betweenClosed(foot.offset(upright.minX(), -2, upright.minZ()), foot.offset(upright.maxX(), 2, upright.maxZ()))) {
-            if (level.getBlockState(pos).getBlock() instanceof com.antcolonies.block.FallenBranchBlock) {
+            if (level.getBlockState(pos).getBlock() instanceof com.antcolonies.savanna.block.FallenBranchBlock) {
                 helper.assertTrue(level.getBlockState(pos.below()).isFaceSturdy(level, pos.below(), net.minecraft.core.Direction.UP),
                         "a shed branch does not lie on the ground at " + pos);
                 level.setBlock(pos, Blocks.AIR.defaultBlockState(), 2); // cleared for the rest of the test
@@ -547,7 +547,7 @@ public class TreeGrowthTests {
             }
             before = want;
             if (want == TreeStage.MUD) {
-                int mud = countAround(level, foot, 0, 30, b -> b.is(com.antcolonies.registry.SavannaBlocks.MUD_CRUST.get()));
+                int mud = countAround(level, foot, 0, 30, b -> b.is(com.antcolonies.savanna.registry.SavannaBlocks.MUD_CRUST.get()));
                 firstMud = firstMud < 0 ? mud : firstMud;
                 lastMud = mud;
             }
@@ -1063,7 +1063,7 @@ public class TreeGrowthTests {
         for (int i = 0; i < shape.size(); i++) {
             int x = shape.xs()[i], z = shape.zs()[i];
             BlockState st = shape.states()[i];
-            if (shape.ys()[i] >= minY && x * x + z * z > minR * minR && (deadWood(st) || st.is(com.antcolonies.registry.SavannaBlocks.MUD_CRUST.get()))) {
+            if (shape.ys()[i] >= minY && x * x + z * z > minR * minR && (deadWood(st) || st.is(com.antcolonies.savanna.registry.SavannaBlocks.MUD_CRUST.get()))) {
                 sx += x;
                 sz += z;
                 n++;
@@ -1085,7 +1085,7 @@ public class TreeGrowthTests {
         Forest forest = Forest.get(level);
         long base = Forest.today(level);
         long seed = 21;
-        com.antcolonies.tree.TreeKind kind = TreePlacer.kind("baobab");
+        com.antcolonies.savanna.tree.TreeKind kind = TreePlacer.kind("baobab");
         BlockPos foot = helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE));
         Forest.Tree t = forest.add(new Forest.Tree("baobab", foot, seed, 1.0, TreeStage.LIVING, -1, base));
         forest.update(level, t, base);

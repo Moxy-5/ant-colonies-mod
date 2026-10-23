@@ -1,15 +1,16 @@
-package com.antcolonies.entity.goal;
+package com.antcolonies.desert.entity.goal;
 
+import com.antcolonies.entity.goal.Errand;
 import java.util.EnumSet;
 
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
-import com.antcolonies.colony.DesertParts;
+import com.antcolonies.desert.colony.DesertParts;
 import com.antcolonies.colony.ColonyRole;
-import com.antcolonies.colony.Hill;
-import com.antcolonies.colony.NightSoil;
+import com.antcolonies.desert.colony.Hill;
+import com.antcolonies.desert.colony.NightSoil;
 import com.antcolonies.entity.AbstractAntEntity;
 
 import net.minecraft.core.BlockPos;
@@ -23,7 +24,7 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * Carries the night soil up (brain step 4b): the soil dug while the surface was shut waits in piles of loose soil near
- * the top of the nest (see {@link com.antcolonies.colony.NightSoil}); once the surface opens, builders pick it up one
+ * the top of the nest (see {@link com.antcolonies.desert.colony.NightSoil}); once the surface opens, builders pick it up one
  * pellet at a time, one carrier to a pile, and {@link CarryPelletGoal} takes each out onto the hill like any other
  * pellet. A builder does this before it digs again ({@link DigGoal}): the morning clear-out. Like {@link RepairHillGoal}.
  */

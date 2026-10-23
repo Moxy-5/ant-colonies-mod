@@ -1,5 +1,8 @@
-package com.antcolonies.colony;
+package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.ColonyHooks;
+import com.antcolonies.colony.NestPlan;
+import com.antcolonies.colony.TunnelRoute;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -59,7 +62,7 @@ final class FeedingGallery {
 
         @Override
         public net.minecraft.world.level.block.state.BlockState castFor(Level level, BlockPos pos, List<net.minecraft.core.Direction> open) {
-            return com.antcolonies.registry.SavannaBlocks.MUD_CAST.get().stateFor(level, pos, 0, open);
+            return com.antcolonies.savanna.registry.SavannaBlocks.MUD_CAST.get().stateFor(level, pos, 0, open);
         }
     };
 
@@ -88,16 +91,16 @@ final class FeedingGallery {
     /** Adds the mud casts whose channels join the one at {@code from} (a gallery cell or a cast) to {@code casts}. */
     private static void joinCasts(Level level, BlockPos from, BlockPos gallery, Map<BlockPos, BlockPos> casts, ArrayDeque<BlockPos> queue) {
         BlockState fromState = level.getBlockState(from);
-        boolean fromCast = com.antcolonies.block.MudCastBlock.isCast(fromState);
+        boolean fromCast = com.antcolonies.savanna.block.MudCastBlock.isCast(fromState);
         for (Direction side : Direction.values()) {
             BlockPos next = from.relative(side);
             if (casts.containsKey(next) || !level.isLoaded(next)) {
                 continue;
             }
             BlockState state = level.getBlockState(next);
-            if (com.antcolonies.block.MudCastBlock.isCast(state)
-                    && com.antcolonies.nav.Channel.has(com.antcolonies.block.TermiteTunnelBlock.openMask(state), side.getOpposite())
-                    && (!fromCast || com.antcolonies.nav.Channel.has(com.antcolonies.block.TermiteTunnelBlock.openMask(fromState), side))) {
+            if (com.antcolonies.savanna.block.MudCastBlock.isCast(state)
+                    && com.antcolonies.nav.Channel.has(com.antcolonies.savanna.block.TermiteTunnelBlock.openMask(state), side.getOpposite())
+                    && (!fromCast || com.antcolonies.nav.Channel.has(com.antcolonies.savanna.block.TermiteTunnelBlock.openMask(fromState), side))) {
                 casts.put(next.immutable(), gallery);
                 queue.add(next.immutable());
             }

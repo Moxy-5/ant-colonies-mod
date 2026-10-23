@@ -1,7 +1,9 @@
-package com.antcolonies.gametest;
+package com.antcolonies.savanna.gametest;
 
-import static com.antcolonies.gametest.TermiteMoundTests.MIDDLE;
-import static com.antcolonies.gametest.TermiteMoundTests.SURFACE;
+import com.antcolonies.gametest.TestClock;
+import com.antcolonies.gametest.TestScenes;
+import static com.antcolonies.savanna.gametest.TermiteMoundTests.MIDDLE;
+import static com.antcolonies.savanna.gametest.TermiteMoundTests.SURFACE;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -11,16 +13,16 @@ import java.util.UUID;
 
 import com.antcolonies.colony.Caste;
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.colony.Alarm;
+import com.antcolonies.savanna.colony.Alarm;
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.SavannaParts;
+import com.antcolonies.savanna.colony.SavannaParts;
 import com.antcolonies.colony.ForagingHoles;
 import com.antcolonies.colony.NestPlan;
 import com.antcolonies.entity.AbstractAntEntity;
-import com.antcolonies.entity.TermiteSoldierEntity;
-import com.antcolonies.entity.TermiteSoldierEntity.Rank;
-import com.antcolonies.entity.TermiteWorkerEntity;
-import com.antcolonies.registry.SavannaEntities;
+import com.antcolonies.savanna.entity.TermiteSoldierEntity;
+import com.antcolonies.savanna.entity.TermiteSoldierEntity.Rank;
+import com.antcolonies.savanna.entity.TermiteWorkerEntity;
+import com.antcolonies.savanna.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -184,8 +186,8 @@ public class TermiteAlarmTests {
             }
             // A young mound still being built: its hollow shaft over the hole is not roofed over yet (open to the sky).
             colony.part(SavannaParts.MOUND).orElseThrow().buildInstantly(level, 3);
-            for (java.util.Map.Entry<BlockPos, com.antcolonies.colony.MoundPlan.Part> part : colony.part(SavannaParts.MOUND).orElseThrow().getParts(level).entrySet()) {
-                if (part.getValue() == com.antcolonies.colony.MoundPlan.Part.OPEN) {
+            for (java.util.Map.Entry<BlockPos, com.antcolonies.savanna.colony.MoundPlan.Part> part : colony.part(SavannaParts.MOUND).orElseThrow().getParts(level).entrySet()) {
+                if (part.getValue() == com.antcolonies.savanna.colony.MoundPlan.Part.OPEN) {
                     for (BlockPos above = part.getKey().above(); above.getY() < part.getKey().getY() + 12; above = above.above()) {
                         level.setBlock(above, Blocks.AIR.defaultBlockState(), 3);
                     }
@@ -419,8 +421,8 @@ public class TermiteAlarmTests {
             colony.part(SavannaParts.ALARM).orElseThrow().calmForTests();
             // A player breaking a wall of the mound (the user's report of 2026-10-22): a break-in too.
             colony.part(SavannaParts.MOUND).orElseThrow().buildInstantly(level, 3);
-            BlockPos moundWall = com.antcolonies.colony.Mound.partsOf(colony, level).entrySet().stream()
-                    .filter(part -> part.getValue() == com.antcolonies.colony.MoundPlan.Part.WALL && !level.getBlockState(part.getKey()).isAir())
+            BlockPos moundWall = com.antcolonies.savanna.colony.Mound.partsOf(colony, level).entrySet().stream()
+                    .filter(part -> part.getValue() == com.antcolonies.savanna.colony.MoundPlan.Part.WALL && !level.getBlockState(part.getKey()).isAir())
                     .map(java.util.Map.Entry::getKey).max(java.util.Comparator.comparingInt(BlockPos::getY)).orElseThrow();
             net.minecraft.server.level.ServerPlayer builder = helper.makeMockServerPlayerInLevel();
             builder.moveTo(moundWall.getX() + 0.5, moundWall.getY() + 1, moundWall.getZ() + 0.5);

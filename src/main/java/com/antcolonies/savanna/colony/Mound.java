@@ -1,5 +1,8 @@
-package com.antcolonies.colony;
+package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.Claims;
+import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.NestWalls;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -11,20 +14,20 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import com.antcolonies.block.MoundPieceBlock;
-import com.antcolonies.block.MudCrustBlock;
-import com.antcolonies.block.MoundSoil;
-import com.antcolonies.block.TermiteHoleBlock;
-import com.antcolonies.block.TermiteMoundBlock;
-import com.antcolonies.block.TermiteMouthBlock;
-import com.antcolonies.block.TermiteRampBlock;
-import com.antcolonies.block.TermiteSpireBlock;
-import com.antcolonies.block.TermiteTunnelBlock;
+import com.antcolonies.savanna.block.MoundPieceBlock;
+import com.antcolonies.savanna.block.MudCrustBlock;
+import com.antcolonies.savanna.block.MoundSoil;
+import com.antcolonies.savanna.block.TermiteHoleBlock;
+import com.antcolonies.savanna.block.TermiteMoundBlock;
+import com.antcolonies.savanna.block.TermiteMouthBlock;
+import com.antcolonies.savanna.block.TermiteRampBlock;
+import com.antcolonies.savanna.block.TermiteSpireBlock;
+import com.antcolonies.savanna.block.TermiteTunnelBlock;
 import com.antcolonies.entity.AbstractAntEntity;
-import com.antcolonies.entity.TermiteWorkerEntity;
+import com.antcolonies.savanna.entity.TermiteWorkerEntity;
 import com.antcolonies.registry.ModTags;
 import com.antcolonies.species.SpeciesProfile.MoundNumbers;
-import com.antcolonies.registry.SavannaBlocks;
+import com.antcolonies.savanna.registry.SavannaBlocks;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;

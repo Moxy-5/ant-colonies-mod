@@ -1,17 +1,22 @@
-package com.antcolonies.colony;
+package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.ColonyHooks;
+import com.antcolonies.colony.NestLedger;
+import com.antcolonies.colony.NurseFood;
+import com.antcolonies.colony.Population;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.block.FungusCombBlock;
+import com.antcolonies.savanna.block.FungusCombBlock;
 import com.antcolonies.block.SeedPileBlock;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.species.SpeciesProfile;
-import com.antcolonies.registry.SavannaBlocks;
-import com.antcolonies.registry.SavannaItems;
+import com.antcolonies.savanna.registry.SavannaBlocks;
+import com.antcolonies.savanna.registry.SavannaItems;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;

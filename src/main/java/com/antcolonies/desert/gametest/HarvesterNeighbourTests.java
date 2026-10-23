@@ -1,5 +1,6 @@
-package com.antcolonies.gametest;
+package com.antcolonies.desert.gametest;
 
+import com.antcolonies.gametest.TestScenes;
 import static com.antcolonies.gametest.TestScenes.*;
 import static com.antcolonies.gametest.TestScenes.SURFACE;
 
@@ -9,11 +10,11 @@ import java.util.UUID;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.DesertParts;
+import com.antcolonies.desert.colony.DesertParts;
 import com.antcolonies.colony.Neighbours;
-import com.antcolonies.colony.TrunkTrails;
-import com.antcolonies.entity.WorkerAntEntity;
-import com.antcolonies.registry.DesertEntities;
+import com.antcolonies.desert.colony.TrunkTrails;
+import com.antcolonies.desert.entity.WorkerAntEntity;
+import com.antcolonies.desert.registry.DesertEntities;
 import com.antcolonies.species.Species;
 
 import net.minecraft.core.BlockPos;

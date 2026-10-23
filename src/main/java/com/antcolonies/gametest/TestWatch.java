@@ -13,7 +13,7 @@ import net.minecraft.world.phys.Vec3;
  * Watches an insect walking in a game test (the split, step S4: from the ant's walking tests, as the termites' climbing
  * and tunnel tests use it too): it never hangs in the air, leans on a wall it has not reached, or floats while climbing.
  */
-final class TestWatch {
+public final class TestWatch {
     private TestWatch() {
     }
 
@@ -25,7 +25,7 @@ final class TestWatch {
     static final int MAX_HOVER_TICKS = 4;
 
     /** Watches the insect every tick; with {@code verbose}, logs its position and what its walker is doing every 4 ticks. */
-    static void watch(GameTestHelper helper, AbstractAntEntity ant, boolean verbose) {
+    public static void watch(GameTestHelper helper, AbstractAntEntity ant, boolean verbose) {
         Vec3 origin = Vec3.atLowerCornerOf(helper.absolutePos(BlockPos.ZERO));
         int[] floating = {0};
         int[] leaning = {0};

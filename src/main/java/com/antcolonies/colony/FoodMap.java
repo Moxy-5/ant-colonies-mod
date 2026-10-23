@@ -88,12 +88,12 @@ public class FoodMap {
     }
 
     /** The colony now knows this plant (a forager came across it while the colony was away, termites underground step 4). */
-    void learn(BlockPos plant) {
+    public void learn(BlockPos plant) {
         known.add(plant.immutable());
     }
 
     /** The plants the whole colony knows of (for the plant scan, which looks round them). */
-    java.util.Collection<BlockPos> knownPlants() {
+    public java.util.Collection<BlockPos> knownPlants() {
         return java.util.Collections.unmodifiableSet(known);
     }
 

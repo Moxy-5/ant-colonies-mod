@@ -34,11 +34,11 @@ import net.minecraft.world.phys.Vec3;
  */
 public class BuildLife {
     /** How long (ticks) a bite of soil takes (as {@code DigGoal}). */
-    static final int BITE_TICKS = 10;
+    public static final int BITE_TICKS = 10;
     /** How long (ticks) a builder takes for each block of the way with a pellet, there or back (the forager numbers' pace). */
-    static final int TICKS_PER_BLOCK = 8;
+    public static final int TICKS_PER_BLOCK = 8;
     /** How long (ticks) shaping a block of the mound takes (carving a tunnel, reshaping a piece; as {@code ShapeMoundGoal}). */
-    static final int SHAPE_TICKS = 30;
+    public static final int SHAPE_TICKS = 30;
     /** At most this many blocks change a second (a long time away can owe a lot; the rest comes the next second). */
     private static final int PER_SECOND = 200;
     /** At most this many times a second the whole mound plan is looked over. */
@@ -232,7 +232,7 @@ public class BuildLife {
     }
 
     /** How many bites a block takes (as {@code DigGoal}: plain dirt about 6). */
-    static int bites(ServerLevel level, BlockPos pos) {
+    public static int bites(ServerLevel level, BlockPos pos) {
         BlockState state = level.getBlockState(pos);
         return Math.max(1, (int) Math.ceil(state.getDestroySpeed(level, pos) * 12.0F));
     }
@@ -316,37 +316,37 @@ public class BuildLife {
     // --- for the species' own building on return (ColonyHooks.AwayBuilder: the hill, the mound) -------------------------
 
     /** The colony building. */
-    Colony colony() {
+    public Colony colony() {
         return colony;
     }
 
     /** Whether there is building time left to spend. */
-    boolean timeLeft() {
+    public boolean timeLeft() {
         return work > 0;
     }
 
     /** Whether as many blocks have changed this second as may (the rest comes the next second). */
-    boolean secondFull() {
+    public boolean secondFull() {
         return changes >= PER_SECOND;
     }
 
     /** How many blocks have changed this second. */
-    int changesNow() {
+    public int changesNow() {
         return changes;
     }
 
     /** One more block changed this second. */
-    void changed() {
+    public void changed() {
         changes++;
     }
 
     /** {@code ticks} of the builders' time spent. */
-    void spend(long ticks) {
+    public void spend(long ticks) {
         work -= ticks;
     }
 
     /** Whether a player can see {@code pos}: if so the catch-up waits (it is done out of every player's sight). */
-    boolean seen(ServerLevel level, BlockPos pos) {
+    public boolean seen(ServerLevel level, BlockPos pos) {
         if (!Population.outOfSight(level, pos, eyes)) {
             waited = true;
             return true;
@@ -355,7 +355,7 @@ public class BuildLife {
     }
 
     /** Whether this second's catch-up has waited for something (a player looking, an insect in the way). */
-    boolean waited() {
+    public boolean waited() {
         return waited;
     }
 
@@ -365,29 +365,29 @@ public class BuildLife {
     }
 
     /** Pellets of soil dug and not built in yet (termites: for the mound). */
-    int soil() {
+    public int soil() {
         return soil;
     }
 
     /** {@code pellets} of soil more (negative: used). */
-    void addSoil(int pellets) {
+    public void addSoil(int pellets) {
         soil += pellets;
     }
 
     /** The block is dug out, quietly (nobody is there to hear it). */
-    void dig(ServerLevel level, BlockPos pos) {
+    public void dig(ServerLevel level, BlockPos pos) {
         colony.nest().clearDigProgress(pos);
         colony.news().tell(level, ColonyNews.BLOCK_DUG, new ColonyNews.BlockDug(pos)); // (the mound counts its soil)
         level.removeBlock(pos, false);
     }
 
     /** The time (ticks) a pellet takes from where it was dug to where it goes, and the builder back. */
-    static long trip(BlockPos from, BlockPos to) {
+    public static long trip(BlockPos from, BlockPos to) {
         return 2L * TICKS_PER_BLOCK * from.distManhattan(to);
     }
 
     /** Whether nobody stands in this cell (nobody is ever buried, docs/BUGS.md 9 and 6g) and no player can see it. */
-    boolean freeAndHidden(ServerLevel level, BlockPos pos) {
+    public boolean freeAndHidden(ServerLevel level, BlockPos pos) {
         if (!level.getEntitiesOfClass(LivingEntity.class, new AABB(pos), LivingEntity::isAlive).isEmpty()
                 || !Population.outOfSight(level, pos, eyes)) {
             waited = true;

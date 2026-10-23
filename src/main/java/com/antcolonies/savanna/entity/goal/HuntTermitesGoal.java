@@ -1,11 +1,11 @@
-package com.antcolonies.entity.goal;
+package com.antcolonies.savanna.entity.goal;
 
 import java.util.Comparator;
 import java.util.EnumSet;
 
 import org.jetbrains.annotations.Nullable;
 
-import com.antcolonies.entity.TermiteWorkerEntity;
+import com.antcolonies.savanna.entity.TermiteWorkerEntity;
 
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;

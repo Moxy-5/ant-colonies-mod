@@ -1,4 +1,4 @@
-package com.antcolonies.tree;
+package com.antcolonies.savanna.tree;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;

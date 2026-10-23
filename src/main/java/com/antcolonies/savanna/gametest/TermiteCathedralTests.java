@@ -1,18 +1,21 @@
-package com.antcolonies.gametest;
+package com.antcolonies.savanna.gametest;
 
+import com.antcolonies.gametest.TestClock;
+import com.antcolonies.gametest.TestIsolation;
+import com.antcolonies.gametest.TestScenes;
 import java.util.Map;
 import java.util.TreeMap;
 
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.block.TermiteMoundBlock;
-import com.antcolonies.block.TermiteMouthBlock;
-import com.antcolonies.block.TermiteSpireBlock;
-import com.antcolonies.block.TermiteTunnelBlock;
+import com.antcolonies.savanna.block.TermiteMoundBlock;
+import com.antcolonies.savanna.block.TermiteMouthBlock;
+import com.antcolonies.savanna.block.TermiteSpireBlock;
+import com.antcolonies.savanna.block.TermiteTunnelBlock;
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.SavannaParts;
-import com.antcolonies.colony.MoundGrowth;
-import com.antcolonies.colony.MoundPlan;
-import com.antcolonies.registry.SavannaEntities;
+import com.antcolonies.savanna.colony.SavannaParts;
+import com.antcolonies.savanna.colony.MoundGrowth;
+import com.antcolonies.savanna.colony.MoundPlan;
+import com.antcolonies.savanna.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -75,7 +78,7 @@ public class TermiteCathedralTests {
                         entry.getKey().subtract(origin).toShortString(), entry.getKey().subtract(colony.getCenter()).toShortString(), level.getBlockState(entry.getKey()));
             }
         }
-        for (com.antcolonies.entity.TermiteWorkerEntity worker : level.getEntitiesOfClass(com.antcolonies.entity.TermiteWorkerEntity.class, helper.getBounds().inflate(8))) {
+        for (com.antcolonies.savanna.entity.TermiteWorkerEntity worker : level.getEntitiesOfClass(com.antcolonies.savanna.entity.TermiteWorkerEntity.class, helper.getBounds().inflate(8))) {
             AntColoniesMod.LOGGER.info("[cathedral-test]   worker {} at {} on {}, carrying {}, goals {}, walking {}", worker.getId(),
                     worker.blockPosition().subtract(origin).toShortString(), worker.getNavigator().getFoothold(), worker.getCarriedBlock(),
                     worker.goalSelector.getAvailableGoals().stream().filter(g -> g.isRunning()).map(g -> g.getGoal().getClass().getSimpleName()).toList(),
@@ -202,7 +205,7 @@ public class TermiteCathedralTests {
             // A dig begun while founding may run on a tick or two after the workers join: the game checks a running goal
             // only every other tick (the run of 2026-10-17 caught that gap), so only longer counts.
             for (com.antcolonies.entity.AbstractAntEntity royal : TestIsolation.insectsOf(level, colony, com.antcolonies.entity.AbstractAntEntity.class)) {
-                if (royal instanceof com.antcolonies.entity.TermiteKingEntity || royal instanceof com.antcolonies.entity.TermiteQueenEntity) {
+                if (royal instanceof com.antcolonies.savanna.entity.TermiteKingEntity || royal instanceof com.antcolonies.savanna.entity.TermiteQueenEntity) {
                     boolean digs = royal.goalSelector.getAvailableGoals().stream()
                             .anyMatch(g -> g.isRunning() && g.getGoal() instanceof com.antcolonies.entity.goal.DigGoal);
                     int ticks = digs ? royalDigTicks.merge(royal.getUUID(), 1, Integer::sum) : 0;
@@ -216,14 +219,14 @@ public class TermiteCathedralTests {
             // minutes at normal speed, see TermiteMoundBlock).
             for (BlockPos pos : colony.part(SavannaParts.MOUND).orElseThrow().getParts(level).keySet()) {
                 BlockState state = level.getBlockState(pos);
-                if (state.hasProperty(com.antcolonies.block.MoundSoil.AGE) && state.getValue(com.antcolonies.block.MoundSoil.AGE) == 0
+                if (state.hasProperty(com.antcolonies.savanna.block.MoundSoil.AGE) && state.getValue(com.antcolonies.savanna.block.MoundSoil.AGE) == 0
                         && (!(state.getBlock() instanceof TermiteMoundBlock) || TermiteMoundBlock.isFinished(state))
                         && level.getRandom().nextInt(24000) == 0) {
-                    level.setBlockAndUpdate(pos, state.setValue(com.antcolonies.block.MoundSoil.AGE, 1));
+                    level.setBlockAndUpdate(pos, state.setValue(com.antcolonies.savanna.block.MoundSoil.AGE, 1));
                 }
             }
             if (helper.getTick() % 3000 == 0) {
-                long outside = level.getEntitiesOfClass(com.antcolonies.entity.TermiteWorkerEntity.class, helper.getBounds().inflate(8)).stream()
+                long outside = level.getEntitiesOfClass(com.antcolonies.savanna.entity.TermiteWorkerEntity.class, helper.getBounds().inflate(8)).stream()
                         .filter(w -> !colony.nest().isInside(level, w.blockPosition())).count();
                 AntColoniesMod.LOGGER.info("[user-mound-test]   workers outside: {}", outside);
                 Map<String, Integer> left = jobsLeft(level, colony);

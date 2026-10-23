@@ -1,5 +1,8 @@
-package com.antcolonies.gametest;
+package com.antcolonies.savanna.gametest;
 
+import com.antcolonies.gametest.TestClock;
+import com.antcolonies.gametest.TestIsolation;
+import com.antcolonies.gametest.TestScenes;
 import static com.antcolonies.gametest.TestScenes.*;
 import static com.antcolonies.gametest.TestScenes.SURFACE;
 
@@ -8,11 +11,11 @@ import java.util.List;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Caste;
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.Galleries;
+import com.antcolonies.savanna.colony.Galleries;
 import com.antcolonies.colony.Neighbours;
 import com.antcolonies.colony.NestPlan;
-import com.antcolonies.colony.SavannaParts;
-import com.antcolonies.registry.SavannaEntities;
+import com.antcolonies.savanna.colony.SavannaParts;
+import com.antcolonies.savanna.registry.SavannaEntities;
 import com.antcolonies.species.Species;
 
 import net.minecraft.core.BlockPos;
@@ -74,7 +77,7 @@ public class TermiteNeighbourTests {
                 TermiteMoundTests.colony(helper); // (keeps the food map and the alarm in the arena; the first colony only)
                 colony.foodMap().setTestArea(helper.getBounds().expandTowards(0, 16, 0));
                 colony.part(SavannaParts.ALARM).orElseThrow().setTestArea(helper.getBounds());
-                for (com.antcolonies.entity.TermiteWorkerEntity worker : TestIsolation.insectsOf(level, colony, com.antcolonies.entity.TermiteWorkerEntity.class)) {
+                for (com.antcolonies.savanna.entity.TermiteWorkerEntity worker : TestIsolation.insectsOf(level, colony, com.antcolonies.savanna.entity.TermiteWorkerEntity.class)) {
                     worker.setGrownUpAt(now - colony.profile().worker().nurseUntilTicks() - 1000);
                 }
                 TermiteSoldierTests.digNestAtOnce(level, colony);

@@ -1,12 +1,16 @@
-package com.antcolonies.gametest;
+package com.antcolonies.desert.gametest;
 
+import com.antcolonies.gametest.AwayKit;
+import com.antcolonies.gametest.TestAnts;
+import com.antcolonies.gametest.TestFilter;
+import com.antcolonies.gametest.TestIsolation;
 import com.antcolonies.colony.Caste;
 import com.antcolonies.colony.ColonyHooks;
 import com.antcolonies.colony.ColonyQuestions;
-import com.antcolonies.colony.DesertParts;
-import com.antcolonies.colony.TrunkTrails;
-import com.antcolonies.entity.WorkerAntEntity;
-import com.antcolonies.registry.DesertEntities;
+import com.antcolonies.desert.colony.DesertParts;
+import com.antcolonies.desert.colony.TrunkTrails;
+import com.antcolonies.desert.entity.WorkerAntEntity;
+import com.antcolonies.desert.registry.DesertEntities;
 import com.antcolonies.species.Species;
 import com.antcolonies.species.SpeciesBodies;
 

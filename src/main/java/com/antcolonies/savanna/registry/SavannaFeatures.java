@@ -1,8 +1,8 @@
-package com.antcolonies.registry;
+package com.antcolonies.savanna.registry;
 
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.worldgen.FallenBranchFeature;
-import com.antcolonies.worldgen.FallenTreeFeature;
+import com.antcolonies.savanna.worldgen.FallenBranchFeature;
+import com.antcolonies.savanna.worldgen.FallenTreeFeature;
 
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.levelgen.feature.Feature;
@@ -28,6 +28,6 @@ public class SavannaFeatures {
 
     /** Lets it rain in savannas (data/antcolonies/neoforge/biome_modifier/savanna_rain.json). */
     public static final DeferredHolder<com.mojang.serialization.MapCodec<? extends net.neoforged.neoforge.common.world.BiomeModifier>,
-            com.mojang.serialization.MapCodec<com.antcolonies.worldgen.RainModifier>> RAIN =
-            BIOME_MODIFIERS.register("rain", () -> com.antcolonies.worldgen.RainModifier.CODEC);
+            com.mojang.serialization.MapCodec<com.antcolonies.savanna.worldgen.RainModifier>> RAIN =
+            BIOME_MODIFIERS.register("rain", () -> com.antcolonies.savanna.worldgen.RainModifier.CODEC);
 }

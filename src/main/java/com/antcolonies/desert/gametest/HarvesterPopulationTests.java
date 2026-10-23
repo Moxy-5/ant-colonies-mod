@@ -1,5 +1,6 @@
-package com.antcolonies.gametest;
+package com.antcolonies.desert.gametest;
 
+import com.antcolonies.gametest.TestScenes;
 import static com.antcolonies.gametest.TestScenes.*;
 import static com.antcolonies.gametest.TestScenes.MIDDLE;
 import static com.antcolonies.gametest.TestScenes.SURFACE;
@@ -17,7 +18,7 @@ import com.antcolonies.colony.NestPlan;
 import com.antcolonies.colony.Population;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.AntLarvaEntity;
-import com.antcolonies.registry.DesertEntities;
+import com.antcolonies.desert.registry.DesertEntities;
 import com.antcolonies.species.Species;
 
 import net.minecraft.core.BlockPos;

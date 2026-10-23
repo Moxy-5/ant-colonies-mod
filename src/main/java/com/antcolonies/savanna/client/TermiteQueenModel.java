@@ -1,7 +1,8 @@
-package com.antcolonies.client;
+package com.antcolonies.savanna.client;
 
+import com.antcolonies.client.InsectModel;
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.entity.TermiteQueenEntity;
+import com.antcolonies.savanna.entity.TermiteQueenEntity;
 
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;

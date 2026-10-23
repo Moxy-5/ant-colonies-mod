@@ -1,5 +1,8 @@
-package com.antcolonies.colony;
+package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.FoodWays;
+import com.antcolonies.colony.NestPlan;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;

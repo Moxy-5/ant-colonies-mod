@@ -1,6 +1,6 @@
-package com.antcolonies.block;
+package com.antcolonies.desert.block;
 
-import com.antcolonies.block.GramaGrassBlock.Stage;
+import com.antcolonies.desert.block.GramaGrassBlock.Stage;
 
 /**
  * The life of a grama plant (see {@link GramaGrassBlock}), worked out without the world so it can be tested alone: each

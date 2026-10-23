@@ -1,5 +1,7 @@
-package com.antcolonies.gametest;
+package com.antcolonies.savanna.gametest;
 
+import com.antcolonies.gametest.TestClock;
+import com.antcolonies.gametest.TestScenes;
 import static com.antcolonies.gametest.TestScenes.MIDDLE;
 import static com.antcolonies.gametest.TestScenes.SURFACE;
 
@@ -12,8 +14,8 @@ import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.NestPlan;
 import com.antcolonies.debug.Perf;
 import com.antcolonies.entity.AbstractAntEntity;
-import com.antcolonies.entity.TermiteSoldierEntity;
-import com.antcolonies.registry.SavannaEntities;
+import com.antcolonies.savanna.entity.TermiteSoldierEntity;
+import com.antcolonies.savanna.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;

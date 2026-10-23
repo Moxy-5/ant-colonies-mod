@@ -136,7 +136,7 @@ insect that does not belong, does not fit, is not pricked). **S3 and S4 BUILT 20
 **S5. Packages** (about 2 hours, mostly done by a script). Java's names for folders of code ("packages") must differ
 between mods (the mod loader refuses two mods sharing one), so the species code moves to `com.antcolonies.savanna.*`
 and `com.antcolonies.desert.*`; the framework keeps `com.antcolonies.*`. The wall checker reads zero. The anim lab
-checks and the guard films (the body code moved) pass unchanged.
+checks and the guard films (the body code moved) pass unchanged. **BUILT 2026-10-22** (round 3, `docs/HISTORY.md`): 173 files moved with `git mv` (savanna 118 game files and 11 unit tests, desert 40 and 4), sorted by `wall_check.py --sides` (unit tests by the species classes they name); package lines, imports and full names rewritten by a script; about 100 shared declarations that were only visible inside their old folder made public (the test kit, `ColonyPart`'s sign-up methods, `BuildLife`, `FieldLife`, `AwayLife`, ...). Mod name, registry names and save names unchanged. Checks: `./gradlew build` with its 163 unit tests, `wall_check.py --strict` 0, `anim_lab.py check` for the worker ant (0 problems) and the five termites (only the old `peek` clip's known findings). The full run is done by S6's session first (the user's rule); the guard films at the end of round 3.
 **The user's in-game test 1** (about 20 minutes, termites only, a new world), see the checklist then.
 **Then merge block 1 into `master`** with the user's OK.
 

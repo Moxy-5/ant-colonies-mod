@@ -1,5 +1,6 @@
-package com.antcolonies.gametest;
+package com.antcolonies.savanna.gametest;
 
+import com.antcolonies.gametest.TestScenes;
 import static com.antcolonies.gametest.TestScenes.MIDDLE;
 import static com.antcolonies.gametest.TestScenes.SURFACE;
 
@@ -9,8 +10,8 @@ import java.util.List;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyRole;
-import com.antcolonies.entity.TermiteWorkerEntity;
-import com.antcolonies.registry.SavannaEntities;
+import com.antcolonies.savanna.entity.TermiteWorkerEntity;
+import com.antcolonies.savanna.registry.SavannaEntities;
 
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;

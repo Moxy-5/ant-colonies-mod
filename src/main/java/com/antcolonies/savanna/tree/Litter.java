@@ -1,8 +1,8 @@
-package com.antcolonies.tree;
+package com.antcolonies.savanna.tree;
 
-import static com.antcolonies.tree.TreeDraw.DEAD;
-import static com.antcolonies.tree.TreeDraw.seg;
-import static com.antcolonies.tree.TreeDraw.thinLine;
+import static com.antcolonies.savanna.tree.TreeDraw.DEAD;
+import static com.antcolonies.savanna.tree.TreeDraw.seg;
+import static com.antcolonies.savanna.tree.TreeDraw.thinLine;
 
 /**
  * The dead wood lying round the trees of new land (M7.5 step 6c, user, 2026-10-19). Real savannas: under nearly every

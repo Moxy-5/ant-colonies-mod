@@ -83,28 +83,28 @@ public final class ColonyPart<T> {
     }
 
     /** Ticked once a second while the nest's middle is loaded (from {@link Colony#tick}), at this place. */
-    ColonyPart<T> ticks(int place, BiConsumer<T, ServerLevel> tick) {
+    public ColonyPart<T> ticks(int place, BiConsumer<T, ServerLevel> tick) {
         this.tickPlace = place;
         this.tick = tick;
         return this;
     }
 
     /** Ticked once a second while the colony is away (from {@link AwayLife#tickAway}), at this place. */
-    ColonyPart<T> ticksAway(int place, BiConsumer<T, ServerLevel> tick) {
+    public ColonyPart<T> ticksAway(int place, BiConsumer<T, ServerLevel> tick) {
         this.awayPlace = place;
         this.tickAway = tick;
         return this;
     }
 
     /** Saved into the colony's tag, and loaded from it. */
-    ColonyPart<T> saves(BiConsumer<T, CompoundTag> save, BiConsumer<T, CompoundTag> load) {
+    public ColonyPart<T> saves(BiConsumer<T, CompoundTag> save, BiConsumer<T, CompoundTag> load) {
         this.save = save;
         this.load = load;
         return this;
     }
 
     /** Never saved, on purpose (claims and short-lived things that start again after a load): {@code why}. */
-    ColonyPart<T> notSaved(String why) {
+    public ColonyPart<T> notSaved(String why) {
         this.notSavedBecause = why;
         return this;
     }
@@ -113,7 +113,7 @@ public final class ColonyPart<T> {
      * Hears every {@code kind} of news told in its colony ({@link ColonyNews}), at {@code place} among that kind's
      * listeners (lower first, gaps of 10, as with the tick places). Called only when that news comes.
      */
-    <N> ColonyPart<T> hears(ColonyNews.Kind<N> kind, int place, Hearer<T, N> hearer) {
+    public <N> ColonyPart<T> hears(ColonyNews.Kind<N> kind, int place, Hearer<T, N> hearer) {
         hears.add(new Hears<>(kind, place, hearer));
         return this;
     }
@@ -122,7 +122,7 @@ public final class ColonyPart<T> {
      * Answers every {@code kind} of question asked in its colony ({@link ColonyQuestions}), at {@code place} among that
      * kind's answerers (lower first, gaps of 10, as with the news).
      */
-    <Q> ColonyPart<T> answers(ColonyQuestions.Kind<Q> kind, int place, Answerer<T, Q> answerer) {
+    public <Q> ColonyPart<T> answers(ColonyQuestions.Kind<Q> kind, int place, Answerer<T, Q> answerer) {
         answers.add(new Answers<>(kind, place, answerer));
         return this;
     }
@@ -131,7 +131,7 @@ public final class ColonyPart<T> {
      * Plugs {@code hook} (made from the part) into every {@code kind} of socket in the shared code ({@link ColonyHooks}),
      * at {@code place} among that kind's hooks (lower first, gaps of 10, as with the news).
      */
-    <H> ColonyPart<T> plugs(ColonyHooks.Kind<H> kind, int place, java.util.function.Function<T, H> hook) {
+    public <H> ColonyPart<T> plugs(ColonyHooks.Kind<H> kind, int place, java.util.function.Function<T, H> hook) {
         plugs.add(new Plugs<>(kind, place, hook));
         return this;
     }
@@ -168,7 +168,7 @@ public final class ColonyPart<T> {
      * Tests only: how to put a sample into every number the part saves, for the save and load check
      * ({@code AwayKit.everyPartSavesAndLoads}), when the test scenes leave the part empty.
      */
-    ColonyPart<T> sample(BiConsumer<T, ServerLevel> sample) {
+    public ColonyPart<T> sample(BiConsumer<T, ServerLevel> sample) {
         this.sample = sample;
         return this;
     }

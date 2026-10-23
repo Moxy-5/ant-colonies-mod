@@ -233,7 +233,7 @@ public class FoodWays {
     }
 
     /** The tunnel to rich food ending at this hole is gone from the record (its gallery piece was filled in with soil). */
-    void dropNewTunnel(BlockPos hole) {
+    public void dropNewTunnel(BlockPos hole) {
         if (newTunnels.removeIf(tunnel -> tunnel.tunnel().hole().equals(hole))) {
             spentHoles.remove(hole);
             changed.run();

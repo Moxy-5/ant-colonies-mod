@@ -1,7 +1,7 @@
-package com.antcolonies.registry;
+package com.antcolonies.desert.registry;
 
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.block.GramaGrassBlock;
+import com.antcolonies.desert.block.GramaGrassBlock;
 import com.antcolonies.block.SeedPileBlock;
 
 import net.minecraft.world.level.block.Block;

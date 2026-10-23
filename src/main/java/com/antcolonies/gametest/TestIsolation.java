@@ -58,7 +58,7 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * instead ({@link #insectsOf}).</li>
  * </ol>
  */
-final class TestIsolation {
+public final class TestIsolation {
     /** The tests running now, as the test server keeps them ({@code GameTestTicker.testInfos}). */
     @Nullable
     private static Collection<GameTestInfo> running;
@@ -79,7 +79,7 @@ final class TestIsolation {
     }
 
     /** A species' own fence round each colony founded in a test's arena (its tests' sign-up), given that arena's box. */
-    static void addFence(BiConsumer<Colony, AABB> fence) {
+    public static void addFence(BiConsumer<Colony, AABB> fence) {
         FENCES.add(fence);
     }
 
@@ -228,7 +228,7 @@ final class TestIsolation {
      * Every insect of this kind that belongs to the colony, wherever it is in the world (a forager out searching can be
      * past the edge of its test's box, and a neighbour's forager inside it).
      */
-    static <T extends AbstractAntEntity> List<T> insectsOf(ServerLevel level, Colony colony, Class<T> kind) {
+    public static <T extends AbstractAntEntity> List<T> insectsOf(ServerLevel level, Colony colony, Class<T> kind) {
         List<T> found = new ArrayList<>();
         for (Entity entity : level.getAllEntities()) {
             if (kind.isInstance(entity) && colony.getId().equals(((AbstractAntEntity) entity).getColonyId())) {

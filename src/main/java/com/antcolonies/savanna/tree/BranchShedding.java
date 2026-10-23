@@ -1,11 +1,11 @@
-package com.antcolonies.tree;
+package com.antcolonies.savanna.tree;
 
 import java.util.Random;
 
-import com.antcolonies.block.FallenBranchBlock;
-import com.antcolonies.block.TreeBranchBlock;
-import com.antcolonies.block.TreeLeavesBlock;
-import com.antcolonies.worldgen.TreePlacer;
+import com.antcolonies.savanna.block.FallenBranchBlock;
+import com.antcolonies.savanna.block.TreeBranchBlock;
+import com.antcolonies.savanna.block.TreeLeavesBlock;
+import com.antcolonies.savanna.worldgen.TreePlacer;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;

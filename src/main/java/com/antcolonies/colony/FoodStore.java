@@ -124,7 +124,7 @@ public class FoodStore {
     }
 
     /** Pieces in the store were used up where they lie (the fungus garden's comb turned into nodules): the count goes down. */
-    void used(int pieces) {
+    public void used(int pieces) {
         food = Math.max(0, food - pieces);
         richSeeds = Math.min(richSeeds, food);
     }
@@ -320,7 +320,7 @@ public class FoodStore {
      * colony's food radius a hay bale always draws them; a hay bale nearly used up is worth no more than grass. On a tie
      * the plant nearer the ant ({@code fromAnt}, squared) wins. My pick.
      */
-    static double worth(int piecesLeft, double trip, double fromAnt) {
+    public static double worth(int piecesLeft, double trip, double fromAnt) {
         return Math.pow(Math.max(1, piecesLeft), 0.75) / (trip + 4.0) - fromAnt * 1.0E-7;
     }
 
@@ -954,7 +954,7 @@ public class FoodStore {
      * later, out of sight ({@link NestLedger}). A rich seed if {@code wantRich} and there is one, or if only rich ones are
      * left. Returns whether it was a rich one. Call only while {@link #getFood} is above 0.
      */
-    boolean takeCounted(boolean wantRich) {
+    public boolean takeCounted(boolean wantRich) {
         richSeeds = Math.min(richSeeds, food);
         boolean rich = richSeeds > 0 && (wantRich || food <= richSeeds);
         food = Math.max(0, food - 1);

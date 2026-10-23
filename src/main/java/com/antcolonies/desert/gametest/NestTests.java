@@ -1,5 +1,7 @@
-package com.antcolonies.gametest;
+package com.antcolonies.desert.gametest;
 
+import com.antcolonies.gametest.TestClock;
+import com.antcolonies.gametest.TestIsolation;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -8,19 +10,19 @@ import java.util.Set;
 
 import com.antcolonies.colony.Caste;
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.block.GramaGrassBlock;
+import com.antcolonies.desert.block.GramaGrassBlock;
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.DesertParts;
-import com.antcolonies.colony.Hill;
+import com.antcolonies.desert.colony.DesertParts;
+import com.antcolonies.desert.colony.Hill;
 import com.antcolonies.colony.Nest;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.NestPlan;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.AntLarvaEntity;
-import com.antcolonies.entity.QueenAntEntity;
-import com.antcolonies.entity.WorkerAntEntity;
-import com.antcolonies.registry.DesertBlocks;
-import com.antcolonies.registry.DesertEntities;
+import com.antcolonies.desert.entity.QueenAntEntity;
+import com.antcolonies.desert.entity.WorkerAntEntity;
+import com.antcolonies.desert.registry.DesertBlocks;
+import com.antcolonies.desert.registry.DesertEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -167,7 +169,7 @@ public class NestTests {
             helper.assertTrue(rooms.size() == 4, "expected 4 levels (food store, nursery, queen, refuse chamber) but the nest has " + rooms.size());
             BlockPos room = colony.nest().getFinishedRoomCenter(level);
             helper.assertTrue(room != null, "the room is not finished");
-            var queens = level.getEntitiesOfClass(com.antcolonies.entity.QueenAntEntity.class, helper.getBounds());
+            var queens = level.getEntitiesOfClass(com.antcolonies.desert.entity.QueenAntEntity.class, helper.getBounds());
             helper.assertTrue(!queens.isEmpty(), "the queen is gone");
             helper.assertTrue(queens.get(0).blockPosition().equals(room), "the queen is not in the middle of the room yet: " + queens.get(0).blockPosition().subtract(room));
             String hill = hillProblems(helper);
@@ -491,7 +493,7 @@ public class NestTests {
             helper.assertTrue(colony.nest().findDigTarget(level) == null, "something is still left to dig");
             BlockPos room = colony.nest().getFinishedRoomCenter(level);
             helper.assertTrue(room != null, "the room is not finished");
-            var queens = level.getEntitiesOfClass(com.antcolonies.entity.QueenAntEntity.class, helper.getBounds());
+            var queens = level.getEntitiesOfClass(com.antcolonies.desert.entity.QueenAntEntity.class, helper.getBounds());
             helper.assertTrue(!queens.isEmpty() && queens.get(0).blockPosition().equals(room), "the queen is not in the middle of the room yet");
             for (int x = 0; x < 25; x++) {
                 for (int z = 0; z < 25; z++) {
@@ -690,7 +692,7 @@ public class NestTests {
                 helper.assertTrue(state.is(DesertBlocks.BLUE_GRAMA.get()), "a grama plant was broken: it should dry off when cut bare");
                 gramaLast[g] = cut;
                 for (var item : level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, new AABB(at).inflate(1.5),
-                        e -> e.getItem().is(com.antcolonies.registry.DesertItems.BLUE_GRAMA_SEEDS.get()))) {
+                        e -> e.getItem().is(com.antcolonies.desert.registry.DesertItems.BLUE_GRAMA_SEEDS.get()))) {
                     if (shed.add(item.getUUID())) {
                         gramaShed[0] += item.getItem().getCount();
                         item.setUnlimitedLifetime();
@@ -902,7 +904,7 @@ public class NestTests {
             if (laidAt[0] < 0 && colony.queenCare().getEggsLaid() > 0) {
                 laidAt[0] = level.getGameTime();
                 // The egg must lie in her room, behind her (she looks the other way), and not in the nursery yet.
-                var queens = level.getEntitiesOfClass(com.antcolonies.entity.QueenAntEntity.class, helper.getBounds());
+                var queens = level.getEntitiesOfClass(com.antcolonies.desert.entity.QueenAntEntity.class, helper.getBounds());
                 var eggs = colony.brood().getLooseEggs(level);
                 if (queens.size() == 1 && eggs.size() == 1) {
                     var queen = queens.get(0);
@@ -1348,7 +1350,7 @@ public class NestTests {
             WorkerAntEntity copy = reload(level, worker);
             helper.assertTrue(copy.getCarriedSeed().is(net.minecraft.world.item.Items.PUMPKIN_SEEDS) && copy.isSeedForBread(), "the seed for the mill was lost");
             worker.setSeedForBread(false);
-            worker.setCarriedSeed(new net.minecraft.world.item.ItemStack(com.antcolonies.registry.DesertItems.RICH_ANT_BREAD.get()));
+            worker.setCarriedSeed(new net.minecraft.world.item.ItemStack(com.antcolonies.desert.registry.DesertItems.RICH_ANT_BREAD.get()));
             helper.assertTrue(reload(level, worker).isCarryingRichBread(), "the rich bread was lost");
             worker.setCarriedSeed(net.minecraft.world.item.ItemStack.EMPTY);
             worker.setCarryingCorpse(true);
@@ -1730,7 +1732,7 @@ public class NestTests {
             Colony colony = colony(helper);
             helper.assertTrue(colony != null && airBelowSurface(helper) == NEST_CELLS && colony.nest().findDigTarget(level) == null
                     && hillProblems(helper).isEmpty(), "the nest is not finished yet");
-            var queens = level.getEntitiesOfClass(com.antcolonies.entity.QueenAntEntity.class, helper.getBounds());
+            var queens = level.getEntitiesOfClass(com.antcolonies.desert.entity.QueenAntEntity.class, helper.getBounds());
             helper.assertTrue(queens.size() == 1, "no queen");
             int[] roles = new int[com.antcolonies.colony.ColonyRole.values().length];
             int nursesNearQueen = 0;
@@ -2022,7 +2024,7 @@ public class NestTests {
                 BlockPos ground = level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
                         center.offset(at[0], 0, at[1]));
                 var item = new net.minecraft.world.entity.item.ItemEntity(level, ground.getX() + 0.5, ground.getY(), ground.getZ() + 0.5,
-                        new net.minecraft.world.item.ItemStack(com.antcolonies.registry.DesertItems.BLUE_GRAMA_SEEDS.get(), 5)); // 40 in all, twice the bread wanted
+                        new net.minecraft.world.item.ItemStack(com.antcolonies.desert.registry.DesertItems.BLUE_GRAMA_SEEDS.get(), 5)); // 40 in all, twice the bread wanted
                 item.setDeltaMovement(0, 0, 0);
                 item.setUnlimitedLifetime();
                 level.addFreshEntity(item);

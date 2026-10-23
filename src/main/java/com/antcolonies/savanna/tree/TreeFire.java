@@ -1,10 +1,10 @@
-package com.antcolonies.tree;
+package com.antcolonies.savanna.tree;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import com.antcolonies.debug.Perf;
-import com.antcolonies.worldgen.TreePlacer;
+import com.antcolonies.savanna.worldgen.TreePlacer;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;

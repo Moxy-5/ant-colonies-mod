@@ -1,19 +1,22 @@
-package com.antcolonies.gametest;
+package com.antcolonies.savanna.gametest;
 
-import static com.antcolonies.gametest.TermiteMoundTests.MIDDLE;
-import static com.antcolonies.gametest.TermiteMoundTests.SURFACE;
+import com.antcolonies.gametest.StuckWatcher;
+import com.antcolonies.gametest.TestClock;
+import com.antcolonies.gametest.TestIsolation;
+import static com.antcolonies.savanna.gametest.TermiteMoundTests.MIDDLE;
+import static com.antcolonies.savanna.gametest.TermiteMoundTests.SURFACE;
 
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Caste;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.SavannaParts;
+import com.antcolonies.savanna.colony.SavannaParts;
 import com.antcolonies.colony.FoodWays;
 import com.antcolonies.colony.ForagingHoles;
 import com.antcolonies.colony.Nest;
-import com.antcolonies.entity.TermiteWorkerEntity;
-import com.antcolonies.registry.SavannaEntities;
+import com.antcolonies.savanna.entity.TermiteWorkerEntity;
+import com.antcolonies.savanna.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -83,7 +86,7 @@ public class TermiteNewHoleTests {
             // The food lies a set distance out, past the old 2 holes: with the arms of termites underground (step 1)
             // a hole along an arm may land near it, and the colony then uses that hole (a runway) and digs no new
             // tunnel. This scene is about the tunnel out to far food, so the arms are switched off here.
-            com.antcolonies.colony.Galleries.of(colony).setSwitchForTests(false);
+            com.antcolonies.savanna.colony.Galleries.of(colony).setSwitchForTests(false);
             long middleAged = level.getGameTime() - colony.profile().worker().nurseUntilTicks() - 1000;
             for (TermiteWorkerEntity worker : level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds())) {
                 worker.setGrownUpAt(middleAged);
@@ -371,7 +374,7 @@ public class TermiteNewHoleTests {
             if (!scene.tick(colony)) {
                 return;
             }
-            com.antcolonies.colony.HiddenTrips trips = colony.part(SavannaParts.HIDDEN_TRIPS).orElseThrow();
+            com.antcolonies.savanna.colony.HiddenTrips trips = colony.part(SavannaParts.HIDDEN_TRIPS).orElseThrow();
             long now = level.getGameTime();
             BlockPos center = colony.getCenter();
             int shortest = trips.shortest();
@@ -551,7 +554,7 @@ public class TermiteNewHoleTests {
                 // range, 24, matched the food radius and the plant scan skipped the known hay 38 out; the test failed
                 // whenever the arms came first, about 1 run in 10).
                 helper.assertTrue(helper.getTick() < 600, "the galleries planned no arms");
-                if (!com.antcolonies.colony.Galleries.of(colony).armsPlanned()) {
+                if (!com.antcolonies.savanna.colony.Galleries.of(colony).armsPlanned()) {
                     return false;
                 }
                 level.setBlock(hay, Blocks.HAY_BLOCK.defaultBlockState(), 3);
@@ -629,7 +632,7 @@ public class TermiteNewHoleTests {
             // The food lies a set distance out, past the old 2 holes: with the arms of termites underground (step 1)
             // a hole along an arm may land near it, and the colony then uses that hole (a runway) and digs no new
             // tunnel. This scene is about the tunnel out to far food, so the arms are switched off here.
-            com.antcolonies.colony.Galleries.of(colony).setSwitchForTests(false);
+            com.antcolonies.savanna.colony.Galleries.of(colony).setSwitchForTests(false);
             long middleAged = level.getGameTime() - colony.profile().worker().nurseUntilTicks() - 1000;
             for (TermiteWorkerEntity worker : level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds())) {
                 worker.setGrownUpAt(middleAged);
@@ -638,7 +641,7 @@ public class TermiteNewHoleTests {
             colony.population().addNewMembers(Caste.WORKER, level.getGameTime() - 1000, 500);
             TestClock.still(helper, 0.0); // midnight: foraging time
             for (BlockPos wood : tree) {
-                level.setBlock(wood, com.antcolonies.registry.SavannaBlocks.DEAD_WOOD.get().defaultBlockState()
+                level.setBlock(wood, com.antcolonies.savanna.registry.SavannaBlocks.DEAD_WOOD.get().defaultBlockState()
                         .setValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS, net.minecraft.core.Direction.Axis.X), 3);
             }
             colony.food().rescanPlantsSoon();
@@ -797,7 +800,7 @@ public class TermiteNewHoleTests {
             // The food lies a set distance out, past the old 2 holes: with the arms of termites underground (step 1)
             // a hole along an arm may land near it, and the colony then uses that hole (a runway) and digs no new
             // tunnel. This scene is about the tunnel out to far food, so the arms are switched off here.
-            com.antcolonies.colony.Galleries.of(colony).setSwitchForTests(false);
+            com.antcolonies.savanna.colony.Galleries.of(colony).setSwitchForTests(false);
             long middleAged = level.getGameTime() - colony.profile().worker().nurseUntilTicks() - 1000;
             for (TermiteWorkerEntity worker : level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds())) {
                 worker.setGrownUpAt(middleAged);
@@ -810,8 +813,8 @@ public class TermiteNewHoleTests {
                     for (int dz = -1; dz <= 1; dz++) {
                         for (int dy = 0; dy <= 2; dy++) {
                             boolean core = dz == 0 && dy == 1;
-                            level.setBlock(bottom.offset(0, dy, dz), (core ? com.antcolonies.registry.TreeBlocks.BLEACHED_LOG
-                                    : com.antcolonies.registry.TreeBlocks.BLEACHED_WOOD).get().defaultBlockState()
+                            level.setBlock(bottom.offset(0, dy, dz), (core ? com.antcolonies.savanna.registry.TreeBlocks.BLEACHED_LOG
+                                    : com.antcolonies.savanna.registry.TreeBlocks.BLEACHED_WOOD).get().defaultBlockState()
                                     .setValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS, net.minecraft.core.Direction.Axis.X), 3);
                         }
                     }
@@ -819,11 +822,11 @@ public class TermiteNewHoleTests {
             }
             for (int i = 0; kind != Food.GIANT && i < log.size(); i++) {
                 level.setBlock(log.get(i), kind == Food.BRANCH
-                        ? com.antcolonies.registry.SavannaBlocks.FALLEN_BRANCH.get().defaultBlockState()
-                                .setValue(com.antcolonies.block.FallenBranchBlock.AXIS, net.minecraft.core.Direction.Axis.X)
-                                .setValue(com.antcolonies.block.FallenBranchBlock.PART, i == 0 ? com.antcolonies.block.FallenBranchBlock.Part.BASE
-                                        : i == log.size() - 1 ? com.antcolonies.block.FallenBranchBlock.Part.TIP : com.antcolonies.block.FallenBranchBlock.Part.MIDDLE)
-                        : com.antcolonies.registry.SavannaBlocks.DEAD_WOOD.get().defaultBlockState()
+                        ? com.antcolonies.savanna.registry.SavannaBlocks.FALLEN_BRANCH.get().defaultBlockState()
+                                .setValue(com.antcolonies.savanna.block.FallenBranchBlock.AXIS, net.minecraft.core.Direction.Axis.X)
+                                .setValue(com.antcolonies.savanna.block.FallenBranchBlock.PART, i == 0 ? com.antcolonies.savanna.block.FallenBranchBlock.Part.BASE
+                                        : i == log.size() - 1 ? com.antcolonies.savanna.block.FallenBranchBlock.Part.TIP : com.antcolonies.savanna.block.FallenBranchBlock.Part.MIDDLE)
+                        : com.antcolonies.savanna.registry.SavannaBlocks.DEAD_WOOD.get().defaultBlockState()
                                 .setValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS, net.minecraft.core.Direction.Axis.X), 3);
             }
             if (kind == Food.BRANCH) {
@@ -834,7 +837,7 @@ public class TermiteNewHoleTests {
                         BlockPos foot = helper.absolutePos(new BlockPos(x, (onAStep && x >= logStart - 3 && z > MIDDLE ? SURFACE - 2 : SURFACE), z));
                         if (level.getBlockState(foot).isAir() && level.getBlockState(foot.above()).isAir()) {
                             net.minecraft.world.level.block.DoublePlantBlock.placeAt(level, x % 2 == 0 ? Blocks.TALL_GRASS.defaultBlockState()
-                                    : com.antcolonies.registry.SavannaBlocks.TALL_DRY_GRASS.get().defaultBlockState(), foot, 3);
+                                    : com.antcolonies.savanna.registry.SavannaBlocks.TALL_DRY_GRASS.get().defaultBlockState(), foot, 3);
                         }
                     }
                 }
@@ -851,9 +854,9 @@ public class TermiteNewHoleTests {
             int eaten = 0;
             for (BlockPos wood : log) {
                 BlockState state = level.getBlockState(wood);
-                eaten += state.hasProperty(com.antcolonies.block.DeadWoodBlock.EATEN) ? state.getValue(com.antcolonies.block.DeadWoodBlock.EATEN) * 10
+                eaten += state.hasProperty(com.antcolonies.savanna.block.DeadWoodBlock.EATEN) ? state.getValue(com.antcolonies.savanna.block.DeadWoodBlock.EATEN) * 10
                         + colony.food().getPiecesCut(wood)
-                        : state.getBlock() instanceof com.antcolonies.block.FallenBranchBlock ? state.getValue(com.antcolonies.block.FallenBranchBlock.EATEN) * 10
+                        : state.getBlock() instanceof com.antcolonies.savanna.block.FallenBranchBlock ? state.getValue(com.antcolonies.savanna.block.FallenBranchBlock.EATEN) * 10
                         + colony.food().getPiecesCut(wood) : 100;
             }
             FoodWays.NewTunnel tunnel = colony.nest().foodWays().getNewTunnels().isEmpty() ? null : colony.nest().foodWays().getNewTunnels().get(0);
@@ -912,8 +915,8 @@ public class TermiteNewHoleTests {
                             // a cast comes soon.
                             for (BlockPos block : underside(log)) {
                                 BlockState wood = level.getBlockState(block);
-                                if (wood.hasProperty(com.antcolonies.block.DeadWoodBlock.EATEN)) {
-                                    level.setBlock(block, wood.setValue(com.antcolonies.block.DeadWoodBlock.EATEN, com.antcolonies.block.DeadWoodBlock.MAX_EATEN), 3);
+                                if (wood.hasProperty(com.antcolonies.savanna.block.DeadWoodBlock.EATEN)) {
+                                    level.setBlock(block, wood.setValue(com.antcolonies.savanna.block.DeadWoodBlock.EATEN, com.antcolonies.savanna.block.DeadWoodBlock.MAX_EATEN), 3);
                                     // (all but 2 of its pieces: eating from below by day is slow, and a cast must come within the day)
                                     colony.food().setPiecesCutForTests(block, colony.food().piecesOf(wood) - 2);
                                 }
@@ -923,10 +926,10 @@ public class TermiteNewHoleTests {
                         if (kind == Food.STUMP) {
                             // The stump on the log; it and every block of the log nearly eaten (quicker, and alike, so the
                             // block under the stump, nearest the hole, goes first). The stump only from the log's cast.
-                            BlockState wood = com.antcolonies.registry.SavannaBlocks.DEAD_WOOD.get().defaultBlockState()
-                                    .setValue(com.antcolonies.block.DeadWoodBlock.EATEN, com.antcolonies.block.DeadWoodBlock.MAX_EATEN);
+                            BlockState wood = com.antcolonies.savanna.registry.SavannaBlocks.DEAD_WOOD.get().defaultBlockState()
+                                    .setValue(com.antcolonies.savanna.block.DeadWoodBlock.EATEN, com.antcolonies.savanna.block.DeadWoodBlock.MAX_EATEN);
                             for (BlockPos block : log) {
-                                if (level.getBlockState(block).getBlock() instanceof com.antcolonies.block.DeadWoodBlock) {
+                                if (level.getBlockState(block).getBlock() instanceof com.antcolonies.savanna.block.DeadWoodBlock) {
                                     level.setBlock(block, wood.setValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS, net.minecraft.core.Direction.Axis.X), 3);
                                     colony.food().forgetCutsForTests(block);
                                 }
@@ -951,7 +954,7 @@ public class TermiteNewHoleTests {
             int crusts = 0;
             for (BlockPos cell : tunnel.gallery()) {
                 for (net.minecraft.core.Direction side : net.minecraft.core.Direction.Plane.HORIZONTAL) {
-                    crusts += com.antcolonies.block.MudCrustBlock.hasFace(level.getBlockState(cell.relative(side)), side.getOpposite()) ? 1 : 0;
+                    crusts += com.antcolonies.savanna.block.MudCrustBlock.hasFace(level.getBlockState(cell.relative(side)), side.getOpposite()) ? 1 : 0;
                 }
             }
             helper.assertTrue(!colony.isForagingTime(level), "foraging time");
@@ -964,22 +967,22 @@ public class TermiteNewHoleTests {
             BlockState top = level.getBlockState(stump);
             if (kind == Food.STUMP) {
                 // A cast joined to the gallery, and the stump on it eaten from it by day: a cast too.
-                if (com.antcolonies.block.MudCastBlock.isCast(under) && com.antcolonies.block.MudCastBlock.isCast(top)) {
-                    helper.assertTrue(under.getValue(com.antcolonies.block.TermiteTunnelBlock.OPEN.get(net.minecraft.core.Direction.DOWN))
-                            && under.getValue(com.antcolonies.block.TermiteTunnelBlock.OPEN.get(net.minecraft.core.Direction.UP)),
+                if (com.antcolonies.savanna.block.MudCastBlock.isCast(under) && com.antcolonies.savanna.block.MudCastBlock.isCast(top)) {
+                    helper.assertTrue(under.getValue(com.antcolonies.savanna.block.TermiteTunnelBlock.OPEN.get(net.minecraft.core.Direction.DOWN))
+                            && under.getValue(com.antcolonies.savanna.block.TermiteTunnelBlock.OPEN.get(net.minecraft.core.Direction.UP)),
                             "the cast of the log does not join the gallery and the cast of the stump: " + under);
                     helper.succeed();
                 }
             } else if (kind == Food.GIANT) {
                 // A block of the giant's underside eaten away by day is a mud cast, the rest of the log over it.
-                if (underside(log).stream().anyMatch(b -> com.antcolonies.block.MudCastBlock.isCast(level.getBlockState(b)))) {
+                if (underside(log).stream().anyMatch(b -> com.antcolonies.savanna.block.MudCastBlock.isCast(level.getBlockState(b)))) {
                     helper.succeed();
                 }
             } else if (kind == Food.BRANCH) {
                 // Cased in mud (a plate over each block of it), held up over the gallery, eaten from below.
                 int cased = 0;
                 for (BlockPos wood : log) {
-                    cased += com.antcolonies.block.MudCrustBlock.hasFace(level.getBlockState(wood.above()), net.minecraft.core.Direction.DOWN) ? 1 : 0;
+                    cased += com.antcolonies.savanna.block.MudCrustBlock.hasFace(level.getBlockState(wood.above()), net.minecraft.core.Direction.DOWN) ? 1 : 0;
                 }
                 if (eaten > eatenAtDawn[0] && cased > 0) {
                     helper.succeed();

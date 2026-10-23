@@ -1,4 +1,4 @@
-package com.antcolonies.tree;
+package com.antcolonies.savanna.tree;
 
 /**
  * The tree shape maker (M7.5 step 2): the blocks of a giant savanna tree for its kind, seed, age and stage, around its

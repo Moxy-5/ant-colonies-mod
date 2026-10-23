@@ -1,8 +1,8 @@
-package com.antcolonies.client;
+package com.antcolonies.savanna.client;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.entity.AntLarvaEntity;
-import com.antcolonies.entity.TermiteSoldierEntity;
+import com.antcolonies.savanna.entity.TermiteSoldierEntity;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;

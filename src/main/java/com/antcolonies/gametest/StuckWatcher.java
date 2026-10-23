@@ -66,7 +66,7 @@ public final class StuckWatcher {
     }
 
     /** Watches the colony's insects every tick for the rest of the test ({@code colony} may give null before it is founded). */
-    static Tracker watch(GameTestHelper helper, Supplier<Colony> colony) {
+    public static Tracker watch(GameTestHelper helper, Supplier<Colony> colony) {
         Tracker tracker = new Tracker();
         helper.onEachTick(() -> {
             Colony watched = colony.get();

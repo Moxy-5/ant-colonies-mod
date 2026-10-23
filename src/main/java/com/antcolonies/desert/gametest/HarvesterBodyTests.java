@@ -1,14 +1,15 @@
-package com.antcolonies.gametest;
+package com.antcolonies.desert.gametest;
 
+import com.antcolonies.gametest.TestScenes;
 import static com.antcolonies.gametest.TestScenes.*;
 
 import java.util.List;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.entity.AbstractAntEntity;
-import com.antcolonies.entity.WorkerAntEntity;
+import com.antcolonies.desert.entity.WorkerAntEntity;
 import com.antcolonies.species.SpeciesProfile;
-import com.antcolonies.registry.DesertEntities;
+import com.antcolonies.desert.registry.DesertEntities;
 
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;

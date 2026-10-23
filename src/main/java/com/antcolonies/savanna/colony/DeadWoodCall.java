@@ -1,5 +1,6 @@
-package com.antcolonies.colony;
+package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.Colony;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -10,10 +11,10 @@ import java.util.Set;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.block.DeadTreeWoodBlock;
-import com.antcolonies.block.DeadWoodBlock;
+import com.antcolonies.savanna.block.DeadTreeWoodBlock;
+import com.antcolonies.savanna.block.DeadWoodBlock;
 import com.antcolonies.block.FacedWall;
-import com.antcolonies.block.SoftDeadWoodBlock;
+import com.antcolonies.savanna.block.SoftDeadWoodBlock;
 import com.antcolonies.species.SpeciesProfile;
 
 import net.minecraft.core.BlockPos;
@@ -158,7 +159,7 @@ final class DeadWoodCall {
             BlockState state = level.getBlockState(over);
             if (!isDeadWood(state)) {
                 return state.isAir() || FacedWall.isWall(state) || !state.blocksMotion()
-                        || state.is(com.antcolonies.registry.TreeBlocks.TREE_WOOD) || state.is(com.antcolonies.registry.TreeBlocks.TREE_LEAVES);
+                        || state.is(com.antcolonies.savanna.registry.TreeBlocks.TREE_WOOD) || state.is(com.antcolonies.savanna.registry.TreeBlocks.TREE_LEAVES);
             }
         }
         return true;

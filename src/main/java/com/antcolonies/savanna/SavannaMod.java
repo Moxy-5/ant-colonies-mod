@@ -1,13 +1,14 @@
-package com.antcolonies;
+package com.antcolonies.savanna;
 
-import com.antcolonies.colony.SavannaParts;
-import com.antcolonies.gametest.SavannaTests;
-import com.antcolonies.registry.SavannaBlocks;
-import com.antcolonies.registry.SavannaEntities;
-import com.antcolonies.registry.SavannaFeatures;
-import com.antcolonies.registry.SavannaItems;
-import com.antcolonies.registry.SavannaStructures;
-import com.antcolonies.registry.TreeBlocks;
+import com.antcolonies.AntColoniesMod;
+import com.antcolonies.savanna.colony.SavannaParts;
+import com.antcolonies.savanna.gametest.SavannaTests;
+import com.antcolonies.savanna.registry.SavannaBlocks;
+import com.antcolonies.savanna.registry.SavannaEntities;
+import com.antcolonies.savanna.registry.SavannaFeatures;
+import com.antcolonies.savanna.registry.SavannaItems;
+import com.antcolonies.savanna.registry.SavannaStructures;
+import com.antcolonies.savanna.registry.TreeBlocks;
 
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
@@ -35,6 +36,6 @@ public class SavannaMod {
         // How the giant savanna trees' blocks burn (Minecraft's fire table is filled once, at start).
         modEventBus.addListener((FMLCommonSetupEvent event) -> event.enqueueWork(TreeBlocks::setFlammable));
         // In-game tests: only loaded when the game is started in game-test mode.
-        modEventBus.addListener((RegisterGameTestsEvent event) -> event.register(com.antcolonies.gametest.TermiteTests.class));
+        modEventBus.addListener((RegisterGameTestsEvent event) -> event.register(com.antcolonies.savanna.gametest.TermiteTests.class));
     }
 }

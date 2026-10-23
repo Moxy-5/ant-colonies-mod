@@ -1,8 +1,8 @@
-package com.antcolonies.registry;
+package com.antcolonies.savanna.registry;
 
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.worldgen.GiantTreePiece;
-import com.antcolonies.worldgen.GiantTreeStructure;
+import com.antcolonies.savanna.worldgen.GiantTreePiece;
+import com.antcolonies.savanna.worldgen.GiantTreeStructure;
 
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.levelgen.structure.StructureType;

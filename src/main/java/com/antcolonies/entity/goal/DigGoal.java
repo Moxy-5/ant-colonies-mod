@@ -80,7 +80,7 @@ public class DigGoal extends Goal {
 
     /**
      * Whether the dug soil waits to be dealt with before this builder digs on: asked of where the colony's soil goes
-     * ({@link ColonyHooks#DUG_SOIL}; the harvester's morning clear-out, {@link com.antcolonies.colony.Hill#soilWaits}).
+     * ({@link ColonyHooks#DUG_SOIL}; the harvester's morning clear-out, {@link com.antcolonies.desert.colony.Hill#soilWaits}).
      */
     private boolean soilWaits(ServerLevel level) {
         ColonyHooks.DugSoil soil = colony.hooks().first(ColonyHooks.DUG_SOIL);

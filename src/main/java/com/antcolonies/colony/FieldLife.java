@@ -49,9 +49,9 @@ import net.minecraft.world.phys.Vec3;
  */
 public class FieldLife {
     /** What every trip costs besides the walk out there and back (ticks): out of the nest, cutting, in to the store (10 seconds; my pick). */
-    static final int TRIP_TICKS = 200;
+    public static final int TRIP_TICKS = 200;
     /** How long (ticks) a forager takes for each block of the way, there or back (about the real foragers' pace with the turns; my pick). */
-    static final int TICKS_PER_BLOCK = 8;
+    public static final int TICKS_PER_BLOCK = 8;
     /** How long (ticks) a forager cuts at a plant before the piece comes off (as {@code ClipGrassGoal}). */
     private static final int CUT_TICKS = 50;
     /** How long (ticks) a plant only one forager cuts at rests after a cut (as {@link FoodStore}'s real foragers). */
@@ -59,10 +59,10 @@ public class FieldLife {
     /** How often (ticks) the brain looks at the plants it can see. */
     private static final int LOOK_TICKS = 100;
     /** At most this many plants are worked or shown a second (a big colony far from its food does not cost too much). */
-    static final int PLANTS_PER_SECOND = 200;
+    public static final int PLANTS_PER_SECOND = 200;
 
     /** A plant the brain remembers: its kind (its place in the profile's {@code food.plants}), the walk, whether it can be eaten from inside. */
-    record Plant(int kind, float trip, boolean fromInside) {
+    public record Plant(int kind, float trip, boolean fromInside) {
     }
 
     private final Colony colony;
@@ -170,7 +170,7 @@ public class FieldLife {
      * {@code radius} blocks of them (a forager out of that hole would have come across them). The colony knows them
      * now. Returns how many were found.
      */
-    int findRound(ServerLevel level, java.util.Collection<BlockPos> holes, int radius) {
+    public int findRound(ServerLevel level, java.util.Collection<BlockPos> holes, int radius) {
         if (holes.isEmpty() || unknown.isEmpty()) {
             return 0;
         }
@@ -200,7 +200,7 @@ public class FieldLife {
     }
 
     /** The plants the brain remembers that the colony knows (for picking the night's holes while away). */
-    List<BlockPos> knownPlants() {
+    public List<BlockPos> knownPlants() {
         List<BlockPos> list = new ArrayList<>();
         for (BlockPos pos : known.keySet()) {
             if (colony.foodMap().knows(pos, null)) {
@@ -230,7 +230,7 @@ public class FieldLife {
         return best;
     }
 
-    static double flat(BlockPos a, BlockPos b) {
+    public static double flat(BlockPos a, BlockPos b) {
         double dx = a.getX() - b.getX();
         double dz = a.getZ() - b.getZ();
         return Math.sqrt(dx * dx + dz * dz);
@@ -242,7 +242,7 @@ public class FieldLife {
      * How many of the worker numbers are foragers: the old ones, at least a third of those that are not nurses (the
      * colony moves the next oldest over when it is short, as with the real workers, see {@link Colony#shareOut}).
      */
-    int foragersInside(ServerLevel level) {
+    public int foragersInside(ServerLevel level) {
         int workers = colony.population().inside(Caste.WORKER);
         if (workers <= 0) {
             return 0;
@@ -265,7 +265,7 @@ public class FieldLife {
     }
 
     /** How many of the {@code foragers} may be out now: all of them, unless a part's rule holds some in (the harvester's door, Gordon's rule). */
-    double foragersFree(ServerLevel level, int foragers) {
+    public double foragersFree(ServerLevel level, int foragers) {
         ColonyHooks.DoorRule door = colony.hooks().first(ColonyHooks.DOOR_RULE);
         return door == null ? foragers : door.free(level, foragers);
     }
@@ -381,17 +381,17 @@ public class FieldLife {
     }
 
     /** The food plants the brain remembers (only to read). */
-    Map<BlockPos, Plant> known() {
+    public Map<BlockPos, Plant> known() {
         return known;
     }
 
     /** Room left in the food store this second, as last seen. */
-    int roomNow() {
+    public int roomNow() {
         return roomNow;
     }
 
     /** {@code foragers} more of the numbers out this second, placed at work (for the door and the colony list): out searching, they come home with food, not empty. */
-    void sendSearching(int foragers) {
+    public void sendSearching(int foragers) {
         placedNow += foragers;
         out += foragers;
     }
@@ -401,7 +401,7 @@ public class FieldLife {
      * foragers there; a plant a player can see is left to the real ones). Pieces they bring home are counted into the
      * store. Returns how many were sent.
      */
-    double work(ServerLevel level, BlockPos pos, Plant plant, double free, List<Vec3> eyes, List<BlockPos> usedUp) {
+    public double work(ServerLevel level, BlockPos pos, Plant plant, double free, List<Vec3> eyes, List<BlockPos> usedUp) {
         FoodStore food = colony.food();
         SpeciesProfile.PlantFood kind = colony.profile().food().plants().get(plant.kind());
         int places = Math.max(1, kind.foragers()) - food.foragersAt(pos);
@@ -456,7 +456,7 @@ public class FieldLife {
         return sent;
     }
 
-    void forgetUsedUp(ServerLevel level, List<BlockPos> usedUp) {
+    public void forgetUsedUp(ServerLevel level, List<BlockPos> usedUp) {
         for (BlockPos pos : usedUp) {
             known.remove(pos);
             progress.remove(pos);

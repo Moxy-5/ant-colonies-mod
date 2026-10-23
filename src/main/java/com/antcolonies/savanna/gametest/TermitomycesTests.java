@@ -1,19 +1,20 @@
-package com.antcolonies.gametest;
+package com.antcolonies.savanna.gametest;
 
-import static com.antcolonies.gametest.TermiteMoundTests.MIDDLE;
-import static com.antcolonies.gametest.TermiteMoundTests.SURFACE;
+import com.antcolonies.gametest.TestScenes;
+import static com.antcolonies.savanna.gametest.TermiteMoundTests.MIDDLE;
+import static com.antcolonies.savanna.gametest.TermiteMoundTests.SURFACE;
 
 import java.util.List;
 
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.block.GiantTermitomycesBlock;
+import com.antcolonies.savanna.block.GiantTermitomycesBlock;
 import com.antcolonies.block.SeedPileBlock;
-import com.antcolonies.block.TermitomycesBlock;
+import com.antcolonies.savanna.block.TermitomycesBlock;
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.SavannaParts;
-import com.antcolonies.registry.SavannaBlocks;
-import com.antcolonies.registry.SavannaItems;
-import com.antcolonies.registry.SavannaEntities;
+import com.antcolonies.savanna.colony.SavannaParts;
+import com.antcolonies.savanna.registry.SavannaBlocks;
+import com.antcolonies.savanna.registry.SavannaItems;
+import com.antcolonies.savanna.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;

@@ -1,4 +1,4 @@
-package com.antcolonies.colony;
+package com.antcolonies.savanna.colony;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -12,8 +12,8 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
-import com.antcolonies.block.TermiteRampBlock;
-import com.antcolonies.block.TermiteSpireBlock;
+import com.antcolonies.savanna.block.TermiteRampBlock;
+import com.antcolonies.savanna.block.TermiteSpireBlock;
 import com.antcolonies.species.SpeciesProfile.MoundNumbers;
 
 import net.minecraft.core.BlockPos;

@@ -1,7 +1,10 @@
-package com.antcolonies.gametest;
+package com.antcolonies.desert.gametest;
 
+import com.antcolonies.gametest.AwayKit;
+import com.antcolonies.gametest.TestClock;
+import com.antcolonies.gametest.TestScenes;
 import static com.antcolonies.gametest.AwayKit.*;
-import static com.antcolonies.gametest.HarvesterPopulationTests.*;
+import static com.antcolonies.desert.gametest.HarvesterPopulationTests.*;
 import static com.antcolonies.gametest.TestScenes.*;
 import static com.antcolonies.gametest.TestScenes.MIDDLE;
 import static com.antcolonies.gametest.TestScenes.SURFACE;
@@ -18,12 +21,12 @@ import com.antcolonies.colony.Brood;
 import com.antcolonies.colony.Caste;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
-import com.antcolonies.colony.DesertParts;
+import com.antcolonies.desert.colony.DesertParts;
 import com.antcolonies.colony.NestPlan;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.AntLarvaEntity;
-import com.antcolonies.entity.WorkerAntEntity;
-import com.antcolonies.registry.DesertEntities;
+import com.antcolonies.desert.entity.WorkerAntEntity;
+import com.antcolonies.desert.registry.DesertEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -53,9 +56,9 @@ public class HarvesterAwayTests {
     /** How many blocks of the hill (burrowed dirt) stand round the entrance. */
     static int hillBlocks(ServerLevel level, Colony colony) {
         int count = 0;
-        int r = com.antcolonies.colony.Hill.MOUND_RADIUS;
+        int r = com.antcolonies.desert.colony.Hill.MOUND_RADIUS;
         for (BlockPos pos : BlockPos.betweenClosed(colony.getCenter().offset(-r, 0, -r), colony.getCenter().offset(r, 4, r))) {
-            if (level.getBlockState(pos).is(com.antcolonies.registry.DesertBlocks.BURROWED_DIRT.get())) {
+            if (level.getBlockState(pos).is(com.antcolonies.desert.registry.DesertBlocks.BURROWED_DIRT.get())) {
                 count++;
             }
         }

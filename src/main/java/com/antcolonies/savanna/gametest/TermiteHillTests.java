@@ -1,5 +1,7 @@
-package com.antcolonies.gametest;
+package com.antcolonies.savanna.gametest;
 
+import com.antcolonies.gametest.TestClock;
+import com.antcolonies.gametest.TestScenes;
 import static com.antcolonies.gametest.TestScenes.*;
 import static com.antcolonies.gametest.TestScenes.MIDDLE;
 import static com.antcolonies.gametest.TestScenes.SURFACE;
@@ -11,9 +13,9 @@ import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ForagingHoles;
 import com.antcolonies.colony.NestPlan;
-import com.antcolonies.colony.SavannaParts;
-import com.antcolonies.entity.TermiteWorkerEntity;
-import com.antcolonies.registry.SavannaEntities;
+import com.antcolonies.savanna.colony.SavannaParts;
+import com.antcolonies.savanna.entity.TermiteWorkerEntity;
+import com.antcolonies.savanna.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -97,9 +99,9 @@ public class TermiteHillTests {
             if (helper.getTick() % 20 == 0) {
                 for (BlockPos pos : BlockPos.betweenClosed(colony.getCenter().offset(-8, -4, -8), colony.getCenter().offset(8, 8, 8))) {
                     net.minecraft.world.level.block.state.BlockState state = level.getBlockState(pos);
-                    if (state.getBlock() instanceof com.antcolonies.block.TermiteMoundBlock && com.antcolonies.block.TermiteMoundBlock.isFinished(state)
-                            && state.getValue(com.antcolonies.block.TermiteMoundBlock.AGE) == 0) {
-                        level.setBlockAndUpdate(pos, state.setValue(com.antcolonies.block.TermiteMoundBlock.AGE, 1));
+                    if (state.getBlock() instanceof com.antcolonies.savanna.block.TermiteMoundBlock && com.antcolonies.savanna.block.TermiteMoundBlock.isFinished(state)
+                            && state.getValue(com.antcolonies.savanna.block.TermiteMoundBlock.AGE) == 0) {
+                        level.setBlockAndUpdate(pos, state.setValue(com.antcolonies.savanna.block.TermiteMoundBlock.AGE, 1));
                     }
                 }
             }
@@ -133,9 +135,9 @@ public class TermiteHillTests {
             BlockPos pos = entry.getKey();
             net.minecraft.world.level.block.state.BlockState state = level.getBlockState(pos);
             boolean ok = switch (entry.getValue()) {
-                case WALL -> state.getBlock() instanceof com.antcolonies.block.TermiteMoundBlock && com.antcolonies.block.TermiteMoundBlock.isFinished(state)
+                case WALL -> state.getBlock() instanceof com.antcolonies.savanna.block.TermiteMoundBlock && com.antcolonies.savanna.block.TermiteMoundBlock.isFinished(state)
                         || state.is(com.antcolonies.registry.ModTags.DIGGABLE);
-                case TUNNEL -> state.getBlock() instanceof com.antcolonies.block.TermiteTunnelBlock;
+                case TUNNEL -> state.getBlock() instanceof com.antcolonies.savanna.block.TermiteTunnelBlock;
                 case OPEN -> state.isAir();
                 case MOUTH, SPIRE, RAMP -> true;
             };
@@ -199,7 +201,7 @@ public class TermiteHillTests {
             // This scene is about where the two holes open on the slope, not which holes take their turn tonight (a
             // small colony opens only one of them): the arms and turns are switched off here (they have their own
             // proof over 400 landscapes, GalleryProofTest, and their own scene in TermiteForagingTests).
-            com.antcolonies.colony.Galleries.of(colony).setSwitchForTests(false);
+            com.antcolonies.savanna.colony.Galleries.of(colony).setSwitchForTests(false);
             TestClock.still(helper, 0.0); // midnight: foraging time
             ready[0] = true;
         });

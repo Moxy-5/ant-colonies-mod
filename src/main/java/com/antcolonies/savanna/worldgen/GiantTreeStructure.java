@@ -1,12 +1,12 @@
-package com.antcolonies.worldgen;
+package com.antcolonies.savanna.worldgen;
 
 import java.util.Optional;
 
-import com.antcolonies.tree.Litter;
-import com.antcolonies.tree.TreeKind;
-import com.antcolonies.tree.TreeShapes;
-import com.antcolonies.tree.TreeStage;
-import com.antcolonies.registry.SavannaStructures;
+import com.antcolonies.savanna.tree.Litter;
+import com.antcolonies.savanna.tree.TreeKind;
+import com.antcolonies.savanna.tree.TreeShapes;
+import com.antcolonies.savanna.tree.TreeStage;
+import com.antcolonies.savanna.registry.SavannaStructures;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;

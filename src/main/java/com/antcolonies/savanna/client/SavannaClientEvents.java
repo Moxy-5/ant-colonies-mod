@@ -1,10 +1,12 @@
-package com.antcolonies.client;
+package com.antcolonies.savanna.client;
 
+import com.antcolonies.client.AntRenderer;
+import com.antcolonies.client.InsectModel;
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.entity.TermiteKingEntity;
-import com.antcolonies.entity.TermiteSoldierEntity;
-import com.antcolonies.entity.TermiteWorkerEntity;
-import com.antcolonies.registry.SavannaEntities;
+import com.antcolonies.savanna.entity.TermiteKingEntity;
+import com.antcolonies.savanna.entity.TermiteSoldierEntity;
+import com.antcolonies.savanna.entity.TermiteWorkerEntity;
+import com.antcolonies.savanna.registry.SavannaEntities;
 import com.antcolonies.species.Species;
 import com.antcolonies.species.SpeciesBodies;
 

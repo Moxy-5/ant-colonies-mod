@@ -1,5 +1,6 @@
-package com.antcolonies.entity.goal;
+package com.antcolonies.savanna.entity.goal;
 
+import com.antcolonies.entity.goal.Errand;
 import java.util.EnumSet;
 import java.util.function.Predicate;
 
@@ -7,11 +8,11 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
-import com.antcolonies.colony.SavannaParts;
+import com.antcolonies.savanna.colony.SavannaParts;
 import com.antcolonies.colony.ColonyRole;
-import com.antcolonies.colony.Mound;
-import com.antcolonies.colony.MoundGrowth;
-import com.antcolonies.colony.MoundReach;
+import com.antcolonies.savanna.colony.Mound;
+import com.antcolonies.savanna.colony.MoundGrowth;
+import com.antcolonies.savanna.colony.MoundReach;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.nav.Foothold;
 
@@ -24,7 +25,7 @@ import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
- * A termite shapes its mound where the plan says (see {@link com.antcolonies.colony.MoundShaping#pickShapeJob}): it carves a
+ * A termite shapes its mound where the plan says (see {@link com.antcolonies.savanna.colony.MoundShaping#pickShapeJob}): it carves a
  * tunnel into finished soil from a channel or the shaft right beside it (so the new tunnel joins up at once, and opens
  * into the shaft beside it), reshapes a piece into the one the plan has there now (a thicker spire piece, a ramp facing
  * another way, a mouth that is now a spire piece), or fills a piece up into the soil or tunnel block the plan has where

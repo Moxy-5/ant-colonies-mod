@@ -1,6 +1,6 @@
-package com.antcolonies.block;
+package com.antcolonies.savanna.block;
 
-import static com.antcolonies.block.DryGrassBlock.GROWTH;
+import static com.antcolonies.savanna.block.DryGrassBlock.GROWTH;
 
 import org.jetbrains.annotations.Nullable;
 

@@ -41,7 +41,7 @@ import net.minecraft.world.level.block.Blocks;
  * checked, and founding while away. Each species' scenes are in its own files ({@code TermiteAwayTests},
  * {@code HarvesterAwayTests}), its own part checks signed up by its tests ({@link #addPartsCheck}).
  */
-final class AwayKit {
+public final class AwayKit {
     /**
      * Each species' own checks of a colony's parts (the split, step S4), run by {@link #partsAreTheSpecies} on every
      * colony saved and loaded in a test (of any species: a check says what it expects of a colony without its parts).
@@ -54,7 +54,7 @@ final class AwayKit {
      * digging anything (the termite pair), or once the queen is sealed in, staying away until the first workers have dug
      * the store and foraged (the lone ant queen).
      */
-    record Founders(ResourceLocation species, Consumer<GameTestHelper> spawn, @Nullable Class<? extends AbstractAntEntity> partner,
+    public record Founders(ResourceLocation species, Consumer<GameTestHelper> spawn, @Nullable Class<? extends AbstractAntEntity> partner,
             @Nullable String partnerCaste, boolean awayAtOnce) {
     }
 
@@ -62,12 +62,12 @@ final class AwayKit {
     }
 
     /** A species' own check of a colony's parts, run on every colony saved and loaded in a test (its tests' sign-up). */
-    static void addPartsCheck(BiConsumer<GameTestHelper, Colony> check) {
+    public static void addPartsCheck(BiConsumer<GameTestHelper, Colony> check) {
         PARTS_CHECKS.add(check);
     }
 
     /** What a frozen insect looked like on disk: saved before it leaves the world, so it can be loaded again. */
-    static CompoundTag freezeAndUnload(Colony colony, ServerLevel level, Entity entity) {
+    public static CompoundTag freezeAndUnload(Colony colony, ServerLevel level, Entity entity) {
         colony.away().freeze(level, entity); // what the game does when the insect's chunk goes out of range
         CompoundTag tag = new CompoundTag();
         entity.save(tag);
@@ -76,7 +76,7 @@ final class AwayKit {
     }
 
     /** The insect's chunk is loaded again: the same insect (same id) is back in the world. */
-    static void loadAgain(ServerLevel level, CompoundTag tag) {
+    public static void loadAgain(ServerLevel level, CompoundTag tag) {
         Entity entity = EntityType.loadEntityRecursive(tag, level, loaded -> loaded);
         if (entity != null) {
             level.addFreshEntity(entity);
@@ -84,7 +84,7 @@ final class AwayKit {
     }
 
     /** Every real worker of the test's colonies leaves the world: only the numbers may forage in these tests. */
-    static void noRealWorkers(GameTestHelper helper) {
+    public static void noRealWorkers(GameTestHelper helper) {
         for (AbstractAntEntity worker : helper.getLevel().getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds(),
                 mob -> SpeciesBodies.all().stream().anyMatch(bodies -> mob.getType() == bodies.typeFor(Caste.WORKER)))) {
             worker.discard();
@@ -119,7 +119,7 @@ final class AwayKit {
      * writes exactly the same save (nothing saved is lost or read back wrong); the parts that differ are named. The test
      * switches (never saved) must be set again on the copy by the caller.
      */
-    static Colony saveAndLoad(GameTestHelper helper, Colony colony) {
+    public static Colony saveAndLoad(GameTestHelper helper, Colony colony) {
         partsAreTheSpecies(helper, colony);
         CompoundTag saved = colony.save();
         Colony copy = Colony.load(saved);
@@ -326,7 +326,7 @@ final class AwayKit {
     }
 
     /** The colony with this id (also while its queen is frozen, or dead). */
-    static Colony byId(GameTestHelper helper, UUID id) {
+    public static Colony byId(GameTestHelper helper, UUID id) {
         Colony colony = ColonyManager.get(helper.getLevel()).getColony(id);
         helper.assertTrue(colony != null, "the colony is gone");
         return colony;
@@ -345,7 +345,7 @@ final class AwayKit {
      * away at once, before they have dug anything. While away they dig their chamber and close themselves in at the real
      * pace (the report says so), and the queen lays her batch; back home they are in their chamber, the grass is gone.
      */
-    static void foundsWhileAway(GameTestHelper helper, Founders founders) {
+    public static void foundsWhileAway(GameTestHelper helper, Founders founders) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
         TestScenes.deepGround(helper);

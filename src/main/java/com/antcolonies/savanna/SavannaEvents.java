@@ -1,13 +1,15 @@
-package com.antcolonies;
+package com.antcolonies.savanna;
 
-import com.antcolonies.block.DryGrassBlock;
-import com.antcolonies.entity.TermiteKingEntity;
-import com.antcolonies.entity.TermiteQueenEntity;
-import com.antcolonies.entity.TermiteSoldierEntity;
-import com.antcolonies.entity.TermiteWorkerEntity;
-import com.antcolonies.entity.goal.HuntTermitesGoal;
-import com.antcolonies.registry.SavannaEntities;
-import com.antcolonies.registry.SavannaItems;
+import com.antcolonies.AntColoniesMod;
+import com.antcolonies.ModEvents;
+import com.antcolonies.savanna.block.DryGrassBlock;
+import com.antcolonies.savanna.entity.TermiteKingEntity;
+import com.antcolonies.savanna.entity.TermiteQueenEntity;
+import com.antcolonies.savanna.entity.TermiteSoldierEntity;
+import com.antcolonies.savanna.entity.TermiteWorkerEntity;
+import com.antcolonies.savanna.entity.goal.HuntTermitesGoal;
+import com.antcolonies.savanna.registry.SavannaEntities;
+import com.antcolonies.savanna.registry.SavannaItems;
 
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
@@ -33,7 +35,7 @@ public class SavannaEvents {
     @SubscribeEvent
     public static void onNeighborNotify(BlockEvent.NeighborNotifyEvent event) {
         if (event.getLevel() instanceof ServerLevel level) {
-            com.antcolonies.tree.TreeFire.changed(level, event.getPos(), event.getState());
+            com.antcolonies.savanna.tree.TreeFire.changed(level, event.getPos(), event.getState());
         }
     }
 
@@ -49,7 +51,7 @@ public class SavannaEvents {
     /** Chickens hunt termite workers out on the surface (step 6c; see {@link HuntTermitesGoal}). */
     @SubscribeEvent
     public static void onJoinLevel(EntityJoinLevelEvent event) {
-        if (event.loadedFromDisk() && event.getEntity().getTags().contains(com.antcolonies.tree.TreeFall.TAG)) {
+        if (event.loadedFromDisk() && event.getEntity().getTags().contains(com.antcolonies.savanna.tree.TreeFall.TAG)) {
             // A falling tree's display left by a stop in the middle of its fall: the tree is placed fallen instead.
             event.setCanceled(true);
             return;
@@ -57,7 +59,7 @@ public class SavannaEvents {
         if (!event.loadedFromDisk() && event.getLevel() instanceof ServerLevel level && event.getEntity() instanceof net.minecraft.world.entity.LightningBolt bolt
                 && !level.getBlockState(bolt.blockPosition().below()).is(net.minecraft.world.level.block.Blocks.LIGHTNING_ROD)) {
             // Step 5e: a big savanna tree near the strike draws it to its top (a lightning rod still wins).
-            net.minecraft.core.BlockPos to = com.antcolonies.tree.Forest.get(level).lightning(level, bolt.blockPosition());
+            net.minecraft.core.BlockPos to = com.antcolonies.savanna.tree.Forest.get(level).lightning(level, bolt.blockPosition());
             if (to != null) {
                 bolt.moveTo(net.minecraft.world.phys.Vec3.atBottomCenterOf(to));
             }
@@ -71,7 +73,7 @@ public class SavannaEvents {
     @SubscribeEvent(priority = EventPriority.LOW)
     public static void onLevelTick(net.neoforged.neoforge.event.tick.LevelTickEvent.Post event) {
         if (event.getLevel() instanceof ServerLevel level) {
-            com.antcolonies.tree.Forest.tick(level);
+            com.antcolonies.savanna.tree.Forest.tick(level);
         }
     }
 
@@ -81,7 +83,7 @@ public class SavannaEvents {
         if (!(event.getLevel() instanceof ServerLevel level) || !event.getItemStack().is(net.minecraft.world.item.Items.BONE_MEAL)) {
             return;
         }
-        if (com.antcolonies.tree.Forest.get(level).boneMeal(level, event.getPos())) {
+        if (com.antcolonies.savanna.tree.Forest.get(level).boneMeal(level, event.getPos())) {
             if (!event.getEntity().getAbilities().instabuild) {
                 event.getItemStack().shrink(1);
             }

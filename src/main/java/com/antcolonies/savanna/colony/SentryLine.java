@@ -1,4 +1,4 @@
-package com.antcolonies.colony;
+package com.antcolonies.savanna.colony;
 
 import java.util.ArrayList;
 import java.util.HashSet;

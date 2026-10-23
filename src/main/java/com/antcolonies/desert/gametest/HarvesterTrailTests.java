@@ -1,5 +1,9 @@
-package com.antcolonies.gametest;
+package com.antcolonies.desert.gametest;
 
+import com.antcolonies.gametest.AwayKit;
+import com.antcolonies.gametest.TestClock;
+import com.antcolonies.gametest.TestIsolation;
+import com.antcolonies.gametest.TestScenes;
 import static com.antcolonies.gametest.TestScenes.MIDDLE;
 import static com.antcolonies.gametest.TestScenes.SURFACE;
 
@@ -11,12 +15,12 @@ import java.util.UUID;
 
 import com.antcolonies.colony.Caste;
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.block.GramaGrassBlock;
+import com.antcolonies.desert.block.GramaGrassBlock;
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.DesertParts;
-import com.antcolonies.colony.TrunkTrails;
-import com.antcolonies.entity.WorkerAntEntity;
-import com.antcolonies.registry.DesertBlocks;
+import com.antcolonies.desert.colony.DesertParts;
+import com.antcolonies.desert.colony.TrunkTrails;
+import com.antcolonies.desert.entity.WorkerAntEntity;
+import com.antcolonies.desert.registry.DesertBlocks;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;

@@ -1,6 +1,6 @@
-package com.antcolonies.worldgen;
+package com.antcolonies.savanna.worldgen;
 
-import com.antcolonies.registry.SavannaFeatures;
+import com.antcolonies.savanna.registry.SavannaFeatures;
 
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;

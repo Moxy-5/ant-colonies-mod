@@ -1,5 +1,8 @@
-package com.antcolonies.gametest;
+package com.antcolonies.savanna.gametest;
 
+import com.antcolonies.gametest.AwayKit;
+import com.antcolonies.gametest.TestClock;
+import com.antcolonies.gametest.TestScenes;
 import static com.antcolonies.gametest.AwayKit.*;
 import static com.antcolonies.gametest.TestScenes.*;
 import static com.antcolonies.gametest.TestScenes.MIDDLE;
@@ -20,10 +23,10 @@ import com.antcolonies.colony.Caste;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.NestPlan;
-import com.antcolonies.colony.SavannaParts;
+import com.antcolonies.savanna.colony.SavannaParts;
 import com.antcolonies.entity.AbstractAntEntity;
-import com.antcolonies.entity.TermiteSoldierEntity;
-import com.antcolonies.registry.SavannaEntities;
+import com.antcolonies.savanna.entity.TermiteSoldierEntity;
+import com.antcolonies.savanna.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -83,7 +86,7 @@ public class TermiteAwayTests {
     }
 
     /** How many gallery pieces are dug all through. */
-    private static int dugPieces(ServerLevel level, com.antcolonies.colony.Galleries galleries) {
+    private static int dugPieces(ServerLevel level, com.antcolonies.savanna.colony.Galleries galleries) {
         int dug = 0;
         for (BlockPos piece : galleries.pieceHoles()) {
             if (galleries.digCells(galleries.pieceAt(piece)).stream().allMatch(cell -> com.antcolonies.colony.Nest.isDugOut(level, cell))) {
@@ -97,7 +100,7 @@ public class TermiteAwayTests {
     static BlockPos knownDryTuft(GameTestHelper helper, Colony colony, int x, int z) {
         BlockPos tuft = helper.absolutePos(new BlockPos(x, SURFACE, z));
         helper.getLevel().setBlock(tuft.below(), Blocks.GRASS_BLOCK.defaultBlockState(), 3);
-        helper.getLevel().setBlock(tuft, com.antcolonies.registry.SavannaBlocks.DRY_GRASS.get().defaultBlockState(), 3);
+        helper.getLevel().setBlock(tuft, com.antcolonies.savanna.registry.SavannaBlocks.DRY_GRASS.get().defaultBlockState(), 3);
         colony.food().setPiecesCutForTests(tuft, 2);
         colony.foodMap().knowForTests(tuft);
         colony.food().rescanPlantsSoon();
@@ -109,11 +112,11 @@ public class TermiteAwayTests {
         int[] totals = new int[5];
         for (BlockPos pos : colony.part(SavannaParts.FUNGUS_GARDEN).orElseThrow().getCombs(level)) {
             var state = level.getBlockState(pos);
-            totals[0] += com.antcolonies.block.FungusCombBlock.fresh(state);
-            totals[1] += com.antcolonies.block.FungusCombBlock.ripe(state);
-            totals[2] += com.antcolonies.block.FungusCombBlock.old(state);
-            totals[3] += state.getValue(com.antcolonies.block.FungusCombBlock.NODULES);
-            totals[4] += com.antcolonies.block.FungusCombBlock.layers(state);
+            totals[0] += com.antcolonies.savanna.block.FungusCombBlock.fresh(state);
+            totals[1] += com.antcolonies.savanna.block.FungusCombBlock.ripe(state);
+            totals[2] += com.antcolonies.savanna.block.FungusCombBlock.old(state);
+            totals[3] += state.getValue(com.antcolonies.savanna.block.FungusCombBlock.NODULES);
+            totals[4] += com.antcolonies.savanna.block.FungusCombBlock.layers(state);
         }
         return totals;
     }
@@ -139,9 +142,9 @@ public class TermiteAwayTests {
                     + finished + " blocks, " + report.describe());
             for (BlockPos pos : colony.part(SavannaParts.MOUND).orElseThrow().getParts(level).keySet()) {
                 var state = level.getBlockState(pos);
-                if (state.getBlock() instanceof com.antcolonies.block.TermiteMoundBlock) {
-                    helper.assertTrue(com.antcolonies.block.TermiteMoundBlock.isFinished(state)
-                            && state.getValue(com.antcolonies.block.TermiteMoundBlock.AGE) >= 1, "a mound block built while away should be finished and set: "
+                if (state.getBlock() instanceof com.antcolonies.savanna.block.TermiteMoundBlock) {
+                    helper.assertTrue(com.antcolonies.savanna.block.TermiteMoundBlock.isFinished(state)
+                            && state.getValue(com.antcolonies.savanna.block.TermiteMoundBlock.AGE) >= 1, "a mound block built while away should be finished and set: "
                                     + pos + " " + state);
                 }
             }
@@ -181,12 +184,12 @@ public class TermiteAwayTests {
             TermiteSoldierTests.digNestAtOnce(level, colony);
             colony.population().addNewMembers(Caste.WORKER, level.getGameTime() - 250000, 60);
             // Step 2c's rule with the 2 holes of before (the galleries' night holes have their own scene, step 4 below).
-            com.antcolonies.colony.Galleries.of(colony).setSwitchForTests(false);
+            com.antcolonies.savanna.colony.Galleries.of(colony).setSwitchForTests(false);
             int[][] spots = {{MIDDLE + 6, MIDDLE}, {MIDDLE - 6, MIDDLE}, {MIDDLE, MIDDLE + 6}, {MIDDLE, MIDDLE - 6}};
             for (int[] spot : spots) {
                 BlockPos tuft = helper.absolutePos(new BlockPos(spot[0], SURFACE, spot[1]));
                 level.setBlock(tuft.below(), Blocks.GRASS_BLOCK.defaultBlockState(), 3);
-                level.setBlock(tuft, com.antcolonies.registry.SavannaBlocks.DRY_GRASS.get().defaultBlockState(), 3);
+                level.setBlock(tuft, com.antcolonies.savanna.registry.SavannaBlocks.DRY_GRASS.get().defaultBlockState(), 3);
                 colony.food().setPiecesCutForTests(tuft, 2);
                 tufts.add(tuft);
             }
@@ -217,12 +220,12 @@ public class TermiteAwayTests {
             for (int i = 0; i < 3; i++) {
                 BlockPos tuft = tufts.get(i);
                 helper.assertTrue(level.getBlockState(tuft).isAir(), "a known tuft should be eaten up at night and gone: " + tuft);
-                long growsAt = colony.part(com.antcolonies.colony.SavannaParts.BARE_PATCHES).orElseThrow().growsAtForTests(tuft);
+                long growsAt = colony.part(com.antcolonies.savanna.colony.SavannaParts.BARE_PATCHES).orElseThrow().growsAtForTests(tuft);
                 helper.assertTrue(growsAt > nightFrom[0] + regrowth && growsAt <= level.getGameTime() + regrowth,
                         "the tuft should grow back 3 days after it was eaten: " + growsAt);
                 helper.assertTrue(!colony.foodMap().isKnown(tuft), "an eaten-up tuft should be forgotten: " + tuft);
             }
-            helper.assertTrue(level.getBlockState(tufts.get(3)).is(com.antcolonies.registry.SavannaBlocks.DRY_GRASS.get())
+            helper.assertTrue(level.getBlockState(tufts.get(3)).is(com.antcolonies.savanna.registry.SavannaBlocks.DRY_GRASS.get())
                     && colony.food().getPiecesCut(tufts.get(3)) == 2, "the tuft nobody found should be left: cut " + colony.food().getPiecesCut(tufts.get(3)));
             helper.assertTrue(colony.food().getFood() == foodBefore[0] + 6, "6 pieces should have come in: " + colony.food().getFood()
                     + ", was " + foodBefore[0]);
@@ -347,8 +350,8 @@ public class TermiteAwayTests {
             colony.population().addNewMembers(Caste.WORKER, now - colony.profile().worker().builderUntilTicks() - 1000, 30);
             colony.population().addNewMembers(Caste.WORKER, now - colony.profile().worker().nurseUntilTicks() - 1000, 8);
             TermiteSoldierTests.digNestAtOnce(level, colony); // (the nest of a colony with workers, not the founders' chamber)
-            com.antcolonies.colony.Galleries.of(colony).setSwitchForTests(true);
-            com.antcolonies.colony.Galleries.of(colony).setReachForTests(reach);
+            com.antcolonies.savanna.colony.Galleries.of(colony).setSwitchForTests(true);
+            com.antcolonies.savanna.colony.Galleries.of(colony).setReachForTests(reach);
             colony.field().setOnForTests(true);
             stage[0] = 1;
         });
@@ -357,7 +360,7 @@ public class TermiteAwayTests {
             if (colony == null || stage[0] == 0) {
                 return;
             }
-            com.antcolonies.colony.Galleries galleries = com.antcolonies.colony.Galleries.of(colony);
+            com.antcolonies.savanna.colony.Galleries galleries = com.antcolonies.savanna.colony.Galleries.of(colony);
             List<NestPlan.ForagingTunnel> tunnels = colony.foragingHoles().tunnels(level);
             BlockPos center = colony.getCenter();
             int graze = colony.profile().nest().galleries().orElseThrow().foodRadius();
@@ -400,7 +403,7 @@ public class TermiteAwayTests {
                     spot[2] = groundSpot(helper, colony, center, 9, 20, at -> holes.stream().allMatch(hole -> flat(hole, at) > graze + 2.5));
                     helper.assertTrue(spot[1] != null && spot[2] != null, "no room for the other tufts");
                     for (int i = 0; i < 3; i++) {
-                        level.setBlock(spot[i], com.antcolonies.registry.SavannaBlocks.DRY_GRASS.get().defaultBlockState(), 3);
+                        level.setBlock(spot[i], com.antcolonies.savanna.registry.SavannaBlocks.DRY_GRASS.get().defaultBlockState(), 3);
                         colony.food().setPiecesCutForTests(spot[i], i == 0 ? 3 : 2);
                         if (i != 1) {
                             colony.foodMap().knowForTests(spot[i]);
@@ -529,7 +532,7 @@ public class TermiteAwayTests {
                     helper.assertTrue(grown[0] != null, "no grown far piece:" + galleries.describe(level));
                     spot[4] = groundSpot(helper, colony, grown[0], 2, 3.5, at -> true);
                     helper.assertTrue(spot[4] != null, "no room for a tuft by the grown piece " + helper.relativePos(grown[0]));
-                    level.setBlock(spot[4], com.antcolonies.registry.SavannaBlocks.DRY_GRASS.get().defaultBlockState(), 3);
+                    level.setBlock(spot[4], com.antcolonies.savanna.registry.SavannaBlocks.DRY_GRASS.get().defaultBlockState(), 3);
                     colony.food().setPiecesCutForTests(spot[4], 3);
                     colony.foodMap().knowForTests(spot[4]);
                     colony.food().rescanPlantsSoon();
@@ -626,7 +629,7 @@ public class TermiteAwayTests {
             colony.population().setViewersForTests(List.of());
             TermiteSoldierTests.digNestAtOnce(level, colony);
             colony.population().addNewMembers(Caste.WORKER, level.getGameTime() - 250000, 60);
-            com.antcolonies.colony.Galleries.of(colony).setSwitchForTests(false);
+            com.antcolonies.savanna.colony.Galleries.of(colony).setSwitchForTests(false);
             for (int i = 0; i < 6; i++) {
                 colony.danger().seen(level, place, UUID.randomUUID(), "husk"); // seen only: not an attack
             }
@@ -721,7 +724,7 @@ public class TermiteAwayTests {
             helper.assertTrue(room != null, "the royal chamber should be dug");
             AbstractAntEntity theQueen = colony.getQueen(level);
             theQueen.teleportTo(room.getX() + 0.5, room.getY(), room.getZ() + 0.5);
-            ((com.antcolonies.entity.TermiteQueenEntity) theQueen).setSize(1.0F); // full-grown: an egg every 15 seconds
+            ((com.antcolonies.savanna.entity.TermiteQueenEntity) theQueen).setSize(1.0F); // full-grown: an egg every 15 seconds
             long now = level.getGameTime();
             colony.population().addNewMembers(Caste.WORKER, now, 40);
             colony.population().addNewMembers(Caste.WORKER, now - 250000, 60);
@@ -735,12 +738,12 @@ public class TermiteAwayTests {
                 colony.food().depositSeed(level, spot);
             }
             for (BlockPos comb : colony.part(SavannaParts.FUNGUS_GARDEN).orElseThrow().getCombs(level)) {
-                if (com.antcolonies.block.FungusCombBlock.layers(level.getBlockState(comb)) < 4) {
+                if (com.antcolonies.savanna.block.FungusCombBlock.layers(level.getBlockState(comb)) < 4) {
                     continue; // (a comb not full yet stays all fresh)
                 }
                 // Aged comb: 2 old layers at the bottom, a ripe one, a fresh one on top; 3 nodules.
-                level.setBlock(comb, level.getBlockState(comb).setValue(com.antcolonies.block.FungusCombBlock.NODULES, 3)
-                        .setValue(com.antcolonies.block.FungusCombBlock.OLD, 2).setValue(com.antcolonies.block.FungusCombBlock.FRESH, 1), 3);
+                level.setBlock(comb, level.getBlockState(comb).setValue(com.antcolonies.savanna.block.FungusCombBlock.NODULES, 3)
+                        .setValue(com.antcolonies.savanna.block.FungusCombBlock.OLD, 2).setValue(com.antcolonies.savanna.block.FungusCombBlock.FRESH, 1), 3);
             }
             helper.assertTrue(colony.part(SavannaParts.FUNGUS_GARDEN).orElseThrow().getCombs(level).size() >= 5, "only " + colony.part(SavannaParts.FUNGUS_GARDEN).orElseThrow().getCombs(level).size() + " comb blocks");
             helper.assertTrue(colony.food().getFood() == combTotals(level, colony)[4], "the food count " + colony.food().getFood()
@@ -753,9 +756,9 @@ public class TermiteAwayTests {
             AbstractAntEntity theQueen = colony.getQueen(level);
             queen[0] = theQueen.getUUID();
             // The king, a day and more since his last nodule: he wants one.
-            var theKing = level.getEntitiesOfClass(com.antcolonies.entity.TermiteKingEntity.class, helper.getBounds(),
+            var theKing = level.getEntitiesOfClass(com.antcolonies.savanna.entity.TermiteKingEntity.class, helper.getBounds(),
                     mob -> colony.getId().equals(mob.getColonyId())).stream().findFirst().orElse(null);
-            helper.assertTrue(theKing != null && colony.getCount(com.antcolonies.entity.TermiteKingEntity.CASTE) == 1, "the king should have joined");
+            helper.assertTrue(theKing != null && colony.getCount(com.antcolonies.savanna.entity.TermiteKingEntity.CASTE) == 1, "the king should have joined");
             theKing.teleportTo(theQueen.getX() + 1.0, theQueen.getY(), theQueen.getZ());
             king[0] = theKing.getUUID();
             kingHungrySince[0] = level.getGameTime() - colony.profile().worker().mealIntervalTicks() - 100;
@@ -888,7 +891,7 @@ public class TermiteAwayTests {
             helper.assertTrue(blocks[3] == expected[3] + grown - lost, "the nodules should be as counted: blocks " + java.util.Arrays.toString(blocks)
                     + ", counted " + java.util.Arrays.toString(expected) + ", " + grown + " grown since, " + lost + " lost with used-up comb");
             Entity theKing = level.getEntity(king[0]);
-            helper.assertTrue(theKing != null && theKing.isAlive() && colony.getCount(com.antcolonies.entity.TermiteKingEntity.CASTE) == 1,
+            helper.assertTrue(theKing != null && theKing.isAlive() && colony.getCount(com.antcolonies.savanna.entity.TermiteKingEntity.CASTE) == 1,
                     "the king, fed while away, should be alive when his land loads: " + theKing);
             colony.part(SavannaParts.FUNGUS_GARDEN).orElseThrow().setAgeingSpeedForTests(1.0F);
             phase[0] = 1;
@@ -935,7 +938,7 @@ public class TermiteAwayTests {
             helper.assertTrue(colony.queenCare().isQueenHome(level), "the queen should be in the royal chamber");
             helper.assertTrue(colony.life().nurseFoodLeft(level) == 0, "there should be no nodule: " + colony.life().nurseFoodLeft(level));
             AbstractAntEntity theQueen = colony.getQueen(level);
-            var theKing = level.getEntitiesOfClass(com.antcolonies.entity.TermiteKingEntity.class, helper.getBounds(),
+            var theKing = level.getEntitiesOfClass(com.antcolonies.savanna.entity.TermiteKingEntity.class, helper.getBounds(),
                     mob -> colony.getId().equals(mob.getColonyId())).stream().findFirst().orElse(null);
             helper.assertTrue(theKing != null, "the king should have joined");
             theKing.teleportTo(theQueen.getX() + 1.0, theQueen.getY(), theQueen.getZ());
@@ -972,8 +975,8 @@ public class TermiteAwayTests {
             AntColoniesMod.LOGGER.info("[away-test] king fix, starving pair back: queen {}, king {}, {}", theQueen, theKing, colony.away().describe(level));
             helper.assertTrue(theQueen == null || !theQueen.isAlive(), "the queen who starved while away should die as her land loads");
             helper.assertTrue(theKing == null || !theKing.isAlive(), "the king who starved while away should die as his land loads");
-            helper.assertTrue(colony.isQueenless() && colony.getCount(com.antcolonies.entity.TermiteKingEntity.CASTE) == 0,
-                    "the colony should carry on without them: kings " + colony.getCount(com.antcolonies.entity.TermiteKingEntity.CASTE));
+            helper.assertTrue(colony.isQueenless() && colony.getCount(com.antcolonies.savanna.entity.TermiteKingEntity.CASTE) == 0,
+                    "the colony should carry on without them: kings " + colony.getCount(com.antcolonies.savanna.entity.TermiteKingEntity.CASTE));
             helper.succeed();
         });
     }
@@ -984,6 +987,6 @@ public class TermiteAwayTests {
         foundsWhileAway(helper, new AwayKit.Founders(com.antcolonies.species.Species.MACROTERMES, h -> {
             h.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
             h.runAfterDelay(5, () -> h.spawn(SavannaEntities.TERMITE_KING.get(), MIDDLE + 2, SURFACE, MIDDLE + 1));
-        }, com.antcolonies.entity.TermiteKingEntity.class, com.antcolonies.entity.TermiteKingEntity.CASTE, true));
+        }, com.antcolonies.savanna.entity.TermiteKingEntity.class, com.antcolonies.savanna.entity.TermiteKingEntity.CASTE, true));
     }
 }

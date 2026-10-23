@@ -1,5 +1,13 @@
-package com.antcolonies.colony;
+package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.Caste;
+import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.ColonyHooks;
+import com.antcolonies.colony.ForagingHoles;
+import com.antcolonies.colony.ForagingTrails;
+import com.antcolonies.colony.Nest;
+import com.antcolonies.colony.NestPlan;
+import com.antcolonies.colony.Population;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -11,8 +19,8 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.entity.AntLarvaEntity;
-import com.antcolonies.entity.TermiteSoldierEntity;
-import com.antcolonies.entity.TermiteSoldierEntity.Rank;
+import com.antcolonies.savanna.entity.TermiteSoldierEntity;
+import com.antcolonies.savanna.entity.TermiteSoldierEntity.Rank;
 import com.antcolonies.species.SpeciesProfile;
 
 import net.minecraft.core.BlockPos;

@@ -1,22 +1,22 @@
-package com.antcolonies.worldgen;
+package com.antcolonies.savanna.worldgen;
 
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import com.antcolonies.block.FallenBranchBlock;
-import com.antcolonies.block.MudCrustBlock;
-import com.antcolonies.block.TaperingBranchBlock;
-import com.antcolonies.block.TreeBranchBlock;
-import com.antcolonies.block.TreeLeavesBlock;
-import com.antcolonies.registry.TreeBlocks;
-import com.antcolonies.tree.TreeKind;
-import com.antcolonies.tree.TreeLife;
-import com.antcolonies.tree.TreePart;
-import com.antcolonies.tree.TreeShapes;
-import com.antcolonies.tree.TreeStage;
-import com.antcolonies.tree.TreeVoxels;
-import com.antcolonies.registry.SavannaBlocks;
+import com.antcolonies.savanna.block.FallenBranchBlock;
+import com.antcolonies.savanna.block.MudCrustBlock;
+import com.antcolonies.savanna.block.TaperingBranchBlock;
+import com.antcolonies.savanna.block.TreeBranchBlock;
+import com.antcolonies.savanna.block.TreeLeavesBlock;
+import com.antcolonies.savanna.registry.TreeBlocks;
+import com.antcolonies.savanna.tree.TreeKind;
+import com.antcolonies.savanna.tree.TreeLife;
+import com.antcolonies.savanna.tree.TreePart;
+import com.antcolonies.savanna.tree.TreeShapes;
+import com.antcolonies.savanna.tree.TreeStage;
+import com.antcolonies.savanna.tree.TreeVoxels;
+import com.antcolonies.savanna.registry.SavannaBlocks;
 
 import it.unimi.dsi.fastutil.longs.Long2DoubleOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
@@ -960,7 +960,7 @@ public final class TreePlacer {
      * book leaves it alone (never grown over or taken away), as it does their mud casts.
      */
     public static boolean same(BlockState there, BlockState was) {
-        if (com.antcolonies.block.DeadTreeWoodBlock.isEaten(there)) {
+        if (com.antcolonies.savanna.block.DeadTreeWoodBlock.isEaten(there)) {
             return false;
         }
         Block b = was.getBlock();

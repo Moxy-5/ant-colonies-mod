@@ -1,5 +1,6 @@
-package com.antcolonies.gametest;
+package com.antcolonies.desert.gametest;
 
+import com.antcolonies.gametest.TestScenes;
 import static com.antcolonies.gametest.TestScenes.*;
 import static com.antcolonies.gametest.TestScenes.MIDDLE;
 import static com.antcolonies.gametest.TestScenes.SURFACE;
@@ -10,8 +11,8 @@ import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.NestPlan;
 import com.antcolonies.colony.NestSite;
-import com.antcolonies.registry.DesertBlocks;
-import com.antcolonies.registry.DesertEntities;
+import com.antcolonies.desert.registry.DesertBlocks;
+import com.antcolonies.desert.registry.DesertEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -115,7 +116,7 @@ public class HarvesterHillTests {
             StringBuilder problems = new StringBuilder();
             for (int dx = -4; dx <= 4; dx++) {
                 for (int dz = -4; dz <= 4; dz++) {
-                    int planned = com.antcolonies.colony.Hill.moundHeightAt(dx, dz);
+                    int planned = com.antcolonies.desert.colony.Hill.moundHeightAt(dx, dz);
                     if (planned == 0) {
                         continue;
                     }
@@ -148,7 +149,7 @@ public class HarvesterHillTests {
     private static Colony antColony(GameTestHelper helper) {
         return com.antcolonies.colony.ColonyManager.get(helper.getLevel()).getColonies().stream()
                 .filter(c -> helper.getBounds().contains(net.minecraft.world.phys.Vec3.atCenterOf(c.getCenter()))
-                        && c.getQueen(helper.getLevel()) instanceof com.antcolonies.entity.QueenAntEntity)
+                        && c.getQueen(helper.getLevel()) instanceof com.antcolonies.desert.entity.QueenAntEntity)
                 .findFirst().orElse(null);
     }
 }

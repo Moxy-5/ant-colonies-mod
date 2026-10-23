@@ -1,5 +1,6 @@
-package com.antcolonies.colony;
+package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.NestWalls;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -8,11 +9,11 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import com.antcolonies.block.MoundSoil;
-import com.antcolonies.block.TermiteMoundBlock;
-import com.antcolonies.block.TermiteTunnelBlock;
+import com.antcolonies.savanna.block.MoundSoil;
+import com.antcolonies.savanna.block.TermiteMoundBlock;
+import com.antcolonies.savanna.block.TermiteTunnelBlock;
 import com.antcolonies.entity.AbstractAntEntity;
-import com.antcolonies.registry.SavannaBlocks;
+import com.antcolonies.savanna.registry.SavannaBlocks;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;

@@ -1,4 +1,4 @@
-package com.antcolonies.tree;
+package com.antcolonies.savanna.tree;
 
 /**
  * Where a giant savanna tree is in its life (M7.5). Acacias (umbrella and camel thorn): living, a dead snag, mud-climbed,

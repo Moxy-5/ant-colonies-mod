@@ -1,7 +1,11 @@
-package com.antcolonies.colony;
+package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.AwayReport;
+import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.NestLife;
+import com.antcolonies.colony.QueenCare;
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.entity.TermiteKingEntity;
+import com.antcolonies.savanna.entity.TermiteKingEntity;
 
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;

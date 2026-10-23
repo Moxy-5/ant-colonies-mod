@@ -1,13 +1,14 @@
-package com.antcolonies.entity.goal;
+package com.antcolonies.desert.entity.goal;
 
+import com.antcolonies.entity.goal.Errand;
 import java.util.EnumSet;
 
 import org.jetbrains.annotations.Nullable;
 
-import com.antcolonies.colony.Bakery;
+import com.antcolonies.desert.colony.Bakery;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
-import com.antcolonies.colony.DesertParts;
+import com.antcolonies.desert.colony.DesertParts;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.entity.AbstractAntEntity;
 

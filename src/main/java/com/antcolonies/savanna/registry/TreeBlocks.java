@@ -1,19 +1,19 @@
-package com.antcolonies.registry;
+package com.antcolonies.savanna.registry;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.block.BleachedBranchBlock;
-import com.antcolonies.block.DeadTreeWoodBlock;
-import com.antcolonies.block.FrassBlock;
-import com.antcolonies.block.HangingPodsBlock;
-import com.antcolonies.block.SoftDeadWoodBlock;
-import com.antcolonies.block.TaperingBranchBlock;
-import com.antcolonies.block.ThornyTwigBlock;
-import com.antcolonies.block.TreeBranchBlock;
-import com.antcolonies.block.TreeLeavesBlock;
-import com.antcolonies.block.TreeSeedlingBlock;
+import com.antcolonies.savanna.block.BleachedBranchBlock;
+import com.antcolonies.savanna.block.DeadTreeWoodBlock;
+import com.antcolonies.savanna.block.FrassBlock;
+import com.antcolonies.savanna.block.HangingPodsBlock;
+import com.antcolonies.savanna.block.SoftDeadWoodBlock;
+import com.antcolonies.savanna.block.TaperingBranchBlock;
+import com.antcolonies.savanna.block.ThornyTwigBlock;
+import com.antcolonies.savanna.block.TreeBranchBlock;
+import com.antcolonies.savanna.block.TreeLeavesBlock;
+import com.antcolonies.savanna.block.TreeSeedlingBlock;
 
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;

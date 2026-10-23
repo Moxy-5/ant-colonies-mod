@@ -1,8 +1,8 @@
-package com.antcolonies.worldgen;
+package com.antcolonies.savanna.worldgen;
 
-import com.antcolonies.block.DeadWoodBlock;
-import com.antcolonies.block.FallenBranchBlock;
-import com.antcolonies.registry.SavannaBlocks;
+import com.antcolonies.savanna.block.DeadWoodBlock;
+import com.antcolonies.savanna.block.FallenBranchBlock;
+import com.antcolonies.savanna.registry.SavannaBlocks;
 import com.mojang.serialization.Codec;
 
 import net.minecraft.core.BlockPos;

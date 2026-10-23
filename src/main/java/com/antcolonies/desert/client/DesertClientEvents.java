@@ -1,9 +1,12 @@
-package com.antcolonies.client;
+package com.antcolonies.desert.client;
 
+import com.antcolonies.client.AntLarvaRenderer;
+import com.antcolonies.client.AntRenderer;
+import com.antcolonies.client.InsectModel;
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.entity.QueenAntEntity;
-import com.antcolonies.entity.WorkerAntEntity;
-import com.antcolonies.registry.DesertEntities;
+import com.antcolonies.desert.entity.QueenAntEntity;
+import com.antcolonies.desert.entity.WorkerAntEntity;
+import com.antcolonies.desert.registry.DesertEntities;
 import com.antcolonies.species.Species;
 import com.antcolonies.species.SpeciesBodies;
 

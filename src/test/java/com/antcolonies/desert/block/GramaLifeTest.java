@@ -1,4 +1,4 @@
-package com.antcolonies.block;
+package com.antcolonies.desert.block;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -7,7 +7,7 @@ import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
-import com.antcolonies.block.GramaGrassBlock.Stage;
+import com.antcolonies.desert.block.GramaGrassBlock.Stage;
 
 /** Grama's life (the user's decisions, 2026-10-16): seeding after rain, a stand ripening together, back to leaves. */
 class GramaLifeTest {

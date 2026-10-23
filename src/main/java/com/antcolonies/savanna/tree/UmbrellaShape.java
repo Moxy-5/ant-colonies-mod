@@ -1,22 +1,22 @@
-package com.antcolonies.tree;
+package com.antcolonies.savanna.tree;
 
-import static com.antcolonies.tree.TreeDraw.DEAD;
-import static com.antcolonies.tree.TreeDraw.LIVE;
-import static com.antcolonies.tree.TreeDraw.add;
-import static com.antcolonies.tree.TreeDraw.clamp;
-import static com.antcolonies.tree.TreeDraw.len;
-import static com.antcolonies.tree.TreeDraw.lerp;
-import static com.antcolonies.tree.TreeDraw.mix;
-import static com.antcolonies.tree.TreeDraw.mul;
-import static com.antcolonies.tree.TreeDraw.seg;
-import static com.antcolonies.tree.TreeDraw.smooth;
-import static com.antcolonies.tree.TreeDraw.sub;
-import static com.antcolonies.tree.TreeDraw.thinLine;
+import static com.antcolonies.savanna.tree.TreeDraw.DEAD;
+import static com.antcolonies.savanna.tree.TreeDraw.LIVE;
+import static com.antcolonies.savanna.tree.TreeDraw.add;
+import static com.antcolonies.savanna.tree.TreeDraw.clamp;
+import static com.antcolonies.savanna.tree.TreeDraw.len;
+import static com.antcolonies.savanna.tree.TreeDraw.lerp;
+import static com.antcolonies.savanna.tree.TreeDraw.mix;
+import static com.antcolonies.savanna.tree.TreeDraw.mul;
+import static com.antcolonies.savanna.tree.TreeDraw.seg;
+import static com.antcolonies.savanna.tree.TreeDraw.smooth;
+import static com.antcolonies.savanna.tree.TreeDraw.sub;
+import static com.antcolonies.savanna.tree.TreeDraw.thinLine;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import com.antcolonies.tree.TreeDraw.Poly;
+import com.antcolonies.savanna.tree.TreeDraw.Poly;
 
 /**
  * The umbrella thorn (the user's redo, 2026-10-18, from two photos of real Vachellia tortilis; version N4 picked by the

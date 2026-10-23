@@ -94,7 +94,7 @@ public class NestWalls {
      * on its own (a cave crossing a gallery nobody has dug yet) is not part of the nest yet, so the caves round it are
      * not leaks: otherwise the workers would go sealing caves far from where they live.
      */
-    Set<BlockPos> joinedCells(Level level, Set<BlockPos> nest) {
+    public Set<BlockPos> joinedCells(Level level, Set<BlockPos> nest) {
         Set<BlockPos> joined = new HashSet<>();
         BlockPos start = center.below();
         if (!nest.contains(start) || !Nest.isDugOut(level, start)) {
@@ -623,7 +623,7 @@ public class NestWalls {
      * Puts an insect in a cell that was just filled up on top of the new soil, or beside it if there is no room on top
      * (a store's heap or the termites' mound blocks growing round it).
      */
-    static void liftOnto(Level level, LivingEntity ant, BlockPos spot, double top) {
+    public static void liftOnto(Level level, LivingEntity ant, BlockPos spot, double top) {
         BlockPos above = BlockPos.containing(ant.getX(), top, ant.getZ());
         if (top < spot.getY() + 1.0 || level.getBlockState(above).getCollisionShape(level, above).isEmpty()) {
             ant.setPos(ant.getX(), top, ant.getZ());

@@ -1,5 +1,9 @@
-package com.antcolonies.colony;
+package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.colony.DangerMap;
+import com.antcolonies.colony.NestPlan;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;

@@ -1,4 +1,4 @@
-package com.antcolonies.registry;
+package com.antcolonies.savanna.registry;
 
 import java.util.ArrayList;
 import java.util.List;

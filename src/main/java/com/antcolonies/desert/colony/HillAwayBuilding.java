@@ -1,5 +1,9 @@
-package com.antcolonies.colony;
+package com.antcolonies.desert.colony;
 
+import com.antcolonies.colony.AwayReport;
+import com.antcolonies.colony.BuildLife;
+import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.ColonyHooks;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 

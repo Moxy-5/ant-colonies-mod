@@ -1,7 +1,7 @@
-package com.antcolonies.worldgen;
+package com.antcolonies.savanna.worldgen;
 
-import com.antcolonies.tree.TreeStage;
-import com.antcolonies.registry.SavannaStructures;
+import com.antcolonies.savanna.tree.TreeStage;
+import com.antcolonies.savanna.registry.SavannaStructures;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -88,25 +88,25 @@ public class GiantTreePiece extends StructurePiece {
 
     /** Step 6c: a young tree of new land that is instead a dead young tree lying in the grass (no tree in the book). */
     public static boolean fallenYoung(GiantTreeStructure.Pick pick) {
-        return pick.stage() == com.antcolonies.tree.TreeStage.FALLEN && pick.age() < com.antcolonies.tree.TreeLife.YOUNG_END;
+        return pick.stage() == com.antcolonies.savanna.tree.TreeStage.FALLEN && pick.age() < com.antcolonies.savanna.tree.TreeLife.YOUNG_END;
     }
 
     /**
-     * Step 6c: the dead wood lying round a tree of new land (see {@link com.antcolonies.tree.Litter}), laid on the land
+     * Step 6c: the dead wood lying round a tree of new land (see {@link com.antcolonies.savanna.tree.Litter}), laid on the land
      * given by {@code ground}: under a living tree its fallen branches and maybe a giant limb; a fallen young tree is all
      * litter; a dead tree has its own fallen pieces already (nothing more).
      */
     public static TreePlacer.Placed litter(GiantTreeStructure.Pick pick, BlockPos foot, TreePlacer.Ground ground) {
-        com.antcolonies.tree.TreeVoxels v;
+        com.antcolonies.savanna.tree.TreeVoxels v;
         if (fallenYoung(pick)) {
-            v = com.antcolonies.tree.Litter.fallenYoung(pick.seed());
-        } else if (pick.stage() == com.antcolonies.tree.TreeStage.LIVING) {
-            com.antcolonies.tree.TreeKind kind = TreePlacer.kind(pick.kind());
+            v = com.antcolonies.savanna.tree.Litter.fallenYoung(pick.seed());
+        } else if (pick.stage() == com.antcolonies.savanna.tree.TreeStage.LIVING) {
+            com.antcolonies.savanna.tree.TreeKind kind = TreePlacer.kind(pick.kind());
             TreePlacer.Placed tree = TreePlacer.placed(pick.kind(), pick.seed(), pick.age(), pick.stage());
             double reach = Math.max(Math.max(-tree.minX(), tree.maxX()), Math.max(-tree.minZ(), tree.maxZ()));
-            v = com.antcolonies.tree.Litter.underTree(pick.seed(), pick.age(), reach, kind.trunk().radius(), kind.isBaobab());
+            v = com.antcolonies.savanna.tree.Litter.underTree(pick.seed(), pick.age(), reach, kind.trunk().radius(), kind.isBaobab());
         } else {
-            v = new com.antcolonies.tree.TreeVoxels();
+            v = new com.antcolonies.savanna.tree.TreeVoxels();
         }
         return TreePlacer.rest(TreePlacer.litter(v), foot, ground);
     }
@@ -137,6 +137,6 @@ public class GiantTreePiece extends StructurePiece {
         TreePlacer.place(level, tree, foot, box, Block.UPDATE_CLIENTS);
         TreePlacer.place(level, litter, foot, box, Block.UPDATE_CLIENTS);
         // The tree goes into the tree book (M7.5 step 4), so it grows from here (once, whichever of its chunks is first).
-        com.antcolonies.tree.Forest.queue(level.getLevel(), pick.kind(), foot, pick.seed(), pick.age(), pick.stage());
+        com.antcolonies.savanna.tree.Forest.queue(level.getLevel(), pick.kind(), foot, pick.seed(), pick.age(), pick.stage());
     }
 }

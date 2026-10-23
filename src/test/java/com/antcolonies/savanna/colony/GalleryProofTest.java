@@ -1,5 +1,8 @@
-package com.antcolonies.colony;
+package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.ColonyHooks;
+import com.antcolonies.colony.NestPlan;
+import com.antcolonies.colony.TunnelRoute;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 

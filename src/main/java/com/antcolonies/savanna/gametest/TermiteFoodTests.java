@@ -1,7 +1,10 @@
-package com.antcolonies.gametest;
+package com.antcolonies.savanna.gametest;
 
-import static com.antcolonies.gametest.TermiteMoundTests.MIDDLE;
-import static com.antcolonies.gametest.TermiteMoundTests.SURFACE;
+import com.antcolonies.gametest.StuckWatcher;
+import com.antcolonies.gametest.TestClock;
+import com.antcolonies.gametest.TestScenes;
+import static com.antcolonies.savanna.gametest.TermiteMoundTests.MIDDLE;
+import static com.antcolonies.savanna.gametest.TermiteMoundTests.SURFACE;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -10,25 +13,25 @@ import java.util.Set;
 
 import com.antcolonies.colony.Caste;
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.block.DeadWoodBlock;
-import com.antcolonies.block.DryGrassBlock;
-import com.antcolonies.block.FallenBranchBlock;
-import com.antcolonies.block.FungusCombBlock;
+import com.antcolonies.savanna.block.DeadWoodBlock;
+import com.antcolonies.savanna.block.DryGrassBlock;
+import com.antcolonies.savanna.block.FallenBranchBlock;
+import com.antcolonies.savanna.block.FungusCombBlock;
 import com.antcolonies.block.SeedPileBlock;
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.SavannaParts;
+import com.antcolonies.savanna.colony.SavannaParts;
 import com.antcolonies.colony.NestPlan;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.AntEggEntity;
 import com.antcolonies.entity.AntLarvaEntity;
-import com.antcolonies.entity.TermiteQueenEntity;
+import com.antcolonies.savanna.entity.TermiteQueenEntity;
 import com.antcolonies.species.Species;
 import com.antcolonies.species.SpeciesProfile;
 import com.antcolonies.species.SpeciesProfiles;
-import com.antcolonies.worldgen.FallenBranchFeature;
-import com.antcolonies.worldgen.FallenTreeFeature;
-import com.antcolonies.registry.SavannaBlocks;
-import com.antcolonies.registry.SavannaEntities;
+import com.antcolonies.savanna.worldgen.FallenBranchFeature;
+import com.antcolonies.savanna.worldgen.FallenTreeFeature;
+import com.antcolonies.savanna.registry.SavannaBlocks;
+import com.antcolonies.savanna.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
@@ -259,13 +262,13 @@ public class TermiteFoodTests {
         });
         BlockPos[] spots = new BlockPos[3]; // the hay, the grass by the first hole, the grass by the second
         int[] phase = {0}; // 0 setting up, 1 day: the finder, 2 night
-        com.antcolonies.entity.TermiteWorkerEntity[] finder = {null};
+        com.antcolonies.savanna.entity.TermiteWorkerEntity[] finder = {null};
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
             TestClock.still(helper, 12.0); // midday: nobody goes out
             long old = level.getGameTime() - colony.profile().worker().builderUntilTicks() - 1000;
-            for (com.antcolonies.entity.TermiteWorkerEntity worker : level.getEntitiesOfClass(com.antcolonies.entity.TermiteWorkerEntity.class, helper.getBounds())) {
+            for (com.antcolonies.savanna.entity.TermiteWorkerEntity worker : level.getEntitiesOfClass(com.antcolonies.savanna.entity.TermiteWorkerEntity.class, helper.getBounds())) {
                 worker.setGrownUpAt(old); // old workers: foragers first
             }
             TermiteSoldierTests.digNestAtOnce(level, colony);
@@ -306,7 +309,7 @@ public class TermiteFoodTests {
             }
             if (phase[0] == 1) {
                 if (helper.getTick() % 200 == 0) {
-                    com.antcolonies.entity.TermiteWorkerEntity f = finder[0];
+                    com.antcolonies.savanna.entity.TermiteWorkerEntity f = finder[0];
                     AntColoniesMod.LOGGER.info("[find-test] tick {}: finder alive {} at {} (inside {}, colony ours {}, last hurt by {}), found {}, holes {}{}",
                             helper.getTick(), f.isAlive(), f.blockPosition().toShortString(), colony.nest().isInside(level, f.blockPosition()),
                             colony.getId().equals(f.getColonyId()), f.getLastHurtByMob(), colony.foodMap().isFoundButUntold(spots[0]),
@@ -440,22 +443,22 @@ public class TermiteFoodTests {
         level.setBlock(shaded, SavannaBlocks.FALLEN_BRANCH.get().defaultBlockState(), 3);
         for (int dx = -2; dx <= 2; dx++) {
             for (int dz = -2; dz <= 2; dz++) {
-                level.setBlock(shaded.offset(dx, 5, dz), com.antcolonies.registry.TreeBlocks.UMBRELLA_THORN.leaves().get().defaultBlockState(), 3);
+                level.setBlock(shaded.offset(dx, 5, dz), com.antcolonies.savanna.registry.TreeBlocks.UMBRELLA_THORN.leaves().get().defaultBlockState(), 3);
             }
         }
         BlockPos snag = helper.absolutePos(new BlockPos(MIDDLE - 6, SURFACE, MIDDLE - 6));
         for (int y = 0; y < 9; y++) {
-            level.setBlock(snag.above(y), com.antcolonies.registry.TreeBlocks.BLEACHED_LOG.get().defaultBlockState(), 3);
+            level.setBlock(snag.above(y), com.antcolonies.savanna.registry.TreeBlocks.BLEACHED_LOG.get().defaultBlockState(), 3);
         }
         colony.food().rescanPlantsSoon();
         java.util.List<BlockPos> plants = colony.food().plants(level);
         helper.assertTrue(plants.contains(shaded), "a fallen branch under a crown of leaves is not seen as food");
         helper.assertTrue(plants.contains(snag), "a dead trunk 9 tall is not seen at its foot");
-        BlockState log = com.antcolonies.registry.TreeBlocks.BLEACHED_LOG.get().defaultBlockState();
+        BlockState log = com.antcolonies.savanna.registry.TreeBlocks.BLEACHED_LOG.get().defaultBlockState();
         int logPieces = colony.food().piecesOf(log), deadWood = colony.food().piecesOf(SavannaBlocks.DEAD_WOOD.get().defaultBlockState());
-        int rot = colony.food().piecesOf(com.antcolonies.registry.TreeBlocks.ROTTEN_WOOD.get().defaultBlockState());
-        helper.assertTrue(logPieces == deadWood && colony.food().piecesOf(com.antcolonies.registry.TreeBlocks.BLEACHED_WOOD.get().defaultBlockState()) == deadWood
-                && rot > 0 && rot < logPieces && colony.food().piecesOf(com.antcolonies.registry.TreeBlocks.BLEACHED_BRANCH.get().defaultBlockState()) > 0,
+        int rot = colony.food().piecesOf(com.antcolonies.savanna.registry.TreeBlocks.ROTTEN_WOOD.get().defaultBlockState());
+        helper.assertTrue(logPieces == deadWood && colony.food().piecesOf(com.antcolonies.savanna.registry.TreeBlocks.BLEACHED_WOOD.get().defaultBlockState()) == deadWood
+                && rot > 0 && rot < logPieces && colony.food().piecesOf(com.antcolonies.savanna.registry.TreeBlocks.BLEACHED_BRANCH.get().defaultBlockState()) > 0,
                 "the dead trees' wood is worth " + logPieces + " (old Dead Wood " + deadWood + "), rot " + rot);
         // The snag's top block eaten piece by piece (nothing of a nest beside it: it goes, no cast).
         BlockPos top = snag.above(8);
@@ -465,13 +468,13 @@ public class TermiteFoodTests {
             colony.food().clippedGrass(level, top, ant);
             BlockState now = level.getBlockState(top);
             if (cut < logPieces) {
-                stage = Math.max(stage, now.getValue(com.antcolonies.block.DeadWoodBlock.EATEN));
-                helper.assertTrue(!com.antcolonies.worldgen.TreePlacer.same(now, log) || stage == 0, "eaten wood is still the tree's own");
+                stage = Math.max(stage, now.getValue(com.antcolonies.savanna.block.DeadWoodBlock.EATEN));
+                helper.assertTrue(!com.antcolonies.savanna.worldgen.TreePlacer.same(now, log) || stage == 0, "eaten wood is still the tree's own");
             } else {
                 helper.assertTrue(!now.is(log.getBlock()), "the dead trunk's block is still there after its last piece: " + now);
             }
         }
-        helper.assertTrue(stage == com.antcolonies.block.DeadWoodBlock.MAX_EATEN, "the dead trunk's block only got to stage " + stage);
+        helper.assertTrue(stage == com.antcolonies.savanna.block.DeadWoodBlock.MAX_EATEN, "the dead trunk's block only got to stage " + stage);
         helper.succeed();
     }
 
@@ -492,7 +495,7 @@ public class TermiteFoodTests {
         level.setBlock(second, cast, 3);
         level.setBlock(wood, SavannaBlocks.DEAD_WOOD.get().defaultBlockState(), 3);
         level.setBlock(wood.above(), SavannaBlocks.MUD_CRUST.get().withFace(Blocks.AIR.defaultBlockState(), net.minecraft.core.Direction.DOWN), 3);
-        helper.assertTrue(level.getBlockState(first).getValue(com.antcolonies.block.TermiteTunnelBlock.OPEN.get(net.minecraft.core.Direction.EAST)),
+        helper.assertTrue(level.getBlockState(first).getValue(com.antcolonies.savanna.block.TermiteTunnelBlock.OPEN.get(net.minecraft.core.Direction.EAST)),
                 "two casts side by side do not join up: " + level.getBlockState(first));
         RandomSource random = RandomSource.create(1);
         for (int i = 0; i < 400; i++) {
@@ -500,9 +503,9 @@ public class TermiteFoodTests {
                 level.getBlockState(pos).randomTick(level, pos, random);
             }
         }
-        helper.assertTrue(com.antcolonies.block.MudCastBlock.isCast(level.getBlockState(first)) && com.antcolonies.block.MudCastBlock.isCast(level.getBlockState(second)),
+        helper.assertTrue(com.antcolonies.savanna.block.MudCastBlock.isCast(level.getBlockState(first)) && com.antcolonies.savanna.block.MudCastBlock.isCast(level.getBlockState(second)),
                 "a cast crumbled while the log beside it is still being eaten");
-        helper.assertTrue(com.antcolonies.block.MudCrustBlock.hasFace(level.getBlockState(wood.above()), net.minecraft.core.Direction.DOWN),
+        helper.assertTrue(com.antcolonies.savanna.block.MudCrustBlock.hasFace(level.getBlockState(wood.above()), net.minecraft.core.Direction.DOWN),
                 "the mud on top of the log crumbled while the wood is still there");
         level.setBlock(wood, cast, 3); // the last block eaten too
         for (int i = 0; i < 400; i++) {
@@ -537,20 +540,20 @@ public class TermiteFoodTests {
         helper.runAfterDelay(15, () -> {
             com.antcolonies.colony.Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null, "no termite colony");
-            List<com.antcolonies.entity.TermiteWorkerEntity> workers = level.getEntitiesOfClass(com.antcolonies.entity.TermiteWorkerEntity.class,
+            List<com.antcolonies.savanna.entity.TermiteWorkerEntity> workers = level.getEntitiesOfClass(com.antcolonies.savanna.entity.TermiteWorkerEntity.class,
                     helper.getBounds(), worker -> colony.getId().equals(worker.getColonyId()));
             helper.assertTrue(workers.size() == 2, workers.size() + " workers joined the colony, not 2");
-            com.antcolonies.entity.TermiteWorkerEntity first = workers.get(0);
+            com.antcolonies.savanna.entity.TermiteWorkerEntity first = workers.get(0);
             BlockPos cell = first.blockPosition();
             first.moveTo(cell.getX() + 0.5, cell.getY(), cell.getZ() + 0.5);
             helper.assertTrue(colony.walls().plate(level, cell, net.minecraft.core.Direction.SOUTH), "the plate was not put down");
-            helper.assertTrue(com.antcolonies.block.MudCrustBlock.hasFace(level.getBlockState(cell), net.minecraft.core.Direction.SOUTH),
+            helper.assertTrue(com.antcolonies.savanna.block.MudCrustBlock.hasFace(level.getBlockState(cell), net.minecraft.core.Direction.SOUTH),
                     "no plate in the cell");
             helper.assertTrue(!first.blockPosition().equals(cell) && first.blockPosition().distManhattan(cell) == 1,
                     "the termite was not nudged out beside the plate: at " + first.blockPosition().toShortString());
             helper.assertTrue(!first.blockPosition().equals(cell.south()), "the termite was nudged through the plate");
             // A termite already inside a plate's block plans its way out.
-            com.antcolonies.entity.TermiteWorkerEntity second = workers.get(1);
+            com.antcolonies.savanna.entity.TermiteWorkerEntity second = workers.get(1);
             BlockPos caught = second.blockPosition();
             second.moveTo(caught.getX() + 0.5, caught.getY(), caught.getZ() + 0.5);
             level.setBlock(caught, SavannaBlocks.MUD_CRUST.get().withFace(Blocks.AIR.defaultBlockState(), net.minecraft.core.Direction.SOUTH), 3);
@@ -600,9 +603,9 @@ public class TermiteFoodTests {
         ServerLevel level = helper.getLevel();
         TestScenes.deepGround(helper);
         helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
-        com.antcolonies.entity.TermiteWorkerEntity[] worker = {null};
-        com.antcolonies.entity.TermiteSoldierEntity[] minor = {null};
-        com.antcolonies.entity.TermiteWorkerEntity[] loner = {null};
+        com.antcolonies.savanna.entity.TermiteWorkerEntity[] worker = {null};
+        com.antcolonies.savanna.entity.TermiteSoldierEntity[] minor = {null};
+        com.antcolonies.savanna.entity.TermiteWorkerEntity[] loner = {null};
         java.util.UUID[] colonyId = {null};
         helper.runAfterDelay(5, () -> {
             worker[0] = helper.spawn(SavannaEntities.TERMITE_WORKER.get(), MIDDLE + 5, SURFACE, MIDDLE);
@@ -750,7 +753,7 @@ public class TermiteFoodTests {
             long now = level.getGameTime();
             TermiteSoldierTests.digNestAtOnce(level, colony);
             colony.population().addNewMembers(Caste.WORKER, now - colony.profile().worker().builderUntilTicks() - 1000, 500);
-            com.antcolonies.colony.Galleries.of(colony).setSwitchForTests(true);
+            com.antcolonies.savanna.colony.Galleries.of(colony).setSwitchForTests(true);
             stage[0] = 1;
         });
         helper.onEachTick(() -> {
@@ -758,7 +761,7 @@ public class TermiteFoodTests {
             if (colony == null || stage[0] == 0) {
                 return;
             }
-            com.antcolonies.colony.Galleries galleries = com.antcolonies.colony.Galleries.of(colony);
+            com.antcolonies.savanna.colony.Galleries galleries = com.antcolonies.savanna.colony.Galleries.of(colony);
             for (NestPlan.ForagingTunnel tunnel : colony.foragingHoles().tunnels(level)) {
                 for (BlockPos cell : galleries.digCells(tunnel)) {
                     if (!com.antcolonies.colony.Nest.isDugOut(level, cell)) {
@@ -802,9 +805,9 @@ public class TermiteFoodTests {
                 }
                 BlockPos treeFoot = helper.absolutePos(spot.below());
                 trunkFloor[0] = treeFoot.getY();
-                com.antcolonies.worldgen.TreePlacer.Placed tree = com.antcolonies.worldgen.TreePlacer.placed("umbrella_thorn", 3, 0.8,
-                        com.antcolonies.tree.TreeStage.MUD);
-                com.antcolonies.worldgen.TreePlacer.place(level, tree, treeFoot, tree.box(treeFoot), 3);
+                com.antcolonies.savanna.worldgen.TreePlacer.Placed tree = com.antcolonies.savanna.worldgen.TreePlacer.placed("umbrella_thorn", 3, 0.8,
+                        com.antcolonies.savanna.tree.TreeStage.MUD);
+                com.antcolonies.savanna.worldgen.TreePlacer.place(level, tree, treeFoot, tree.box(treeFoot), 3);
                 for (int i = 0; i < tree.size(); i++) {
                     BlockPos at = treeFoot.offset(tree.xs()[i], tree.ys()[i], tree.zs()[i]);
                     if (level.getBlockState(at).getBlock() instanceof com.antcolonies.block.EatenInStages) {
@@ -818,7 +821,7 @@ public class TermiteFoodTests {
                 // A fallen dead stem, 6 blocks: too small to be sensed from afar.
                 for (int dx = 0; dx < 6; dx++) {
                     BlockPos at = helper.absolutePos(new BlockPos(mid - 24 + dx, SURFACE, mid - 10));
-                    level.setBlock(at, com.antcolonies.registry.TreeBlocks.BLEACHED_LOG.get().defaultBlockState()
+                    level.setBlock(at, com.antcolonies.savanna.registry.TreeBlocks.BLEACHED_LOG.get().defaultBlockState()
                             .setValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS, net.minecraft.core.Direction.Axis.X), 3);
                     stem.add(at);
                 }
@@ -845,7 +848,7 @@ public class TermiteFoodTests {
                 List<BlockPos> bitten = wood.stream().filter(b -> {
                     BlockState state = level.getBlockState(b);
                     return !(state.getBlock() instanceof com.antcolonies.block.EatenInStages) || colony.food().getPiecesCut(b) > 0
-                            || state.hasProperty(com.antcolonies.block.DeadWoodBlock.EATEN) && state.getValue(com.antcolonies.block.DeadWoodBlock.EATEN) > 0;
+                            || state.hasProperty(com.antcolonies.savanna.block.DeadWoodBlock.EATEN) && state.getValue(com.antcolonies.savanna.block.DeadWoodBlock.EATEN) > 0;
                 }).toList();
                 long eaten = bitten.size();
                 int highest = bitten.stream().mapToInt(b -> b.getY() - trunkFloor[0]).max().orElse(-99);

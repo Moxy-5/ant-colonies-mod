@@ -1,4 +1,4 @@
-package com.antcolonies.tree;
+package com.antcolonies.savanna.tree;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;

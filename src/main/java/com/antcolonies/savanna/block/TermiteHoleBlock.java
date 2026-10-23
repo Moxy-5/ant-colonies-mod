@@ -1,4 +1,4 @@
-package com.antcolonies.block;
+package com.antcolonies.savanna.block;
 
 import com.antcolonies.nav.Doorway;
 import com.antcolonies.registry.ModTags;

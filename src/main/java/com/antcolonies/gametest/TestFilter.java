@@ -35,7 +35,7 @@ public final class TestFilter {
      * Adds test classes to a category (the split, step S4: each species signs up its own, {@code SavannaTests} and
      * {@code DesertTests}; two species may share a category, such as {@code away} or {@code hills}).
      */
-    static void addCategory(String name, Class<?>... classes) {
+    public static void addCategory(String name, Class<?>... classes) {
         CATEGORIES.computeIfAbsent(name, key -> new java.util.ArrayList<>()).addAll(List.of(classes));
     }
 

@@ -1,4 +1,4 @@
-package com.antcolonies.colony;
+package com.antcolonies.desert.colony;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;

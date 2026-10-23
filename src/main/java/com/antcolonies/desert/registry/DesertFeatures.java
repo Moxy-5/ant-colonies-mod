@@ -1,8 +1,8 @@
-package com.antcolonies.registry;
+package com.antcolonies.desert.registry;
 
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.worldgen.DeepSoilFeature;
-import com.antcolonies.worldgen.GramaPatchFeature;
+import com.antcolonies.desert.worldgen.DeepSoilFeature;
+import com.antcolonies.desert.worldgen.GramaPatchFeature;
 
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.levelgen.feature.Feature;

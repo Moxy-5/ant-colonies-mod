@@ -1,4 +1,4 @@
-package com.antcolonies.tree;
+package com.antcolonies.savanna.tree;
 
 import java.io.InputStream;
 import java.io.InputStreamReader;

@@ -1,10 +1,10 @@
-package com.antcolonies.registry;
+package com.antcolonies.desert.registry;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.entity.AntCorpseEntity;
 import com.antcolonies.entity.AntLarvaEntity;
-import com.antcolonies.entity.QueenAntEntity;
-import com.antcolonies.entity.WorkerAntEntity;
+import com.antcolonies.desert.entity.QueenAntEntity;
+import com.antcolonies.desert.entity.WorkerAntEntity;
 import com.antcolonies.species.Species;
 import com.antcolonies.species.SpeciesBodies;
 

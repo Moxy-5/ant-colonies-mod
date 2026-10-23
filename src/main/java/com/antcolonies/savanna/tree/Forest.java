@@ -1,4 +1,4 @@
-package com.antcolonies.tree;
+package com.antcolonies.savanna.tree;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -6,14 +6,14 @@ import java.util.Random;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.block.TreeBranchBlock;
+import com.antcolonies.savanna.block.TreeBranchBlock;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.Population;
 import com.antcolonies.debug.Perf;
-import com.antcolonies.registry.TreeBlocks;
-import com.antcolonies.worldgen.FallenBranchFeature;
-import com.antcolonies.worldgen.TreePlacer;
+import com.antcolonies.savanna.registry.TreeBlocks;
+import com.antcolonies.savanna.worldgen.FallenBranchFeature;
+import com.antcolonies.savanna.worldgen.TreePlacer;
 
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
@@ -984,7 +984,7 @@ public class Forest extends SavedData {
             pos.set(t.foot.getX() + now.xs()[i], t.foot.getY(), t.foot.getZ() + now.zs()[i]);
             BlockState state = level.getBlockState(pos);
             if (TreePlacer.same(state, now.states()[i])
-                    || state.is(now.states()[i].getBlock()) && state.getValue(com.antcolonies.block.DeadWoodBlock.EATEN) < 2) {
+                    || state.is(now.states()[i].getBlock()) && state.getValue(com.antcolonies.savanna.block.DeadWoodBlock.EATEN) < 2) {
                 there++;
             }
         }

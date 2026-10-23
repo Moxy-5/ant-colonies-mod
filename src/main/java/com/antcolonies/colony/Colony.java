@@ -732,7 +732,7 @@ public class Colony {
 
     /** The area (around the nest, down to the refuse chamber) where the colony's eggs, larvae and dead ants are looked for. */
 
-    AABB nestArea() {
+    public AABB nestArea() {
         int radius = Math.max(NEST_AREA_LEAST, profile().food().radius());
         return new AABB(center).inflate(radius, 0, radius).expandTowards(0, 8, 0).expandTowards(0, -12, 0);
     }

@@ -1,5 +1,8 @@
-package com.antcolonies.entity;
+package com.antcolonies.savanna.entity;
 
+import com.antcolonies.entity.AbstractAntEntity;
+import com.antcolonies.entity.ColonyBorn;
+import com.antcolonies.entity.FedByNurses;
 import java.util.EnumSet;
 import java.util.UUID;
 
@@ -8,11 +11,11 @@ import org.jetbrains.annotations.Nullable;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
-import com.antcolonies.colony.SavannaParts;
+import com.antcolonies.savanna.colony.SavannaParts;
 import com.antcolonies.entity.goal.AntWanderGoal;
-import com.antcolonies.entity.goal.DefendGoal;
+import com.antcolonies.savanna.entity.goal.DefendGoal;
 import com.antcolonies.entity.goal.GoInsideGoal;
-import com.antcolonies.entity.goal.GuardPostGoal;
+import com.antcolonies.savanna.entity.goal.GuardPostGoal;
 import com.antcolonies.species.Species;
 import com.antcolonies.species.SpeciesProfile;
 

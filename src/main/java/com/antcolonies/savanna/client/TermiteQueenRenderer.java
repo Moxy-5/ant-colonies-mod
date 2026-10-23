@@ -1,6 +1,7 @@
-package com.antcolonies.client;
+package com.antcolonies.savanna.client;
 
-import com.antcolonies.entity.TermiteQueenEntity;
+import com.antcolonies.client.AntRenderer;
+import com.antcolonies.savanna.entity.TermiteQueenEntity;
 import com.mojang.blaze3d.vertex.PoseStack;
 
 import net.minecraft.client.renderer.MultiBufferSource;

@@ -65,7 +65,7 @@ public class AwayReport {
     /** The founders dug their chamber while away and closed themselves in. Saved. */
     private boolean foundersSealed;
 
-    void add(What what, int count) {
+    public void add(What what, int count) {
         if (count > 0) {
             counts.merge(what, count, Integer::sum);
         }

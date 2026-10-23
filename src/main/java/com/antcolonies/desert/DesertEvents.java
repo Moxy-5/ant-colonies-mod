@@ -1,10 +1,12 @@
-package com.antcolonies;
+package com.antcolonies.desert;
 
-import com.antcolonies.block.GramaGrassBlock;
-import com.antcolonies.entity.QueenAntEntity;
-import com.antcolonies.entity.WorkerAntEntity;
-import com.antcolonies.registry.DesertEntities;
-import com.antcolonies.registry.DesertItems;
+import com.antcolonies.AntColoniesMod;
+import com.antcolonies.ModEvents;
+import com.antcolonies.desert.block.GramaGrassBlock;
+import com.antcolonies.desert.entity.QueenAntEntity;
+import com.antcolonies.desert.entity.WorkerAntEntity;
+import com.antcolonies.desert.registry.DesertEntities;
+import com.antcolonies.desert.registry.DesertItems;
 
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;

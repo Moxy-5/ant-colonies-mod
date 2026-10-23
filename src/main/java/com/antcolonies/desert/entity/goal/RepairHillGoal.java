@@ -1,16 +1,17 @@
-package com.antcolonies.entity.goal;
+package com.antcolonies.desert.entity.goal;
 
+import com.antcolonies.entity.goal.Errand;
 import java.util.EnumSet;
 
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
-import com.antcolonies.colony.DesertParts;
+import com.antcolonies.desert.colony.DesertParts;
 import com.antcolonies.colony.ColonyRole;
-import com.antcolonies.colony.Hill;
+import com.antcolonies.desert.colony.Hill;
 import com.antcolonies.entity.AbstractAntEntity;
-import com.antcolonies.registry.DesertBlocks;
+import com.antcolonies.desert.registry.DesertBlocks;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.BlockParticleOption;

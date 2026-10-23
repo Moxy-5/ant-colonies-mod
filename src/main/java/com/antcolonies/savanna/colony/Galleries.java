@@ -1,5 +1,21 @@
-package com.antcolonies.colony;
+package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.AwayReport;
+import com.antcolonies.colony.Caste;
+import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.ColonyHooks;
+import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.colony.ColonyNews;
+import com.antcolonies.colony.ColonyQuestions;
+import com.antcolonies.colony.FoodWays;
+import com.antcolonies.colony.ForagingHoles;
+import com.antcolonies.colony.ForagingTrails;
+import com.antcolonies.colony.GroundReader;
+import com.antcolonies.colony.Neighbours;
+import com.antcolonies.colony.Nest;
+import com.antcolonies.colony.NestPlan;
+import com.antcolonies.colony.Population;
+import com.antcolonies.colony.TunnelRoute;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;

@@ -1,16 +1,19 @@
-package com.antcolonies.gametest;
+package com.antcolonies.savanna.gametest;
 
-import static com.antcolonies.gametest.TermiteMoundTests.MIDDLE;
-import static com.antcolonies.gametest.TermiteMoundTests.SURFACE;
+import com.antcolonies.gametest.TestClock;
+import com.antcolonies.gametest.TestIsolation;
+import com.antcolonies.gametest.TestScenes;
+import static com.antcolonies.savanna.gametest.TermiteMoundTests.MIDDLE;
+import static com.antcolonies.savanna.gametest.TermiteMoundTests.SURFACE;
 
 import com.antcolonies.colony.Caste;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.SavannaParts;
+import com.antcolonies.savanna.colony.SavannaParts;
 import com.antcolonies.colony.ForagingHoles;
 import com.antcolonies.colony.NestPlan;
-import com.antcolonies.registry.SavannaBlocks;
-import com.antcolonies.registry.SavannaEntities;
+import com.antcolonies.savanna.registry.SavannaBlocks;
+import com.antcolonies.savanna.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -61,7 +64,7 @@ public class TermiteForagingTests {
             int tunnels = holes.tunnels(level).size();
             // Every hole whose turn it is (termites underground: holes take turns; switched off, both holes) is open.
             boolean turnsOpen = holes.countOpen(level) > 0 && holes.tunnels(level).stream()
-                    .filter(t -> ForagingHoles.isDug(level, t) && com.antcolonies.colony.Galleries.of(colony).isInTurn(t.hole()))
+                    .filter(t -> ForagingHoles.isDug(level, t) && com.antcolonies.savanna.colony.Galleries.of(colony).isInTurn(t.hole()))
                     .allMatch(t -> ForagingHoles.isOpen(level, t.hole()));
             switch (phase[0]) {
                 case 0 -> {
@@ -115,7 +118,7 @@ public class TermiteForagingTests {
             helper.assertTrue(colony != null, "no termite colony");
             helper.assertTrue(phase[0] == 4, switch (phase[0]) {
                 case 0 -> "the foraging holes in turn were not all opened at night (" + colony.foragingHoles().countOpen(level) + " open"
-                        + com.antcolonies.colony.Galleries.of(colony).describe(level) + ")";
+                        + com.antcolonies.savanna.colony.Galleries.of(colony).describe(level) + ")";
                 case 1 -> "by day the holes (and the middle hole) were not all plugged with everybody inside";
                 case 2 -> "the next night never came";
                 default -> "the holes in turn and the middle hole were not opened again the next night";
@@ -176,12 +179,12 @@ public class TermiteForagingTests {
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
             long now = level.getGameTime();
             int i = 0;
-            for (com.antcolonies.entity.TermiteWorkerEntity worker : TestIsolation.insectsOf(level, colony, com.antcolonies.entity.TermiteWorkerEntity.class)) {
+            for (com.antcolonies.savanna.entity.TermiteWorkerEntity worker : TestIsolation.insectsOf(level, colony, com.antcolonies.savanna.entity.TermiteWorkerEntity.class)) {
                 worker.setGrownUpAt(now - (i++ < 2 ? colony.profile().worker().nurseUntilTicks() : colony.profile().worker().builderUntilTicks()) - 1000);
             }
             TermiteSoldierTests.digNestAtOnce(level, colony);
             colony.population().addNewMembers(Caste.WORKER, now - colony.profile().worker().builderUntilTicks() - 1000, 30);
-            com.antcolonies.colony.Galleries.of(colony).setSwitchForTests(true);
+            com.antcolonies.savanna.colony.Galleries.of(colony).setSwitchForTests(true);
             stage[0] = 1;
         });
         helper.onEachTick(() -> {
@@ -190,7 +193,7 @@ public class TermiteForagingTests {
                 return;
             }
             ForagingHoles holes = colony.foragingHoles();
-            com.antcolonies.colony.Galleries galleries = com.antcolonies.colony.Galleries.of(colony);
+            com.antcolonies.savanna.colony.Galleries galleries = com.antcolonies.savanna.colony.Galleries.of(colony);
             java.util.List<NestPlan.ForagingTunnel> tunnels = holes.tunnels(level);
             // A hole that opens is always one whose turn it is.
             java.util.Set<BlockPos> openNow = new java.util.HashSet<>();
@@ -287,8 +290,8 @@ public class TermiteForagingTests {
                 }
                 case 6 -> { // brain step 4g, step 3: the next night a worker in the food hole killed by a zombie
                     if (tick - since[0] >= 30) {
-                        com.antcolonies.entity.TermiteWorkerEntity victim = null;
-                        for (com.antcolonies.entity.TermiteWorkerEntity worker : TestIsolation.insectsOf(level, colony, com.antcolonies.entity.TermiteWorkerEntity.class)) {
+                        com.antcolonies.savanna.entity.TermiteWorkerEntity victim = null;
+                        for (com.antcolonies.savanna.entity.TermiteWorkerEntity worker : TestIsolation.insectsOf(level, colony, com.antcolonies.savanna.entity.TermiteWorkerEntity.class)) {
                             if (colony.roleOf(level, worker) != com.antcolonies.colony.ColonyRole.BUILDER) {
                                 victim = worker; // (the builders plug the holes)
                             }
@@ -386,7 +389,7 @@ public class TermiteForagingTests {
             helper.assertTrue(stage[0] == 10, "the test did not get through its foraging times (stage " + stage[0] + ")");
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony.foragingHoles().tunnels(level).size() == 2, "with the switch off the colony did not go back to its 2 holes");
-            helper.assertTrue(com.antcolonies.colony.Galleries.of(colony).isInTurn(colony.foragingHoles().tunnels(level).get(1).hole()),
+            helper.assertTrue(com.antcolonies.savanna.colony.Galleries.of(colony).isInTurn(colony.foragingHoles().tunnels(level).get(1).hole()),
                     "with the switch off a hole may not open at foraging time");
         });
     }
@@ -462,13 +465,13 @@ public class TermiteForagingTests {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
             long now = level.getGameTime();
-            for (com.antcolonies.entity.TermiteWorkerEntity worker : TestIsolation.insectsOf(level, colony, com.antcolonies.entity.TermiteWorkerEntity.class)) {
+            for (com.antcolonies.savanna.entity.TermiteWorkerEntity worker : TestIsolation.insectsOf(level, colony, com.antcolonies.savanna.entity.TermiteWorkerEntity.class)) {
                 worker.setGrownUpAt(now - colony.profile().worker().nurseUntilTicks() - 1000);
             }
             TermiteSoldierTests.digNestAtOnce(level, colony);
             colony.population().addNewMembers(Caste.WORKER, now - colony.profile().worker().builderUntilTicks() - 1000, 30);
-            com.antcolonies.colony.Galleries.of(colony).setSwitchForTests(true);
-            com.antcolonies.colony.Galleries.of(colony).setReachForTests(reach);
+            com.antcolonies.savanna.colony.Galleries.of(colony).setSwitchForTests(true);
+            com.antcolonies.savanna.colony.Galleries.of(colony).setReachForTests(reach);
             level.setBlock(hay, Blocks.HAY_BLOCK.defaultBlockState(), 3);
             colony.food().rescanPlantsSoon();
             colony.foodMap().knowForTests(hay);
@@ -479,7 +482,7 @@ public class TermiteForagingTests {
             if (colony == null || stage[0] == 0) {
                 return;
             }
-            com.antcolonies.colony.Galleries galleries = com.antcolonies.colony.Galleries.of(colony);
+            com.antcolonies.savanna.colony.Galleries galleries = com.antcolonies.savanna.colony.Galleries.of(colony);
             java.util.List<NestPlan.ForagingTunnel> tunnels = colony.foragingHoles().tunnels(level);
             // Whatever is planned is dug at once (the digging itself is the other scenes'): the arms, then each new piece.
             for (NestPlan.ForagingTunnel tunnel : tunnels) {

@@ -1,11 +1,12 @@
-package com.antcolonies.colony;
+package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.Colony;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.block.TermitomycesBlock;
+import com.antcolonies.savanna.block.TermitomycesBlock;
 import com.antcolonies.species.SpeciesProfile;
-import com.antcolonies.registry.SavannaBlocks;
+import com.antcolonies.savanna.registry.SavannaBlocks;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;

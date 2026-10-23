@@ -195,7 +195,7 @@ public class Brood {
     }
 
     /** How many of the larvae (nymphs) that are numbers grow into this caste (a soldier; null: a worker). */
-    int insideGrowingInto(@Nullable String caste) {
+    public int insideGrowingInto(@Nullable String caste) {
         int count = 0;
         for (Young young : inside) {
             if (!young.isEgg() && java.util.Objects.equals(young.growsInto(), caste)) {

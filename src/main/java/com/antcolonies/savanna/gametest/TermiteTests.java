@@ -1,15 +1,17 @@
-package com.antcolonies.gametest;
+package com.antcolonies.savanna.gametest;
 
+import com.antcolonies.gametest.TestAnts;
+import com.antcolonies.gametest.TestClock;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
-import com.antcolonies.entity.TermiteKingEntity;
-import com.antcolonies.entity.TermiteQueenEntity;
-import com.antcolonies.entity.TermiteWorkerEntity;
+import com.antcolonies.savanna.entity.TermiteKingEntity;
+import com.antcolonies.savanna.entity.TermiteQueenEntity;
+import com.antcolonies.savanna.entity.TermiteWorkerEntity;
 import com.antcolonies.entity.goal.StayWithQueenGoal;
 import com.antcolonies.species.Species;
-import com.antcolonies.registry.SavannaBlocks;
-import com.antcolonies.registry.SavannaEntities;
+import com.antcolonies.savanna.registry.SavannaBlocks;
+import com.antcolonies.savanna.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;

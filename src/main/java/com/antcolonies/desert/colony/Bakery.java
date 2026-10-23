@@ -1,5 +1,12 @@
-package com.antcolonies.colony;
+package com.antcolonies.desert.colony;
 
+import com.antcolonies.colony.AwayReport;
+import com.antcolonies.colony.Brood;
+import com.antcolonies.colony.Claims;
+import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.Nest;
+import com.antcolonies.colony.NurseFood;
+import com.antcolonies.colony.QueenCare;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -11,8 +18,8 @@ import org.jetbrains.annotations.Nullable;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.block.SeedPileBlock;
 import com.antcolonies.entity.AbstractAntEntity;
-import com.antcolonies.registry.DesertBlocks;
-import com.antcolonies.registry.DesertItems;
+import com.antcolonies.desert.registry.DesertBlocks;
+import com.antcolonies.desert.registry.DesertItems;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;

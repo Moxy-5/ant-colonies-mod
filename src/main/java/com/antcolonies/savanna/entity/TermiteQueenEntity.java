@@ -1,5 +1,7 @@
-package com.antcolonies.entity;
+package com.antcolonies.savanna.entity;
 
+import com.antcolonies.entity.AbstractAntEntity;
+import com.antcolonies.entity.SwellingQueen;
 import java.util.Optional;
 
 import com.antcolonies.colony.Colony;

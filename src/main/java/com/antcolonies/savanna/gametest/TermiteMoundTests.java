@@ -1,17 +1,18 @@
-package com.antcolonies.gametest;
+package com.antcolonies.savanna.gametest;
 
+import com.antcolonies.gametest.TestAnts;
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.block.TermiteHoleBlock;
-import com.antcolonies.block.TermiteMoundBlock;
-import com.antcolonies.block.TermiteMouthBlock;
+import com.antcolonies.savanna.block.TermiteHoleBlock;
+import com.antcolonies.savanna.block.TermiteMoundBlock;
+import com.antcolonies.savanna.block.TermiteMouthBlock;
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.SavannaParts;
+import com.antcolonies.savanna.colony.SavannaParts;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.species.Species;
-import com.antcolonies.entity.TermiteSoldierEntity;
-import com.antcolonies.entity.TermiteWorkerEntity;
-import com.antcolonies.registry.SavannaBlocks;
-import com.antcolonies.registry.SavannaEntities;
+import com.antcolonies.savanna.entity.TermiteSoldierEntity;
+import com.antcolonies.savanna.entity.TermiteWorkerEntity;
+import com.antcolonies.savanna.registry.SavannaBlocks;
+import com.antcolonies.savanna.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -65,7 +66,7 @@ public class TermiteMoundTests {
     public static void cathedralPiecesArePlacedByHand(GameTestHelper helper) {
         ground(helper);
         net.minecraft.world.entity.player.Player player = helper.makeMockPlayer(net.minecraft.world.level.GameType.CREATIVE);
-        net.minecraft.world.item.ItemStack spires = new net.minecraft.world.item.ItemStack(com.antcolonies.registry.SavannaItems.TERMITE_SPIRE.get(), 64);
+        net.minecraft.world.item.ItemStack spires = new net.minecraft.world.item.ItemStack(com.antcolonies.savanna.registry.SavannaItems.TERMITE_SPIRE.get(), 64);
         // A spire: five pieces in a column narrow to the tip.
         for (int y = 0; y < 6; y++) {
             place(helper, player, spires, new BlockPos(1, y, 1));
@@ -73,12 +74,12 @@ public class TermiteMoundTests {
         for (int y = 1; y <= 6; y++) {
             BlockState piece = helper.getBlockState(new BlockPos(1, y, 1));
             helper.assertTrue(piece.is(SavannaBlocks.TERMITE_SPIRE.get()), "no spire piece at height " + y);
-            int expected = Math.min(com.antcolonies.block.TermiteSpireBlock.TIP, y - 1);
-            helper.assertTrue(piece.getValue(com.antcolonies.block.TermiteSpireBlock.THICKNESS) == expected,
-                    "spire piece " + y + " has thickness " + piece.getValue(com.antcolonies.block.TermiteSpireBlock.THICKNESS) + ", not " + expected);
+            int expected = Math.min(com.antcolonies.savanna.block.TermiteSpireBlock.TIP, y - 1);
+            helper.assertTrue(piece.getValue(com.antcolonies.savanna.block.TermiteSpireBlock.THICKNESS) == expected,
+                    "spire piece " + y + " has thickness " + piece.getValue(com.antcolonies.savanna.block.TermiteSpireBlock.THICKNESS) + ", not " + expected);
         }
         // Two ramps: one rising east, and ahead of it one rising north: the first becomes an outer corner.
-        net.minecraft.world.item.ItemStack ramps = new net.minecraft.world.item.ItemStack(com.antcolonies.registry.SavannaItems.TERMITE_RAMP.get(), 64);
+        net.minecraft.world.item.ItemStack ramps = new net.minecraft.world.item.ItemStack(com.antcolonies.savanna.registry.SavannaItems.TERMITE_RAMP.get(), 64);
         player.setYRot(-90.0F); // looking east
         place(helper, player, ramps, new BlockPos(3, 0, 3));
         player.setYRot(180.0F); // looking north
@@ -86,14 +87,14 @@ public class TermiteMoundTests {
         BlockState first = helper.getBlockState(new BlockPos(3, 1, 3));
         BlockState second = helper.getBlockState(new BlockPos(4, 1, 3));
         helper.assertTrue(first.is(SavannaBlocks.TERMITE_RAMP.get()) && second.is(SavannaBlocks.TERMITE_RAMP.get()), "the ramps were not placed");
-        helper.assertTrue(first.getValue(com.antcolonies.block.TermiteRampBlock.FACING) == net.minecraft.core.Direction.EAST
-                && second.getValue(com.antcolonies.block.TermiteRampBlock.FACING) == net.minecraft.core.Direction.NORTH,
+        helper.assertTrue(first.getValue(com.antcolonies.savanna.block.TermiteRampBlock.FACING) == net.minecraft.core.Direction.EAST
+                && second.getValue(com.antcolonies.savanna.block.TermiteRampBlock.FACING) == net.minecraft.core.Direction.NORTH,
                 "the ramps do not rise the way the player looked");
-        helper.assertTrue(first.getValue(com.antcolonies.block.TermiteRampBlock.SHAPE) == net.minecraft.world.level.block.state.properties.StairsShape.OUTER_LEFT,
-                "the ramps did not join into a corner (" + first.getValue(com.antcolonies.block.TermiteRampBlock.SHAPE) + ")");
+        helper.assertTrue(first.getValue(com.antcolonies.savanna.block.TermiteRampBlock.SHAPE) == net.minecraft.world.level.block.state.properties.StairsShape.OUTER_LEFT,
+                "the ramps did not join into a corner (" + first.getValue(com.antcolonies.savanna.block.TermiteRampBlock.SHAPE) + ")");
         // A chimney mouth on top of a spire piece: slim; with soil beside it, a full block.
         helper.setBlock(new BlockPos(4, 1, 1), SavannaBlocks.TERMITE_SPIRE.get());
-        place(helper, player, new net.minecraft.world.item.ItemStack(com.antcolonies.registry.SavannaItems.TERMITE_MOUTH.get()), new BlockPos(4, 1, 1));
+        place(helper, player, new net.minecraft.world.item.ItemStack(com.antcolonies.savanna.registry.SavannaItems.TERMITE_MOUTH.get()), new BlockPos(4, 1, 1));
         BlockPos mouth = new BlockPos(4, 2, 1);
         helper.assertTrue(helper.getBlockState(mouth).is(SavannaBlocks.TERMITE_MOUTH.get()) && helper.getBlockState(mouth).getValue(TermiteMouthBlock.SLIM),
                 "a chimney mouth alone on a spire is not slim");
@@ -107,10 +108,10 @@ public class TermiteMoundTests {
                 "a player can pass through the chimney mouth");
         // Ageing: random ticks dry a spire piece through the ages to old.
         BlockPos aged = new BlockPos(1, 1, 1);
-        for (int i = 0; i < 20000 && helper.getBlockState(aged).getValue(com.antcolonies.block.MoundSoil.AGE) < com.antcolonies.block.MoundSoil.OLDEST; i++) {
+        for (int i = 0; i < 20000 && helper.getBlockState(aged).getValue(com.antcolonies.savanna.block.MoundSoil.AGE) < com.antcolonies.savanna.block.MoundSoil.OLDEST; i++) {
             helper.randomTick(aged);
         }
-        helper.assertTrue(helper.getBlockState(aged).getValue(com.antcolonies.block.MoundSoil.AGE) == com.antcolonies.block.MoundSoil.OLDEST,
+        helper.assertTrue(helper.getBlockState(aged).getValue(com.antcolonies.savanna.block.MoundSoil.AGE) == com.antcolonies.savanna.block.MoundSoil.OLDEST,
                 "a spire piece did not dry to old");
         helper.succeed();
     }
@@ -126,7 +127,7 @@ public class TermiteMoundTests {
         ground(helper);
         ServerLevel level = helper.getLevel();
         net.minecraft.world.entity.player.Player player = helper.makeMockPlayer(net.minecraft.world.level.GameType.CREATIVE);
-        net.minecraft.world.item.ItemStack tunnels = new net.minecraft.world.item.ItemStack(com.antcolonies.registry.SavannaItems.TERMITE_TUNNEL.get(), 64);
+        net.minecraft.world.item.ItemStack tunnels = new net.minecraft.world.item.ItemStack(com.antcolonies.savanna.registry.SavannaItems.TERMITE_TUNNEL.get(), 64);
         BlockPos a = new BlockPos(3, 1, 3);
         BlockPos b = a.east();
         BlockPos c = a.above();
@@ -162,10 +163,10 @@ public class TermiteMoundTests {
         TermiteWorkerEntity termite = helper.spawnWithNoFreeWill(SavannaEntities.TERMITE_WORKER.get(), 0, 1, 0);
         helper.assertTrue(!helper.getBlockState(a).getCollisionShape(level, absA, CollisionContext.of(termite)).isEmpty(),
                 "a termite can pass through a tunnel block already");
-        for (int i = 0; i < 20000 && helper.getBlockState(a).getValue(com.antcolonies.block.MoundSoil.AGE) < com.antcolonies.block.MoundSoil.OLDEST; i++) {
+        for (int i = 0; i < 20000 && helper.getBlockState(a).getValue(com.antcolonies.savanna.block.MoundSoil.AGE) < com.antcolonies.savanna.block.MoundSoil.OLDEST; i++) {
             helper.randomTick(a);
         }
-        helper.assertTrue(helper.getBlockState(a).getValue(com.antcolonies.block.MoundSoil.AGE) == com.antcolonies.block.MoundSoil.OLDEST,
+        helper.assertTrue(helper.getBlockState(a).getValue(com.antcolonies.savanna.block.MoundSoil.AGE) == com.antcolonies.savanna.block.MoundSoil.OLDEST,
                 "a tunnel block did not dry to old");
         assertOpen(helper, a, "after it dried", net.minecraft.core.Direction.EAST, net.minecraft.core.Direction.UP);
         helper.succeed();
@@ -176,7 +177,7 @@ public class TermiteMoundTests {
         BlockState state = helper.getBlockState(pos);
         java.util.Set<net.minecraft.core.Direction> expected = java.util.Set.of(open);
         for (net.minecraft.core.Direction side : net.minecraft.core.Direction.values()) {
-            boolean isOpen = state.getValue(com.antcolonies.block.TermiteTunnelBlock.OPEN.get(side));
+            boolean isOpen = state.getValue(com.antcolonies.savanna.block.TermiteTunnelBlock.OPEN.get(side));
             helper.assertTrue(isOpen == expected.contains(side), what + ": its " + side + " side is " + (isOpen ? "open" : "closed"));
         }
     }
@@ -240,7 +241,7 @@ public class TermiteMoundTests {
         // A finished block drops itself (this also fails if the loot table does not load); wet soil drops nothing.
         BlockState fresh = mound.defaultBlockState().setValue(TermiteMoundBlock.LAYERS, TermiteMoundBlock.FINISHED);
         helper.assertTrue(net.minecraft.world.level.block.Block.getDrops(fresh, level, pos, null).stream()
-                .anyMatch(stack -> stack.is(com.antcolonies.registry.SavannaItems.TERMITE_MOUND.get())), "a finished block drops nothing");
+                .anyMatch(stack -> stack.is(com.antcolonies.savanna.registry.SavannaItems.TERMITE_MOUND.get())), "a finished block drops nothing");
         helper.assertTrue(net.minecraft.world.level.block.Block.getDrops(mound.defaultBlockState(), level, pos, null).isEmpty(),
                 "a block still being built drops something");
         helper.succeed();

@@ -1,12 +1,12 @@
-package com.antcolonies.registry;
+package com.antcolonies.savanna.registry;
 
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.entity.AntCorpseEntity;
 import com.antcolonies.entity.AntLarvaEntity;
-import com.antcolonies.entity.TermiteKingEntity;
-import com.antcolonies.entity.TermiteQueenEntity;
-import com.antcolonies.entity.TermiteSoldierEntity;
-import com.antcolonies.entity.TermiteWorkerEntity;
+import com.antcolonies.savanna.entity.TermiteKingEntity;
+import com.antcolonies.savanna.entity.TermiteQueenEntity;
+import com.antcolonies.savanna.entity.TermiteSoldierEntity;
+import com.antcolonies.savanna.entity.TermiteWorkerEntity;
 import com.antcolonies.species.Species;
 import com.antcolonies.species.SpeciesBodies;
 

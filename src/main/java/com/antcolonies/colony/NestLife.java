@@ -360,7 +360,7 @@ public class NestLife {
      * One of the numbers takes a piece of the nurses' food (for itself or a young one). Its block comes off later, out of
      * sight. False if there was none.
      */
-    boolean takeNurseFood(ServerLevel level) {
+    public boolean takeNurseFood(ServerLevel level) {
         if (nurseFoodLeft(level) <= 0) {
             return false;
         }

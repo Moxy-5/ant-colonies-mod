@@ -1,5 +1,6 @@
-package com.antcolonies.entity.goal;
+package com.antcolonies.desert.entity.goal;
 
+import com.antcolonies.entity.goal.Errand;
 import java.util.EnumSet;
 import java.util.function.Supplier;
 

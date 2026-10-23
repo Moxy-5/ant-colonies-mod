@@ -1,10 +1,10 @@
-package com.antcolonies.command;
+package com.antcolonies.savanna.command;
 
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.tree.Forest;
-import com.antcolonies.tree.TreeLife;
-import com.antcolonies.tree.TreeShapes;
-import com.antcolonies.tree.TreeStage;
+import com.antcolonies.savanna.tree.Forest;
+import com.antcolonies.savanna.tree.TreeLife;
+import com.antcolonies.savanna.tree.TreeShapes;
+import com.antcolonies.savanna.tree.TreeStage;
 
 import java.util.Comparator;
 

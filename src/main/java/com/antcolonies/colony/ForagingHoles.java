@@ -334,7 +334,7 @@ public class ForagingHoles {
     }
 
     /** The check below now, whatever the clock (termites underground step 4: the builders' time spent on return). */
-    void checkNewHolesNow(ServerLevel level) {
+    public void checkNewHolesNow(ServerLevel level) {
         newHolesCheckedAt = Long.MIN_VALUE;
         tick(level);
     }

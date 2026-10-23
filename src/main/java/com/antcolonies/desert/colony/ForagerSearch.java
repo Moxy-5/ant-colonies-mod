@@ -1,5 +1,7 @@
-package com.antcolonies.colony;
+package com.antcolonies.desert.colony;
 
+import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.ColonyHooks;
 import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;

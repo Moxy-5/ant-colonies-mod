@@ -1,5 +1,8 @@
-package com.antcolonies.gametest;
+package com.antcolonies.savanna.gametest;
 
+import com.antcolonies.gametest.AwayKit;
+import com.antcolonies.gametest.TestAnts;
+import com.antcolonies.gametest.TestFilter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -7,13 +10,13 @@ import java.util.Objects;
 import com.antcolonies.colony.Brood;
 import com.antcolonies.colony.Caste;
 import com.antcolonies.colony.ColonyHooks;
-import com.antcolonies.colony.Mound;
-import com.antcolonies.colony.SavannaParts;
-import com.antcolonies.entity.TermiteSoldierEntity;
-import com.antcolonies.entity.TermiteKingEntity;
-import com.antcolonies.entity.TermiteWorkerEntity;
-import com.antcolonies.registry.SavannaBlocks;
-import com.antcolonies.registry.SavannaEntities;
+import com.antcolonies.savanna.colony.Mound;
+import com.antcolonies.savanna.colony.SavannaParts;
+import com.antcolonies.savanna.entity.TermiteSoldierEntity;
+import com.antcolonies.savanna.entity.TermiteKingEntity;
+import com.antcolonies.savanna.entity.TermiteWorkerEntity;
+import com.antcolonies.savanna.registry.SavannaBlocks;
+import com.antcolonies.savanna.registry.SavannaEntities;
 import com.antcolonies.species.Species;
 import com.antcolonies.species.SpeciesBodies;
 

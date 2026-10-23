@@ -1,5 +1,7 @@
-package com.antcolonies.block;
+package com.antcolonies.savanna.block;
 
+import com.antcolonies.block.EatenInStages;
+import com.antcolonies.block.FoodCast;
 import java.util.ArrayDeque;
 import java.util.HashSet;
 import java.util.Set;

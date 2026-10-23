@@ -434,7 +434,7 @@ public class QueenCare {
      * store has held its first piece (termites: a young colony has no garden yet, its first workers feed the royals on
      * what they find) once it has.
      */
-    static boolean royalsGetHungry(Colony colony) {
+    public static boolean royalsGetHungry(Colony colony) {
         return colony.isHungerOn() && !colony.isFounding()
                 && (!colony.profile().worker().diet().hungryFromFirstFood() || colony.food().hasHadFood());
     }

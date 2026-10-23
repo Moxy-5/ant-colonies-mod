@@ -1,7 +1,7 @@
-package com.antcolonies.block;
+package com.antcolonies.savanna.block;
 
-import com.antcolonies.registry.SavannaBlocks;
-import com.antcolonies.registry.SavannaItems;
+import com.antcolonies.savanna.registry.SavannaBlocks;
+import com.antcolonies.savanna.registry.SavannaItems;
 
 import com.mojang.serialization.MapCodec;
 

@@ -1,5 +1,11 @@
-package com.antcolonies.colony;
+package com.antcolonies.desert.colony;
 
+import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.ColonyHooks;
+import com.antcolonies.colony.ColonyNews;
+import com.antcolonies.colony.ColonyPart;
+import com.antcolonies.colony.ColonyParts;
+import com.antcolonies.colony.ColonyQuestions;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;

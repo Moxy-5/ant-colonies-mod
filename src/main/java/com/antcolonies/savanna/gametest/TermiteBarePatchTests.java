@@ -1,16 +1,16 @@
-package com.antcolonies.gametest;
+package com.antcolonies.savanna.gametest;
 
-import static com.antcolonies.gametest.TermiteMoundTests.MIDDLE;
-import static com.antcolonies.gametest.TermiteMoundTests.SURFACE;
+import static com.antcolonies.savanna.gametest.TermiteMoundTests.MIDDLE;
+import static com.antcolonies.savanna.gametest.TermiteMoundTests.SURFACE;
 
 import java.util.UUID;
 
 import com.antcolonies.AntColoniesMod;
-import com.antcolonies.block.DryGrassBlock;
+import com.antcolonies.savanna.block.DryGrassBlock;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.NestPlan;
-import com.antcolonies.registry.SavannaBlocks;
-import com.antcolonies.registry.SavannaEntities;
+import com.antcolonies.savanna.registry.SavannaBlocks;
+import com.antcolonies.savanna.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -22,7 +22,7 @@ import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
- * Bare patches and grass growing back (the user's plan of 2026-10-14; {@link com.antcolonies.colony.BarePatches}): dry
+ * Bare patches and grass growing back (the user's plan of 2026-10-14; {@link com.antcolonies.savanna.colony.BarePatches}): dry
  * grass the termites eat away by a foraging hole leaves bare ground, grass eaten farther out does not, and every eaten
  * tuft grows back green later, the bare ground turning back to grass.
  */
@@ -76,9 +76,9 @@ public class TermiteBarePatchTests {
             }
             helper.assertTrue(level.getBlockState(tufts[0].below()).is(Blocks.COARSE_DIRT), "no bare ground by the hole");
             helper.assertTrue(level.getBlockState(tufts[1].below()).is(Blocks.GRASS_BLOCK), "bare ground far from the holes");
-            helper.assertTrue(colony.part(com.antcolonies.colony.SavannaParts.BARE_PATCHES).orElseThrow().waiting() == 3, "not 3 tufts waiting: " + colony.part(com.antcolonies.colony.SavannaParts.BARE_PATCHES).orElseThrow().describe());
+            helper.assertTrue(colony.part(com.antcolonies.savanna.colony.SavannaParts.BARE_PATCHES).orElseThrow().waiting() == 3, "not 3 tufts waiting: " + colony.part(com.antcolonies.savanna.colony.SavannaParts.BARE_PATCHES).orElseThrow().describe());
             level.setBlock(tufts[2], Blocks.STONE.defaultBlockState(), 3);
-            colony.part(com.antcolonies.colony.SavannaParts.BARE_PATCHES).orElseThrow().growBackSoonForTests(level);
+            colony.part(com.antcolonies.savanna.colony.SavannaParts.BARE_PATCHES).orElseThrow().growBackSoonForTests(level);
         });
         helper.runAfterDelay(400, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
@@ -89,7 +89,7 @@ public class TermiteBarePatchTests {
                 helper.assertTrue(level.getBlockState(tufts[i].below()).is(Blocks.GRASS_BLOCK), "the ground at " + tufts[i].toShortString() + " is not grass again");
             }
             helper.assertTrue(level.getBlockState(tufts[2]).is(Blocks.STONE), "the stone was replaced");
-            helper.assertTrue(colony.part(com.antcolonies.colony.SavannaParts.BARE_PATCHES).orElseThrow().waiting() == 0, "tufts still waiting: " + colony.part(com.antcolonies.colony.SavannaParts.BARE_PATCHES).orElseThrow().describe());
+            helper.assertTrue(colony.part(com.antcolonies.savanna.colony.SavannaParts.BARE_PATCHES).orElseThrow().waiting() == 0, "tufts still waiting: " + colony.part(com.antcolonies.savanna.colony.SavannaParts.BARE_PATCHES).orElseThrow().describe());
             helper.succeed();
         });
     }

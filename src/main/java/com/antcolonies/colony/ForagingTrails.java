@@ -39,7 +39,7 @@ public class ForagingTrails {
     /** How long (ticks) a food spot is remembered: 2 minutes. */
     static final int MEMORY_TICKS = 2400;
     /** Spots within this distance (blocks) of each other lie in the same patch. */
-    static final double PATCH_RADIUS = 4.0;
+    public static final double PATCH_RADIUS = 4.0;
     /** At most this many spots are remembered (the oldest are forgotten first). */
     private static final int MAX_VISITS = 128;
     /** A worker first seen outside within this distance (blocks) of a way out came out by it. */
@@ -254,7 +254,7 @@ public class ForagingTrails {
      * The middle of the patch the most spots lie in: the spot with the most others within {@code radius} (the latest one
      * on a tie), and the average of those (rounded to a block).
      */
-    static BlockPos densest(List<BlockPos> spots, double radius) {
+    public static BlockPos densest(List<BlockPos> spots, double radius) {
         BlockPos best = spots.get(0);
         int bestCount = -1;
         for (BlockPos spot : spots) {

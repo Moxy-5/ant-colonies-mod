@@ -1,10 +1,11 @@
-package com.antcolonies.colony;
+package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.Colony;
 import org.jetbrains.annotations.Nullable;
 
-import com.antcolonies.block.TermiteMouthBlock;
-import com.antcolonies.block.TermiteSpireBlock;
-import com.antcolonies.block.TermiteTunnelBlock;
+import com.antcolonies.savanna.block.TermiteMouthBlock;
+import com.antcolonies.savanna.block.TermiteSpireBlock;
+import com.antcolonies.savanna.block.TermiteTunnelBlock;
 import com.antcolonies.nav.Foothold;
 
 import net.minecraft.core.BlockPos;

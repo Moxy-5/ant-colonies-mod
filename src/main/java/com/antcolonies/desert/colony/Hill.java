@@ -1,5 +1,7 @@
-package com.antcolonies.colony;
+package com.antcolonies.desert.colony;
 
+import com.antcolonies.colony.Claims;
+import com.antcolonies.colony.Colony;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -9,7 +11,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.entity.AbstractAntEntity;
-import com.antcolonies.registry.DesertBlocks;
+import com.antcolonies.desert.registry.DesertBlocks;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -150,7 +152,7 @@ public class Hill {
     /**
      * The morning clear-out (real Pogonomyrmex: the nest maintenance workers carry out the soil dug in the night first
      * thing each morning, before they dig on): while the surface is open, a builder carries a waiting pile up before it
-     * digs ({@link com.antcolonies.entity.goal.CarryNightSoilGoal}); while it is shut, the diggers rest once the piles
+     * digs ({@link com.antcolonies.desert.entity.goal.CarryNightSoilGoal}); while it is shut, the diggers rest once the piles
      * are as big as a morning's carrying ({@link NightSoil#isFull}). The entrance (a plug, a plant in it) is always
      * bitten: that is how the surface opens. Only while the hill has room.
      */

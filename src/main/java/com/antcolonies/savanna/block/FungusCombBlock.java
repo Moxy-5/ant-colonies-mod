@@ -1,5 +1,7 @@
-package com.antcolonies.block;
+package com.antcolonies.savanna.block;
 
+import com.antcolonies.block.GardenBed;
+import com.antcolonies.block.SeedPileBlock;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.nav.Slope;

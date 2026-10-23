@@ -1,4 +1,4 @@
-package com.antcolonies.registry;
+package com.antcolonies.desert.registry;
 
 import com.antcolonies.AntColoniesMod;
 

@@ -1,4 +1,4 @@
-package com.antcolonies.tree;
+package com.antcolonies.savanna.tree;
 
 /**
  * The dice of the tree shape maker: the same small random number maker (mulberry32) and block hash as the tree viewer

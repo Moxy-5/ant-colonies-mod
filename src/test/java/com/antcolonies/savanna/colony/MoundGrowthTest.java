@@ -1,4 +1,4 @@
-package com.antcolonies.colony;
+package com.antcolonies.savanna.colony;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -9,8 +9,8 @@ import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
-import com.antcolonies.colony.MoundPlan.Part;
-import com.antcolonies.colony.MoundPlan.Shape;
+import com.antcolonies.savanna.colony.MoundPlan.Part;
+import com.antcolonies.savanna.colony.MoundPlan.Shape;
 import com.antcolonies.species.SpeciesProfile.MoundNumbers;
 
 import net.minecraft.core.BlockPos;

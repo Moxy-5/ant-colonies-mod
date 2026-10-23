@@ -1,6 +1,9 @@
-package com.antcolonies.colony;
+package com.antcolonies.savanna.colony;
 
-import com.antcolonies.block.FungusCombBlock;
+import com.antcolonies.colony.AwayReport;
+import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.NestLedger;
+import com.antcolonies.savanna.block.FungusCombBlock;
 import com.antcolonies.species.SpeciesProfile;
 
 import net.minecraft.server.level.ServerLevel;

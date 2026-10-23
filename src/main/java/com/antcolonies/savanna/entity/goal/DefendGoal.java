@@ -1,13 +1,13 @@
-package com.antcolonies.entity.goal;
+package com.antcolonies.savanna.entity.goal;
 
 import java.util.EnumSet;
 
 import org.jetbrains.annotations.Nullable;
 
-import com.antcolonies.colony.Alarm;
+import com.antcolonies.savanna.colony.Alarm;
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.SavannaParts;
-import com.antcolonies.entity.TermiteSoldierEntity;
+import com.antcolonies.savanna.colony.SavannaParts;
+import com.antcolonies.savanna.entity.TermiteSoldierEntity;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;

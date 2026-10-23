@@ -1,5 +1,8 @@
-package com.antcolonies.colony;
+package com.antcolonies.desert.colony;
 
+import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.ColonyRole;
+import com.antcolonies.colony.FoodStore;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;

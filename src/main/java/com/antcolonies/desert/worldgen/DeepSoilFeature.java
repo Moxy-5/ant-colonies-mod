@@ -1,6 +1,6 @@
-package com.antcolonies.worldgen;
+package com.antcolonies.desert.worldgen;
 
-import com.antcolonies.registry.DesertBlocks;
+import com.antcolonies.desert.registry.DesertBlocks;
 
 import com.mojang.serialization.Codec;
 

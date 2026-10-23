@@ -1,5 +1,6 @@
-package com.antcolonies.entity.goal;
+package com.antcolonies.desert.entity.goal;
 
+import com.antcolonies.entity.goal.Errand;
 import java.util.EnumSet;
 
 import org.jetbrains.annotations.Nullable;
@@ -7,8 +8,8 @@ import org.jetbrains.annotations.Nullable;
 import com.antcolonies.AntColoniesMod;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
-import com.antcolonies.colony.DesertParts;
-import com.antcolonies.colony.Hill;
+import com.antcolonies.desert.colony.DesertParts;
+import com.antcolonies.desert.colony.Hill;
 import com.antcolonies.entity.AbstractAntEntity;
 
 import net.minecraft.core.BlockPos;
@@ -26,7 +27,7 @@ import net.minecraft.world.phys.AABB;
  * in the hill that was knocked out; see {@link RepairHillGoal}). While the surface is shut to it (at night, in the rain,
  * in the midday rest: see {@link AbstractAntEntity#mayGoOut}), or while the entrance is still plugged (the first workers
  * opening their founding queen's plug: the way out is the block they bite), it puts the pellet on a pile of night soil
- * near the top of the nest instead ({@link com.antcolonies.colony.NightSoil}); {@link CarryNightSoilGoal} brings that up
+ * near the top of the nest instead ({@link com.antcolonies.desert.colony.NightSoil}); {@link CarryNightSoilGoal} brings that up
  * once the surface opens. With the piles full the pellet is packed into the walls.
  */
 public class CarryPelletGoal extends Goal {
