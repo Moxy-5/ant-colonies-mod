@@ -20,6 +20,11 @@ python tools/model_viewer.py grama [out.html]   (default references/grama_viewer
 Fourth scene, the giant savanna trees (M7.5 step 0, 2026-10-18, tree_art.py for the textures; its own template,
 tree_viewer.template.html, which also holds the tree shape maker: every kind, age and dead stage from one seed):
 python tools/model_viewer.py trees [out.html]   (default references/tree_viewer.html)
+
+Fifth scene, the Matabele ant's looks and size (M8 step 1, 2026-10-23, matabele_models.py; its own template,
+matabele_viewer.template.html): each look as a major and a minor, beside the harvester worker, the termite worker and
+major soldier and a player's height, all at their game sizes; sliders for the Matabele sizes:
+python tools/model_viewer.py matabele [out.html]   (default references/matabele_viewer.html)
 """
 import base64
 import json
@@ -182,7 +187,31 @@ def trees_page(out):
     print("wrote", out)
 
 
+def matabele_page(out):
+    """The Matabele looks (A, B, C) as majors and minors, and the game's own models beside them for size (their model
+    files, textures and the sizes their renderers draw them at)."""
+    import matabele_models as mm
+    data = {"looks": {}, "major": mm.model(), "minor": mm.model(minor=True), "refs": []}
+    for key, look in mm.LOOKS.items():
+        data["looks"][key] = {"name": look["name"], "note": look["note"], "texture": uri(mm.png(mm.texture_rows(key)))}
+    for mod, model, scale, label in (("desert", "worker_ant", 0.65, "Harvester worker"),
+                                     ("savanna", "termite_worker", 0.75, "Termite worker"),
+                                     ("savanna", "termite_major_soldier", 0.75, "Termite major soldier")):
+        assets = mod_paths.assets(mod)
+        geo = json.loads((assets / f"geo/entity/{model}.geo.json").read_text(encoding="utf-8"))
+        texture = "data:image/png;base64," + base64.b64encode((assets / f"textures/entity/{model}.png").read_bytes()).decode()
+        data["refs"].append({"label": label, "bones": geo["minecraft:geometry"][0]["bones"], "scale": scale,
+                             "texture": texture})
+    template = (Path(__file__).resolve().parent / "matabele_viewer.template.html").read_text(encoding="utf-8")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")
+    print("wrote", out)
+
+
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "matabele":
+        matabele_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/matabele_viewer.html")
+        return
     if len(sys.argv) > 1 and sys.argv[1] == "trees":
         trees_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/tree_viewer.html")
         return

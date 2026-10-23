@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Matabele Ant Viewer</title>
+<style>
+  :root { --bg: #f4efe6; --panel: #fffaf2; --ink: #2b211b; --muted: #75685d; --line: #dccfbe; --accent: #a8401f; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #1d1915; --panel: #27211c; --ink: #efe6da; --muted: #a8998a; --line: #3d342c; --accent: #e07a52; }
+  }
+  :root[data-theme="dark"] { --bg: #1d1915; --panel: #27211c; --ink: #efe6da; --muted: #a8998a; --line: #3d342c; --accent: #e07a52; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, sans-serif; }
+  header { padding: 14px 16px 6px; }
+  h1 { margin: 0 0 4px; font-size: 20px; }
+  header p { margin: 0; color: var(--muted); max-width: 80ch; }
+  #wrap { position: relative; height: 62vh; min-height: 340px; margin: 10px 16px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; }
+  #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .tag { position: absolute; transform: translate(-50%, -100%); background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+         padding: 1px 6px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px 14px; padding: 0 16px 8px; align-items: center; }
+  .controls label { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+  .controls input[type=range] { width: 180px; max-width: 50vw; }
+  .readout { color: var(--muted); font-size: 13px; }
+  button { font: inherit; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+  button.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  ul { margin: 8px 16px 24px; padding-left: 22px; max-width: 80ch; }
+  li { margin: 4px 0; }
+  li b { color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Matabele ant viewer</h1>
+  <p>Three looks for the Matabele ant, each as a big major (left) and a small minor (right), in front of the game's own
+     insects at their game sizes and a player's height. The grid lines are one block apart. Drag to turn, scroll or pinch
+     to zoom, right-drag to slide. The sliders change only the Matabele sizes.</p>
+</header>
+<div id="wrap"><canvas id="c"></canvas><div id="labels"></div></div>
+<div class="controls">
+  <label>Major length <input id="major" type="range" min="0.3" max="3" step="0.05"> <span id="majorOut" class="readout"></span></label>
+  <label>Minor size <input id="minor" type="range" min="0.25" max="0.75" step="0.01"> <span id="minorOut" class="readout"></span></label>
+</div>
+<div class="controls" id="cams"></div>
+<ul id="list"></ul>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const DATA = /*DATA*/null;
+const canvas = document.getElementById('c');
+const wrap = document.getElementById('wrap');
+const renderer = new THREE.WebGLRenderer({canvas, antialias: true, preserveDrawingBuffer: true});
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#cfe3ee');
+const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 200);
+const controls = new THREE.OrbitControls(camera, canvas);
+scene.add(new THREE.HemisphereLight('#ffffff', '#8a7454', 0.75));
+const sun = new THREE.DirectionalLight('#ffffff', 0.55);
+sun.position.set(4, 12, 6);
+sun.castShadow = true;
+sun.shadow.mapSize.set(4096, 4096);
+sun.shadow.bias = -0.0004;
+Object.assign(sun.shadow.camera, {left: -14, right: 14, top: 14, bottom: -14, near: 0.5, far: 40});
+scene.add(sun);
+
+// A savanna-red floor with a block grid.
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshLambertMaterial({color: '#c9a77a'}));
+floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
+scene.add(floor);
+const grid = new THREE.GridHelper(60, 60, '#9c7d55', '#9c7d55');
+grid.position.y = 0.002;
+scene.add(grid);
+
+function deg(v) { return v * Math.PI / 180; }
+function setRot(obj, r) { obj.rotation.set(deg(-r[0]), deg(r[1]), deg(-r[2]), 'ZYX'); }
+
+function loadTexture(uri) {
+  const t = new THREE.TextureLoader().load(uri);
+  t.magFilter = THREE.NearestFilter;
+  t.minFilter = THREE.NearestFilter;
+  return t;
+}
+
+// Each face shows its own patch of the 64 x 64 texture, as in the game (BoxGeometry's faces: +x, -x, +y, -y, +z, -z).
+const FACES = ['east', 'west', 'up', 'down', 'south', 'north'];
+function boxGeometry(c) {
+  const g = new THREE.BoxGeometry(Math.max(c.size[0], 0.02), Math.max(c.size[1], 0.02), Math.max(c.size[2], 0.02));
+  const uv = g.attributes.uv;
+  FACES.forEach((f, i) => {
+    const face = (c.uv && c.uv[f]) || (c.uv && c.uv.north);
+    if (!face) return;
+    const [u0, v0] = face.uv, [w, h] = face.uv_size;
+    for (let k = 0; k < 4; k++) {
+      const j = i * 4 + k;
+      uv.setXY(j, (u0 + uv.getX(j) * w) / 64, 1 - (v0 + (1 - uv.getY(j)) * h) / 64);
+    }
+  });
+  uv.needsUpdate = true;
+  return g;
+}
+
+function buildModel(bones, texture) {
+  const mat = new THREE.MeshLambertMaterial({map: texture, alphaTest: 0.5});
+  const root = new THREE.Group();
+  const groups = {}, byName = {};
+  bones.forEach(b => byName[b.name] = b);
+  bones.forEach(b => {
+    const g = new THREE.Group();
+    const p = b.parent ? byName[b.parent].pivot : [0, 0, 0];
+    g.position.set(b.pivot[0] - p[0], b.pivot[1] - p[1], b.pivot[2] - p[2]);
+    if (b.rotation) setRot(g, b.rotation);
+    groups[b.name] = g;
+    (b.cubes || []).forEach(c => {
+      const mesh = new THREE.Mesh(boxGeometry(c), mat);
+      mesh.castShadow = true;
+      const centre = [c.origin[0] + c.size[0] / 2, c.origin[1] + c.size[1] / 2, c.origin[2] + c.size[2] / 2];
+      if (c.rotation) {
+        const holder = new THREE.Group();
+        holder.position.set(c.pivot[0] - b.pivot[0], c.pivot[1] - b.pivot[1], c.pivot[2] - b.pivot[2]);
+        setRot(holder, c.rotation);
+        mesh.position.set(centre[0] - c.pivot[0], centre[1] - c.pivot[1], centre[2] - c.pivot[2]);
+        holder.add(mesh);
+        g.add(holder);
+      } else {
+        mesh.position.set(centre[0] - b.pivot[0], centre[1] - b.pivot[1], centre[2] - b.pivot[2]);
+        g.add(mesh);
+      }
+    });
+  });
+  bones.forEach(b => (b.parent ? groups[b.parent] : root).add(groups[b.name]));
+  // Model units to blocks (16 a block); the holder takes the size, the root sits on the floor and is centred lengthwise.
+  root.scale.setScalar(1 / 16);
+  const holder = new THREE.Group();
+  holder.add(root);
+  const bounds = new THREE.Box3().setFromObject(holder);
+  root.position.z = -(bounds.min.z + bounds.max.z) / 2;
+  root.position.y = -bounds.min.y;
+  holder.userData.length = bounds.max.z - bounds.min.z;    // in blocks at scale 1
+  holder.userData.height = bounds.max.y - bounds.min.y;
+  return holder;
+}
+
+const tags = [];
+function tag(text, obj) {
+  const el = document.createElement('div');
+  el.className = 'tag';
+  el.textContent = text;
+  document.getElementById('labels').appendChild(el);
+  tags.push({el, obj});
+}
+
+// The Matabele looks: a major and a minor each, turned three-quarters to the camera.
+const looks = Object.entries(DATA.looks).map(([key, look]) => {
+  const texture = loadTexture(look.texture);
+  const major = buildModel(DATA.major, texture), minor = buildModel(DATA.minor, texture);
+  [major, minor].forEach(m => { m.rotation.y = -0.6; scene.add(m); });
+  tag(key + ' major', major);
+  tag(key + ' minor', minor);
+  return {key, look, major, minor};
+});
+
+// The game's own insects at the sizes their renderers draw them, and a player's height (1.8 blocks).
+const refs = DATA.refs.map(r => {
+  const m = buildModel(r.bones, loadTexture(r.texture));
+  m.scale.setScalar(r.scale);
+  m.rotation.y = -0.6;
+  scene.add(m);
+  tag(r.label, m);
+  return m;
+});
+const player = new THREE.Group();
+[[0.5, 0.75, 0.25, 0.375, '#3b4a8f'], [0.5, 0.75, 0.25, 1.125, '#2f9c9c'], [0.5, 0.5, 0.5, 1.55, '#b98a68']].forEach(([w, h, d, y, col]) => {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshLambertMaterial({color: col}));
+  m.position.y = y; m.castShadow = true; player.add(m);
+});
+player.userData.height = 1.8;
+scene.add(player);
+tag('Player, 1.8 blocks', player);
+const cubeBlock = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({color: '#7da453'}));
+cubeBlock.position.y = 0.5; cubeBlock.castShadow = true; cubeBlock.userData.height = 1;
+scene.add(cubeBlock);
+tag('1 block', cubeBlock);
+
+// --- sizes and layout -----------------------------------------------------------------------------------------------
+const settings = {major: 0.7, minor: 0.45, cam: 'overview'};
+location.hash.slice(1).split('&').filter(Boolean).forEach(kv => {
+  const [k, v] = kv.split('=');
+  settings[k] = isNaN(parseFloat(v)) ? v : parseFloat(v);
+});
+const majorIn = document.getElementById('major'), minorIn = document.getElementById('minor');
+majorIn.value = settings.major; minorIn.value = settings.minor;
+
+function layout() {
+  const majorLen = settings.major, minorLen = settings.major * settings.minor;
+  const gap = Math.max(0.6, majorLen * 0.9);
+  const lookWidth = majorLen + minorLen + gap;
+  looks.forEach((l, i) => {
+    const x0 = (i - (looks.length - 1) / 2) * (lookWidth + gap * 1.5);
+    l.major.scale.setScalar(majorLen / l.major.userData.length);
+    l.minor.scale.setScalar(minorLen / l.minor.userData.length);
+    l.major.position.set(x0 - (minorLen + gap) / 2, 0, -1.2);
+    l.minor.position.set(x0 + (majorLen + gap) / 2, 0, -1.2);
+  });
+  const step = Math.max(1.0, majorLen * 1.2);
+  refs.forEach((m, i) => m.position.set((i - (refs.length - 1) / 2) * step, 0, 1.0 + majorLen * 0.5));
+  const right = looks[looks.length - 1].minor.position.x + minorLen + gap + 0.8;
+  cubeBlock.position.set(right, 0.5, -1.2);
+  player.position.set(right + 1.6, 0, -1.2);
+  const harvester = refs[0].userData.length * refs[0].scale.x;
+  document.getElementById('majorOut').textContent = majorLen.toFixed(2) + ' blocks long (' +
+    (majorLen / harvester).toFixed(1) + ' times a harvester worker, ' + harvester.toFixed(2) + ')';
+  document.getElementById('minorOut').textContent = Math.round(settings.minor * 100) + '% of the major: ' +
+    minorLen.toFixed(2) + ' blocks long';
+}
+majorIn.addEventListener('input', () => { settings.major = parseFloat(majorIn.value); layout(); });
+minorIn.addEventListener('input', () => { settings.minor = parseFloat(minorIn.value); layout(); });
+
+// --- cameras ---------------------------------------------------------------------------------------------------------
+const CAMS = {
+  overview: () => [[0, 3.2 + settings.major * 1.5, 7 + settings.major * 3], [0, 0.2, -0.3]],
+  low: () => [[0, 0.25 + settings.major * 0.2, 4 + settings.major * 2], [0, settings.major * 0.15, -0.6]],
+};
+looks.forEach(l => {
+  CAMS['side ' + l.key] = () => { const p = l.major.position; const d = settings.major * 1.6 + 0.3;
+    return [[p.x + d * 0.9, settings.major * 0.35, p.z + d * 0.55], [p.x, settings.major * 0.12, p.z]]; };
+  CAMS['top ' + l.key] = () => { const p = l.major.position; const d = settings.major * 1.6 + 0.3;
+    return [[p.x + 0.001, d, p.z + 0.001], [p.x, 0, p.z]]; };
+});
+const camBox = document.getElementById('cams');
+function setCam(name) {
+  settings.cam = name;
+  const [pos, target] = CAMS[name]();
+  camera.position.set(...pos);
+  controls.target.set(...target);
+  controls.update();
+  [...camBox.children].forEach(b => b.classList.toggle('on', b.textContent === name));
+}
+Object.keys(CAMS).forEach(name => {
+  const b = document.createElement('button');
+  b.textContent = name;
+  b.onclick = () => setCam(name);
+  camBox.appendChild(b);
+});
+
+const list = document.getElementById('list');
+looks.forEach(l => {
+  const li = document.createElement('li');
+  li.innerHTML = '<b>' + l.key + '. ' + l.look.name + ':</b> ' + l.look.note;
+  list.appendChild(li);
+});
+
+function resize() {
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+
+const v = new THREE.Vector3();
+function frame() {
+  controls.update();
+  renderer.render(scene, camera);
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  tags.forEach(({el, obj}) => {
+    const height = (obj.userData.height || 0.2) * obj.scale.y;
+    v.set(obj.position.x, (obj === cubeBlock ? 0 : obj.position.y) + height + 0.08, obj.position.z).project(camera);
+    const show = v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1;
+    el.style.display = show ? '' : 'none';
+    el.style.left = ((v.x + 1) / 2 * w) + 'px';
+    el.style.top = ((1 - v.y) / 2 * h) + 'px';
+  });
+  requestAnimationFrame(frame);
+}
+layout();
+resize();
+setCam(CAMS[settings.cam] ? settings.cam : 'overview');
+frame();
+</script>
+</body>
+</html>
