@@ -18,9 +18,14 @@ of the Undergrowth), the user: "make them longer", "the mandibles also have to b
 - One thick, tall waist node (a ponerine), the gaster a long oval pinched between its first two segments, a sting.
 - Glossy black, the feet and the jaws' edges red-brown.
 
-Bones: the harvester worker's names (tools/body_plan.py), only as labels: every box is this ant's own, and the motion
-library will work its walks out from these legs, as it did for each termite. A ponerine has no postpetiole: here the
-bone of that name holds the gaster's first segment, so the gaster bends at its real pinch.
+Nothing is taken from the harvester ant: every box is this ant's own. The bones have this ant's own names; its body
+plan (tools/body_plan.py, written when it goes into the game) names which bone plays which part for the walking code,
+and the motion library works its walks out from these legs, as it did for each termite. A ponerine has no
+postpetiole: its gaster bends at the real pinch between the gaster's first segment (`gaster_front`) and the rest
+(`gaster_back`).
+
+Fourth round (the user's pictures, 2026-10-23): the body slimmer behind the head (thorax, waist and gaster drawn
+SLIM as wide), the antennae set low on the sides of the head, under the eyes, and reaching out sideways and forward.
 
 Units are model pixels before SCALE, as in ant_models.py: the head points to -Z, the ground is y = 0, left is +X.
 """
@@ -185,13 +190,15 @@ CARRY = (0, 2.5, -16.1)          # between the jaw tips: where the stack of term
 # Legs: hip, knee, ankle, toe (left side; before LIFT, so the toes at -LIFT stand on the ground). Long and thin, the knees high over the back, the body carried high; the hind
 # legs the longest, about as long as the body.
 LEGS = {
-    1: [(0.95, 3.6, -6.0), (3.8, 6.9, -8.4), (6.0, 1.3, -11.2), (7.0, -LIFT, -13.4)],
-    2: [(1.1, 3.5, -3.4), (5.0, 7.3, -3.6), (8.2, 1.3, -3.2), (9.6, -LIFT, -2.6)],
-    3: [(1.05, 3.45, -1.2), (4.6, 7.5, 1.3), (7.6, 1.3, 6.0), (8.8, -LIFT, 8.6)],
+    1: [(0.7, 3.6, -6.0), (3.8, 6.9, -8.4), (6.0, 1.3, -11.2), (7.0, -LIFT, -13.4)],
+    2: [(0.8, 3.5, -3.4), (5.0, 7.3, -3.6), (8.2, 1.3, -3.2), (9.6, -LIFT, -2.6)],
+    3: [(0.78, 3.45, -1.2), (4.6, 7.5, 1.3), (7.6, 1.3, 6.0), (8.8, -LIFT, 8.6)],
 }
-ANTENNA_SOCKET = (0.75, 5.6, -11.8)
-ANTENNA_ELBOW = (2.6, 7.7, -8.5)                                     # the long scape reaches back past the head
-ANTENNA_WHIP = [(3.6, 8.3, -11.0), (4.5, 8.1, -13.5), (5.2, 7.3, -15.7), (5.6, 6.0, -17.5)]
+# The antennae: set low on the front of the head's sides, under the eyes; the long scape reaches out sideways and a
+# little forward, the whip on forward and out, bending down at the tip (the user's pictures, 2026-10-23).
+ANTENNA_SOCKET = (1.75, 4.2, -11.5)
+ANTENNA_ELBOW = (4.0, 4.9, -12.8)
+ANTENNA_WHIP = [(5.0, 5.4, -15.0), (5.8, 5.2, -17.3), (6.3, 4.4, -19.2), (6.6, 3.3, -20.6)]
 WHIP_RINGS = 10
 # The jaw: a thick hook from its base under the front of the head, forward and out, then down and in to the tip, held a
 # little open (the tips about 1.8 apart); thickest at the base (left side).
@@ -225,9 +232,9 @@ def head_bones(head=1.0, antenna=1.0):
     ]
     for sx in (1, -1):
         cubes += [
-            box(*[h(p) for p in sym_points([0.25, 5.9, -12.15], [1.0, 6.35, -11.2], sx)], 'head'),   # frontal lobe
-            box(*[h(p) for p in sym_points([2.2, 4.6, -11.5], [2.58, 5.85, -10.0], sx)], 'eye'),    # big, bulging
-            box(*[h(p) for p in sym_points([1.3, 5.85, -11.8], [2.45, 6.3, -9.9], sx)], 'head'),    # the heavy brow
+            box(*[h(p) for p in sym_points([1.5, 3.8, -12.0], [2.05, 4.6, -11.0], sx)], 'head'),    # the antenna socket
+            box(*[h(p) for p in sym_points([2.15, 4.8, -11.4], [2.55, 6.0, -9.9], sx)], 'eye'),     # big, bulging, above
+            box(*[h(p) for p in sym_points([1.3, 6.0, -11.7], [2.45, 6.4, -9.8], sx)], 'head'),     # the heavy brow
         ]
     bones = [bone('head', 'forebody', NECK, cubes)]
     for side, sx in (('l', 1), ('r', -1)):
@@ -299,6 +306,10 @@ def leg_bones():
     return bones
 
 
+SLIM = 0.72
+SLIM_BONES = ('thorax', 'petiole', 'gaster_front', 'gaster_back')
+
+
 def model(minor=False):
     """The ant's bones (the game's model file format). minor: the small ant's proportions."""
     bones = [bone('body', None, (0, 4.5, 0)), bone('forebody', 'body', WAIST)]
@@ -311,13 +322,18 @@ def model(minor=False):
         box([-0.85, 6.0, 0.85], [0.85, 6.25, 1.75], 'waist'),     # its rounded top
         box([-0.3, 3.15, 0.9], [0.3, 3.5, 1.6], 'waist'),         # the keel under it
     ]))
-    bones.append(bone('postpetiole', 'petiole', GIRDLE_FRONT, [   # the gaster's first segment
+    bones.append(bone('gaster_front', 'petiole', GIRDLE_FRONT, [  # the gaster's first segment
         box([-1.3, 3.4, 1.9], [1.3, 5.6, 2.2], 'gaster'),
         box([-1.75, 3.15, 2.1], [1.75, 5.85, 4.6], 'gaster'),
         box([-1.45, 2.95, 2.4], [1.45, 6.05, 4.3], 'gaster'),
         box([-1.5, 3.4, 4.55], [1.5, 5.6, 5.0], 'gaster'),        # the girdle, the pinch
     ]))
-    bones.append(bone('abdomen', 'postpetiole', GIRDLE, gaster_cubes()))
+    bones.append(bone('gaster_back', 'gaster_front', GIRDLE, gaster_cubes()))
+    for b in bones:
+        if b['name'] in SLIM_BONES:                                 # the slim body behind the head
+            for c in b.get('cubes', []):
+                c['origin'][0] = round(c['origin'][0] * SLIM, 3)
+                c['size'][0] = round(c['size'][0] * SLIM, 3)
     return bones
 
 
