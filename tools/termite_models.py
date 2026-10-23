@@ -137,7 +137,7 @@ def front_half(legs=KING_LEGS):
     ]))
     bones.append(bone('mandible_l', 'head', [0.4, 1.2, -4.3], [cube([0.1, 1.0, -4.95], [0.45, 0.35, 0.7], 'jaw')]))
     bones.append(bone('mandible_r', 'head', [-0.4, 1.2, -4.3], [cube([-0.55, 1.0, -4.95], [0.45, 0.35, 0.7], 'jaw')]))
-    # No boxes: the spot just in front of the mandible tips where a load is held (PelletLayer).
+    # No boxes: the spot just in front of the mandible tips where a load is held (CarriedLoadLayer).
     bones.append(bone('carry', 'head', [0, 1.15, -5.35]))
     # Beaded antennae, held forward and a little outward: rising slightly at first, the tips curving down.
     for side, sx in (('l', 1), ('r', -1)):

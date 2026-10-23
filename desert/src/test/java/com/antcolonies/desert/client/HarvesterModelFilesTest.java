@@ -23,7 +23,7 @@ import software.bernie.geckolib.loading.object.BakedAnimations;
 /**
  * The worker ant's model and animation files the game window loads (the game tests never load them), moved out of the
  * savanna's ModelFilesTest with the ant (the split, step S7): its model has the empty "carry" bone in its head, where
- * PelletLayer draws a carried load, and its animations read the way GeckoLib reads them and only move bones it has.
+ * CarriedLoadLayer draws a carried load, and its animations read the way GeckoLib reads them and only move bones it has.
  */
 class HarvesterModelFilesTest {
     private static final String ASSETS = "/assets/desertcolonies/";

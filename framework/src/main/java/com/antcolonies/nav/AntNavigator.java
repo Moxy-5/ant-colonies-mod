@@ -113,6 +113,12 @@ public class AntNavigator {
     @Nullable
     private Predicate<Foothold> goalTest;
     /**
+     * With {@link #goalTest}: every foothold the test accepts lies within this many blocks of {@link #goal} each way (the
+     * mind's promise, its reach), so a walk is known to have no route when no foothold in that box passes, without a
+     * route search ({@code docs/plans/apex-termites.md}, T4). -1: no such promise.
+     */
+    private int goalReach = -1;
+    /**
      * When the mind gave a choice of cells (the free spots of a chamber, say) and the walk goes to the nearest it can
      * reach; else null. Only for the first plan: once it is found the goal is that one cell (planning again keeps to it).
      */
@@ -198,7 +204,7 @@ public class AntNavigator {
      * the far side of it.
      */
     public boolean moveTo(BlockPos goal, double speed, AntPathFinder.StepCosts mindCosts) {
-        return begin(goal, null, null, null, null, speed, mindCosts);
+        return begin(goal, null, null, -1, null, null, speed, mindCosts);
     }
 
     /**
@@ -211,7 +217,7 @@ public class AntNavigator {
         }
         BlockPos here = ant.blockPosition();
         BlockPos nearest = goals.stream().min(Comparator.comparingInt(cell -> cell.distManhattan(here))).orElseThrow();
-        return begin(nearest, null, null, goals, null, speed, AntPathFinder.StepCosts.NONE);
+        return begin(nearest, null, null, -1, goals, null, speed, AntPathFinder.StepCosts.NONE);
     }
 
     /**
@@ -219,7 +225,7 @@ public class AntNavigator {
      * False (and does nothing) if there is no route to it.
      */
     public boolean moveTo(Foothold goal, double speed) {
-        return begin(goal.cell(), goal, null, null, null, speed, AntPathFinder.StepCosts.NONE);
+        return begin(goal.cell(), goal, null, -1, null, null, speed, AntPathFinder.StepCosts.NONE);
     }
 
     /**
@@ -227,7 +233,17 @@ public class AntNavigator {
      * can be reached), searching toward {@code towards} first. False (and does nothing) if there is none to walk to.
      */
     public boolean moveTo(Predicate<Foothold> isGoal, BlockPos towards, double speed) {
-        return begin(towards, null, isGoal, null, null, speed, AntPathFinder.StepCosts.NONE);
+        return begin(towards, null, isGoal, -1, null, null, speed, AntPathFinder.StepCosts.NONE);
+    }
+
+    /**
+     * Like {@link #moveTo(Predicate, BlockPos, double)}, where {@code isGoal} accepts no foothold more than {@code reach}
+     * blocks from {@code towards} each way (a spot to work on a block from, within the insect's reach). When none in
+     * that box passes, it knows at once there is no route (the same as a search that found none, without the search:
+     * many workers handed a job nobody can reach no longer search the whole nest for it in turn, docs/plans/apex-termites.md T4).
+     */
+    public boolean moveTo(Predicate<Foothold> isGoal, BlockPos towards, int reach, double speed) {
+        return begin(towards, null, isGoal, reach, null, null, speed, AntPathFinder.StepCosts.NONE);
     }
 
     /**
@@ -236,7 +252,7 @@ public class AntNavigator {
      * onto it where it left it (or further on) and goes on along it. False if it cannot get onto it.
      */
     public boolean follow(Route shared, double speed) {
-        return begin(shared.end().cell(), null, null, null, shared, speed, AntPathFinder.StepCosts.NONE);
+        return begin(shared.end().cell(), null, null, -1, null, shared, speed, AntPathFinder.StepCosts.NONE);
     }
 
     /** Stops walking. An insect on a wall keeps holding on where it is. */
@@ -257,11 +273,12 @@ public class AntNavigator {
      * (searched toward the goal cell), or the nearest of {@code cells}, or along a shared route; with the mind's costs
      * for it. Plans the route at once.
      */
-    private boolean begin(BlockPos goal, @Nullable Foothold foothold, @Nullable Predicate<Foothold> test,
+    private boolean begin(BlockPos goal, @Nullable Foothold foothold, @Nullable Predicate<Foothold> test, int reach,
             @Nullable Collection<BlockPos> cells, @Nullable Route shared, double speed, AntPathFinder.StepCosts mindCosts) {
         this.goal = goal.immutable();
         this.goalFoothold = foothold;
         this.goalTest = test;
+        this.goalReach = test == null ? -1 : reach;
         this.goalCells = cells;
         this.shared = shared;
         this.sharedFrom = 0;
@@ -432,7 +449,7 @@ public class AntNavigator {
         AntPathFinder.StepCosts costs = avoid.isEmpty() ? mindCosts
                 : mindCosts.and((from, to, kind) -> avoid.containsKey(to) ? 50.0 : 0.0);
         Route found = null;
-        if (!starts.isEmpty()) {
+        if (!starts.isEmpty() && mayHaveGoal()) {
             // Keeping to its habits if it can; if no route does, without them.
             found = habits == AntPathFinder.StepCosts.NONE ? null : search(map, starts, costs.and(habits));
             if (found == null) {
@@ -459,6 +476,25 @@ public class AntNavigator {
         blockedFrom = ant.position();
         at = start;
         return found != null;
+    }
+
+    /**
+     * False when the walk is known to have no route before any search: the mind promised its goal footholds lie within
+     * {@link #goalReach} of the goal cell, and no foothold there passes its test (every kind of foothold a cell can give
+     * is tried: each surface, in a channel or not). True otherwise (then the search decides).
+     */
+    private boolean mayHaveGoal() {
+        if (goalTest == null || goalReach < 0 || shared != null) {
+            return true;
+        }
+        for (BlockPos cell : BlockPos.betweenClosed(goal.offset(-goalReach, -goalReach, -goalReach), goal.offset(goalReach, goalReach, goalReach))) {
+            for (Direction surface : Direction.values()) {
+                if (goalTest.test(new Foothold(cell, surface, false)) || goalTest.test(new Foothold(cell, surface, true))) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /** One search for a route from the starts: to the goal, or onto the shared route and along it. Null if none. */

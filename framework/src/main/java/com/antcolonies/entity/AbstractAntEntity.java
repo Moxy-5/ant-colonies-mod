@@ -3,11 +3,11 @@ package com.antcolonies.entity;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import com.antcolonies.ColonyFrameworkMod;
 import com.antcolonies.colony.ColonyHooks;
 import com.antcolonies.colony.ColonyQuestions;
 import com.antcolonies.nav.AntMoveControl;
@@ -21,6 +21,9 @@ import com.antcolonies.entity.body.AntAnimationController;
 import com.antcolonies.entity.body.BodyPlans;
 import com.antcolonies.entity.body.EdgeOver;
 import com.antcolonies.entity.body.Spine;
+import com.antcolonies.entity.load.CarriedLoad;
+import com.antcolonies.entity.load.FrameworkLoads;
+import com.antcolonies.entity.load.LoadKind;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.entity.goal.GroomGoal;
 import com.antcolonies.entity.goal.NapGoal;
@@ -35,9 +38,7 @@ import com.antcolonies.nav.Slope;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtUtils;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -182,28 +183,14 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     private static final int ASLEEP = 8;
     private static final int ON_HOT_GROUND = 16;
 
-    /** The soil pellet held in the mandibles (empty = carrying nothing). Synced so the renderer can draw it. */
-    private static final EntityDataAccessor<Optional<BlockState>> DATA_CARRIED =
-            SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.OPTIONAL_BLOCK_STATE);
-
-    /** The seed held in the mandibles (empty = none). Synced so the renderer can draw it. Saved. */
-    private static final EntityDataAccessor<ItemStack> DATA_CARRIED_SEED =
-            SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.ITEM_STACK);
-
     /**
-     * True while the nurse food it carries is in its crop, not its jaws (it ate it to pass it on mouth to mouth): the
-     * renderer draws nothing in the jaws. Synced. Saved.
+     * What it holds (a soil pellet, a seed, bread, forage, a nodule in the jaws or the crop, an egg, a dead nestmate, or
+     * a species' own load): one row of the load list, {@link LoadKind} (Project Apex part 3, step T3). One slot: it
+     * holds one load at a time. Synced so the renderer can draw it ({@code client.LoadLooks}). Saved, each row with its
+     * own save words.
      */
-    private static final EntityDataAccessor<Boolean> DATA_IN_CROP =
-            SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.BOOLEAN);
-
-    /** True while the ant holds an egg in its mandibles (carrying it to the nursery). Synced so the renderer can draw it. Saved. */
-    private static final EntityDataAccessor<Boolean> DATA_CARRIED_EGG =
-            SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.BOOLEAN);
-
-    /** True while the ant holds a dead nestmate in its mandibles (carrying it to the refuse chamber). Synced so the renderer can draw it. Saved. */
-    private static final EntityDataAccessor<Boolean> DATA_CARRIED_CORPSE =
-            SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<CarriedLoad> DATA_LOAD =
+            SynchedEntityData.defineId(AbstractAntEntity.class, CarriedLoad.SERIALIZER);
 
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
 
@@ -263,17 +250,46 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         builder.define(DATA_NOTICE, NOTICE_NONE);
         builder.define(DATA_ACTIVITY, ACTIVITY_NONE);
         builder.define(DATA_YOUTH, (byte) 0);
-        builder.define(DATA_CARRIED, Optional.empty());
-        builder.define(DATA_CARRIED_SEED, ItemStack.EMPTY);
-        builder.define(DATA_CARRIED_EGG, false);
-        builder.define(DATA_IN_CROP, false);
-        builder.define(DATA_CARRIED_CORPSE, false);
+        builder.define(DATA_LOAD, CarriedLoad.NONE);
     }
 
-    /** The block type of the pellet this ant carries, or null if its mandibles are empty. */
+    /** What it holds ({@link CarriedLoad#NONE}: nothing). */
+    public CarriedLoad getLoad() {
+        return entityData.get(DATA_LOAD);
+    }
+
+    /** Whether it holds a load of this row. */
+    public boolean isCarrying(LoadKind kind) {
+        return getLoad().is(kind);
+    }
+
+    /**
+     * Takes this load into its jaws (or its crop); {@link CarriedLoad#NONE} empties them. It holds one load at a time:
+     * the jobs only pick something up with empty jaws ({@link #hasFullMandibles}).
+     */
+    public void setLoad(CarriedLoad load) {
+        CarriedLoad held = getLoad();
+        if (!held.isEmpty() && !load.isEmpty() && held.kind() != load.kind()) {
+            // Never seen: every job picks up only with empty jaws. Logged so a full run would show it if one did.
+            ColonyFrameworkMod.LOGGER.warn("[load] insect {} took a load of {} while holding {}, which it let go", getId(), load.kind(), held.kind());
+        }
+        entityData.set(DATA_LOAD, load);
+    }
+
+    /** Empties its jaws if it holds a load of one of these rows (and only then). */
+    public void letGoOf(LoadKind... kinds) {
+        for (LoadKind kind : kinds) {
+            if (isCarrying(kind)) {
+                entityData.set(DATA_LOAD, CarriedLoad.NONE);
+                return;
+            }
+        }
+    }
+
+    /** The block type of the pellet this ant carries, or null if it holds no soil. */
     @Nullable
     public BlockState getCarriedBlock() {
-        return entityData.get(DATA_CARRIED).orElse(null);
+        return isCarrying(FrameworkLoads.SOIL) ? getLoad().block() : null;
     }
 
     /** Whether this ant can carry soil out and pack it into place. A queen can only dig: the soil stays where it falls. */
@@ -281,17 +297,27 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return true;
     }
 
+    /** Whether it holds a soil pellet. */
     public boolean isCarrying() {
-        return entityData.get(DATA_CARRIED).isPresent();
+        return isCarrying(FrameworkLoads.SOIL);
     }
 
+    /** Takes a soil pellet of this block; null lets go of the pellet it holds (if it holds one). */
     public void setCarriedBlock(@Nullable BlockState state) {
-        entityData.set(DATA_CARRIED, Optional.ofNullable(state));
+        if (state == null) {
+            letGoOf(FrameworkLoads.SOIL);
+        } else {
+            setLoad(CarriedLoad.of(FrameworkLoads.SOIL, state));
+        }
     }
 
-    /** What this ant carries in its mandibles besides soil and eggs: a seed, or a piece of ant bread (empty if none). */
+    /**
+     * The item it carries in its jaws or its crop: a seed, a piece of ant bread, forage, a fungus nodule (empty if
+     * none).
+     */
     public ItemStack getCarriedSeed() {
-        return entityData.get(DATA_CARRIED_SEED);
+        CarriedLoad load = getLoad();
+        return load.is(FrameworkLoads.ITEM) || load.is(FrameworkLoads.CROP) ? load.item() : ItemStack.EMPTY;
     }
 
     /** Whether the ant holds a seed (on its way to the food store or the mill). */
@@ -312,10 +338,12 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return getCarriedSeed().is(ModTags.RICH_NURSE_FOOD);
     }
 
+    /** Takes this item into its jaws; empty lets go of the item it holds, in its jaws or its crop (if it holds one). */
     public void setCarriedSeed(ItemStack seed) {
-        entityData.set(DATA_CARRIED_SEED, seed);
         if (seed.isEmpty()) {
-            entityData.set(DATA_IN_CROP, false);
+            letGoOf(FrameworkLoads.ITEM, FrameworkLoads.CROP);
+        } else {
+            setLoad(CarriedLoad.of(FrameworkLoads.ITEM, seed));
         }
     }
 
@@ -324,13 +352,16 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
      * through), but it is in the crop, so nothing shows in the jaws.
      */
     public void swallowToPassOn(ItemStack food) {
-        entityData.set(DATA_CARRIED_SEED, food);
-        entityData.set(DATA_IN_CROP, !food.isEmpty());
+        if (food.isEmpty()) {
+            letGoOf(FrameworkLoads.ITEM, FrameworkLoads.CROP);
+        } else {
+            setLoad(CarriedLoad.of(FrameworkLoads.CROP, food));
+        }
     }
 
     /** Whether what it carries is in its crop (to pass on mouth to mouth), not in its jaws. */
     public boolean isFoodInCrop() {
-        return entityData.get(DATA_IN_CROP) && !getCarriedSeed().isEmpty();
+        return isCarrying(FrameworkLoads.CROP);
     }
 
     /**
@@ -344,20 +375,30 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
 
     /** Whether this ant holds an egg in its mandibles (a worker bringing it to the nursery). */
     public boolean isCarryingEgg() {
-        return entityData.get(DATA_CARRIED_EGG);
+        return isCarrying(FrameworkLoads.EGG);
     }
 
+    /** Takes an egg into its jaws; false lets go of the egg it holds (if it holds one). */
     public void setCarryingEgg(boolean carrying) {
-        entityData.set(DATA_CARRIED_EGG, carrying);
+        if (carrying) {
+            setLoad(CarriedLoad.of(FrameworkLoads.EGG));
+        } else {
+            letGoOf(FrameworkLoads.EGG);
+        }
     }
 
     /** Whether this ant holds a dead nestmate in its mandibles (a worker bringing it to the refuse chamber). */
     public boolean isCarryingCorpse() {
-        return entityData.get(DATA_CARRIED_CORPSE);
+        return isCarrying(FrameworkLoads.CORPSE);
     }
 
+    /** Takes a dead nestmate into its jaws; false lets go of the one it holds (if it holds one). */
     public void setCarryingCorpse(boolean carrying) {
-        entityData.set(DATA_CARRIED_CORPSE, carrying);
+        if (carrying) {
+            setLoad(CarriedLoad.of(FrameworkLoads.CORPSE));
+        } else {
+            letGoOf(FrameworkLoads.CORPSE);
+        }
     }
 
     /** The seed in the mandibles is for the mill (it becomes bread), not for the food store. Server side only, saved. */
@@ -369,9 +410,12 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         this.seedForBread = forBread;
     }
 
-    /** Whether the mandibles are full (a soil pellet, a seed, bread, an egg or a dead ant), so the ant can't pick up anything else. */
+    /**
+     * Whether the mandibles are full (any load: a soil pellet, a seed, bread, food in the crop, an egg, a dead ant, a
+     * species' own), so the ant can't pick up anything else.
+     */
     public boolean hasFullMandibles() {
-        return isCarrying() || !getCarriedSeed().isEmpty() || isCarryingEgg() || isCarryingCorpse();
+        return !getLoad().isEmpty();
     }
 
     /** Whether this caste leaves a body when it dies (workers and soldiers; not the queen and king, whose colony ends with them). */
@@ -442,27 +486,15 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     }
 
     /**
-     * A dying ant lets go of what it holds, so another can pick it up: an egg or a dead ant falls where it died, a
-     * piece of nurse food (bread, a fungus nodule) is put down as a heap if there is a floor, a seed or a piece of forage
-     * drops as an item. A soil pellet is just lost.
+     * A dying ant lets go of what it holds, so another can pick it up, as its row says ({@link LoadKind}): an egg or a
+     * dead ant falls where it died, a piece of nurse food (bread, a fungus nodule) is put down as a heap if there is a
+     * floor, a seed or a piece of forage drops as an item. Food in the crop dies with it, a soil pellet is just lost.
      */
     protected void dropLoadOnDeath(ServerLevel level, Colony colony) {
-        if (isCarryingEgg()) {
-            setCarryingEgg(false);
-            colony.brood().spawnEgg(level, getX(), getY(), getZ());
-        }
-        if (isCarryingCorpse()) {
-            setCarryingCorpse(false);
-            colony.refuse().spawnCorpse(level, getX(), getY(), getZ());
-        }
-        if (isFoodInCrop()) {
-            setCarriedSeed(ItemStack.EMPTY); // (eaten: it dies with it)
-        } else if (isCarryingBread()) {
-            colony.nurseFood().putDownWhereItStands(level, this);
-            setCarriedSeed(ItemStack.EMPTY);
-        } else if (!getCarriedSeed().isEmpty()) {
-            spawnAtLocation(getCarriedSeed());
-            setCarriedSeed(ItemStack.EMPTY);
+        CarriedLoad load = getLoad();
+        if (!load.isEmpty()) {
+            load.kind().drop(level, colony, this, load);
+            entityData.set(DATA_LOAD, CarriedLoad.NONE);
         }
     }
 
@@ -1431,16 +1463,12 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         }
         // What the ant holds in its mandibles, so nothing is lost when the world is saved and loaded again: the job that
         // carries it picks it up again after the reload (each one carries on when the ant already holds its load).
-        BlockState pellet = getCarriedBlock();
-        if (pellet != null) {
-            tag.put("CarriedBlock", NbtUtils.writeBlockState(pellet));
+        // Each row writes its own save words, the same as before the one slot (CarriedBlock, CarriedSeed, FoodInCrop,
+        // CarryingEgg, CarryingCorpse), so loads carried in a world saved before it are still held.
+        CarriedLoad load = getLoad();
+        if (!load.isEmpty()) {
+            load.kind().write(tag, load, registryAccess());
         }
-        if (!getCarriedSeed().isEmpty()) {
-            tag.put("CarriedSeed", getCarriedSeed().save(registryAccess()));
-        }
-        tag.putBoolean("CarryingEgg", isCarryingEgg());
-        tag.putBoolean("FoodInCrop", isFoodInCrop());
-        tag.putBoolean("CarryingCorpse", isCarryingCorpse());
         tag.putBoolean("SeedForBread", seedForBread);
         if (!Float.isNaN(boldness)) {
             tag.putFloat("Boldness", boldness);
@@ -1464,15 +1492,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             colonyId = tag.getUUID("ColonyId");
         }
         grownUpAt = tag.contains("GrownUpAt") ? tag.getLong("GrownUpAt") : AGE_NOT_SET;
-        if (tag.contains("CarriedBlock")) {
-            setCarriedBlock(NbtUtils.readBlockState(registryAccess().lookupOrThrow(Registries.BLOCK), tag.getCompound("CarriedBlock")));
-        }
-        if (tag.contains("CarriedSeed")) {
-            setCarriedSeed(ItemStack.parse(registryAccess(), tag.getCompound("CarriedSeed")).orElse(ItemStack.EMPTY));
-        }
-        setCarryingEgg(tag.getBoolean("CarryingEgg"));
-        entityData.set(DATA_IN_CROP, tag.getBoolean("FoodInCrop") && !getCarriedSeed().isEmpty());
-        setCarryingCorpse(tag.getBoolean("CarryingCorpse"));
+        entityData.set(DATA_LOAD, LoadKind.readFrom(tag, registryAccess()));
         seedForBread = tag.getBoolean("SeedForBread");
         if (tag.contains("Boldness")) {
             boldness = tag.getFloat("Boldness");

@@ -1354,6 +1354,22 @@ public class NestTests {
             worker.setCarriedSeed(new net.minecraft.world.item.ItemStack(com.antcolonies.desert.registry.DesertItems.RICH_ANT_BREAD.get()));
             helper.assertTrue(reload(level, worker).isCarryingRichBread(), "the rich bread was lost");
             worker.setCarriedSeed(net.minecraft.world.item.ItemStack.EMPTY);
+            // Food in the crop, to pass on mouth to mouth (the one load slot, Apex part 3, T3: each row its own save words).
+            worker.swallowToPassOn(new net.minecraft.world.item.ItemStack(com.antcolonies.desert.registry.DesertItems.RICH_ANT_BREAD.get()));
+            WorkerAntEntity fed = reload(level, worker);
+            helper.assertTrue(fed.isFoodInCrop() && fed.isCarryingRichBread(), "the food in the crop was lost");
+            worker.setCarriedSeed(net.minecraft.world.item.ItemStack.EMPTY);
+            // A save written before the one slot (every flag written, false ones too) still reads the same.
+            net.minecraft.nbt.CompoundTag old = new net.minecraft.nbt.CompoundTag();
+            worker.saveWithoutId(old);
+            old.put("CarriedSeed", new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.WHEAT_SEEDS).save(level.registryAccess()));
+            old.putBoolean("CarryingEgg", false);
+            old.putBoolean("FoodInCrop", false);
+            old.putBoolean("CarryingCorpse", false);
+            WorkerAntEntity fromOld = DesertEntities.WORKER_ANT.get().create(level);
+            fromOld.load(old);
+            helper.assertTrue(fromOld.isCarryingSeed() && !fromOld.isCarryingEgg() && !fromOld.isFoodInCrop() && !fromOld.isCarryingCorpse(),
+                    "a seed in an old save did not read back as only a seed");
             worker.setCarryingCorpse(true);
             helper.assertTrue(reload(level, worker).isCarryingCorpse(), "the dead ant was lost");
             worker.setCarryingCorpse(false);

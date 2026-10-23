@@ -49,6 +49,13 @@ public final class MoundReach {
     }
 
     /**
+     * How far (blocks each way) a foothold that {@link #canBuildFrom} or {@link #canCarveFrom} accepts can be from the
+     * block worked on: both only accept a cell next to it (a mind passes it to the legs, so a block with no such
+     * foothold beside it is known to have no way to it without a route search).
+     */
+    public static final int REACH = 1;
+
+    /**
      * Whether a termite holding {@code at} can build on {@code target} from inside (see the class). {@code windows}:
      * whether it may bite a window now.
      */

@@ -14,7 +14,7 @@ Bones (the same names as the termites', so animations and code can work on both)
       thorax
       leg_l1 > leg_l1_lower > leg_l1_foot ... leg_r3 (hip, knee, ankle)
     petiole > postpetiole > abdomen (the two waist nodes and the gaster)
-'carry' has no boxes: it marks the spot between the mandible tips where a load is held (PelletLayer).
+'carry' has no boxes: it marks the spot between the mandible tips where a load is held (CarriedLoadLayer).
 
 What makes it a harvester ant (from photos of Pogonomyrmex barbatus): rusty red all over, the gaster a little darker
 and shinier; a big, almost square head with fine lengthwise ridges; strong dark triangular mandibles; a beard of long

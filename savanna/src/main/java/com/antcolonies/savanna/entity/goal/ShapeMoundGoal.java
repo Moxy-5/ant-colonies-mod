@@ -89,11 +89,14 @@ public class ShapeMoundGoal extends Goal {
 
     /**
      * Sets off to a foothold to work from. False if there is none it can get to: then the job is left alone for a
-     * while.
+     * while. The footholds to work from are all next to the job ({@link MoundReach#REACH}), so a job with none at all (a
+     * tunnel cell planned at the mound's foot with only outside air beside it, not yet joined to anything inside) fails
+     * at once, with no route search: before, every builder searched the whole nest for it in turn, a burst of failed
+     * searches every 20 seconds (docs/plans/apex-termites.md, T4).
      */
     private boolean walkThere() {
         ServerLevel level = (ServerLevel) ant.level();
-        return errand.setOff(workFrom(level, spot), spot, 1.0) || errand.leaveAlone(spot);
+        return errand.setOff(workFrom(level, spot), spot, MoundReach.REACH, 1.0) || errand.leaveAlone(spot);
     }
 
     @Override
