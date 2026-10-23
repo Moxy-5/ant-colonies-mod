@@ -274,7 +274,27 @@ easiest to stop bugs from happening and push updates easier"); so these are my p
    2026-10-22 with the user's OK** (steps 6 to 10).
 
 Then the split's own plan (`docs/plans/mod-split.md`) can draw the framework's wall along the registry: shared parts
-in, species parts out.
+in, species parts out. **Planned 2026-10-22** (`docs/plans/mod-split.md`, steps S0 to S10, waiting for the user's
+calls). Found while planning it (the "ideas found along the way" rule):
+
+**Before the split:**
+11. **The termite pieces inside shared parts block the split** (left "for part 3" in step 9): the galleries
+   (`colony/Galleries`, 2,199 lines) held and called by the shared `Nest`, `ForagingHoles` and `BuildLife`, with the
+   feeding galleries, mud casts and tunnel blocks; the comb, dead wood and bare patches in `FoodStore`. The framework
+   could not compile without them, so they move in the split itself: steps S2 and S3 of `mod-split.md`. Nothing
+   changes in-game.
+
+**Before part 3 (the termites), unless the user picks it for the split (`mod-split.md`, your call 4):**
+12. **Each species' numbers read by its own part.** `species/SpeciesProfile` (1,562 lines) holds every species' number
+   groups (mound, galleries, garden, soldiers, alarm; door, patrol, search, recruits, trunk trails, night soil). Only
+   numbers, so the wall holds, but a new species (the Matabele ant) would need an edit in the framework's reader. Fix:
+   a part's row brings the reader for its own section, the species files keep their exact layout. Nothing changes
+   in-game.
+
+**Before the harvester ant leaves the mod (the user's later plan):**
+13. **The legs and body tests ride on the harvester ant.** The walking scenes (`NavigationTests`, 769 lines), half of
+   `BodyTests` and the trail scenes use harvester bodies; the shared legs would lose most of their walking tests with
+   it. Fix: those scenes on a savanna body (a termite worker, later the Matabele ant) first. Nothing changes in-game.
 
 After it: `colony/FoodStore.java` (1,077 lines, the seed granary and the fungus comb in one; 23 of the 57 colony files
 mix harvester-only and termite-only work). Smaller: errand helper step 4 (`ScoutGoal` in three); later, in the
