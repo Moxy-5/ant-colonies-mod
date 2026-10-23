@@ -696,6 +696,28 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return playersForTests != null ? playersForTests : level().players();
     }
 
+    /** The player whose jump or landing it last felt through the ground, and when (see {@code GroundShakes}; not saved). */
+    @Nullable
+    private UUID shakenBy;
+    private long shakenAt;
+
+    /** Server: it feels this player's jump or landing through the ground (see {@code GroundShakes}). */
+    public void feelShake(UUID player, long gameTime) {
+        shakenBy = player;
+        shakenAt = gameTime;
+    }
+
+    /** The player whose jump or landing it felt at this game time or since, or null (see {@code NoticeGoal}). */
+    @Nullable
+    public UUID shakeFeltSince(long since) {
+        return shakenBy != null && shakenAt >= since ? shakenBy : null;
+    }
+
+    /** It has had its chance to freeze at the shake it felt. */
+    public void forgetShake() {
+        shakenBy = null;
+    }
+
     /** Server: falls asleep or wakes up (see {@code NapGoal}). */
     public void setAsleep(boolean asleep) {
         this.asleep = asleep;
