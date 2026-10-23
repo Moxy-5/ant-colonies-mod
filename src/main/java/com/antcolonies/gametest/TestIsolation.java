@@ -52,7 +52,9 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * arena's edge fell near its chunk's edge (the test's random place in the world decides it, about 1 run in 3), the arm
  * ends lay in a chunk Minecraft keeps but does not run, and every worker walking there stood still for the rest of the
  * test. Now the chunks within {@link #GROUND_ROUND} blocks of each running arena run too, by a loading ticket of the
- * test's own, taken away when the test is done.</li>
+ * test's own, taken away when the test is done. A chunk two neighbouring tests share keeps running until the last of
+ * them is done (2026-10-23, {@code docs/BUGS.md} 64: Minecraft folds equal tickets into one, so the first test done
+ * stopped the other's shared ground).</li>
  * <li><b>Counting boxes</b> (in the tests themselves): a test that counts "the workers in my box" misses its own
  * foragers out searching past the box's edge and counts a neighbour's. Such checks count the colony's own insects
  * instead ({@link #insectsOf}).</li>
@@ -70,10 +72,15 @@ public final class TestIsolation {
     private static final List<BiConsumer<Colony, AABB>> FENCES = new ArrayList<>();
     /** How far past its arena's edge a test's ground runs (blocks; a colony's food radius is 24, its gallery arms 16). */
     static final int GROUND_ROUND = 32;
-    /** The loading ticket for the ground round the arenas (one per chunk, so a chunk two tests share runs while either does). */
+    /**
+     * The loading ticket for the ground round the arenas, one per chunk. Minecraft keeps equal tickets as one and does not
+     * count them, so a chunk two tests share holds a single ticket and {@link #GROUND_HOLDERS} counts its tests.
+     */
     private static final TicketType<ChunkPos> GROUND = TicketType.create("antcolonies_test_ground", Comparator.comparingLong(ChunkPos::toLong));
     /** The chunks each running test keeps running. */
     private static final Map<GameTestInfo, List<ChunkPos>> GROUND_HELD = new HashMap<>();
+    /** How many running tests hold each ground chunk (its ticket is taken by the first and given back by the last). */
+    private static final Map<ChunkPos, Integer> GROUND_HOLDERS = new HashMap<>();
 
     private TestIsolation() {
     }
@@ -135,8 +142,10 @@ public final class TestIsolation {
         for (int x = minX; x <= maxX; x++) {
             for (int z = minZ; z <= maxZ; z++) {
                 ChunkPos chunk = new ChunkPos(x, z);
-                // distance 2 from level 33: ticket level 31, entities run in this very chunk
-                level.getChunkSource().addRegionTicket(GROUND, chunk, 2, chunk);
+                if (GROUND_HOLDERS.merge(chunk, 1, Integer::sum) == 1) {
+                    // distance 2 from level 33: ticket level 31, entities run in this very chunk
+                    level.getChunkSource().addRegionTicket(GROUND, chunk, 2, chunk);
+                }
                 held.add(chunk);
             }
         }
@@ -146,7 +155,13 @@ public final class TestIsolation {
     private static void letGroundGo(ServerLevel level, GameTestInfo test) {
         List<ChunkPos> held = GROUND_HELD.remove(test);
         if (held != null) {
-            held.forEach(chunk -> level.getChunkSource().removeRegionTicket(GROUND, chunk, 2, chunk));
+            for (ChunkPos chunk : held) {
+                // (a neighbouring test still running keeps its shared ground running)
+                if (GROUND_HOLDERS.merge(chunk, -1, Integer::sum) == 0) {
+                    GROUND_HOLDERS.remove(chunk);
+                    level.getChunkSource().removeRegionTicket(GROUND, chunk, 2, chunk);
+                }
+            }
         }
     }
 
