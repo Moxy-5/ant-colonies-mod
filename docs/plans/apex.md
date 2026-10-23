@@ -262,6 +262,13 @@ easiest to stop bugs from happening and push updates easier"); so these are my p
    reads the number (the renderer stays with the species). Nothing changes in-game. Small (one body, about 10 lines,
    plus the renderer's read). The other shared-body leftover, `AbstractAntEntity` naming the bread and the fungus
    nodule as "nurse food it carries" (1 line), is the "what I carry" slot already listed below for part 3.
+   **BUILT 2026-10-22** on branch `claude/apex-step10` (from step 9, not merged; planned with the user, my picks: the
+   save word stays `soldier`, each caste's number written out in the hook, not its place in the list): the castes hook's
+   `numberOf` and `casteOf` (the soldiers' 1 and 2), `Colony.casteNumber` and `casteOfNumber`, the young body keeps
+   only the number and asks its colony (`getGrowsInto(colony)`), the nymph renderer reads the number. No shared file
+   names the soldier rank now (only the soldiers' own files, the registry rows and the renderer). Checks in
+   `AwayTests.partsAreTheSpecies` and `TermiteSoldierTests`; `soldiers,away,colony` 36 of 37 (the neighbours flake, BUGS 55, 3 of 3 alone) on 6 servers. Nothing
+   changes in-game. Next: the user tests steps 6 to 10 in-game, then a full run and speed check, then merge.
 
 Then the split's own plan (`docs/plans/mod-split.md`) can draw the framework's wall along the registry: shared parts
 in, species parts out.
