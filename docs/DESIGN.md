@@ -185,6 +185,14 @@ it.** If a decision changes, ask the user first, then update it here. The short 
   - **Gather before attack:** the column stops just short of the spot and bunches up, then the big ants break in all at once.
   - **Prey stacks show:** big ants carry a visible stack of paralysed termites (up to about 10), small ones 1 or 2.
   - **Cleaning after:** back at the nest, ants clean themselves and each other before going in.
+- **Rescue and wound care, details (questionnaire with the user, 2026-10-22; step 5):**
+  - **The study's line for lost causes** (Frank 2018; replaces "3 or more gone: left" from the fight round): 1 or 2 legs gone, carried home, healed, raid again; 3 or 4 gone, carried home and kept alive, nest jobs only; 5 or more, they flail, nobody carries them, left on the field.
+  - **Left alone, limps home:** a lightly hurt ant nobody picks up follows the raid's scent trail home slowly; termite soldiers, hunters or the heat may get it on the way.
+  - **Wound care visible, real rates** (Frank 2023): a nestmate stands over the hurt ant licking the stump for minutes; for an infected wound it reaches back to its gland and dabs. Untreated infections kill about 80% within about a day or two, treated about 10%.
+  - **Infected first:** carers tell infected wounds by smell and give those the gland treatment first; clean wounds are only licked.
+  - **Help squeak:** a hurt ant squeaks as well as giving off the help smell; nestmates near turn toward it.
+  - **The termite heap:** a pile of uneaten termite remains (heads, wings, hard bits) by the entrance, growing with every raid.
+  - **Hurt rest in one spot:** hurt ants are carried to one room near the entrance to rest and be cared for (the user's pick; the least certain of these, real nests are hard to see inside).
 - **Harvester ant fights (user, 2026-10-18, settles the old open question):** harvester ants fight **their own harvester neighbours** (real territory fights where trails meet: grappling, biting, stinging), on the same fight system after the Matabele. No harvester vs termite or harvester vs Matabele fights (they never meet in real life).
 
 ### Later species (NOT version 1)
