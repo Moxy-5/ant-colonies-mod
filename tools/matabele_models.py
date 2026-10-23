@@ -8,8 +8,11 @@ texture and body plan into the savanna mod, as ant_models.py does for the harves
 Redrawn 2026-10-23 from the user's two pictures (Daniel Kronauer's photo of a major and a minor, and the ant in Empires
 of the Undergrowth), the user: "make them longer", "the mandibles also have to be curved", its own shape:
 - Long and slender, standing high on long thin legs; the hind legs about as long as the body.
-- A big glossy head about as wide as long, rounded at the back; small eyes at the front of the sides.
-- Long curved jaws, sickles bending in toward each other, their inner toothed edge dark red-brown.
+- A big glossy head about as wide as long, rounded at the back; the eyes at the front of the sides (drawn bigger than
+  the real ones, under a heavy brow: the user wants them to look fierce, the harvester ants are the cute ones).
+- Big thick hooked jaws (the user's third picture, 2026-10-23, an AI drawing made from a photo: only its jaws, colours
+  and eyes are taken, not its boxy body): out from the front of the head, down and in to the tips, held a little open,
+  dark red with a row of teeth along the inside of the hook.
 - Long antennae: a long scape reaching back past the head, then a ringed whip as long again.
 - A long thorax: a rounded pronotum, a lower mesonotum, a groove, a long sloping propodeum, no spines.
 - One thick, tall waist node (a ponerine), the gaster a long oval pinched between its first two segments, a sting.
@@ -39,7 +42,7 @@ CELLS = {
     'antenna': (5, 0, 'noise'),    # the scape and every other ring of the whip
     'ring':    (6, 0, 'noise'),    # the whip's other rings
     'eye':     (7, 0, 'eye'),
-    'jaw':     (0, 1, 'glossy'),
+    'jaw':     (0, 1, 'noise'),
     'teeth':   (1, 1, 'noise'),    # the jaws' inner toothed edge
     'tarsus':  (2, 1, 'noise'),
     'joint':   (3, 1, 'noise'),
@@ -48,6 +51,14 @@ CELLS = {
 
 # The looks. shine: the light on the hard plates; hair: how much the gaster's fine hairs grey it.
 LOOKS = {
+    'C': {'name': 'Like your third picture',
+          'note': 'dark charcoal plates patched with grey and warm brown, dark brown legs and antennae with tan tips and '
+                  'feet, dark red jaws, big dark eyes with a hard glint',
+          'shine': 0.35, 'hair': 0.05, 'mottle': [((18, 18, 20), 0.25), ((34, 14, 2), 0.25)],
+          'colours': {'head': (50, 46, 46), 'thorax': (52, 47, 46), 'waist': (52, 47, 46), 'gaster': (52, 47, 46),
+                      'leg': (62, 44, 32), 'antenna': (66, 46, 34), 'ring': (56, 40, 30), 'eye': (58, 60, 68),
+                      'jaw': (98, 30, 26), 'teeth': (80, 24, 22), 'tarsus': (150, 100, 60), 'joint': (44, 34, 28),
+                      'sting': (120, 84, 52)}},
     'A': {'name': 'Like the photo',
           'note': 'glossy black (the real ant, Daniel Kronauer\'s photo): the head, thorax and gaster shining, fine pale '
                   'hairs on the gaster, the jaws\' toothed edges, the feet and the antenna tips red-brown',
@@ -83,11 +94,18 @@ def texture_rows(look):
                         k += spec['shine'] * 1.1                    # the light on a hard plate
                     elif (x, y) in ((3, 2), (2, 3)):
                         k += spec['shine'] * 0.45
+                if pattern in ('glossy', 'haired') and spec.get('mottle'):
+                    roll = rnd.random()                             # patches of other tones on the plates
+                    for tone, chance in spec['mottle']:
+                        if roll < chance:
+                            rgb = [c + t for c, t in zip(rgb, tone)]
+                            break
+                        roll -= chance
                 if pattern == 'haired' and rnd.random() < 0.5:
                     mix = spec['hair'] * rnd.uniform(0.25, 0.55)    # a fine pale hair
                     rgb = [c + (150 - c) * mix for c in rgb]
                 elif pattern == 'eye':
-                    k = rnd.uniform(-0.05, 0.05) + (3.0 if (x, y) == (2, 2) else 0.0)   # a glint
+                    k = rnd.uniform(-0.05, 0.05) + (4.0 if (x, y) in ((1, 1), (2, 1)) else 0.0)   # a hard glint high up
                 rows[row * 8 + y][col * 8 + x] = tuple(max(0, min(255, int(c * (1 + k)))) for c in rgb) + (255,)
     return rows
 
@@ -174,8 +192,8 @@ NECK = (0, 4.5, -7.2)
 WAIST = (0, 4.2, 0.4)            # thorax to the waist node
 GIRDLE_FRONT = (0, 4.4, 2.0)     # the waist node to the gaster's first segment
 GIRDLE = (0, 4.5, 4.8)           # the pinch between the gaster's first and second segments
-MANDIBLE_TIPS_Z = -16.2
-CARRY = (0, 3.3, -16.6)          # just in front of the jaws: where the stack of termites is held
+MANDIBLE_TIPS_Z = -15.9
+CARRY = (0, 2.5, -16.1)          # between the jaw tips: where the stack of termites is held
 
 # Legs: hip, knee, ankle, toe (left side; before LIFT, so the toes at -LIFT stand on the ground). Long and thin, the knees high over the back, the body carried high; the hind
 # legs the longest, about as long as the body.
@@ -188,9 +206,11 @@ ANTENNA_SOCKET = (0.75, 5.6, -11.8)
 ANTENNA_ELBOW = (2.6, 7.7, -8.5)                                     # the long scape reaches back past the head
 ANTENNA_WHIP = [(3.6, 8.3, -11.0), (4.5, 8.1, -13.5), (5.2, 7.3, -15.7), (5.6, 6.0, -17.5)]
 WHIP_RINGS = 10
-# The jaw: a sickle from its base at the front of the head, out, forward and in to the tip, a little down (left side).
-JAW = [(1.25, 3.8, -12.3), (1.55, 3.65, -13.6), (1.45, 3.45, -14.8), (0.95, 3.3, -15.7), (0.25, 3.25, -16.2)]
-JAW_WIDTH = [1.0, 0.85, 0.7, 0.5]
+# The jaw: a thick hook from its base under the front of the head, forward and out, then down and in to the tip, held a
+# little open (the tips about 1.8 apart); thickest at the base (left side).
+JAW = [(1.35, 3.9, -12.2), (1.9, 3.5, -13.4), (2.0, 2.9, -14.6), (1.6, 2.3, -15.5), (0.9, 1.9, -15.9)]
+JAW_WIDTH = [1.3, 1.15, 0.95, 0.7]
+JAW_HEIGHT = [1.0, 0.9, 0.8, 0.6]
 
 # The head is drawn at HEAD of its boxes' size: the major's big head stands out from its narrow thorax as in the
 # photo; the minor's head and jaws are smaller for its body, its antennae less so (my picks, from the photo).
@@ -219,7 +239,8 @@ def head_bones(head=1.0, antenna=1.0):
     for sx in (1, -1):
         cubes += [
             box(*[h(p) for p in sym_points([0.25, 5.9, -12.15], [1.0, 6.35, -11.2], sx)], 'head'),   # frontal lobe
-            box(*[h(p) for p in sym_points([2.28, 4.95, -11.1], [2.42, 5.6, -10.3], sx)], 'eye'),
+            box(*[h(p) for p in sym_points([2.2, 4.6, -11.5], [2.58, 5.85, -10.0], sx)], 'eye'),    # big, bulging
+            box(*[h(p) for p in sym_points([1.3, 5.85, -11.8], [2.45, 6.3, -9.9], sx)], 'head'),    # the heavy brow
         ]
     bones = [bone('head', 'forebody', NECK, cubes)]
     for side, sx in (('l', 1), ('r', -1)):
@@ -229,10 +250,14 @@ def head_bones(head=1.0, antenna=1.0):
         cubes = []
         for i, (a, b) in enumerate(zip(jaw, jaw[1:])):
             w = JAW_WIDTH[i] * head
-            cubes.append(rod(a, b, w, 'jaw', 0.75 * head - 0.07 * i))
-            inner = (-0.42 * sx * head * (1 - 0.25 * i), 0, 0)      # the toothed edge on the inside of the curve
-            cubes.append(rod(tuple(p + o for p, o in zip(a, inner)), tuple(p + o for p, o in zip(b, inner)),
-                             0.3 * head, 'teeth', 0.5 * head))
+            cubes.append(rod(a, b, w, 'jaw', JAW_HEIGHT[i] * head))
+            if i == 0:
+                continue
+            # Two teeth on the inside of the hook: from the jaw's middle line toward the other jaw.
+            for f in (0.3, 0.75):
+                c = lerp(a, b, f)
+                inward = (-sx * (w / 2 + 0.12 * head), 0, 0)
+                cubes.append(centered(c[0] + inward[0], c[1] - 0.05, c[2], 0.42 * head, 0.5 * head, 0.36 * head, 'teeth'))
         bones.append(bone(f'mandible_{side}', 'head', jaw[0], cubes))
         socket = h(m(ANTENNA_SOCKET))
 
