@@ -177,6 +177,14 @@ it.** If a decision changes, ask the user first, then update it here. The short 
   - **Dead ants walled in:** dead Matabele ants left in a gallery are plastered into the wall with Mud Crust by the termites; breaking it finds them.
   - **Soldiers stay behind:** at a breach the soldiers face the opening while the workers retreat and seal the tunnel behind them, shutting the soldiers out. The user asked whether they live: real shut-out soldiers mostly die fighting. **My pick, to confirm:** those still alive when the raid leaves wait by the seal and are let back in when the gallery reopens at night.
   - **Not picked:** the stink cloud round nests and columns.
+- **Scouts and raids, details (questionnaire with the user, 2026-10-22; step 4):**
+  - **Raid size matches the find** (Frank 2018): the scout recruits in proportion to the termites it found, capped by the colony's size and hunger; big feeding spots get the full 200 to 500.
+  - **Empty raids:** if the termites have gone or plugged the holes, the ants spread out round the spot for a short while, take any they find, then go home empty; hunger sends a new scout out sooner.
+  - **Old spots rechecked:** scouts check their colony's past good spots first; the termites' danger memory (plugged holes, closed galleries) dries them up, so the ants slowly hunt further out.
+  - **Scout leads the way:** the finder walks at the front laying fresh scent; the column follows single file at first, then widens.
+  - **Gather before attack:** the column stops just short of the spot and bunches up, then the big ants break in all at once.
+  - **Prey stacks show:** big ants carry a visible stack of paralysed termites (up to about 10), small ones 1 or 2.
+  - **Cleaning after:** back at the nest, ants clean themselves and each other before going in.
 - **Harvester ant fights (user, 2026-10-18, settles the old open question):** harvester ants fight **their own harvester neighbours** (real territory fights where trails meet: grappling, biting, stinging), on the same fight system after the Matabele. No harvester vs termite or harvester vs Matabele fights (they never meet in real life).
 
 ### Later species (NOT version 1)
