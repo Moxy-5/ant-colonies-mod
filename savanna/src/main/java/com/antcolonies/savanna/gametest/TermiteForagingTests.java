@@ -15,6 +15,8 @@ import com.antcolonies.colony.NestPlan;
 import com.antcolonies.savanna.registry.SavannaBlocks;
 import com.antcolonies.savanna.registry.SavannaEntities;
 
+import com.antcolonies.savanna.species.SavannaNumbers;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -250,7 +252,7 @@ public class TermiteForagingTests {
                 case 3 -> { // the first night, dry
                     if (tick - since[0] >= 30) {
                         int foragers = colony.foragersNow(level);
-                        int wanted = Math.min(tunnels.size(), colony.profile().nest().galleries().orElseThrow().holesFor(foragers, false));
+                        int wanted = Math.min(tunnels.size(), colony.profile().section(SavannaNumbers.GALLERIES).orElseThrow().holesFor(foragers, false));
                         SavannaMod.LOGGER.info("[turns-test] tick {}: first night, {} foragers, in turn {}", tick, foragers,
                                 galleries.tonight().stream().map(helper::relativePos).toList());
                         helper.assertTrue(wanted < tunnels.size(), "every hole is wanted, nothing to take turns: " + wanted + " of " + tunnels.size());
@@ -278,7 +280,7 @@ public class TermiteForagingTests {
                 case 5 -> { // the rainy day
                     if (tick - since[0] >= 30) {
                         int foragers = colony.foragersNow(level);
-                        int wanted = Math.min(tunnels.size(), colony.profile().nest().galleries().orElseThrow().holesFor(foragers, true));
+                        int wanted = Math.min(tunnels.size(), colony.profile().section(SavannaNumbers.GALLERIES).orElseThrow().holesFor(foragers, true));
                         java.util.Set<BlockPos> rainy = galleries.tonight();
                         SavannaMod.LOGGER.info("[turns-test] tick {}: rain, {} foragers, in turn {}", tick, foragers,
                                 rainy.stream().map(helper::relativePos).toList());
@@ -355,7 +357,7 @@ public class TermiteForagingTests {
                                 "a hole was left for good for one worker killed (BUGS 65): " + colony.part(SavannaParts.CLOSED_HOLES).orElseThrow().describe(level));
                         stage[0] = 7;
                     } else {
-                        com.antcolonies.species.SpeciesProfile.AlarmNumbers numbers = alarm.numbers();
+                        com.antcolonies.savanna.species.SavannaNumbers.AlarmNumbers numbers = alarm.numbers();
                         helper.assertTrue(tick - since[0] <= numbers.calmTicksFor(2) + numbers.calmTicksFor(1) + 100,
                                 "the alarm is still at " + alarm.level(level) + " " + (tick - since[0]) + " ticks after the chicken was killed (BUGS 65): " + alarm.describe(level));
                     }
@@ -565,7 +567,7 @@ public class TermiteForagingTests {
                         colony.foragingRadius(), galleries.filledLength());
             }
             BlockPos center = colony.getCenter();
-            int pieceLength = colony.profile().nest().galleries().orElseThrow().pieceLength();
+            int pieceLength = colony.profile().section(SavannaNumbers.GALLERIES).orElseThrow().pieceLength();
             switch (stage[0]) {
                 case 1 -> { // the arms planned and their tips made: the small colony's galleries stay as they are
                     if (galleries.tipCount() >= 3) {

@@ -30,6 +30,8 @@ import org.jetbrains.annotations.Nullable;
 import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.species.SpeciesProfile;
 
+import com.antcolonies.savanna.species.SavannaNumbers;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
@@ -88,7 +90,7 @@ public class Galleries implements ColonyHooks.Underground {
     /** A remembered trail counts for its hole while known food lies this near (blocks) its patch. */
     private static final double PATCH_FOOD = 4.0;
     /** The numbers when the species file has none (only a test switching it on for a species without them). */
-    private static final SpeciesProfile.GalleryNumbers DEFAULT = new SpeciesProfile.GalleryNumbers(true, 16, 4, 6, 0.5, 6, 2);
+    private static final SavannaNumbers.GalleryNumbers DEFAULT = new SavannaNumbers.GalleryNumbers(true, 16, 4, 6, 0.5, 6, 2);
 
     /** How often (ticks) the pieces' use is looked at and unused far branches filled in. */
     private static final int UPKEEP_TICKS = 200;
@@ -207,7 +209,7 @@ public class Galleries implements ColonyHooks.Underground {
         if (switchForTests != null) {
             return switchForTests;
         }
-        return colony.profile().nest().galleries().map(SpeciesProfile.GalleryNumbers::enabled).orElse(false);
+        return colony.profile().section(SavannaNumbers.GALLERIES).map(SavannaNumbers.GalleryNumbers::enabled).orElse(false);
     }
 
     /** Tests only: switch it on or off for this colony whatever the species file says (null: as the file says). */
@@ -216,8 +218,8 @@ public class Galleries implements ColonyHooks.Underground {
         changed.run();
     }
 
-    SpeciesProfile.GalleryNumbers numbers() {
-        return colony.profile().nest().galleries().orElse(DEFAULT);
+    SavannaNumbers.GalleryNumbers numbers() {
+        return colony.profile().section(SavannaNumbers.GALLERIES).orElse(DEFAULT);
     }
 
     /**
@@ -477,7 +479,7 @@ public class Galleries implements ColonyHooks.Underground {
                 return;
             }
         }
-        SpeciesProfile.GalleryNumbers numbers = numbers();
+        SavannaNumbers.GalleryNumbers numbers = numbers();
         BlockPos center = colony.getCenter();
         Direction front = own.get(0).side().getClockWise(); // (the first side tunnel runs to the left of the rooms)
         List<Direction> ways = new ArrayList<>();
@@ -691,7 +693,7 @@ public class Galleries implements ColonyHooks.Underground {
      * tips, dead wood big enough is sensed and the colony learns it, so a piece goes out to it before the tips spread.
      */
     private void listenForWood(ServerLevel level) {
-        SpeciesProfile.WoodCall call = numbers().woodCall();
+        SavannaNumbers.WoodCall call = numbers().woodCall();
         if (call.farthest() <= 0) {
             return;
         }
@@ -712,7 +714,7 @@ public class Galleries implements ColonyHooks.Underground {
 
     /** Once everything planned is dug and the colony may have more: the shortest tip grows by a piece (or forks). */
     private void growTips(ServerLevel level) {
-        SpeciesProfile.GalleryNumbers numbers = numbers();
+        SavannaNumbers.GalleryNumbers numbers = numbers();
         BlockPos center = colony.getCenter();
         if (!tipsMade) {
             tips.clear();
@@ -980,7 +982,7 @@ public class Galleries implements ColonyHooks.Underground {
     }
 
     /** Whether the ground round a tip's end is loaded as far as its next piece may go. */
-    private static boolean loadedAround(Level level, BlockPos end, SpeciesProfile.GalleryNumbers numbers) {
+    private static boolean loadedAround(Level level, BlockPos end, SavannaNumbers.GalleryNumbers numbers) {
         int around = numbers.pieceLength() + TunnelRoute.HOLE_REACH + 2;
         return level.isLoaded(end.offset(around, 0, around)) && level.isLoaded(end.offset(-around, 0, -around))
                 && level.isLoaded(end.offset(around, 0, -around)) && level.isLoaded(end.offset(-around, 0, around));
@@ -1056,7 +1058,7 @@ public class Galleries implements ColonyHooks.Underground {
      * grows a piece straight toward that grass (no wander; a fork is still made when due, as real tunnels branch round
      * found food). It may use the length filled-in branches gave back. False if no grass pulls.
      */
-    private boolean pullTowardGrass(ServerLevel level, SpeciesProfile.GalleryNumbers numbers, BlockPos center, Set<BlockPos> stopped) {
+    private boolean pullTowardGrass(ServerLevel level, SavannaNumbers.GalleryNumbers numbers, BlockPos center, Set<BlockPos> stopped) {
         List<BlockPos> grass = new ArrayList<>();
         for (BlockPos plant : colony.food().plants(level)) {
             SpeciesProfile.PlantFood food = colony.profile().food().plantFor(level.getBlockState(plant));
@@ -1173,7 +1175,7 @@ public class Galleries implements ColonyHooks.Underground {
         if (length() + fresh <= allowed) {
             return true;
         }
-        SpeciesProfile.WoodCall call = numbers().woodCall();
+        SavannaNumbers.WoodCall call = numbers().woodCall();
         if (call.overLimit() > 0 && length() + fresh <= allowed + call.overLimit() && woodCall.isBig(level, food, call)) {
             SavannaMod.LOGGER.debug("[galleries] the way to the big dead wood at {} is {} blocks: past what the workers allow ({} of {}), dug all the same",
                     food.toShortString(), fresh, length(), lengthAllowed());
@@ -1572,7 +1574,7 @@ public class Galleries implements ColonyHooks.Underground {
      * grows whole webs with it on made-up landscapes).
      */
     static List<Tip> grow(Tip tip, List<Tip> tips, TunnelRoute.Ground ground, BlockPos center, int keepOut,
-            SpeciesProfile.GalleryNumbers numbers, RandomSource random) {
+            SavannaNumbers.GalleryNumbers numbers, RandomSource random) {
         TunnelRoute.Ground outside = keepOutOf(ground, center, keepOut);
         boolean fork = tip.sinceFork() + numbers.pieceLength() >= tip.forkAt();
         double[] ways = fork ? new double[] {tip.bearing() - numbers.forkAngle(), tip.bearing() + numbers.forkAngle()}
@@ -1636,7 +1638,7 @@ public class Galleries implements ColonyHooks.Underground {
     }
 
     /** After how many blocks of growth a tip forks: {@code fork_min} to {@code fork_max}. */
-    private static int forkAt(SpeciesProfile.GalleryNumbers numbers, RandomSource random) {
+    private static int forkAt(SavannaNumbers.GalleryNumbers numbers, RandomSource random) {
         return numbers.forkMin() + random.nextInt(Math.max(1, numbers.forkMax() - numbers.forkMin() + 1));
     }
 
@@ -1863,7 +1865,7 @@ public class Galleries implements ColonyHooks.Underground {
         if (candidates.isEmpty()) {
             return;
         }
-        SpeciesProfile.GalleryNumbers numbers = numbers();
+        SavannaNumbers.GalleryNumbers numbers = numbers();
         int foragers = colony.foragersNow(level);
         boolean rain = colony.rainsNow(level);
         int open = Math.min(candidates.size(), numbers.holesFor(foragers, rain));

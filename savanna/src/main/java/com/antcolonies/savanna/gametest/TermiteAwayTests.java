@@ -28,6 +28,8 @@ import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.savanna.entity.TermiteSoldierEntity;
 import com.antcolonies.savanna.registry.SavannaEntities;
 
+import com.antcolonies.savanna.species.SavannaNumbers;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -216,7 +218,7 @@ public class TermiteAwayTests {
         helper.runAfterDelay(1500, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             SavannaMod.LOGGER.info("[away-test] 2c termites at night: food {}{}", colony.food().getFood(), colony.field().describe());
-            long regrowth = colony.profile().food().regrowth().orElseThrow().ticks();
+            long regrowth = colony.profile().section(SavannaNumbers.REGROWTH).orElseThrow().ticks();
             for (int i = 0; i < 3; i++) {
                 BlockPos tuft = tufts.get(i);
                 helper.assertTrue(level.getBlockState(tuft).isAir(), "a known tuft should be eaten up at night and gone: " + tuft);
@@ -363,8 +365,8 @@ public class TermiteAwayTests {
             com.antcolonies.savanna.colony.Galleries galleries = com.antcolonies.savanna.colony.Galleries.of(colony);
             List<NestPlan.ForagingTunnel> tunnels = colony.foragingHoles().tunnels(level);
             BlockPos center = colony.getCenter();
-            int graze = colony.profile().nest().galleries().orElseThrow().foodRadius();
-            int pieceLength = colony.profile().nest().galleries().orElseThrow().pieceLength();
+            int graze = colony.profile().section(SavannaNumbers.GALLERIES).orElseThrow().foodRadius();
+            int pieceLength = colony.profile().section(SavannaNumbers.GALLERIES).orElseThrow().pieceLength();
             List<BlockPos> holes = tunnels.stream().map(NestPlan.ForagingTunnel::hole).distinct().toList();
             AwayReport report = colony.away().report();
             long tick = helper.getTick();

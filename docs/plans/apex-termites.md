@@ -58,6 +58,10 @@ in-game test at the end (termites, a new world, about 30 minutes), then one merg
 **Rounds** (the user, 2026-10-23: fewer steps where two quick ones go together; 7 steps folded into 5): 1 T1 + T2;
 2 T3 + T4; 3 T5. One full run per round.
 
+**Where each step runs (the user, 2026-10-23):** T3 and T4 in a linked session on their own branch (`apex-t3-t4`), merged into `claude/apex-termites` before T5; T1, T2 and T5 here.
+
+**T1 BUILT 2026-10-23** (`SpeciesSection`, `SavannaNumbers`, `DesertNumbers`; every number the same before and after).
+
 **Not in part 3:** the shared fight system and a shared "defender" (M8 builds it with the Matabele ant as the first
 fighter; the termite soldiers join it then); `ScoutGoal` in three (errand helper step 4, part 4 or M8's scouts); the
 legs tests on a savanna body (`apex.md` step 13, before the harvester ant leaves); new termite behaviour of any kind.

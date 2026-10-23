@@ -5,15 +5,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
-import com.antcolonies.species.SpeciesProfile;
+import com.antcolonies.desert.species.DesertNumbers;
 
 /**
  * Brain step 4b: Gordon's door rule for the forager numbers ({@link Door#step}) and the patroller counts (the user's
  * scaling: 2 at 10 workers, 4 at 25, 8 at 50, 16 at 100; later rounds half).
  */
 class DoorRuleTest {
-    private static final SpeciesProfile.DoorNumbers DOOR = new SpeciesProfile.DoorNumbers(3, 600, 2.0, 10, 3);
-    private static final SpeciesProfile.PatrolNumbers PATROL = new SpeciesProfile.PatrolNumbers(0.16F, 1, 10, 0.5F, 4.0, 1.0F, 0.5F);
+    private static final DesertNumbers.DoorNumbers DOOR = new DesertNumbers.DoorNumbers(3, 600, 2.0, 10, 3);
+    private static final DesertNumbers.PatrolNumbers PATROL = new DesertNumbers.PatrolNumbers(0.16F, 1, 10, 0.5F, 4.0, 1.0F, 0.5F);
 
     /** Runs the numbers for {@code seconds}: each second {@code returnsPerSecond} homecomings with food (a fraction: on average). */
     private static double run(int foragers, double out, double returnsPerSecond, int seconds, boolean small) {

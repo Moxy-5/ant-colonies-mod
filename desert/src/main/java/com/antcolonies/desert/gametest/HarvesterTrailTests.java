@@ -21,6 +21,7 @@ import com.antcolonies.desert.colony.DesertParts;
 import com.antcolonies.desert.colony.TrunkTrails;
 import com.antcolonies.desert.entity.WorkerAntEntity;
 import com.antcolonies.desert.registry.DesertBlocks;
+import com.antcolonies.desert.species.DesertNumbers;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -102,7 +103,7 @@ public class HarvesterTrailTests {
             int groundY = helper.absolutePos(new BlockPos(0, SURFACE - 1, 0)).getY();
             BlockPos eastFood = new BlockPos(center[0].getX() + FOOD_OUT, groundY + 1, center[0].getZ());
             BlockPos southFood = new BlockPos(center[0].getX(), groundY + 1, center[0].getZ() + FOOD_OUT);
-            int laidBy = colony.profile().food().trails().trunk().orElseThrow().newTrailTrips();
+            int laidBy = colony.profile().section(DesertNumbers.TRUNK).orElseThrow().newTrailTrips();
             helper.assertTrue(trails.trails().size() == 1 && trails.strength(level, trails.trails().get(0)) > laidBy - 1,
                     "a trail laid by " + laidBy + " trips should not fade a minute later: " + trails.describe(level));
             for (int i = 0; i < 8; i++) {
@@ -160,7 +161,7 @@ public class HarvesterTrailTests {
             DesertMod.LOGGER.info("[trail-test] patrol: {} ways {}", colony.part(DesertParts.PATROL).orElseThrow().describe(level), ways);
             helper.assertTrue(colony.part(DesertParts.PATROL).orElseThrow().isRoundOn() && ways.size() >= 2 && ways.get(0).endsWith("(trail)") && ways.get(1).endsWith("(trail)")
                     && ways.contains("east (trail)") && ways.contains("south (trail)"), "the patrol should walk the two trunk trails first: " + ways);
-            helper.assertTrue(colony.part(DesertParts.PATROL).orElseThrow().sentThisRound() == colony.profile().food().patrol().orElseThrow().dawnPatrol(colony.getCount(Caste.WORKER)),
+            helper.assertTrue(colony.part(DesertParts.PATROL).orElseThrow().sentThisRound() == colony.profile().section(DesertNumbers.PATROL).orElseThrow().dawnPatrol(colony.getCount(Caste.WORKER)),
                     "the dawn patrol should be the share of the workers: " + colony.part(DesertParts.PATROL).orElseThrow().describe(level));
             int groundY = helper.absolutePos(new BlockPos(0, SURFACE - 1, 0)).getY();
             helper.assertTrue(!colony.part(DesertParts.PATROL).orElseThrow().isOpen(level, new BlockPos(center[0].getX() + FOOD_OUT, groundY + 1, center[0].getZ())),

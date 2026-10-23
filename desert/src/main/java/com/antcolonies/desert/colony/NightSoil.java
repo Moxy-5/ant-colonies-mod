@@ -13,8 +13,8 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.desert.DesertMod;
 import com.antcolonies.block.SeedPileBlock;
-import com.antcolonies.species.SpeciesProfile;
 import com.antcolonies.desert.registry.DesertBlocks;
+import com.antcolonies.desert.species.DesertNumbers;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -62,8 +62,8 @@ public class NightSoil {
         return colony.nest().nightSoilCells(level, DesertBlocks.LOOSE_SOIL.get());
     }
 
-    private SpeciesProfile.NightSoilNumbers numbers() {
-        return colony.profile().nest().nightSoil();
+    private DesertNumbers.NightSoilNumbers numbers() {
+        return colony.profile().section(DesertNumbers.NIGHT_SOIL).orElse(DesertNumbers.NightSoilNumbers.DEFAULT);
     }
 
     /** How many pellets wait in the piles now. */

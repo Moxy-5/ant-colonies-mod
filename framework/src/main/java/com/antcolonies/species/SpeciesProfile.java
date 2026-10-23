@@ -1,5 +1,6 @@
 package com.antcolonies.species;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -9,7 +10,10 @@ import org.jetbrains.annotations.Nullable;
 import com.antcolonies.block.SeedPileBlock;
 import com.antcolonies.block.PlugBlock;
 import com.antcolonies.colony.NestPlan;
+import com.google.gson.JsonElement;
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
+import com.mojang.serialization.JsonOps;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -28,43 +32,90 @@ import net.minecraft.world.level.block.state.properties.Property;
  * (see {@link SpeciesProfiles}). The shared colony code asks the colony's profile instead of using fixed numbers, so a
  * new species (termites) only needs its own file. Times are in ticks (20 ticks = 1 second, a day = 24000 ticks).
  *
+ * <p>The profile reads the shared numbers only; each species mod reads its own sections of the same file (Project
+ * Apex part 3, T1: the termite mound, the harvester's door, ...) through {@link SpeciesSection}, held here by section
+ * ({@link #section}). {@code gardenRooms} is the shared view of a fungus garden's rooms (the nest layout digs them);
+ * the savanna mod reads the rest of the {@code garden} object.
+ *
  * <p>Not in the profile yet (still in code): the room sizes and the spiral ({@code NestPlan}), the hill
  * ({@code Hill}), the castes' size, health and speed (fixed when the game starts), and the diggable blocks tag (the food
  * the workers gather is in {@link FoodNumbers}).
  */
 public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNumbers queen, BroodNumbers brood,
-        FoodNumbers food, RefuseNumbers refuse, NestNumbers nest, Optional<QueenBody> queenBody, Optional<Founding> founding,
-        Optional<MoundNumbers> mound, Optional<GardenNumbers> garden, Optional<Laying> laying, Optional<SoldierNumbers> soldiers,
-        Optional<AlarmNumbers> alarm, Optional<BodyLanguage> bodyLanguage, List<String> parts) {
+        FoodNumbers food, RefuseNumbers refuse, NestNumbers nest, Optional<Founding> founding, Optional<GardenRooms> gardenRooms,
+        Optional<Laying> laying, Optional<BodyLanguage> bodyLanguage, List<String> parts, Map<SpeciesSection<?>, Object> sections) {
 
-    /** The numbers without a parts list (only the parts every colony has; see {@code colony.ColonyParts}). */
+    public SpeciesProfile {
+        sections = Map.copyOf(sections);
+    }
+
+    /** The shared numbers as read, with no species sections yet ({@link #withSection}). */
     public SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNumbers queen, BroodNumbers brood, FoodNumbers food,
-            RefuseNumbers refuse, NestNumbers nest, Optional<QueenBody> queenBody, Optional<Founding> founding,
-            Optional<MoundNumbers> mound, Optional<GardenNumbers> garden, Optional<Laying> laying, Optional<SoldierNumbers> soldiers,
-            Optional<AlarmNumbers> alarm, Optional<BodyLanguage> bodyLanguage) {
-        this(colony, worker, queen, brood, food, refuse, nest, queenBody, founding, mound, garden, laying, soldiers, alarm, bodyLanguage, List.of());
+            RefuseNumbers refuse, NestNumbers nest, Optional<Founding> founding, Optional<GardenRooms> gardenRooms, Optional<Laying> laying,
+            Optional<BodyLanguage> bodyLanguage, List<String> parts) {
+        this(colony, worker, queen, brood, food, refuse, nest, founding, gardenRooms, laying, bodyLanguage, parts, Map.of());
+    }
+
+    /** The numbers without a parts list (only the parts every colony has; see {@code colony.ColonyParts}), a garden or body language. */
+    public SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNumbers queen, BroodNumbers brood, FoodNumbers food,
+            RefuseNumbers refuse, NestNumbers nest, Optional<Founding> founding, Optional<Laying> laying) {
+        this(colony, worker, queen, brood, food, refuse, nest, founding, Optional.empty(), laying, Optional.empty(), List.of());
     }
 
     /** The same numbers with this parts list. */
     public SpeciesProfile withParts(List<String> parts) {
-        return new SpeciesProfile(colony, worker, queen, brood, food, refuse, nest, queenBody, founding, mound, garden, laying, soldiers, alarm,
-                bodyLanguage, List.copyOf(parts));
+        return new SpeciesProfile(colony, worker, queen, brood, food, refuse, nest, founding, gardenRooms, laying, bodyLanguage,
+                List.copyOf(parts), sections);
     }
 
-    /** The numbers without a body language section (the insects' bodies just walk and stand). */
-    public SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNumbers queen, BroodNumbers brood, FoodNumbers food,
-            RefuseNumbers refuse, NestNumbers nest, Optional<QueenBody> queenBody, Optional<Founding> founding,
-            Optional<MoundNumbers> mound, Optional<GardenNumbers> garden, Optional<Laying> laying, Optional<SoldierNumbers> soldiers,
-            Optional<AlarmNumbers> alarm) {
-        this(colony, worker, queen, brood, food, refuse, nest, queenBody, founding, mound, garden, laying, soldiers, alarm, Optional.empty());
+    /** A species mod's own section of the file (Apex part 3, T1), or empty if the file has none. */
+    @SuppressWarnings("unchecked")
+    public <T> Optional<T> section(SpeciesSection<T> section) {
+        return Optional.ofNullable((T) sections.get(section));
     }
 
-    /** The numbers without a fungus garden, without a steady stream of eggs (the queen lays one egg per meal) and without soldiers. */
-    public SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNumbers queen, BroodNumbers brood, FoodNumbers food,
-            RefuseNumbers refuse, NestNumbers nest, Optional<QueenBody> queenBody, Optional<Founding> founding,
-            Optional<MoundNumbers> mound) {
-        this(colony, worker, queen, brood, food, refuse, nest, queenBody, founding, mound, Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty());
+    /** The same numbers with this section as given (built-in numbers and tests). */
+    public <T> SpeciesProfile withSection(SpeciesSection<T> section, T numbers) {
+        Map<SpeciesSection<?>, Object> more = new LinkedHashMap<>(sections);
+        more.put(section, numbers);
+        return new SpeciesProfile(colony, worker, queen, brood, food, refuse, nest, founding, gardenRooms, laying, bodyLanguage, parts, more);
+    }
+
+    /**
+     * Reads a species file: the shared numbers ({@link #CODEC}), then every section a species mod signed up
+     * ({@link SpeciesSection#all}). A broken section makes the whole file broken, as a broken shared number does.
+     */
+    public static DataResult<SpeciesProfile> read(JsonElement file) {
+        DataResult<SpeciesProfile> result = CODEC.parse(JsonOps.INSTANCE, file);
+        for (SpeciesSection<?> section : SpeciesSection.all()) {
+            result = result.flatMap(profile -> addSection(profile, section, file));
+        }
+        return result;
+    }
+
+    private static <T> DataResult<SpeciesProfile> addSection(SpeciesProfile profile, SpeciesSection<T> section, JsonElement file) {
+        return section.read(file).map(found -> found.map(numbers -> profile.withSection(section, numbers)).orElse(profile));
+    }
+
+    /**
+     * The shared view of a fungus garden (the {@code garden} object; termites): how many small garden rooms the nest has
+     * round the royal chamber ({@code NestPlan.gardens}), at most {@code rooms}; the workers dig the first as soon as
+     * the colony has workers and one more for every {@code workersPerRoom} workers. The savanna mod reads the garden's
+     * other numbers (the nodules, the comb, the mushrooms).
+     */
+    public record GardenRooms(int rooms, int workersPerRoom) {
+        public static final Codec<GardenRooms> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.INT.fieldOf("rooms").forGetter(GardenRooms::rooms),
+                Codec.INT.fieldOf("workers_per_room").forGetter(GardenRooms::workersPerRoom)
+        ).apply(i, GardenRooms::new));
+
+        /** How many garden rooms a colony with this many workers wants (none while it has no workers). */
+        public int roomsFor(int workers) {
+            if (workers <= 0) {
+                return 0;
+            }
+            return Math.min(rooms, 1 + workers / Math.max(1, workersPerRoom));
+        }
     }
 
     /**
@@ -345,41 +396,30 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * always); outside those times the workers stay inside (see {@code Colony.isForagingTime}). {@code findRadius}
      * (optional, 0: the colony knows every plant in its area at once): a plant is only gone for once a worker has
      * been within this many blocks of it and brought the news home, and foragers with nothing good to go for scout
-     * the area (see {@code FoodMap}). {@code regrowth} (optional): eaten plants that grow back, and bare patches round
-     * the foraging holes (see {@link Regrowth}). {@code trails} (optional, the defaults of {@link Trails}): how the
-     * colony's foraging trails get stronger with use and fade unused, and lasting trunk trails worn into the ground.
-     * {@code dayClock} (optional): the foragers' daily round. {@code door} (optional): how many foragers go out is
-     * driven by the foragers coming home with food (Deborah Gordon's rule, see {@link DoorNumbers}). {@code patrol}
-     * (optional): patrollers open each round of foraging (see {@link PatrolNumbers}). {@code search} (optional): each
-     * forager searches alone and remembers its own spot (see {@link SearchNumbers}).
+     * the area (see {@code FoodMap}). {@code trails} (optional, the defaults of {@link Trails}): how the colony's
+     * foraging trails get stronger with use and fade unused. {@code dayClock} (optional): the foragers' daily round.
+     * {@code search} (optional): each forager searches alone and remembers its own spot (see {@link SearchNumbers}).
+     * A species' own food numbers are read by its own mod (Apex part 3, T1, {@link SpeciesSection}): the savanna's
+     * grass growing back ({@code regrowth}), the desert's door and patrol ({@code door}, {@code patrol}).
      */
     public record FoodNumbers(int radius, String items, List<PlantFood> plants, String piece, String pile, int millTicks, int breadStock,
-            List<String> forageAt, int findRadius, Optional<Regrowth> regrowth, Trails trails, Optional<DayClock> dayClock,
-            Optional<DoorNumbers> door, Optional<PatrolNumbers> patrol, Optional<SearchNumbers> search) {
+            List<String> forageAt, int findRadius, Trails trails, Optional<DayClock> dayClock, Optional<SearchNumbers> search) {
         /** Foraging at any time: day, night and in the rain. */
         public static final List<String> ALWAYS = List.of("day", "night", "rain");
 
         public FoodNumbers(int radius, String items, List<PlantFood> plants, String piece, String pile, int millTicks, int breadStock,
-                List<String> forageAt, int findRadius, Optional<Regrowth> regrowth, Trails trails, Optional<DayClock> dayClock,
-                Optional<DoorNumbers> door, Optional<PatrolNumbers> patrol) {
-            this(radius, items, plants, piece, pile, millTicks, breadStock, forageAt, findRadius, regrowth, trails, dayClock, door, patrol,
-                    Optional.empty());
+                List<String> forageAt, int findRadius, Trails trails, Optional<DayClock> dayClock) {
+            this(radius, items, plants, piece, pile, millTicks, breadStock, forageAt, findRadius, trails, dayClock, Optional.empty());
         }
 
         public FoodNumbers(int radius, String items, List<PlantFood> plants, String piece, String pile, int millTicks, int breadStock,
-                List<String> forageAt, int findRadius, Optional<Regrowth> regrowth, Trails trails, Optional<DayClock> dayClock) {
-            this(radius, items, plants, piece, pile, millTicks, breadStock, forageAt, findRadius, regrowth, trails, dayClock, Optional.empty(),
-                    Optional.empty());
+                List<String> forageAt, int findRadius, Trails trails) {
+            this(radius, items, plants, piece, pile, millTicks, breadStock, forageAt, findRadius, trails, Optional.empty());
         }
 
         public FoodNumbers(int radius, String items, List<PlantFood> plants, String piece, String pile, int millTicks, int breadStock,
-                List<String> forageAt, int findRadius, Optional<Regrowth> regrowth, Trails trails) {
-            this(radius, items, plants, piece, pile, millTicks, breadStock, forageAt, findRadius, regrowth, trails, Optional.empty());
-        }
-
-        public FoodNumbers(int radius, String items, List<PlantFood> plants, String piece, String pile, int millTicks, int breadStock,
-                List<String> forageAt, int findRadius, Optional<Regrowth> regrowth) {
-            this(radius, items, plants, piece, pile, millTicks, breadStock, forageAt, findRadius, regrowth, Trails.DEFAULT);
+                List<String> forageAt, int findRadius) {
+            this(radius, items, plants, piece, pile, millTicks, breadStock, forageAt, findRadius, Trails.DEFAULT);
         }
 
         public static final Codec<FoodNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
@@ -392,11 +432,8 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 Codec.INT.optionalFieldOf("bread_stock", 0).forGetter(FoodNumbers::breadStock),
                 Codec.STRING.listOf().optionalFieldOf("forage_at", ALWAYS).forGetter(FoodNumbers::forageAt),
                 Codec.INT.optionalFieldOf("find_radius", 0).forGetter(FoodNumbers::findRadius),
-                Regrowth.CODEC.optionalFieldOf("regrowth").forGetter(FoodNumbers::regrowth),
                 Trails.CODEC.optionalFieldOf("trails", Trails.DEFAULT).forGetter(FoodNumbers::trails),
                 DayClock.CODEC.optionalFieldOf("day_clock").forGetter(FoodNumbers::dayClock),
-                DoorNumbers.CODEC.optionalFieldOf("door").forGetter(FoodNumbers::door),
-                PatrolNumbers.CODEC.optionalFieldOf("patrol").forGetter(FoodNumbers::patrol),
                 SearchNumbers.CODEC.optionalFieldOf("search").forGetter(FoodNumbers::search)
         ).apply(i, FoodNumbers::new));
 
@@ -475,16 +512,15 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * The colony's foraging trails (brain part 4, step 4a; species-neutral). Every trip along a trail makes it one
      * stronger, up to {@code mostStrength}; unused, its strength halves every {@code halfLifeTicks}, and below
      * {@code fadeBelow} the trail has faded and is forgotten. So a trail used every day lasts, and one nobody uses
-     * fades over several days. {@code trunk} (optional): the colony keeps lasting trunk trails worn into the ground
-     * (see {@code colony.TrunkTrails}).
+     * fades over several days. (A species' own trail numbers, such as the harvester's lasting trunk trails, are read
+     * by its own mod: Apex part 3, T1.)
      */
-    public record Trails(int halfLifeTicks, double mostStrength, double fadeBelow, Optional<TrunkNumbers> trunk) {
-        public static final Trails DEFAULT = new Trails(24000, 64.0, 1.0, Optional.empty());
+    public record Trails(int halfLifeTicks, double mostStrength, double fadeBelow) {
+        public static final Trails DEFAULT = new Trails(24000, 64.0, 1.0);
         public static final Codec<Trails> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.optionalFieldOf("half_life_ticks", 24000).forGetter(Trails::halfLifeTicks),
                 Codec.DOUBLE.optionalFieldOf("most_strength", 64.0).forGetter(Trails::mostStrength),
-                Codec.DOUBLE.optionalFieldOf("fade_below", 1.0).forGetter(Trails::fadeBelow),
-                TrunkNumbers.CODEC.optionalFieldOf("trunk").forGetter(Trails::trunk)
+                Codec.DOUBLE.optionalFieldOf("fade_below", 1.0).forGetter(Trails::fadeBelow)
         ).apply(i, Trails::new));
 
         /** A strength of {@code strength} at some time, {@code ticks} later with no use. */
@@ -541,66 +577,6 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
         public static String clock(long dayTime) {
             long minutes = (Math.floorMod(dayTime, 24000L) * 60 / 1000 + 6 * 60) % (24 * 60);
             return (minutes / 60) + ":" + String.format("%02d", minutes % 60);
-        }
-    }
-
-    /**
-     * The door (brain step 4b; Deborah Gordon's rule for red harvester ants): no ant is in charge of how many go out.
-     * Foragers that are not out wait inside by the entrance; a forager (or a patroller) coming home touches the waiting
-     * ants it passes within {@code touchReach} blocks, and one that has had {@code touchesNeeded} touches within
-     * {@code touchMemoryTicks} goes out (Greene and Gordon: about one contact every 10 seconds). A forager home with
-     * nothing does not count. While the colony has fewer than {@code smallColonyForagers} foragers one touch is enough,
-     * a homecomer reaches every waiting ant by the entrance (a tiny nest), and a forager's own seed counts as its touch,
-     * so a young colony is never slower than before. For the foragers that are numbers, each homecomer touches
-     * {@code touchesPerReturn} of the waiting ones. My picks, to confirm.
-     */
-    public record DoorNumbers(int touchesNeeded, int touchMemoryTicks, double touchReach, int smallColonyForagers, int touchesPerReturn) {
-        public static final Codec<DoorNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
-                Codec.INT.optionalFieldOf("touches_needed", 3).forGetter(DoorNumbers::touchesNeeded),
-                Codec.INT.optionalFieldOf("touch_memory_ticks", 600).forGetter(DoorNumbers::touchMemoryTicks),
-                Codec.DOUBLE.optionalFieldOf("touch_reach", 2.0).forGetter(DoorNumbers::touchReach),
-                Codec.INT.optionalFieldOf("small_colony_foragers", 10).forGetter(DoorNumbers::smallColonyForagers),
-                Codec.INT.optionalFieldOf("touches_per_return", 3).forGetter(DoorNumbers::touchesPerReturn)
-        ).apply(i, DoorNumbers::new));
-
-        /** How many touches a waiting forager needs to go out, in a colony with this many foragers. */
-        public int touchesFor(int foragers) {
-            return foragers < smallColonyForagers ? 1 : Math.max(1, touchesNeeded);
-        }
-    }
-
-    /**
-     * Patrollers (brain step 4b; real <i>Pogonomyrmex barbatus</i>, Gordon; Greene and Gordon 2007): each time the day
-     * clock opens (at dawn, after the midday rest, after rain) a few workers taken from the builders go out first, over
-     * and round the hill and then about {@code reach} blocks out along a trunk trail (or in a new direction) and back.
-     * Foraging starts only once one is back, and only in the directions they came back from. A dawn patrol is
-     * {@code share} of the workers (at least {@code least}); a later one {@code laterRounds} of that. A patroller hurt, or
-     * with a hostile mob within {@code hostileWithin} blocks, turns back: its direction stays shut for the day,
-     * {@code extraOnDanger} times as many again come out to patrol the hill, and the foragers allowed out are
-     * {@code foragersAfterDanger} of the forager share for the rest of the day. A patroller meeting another colony's ants
-     * turns back and shuts that direction for the day. The share and the later rounds are the user's; the rest my picks.
-     */
-    public record PatrolNumbers(float share, int least, int reach, float laterRounds, double hostileWithin, float extraOnDanger,
-            float foragersAfterDanger) {
-        public static final Codec<PatrolNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
-                Codec.FLOAT.optionalFieldOf("share", 0.16F).forGetter(PatrolNumbers::share),
-                Codec.INT.optionalFieldOf("least", 1).forGetter(PatrolNumbers::least),
-                Codec.INT.optionalFieldOf("reach", 10).forGetter(PatrolNumbers::reach),
-                Codec.FLOAT.optionalFieldOf("later_rounds", 0.5F).forGetter(PatrolNumbers::laterRounds),
-                Codec.DOUBLE.optionalFieldOf("hostile_within", 4.0).forGetter(PatrolNumbers::hostileWithin),
-                Codec.FLOAT.optionalFieldOf("extra_on_danger", 1.0F).forGetter(PatrolNumbers::extraOnDanger),
-                Codec.FLOAT.optionalFieldOf("foragers_after_danger", 0.5F).forGetter(PatrolNumbers::foragersAfterDanger)
-        ).apply(i, PatrolNumbers::new));
-
-        /** How many patrol at dawn in a colony of this many workers (2 at 10, 4 at 25, 8 at 50, 16 at 100). */
-        public int dawnPatrol(int workers) {
-            return workers <= 0 ? 0 : Math.min(workers, Math.max(least, Math.round(workers * share)));
-        }
-
-        /** How many patrol after the midday rest or after rain: {@code laterRounds} of the dawn patrol. */
-        public int laterPatrol(int workers) {
-            int dawn = dawnPatrol(workers);
-            return dawn <= 0 ? 0 : Math.min(dawn, Math.max(least, Math.round(dawn * laterRounds)));
         }
     }
 
@@ -682,117 +658,6 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
         /** Whether this food plant (its {@code block} as the profile names it) counts toward a rich patch. */
         public boolean counts(PlantFood plant) {
             return plants.isEmpty() || plants.contains(plant.block());
-        }
-    }
-
-    /**
-     * Lasting trunk trails (real red harvester ants, <i>Pogonomyrmex barbatus</i>: cleared paths running straight out
-     * from the nest disc, used for years). Each starts {@code start} blocks from the nest's middle (the hill's edge). The
-     * colony keeps 1 trail while young, and more as it grows: up to {@code most} at {@code fullAtWorkers} workers. A
-     * forager going for food within {@code spreadDegrees} of a trail's line walks out along it and leaves it at the
-     * spot nearest its food; a direction with no trail gets a new one once {@code newTrailTrips} trips have gone that
-     * way within a day (while the colony may have more). A block of the trail walked by {@code bareAfterTrips} trips
-     * wears bare: the plants on it are cut and the ground turns to {@code bareGround}. A faded trail's bare ground
-     * grows back to grass about {@code regrowTicks} later (a bit sooner or later for each block).
-     * <p>Long trails (the user's decisions of 2026-10-17, {@code docs/plans/long-trails.md}): a trail reaches out as far as
-     * its trips go (its tip), at most {@code mostLength} blocks from the nest's middle, and only as far as its traffic
-     * holds: {@code blocksPerDailyTrip} blocks for each trip a day it gets (real trails live by their traffic; a long one
-     * needs more trips, so a small colony keeps short trails).
-     */
-    public record TrunkNumbers(int start, int most, int fullAtWorkers, int spreadDegrees, int newTrailTrips, int bareAfterTrips,
-            String bareGround, int regrowTicks, int mostLength, double blocksPerDailyTrip) {
-        public static final Codec<TrunkNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
-                Codec.INT.optionalFieldOf("start", 4).forGetter(TrunkNumbers::start),
-                Codec.INT.optionalFieldOf("most", 8).forGetter(TrunkNumbers::most),
-                Codec.INT.optionalFieldOf("full_at_workers", 1500).forGetter(TrunkNumbers::fullAtWorkers),
-                Codec.INT.optionalFieldOf("spread_degrees", 35).forGetter(TrunkNumbers::spreadDegrees),
-                Codec.INT.optionalFieldOf("new_trail_trips", 8).forGetter(TrunkNumbers::newTrailTrips),
-                Codec.INT.optionalFieldOf("bare_after_trips", 60).forGetter(TrunkNumbers::bareAfterTrips),
-                Codec.STRING.optionalFieldOf("bare_ground", "minecraft:coarse_dirt").forGetter(TrunkNumbers::bareGround),
-                Codec.INT.optionalFieldOf("regrow_ticks", 48000).forGetter(TrunkNumbers::regrowTicks),
-                Codec.INT.optionalFieldOf("most_length", 96).forGetter(TrunkNumbers::mostLength),
-                Codec.DOUBLE.optionalFieldOf("blocks_per_daily_trip", 6.0).forGetter(TrunkNumbers::blocksPerDailyTrip)
-        ).apply(i, TrunkNumbers::new));
-
-        /**
-         * How far out (blocks from the nest's middle) a trail of this {@code strength} can reach: {@code blocksPerDailyTrip}
-         * for each trip a day it gets past its start, at most {@code mostLength}. A trail's strength halves every
-         * {@code halfLifeTicks} unused and each trip adds 1, so a trail walked {@code r} times a day sits near a strength
-         * of {@code r * halfLife / (day * ln 2)}: its trips a day are its strength times {@code ln 2 * day / halfLife}.
-         */
-        public double holds(double strength, int halfLifeTicks) {
-            double tripsADay = Math.max(0, strength) * Math.log(2) * 24000.0 / Math.max(1, halfLifeTicks);
-            return Math.min(mostLength, start + blocksPerDailyTrip * tripsADay);
-        }
-
-        /** How many trunk trails a colony of this many workers keeps: 1 while young, up to {@code most}. */
-        public int trailsFor(int workers) {
-            double share = Math.min(1.0, Math.max(0, workers) / (double) Math.max(1, fullAtWorkers));
-            return Math.max(1, Math.min(most, 1 + (int) Math.floor((most - 1) * share)));
-        }
-
-        /** The block bare ground turns into (coarse dirt if the name is unknown). */
-        public BlockState bareGroundState() {
-            ResourceLocation id = ResourceLocation.tryParse(bareGround);
-            Block block = id == null ? null : BuiltInRegistries.BLOCK.getOptional(id).orElse(null);
-            return (block == null ? net.minecraft.world.level.block.Blocks.COARSE_DIRT : block).defaultBlockState();
-        }
-    }
-
-    /**
-     * Grass that grows back after it is eaten (the user's plan of 2026-10-14, "bare patches"): a tuft of one of the
-     * {@code plants} eaten away grows back as {@code growsBack} (with the values in {@code state}: green) about
-     * {@code ticks} later, from the roots left in the ground. A tuft eaten within {@code bareRadius} blocks (sideways) of
-     * a foraging hole leaves the grass block under it bare ({@code bareGround}, coarse dirt) until it grows back, so the
-     * ground round a busy hole is a patch of bare soil, as round real Macrotermes foraging holes; the rest of the
-     * savanna is only grazed.
-     */
-    public record Regrowth(List<String> plants, String growsBack, Map<String, String> state, int ticks, int bareRadius, String bareGround) {
-        public static final Codec<Regrowth> CODEC = RecordCodecBuilder.create(i -> i.group(
-                Codec.STRING.listOf().fieldOf("plants").forGetter(Regrowth::plants),
-                Codec.STRING.fieldOf("grows_back").forGetter(Regrowth::growsBack),
-                Codec.unboundedMap(Codec.STRING, Codec.STRING).optionalFieldOf("state", Map.of()).forGetter(Regrowth::state),
-                Codec.INT.fieldOf("ticks").forGetter(Regrowth::ticks),
-                Codec.INT.optionalFieldOf("bare_radius", 0).forGetter(Regrowth::bareRadius),
-                Codec.STRING.optionalFieldOf("bare_ground", "minecraft:coarse_dirt").forGetter(Regrowth::bareGround)
-        ).apply(i, Regrowth::new));
-
-        /** Whether this eaten plant grows back. */
-        public boolean regrows(BlockState state) {
-            for (String plant : plants) {
-                if (new PlantFood(plant, 1, false, 1).matches(state)) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        /** The young tuft that grows back, or null if the block is unknown. */
-        @Nullable
-        public BlockState growsBackState() {
-            ResourceLocation id = ResourceLocation.tryParse(growsBack);
-            BlockState young = id == null ? null : BuiltInRegistries.BLOCK.getOptional(id).map(Block::defaultBlockState).orElse(null);
-            if (young == null) {
-                return null;
-            }
-            for (Map.Entry<String, String> value : state.entrySet()) {
-                Property<?> property = young.getBlock().getStateDefinition().getProperty(value.getKey());
-                if (property != null) {
-                    young = withValue(young, property, value.getValue());
-                }
-            }
-            return young;
-        }
-
-        /** The bare ground left round a hole, or null if the block is unknown. */
-        @Nullable
-        public BlockState bareGroundState() {
-            ResourceLocation id = ResourceLocation.tryParse(bareGround);
-            return id == null ? null : BuiltInRegistries.BLOCK.getOptional(id).map(Block::defaultBlockState).orElse(null);
-        }
-
-        private static <T extends Comparable<T>> BlockState withValue(BlockState state, Property<T> property, String name) {
-            return property.getValue(name).map(value -> state.setValue(property, value)).orElse(state);
         }
     }
 
@@ -898,7 +763,7 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      */
     public record NestNumbers(int maxLevels, boolean sealWhileFounding, boolean foundingChamber, List<String> sideRooms,
             int foragingHoles, int foragingHoleDistance, String plugBlock, List<LevelUnlock> levelUnlocks, Optional<NewHoles> newHoles,
-            boolean crustWalls, Optional<Sheeting> sheeting, NestPlan.RoomSizes roomSizes, NightSoilNumbers nightSoil, Optional<GalleryNumbers> galleries) {
+            boolean crustWalls, Optional<Sheeting> sheeting, NestPlan.RoomSizes roomSizes) {
         public static final Codec<NestNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("max_levels").forGetter(NestNumbers::maxLevels),
                 Codec.BOOL.fieldOf("seal_while_founding").forGetter(NestNumbers::sealWhileFounding),
@@ -911,24 +776,8 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 NewHoles.CODEC.optionalFieldOf("new_holes").forGetter(NestNumbers::newHoles),
                 Codec.BOOL.optionalFieldOf("crust_walls", false).forGetter(NestNumbers::crustWalls),
                 Sheeting.CODEC.optionalFieldOf("sheeting").forGetter(NestNumbers::sheeting),
-                NestPlan.RoomSizes.CODEC.optionalFieldOf("room_sizes", NestPlan.RoomSizes.DEFAULT).forGetter(NestNumbers::roomSizes),
-                NightSoilNumbers.CODEC.optionalFieldOf("night_soil", NightSoilNumbers.DEFAULT).forGetter(NestNumbers::nightSoil),
-                GalleryNumbers.CODEC.optionalFieldOf("galleries").forGetter(NestNumbers::galleries)
+                NestPlan.RoomSizes.CODEC.optionalFieldOf("room_sizes", NestPlan.RoomSizes.DEFAULT).forGetter(NestNumbers::roomSizes)
         ).apply(i, NestNumbers::new));
-
-        public NestNumbers(int maxLevels, boolean sealWhileFounding, boolean foundingChamber, List<String> sideRooms,
-                int foragingHoles, int foragingHoleDistance, String plugBlock, List<LevelUnlock> levelUnlocks, Optional<NewHoles> newHoles,
-                boolean crustWalls, Optional<Sheeting> sheeting, NestPlan.RoomSizes roomSizes, NightSoilNumbers nightSoil) {
-            this(maxLevels, sealWhileFounding, foundingChamber, sideRooms, foragingHoles, foragingHoleDistance, plugBlock, levelUnlocks, newHoles,
-                    crustWalls, sheeting, roomSizes, nightSoil, Optional.empty());
-        }
-
-        public NestNumbers(int maxLevels, boolean sealWhileFounding, boolean foundingChamber, List<String> sideRooms,
-                int foragingHoles, int foragingHoleDistance, String plugBlock, List<LevelUnlock> levelUnlocks, Optional<NewHoles> newHoles,
-                boolean crustWalls, Optional<Sheeting> sheeting, NestPlan.RoomSizes roomSizes) {
-            this(maxLevels, sealWhileFounding, foundingChamber, sideRooms, foragingHoles, foragingHoleDistance, plugBlock, levelUnlocks, newHoles,
-                    crustWalls, sheeting, roomSizes, NightSoilNumbers.DEFAULT);
-        }
 
         public NestNumbers(int maxLevels, boolean sealWhileFounding, boolean foundingChamber, List<String> sideRooms,
                 int foragingHoles, int foragingHoleDistance, String plugBlock, List<LevelUnlock> levelUnlocks, Optional<NewHoles> newHoles,
@@ -1003,141 +852,6 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * hole (no new hole is dug for it), the workers build a runway of mud crust from the hole to it, at most
      * {@code maxLength} blocks long; at most {@code max} runways at a time. Far food gets a new hole instead.
      */
-    /**
-     * The night soil (a species with a hill): soil dug while the surface is shut waits in loose piles on the floors near
-     * the top of the nest, {@code layersPerCell} layers a cell at most (2 pixels each), and is carried up first thing once
-     * the surface opens. Diggers rest while the surface is shut once {@code perBuilder} pellets wait for each builder (more
-     * than they could carry out in a morning). My picks, to confirm.
-     */
-    public record NightSoilNumbers(int layersPerCell, int perBuilder) {
-        public static final NightSoilNumbers DEFAULT = new NightSoilNumbers(4, 12);
-        public static final Codec<NightSoilNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
-                Codec.INT.optionalFieldOf("layers_per_cell", DEFAULT.layersPerCell()).forGetter(NightSoilNumbers::layersPerCell),
-                Codec.INT.optionalFieldOf("per_builder", DEFAULT.perBuilder()).forGetter(NightSoilNumbers::perBuilder)
-        ).apply(i, NightSoilNumbers::new));
-    }
-
-    /**
-     * Big dead wood calls the galleries (the user's pick, 2026-10-19): real termites sense rotting wood through the soil
-     * from afar (the smell of the wood and its fungi; they even judge a log's size from how it vibrates). Dead wood of at
-     * least {@code minBlocks} blocks together (a standing dead giant, a fallen giant) is noticed from {@code reach} blocks
-     * past any hole or tip, and from {@code bigReach} once it is {@code bigBlocks} blocks or more; the colony then knows
-     * it, and a gallery piece or a runway goes to it. A big find gets the diggers (the user's pick, 2026-10-19): the way
-     * to such wood may take the galleries up to {@code overLimit} blocks past the length the workers allow (the even
-     * spreading waits until the workers catch up). {@code reach} 0: off. My numbers, to confirm.
-     */
-    public record WoodCall(int minBlocks, int reach, int bigBlocks, int bigReach, int overLimit) {
-        public static final WoodCall DEFAULT = new WoodCall(20, 0, 100, 0, 0);
-        public static final Codec<WoodCall> CODEC = RecordCodecBuilder.create(i -> i.group(
-                Codec.INT.optionalFieldOf("min_blocks", 20).forGetter(WoodCall::minBlocks),
-                Codec.INT.optionalFieldOf("reach", 16).forGetter(WoodCall::reach),
-                Codec.INT.optionalFieldOf("big_blocks", 100).forGetter(WoodCall::bigBlocks),
-                Codec.INT.optionalFieldOf("big_reach", 20).forGetter(WoodCall::bigReach),
-                Codec.INT.optionalFieldOf("over_limit", 32).forGetter(WoodCall::overLimit)
-        ).apply(i, WoodCall::new));
-
-        /** How far wood of this many blocks is noticed from (0: too small, or off). */
-        public int reachFor(int blocks) {
-            if (reach <= 0 || blocks < minBlocks) {
-                return 0;
-            }
-            double big = bigBlocks <= minBlocks ? 1.0 : Math.min(1.0, (blocks - minBlocks) / (double) (bigBlocks - minBlocks));
-            return (int) Math.round(reach + (bigReach - reach) * big);
-        }
-
-        /** The farthest any wood is noticed from. */
-        public int farthest() {
-            return reach <= 0 ? 0 : Math.max(reach, bigReach);
-        }
-    }
-
-    /**
-     * Termites underground (the user's plan of 2026-10-17, {@code docs/plans/termites-underground.md}), behind a switch:
-     * {@code enabled} turns it on (off: the 2 foraging holes of before, both open every foraging time). Step 1, holes
-     * take turns (real Macrotermes: many small holes along the galleries, only some opened on a night, near food found
-     * before plus a few new ones to explore): the nest's tunnels reach out in 4 arms {@code armLength} blocks from the
-     * middle (the 2 side tunnels go on out, 2 more branch off them past the mound round to the front and back); holes
-     * lie about {@code holeSpacing} blocks apart along every tunnel; on each foraging time one hole is open for every
-     * {@code foragersPerHole} foragers (at least 1), {@code rainMore} times as many again in the rain; the holes with
-     * food the colony knows within {@code foodRadius} blocks (or a remembered trail to food still there) open first, and
-     * {@code explore} of them (none if only 1 opens, 1 if 2 or 3) go to the holes rested longest. Step 3, growing toward
-     * food: known grass up to {@code pullReach} blocks past a tip pulls it; a far branch that led to no food for
-     * {@code fillDays} game days is packed with soil. My picks for the numbers, to confirm.
-     */
-    public record GalleryNumbers(boolean enabled, int armLength, int holeSpacing, int foragersPerHole, double rainMore, int foodRadius, int explore,
-            int workersPerBlock, int maxLength, int reach, int pieceLength, int forkMin, int forkMax, int forkAngle, int wander, int hiddenTrip,
-            int fillDays, int pullReach, WoodCall woodCall) {
-        /** The first 16 numbers (a codec group holds at most 16), the step 3 ones at their defaults. */
-        private static final com.mojang.serialization.MapCodec<GalleryNumbers> STEPS_1_TO_2 = RecordCodecBuilder.mapCodec(i -> i.group(
-                Codec.BOOL.optionalFieldOf("enabled", false).forGetter(GalleryNumbers::enabled),
-                Codec.INT.optionalFieldOf("arm_length", 16).forGetter(GalleryNumbers::armLength),
-                Codec.INT.optionalFieldOf("hole_spacing", 4).forGetter(GalleryNumbers::holeSpacing),
-                Codec.INT.optionalFieldOf("foragers_per_hole", 6).forGetter(GalleryNumbers::foragersPerHole),
-                Codec.DOUBLE.optionalFieldOf("rain_more", 0.5).forGetter(GalleryNumbers::rainMore),
-                Codec.INT.optionalFieldOf("food_radius", 6).forGetter(GalleryNumbers::foodRadius),
-                Codec.INT.optionalFieldOf("explore", 2).forGetter(GalleryNumbers::explore),
-                Codec.INT.optionalFieldOf("workers_per_block", 4).forGetter(GalleryNumbers::workersPerBlock),
-                Codec.INT.optionalFieldOf("max_length", 600).forGetter(GalleryNumbers::maxLength),
-                Codec.INT.optionalFieldOf("reach", 50).forGetter(GalleryNumbers::reach),
-                Codec.INT.optionalFieldOf("piece_length", 4).forGetter(GalleryNumbers::pieceLength),
-                Codec.INT.optionalFieldOf("fork_min", 8).forGetter(GalleryNumbers::forkMin),
-                Codec.INT.optionalFieldOf("fork_max", 12).forGetter(GalleryNumbers::forkMax),
-                Codec.INT.optionalFieldOf("fork_angle", 30).forGetter(GalleryNumbers::forkAngle),
-                Codec.INT.optionalFieldOf("wander", 20).forGetter(GalleryNumbers::wander),
-                Codec.INT.optionalFieldOf("hidden_trip", 12).forGetter(GalleryNumbers::hiddenTrip)
-        ).apply(i, GalleryNumbers::new));
-        public static final Codec<GalleryNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
-                STEPS_1_TO_2.forGetter(numbers -> numbers),
-                Codec.INT.optionalFieldOf("fill_days", 10).forGetter(GalleryNumbers::fillDays),
-                Codec.INT.optionalFieldOf("pull_reach", 12).forGetter(GalleryNumbers::pullReach),
-                WoodCall.CODEC.optionalFieldOf("wood_call", WoodCall.DEFAULT).forGetter(GalleryNumbers::woodCall)
-        ).apply(i, (numbers, fillDays, pullReach, woodCall) -> numbers.withStep3(fillDays, pullReach, woodCall)));
-
-        /** Step 1's numbers only (growing with the step 2 and 3 defaults). */
-        public GalleryNumbers(boolean enabled, int armLength, int holeSpacing, int foragersPerHole, double rainMore, int foodRadius, int explore) {
-            this(enabled, armLength, holeSpacing, foragersPerHole, rainMore, foodRadius, explore, 4, 600, 50, 4, 8, 12, 30, 20, 12);
-        }
-
-        /** Steps 1 and 2's numbers (step 3's at their defaults). */
-        public GalleryNumbers(boolean enabled, int armLength, int holeSpacing, int foragersPerHole, double rainMore, int foodRadius, int explore,
-                int workersPerBlock, int maxLength, int reach, int pieceLength, int forkMin, int forkMax, int forkAngle, int wander, int hiddenTrip) {
-            this(enabled, armLength, holeSpacing, foragersPerHole, rainMore, foodRadius, explore, workersPerBlock, maxLength, reach, pieceLength,
-                    forkMin, forkMax, forkAngle, wander, hiddenTrip, 10, 12, WoodCall.DEFAULT);
-        }
-
-        GalleryNumbers withStep3(int fillDays, int pullReach, WoodCall woodCall) {
-            return new GalleryNumbers(enabled, armLength, holeSpacing, foragersPerHole, rainMore, foodRadius, explore, workersPerBlock, maxLength,
-                    reach, pieceLength, forkMin, forkMax, forkAngle, wander, hiddenTrip, fillDays, pullReach, woodCall);
-        }
-
-        /** The same numbers with another reach (tests keep a web inside their arena). */
-        public GalleryNumbers withReach(int reach) {
-            return new GalleryNumbers(enabled, armLength, holeSpacing, foragersPerHole, rainMore, foodRadius, explore, workersPerBlock, maxLength,
-                    reach, pieceLength, forkMin, forkMax, forkAngle, wander, hiddenTrip, fillDays, pullReach, woodCall);
-        }
-
-        /** The same numbers with another wander (a tip pulled toward food goes straight for it). */
-        public GalleryNumbers withWander(int wander) {
-            return new GalleryNumbers(enabled, armLength, holeSpacing, foragersPerHole, rainMore, foodRadius, explore, workersPerBlock, maxLength,
-                    reach, pieceLength, forkMin, forkMax, forkAngle, wander, hiddenTrip, fillDays, pullReach, woodCall);
-        }
-
-        /** How many blocks of gallery a colony with this many workers may have in all, at most max_length (0 when it does not grow). */
-        public int lengthFor(int workers) {
-            return workersPerBlock <= 0 ? 0 : Math.min(maxLength, workers / workersPerBlock);
-        }
-
-        /** How many holes open on a foraging time with this many foragers, in the rain or not. */
-        public int holesFor(int foragers, boolean raining) {
-            int holes = Math.max(1, (foragers + foragersPerHole - 1) / Math.max(1, foragersPerHole));
-            return raining ? (int) Math.ceil(holes * (1 + rainMore)) : holes;
-        }
-
-        /** How many of {@code open} holes go to exploring (the rest to holes near known food): none of 1, 1 of 2 or 3. */
-        public int exploreOf(int open) {
-            return open <= 1 ? 0 : Math.min(open, open <= 3 ? 1 : explore);
-        }
-    }
 
     public record Sheeting(int max, int maxLength) {
         public static final Codec<Sheeting> CODEC = RecordCodecBuilder.create(i -> i.group(
@@ -1172,19 +886,6 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
     }
 
     /**
-     * A queen that swells as her colony grows (termites). Her size goes from 0 (just founded) to 1 (full grown, at
-     * {@code fullSizeAtMembers} colony members besides the king); she grows by at most {@code growthPerDay} each day
-     * and never shrinks. From {@code tooBigToWalkAt} on she can no longer walk.
-     */
-    public record QueenBody(int fullSizeAtMembers, float growthPerDay, float tooBigToWalkAt) {
-        public static final Codec<QueenBody> CODEC = RecordCodecBuilder.create(i -> i.group(
-                Codec.INT.fieldOf("full_size_at_members").forGetter(QueenBody::fullSizeAtMembers),
-                Codec.FLOAT.fieldOf("growth_per_day").forGetter(QueenBody::growthPerDay),
-                Codec.FLOAT.fieldOf("too_big_to_walk_at").forGetter(QueenBody::tooBigToWalkAt)
-        ).apply(i, QueenBody::new));
-    }
-
-    /**
      * A founding batch: after the founders have sealed themselves in, the queen lays {@code eggs} eggs, one every
      * {@code eggIntervalTicks}, and the founders (the queen, and the king if the species has one) feed the young on
      * their own body fat (one piece every {@code feedIntervalTicks}), so the first workers need no food from outside.
@@ -1209,87 +910,6 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
     }
 
     /**
-     * A cathedral mound built of termite mound soil (termites; species without it build the ant hill instead). It grows
-     * in {@code maxHeight} stages ({@code MoundPlan}) and is about {@code maxHeight} blocks tall when full-grown. How big
-     * the colony lets it get grows with time: every day it may have {@code blocksPerDay} more blocks, plus
-     * {@code blocksPerDayPerWorker} for each worker (so an old small colony still adds to it slowly, and a big one builds
-     * fast). The soil comes from galleries dug under it: {@code galleryLevels} levels, reaching up to
-     * {@code galleryRadius} blocks out from the shaft. {@code chimneyTripChance}: the share of walks (0 to 1) on which a
-     * termite may come out of or go in by a chimney mouth although there is another way (a foraging hole); on the
-     * others it only uses a mouth when there is no other way (optional, 1: any walk).
-     */
-    public record MoundNumbers(int maxHeight, float blocksPerDay, float blocksPerDayPerWorker, int galleryLevels,
-            int galleryRadius, float chimneyTripChance) {
-        /** The numbers without a chimney trip chance (any walk may use a chimney mouth). */
-        public MoundNumbers(int maxHeight, float blocksPerDay, float blocksPerDayPerWorker, int galleryLevels, int galleryRadius) {
-            this(maxHeight, blocksPerDay, blocksPerDayPerWorker, galleryLevels, galleryRadius, 1.0F);
-        }
-
-        public static final Codec<MoundNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
-                Codec.INT.fieldOf("max_height").forGetter(MoundNumbers::maxHeight),
-                Codec.FLOAT.fieldOf("blocks_per_day").forGetter(MoundNumbers::blocksPerDay),
-                Codec.FLOAT.fieldOf("blocks_per_day_per_worker").forGetter(MoundNumbers::blocksPerDayPerWorker),
-                Codec.INT.fieldOf("gallery_levels").forGetter(MoundNumbers::galleryLevels),
-                Codec.INT.fieldOf("gallery_radius").forGetter(MoundNumbers::galleryRadius),
-                Codec.FLOAT.optionalFieldOf("chimney_trip_chance", 1.0F).forGetter(MoundNumbers::chimneyTripChance)
-        ).apply(i, MoundNumbers::new));
-    }
-
-    /**
-     * A fungus garden (termites): small garden rooms round the royal chamber ({@code NestPlan.gardens}), at most
-     * {@code rooms} of them; the workers dig the first as soon as the colony has workers and one more for every
-     * {@code workersPerRoom} workers. The food the foragers bring in is built into fungus comb there (the profile's food
-     * {@code pile}), and on every comb block a white nodule grows about every {@code noduleTicks} (while it has a ripe
-     * layer and room for one); the nurses feed the nodules to the queen and the young instead of bread.
-     * <p>
-     * The comb ages like the real conveyor: a layer goes on top fresh, ripens after about {@code ripenTicks}, turns old
-     * when a nodule grows from it or after about {@code oldTicks} by itself, and an old layer nobody eats crumbles away
-     * after about {@code crumbleTicks} (see {@code block.FungusCombBlock}).
-     * <p>
-     * Termitomyces mushrooms (step 5c): when a rain ends, a colony whose gardens hold at least {@code mushroomCombLayers}
-     * layers of comb (a healthy garden) sends up one mushroom for every {@code combLayersPerMushroom} layers, at most
-     * {@code maxMushrooms}, on the ground and the mound's lower slopes within {@code mushroomRadius} blocks of the
-     * entrance; each one is a rare giant with the chance {@code giantMushroomChance} (see {@code colony.Mushrooms}).
-     */
-    public record GardenNumbers(int rooms, int workersPerRoom, int noduleTicks, int mushroomCombLayers, int combLayersPerMushroom,
-            int maxMushrooms, int mushroomRadius, float giantMushroomChance, int ripenTicks, int oldTicks, int crumbleTicks) {
-        /** The numbers with the default mushrooms and comb ages. */
-        public GardenNumbers(int rooms, int workersPerRoom, int noduleTicks) {
-            this(rooms, workersPerRoom, noduleTicks, 8, 6, 8, 12, 0.04F, 12000, 48000, 72000);
-        }
-
-        public static final Codec<GardenNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
-                Codec.INT.fieldOf("rooms").forGetter(GardenNumbers::rooms),
-                Codec.INT.fieldOf("workers_per_room").forGetter(GardenNumbers::workersPerRoom),
-                Codec.INT.fieldOf("nodule_ticks").forGetter(GardenNumbers::noduleTicks),
-                Codec.INT.optionalFieldOf("mushroom_comb_layers", 8).forGetter(GardenNumbers::mushroomCombLayers),
-                Codec.INT.optionalFieldOf("comb_layers_per_mushroom", 6).forGetter(GardenNumbers::combLayersPerMushroom),
-                Codec.INT.optionalFieldOf("max_mushrooms", 8).forGetter(GardenNumbers::maxMushrooms),
-                Codec.INT.optionalFieldOf("mushroom_radius", 12).forGetter(GardenNumbers::mushroomRadius),
-                Codec.FLOAT.optionalFieldOf("giant_mushroom_chance", 0.04F).forGetter(GardenNumbers::giantMushroomChance),
-                Codec.INT.optionalFieldOf("ripen_ticks", 12000).forGetter(GardenNumbers::ripenTicks),
-                Codec.INT.optionalFieldOf("old_ticks", 48000).forGetter(GardenNumbers::oldTicks),
-                Codec.INT.optionalFieldOf("crumble_ticks", 72000).forGetter(GardenNumbers::crumbleTicks)
-        ).apply(i, GardenNumbers::new));
-
-        /** How many mushrooms come up after a rain from gardens holding this many layers of comb (none below a healthy garden). */
-        public int mushroomsFor(int combLayers) {
-            if (combLayers < mushroomCombLayers) {
-                return 0;
-            }
-            return Math.max(1, Math.min(maxMushrooms, combLayers / Math.max(1, combLayersPerMushroom)));
-        }
-
-        /** How many garden rooms a colony with this many workers wants (none while it has no workers). */
-        public int roomsFor(int workers) {
-            if (workers <= 0) {
-                return 0;
-            }
-            return Math.min(rooms, 1 + workers / Math.max(1, workersPerRoom));
-        }
-    }
-
-    /**
      * A queen who lays a steady stream of eggs (termites) instead of one egg per meal: as long as she has at least
      * {@code foodPerEgg} pieces of food in her (the queen's {@code meal} is how much she holds), she lays an egg every
      * {@code eggIntervalTicks} while she is small, faster as she swells, every {@code eggIntervalTicksFullSize} once she
@@ -1306,72 +926,6 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
         public int intervalFor(float size) {
             float clamped = Math.max(0.0F, Math.min(1.0F, size));
             return Math.round(eggIntervalTicks + (eggIntervalTicksFullSize - eggIntervalTicks) * clamped);
-        }
-    }
-
-    /**
-     * Soldiers (termites: minor and major soldiers; a species without them has none). The colony wants about
-     * {@code perWorker} soldiers for every worker (0.1: about 1 termite in 10 is a soldier), {@code minorsPerMajor}
-     * minors to every major. When it has fewer than it wants, a new nymph grows into a soldier instead of a worker:
-     * a minor after {@code minorMeal} pieces of food, a major after {@code majorMeal} (a bigger meal). Soldiers cannot
-     * feed themselves (their jaws are too big): they want a piece from a nurse every {@code mealIntervalTicks}, and one
-     * that has gone {@code slowAfterTicks} without moves at half speed. At foraging time the minors go out: one beside
-     * each open way out, and a sentry line along the foragers' trail, one every {@code sentrySpacing} blocks on
-     * alternate sides; when the foraging is over they wait at their posts until the workers are in, at most
-     * {@code escortHomeTicks}, then go in last.
-     */
-    public record SoldierNumbers(float perWorker, int minorsPerMajor, int minorMeal, int majorMeal, int mealIntervalTicks, int slowAfterTicks,
-            int sentrySpacing, int escortHomeTicks) {
-        public static final Codec<SoldierNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
-                Codec.FLOAT.fieldOf("per_worker").forGetter(SoldierNumbers::perWorker),
-                Codec.INT.fieldOf("minors_per_major").forGetter(SoldierNumbers::minorsPerMajor),
-                Codec.INT.fieldOf("minor_meal").forGetter(SoldierNumbers::minorMeal),
-                Codec.INT.fieldOf("major_meal").forGetter(SoldierNumbers::majorMeal),
-                Codec.INT.optionalFieldOf("meal_interval_ticks", 24000).forGetter(SoldierNumbers::mealIntervalTicks),
-                Codec.INT.optionalFieldOf("slow_after_ticks", 48000).forGetter(SoldierNumbers::slowAfterTicks),
-                Codec.INT.optionalFieldOf("sentry_spacing", 3).forGetter(SoldierNumbers::sentrySpacing),
-                Codec.INT.optionalFieldOf("escort_home_ticks", 300).forGetter(SoldierNumbers::escortHomeTicks)
-        ).apply(i, SoldierNumbers::new));
-
-        /** How many minor soldiers a colony with this many workers wants (rounded; 0.5 rounds up). */
-        public int wantedMinors(int workers) {
-            return roundHalfUp(workers * perWorker * minorsPerMajor / (minorsPerMajor + 1.0));
-        }
-
-        /** How many major soldiers a colony with this many workers wants (rounded; 0.5 rounds up). */
-        public int wantedMajors(int workers) {
-            return roundHalfUp(workers * perWorker / (minorsPerMajor + 1.0));
-        }
-
-        private static int roundHalfUp(double value) {
-            return Math.max(0, (int) Math.floor(value + 0.5 + 1.0E-6));
-        }
-    }
-
-    /**
-     * The alarm (species that raise one; see {@code colony.Alarm}). {@code calmTicks}: how long each level (1 footsteps,
-     * 2 an enemy at the foragers, 3 a break-in, 4 repeated break-ins) lasts after the last thing that raised it before it
-     * drops a level. {@code breakInsForLevel4} break-ins within {@code breakInWindowTicks} make it level 4; after a
-     * level 4 the colony wants {@code soldierBoost} times as many soldiers for {@code boostTicks}. A soldier feels the
-     * drumming of another within {@code feelRadius} blocks (through the walls).
-     */
-    public record AlarmNumbers(List<Integer> calmTicks, int breakInsForLevel4, int breakInWindowTicks, float soldierBoost, int boostTicks,
-            int feelRadius) {
-        public static final Codec<AlarmNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
-                Codec.INT.listOf().optionalFieldOf("calm_ticks", List.of(600, 2400, 3600, 24000)).forGetter(AlarmNumbers::calmTicks),
-                Codec.INT.optionalFieldOf("break_ins_for_level_4", 3).forGetter(AlarmNumbers::breakInsForLevel4),
-                Codec.INT.optionalFieldOf("break_in_window_ticks", 6000).forGetter(AlarmNumbers::breakInWindowTicks),
-                Codec.FLOAT.optionalFieldOf("soldier_boost", 2.0F).forGetter(AlarmNumbers::soldierBoost),
-                Codec.INT.optionalFieldOf("boost_ticks", 72000).forGetter(AlarmNumbers::boostTicks),
-                Codec.INT.optionalFieldOf("feel_radius", 6).forGetter(AlarmNumbers::feelRadius)
-        ).apply(i, AlarmNumbers::new));
-
-        /** How long (ticks) this level (1 to 4) lasts after the last thing that raised it. */
-        public int calmTicksFor(int level) {
-            if (calmTicks.isEmpty()) {
-                return 600;
-            }
-            return calmTicks.get(Math.max(0, Math.min(calmTicks.size() - 1, level - 1)));
         }
     }
 
@@ -1552,13 +1106,9 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
             FoodNumbers.CODEC.fieldOf("food").forGetter(SpeciesProfile::food),
             RefuseNumbers.CODEC.fieldOf("refuse").forGetter(SpeciesProfile::refuse),
             NestNumbers.CODEC.fieldOf("nest").forGetter(SpeciesProfile::nest),
-            QueenBody.CODEC.optionalFieldOf("queen_body").forGetter(SpeciesProfile::queenBody),
             Founding.CODEC.optionalFieldOf("founding").forGetter(SpeciesProfile::founding),
-            MoundNumbers.CODEC.optionalFieldOf("mound").forGetter(SpeciesProfile::mound),
-            GardenNumbers.CODEC.optionalFieldOf("garden").forGetter(SpeciesProfile::garden),
+            GardenRooms.CODEC.optionalFieldOf("garden").forGetter(SpeciesProfile::gardenRooms),
             Laying.CODEC.optionalFieldOf("laying").forGetter(SpeciesProfile::laying),
-            SoldierNumbers.CODEC.optionalFieldOf("soldiers").forGetter(SpeciesProfile::soldiers),
-            AlarmNumbers.CODEC.optionalFieldOf("alarm").forGetter(SpeciesProfile::alarm),
             BodyLanguage.CODEC.optionalFieldOf("body_language").forGetter(SpeciesProfile::bodyLanguage),
             Codec.STRING.listOf().optionalFieldOf("parts", List.of()).forGetter(SpeciesProfile::parts)
     ).apply(i, SpeciesProfile::new));

@@ -51,9 +51,9 @@ class Meals {
             var worker = colony.profile().worker();
             return worker.eats() && worker.mealIntervalTicks() > 0 ? new Diet(worker.mealIntervalTicks(), worker.starveAfterTicks(), true) : null;
         }
-        var soldiers = colony.profile().soldiers().orElse(null);
-        boolean soldier = colony.isOwnCaste(caste);
-        return soldier && soldiers != null && soldiers.mealIntervalTicks() > 0 ? new Diet(soldiers.mealIntervalTicks(), 0, false) : null;
+        ColonyHooks.Castes castes = colony.isOwnCaste(caste) ? colony.hooks().first(ColonyHooks.CASTES) : null;
+        int interval = castes == null ? 0 : castes.mealIntervalTicks(caste);
+        return interval > 0 ? new Diet(interval, 0, false) : null;
     }
 
     private static long minute(long time) {

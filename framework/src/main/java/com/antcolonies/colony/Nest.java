@@ -251,7 +251,7 @@ public class Nest {
 
     /** The garden rooms the colony wants dug now: the first, and one more for every few workers (the profile's {@code garden}). */
     private List<NestPlan.Chamber> wantedGardens(NestLayout layout) {
-        var garden = colony.profile().garden();
+        var garden = colony.profile().gardenRooms();
         if (garden.isEmpty()) {
             return List.of();
         }

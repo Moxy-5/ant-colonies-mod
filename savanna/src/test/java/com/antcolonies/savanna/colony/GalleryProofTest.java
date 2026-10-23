@@ -22,6 +22,8 @@ import com.antcolonies.nav.Foothold;
 import com.antcolonies.nav.Route;
 import com.antcolonies.species.SpeciesProfile;
 
+import com.antcolonies.savanna.species.SavannaNumbers;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 
@@ -452,7 +454,7 @@ class GalleryProofTest {
      */
     @Test
     void wholeWebsGrownTipByTipCanAllBeWalkedAndNeverOpenToTheSky() {
-        SpeciesProfile.GalleryNumbers numbers = new SpeciesProfile.GalleryNumbers(true, 16, 4, 6, 0.5, 6, 2);
+        SavannaNumbers.GalleryNumbers numbers = new SavannaNumbers.GalleryNumbers(true, 16, 4, 6, 0.5, 6, 2);
         int landscapes = 0;
         int pieces = 0;
         int forks = 0;

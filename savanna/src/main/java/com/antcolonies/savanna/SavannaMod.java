@@ -1,6 +1,7 @@
 package com.antcolonies.savanna;
 
 import com.antcolonies.savanna.colony.SavannaParts;
+import com.antcolonies.savanna.species.SavannaNumbers;
 import com.antcolonies.savanna.gametest.SavannaTests;
 import com.antcolonies.savanna.registry.SavannaBlocks;
 import com.antcolonies.savanna.registry.SavannaEntities;
@@ -41,6 +42,7 @@ public class SavannaMod {
         SavannaStructures.STRUCTURE_PIECES.register(modEventBus);
         SavannaEntities.ENTITY_TYPES.register(modEventBus);
         SavannaItems.ITEMS.register(modEventBus);
+        SavannaNumbers.signUp(); // its own sections of the species files (Apex part 3, T1), before they load
         SavannaParts.signUp();
         SavannaEvents.signUpCreativeTab();
         SavannaTests.signUp();

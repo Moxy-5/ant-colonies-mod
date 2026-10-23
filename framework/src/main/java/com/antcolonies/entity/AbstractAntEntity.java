@@ -888,8 +888,9 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
 
     /**
      * How this insect would like to walk this time (asked by the legs once for each new walk; they give way when no
-     * route keeps to them). A termite comes out of or goes in by a chimney's mouth only on some walks (the profile's
-     * {@code mound.chimney_trip_chance}, about 1 in 10): on the others it takes another way, such as a foraging hole,
+     * route keeps to them). An insect comes out of or goes in by a chimney's mouth only on some walks (its colony's
+     * structure says how often, {@code ColonyHooks.Structure#mouthTripChance}; termites about 1 in 10): on the others
+     * it takes another way, such as a foraging hole,
      * if there is one.
      */
     public AntPathFinder.StepCosts walkHabits() {
@@ -897,7 +898,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             return habitsForTests;
         }
         Colony colony = getColony();
-        float chance = colony == null ? 1.0F : colony.profile().mound().map(SpeciesProfile.MoundNumbers::chimneyTripChance).orElse(1.0F);
+        ColonyHooks.Structure structure = colony == null ? null : colony.hooks().first(ColonyHooks.STRUCTURE);
+        float chance = structure == null ? 1.0F : structure.mouthTripChance();
         return chance >= 1.0F || getRandom().nextFloat() < chance ? AntPathFinder.StepCosts.NONE : Doorway.avoidMouths(level());
     }
 

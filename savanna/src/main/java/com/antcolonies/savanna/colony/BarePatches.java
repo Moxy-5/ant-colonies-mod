@@ -9,6 +9,8 @@ import java.util.List;
 
 import com.antcolonies.species.SpeciesProfile;
 
+import com.antcolonies.savanna.species.SavannaNumbers;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -65,7 +67,7 @@ public class BarePatches {
 
     /** As above; {@code eatenAt}: when it was eaten (the numbers may have eaten it while its land was not loaded). */
     void eatenAway(Level level, BlockPos pos, BlockState eaten, long eatenAt) {
-        SpeciesProfile.Regrowth numbers = colony.profile().food().regrowth().orElse(null);
+        SavannaNumbers.Regrowth numbers = colony.profile().section(SavannaNumbers.REGROWTH).orElse(null);
         if (numbers == null || !numbers.regrows(eaten)) {
             return;
         }
@@ -108,7 +110,7 @@ public class BarePatches {
             return;
         }
         nextCheck = level.getGameTime() + CHECK_TICKS;
-        SpeciesProfile.Regrowth numbers = colony.profile().food().regrowth().orElse(null);
+        SavannaNumbers.Regrowth numbers = colony.profile().section(SavannaNumbers.REGROWTH).orElse(null);
         BlockState young = numbers == null ? null : numbers.growsBackState();
         long now = level.getGameTime();
         List<Tuft> later = new ArrayList<>();
@@ -152,7 +154,7 @@ public class BarePatches {
 
     /** The ground made bare under a tuft turns back to grass (the grass spreads in again as the tuft grows back). */
     private void unbare(Level level, Tuft tuft) {
-        SpeciesProfile.Regrowth numbers = colony.profile().food().regrowth().orElse(null);
+        SavannaNumbers.Regrowth numbers = colony.profile().section(SavannaNumbers.REGROWTH).orElse(null);
         BlockState bareGround = numbers == null ? null : numbers.bareGroundState();
         BlockPos ground = tuft.spot().below();
         if (tuft.madeBare() && bareGround != null && level.getBlockState(ground).is(bareGround.getBlock())

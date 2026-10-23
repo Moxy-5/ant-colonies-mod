@@ -15,6 +15,8 @@ import java.util.function.UnaryOperator;
 
 import com.antcolonies.colony.ColonyParts.Type;
 
+import com.antcolonies.savanna.species.SavannaNumbers;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
@@ -85,6 +87,11 @@ public final class SavannaParts {
                 @Override
                 public void addInside(Level level, Set<BlockPos> cells, Set<BlockPos> channels) {
                     mound.addInside(level, cells, channels);
+                }
+
+                @Override
+                public float mouthTripChance() {
+                    return mound.numbers() == null ? 1.0F : mound.numbers().chimneyTripChance(); // the mound's own numbers (T1)
                 }
 
                 @Override
@@ -171,6 +178,11 @@ public final class SavannaParts {
                 }
 
                 @Override
+                public int mealIntervalTicks(String caste) {
+                    return soldiers.numbers() == null ? 0 : soldiers.numbers().mealIntervalTicks(); // the soldiers' own numbers (T1)
+                }
+
+                @Override
                 public String wanted(Level level) {
                     com.antcolonies.savanna.entity.TermiteSoldierEntity.Rank rank = soldiers.rankForNewNymph(level);
                     return rank == null ? null : rank.caste();
@@ -243,7 +255,7 @@ public final class SavannaParts {
     public static final Type<BarePatches> BARE_PATCHES = listed("bare_patches", BarePatches::new, part -> part
             .ticks(110, BarePatches::tick)
             .hears(ColonyNews.PLANT_EATEN, 10, (patches, level, news) -> patches.eatenAway(level, news.where(), news.eaten(), news.eatenAt()))
-            .plugs(ColonyHooks.LIST_HOLES, 30, patches -> level -> patches.colony().profile().food().regrowth().isPresent() ? ", " + patches.describe() : "")
+            .plugs(ColonyHooks.LIST_HOLES, 30, patches -> level -> patches.colony().profile().section(SavannaNumbers.REGROWTH).isPresent() ? ", " + patches.describe() : "")
             .saves(BarePatches::save, BarePatches::load)
             .sample(BarePatches::fillForTests));
 

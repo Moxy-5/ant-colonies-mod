@@ -13,6 +13,8 @@ import com.antcolonies.entity.goal.SealEntranceGoal;
 import com.antcolonies.savanna.SavannaSpecies;
 import com.antcolonies.species.SpeciesProfile;
 
+import com.antcolonies.savanna.species.SavannaNumbers;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -120,7 +122,7 @@ public class TermiteQueenEntity extends AbstractAntEntity implements SwellingQue
             return false;
         }
         Colony colony = ColonyManager.get(serverLevel).getColony(getColonyId());
-        Optional<SpeciesProfile.QueenBody> body = colony == null ? Optional.empty() : colony.profile().queenBody();
+        Optional<SavannaNumbers.QueenBody> body = colony == null ? Optional.empty() : colony.profile().section(SavannaNumbers.QUEEN_BODY);
         return body.isPresent() && getSize() >= body.get().tooBigToWalkAt();
     }
 
@@ -165,7 +167,7 @@ public class TermiteQueenEntity extends AbstractAntEntity implements SwellingQue
                     colony.queenCare().layStreamEgg(serverLevel, at.x, getY(), at.z, getSize());
                     manager.markChanged();
                 }
-                colony.profile().queenBody().ifPresent(body -> {
+                colony.profile().section(SavannaNumbers.QUEEN_BODY).ifPresent(body -> {
                     int members = colony.getMemberCount() - colony.getCount(TermiteKingEntity.CASTE);
                     float target = Math.min(1.0F, members / (float) Math.max(1, body.fullSizeAtMembers()));
                     float step = body.growthPerDay() / 1200.0F; // a day is 1200 seconds

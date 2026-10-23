@@ -15,7 +15,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.entity.AbstractAntEntity;
-import com.antcolonies.species.SpeciesProfile;
+import com.antcolonies.desert.species.DesertNumbers;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -103,8 +103,8 @@ public class Door {
     }
 
     @Nullable
-    private SpeciesProfile.DoorNumbers numbers() {
-        return colony.profile().food().door().orElse(null);
+    private DesertNumbers.DoorNumbers numbers() {
+        return colony.profile().section(DesertNumbers.DOOR).orElse(null);
     }
 
     /** Whether the door holds the foragers back (with the patrollers only: they open it each round). */
@@ -124,7 +124,7 @@ public class Door {
         return realForagers + colony.field().foragersInside(level);
     }
 
-    private boolean isSmall(ServerLevel level, SpeciesProfile.DoorNumbers numbers) {
+    private boolean isSmall(ServerLevel level, DesertNumbers.DoorNumbers numbers) {
         return foragers(level) < numbers.smallColonyForagers();
     }
 
@@ -144,7 +144,7 @@ public class Door {
      * carry on.
      */
     public boolean mayGo(ServerLevel level, AbstractAntEntity ant) {
-        SpeciesProfile.DoorNumbers numbers = numbers();
+        DesertNumbers.DoorNumbers numbers = numbers();
         if (numbers == null || !isOn(level)) {
             return true;
         }
@@ -195,7 +195,7 @@ public class Door {
      * waiting ants it passes, once each this trip.
      */
     public void homecomer(ServerLevel level, AbstractAntEntity ant, boolean withFood) {
-        SpeciesProfile.DoorNumbers numbers = numbers();
+        DesertNumbers.DoorNumbers numbers = numbers();
         if (numbers == null || !isOn(level)) {
             return;
         }
@@ -285,7 +285,7 @@ public class Door {
 
     /** Once a second (here only): trips that are over, old touches gone, the real foragers counted. */
     void tick(ServerLevel level) {
-        SpeciesProfile.DoorNumbers numbers = numbers();
+        DesertNumbers.DoorNumbers numbers = numbers();
         if (numbers == null) {
             return;
         }
@@ -344,7 +344,7 @@ public class Door {
     }
 
     /** The real foragers counted, and whether the colony is small (under {@code small_colony_foragers}). */
-    private void countForagers(ServerLevel level, SpeciesProfile.DoorNumbers numbers) {
+    private void countForagers(ServerLevel level, DesertNumbers.DoorNumbers numbers) {
         int count = 0;
         BlockPos center = colony.getCenter();
         int radius = colony.searchReach();
@@ -377,7 +377,7 @@ public class Door {
      * (they touch nobody). New ones go out by the touches, up to the day's share of the {@code foragers}.
      */
     void numbersSecond(ServerLevel level, int foragers, int returned, double placed) {
-        SpeciesProfile.DoorNumbers numbers = numbers();
+        DesertNumbers.DoorNumbers numbers = numbers();
         if (numbers == null || !isOn(level)) {
             numbersOut = 0;
             return;
@@ -412,7 +412,7 @@ public class Door {
      * memory (the touches of the window spread over the waiting ones, a Poisson guess). A small colony: every waiting
      * one goes at any homecoming.
      */
-    static double step(SpeciesProfile.DoorNumbers numbers, int foragers, double out, double placed, int homecomings,
+    static double step(DesertNumbers.DoorNumbers numbers, int foragers, double out, double placed, int homecomings,
             int windowTouches, boolean small, float share) {
         double idle = Math.max(0, Math.min(foragers, out) - placed);
         out = Math.max(0, out - idle * 20.0 / FieldLife.TRIP_TICKS);
@@ -445,7 +445,7 @@ public class Door {
         return Math.max(0, 1.0 - below);
     }
 
-    private int windowTouches(SpeciesProfile.DoorNumbers numbers, long now) {
+    private int windowTouches(DesertNumbers.DoorNumbers numbers, long now) {
         while (!window.isEmpty() && (window.peekFirst()[0] <= now - numbers.touchMemoryTicks() || window.peekFirst()[0] > now)) {
             window.removeFirst();
         }
@@ -457,7 +457,7 @@ public class Door {
     }
 
     /** Each real ant waiting by the entrance is touched by the numbers' homecomings in its share. */
-    private void touchRealWaiting(ServerLevel level, SpeciesProfile.DoorNumbers numbers, int returned, int foragers) {
+    private void touchRealWaiting(ServerLevel level, DesertNumbers.DoorNumbers numbers, int returned, int foragers) {
         BlockPos entrance = colony.nest().getEntrance();
         List<AbstractAntEntity> waiting = level.getEntitiesOfClass(AbstractAntEntity.class,
                 new AABB(entrance).inflate(Math.max(2, colony.profile().worker().restNearEntrance())),

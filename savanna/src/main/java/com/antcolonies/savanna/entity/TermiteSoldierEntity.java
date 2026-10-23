@@ -19,6 +19,8 @@ import com.antcolonies.savanna.entity.goal.GuardPostGoal;
 import com.antcolonies.savanna.SavannaSpecies;
 import com.antcolonies.species.SpeciesProfile;
 
+import com.antcolonies.savanna.species.SavannaNumbers;
+
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -99,7 +101,7 @@ public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurs
     /** How close (in blocks) a termite colony must be for a soldier put down with a spawn egg to join it. */
     private static final double JOIN_RADIUS = 32.0;
     /** The soldiers' numbers when the colony has none in its profile (or there is no colony): the termite file's own. */
-    private static final SpeciesProfile.SoldierNumbers DEFAULT_NUMBERS = new SpeciesProfile.SoldierNumbers(0.1F, 3, 6, 10, 24000, 48000, 3, 300);
+    private static final SavannaNumbers.SoldierNumbers DEFAULT_NUMBERS = new SavannaNumbers.SoldierNumbers(0.1F, 3, 6, 10, 24000, 48000, 3, 300);
     private static final ResourceLocation HUNGRY_SLOWDOWN = ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "soldier_hungry");
     private static final RawAnimation HEAD_BANG = RawAnimation.begin().thenLoop("head_bang");
     private static final RawAnimation BITE = RawAnimation.begin().thenPlay("bite");
@@ -230,9 +232,9 @@ public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurs
     }
 
     /** The colony's soldier numbers (the termites' own while it has no colony). */
-    private SpeciesProfile.SoldierNumbers numbers() {
+    private SavannaNumbers.SoldierNumbers numbers() {
         Colony colony = getColony();
-        return colony == null ? DEFAULT_NUMBERS : colony.profile().soldiers().orElse(DEFAULT_NUMBERS);
+        return colony == null ? DEFAULT_NUMBERS : colony.profile().section(SavannaNumbers.SOLDIERS).orElse(DEFAULT_NUMBERS);
     }
 
     // --- food: a nurse brings it --------------------------------------------------------------------------------

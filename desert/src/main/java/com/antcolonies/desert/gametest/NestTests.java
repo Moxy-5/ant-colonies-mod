@@ -23,6 +23,7 @@ import com.antcolonies.desert.entity.QueenAntEntity;
 import com.antcolonies.desert.entity.WorkerAntEntity;
 import com.antcolonies.desert.registry.DesertBlocks;
 import com.antcolonies.desert.registry.DesertEntities;
+import com.antcolonies.desert.species.DesertNumbers;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -104,7 +105,7 @@ public class NestTests {
                     }
                 }
                 int waiting = colony.part(DesertParts.HILL).orElseThrow().nightSoil().waiting(level);
-                int room = cells.size() * colony.profile().nest().nightSoil().layersPerCell();
+                int room = cells.size() * colony.profile().section(DesertNumbers.NIGHT_SOIL).orElse(DesertNumbers.NightSoilNumbers.DEFAULT).layersPerCell();
                 if (waiting > room) {
                     pileProblem[0] = waiting + " pellets wait in piles that hold " + room + " (tick " + helper.getTick() + ")";
                 }

@@ -15,19 +15,22 @@ import com.antcolonies.colony.NestPlan;
 import com.antcolonies.species.SpeciesProfile;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
-import com.mojang.serialization.JsonOps;
 
 /**
  * Checks that the red harvester ant's species file reads without errors and holds sensible numbers (moved out of the
  * savanna's SpeciesProfileTest with the file, the split, step S7; every check kept).
  */
 class HarvesterProfileTest {
-    private static SpeciesProfile read(String name) throws Exception {
+    private static JsonElement json(String name) throws Exception {
         try (InputStream in = HarvesterProfileTest.class.getResourceAsStream("/data/desertcolonies/species/" + name + ".json")) {
             assertNotNull(in, "no file data/desertcolonies/species/" + name + ".json");
-            JsonElement json = JsonParser.parseReader(new InputStreamReader(in, StandardCharsets.UTF_8));
-            return SpeciesProfile.CODEC.parse(JsonOps.INSTANCE, json).getOrThrow(error -> new AssertionError(name + ": " + error));
+            return JsonParser.parseReader(new InputStreamReader(in, StandardCharsets.UTF_8));
         }
+    }
+
+    private static SpeciesProfile read(String name) throws Exception {
+        DesertNumbers.signUp(); // its own sections are read too (Apex part 3, T1)
+        return SpeciesProfile.read(json(name)).getOrThrow(error -> new AssertionError(name + ": " + error));
     }
 
     @Test
@@ -40,6 +43,17 @@ class HarvesterProfileTest {
                 "the built-in harvester numbers (used when its file is broken) have the same parts as its file");
     }
 
+    /** Apex part 3, T1: the desert mod reads its own sections of the file. */
+    @Test
+    void theDesertModReadsItsOwnSectionsOfTheFile() throws Exception {
+        SpeciesProfile profile = read("red_harvester_ant");
+        for (com.antcolonies.species.SpeciesSection<?> section : java.util.List.of(DesertNumbers.DOOR, DesertNumbers.PATROL,
+                DesertNumbers.TRUNK, DesertNumbers.NIGHT_SOIL)) {
+            assertTrue(profile.section(section).isPresent(), "the harvester file's " + section + " is read");
+        }
+        assertTrue(profile.gardenRooms().isEmpty(), "harvester ants grow no fungus");
+    }
+
     @Test
     void theRedHarvesterAntFileReadsAndItsNumbersMakeSense() throws Exception {
         SpeciesProfile profile = read("red_harvester_ant");
@@ -49,7 +63,7 @@ class HarvesterProfileTest {
                 && profile.worker().slowAfterTicks() < profile.worker().starveAfterTicks(), "a worker must get hungry before it slows down, and slow down before it starves");
         assertTrue(profile.food().radius() > 0 && profile.food().plants().get(0).pieces() > 0 && profile.food().makesBread());
         assertEquals(4, profile.nest().maxLevels());
-        assertTrue(profile.queenBody().isEmpty(), "the ant queen does not swell");
+        assertFalse(json("red_harvester_ant").getAsJsonObject().has("queen_body"), "the ant queen does not swell");
         assertTrue(profile.founding().isPresent() && profile.founding().get().eggs() == 3, "the ant queen raises 3 eggs on her own fat");
         assertTrue(profile.nest().sealWhileFounding() && profile.nest().foundingChamber(), "the ant queen seals herself into a founding chamber");
         assertEquals(NestPlan.RoomSizes.DEFAULT, profile.nest().roomSizes(), "the file lists the room sizes nests have always had");
@@ -57,8 +71,8 @@ class HarvesterProfileTest {
 
     @Test
     void harvesterAntsHaveNoSoldiersAndSearchAlone() throws Exception {
-        assertTrue(read("red_harvester_ant").soldiers().isEmpty(), "harvester ants have no soldier caste");
-        assertTrue(read("red_harvester_ant").alarm().isEmpty(), "harvester ants raise no alarm yet (their workers are unchanged)");
+        assertFalse(json("red_harvester_ant").getAsJsonObject().has("soldiers"), "harvester ants have no soldier caste");
+        assertFalse(json("red_harvester_ant").getAsJsonObject().has("alarm"), "harvester ants raise no alarm yet (their workers are unchanged)");
         // Brain step 4c (the user's decision): harvester ants no longer know every plant round the nest; each searches alone.
         assertTrue(read("red_harvester_ant").food().findRadius() > 0, "harvester ants find their food by looking too");
         assertTrue(read("red_harvester_ant").food().search().map(search -> search.alone()).orElse(false), "harvester ants search alone");
@@ -81,7 +95,7 @@ class HarvesterProfileTest {
     void aTrailReachesAsFarAsItsTrafficHolds() throws Exception {
         SpeciesProfile profile = read("red_harvester_ant");
         SpeciesProfile.Trails trails = profile.food().trails();
-        SpeciesProfile.TrunkNumbers trunk = trails.trunk().orElseThrow();
+        DesertNumbers.TrunkNumbers trunk = profile.section(DesertNumbers.TRUNK).orElseThrow();
         assertEquals(12, profile.food().radius(), "a young colony reaches about 12 blocks");
         assertEquals(96, trunk.mostLength());
         assertEquals(trunk.start(), trunk.holds(0, trails.halfLifeTicks()), 1e-9, "an unused trail holds nothing past its start");
@@ -119,7 +133,7 @@ class HarvesterProfileTest {
     @Test
     void foragersGoOutWhenTheirProfileSays() {
         SpeciesProfile.FoodNumbers ant = HarvesterBuiltIn.NUMBERS.food();
-        SpeciesProfile.FoodNumbers termite = new SpeciesProfile.FoodNumbers(24, "x", java.util.List.of(), "x", "x", 0, 0, java.util.List.of("night", "rain"), 0, java.util.Optional.empty());
+        SpeciesProfile.FoodNumbers termite = new SpeciesProfile.FoodNumbers(24, "x", java.util.List.of(), "x", "x", 0, 0, java.util.List.of("night", "rain"), 0);
         for (boolean day : new boolean[] {true, false}) {
             for (boolean rain : new boolean[] {true, false}) {
                 assertTrue(ant.foragesNow(day, rain), "the harvester ant forages at any time");

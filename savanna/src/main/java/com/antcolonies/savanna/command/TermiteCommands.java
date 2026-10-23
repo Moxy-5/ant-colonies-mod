@@ -16,6 +16,8 @@ import com.antcolonies.savanna.colony.Mushrooms;
 import com.antcolonies.savanna.entity.TermiteQueenEntity;
 import com.antcolonies.savanna.entity.TermiteSoldierEntity;
 import com.antcolonies.savanna.registry.SavannaBlocks;
+
+import com.antcolonies.savanna.species.SavannaNumbers;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 
 import java.util.Comparator;
@@ -146,7 +148,7 @@ public class TermiteCommands {
         int wanted = count > 0 ? count : mushrooms.wanted(level);
         if (wanted == 0) {
             source.sendSuccess(() -> Component.literal("The garden is not healthy yet: it has " + garden.countCombLayers(level)
-                    + " layers of comb, mushrooms need " + colony.profile().garden().get().mushroomCombLayers() + ". None came up."), false);
+                    + " layers of comb, mushrooms need " + colony.profile().section(SavannaNumbers.GARDEN).get().mushroomCombLayers() + ". None came up."), false);
             return 1;
         }
         int sprouted = mushrooms.sprout(level, wanted, giants);

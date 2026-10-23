@@ -12,7 +12,7 @@ import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.desert.colony.DesertParts;
 import com.antcolonies.desert.colony.Patrol;
 import com.antcolonies.entity.AbstractAntEntity;
-import com.antcolonies.species.SpeciesProfile;
+import com.antcolonies.desert.species.DesertNumbers;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -187,7 +187,7 @@ public class PatrolGoal extends Goal {
 
     /** Hurt (see {@code AbstractAntEntity.hurt}), a hostile mob close, or another colony's ants: it turns for home. */
     private void lookForTrouble(ServerLevel level) {
-        SpeciesProfile.PatrolNumbers numbers = colony.profile().food().patrol().orElse(null);
+        DesertNumbers.PatrolNumbers numbers = colony.profile().section(DesertNumbers.PATROL).orElse(null);
         double hostile = numbers == null ? 4.0 : numbers.hostileWithin();
         boolean danger = !level.getEntitiesOfClass(Mob.class, ant.getBoundingBox().inflate(hostile),
                 mob -> mob.isAlive() && !(mob instanceof AbstractAntEntity)

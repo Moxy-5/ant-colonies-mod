@@ -9,7 +9,6 @@ import java.util.Set;
 import com.antcolonies.ColonyFrameworkMod;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
-import com.mojang.serialization.JsonOps;
 
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.ResourceManager;
@@ -40,7 +39,7 @@ public class SpeciesProfiles extends SimpleJsonResourceReloadListener {
     @Override
     protected void apply(Map<ResourceLocation, JsonElement> files, ResourceManager resources, ProfilerFiller profiler) {
         Map<ResourceLocation, SpeciesProfile> loaded = new HashMap<>();
-        files.forEach((id, json) -> SpeciesProfile.CODEC.parse(JsonOps.INSTANCE, json)
+        files.forEach((id, json) -> SpeciesProfile.read(json) // the shared numbers, then each species mod's own sections (Apex part 3, T1)
                 .resultOrPartial(error -> ColonyFrameworkMod.LOGGER.error("Species profile {} is broken, using the built-in numbers: {}", id, error))
                 .ifPresent(profile -> loaded.put(id, profile)));
         // A part name nothing signed up stops the loading here, with a clear message (Project Apex, colony parts step 2).

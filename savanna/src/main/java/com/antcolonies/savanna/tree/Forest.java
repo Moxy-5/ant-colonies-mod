@@ -15,6 +15,8 @@ import com.antcolonies.savanna.registry.TreeBlocks;
 import com.antcolonies.savanna.worldgen.FallenBranchFeature;
 import com.antcolonies.savanna.worldgen.TreePlacer;
 
+import com.antcolonies.savanna.species.SavannaNumbers;
+
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongAVLTreeSet;
@@ -640,7 +642,7 @@ public class Forest extends SavedData {
      */
     public static boolean termitesUnder(ServerLevel level, BlockPos foot) {
         for (Colony colony : ColonyManager.get(level).getColonies()) {
-            if (colony.profile().garden().isEmpty()) {
+            if (colony.profile().section(SavannaNumbers.GARDEN).isEmpty()) {
                 continue;
             }
             double dx = colony.getCenter().getX() - foot.getX(), dz = colony.getCenter().getZ() - foot.getZ();
