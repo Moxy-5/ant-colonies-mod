@@ -227,6 +227,12 @@ it.** If a decision changes, ask the user first, then update it here. The short 
 
 ## Core systems
 
+### Architecture: three mods (the split, Project Apex part 2, built 2026-10-22 to 2026-10-23; plan `docs/plans/mod-split.md`)
+- **One repository, three mods**, three Gradle subprojects built and tested together by the root's same commands: `framework\` (**Colony Framework**, `colonyframework`, package `com.antcolonies.*`), `savanna\` (**Ant & Termite Colonies**, keeps `antcolonies` so termite, mound, garden and tree saves keep their names; `com.antcolonies.savanna.*`: termites, giant trees, the Matabele ants in M8, savanna life) and `desert\` (**Desert Colonies**, `desertcolonies`, `com.antcolonies.desert.*`: the red harvester ant; its old names were not forwarded, the user's call: old test worlds may be deleted).
+- **The walls:** the framework names no species and the two species mods see only the framework, never each other (the compiler refuses it). Each mod also runs alone with the framework (`-PspeciesMods=savanna|desert`, `ANTCOLONIES_MODS`), so the harvester can leave this repository with a clean cut.
+- **How a species plugs in:** its colony parts (signed up into `ColonyParts`, picked by the species file's `"parts"` list), the parts' questions, news and hooks, its bodies' table (`SpeciesBodies`), its body plans (`BodyPlans.signUp`), its own sub-commands under the one `/antcolonies` command, its own game tests and categories (`TestFilter` sign-ups). The framework signs up only the shared egg (`colonyframework:ant_egg`) and the shared tags (`colonyframework:diggable`, `seeds`, ...), which each species mod fills with its own entries.
+- **Left for Apex part 3:** the species' number groups still sit in the framework's species-file reader (only numbers; the user's call 4, moved before M8), and the legs and body tests still ride on the harvester ant (`apex.md` step 13, before it leaves).
+
 ### Colony brain
 - Each colony has a server-side brain storing: id, species, queen (and king) UUIDs, member count, stored food, growth stage, nest plan (chamber positions), territory center and radius.
 - Must survive save/reload (use SavedData). Queens and colony members never despawn.

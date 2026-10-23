@@ -207,6 +207,7 @@ starts and passes the harvester tests. This is what makes the harvester's later 
 **S10. The full check and the merge** (about 2 hours). Full run, the stress test before and after (nothing is meant to
 get faster; checked once in case), guard films, notes (`CLAUDE.md` "Tech
 stack" and folders, `docs/DESIGN.md` architecture, `docs/HISTORY.md`).
+**BUILT 2026-10-23** (round 5, `docs/HISTORY.md`): `./gradlew build` passes (170 unit tests); **full run on 6 servers 143 of 143** (12 minutes, also the check of S9); stress test 3 runs of `master` (before the split) and 3 of this branch taking turns, every 5-second window (228 a side, every termite ticking): colony brain 0.365 ms a tick before, 0.374 after; the whole mod without route searches 1.76 before, 1.75 after; route searches 0.56 before, 0.47 after (the known bursts): the same, as expected; guard films 15 of 15 scenes, 0 pictures changed (drawing 400 ants 33 ms a frame, 25 to 27 when first measured: the body code is untouched, so read as the PC's state; noted only); notes: `CLAUDE.md` "Tech stack" and architecture, `docs/DESIGN.md` "Architecture: three mods". No game code changed. Next: the user's one in-game test, then the merge into `master` with the user's OK.
 **The user's in-game test 2** (about 30 minutes, termites only, a new world).
 **Then merge block 2 into `master`** with the user's OK.
 
