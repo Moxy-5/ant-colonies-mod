@@ -188,12 +188,14 @@ def trees_page(out):
 
 
 def matabele_page(out):
-    """The Matabele looks (A, B, C) as majors and minors, and the game's own models beside them for size (their model
+    """The Matabele head options (A, B, C) as majors and minors, and the game's own models beside them for size (their model
     files, textures and the sizes their renderers draw them at)."""
     import matabele_models as mm
-    data = {"looks": {}, "major": mm.model(), "minor": mm.model(minor=True), "refs": []}
-    for key, look in mm.LOOKS.items():
-        data["looks"][key] = {"name": look["name"], "note": look["note"], "texture": uri(mm.png(mm.texture_rows(key)))}
+    data = {"looks": {}, "refs": []}
+    texture = uri(mm.png(mm.texture_rows("A")))
+    for key, head in mm.HEADS.items():          # the head options, each as a major and a minor, the look the user picked
+        data["looks"][key] = {"name": head["name"], "note": head["note"], "texture": texture,
+                              "major": mm.model(head=key), "minor": mm.model(minor=True, head=key)}
     for mod, model, scale, label in (("desert", "worker_ant", 0.65, "Harvester worker"),
                                      ("savanna", "termite_worker", 0.75, "Termite worker"),
                                      ("savanna", "termite_major_soldier", 0.75, "Termite major soldier")):
