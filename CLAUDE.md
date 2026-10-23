@@ -185,6 +185,7 @@ A Minecraft mod where ants and termites live as real colonies: they dig, build, 
 - **Apex part 3, T3 + T4 merged into `claude/apex-termites` 2026-10-23** (clean merge, build passes); the cut-off nurse fix (she would try every 20 s in place of 2) waits for the user's call. Next: T5's full check.
 - **Apex part 3, T5, the full check, BUILT 2026-10-23** (branch `claude/apex-termites`, T1 to T5 all in): full run 142 of 143 on 6 servers (the old harvester neighbours flake, `docs/BUGS.md` 68, 6 of 6 alone); speed the same as `master` within the noise, failed route searches halved; guard films 15 of 15 unchanged; anim lab unchanged. **Apex part 3 is ready for the user's in-game test (termites, a new world), then the merge into `master` with the user's OK**; the cut-off nurse fix waits for the user's call.
 - **The cut-off nurse fix moved to M8.5 (the user, 2026-10-23):** a termite nurse cut off from her queen keeps trying every 2 seconds for now; trying every 20 seconds (fewer failed route searches, up to 18 seconds slower back once a way opens) is to be picked up with M8.5's polish (`docs/plans/apex-termites.md`).
+- **Apex part 3 (T1 to T5) confirmed in-game by the user 2026-10-23 ("everything works") and merged into `master` the same day with the user's OK.** Next: M8, the Matabele ants and the first fights.
 
 ## Other notes files (read only when the task needs them)
 - `docs/DESIGN.md`: every design decision for the species and shared systems (read the section for a feature before working on it).
