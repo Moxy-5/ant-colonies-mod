@@ -188,6 +188,7 @@ A Minecraft mod where ants and termites live as real colonies: they dig, build, 
 - **The cut-off nurse fix moved to M8.5 (the user, 2026-10-23):** a termite nurse cut off from her queen keeps trying every 2 seconds for now; trying every 20 seconds (fewer failed route searches, up to 18 seconds slower back once a way opens) is to be picked up with M8.5's polish (`docs/plans/apex-termites.md`).
 - **Apex part 3 (T1 to T5) confirmed in-game by the user 2026-10-23 ("everything works") and merged into `master` the same day with the user's OK.** Next: M8, the Matabele ants and the first fights.
 - **M8 step 1 started 2026-10-23** (branch `claude/m8-matabele`): the Matabele ant's model in `tools/matabele_models.py`, three looks (A matt, B satin, C rust-brown tips) as major and minor in `python tools/model_viewer.py matabele`, with size sliders (the user plans big ants, size open); waiting for the user's pick of look and size; nothing in-game yet.
+- **M8 step 1, the Matabele model redrawn 2026-10-23** from the user's photo and Empires of the Undergrowth picture: longer, curved jaws, its own shape; looks A (the photo) and B (the game); the major starts at twice the termite major (1.5 blocks); waiting for the user's look.
 
 ## Other notes files (read only when the task needs them)
 - `docs/DESIGN.md`: every design decision for the species and shared systems (read the section for a feature before working on it).

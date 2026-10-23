@@ -34,7 +34,7 @@
 <body>
 <header>
   <h1>Matabele ant viewer</h1>
-  <p>Three looks for the Matabele ant, each as a big major (left) and a small minor (right), in front of the game's own
+  <p>Two looks for the Matabele ant, each as a big major (left) and a small minor (right), in front of the game's own
      insects at their game sizes and a player's height. The grid lines are one block apart. Drag to turn, scroll or pinch
      to zoom, right-drag to slide. The sliders change only the Matabele sizes.</p>
 </header>
@@ -188,7 +188,9 @@ scene.add(cubeBlock);
 tag('1 block', cubeBlock);
 
 // --- sizes and layout -----------------------------------------------------------------------------------------------
-const settings = {major: 0.7, minor: 0.45, cam: 'overview'};
+// The major starts at twice the termite major soldier's length (the user, 2026-10-23).
+const termiteMajor = refs[2].userData.length * refs[2].scale.x;
+const settings = {major: Math.round(termiteMajor * 2 / 0.05) * 0.05, minor: 0.45, cam: 'overview'};
 location.hash.slice(1).split('&').filter(Boolean).forEach(kv => {
   const [k, v] = kv.split('=');
   settings[k] = isNaN(parseFloat(v)) ? v : parseFloat(v);
@@ -214,7 +216,8 @@ function layout() {
   player.position.set(right + 1.6, 0, -1.2);
   const harvester = refs[0].userData.length * refs[0].scale.x;
   document.getElementById('majorOut').textContent = majorLen.toFixed(2) + ' blocks long (' +
-    (majorLen / harvester).toFixed(1) + ' times a harvester worker, ' + harvester.toFixed(2) + ')';
+    (majorLen / termiteMajor).toFixed(1) + ' times a termite major soldier, ' + (majorLen / harvester).toFixed(1) +
+    ' times a harvester worker)';
   document.getElementById('minorOut').textContent = Math.round(settings.minor * 100) + '% of the major: ' +
     minorLen.toFixed(2) + ' blocks long';
 }
