@@ -132,6 +132,24 @@ public final class TestIsolation {
         return null;
     }
 
+    /**
+     * The running tests whose arenas come within so many blocks of this spot, with their arenas' corners, for a log line
+     * when something from outside a test's arena seems to reach into it.
+     */
+    public static synchronized String describeTestsNear(BlockPos pos, int within) {
+        readArenas();
+        StringBuilder out = new StringBuilder();
+        for (Map.Entry<GameTestInfo, AABB> entry : ARENAS.entrySet()) {
+            AABB arena = entry.getValue();
+            if (arena.inflate(within).contains(pos.getX() + 0.5, arena.minY + 0.5, pos.getZ() + 0.5)) {
+                out.append(out.isEmpty() ? "" : "; ").append(entry.getKey().getTestName()).append(" from ")
+                        .append((int) arena.minX - pos.getX()).append(", ").append((int) arena.minZ - pos.getZ())
+                        .append(entry.getKey().isDone() ? " (done)" : "");
+            }
+        }
+        return out.toString();
+    }
+
     /** Keeps every chunk within {@link #GROUND_ROUND} blocks of this arena running while its test runs. */
     private static void holdGround(ServerLevel level, GameTestInfo test, AABB arena) {
         List<ChunkPos> held = new ArrayList<>();
