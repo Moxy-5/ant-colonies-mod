@@ -29,8 +29,8 @@ import net.minecraft.world.phys.Vec3;
  * for a few seconds, or its look time is over, it goes on, and for a while takes no notice of players (it has got used
  * to a harmless thing).</li>
  * <li><b>Termites feel</b> (the user's decision: Macrotermes workers are blind). A player walking near, or jumping,
- * landing or sprinting further off, makes an idle worker freeze with its antennae raised for a second or two. It never
- * turns to look.</li>
+ * landing or sprinting further off, makes an idle worker freeze with its antennae raised for a second or two. A jump or a
+ * landing reaches it the moment it happens, and it freezes on its next step. It never turns to look.</li>
  * </ul>
  * Only an insect with nothing to do notices (this goal comes after every job), never one carrying something, hurt,
  * asleep or in an alarm. Numbers in the profile's {@code body_language.notice}; personality from the insect's traits.
@@ -44,6 +44,8 @@ public class NoticeGoal extends Goal {
     /** How fast it walks closer (times its normal speed: slowly, carefully) and backs off (quickly). */
     private static final double CLOSER_SPEED = 0.6;
     private static final double BACK_OFF_SPEED = 1.0;
+    /** A jump felt while it may not stop (climbing, carrying, resting) still freezes it if it may within this long (ticks). */
+    private static final int SHAKE_HOLD = 20;
 
     private enum Step { LOOK, CLOSER, BACK_OFF, FREEZE }
 
@@ -78,16 +80,27 @@ public class NoticeGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        if (insect.tickCount % 20 != insect.getId() % 20 || !(insect.level() instanceof ServerLevel level)) {
-            return false; // (asked once a second)
+        if (!(insect.level() instanceof ServerLevel level)) {
+            return false;
+        }
+        Player shook = shookBy(level);
+        boolean asking = insect.tickCount % 20 == insect.getId() % 20;
+        if (!asking && shook == null) {
+            return false; // (moving players asked once a second; a jump felt through the ground at once)
         }
         SpeciesProfile.Notice notice = notice();
         if (notice == null) {
             return false;
         }
-        Player moving = movingPlayer(level, notice);
+        Player moving = asking ? movingPlayer(level, notice) : null;
+        if (shook != null) {
+            moving = shook;
+        }
         if (moving == null || level.getGameTime() < restUntil || !mayStop(level) || !insect.onGround() || insect.isClimbing()) {
             return false;
+        }
+        if (shook != null) {
+            insect.forgetShake(); // one chance to freeze for each jump
         }
         float chance = insect.noticeChanceForTests() >= 0.0F ? insect.noticeChanceForTests() : notice.chanceFor(insect.curiosity());
         if (insect.getRandom().nextFloat() >= chance) {
@@ -98,9 +111,27 @@ public class NoticeGoal extends Goal {
     }
 
     /**
+     * The player whose jump or landing it felt in the last {@link #SHAKE_HOLD} ticks (within its shake range at that very
+     * moment, {@link GroundShakes}), if it may notice that player, or null.
+     */
+    @Nullable
+    private Player shookBy(ServerLevel level) {
+        UUID felt = insect.shakeFeltSince(level.getGameTime() - SHAKE_HOLD);
+        if (felt == null) {
+            return null;
+        }
+        for (Player near : insect.playersToNotice()) {
+            if (near.getUUID().equals(felt) && near.isAlive() && !near.isSpectator()) {
+                return near;
+            }
+        }
+        return null;
+    }
+
+    /**
      * The nearest player it can tell is moving: by sight one in plain view who moved since the last check, within the
-     * range; by feel one walking within the range (not sneaking: soft steps), or jumping, landing or sprinting within the
-     * shake range. Remembers where every player near is, for the next check.
+     * range; by feel one walking within the range (not sneaking: soft steps), or sprinting within the shake range (a jump
+     * or landing is felt at once, {@link #shookBy}). Remembers where every player near is, for the next check.
      */
     @Nullable
     private Player movingPlayer(ServerLevel level, SpeciesProfile.Notice notice) {
@@ -117,7 +148,7 @@ public class NoticeGoal extends Goal {
             boolean moved = before != null && now - before.time() <= 30 && before.at().distanceToSqr(near.position()) > MOVED * MOVED;
             boolean noticed;
             if (notice.byVibration()) {
-                boolean hard = GroundShakes.hardSince(near, now - 20) || near.isSprinting() && near.onGround() && moved;
+                boolean hard = near.isSprinting() && near.onGround() && moved;
                 noticed = hard ? distance <= notice.shakeRange()
                         : moved && near.onGround() && !near.isShiftKeyDown() && distance <= notice.range();
             } else {

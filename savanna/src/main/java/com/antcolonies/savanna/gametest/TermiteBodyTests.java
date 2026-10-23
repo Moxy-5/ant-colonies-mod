@@ -52,7 +52,9 @@ public class TermiteBodyTests {
 
     /**
      * A termite worker feels no sneaking player's steps (it is blind), but freezes at a jump 5 blocks off, holding still,
-     * and not again at once (it can tell only its own mock player is there, and takes every chance to notice).
+     * and not again at once (it can tell only its own mock player is there, and takes every chance to notice). It feels the
+     * jump the moment it happens and freezes within a tenth of a second, even while walking away from the player (it once
+     * listened only once a second, and missed a jump it had walked out of range of by then, {@code docs/BUGS.md} 66).
      */
     @GameTest(template = "arena", timeoutTicks = 900)
     public static void termitesFeelNoSneakingStepsButFreezeAtAJump(GameTestHelper helper) {
@@ -99,6 +101,9 @@ public class TermiteBodyTests {
                 }
                 if (freezeStart[0] < 0) {
                     freezeStart[0] = t;
+                    if (t - jumpAt > 3) {
+                        helper.fail("a termite felt the jump late: it froze " + (t - jumpAt) + " ticks after it");
+                    }
                 }
                 if (t - freezeStart[0] == 3) {
                     frozenAt[0] = termite.position();
@@ -111,6 +116,10 @@ public class TermiteBodyTests {
             }
             if (t == jumpAt) {
                 GroundShakes.hard(termiteFelt);
+            }
+            if (t == jumpAt - 3) {
+                // It walks away from the player as the player jumps: it must still feel the jump, at once.
+                termite.getNavigator().moveTo(termite.blockPosition().offset(0, 0, 6), 1.0);
             }
         });
         helper.startSequence()
