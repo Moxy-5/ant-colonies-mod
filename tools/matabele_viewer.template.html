@@ -34,8 +34,9 @@
 <body>
 <header>
   <h1>Matabele ant viewer</h1>
-  <p>The Matabele ant's three ways to build its slanted head (A, B, C), each as a big major (left) and a small minor
-     (right), the majors' heads hanging lower; the "profile" buttons look at each major straight from the side. In front, the game's own
+  <p>The Matabele ant with the head from your picture, in two colours (A black, B the picture's brown-grey), each as a
+     big major (left) and a small minor (right), the heads hanging slanted down, the majors' the most; every face painted
+     with pixels of one size; the "profile" buttons look at each major straight from the side. In front, the game's own
      insects at their game sizes and a player's height. The grid lines are one block apart. Drag to turn, scroll or pinch
      to zoom, right-drag to slide. The sliders change only the Matabele sizes.</p>
 </header>
@@ -88,9 +89,9 @@ function loadTexture(uri) {
   return t;
 }
 
-// Each face shows its own patch of the 64 x 64 texture, as in the game (BoxGeometry's faces: +x, -x, +y, -y, +z, -z).
+// Each face shows its own patch of the model's texture (tw x th pixels), as in the game (BoxGeometry's faces: +x, -x, +y, -y, +z, -z).
 const FACES = ['east', 'west', 'up', 'down', 'south', 'north'];
-function boxGeometry(c) {
+function boxGeometry(c, tw, th) {
   const g = new THREE.BoxGeometry(Math.max(c.size[0], 0.02), Math.max(c.size[1], 0.02), Math.max(c.size[2], 0.02));
   const uv = g.attributes.uv;
   FACES.forEach((f, i) => {
@@ -99,14 +100,14 @@ function boxGeometry(c) {
     const [u0, v0] = face.uv, [w, h] = face.uv_size;
     for (let k = 0; k < 4; k++) {
       const j = i * 4 + k;
-      uv.setXY(j, (u0 + uv.getX(j) * w) / 64, 1 - (v0 + (1 - uv.getY(j)) * h) / 64);
+      uv.setXY(j, (u0 + uv.getX(j) * w) / tw, 1 - (v0 + (1 - uv.getY(j)) * h) / th);
     }
   });
   uv.needsUpdate = true;
   return g;
 }
 
-function buildModel(bones, texture) {
+function buildModel(bones, texture, tw, th) {
   const mat = new THREE.MeshLambertMaterial({map: texture, alphaTest: 0.5});
   const root = new THREE.Group();
   const groups = {}, byName = {};
@@ -118,7 +119,7 @@ function buildModel(bones, texture) {
     if (b.rotation) setRot(g, b.rotation);
     groups[b.name] = g;
     (b.cubes || []).forEach(c => {
-      const mesh = new THREE.Mesh(boxGeometry(c), mat);
+      const mesh = new THREE.Mesh(boxGeometry(c, tw, th), mat);
       mesh.castShadow = true;
       const centre = [c.origin[0] + c.size[0] / 2, c.origin[1] + c.size[1] / 2, c.origin[2] + c.size[2] / 2];
       if (c.rotation) {
@@ -156,10 +157,10 @@ function tag(text, obj) {
   tags.push({el, obj});
 }
 
-// The Matabele head options: a major and a minor each, turned three-quarters to the camera.
+// The Matabele colours: a major and a minor each, turned three-quarters to the camera.
 const looks = Object.entries(DATA.looks).map(([key, look]) => {
-  const texture = loadTexture(look.texture);
-  const major = buildModel(look.major, texture), minor = buildModel(look.minor, texture);
+  const build = m => buildModel(m.bones, loadTexture(m.texture), m.w, m.h);
+  const major = build(look.major), minor = build(look.minor);
   [major, minor].forEach(m => { m.rotation.y = -0.6; scene.add(m); });
   tag(key + ' major', major);
   tag(key + ' minor', minor);
@@ -168,7 +169,7 @@ const looks = Object.entries(DATA.looks).map(([key, look]) => {
 
 // The game's own insects at the sizes their renderers draw them, and a player's height (1.8 blocks).
 const refs = DATA.refs.map(r => {
-  const m = buildModel(r.bones, loadTexture(r.texture));
+  const m = buildModel(r.bones, loadTexture(r.texture), r.w, r.h);
   m.scale.setScalar(r.scale);
   m.rotation.y = -0.6;
   scene.add(m);
@@ -235,6 +236,9 @@ looks.forEach(l => {
     return [[p.x + d * 0.9, settings.major * 0.35, p.z + d * 0.55], [p.x, settings.major * 0.12, p.z]]; };
   CAMS['profile ' + l.key] = () => { const p = l.major.position, r = l.major.rotation.y, d = settings.major * 1.3 + 0.3;
     return [[p.x + Math.cos(r) * d, settings.major * 0.2, p.z - Math.sin(r) * d], [p.x, settings.major * 0.16, p.z]]; };
+  CAMS['face ' + l.key] = () => { const p = l.major.position, r = l.major.rotation.y, L = l.major.userData.length * l.major.scale.x;
+    const fx = -Math.sin(r), fz = -Math.cos(r), head = [p.x + fx * L * 0.36, L * 0.17, p.z + fz * L * 0.36], d = L * 0.42;
+    return [[head[0] + fx * d - fz * d * 0.75, head[1] + d * 0.35, head[2] + fz * d + fx * d * 0.75], head]; };
   CAMS['top ' + l.key] = () => { const p = l.major.position; const d = settings.major * 1.6 + 0.3;
     return [[p.x + 0.001, d, p.z + 0.001], [p.x, 0, p.z]]; };
 });

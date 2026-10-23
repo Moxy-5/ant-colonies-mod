@@ -32,8 +32,15 @@ down from the weight of their mandibles and head"), between the user's two photo
 side by side (HEADS): tilted as one piece like a horse's head, stepped square to the grid, and tilted with every detail
 the size allows. No painted shine for now (the user: that is light bouncing off them).
 
+Sixth round (the user's picture of a Minecraft-style head, 2026-10-23, "make it like this"): the head a rounded block
+with a narrower muzzle under the face, big dark eyes with a pale rim, antennae from the face with a red band, sickle
+jaws with a red inner edge, still tilted at the neck; and every box face painted with pixels of one size (paint()), as
+on a Minecraft mob, in place of one small swatch stretched over each box. Two colours: black (the user's pick) and the
+picture's brown-grey.
+
 Units are model pixels before SCALE, as in ant_models.py: the head points to -Z, the ground is y = 0, left is +X.
 """
+import copy
 import math
 import random
 import struct
@@ -42,69 +49,92 @@ import zlib
 SCALE = 0.85
 LIFT = 1.5   # the whole ant is drawn this much higher than its boxes say, the feet brought down to the ground: it stands tall
 
-# --- texture: 64x64, 8x8 swatches (column, row, pattern); colours come from the look ------------------------------
-CELLS = {
-    'head':    (0, 0, 'glossy'),
-    'thorax':  (1, 0, 'glossy'),
-    'waist':   (2, 0, 'glossy'),
-    'gaster':  (3, 0, 'haired'),
-    'leg':     (4, 0, 'noise'),
-    'antenna': (5, 0, 'noise'),    # the scape and every other ring of the whip
-    'ring':    (6, 0, 'noise'),    # the whip's other rings
-    'eye':     (7, 0, 'eye'),
-    'jaw':     (0, 1, 'noise'),
-    'teeth':   (1, 1, 'noise'),    # the jaws' inner toothed edge
-    'tarsus':  (2, 1, 'noise'),
-    'joint':   (3, 1, 'noise'),
-    'sting':   (4, 1, 'noise'),
-    'rim':     (5, 1, 'glossy'),   # the shining back edge of each gaster plate
+# --- texture: every box face gets its own patch, all at TEXELS pixels a model pixel (the user's picture, 2026-10-23:
+# the same pixel size on the big head and the thin jaws, as on a Minecraft mob), packed into one texture by paint().
+# Each box names its swatch: what part of the ant it is, its colour from the look and its pattern.
+SWATCHES = {
+    'head': 'plate', 'thorax': 'plate', 'waist': 'plate', 'gaster': 'haired', 'rim': 'plate',
+    'leg': 'plain', 'antenna': 'plain', 'ring': 'plain', 'band': 'plain', 'tarsus': 'plain', 'joint': 'plain',
+    'eye': 'eye', 'eyerim': 'plain', 'jaw': 'plain', 'teeth': 'plain', 'sting': 'plain',
 }
+TEXELS = 3.0
 
-# The look (the user picked A, "like the photo", 2026-10-23; B, like Empires of the Undergrowth, and C, the third
-# picture's charcoal and brown, are in git history). shine: the light on the hard plates; hair: how much the gaster's
-# fine hairs grey it; mottle (C had it): patches of other tones on the plates, [(colour offset, chance), ...].
+# The looks: A glossy black (the user's pick, the photo), B the brown-grey of the user's picture of the head
+# (2026-10-23). grain: how far a pixel strays from its colour; flecks: how many pixels are lighter (or darker) specks;
+# hair: how much the gaster's fine pale hairs grey it.
 LOOKS = {
-    'A': {'name': 'Like the photo',
-          'note': 'glossy black (the real ant, Daniel Kronauer\'s photo): the head, thorax and gaster shining, fine pale '
-                  'hairs on the gaster, the jaws\' toothed edges, the feet and the antenna tips red-brown',
-          'shine': 0.9, 'hair': 0.18,
-          'colours': {'head': (24, 23, 25), 'thorax': (26, 25, 27), 'waist': (26, 25, 27), 'gaster': (30, 29, 30),
-                      'leg': (34, 28, 26), 'antenna': (36, 29, 26), 'ring': (52, 38, 30), 'eye': (12, 12, 14),
-                      'jaw': (34, 24, 21), 'teeth': (112, 40, 26), 'tarsus': (78, 44, 30), 'joint': (22, 20, 21),
-                      'sting': (90, 52, 34), 'rim': (54, 52, 56)}},
+    'A': {'name': 'Black',
+          'note': "glossy black, the look you picked (the photo): the eyes dark with a grey rim, the jaws' inner edges, "
+                  "the feet and the antenna bands red-brown",
+          'grain': 7, 'flecks': 0.10, 'hair': 0.18,
+          'colours': {'head': (26, 25, 27), 'thorax': (28, 27, 29), 'waist': (28, 27, 29), 'gaster': (31, 30, 31),
+                      'rim': (52, 50, 54), 'leg': (36, 30, 28), 'antenna': (38, 31, 28), 'ring': (46, 36, 30),
+                      'band': (120, 40, 26), 'tarsus': (78, 44, 30), 'joint': (22, 20, 21), 'eye': (14, 14, 16),
+                      'eyerim': (92, 92, 98), 'jaw': (36, 26, 23), 'teeth': (130, 40, 26), 'sting': (90, 52, 34)}},
+    'B': {'name': 'Like the picture',
+          'note': "the brown-grey of your picture of the head: pale specks, the eyes dark grey with a light rim, the "
+                  "jaws' inner edges and the antenna bands red",
+          'grain': 9, 'flecks': 0.14, 'hair': 0.12,
+          'colours': {'head': (86, 74, 66), 'thorax': (84, 72, 64), 'waist': (84, 72, 64), 'gaster': (82, 70, 63),
+                      'rim': (100, 88, 79), 'leg': (80, 68, 60), 'antenna': (82, 70, 62), 'ring': (82, 70, 62),
+                      'band': (166, 40, 26), 'tarsus': (92, 76, 64), 'joint': (60, 52, 47), 'eye': (50, 52, 56),
+                      'eyerim': (150, 150, 155), 'jaw': (84, 70, 62), 'teeth': (170, 42, 28), 'sting': (104, 84, 68)}},
 }
 
 
-def texture_rows(look):
-    """The look's 64x64 texture as rows of (r, g, b, a)."""
+def faces(c):
+    """A box's six faces and their sizes in model pixels."""
+    sx, sy, sz = c['size']
+    return {'north': (sx, sy), 'south': (sx, sy), 'east': (sz, sy), 'west': (sz, sy), 'up': (sx, sz), 'down': (sx, sz)}
+
+
+def paint(bones, look):
+    """The bones with every face's place on the texture, and the texture: (bones, rows of (r, g, b, a), width, height).
+    Each face gets its own patch at TEXELS pixels a model pixel, packed in shelves, the tallest first."""
     spec = LOOKS[look]
     rnd = random.Random(23)
-    rows = [[(0, 0, 0, 0)] * 64 for _ in range(64)]
-    for name, (col, row, pattern) in CELLS.items():
-        base = spec['colours'][name]
-        for y in range(8):
-            for x in range(8):
-                k = rnd.uniform(-0.06, 0.06)
-                rgb = list(base)
-                if pattern in ('glossy', 'haired'):
-                    if (x, y) == (2, 2):
-                        k += spec['shine'] * 1.1                    # the light on a hard plate
-                    elif (x, y) in ((3, 2), (2, 3)):
-                        k += spec['shine'] * 0.45
-                if pattern in ('glossy', 'haired') and spec.get('mottle'):
-                    roll = rnd.random()                             # patches of other tones on the plates
-                    for tone, chance in spec['mottle']:
-                        if roll < chance:
-                            rgb = [c + t for c, t in zip(rgb, tone)]
-                            break
-                        roll -= chance
-                if pattern == 'haired' and rnd.random() < 0.5:
-                    mix = spec['hair'] * rnd.uniform(0.25, 0.55)    # a fine pale hair
-                    rgb = [c + (150 - c) * mix for c in rgb]
-                elif pattern == 'eye':
-                    k = rnd.uniform(-0.05, 0.05) + (4.0 if (x, y) in ((1, 1), (2, 1)) else 0.0)   # a hard glint high up
-                rows[row * 8 + y][col * 8 + x] = tuple(max(0, min(255, int(c * (1 + k)))) for c in rgb) + (255,)
-    return rows
+    bones = copy.deepcopy(bones)
+    patches = []
+    for b in bones:
+        for c in b.get('cubes', []):
+            swatch = c.pop('_swatch')
+            c['uv'] = {}
+            for face, (w, h) in faces(c).items():
+                patches.append((max(1, round(w / SCALE * TEXELS)), max(1, round(h / SCALE * TEXELS)), c, face, swatch))
+    patches.sort(key=lambda p: (-p[1], -p[0]))
+    for width in (64, 128, 256, 512, 1024):
+        x = y = shelf = 0
+        places = []
+        for w, h, c, face, swatch in patches:
+            if x + w > width:
+                x, y, shelf = 0, y + shelf, 0
+            places.append((x, y, w, h, c, face, swatch))
+            x, shelf = x + w, max(shelf, h)
+        if y + shelf <= width:
+            break
+    height = 16
+    while height < y + shelf:
+        height *= 2
+    rows = [[(0, 0, 0, 0)] * width for _ in range(height)]
+    for x0, y0, w, h, c, face, swatch in places:
+        c['uv'][face] = {'uv': [x0, y0], 'uv_size': [w, h]}
+        base, pattern = spec['colours'][swatch], SWATCHES[swatch]
+        for y in range(h):
+            for x in range(w):
+                d = rnd.uniform(-1, 1) * spec['grain']
+                roll = rnd.random()
+                if roll < spec['flecks']:
+                    d += spec['grain'] * 2.2                          # a pale speck
+                elif roll < spec['flecks'] * 1.6:
+                    d -= spec['grain'] * 1.6                          # a dark one
+                rgb = [v + d for v in base]
+                if pattern == 'haired' and rnd.random() < 0.3:
+                    mix = spec['hair'] * rnd.uniform(0.3, 0.7)       # a fine pale hair
+                    rgb = [v + (150 - v) * mix for v in rgb]
+                if pattern == 'eye' and w > 3 and h > 3 and (x, y) in ((1, 1), (2, 1), (1, 2)):
+                    rgb = [v + 60 for v in rgb]                       # a hard glint high up
+                rows[y0 + y][x0 + x] = tuple(max(0, min(255, int(v))) for v in rgb) + (255,)
+    return bones, rows, width, height
 
 
 def png(rows):
@@ -129,10 +159,7 @@ def lifted(p):
 
 def box(lo, hi, swatch, pivot=None, rotation=None):
     """A box from corner lo to corner hi (design units), optionally turned by rotation about pivot."""
-    col, row, _ = CELLS[swatch]
-    face = {'uv': [col * 8 + 1, row * 8 + 1], 'uv_size': [6, 6]}
-    c = {'origin': r3(lifted(lo)), 'size': r3([b - a for a, b in zip(lo, hi)]),
-         'uv': {f: dict(face) for f in ('north', 'south', 'east', 'west', 'up', 'down')}}
+    c = {'origin': r3(lifted(lo)), 'size': r3([b - a for a, b in zip(lo, hi)]), '_swatch': swatch}   # painted by paint()
     if rotation and any(abs(v) > 1e-6 for v in rotation):
         c['pivot'] = r3(lifted(pivot))
         c['rotation'] = [round(v, 2) for v in rotation]
@@ -197,92 +224,67 @@ LEGS = {
     2: [(0.8, 3.5, -3.4), (5.0, 7.3, -3.6), (8.2, 1.3, -3.2), (9.6, -LIFT, -2.6)],
     3: [(0.78, 3.45, -1.2), (4.6, 7.5, 1.3), (7.6, 1.3, 6.0), (8.8, -LIFT, 8.6)],
 }
-# --- the head (the user, 2026-10-23: the real head hangs slanted down from the neck, the majors' the most, "looking
-# down from the weight of their mandibles and head"; three ways to build it, side by side in the viewer) ------------
-# The head is drawn level in its own frame (from the neck, the face toward -z), then tilted nose-down at the neck.
-HEADS = {
-    'A': {'name': 'Tilted head',
-          'note': "the whole head turned nose-down at the neck as one piece, the way a horse's head is built in "
-                  "Minecraft: the eyes, antennae and jaws all slope with it",
-          'stepped': False, 'detail': False},
-    'B': {'name': 'Stepped head',
-          'note': "the head's boxes kept square to the block grid, each slice set lower toward the face, so the slope "
-                  "comes out in steps like stairs (the most Minecraft-like, but jagged at this angle)",
-          'stepped': True, 'detail': False},
-    'C': {'name': 'Tilted, more detail',
-          'note': "A with every detail the size allows: the high rounded back of the crown and the line down its "
-                  "middle, the hard rim round the back of the head, the throat plate, the face plate, the clypeus' "
-                  "edge and the lip under it, cheeks under the eyes, dark sockets round bulging eyes, the brow ridges, "
-                  "a rim over each antenna socket, little mouthparts under the head, smoother jaws with a row of "
-                  "teeth, a thicker scape end and a joint at each antenna's elbow, more rings in the whip",
-          'stepped': False, 'detail': True},
-}
-# How far each head is tilted, in degrees: between the user's two photos, the majors the most (their heavy heads).
-MAJOR_TILT = 31.0
+# --- the head (the user's picture of the head, 2026-10-23, "make it like this") ------------------------------------
+# A rounded block, the narrower muzzle (clypeus) jutting out under the face, the big dark eyes high on the sides toward
+# the front with a pale rim, the antennae from the face beside the muzzle with a red band past the elbow, the jaws thick
+# sickles from under the muzzle, down and in, a red edge along the inside. The real head hangs slanted down from the
+# neck, the majors' the most (the user: "looking down from the weight of their mandibles and head"): the head is drawn
+# level in its own frame (from the neck, the face toward -z), and its bone is tilted nose-down at the neck, the way a
+# horse's head is built in Minecraft.
+MAJOR_TILT = 31.0       # degrees: between the user's two photos, the majors the most (my picks, to confirm)
 MINOR_TILT = 21.0
 # The head is drawn at this size: the major's big head stands out from its narrow thorax as in the photo; the minor's
 # head and jaws are smaller for its body, its antennae less so (my picks, from the photo).
 MAJOR_HEAD = 1.15
 MINOR_HEAD = 0.92
 MINOR_ANTENNA = 0.92
-STEP = 0.8       # the stepped head's slice length
 
 # The head's boxes in its own frame, (lo, hi, swatch); the side boxes for the left side, mirrored for the right.
 HEAD_BOXES = [
-    ([-2.0, -1.2, -5.0], [2.0, 1.8, -0.6], 'head'),        # the head capsule
-    ([-2.3, -0.8, -4.4], [2.3, 1.4, -1.1], 'head'),        # its full rounded sides
-    ([-1.6, 1.8, -4.4], [1.6, 2.15, -1.2], 'head'),        # the domed crown
-    ([-1.6, -1.5, -4.4], [1.6, -1.2, -1.2], 'head'),       # the underside
-    ([-1.5, -0.8, -0.6], [1.5, 1.4, -0.25], 'head'),       # the rounded back
-    ([-1.3, -0.9, -5.4], [1.3, 0.2, -5.0], 'head'),        # the clypeus over the jaws
-    ([-0.8, -0.5, -0.4], [0.8, 0.5, 0.3], 'thorax'),       # the neck
+    ([-2.3, -1.1, -4.6], [2.3, 1.7, -0.8], 'head'),        # the head, a rounded block: its full width,
+    ([-1.9, -1.5, -4.6], [1.9, 2.1, -0.8], 'head'),        # its full height,
+    ([-1.9, -1.1, -5.0], [1.9, 1.7, -0.4], 'head'),        # its full length
+    ([-1.5, 2.1, -4.2], [1.5, 2.4, -1.2], 'head'),         # the domed crown
+    ([-2.55, -0.7, -4.2], [2.55, 1.3, -1.2], 'head'),      # the full sides
+    ([-1.5, -1.8, -4.2], [1.5, -1.5, -1.2], 'head'),       # the rounded underside
+    ([-1.5, -0.7, -0.4], [1.5, 1.3, -0.1], 'head'),        # the rounded back
+    ([-1.3, -1.45, -5.65], [1.3, -0.15, -4.85], 'head'),   # the muzzle under the face, narrower, jutting out
+    ([-1.0, -0.15, -5.4], [1.0, 0.2, -4.9], 'head'),       # its sloping top
+    ([-0.9, -1.75, -5.5], [0.9, -1.45, -5.0], 'jaw'),      # the lip under it
+    ([-0.8, -0.5, -0.1], [0.8, 0.5, 0.4], 'thorax'),       # the neck
 ]
 HEAD_SIDE_BOXES = [
-    ([1.5, -0.7, -4.8], [2.05, 0.1, -3.8], 'head'),        # the antenna socket, low on the side
-    ([2.15, 0.3, -4.2], [2.55, 1.5, -2.7], 'eye'),         # big, bulging, above it
-    ([1.3, 1.5, -4.5], [2.45, 1.9, -2.6], 'head'),         # the heavy brow
+    ([1.0, -0.25, -5.25], [1.75, 0.5, -4.85], 'head'),     # the antenna socket on the face, beside the muzzle
+    ([2.25, 0.35, -4.45], [2.6, 1.75, -2.55], 'eyerim'),   # the pale rim round the eye
+    ([2.3, 0.5, -4.3], [2.68, 1.6, -2.7], 'eye'),          # the big dark eye, high on the side toward the front
+    ([1.4, 1.7, -4.4], [2.2, 2.0, -2.6], 'head'),          # the brow over it
 ]
-HEAD_DETAIL = [
-    ([-1.25, 2.15, -3.7], [1.25, 2.45, -1.5], 'head'),     # the high rounded back of the crown
-    ([-0.09, 2.2, -4.3], [0.09, 2.5, -1.4], 'joint'),      # the line down the middle of the crown
-    ([-1.8, -1.0, -0.8], [1.8, 1.65, -0.45], 'rim'),       # the hard rim round the back of the head
-    ([-1.4, -1.75, -3.9], [1.4, -1.5, -1.7], 'head'),      # the throat plate
-    ([-1.6, -0.55, -5.15], [1.6, 1.35, -4.95], 'head'),    # the face's front plate
-    ([-1.1, -1.05, -5.6], [1.1, -0.8, -5.35], 'rim'),      # the clypeus' hard front edge
-    ([-0.7, -1.35, -5.55], [0.7, -1.05, -5.15], 'jaw'),    # the lip under it
-]
-HEAD_SIDE_DETAIL = [
-    ([2.05, -0.45, -3.9], [2.4, 0.3, -2.6], 'head'),       # the cheek under the eye
-    ([2.05, 0.15, -4.35], [2.45, 1.65, -2.55], 'joint'),   # the dark socket round the eye
-    ([2.5, 0.55, -3.95], [2.72, 1.25, -2.95], 'eye'),      # the eye's bulge
-    ([1.2, 1.88, -4.3], [2.2, 2.1, -2.9], 'head'),         # the brow's ridge
-    ([1.45, 0.05, -4.95], [2.0, 0.35, -3.95], 'rim'),      # the rim over the antenna socket
-]
-PALP = [(0.75, -1.35, -4.9), (1.05, -1.9, -5.3), (1.0, -2.4, -5.0)]   # a little mouthpart under the head (left)
 
-# The jaw in the head's frame: a thick hook from under the front of the head, forward and out, then down and in to
-# the tip, held a little open; with the head tilted it points forward and down (left side). Thickest at the base.
-JAW = [(1.35, -0.6, -5.0), (1.95, -0.45, -6.1), (2.05, -0.5, -7.2), (1.7, -0.85, -8.1), (0.95, -1.25, -8.5)]
-JAW_WIDTH = [1.3, 1.15, 0.95, 0.7]
-JAW_HEIGHT = [1.0, 0.9, 0.8, 0.6]
-CARRY = (0, -1.45, -8.6)        # between the jaw tips, in the head's frame: where the stack of termites is held
+# The jaw in the head's frame: a thick sickle from under the side of the muzzle, forward and a little out, then
+# curving in to the tip in front of the face, the two tips nearly meeting (left side; the user's picture and the real
+# ant: the curve is sideways, not down); with the head tilted it points forward and down, the major's tips off the
+# ground. Its width and height taper from the base to the tip.
+JAW = [(1.15, -1.0, -5.1), (1.55, -0.8, -6.0), (1.7, -0.7, -6.9), (1.5, -0.65, -7.7), (1.0, -0.7, -8.3),
+       (0.4, -0.8, -8.6)]
+JAW_BASE, JAW_TIP = (0.95, 0.85), (0.4, 0.4)      # (width, height)
+CARRY = (0, -1.0, -8.0)         # between the jaw tips, in the head's frame: where the stack of termites is held
 
-# The antennae: set low on the sides of the head, under the eyes (in the head's frame); the scape and whip are offsets
-# from the socket on the standing ant, so they reach out sideways and forward however far the head is tilted: the long
-# scape out, forward and up, the whip held forward over the jaws, bending down at the tip (the user's pictures).
-ANTENNA_SOCKET = (1.75, -0.3, -4.3)
-ANTENNA_ELBOW = (2.25, 1.5, -1.4)
-ANTENNA_WHIP = [(3.25, 2.4, -3.4), (4.05, 2.5, -5.7), (4.55, 2.0, -7.6), (4.85, 1.1, -9.0)]
+# The antennae: from the socket in the head's frame; the scape and whip are offsets from the socket on the standing
+# ant, so they reach out however far the head is tilted: the scape out sideways and a little up, the whip out and
+# forward, drooping at the tip, a red band past the elbow (the user's picture).
+ANTENNA_SOCKET = (1.4, 0.12, -5.15)
+ANTENNA_ELBOW = (2.7, 1.0, -0.7)
+ANTENNA_WHIP = [(3.7, 1.15, -2.3), (4.3, 0.7, -4.0), (4.6, -0.2, -5.4), (4.7, -1.2, -6.4)]
 WHIP_RINGS = 10
+BAND = (1, 2)                   # the whip's rings drawn red
 
 
 class HeadFrame:
-    """Where the head's own-frame points and boxes go in the model file. Tilted (A, C): the head bone itself is turned
-    nose-down at the neck, so its boxes are written level and turn with it; stepped (B): the boxes stay square to the
-    grid, each slice of a long box set where the tilted head would put it, so the slope comes out in steps."""
+    """Where the head's own-frame points go: the head bone is turned nose-down at the neck, so its boxes are written
+    level in the model file and turn with it."""
 
-    def __init__(self, size, tilt, stepped):
-        self.size, self.stepped = size, stepped
+    def __init__(self, size, tilt):
+        self.size = size
         t = math.radians(tilt)
         self.c, self.s = math.cos(t), math.sin(t)
 
@@ -300,25 +302,14 @@ class HeadFrame:
 
     def pt(self, u):
         """An own-frame point as written in the model file."""
-        v = [c * self.size for c in u]
-        return tuple(n + w for n, w in zip(NECK, self.turn(v) if self.stepped else v))
+        return tuple(n + c * self.size for n, c in zip(NECK, u))
 
     def written(self, w):
         """A point on the standing ant as written in the model file."""
-        if self.stepped:
-            return tuple(w)
         return tuple(n + v for n, v in zip(NECK, self.unturn([a - b for a, b in zip(w, NECK)])))
 
     def box(self, lo, hi, swatch):
-        if not self.stepped:
-            return [box(self.pt(lo), self.pt(hi), swatch)]
-        n, out = max(1, round((hi[2] - lo[2]) / STEP)), []
-        for i in range(n):
-            z0, z1 = (lo[2] + (hi[2] - lo[2]) * k / n for k in (i, i + 1))
-            c = self.pt(((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (z0 + z1) / 2))
-            out.append(centered(*c, (hi[0] - lo[0]) * self.size, (hi[1] - lo[1]) * self.size, (z1 - z0) * self.size,
-                                swatch))
-        return out
+        return box(self.pt(lo), self.pt(hi), swatch)
 
 
 def smooth(points):
@@ -329,41 +320,30 @@ def smooth(points):
     return out + [points[-1]]
 
 
-def head_bones(size=1.0, antenna=1.0, tilt=0.0, style='A'):
-    spec = HEADS[style]
-    detail = spec['detail']
-    f = HeadFrame(size, tilt, spec['stepped'])
-    cubes = [c for lo, hi, swatch in HEAD_BOXES + (HEAD_DETAIL if detail else []) for c in f.box(lo, hi, swatch)]
+def head_bones(size=1.0, antenna=1.0, tilt=0.0):
+    f = HeadFrame(size, tilt)
+    cubes = [f.box(lo, hi, swatch) for lo, hi, swatch in HEAD_BOXES]
     for sx in (1, -1):
-        for lo, hi, swatch in HEAD_SIDE_BOXES + (HEAD_SIDE_DETAIL if detail else []):
-            cubes += f.box(*sym_points(lo, hi, sx), swatch)
-        if detail:
-            palp = [f.pt((p[0] * sx, p[1], p[2])) for p in PALP]
-            cubes += [rod(a, b, 0.22 * size, 'tarsus') for a, b in zip(palp, palp[1:])]
+        cubes += [f.box(*sym_points(lo, hi, sx), swatch) for lo, hi, swatch in HEAD_SIDE_BOXES]
     head = bone('head', 'forebody', NECK, cubes)
-    if tilt and not spec['stepped']:
+    if tilt:
         head['rotation'] = [tilt, 0, 0]
     bones = [head]
     for side, sx in (('l', 1), ('r', -1)):
-        own = [(p[0] * sx, p[1], p[2]) for p in JAW]
-        jaw = [f.pt(p) for p in (smooth(own) if detail else own)]
+        jaw = [f.pt((p[0] * sx, p[1], p[2])) for p in smooth(JAW)]
         cubes, n = [], len(jaw) - 1
         for i, (a, b) in enumerate(zip(jaw, jaw[1:])):
-            if detail:                                                 # tapering smoothly to a sharp tip
-                t = i / (n - 1)
-                w, h = (1.35 - 0.9 * t) * size, (1.05 - 0.65 * t) * size
-            else:
-                w, h = JAW_WIDTH[i] * size, JAW_HEIGHT[i] * size
+            t = i / (n - 1)
+            w, h = ((p + (q - p) * t) * size for p, q in zip(JAW_BASE, JAW_TIP))
             cubes.append(rod(a, b, w, 'jaw', h))
-            if i == 0 or (detail and i == n - 1):
-                continue
-            # Teeth on the inside of the hook: from the jaw's middle line toward the other jaw.
-            for fr in ((0.5,) if detail else (0.3, 0.75)):
-                c = lerp(a, b, fr)
-                big = 0.7 if detail and i % 2 == 0 else 1.0
-                inward = -sx * (w / 2 + 0.12 * size)
-                cubes.append(centered(c[0] + inward, c[1] - 0.05, c[2], 0.42 * size * big, 0.5 * size * big,
-                                      0.36 * size * big, 'teeth'))
+            # The red inner edge, along the inside of the hook; a tooth on every other piece.
+            inward = (-sx * w / 2, 0, 0)
+            cubes.append(rod(tuple(p + o for p, o in zip(a, inward)), tuple(p + o for p, o in zip(b, inward)),
+                             0.3 * size, 'teeth', h * 0.7))
+            if 0 < i < n - 1 and i % 2:
+                c = lerp(a, b, 0.5)
+                cubes.append(centered(c[0] - sx * (w / 2 + 0.15 * size), c[1], c[2], 0.4 * size, 0.45 * size,
+                                      0.4 * size, 'teeth'))
         bones.append(bone(f'mandible_{side}', 'head', jaw[0], cubes))
         socket_at = f.world((ANTENNA_SOCKET[0] * sx, ANTENNA_SOCKET[1], ANTENNA_SOCKET[2]))
         k = size * antenna
@@ -372,19 +352,17 @@ def head_bones(size=1.0, antenna=1.0, tilt=0.0, style='A'):
             """An antenna point: an offset from the socket on the standing ant, as written in the model file."""
             return f.written(tuple(s + o * k for s, o in zip(socket_at, (off[0] * sx, off[1], off[2]))))
         socket, elbow = f.written(socket_at), a(ANTENNA_ELBOW)
-        if detail:                                                     # the scape thickening to its end, the joint
-            scape = [rod(socket, lerp(socket, elbow, 0.55), 0.4 * size, 'antenna'),
-                     rod(lerp(socket, elbow, 0.5), elbow, 0.52 * size, 'antenna'),
-                     centered(*elbow, 0.5 * size, 0.5 * size, 0.5 * size, 'joint')]
-        else:
-            scape = [rod(socket, elbow, 0.45 * size, 'antenna')]
-        bones.append(bone(f'antenna_{side}_1', 'head', socket, scape))
-        rings = along([elbow] + [a(p) for p in ANTENNA_WHIP], WHIP_RINGS + (3 if detail else 0))
-        whip = [rod(p, q, (0.38 + 0.012 * i) * size, 'ring' if i % 2 else 'antenna')   # ringed, a little thicker out
+        bones.append(bone(f'antenna_{side}_1', 'head', socket, [
+            rod(socket, lerp(socket, elbow, 0.55), 0.42 * size, 'antenna'),      # the scape, thicker to its end
+            rod(lerp(socket, elbow, 0.5), elbow, 0.5 * size, 'antenna'),
+            centered(*elbow, 0.5 * size, 0.5 * size, 0.5 * size, 'joint')]))
+        rings = along([elbow] + [a(p) for p in ANTENNA_WHIP], WHIP_RINGS)
+        whip = [rod(p, q, (0.4 - 0.01 * i) * size, 'band' if i in BAND else 'ring' if i % 2 else 'antenna')
                 for i, (p, q) in enumerate(zip(rings, rings[1:]))]
         bones.append(bone(f'antenna_{side}_2', f'antenna_{side}_1', elbow, whip))
     bones.append(bone('carry', 'head', f.pt(CARRY)))
     return bones
+
 
 def sym_points(lo, hi, sx):
     xs = sorted((lo[0] * sx, hi[0] * sx))
@@ -428,12 +406,12 @@ SLIM = 0.72
 SLIM_BONES = ('thorax', 'petiole', 'gaster_front', 'gaster_back')
 
 
-def model(minor=False, head='A'):
-    """The ant's bones (the game's model file format). minor: the small ant's proportions; head: which way the head
-    is built (HEADS)."""
+def model(minor=False):
+    """The ant's bones (the game's model file format, each box naming its swatch until paint() gives it its place on
+    the texture). minor: the small ant's proportions."""
     bones = [bone('body', None, (0, 4.5, 0)), bone('forebody', 'body', WAIST)]
     bones += head_bones(MINOR_HEAD if minor else MAJOR_HEAD, MINOR_ANTENNA if minor else 1.0,
-                        MINOR_TILT if minor else MAJOR_TILT, head)
+                        MINOR_TILT if minor else MAJOR_TILT)
     bones.append(thorax_bone())
     bones += leg_bones()
     bones.append(bone('petiole', 'body', WAIST, [

@@ -188,22 +188,25 @@ def trees_page(out):
 
 
 def matabele_page(out):
-    """The Matabele head options (A, B, C) as majors and minors, and the game's own models beside them for size (their model
-    files, textures and the sizes their renderers draw them at)."""
+    """The Matabele ant in each colour as a major and a minor (each box face painted at one pixel size), and the game's
+    own models beside them for size (their model files, textures and the sizes their renderers draw them at)."""
     import matabele_models as mm
     data = {"looks": {}, "refs": []}
-    texture = uri(mm.png(mm.texture_rows("A")))
-    for key, head in mm.HEADS.items():          # the head options, each as a major and a minor, the look the user picked
-        data["looks"][key] = {"name": head["name"], "note": head["note"], "texture": texture,
-                              "major": mm.model(head=key), "minor": mm.model(minor=True, head=key)}
+    for key, look in mm.LOOKS.items():
+        entry = {"name": look["name"], "note": look["note"]}
+        for caste, minor in (("major", False), ("minor", True)):
+            bones, rows, w, h = mm.paint(mm.model(minor=minor), key)
+            entry[caste] = {"bones": bones, "texture": uri(mm.png(rows)), "w": w, "h": h}
+        data["looks"][key] = entry
     for mod, model, scale, label in (("desert", "worker_ant", 0.65, "Harvester worker"),
                                      ("savanna", "termite_worker", 0.75, "Termite worker"),
                                      ("savanna", "termite_major_soldier", 0.75, "Termite major soldier")):
         assets = mod_paths.assets(mod)
         geo = json.loads((assets / f"geo/entity/{model}.geo.json").read_text(encoding="utf-8"))
         texture = "data:image/png;base64," + base64.b64encode((assets / f"textures/entity/{model}.png").read_bytes()).decode()
+        desc = geo["minecraft:geometry"][0]["description"]
         data["refs"].append({"label": label, "bones": geo["minecraft:geometry"][0]["bones"], "scale": scale,
-                             "texture": texture})
+                             "texture": texture, "w": desc.get("texture_width", 64), "h": desc.get("texture_height", 64)})
     template = (Path(__file__).resolve().parent / "matabele_viewer.template.html").read_text(encoding="utf-8")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")
