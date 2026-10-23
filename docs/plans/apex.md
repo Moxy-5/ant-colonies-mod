@@ -268,7 +268,7 @@ easiest to stop bugs from happening and push updates easier"); so these are my p
    only the number and asks its colony (`getGrowsInto(colony)`), the nymph renderer reads the number. No shared file
    names the soldier rank now (only the soldiers' own files, the registry rows and the renderer). Checks in
    `AwayTests.partsAreTheSpecies` and `TermiteSoldierTests`; `soldiers,away,colony` 36 of 37 (the neighbours flake, BUGS 55, 3 of 3 alone) on 6 servers. Nothing
-   changes in-game. Next: the user tests steps 6 to 10 in-game, then a full run and speed check, then merge.
+   changes in-game. **Steps 6 to 10 confirmed in-game by the user 2026-10-22** ("everything is working"; tried on termites only: the user plans to take the red harvester ant out of this mod for other mods, and to rework its behaviour when those are planned). Next: a full run and speed check, then merge with the user's OK.
 
 Then the split's own plan (`docs/plans/mod-split.md`) can draw the framework's wall along the registry: shared parts
 in, species parts out.
