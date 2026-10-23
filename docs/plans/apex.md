@@ -328,3 +328,10 @@ want to rush the project, so whatever you think is best". My plan, agreed: part 
 and part 2 (the split, about 6 to 10 steps) at a careful pace, about 3 days; then part 3 (the termites, the Matabele
 ants' prey) with the days left. Everything merged into `master` with a full run before the trip, never a half-done
 branch left behind; the Matabele ants (M8) start after the trip.
+
+## Part 4 dropped (the user, 2026-10-23)
+Part 4 (reshaping the harvester ant's code in the desert mod) is dropped from Apex. The user's plan: the red harvester
+ant does not fit the savanna, so the Matabele ant replaces it there (M8, straight after part 3); the split already
+moved the harvester into the desert mod. Its tidy-up is done with its rework, when the desert mod is planned. Part 3,
+the termites, is the last part of Apex. Step 13 (the framework's legs tests riding on the harvester ant) still stands
+for whenever the desert mod leaves or changes.
