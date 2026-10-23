@@ -47,8 +47,16 @@ public class DangerMap {
         int hurts;
         /** The most the strength has been (a place once hit hard enough is left for good: termites, step 3). */
         double peak;
+        /**
+         * Separate attacks here (BUGS 65): hurts and deaths with less than {@code seen_every_ticks} between them are one
+         * attack (a chicken's flurry of pecks), one after a quiet spell is a new one. A place is left for good only once
+         * attacked again and again, not for one attack however bad.
+         */
+        int attacks;
+        /** When someone was last hurt or killed here, or {@link Colony#NOT_SET}. */
+        long lastAttack;
 
-        Place(BlockPos pos, double strength, long at, String what, int deaths, int hurts, double peak) {
+        Place(BlockPos pos, double strength, long at, String what, int deaths, int hurts, double peak, int attacks, long lastAttack) {
             this.pos = pos;
             this.strength = strength;
             this.at = at;
@@ -56,6 +64,8 @@ public class DangerMap {
             this.deaths = deaths;
             this.hurts = hurts;
             this.peak = peak;
+            this.attacks = attacks;
+            this.lastAttack = lastAttack;
         }
 
         public BlockPos pos() {
@@ -78,10 +88,25 @@ public class DangerMap {
         public double peak() {
             return peak;
         }
+
+        /** Separate attacks here (see {@link #attacks}). */
+        public int attacks() {
+            return attacks;
+        }
     }
 
     /** How sightings are counted: once a mob has been seen it adds again only after this long (ticks). */
     private final Map<UUID, Long> seenAt = new HashMap<>();
+    /** A member's wounds of late: the most counted for it and when it was last hurt (BUGS 65). Not saved. */
+    private record Wounds(double counted, long at) {
+    }
+
+    /**
+     * The members hurt of late (BUGS 65): one member pecked again and again and killed in a moment is one attack, counted
+     * once at its worst (a death), not a hurt for every peck. Its wounds count afresh once it was left alone for
+     * {@code seen_every_ticks}.
+     */
+    private final Map<UUID, Wounds> wounded = new HashMap<>();
     private final Colony colony;
     private final List<Place> places = new ArrayList<>();
     /** Places forgotten since the colony was loaded (for the list). */
@@ -104,11 +129,41 @@ public class DangerMap {
 
     /** A member was hurt at {@code where} by {@code what} (a living thing not of its colony); {@code killed}: it died of it. */
     public void hurt(ServerLevel level, BlockPos where, String what, boolean killed) {
+        hurt(level, where, what, killed, null);
+    }
+
+    /**
+     * As above, {@code member}: the one hurt (null: not known, each hurt counts). The same member hurt again within
+     * {@code seen_every_ticks} of its last wound adds only what its worst wound adds more (BUGS 65: a chicken's 3 pecks and
+     * the kill were 4 attacks, strength 10, and the hole there was left for good for one dead worker).
+     */
+    public void hurt(ServerLevel level, BlockPos where, String what, boolean killed, @Nullable UUID member) {
         SpeciesProfile.DangerNumbers numbers = numbers();
         if (numbers == null) {
             return;
         }
-        add(level, where, killed ? numbers.killed() : numbers.hurt(), what, killed, true, killed ? "a member killed" : "a member hurt");
+        double amount = killed ? numbers.killed() : numbers.hurt();
+        boolean again = false;
+        if (member != null) {
+            long now = level.getGameTime();
+            Wounds before = wounded.get(member);
+            if (before != null && now - before.at() < numbers.seenEveryTicks() && now >= before.at()) {
+                again = true;
+                amount = Math.max(0, amount - before.counted());
+            }
+            if (killed) {
+                wounded.remove(member);
+            } else {
+                wounded.put(member, new Wounds(again ? before.counted() + amount : amount, now));
+            }
+            if (wounded.size() > 256) {
+                wounded.values().removeIf(wounds -> now - wounds.at() >= numbers.seenEveryTicks() || wounds.at() > now);
+            }
+        }
+        if (again && !killed) {
+            return; // the same member hurt again: already counted
+        }
+        add(level, where, amount, what, killed, !again, killed ? "a member killed" : "a member hurt");
     }
 
     /** A member out on the surface saw a hostile mob ({@code mob}) close by at {@code where}: counted once per {@code seen_every_ticks}. */
@@ -142,7 +197,7 @@ public class DangerMap {
             }
         }
         if (nearest == null) {
-            nearest = new Place(where.immutable(), 0, now, what, 0, 0, 0);
+            nearest = new Place(where.immutable(), 0, now, what, 0, 0, 0, 0, Colony.NOT_SET);
             places.add(nearest);
         }
         nearest.strength = Math.min(numbers.most(), strength(nearest, now) + amount);
@@ -153,6 +208,12 @@ public class DangerMap {
             nearest.deaths++;
         } else if (attack) {
             nearest.hurts++;
+        }
+        if (killed || attack) {
+            if (nearest.lastAttack == Colony.NOT_SET || now - nearest.lastAttack >= numbers.seenEveryTicks() || nearest.lastAttack > now) {
+                nearest.attacks++;
+            }
+            nearest.lastAttack = now;
         }
         version++;
         ColonyFrameworkMod.LOGGER.info("[danger] colony {}: {} at {} ({}), strength now {}", colony.getId(), happened, where.toShortString(), what,
@@ -211,13 +272,16 @@ public class DangerMap {
         return sum >= numbers.dangerousFrom();
     }
 
-    /** The places where someone was attacked that were once as strong as {@code leave_from} (left for good: termites, step 3). */
+    /**
+     * The places attacked again and again (at least twice, {@link Place#attacks}) that were once as strong as
+     * {@code leave_from} (left for good: termites, step 3). One attack, however bad, is not enough (BUGS 65).
+     */
     public List<Place> hitHard() {
         SpeciesProfile.DangerNumbers numbers = numbers();
         List<Place> hard = new ArrayList<>();
         if (numbers != null) {
             for (Place place : places) {
-                if (place.attacked() && place.peak >= numbers.leaveFrom() && !atHome(place.pos)) {
+                if (place.attacked() && place.attacks >= 2 && place.peak >= numbers.leaveFrom() && !atHome(place.pos)) {
                     hard.add(place);
                 }
             }
@@ -386,6 +450,9 @@ public class DangerMap {
     public void ageForTests(long ticks) {
         for (Place place : places) {
             place.at -= ticks;
+            if (place.lastAttack != Colony.NOT_SET) {
+                place.lastAttack -= ticks;
+            }
         }
         version++;
     }
@@ -414,7 +481,7 @@ public class DangerMap {
 
     /** Tests only: a sample in every saved number (the save and load check, {@code AwayKit.everyPartSavesAndLoads}). */
     public void fillForTests(ServerLevel level) {
-        places.add(new Place(new BlockPos(6, 60, -4), 1.5, level.getGameTime(), "minecraft:spider", 1, 2, 1.5));
+        places.add(new Place(new BlockPos(6, 60, -4), 1.5, level.getGameTime(), "minecraft:spider", 1, 2, 1.5, 2, level.getGameTime() - 5));
     }
 
     void save(CompoundTag tag) {
@@ -428,6 +495,8 @@ public class DangerMap {
             one.putInt("deaths", place.deaths);
             one.putInt("hurts", place.hurts);
             one.putDouble("peak", place.peak);
+            one.putInt("attacks", place.attacks);
+            one.putLong("lastAttack", place.lastAttack);
             list.add(one);
         }
         tag.put("danger", list);
@@ -437,8 +506,12 @@ public class DangerMap {
         places.clear();
         for (Tag entry : tag.getList("danger", Tag.TAG_COMPOUND)) {
             CompoundTag one = (CompoundTag) entry;
+            int deaths = one.getInt("deaths");
+            int hurts = one.getInt("hurts");
             places.add(new Place(BlockPos.of(one.getLong("pos")), one.getDouble("strength"), one.getLong("at"), one.getString("what"),
-                    one.getInt("deaths"), one.getInt("hurts"), one.contains("peak") ? one.getDouble("peak") : one.getDouble("strength")));
+                    deaths, hurts, one.contains("peak") ? one.getDouble("peak") : one.getDouble("strength"),
+                    one.contains("attacks") ? one.getInt("attacks") : deaths + hurts > 0 ? 1 : 0,
+                    one.contains("lastAttack") ? one.getLong("lastAttack") : Colony.NOT_SET));
         }
     }
 }

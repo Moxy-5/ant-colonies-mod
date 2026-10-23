@@ -35,7 +35,7 @@
       "most": 12.0,
       "home": 6.0,
       "keep_away": false,
-      "_note_close": "Brain step 4g, step 3 (real Macrotermes after a raid): close_holes plugs at once every foraging hole within reach blocks of where a termite was hurt or killed (not only a hostile seen), and every hole whose gallery out from the nest runs that near it; they stay shut, get no turn, draw no growing tip and no food is fetched there until the danger fades below dangerous_from. A place once as strong as leave_from (two deaths, or a death and a hurt) is left for good: its holes within merge_within are never opened again, and a new hole is opened on the same gallery at least new_hole_from blocks from it. My picks, to confirm.",
+      "_note_close": "Brain step 4g, step 3 (real Macrotermes after a raid): close_holes plugs at once every foraging hole within reach blocks of where a termite was hurt or killed (not only a hostile seen), and every hole whose gallery out from the nest runs that near it; they stay shut, get no turn, draw no growing tip and no food is fetched there until the danger fades below dangerous_from. A place once as strong as leave_from (two deaths, or a death and a hurt) and attacked at least twice (attacks less than seen_every_ticks apart are one; each termite counts once an attack, at its worst; BUGS 65) is left for good: its holes within merge_within are never opened again, and a new hole is opened on the same gallery at least new_hole_from blocks from it. My picks, to confirm.",
       "close_holes": true,
       "leave_from": 6.0,
       "new_hole_from": 7.0
