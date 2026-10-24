@@ -37,6 +37,11 @@ timings: all "my pick, to confirm" until then).
    sting (paralysis), termite soldiers clamping on and riding along, legs bitten
    off (saved per ant, hidden on the model, 5- and 4-legged walks), stinging a
    player who provokes them, defenders in waves who give up past their territory.
+   Ideas from the user (2026-10-23, planning, liked): the attack picked by where the
+   termite is (grab and sting under when it is in front, bite and stab down into a
+   broken tunnel); antennae bitten off too; termite soldier heads left clamped on the
+   ants' legs and pulled off at home; lost legs lying on the battlefield a while.
+   Matabele heads coming off: not real, left out.
    Replaces `Alarm`/`Soldiers` using `TermiteSoldierEntity` directly with a shared
    defender idea.
 3. **Drawn-only ants** (brain step 4e, pulled forward): the column far from the
