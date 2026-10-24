@@ -34,9 +34,9 @@
 <body>
 <header>
   <h1>Matabele ant viewer</h1>
-  <p>The Matabele ant in plain black with head B and its black crushing jaws hanging out and down from the face (your pick, 4, made bulkier), (the list under the
+  <p>The Matabele ant in plain black with head B and new jaws, short thick triangles folded across the mouth as in your photos, A closed and B a little open, (the list under the
      buttons says what each is), each as a big major (left) and a small minor (right), the heads hanging slanted down,
-     the majors' the most; the "face" buttons look each major in the face, the "head" buttons at its head from the side,
+     the majors' the most; the "face" buttons look each major in the face, the "front" buttons straight at it as in your photos, the "head" buttons at its head from the side,
      the "profile" buttons at the whole ant from the side. In front, the game's own
      insects at their game sizes and a player's height. The grid lines are one block apart. Drag to turn, scroll or pinch
      to zoom, right-drag to slide. The sliders change only the Matabele sizes.</p>
@@ -253,6 +253,7 @@ looks.forEach(l => {
   CAMS['profile ' + l.key] = () => { const p = l.major.position, r = l.major.rotation.y, d = settings.major * 1.3 + 0.3;
     return [[p.x + Math.cos(r) * d, settings.major * 0.2, p.z - Math.sin(r) * d], [p.x, settings.major * 0.16, p.z]]; };
   CAMS['face ' + l.key] = () => headCam(l.major, 35, 12, 1.7);
+  CAMS['front ' + l.key] = () => headCam(l.major, 0, -8, 1.5);      // straight at the face, as in the photos
   CAMS['head ' + l.key] = () => headCam(l.major, 90, 0, 1.9);
   CAMS['top ' + l.key] = () => { const p = l.major.position; const d = settings.major * 1.6 + 0.3;
     return [[p.x + 0.001, d, p.z + 0.001], [p.x, 0, p.z]]; };

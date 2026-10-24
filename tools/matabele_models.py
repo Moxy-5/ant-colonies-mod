@@ -53,6 +53,10 @@ Ninth round (the user, 2026-10-23: "I want the jaws in B4 but I want them in the
 B2"): B4's broad toothed blades hung out and down from the face like crushers, four ways to keep them off the floor
 (JAWS, 1 to 4); then 4 picked and made new: bulkier, wider crushers, all black.
 
+Tenth round (the user, 2026-10-23, three photos: the hanging jaws "look like ram horns"): the jaws remade as the real
+ones are, short thick triangles hinged at the mouth's corners, folded shut across the mouth into a pointed muzzle,
+the toothed edges meeting; closed and a little open side by side (JAWS A and B).
+
 Units are model pixels before SCALE, as in ant_models.py: the head points to -Z, the ground is y = 0, left is +X.
 """
 import copy
@@ -81,12 +85,12 @@ TEXELS = 3.0
 BLACK, WHITE = (22, 22, 24), (236, 234, 228)
 LOOKS = {
     'A': {'name': 'Black',
-          'note': "plain black all over, no texture, like a real Matabele: the eyes a lighter black, the jaws black,"
-                  " the antennae fading from black to white toward their tips",
+          'note': "plain black all over, no texture, like a real Matabele: the eyes a lighter black, the jaws black "
+                  "with a faint brown toothed edge, the antennae fading from black to white toward their tips",
           'grain': 7, 'flecks': 0.10, 'hair': 0.08,
           'colours': {'head': BLACK, 'thorax': BLACK, 'waist': BLACK, 'gaster': BLACK, 'rim': BLACK, 'leg': BLACK,
                       'antenna': BLACK, 'tarsus': BLACK, 'joint': BLACK, 'eye': (50, 50, 55), 'jaw': BLACK,
-                      'jawedge': BLACK, 'sting': BLACK,
+                      'jawedge': (62, 40, 30), 'sting': BLACK,
                       # the antenna's whip, segment by segment, from black at the elbow to white at the tip
                       **{f'whip{i}': tuple(round(k + (w - k) * (i / 10) ** 1.4) for k, w in zip(BLACK, WHITE))
                          for i in range(11)}}},
@@ -273,31 +277,28 @@ HEAD_B = {
     'socket': (1.0, 0.25, -6.75), 'elbow': (2.9, 0.9, -1.6),
     'whip': [(4.3, 1.2, -3.2), (5.2, 0.8, -5.0), (5.6, -0.2, -6.6), (5.7, -1.3, -7.6)],
 }
-# The jaws (the user, 2026-10-23): B4's broad three-cornered blades with their four blunt teeth, hung where B2's hooks
-# are (out from the face, then down and in, like crushers: the real jaws open side to side across the head, and the
-# head hangs down, so they reach out and then down). B4's blades are bigger than B2's hooks and would reach through the
-# floor, so four ways side by side (the user's picks): 1 curled in tighter and a little smaller, 2 only curled in
-# tighter, 3 only smaller, 4 as they are, the floor left to the animations (the jaws resting closed while walking).
-# Each jaw: its middle line (left side, in the head's own frame), its width at each point, its thickness, which way its
-# flat sides face (side: out, so the curve shows from the side), how far the tips pass each other, and its teeth (how
-# far along, how long, how wide).
-JAW_BASE = (1.25, -0.8, -6.35)
-# The jaw's path as offsets from its base: B2's hook drawn out to B4's length, the tips meeting.
-HANGING = [(0, 0, 0), (0.3, -0.55, -1.15), (0.35, -1.4, -1.85), (0.1, -2.15, -1.9), (-0.45, -2.6, -1.35),
-           (-1.1, -2.7, -0.65)]
-
-
-# The user picked 4 (2026-10-23: "4 looks the best Ill let the animations do the rest") and asked for the jaws new in
-# that hang, "bulkier", "black", "wider like a crusher like the images": broad heavy blades, twice as thick, wider all
-# the way to a blunter point, and four big blunt crushing teeth along the inside, all black.
-CRUSHER = {'jaw': [tuple(b + o for b, o in zip(JAW_BASE, p)) for p in HANGING],
-           'jaw_width': [1.9, 1.75, 1.5, 1.2, 0.85, 0.4], 'jaw_thick': 0.85, 'flat': 'side', 'jaw_cross': 0.0,
-           'jaw_teeth': [(0.24, 0.5, 0.46), (0.4, 0.46, 0.42), (0.56, 0.4, 0.38), (0.7, 0.32, 0.32)]}
+# The jaws (the user, 2026-10-23, from three photos: the hanging blades "look like ram horns"): a real ant's jaws are
+# hinged at the corners of the mouth and swing side to side like gates in the plane of the mouth; closed, the Matabele's
+# are two short, thick triangles folded across the front of the mouth under the clypeus, their toothed inner edges
+# meeting in the middle, so from the front the face ends in a pointed chin, a muzzle. Each jaw is drawn as rows across
+# it from the hinge to the point: the outer edge curving round from the face's full width to the point, the inner edge
+# slanting in from the hinge's inner corner to the middle and then running along it (the toothed edge, a faint brown
+# as in the user's photo), blunt teeth on every other row, the left jaw's between the right one's so they interlock
+# when closed; thickest at the hinge, thinner toward the point, sloping a little down.
+# hinge: the outer back corner (left side, head frame); length: hinge to point; width: the outer edge's reach from the
+# middle at the hinge; basal: the inner corner's reach at the hinge, and how far along the inner edge reaches the middle;
+# top, slope: the top at the hinge and how far it drops by the point; thick: at the hinge and at the point; gap: the
+# inner edge's distance from the middle; tooth: how far a tooth reaches past it; open: degrees each jaw swings out.
+MANDIBLE = {'hinge': (1.5, -1.05, -6.2), 'length': 2.1, 'width': 1.5, 'basal': (0.9, 0.38), 'top': -1.05,
+            'slope': 0.25, 'thick': (0.72, 0.32), 'gap': 0.1, 'tooth': 0.16, 'rows': 11, 'open': 0.0}
 JAWS = {
-    'A': {'name': 'Crushers',
-          'note': "your pick, 4: the jaws hanging out and down from the face, curling in, the points meeting behind; "
-                  "made new, bulkier and wider, black, with four big blunt crushing teeth; they reach the floor at "
-                  "rest, left to the animations (closed while walking)", **CRUSHER},
+    'A': {'name': 'Closed',
+          'note': "the jaws folded shut across the mouth as in your photo, the toothed edges meeting in the middle "
+                  "and the teeth interlocking: a pointed muzzle under the face",
+          'mandible': MANDIBLE},
+    'B': {'name': 'A little open',
+          'note': "the same jaws swung out a little at the hinges, a gap between them so the teeth along the inner "
+                  "edges show", 'mandible': {**MANDIBLE, 'open': 16.0}},
 }
 HEADS = {key: {**HEAD_B, **jaw} for key, jaw in JAWS.items()}
 WHIP_SEGMENTS = 11              # the real funiculus: 11 segments
@@ -421,50 +422,31 @@ def head_boxes(spec):
 
 
 def jaw_cubes(f, spec, sx, size):
-    """The jaw (the left one for sx = 1) as a curved blade narrowing to its point, in the model file's frame: short
-    overlapping pieces along its middle line, a deep red strip along the inner edge of the curve, and its teeth."""
-    line = smooth(smooth(spec['jaw']))
-    n = len(line) - 1
-    # The tips pass one over the other: the left jaw's end a little lower, the right one's a little higher.
-    line = [(x, y - sx * spec['jaw_cross'] * (i / n) ** 2, z) for i, (x, y, z) in enumerate(line)]
-    pts = [f.pt((x * sx, y, z)) for x, y, z in line]
-    up = (0, 1, 0) if spec['flat'] == 'up' else (1, 0, 0)
-    widths, thick = spec['jaw_width'], spec['jaw_thick'] * size
-    middle = tuple(sum(c) / len(pts) for c in zip(*pts))     # inside the curve: the inner edge faces it
-
-    def width(t):
-        k = min(int(t * (len(widths) - 1)), len(widths) - 2)
-        u = t * (len(widths) - 1) - k
-        return (widths[k] + (widths[k + 1] - widths[k]) * u) * size
-
-    def inward(a, b):
-        d = unit([q - p for p, q in zip(a, b)])
-        side = unit(cross(up, d))
-        if dot(side, [m - c for m, c in zip(middle, lerp(a, b, 0.5))]) < 0:
-            side = tuple(-c for c in side)
-        return d, side
-
-    cubes = []
-    for i, (a, b) in enumerate(zip(pts, pts[1:])):
-        t = (i + 0.5) / n
-        w, d = width(t), unit([q - p for p, q in zip(a, b)])
-        reach = 0.12 * size if i < n - 1 else 0                 # each piece a little longer, so the bends close up
-        a2 = tuple(p - c * reach for p, c in zip(a, d))
-        b2 = tuple(p + c * reach for p, c in zip(b, d))
-        tk = thick * (1 - 0.45 * t)                             # thinner toward the point
-        cubes.append(plate(a2, b2, w, tk, up, 'jaw'))
-        _, side = inward(a, b)
-        strip = max(0.12 * size, w * 0.32)
-        edge = [tuple(p + c * (w - strip) / 2 for p, c in zip(P, side)) for P in (a2, b2)]
-        cubes.append(plate(edge[0], edge[1], strip, tk * 1.08, up, 'jawedge'))
-    for frac, length, across in spec['jaw_teeth']:
-        i = min(int(frac * n), n - 1)
-        a, b = pts[i], pts[i + 1]
-        _, side = inward(a, b)
-        w = width((i + 0.5) / n)
-        root = tuple(p + c * (w / 2 - 0.08 * size) for p, c in zip(lerp(a, b, frac * n - i), side))
-        tip = tuple(p + c * length * size for p, c in zip(root, side))
-        cubes.append(plate(root, tip, across * size, thick * 0.8, up, 'jawedge'))
+    """The jaw (the left one for sx = 1) in the head's own frame: rows across it from the hinge to the point (see
+    MANDIBLE), each a box, the inner edge's strip and the teeth in the toothed edge's colour."""
+    m = spec['mandible']
+    hx, _, z0 = m['hinge']
+    basal_x, basal_t = m['basal']
+    rows, cubes = m['rows'], []
+    for r in range(rows):
+        t0, t1 = r / rows, (r + 1) / rows
+        t = (t0 + t1) / 2
+        za, zb = z0 - m['length'] * t1, z0 - m['length'] * t0
+        x_out = m['width'] * (1 - t ** 1.6) ** 0.7
+        x_in = max(m['gap'], basal_x * (1 - t / basal_t)) if t < basal_t else m['gap']
+        top = m['top'] - m['slope'] * t
+        thick = m['thick'][0] + (m['thick'][1] - m['thick'][0]) * t
+        y0, y1 = top - thick, top
+        toothed = t >= basal_t
+        strip = min(0.2, (x_out - x_in) / 2) if toothed else 0
+        if x_out - x_in - strip > 0.05:
+            cubes.append(f.box(*sym_points([x_in + strip, y0, za], [x_out, y1, zb], sx), 'jaw'))
+        if strip:
+            cubes.append(f.box(*sym_points([x_in, y0 + 0.04, za], [x_in + strip, y1 - 0.04, zb], sx), 'jawedge'))
+            if (r + (0 if sx > 0 else 1)) % 2 == 0:                        # the teeth interlock when closed
+                mid = (za + zb) / 2
+                cubes.append(f.box(*sym_points([x_in - m['tooth'], y0 + 0.1, mid - 0.07],
+                                               [x_in, y1 - 0.1, mid + 0.07], sx), 'jawedge'))
     return cubes
 
 
@@ -475,9 +457,11 @@ def head_bones(spec, size=1.0, antenna=1.0, tilt=0.0):
         head['rotation'] = [tilt, 0, 0]
     bones = [head]
     for side, sx in (('l', 1), ('r', -1)):
-        base = spec['jaw'][0]
-        bones.append(bone(f'mandible_{side}', 'head', f.pt((base[0] * sx, base[1], base[2])),
-                          jaw_cubes(f, spec, sx, size)))
+        hinge = spec['mandible']['hinge']
+        jaw = bone(f'mandible_{side}', 'head', f.pt((hinge[0] * sx, hinge[1], hinge[2])), jaw_cubes(f, spec, sx, size))
+        if spec['mandible']['open']:
+            jaw['rotation'] = [0, -spec['mandible']['open'] * sx, 0]          # swung out at its hinge
+        bones.append(jaw)
         sock = spec['socket']
         socket_at = f.world((sock[0] * sx, sock[1], sock[2]))
         k = size * antenna
@@ -498,8 +482,8 @@ def head_bones(spec, size=1.0, antenna=1.0, tilt=0.0):
             thick = (0.32 + 0.1 * i / (WHIP_SEGMENTS - 1)) * size            # a little thicker toward the tip
             whip.append(rod(p, q, thick, f'whip{i}'))                         # black at the elbow to white at the tip
         bones.append(bone(f'antenna_{side}_2', f'antenna_{side}_1', elbow, whip))
-    tips = spec['jaw'][-1]
-    bones.append(bone('carry', 'head', f.pt((0, tips[1], tips[2] + 0.4))))     # between the jaw tips: the termites held
+    m = spec['mandible']
+    bones.append(bone('carry', 'head', f.pt((0, m['top'] - m['slope'], m['hinge'][2] - m['length']))))  # at the points
     return bones
 
 
