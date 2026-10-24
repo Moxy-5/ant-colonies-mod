@@ -1043,9 +1043,14 @@ public class Nest {
         return levelsUnlocked;
     }
 
+    /** Every level may be dug (an old colony placed in new land, M8 step 1b, dug them all long ago). */
+    public void unlockAllLevels() {
+        levelsUnlocked = Integer.MAX_VALUE;
+    }
+
     /** Tests only: every level may be dug at once (for tests about the digging itself, not about nest stages). */
     public void unlockAllLevelsForTests() {
-        levelsUnlocked = Integer.MAX_VALUE;
+        unlockAllLevels();
     }
 
     void save(CompoundTag tag) {

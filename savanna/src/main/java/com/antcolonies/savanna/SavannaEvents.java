@@ -77,6 +77,7 @@ public class SavannaEvents {
         if (event.getLevel() instanceof ServerLevel level) {
             com.antcolonies.savanna.tree.Forest.tick(level);
             com.antcolonies.savanna.colony.DeadMounds.tick(level);
+            com.antcolonies.savanna.colony.NewLandMounds.tick(level);
         }
     }
 

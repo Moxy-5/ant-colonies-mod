@@ -381,9 +381,14 @@ public class Colony {
         return bornAt == NOT_SET ? 0 : Math.max(0, now - bornAt) / 24000.0;
     }
 
+    /** The colony was founded {@code days} game days ago (a colony placed in new land, M8 step 1b, has lived there long). */
+    public void setAge(Level level, double days) {
+        bornAt = level.getGameTime() - Math.round(days * 24000.0);
+    }
+
     /** Game tests only: the colony was founded {@code days} game days ago. */
     public void setAgeForTests(Level level, double days) {
-        bornAt = level.getGameTime() - Math.round(days * 24000.0);
+        setAge(level, days);
     }
 
     /**

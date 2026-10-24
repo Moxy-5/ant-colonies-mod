@@ -95,6 +95,12 @@ public class TermiteQueenEntity extends AbstractAntEntity implements SwellingQue
         entityData.set(DATA_SIZE, Mth.clamp(size, 0.0F, 1.0F));
     }
 
+    /** M8 step 1b: she is the queen of a colony placed in new land (made for her, not founded by her). */
+    public void becomeQueenOf(Colony colony) {
+        setColonyId(colony.getId());
+        colonyChecked = true;
+    }
+
     // A bigger queen takes up more room (her hitbox grows with her).
     @Override
     public void onSyncedDataUpdated(EntityDataAccessor<?> key) {

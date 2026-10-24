@@ -34,7 +34,12 @@ public class ColonyManager extends SavedData {
     }
 
     public Colony createColony(ResourceLocation species, UUID queenId, BlockPos center) {
-        Colony colony = new Colony(UUID.randomUUID(), species, queenId, center);
+        return createColony(species, UUID.randomUUID(), queenId, center);
+    }
+
+    /** As above, with the colony's id chosen beforehand (a colony of new land whose nest was worked out ahead of it). */
+    public Colony createColony(ResourceLocation species, UUID colonyId, UUID queenId, BlockPos center) {
+        Colony colony = new Colony(colonyId, species, queenId, center);
         colonies.put(colony.getId(), colony);
         setDirty();
         return colony;

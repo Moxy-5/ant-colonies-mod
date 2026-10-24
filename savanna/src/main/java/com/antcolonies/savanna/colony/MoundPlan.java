@@ -11,6 +11,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import com.antcolonies.savanna.block.TermiteRampBlock;
 import com.antcolonies.savanna.block.TermiteSpireBlock;
@@ -93,26 +97,82 @@ public final class MoundPlan {
         return new Builder(h, numbers.maxHeight(), seed).build();
     }
 
-    /** The grown mounds of the last few colonies asked for (growing one takes a moment). */
-    private static final Map<String, List<Shape>> GROWN = new LinkedHashMap<>(8, 0.75F, true) {
+    /**
+     * The grown mounds of the last few colonies asked for (growing one takes about a second; a grown full mound is about
+     * 15,000 cells over its stages, some 2 MB). 24 since new land has a mound every 80 blocks (M8 step 1b): about 8 to 12
+     * colonies round a player, each asking again whenever its mound moves on a stage.
+     */
+    private static final int KEPT = 24;
+    private static final Map<String, List<Shape>> GROWN = new LinkedHashMap<>(KEPT, 0.75F, true) {
         @Override
         protected boolean removeEldestEntry(Map.Entry<String, List<Shape>> eldest) {
-            return size() > 8;
+            return size() > KEPT;
         }
     };
+    /** Mounds being grown in the background ({@link #grownSoon}), by key. */
+    private static final Map<String, CompletableFuture<List<Shape>>> GROWING = new ConcurrentHashMap<>();
+    /** A quarter of the computer's threads, 1 to 4: a world loaded with many mound colonies round the player grows them side by side. */
+    private static final ExecutorService GROWER = Executors.newFixedThreadPool(Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors() / 4)), run -> {
+        Thread thread = new Thread(run, "termite-mound-grower");
+        thread.setDaemon(true);
+        thread.setPriority(Thread.MIN_PRIORITY);
+        return thread;
+    });
+
+    private static String key(MoundNumbers numbers, long seed) {
+        return numbers.maxHeight() + "/" + seed;
+    }
 
     /**
      * Every stage of the mound of the colony with this seed, with its tunnels: index {@code h} is stage {@code h}
      * (index 0 is unused). Grown once with the termites' building rules ({@link MoundGrowth#grow}) and kept.
      */
-    public static synchronized List<Shape> growth(MoundNumbers numbers, long seed) {
-        String key = numbers.maxHeight() + "/" + seed;
-        List<Shape> stages = GROWN.get(key);
-        if (stages == null) {
-            stages = MoundGrowth.grow(numbers.maxHeight(), h -> shapeOf(h, numbers, seed));
+    public static List<Shape> growth(MoundNumbers numbers, long seed) {
+        String key = key(numbers, seed);
+        synchronized (GROWN) {
+            List<Shape> stages = GROWN.get(key);
+            if (stages != null) {
+                return stages;
+            }
+        }
+        CompletableFuture<List<Shape>> later = GROWING.get(key);
+        if (later != null) {
+            return later.join(); // being grown in the background: wait for it
+        }
+        synchronized (GROWN) {
+            List<Shape> justGrown = GROWN.get(key); // (the background may have finished in between)
+            if (justGrown != null) {
+                return justGrown;
+            }
+        }
+        List<Shape> stages = MoundGrowth.grow(numbers.maxHeight(), h -> shapeOf(h, numbers, seed));
+        synchronized (GROWN) {
             GROWN.put(key, stages);
         }
         return stages;
+    }
+
+    /**
+     * Whether the mound of this seed is grown and kept; if not, it is grown on a background thread from now (M8 step 1b:
+     * a colony of new land waits for it, so the game never stops for a second while it is grown).
+     */
+    public static boolean grownSoon(MoundNumbers numbers, long seed) {
+        String key = key(numbers, seed);
+        synchronized (GROWN) {
+            if (GROWN.containsKey(key)) {
+                return true;
+            }
+        }
+        GROWING.computeIfAbsent(key, k -> CompletableFuture.supplyAsync(() -> MoundGrowth.grow(numbers.maxHeight(), h -> shapeOf(h, numbers, seed)), GROWER)
+                .whenComplete((stages, failed) -> {
+                    if (stages != null) {
+                        synchronized (GROWN) {
+                            GROWN.put(k, stages);
+                        }
+                    }
+                    GROWING.remove(k);
+                }));
+        return false;
     }
 
     /** How many blocks of mound soil a stage has (plain soil and soil with a tunnel through it). */

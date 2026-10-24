@@ -166,6 +166,14 @@ public class TermiteKingEntity extends AbstractAntEntity implements FedByNurses 
         }
     }
 
+    /** M8 step 1b: he is the king of a colony placed in new land (as when he joins a queen by himself). */
+    public void becomeKingOf(ServerLevel level, Colony colony) {
+        setColonyId(colony.getId());
+        colony.setCount(CASTE, 1);
+        colony.part(SavannaParts.KING_CARE).ifPresent(care -> care.joined(level));
+        ColonyManager.get(level).markChanged();
+    }
+
     // The colony loses its king (the queen lives on).
     @Override
     public void die(DamageSource source) {

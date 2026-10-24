@@ -36,7 +36,7 @@ public final class SavannaTests {
         // The legs: climbing, crawling through termite tunnels, reloads of climbing insects, the Matabele up a pillar.
         TestFilter.addCategory("legs", TermiteClimbingTests.class, TermiteTunnelTests.class, MatabeleTests.class);
         // The termite mound: its blocks, the cathedral, doorways and chimney mouths, mending the nest.
-        TestFilter.addCategory("mound", TermiteMoundTests.class, TermiteCathedralTests.class, TermiteRepairTests.class);
+        TestFilter.addCategory("mound", TermiteMoundTests.class, TermiteCathedralTests.class, TermiteRepairTests.class, TermiteNewLandTests.class);
         // Termite food: foraging and its holes, the garden, new holes, dead wood, runways, bare patches, mushrooms.
         TestFilter.addCategory("termitefood", TermiteFoodTests.class, TermiteForagingTests.class, TermiteNewHoleTests.class,
                 TermiteRunwayTests.class, TermiteBarePatchTests.class, TermitomycesTests.class);

@@ -144,6 +144,9 @@ public class GiantTreeStructure extends Structure {
         if (tree != null && litter.size() > 0) {
             box = box.encapsulate(litter.box(foot));
         }
+        if (TermiteMoundStructure.crowds(context, box)) {
+            return Optional.empty(); // M8 step 1b: a termite mound has this place (trees on old humps are put there on purpose)
+        }
         net.minecraft.world.level.levelgen.structure.BoundingBox pieceBox = box;
         return Optional.of(new GenerationStub(foot, builder -> builder.addPiece(new GiantTreePiece(chosen, foot, pieceBox))));
     }

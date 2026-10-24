@@ -404,6 +404,14 @@ public class BuildLife {
         return String.format(java.util.Locale.ROOT, "%.1f builder-hours of building", work / 1000.0);
     }
 
+    /**
+     * {@code ticks} more of the builders' time to spend out of sight, as if they had worked that long while away (a
+     * colony placed in new land, M8 step 1b, grows its galleries this way: it has lived there for years).
+     */
+    public void addWork(long ticks) {
+        work += Math.max(0, ticks);
+    }
+
     // --- tests ----------------------------------------------------------------------------------------------------
 
     /** Tests only: the builders' time to spend, as if they had worked that long while away. */

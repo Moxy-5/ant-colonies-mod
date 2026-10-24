@@ -601,7 +601,7 @@ public class TermiteMoundTests {
     }
 
     /** Every block that is not air round a mound's middle, from its ground up. */
-    private static java.util.Map<BlockPos, BlockState> snapshot(ServerLevel level, BlockPos center) {
+    static java.util.Map<BlockPos, BlockState> snapshot(ServerLevel level, BlockPos center) {
         java.util.Map<BlockPos, BlockState> blocks = new java.util.HashMap<>();
         for (BlockPos pos : BlockPos.betweenClosed(center.offset(-11, 0, -11), center.offset(11, 40, 11))) {
             BlockState state = level.getBlockState(pos);
@@ -613,7 +613,7 @@ public class TermiteMoundTests {
     }
 
     /** How tall the mound stands: the highest mound block's height above the ground, plus one. */
-    private static int highest(java.util.Map<BlockPos, BlockState> blocks, BlockPos center) {
+    static int highest(java.util.Map<BlockPos, BlockState> blocks, BlockPos center) {
         int top = 0;
         for (java.util.Map.Entry<BlockPos, BlockState> entry : blocks.entrySet()) {
             if (isMound(entry.getValue())) {
@@ -686,7 +686,7 @@ public class TermiteMoundTests {
         return blocks.values().stream().filter(TermiteMoundTests::isPiece).count();
     }
 
-    private static boolean isMound(BlockState state) {
+    static boolean isMound(BlockState state) {
         return state.getBlock() instanceof TermiteMoundBlock || state.getBlock() instanceof TermiteHoleBlock
                 || state.getBlock() instanceof com.antcolonies.savanna.block.MoundPieceBlock;
     }

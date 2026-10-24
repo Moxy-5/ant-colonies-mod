@@ -75,7 +75,8 @@ public class DeadMounds extends SavedData {
     public static final class DeadMound {
         public final UUID colony;
         public final BlockPos center;
-        public final long diedAt;
+        /** (Set back once for a dead mound of new land, M8 step 1b, which died before the world was made.) */
+        public long diedAt;
         final List<Comb> combs = new ArrayList<>();
         /** The mound's wear (none if the colony had no mound standing). */
         Wear wear;
@@ -262,6 +263,22 @@ public class DeadMounds extends SavedData {
      */
     public void updateForTests(ServerLevel level, DeadMound mound, double days) {
         update(level, mound, days, Integer.MAX_VALUE);
+    }
+
+    /**
+     * M8 step 1b: a dead mound of new land, its colony dead {@code days} already: its clock set back that far and the
+     * mound, comb and works brought up to that day at once (the land was just made: nobody saw it standing). Null if
+     * there is no such dead mound.
+     */
+    public DeadMound agedForNewLand(ServerLevel level, UUID colony, double days) {
+        DeadMound mound = mounds.get(colony);
+        if (mound == null) {
+            return null;
+        }
+        mound.diedAt = level.getDayTime() - Math.round(days * 24000.0);
+        update(level, mound, mound.days(level), Integer.MAX_VALUE);
+        setDirty();
+        return mound;
     }
 
     /** The game tests: one column of the wear, told in words (for a failing check's message). */

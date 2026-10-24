@@ -936,5 +936,9 @@ public class Mound {
         allowance = tag.getDouble("moundAllowance");
         updatedAt = tag.contains("moundUpdated") ? tag.getLong("moundUpdated") : Colony.NOT_SET;
         workStage = tag.getInt("moundWorkStage"); // 0 in an old save: climbs up from the first stage
+        MoundNumbers numbers = numbers();
+        if (numbers != null) {
+            MoundPlan.grownSoon(numbers, seed()); // its shape grown in the background while the world loads (M8 step 1b)
+        }
     }
 }
