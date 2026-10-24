@@ -94,7 +94,7 @@ LOOKS = {
           'grain': 7, 'flecks': 0.10, 'hair': 0.08,
           'colours': {'head': BLACK, 'thorax': BLACK, 'waist': BLACK, 'gaster': BLACK, 'rim': BLACK, 'leg': BLACK,
                       'antenna': BLACK, 'tarsus': BLACK, 'joint': BLACK, 'eye': (50, 50, 55), 'jaw': BLACK,
-                      'jawedge': (62, 40, 30), 'sting': BLACK,
+                      'jawedge': (6, 6, 7), 'sting': BLACK,
                       # the antenna's whip, segment by segment, from black at the elbow to white at the tip
                       **{f'whip{i}': tuple(round(k + (w - k) * (i / 10) ** 1.4) for k, w in zip(BLACK, WHITE))
                          for i in range(11)}}},
@@ -278,7 +278,7 @@ HEAD_B = {
     'boxes': [([-0.9, -1.15, -7.0], [0.9, 0.05, -6.55], 'head'), NECK_BOX],
     'side_boxes': [([0.1, 0.55, -6.85], [0.75, 0.95, -6.1], 'head')],
     'eyes': (-4.8, 0.5, 1.1, 0.8, 0.25),
-    'socket': (1.0, 0.25, -6.75), 'elbow': (2.9, 0.9, -1.6),
+    'socket': (0.55, 0.7, -6.9), 'elbow': (2.9, 0.9, -1.6),
     'whip': [(4.3, 1.2, -3.2), (5.2, 0.8, -5.0), (5.6, -0.2, -6.6), (5.7, -1.3, -7.6)],
 }
 # The jaws (the user, 2026-10-23, from three photos: the hanging blades "look like ram horns"): a real ant's jaws are
@@ -297,17 +297,25 @@ HEAD_B = {
 # (B's starts 32 up, which on the major's head, slanted 31 down, is straight out, so the long tips clear the ground).
 MANDIBLE = {'hinge': (1.5, -1.05, -6.2), 'length': 2.1, 'width': 1.5, 'basal': (0.9, 0.38), 'top': -1.05,
             'slope': 0.25, 'thick': (0.72, 0.32), 'gap': 0.1, 'tooth': 0.16, 'rows': 11, 'open': 0.0}
+# B's long jaws curving down (the user, 2026-10-23: "Okay thats alot better"), all black, hinged higher up under the
+# face so they meet the chin instead of hanging below it: two heights to pick from (only the jaw differs).
+LONG_JAWS = {**MANDIBLE, 'length': 4.0, 'width': 1.6, 'basal': (0.95, 0.25), 'rows': 22,
+             'thick': (1.3, 0.28), 'bend': (-32.0, 60.0), 'open': 16.0}
+
+
+def raised(up):
+    """The long jaws with their hinge (and so the whole jaw) up higher by up."""
+    x, y, z = LONG_JAWS['hinge']
+    return {**LONG_JAWS, 'hinge': (x, y + up, z), 'top': LONG_JAWS['top'] + up}
+
+
 JAWS = {
-    'A': {'name': 'Closed',
-          'note': "the jaws folded shut across the mouth as in your photo, the toothed edges meeting in the middle "
-                  "and the teeth interlocking: a pointed muzzle under the face",
-          'mandible': MANDIBLE},
-    'B': {'name': 'Long, curving down',
-          'note': "your last photo: the jaws about twice as long, deep and broad at the hinge and narrowing to a point, "
-                  "curving down along their length like sickles, swung a little open so the teeth along the inner "
-                  "edges show; the big ant's tips just clear the ground",
-          'mandible': {**MANDIBLE, 'length': 4.0, 'width': 1.6, 'basal': (0.95, 0.25), 'rows': 22,
-                       'thick': (1.3, 0.28), 'bend': (-32.0, 60.0), 'open': 16.0}},
+    '1': {'name': 'Jaws a little higher',
+          'note': "the long jaws curving down, all black, hinged a little higher so their base meets the chin",
+          'mandible': raised(0.45)},
+    '2': {'name': 'Jaws higher still',
+          'note': "the same jaws hinged higher still, their base tucked up into the face under the antennae",
+          'mandible': raised(0.7)},
 }
 HEADS = {key: {**HEAD_B, **jaw} for key, jaw in JAWS.items()}
 WHIP_SEGMENTS = 11              # the real funiculus: 11 segments
