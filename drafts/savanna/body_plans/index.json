@@ -1,0 +1,7 @@
+{
+  "about": "Draft body plans (models not in the game yet, tools/mod_paths.py \"Drafts\"); checked by python tools/body_plan.py check like the game's.",
+  "plans": [
+    "matabele_major",
+    "matabele_minor"
+  ]
+}

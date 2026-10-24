@@ -71,9 +71,18 @@ def plan_mods():
     return [mod for mod in mod_paths.SEARCH if os.path.exists(index_path(mod))]
 
 
-def all_plans():
-    """Every plan listed in every mod's index.json, as (model, mod)."""
-    return [(model, mod) for mod in plan_mods() for model in json.load(open(index_path(mod), encoding='utf-8'))['plans']]
+def draft_index(mod):
+    """A mod's list of draft plans (models not in the game yet, tools/mod_paths.py), checked like the others."""
+    return os.path.join(mod_paths.draft_assets(mod), 'body_plans', 'index.json')
+
+
+def all_plans(drafts=True):
+    """Every plan listed in every mod's index.json (and its drafts' index.json), as (model, mod)."""
+    out = [(model, mod) for mod in plan_mods() for model in json.load(open(index_path(mod), encoding='utf-8'))['plans']]
+    for mod in mod_paths.SEARCH if drafts else ():
+        if os.path.exists(draft_index(mod)):
+            out += [(model, mod) for model in json.load(open(draft_index(mod), encoding='utf-8'))['plans']]
+    return out
 
 
 class Plan:
@@ -443,7 +452,8 @@ if __name__ == '__main__':
         rename_test(*args[1:])
     elif args[:1] == ['new'] and len(args) == 2:
         write_plan(args[1], starter(args[1]))
-        print(f'wrote {plan_path(args[1])}; add "{args[1]}" to {index_path(mod_paths.model_mod(args[1]))}, '
+        index = draft_index if mod_paths.is_draft(args[1]) else index_path
+        print(f'wrote {plan_path(args[1])}; add "{args[1]}" to {index(mod_paths.model_mod(args[1]))}, '
               f'then run measure {args[1]}')
     elif args[:1] == ['measure'] and len(args) == 2:
         for name in [m for m, _ in all_plans()] if args[1] == 'all' else [args[1]]:

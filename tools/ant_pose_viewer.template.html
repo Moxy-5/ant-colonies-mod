@@ -34,8 +34,8 @@
 </head>
 <body>
 <header>
-  <h1>Ant pose viewer</h1>
-  <p>The worker ant as the game draws it, every option playing side by side. Drag to turn, scroll or pinch to zoom, right-drag to slide.
+  <h1 id="h1">Ant pose viewer</h1>
+  <p><span id="intro">The worker ant as the game draws it, every option playing side by side.</span> Drag to turn, scroll or pinch to zoom, right-drag to slide.
      Click a name to look closer. Space pauses, the comma and full stop keys step one frame. Coloured lines are each foot's path over the floor:
      a foot on the ground should make one still dot, not a smear.</p>
 </header>
@@ -69,8 +69,13 @@ sun.shadow.bias = -0.0005;
 scene.add(sun);
 scene.add(sun.target);
 
-const SPACING = 22;
+// Other models (2026-10-23, the Matabele's draft clips): DATA.models holds each model's bones by name and an anim names
+// its model; DATA.view scales the spacing and the cameras to the model's size, DATA.scale is the game's drawing scale.
+const VIEW = DATA.view || 1;
+const SPACING = 22 * VIEW;
 const n = DATA.anims.length;
+if (DATA.title) { document.title = DATA.title; document.getElementById('h1').textContent = DATA.title; }
+if (DATA.intro) document.getElementById('intro').textContent = DATA.intro;
 // A sandy floor with a block grid (1 block = 16 model units; the game draws the worker at 0.65 of the model) and a
 // fine grid of single model units near each ant.
 const floorSize = SPACING * (n + 2);
@@ -78,7 +83,7 @@ const floor = new THREE.Mesh(new THREE.PlaneGeometry(floorSize, 200), new THREE.
 floor.rotation.x = -Math.PI / 2;
 floor.receiveShadow = true;
 scene.add(floor);
-const block = 16 / 0.65;
+const block = 16 / (DATA.scale || 0.65);
 const grid = new THREE.GridHelper(Math.ceil(floorSize / block) * block, Math.ceil(floorSize / block), '#a98f5c', '#a98f5c');
 grid.position.y = 0.02;
 scene.add(grid);
@@ -88,16 +93,20 @@ sc.left = -floorSize / 2; sc.right = floorSize / 2; sc.top = 100; sc.bottom = -1
 function deg(v) { return v * Math.PI / 180; }
 function setRot(obj, r) { obj.rotation.set(deg(-r[0]), deg(r[1]), deg(-r[2]), 'ZYX'); }
 
-function buildAnt() {
+function buildAnt(anim) {
   const root = new THREE.Group();
   const groups = {};
   const byName = {};
-  DATA.bones.forEach(b => byName[b.name] = b);
-  DATA.bones.forEach(b => {
+  // A load held at a bone (anim.load: {bone, cubes}, e.g. termites in the jaws): extra boxes drawn on that bone.
+  const bones = (anim.model ? DATA.models[anim.model] : DATA.bones).map(b => anim.load && b.name === anim.load.bone
+    ? Object.assign({}, b, {cubes: (b.cubes || []).concat(anim.load.cubes)}) : b);
+  bones.forEach(b => byName[b.name] = b);
+  bones.forEach(b => {
     const g = new THREE.Group();
     const p = b.parent ? byName[b.parent].pivot : [0, 0, 0];
     g.position.set(b.pivot[0] - p[0], b.pivot[1] - p[1], b.pivot[2] - p[2]);
     g.userData.base = g.position.clone();
+    g.userData.rest = b.rotation || [0, 0, 0];      // a bone turned in the model (GeckoLib adds the clip's turn to it)
     groups[b.name] = g;
     (b.cubes || []).forEach(c => {
       const mat = new THREE.MeshLambertMaterial({color: c.colour});
@@ -117,7 +126,7 @@ function buildAnt() {
       }
     });
   });
-  DATA.bones.forEach(b => (b.parent ? groups[b.parent] : root).add(groups[b.name]));
+  bones.forEach(b => (b.parent ? groups[b.parent] : root).add(groups[b.name]));
   return {root, groups};
 }
 
@@ -160,8 +169,9 @@ const ants = DATA.anims.map((anim, i) => {
   const base = new THREE.Group();     // where the ant starts: its place in the row and its heading
   base.position.x = (i - (n - 1) / 2) * SPACING;
   base.rotation.y = -Math.PI / 2 - 0.5;
+  if (anim.size) base.scale.setScalar(anim.size);    // drawn at its size beside the others (a minor beside a major)
   scene.add(base);
-  const ant = buildAnt();
+  const ant = buildAnt(anim);
   base.add(ant.root);
   ant.base = base;
   ant.anim = anim;
@@ -202,14 +212,22 @@ const HEAD_BONE = /^(head|mandible|antenna|carry)/;
 function pose(ant, realTau) {
   const rate = ant.anim.rate || 1;
   const tau = realTau * rate;
-  const t = tau % ant.anim.length;
-  const th = (realTau * (ant.anim.head_rate || rate)) % ant.anim.length;
-  Object.values(ant.groups).forEach(g => { g.rotation.set(0, 0, 0); g.position.copy(g.userData.base); });
+  // A clip played once (anim.once: dying) is held at its end for a while, then starts again.
+  const loopLen = ant.anim.once ? ant.anim.length + ant.anim.once : ant.anim.length;
+  const t = ant.anim.once ? Math.min(tau % loopLen, ant.anim.length) : tau % ant.anim.length;
+  const th = ant.anim.once ? t : (realTau * (ant.anim.head_rate || rate)) % ant.anim.length;
+  Object.values(ant.groups).forEach(g => { setRot(g, g.userData.rest); g.position.copy(g.userData.base); });
+  // The game's own tip-over of a dying mob (anim.tip): rolled onto its side about its long axis at the floor, 90 degrees
+  // reached after 0.66 s (Minecraft's renderer: the square root of (ticks dead - 1) / 20 * 1.6).
+  if (ant.anim.tip) {
+    const ticks = (ant.anim.once ? tau % loopLen : tau) * 20;
+    ant.root.rotation.z = deg(Math.min(1, Math.sqrt(Math.max(0, (ticks - 1) / 20 * 1.6))) * 90);
+  }
   for (const [bone, tr] of Object.entries(ant.tracks)) {
     const g = ant.groups[bone];
     if (!g) continue;
     const tb = HEAD_BONE.test(bone) ? th : t;
-    if (tr.rotation) setRot(g, sample(tr.rotation, tb));
+    if (tr.rotation) { const r = sample(tr.rotation, tb), q = g.userData.rest; setRot(g, [r[0] + q[0], r[1] + q[1], r[2] + q[2]]); }
     if (tr.position) {
       const p = sample(tr.position, tb);
       g.position.set(g.userData.base.x + p[0], g.userData.base.y + p[1], g.userData.base.z + p[2]);
@@ -242,7 +260,7 @@ function pose(ant, realTau) {
 const target = new THREE.Vector3();
 function antPoint(i) {
   const a = ants[i];
-  const p = new THREE.Vector3(0, 1.8, a.root.position.z);
+  const p = new THREE.Vector3(0, 1.8 * VIEW, a.root.position.z);
   return a.base.localToWorld(p);
 }
 function place(cam) {
@@ -258,7 +276,7 @@ function place(cam) {
   // Camera spots in the ant's own frame (its head points to -Z, its left legs are on +X).
   const spots = {side: [26, 1.8, 0], other: [-26, 1.8, 0], front: [0, 3, -26], back: [0, 4, 26], top: [0.01, 30, 0],
                  three: [16, 11, -18], low: [12, 0.6, -10]};
-  const s = spots[cam] || spots.three;
+  const s = (spots[cam] || spots.three).map(c => c * VIEW);
   const p = a.base.localToWorld(new THREE.Vector3(s[0], s[1], s[2] + a.root.position.z));
   controls.target.copy(target);
   camera.position.copy(p);
@@ -353,7 +371,7 @@ function frame(loop = true) {
   if (loop && !state.paused) state.tau += dt * state.slow;
   ants.forEach(ant => {
     pose(ant, state.tau);
-    v.copy(ant.base.localToWorld(new THREE.Vector3(0, 7.5, ant.root.position.z))).project(camera);
+    v.copy(ant.base.localToWorld(new THREE.Vector3(0, 7.5 * VIEW, ant.root.position.z))).project(camera);
     ant.tag.style.left = ((v.x + 1) / 2 * wrap.clientWidth) + 'px';
     ant.tag.style.top = ((1 - v.y) / 2 * wrap.clientHeight) + 'px';
     ant.tag.style.display = v.z < 1 ? '' : 'none';

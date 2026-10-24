@@ -647,3 +647,49 @@ def gaster_cubes():
         cubes.append(tilted(c, (thick, thick, length), down, 'sting'))
         p = [q + v * (length - 0.05) for q, v in zip(p, d)]
     return cubes
+
+
+# --- the draft game files (2026-10-23, for the animations) -----------------------------------------------------------
+# The model as the game would read it, a major and a minor, each with its own texture, written into drafts/savanna/
+# (tools/mod_paths.py, "Drafts"): every tool (the animation lab, the body plans, the motion library) reads them as if
+# they were in the savanna mod, while the game never sees them. Putting the ant into the game is moving these files
+# into the mod (the user's call). The clips are written next to them by tools/matabele_anims.py.
+#   python tools/matabele_models.py      writes both models and textures
+import json  # noqa: E402
+import os  # noqa: E402
+import sys  # noqa: E402
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import mod_paths  # noqa: E402
+
+DRAFTS = mod_paths.draft_assets('savanna')
+MODELS = {'matabele_major': False, 'matabele_minor': True}     # name -> minor
+JAW = '2'                                                       # the jaws the user picked (JAWS)
+LOOK = 'A'
+
+
+def game_bones(name):
+    """The model's bones with every face's place on its texture, and the texture: (bones, rows, width, height)."""
+    return paint(model(minor=MODELS[name], head=JAW), LOOK)
+
+
+def write_drafts():
+    for name in MODELS:
+        bones, rows, w, h = game_bones(name)
+        geo = {'format_version': '1.12.0', 'minecraft:geometry': [{
+            'description': {'identifier': f'geometry.{name}', 'texture_width': w, 'texture_height': h,
+                            'visible_bounds_width': 4, 'visible_bounds_height': 3, 'visible_bounds_offset': [0, 1, 0]},
+            'bones': bones}]}
+        for rel, data in ((f'geo/entity/{name}.geo.json', None), (f'textures/entity/{name}.png', png(rows))):
+            path = DRAFTS / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            if data is None:
+                with open(path, 'w', encoding='utf-8', newline='\n') as f:
+                    json.dump(geo, f, indent=1)
+            else:
+                path.write_bytes(data)
+        print('wrote', (DRAFTS / f'geo/entity/{name}.geo.json').relative_to(mod_paths.PROJECT))
+
+
+if __name__ == '__main__':
+    write_drafts()

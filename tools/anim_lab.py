@@ -91,12 +91,18 @@ OUT = os.path.join(PROJECT, 'references', 'anim_lab')
 
 # The renderer's scale for each model (client/ClientEvents.java and TermiteQueenModel.RENDER_SCALE).
 RENDER_SCALE = {'worker_ant': 0.65, 'queen_ant': 1.3, 'termite_king': 0.75, 'termite_queen': 0.75,
-                'termite_worker': 0.75, 'termite_minor_soldier': 0.75, 'termite_major_soldier': 0.75}
+                'termite_worker': 0.75, 'termite_minor_soldier': 0.75, 'termite_major_soldier': 0.75,
+                # the Matabele drafts (2026-10-23, not in the game): the major twice a termite major soldier's length,
+                # the minor 45% of it, the model viewer's starting sizes (the sizes are still the user's to pick)
+                'matabele_major': 0.95, 'matabele_minor': 0.455}
 # Normal walking speed in blocks a second (my estimate from the movement speed attribute: a ground mob's top speed is
 # about attribute x 0.25 / 0.454 blocks a tick at the normal speed modifier; the worker's 0.25 gives about 2.75 b/s,
 # about 6 body lengths a second, which is what real Pogonomyrmex walk). The in-game camera can measure the real one.
 WALK_SPEED = {'worker_ant': 2.75, 'queen_ant': 0.9, 'termite_worker': 2.4, 'termite_king': 1.3, 'termite_queen': 0.9,
-              'termite_minor_soldier': 2.6, 'termite_major_soldier': 1.9}
+              'termite_minor_soldier': 2.6, 'termite_major_soldier': 1.9,
+              # Matabele raid columns: majors and minors march together at one speed, about 2.6 major body lengths a
+              # second (my estimate from Frank's raid films, to confirm; the game's speed is set when the ant goes in)
+              'matabele_major': 3.9, 'matabele_minor': 3.9}
 
 LEG_COLOURS = {'l1': (220, 40, 40), 'l2': (240, 150, 20), 'l3': (200, 190, 30),
                'r1': (40, 90, 230), 'r2': (30, 170, 200), 'r3': (150, 60, 210)}

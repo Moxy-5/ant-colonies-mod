@@ -20,6 +20,13 @@ lab, the body plans, the Blockbench import) ask which mod holds it (model_assets
   mod_paths.find('textures/block/x.png') the first mod's copy of a file, or None
   mod_paths.models()                     every model (geo file) with its mod, species mods first
 
+Drafts (2026-10-23, the Matabele ant's animations, M8 step 1): a model being made that is not in the game yet keeps
+its game files (geo, texture, clips, body plan) in drafts/<mod folder>/, laid out as that mod's assets folder, so every
+tool reads it as it would in the mod (model_assets) while the game never sees it. Putting it into the game is moving
+those files (git mv) into the mod's assets folder, the user's call.
+  mod_paths.draft_assets('savanna')      drafts/savanna
+  mod_paths.is_draft('matabele_major')   True while the model is only a draft
+
 Run it to list the mods and their models:  python tools/mod_paths.py
 """
 import os
@@ -67,8 +74,12 @@ def find(rel, kind='assets'):
     return None
 
 
-def _holds(mod, model):
-    base = assets(mod)
+def draft_assets(mod):
+    return PROJECT / 'drafts' / mod
+
+
+def _holds(mod, model, base=None):
+    base = base or assets(mod)
     return any((base / rel).exists() for rel in (
         f'geo/entity/{model}.geo.json', f'body_plans/{model}.json',
         f'animations/entity/{model}.animation.json', f'textures/entity/{model}.png'))
@@ -79,11 +90,21 @@ def model_mod(model):
     for mod in SEARCH:
         if _holds(mod, model):
             return mod
+    for mod in SEARCH:
+        if _holds(mod, model, draft_assets(mod)):
+            return mod
     raise FileNotFoundError(f'no mod holds a model called {model} (looked in {", ".join(SEARCH)})')
 
 
+def is_draft(model):
+    """Whether a model is only a draft (its files in drafts/, not in any mod)."""
+    return not any(_holds(mod, model) for mod in SEARCH) and any(_holds(m, model, draft_assets(m)) for m in SEARCH)
+
+
 def model_assets(model):
-    return assets(model_mod(model))
+    """The assets folder holding a model's files: its mod's, or its draft folder while it is only a draft."""
+    mod = model_mod(model)
+    return draft_assets(mod) if is_draft(model) else assets(mod)
 
 
 def models():

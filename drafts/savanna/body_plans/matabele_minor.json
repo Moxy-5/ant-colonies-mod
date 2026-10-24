@@ -1,0 +1,81 @@
+{
+ "about": "Body plan (tools/body_plan.py explains every part). \"bones\" is the rename table: role name (left, used everywhere else in this file and in the tools) to the bone name in the model (right). The names are the placeholder models' for now; when the real model has other bone names, change only the right-hand side, then run python tools/body_plan.py check. A draft (tools/mod_paths.py, \"Drafts\"): the Matabele ant is not in the game yet. Its waist is a ponerine's: the one node (petiole), the joint to the gaster (gaster_front) and the pinch inside the gaster (gaster_back), the bend shared as the harvester ant's waist (my picks, to confirm).",
+ "model": "matabele_minor",
+ "bones": {
+  "body": "body",
+  "forebody": "forebody",
+  "head": "head",
+  "mandible_l": "mandible_l",
+  "antenna_l_1": "antenna_l_1",
+  "antenna_l_2": "antenna_l_2",
+  "mandible_r": "mandible_r",
+  "antenna_r_1": "antenna_r_1",
+  "antenna_r_2": "antenna_r_2",
+  "carry": "carry",
+  "thorax": "thorax",
+  "leg_l1": "leg_l1",
+  "leg_l1_lower": "leg_l1_lower",
+  "leg_l1_foot": "leg_l1_foot",
+  "leg_r1": "leg_r1",
+  "leg_r1_lower": "leg_r1_lower",
+  "leg_r1_foot": "leg_r1_foot",
+  "leg_l2": "leg_l2",
+  "leg_l2_lower": "leg_l2_lower",
+  "leg_l2_foot": "leg_l2_foot",
+  "leg_r2": "leg_r2",
+  "leg_r2_lower": "leg_r2_lower",
+  "leg_r2_foot": "leg_r2_foot",
+  "leg_l3": "leg_l3",
+  "leg_l3_lower": "leg_l3_lower",
+  "leg_l3_foot": "leg_l3_foot",
+  "leg_r3": "leg_r3",
+  "leg_r3_lower": "leg_r3_lower",
+  "leg_r3_foot": "leg_r3_foot",
+  "petiole": "petiole",
+  "gaster_front": "gaster_front",
+  "gaster_back": "gaster_back"
+ },
+ "root": "body",
+ "forebody": "forebody",
+ "legs": {
+  "l1": ["leg_l1", "leg_l1_lower", "leg_l1_foot"],
+  "r1": ["leg_r1", "leg_r1_lower", "leg_r1_foot"],
+  "l2": ["leg_l2", "leg_l2_lower", "leg_l2_foot"],
+  "r2": ["leg_r2", "leg_r2_lower", "leg_r2_foot"],
+  "l3": ["leg_l3", "leg_l3_lower", "leg_l3_foot"],
+  "r3": ["leg_r3", "leg_r3_lower", "leg_r3_foot"]
+ },
+ "head": {
+  "bone": "head",
+  "jaws": ["mandible_l", "mandible_r"],
+  "antennae": {
+   "l": ["antenna_l_1", "antenna_l_2"],
+   "r": ["antenna_r_1", "antenna_r_2"]
+  },
+  "sockets": {
+   "carry": "carry"
+  }
+ },
+ "head_player": ["head", "mandible_l", "antenna_l_1", "antenna_l_2", "mandible_r", "antenna_r_1", "antenna_r_2", "carry"],
+ "spine": [
+  {
+   "joints": [
+    {"bone": "petiole", "share": 0.4},
+    {"bone": "gaster_front", "share": 0.35},
+    {"bone": "gaster_back", "share": 0.25}
+   ],
+   "max_pitch": 60,
+   "max_yaw": 25,
+   "hinge": 0.26,
+   "from": 3.99,
+   "to": 10.75
+  }
+ ],
+ "climb": {
+  "front_feet": 11.29,
+  "hind_feet": 7.21,
+  "front_end": 12.27,
+  "rear_end": 10.75,
+  "tightest_curve": 6.22
+ }
+}
