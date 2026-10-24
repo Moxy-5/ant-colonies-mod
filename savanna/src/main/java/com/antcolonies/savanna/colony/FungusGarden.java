@@ -105,7 +105,7 @@ public class FungusGarden implements NurseFood {
         for (int tries = 0; ripened > 0 && tries < most; tries++) {
             BlockPos spot = pickToAge(level, combs, eyes, state -> FungusCombBlock.fresh(state) > 0);
             if (spot == null) {
-                ripened = combs.stream().anyMatch(pos -> FungusCombBlock.fresh(level.getBlockState(pos)) > 0) ? ripened : 0;
+                ripened = combs.stream().anyMatch(pos -> level.getBlockState(pos).getBlock() instanceof FungusCombBlock && FungusCombBlock.fresh(level.getBlockState(pos)) > 0) ? ripened : 0;
                 break;
             }
             level.setBlock(spot, FungusCombBlock.ripenOne(level.getBlockState(spot)), 3);
@@ -115,7 +115,7 @@ public class FungusGarden implements NurseFood {
         for (int tries = 0; aged > 0 && tries < most; tries++) {
             BlockPos spot = pickToAge(level, combs, eyes, state -> FungusCombBlock.ripe(state) > 0);
             if (spot == null) {
-                aged = combs.stream().anyMatch(pos -> FungusCombBlock.ripe(level.getBlockState(pos)) > 0) ? aged : 0;
+                aged = combs.stream().anyMatch(pos -> level.getBlockState(pos).getBlock() instanceof FungusCombBlock && FungusCombBlock.ripe(level.getBlockState(pos)) > 0) ? aged : 0;
                 break;
             }
             level.setBlock(spot, FungusCombBlock.ageOne(level.getBlockState(spot)), 3);
@@ -189,6 +189,9 @@ public class FungusGarden implements NurseFood {
         int allNodules = 0;
         for (BlockPos pos : getCombs(level)) {
             BlockState state = level.getBlockState(pos);
+            if (!state.is(SavannaBlocks.FUNGUS_COMB.get())) {
+                continue; // gone since the list was made: a comb whose floor crumbled away earlier this second fell with it (docs/BUGS.md 71)
+            }
             BlockState was = state;
             int ripeBefore = FungusCombBlock.ripe(state);
             int oldBefore = FungusCombBlock.old(state);
