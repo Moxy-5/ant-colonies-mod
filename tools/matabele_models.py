@@ -65,6 +65,10 @@ Twelfth round (the user, 2026-10-23: "Okay thats alot better"): only the long ja
 edges the darkest black, hinged higher so they meet the chin (two heights, JAWS 1 and 2); the antennae moved up and in
 on the face, to the user's red dot, clear of the jaws.
 
+Thirteenth round (the user, 2026-10-23: "Jaw 2 a little higher"): height 2 picked and raised a little more (0.75 over
+the old jaw, as high as it goes before touching the antennae on the major); the toothed inner edge a shade less black
+than before, still darker than the body so it stands out a little.
+
 Units are model pixels before SCALE, as in ant_models.py: the head points to -Z, the ground is y = 0, left is +X.
 """
 import copy
@@ -94,11 +98,11 @@ BLACK, WHITE = (22, 22, 24), (236, 234, 228)
 LOOKS = {
     'A': {'name': 'Black',
           'note': "plain black all over, no texture, like a real Matabele: the eyes a lighter black, the jaws black "
-                  "with the toothed inner edge the darkest black, the antennae fading from black to white toward their tips",
+                  "with the toothed inner edge a shade darker than the body, the antennae fading from black to white toward their tips",
           'grain': 7, 'flecks': 0.10, 'hair': 0.08,
           'colours': {'head': BLACK, 'thorax': BLACK, 'waist': BLACK, 'gaster': BLACK, 'rim': BLACK, 'leg': BLACK,
                       'antenna': BLACK, 'tarsus': BLACK, 'joint': BLACK, 'eye': (50, 50, 55), 'jaw': BLACK,
-                      'jawedge': (6, 6, 7), 'sting': BLACK,
+                      'jawedge': (13, 13, 14), 'sting': BLACK,
                       # the antenna's whip, segment by segment, from black at the elbow to white at the tip
                       **{f'whip{i}': tuple(round(k + (w - k) * (i / 10) ** 1.4) for k, w in zip(BLACK, WHITE))
                          for i in range(11)}}},
@@ -314,12 +318,10 @@ def raised(up):
 
 
 JAWS = {
-    '1': {'name': 'Jaws a little higher',
-          'note': "the long jaws curving down, all black, hinged a little higher so their base meets the chin",
-          'mandible': raised(0.45)},
-    '2': {'name': 'Jaws higher still',
-          'note': "the same jaws hinged higher still, their base tucked up into the face under the antennae",
-          'mandible': raised(0.7)},
+    '2': {'name': 'Jaws high up',
+          'note': "the long jaws curving down, all black, hinged high up so their base is tucked into the face under "
+                  "the antennae (the user's pick, version 2, then a little higher)",
+          'mandible': raised(0.75)},
 }
 HEADS = {key: {**HEAD_B, **jaw} for key, jaw in JAWS.items()}
 WHIP_SEGMENTS = 11              # the real funiculus: 11 segments
