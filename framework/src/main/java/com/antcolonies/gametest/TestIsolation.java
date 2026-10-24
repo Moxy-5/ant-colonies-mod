@@ -245,16 +245,7 @@ public final class TestIsolation {
     /** The colony an insect, egg, larva or body belongs to, or null. */
     @Nullable
     private static UUID colonyOf(Entity entity) {
-        if (entity instanceof AbstractAntEntity ant) {
-            return ant.getColonyId();
-        } else if (entity instanceof AntEggEntity egg) {
-            return egg.getColonyId();
-        } else if (entity instanceof AntLarvaEntity larva) {
-            return larva.getColonyId();
-        } else if (entity instanceof AntCorpseEntity corpse) {
-            return corpse.getColonyId();
-        }
-        return null;
+        return ColonyManager.colonyOf(entity);
     }
 
     /**

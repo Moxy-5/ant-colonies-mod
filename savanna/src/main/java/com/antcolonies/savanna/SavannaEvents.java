@@ -76,6 +76,7 @@ public class SavannaEvents {
     public static void onLevelTick(net.neoforged.neoforge.event.tick.LevelTickEvent.Post event) {
         if (event.getLevel() instanceof ServerLevel level) {
             com.antcolonies.savanna.tree.Forest.tick(level);
+            com.antcolonies.savanna.colony.DeadMounds.tick(level);
         }
     }
 
@@ -106,6 +107,7 @@ public class SavannaEvents {
         ModEvents.addToCreativeTab(CreativeModeTabs.NATURAL_BLOCKS, 20, event -> {
             event.accept(SavannaItems.FORAGE_PILE);
             event.accept(SavannaItems.FUNGUS_COMB);
+            event.accept(SavannaItems.DEAD_COMB);
             event.accept(SavannaItems.TERMITE_MOUND);
             event.accept(SavannaItems.TERMITE_HOLE);
             event.accept(SavannaItems.TERMITE_SPIRE);

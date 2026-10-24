@@ -38,11 +38,29 @@ public class ColonyCommands {
                         .then(Commands.literal("off").executes(context -> stress(context.getSource(), 0)))
                         .then(Commands.argument("count", IntegerArgumentType.integer(1, 500))
                                 .executes(context -> stress(context.getSource(), IntegerArgumentType.getInteger(context, "count")))))
+                // M8 step 1a: the nearest colony dies out at once (its insects gone), to see what it leaves behind.
+                .then(Commands.literal("kill").executes(context -> kill(context.getSource())))
                 .then(Commands.literal("perf").executes(context -> {
                     context.getSource().sendSuccess(() -> Component.literal(Perf.report()), false);
                     return 1;
                 })));
         // (The termites' own commands, mound, mushrooms, drum, alarm, queensize and age: TermiteCommands; the trees: TreeCommands.)
+    }
+
+    private static int kill(CommandSourceStack source) {
+        ServerLevel level = source.getLevel();
+        BlockPos at = BlockPos.containing(source.getPosition());
+        Colony colony = ColonyManager.get(level).getColonies().stream()
+                .filter(c -> c.getCenter().distSqr(at) <= 64 * 64)
+                .min(Comparator.comparingDouble(c -> c.getCenter().distSqr(at))).orElse(null);
+        if (colony == null) {
+            source.sendFailure(Component.literal("No colony within 64 blocks."));
+            return 0;
+        }
+        BlockPos center = colony.getCenter();
+        ColonyManager.get(level).kill(level, colony);
+        source.sendSuccess(() -> Component.literal("The colony at " + center.toShortString() + " has died out."), true);
+        return 1;
     }
 
     private static int population(CommandSourceStack source, int workers) {

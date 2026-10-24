@@ -80,6 +80,12 @@ public class TermiteCommands {
                 .then(Commands.literal("alarm")
                         .then(Commands.argument("level", IntegerArgumentType.integer(0, 4))
                                 .executes(context -> alarm(context.getSource(), IntegerArgumentType.getInteger(context, "level")))))
+                // M8 step 1a: the dead termite mounds (a colony's end: /antcolonies kill), how long dead, comb left.
+                .then(Commands.literal("deadmounds").executes(context -> {
+                    context.getSource().sendSuccess(() -> Component.literal(
+                            com.antcolonies.savanna.colony.DeadMounds.get(context.getSource().getLevel()).describe(context.getSource().getLevel())), false);
+                    return 1;
+                }))
                 .then(Commands.literal("age")
                         .then(Commands.argument("age", IntegerArgumentType.integer(0, MoundSoil.OLDEST))
                                 .executes(context -> age(context.getSource(), IntegerArgumentType.getInteger(context, "age"), 8))

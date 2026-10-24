@@ -53,7 +53,7 @@ public class ColonyManager extends SavedData {
         if (colony.queenDied(level)) {
             manager.markChanged();
         } else {
-            manager.removeColony(colonyId);
+            manager.colonyEnded(level, colony);
         }
     }
 
@@ -73,9 +73,48 @@ public class ColonyManager extends SavedData {
             if (!colony.tick(level)) {
                 com.antcolonies.ColonyFrameworkMod.LOGGER.info("[colony] queenless colony {} at {} has died out; its nest is abandoned",
                         colony.getId(), colony.getCenter().toShortString());
-                removeColony(colony.getId());
+                colonyEnded(level, colony);
             }
         }
+    }
+
+    /**
+     * The colony has died out: its parts hear it first ({@link ColonyNews#COLONY_ENDED}, so a species can leave its
+     * dead nest behind), then it is removed. Its nest stays in the ground.
+     */
+    public void colonyEnded(ServerLevel level, Colony colony) {
+        colony.news().tell(level, ColonyNews.COLONY_ENDED, new ColonyNews.ColonyEnded(colony.getId(), colony.getCenter()));
+        removeColony(colony.getId());
+    }
+
+    /**
+     * For testing (the command {@code /antcolonies kill}): the colony dies out at once, its insects, eggs, young and bodies
+     * in loaded land gone (a real queenless colony dwindles over weeks).
+     */
+    public void kill(ServerLevel level, Colony colony) {
+        java.util.List<net.minecraft.world.entity.Entity> members = new java.util.ArrayList<>();
+        for (net.minecraft.world.entity.Entity entity : level.getAllEntities()) {
+            if (colony.getId().equals(colonyOf(entity))) {
+                members.add(entity);
+            }
+        }
+        members.forEach(entity -> entity.remove(net.minecraft.world.entity.Entity.RemovalReason.DISCARDED));
+        colonyEnded(level, colony);
+    }
+
+    /** The colony an insect, egg, larva or body belongs to, or null. */
+    @Nullable
+    public static UUID colonyOf(net.minecraft.world.entity.Entity entity) {
+        if (entity instanceof com.antcolonies.entity.AbstractAntEntity ant) {
+            return ant.getColonyId();
+        } else if (entity instanceof com.antcolonies.entity.AntEggEntity egg) {
+            return egg.getColonyId();
+        } else if (entity instanceof com.antcolonies.entity.AntLarvaEntity larva) {
+            return larva.getColonyId();
+        } else if (entity instanceof com.antcolonies.entity.AntCorpseEntity corpse) {
+            return corpse.getColonyId();
+        }
+        return null;
     }
 
     /**

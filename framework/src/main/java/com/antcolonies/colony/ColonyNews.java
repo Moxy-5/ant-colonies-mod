@@ -174,6 +174,18 @@ public final class ColonyNews {
     public record BlockBroken(BlockPos where, @Nullable Player breaker) {
     }
 
+    // M8 step 1a (dead mounds): the colony's end.
+
+    /**
+     * The colony has died out (its queen gone and nobody left, or killed by a command): told once, just before it is
+     * removed, while its parts still know their nest, so what it leaves behind (a dead mound, its garden) can be written
+     * down.
+     */
+    public record ColonyEnded(UUID colony, BlockPos center) {
+    }
+
+    public static final Kind<ColonyEnded> COLONY_ENDED = Kind.of("colony_ended");
+
     public static final Kind<SetOut> SET_OUT = Kind.of("set_out");
     public static final Kind<SearchStarted> SEARCH_STARTED = Kind.of("search_started");
     public static final Kind<SearchOver> SEARCH_OVER = Kind.of("search_over");

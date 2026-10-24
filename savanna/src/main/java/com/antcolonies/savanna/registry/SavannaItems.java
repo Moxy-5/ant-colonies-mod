@@ -21,6 +21,7 @@ public class SavannaItems {
     public static final DeferredItem<BlockItem> FORAGE_PILE = ITEMS.registerSimpleBlockItem(SavannaBlocks.FORAGE_PILE);
 
     public static final DeferredItem<BlockItem> FUNGUS_COMB = ITEMS.registerSimpleBlockItem(SavannaBlocks.FUNGUS_COMB);
+    public static final DeferredItem<BlockItem> DEAD_COMB = ITEMS.registerSimpleBlockItem(SavannaBlocks.DEAD_COMB);
 
     public static final DeferredItem<BlockItem> TERMITE_MOUND = ITEMS.registerSimpleBlockItem(SavannaBlocks.TERMITE_MOUND);
 

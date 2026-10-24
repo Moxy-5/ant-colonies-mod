@@ -58,6 +58,7 @@ public final class SavannaParts {
     public static final Type<Mound> MOUND = listed("mound", Mound::new, part -> part
             .ticks(30, Mound::tick)
             .hears(ColonyNews.BLOCK_DUG, 10, (mound, level, news) -> mound.blockDug(level, news.where()))
+            .hears(ColonyNews.COLONY_ENDED, 10, (mound, level, news) -> DeadMounds.get(level).died(level, news.colony(), news.center())) // M8 1a: it stays, dead
             .plugs(ColonyHooks.AWAY_BUILDER, 20, MoundAwayBuilding::new) // the dug soil and the mound built up, on return
             .plugs(ColonyHooks.DUG_SOIL, 10, mound -> new ColonyHooks.DugSoil() { // one pellet per layer of a mound block from each dug block
                 @Override
@@ -145,6 +146,8 @@ public final class SavannaParts {
     public static final Type<FungusGarden> FUNGUS_GARDEN = listed("fungus_garden", FungusGarden::new, part -> part
             .ticks(20, FungusGarden::grow)
             .hears(ColonyNews.HEAP_GONE, 10, (garden, level, news) -> garden.loseNodules(news.nodules())) // a comb eaten right down: its nodules go with it
+            .hears(ColonyNews.COLONY_ENDED, 20, (garden, level, news) -> // M8 1a: Xylaria takes the dead garden
+                    DeadMounds.get(level).addCombs(level, news.colony(), news.center(), garden.getCombs(level)))
             .plugs(ColonyHooks.AWAY_AFTER_NURSES, 10, garden -> new GardenAway(garden)::grow) // nodules grow and the comb ages while away
             .answers(ColonyQuestions.NOTHING_TO_EAT_IN_STORE, 10, (garden, level, nothing) -> garden.oldKnown() <= 0) // no old layer as far as the brain knows
             .plugs(ColonyHooks.NURSE_FOOD, 10, garden -> garden) // fungus nodules

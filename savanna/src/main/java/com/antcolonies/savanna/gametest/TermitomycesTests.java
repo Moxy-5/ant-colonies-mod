@@ -7,10 +7,12 @@ import static com.antcolonies.savanna.gametest.TermiteMoundTests.SURFACE;
 import java.util.List;
 
 import com.antcolonies.savanna.SavannaMod;
+import com.antcolonies.savanna.block.DeadCombBlock;
 import com.antcolonies.savanna.block.GiantTermitomycesBlock;
 import com.antcolonies.block.SeedPileBlock;
 import com.antcolonies.savanna.block.TermitomycesBlock;
 import com.antcolonies.colony.Colony;
+import com.antcolonies.savanna.colony.DeadMounds;
 import com.antcolonies.savanna.colony.SavannaParts;
 import com.antcolonies.savanna.registry.SavannaBlocks;
 import com.antcolonies.savanna.registry.SavannaItems;
@@ -196,8 +198,57 @@ public class TermitomycesTests {
             }
             helper.assertTrue(grown == giants + giantsBefore, grown + " giants grew of " + giants + " sent up and " + giantsBefore + " from the rain");
             SavannaMod.LOGGER.info("[mushroom-test] {} mushrooms after the rain, {} giants", mushrooms.size(), giants);
+            deadGarden(helper, c);
             helper.succeed();
         });
+    }
+
+    /**
+     * M8 step 1a: the colony dies out; its mound is written in the dead mound book and Xylaria takes the garden: every
+     * comb furred at once with its layers, black from day 1, rotting from day 4 with fewer layers, gone by day 7; the
+     * dead mound stays in the book.
+     */
+    private static void deadGarden(GameTestHelper helper, Colony c) {
+        ServerLevel level = helper.getLevel();
+        java.util.Map<BlockPos, Integer> combs = new java.util.HashMap<>();
+        for (BlockPos cell : c.nest().getGardenCells(level)) {
+            BlockState state = level.getBlockState(cell);
+            if (state.is(SavannaBlocks.FUNGUS_COMB.get())) {
+                combs.put(cell.immutable(), state.getValue(SeedPileBlock.LAYERS));
+            }
+        }
+        helper.assertTrue(combs.size() >= 5, "only " + combs.size() + " combs in the garden before the colony died");
+        java.util.UUID id = c.getId();
+        com.antcolonies.colony.ColonyManager.get(level).kill(level, c);
+        helper.assertTrue(com.antcolonies.colony.ColonyManager.get(level).getColony(id) == null, "the killed colony is still there");
+        DeadMounds book = DeadMounds.get(level);
+        DeadMounds.DeadMound mound = book.get(id);
+        helper.assertTrue(mound != null, "the dead colony's mound is not in the dead mound book");
+        try {
+            helper.assertTrue(mound.combs().size() == combs.size(), mound.combs().size() + " dead combs in the book, " + combs.size() + " in the garden");
+            combs.forEach((cell, layers) -> {
+                BlockState state = level.getBlockState(cell);
+                helper.assertTrue(state.is(SavannaBlocks.DEAD_COMB.get()) && state.getValue(DeadCombBlock.STAGE) == DeadCombBlock.FURRED
+                        && state.getValue(DeadCombBlock.LAYERS) == (int) layers, "a comb is not furred with its " + layers + " layers: " + state);
+            });
+            book.updateForTests(level, mound, 2.0);
+            combs.forEach((cell, layers) -> helper.assertTrue(level.getBlockState(cell).getValue(DeadCombBlock.STAGE) == DeadCombBlock.BLACK,
+                    "a comb is not black on day 2: " + level.getBlockState(cell)));
+            book.updateForTests(level, mound, 1.0); // the clock set back: nothing goes back
+            combs.forEach((cell, layers) -> helper.assertTrue(level.getBlockState(cell).getValue(DeadCombBlock.STAGE) == DeadCombBlock.BLACK,
+                    "a comb went back to furred: " + level.getBlockState(cell)));
+            book.updateForTests(level, mound, 5.5);
+            combs.forEach((cell, layers) -> {
+                BlockState state = level.getBlockState(cell);
+                helper.assertTrue(state.getValue(DeadCombBlock.STAGE) == DeadCombBlock.ROTTEN && state.getValue(DeadCombBlock.LAYERS) <= Math.max(1, layers - 1),
+                        "a comb of " + layers + " layers is not rotting lower on day 5.5: " + state);
+            });
+            book.updateForTests(level, mound, 7.0);
+            combs.forEach((cell, layers) -> helper.assertTrue(level.getBlockState(cell).isAir(), "a comb is not gone on day 7: " + level.getBlockState(cell)));
+            helper.assertTrue(mound.combs().isEmpty() && book.get(id) != null, "the dead mound should stay in the book with no comb left");
+        } finally {
+            book.forgetForTests(id);
+        }
     }
 
     private static int stageAt(ServerLevel level, BlockPos pos) {

@@ -1,0 +1,136 @@
+{
+  "variants": {
+    "layers=1,stage=0": [
+      {
+        "model": "antcolonies:block/dead_comb_1_furred_0"
+      },
+      {
+        "model": "antcolonies:block/dead_comb_1_furred_1"
+      },
+      {
+        "model": "antcolonies:block/dead_comb_1_furred_2"
+      }
+    ],
+    "layers=1,stage=1": [
+      {
+        "model": "antcolonies:block/dead_comb_1_black_0"
+      },
+      {
+        "model": "antcolonies:block/dead_comb_1_black_1"
+      },
+      {
+        "model": "antcolonies:block/dead_comb_1_black_2"
+      }
+    ],
+    "layers=1,stage=2": [
+      {
+        "model": "antcolonies:block/dead_comb_1_rotten_0"
+      },
+      {
+        "model": "antcolonies:block/dead_comb_1_rotten_1"
+      },
+      {
+        "model": "antcolonies:block/dead_comb_1_rotten_2"
+      }
+    ],
+    "layers=2,stage=0": [
+      {
+        "model": "antcolonies:block/dead_comb_2_furred_0"
+      },
+      {
+        "model": "antcolonies:block/dead_comb_2_furred_1"
+      },
+      {
+        "model": "antcolonies:block/dead_comb_2_furred_2"
+      }
+    ],
+    "layers=2,stage=1": [
+      {
+        "model": "antcolonies:block/dead_comb_2_black_0"
+      },
+      {
+        "model": "antcolonies:block/dead_comb_2_black_1"
+      },
+      {
+        "model": "antcolonies:block/dead_comb_2_black_2"
+      }
+    ],
+    "layers=2,stage=2": [
+      {
+        "model": "antcolonies:block/dead_comb_2_rotten_0"
+      },
+      {
+        "model": "antcolonies:block/dead_comb_2_rotten_1"
+      },
+      {
+        "model": "antcolonies:block/dead_comb_2_rotten_2"
+      }
+    ],
+    "layers=3,stage=0": [
+      {
+        "model": "antcolonies:block/dead_comb_3_furred_0"
+      },
+      {
+        "model": "antcolonies:block/dead_comb_3_furred_1"
+      },
+      {
+        "model": "antcolonies:block/dead_comb_3_furred_2"
+      }
+    ],
+    "layers=3,stage=1": [
+      {
+        "model": "antcolonies:block/dead_comb_3_black_0"
+      },
+      {
+        "model": "antcolonies:block/dead_comb_3_black_1"
+      },
+      {
+        "model": "antcolonies:block/dead_comb_3_black_2"
+      }
+    ],
+    "layers=3,stage=2": [
+      {
+        "model": "antcolonies:block/dead_comb_3_rotten_0"
+      },
+      {
+        "model": "antcolonies:block/dead_comb_3_rotten_1"
+      },
+      {
+        "model": "antcolonies:block/dead_comb_3_rotten_2"
+      }
+    ],
+    "layers=4,stage=0": [
+      {
+        "model": "antcolonies:block/dead_comb_4_furred_0"
+      },
+      {
+        "model": "antcolonies:block/dead_comb_4_furred_1"
+      },
+      {
+        "model": "antcolonies:block/dead_comb_4_furred_2"
+      }
+    ],
+    "layers=4,stage=1": [
+      {
+        "model": "antcolonies:block/dead_comb_4_black_0"
+      },
+      {
+        "model": "antcolonies:block/dead_comb_4_black_1"
+      },
+      {
+        "model": "antcolonies:block/dead_comb_4_black_2"
+      }
+    ],
+    "layers=4,stage=2": [
+      {
+        "model": "antcolonies:block/dead_comb_4_rotten_0"
+      },
+      {
+        "model": "antcolonies:block/dead_comb_4_rotten_1"
+      },
+      {
+        "model": "antcolonies:block/dead_comb_4_rotten_2"
+      }
+    ]
+  }
+}

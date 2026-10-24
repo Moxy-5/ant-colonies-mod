@@ -15,6 +15,8 @@ the game). Looks (my picks, for the user to choose from):
   A  Field photo: real colours and size, thin stalks, a few forks, whitish tips, the comb going from grey fuzz to black.
   B  Antler forest: more and taller stalks, forked two or three times like antlers, bright white tips.
   C  Sooty crust: the comb black and sooty all over, short stubby stalks, white only as a fine dust.
+The user picked B (2026-10-24). The game's files (textures, models, blockstate of antcolonies:dead_comb):
+python tools/xylaria_art.py
 """
 import random
 
@@ -204,3 +206,69 @@ def stalks(look, stage, variant=0):
         taken.append((x, z))
         out += stalk(rng, look, x, z, rng.randint(hlo, hhi), forks, tip, rng.random() < fallen)
     return out
+
+
+# --- the game's files (look B, picked by the user 2026-10-24) --------------------------------------------------------
+
+def write_game_files():
+    """The dead comb's textures (each stage's top and side), the stalks' colour sheet, a model for every layers x stage
+    x variant (the comb's 2-pixel bands and the stalks on top), the blockstate (a variant picked by position, so
+    neighbouring combs differ) and the item model."""
+    import json
+    import mod_paths
+    assets = mod_paths.assets("savanna")
+    blocks = assets / "textures/block"
+    models = assets / "models/block"
+    look = GAME_LOOK
+    for stage in STAGES:
+        for f in ("top", "side"):
+            (blocks / f"dead_comb_{stage}_{f}.png").write_bytes(comb.png(texture(look, stage, f)))
+    # The stalks' colours, one pixel each, on a 16 x 16 sheet (a stalk box's faces take their colour's pixel).
+    colours = []
+    for stage in STAGES:
+        for v in range(VARIANTS):
+            for box in stalks(look, stage, v):
+                if box[6] not in colours:
+                    colours.append(box[6])
+    assert len(colours) <= S * S
+    sheet = [[(0, 0, 0, 0)] * S for _ in range(S)]
+    for i, c in enumerate(colours):
+        sheet[i // S][i % S] = tuple(int(c[k:k + 2], 16) for k in (1, 3, 5))
+    (blocks / "xylaria_stalks.png").write_bytes(comb.png(sheet))
+
+    def stalk_elements(layers, stage, v):
+        out = []
+        for x, y, z, w, h, d, c in stalks(look, stage, v):
+            if x < 0 or z < 0 or x + w > S or z + d > S:
+                continue  # a fallen stalk or a branch leaning past the block's edge is left out
+            i = colours.index(c)
+            u, t = i % S, i // S
+            faces = {side: comb.face([u, t, u + 1, t + 1], "#stalk") for side in ("up", "down", "north", "south", "west", "east")}
+            base = layers * 2
+            out.append({"from": [x, base + y, z], "to": [x + w, base + y + h, z + d], "faces": faces})
+        return out
+
+    tex = {f"{stage}_{f}": f"antcolonies:block/dead_comb_{stage}_{f}" for stage in STAGES for f in ("top", "side")}
+    tex["stalk"] = "antcolonies:block/xylaria_stalks"
+    variants = {}
+    for layers in range(1, comb.MAX_LAYERS // 2 + 1):
+        for s_i, stage in enumerate(STAGES):
+            names = []
+            for v in range(VARIANTS):
+                faces = {side: comb.face([0, 16 - layers * 2, 16, 16], f"#{stage}_side", side) for side in ("north", "south", "west", "east")}
+                faces["up"] = comb.face([0, 0, 16, 16], f"#{stage}_top")
+                faces["down"] = comb.face([0, 0, 16, 16], f"#{stage}_top", "down")
+                elements = [{"from": [0, 0, 0], "to": [16, layers * 2, 16], "faces": faces}] + stalk_elements(layers, stage, v)
+                textures = dict(tex, particle=f"antcolonies:block/dead_comb_{stage}_top")
+                name = f"dead_comb_{layers}_{stage}_{v}"
+                (models / f"{name}.json").write_text(json.dumps({"textures": textures, "elements": elements}, indent=2) + "\n", encoding="utf-8")
+                names.append({"model": f"antcolonies:block/{name}"})
+            variants[f"layers={layers},stage={s_i}"] = names
+    (assets / "blockstates/dead_comb.json").write_text(json.dumps({"variants": variants}, indent=2) + "\n", encoding="utf-8")
+    (assets / "models/item/dead_comb.json").write_text(json.dumps({"parent": "antcolonies:block/dead_comb_4_black_0"}, indent=2) + "\n", encoding="utf-8")
+    print(f"wrote the dead comb in look {look}: {len(STAGES) * 2} textures, {len(colours)} stalk colours, "
+          f"{len(variants) * VARIANTS} models, the blockstate and the item")
+
+
+if __name__ == "__main__":
+    write_game_files()

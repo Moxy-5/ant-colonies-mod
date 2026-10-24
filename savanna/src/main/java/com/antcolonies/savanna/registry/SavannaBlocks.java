@@ -47,6 +47,15 @@ public class SavannaBlocks {
             BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_WHITE).strength(0.3F).sound(SoundType.WART_BLOCK)
                     .noOcclusion().pushReaction(PushReaction.DESTROY));
 
+    /**
+     * A dead colony's fungus comb taken over by Xylaria (M8 step 1a, see DeadCombBlock): furred, black with stalks, then
+     * rotting away. Solid: insects walk on it. Drops nothing.
+     */
+    public static final DeferredBlock<com.antcolonies.savanna.block.DeadCombBlock> DEAD_COMB = BLOCKS.registerBlock("dead_comb",
+            com.antcolonies.savanna.block.DeadCombBlock::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLACK).strength(0.2F).sound(SoundType.WART_BLOCK)
+                    .noOcclusion().pushReaction(PushReaction.DESTROY));
+
     /** Termite mound soil: built up in layers, then dries and hardens with age (see TermiteMoundBlock). */
     public static final DeferredBlock<TermiteMoundBlock> TERMITE_MOUND = BLOCKS.registerBlock("termite_mound", TermiteMoundBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_ORANGE).strength(0.6F, 3.0F).sound(SoundType.MUD)
