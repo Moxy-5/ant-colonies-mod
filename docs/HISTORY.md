@@ -337,6 +337,8 @@ Moved here from CLAUDE.md on 2026-10-13 (it was loaded into every chat and took 
 
 - **M8 step 1, the Matabele dying clip: no tip-over (the user's pick, 2026-10-23).** When the Matabele ant goes into the game, its renderer switches off Minecraft's sideways death roll, so the body dies upright on its folded legs as in the clip. Attack A or B is still open: the user leans to both, chosen by where the termite is (planning, `docs/plans/m8-matabele.md` step 2).
 
+- **M8 plan, dead bodies (the user, 2026-10-23):** termites carry dead Matabeles, and their own old dead, out and drop them by the nearest hole, never walled up with blocks; later food for scavengers (M9.5). Planning only, `docs/plans/m8-matabele.md` step 2.
+
 ## Handover notes for a code reviewer (written at the end of a very long session)
 - State: branch `master`, all committed, `./gradlew build` passes, `./gradlew runGameTestServer` passes 47 tests (about 8 minutes, in one world, tests run in parallel arena grids). Some tests are timing-sensitive under load (`antsOnBumpyGroundReachTheFoodStore` and `aStarvingWorkerSlowsDownAndDies` have each failed once and passed on a re-run): re-run before blaming a change.
 - Confirmed in-game by the user so far: everything up to and including dead ants and the refuse chamber, rich bread, worker hunger, colony starvation, and the hill-jam fix. Older bullets in "Current status" that still say "waiting for the user to confirm" are probably stale (the user tested them and reported no problems), but this was never written down: do not rely on those flags.
