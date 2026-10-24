@@ -71,13 +71,14 @@ TEXELS = 3.0
 # fine pale hairs grey it.
 LOOKS = {
     'A': {'name': 'Black',
-          'note': "glossy black (the photo): the eyes a smooth dark grey, the jaws' inner edges red, the feet, the "
-                  "antennae's elbows and whips red-brown",
-          'grain': 7, 'flecks': 0.10, 'hair': 0.18,
+          'note': "glossy black all over (the photo; the user, 2026-10-23: \"make the whole body black\"): legs, feet, "
+                  "sting and plate rims black too, the eyes a slightly lighter black; the antennae and the jaws as "
+                  "before",
+          'grain': 7, 'flecks': 0.10, 'hair': 0.08,
           'colours': {'head': (26, 25, 27), 'thorax': (28, 27, 29), 'waist': (28, 27, 29), 'gaster': (31, 30, 31),
-                      'rim': (46, 44, 48), 'leg': (36, 30, 28), 'antenna': (36, 29, 27), 'ring': (88, 50, 34),
-                      'band': (104, 46, 30), 'tarsus': (78, 44, 30), 'joint': (22, 20, 21), 'eye': (72, 74, 82),
-                      'eyerim': (16, 15, 17), 'jaw': (56, 30, 24), 'teeth': (132, 42, 26), 'sting': (90, 52, 34),
+                      'rim': (34, 33, 36), 'leg': (27, 26, 28), 'antenna': (36, 29, 27), 'ring': (88, 50, 34),
+                      'band': (104, 46, 30), 'tarsus': (25, 24, 26), 'joint': (22, 20, 21), 'eye': (40, 40, 44),
+                      'eyerim': (16, 15, 17), 'jaw': (56, 30, 24), 'teeth': (132, 42, 26), 'sting': (30, 29, 31),
                       'whip': (66, 42, 34), 'bead': (80, 51, 39)}},
 }
 
