@@ -25,7 +25,15 @@ timings: all "my pick, to confirm" until then).
 "Giant savanna trees"): the fallen hollow giants are the Matabele log homes.
 
 ## Steps
-1. **Dead mounds and the ant.** Dead termite mounds (a dead colony's mound stays,
+1. **Dead mounds and the ant.** In pieces (planned with the user 2026-10-24, decisions in
+   `docs/DESIGN.md`, "Dead mounds, details"), each tried in-game: **1a** dead mounds (the
+   colony's death leaves the mound; spires crumble in days, the body to a grassy hump in
+   20-40 days; *Xylaria* takes the comb, look first in the model viewer; holes open into
+   the shaft and galleries); **1b** world generation of living and dead termite mounds in
+   savannas; **1c** the Matabele species file, sizes and the queen; **1d** the shallow nest
+   (dead mound, under a fallen tree, or the ground; digging in where needed); **1e** the
+   prey pile and hunger; **1f** Matabele colonies in new land and a command. The original
+   outline: Dead termite mounds (a dead colony's mound stays,
    empty, wearing down; some placed by world generation). The Matabele species
    profile (`colony_fission`), the ant with its own size from the real spread (one
    placeholder model, scaled), the queen, a shallow nest that reuses ready spaces
