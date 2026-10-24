@@ -51,7 +51,7 @@ fading from black to white toward their tips.
 
 Ninth round (the user, 2026-10-23: "I want the jaws in B4 but I want them in the place of where the fangs are in
 B2"): B4's broad toothed blades hung out and down from the face like crushers, four ways to keep them off the floor
-(JAWS, 1 to 4).
+(JAWS, 1 to 4); then 4 picked and made new: bulkier, wider crushers, all black.
 
 Units are model pixels before SCALE, as in ant_models.py: the head points to -Z, the ground is y = 0, left is +X.
 """
@@ -81,12 +81,12 @@ TEXELS = 3.0
 BLACK, WHITE = (22, 22, 24), (236, 234, 228)
 LOOKS = {
     'A': {'name': 'Black',
-          'note': "plain black all over, no texture, like a real Matabele: the eyes a lighter black, the jaws black "
-                  "with a deep red inner edge, the antennae fading from black to white toward their tips",
+          'note': "plain black all over, no texture, like a real Matabele: the eyes a lighter black, the jaws black,"
+                  " the antennae fading from black to white toward their tips",
           'grain': 7, 'flecks': 0.10, 'hair': 0.08,
           'colours': {'head': BLACK, 'thorax': BLACK, 'waist': BLACK, 'gaster': BLACK, 'rim': BLACK, 'leg': BLACK,
-                      'antenna': BLACK, 'tarsus': BLACK, 'joint': BLACK, 'eye': (50, 50, 55), 'jaw': (32, 22, 22),
-                      'jawedge': (96, 26, 22), 'sting': BLACK,
+                      'antenna': BLACK, 'tarsus': BLACK, 'joint': BLACK, 'eye': (50, 50, 55), 'jaw': BLACK,
+                      'jawedge': BLACK, 'sting': BLACK,
                       # the antenna's whip, segment by segment, from black at the elbow to white at the tip
                       **{f'whip{i}': tuple(round(k + (w - k) * (i / 10) ** 1.4) for k, w in zip(BLACK, WHITE))
                          for i in range(11)}}},
@@ -282,35 +282,22 @@ HEAD_B = {
 # flat sides face (side: out, so the curve shows from the side), how far the tips pass each other, and its teeth (how
 # far along, how long, how wide).
 JAW_BASE = (1.25, -0.8, -6.35)
-B4_WIDTHS = [1.35, 1.1, 0.85, 0.6, 0.38, 0.14]
-B4_TEETH = [(0.3, 0.3, 0.24), (0.45, 0.28, 0.22), (0.6, 0.24, 0.2), (0.74, 0.2, 0.18)]
-# The jaw's path as offsets from its base: B2's hook drawn out to B4's length, the tips meeting; and a tighter curl,
-# bending down sooner and back in under the face.
+# The jaw's path as offsets from its base: B2's hook drawn out to B4's length, the tips meeting.
 HANGING = [(0, 0, 0), (0.3, -0.55, -1.15), (0.35, -1.4, -1.85), (0.1, -2.15, -1.9), (-0.45, -2.6, -1.35),
            (-1.1, -2.7, -0.65)]
-CURLED = [(0, 0, 0), (0.3, -0.6, -0.8), (0.3, -1.35, -1.15), (0.05, -1.95, -0.95), (-0.5, -2.15, -0.45),
-          (-1.1, -2.05, 0.1)]
 
 
-def hanging_jaw(path, scale):
-    return {'jaw': [tuple(b + o * scale for b, o in zip(JAW_BASE, p)) for p in path],
-            'jaw_width': [w * scale for w in B4_WIDTHS], 'jaw_thick': 0.42 * scale ** 0.5, 'flat': 'side',
-            'jaw_cross': 0.0, 'jaw_teeth': [(f, l * scale, w * scale) for f, l, w in B4_TEETH]}
-
-
-SMALLER = 0.8
+# The user picked 4 (2026-10-23: "4 looks the best Ill let the animations do the rest") and asked for the jaws new in
+# that hang, "bulkier", "black", "wider like a crusher like the images": broad heavy blades, twice as thick, wider all
+# the way to a blunter point, and four big blunt crushing teeth along the inside, all black.
+CRUSHER = {'jaw': [tuple(b + o for b, o in zip(JAW_BASE, p)) for p in HANGING],
+           'jaw_width': [1.9, 1.75, 1.5, 1.2, 0.85, 0.4], 'jaw_thick': 0.85, 'flat': 'side', 'jaw_cross': 0.0,
+           'jaw_teeth': [(0.24, 0.5, 0.46), (0.4, 0.46, 0.42), (0.56, 0.4, 0.38), (0.7, 0.32, 0.32)]}
 JAWS = {
-    '1': {'name': 'Curled in, smaller',
-          'note': "B4's blades at 80 percent, curled in tighter under the face: out, down soon, the points meeting "
-                  "underneath", **hanging_jaw(CURLED, SMALLER)},
-    '2': {'name': 'Curled in',
-          'note': "B4's blades at full size, curled in tighter under the face", **hanging_jaw(CURLED, 1.0)},
-    '3': {'name': 'Smaller',
-          'note': "B4's blades at 80 percent, hanging as B2's hooks do: out from the face, down, the points meeting "
-                  "behind", **hanging_jaw(HANGING, SMALLER)},
-    '4': {'name': 'Full size, left to the animations',
-          'note': "B4's blades at full size hanging as B2's hooks do; they may reach the floor, the animations will "
-                  "rest them closed while walking", **hanging_jaw(HANGING, 1.0)},
+    'A': {'name': 'Crushers',
+          'note': "your pick, 4: the jaws hanging out and down from the face, curling in, the points meeting behind; "
+                  "made new, bulkier and wider, black, with four big blunt crushing teeth; they reach the floor at "
+                  "rest, left to the animations (closed while walking)", **CRUSHER},
 }
 HEADS = {key: {**HEAD_B, **jaw} for key, jaw in JAWS.items()}
 WHIP_SEGMENTS = 11              # the real funiculus: 11 segments
