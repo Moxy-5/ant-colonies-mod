@@ -23,7 +23,8 @@ The files are <mod>/src/main/resources/assets/<mod name>/body_plans/<model>.json
             "from" and "to" where the piece itself lies (model units behind the body's middle), and the most it may
             bend, "max_pitch" (up and down) and "max_yaw" (sideways), in degrees (a real joint's reach: written by
             hand). A termite's soft abdomen is one piece per segment (abdomen, abdomen_2, ... in a chain), each
-            of one joint.
+            of one joint. Optional "max_up" and "max_down" (2026-10-24, the Matabele queen's long gaster, plate by
+            plate): the most it may rise (at an inside corner) and droop (over an outside edge) when the two differ.
   climb     the numbers the climbing body needs (entity/body/EdgeOver, the spine, the renderer): how far the front feet
             reach ahead of the middle and the hind feet behind it (the walk's average stance), how far the body's front
             and rear ends reach (front_end, rear_end), the tightest curve the path takes (tightest_curve), and where

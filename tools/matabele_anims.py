@@ -47,7 +47,7 @@ import body_plan  # noqa: E402
 import matabele_climb  # noqa: E402
 import matabele_models as mm  # noqa: E402
 
-MODELS = tuple(mm.MODELS)
+MODELS = mm.GAME_MODELS      # the major, the minor and (2026-10-24) the queen
 _RIGS = {}
 
 
@@ -231,10 +231,18 @@ def jaws(open_by):
     return {'mandible_l': [0, -open_by, 0], 'mandible_r': [0, open_by, 0]}
 
 
-def gaster(curl):
-    """The gaster curled curl degrees under the body (shared petiole 0.4, the gaster's joint 0.35, its pinch 0.25 as
-    the body plan's waist; a backward-pointing part curls under with a negative X turn)."""
-    return {'petiole': [-0.4 * curl, 0, 0], 'gaster_front': [-0.35 * curl, 0, 0], 'gaster_back': [-0.25 * curl, 0, 0]}
+# How a curl is shared along the gaster: a worker's at the waist and the pinch (petiole 0.4, the gaster's joint 0.35, its
+# pinch 0.25, as its body plan's waist); the queen's (2026-10-24) less at the waist and the rest plate by plate down her
+# swollen gaster, so it bends in a curve as a real gaster does, each plate turning a little on the one before (my picks).
+CURL_SHARES = {'worker': {'petiole': 0.4, 'gaster_front': 0.35, 'gaster_back': 0.25},
+               mm.QUEEN: {'petiole': 0.3, 'gaster_front': 0.25, 'gaster_back': 0.15, 'gaster_mid': 0.12,
+                          'gaster_end': 0.1, 'gaster_tip': 0.08}}
+
+
+def gaster(curl, name=None):
+    """The gaster curled curl degrees under the body, shared along it by CURL_SHARES (a backward-pointing part curls
+    under with a negative X turn)."""
+    return {b: [-s * curl, 0, 0] for b, s in CURL_SHARES.get(name, CURL_SHARES['worker']).items()}
 
 
 # --- standing ---------------------------------------------------------------------------------------------------------
@@ -243,15 +251,16 @@ def gaster(curl):
 IDLE_SECONDS = 4.0
 
 
-def idle():
+def idle(name=None):
     T = IDLE_SECONDS
+    breath = 2 if name == mm.QUEEN else -3       # the queen's gaster hangs low: it breathes up, never into the floor
     return {
         'antenna_l_1': keys([(0, [0, 0, 0]), (0.8, [10, 12, 0]), (1.7, [-5, 3, 0]), (2.5, [7, -5, 0]), (3.3, [-3, 7, 0]), (T, [0, 0, 0])]),
         'antenna_r_1': keys([(0, [0, 0, 0]), (0.6, [-5, -5, 0]), (1.4, [9, -12, 0]), (2.5, [-3, 2, 0]), (3.1, [7, -7, 0]), (T, [0, 0, 0])]),
         'antenna_l_2': keys([(0, [0, 0, 0]), (1.0, [8, 0, 0]), (1.3, [-4, 0, 0]), (2.7, [5, 0, 0]), (T, [0, 0, 0])]),
         'antenna_r_2': keys([(0, [0, 0, 0]), (0.7, [-4, 0, 0]), (1.8, [8, 0, 0]), (2.1, [0, 0, 0]), (3.5, [5, 0, 0]), (T, [0, 0, 0])]),
         'head': keys([(0, [0, 0, 0]), (1.2, [2, 7, 0]), (2.0, [2, 7, 0]), (3.0, [0, -5, 0]), (T, [0, 0, 0])]),
-        'gaster_front': keys([(0, [0, 0, 0]), (T / 2, [-3, 0, 0]), (T, [0, 0, 0])]),
+        'gaster_front': keys([(0, [0, 0, 0]), (T / 2, [breath, 0, 0]), (T, [0, 0, 0])]),
         'mandible_l': keys([(0, [0, 0, 0]), (2.5, [0, 0, 0]), (2.65, [0, 10, 0]), (2.95, [0, 0, 0]), (T, [0, 0, 0])]),
         'mandible_r': keys([(0, [0, 0, 0]), (2.5, [0, 0, 0]), (2.65, [0, -10, 0]), (2.95, [0, 0, 0]), (T, [0, 0, 0])]),
     }
@@ -279,7 +288,7 @@ def attack(name, T, pos, fb, hd, jw, pitch, cu):
     """An attack from its curves: body offset, forebody, head (turns), jaws (open by), rear tip, gaster curl."""
     def body(t):
         pose = dict(tipped(curve(pitch, t)[0]), body_pos=curve(pos, t), head=curve(hd, t), **jaws(curve(jw, t)[0]),
-                    **gaster(curve(cu, t)[0]))
+                    **gaster(curve(cu, t)[0], name))
         pose['forebody'] = [pose['forebody'][0] + curve(fb, t)[0], 0, 0]
         return pose
     return posed_clip(name, T, body)
@@ -328,7 +337,7 @@ def death(name):
 
     def body(t):
         return dict(body_pos=curve(pos, t), forebody=curve(fb, t), head=curve(hd, t), **jaws(curve(jw, t)[0]),
-                    **gaster(curve(cu, t)[0]))
+                    **gaster(curve(cu, t)[0], name))
 
     # The feet: two quick kicks by tripods (lifted and thrown forward or back), then drawn in toward the body and up
     # as the legs fold (the front legs only half in, still reaching forward); one hind leg twitches late.
@@ -407,14 +416,15 @@ def climb_feel():
 def animations(name):
     clips = {}
     clips.update(walk_clips(name))
-    clips['idle'] = {'loop': True, 'animation_length': IDLE_SECONDS, 'bones': idle()}
+    clips['idle'] = {'loop': True, 'animation_length': IDLE_SECONDS, 'bones': idle(name)}
     for clip, make in (('attack_a', attack_a), ('attack_b', attack_b), ('death', death)):
         made, miss = make(name)
         if miss > 0.05 and clip != 'death':
             raise ValueError(f'{name} {clip}: a planted foot misses its place by {miss:.3f}')
         clips[clip] = made
-    for clip in CARRY:
-        clips[clip] = carry(name, clip)
+    if name != mm.QUEEN:                                    # a queen never carries prey (her workers feed her)
+        for clip in CARRY:
+            clips[clip] = carry(name, clip)
     clips['climb_feel'] = climb_feel()
     return {'format_version': '1.8.0', 'animations': clips}
 
@@ -434,6 +444,7 @@ def write(name, data):
 # raid column's speeds, the attack's two ways, dying with and without the game's tip-over, and the carries with
 # paralysed termites in the jaws (drawn by the page only: in the game the load is drawn at the jaws by the game).
 MINOR_SIZE = lab.RENDER_SCALE['matabele_minor'] / lab.RENDER_SCALE['matabele_major']
+QUEEN_SIZE = lab.RENDER_SCALE['matabele_queen'] / lab.RENDER_SCALE['matabele_major']
 TERMITE = dict(length=7.0, thick=1.9)       # a Macrotermes worker in the major's units: 0.3 of its body long (real)
 TERMITE_BODY, TERMITE_HEAD = '#eadcb8', '#b06a26'
 
@@ -442,7 +453,7 @@ def termites(name, count):
     """Paralysed termites held crosswise at the jaws' tips (the carry socket), in the model's units: in rows of two, one
     row under the other, the heads to alternate sides, as Matabele majors carry them (up to about 10, Frank)."""
     piv = next(b['pivot'] for b in rig(name).model.bones if b['name'] == 'carry')
-    k = 1.0 / MINOR_SIZE if mm.MODELS[name] else 1.0
+    k = 1.0 / MINOR_SIZE if mm.MODELS.get(name) else 1.0
     body, w = TERMITE['length'] * 0.82 * k, TERMITE['thick'] * k
     head = TERMITE['length'] * 0.18 * k
     cubes = []
@@ -473,12 +484,13 @@ def viewer_bones(name):
 def viewer_data(entry):
     """The page's data in ant_pose_viewer.py's format; entry(name, note, bones, bps, model) makes one option."""
     out = {'title': 'Matabele pose viewer', 'scale': lab.RENDER_SCALE['matabele_major'], 'view': 1.6,
-           'intro': 'The Matabele ant (a draft, not in the game): the major and, smaller, the minor, every clip '
+           'intro': 'The Matabele ant: the major, the smaller minor and the queen, every clip '
                     'playing side by side on a floor with a block grid; behind them, each climbing a stone pillar.',
            'models': {n: viewer_bones(n) for n in MODELS}, 'anims': []}
     for name in MODELS:
-        minor = mm.MODELS[name]
-        who = 'Minor' if minor else 'Major'
+        minor = mm.MODELS.get(name, False)
+        queen = name == mm.QUEEN
+        who = 'Queen' if queen else 'Minor' if minor else 'Major'
         model = lab.Model(name)
         with open(os.path.join(mm.DRAFTS, 'animations', 'entity', f'{name}.animation.json'), encoding='utf-8') as f:
             clips = json.load(f)['animations']
@@ -491,6 +503,8 @@ def viewer_data(entry):
             e.update(model=name, **more)
             if minor:
                 e['size'] = round(MINOR_SIZE, 4)
+            elif queen:
+                e['size'] = round(QUEEN_SIZE, 4)
             out['anims'].append(e)
 
         def over_walk(walk, carry_clip):
@@ -512,7 +526,9 @@ def viewer_data(entry):
                                           '(about its middle, at the floor)', clips['death']['bones'], once=2.0, tip=True)
         add('dying, no tip-over', 'the clip alone: kicks, the legs giving way, the body settling on the ground',
             clips['death']['bones'], once=2.0)
-        if minor:
+        if queen:
+            pass                                                # she carries nothing
+        elif minor:
             add('carrying one termite', 'a minor with its one: the head a little raised, the jaws nearly shut',
                 over_walk('walk_fast', 'carry_small'), 4.5 * body_blocks, load=termites(name, 1))
         else:
@@ -522,7 +538,7 @@ def viewer_data(entry):
                 over_walk('walk', 'carry_small'), 2.5 * body_blocks, load=termites(name, 2))
         # The climbing course (2026-10-23, tools/matabele_climb.py): the game's climbing maths worked out tick by tick.
         course = matabele_climb.viewer_course(name)
-        course.update(feel=clips['climb_feel']['bones'], lane=1 if minor else 0)
+        course.update(feel=clips['climb_feel']['bones'], lane=-1 if queen else 1 if minor else 0)
         add('climbing', 'the slow walk, 1 body length a second, up a 3-block pillar, over the top edge, along the top, '
                         "head first down the far side and round the corner at its foot (the game's climbing maths; "
                         'the buttons under the scene pick the gaster and the antennae versions)',

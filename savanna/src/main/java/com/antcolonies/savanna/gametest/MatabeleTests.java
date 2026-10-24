@@ -14,9 +14,10 @@ import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
- * The Matabele ants in the game (M8 step 1, 2026-10-23): a major and a minor each walk to a 3-block stone pillar, up
- * it, onto its top and back down to the ground on its far side, the course their climbing was drawn on in the pose
- * viewer ({@code tools/matabele_climb.py}). Every walk is watched for floating, hovering and leaning ({@link TestWatch}).
+ * The Matabele ants in the game (M8 step 1, 2026-10-23): a major and a minor (and, since 2026-10-24, the queen, the
+ * biggest body) each walk to a 3-block stone pillar, up it, onto its top and back down to the ground on its far side,
+ * the course their climbing was drawn on in the pose viewer ({@code tools/matabele_climb.py}). Every walk is watched
+ * for floating, hovering and leaning ({@link TestWatch}).
  */
 @GameTestHolder(SavannaMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -24,21 +25,23 @@ public class MatabeleTests {
     @GameTest(template = "arena", timeoutTicks = 1600, skyAccess = true)
     public static void matabeleMajorsAndMinorsClimbAPillarAndComeDown(GameTestHelper helper) {
         for (int x = 0; x < 13; x++) {
-            for (int z = 0; z < 12; z++) {
+            for (int z = 0; z < 16; z++) {
                 helper.setBlock(x, 0, z, Blocks.DIRT);
             }
         }
         AbstractAntEntity major = climber(helper, SavannaEntities.MATABELE_MAJOR.get(), 3);
         AbstractAntEntity minor = climber(helper, SavannaEntities.MATABELE_MINOR.get(), 8);
-        int[] phase = {0, 0};
-        AbstractAntEntity[] ants = {major, minor};
-        int[] lanes = {3, 8};
+        AbstractAntEntity queen = climber(helper, SavannaEntities.MATABELE_QUEEN.get(), 13);
+        int[] phase = {0, 0, 0};
+        AbstractAntEntity[] ants = {major, minor, queen};
+        int[] lanes = {3, 8, 13};
+        String[] names = {"the major", "the minor", "the queen"};
         helper.onEachTick(() -> {
-            for (int i = 0; i < 2; i++) {
+            for (int i = 0; i < ants.length; i++) {
                 AbstractAntEntity ant = ants[i];
                 BlockPos top = helper.absolutePos(new BlockPos(6, 4, lanes[i]));
                 BlockPos beyond = helper.absolutePos(new BlockPos(10, 1, lanes[i]));
-                String name = i == 0 ? "the major" : "the minor";
+                String name = names[i];
                 if (phase[i] == 0 && helper.getTick() >= 10) {
                     helper.assertTrue(ant.getNavigator().moveTo(top, 1.0), "no route up the pillar for " + name);
                     phase[i] = 1;
@@ -54,8 +57,9 @@ public class MatabeleTests {
                 }
             }
         });
-        helper.succeedWhen(() -> helper.assertTrue(phase[0] == 3 && phase[1] == 3,
-                "still climbing (the major at phase " + phase[0] + ", the minor at " + phase[1] + ")"));
+        helper.succeedWhen(() -> helper.assertTrue(phase[0] == 3 && phase[1] == 3 && phase[2] == 3,
+                "still climbing (the major at phase " + phase[0] + ", the minor at " + phase[1] + ", the queen at "
+                        + phase[2] + ")"));
     }
 
     /** A Matabele of this body in its lane ({@code z}), 4 blocks west of its lane's stone pillar, 3 blocks tall. */

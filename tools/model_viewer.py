@@ -26,6 +26,10 @@ matabele_viewer.template.html): each head as a major and a minor, beside the har
 major soldier and a player's height, all at their game sizes; sliders for the Matabele sizes:
 python tools/model_viewer.py matabele [out.html]   (default references/matabele_viewer.html)
 
+Sixth scene, the Matabele queen's looks (M8 step 1c, 2026-10-24, matabele_models.py QUEEN_LOOKS), each beside a major at
+the same scale (same template, set up by the data):
+python tools/model_viewer.py queen [out.html]   (default references/queen_viewer.html)
+
 Sixth scene, Xylaria on a dead colony's fungus comb (M8 step 1a, 2026-10-24, xylaria_art.py; its own template,
 xylaria_viewer.template.html): three looks, each through the dead comb's stages, beside the living comb:
 python tools/model_viewer.py xylaria [out.html]   (default references/xylaria_viewer.html)
@@ -218,6 +222,38 @@ def matabele_page(out):
     print("wrote", out)
 
 
+def queen_page(out):
+    """The Matabele queen in her looks (M8 step 1c), each beside a major of the same scale for size, and the game's own
+    models beside them (as matabele_page)."""
+    import matabele_models as mm
+    data = {"looks": {}, "refs": [], "names": {"first": "major", "second": "queen"}, "sameScale": mm.QUEEN_SIZE,
+            "cams": ["side", "profile", "rear", "top"], "title": "Matabele queen viewer",
+            "intro": "The ergatoid queen (wingless, a major's body a little larger, a thin waist scale leaning forward, a deeper "
+                     "groove behind the shoulders, a swollen gaster) in three looks, A to C, each as a major (left) and the queen "
+                     "(right) at the same scale, and the game's own insects and a player's height in front. The buttons look at "
+                     "each look from the side, the rear, above, or the whole ant in profile. Drag to turn, scroll or pinch to zoom."}
+    major_bones, rows, w, h = mm.paint(mm.model(minor=False, head=mm.JAW, taper=mm.LEG_TAPER), "A")
+    for key, look in mm.QUEEN_LOOKS.items():
+        entry = {"name": look["name"], "note": look["note"],
+                 "major": {"bones": major_bones, "texture": uri(mm.png(rows)), "w": w, "h": h}}
+        bones, rows_q, wq, hq = mm.paint(mm.queen_bones(key), "A")
+        entry["minor"] = {"bones": bones, "texture": uri(mm.png(rows_q)), "w": wq, "h": hq}
+        data["looks"][key] = entry
+    for mod, model, scale, label in (("desert", "worker_ant", 0.65, "Harvester worker"),
+                                     ("savanna", "termite_worker", 0.75, "Termite worker"),
+                                     ("savanna", "termite_major_soldier", 0.75, "Termite major soldier")):
+        assets = mod_paths.assets(mod)
+        geo = json.loads((assets / f"geo/entity/{model}.geo.json").read_text(encoding="utf-8"))
+        texture = "data:image/png;base64," + base64.b64encode((assets / f"textures/entity/{model}.png").read_bytes()).decode()
+        desc = geo["minecraft:geometry"][0]["description"]
+        data["refs"].append({"label": label, "bones": geo["minecraft:geometry"][0]["bones"], "scale": scale,
+                             "texture": texture, "w": desc.get("texture_width", 64), "h": desc.get("texture_height", 64)})
+    template = (Path(__file__).resolve().parent / "matabele_viewer.template.html").read_text(encoding="utf-8")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")
+    print("wrote", out)
+
+
 def xylaria_page(out):
     """The Xylaria looks: for each look and stage, top and side textures (a few variants) and the stalks on a comb's top."""
     import comb_age_art as comb
@@ -239,6 +275,9 @@ def xylaria_page(out):
 def main():
     if len(sys.argv) > 1 and sys.argv[1] == "xylaria":
         xylaria_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/xylaria_viewer.html")
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "queen":
+        queen_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/queen_viewer.html")
         return
     if len(sys.argv) > 1 and sys.argv[1] == "matabele":
         matabele_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/matabele_viewer.html")

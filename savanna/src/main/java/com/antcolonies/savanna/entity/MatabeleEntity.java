@@ -69,6 +69,20 @@ public class MatabeleEntity extends AbstractAntEntity {
                 .add(Attributes.ATTACK_DAMAGE, 1.5);
     }
 
+    /**
+     * The queen (M8 step 1c, 2026-10-24): Megaponera's queen is wingless (ergatoid), a major's body a little larger with a
+     * swollen gaster (the user's look B, 1.2 times a major, "because it will be cool"). Heavy with eggs she walks at half
+     * the workers' pace, about 1.5 blocks a second (attribute 0.137, the speed her walks are fitted to,
+     * {@code tools/anim_lab.py WALK_SPEED}); health and sting my picks, to be set with the fights (M8 step 2). For now she
+     * wanders alone like the workers; her colony comes in 1c's next step.
+     */
+    public static AttributeSupplier.Builder createQueenAttributes() {
+        return PathfinderMob.createMobAttributes()
+                .add(Attributes.MAX_HEALTH, 20.0)
+                .add(Attributes.MOVEMENT_SPEED, 0.137)
+                .add(Attributes.ATTACK_DAMAGE, 3.0);
+    }
+
     @Override
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));

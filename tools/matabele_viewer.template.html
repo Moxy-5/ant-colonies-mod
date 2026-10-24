@@ -33,8 +33,8 @@
 </head>
 <body>
 <header>
-  <h1>Matabele ant viewer</h1>
-  <p>The Matabele ant in plain black with head B and new jaws, the long jaws curving down, all black, hinged high (height 2, raised a little more), the toothed edge a shade darker than the body, the antennae moved up the face, (the list under the
+  <h1 id="title">Matabele ant viewer</h1>
+  <p id="intro">The Matabele ant in plain black with head B and new jaws, the long jaws curving down, all black, hinged high (height 2, raised a little more), the toothed edge a shade darker than the body, the antennae moved up the face, (the list under the
      buttons says what each is), each as a big major (left) and a small minor (right), the heads hanging slanted down,
      the majors' the most; the "face" buttons look each major in the face, the "front" buttons straight at it as in your photos, the "head" buttons at its head from the side,
      the "profile" buttons at the whole ant from the side. In front, the game's own
@@ -44,7 +44,7 @@
 <div id="wrap"><canvas id="c"></canvas><div id="labels"></div></div>
 <div class="controls">
   <label>Major length <input id="major" type="range" min="0.3" max="3" step="0.05"> <span id="majorOut" class="readout"></span></label>
-  <label>Minor size <input id="minor" type="range" min="0.25" max="0.75" step="0.01"> <span id="minorOut" class="readout"></span></label>
+  <label id="minorLabel">Minor size <input id="minor" type="range" min="0.25" max="0.75" step="0.01"> <span id="minorOut" class="readout"></span></label>
 </div>
 <div class="controls" id="cams"></div>
 <ul id="list"></ul>
@@ -52,6 +52,8 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script>
 const DATA = /*DATA*/null;
+if (DATA.intro) document.getElementById('intro').textContent = DATA.intro;
+if (DATA.title) { document.getElementById('title').textContent = DATA.title; document.title = DATA.title; }
 const canvas = document.getElementById('c');
 const wrap = document.getElementById('wrap');
 const renderer = new THREE.WebGLRenderer({canvas, antialias: true, preserveDrawingBuffer: true});
@@ -165,12 +167,13 @@ function tag(text, obj) {
 }
 
 // The Matabele heads: a major and a minor each, turned three-quarters to the camera.
+const names = DATA.names || {first: 'major', second: 'minor'};
 const looks = Object.entries(DATA.looks).map(([key, look]) => {
   const build = m => buildModel(m.bones, loadTexture(m.texture), m.w, m.h);
   const major = build(look.major), minor = build(look.minor);
   [major, minor].forEach(m => { m.rotation.y = -0.6; scene.add(m); });
-  tag(key + ' major', major);
-  tag(key + ' minor', minor);
+  tag(key + ' ' + names.first, major);
+  tag(key + ' ' + names.second, minor);
   return {key, look, major, minor};
 });
 
@@ -208,14 +211,16 @@ const majorIn = document.getElementById('major'), minorIn = document.getElementB
 majorIn.value = settings.major; minorIn.value = settings.minor;
 
 function layout() {
-  const majorLen = settings.major, minorLen = settings.major * settings.minor;
+  const majorLen = settings.major;
+  const minorLen = DATA.sameScale ? Math.max(...looks.map(l => l.minor.userData.length * majorLen / l.major.userData.length * DATA.sameScale))
+                                  : settings.major * settings.minor;
   const gap = Math.max(0.6, majorLen * 0.9);
   const lookWidth = majorLen + minorLen + gap;
   looks.forEach((l, i) => {
     const x0 = (i - (looks.length - 1) / 2) * (lookWidth + gap * 1.5);
     l.major.scale.setScalar(majorLen / l.major.userData.length);
-    l.minor.scale.setScalar(minorLen / l.minor.userData.length);
-    l.major.position.set(x0 - (minorLen + gap) / 2, 0, -1.2);
+    l.minor.scale.setScalar(DATA.sameScale ? l.major.scale.x * DATA.sameScale : minorLen / l.minor.userData.length);
+    l.major.position.set(x0 - (minorLen + gap) / 2, 0, DATA.sameScale ? -1.2 - majorLen * 1.8 : -1.2);   // on the queen page the major stands behind her, out of the cameras' way
     l.minor.position.set(x0 + (majorLen + gap) / 2, 0, -1.2);
   });
   const step = Math.max(1.0, majorLen * 1.2);
@@ -229,6 +234,7 @@ function layout() {
     ' times a harvester worker)';
   document.getElementById('minorOut').textContent = Math.round(settings.minor * 100) + '% of the major: ' +
     minorLen.toFixed(2) + ' blocks long';
+  if (DATA.sameScale) document.getElementById('minorLabel').style.display = 'none';
 }
 majorIn.addEventListener('input', () => { settings.major = parseFloat(majorIn.value); layout(); });
 minorIn.addEventListener('input', () => { settings.minor = parseFloat(minorIn.value); layout(); });
@@ -247,17 +253,22 @@ function headCam(m, yaw, pitch, dist) {
   const a = r + yaw * Math.PI / 180, p = pitch * Math.PI / 180, d = s * dist;
   return [[c.x - Math.sin(a) * Math.cos(p) * d, c.y + Math.sin(p) * d, c.z - Math.cos(a) * Math.cos(p) * d], [c.x, c.y, c.z]];
 }
+const camKinds = DATA.cams || ['side', 'profile', 'face', 'front', 'head', 'top'];
 looks.forEach(l => {
-  CAMS['side ' + l.key] = () => { const p = l.major.position; const d = settings.major * 1.6 + 0.3;
+  const f = DATA.sameScale ? l.minor : l.major;       // the ant the cameras look at (the queen, on the queen page)
+  CAMS['rear ' + l.key] = () => { const p = f.position, d = settings.major * 1.4 + 0.3;
+    return [[p.x - 0.5 * d, settings.major * 0.3, p.z + d * 0.9], [p.x, settings.major * 0.12, p.z]]; };
+  CAMS['side ' + l.key] = () => { const p = f.position; const d = settings.major * 1.6 + 0.3;
     return [[p.x + d * 0.9, settings.major * 0.35, p.z + d * 0.55], [p.x, settings.major * 0.12, p.z]]; };
-  CAMS['profile ' + l.key] = () => { const p = l.major.position, r = l.major.rotation.y, d = settings.major * 1.3 + 0.3;
+  CAMS['profile ' + l.key] = () => { const p = f.position, r = f.rotation.y, d = settings.major * (DATA.sameScale ? 1.9 : 1.3) + 0.3;
     return [[p.x + Math.cos(r) * d, settings.major * 0.2, p.z - Math.sin(r) * d], [p.x, settings.major * 0.16, p.z]]; };
   CAMS['face ' + l.key] = () => headCam(l.major, 35, 12, 1.7);
   CAMS['front ' + l.key] = () => headCam(l.major, 0, -8, 1.5);      // straight at the face, as in the photos
   CAMS['head ' + l.key] = () => headCam(l.major, 90, 0, 1.9);
-  CAMS['top ' + l.key] = () => { const p = l.major.position; const d = settings.major * 1.6 + 0.3;
+  CAMS['top ' + l.key] = () => { const p = f.position; const d = settings.major * 1.6 + 0.3;
     return [[p.x + 0.001, d, p.z + 0.001], [p.x, 0, p.z]]; };
 });
+Object.keys(CAMS).forEach(name => { if (name !== 'overview' && name !== 'low' && !camKinds.includes(name.split(' ')[0])) delete CAMS[name]; });
 const camBox = document.getElementById('cams');
 function setCam(name) {
   settings.cam = name;

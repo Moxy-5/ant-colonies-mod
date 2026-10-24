@@ -23,6 +23,7 @@ public class SavannaClientEvents {
     /** The Matabele models' drawing scales, as the animation lab's (tools/anim_lab.py RENDER_SCALE). */
     static final float MATABELE_MAJOR_SCALE = 0.95F;
     static final float MATABELE_MINOR_SCALE = 0.455F;
+    static final float MATABELE_QUEEN_SCALE = 1.14F;
 
     @SubscribeEvent
     public static void onRegisterLayers(EntityRenderersEvent.RegisterLayerDefinitions event) {
@@ -66,5 +67,9 @@ public class SavannaClientEvents {
                 context, new InsectModel<MatabeleEntity>(
                         ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "matabele_minor")))
                 .withScale(MATABELE_MINOR_SCALE));
+        event.registerEntityRenderer(SavannaEntities.MATABELE_QUEEN.get(), context -> new AntRenderer<>(
+                context, new InsectModel<MatabeleEntity>(
+                        ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "matabele_queen")))
+                .withScale(MATABELE_QUEEN_SCALE));
     }
 }

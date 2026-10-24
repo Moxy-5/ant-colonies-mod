@@ -40,6 +40,20 @@ timings: all "my pick, to confirm" until then).
    (dead mound, under a fallen tree, or a few rooms in the ground), the prey pile
    (goes off in about a day), hunger, world generation in savannas, spawn egg and
    command.
+   **Pieces 1c to 1f planned with the user 2026-10-24** (decisions in `docs/DESIGN.md`, "Matabele colony, details"):
+   - **1c, the ant gets a colony:** `megaponera_analis.json` (castes major and minor, health and damage, how it eats and
+     grows, founding `colony_fission`), the wingless (ergatoid) queen with her own model (a major's body, a swollen rear;
+     the look picked in the model viewer first), her eggs hatching into larvae and then majors or minors in the real
+     two-humped mix, each ant its own size inside its caste. Test: summon a queen, `/antcolonies list`, watch the
+     eggs, larvae and sizes. The colony has no nest yet (1d).
+   - **1d, the shallow nest:** the colony settles in a dead mound (favourite), under a fallen tree, or in a few shallow
+     ground rooms (2 to 5 blocks down), reusing ready spaces and digging only to join them. Test: a queen near each.
+   - **1e, the prey pile and hunger:** the pile of dead termites in the nest, eaten by larvae and adults, off in about a
+     day; hunger by the colony rules already built; stocked by a command until raids exist (step 4). Test: stock it
+     and watch it eaten and rot; leave it empty and watch them starve.
+   - **1f, new land and a command:** a few colonies placed in new savannas (dead mound, under a fallen tree, ground)
+     kept away from living termite mounds, real sizes 400 to 2,500, mostly numbers; a command that makes one anywhere
+     with a size you choose.
 2. **The shared fight system** (species-neutral, the harvester ants use it later
    against their neighbours): health and damage per caste from the profile, the
    sting (paralysis), termite soldiers clamping on and riding along, legs bitten

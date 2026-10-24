@@ -92,6 +92,13 @@ public class SavannaEntities {
                     .sized(0.3F, 0.22F)
                     .build("matabele_minor"));
 
+    // The Matabele queen (M8 step 1c, 2026-10-24): 1.2 times a major (the user's pick), her box the climbing preview's.
+    public static final DeferredHolder<EntityType<?>, EntityType<MatabeleEntity>> MATABELE_QUEEN =
+            ENTITY_TYPES.register("matabele_queen", () -> EntityType.Builder
+                    .of(MatabeleEntity::new, MobCategory.CREATURE)
+                    .sized(0.72F, 0.54F)
+                    .build("matabele_queen"));
+
     // Apex step 9c: the species' bodies, for the shared brood and population code (what eggs hatch into, the dead, each
     // caste's mob); the split, S3: with the looks of its young and its dead (the dead: pale and dull, drawn by
     // tools/corpse_textures.py).

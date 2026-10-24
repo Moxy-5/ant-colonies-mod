@@ -48,6 +48,7 @@ public class SavannaEvents {
         event.put(SavannaEntities.TERMITE_MAJOR_SOLDIER.get(), TermiteSoldierEntity.createMajorAttributes().build());
         event.put(SavannaEntities.MATABELE_MAJOR.get(), com.antcolonies.savanna.entity.MatabeleEntity.createMajorAttributes().build());
         event.put(SavannaEntities.MATABELE_MINOR.get(), com.antcolonies.savanna.entity.MatabeleEntity.createMinorAttributes().build());
+        event.put(SavannaEntities.MATABELE_QUEEN.get(), com.antcolonies.savanna.entity.MatabeleEntity.createQueenAttributes().build());
     }
 
     /** Chickens hunt termite workers out on the surface (step 6c; see {@link HuntTermitesGoal}). */
@@ -144,6 +145,7 @@ public class SavannaEvents {
             event.accept(SavannaItems.TERMITE_MAJOR_SOLDIER_SPAWN_EGG);
             event.accept(SavannaItems.MATABELE_MAJOR_SPAWN_EGG);
             event.accept(SavannaItems.MATABELE_MINOR_SPAWN_EGG);
+            event.accept(SavannaItems.MATABELE_QUEEN_SPAWN_EGG);
         });
     }
 }

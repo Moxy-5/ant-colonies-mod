@@ -1,0 +1,191 @@
+{
+ "about": "Body plan (tools/body_plan.py explains every part). \"bones\" is the rename table: role name (left, used everywhere else in this file and in the tools) to the bone name in the model (right). The names are the placeholder models' for now; when the real model has other bone names, change only the right-hand side, then run python tools/body_plan.py check. The queen (M8 step 1c, 2026-10-24): the major's bones and plan, her climbing numbers measured from her own model. Her waist is a ponerine's (the one node, petiole, and the joint to the gaster, gaster_front), then her swollen gaster bends plate by plate (gaster_back, gaster_mid, gaster_end, gaster_tip: the 4th to the 7th abdominal segment, joined by soft skin as in every ant), so it curves along an edge as she climbs (the user's ask, 2026-10-24); The plates rise far (a real gaster lifts a long way at its joints: 90 degrees at the first, 60 at the rest) but droop little over an edge (18 and 12, so the swollen gaster sticks out over a brink as a real one does instead of cutting the corner), worked out on the climbing course (python tools/matabele_climb.py check matabele_queen); 45 at the waist; my picks, to confirm.",
+ "model": "matabele_queen",
+ "bones": {
+  "body": "body",
+  "forebody": "forebody",
+  "head": "head",
+  "mandible_l": "mandible_l",
+  "antenna_l_1": "antenna_l_1",
+  "antenna_l_2": "antenna_l_2",
+  "mandible_r": "mandible_r",
+  "antenna_r_1": "antenna_r_1",
+  "antenna_r_2": "antenna_r_2",
+  "carry": "carry",
+  "thorax": "thorax",
+  "leg_l1": "leg_l1",
+  "leg_l1_lower": "leg_l1_lower",
+  "leg_l1_foot": "leg_l1_foot",
+  "leg_r1": "leg_r1",
+  "leg_r1_lower": "leg_r1_lower",
+  "leg_r1_foot": "leg_r1_foot",
+  "leg_l2": "leg_l2",
+  "leg_l2_lower": "leg_l2_lower",
+  "leg_l2_foot": "leg_l2_foot",
+  "leg_r2": "leg_r2",
+  "leg_r2_lower": "leg_r2_lower",
+  "leg_r2_foot": "leg_r2_foot",
+  "leg_l3": "leg_l3",
+  "leg_l3_lower": "leg_l3_lower",
+  "leg_l3_foot": "leg_l3_foot",
+  "leg_r3": "leg_r3",
+  "leg_r3_lower": "leg_r3_lower",
+  "leg_r3_foot": "leg_r3_foot",
+  "petiole": "petiole",
+  "gaster_front": "gaster_front",
+  "gaster_back": "gaster_back",
+  "gaster_mid": "gaster_mid",
+  "gaster_end": "gaster_end",
+  "gaster_tip": "gaster_tip"
+ },
+ "root": "body",
+ "forebody": "forebody",
+ "legs": {
+  "l1": [
+   "leg_l1",
+   "leg_l1_lower",
+   "leg_l1_foot"
+  ],
+  "r1": [
+   "leg_r1",
+   "leg_r1_lower",
+   "leg_r1_foot"
+  ],
+  "l2": [
+   "leg_l2",
+   "leg_l2_lower",
+   "leg_l2_foot"
+  ],
+  "r2": [
+   "leg_r2",
+   "leg_r2_lower",
+   "leg_r2_foot"
+  ],
+  "l3": [
+   "leg_l3",
+   "leg_l3_lower",
+   "leg_l3_foot"
+  ],
+  "r3": [
+   "leg_r3",
+   "leg_r3_lower",
+   "leg_r3_foot"
+  ]
+ },
+ "head": {
+  "bone": "head",
+  "jaws": [
+   "mandible_l",
+   "mandible_r"
+  ],
+  "antennae": {
+   "l": [
+    "antenna_l_1",
+    "antenna_l_2"
+   ],
+   "r": [
+    "antenna_r_1",
+    "antenna_r_2"
+   ]
+  },
+  "sockets": {
+   "carry": "carry"
+  }
+ },
+ "head_player": [
+  "head",
+  "mandible_l",
+  "antenna_l_1",
+  "antenna_l_2",
+  "mandible_r",
+  "antenna_r_1",
+  "antenna_r_2",
+  "carry"
+ ],
+ "spine": [
+  {
+   "joints": [
+    {
+     "bone": "petiole",
+     "share": 0.55
+    },
+    {
+     "bone": "gaster_front",
+     "share": 0.45
+    }
+   ],
+   "max_pitch": 45,
+   "max_yaw": 20,
+   "hinge": 0.14,
+   "from": 1.61,
+   "to": 6.62
+  },
+  {
+   "joints": [
+    {
+     "bone": "gaster_back",
+     "share": 1.0
+    }
+   ],
+   "max_pitch": 90,
+   "max_yaw": 6,
+   "hinge": 6.2,
+   "from": 6.2,
+   "to": 13.66,
+   "max_up": 90,
+   "max_down": 18
+  },
+  {
+   "joints": [
+    {
+     "bone": "gaster_mid",
+     "share": 1.0
+    }
+   ],
+   "max_pitch": 60,
+   "max_yaw": 6,
+   "hinge": 12.84,
+   "from": 12.84,
+   "to": 16.75,
+   "max_up": 60,
+   "max_down": 12
+  },
+  {
+   "joints": [
+    {
+     "bone": "gaster_end",
+     "share": 1.0
+    }
+   ],
+   "max_pitch": 60,
+   "max_yaw": 6,
+   "hinge": 15.39,
+   "from": 15.39,
+   "to": 18.7,
+   "max_up": 60,
+   "max_down": 12
+  },
+  {
+   "joints": [
+    {
+     "bone": "gaster_tip",
+     "share": 1.0
+    }
+   ],
+   "max_pitch": 60,
+   "max_yaw": 6,
+   "hinge": 17.29,
+   "from": 17.29,
+   "to": 19.81,
+   "max_up": 60,
+   "max_down": 12
+  }
+ ],
+ "climb": {
+  "front_feet": 11.29,
+  "hind_feet": 7.21,
+  "front_end": 13.04,
+  "rear_end": 19.81,
+  "tightest_curve": 8.87
+ }
+}

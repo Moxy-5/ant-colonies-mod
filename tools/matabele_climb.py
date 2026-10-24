@@ -38,7 +38,7 @@ WALL, DEPTH, HEIGHT = 0.0, 3.0, 3.0
 START, END = -2.6, DEPTH + 2.6   # where the box starts and stops (its middle)
 # The preview's boxes (blocks, width and height), my picks for the preview only (the user picks the sizes): about the
 # body's own height, and no wider than fits a 1-block tunnel.
-BOX = {'matabele_major': (0.6, 0.45), 'matabele_minor': (0.3, 0.22)}
+BOX = {'matabele_major': (0.6, 0.45), 'matabele_minor': (0.3, 0.22), 'matabele_queen': (0.72, 0.54)}
 # How fast it climbs: 1 body length a second, on the floor and the wall alike (my pick: real Megaponera climb well but
 # travel on the ground; a careful pace, the slow walk's band).
 BODY_LENGTHS_A_SECOND = 1.0
@@ -167,7 +167,7 @@ class Spine:
         self.pitch = []
         for piece in pieces:
             lies = self.ground_under(piece['from'], piece['to'], ahead, hind, scale)
-            bend = clamp(ahead - lies, -piece['max_pitch'], piece['max_pitch'])
+            bend = clamp(ahead - lies, -piece.get('max_down', piece['max_pitch']), piece.get('max_up', piece['max_pitch']))
             self.pitch.append(bend)
             ahead -= bend
 
@@ -391,7 +391,7 @@ def simulate(name, gaster='B', head='walk', clips=None, check=True, middle='stif
     head_bones = set(plan.head_player)
     pieces = [dict(p) for p in plan.spine]
     pieces[0]['from'] = gaster_from(name, gaster)
-    if middle == 'waist':
+    if middle == 'waist' and len(pieces) == 1:                     # a gaster in one piece (the workers'); the queen's bends plate by plate
         pieces[0]['joints'] = [(j, WAIST_SHARES.get(plan.to_bone.get(j, j), share)) for j, share in pieces[0]['joints']]
     neck_max = 0.0 if middle == 'stiff' else NECK_MAX
     neck = 0.0
@@ -521,7 +521,7 @@ def viewer_course(name):
 
 if __name__ == '__main__':
     args = [a for a in sys.argv[1:] if a != 'check']
-    names = [a for a in args if a.startswith('matabele_')] or ['matabele_major', 'matabele_minor']
+    names = [a for a in args if a.startswith('matabele_')] or ['matabele_major', 'matabele_minor', 'matabele_queen']
     found = check_all(names)
     picked = 'the picked ways (gaster {}, antennae "{}", middle "{}")'.format(*PICKED)
     print(f'{picked}: {found} part(s) in a block' if found else f'{picked}: nothing in a block')

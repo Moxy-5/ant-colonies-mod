@@ -94,7 +94,9 @@ RENDER_SCALE = {'worker_ant': 0.65, 'queen_ant': 1.3, 'termite_king': 0.75, 'ter
                 'termite_worker': 0.75, 'termite_minor_soldier': 0.75, 'termite_major_soldier': 0.75,
                 # the Matabele (2026-10-23, in the game since the same day, SavannaClientEvents): the major twice a termite major soldier's length,
                 # the minor 45% of it, the model viewer's starting sizes (the sizes are still the user's to pick)
-                'matabele_major': 0.95, 'matabele_minor': 0.455}
+                'matabele_major': 0.95, 'matabele_minor': 0.455,
+                # the queen (2026-10-24): her body 1.2 times a major's, the user's pick ("because it will be cool")
+                'matabele_queen': 1.14}
 # Normal walking speed in blocks a second (my estimate from the movement speed attribute: a ground mob's top speed is
 # about attribute x 0.25 / 0.454 blocks a tick at the normal speed modifier; the worker's 0.25 gives about 2.75 b/s,
 # about 6 body lengths a second, which is what real Pogonomyrmex walk). The in-game camera can measure the real one.
@@ -102,7 +104,9 @@ WALK_SPEED = {'worker_ant': 2.75, 'queen_ant': 0.9, 'termite_worker': 2.4, 'term
               'termite_minor_soldier': 2.6, 'termite_major_soldier': 1.9,
               # Matabele raid columns: majors and minors march together at one speed, about 2 major body lengths a
               # second (my estimate from Frank's raid films, to confirm; the game's speed is set when the ant goes in)
-              'matabele_major': 3.0, 'matabele_minor': 3.0}
+              'matabele_major': 3.0, 'matabele_minor': 3.0,
+              # the queen walks with her colony when it moves house, slower than a raid (my pick, to confirm)
+              'matabele_queen': 1.5}
 
 LEG_COLOURS = {'l1': (220, 40, 40), 'l2': (240, 150, 20), 'l3': (200, 190, 30),
                'r1': (40, 90, 230), 'r2': (30, 170, 200), 'r3': (150, 60, 210)}

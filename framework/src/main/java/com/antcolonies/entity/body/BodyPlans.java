@@ -58,10 +58,16 @@ public final class BodyPlans {
     /**
      * One piece of the spine (climbing done once for every body, 2026-10-18): the joints that bend it and the share of
      * its bend each takes, where it hangs off the piece in front (the hinge) and where it lies behind the body's middle
-     * (model units), and how far it bends at most up or down and to the side (degrees).
+     * (model units), and how far it bends at most up or down and to the side (degrees). maxUp and maxDown (2026-10-24,
+     * the Matabele queen's long gaster): how far it may rise (at an inside corner, a positive bend) and droop (over an
+     * outside edge) when the two differ; a plan without them bends maxPitch both ways.
      */
     public record Piece(List<String> joints, float[] shares, double hinge, double from, double to, float maxPitch,
-            float maxYaw) {
+            float maxYaw, float maxUp, float maxDown) {
+        public Piece(List<String> joints, float[] shares, double hinge, double from, double to, float maxPitch,
+                float maxYaw) {
+            this(joints, shares, hinge, from, to, maxPitch, maxYaw, maxPitch, maxPitch);
+        }
     }
 
     /**
@@ -199,9 +205,12 @@ public final class BodyPlans {
                     joints.add(bones.getOrDefault(role, role));
                     shares[i] = joint.get("share").getAsFloat();
                 }
+                float maxPitch = piece.get("max_pitch").getAsFloat();
                 spine.add(new Piece(List.copyOf(joints), shares, piece.get("hinge").getAsDouble(),
-                        piece.get("from").getAsDouble(), piece.get("to").getAsDouble(),
-                        piece.get("max_pitch").getAsFloat(), piece.get("max_yaw").getAsFloat()));
+                        piece.get("from").getAsDouble(), piece.get("to").getAsDouble(), maxPitch,
+                        piece.get("max_yaw").getAsFloat(),
+                        piece.has("max_up") ? piece.get("max_up").getAsFloat() : maxPitch,
+                        piece.has("max_down") ? piece.get("max_down").getAsFloat() : maxPitch));
             }
         }
         Climb climb = WORKER_CLIMB;

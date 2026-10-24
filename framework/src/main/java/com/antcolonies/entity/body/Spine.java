@@ -107,7 +107,7 @@ public final class Spine {
             float bend = ahead - lies;
             pitchO[i] = pitch[i];
             yawO[i] = yaw[i];
-            pitch[i] = Mth.clamp(bend, -piece.maxPitch(), piece.maxPitch());
+            pitch[i] = Mth.clamp(bend, -piece.maxDown(), piece.maxUp());
             yaw[i] = Mth.clamp(aheadYaw - liesYaw, -piece.maxYaw(), piece.maxYaw());
             ahead -= pitch[i];
             aheadYaw -= yaw[i];

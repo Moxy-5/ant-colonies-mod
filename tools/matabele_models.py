@@ -245,6 +245,9 @@ NECK = (0, 5.5, -7.2)           # high on the front of the pronotum: the head ha
 WAIST = (0, 4.2, 0.4)            # thorax to the waist node
 GIRDLE_FRONT = (0, 4.4, 2.0)     # the waist node to the gaster's first segment
 GIRDLE = (0, 4.5, 4.8)           # the pinch between the gaster's first and second segments
+GASTER_START = 1.9               # where the gaster's first segment begins (what the queen's swell lengthens from)
+QUEEN_SCALE_LEAN = 14.0          # degrees: the queen's waist scale leans forward over the thorax
+QUEEN_SIZE = 1.2                 # her body (head, thorax, legs) against a major's: the user's pick, 2026-10-24, "because it will be cool" (real: 18.5 mm against 18, Arnold 1915)
 
 # Legs: hip, knee, ankle, toe (left side; before LIFT, so the toes at -LIFT stand on the ground). Long and thin, the knees high over the back, the body carried high; the hind
 # legs the longest, about as long as the body.
@@ -547,13 +550,14 @@ def sym_points(lo, hi, sx):
     return [xs[0], lo[1], lo[2]], [xs[1], hi[1], hi[2]]
 
 
-def thorax_bone():
+def thorax_bone(queen=False):
+    groove_top = 4.4 if queen else 4.9                             # the queen's metanotal groove is deeper (Arnold 1915)
     return bone('thorax', 'forebody', (0, 4.5, -3.4), [
         box([-1.5, 3.6, -7.2], [1.5, 6.0, -4.4], 'thorax'),       # the pronotum, round and high
         box([-1.1, 6.0, -6.8], [1.1, 6.35, -4.8], 'thorax'),      # its domed top
         box([-1.15, 3.7, -4.5], [1.15, 5.6, -2.4], 'thorax'),     # the mesonotum, lower
         box([-0.85, 5.6, -4.2], [0.85, 5.85, -2.7], 'thorax'),
-        box([-0.85, 3.8, -2.45], [0.85, 4.9, -1.9], 'thorax'),      # the groove before the propodeum
+        box([-0.85, 3.8, -2.45], [0.85, groove_top, -1.9], 'thorax'),      # the groove before the propodeum
         box([-1.1, 3.4, -2.0], [1.1, 5.3, 0.4], 'thorax'),        # the long propodeum
         box([-0.85, 5.3, -1.8], [0.85, 5.5, -0.4], 'thorax'),       # its sloping top
         box([-1.1, 3.2, -6.5], [1.1, 3.6, -0.5], 'thorax'),       # the underside
@@ -588,30 +592,55 @@ def leg_bones(taper=0.0):
 
 
 SLIM = 0.72
-SLIM_BONES = ('thorax', 'petiole', 'gaster_front', 'gaster_back')
+SLIM_BONES = ('thorax', 'petiole', 'gaster_front', 'gaster_back', 'gaster_mid', 'gaster_end', 'gaster_tip')
 
 
-def model(minor=False, head='A', taper=0.0):
+def model(minor=False, head='A', taper=0.0, queen=None):
     """The ant's bones (the game's model file format, each box naming its swatch until paint() gives it its place on
-    the texture). minor: the small ant's proportions; head: which of the HEADS."""
+    the texture). minor: the small ant's proportions; head: which of the HEADS. queen: (width, height, length) times
+    the worker's gaster, for the ergatoid queen (QUEEN_LOOKS): her gaster swollen, her waist node a thin scale leaning
+    forward, her groove deeper; the rest is a major."""
     bones = [bone('body', None, (0, 4.5, 0)), bone('forebody', 'body', WAIST)]
     bones += head_bones(HEADS[head], MINOR_HEAD if minor else MAJOR_HEAD, MINOR_ANTENNA if minor else 1.0,
                         MINOR_TILT if minor else MAJOR_TILT)
-    bones.append(thorax_bone())
+    bones.append(thorax_bone(queen is not None))
     bones += leg_bones(taper)
-    bones.append(bone('petiole', 'body', WAIST, [
-        box([-0.5, 3.8, 0.3], [0.5, 4.5, 0.8], 'waist'),          # the short stalk
-        box([-1.1, 3.5, 0.7], [1.1, 6.0, 1.9], 'waist'),          # the thick, tall node
-        box([-0.85, 6.0, 0.85], [0.85, 6.25, 1.75], 'waist'),     # its rounded top
-        box([-0.3, 3.15, 0.9], [0.3, 3.5, 1.6], 'waist'),         # the keel under it
+    if queen is None:
+        node = [
+            box([-0.5, 3.8, 0.3], [0.5, 4.5, 0.8], 'waist'),          # the short stalk
+            box([-1.1, 3.5, 0.7], [1.1, 6.0, 1.9], 'waist'),          # the thick, tall node
+            box([-0.85, 6.0, 0.85], [0.85, 6.25, 1.75], 'waist'),     # its rounded top
+            box([-0.3, 3.15, 0.9], [0.3, 3.5, 1.6], 'waist'),         # the keel under it
+        ]
+    else:                                                              # a squamiform petiole: a thin scale, leaning forward
+        lean, base = [QUEEN_SCALE_LEAN, 0, 0], (0, 3.6, 1.15)
+        node = [
+            box([-0.5, 3.8, 0.3], [0.5, 4.5, 0.8], 'waist'),
+            box([-1.0, 3.5, 0.85], [1.0, 6.4, 1.45], 'waist', base, lean),
+            box([-0.75, 6.4, 0.9], [0.75, 6.65, 1.4], 'waist', base, lean),
+            box([-0.3, 3.15, 0.9], [0.3, 3.5, 1.6], 'waist'),
+        ]
+    bones.append(bone('petiole', 'body', WAIST, node))
+    sw = tuple(queen[:3]) if queen else (1.0, 1.0, 1.0)
+    bend = queen[3] if queen and len(queen) > 3 else 1.0                # a heavy gaster hangs less steeply, or it would dip under the ground
+    girdle = (GIRDLE[0], GIRDLE[1], GASTER_START + (GIRDLE[2] - GASTER_START) * sw[2])
+
+    def front(lo, hi):                                                 # a box of the first segment, swollen about its middle line
+        return box([lo[0] * sw[0], GIRDLE[1] + (lo[1] - GIRDLE[1]) * sw[1], GASTER_START + (lo[2] - GASTER_START) * sw[2]],
+                   [hi[0] * sw[0], GIRDLE[1] + (hi[1] - GIRDLE[1]) * sw[1], GASTER_START + (hi[2] - GASTER_START) * sw[2]], 'gaster')
+    bones.append(bone('gaster_front', 'petiole', GIRDLE_FRONT, [      # the gaster's first segment
+        front([-1.3, 3.4, 1.9], [1.3, 5.6, 2.2]),
+        front([-1.75, 3.15, 2.1], [1.75, 5.85, 4.6]),
+        front([-1.45, 2.95, 2.4], [1.45, 6.05, 4.3]),
+        front([-1.5, 3.4, 4.55], [1.5, 5.6, 5.0]),                    # the girdle, the pinch
     ]))
-    bones.append(bone('gaster_front', 'petiole', GIRDLE_FRONT, [  # the gaster's first segment
-        box([-1.3, 3.4, 1.9], [1.3, 5.6, 2.2], 'gaster'),
-        box([-1.75, 3.15, 2.1], [1.75, 5.85, 4.6], 'gaster'),
-        box([-1.45, 2.95, 2.4], [1.45, 6.05, 4.3], 'gaster'),
-        box([-1.5, 3.4, 4.55], [1.5, 5.6, 5.0], 'gaster'),        # the girdle, the pinch
-    ]))
-    bones.append(bone('gaster_back', 'gaster_front', GIRDLE, gaster_cubes()))
+    if queen is None:
+        bones.append(bone('gaster_back', 'gaster_front', girdle, gaster_cubes(girdle, sw, bend)))
+    else:                                                              # her gaster a chain, one bone a plate, to curve as she climbs
+        parent = 'gaster_front'
+        for name, (pivot, cubes) in zip(QUEEN_GASTER, gaster_chain(girdle, sw, bend)):
+            bones.append(bone(name, parent, pivot, cubes))
+            parent = name
     for b in bones:
         if b['name'] in SLIM_BONES:                                 # the slim body behind the head
             for c in b.get('cubes', []):
@@ -635,11 +664,28 @@ def tilted(centre, size, down, swatch):
                [-down, 0, 0])
 
 
-def gaster_cubes():
-    cubes, p = [], [GIRDLE[0], GIRDLE[1], GIRDLE[2] + 0.1]
+def gaster_cubes(girdle=GIRDLE, swell=(1.0, 1.0, 1.0), bend=1.0):
+    """The gaster from the pinch at girdle to the sting; swell: width, height and length times the worker's (the queen's);
+    bend: the plates' downward angles times this (the sting keeps its turn beyond the last plate)."""
+    return [c for _, cubes in gaster_chain(girdle, swell, bend) for c in cubes]
+
+
+# The queen's gaster as a chain (2026-10-24, the user's ask: "her larger abdomen so it properly curves while climbing"): a
+# bone for each plate, the 4th to the 7th abdominal segment (gaster_front is the 3rd), the sting on the last. A real ant's
+# gaster plates overlap like a telescope, joined by soft skin, so the gaster can bend down and under (the sting) and a
+# little at each joint; a queen's swollen gaster bends the same way, plate by plate.
+QUEEN_GASTER = ('gaster_back', 'gaster_mid', 'gaster_end', 'gaster_tip')
+
+
+def gaster_chain(girdle=GIRDLE, swell=(1.0, 1.0, 1.0), bend=1.0):
+    """The gaster plate by plate: [(where the plate is hinged, its boxes)], the sting with the last plate."""
+    out, p = [], [girdle[0], girdle[1], girdle[2] + 0.1]
     for i, (length, w, h, down) in enumerate(GASTER_PLATES):
+        cubes, hinge = [], tuple(round(v, 3) for v in (p if i else girdle))
+        length, w, h, down = length * swell[2], w * swell[0], h * swell[1], down * bend
         d = (0, -math.sin(math.radians(down)), math.cos(math.radians(down)))
         c = [q + v * length / 2 for q, v in zip(p, d)]
+        out.append((hinge, cubes))
         cubes.append(tilted(c, (w, h, length), down, 'gaster'))
         if i == 0:                                                   # the big segment rounded
             cubes.append(tilted(c, (w + 0.3, h - 0.8, length - 0.8), down, 'gaster'))
@@ -649,18 +695,19 @@ def gaster_cubes():
             cubes.append(tilted(rim, (w + 0.2, h + 0.2, 0.3), down, 'rim'))
         p = [q + v * (length - 0.1) for q, v in zip(p, d)]
     for length, thick, down in STING:
+        down = GASTER_PLATES[-1][3] * bend + (down - GASTER_PLATES[-1][3])
         d = (0, -math.sin(math.radians(down)), math.cos(math.radians(down)))
         c = [q + v * length / 2 for q, v in zip(p, d)]
-        cubes.append(tilted(c, (thick, thick, length), down, 'sting'))
+        out[-1][1].append(tilted(c, (thick, thick, length), down, 'sting'))
         p = [q + v * (length - 0.05) for q, v in zip(p, d)]
-    return cubes
+    return out
 
 
 # --- the game files (2026-10-23) ----------------------------------------------------------------------------------------
 # The model as the game reads it, a major and a minor, each with its own texture, written into the savanna mod (drafts
 # in drafts/savanna/ until the user put the ant into the game, 2026-10-23, with a spawn egg each). The clips are written
 # next to them by tools/matabele_anims.py.
-#   python tools/matabele_models.py      writes both models and textures
+#   python tools/matabele_models.py      writes the models and textures (major, minor and, since 2026-10-24, the queen)
 import json  # noqa: E402
 import os  # noqa: E402
 import sys  # noqa: E402
@@ -675,13 +722,58 @@ LOOK = 'A'
 LEG_TAPER = 0.4                                                 # the femur's taper, the user's pick 2026-10-23
 
 
+# --- the queen (M8 step 1c, 2026-10-24) ------------------------------------------------------------------------------------
+# The ergatoid queen: wingless, a major's body made a little larger (QUEEN_SIZE) with a thin waist scale leaning forward,
+# a deeper groove behind the shoulders and a swollen gaster (Arnold 1915 as quoted on AntWiki: "wingless, similar to a
+# major worker but larger, ... an anteriorly slanting squamiform petiole, and a more expansive gaster"). No source gives
+# the gaster's size, so the looks were my picks, the user chose from three in the model viewer
+# (python tools/model_viewer.py queen): (width, height, length) times a worker's gaster, and how steeply it hangs
+# (a heavy gaster hangs flatter, or its tip would dip under the ground).
+QUEEN_LOOKS = {
+    'B': {'name': 'Laying queen', 'swell': (1.6, 1.5, 1.9, 0.7),
+          'note': "a colony's queen in her prime: the gaster broad and long, the first segment a round barrel, carried low behind her "
+                  "(the user's pick, 2026-10-24, of three: the young queen A, 1.3 wide, 1.25 high, 1.4 long, and the swollen queen C, 2.0, 1.85, 2.5, are gone)"},
+}
+QUEEN_LOOK = 'B'
+
+
+def queen_bones(look):
+    """The queen's bones for a look of QUEEN_LOOKS (not yet painted, as model())."""
+    return model(minor=False, head=JAW, taper=LEG_TAPER, queen=QUEEN_LOOKS[look]['swell'])
+
+
+def lowest_point(bones):
+    """The lowest model-unit height any box of the gaster reaches (the ground is 0), to see a swollen gaster clear of it."""
+    low = 99.0
+    for b in bones:
+        if b['name'] not in ('gaster_front', *QUEEN_GASTER):
+            continue
+        for c in b.get('cubes', []):
+            ox, oy, oz = c['origin']
+            sx, sy, sz = c['size']
+            rot = c.get('rotation', [0, 0, 0])[0]
+            piv = c.get('pivot', [0, oy, oz])
+            a = math.radians(-rot)
+            for y in (oy, oy + sy):
+                for z in (oz, oz + sz):
+                    dy, dz = y - piv[1], z - piv[2]
+                    low = min(low, piv[1] + dy * math.cos(a) - dz * math.sin(a) if rot else y)
+    return low
+
+
+QUEEN = 'matabele_queen'                                        # her game model (M8 step 1c, look B, the user's pick)
+GAME_MODELS = (*MODELS, QUEEN)
+
+
 def game_bones(name):
     """The model's bones with every face's place on its texture, and the texture: (bones, rows, width, height)."""
+    if name == QUEEN:
+        return paint(queen_bones(QUEEN_LOOK), LOOK)
     return paint(model(minor=MODELS[name], head=JAW, taper=LEG_TAPER), LOOK)
 
 
 def write_drafts():
-    for name in MODELS:
+    for name in GAME_MODELS:
         bones, rows, w, h = game_bones(name)
         geo = {'format_version': '1.12.0', 'minecraft:geometry': [{
             'description': {'identifier': f'geometry.{name}', 'texture_width': w, 'texture_height': h,
