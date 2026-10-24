@@ -202,6 +202,7 @@ A Minecraft mod where ants and termites live as real colonies: they dig, build, 
 - **M8 step 1, the Matabele jaws picked 2026-10-23:** version 4's hang, made into bulky, wide black crushers with four blunt teeth; they reach the floor at rest, left to the animations; head B, the plain black body and the antennae fading to white kept; in the model viewer; nothing in-game yet.
 - **M8 step 1, the Matabele jaws remade 2026-10-23:** short thick triangles folded across the mouth into a muzzle, as in the user's photos (no more "ram horns"); A closed, B a little open; in the model viewer, waiting for the user's pick; nothing in-game yet.
 - **M8 step 1, the Matabele jaws, B remade long and curving down 2026-10-23** from the user's close photo (deep at the hinge, curving down like sickles, tips just off the ground); A, closed, unchanged; waiting for the user's look; nothing in-game yet.
+- **M8 step 1, the Matabele jaws raised and black 2026-10-23:** only the long curving jaws kept, all black with the toothed edges the darkest black, hinged higher to meet the chin at two heights (1 and 2); the antennae moved up the face to the user's red dot; in the model viewer, waiting for the user's pick of height; nothing in-game yet.
 
 ## Other notes files (read only when the task needs them)
 - `docs/DESIGN.md`: every design decision for the species and shared systems (read the section for a feature before working on it).

@@ -61,6 +61,10 @@ Eleventh round (the user, 2026-10-23, a close photo of a real jaw: "you got it n
 B"): B's jaws twice as long, curving down along their length like sickles (MANDIBLE 'bend'), still a little open; A
 unchanged.
 
+Twelfth round (the user, 2026-10-23: "Okay thats alot better"): only the long jaws kept, all black, the toothed inner
+edges the darkest black, hinged higher so they meet the chin (two heights, JAWS 1 and 2); the antennae moved up and in
+on the face, to the user's red dot, clear of the jaws.
+
 Units are model pixels before SCALE, as in ant_models.py: the head points to -Z, the ground is y = 0, left is +X.
 """
 import copy
@@ -90,7 +94,7 @@ BLACK, WHITE = (22, 22, 24), (236, 234, 228)
 LOOKS = {
     'A': {'name': 'Black',
           'note': "plain black all over, no texture, like a real Matabele: the eyes a lighter black, the jaws black "
-                  "with a faint brown toothed edge, the antennae fading from black to white toward their tips",
+                  "with the toothed inner edge the darkest black, the antennae fading from black to white toward their tips",
           'grain': 7, 'flecks': 0.10, 'hair': 0.08,
           'colours': {'head': BLACK, 'thorax': BLACK, 'waist': BLACK, 'gaster': BLACK, 'rim': BLACK, 'leg': BLACK,
                       'antenna': BLACK, 'tarsus': BLACK, 'joint': BLACK, 'eye': (50, 50, 55), 'jaw': BLACK,
@@ -286,8 +290,8 @@ HEAD_B = {
 # are two short, thick triangles folded across the front of the mouth under the clypeus, their toothed inner edges
 # meeting in the middle, so from the front the face ends in a pointed chin, a muzzle. Each jaw is drawn as rows across
 # it from the hinge to the point: the outer edge curving round from the face's full width to the point, the inner edge
-# slanting in from the hinge's inner corner to the middle and then running along it (the toothed edge, a faint brown
-# as in the user's photo), blunt teeth on every other row, the left jaw's between the right one's so they interlock
+# slanting in from the hinge's inner corner to the middle and then running along it (the toothed edge, the darkest
+# black, the user's idea), blunt teeth on every other row, the left jaw's between the right one's so they interlock
 # when closed; thickest at the hinge, thinner toward the point, sloping a little down.
 # hinge: the outer back corner (left side, head frame); length: hinge to point; width: the outer edge's reach from the
 # middle at the hinge; basal: the inner corner's reach at the hinge, and how far along the inner edge reaches the middle;
