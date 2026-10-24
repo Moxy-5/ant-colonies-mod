@@ -73,5 +73,7 @@
   "block.antcolonies.frass": "Frass",
   "block.antcolonies.baobab_fibre": "Baobab Fibre",
   "death.attack.antcolonies.thorns": "%1$s was pricked to death by acacia thorns",
-  "death.attack.antcolonies.thorns.player": "%1$s was pricked to death by acacia thorns while fleeing %2$s"
+  "death.attack.antcolonies.thorns.player": "%1$s was pricked to death by acacia thorns while fleeing %2$s",
+  "entity.antcolonies.matabele_larva": "Matabele Ant Larva",
+  "entity.antcolonies.matabele_corpse": "Dead Matabele Ant"
 }

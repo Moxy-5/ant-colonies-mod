@@ -27,7 +27,7 @@ public class ClientEvents {
     public static void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerEntityRenderer(ModEntities.ANT_EGG.get(), AntEggRenderer::new);
         for (SpeciesBodies bodies : SpeciesBodies.all()) {
-            event.registerEntityRenderer(bodies.corpse().get(), context -> new AntCorpseRenderer(context, bodies.corpseLook()));
+            event.registerEntityRenderer(bodies.corpse().get(), context -> new AntCorpseRenderer(context, bodies.corpseLook(), bodies.drawSize()));
         }
     }
 }

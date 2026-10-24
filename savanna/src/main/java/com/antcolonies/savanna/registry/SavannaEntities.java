@@ -93,11 +93,31 @@ public class SavannaEntities {
                     .build("matabele_minor"));
 
     // The Matabele queen (M8 step 1c, 2026-10-24): 1.2 times a major (the user's pick), her box the climbing preview's.
-    public static final DeferredHolder<EntityType<?>, EntityType<MatabeleEntity>> MATABELE_QUEEN =
+    public static final DeferredHolder<EntityType<?>, EntityType<com.antcolonies.savanna.entity.MatabeleQueenEntity>> MATABELE_QUEEN =
             ENTITY_TYPES.register("matabele_queen", () -> EntityType.Builder
-                    .of(MatabeleEntity::new, MobCategory.CREATURE)
+                    .of(com.antcolonies.savanna.entity.MatabeleQueenEntity::new, MobCategory.CREATURE)
                     .sized(0.72F, 0.54F)
                     .build("matabele_queen"));
+
+    // M8 step 1c: the Matabele young and dead, for the shared brood and refuse code (no nest to raise young in yet, step
+    // 1d; the dead are carried home in step 5). Drawn MATABELE_DRAW_SIZE times a small ant's grub and body.
+    public static final float MATABELE_DRAW_SIZE = 2.0F;
+
+    public static final DeferredHolder<EntityType<?>, EntityType<AntLarvaEntity>> MATABELE_LARVA =
+            ENTITY_TYPES.register("matabele_larva", () -> EntityType.Builder
+                    .<AntLarvaEntity>of(AntLarvaEntity::new, MobCategory.MISC)
+                    .sized(0.4F, 0.24F)
+                    .clientTrackingRange(6)
+                    .updateInterval(20)
+                    .build("matabele_larva"));
+
+    public static final DeferredHolder<EntityType<?>, EntityType<AntCorpseEntity>> MATABELE_CORPSE =
+            ENTITY_TYPES.register("matabele_corpse", () -> EntityType.Builder
+                    .of(AntCorpseEntity::new, MobCategory.MISC)
+                    .sized(0.5F, 0.3F)
+                    .clientTrackingRange(6)
+                    .updateInterval(20)
+                    .build("matabele_corpse"));
 
     // Apex step 9c: the species' bodies, for the shared brood and population code (what eggs hatch into, the dead, each
     // caste's mob); the split, S3: with the looks of its young and its dead (the dead: pale and dull, drawn by
@@ -108,5 +128,12 @@ public class SavannaEntities {
                         TermiteSoldierEntity.Rank.MAJOR.caste(), TERMITE_MAJOR_SOLDIER),
                 ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "textures/entity/termite_nymph.png"),
                 ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "textures/entity/termite_corpse.png")));
+        // M8 step 1c: the Matabele workers are one caste; each new one gets the major's or the minor's body as often as
+        // the real size spread draws each (MatabeleEntity.pickBody).
+        SpeciesBodies.register(SavannaSpecies.MATABELE, new SpeciesBodies(MATABELE_LARVA, MATABELE_CORPSE,
+                Map.of(MatabeleEntity.CASTE, MATABELE_MAJOR),
+                ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "textures/entity/matabele_larva.png"),
+                ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "textures/entity/matabele_corpse.png"),
+                Map.of(MatabeleEntity.CASTE, MatabeleEntity::pickBody), MATABELE_DRAW_SIZE));
     }
 }

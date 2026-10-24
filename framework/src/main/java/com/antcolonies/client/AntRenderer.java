@@ -43,13 +43,15 @@ public class AntRenderer<T extends AbstractAntEntity> extends GeoEntityRenderer<
     @Override
     public void render(T ant, float entityYaw, float partialTick, PoseStack poseStack, MultiBufferSource buffers,
             int packedLight) {
-        ant.setDrawScale(scaleWidth); // for the stride: the legs keep pace with the ground at the size it is drawn
+        float drawWidth = drawWidth(ant);
+        float drawHeight = drawHeight(ant);
+        ant.setDrawScale(drawWidth); // for the stride: the legs keep pace with the ground at the size it is drawn
         BodyPlans.Plan plan = planOf(ant);
         ant.setBodyPlan(plan); // its own waist and feet, for the bend and for drawing it over an edge
         BodyPlans.Climb climb = plan != null ? plan.climb() : BodyPlans.WORKER_CLIMB;
-        climbLift = (float) climb.liftFor(ant.getBbHeight(), scaleHeight);
-        climbIntoWall = (float) climb.intoWallFor(ant.getBbWidth(), scaleWidth);
-        ant.setClimbPose(climbLift * scaleHeight, climbIntoWall * scaleWidth); // for drawing it over an edge
+        climbLift = (float) climb.liftFor(ant.getBbHeight(), drawHeight);
+        climbIntoWall = (float) climb.intoWallFor(ant.getBbWidth(), drawWidth);
+        ant.setClimbPose(climbLift * drawHeight, climbIntoWall * drawWidth); // for drawing it over an edge
         if (FilmDirector.active()) {
             // The in-game camera: every picture at the in-between time it asks for (a frozen game's own one jitters),
             // the insect's place included (the game put it where its own in-between time says).
@@ -63,6 +65,18 @@ public class AntRenderer<T extends AbstractAntEntity> extends GeoEntityRenderer<
             return;
         }
         super.render(ant, entityYaw, partialTick, poseStack, buffers, packedLight);
+    }
+
+    /**
+     * The size it is drawn at: the renderer's own scale times the insect's own size (M8 step 1c: each Matabele ant has
+     * its own; 1 for every other insect, which then draws exactly as before). GeckoLib scales the pose by both.
+     */
+    private float drawWidth(T ant) {
+        return scaleWidth * ant.getScale();
+    }
+
+    private float drawHeight(T ant) {
+        return scaleHeight * ant.getScale();
     }
 
     private BodyPlans.Plan planOf(T ant) {
@@ -81,7 +95,7 @@ public class AntRenderer<T extends AbstractAntEntity> extends GeoEntityRenderer<
         // axes, in blocks; the pose here is already scaled to the drawn size).
         Vec3 edge = ant.getEdgeShift(partialTick);
         if (edge != null) {
-            poseStack.translate(edge.x / scaleWidth, edge.y / scaleHeight, edge.z / scaleWidth);
+            poseStack.translate(edge.x / drawWidth(ant), edge.y / drawHeight(ant), edge.z / drawWidth(ant));
         }
         if (!ant.isInWallPose()) {
             super.applyRotations(ant, poseStack, ageInTicks, rotationYaw, partialTick, nativeScale);
@@ -105,7 +119,7 @@ public class AntRenderer<T extends AbstractAntEntity> extends GeoEntityRenderer<
         } else {
             // From the wall onto the ceiling: the feet go up to the top of the hitbox, against the ceiling.
             float share = (tilt - 90.0F) / 90.0F;
-            float ceiling = ant.getBbHeight() / scaleHeight;
+            float ceiling = ant.getBbHeight() / drawHeight(ant);
             poseStack.translate(0.0F, climbLift + (ceiling - climbLift) * share, -climbIntoWall * (1.0F - share));
         }
         poseStack.mulPose(Axis.XP.rotationDegrees(tilt));

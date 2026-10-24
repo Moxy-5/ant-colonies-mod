@@ -1,0 +1,66 @@
+{
+  "_note": "The Matabele ant, Megaponera analis (M8 step 1c, docs/DESIGN.md 'Matabele colony, details'). Castes: the ergatoid (wingless) queen, and the workers, majors and minors on one continuous size spread (real Megaponera: one worker caste whose sizes run from about 5 to 18 mm, monophasic, Longhurst and Howse 1979; no soldiers, every worker raids and stings). Founding is colony_fission: a real queen never founds alone, a colony splits in two with a new queen (M9); until then a summoned queen starts an empty colony that spawn-egg workers near her join, or /antcolonies matabele <workers> makes one whole (the user's pick, 2026-10-24). So there is no founding section: a queen alone is never sealed in, digs nothing and lays nothing. nest.dug false: their shallow nest is made another way, step 1d; until then nothing is dug, here or while away, and the queen lays no eggs (eggs need a finished room). Hunger is on from the start (the user's pick, 2026-10-24): with no prey pile yet (step 1e) a colony with workers goes hungry and starves; worker: slow after 2 days without a meal, dead after 4 (my picks, to confirm; real colonies raid termites 2 to 4 times a day and keep no store, so a colony cut off from termites dies fast); the queen dies after starve_ticks wanting food (5 days, my pick), but never while she is alone (a queen with no workers counts as founding). The brood numbers wait for the nest (1d). colony.max_workers 2500, the top of a real colony (400 to 2,500); real_cap and crew 50 as the termites. food: they eat only termites (the prey pile, 1e); the items tag is empty, no plants, the heap block a stand-in until 1e; they go out by day (real Megaponera raid by day). refuse: a dead ant's body crumbles after corpse_decay_ticks (the dead are carried home in step 5).",
+  "_parts_note": "No colony parts beyond the ones every colony has yet (the prey pile, the raids and the fights come as M8's steps).",
+  "parts": [],
+  "worker_sizes": {
+    "_note": "The real size spread of Megaponera workers (Longhurst and Howse 1979, from head widths: about half the workers majors, a quarter in between, a quarter minors; majors about 15 mm long, minors 9 to 11, the whole spread 5 to 18; the user's pick 'real count', 2026-10-24). Each new worker rolls its length from groups (share, the shortest, the commonest, the longest; a triangle between them), keeps it for life (saved) and is drawn at that length: with the major's model (made for major_model_mm) or the minor's (minor_model_mm), whichever its length is nearer (by ratio), scaled from it. The minor model is half the major's (2:1), so a real 10 mm minor is drawn a third bigger than the minor model.",
+    "major_model_mm": 15.0,
+    "minor_model_mm": 7.5,
+    "groups": [
+      { "share": 0.25, "shortest_mm": 5.0, "commonest_mm": 10.0, "longest_mm": 11.5 },
+      { "share": 0.25, "shortest_mm": 11.5, "commonest_mm": 12.5, "longest_mm": 13.5 },
+      { "share": 0.5, "shortest_mm": 13.5, "commonest_mm": 15.0, "longest_mm": 18.0 }
+    ]
+  },
+  "colony": {
+    "max_workers": 2500,
+    "real_cap": 50,
+    "crew": 50,
+    "watch_radius": 48,
+    "swaps_per_second": 2,
+    "nurses_from_workers": [3, 8, 12, 20]
+  },
+  "worker": {
+    "meal_interval_ticks": 24000,
+    "slow_after_ticks": 48000,
+    "starve_after_ticks": 96000,
+    "nurse_until_ticks": 72000,
+    "builder_until_ticks": 192000,
+    "lifespan_ticks": 360000,
+    "eats": true
+  },
+  "queen": {
+    "meal": 6,
+    "rich_meal": 5,
+    "burst_eggs": 5,
+    "burst_interval_ticks": 1200,
+    "incubation_ticks": 3600,
+    "starve_ticks": 120000
+  },
+  "brood": {
+    "max_young": 10,
+    "hatch_ticks": 1200,
+    "larva_meal": 5,
+    "larva_starve_ticks": 48000
+  },
+  "food": {
+    "radius": 24,
+    "items": "antcolonies:matabele_food",
+    "plants": [],
+    "piece": "minecraft:air",
+    "pile": "antcolonies:fungus_comb",
+    "forage_at": ["day"]
+  },
+  "refuse": {
+    "corpse_decay_ticks": 6000
+  },
+  "nest": {
+    "max_levels": 1,
+    "seal_while_founding": false,
+    "dug": false
+  },
+  "body_language": {
+    "_note": "Personality ranges all open (as before 1c, when the ant read the termites' numbers); no naps, hot ground or noticing yet.",
+    "traits": { "boldness": [0.0, 1.0], "curiosity": [0.0, 1.0], "restlessness": [0.0, 1.0], "older_bolder": 0.3 }
+  }
+}

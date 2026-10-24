@@ -30,12 +30,95 @@ public final class SavannaNumbers {
     public static final SpeciesSection<AlarmNumbers> ALARM = SpeciesSection.signUp("alarm", AlarmNumbers.CODEC);
     public static final SpeciesSection<GalleryNumbers> GALLERIES = SpeciesSection.signUp("nest.galleries", GalleryNumbers.CODEC);
     public static final SpeciesSection<Regrowth> REGROWTH = SpeciesSection.signUp("food.regrowth", Regrowth.CODEC);
+    public static final SpeciesSection<WorkerSizes> WORKER_SIZES = SpeciesSection.signUp("worker_sizes", WorkerSizes.CODEC);
 
     private SavannaNumbers() {
     }
 
     /** Signs the sections up (at start, before the species files load; reading a section signs them up too). */
     public static void signUp() {
+    }
+
+    /**
+     * M8 step 1c: workers of one caste on a continuous size spread (the Matabele ant: majors, minors and every size
+     * between). Each new worker rolls its length in mm from {@code groups} (each a share of the workers and a triangle
+     * from its shortest through its commonest to its longest length) and is drawn with the major's model (made for
+     * {@code majorModelMm}) or the minor's ({@code minorModelMm}), whichever is nearer by ratio, scaled to its length.
+     */
+    public record WorkerSizes(float majorModelMm, float minorModelMm, List<SizeGroup> groups) {
+        public static final Codec<WorkerSizes> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.FLOAT.fieldOf("major_model_mm").forGetter(WorkerSizes::majorModelMm),
+                Codec.FLOAT.fieldOf("minor_model_mm").forGetter(WorkerSizes::minorModelMm),
+                SizeGroup.CODEC.listOf().fieldOf("groups").forGetter(WorkerSizes::groups)
+        ).apply(i, WorkerSizes::new));
+
+        /** A new worker's length in mm, by the dice. */
+        public float roll(net.minecraft.util.RandomSource random) {
+            double total = 0.0;
+            for (SizeGroup group : groups) {
+                total += group.share();
+            }
+            double pick = random.nextDouble() * total;
+            for (SizeGroup group : groups) {
+                pick -= group.share();
+                if (pick < 0.0 || group == groups.get(groups.size() - 1)) {
+                    return group.roll(random);
+                }
+            }
+            return majorModelMm;
+        }
+
+        /** Whether a worker this long is drawn with the major's model (else the minor's): the nearer by ratio. */
+        public boolean majorModelFor(float lengthMm) {
+            return lengthMm * lengthMm >= majorModelMm * minorModelMm;
+        }
+
+        /** A new worker's length for the given model (rolled until it is one that model draws; the model's own if none in 64 rolls). */
+        public float rollFor(boolean majorModel, net.minecraft.util.RandomSource random) {
+            for (int i = 0; i < 64; i++) {
+                float length = roll(random);
+                if (majorModelFor(length) == majorModel) {
+                    return length;
+                }
+            }
+            return majorModel ? majorModelMm : minorModelMm;
+        }
+
+        /** How much bigger than its model a worker this long is drawn (and its box). */
+        public float scaleFor(float lengthMm) {
+            return lengthMm / (majorModelFor(lengthMm) ? majorModelMm : minorModelMm);
+        }
+
+        /** The shortest and the longest any worker can be. */
+        public float shortest() {
+            return (float) groups.stream().mapToDouble(SizeGroup::shortestMm).min().orElse(minorModelMm);
+        }
+
+        public float longest() {
+            return (float) groups.stream().mapToDouble(SizeGroup::longestMm).max().orElse(majorModelMm);
+        }
+    }
+
+    /** One group of a size spread: {@code share} of the workers, lengths in a triangle from shortest through commonest to longest. */
+    public record SizeGroup(float share, float shortestMm, float commonestMm, float longestMm) {
+        public static final Codec<SizeGroup> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.FLOAT.fieldOf("share").forGetter(SizeGroup::share),
+                Codec.FLOAT.fieldOf("shortest_mm").forGetter(SizeGroup::shortestMm),
+                Codec.FLOAT.fieldOf("commonest_mm").forGetter(SizeGroup::commonestMm),
+                Codec.FLOAT.fieldOf("longest_mm").forGetter(SizeGroup::longestMm)
+        ).apply(i, SizeGroup::new));
+
+        /** A length from the triangle. */
+        public float roll(net.minecraft.util.RandomSource random) {
+            double a = shortestMm, c = commonestMm, b = longestMm;
+            if (b <= a) {
+                return shortestMm;
+            }
+            double u = random.nextDouble();
+            double split = (c - a) / (b - a);
+            double length = u < split ? a + Math.sqrt(u * (b - a) * (c - a)) : b - Math.sqrt((1.0 - u) * (b - a) * (b - c));
+            return (float) length;
+        }
     }
 
     /**

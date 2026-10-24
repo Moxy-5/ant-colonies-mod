@@ -27,10 +27,17 @@ public class AntLarvaRenderer extends EntityRenderer<AntLarvaEntity> {
             new ModelLayerLocation(ResourceLocation.fromNamespaceAndPath(ColonyFrameworkMod.MODID, "ant_larva"), "main");
     private final ModelPart model;
     private final ResourceLocation texture;
+    private final float drawSize;
 
     /** {@code texture}: the species' look of its young ({@link com.antcolonies.species.SpeciesBodies#youngLook}). */
     public AntLarvaRenderer(EntityRendererProvider.Context context, ResourceLocation texture) {
+        this(context, texture, 1.0F);
+    }
+
+    /** {@code drawSize}: how much bigger than a small ant's grub this species' young are drawn ({@link com.antcolonies.species.SpeciesBodies#drawSize}). */
+    public AntLarvaRenderer(EntityRendererProvider.Context context, ResourceLocation texture, float drawSize) {
         super(context);
+        this.drawSize = drawSize;
         this.texture = texture;
         this.model = context.bakeLayer(LAYER);
         this.shadowRadius = 0.0F;
@@ -52,7 +59,7 @@ public class AntLarvaRenderer extends EntityRenderer<AntLarvaEntity> {
     public void render(AntLarvaEntity larva, float yaw, float partialTick, PoseStack pose, MultiBufferSource buffers, int light) {
         pose.pushPose();
         pose.mulPose(Axis.YP.rotationDegrees(180.0F - larva.getYRot()));
-        float size = 0.45F + 0.4F * Math.min(larva.getFed(), larva.getMeal()) / larva.getMeal();
+        float size = drawSize * (0.45F + 0.4F * Math.min(larva.getFed(), larva.getMeal()) / larva.getMeal());
         pose.scale(size, size, size);
         VertexConsumer consumer = buffers.getBuffer(RenderType.entityCutoutNoCull(texture));
         model.render(pose, consumer, light, OverlayTexture.NO_OVERLAY);

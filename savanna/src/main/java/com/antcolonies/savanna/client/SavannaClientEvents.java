@@ -68,8 +68,10 @@ public class SavannaClientEvents {
                         ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "matabele_minor")))
                 .withScale(MATABELE_MINOR_SCALE));
         event.registerEntityRenderer(SavannaEntities.MATABELE_QUEEN.get(), context -> new AntRenderer<>(
-                context, new InsectModel<MatabeleEntity>(
+                context, new InsectModel<com.antcolonies.savanna.entity.MatabeleQueenEntity>(
                         ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "matabele_queen")))
                 .withScale(MATABELE_QUEEN_SCALE));
+        event.registerEntityRenderer(SavannaEntities.MATABELE_LARVA.get(), context -> new com.antcolonies.client.AntLarvaRenderer(context,
+                ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "textures/entity/matabele_larva.png"), SavannaEntities.MATABELE_DRAW_SIZE));
     }
 }

@@ -132,6 +132,9 @@ public class Nest {
 
     @Nullable
     private BlockPos findDigTarget(Level level, @Nullable java.util.UUID digger, boolean live) {
+        if (!colony.profile().nest().dug()) {
+            return null; // a species whose nest is not dug from a plan (nest.dug false) digs nothing here
+        }
         // A plant growing in the entrance (grass, a flower) is bitten away first: until it is gone nobody can stand over
         // the shaft's first block to dig it (the user's bug, 2026-10-15: founders that had stepped off the spot never dug).
         if (isPlantInEntrance(level)) {
@@ -969,6 +972,9 @@ public class Nest {
      */
     @Nullable
     private NestLayout getLayout(Level level) {
+        if (!colony.profile().nest().dug()) {
+            return null;
+        }
         if (layout == null) {
             layout = new NestLayout.Planner(colony, center, NestLayout.sizesFor(colony)).choose(level);
         }

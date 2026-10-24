@@ -17,7 +17,8 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * The Matabele ants in the game (M8 step 1, 2026-10-23): a major and a minor (and, since 2026-10-24, the queen, the
  * biggest body) each walk to a 3-block stone pillar, up it, onto its top and back down to the ground on its far side,
  * the course their climbing was drawn on in the pose viewer ({@code tools/matabele_climb.py}). Every walk is watched
- * for floating, hovering and leaning ({@link TestWatch}).
+ * for floating, hovering and leaning ({@link TestWatch}). Since 1c each worker has its own size: the longest major and the
+ * shortest minor of the real spread climb.
  */
 @GameTestHolder(SavannaMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -29,8 +30,13 @@ public class MatabeleTests {
                 helper.setBlock(x, 0, z, Blocks.DIRT);
             }
         }
-        AbstractAntEntity major = climber(helper, SavannaEntities.MATABELE_MAJOR.get(), 3);
-        AbstractAntEntity minor = climber(helper, SavannaEntities.MATABELE_MINOR.get(), 8);
+        // M8 step 1c: each worker has its own size; the two ends of the real spread climb, the longest major and the shortest minor.
+        com.antcolonies.savanna.entity.MatabeleEntity major = climber(helper, SavannaEntities.MATABELE_MAJOR.get(), 3);
+        com.antcolonies.savanna.entity.MatabeleEntity minor = climber(helper, SavannaEntities.MATABELE_MINOR.get(), 8);
+        var sizes = com.antcolonies.species.SpeciesProfiles.get(com.antcolonies.savanna.entity.MatabeleEntity.SPECIES)
+                .section(com.antcolonies.savanna.species.SavannaNumbers.WORKER_SIZES).orElseThrow();
+        major.setLengthMm(sizes.longest());
+        minor.setLengthMm(sizes.shortest());
         AbstractAntEntity queen = climber(helper, SavannaEntities.MATABELE_QUEEN.get(), 13);
         int[] phase = {0, 0, 0};
         AbstractAntEntity[] ants = {major, minor, queen};

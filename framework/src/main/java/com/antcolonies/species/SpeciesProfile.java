@@ -763,7 +763,7 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      */
     public record NestNumbers(int maxLevels, boolean sealWhileFounding, boolean foundingChamber, List<String> sideRooms,
             int foragingHoles, int foragingHoleDistance, String plugBlock, List<LevelUnlock> levelUnlocks, Optional<NewHoles> newHoles,
-            boolean crustWalls, Optional<Sheeting> sheeting, NestPlan.RoomSizes roomSizes) {
+            boolean crustWalls, Optional<Sheeting> sheeting, NestPlan.RoomSizes roomSizes, boolean dug) {
         public static final Codec<NestNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("max_levels").forGetter(NestNumbers::maxLevels),
                 Codec.BOOL.fieldOf("seal_while_founding").forGetter(NestNumbers::sealWhileFounding),
@@ -776,8 +776,20 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 NewHoles.CODEC.optionalFieldOf("new_holes").forGetter(NestNumbers::newHoles),
                 Codec.BOOL.optionalFieldOf("crust_walls", false).forGetter(NestNumbers::crustWalls),
                 Sheeting.CODEC.optionalFieldOf("sheeting").forGetter(NestNumbers::sheeting),
-                NestPlan.RoomSizes.CODEC.optionalFieldOf("room_sizes", NestPlan.RoomSizes.DEFAULT).forGetter(NestNumbers::roomSizes)
+                NestPlan.RoomSizes.CODEC.optionalFieldOf("room_sizes", NestPlan.RoomSizes.DEFAULT).forGetter(NestNumbers::roomSizes),
+                Codec.BOOL.optionalFieldOf("dug", true).forGetter(NestNumbers::dug)
         ).apply(i, NestNumbers::new));
+
+        /**
+         * {@code dug} false: the colony digs no nest plan at all (live or while away), for a species whose nest is made
+         * another way (the Matabele ant's shallow nest, its own step).
+         */
+        public NestNumbers(int maxLevels, boolean sealWhileFounding, boolean foundingChamber, List<String> sideRooms,
+                int foragingHoles, int foragingHoleDistance, String plugBlock, List<LevelUnlock> levelUnlocks, Optional<NewHoles> newHoles,
+                boolean crustWalls, Optional<Sheeting> sheeting, NestPlan.RoomSizes roomSizes) {
+            this(maxLevels, sealWhileFounding, foundingChamber, sideRooms, foragingHoles, foragingHoleDistance, plugBlock, levelUnlocks, newHoles,
+                    crustWalls, sheeting, roomSizes, true);
+        }
 
         public NestNumbers(int maxLevels, boolean sealWhileFounding, boolean foundingChamber, List<String> sideRooms,
                 int foragingHoles, int foragingHoleDistance, String plugBlock, List<LevelUnlock> levelUnlocks, Optional<NewHoles> newHoles,

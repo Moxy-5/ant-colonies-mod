@@ -32,12 +32,19 @@ public class AntCorpseRenderer extends EntityRenderer<AntCorpseEntity> {
 
     private final ModelPart model;
     private final ResourceLocation texture;
+    private final float size;
 
     /** {@code texture}: the species' look of its dead ({@link com.antcolonies.species.SpeciesBodies#corpseLook}). */
     public AntCorpseRenderer(EntityRendererProvider.Context context, ResourceLocation texture) {
+        this(context, texture, 1.0F);
+    }
+
+    /** {@code drawSize}: how much bigger than a small worker's body this species' dead are drawn ({@link com.antcolonies.species.SpeciesBodies#drawSize}). */
+    public AntCorpseRenderer(EntityRendererProvider.Context context, ResourceLocation texture, float drawSize) {
         super(context);
         this.model = context.bakeLayer(LAYER);
         this.texture = texture;
+        this.size = SIZE * drawSize;
         this.shadowRadius = 0.0F;
     }
 
@@ -70,7 +77,7 @@ public class AntCorpseRenderer extends EntityRenderer<AntCorpseEntity> {
     public void render(AntCorpseEntity corpse, float yaw, float partialTick, PoseStack pose, MultiBufferSource buffers, int light) {
         pose.pushPose();
         pose.mulPose(Axis.YP.rotationDegrees(180.0F - corpse.getYRot()));
-        pose.scale(SIZE, SIZE, SIZE);
+        pose.scale(size, size, size);
         renderModel(model, pose, buffers, light, texture);
         pose.popPose();
         super.render(corpse, yaw, partialTick, pose, buffers, light);

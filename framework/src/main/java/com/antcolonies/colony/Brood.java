@@ -385,7 +385,7 @@ public class Brood {
 
     /** The real mob of this caste (the species' body, {@link SpeciesBodies}) takes the young one's place and joins the colony. */
     private boolean growUp(ServerLevel level, AntLarvaEntity larva, String caste) {
-        EntityType<? extends AbstractAntEntity> type = SpeciesBodies.of(colony.getSpecies()).typeFor(caste);
+        EntityType<? extends AbstractAntEntity> type = SpeciesBodies.of(colony.getSpecies()).typeFor(caste, colony.random());
         AbstractAntEntity grown = type == null ? null : type.create(level);
         if (!(grown instanceof ColonyBorn born)) {
             return false;

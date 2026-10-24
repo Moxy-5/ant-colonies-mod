@@ -598,10 +598,10 @@ public class Population {
         return ages.firstKey();
     }
 
-    /** The mob a caste of this colony's species is (the species' bodies, {@link SpeciesBodies}). */
+    /** The mob a new member of this caste of this colony's species is (the species' bodies, {@link SpeciesBodies}). */
     @Nullable
     private EntityType<? extends AbstractAntEntity> typeFor(String caste) {
-        return com.antcolonies.species.SpeciesBodies.of(colony.getSpecies()).typeFor(caste);
+        return com.antcolonies.species.SpeciesBodies.of(colony.getSpecies()).typeFor(caste, colony.random());
     }
 
     /**
