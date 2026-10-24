@@ -57,6 +57,10 @@ Tenth round (the user, 2026-10-23, three photos: the hanging jaws "look like ram
 ones are, short thick triangles hinged at the mouth's corners, folded shut across the mouth into a pointed muzzle,
 the toothed edges meeting; closed and a little open side by side (JAWS A and B).
 
+Eleventh round (the user, 2026-10-23, a close photo of a real jaw: "you got it now make them long and curve down for
+B"): B's jaws twice as long, curving down along their length like sickles (MANDIBLE 'bend'), still a little open; A
+unchanged.
+
 Units are model pixels before SCALE, as in ant_models.py: the head points to -Z, the ground is y = 0, left is +X.
 """
 import copy
@@ -288,7 +292,9 @@ HEAD_B = {
 # hinge: the outer back corner (left side, head frame); length: hinge to point; width: the outer edge's reach from the
 # middle at the hinge; basal: the inner corner's reach at the hinge, and how far along the inner edge reaches the middle;
 # top, slope: the top at the hinge and how far it drops by the point; thick: at the hinge and at the point; gap: the
-# inner edge's distance from the middle; tooth: how far a tooth reaches past it; open: degrees each jaw swings out.
+# inner edge's distance from the middle; tooth: how far a tooth reaches past it; open: degrees each jaw swings out;
+# bend (B only): degrees below the head's level at the hinge and at the point, the jaw curving down along its length
+# (B's starts 32 up, which on the major's head, slanted 31 down, is straight out, so the long tips clear the ground).
 MANDIBLE = {'hinge': (1.5, -1.05, -6.2), 'length': 2.1, 'width': 1.5, 'basal': (0.9, 0.38), 'top': -1.05,
             'slope': 0.25, 'thick': (0.72, 0.32), 'gap': 0.1, 'tooth': 0.16, 'rows': 11, 'open': 0.0}
 JAWS = {
@@ -296,9 +302,12 @@ JAWS = {
           'note': "the jaws folded shut across the mouth as in your photo, the toothed edges meeting in the middle "
                   "and the teeth interlocking: a pointed muzzle under the face",
           'mandible': MANDIBLE},
-    'B': {'name': 'A little open',
-          'note': "the same jaws swung out a little at the hinges, a gap between them so the teeth along the inner "
-                  "edges show", 'mandible': {**MANDIBLE, 'open': 16.0}},
+    'B': {'name': 'Long, curving down',
+          'note': "your last photo: the jaws about twice as long, deep and broad at the hinge and narrowing to a point, "
+                  "curving down along their length like sickles, swung a little open so the teeth along the inner "
+                  "edges show; the big ant's tips just clear the ground",
+          'mandible': {**MANDIBLE, 'length': 4.0, 'width': 1.6, 'basal': (0.95, 0.25), 'rows': 22,
+                       'thick': (1.3, 0.28), 'bend': (-32.0, 60.0), 'open': 16.0}},
 }
 HEADS = {key: {**HEAD_B, **jaw} for key, jaw in JAWS.items()}
 WHIP_SEGMENTS = 11              # the real funiculus: 11 segments
@@ -421,32 +430,63 @@ def head_boxes(spec):
     return boxes
 
 
+def jaw_line(m):
+    """The jaw's line from the hinge to the point, one (z, y) point per row edge in the head's own frame: its top,
+    straight and sloping a little down, or, with 'bend' (degrees below level at the hinge and at the point), its middle,
+    curving down along its length like a sickle, the bend growing toward the point."""
+    z, n = m['hinge'][2], m['rows']
+    if 'bend' not in m:
+        return [(z - m['length'] * r / n, m['top'] - m['slope'] * r / n) for r in range(n + 1)]
+    y, (a0, a1) = m['top'] - m['thick'][0] / 2, m['bend']
+    pts = [(z, y)]
+    for r in range(n):
+        a = math.radians(a0 + (a1 - a0) * ((r + 0.5) / n) ** 1.5)
+        z, y = z - math.cos(a) * m['length'] / n, y - math.sin(a) * m['length'] / n
+        pts.append((z, y))
+    return pts
+
+
 def jaw_cubes(f, spec, sx, size):
     """The jaw (the left one for sx = 1) in the head's own frame: rows across it from the hinge to the point (see
-    MANDIBLE), each a box, the inner edge's strip and the teeth in the toothed edge's colour."""
+    MANDIBLE), each a box round its piece of the middle line, the inner edge's strip and the teeth in the toothed
+    edge's colour."""
     m = spec['mandible']
-    hx, _, z0 = m['hinge']
     basal_x, basal_t = m['basal']
-    rows, cubes = m['rows'], []
+    rows, line, cubes = m['rows'], jaw_line(m), []
     for r in range(rows):
-        t0, t1 = r / rows, (r + 1) / rows
-        t = (t0 + t1) / 2
-        za, zb = z0 - m['length'] * t1, z0 - m['length'] * t0
+        t = (r + 0.5) / rows
+        (za, ya), (zb, yb) = line[r], line[r + 1]
         x_out = m['width'] * (1 - t ** 1.6) ** 0.7
         x_in = max(m['gap'], basal_x * (1 - t / basal_t)) if t < basal_t else m['gap']
-        top = m['top'] - m['slope'] * t
         thick = m['thick'][0] + (m['thick'][1] - m['thick'][0]) * t
-        y0, y1 = top - thick, top
+        run = math.hypot(za - zb, ya - yb)
+        down, along = abs(ya - yb) / run, abs(za - zb) / run      # the piece's own slant: its thickness across it
+
+        def piece(shrink, z_mid=None, z_half=None):
+            """The row's box in z and y, its thickness less shrink on each face (or only z_half either side of
+            z_mid along the line, for a tooth)."""
+            if 'bend' not in m:                 # straight: the line is the top, the jaw hangs under it
+                top = (ya + yb) / 2
+                lo, hi = [zb, top - thick + shrink], [za, top - shrink]
+                if z_mid is not None:
+                    lo[0], hi[0] = z_mid[0] - z_half, z_mid[0] + z_half
+                return lo, hi
+            pz, py = (thick / 2 - shrink) * down, (thick / 2 - shrink) * along
+            if z_mid is None:
+                return [min(za, zb) - pz, min(ya, yb) - py], [max(za, zb) + pz, max(ya, yb) + py]
+            zm, ym = z_mid
+            return [zm - z_half * along - pz, ym - z_half * down - py], [zm + z_half * along + pz, ym + z_half * down + py]
         toothed = t >= basal_t
         strip = min(0.2, (x_out - x_in) / 2) if toothed else 0
+        (z_lo, y_lo), (z_hi, y_hi) = piece(0)
         if x_out - x_in - strip > 0.05:
-            cubes.append(f.box(*sym_points([x_in + strip, y0, za], [x_out, y1, zb], sx), 'jaw'))
+            cubes.append(f.box(*sym_points([x_in + strip, y_lo, z_lo], [x_out, y_hi, z_hi], sx), 'jaw'))
         if strip:
-            cubes.append(f.box(*sym_points([x_in, y0 + 0.04, za], [x_in + strip, y1 - 0.04, zb], sx), 'jawedge'))
+            (z_lo, y_lo), (z_hi, y_hi) = piece(0.04)
+            cubes.append(f.box(*sym_points([x_in, y_lo, z_lo], [x_in + strip, y_hi, z_hi], sx), 'jawedge'))
             if (r + (0 if sx > 0 else 1)) % 2 == 0:                        # the teeth interlock when closed
-                mid = (za + zb) / 2
-                cubes.append(f.box(*sym_points([x_in - m['tooth'], y0 + 0.1, mid - 0.07],
-                                               [x_in, y1 - 0.1, mid + 0.07], sx), 'jawedge'))
+                (z_lo, y_lo), (z_hi, y_hi) = piece(0.1, ((za + zb) / 2, (ya + yb) / 2), 0.07)
+                cubes.append(f.box(*sym_points([x_in - m['tooth'], y_lo, z_lo], [x_in, y_hi, z_hi], sx), 'jawedge'))
     return cubes
 
 
@@ -483,7 +523,8 @@ def head_bones(spec, size=1.0, antenna=1.0, tilt=0.0):
             whip.append(rod(p, q, thick, f'whip{i}'))                         # black at the elbow to white at the tip
         bones.append(bone(f'antenna_{side}_2', f'antenna_{side}_1', elbow, whip))
     m = spec['mandible']
-    bones.append(bone('carry', 'head', f.pt((0, m['top'] - m['slope'], m['hinge'][2] - m['length']))))  # at the points
+    z, y = jaw_line(m)[-1]
+    bones.append(bone('carry', 'head', f.pt((0, y + (m['thick'][1] / 2 if 'bend' in m else 0), z))))  # at the points
     return bones
 
 
