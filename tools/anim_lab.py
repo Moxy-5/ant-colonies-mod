@@ -100,9 +100,9 @@ RENDER_SCALE = {'worker_ant': 0.65, 'queen_ant': 1.3, 'termite_king': 0.75, 'ter
 # about 6 body lengths a second, which is what real Pogonomyrmex walk). The in-game camera can measure the real one.
 WALK_SPEED = {'worker_ant': 2.75, 'queen_ant': 0.9, 'termite_worker': 2.4, 'termite_king': 1.3, 'termite_queen': 0.9,
               'termite_minor_soldier': 2.6, 'termite_major_soldier': 1.9,
-              # Matabele raid columns: majors and minors march together at one speed, about 2.6 major body lengths a
+              # Matabele raid columns: majors and minors march together at one speed, about 2 major body lengths a
               # second (my estimate from Frank's raid films, to confirm; the game's speed is set when the ant goes in)
-              'matabele_major': 3.9, 'matabele_minor': 3.9}
+              'matabele_major': 3.0, 'matabele_minor': 3.0}
 
 LEG_COLOURS = {'l1': (220, 40, 40), 'l2': (240, 150, 20), 'l3': (200, 190, 30),
                'r1': (40, 90, 230), 'r2': (30, 170, 200), 'r3': (150, 60, 210)}

@@ -131,7 +131,9 @@ def trail_antennae(track, rig_, seconds, raise_by=0.0, extra=None, n=40):
 # the forebody sways 1.5 degrees and the gaster 2.5 against it (a slender runner, steadier than the harvester's 2 and 3),
 # the body bobs 0.05 units. Key frames 80 / 60 / 40 a cycle.
 WALK_SECONDS = 0.5
-WALK_BANDS = {'walk_slow': (0.0, 1.6), 'walk': (1.6, 3.7), 'walk_fast': (3.7, 999.0)}
+# The band edges are lowered from the other species' (1.6, 3.7) so the ants' marching speed, 3 blocks a second (the user,
+# 2026-10-23), lies well inside a band: the major's 1.75 body lengths a second in the walk, the minor's 3.9 in the fast walk.
+WALK_BANDS = {'walk_slow': (0.0, 1.2), 'walk': (1.2, 3.4), 'walk_fast': (3.4, 999.0)}
 GAITS = {'walk_slow': dict(sweep=4.4, duty=0.68, middle_duty=0.72, phases=mo.LOOSE_TRIPOD, keys=80),
          'walk': dict(sweep=5.6, duty=0.62, middle_duty=0.67, keys=60),
          'walk_fast': dict(sweep=6.6, duty=0.55, keys=40)}

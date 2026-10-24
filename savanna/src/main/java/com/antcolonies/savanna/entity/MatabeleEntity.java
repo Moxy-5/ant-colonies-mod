@@ -52,12 +52,12 @@ public class MatabeleEntity extends AbstractAntEntity {
 
     /**
      * A major: big and strong (health and bite my picks, to be set with the fights, M8 step 2). Majors and minors march
-     * at one speed, about 3.9 blocks a second, the speed their walks were made for ({@code tools/anim_lab.py WALK_SPEED}).
+     * at one speed, about 3 blocks a second (the user's pick, 2026-10-23; attribute 0.273), the speed their walks are fitted to ({@code tools/anim_lab.py WALK_SPEED}).
      */
     public static AttributeSupplier.Builder createMajorAttributes() {
         return PathfinderMob.createMobAttributes()
                 .add(Attributes.MAX_HEALTH, 10.0)
-                .add(Attributes.MOVEMENT_SPEED, 0.35)
+                .add(Attributes.MOVEMENT_SPEED, 0.273)
                 .add(Attributes.ATTACK_DAMAGE, 3.0);
     }
 
@@ -65,7 +65,7 @@ public class MatabeleEntity extends AbstractAntEntity {
     public static AttributeSupplier.Builder createMinorAttributes() {
         return PathfinderMob.createMobAttributes()
                 .add(Attributes.MAX_HEALTH, 5.0)
-                .add(Attributes.MOVEMENT_SPEED, 0.35)
+                .add(Attributes.MOVEMENT_SPEED, 0.273)
                 .add(Attributes.ATTACK_DAMAGE, 1.5);
     }
 
