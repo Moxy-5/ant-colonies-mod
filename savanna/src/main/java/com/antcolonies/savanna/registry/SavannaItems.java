@@ -100,7 +100,7 @@ public class SavannaItems {
     // The queen (2026-10-24): black with a deep red spot, my pick, to tell her egg from the workers'.
     public static final DeferredItem<DeferredSpawnEggItem> MATABELE_QUEEN_SPAWN_EGG =
             ITEMS.register("matabele_queen_spawn_egg",
-                    () -> new DeferredSpawnEggItem(SavannaEntities.MATABELE_QUEEN, 0x0B0B0B, 0x7A1A14, new Item.Properties()));
+                    () -> new DeferredSpawnEggItem(SavannaEntities.MATABELE_QUEEN, 0x050505, 0x050505, new Item.Properties()));
 
     /** The items of the giant savanna trees' blocks (M7.5), in creative tab order. */
     public static final List<DeferredItem<BlockItem>> TREE_ITEMS = new ArrayList<>();
