@@ -403,7 +403,7 @@ public class Mound {
     }
 
     /** A shaped piece of the mound (a ramp, a spire piece, a mouth), not a tunnel block. */
-    private static boolean isPieceBlock(BlockState state) {
+    static boolean isPieceBlock(BlockState state) {
         return state.getBlock() instanceof MoundPieceBlock && !(state.getBlock() instanceof TermiteTunnelBlock);
     }
 
@@ -817,7 +817,7 @@ public class Mound {
     }
 
     /** Any block of a termite mound: soil, the old chimney crown, a spire piece, a chimney mouth or a ramp. */
-    private static boolean isMoundBlock(BlockState state) {
+    static boolean isMoundBlock(BlockState state) {
         Block block = state.getBlock();
         return block instanceof TermiteMoundBlock || block instanceof TermiteHoleBlock || block instanceof MoundPieceBlock;
     }

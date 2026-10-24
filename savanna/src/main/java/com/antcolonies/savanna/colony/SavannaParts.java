@@ -58,7 +58,8 @@ public final class SavannaParts {
     public static final Type<Mound> MOUND = listed("mound", Mound::new, part -> part
             .ticks(30, Mound::tick)
             .hears(ColonyNews.BLOCK_DUG, 10, (mound, level, news) -> mound.blockDug(level, news.where()))
-            .hears(ColonyNews.COLONY_ENDED, 10, (mound, level, news) -> DeadMounds.get(level).died(level, news.colony(), news.center())) // M8 1a: it stays, dead
+            .hears(ColonyNews.COLONY_ENDED, 10, (mound, level, news) -> // M8 1a: it stays, dead, and wears down
+                    DeadMounds.get(level).addMound(level, news.colony(), news.center(), mound.getParts(level)))
             .plugs(ColonyHooks.AWAY_BUILDER, 20, MoundAwayBuilding::new) // the dug soil and the mound built up, on return
             .plugs(ColonyHooks.DUG_SOIL, 10, mound -> new ColonyHooks.DugSoil() { // one pellet per layer of a mound block from each dug block
                 @Override

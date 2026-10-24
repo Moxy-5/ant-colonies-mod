@@ -356,4 +356,199 @@ public class TermiteMoundTests {
             helper.assertTrue(peeked[2] > 0, "with no other way the termite did not come out of the mouth (it never looked out)");
         });
     }
+
+    /**
+     * M8 step 1a part 2: a full grown mound (put up at once) whose colony dies wears down in the real order, driven day by
+     * day through the dead mound book (the world's clock is shared): nothing on the day it dies; the spire tips and
+     * chimney mouths first and the spires lower by day 2; every piece gone and the spires down to the body by day 6, grass
+     * on the settled foot; the body lower by day 18; by day 40 a low hump 4 blocks high, grass over every column, washed
+     * soil round the foot, the shaft closed over. Never back up when the clock goes back; carries on after a save and load;
+     * a player's block keeps its column; nothing under the ground changes; the hump stays.
+     */
+    @GameTest(template = "arena", timeoutTicks = 400, skyAccess = true)
+    public static void aDeadMoundWearsDownToAGrassyHump(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        com.antcolonies.gametest.TestScenes.deepGround(helper);
+        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        helper.runAfterDelay(10, () -> {
+            Colony colony = colony(helper);
+            helper.assertTrue(colony != null, "no termite colony");
+            com.antcolonies.savanna.colony.Mound mound = colony.part(SavannaParts.MOUND).orElseThrow();
+            mound.buildInstantly(level, mound.numbers().maxHeight());
+            BlockPos center = colony.getCenter();
+            java.util.UUID id = colony.getId();
+            com.antcolonies.savanna.colony.DeadMounds book = com.antcolonies.savanna.colony.DeadMounds.get(level);
+            try {
+                java.util.Map<BlockPos, BlockState> whole = snapshot(level, center);
+                int stood = highest(whole, center);
+                long pieces = pieces(whole);
+                java.util.Set<Long> footprint = new java.util.HashSet<>();
+                whole.forEach((pos, state) -> {
+                    if (isMound(state)) {
+                        footprint.add(BlockPos.asLong(pos.getX(), 0, pos.getZ()));
+                    }
+                });
+                helper.assertTrue(stood >= 28 && pieces >= 20, "the full mound stands " + stood + " tall with " + pieces + " pieces");
+                // A player's block in a column of the body: it and the soil under it stay.
+                BlockPos cobble = null;
+                for (int dx = -5; dx <= 5 && cobble == null; dx++) {
+                    for (int dz = -5; dz <= 5 && cobble == null; dz++) {
+                        double distance = Math.sqrt(dx * dx + dz * dz);
+                        BlockPos base = center.offset(dx, 0, dz);
+                        boolean solid = distance >= 3 && distance <= 5;
+                        for (int y = 0; y <= 6 && solid; y++) {
+                            solid = isMound(level.getBlockState(base.above(y)));
+                        }
+                        if (solid) {
+                            cobble = base.above(4);
+                        }
+                    }
+                }
+                helper.assertTrue(cobble != null, "no column of the body 7 blocks tall 3 to 5 blocks out");
+                level.setBlock(cobble, Blocks.COBBLESTONE.defaultBlockState(), 3);
+                java.util.List<BlockState> underCobble = new java.util.ArrayList<>();
+                for (int y = 1; y <= 4; y++) {
+                    underCobble.add(level.getBlockState(cobble.below(y)));
+                }
+                java.util.Map<BlockPos, BlockState> underground = new java.util.HashMap<>();
+                for (BlockPos pos : BlockPos.betweenClosed(center.offset(-12, -6, -12), center.offset(12, -1, 12))) {
+                    underground.put(pos.immutable(), level.getBlockState(pos));
+                }
+                java.util.Map<BlockPos, BlockState> before = snapshot(level, center);
+
+                ColonyManager.get(level).kill(level, colony);
+                com.antcolonies.savanna.colony.DeadMounds.DeadMound dead = book.get(id);
+                helper.assertTrue(dead != null && dead.wears(), "the dead mound's wear was not written down");
+
+                book.updateForTests(level, dead, 0.1);
+                helper.assertTrue(snapshot(level, center).equals(before), "the mound changed on the day it died");
+
+                book.updateForTests(level, dead, 2.0);
+                java.util.Map<BlockPos, BlockState> day2 = snapshot(level, center);
+                helper.assertTrue(highest(day2, center) <= stood - 5, "the spires are only " + (stood - highest(day2, center)) + " lower on day 2");
+                helper.assertTrue(pieces(day2) < pieces, "no piece has crumbled by day 2");
+                day2.forEach((pos, state) -> helper.assertTrue(!isPiece(state) || pos.getY() - center.getY() <= 16,
+                        "a piece " + (pos.getY() - center.getY()) + " blocks up still stands on day 2: " + state));
+                book.updateForTests(level, dead, 1.0); // the clock set back: nothing comes back
+                helper.assertTrue(snapshot(level, center).equals(day2), "the mound changed when the clock went back");
+
+                dead = book.reloadForTests(level, id); // saved and loaded: the wear carries on from where it was
+                book.updateForTests(level, dead, 6.0);
+                java.util.Map<BlockPos, BlockState> day6 = snapshot(level, center);
+                helper.assertTrue(pieces(day6) == 0, pieces(day6) + " pieces still stand on day 6");
+                int body = highest(day6, center);
+                helper.assertTrue(body <= stood * 0.6 && body >= 8, "on day 6 the mound is " + body + " tall (stood " + stood + "): not down to its body");
+                helper.assertTrue(day6.values().stream().anyMatch(state -> state.is(Blocks.GRASS_BLOCK)), "no grass on the settled foot by day 6");
+                helper.assertTrue(windowsToTheSky(level, day6) == 0, "tunnels laid open to the sky by day 6 (the holes come in part 3)");
+
+                book.updateForTests(level, dead, 18.0);
+                java.util.Map<BlockPos, BlockState> day18 = snapshot(level, center);
+                int slumping = highest(day18, center);
+                helper.assertTrue(slumping < body && slumping > 4, "on day 18 the mound is " + slumping + " tall (" + body + " on day 6)");
+                helper.assertTrue(windowsToTheSky(level, day18) == 0, "tunnels laid open to the sky by day 18 (the holes come in part 3)");
+
+                book.updateForTests(level, dead, 40.0);
+                java.util.Map<BlockPos, BlockState> hump = snapshot(level, center);
+                helper.assertTrue(highest(hump, center) == 4, "the hump is " + highest(hump, center) + " tall on day 40");
+                helper.assertTrue(level.getBlockState(center.above(3)).is(Blocks.GRASS_BLOCK), "the middle of the hump is "
+                        + level.getBlockState(center.above(3)) + ", not grass over the closed shaft");
+                int apron = 0;
+                for (int dx = -11; dx <= 11; dx++) {
+                    for (int dz = -11; dz <= 11; dz++) {
+                        BlockPos base = center.offset(dx, 0, dz);
+                        for (int y = 12; y >= 0; y--) {
+                            BlockState state = level.getBlockState(base.above(y));
+                            if (state.canBeReplaced()) {
+                                continue;
+                            }
+                            helper.assertTrue(y <= 4 && (state.is(Blocks.GRASS_BLOCK) || base.above(y).equals(cobble)),
+                                    "the top of the hump at " + dx + ", " + dz + " is " + state + " " + y + " blocks up on day 40 (was "
+                                            + before.get(base.above(y)) + ", under it " + level.getBlockState(base.below()) + "; " + book.describeColumnForTests(dead, dx, dz) + ")");
+                            if (y == 0 && !footprint.contains(BlockPos.asLong(base.getX(), 0, base.getZ()))) {
+                                apron++;
+                            }
+                            break;
+                        }
+                    }
+                }
+                helper.assertTrue(apron >= 20, "only " + apron + " places of washed soil round the foot");
+                helper.assertTrue(windowsToTheSky(level, hump) == 0, windowsToTheSky(level, hump) + " tunnel sides open to the sky in the hump");
+                helper.assertTrue(level.getBlockState(cobble).is(Blocks.COBBLESTONE), "the player's block is gone");
+                for (int y = 1; y <= 4; y++) {
+                    helper.assertTrue(level.getBlockState(cobble.below(y)).equals(underCobble.get(y - 1)), "the soil under the player's block changed");
+                }
+                underground.forEach((pos, state) -> helper.assertTrue(level.getBlockState(pos).equals(state),
+                        "under the ground " + pos.subtract(center).toShortString() + " changed from " + state + " to " + level.getBlockState(pos)));
+                helper.assertTrue(dead.isSettled(), "the hump is not settled on day 40");
+                book.updateForTests(level, dead, 10.0);
+                book.updateForTests(level, dead, 1000.0);
+                helper.assertTrue(snapshot(level, center).equals(hump), "the settled hump changed");
+            } finally {
+                book.forgetForTests(id);
+                for (BlockPos pos : BlockPos.betweenClosed(center.offset(-11, 5, -11), center.offset(11, 40, 11))) {
+                    if (!level.getBlockState(pos).isAir()) {
+                        level.setBlock(pos, Blocks.AIR.defaultBlockState(), 2);
+                    }
+                }
+            }
+            helper.succeed();
+        });
+    }
+
+    /** Every block that is not air round a mound's middle, from its ground up. */
+    private static java.util.Map<BlockPos, BlockState> snapshot(ServerLevel level, BlockPos center) {
+        java.util.Map<BlockPos, BlockState> blocks = new java.util.HashMap<>();
+        for (BlockPos pos : BlockPos.betweenClosed(center.offset(-11, 0, -11), center.offset(11, 40, 11))) {
+            BlockState state = level.getBlockState(pos);
+            if (!state.isAir()) {
+                blocks.put(pos.immutable(), state);
+            }
+        }
+        return blocks;
+    }
+
+    /** How tall the mound stands: the highest mound block's height above the ground, plus one. */
+    private static int highest(java.util.Map<BlockPos, BlockState> blocks, BlockPos center) {
+        int top = 0;
+        for (java.util.Map.Entry<BlockPos, BlockState> entry : blocks.entrySet()) {
+            if (isMound(entry.getValue())) {
+                top = Math.max(top, entry.getKey().getY() - center.getY() + 1);
+            }
+        }
+        return top;
+    }
+
+    /** Sides of tunnel blocks in {@code blocks} (as they stand now) open to air under the open sky. */
+    private static int windowsToTheSky(ServerLevel level, java.util.Map<BlockPos, BlockState> blocks) {
+        int open = 0;
+        for (BlockPos pos : blocks.keySet()) {
+            BlockState state = level.getBlockState(pos);
+            if (!(state.getBlock() instanceof com.antcolonies.savanna.block.TermiteTunnelBlock)) {
+                continue;
+            }
+            for (net.minecraft.core.Direction side : net.minecraft.core.Direction.values()) {
+                BlockPos beside = pos.relative(side);
+                if (state.getValue(com.antcolonies.savanna.block.TermiteTunnelBlock.OPEN.get(side)) && level.getBlockState(beside).isAir()
+                        && level.canSeeSky(beside)) {
+                    open++;
+                }
+            }
+        }
+        return open;
+    }
+
+    private static long pieces(java.util.Map<BlockPos, BlockState> blocks) {
+        return blocks.values().stream().filter(TermiteMoundTests::isPiece).count();
+    }
+
+    private static boolean isMound(BlockState state) {
+        return state.getBlock() instanceof TermiteMoundBlock || state.getBlock() instanceof TermiteHoleBlock
+                || state.getBlock() instanceof com.antcolonies.savanna.block.MoundPieceBlock;
+    }
+
+    /** A spire piece, a chimney mouth or a ramp. */
+    private static boolean isPiece(BlockState state) {
+        return state.getBlock() instanceof com.antcolonies.savanna.block.TermiteSpireBlock || state.getBlock() instanceof TermiteMouthBlock
+                || state.getBlock() instanceof com.antcolonies.savanna.block.TermiteRampBlock;
+    }
 }
