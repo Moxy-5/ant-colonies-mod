@@ -23,6 +23,7 @@ import comb_age_art as comb
 S = 16
 LOOKS = "ABC"
 STAGES = ["furred", "black", "rotten"]
+GAME_LOOK = "B"  # picked by the user 2026-10-24 ("antler forest", more dramatic)
 VARIANTS = 3
 
 
