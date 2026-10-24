@@ -49,6 +49,10 @@ texture (the 'flat' paint), the eyes a lighter black; head B kept, the others go
 B4) from two more photos, built new (curved blades narrowing to a point, a deep red inner edge); the antennae's whips
 fading from black to white toward their tips.
 
+Ninth round (the user, 2026-10-23: "I want the jaws in B4 but I want them in the place of where the fangs are in
+B2"): B4's broad toothed blades hung out and down from the face like crushers, four ways to keep them off the floor
+(JAWS, 1 to 4).
+
 Units are model pixels before SCALE, as in ant_models.py: the head points to -Z, the ground is y = 0, left is +X.
 """
 import copy
@@ -269,43 +273,44 @@ HEAD_B = {
     'socket': (1.0, 0.25, -6.75), 'elbow': (2.9, 0.9, -1.6),
     'whip': [(4.3, 1.2, -3.2), (5.2, 0.8, -5.0), (5.6, -0.2, -6.6), (5.7, -1.3, -7.6)],
 }
-# Four new jaws on head B (the user, 2026-10-23, from two more photos: "I want the jaws different that looks more like
-# these ants dont reuse the ones from earlier"). What the photos show: the real jaws are long, smooth curved blades,
-# broad at the base and narrowing all the way to a sharp point, glossy black with a deep red inner edge; closed, they
-# curve in and their tips cross in front of the face (seen from above); seen from the front they hang down from the face
-# and curl back in under it like hooks. Each jaw: its middle line (left side, in the head's own frame), its width at
-# each point, its thickness, which way its flat sides face (flat: up, so the curve shows from above; side: out, so it
-# shows from the side), how far the tips pass each other (one over the other, as real jaws cross), and its teeth
-# (how far along, how long, how wide).
+# The jaws (the user, 2026-10-23): B4's broad three-cornered blades with their four blunt teeth, hung where B2's hooks
+# are (out from the face, then down and in, like crushers: the real jaws open side to side across the head, and the
+# head hangs down, so they reach out and then down). B4's blades are bigger than B2's hooks and would reach through the
+# floor, so four ways side by side (the user's picks): 1 curled in tighter and a little smaller, 2 only curled in
+# tighter, 3 only smaller, 4 as they are, the floor left to the animations (the jaws resting closed while walking).
+# Each jaw: its middle line (left side, in the head's own frame), its width at each point, its thickness, which way its
+# flat sides face (side: out, so the curve shows from the side), how far the tips pass each other, and its teeth (how
+# far along, how long, how wide).
+JAW_BASE = (1.25, -0.8, -6.35)
+B4_WIDTHS = [1.35, 1.1, 0.85, 0.6, 0.38, 0.14]
+B4_TEETH = [(0.3, 0.3, 0.24), (0.45, 0.28, 0.22), (0.6, 0.24, 0.2), (0.74, 0.2, 0.18)]
+# The jaw's path as offsets from its base: B2's hook drawn out to B4's length, the tips meeting; and a tighter curl,
+# bending down sooner and back in under the face.
+HANGING = [(0, 0, 0), (0.3, -0.55, -1.15), (0.35, -1.4, -1.85), (0.1, -2.15, -1.9), (-0.45, -2.6, -1.35),
+           (-1.1, -2.7, -0.65)]
+CURLED = [(0, 0, 0), (0.3, -0.6, -0.8), (0.3, -1.35, -1.15), (0.05, -1.95, -0.95), (-0.5, -2.15, -0.45),
+          (-1.1, -2.05, 0.1)]
+
+
+def hanging_jaw(path, scale):
+    return {'jaw': [tuple(b + o * scale for b, o in zip(JAW_BASE, p)) for p in path],
+            'jaw_width': [w * scale for w in B4_WIDTHS], 'jaw_thick': 0.42 * scale ** 0.5, 'flat': 'side',
+            'jaw_cross': 0.0, 'jaw_teeth': [(f, l * scale, w * scale) for f, l, w in B4_TEETH]}
+
+
+SMALLER = 0.8
 JAWS = {
-    'B1': {'name': 'Sickles that cross',
-           'note': "long thin jaws curving in like sickles, the tips crossing one over the other in front of the face "
-                   "(your second photo, from above); black with a deep red inner edge, smooth, no teeth",
-           'jaw': [(1.3, -0.7, -6.35), (1.95, -0.75, -7.3), (2.05, -0.85, -8.4), (1.7, -0.95, -9.4),
-                   (0.95, -1.05, -10.05), (-0.35, -1.1, -10.25)],
-           'jaw_width': [0.8, 0.62, 0.52, 0.42, 0.3, 0.12], 'jaw_thick': 0.36, 'flat': 'up', 'jaw_cross': 0.18,
-           'jaw_teeth': []},
-    'B2': {'name': 'Hanging hooks',
-           'note': "the jaws hang down from the face and curl back in under it like hooks (your first photo), broad at "
-                   "the base, a deep red inside the hook, the tips pointing back toward each other",
-           'jaw': [(1.25, -0.8, -6.35), (1.5, -1.25, -7.3), (1.55, -1.95, -7.9), (1.35, -2.6, -7.95),
-                   (1.0, -2.95, -7.5), (0.55, -3.05, -6.9)],
-           'jaw_width': [1.0, 0.85, 0.7, 0.55, 0.38, 0.14], 'jaw_thick': 0.42, 'flat': 'side', 'jaw_cross': 0.0,
-           'jaw_teeth': []},
-    'B3': {'name': 'Open wide',
-           'note': "the jaws held wide apart, ready to snap shut on a termite, curving in at the tips; a small tooth "
-                   "near the base of each",
-           'jaw': [(1.3, -0.7, -6.35), (2.25, -0.75, -7.05), (2.85, -0.85, -8.0), (2.9, -0.95, -9.0),
-                   (2.45, -1.05, -9.8), (1.75, -1.1, -10.2)],
-           'jaw_width': [0.82, 0.62, 0.52, 0.42, 0.3, 0.12], 'jaw_thick': 0.36, 'flat': 'up', 'jaw_cross': 0.0,
-           'jaw_teeth': [(0.22, 0.38, 0.26)]},
-    'B4': {'name': 'Broad blades with teeth',
-           'note': "broad three-cornered jaws, as a real ponerine's, narrowing to long curved points that meet in front "
-                   "and droop a little; four blunt teeth along the red inner edge",
-           'jaw': [(1.2, -0.7, -6.35), (1.95, -0.8, -7.2), (2.05, -1.0, -8.2), (1.65, -1.3, -9.0),
-                   (0.95, -1.6, -9.5), (0.15, -1.8, -9.6)],
-           'jaw_width': [1.35, 1.1, 0.85, 0.6, 0.38, 0.14], 'jaw_thick': 0.4, 'flat': 'up', 'jaw_cross': 0.0,
-           'jaw_teeth': [(0.3, 0.3, 0.24), (0.45, 0.28, 0.22), (0.6, 0.24, 0.2), (0.74, 0.2, 0.18)]},
+    '1': {'name': 'Curled in, smaller',
+          'note': "B4's blades at 80 percent, curled in tighter under the face: out, down soon, the points meeting "
+                  "underneath", **hanging_jaw(CURLED, SMALLER)},
+    '2': {'name': 'Curled in',
+          'note': "B4's blades at full size, curled in tighter under the face", **hanging_jaw(CURLED, 1.0)},
+    '3': {'name': 'Smaller',
+          'note': "B4's blades at 80 percent, hanging as B2's hooks do: out from the face, down, the points meeting "
+                  "behind", **hanging_jaw(HANGING, SMALLER)},
+    '4': {'name': 'Full size, left to the animations',
+          'note': "B4's blades at full size hanging as B2's hooks do; they may reach the floor, the animations will "
+                  "rest them closed while walking", **hanging_jaw(HANGING, 1.0)},
 }
 HEADS = {key: {**HEAD_B, **jaw} for key, jaw in JAWS.items()}
 WHIP_SEGMENTS = 11              # the real funiculus: 11 segments
