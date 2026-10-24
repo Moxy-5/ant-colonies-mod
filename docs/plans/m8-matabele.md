@@ -42,6 +42,10 @@ timings: all "my pick, to confirm" until then).
    broken tunnel); antennae bitten off too; termite soldier heads left clamped on the
    ants' legs and pulled off at home; lost legs lying on the battlefield a while.
    Matabele heads coming off: not real, left out.
+   Dead Matabeles in the termites' tunnels (the user, 2026-10-23): never walled up
+   with blocks (50 dead ants would mean 50 blocks placed); the termites carry the
+   body away like their own dead. Where to (today termite bodies are eaten in the
+   garden fresh or walled up where they lie): to ask the user.
    Replaces `Alarm`/`Soldiers` using `TermiteSoldierEntity` directly with a shared
    defender idea.
 3. **Drawn-only ants** (brain step 4e, pulled forward): the column far from the
