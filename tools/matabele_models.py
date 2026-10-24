@@ -560,16 +560,23 @@ def thorax_bone():
     ])
 
 
-def leg_bones():
+def leg_bones(taper=0.0):
+    """The legs. taper: 0 is today's even thin femur; above 0 the femur is thick at the hip and thins in two steps to
+    the knee (the real ant's upper leg), the lower leg and feet unchanged (the user, 2026-10-23: less spidery)."""
     bones = []
     for n, (hip, knee, ankle, toe) in LEGS.items():
         for side, sx in (('l', 1), ('r', -1)):
             def m(p):
                 return p if sx > 0 else mirror(p)
             h, k, a, t = m(hip), m(knee), m(ankle), m(toe)
+            if taper > 0 and n != 1:                                   # the front legs pass the head: left as they were
+                mid = lerp(h, k, 0.5)
+                femur = [rod(h, mid, 0.62 * (1 + taper), 'leg'),      # the femur, thick at the hip
+                         rod(mid, k, 0.62 * (1 + taper * 0.45), 'leg')]   # thinning toward the knee
+            else:
+                femur = [rod(h, k, 0.62, 'leg')]                      # the femur, long and thin
             bones.append(bone(f'leg_{side}{n}', 'forebody', h, [
-                centered(h[0], h[1], h[2], 1.0, 1.0, 1.0, 'leg'),     # the coxa
-                rod(h, k, 0.62, 'leg')]))                             # the femur, long and thin
+                centered(h[0], h[1], h[2], 1.0, 1.0, 1.0, 'leg')] + femur))   # the coxa, then the femur
             bones.append(bone(f'leg_{side}{n}_lower', f'leg_{side}{n}', k, [
                 centered(k[0], k[1], k[2], 0.58, 0.58, 0.58, 'joint'),
                 rod(k, a, 0.48, 'leg')]))                             # the tibia
@@ -584,14 +591,14 @@ SLIM = 0.72
 SLIM_BONES = ('thorax', 'petiole', 'gaster_front', 'gaster_back')
 
 
-def model(minor=False, head='A'):
+def model(minor=False, head='A', taper=0.0):
     """The ant's bones (the game's model file format, each box naming its swatch until paint() gives it its place on
     the texture). minor: the small ant's proportions; head: which of the HEADS."""
     bones = [bone('body', None, (0, 4.5, 0)), bone('forebody', 'body', WAIST)]
     bones += head_bones(HEADS[head], MINOR_HEAD if minor else MAJOR_HEAD, MINOR_ANTENNA if minor else 1.0,
                         MINOR_TILT if minor else MAJOR_TILT)
     bones.append(thorax_bone())
-    bones += leg_bones()
+    bones += leg_bones(taper)
     bones.append(bone('petiole', 'body', WAIST, [
         box([-0.5, 3.8, 0.3], [0.5, 4.5, 0.8], 'waist'),          # the short stalk
         box([-1.1, 3.5, 0.7], [1.1, 6.0, 1.9], 'waist'),          # the thick, tall node
@@ -665,11 +672,12 @@ DRAFTS = mod_paths.assets('savanna')                          # where the files 
 MODELS = {'matabele_major': False, 'matabele_minor': True}     # name -> minor
 JAW = '2'                                                       # the jaws the user picked (JAWS)
 LOOK = 'A'
+LEG_TAPER = 0.4                                                 # the femur's taper, the user's pick 2026-10-23
 
 
 def game_bones(name):
     """The model's bones with every face's place on its texture, and the texture: (bones, rows, width, height)."""
-    return paint(model(minor=MODELS[name], head=JAW), LOOK)
+    return paint(model(minor=MODELS[name], head=JAW, taper=LEG_TAPER), LOOK)
 
 
 def write_drafts():

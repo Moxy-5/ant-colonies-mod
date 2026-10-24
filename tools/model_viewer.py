@@ -193,11 +193,12 @@ def matabele_page(out):
     import matabele_models as mm
     data = {"looks": {}, "refs": []}
     for key, head in mm.HEADS.items():
-        entry = {"name": head["name"], "note": head["note"]}
-        for caste, minor in (("major", False), ("minor", True)):
-            bones, rows, w, h = mm.paint(mm.model(minor=minor, head=key), "A")
-            entry[caste] = {"bones": bones, "texture": uri(mm.png(rows)), "w": w, "h": h}
-        data["looks"][key] = entry
+        for leg_key, leg_name, taper in (("", "today's legs", 0.0), ("T", "tapered legs", mm.LEG_TAPER)):
+            entry = {"name": f"{head['name']}, {leg_name}", "note": head["note"]}
+            for caste, minor in (("major", False), ("minor", True)):
+                bones, rows, w, h = mm.paint(mm.model(minor=minor, head=key, taper=taper), "A")
+                entry[caste] = {"bones": bones, "texture": uri(mm.png(rows)), "w": w, "h": h}
+            data["looks"][key + leg_key] = entry
     for mod, model, scale, label in (("desert", "worker_ant", 0.65, "Harvester worker"),
                                      ("savanna", "termite_worker", 0.75, "Termite worker"),
                                      ("savanna", "termite_major_soldier", 0.75, "Termite major soldier")):
