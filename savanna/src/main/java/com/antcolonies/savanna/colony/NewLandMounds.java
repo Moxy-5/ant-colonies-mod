@@ -207,7 +207,7 @@ public class NewLandMounds extends SavedData {
             default -> "young";
         };
         if (pick.living()) {
-            return String.format(Locale.ROOT, "living %s termite colony (%.0f days old)", size, pick.days());
+            return String.format(Locale.ROOT, "living %s termite colony (stage %d, %.0f days old)", size, pick.stage(), pick.days());
         }
         String woods = switch (pick.woods()) {
             case TermiteMoundStructure.THICKET -> ", a thicket on it";
@@ -215,41 +215,45 @@ public class NewLandMounds extends SavedData {
             case TermiteMoundStructure.YOUNG_BAOBAB -> ", a young baobab on it";
             default -> "";
         };
-        return String.format(Locale.ROOT, "dead %s termite mound (%.1f days dead%s%s)", size, pick.days(), woods,
+        return String.format(Locale.ROOT, "dead %s termite mound (stage %d, %.1f days dead%s%s)", size, pick.stage(), pick.days(), woods,
                 pick.burrow() ? ", an aardvark burrow" : "");
     }
 
     /**
-     * A pick by hand (the command): {@code full}, {@code half} or {@code young} living colonies at the middle of their
-     * spreads; {@code dead} a full mound dead so many days, and once an old hump (35 days) with woods by the dice, an
-     * aardvark burrow and the green grass, to see every extra at once.
+     * A pick by hand (the command): {@code full} (stage 30), {@code half} (16) or {@code young} (6) living colonies, of
+     * the age their stage gives; {@code dead} a full mound dead so many days, and once an old hump (35 days) with woods
+     * by the dice, an aardvark burrow and the green grass, to see every extra at once.
      */
     public static Pick pickFor(String kind, double days, long seed) {
         return switch (kind) {
-            case "full" -> new Pick(true, TermiteMoundStructure.FULL, 0.95, 200, TermiteMoundStructure.NO_WOODS, false, false, seed);
-            case "half" -> new Pick(true, TermiteMoundStructure.HALF, 0.5, 60, TermiteMoundStructure.NO_WOODS, false, false, seed);
-            case "young" -> new Pick(true, TermiteMoundStructure.YOUNG, 0.15, 15, TermiteMoundStructure.NO_WOODS, false, false, seed);
+            case "full" -> livingAt(30, seed);
+            case "half" -> livingAt(16, seed);
+            case "young" -> livingAt(6, seed);
             default -> {
                 boolean old = days >= 35;
                 int woods = !old ? TermiteMoundStructure.NO_WOODS : 1 + (int) Math.floorMod(seed, 3L);
-                yield new Pick(false, TermiteMoundStructure.FULL, 0.95, days, woods, old, old, seed);
+                yield new Pick(false, TermiteMoundStructure.FULL, 30.0 / TermiteMoundStructure.FULL_STAGE, days, woods, old, old, seed);
             }
         };
+    }
+
+    private static Pick livingAt(int stage, long seed) {
+        double age = 5 + Math.pow(stage, 1.6); // (the middle of TermiteMoundStructure.ageFor)
+        return new Pick(true, TermiteMoundStructure.sizeOf(stage), (double) stage / TermiteMoundStructure.FULL_STAGE, age,
+                TermiteMoundStructure.NO_WOODS, false, false, seed);
     }
 
     // ---------------------------------------------------------------- the colony
 
     /**
-     * How many workers a colony of this size has (my picks, to confirm: real mature Macrotermes colonies are a million or
-     * more; these are kept to what the colony's food here can feed, and it grows on from them): full 400 to 700, half
-     * grown 150 to 300, young 30 to 60.
+     * How many workers a colony with a mound of this stage has (my picks, to confirm: real mature Macrotermes colonies
+     * are a million or more; these are kept to what the colony's food here can feed, and it grows on from them): about
+     * 50 at stage 6, 200 at 15, 700 at the full 32, give or take 15 percent, the mound growing with the workers who build
+     * it.
      */
     static int workersFor(Pick pick, RandomSource random) {
-        return switch (pick.size()) {
-            case TermiteMoundStructure.FULL -> 400 + random.nextInt(301);
-            case TermiteMoundStructure.HALF -> 150 + random.nextInt(151);
-            default -> 30 + random.nextInt(31);
-        };
+        double share = (double) pick.stage() / TermiteMoundStructure.FULL_STAGE;
+        return Math.max(20, (int) Math.round(700 * Math.pow(share, 1.6) * (0.85 + 0.3 * random.nextDouble())));
     }
 
     /** The members a colony of that size has, the nest dug, the mound up, the gardens filled (living or about to die). */
@@ -265,7 +269,7 @@ public class NewLandMounds extends SavedData {
         for (ColonyHooks.Castes castes : colony.hooks().all(ColonyHooks.CASTES)) {
             castes.addFor(workers, now); // (the termite soldiers so many workers keep)
         }
-        if (pick.size() != TermiteMoundStructure.YOUNG) {
+        if (pick.stage() >= 10) {
             colony.nest().unlockAllLevels(); // an old colony dug them all long ago
         }
         Mound mound = colony.part(SavannaParts.MOUND).orElse(null);

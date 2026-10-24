@@ -5,9 +5,22 @@
   "step": "surface_structures",
   "terrain_adaptation": "none",
   "numbers": {
-    "_note": "M8 step 1b (docs/DESIGN.md, 'World generation, details'; the user's decisions 2026-10-24, the exact numbers my picks, to confirm): dead_share, of the mounds how many are dead (real surveys: a third to a half); sizes, weights of full, half-grown and young mounds (living: the real age mix, mostly full; dead: the size they had stood to); dead_stages, weights of freshly dead (0-3 days), wearing (3-12), slumping (12-30) and old grassy humps (35-200); hump_woods, of the old humps how many have trees or a thicket on them (real mound islands); aardvark_burrows, of the old humps how many an aardvark has dug a burrow into, down to the old nest (0 turns it off); hump_grass, greener grass on the old humps (false turns it off).",
+    "_note": "M8 step 1b (docs/DESIGN.md, 'World generation, details'; the user's decisions 2026-10-24, the exact numbers my picks, to confirm): dead_share, of the mounds how many are dead (real surveys: a third to a half); living_stages, bands of mound stage (1 to 32) and their weights for living colonies (the user's table 2026-10-24: giant cathedrals rare, most mounds small; stages 1 to 3 never, a first-year colony has no mound to see; the colony's workers and age follow its stage); dead_sizes, the same for the size a dead mound had stood to (tilted bigger: big mounds stand for decades, small dead ones wash away fast); dead_stages, weights of freshly dead (0-3 days), wearing (3-12), slumping (12-30) and old grassy humps (35-200); hump_woods, of the old humps how many have trees or a thicket on them (real mound islands); aardvark_burrows, of the old humps how many an aardvark has dug a burrow into, down to the old nest (0 turns it off); hump_grass, greener grass on the old humps (false turns it off).",
     "dead_share": 0.33,
-    "sizes": [6, 3, 1],
+    "living_stages": [
+      {"from": 4, "to": 9, "weight": 40},
+      {"from": 10, "to": 14, "weight": 28},
+      {"from": 15, "to": 19, "weight": 17},
+      {"from": 20, "to": 24, "weight": 10},
+      {"from": 25, "to": 32, "weight": 5}
+    ],
+    "dead_sizes": [
+      {"from": 4, "to": 9, "weight": 20},
+      {"from": 10, "to": 14, "weight": 25},
+      {"from": 15, "to": 19, "weight": 25},
+      {"from": 20, "to": 24, "weight": 18},
+      {"from": 25, "to": 32, "weight": 12}
+    ],
     "dead_stages": [15, 20, 20, 45],
     "hump_woods": 0.5,
     "aardvark_burrows": 0.4,

@@ -24,8 +24,8 @@ import net.minecraft.world.level.levelgen.structure.placement.RandomSpreadStruct
 
 /**
  * A Macrotermes mound in new land (M8 step 1b, {@code docs/DESIGN.md}, "World generation, details"): living colonies
- * with dead mounds among them, spaced evenly about every 80 blocks (data/antcolonies/worldgen/structure_set/
- * termite_mounds.json: one to a square of 5 by 5 chunks, its place in it a little to either side), as real neighbouring
+ * with dead mounds among them, spaced evenly about every 96 blocks (data/antcolonies/worldgen/structure_set/
+ * termite_mounds.json: one to a square of 6 by 6 chunks, its place in it a little to either side), as real neighbouring
  * colonies fight over the ground between them and their mounds end up over-dispersed, about one to a hectare.
  *
  * <p>World generation only picks what stands there ({@link Pick}) and where; the colony, its nest and its mound are put
@@ -46,26 +46,46 @@ public class TermiteMoundStructure extends Structure {
             settingsCodec(i),
             Numbers.CODEC.fieldOf("numbers").forGetter(TermiteMoundStructure::numbers)).apply(i, TermiteMoundStructure::new));
 
+    /** One band of mound stages (1 to the full 32) and how often a mound of new land is in it. */
+    public record Band(int from, int to, int weight) {
+        public static final Codec<Band> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.INT.fieldOf("from").forGetter(Band::from),
+                Codec.INT.fieldOf("to").forGetter(Band::to),
+                Codec.INT.fieldOf("weight").forGetter(Band::weight)
+        ).apply(i, Band::new));
+
+        /** The living colonies' stages (the user, 2026-10-24): giant cathedrals rare, most mounds small. */
+        static final List<Band> LIVING = List.of(new Band(4, 9, 40), new Band(10, 14, 28), new Band(15, 19, 17),
+                new Band(20, 24, 10), new Band(25, 32, 5));
+        /** The dead mounds' stages: tilted bigger, as big mounds stand for decades and small dead ones wash away fast. */
+        static final List<Band> DEAD = List.of(new Band(4, 9, 20), new Band(10, 14, 25), new Band(15, 19, 25),
+                new Band(20, 24, 18), new Band(25, 32, 12));
+    }
+
+    /** The mound's full height in stages (the Macrotermes species file's {@code mound.max_height}). */
+    public static final int FULL_STAGE = 32;
+
     /**
-     * The real spreads, from the structure's file. {@code deadShare}: of the mounds, how many are dead. {@code sizes}:
-     * weights of full, half-grown and young (the living by the real age mix; the dead by the size they had stood to).
-     * {@code deadStages}: weights of freshly dead (days 0 to 3, the spires standing, Xylaria on the comb), wearing
-     * (3 to 12), slumping (12 to 30) and old grassy humps (35 to 200). {@code humpWoods}: of the old humps, how many
-     * have trees or a thicket on them. {@code burrows}: of the old humps, how many an aardvark
-     * (an old hump) has dug into. {@code humpGrass}: whether old humps carry the greener grass of real mound islands.
+     * The real spreads, from the structure's file. {@code deadShare}: of the mounds, how many are dead.
+     * {@code livingStages}, {@code deadSizes}: bands of mound stage with their weights, for living colonies and for the
+     * size dead mounds had stood to. {@code deadStages}: weights of freshly dead (days 0 to 3, the spires standing,
+     * Xylaria on the comb), wearing (3 to 12), slumping (12 to 30) and old grassy humps (35 to 200). {@code humpWoods}:
+     * of the old humps, how many have trees or a thicket on them. {@code burrows}: of the old humps, how many an aardvark
+     * has dug into. {@code humpGrass}: whether old humps carry the greener grass of real mound islands.
      */
-    public record Numbers(double deadShare, List<Integer> sizes, List<Integer> deadStages, double humpWoods, double burrows,
-            boolean humpGrass) {
+    public record Numbers(double deadShare, List<Band> livingStages, List<Band> deadSizes, List<Integer> deadStages,
+            double humpWoods, double burrows, boolean humpGrass) {
         public static final Codec<Numbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.DOUBLE.optionalFieldOf("dead_share", 0.33).forGetter(Numbers::deadShare),
-                Codec.INT.listOf().optionalFieldOf("sizes", List.of(6, 3, 1)).forGetter(Numbers::sizes),
+                Band.CODEC.listOf().optionalFieldOf("living_stages", Band.LIVING).forGetter(Numbers::livingStages),
+                Band.CODEC.listOf().optionalFieldOf("dead_sizes", Band.DEAD).forGetter(Numbers::deadSizes),
                 Codec.INT.listOf().optionalFieldOf("dead_stages", List.of(15, 20, 20, 45)).forGetter(Numbers::deadStages),
                 Codec.DOUBLE.optionalFieldOf("hump_woods", 0.5).forGetter(Numbers::humpWoods),
                 Codec.DOUBLE.optionalFieldOf("aardvark_burrows", 0.4).forGetter(Numbers::burrows),
                 Codec.BOOL.optionalFieldOf("hump_grass", true).forGetter(Numbers::humpGrass)
         ).apply(i, Numbers::new));
 
-        public static final Numbers DEFAULT = new Numbers(0.33, List.of(6, 3, 1), List.of(15, 20, 20, 45), 0.5, 0.4, true);
+        public static final Numbers DEFAULT = new Numbers(0.33, Band.LIVING, Band.DEAD, List.of(15, 20, 20, 45), 0.5, 0.4, true);
     }
 
     /** Sizes of mound (and colony). */
@@ -80,6 +100,11 @@ public class TermiteMoundStructure extends Structure {
      * its own seed (its galleries, trees and burrow).
      */
     public record Pick(boolean living, int size, double height, double days, int woods, boolean burrow, boolean grass, long seed) {
+        /** The mound's stage, 1 to {@link #FULL_STAGE}. */
+        public int stage() {
+            return Math.max(1, Math.min(FULL_STAGE, (int) Math.round(height * FULL_STAGE)));
+        }
+
         public boolean isOldHump() {
             return !living && days >= 35;
         }
@@ -120,31 +145,42 @@ public class TermiteMoundStructure extends Structure {
         return Math.round((from + random.nextDouble() * (to - from)) * 100) / 100.0;
     }
 
+    private static int stageFrom(List<Band> bands, RandomSource random) {
+        Band band = bands.get(weighted(bands.stream().map(Band::weight).toList(), random));
+        int from = Math.max(1, Math.min(band.from(), band.to())), to = Math.min(FULL_STAGE, Math.max(band.from(), band.to()));
+        return from + random.nextInt(to - from + 1);
+    }
+
+    /** Full, half grown or young, by stage: the names the command and the log use (and young colonies keep their deep levels shut). */
+    public static int sizeOf(int stage) {
+        return stage >= 20 ? FULL : stage >= 10 ? HALF : YOUNG;
+    }
+
     /**
-     * The dice for one mound, the real spreads (my picks, to confirm). Living, by the real age mix: a full mound
-     * (85 to 100 percent of the full height) is a colony of 100 to 300 days; half grown (40 to 65 percent) 40 to 80 days;
-     * young (8 to 20 percent, a few blocks) 10 to 25 days. Dead: most stood to full size (an old colony's natural end),
-     * at every stage of the wear.
+     * A living colony's age by its mound's stage (my pick, to confirm): real Macrotermes mounds show after a year or two
+     * and reach full size after decades, the growth slowing as it goes; here about 15 days at stage 4, 80 at 15, 260 at
+     * the full 32, give or take 15 percent.
+     */
+    public static double ageFor(int stage, RandomSource random) {
+        return between(random, 0.85, 1.15) * (5 + Math.pow(stage, 1.6));
+    }
+
+    /**
+     * The dice for one mound, the real spreads. Living, by the stage bands (giant cathedrals rare, most small, the user's
+     * table); the colony's age follows its stage. Dead: the size it had stood to by its own bands (tilted bigger), at
+     * every stage of the wear. Stages 1 to 3 never: a first-year colony has no mound to see.
      */
     public static Pick pick(Numbers numbers, RandomSource random) {
         long seed = random.nextLong() & 0xFFFFFFFFL;
         boolean living = random.nextDouble() >= numbers.deadShare();
-        int size = Math.min(YOUNG, weighted(numbers.sizes(), random));
-        double height = switch (size) {
-            case FULL -> between(random, 0.85, 1.0);
-            case HALF -> between(random, 0.4, 0.65);
-            default -> between(random, 0.08, 0.2);
-        };
+        int stage = stageFrom(living ? numbers.livingStages() : numbers.deadSizes(), random);
+        double height = (double) stage / FULL_STAGE;
+        int size = sizeOf(stage);
         if (living) {
-            double age = switch (size) {
-                case FULL -> between(random, 100, 300);
-                case HALF -> between(random, 40, 80);
-                default -> between(random, 10, 25);
-            };
-            return new Pick(true, size, height, age, NO_WOODS, false, false, seed);
+            return new Pick(true, size, height, ageFor(stage, random), NO_WOODS, false, false, seed);
         }
-        int stage = Math.min(3, weighted(numbers.deadStages(), random));
-        double days = switch (stage) {
+        int wear = Math.min(3, weighted(numbers.deadStages(), random));
+        double days = switch (wear) {
             case 0 -> between(random, 0.2, 3);
             case 1 -> between(random, 3, 12);
             case 2 -> between(random, 12, 30);
