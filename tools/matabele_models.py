@@ -38,6 +38,12 @@ jaws with a red inner edge, still tilted at the neck; and every box face painted
 on a Minecraft mob, in place of one small swatch stretched over each box. Two colours: black (the user's pick) and the
 picture's brown-grey.
 
+Seventh round (the user, 2026-10-23: the head "still looks exactly like the red harvester ant just with a little nose
+now", "the head needs to be completely remade", "stick with the black colour just go off the images", five options):
+the head, antennae and jaws built again from nothing, from the photos: an egg-shaped head from rounded slices, oval
+eyes on the sides, the antennae from the front of the face under little lobes, flat broad jaws with a comb of teeth;
+five ways (HEADS, A to E) for the user to pick from, all black.
+
 Units are model pixels before SCALE, as in ant_models.py: the head points to -Z, the ground is y = 0, left is +X.
 """
 import copy
@@ -56,29 +62,23 @@ SWATCHES = {
     'head': 'plate', 'thorax': 'plate', 'waist': 'plate', 'gaster': 'haired', 'rim': 'plate',
     'leg': 'plain', 'antenna': 'plain', 'ring': 'plain', 'band': 'plain', 'tarsus': 'plain', 'joint': 'plain',
     'eye': 'eye', 'eyerim': 'plain', 'jaw': 'plain', 'teeth': 'plain', 'sting': 'plain',
+    'whip': 'plain', 'bead': 'plain',
 }
 TEXELS = 3.0
 
-# The looks: A glossy black (the user's pick, the photo), B the brown-grey of the user's picture of the head
-# (2026-10-23). grain: how far a pixel strays from its colour; flecks: how many pixels are lighter (or darker) specks;
-# hair: how much the gaster's fine pale hairs grey it.
+# The colour: glossy black (the user's pick, the photo; "stick with the black colour", 2026-10-23). grain: how far a
+# pixel strays from its colour; flecks: how many pixels are lighter (or darker) specks; hair: how much the gaster's
+# fine pale hairs grey it.
 LOOKS = {
     'A': {'name': 'Black',
-          'note': "glossy black, the look you picked (the photo): the eyes dark with a grey rim, the jaws' inner edges, "
-                  "the feet and the antenna bands red-brown",
+          'note': "glossy black (the photo): the eyes a smooth dark grey, the jaws' inner edges red, the feet, the "
+                  "antennae's elbows and whips red-brown",
           'grain': 7, 'flecks': 0.10, 'hair': 0.18,
           'colours': {'head': (26, 25, 27), 'thorax': (28, 27, 29), 'waist': (28, 27, 29), 'gaster': (31, 30, 31),
-                      'rim': (52, 50, 54), 'leg': (36, 30, 28), 'antenna': (38, 31, 28), 'ring': (46, 36, 30),
-                      'band': (120, 40, 26), 'tarsus': (78, 44, 30), 'joint': (22, 20, 21), 'eye': (14, 14, 16),
-                      'eyerim': (92, 92, 98), 'jaw': (36, 26, 23), 'teeth': (130, 40, 26), 'sting': (90, 52, 34)}},
-    'B': {'name': 'Like the picture',
-          'note': "the brown-grey of your picture of the head: pale specks, the eyes dark grey with a light rim, the "
-                  "jaws' inner edges and the antenna bands red",
-          'grain': 9, 'flecks': 0.14, 'hair': 0.12,
-          'colours': {'head': (86, 74, 66), 'thorax': (84, 72, 64), 'waist': (84, 72, 64), 'gaster': (82, 70, 63),
-                      'rim': (100, 88, 79), 'leg': (80, 68, 60), 'antenna': (82, 70, 62), 'ring': (82, 70, 62),
-                      'band': (166, 40, 26), 'tarsus': (92, 76, 64), 'joint': (60, 52, 47), 'eye': (50, 52, 56),
-                      'eyerim': (150, 150, 155), 'jaw': (84, 70, 62), 'teeth': (170, 42, 28), 'sting': (104, 84, 68)}},
+                      'rim': (46, 44, 48), 'leg': (36, 30, 28), 'antenna': (36, 29, 27), 'ring': (88, 50, 34),
+                      'band': (104, 46, 30), 'tarsus': (78, 44, 30), 'joint': (22, 20, 21), 'eye': (72, 74, 82),
+                      'eyerim': (16, 15, 17), 'jaw': (56, 30, 24), 'teeth': (132, 42, 26), 'sting': (90, 52, 34),
+                      'whip': (66, 42, 34), 'bead': (80, 51, 39)}},
 }
 
 
@@ -224,59 +224,113 @@ LEGS = {
     2: [(0.8, 3.5, -3.4), (5.0, 7.3, -3.6), (8.2, 1.3, -3.2), (9.6, -LIFT, -2.6)],
     3: [(0.78, 3.45, -1.2), (4.6, 7.5, 1.3), (7.6, 1.3, 6.0), (8.8, -LIFT, 8.6)],
 }
-# --- the head (the user's picture of the head, 2026-10-23, "make it like this") ------------------------------------
-# A rounded block, the narrower muzzle (clypeus) jutting out under the face, the big dark eyes high on the sides toward
-# the front with a pale rim, the antennae from the face beside the muzzle with a red band past the elbow, the jaws thick
-# sickles from under the muzzle, down and in, a red edge along the inside. The real head hangs slanted down from the
-# neck, the majors' the most (the user: "looking down from the weight of their mandibles and head"): the head is drawn
-# level in its own frame (from the neck, the face toward -z), and its bone is tilted nose-down at the neck, the way a
-# horse's head is built in Minecraft.
+# --- the head (remade from nothing, from the user's photos, 2026-10-23) ---------------------------------------------
+# The user: the head still looked like the harvester's ("just with a little nose"), so it is remade from the photos,
+# five ways to pick from (HEADS), all black. What the photos show (Daniel Kronauer's photo of a major and a minor):
+# - The head is an egg, not a cube: a little longer than wide, widest behind the middle, narrowing to the face, domed
+#   on top and flatter below, the back rounded. It hangs slanted down from the neck, the majors' the most.
+# - The eyes are oval, on the sides of the head's front half, a smooth dark grey against the black.
+# - The antennae start from the front of the face, close to the middle, under two little lobes, below and in front of
+#   the eyes: the long scape points forward and up, a red-brown joint at the elbow, then the long beaded whip, dark
+#   red-brown, reaching on forward and curving down.
+# - The jaws are broad flat blades from the front corners of the face, seen broad from the side: reaching forward,
+#   then curving down and back to the tips like hooks, red-brown, a comb of red teeth along the inner edge.
+# The head is drawn level in its own frame (from the neck, the face toward -z), from slices across it (each slice a box
+# with its long edges rounded off in steps, as a Minecraft head is), and its bone is tilted nose-down at the neck.
 MAJOR_TILT = 31.0       # degrees: between the user's two photos, the majors the most (my picks, to confirm)
 MINOR_TILT = 21.0
-# The head is drawn at this size: the major's big head stands out from its narrow thorax as in the photo; the minor's
-# head and jaws are smaller for its body, its antennae less so (my picks, from the photo).
-MAJOR_HEAD = 1.15
-MINOR_HEAD = 0.92
-MINOR_ANTENNA = 0.92
+# The head was drawn 2.6 times as wide as the thorax; in the photo it is about 1.5 times: drawn smaller now, still big
+# (about twice as wide as the thorax, my pick). The minor's head and jaws smaller for its body, its antennae less so.
+MAJOR_HEAD = 1.0
+MINOR_HEAD = 0.8
+MINOR_ANTENNA = 1.1
 
-# The head's boxes in its own frame, (lo, hi, swatch); the side boxes for the left side, mirrored for the right.
-HEAD_BOXES = [
-    ([-2.3, -1.1, -4.6], [2.3, 1.7, -0.8], 'head'),        # the head, a rounded block: its full width,
-    ([-1.9, -1.5, -4.6], [1.9, 2.1, -0.8], 'head'),        # its full height,
-    ([-1.9, -1.1, -5.0], [1.9, 1.7, -0.4], 'head'),        # its full length
-    ([-1.5, 2.1, -4.2], [1.5, 2.4, -1.2], 'head'),         # the domed crown
-    ([-2.55, -0.7, -4.2], [2.55, 1.3, -1.2], 'head'),      # the full sides
-    ([-1.5, -1.8, -4.2], [1.5, -1.5, -1.2], 'head'),       # the rounded underside
-    ([-1.5, -0.7, -0.4], [1.5, 1.3, -0.1], 'head'),        # the rounded back
-    ([-1.3, -1.45, -5.65], [1.3, -0.15, -4.85], 'head'),   # the muzzle under the face, narrower, jutting out
-    ([-1.0, -0.15, -5.4], [1.0, 0.2, -4.9], 'head'),       # its sloping top
-    ([-0.9, -1.75, -5.5], [0.9, -1.45, -5.0], 'jaw'),      # the lip under it
-    ([-0.8, -0.5, -0.1], [0.8, 0.5, 0.4], 'thorax'),       # the neck
-]
-HEAD_SIDE_BOXES = [
-    ([1.0, -0.25, -5.25], [1.75, 0.5, -4.85], 'head'),     # the antenna socket on the face, beside the muzzle
-    ([2.25, 0.35, -4.45], [2.6, 1.75, -2.55], 'eyerim'),   # the pale rim round the eye
-    ([2.3, 0.5, -4.3], [2.68, 1.6, -2.7], 'eye'),          # the big dark eye, high on the side toward the front
-    ([1.4, 1.7, -4.4], [2.2, 2.0, -2.6], 'head'),          # the brow over it
-]
-
-# The jaw in the head's frame: a thick sickle from under the side of the muzzle, forward and a little out, then
-# curving in to the tip in front of the face, the two tips nearly meeting (left side; the user's picture and the real
-# ant: the curve is sideways, not down); with the head tilted it points forward and down, the major's tips off the
-# ground. Its width and height taper from the base to the tip.
-JAW = [(1.15, -1.0, -5.1), (1.55, -0.8, -6.0), (1.7, -0.7, -6.9), (1.5, -0.65, -7.7), (1.0, -0.7, -8.3),
-       (0.4, -0.8, -8.6)]
-JAW_BASE, JAW_TIP = (0.95, 0.85), (0.4, 0.4)      # (width, height)
-CARRY = (0, -1.0, -8.0)         # between the jaw tips, in the head's frame: where the stack of termites is held
-
-# The antennae: from the socket in the head's frame; the scape and whip are offsets from the socket on the standing
-# ant, so they reach out however far the head is tilted: the scape out sideways and a little up, the whip out and
-# forward, drooping at the tip, a red band past the elbow (the user's picture).
-ANTENNA_SOCKET = (1.4, 0.12, -5.15)
-ANTENNA_ELBOW = (2.7, 1.0, -0.7)
-ANTENNA_WHIP = [(3.7, 1.15, -2.3), (4.3, 0.7, -4.0), (4.6, -0.2, -5.4), (4.7, -1.2, -6.4)]
-WHIP_RINGS = 10
-BAND = (1, 2)                   # the whip's rings drawn red
+# A head option: its slices (back end, front end, half width, bottom, top) from the neck forward and how much their
+# edges are rounded; cuts taken out of them (a notch, a groove); extra boxes (lo, hi, swatch), the side ones for the
+# left side, mirrored; the eyes (middle along, middle up, length, height, how far they stand out); the antenna socket,
+# then the elbow and the whip as offsets from the socket on the standing ant; the jaw's points (left side), its width
+# at each point, its thickness and its teeth (TEETH); the palps.
+A_SLICES = [(-0.15, -0.8, 2.0, -1.2, 1.75), (-0.8, -1.9, 2.3, -1.55, 2.15), (-1.9, -3.1, 2.4, -1.7, 2.3),
+            (-3.1, -4.2, 2.3, -1.65, 2.15), (-4.2, -5.1, 2.0, -1.5, 1.8), (-5.1, -5.8, 1.65, -1.3, 1.3)]
+A_CLYPEUS = [([-1.0, -1.25, -6.2], [1.0, 0.15, -5.75], 'head'),           # the clypeus, the plate over the mouth
+             ([-0.7, 0.15, -6.0], [0.7, 0.45, -5.75], 'head')]
+A_LOBE = ([0.15, 0.85, -6.05], [0.95, 1.35, -5.4], 'head')                 # the lobe over the antenna's socket
+A_ANTENNA = {'socket': (1.0, 0.55, -5.95), 'elbow': (1.6, 1.4, -3.3),
+             'whip': [(2.5, 1.7, -5.0), (3.3, 1.3, -6.8), (3.8, 0.3, -8.2), (4.0, -0.9, -9.1)]}
+A_JAW = {'jaw': [(1.2, -0.55, -5.6), (1.55, -0.55, -6.5), (1.7, -0.75, -7.4), (1.55, -1.2, -8.1),
+                 (1.2, -1.7, -8.5), (0.85, -2.15, -8.45)],
+         'jaw_width': [0.75, 1.05, 1.25, 1.15, 0.85, 0.4], 'jaw_thick': 0.4}
+NECK_BOX = ([-0.8, -0.5, -0.25], [0.8, 0.5, 0.4], 'thorax')
+HEADS = {
+    'A': {'name': 'The photo',
+          'note': "built to the photo: an egg-shaped head, narrower at the face, the eyes oval on the sides; the "
+                  "antennae from the front of the face, under two little lobes, pointing forward, a red-brown elbow; "
+                  "broad flat jaws reaching forward and curving down and in, a comb of red teeth inside",
+          'slices': A_SLICES, 'round': 0.42, 'boxes': A_CLYPEUS + [NECK_BOX], 'side_boxes': [A_LOBE],
+          'eyes': (-3.9, 0.8, 1.5, 1.0, 0.28), **A_ANTENNA, **A_JAW, 'teeth': 'comb'},
+    'B': {'name': 'Long face',
+          'note': "a longer, narrower, flatter head, the eyes small and far forward; the antennae reaching out to the "
+                  "sides (as in your earlier pictures); long narrow sickle jaws whose tips nearly meet",
+          'slices': [(-0.15, -0.9, 1.85, -1.1, 1.5), (-0.9, -2.2, 2.05, -1.4, 1.85), (-2.2, -3.6, 2.1, -1.5, 1.95),
+                     (-3.6, -4.9, 2.0, -1.45, 1.7), (-4.9, -5.9, 1.8, -1.35, 1.35), (-5.9, -6.6, 1.5, -1.2, 0.95)],
+          'round': 0.42,
+          'boxes': [([-0.9, -1.15, -7.0], [0.9, 0.05, -6.55], 'head'), NECK_BOX],
+          'side_boxes': [([0.1, 0.55, -6.85], [0.75, 0.95, -6.1], 'head')],
+          'eyes': (-4.8, 0.5, 1.1, 0.8, 0.25),
+          'socket': (1.0, 0.25, -6.75), 'elbow': (2.9, 0.9, -1.6),
+          'whip': [(4.3, 1.2, -3.2), (5.2, 0.8, -5.0), (5.6, -0.2, -6.6), (5.7, -1.3, -7.6)],
+          'jaw': [(1.15, -0.5, -6.5), (1.65, -0.45, -7.5), (1.85, -0.45, -8.5), (1.65, -0.55, -9.4),
+                  (1.05, -0.75, -10.0), (0.3, -0.95, -10.2)],
+          'jaw_width': [0.6, 0.7, 0.72, 0.66, 0.55, 0.32], 'jaw_thick': 0.45, 'teeth': 'fine'},
+    'C': {'name': 'Round, like the game',
+          'note': "a rounder, taller head with a big eye, as in Empires of the Undergrowth; long ringed antennae held "
+                  "up and forward; short thick jaws hooking down hard, with big teeth",
+          'slices': [(-0.15, -0.8, 2.15, -1.35, 1.95), (-0.8, -2.0, 2.45, -1.75, 2.4), (-2.0, -3.3, 2.55, -1.9, 2.55),
+                     (-3.3, -4.4, 2.4, -1.8, 2.35), (-4.4, -5.2, 2.0, -1.55, 1.85)],
+          'round': 0.5,
+          'boxes': [([-1.05, -1.35, -5.6], [1.05, 0.0, -5.15], 'head'), NECK_BOX],
+          'side_boxes': [([0.15, 0.7, -5.45], [0.9, 1.15, -4.85], 'head')],
+          'eyes': (-3.5, 0.9, 1.9, 1.35, 0.35),
+          'socket': (1.0, 0.45, -5.35), 'elbow': (1.6, 1.6, -3.0),
+          'whip': [(2.7, 2.0, -4.8), (3.6, 1.7, -6.6), (4.2, 0.8, -8.0), (4.5, -0.4, -8.9)], 'rings': True,
+          'jaw': [(1.25, -0.7, -5.0), (1.65, -0.75, -5.9), (1.75, -1.0, -6.7), (1.5, -1.45, -7.25),
+                  (1.0, -1.85, -7.4), (0.6, -2.05, -7.2)],
+          'jaw_width': [0.95, 1.15, 1.15, 1.0, 0.75, 0.4], 'jaw_thick': 0.6, 'teeth': 'big'},
+    'D': {'name': 'Heavy major',
+          'note': "a heavy head, widest at the back, with two rounded lobes and a notch between them, flat on top with "
+                  "a deep groove down the middle, small eyes; the antennae low on the sides under the eyes, going out "
+                  "(your earlier ask); the jaws held wide open, broad, with big teeth",
+          'slices': [(-0.15, -1.3, 2.55, -1.3, 1.9), (-1.3, -2.6, 2.6, -1.6, 2.1), (-2.6, -3.9, 2.35, -1.6, 2.0),
+                     (-3.9, -5.0, 2.0, -1.5, 1.7), (-5.0, -5.7, 1.7, -1.3, 1.2)],
+          'round': 0.35,
+          'cuts': [([-0.7, 0.4, -0.7], [0.7, 3.0, 0.5]),                       # the notch at the back
+                   ([-0.2, 1.5, -5.8], [0.2, 3.0, 0.5])],                      # the groove down the middle
+          'boxes': [([-0.95, -1.15, -6.05], [0.95, 0.05, -5.65], 'head'), NECK_BOX],
+          'side_boxes': [([1.3, -0.5, -5.45], [1.95, 0.3, -4.85], 'head')],   # the socket's boss on the cheek
+          'eyes': (-4.1, 0.85, 1.0, 0.75, 0.22),
+          'socket': (1.7, -0.1, -5.25), 'elbow': (2.8, 0.6, -1.2),
+          'whip': [(4.1, 0.8, -2.8), (4.9, 0.3, -4.6), (5.3, -0.6, -6.0), (5.4, -1.6, -6.9)],
+          'jaw': [(1.25, -0.6, -5.5), (2.0, -0.6, -6.3), (2.55, -0.65, -7.2), (2.7, -0.8, -8.1),
+                  (2.45, -1.05, -8.85), (1.95, -1.3, -9.2)],
+          'jaw_width': [0.9, 1.25, 1.4, 1.3, 1.0, 0.5], 'jaw_thick': 0.5, 'teeth': 'big'},
+    'E': {'name': 'The photo, every detail',
+          'note': "the photo's head with every detail the size allows: a notch at the back, a groove down the middle, "
+                  "ridges behind the antennae, a dark rim round each eye, a rim on the clypeus, the palps under the "
+                  "head; beaded antennae, the scape thickening to its end; the comb of teeth tooth by tooth",
+          'slices': A_SLICES, 'round': 0.42,
+          'cuts': [([-0.55, 0.6, -0.5], [0.55, 3.0, 0.5]), ([-0.13, 1.7, -5.3], [0.13, 3.0, -1.0])],
+          'boxes': A_CLYPEUS + [([-0.95, -1.32, -6.3], [0.95, -1.0, -6.12], 'rim'), NECK_BOX],
+          'side_boxes': [A_LOBE,
+                         ([0.38, 1.72, -5.1], [0.62, 1.95, -4.2], 'head'),      # the ridges behind the lobes
+                         ([0.38, 2.07, -4.2], [0.62, 2.3, -3.3], 'head')],
+          'eyes': (-3.9, 0.8, 1.5, 1.0, 0.28), 'eye_rim': True,
+          **A_ANTENNA, 'club': True, 'beads': True, **A_JAW, 'teeth': 'comb_fine',
+          'palps': [(0.65, -1.45, -5.3), (0.85, -2.1, -5.65), (0.8, -2.7, -5.5)]},
+}
+WHIP_SEGMENTS = 11              # the real funiculus: 11 segments
+# The jaws' teeth: (teeth on a piece of the jaw, on every how-many'th piece, how far they stick in, how wide).
+TEETH = {'comb': (1, 2, 0.2, 0.18), 'comb_fine': (1, 1, 0.16, 0.14), 'fine': (1, 2, 0.16, 0.16),
+         'big': (1, 3, 0.4, 0.36)}
 
 
 class HeadFrame:
@@ -320,47 +374,152 @@ def smooth(points):
     return out + [points[-1]]
 
 
-def head_bones(size=1.0, antenna=1.0, tilt=0.0):
-    f = HeadFrame(size, tilt)
-    cubes = [f.box(lo, hi, swatch) for lo, hi, swatch in HEAD_BOXES]
+def unit(v):
+    n = math.sqrt(sum(c * c for c in v))
+    return tuple(c / n for c in v)
+
+
+def cross(a, b):
+    return (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0])
+
+
+def dot(a, b):
+    return sum(p * q for p, q in zip(a, b))
+
+
+def plate(a, b, across, thick, up, swatch):
+    """A flat box from a to b, across wide and thick thick, its flat side toward up (a jaw's blade), turned as the
+    viewer and the game turn a box (Z, then Y, then X; the file's X and Z turns read negative, as in rod())."""
+    d = unit([q - p for p, q in zip(a, b)])
+    y = unit([u - dot(up, d) * c for u, c in zip(up, d)])
+    z = cross(d, y)
+    turn_y = math.asin(max(-1.0, min(1.0, -d[2])))
+    turn_z = math.atan2(d[1], d[0])
+    turn_x = math.atan2(y[2], z[2])
+    length = math.dist(a, b)
+    return box([a[0], a[1] - thick / 2, a[2] - across / 2], [a[0] + length, a[1] + thick / 2, a[2] + across / 2],
+               swatch, a, [-math.degrees(turn_x), math.degrees(turn_y), -math.degrees(turn_z)])
+
+
+def rounded_slice(z0, z1, hw, lo, hi, rnd):
+    """One slice across the head, z0 (back) to z1 (front): a box with its four long edges rounded off in steps."""
+    r = min(hw, (hi - lo) / 2) * rnd
+    out = [([-hw, lo + r, z1], [hw, hi - r, z0]), ([-(hw - r), lo, z1], [hw - r, hi, z0])]
+    if r > 0.5:
+        q = r * 0.45
+        out.append(([-(hw - q), lo + q, z1], [hw - q, hi - q, z0]))
+    return out
+
+
+def carve(lo, hi, cut_lo, cut_hi):
+    """What is left of the box lo..hi once the box cut_lo..cut_hi is taken out of it (up to six boxes)."""
+    if any(cut_hi[i] <= lo[i] or cut_lo[i] >= hi[i] for i in range(3)):
+        return [(lo, hi)]
+    out, lo, hi = [], list(lo), list(hi)
+    for i in range(3):
+        if cut_lo[i] > lo[i]:
+            a, b = list(lo), list(hi)
+            b[i] = cut_lo[i]
+            out.append((a, b))
+            lo[i] = cut_lo[i]
+        if cut_hi[i] < hi[i]:
+            a, b = list(lo), list(hi)
+            a[i] = cut_hi[i]
+            out.append((a, b))
+            hi[i] = cut_hi[i]
+    return [(a, b) for a, b in out if all(q - p > 0.04 for p, q in zip(a, b))]
+
+
+def head_boxes(spec):
+    """The head's boxes in its own frame, (lo, hi, swatch): the rounded slices, carved, then the extra boxes and the
+    eyes (each eye in pieces following the steps of the head's side)."""
+    boxes = []
+    for z0, z1, hw, lo, hi in spec['slices']:
+        boxes += [(a, b, 'head') for a, b in rounded_slice(z0, z1, hw, lo, hi, spec['round'])]
+    for cut_lo, cut_hi in spec.get('cuts', []):
+        boxes = [(p, q, s) for a, b, s in boxes for p, q in carve(a, b, cut_lo, cut_hi)]
+    boxes += list(spec.get('boxes', []))
+    zc, yc, lz, hy, out = spec['eyes']
+    front, back = zc - lz / 2, zc + lz / 2
     for sx in (1, -1):
-        cubes += [f.box(*sym_points(lo, hi, sx), swatch) for lo, hi, swatch in HEAD_SIDE_BOXES]
-    head = bone('head', 'forebody', NECK, cubes)
+        boxes += [(*sym_points(lo, hi, sx), s) for lo, hi, s in spec.get('side_boxes', [])]
+        for z0, z1, hw, lo, hi in spec['slices']:
+            a, b = max(z1, front), min(z0, back)
+            if b - a > 0.05:
+                if spec.get('eye_rim'):
+                    ra, rb = a - 0.12 if a == front else a, b + 0.12 if b == back else b
+                    rim_lo, rim_hi = [hw - 0.12, yc - hy / 2 - 0.15, ra], [hw + out * 0.6, yc + hy / 2 + 0.15, rb]
+                    boxes.append((*sym_points(rim_lo, rim_hi, sx), 'eyerim'))
+                boxes.append((*sym_points([hw - 0.12, yc - hy / 2, a], [hw + out, yc + hy / 2, b], sx), 'eye'))
+    return boxes
+
+
+def jaw_cubes(f, spec, sx, size):
+    """The jaw's flat blade, its red inner edge and its teeth (the left jaw for sx = 1), in the model file's frame. The
+    blade's flat sides face out sideways, so it is seen broad from the side, as in the photo."""
+    pts = [f.pt((p[0] * sx, p[1], p[2])) for p in smooth(spec['jaw'])]
+    widths, n = spec['jaw_width'], len(pts) - 1
+    thick = spec['jaw_thick'] * size
+    per_piece, every, reach, across = TEETH[spec['teeth']]
+    flat = (1, 0, 0)
+    # The inside of the hook, where its teeth point: below the tip's height, halfway along.
+    inside = (pts[0][0], pts[-1][1], (pts[0][2] + pts[-1][2]) / 2)
+    cubes = []
+    for i, (a, b) in enumerate(zip(pts, pts[1:])):
+        t = (i + 0.5) / n * (len(widths) - 1)
+        k = min(int(t), len(widths) - 2)
+        w = (widths[k] + (widths[k + 1] - widths[k]) * (t - k)) * size
+        cubes.append(plate(a, b, w, thick, flat, 'jaw'))
+        side = unit(cross(unit([q - p for p, q in zip(a, b)]), flat))
+        if dot(side, [q - p for p, q in zip(lerp(a, b, 0.5), inside)]) < 0:
+            side = tuple(-c for c in side)
+        edge = [tuple(p + c * w / 2 for p, c in zip(P, side)) for P in (a, b)]
+        cubes.append(plate(edge[0], edge[1], 0.26 * size, thick * 1.05, flat, 'teeth'))
+        if 0 < i < n - 1 and i % every == 0:
+            for j in range(per_piece):
+                c = lerp(edge[0], edge[1], (j + 0.5) / per_piece)
+                tip = tuple(p + s * reach * size for p, s in zip(c, side))
+                cubes.append(plate(c, tip, across * size, thick * 0.9, flat, 'teeth'))
+    return cubes
+
+
+def head_bones(spec, size=1.0, antenna=1.0, tilt=0.0):
+    f = HeadFrame(size, tilt)
+    head = bone('head', 'forebody', NECK, [f.box(lo, hi, s) for lo, hi, s in head_boxes(spec)])
     if tilt:
         head['rotation'] = [tilt, 0, 0]
     bones = [head]
     for side, sx in (('l', 1), ('r', -1)):
-        jaw = [f.pt((p[0] * sx, p[1], p[2])) for p in smooth(JAW)]
-        cubes, n = [], len(jaw) - 1
-        for i, (a, b) in enumerate(zip(jaw, jaw[1:])):
-            t = i / (n - 1)
-            w, h = ((p + (q - p) * t) * size for p, q in zip(JAW_BASE, JAW_TIP))
-            cubes.append(rod(a, b, w, 'jaw', h))
-            # The red inner edge, along the inside of the hook; a tooth on every other piece.
-            inward = (-sx * w / 2, 0, 0)
-            cubes.append(rod(tuple(p + o for p, o in zip(a, inward)), tuple(p + o for p, o in zip(b, inward)),
-                             0.3 * size, 'teeth', h * 0.7))
-            if 0 < i < n - 1 and i % 2:
-                c = lerp(a, b, 0.5)
-                cubes.append(centered(c[0] - sx * (w / 2 + 0.15 * size), c[1], c[2], 0.4 * size, 0.45 * size,
-                                      0.4 * size, 'teeth'))
-        bones.append(bone(f'mandible_{side}', 'head', jaw[0], cubes))
-        socket_at = f.world((ANTENNA_SOCKET[0] * sx, ANTENNA_SOCKET[1], ANTENNA_SOCKET[2]))
+        base = spec['jaw'][0]
+        bones.append(bone(f'mandible_{side}', 'head', f.pt((base[0] * sx, base[1], base[2])),
+                          jaw_cubes(f, spec, sx, size)))
+        if spec.get('palps'):
+            p = [f.pt((q[0] * sx, q[1], q[2])) for q in spec['palps']]
+            bones.append(bone(f'palp_{side}', 'head', p[0], [rod(a, b, 0.24 * size, 'leg') for a, b in zip(p, p[1:])]))
+        sock = spec['socket']
+        socket_at = f.world((sock[0] * sx, sock[1], sock[2]))
         k = size * antenna
 
         def a(off):
             """An antenna point: an offset from the socket on the standing ant, as written in the model file."""
             return f.written(tuple(s + o * k for s, o in zip(socket_at, (off[0] * sx, off[1], off[2]))))
-        socket, elbow = f.written(socket_at), a(ANTENNA_ELBOW)
+        socket, elbow = f.written(socket_at), a(spec['elbow'])
+        end = (0.58 if spec.get('club') else 0.48) * size                     # the scape thickens toward the elbow
         bones.append(bone(f'antenna_{side}_1', 'head', socket, [
-            rod(socket, lerp(socket, elbow, 0.55), 0.42 * size, 'antenna'),      # the scape, thicker to its end
-            rod(lerp(socket, elbow, 0.5), elbow, 0.5 * size, 'antenna'),
-            centered(*elbow, 0.5 * size, 0.5 * size, 0.5 * size, 'joint')]))
-        rings = along([elbow] + [a(p) for p in ANTENNA_WHIP], WHIP_RINGS)
-        whip = [rod(p, q, (0.4 - 0.01 * i) * size, 'band' if i in BAND else 'ring' if i % 2 else 'antenna')
-                for i, (p, q) in enumerate(zip(rings, rings[1:]))]
+            centered(*socket, 0.55 * size, 0.55 * size, 0.55 * size, 'joint'),
+            rod(socket, lerp(socket, elbow, 0.55), 0.4 * size, 'antenna'),
+            rod(lerp(socket, elbow, 0.5), elbow, end, 'antenna'),
+            centered(*elbow, 0.56 * size, 0.56 * size, 0.56 * size, 'band')]))   # the red-brown elbow
+        rings = along([elbow] + [a(p) for p in spec['whip']], WHIP_SEGMENTS)
+        whip = []
+        for i, (p, q) in enumerate(zip(rings, rings[1:])):
+            thick = (0.32 + 0.1 * i / (WHIP_SEGMENTS - 1)) * size            # a little thicker toward the tip
+            whip.append(rod(p, q, thick, ('ring' if spec.get('rings') else 'bead') if i % 2 else 'whip'))
+            if spec.get('beads') and i < WHIP_SEGMENTS - 1:                    # each segment swelling at its end
+                whip.append(rod(lerp(p, q, 0.7), q, thick * 1.25, 'bead'))
         bones.append(bone(f'antenna_{side}_2', f'antenna_{side}_1', elbow, whip))
-    bones.append(bone('carry', 'head', f.pt(CARRY)))
+    tips = spec['jaw'][-1]
+    bones.append(bone('carry', 'head', f.pt((0, tips[1], tips[2] + 0.4))))     # between the jaw tips: the termites held
     return bones
 
 
@@ -406,11 +565,11 @@ SLIM = 0.72
 SLIM_BONES = ('thorax', 'petiole', 'gaster_front', 'gaster_back')
 
 
-def model(minor=False):
+def model(minor=False, head='A'):
     """The ant's bones (the game's model file format, each box naming its swatch until paint() gives it its place on
-    the texture). minor: the small ant's proportions."""
+    the texture). minor: the small ant's proportions; head: which of the HEADS."""
     bones = [bone('body', None, (0, 4.5, 0)), bone('forebody', 'body', WAIST)]
-    bones += head_bones(MINOR_HEAD if minor else MAJOR_HEAD, MINOR_ANTENNA if minor else 1.0,
+    bones += head_bones(HEADS[head], MINOR_HEAD if minor else MAJOR_HEAD, MINOR_ANTENNA if minor else 1.0,
                         MINOR_TILT if minor else MAJOR_TILT)
     bones.append(thorax_bone())
     bones += leg_bones()

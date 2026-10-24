@@ -21,8 +21,8 @@ Fourth scene, the giant savanna trees (M7.5 step 0, 2026-10-18, tree_art.py for 
 tree_viewer.template.html, which also holds the tree shape maker: every kind, age and dead stage from one seed):
 python tools/model_viewer.py trees [out.html]   (default references/tree_viewer.html)
 
-Fifth scene, the Matabele ant's looks and size (M8 step 1, 2026-10-23, matabele_models.py; its own template,
-matabele_viewer.template.html): each look as a major and a minor, beside the harvester worker, the termite worker and
+Fifth scene, the Matabele ant's heads and size (M8 step 1, 2026-10-23, matabele_models.py; its own template,
+matabele_viewer.template.html): each head as a major and a minor, beside the harvester worker, the termite worker and
 major soldier and a player's height, all at their game sizes; sliders for the Matabele sizes:
 python tools/model_viewer.py matabele [out.html]   (default references/matabele_viewer.html)
 """
@@ -188,14 +188,14 @@ def trees_page(out):
 
 
 def matabele_page(out):
-    """The Matabele ant in each colour as a major and a minor (each box face painted at one pixel size), and the game's
-    own models beside them for size (their model files, textures and the sizes their renderers draw them at)."""
+    """The Matabele ant with each of its heads as a major and a minor (each box face painted at one pixel size), and the
+    game's own models beside them for size (their model files, textures and the sizes their renderers draw them at)."""
     import matabele_models as mm
     data = {"looks": {}, "refs": []}
-    for key, look in mm.LOOKS.items():
-        entry = {"name": look["name"], "note": look["note"]}
+    for key, head in mm.HEADS.items():
+        entry = {"name": head["name"], "note": head["note"]}
         for caste, minor in (("major", False), ("minor", True)):
-            bones, rows, w, h = mm.paint(mm.model(minor=minor), key)
+            bones, rows, w, h = mm.paint(mm.model(minor=minor, head=key), "A")
             entry[caste] = {"bones": bones, "texture": uri(mm.png(rows)), "w": w, "h": h}
         data["looks"][key] = entry
     for mod, model, scale, label in (("desert", "worker_ant", 0.65, "Harvester worker"),
