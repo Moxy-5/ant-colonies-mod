@@ -25,6 +25,10 @@ Fifth scene, the Matabele ant's heads and size (M8 step 1, 2026-10-23, matabele_
 matabele_viewer.template.html): each head as a major and a minor, beside the harvester worker, the termite worker and
 major soldier and a player's height, all at their game sizes; sliders for the Matabele sizes:
 python tools/model_viewer.py matabele [out.html]   (default references/matabele_viewer.html)
+
+Sixth scene, Xylaria on a dead colony's fungus comb (M8 step 1a, 2026-10-24, xylaria_art.py; its own template,
+xylaria_viewer.template.html): three looks, each through the dead comb's stages, beside the living comb:
+python tools/model_viewer.py xylaria [out.html]   (default references/xylaria_viewer.html)
 """
 import base64
 import json
@@ -214,7 +218,28 @@ def matabele_page(out):
     print("wrote", out)
 
 
+def xylaria_page(out):
+    """The Xylaria looks: for each look and stage, top and side textures (a few variants) and the stalks on a comb's top."""
+    import comb_age_art as comb
+    import xylaria_art as xyl
+    data = {"nodule": uri(png(comb.nodule())), "wall": uri(png(comb.room_wall())),
+            "living": {age: {f: uri(png(comb.texture(comb.GAME_LOOK, age, f))) for f in ("top", "side")} for age in ("ripe", "old")},
+            "looks": {}}
+    for look in xyl.LOOKS:
+        data["looks"][look] = {
+            "stages": {st: {f: [uri(png(xyl.texture(look, st, f, v))) for v in range(xyl.VARIANTS)] for f in ("top", "side")}
+                       for st in xyl.STAGES},
+            "stalks": {st: [xyl.stalks(look, st, v) for v in range(xyl.VARIANTS)] for st in xyl.STAGES}}
+    template = (Path(__file__).resolve().parent / "xylaria_viewer.template.html").read_text(encoding="utf-8")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")
+    print("wrote", out)
+
+
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "xylaria":
+        xylaria_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/xylaria_viewer.html")
+        return
     if len(sys.argv) > 1 and sys.argv[1] == "matabele":
         matabele_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/matabele_viewer.html")
         return
