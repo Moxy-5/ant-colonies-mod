@@ -386,7 +386,7 @@ final class GalleryUpkeep {
     }
 
     /** The soil a filled-in block is packed with: the ground round it where that is soil the termites dig, else dirt. */
-    private static net.minecraft.world.level.block.state.BlockState soilFor(ServerLevel level, BlockPos cell) {
+    static net.minecraft.world.level.block.state.BlockState soilFor(ServerLevel level, BlockPos cell) {
         for (Direction side : new Direction[] {Direction.DOWN, Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST}) {
             BlockPos next = cell.relative(side);
             net.minecraft.world.level.block.state.BlockState state = level.getBlockState(next);

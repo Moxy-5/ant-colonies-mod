@@ -176,6 +176,21 @@ public class FoodWays {
         return crumblingRunways;
     }
 
+    /** A copy of the cells of the runways whose mud is crumbling away (for a species keeping a dead colony's works). */
+    public List<List<BlockPos>> crumblingRunwayCells() {
+        return crumblingRunways.stream().map(List::copyOf).toList();
+    }
+
+    /** Tests only: a runway of mud sheeting as if the colony had planned it (its cells must be laid out by the test). */
+    public void addRunwayForTests(Runway runway) {
+        addRunway(runway);
+    }
+
+    /** Tests only: a new tunnel out to food as if the colony had dug it (its cells must be dug by the test). */
+    public void addNewTunnelForTests(NewTunnel tunnel) {
+        addNewTunnel(tunnel);
+    }
+
     /**
      * A cell of a runway holding a plant (grass growing where the runway runs): the workers bite it away like soil (real
      * termites cut the grass under their sheeting), at foraging time, once the runway's hole is open. Null if none.

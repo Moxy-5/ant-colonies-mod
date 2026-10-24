@@ -43,6 +43,27 @@ public final class MoundWear {
     static final int APRON = 2;
     /** Soil narrower than about {@code 2 * SPIRE_RADIUS + 1} blocks counts as spire and wears away first. */
     static final int SPIRE_RADIUS = 2;
+    /**
+     * Part 3, the way in: at most this many tunnel blocks at the top of the final hump stay open upward, little holes down
+     * into the old channels (my pick, to confirm); the hollow shaft up the middle always stays open, the big way in.
+     */
+    public static final int MOST_TUNNEL_WAYS = 3;
+    /**
+     * Part 3, the colony's works out round the mound: nobody repairs them, so the rain takes the thin mud first. The mud
+     * sheeting over the runways, the mud plastered over the wood they ate, the mud casts and any gallery wall under the open
+     * sky crumble between these days (my picks, to confirm; real: within a few weeks, sped up like the mound) ...
+     */
+    public static final double SURFACE_MUD_FROM = 0.5;
+    public static final double SURFACE_MUD_TO = 3.0;
+    /** ... the foraging holes, plugged or open, silt up and grass closes over them between these days ... */
+    public static final double HOLES_FROM = 1.0;
+    public static final double HOLES_TO = 5.0;
+    /**
+     * ... and the galleries under the ground last much longer, filling in with washed-in soil between these days, the far
+     * ends first and the galleries by the nest last (my picks, to confirm; real abandoned galleries last for years).
+     */
+    public static final double GALLERIES_FROM = 15.0;
+    public static final double GALLERIES_TO = 45.0;
 
     private MoundWear() {
     }
@@ -228,5 +249,36 @@ public final class MoundWear {
     /** Whether grass grows over this place's top once it is bare hump: about 1 in 3 gets a tuft (my pick). */
     public static boolean tuft(long place) {
         return jitter(place * 31 + 7) < 0.95;
+    }
+
+    // --- part 3: the way in and the works round the mound ------------------------------------------------------------
+
+    /** Whether a tunnel block at the top of the final hump here falls open upward: about 1 in 3 (my pick). */
+    public static boolean opensUp(long place) {
+        return jitter(place * 17 + 3) < 0.95;
+    }
+
+    /** The day the thin mud at a place (sheeting, mud over wood, a cast, a gallery wall in the open) crumbles. */
+    public static double surfaceMudDay(double jitter) {
+        return SURFACE_MUD_FROM + (SURFACE_MUD_TO - SURFACE_MUD_FROM) * spread(jitter);
+    }
+
+    /** The day a foraging hole silts up and grass closes over it. */
+    public static double holeDay(double jitter) {
+        return HOLES_FROM + (HOLES_TO - HOLES_FROM) * spread(jitter);
+    }
+
+    /**
+     * The day a gallery cell {@code distance} blocks from the nest fills in, the galleries reaching {@code reach} blocks
+     * out: mostly by the distance (the far ends first, the ones by the nest last), a little by chance.
+     */
+    public static double galleryDay(double distance, double reach, double jitter) {
+        double near = 1 - Math.min(1, Math.max(0, distance) / Math.max(1, reach));
+        return GALLERIES_FROM + (GALLERIES_TO - GALLERIES_FROM) * Math.min(1, 0.75 * near + 0.25 * spread(jitter));
+    }
+
+    /** A place's {@link #jitter} (0.85 to 1.15) as a share from 0 to 1. */
+    private static double spread(double jitter) {
+        return Math.max(0, Math.min(1, (jitter - 0.85) / 0.3));
     }
 }

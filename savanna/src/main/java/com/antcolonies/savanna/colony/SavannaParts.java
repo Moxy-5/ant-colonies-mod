@@ -34,6 +34,8 @@ public final class SavannaParts {
             .plugs(ColonyHooks.UNDERGROUND, 10, galleries -> galleries) // asked only while switched on (Colony#underground)
             .plugs(ColonyHooks.FEEDING_WAYS, 10, galleries -> FeedingGallery.WAYS) // (switched on or not, as before)
             .plugs(ColonyHooks.LIST_HOLES, 10, galleries -> galleries::describe)
+            .hears(ColonyNews.COLONY_ENDED, 30, (galleries, level, news) -> // M8 1a part 3: its holes, mud and galleries weather
+                    DeadWorks.colonyEnded(level, galleries.colony, news.center()))
             .saves(Galleries::save, Galleries::load));
     public static final Type<KingCare> KING_CARE = listed("king_care", KingCare::new, part -> part
             .plugs(ColonyHooks.CO_FOUNDERS, 10, king -> new ColonyHooks.CoFounders() { // he digs beside the queen and seals them in

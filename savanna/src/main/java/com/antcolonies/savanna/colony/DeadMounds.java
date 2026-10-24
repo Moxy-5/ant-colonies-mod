@@ -49,6 +49,12 @@ import net.minecraft.world.level.saveddata.SavedData;
  * the world's clock, catching up when the land loads, at most {@link #BLOCKS_PER_LOOK} blocks a look (a whole mound worn
  * at once takes a minute or two of looks). Only mound blocks are taken: a player's block in a column keeps that column
  * as it is, and nothing under the ground is touched.
+ *
+ * <p>Part 3, the way in and the works round it: the hollow shaft up the middle stays open as the mound wears (the old
+ * chimney falls open, a hole from the top of the hump down to the nest), and a few tunnel blocks at the top of the final
+ * hump open upward ({@link MoundWear#MOST_TUNNEL_WAYS}): the ways in the Matabele ants use later. The colony's works out
+ * round the mound weather too ({@link DeadWorks}): the surface mud first, then the holes grass over, the galleries under
+ * the ground last.
  */
 public class DeadMounds extends SavedData {
     private static final String DATA_NAME = SavannaMod.MODID + "_dead_mounds";
@@ -73,6 +79,8 @@ public class DeadMounds extends SavedData {
         final List<Comb> combs = new ArrayList<>();
         /** The mound's wear (none if the colony had no mound standing). */
         Wear wear;
+        /** Part 3: the colony's works out round the mound (none if it had built none). */
+        DeadWorks works;
 
         DeadMound(UUID colony, BlockPos center, long diedAt) {
             this.colony = colony;
@@ -99,20 +107,28 @@ public class DeadMounds extends SavedData {
             return wear == null || wear.settled;
         }
 
-        /** Whether anything about it still changes: comb left to rot, or the mound still wearing down. */
+        /** Whether any of the colony's works round the mound (holes, mud, galleries) are still to weather. */
+        public boolean hasWorksLeft() {
+            return works != null && !works.isEmpty();
+        }
+
+        /** Whether anything about it still changes: comb left to rot, the mound still wearing down, or its works weathering. */
         boolean isChanging() {
-            return !combs.isEmpty() || !isSettled();
+            return !combs.isEmpty() || !isSettled() || hasWorksLeft();
         }
     }
 
     /**
      * A dead mound's wear (part 2): its columns and how far each has come, the pieces (spire tips, chimney mouths, ramps)
-     * still standing, and the cells of its hollow shaft (filled with washed-in soil where the hump closes over it).
+     * still standing, the cells of its hollow shaft (left open: the way in, part 3), and the tunnel blocks fallen open
+     * upward at the top of the hump.
      */
     static final class Wear {
         final List<WearColumn> columns = new ArrayList<>();
         final List<BlockPos> pieces = new ArrayList<>();
         final Set<BlockPos> shaft = new HashSet<>();
+        /** Part 3: the tunnel blocks at the top of the hump left open upward, little holes into the old channels. */
+        final Set<BlockPos> ways = new HashSet<>();
         /** How tall the mound stood (blocks above the ground): the pieces high up go first. */
         int highest;
         /** Everything has come to the grassy hump: nothing more to do, ever. */
@@ -202,6 +218,15 @@ public class DeadMounds extends SavedData {
         setDirty();
     }
 
+    /** Part 3: the dead colony's works out round its mound ({@link DeadWorks#record}), to weather from now on. */
+    void addWorks(ServerLevel level, UUID colony, BlockPos center, DeadWorks works) {
+        DeadMound mound = died(level, colony, center);
+        if (mound.works == null && !works.isEmpty()) {
+            mound.works = works;
+            setDirty();
+        }
+    }
+
     /** The dead colony's comb, as it was when it died: each turns furred at once (its nodules gone). */
     public void addCombs(ServerLevel level, UUID colony, BlockPos center, List<BlockPos> combs) {
         DeadMound mound = died(level, colony, center);
@@ -246,6 +271,36 @@ public class DeadMounds extends SavedData {
                 + (column.grassed ? " grassed" : "");
     }
 
+    /** The game tests: the ways in (the hollow shaft and the tunnel blocks open upward at the top of the hump). */
+    public Set<BlockPos> waysInForTests(DeadMound mound) {
+        Set<BlockPos> ways = new HashSet<>();
+        if (mound.wear != null) {
+            ways.addAll(mound.wear.shaft);
+            ways.addAll(mound.wear.ways);
+        }
+        return ways;
+    }
+
+    /** The game tests: how many of the tunnel blocks at the top of the hump stand open upward. */
+    public int tunnelWaysForTests(DeadMound mound) {
+        return mound.wear == null ? 0 : mound.wear.ways.size();
+    }
+
+    /** The game tests: the foraging holes round the mound still to silt up and grass over. */
+    public List<BlockPos> holesLeftForTests(DeadMound mound) {
+        return mound.works == null ? List.of() : List.copyOf(mound.works.holes);
+    }
+
+    /** The game tests: the gallery cells round the mound still to fill in. */
+    public List<BlockPos> galleriesLeftForTests(DeadMound mound) {
+        return mound.works == null ? List.of() : List.copyOf(mound.works.galleries);
+    }
+
+    /** The game tests: the works round the mound left to weather, told in words. */
+    public String describeWorksForTests(DeadMound mound) {
+        return mound.works == null ? "no works" : mound.works.describe();
+    }
+
     /** The game tests: the dead mound is forgotten (the test's land is cleared after it). */
     public void forgetForTests(UUID colony) {
         if (mounds.remove(colony) != null) {
@@ -260,7 +315,11 @@ public class DeadMounds extends SavedData {
     /** The dead mound brought up to its day, changing at most {@code budget} blocks of the mound: how many it changed. */
     private int update(ServerLevel level, DeadMound mound, double days, int budget) {
         updateCombs(level, mound, days);
-        return wear(level, mound, days, budget);
+        int used = wear(level, mound, days, budget);
+        if (mound.works != null && used < budget && days > 0) {
+            used += mound.works.weather(level, mound.center, days, budget - used, this::setDirty);
+        }
+        return used;
     }
 
     /** The mound's comb brought up to its day: furred, black, rotting, gone; a comb broken or replaced is forgotten. */
@@ -307,9 +366,9 @@ public class DeadMounds extends SavedData {
             if (!level.isLoaded(pos) || days < MoundWear.pieceDay(pos.getY() - mound.center.getY(), wear.highest, MoundWear.jitter(pos.asLong()))) {
                 continue;
             }
-            if (Mound.isPieceBlock(level.getBlockState(pos))) {
+            if (Mound.isPieceBlock(level.getBlockState(pos)) && !underPlayersBlock(level, pos)) {
                 level.destroyBlock(pos, false);
-                used += 1 + closeBeside(level, mound, pos);
+                used += 1 + closeBeside(level, pos);
             }
             it.remove();
             setDirty();
@@ -333,7 +392,7 @@ public class DeadMounds extends SavedData {
                 setDirty();
                 continue;
             }
-            used += closeBeside(level, mound, pos); // (also where it was hollow: the shaft, now open to the sky)
+            used += closeBeside(level, pos); // (also where it was hollow: the shaft, now open to the sky)
             column.now--;
             setDirty();
             if (column.now > height(mound, column, days)) {
@@ -385,6 +444,23 @@ public class DeadMounds extends SavedData {
         return used;
     }
 
+    /**
+     * Whether something a player put stands on this piece, straight or on the mound over it: the piece stays, as a
+     * column under a player's block does.
+     */
+    private static boolean underPlayersBlock(ServerLevel level, BlockPos pos) {
+        for (BlockPos up = pos.above(); level.isLoaded(up) && up.getY() < level.getMaxBuildHeight(); up = up.above()) {
+            BlockState state = level.getBlockState(up);
+            if (state.canBeReplaced()) {
+                return false;
+            }
+            if (!Mound.isMoundBlock(state)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** The column's height on this day (only ever lower than now, see {@link MoundWear#heightAt}). */
     private static int height(DeadMound mound, WearColumn column, double days) {
         return MoundWear.heightAt(column.plan, days, MoundWear.jitter(base(mound, column).asLong()));
@@ -396,8 +472,10 @@ public class DeadMounds extends SavedData {
     }
 
     /**
-     * The new top of a column worn down to its day's height: weathered old soil, closing the hollow shaft or a tunnel
-     * under it (rain washes soil into them; the holes into the nest come in part 3). Returns the blocks changed.
+     * The new top of a column worn down to its day's height: weathered old soil, closing a tunnel under it (rain washes
+     * soil into it). Part 3, the ways in: the hollow shaft is never closed (the old chimney falls open, a hole down to the
+     * nest), and a tunnel block at the top of the final hump may fall open upward instead (about 1 in 3, at most
+     * {@link MoundWear#MOST_TUNNEL_WAYS} to a mound). Returns the blocks changed.
      */
     private static int cap(ServerLevel level, DeadMound mound, WearColumn column) {
         if (column.now < 1) {
@@ -406,8 +484,14 @@ public class DeadMounds extends SavedData {
         BlockPos pos = base(mound, column).above(column.now - 1);
         BlockState state = level.getBlockState(pos);
         BlockState old = Mound.soil(MoundSoil.OLDEST);
-        boolean shaft = state.isAir() && mound.wear.shaft.contains(pos);
-        if (shaft || state.getBlock() instanceof TermiteTunnelBlock || state.getBlock() instanceof TermiteMoundBlock && !state.equals(old)) {
+        Wear wear = mound.wear;
+        if (state.getBlock() instanceof TermiteTunnelBlock && column.now == column.end() && wear.ways.size() < MoundWear.MOST_TUNNEL_WAYS
+                && MoundWear.opensUp(pos.asLong()) && level.getBlockState(pos.above()).isAir()) {
+            TermiteTunnelBlock.setWindow(level, pos, Direction.UP, true);
+            wear.ways.add(pos.immutable());
+            return 1;
+        }
+        if (state.getBlock() instanceof TermiteTunnelBlock || state.getBlock() instanceof TermiteMoundBlock && !state.equals(old)) {
             level.setBlock(pos, old, Block.UPDATE_ALL);
             return 1;
         }
@@ -415,14 +499,13 @@ public class DeadMounds extends SavedData {
     }
 
     /**
-     * A block of the mound has worn away at {@code gone} (or a hollow there is now open to the sky): what it laid bare
-     * beside and under it closes again, as washed soil and slumping walls would (the holes into the shaft and the galleries
-     * come in part 3): a tunnel block's side toward it shuts, the hollow shaft beside or under it fills with soil.
-     * Returns the blocks changed.
+     * A block of the mound has worn away at {@code gone} (or a hollow there is now open to the sky): a tunnel block's side
+     * laid bare toward it shuts again, as washed soil and slumping walls would (the ways in are the shaft, never closed,
+     * and the few tunnel tops opened in {@link #cap}). Returns the blocks changed.
      */
     private static final Direction[] BARED = {Direction.NORTH, Direction.EAST, Direction.SOUTH, Direction.WEST, Direction.DOWN};
 
-    private static int closeBeside(ServerLevel level, DeadMound mound, BlockPos gone) {
+    private static int closeBeside(ServerLevel level, BlockPos gone) {
         int changed = 0;
         for (Direction side : BARED) {
             BlockPos beside = gone.relative(side);
@@ -433,18 +516,9 @@ public class DeadMounds extends SavedData {
             if (state.getBlock() instanceof TermiteTunnelBlock && state.getValue(TermiteTunnelBlock.OPEN.get(side.getOpposite()))) {
                 TermiteTunnelBlock.setWindow(level, beside, side.getOpposite(), false);
                 changed++;
-            } else if (state.isAir() && mound.wear.shaft.contains(beside) && isUnderTop(mound, beside)) {
-                level.setBlock(beside, Mound.soil(MoundSoil.OLDEST), Block.UPDATE_ALL);
-                changed++;
             }
         }
         return changed;
-    }
-
-    /** Whether a cell lies under its column's top now (in the mound still standing, not in air worn away above it). */
-    private static boolean isUnderTop(DeadMound mound, BlockPos pos) {
-        WearColumn column = mound.wear.columnAt(pos.getX() - mound.center.getX(), pos.getZ() - mound.center.getZ());
-        return column != null && pos.getY() - mound.center.getY() < column.now;
     }
 
     /**
@@ -460,8 +534,9 @@ public class DeadMounds extends SavedData {
             if (state.canBeReplaced()) {
                 continue;
             }
-            if (!(state.getBlock() instanceof TermiteMoundBlock) && !(state.getBlock() instanceof TermiteTunnelBlock)) {
-                return 0; // something a player put: no grass
+            if (!(state.getBlock() instanceof TermiteMoundBlock) && !(state.getBlock() instanceof TermiteTunnelBlock)
+                    || mound.wear.ways.contains(pos)) {
+                return 0; // something a player put, or a tunnel fallen open (a way in): no grass
             }
             level.setBlock(pos, Blocks.GRASS_BLOCK.defaultBlockState(), Block.UPDATE_ALL);
             if (MoundWear.tuft(pos.asLong()) && level.getBlockState(pos.above()).isAir()) {
@@ -520,7 +595,11 @@ public class DeadMounds extends SavedData {
                     end = Math.max(end, column.end());
                 }
                 out.append(", mound ").append(now).append(" tall (stood ").append(mound.wear.highest).append(", hump ").append(end)
-                        .append("), pieces left ").append(mound.wear.pieces.size()).append(mound.wear.settled ? ", settled" : "");
+                        .append("), pieces left ").append(mound.wear.pieces.size()).append(", ways in ")
+                        .append(1 + mound.wear.ways.size()).append(mound.wear.settled ? ", settled" : "");
+            }
+            if (mound.works != null) {
+                out.append(mound.works.isEmpty() ? ", works round it all weathered" : ", works left: " + mound.works.describe());
             }
         }
         return out.toString();
@@ -550,6 +629,9 @@ public class DeadMounds extends SavedData {
             if (mound.wear != null) {
                 m.put("wear", saveWear(mound.wear));
             }
+            if (mound.works != null) {
+                m.put("works", mound.works.save());
+            }
             list.add(m);
         }
         tag.put("mounds", list);
@@ -568,6 +650,9 @@ public class DeadMounds extends SavedData {
             }
             if (m.contains("wear", Tag.TAG_COMPOUND)) {
                 mound.wear = loadWear(m.getCompound("wear"));
+            }
+            if (m.contains("works", Tag.TAG_COMPOUND)) {
+                mound.works = DeadWorks.load(m.getCompound("works"));
             }
             book.mounds.put(mound.colony, mound);
         }
@@ -591,6 +676,7 @@ public class DeadMounds extends SavedData {
         tag.putIntArray("columns", columns);
         tag.putLongArray("pieces", wear.pieces.stream().mapToLong(BlockPos::asLong).toArray());
         tag.putLongArray("shaft", wear.shaft.stream().mapToLong(BlockPos::asLong).toArray());
+        tag.putLongArray("ways", wear.ways.stream().mapToLong(BlockPos::asLong).toArray());
         tag.putInt("highest", wear.highest);
         tag.putBoolean("settled", wear.settled);
         return tag;
@@ -611,6 +697,9 @@ public class DeadMounds extends SavedData {
         }
         for (long pos : tag.getLongArray("shaft")) {
             wear.shaft.add(BlockPos.of(pos));
+        }
+        for (long pos : tag.getLongArray("ways")) {
+            wear.ways.add(BlockPos.of(pos));
         }
         wear.highest = tag.getInt("highest");
         wear.settled = tag.getBoolean("settled");

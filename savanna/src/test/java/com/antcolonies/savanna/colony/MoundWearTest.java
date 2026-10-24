@@ -17,7 +17,8 @@ import net.minecraft.core.BlockPos;
 
 /**
  * A dead mound's wear (M8 step 1a part 2): the spires come down to the body first, then the body slumps into a low
- * rounded hump that stays; never back up; pieces on top crumble first.
+ * rounded hump that stays; never back up; pieces on top crumble first. Part 3: round it the thin surface mud goes
+ * first, the holes grass over next, the galleries fill in last, the far ends first; about 1 tunnel top in 3 falls open.
  */
 class MoundWearTest {
     private static final MoundNumbers NUMBERS = new MoundNumbers(32, 2.0F, 0.5F, 3, 13);
@@ -145,5 +146,45 @@ class MoundWearTest {
         int[][] opened = MoundWear.opening(heights, MoundWear.SPIRE_RADIUS);
         assertEquals(8, opened[7][7], "the spire comes down to the body");
         assertEquals(8, opened[5][5], "the body under it stays");
+    }
+
+    @Test
+    void theThinMudGoesFirstThenTheHolesThenTheGalleries() {
+        for (long place = -400; place < 400; place += 7) {
+            double jitter = MoundWear.jitter(place);
+            double mud = MoundWear.surfaceMudDay(jitter), hole = MoundWear.holeDay(jitter);
+            assertTrue(mud >= MoundWear.SURFACE_MUD_FROM && mud <= MoundWear.SURFACE_MUD_TO, "mud on day " + mud);
+            assertTrue(hole >= MoundWear.HOLES_FROM && hole <= MoundWear.HOLES_TO, "a hole on day " + hole);
+            for (double distance = 0; distance <= 60; distance += 5) {
+                double gallery = MoundWear.galleryDay(distance, 50, jitter);
+                assertTrue(gallery >= MoundWear.GALLERIES_FROM && gallery <= MoundWear.GALLERIES_TO, "a gallery on day " + gallery);
+                assertTrue(gallery > MoundWear.HOLES_TO, "a gallery fills in before the last hole grasses over");
+            }
+        }
+    }
+
+    @Test
+    void theFarGalleriesFillInFirstAndTheOnesByTheNestLast() {
+        double sooner = 0, later = 0;
+        for (long place = 0; place < 200; place++) {
+            double jitter = MoundWear.jitter(place);
+            assertTrue(MoundWear.galleryDay(50, 50, jitter) < MoundWear.galleryDay(5, 50, jitter), "the far end not first");
+            for (double distance = 0; distance < 50; distance += 1) {
+                assertTrue(MoundWear.galleryDay(distance + 1, 50, jitter) <= MoundWear.galleryDay(distance, 50, jitter),
+                        "a gallery farther out fills in later");
+            }
+            sooner += MoundWear.galleryDay(48, 50, jitter);
+            later += MoundWear.galleryDay(2, 50, jitter);
+        }
+        assertTrue(sooner / 200 < 25 && later / 200 > 35, "far ends on day " + sooner / 200 + ", by the nest on day " + later / 200);
+    }
+
+    @Test
+    void aboutOneTunnelTopInThreeFallsOpen() {
+        int open = 0, tries = 3000;
+        for (long place = 0; place < tries; place++) {
+            open += MoundWear.opensUp(BlockPos.asLong((int) place, 2, (int) (place * 7 % 23))) ? 1 : 0;
+        }
+        assertTrue(open > tries / 4 && open < tries * 5 / 12, open + " of " + tries);
     }
 }

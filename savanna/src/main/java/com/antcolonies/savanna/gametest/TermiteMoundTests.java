@@ -362,8 +362,13 @@ public class TermiteMoundTests {
      * day through the dead mound book (the world's clock is shared): nothing on the day it dies; the spire tips and
      * chimney mouths first and the spires lower by day 2; every piece gone and the spires down to the body by day 6, grass
      * on the settled foot; the body lower by day 18; by day 40 a low hump 4 blocks high, grass over every column, washed
-     * soil round the foot, the shaft closed over. Never back up when the clock goes back; carries on after a save and load;
-     * a player's block keeps its column; nothing under the ground changes; the hump stays.
+     * soil round the foot. Never back up when the clock goes back; carries on after a save and load; a player's block
+     * keeps its column; the hump stays. Part 3, the way in and the works round it: the hollow shaft stays open, a hole from
+     * the top of the hump down to the nest, with at most 3 tunnel tops fallen open beside it, and no other tunnel open to
+     * the sky; out round it a tunnel to an open hole and a feeding gallery under hay plastered with mud, and a tunnel to a
+     * plugged hole with a runway of mud sheeting on from it: the mud gone by day 6, both holes grass by day 6 while every
+     * gallery is still open; by day 30 the far ends filling in and the cells near the nest still open; by day 1000 every
+     * gallery filled; the nest's shaft open and nothing else under the ground changed.
      */
     @GameTest(template = "arena", timeoutTicks = 400, skyAccess = true)
     public static void aDeadMoundWearsDownToAGrassyHump(GameTestHelper helper) {
@@ -410,6 +415,47 @@ public class TermiteMoundTests {
                 for (int y = 1; y <= 4; y++) {
                     underCobble.add(level.getBlockState(cobble.below(y)));
                 }
+                // Part 3, the works round it: the nest shaft dug out; a tunnel east to an open hole, on to hay with a
+                // feeding gallery under it and mud plastered over it; a tunnel south to a plugged hole, a runway of mud
+                // sheeting on from it.
+                int shaftDepth = colony.nest().shaftDepth(level);
+                for (int i = 1; i <= shaftDepth; i++) {
+                    level.setBlock(center.below(i), Blocks.AIR.defaultBlockState(), 3);
+                }
+                java.util.List<BlockPos> eastTunnel = new java.util.ArrayList<>(), southTunnel = new java.util.ArrayList<>();
+                for (int d = 6; d <= 20; d++) {
+                    eastTunnel.add(center.offset(d, -2, 0));
+                }
+                for (int d = 6; d <= 16; d++) {
+                    southTunnel.add(center.offset(0, -2, d));
+                }
+                BlockPos openHole = center.offset(20, -1, 0), plugHole = center.offset(0, -1, 16), hay = center.offset(22, 0, 3);
+                java.util.List<BlockPos> feeding = java.util.List.of(center.offset(20, -2, 1), center.offset(20, -2, 2), center.offset(20, -2, 3),
+                        center.offset(21, -2, 3), center.offset(22, -2, 3), center.offset(22, -1, 3));
+                java.util.List<BlockPos> runway = java.util.List.of(center.offset(0, 0, 17), center.offset(0, 0, 18), center.offset(0, 0, 19));
+                java.util.List<BlockPos> dug = new java.util.ArrayList<>(eastTunnel);
+                dug.addAll(southTunnel);
+                dug.addAll(feeding);
+                for (BlockPos pos : dug) {
+                    level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+                }
+                level.setBlock(openHole, Blocks.AIR.defaultBlockState(), 3);
+                level.setBlock(plugHole, SavannaBlocks.TERMITE_MOUND.get().defaultBlockState().setValue(TermiteMoundBlock.LAYERS, TermiteMoundBlock.FINISHED), 3);
+                level.setBlock(hay, Blocks.HAY_BLOCK.defaultBlockState(), 3);
+                java.util.List<BlockPos> mud = new java.util.ArrayList<>();
+                plaster(level, hay, java.util.List.of(hay), mud);
+                for (BlockPos cell : runway) {
+                    plaster(level, cell, runway, mud);
+                }
+                com.antcolonies.colony.FoodWays ways = colony.nest().foodWays();
+                ways.addNewTunnelForTests(new com.antcolonies.colony.FoodWays.NewTunnel(
+                        new com.antcolonies.colony.NestPlan.ForagingTunnel(eastTunnel, openHole, net.minecraft.core.Direction.EAST), hay, feeding));
+                ways.addNewTunnelForTests(new com.antcolonies.colony.FoodWays.NewTunnel(
+                        new com.antcolonies.colony.NestPlan.ForagingTunnel(southTunnel, plugHole, net.minecraft.core.Direction.SOUTH),
+                        center.offset(0, 0, 21), null));
+                ways.addRunwayForTests(new com.antcolonies.colony.FoodWays.Runway(plugHole, center.offset(0, 0, 21), runway));
+                helper.assertTrue(mud.size() >= 8, "only " + mud.size() + " plates of mud put");
+
                 java.util.Map<BlockPos, BlockState> underground = new java.util.HashMap<>();
                 for (BlockPos pos : BlockPos.betweenClosed(center.offset(-12, -6, -12), center.offset(12, -1, 12))) {
                     underground.put(pos.immutable(), level.getBlockState(pos));
@@ -419,9 +465,22 @@ public class TermiteMoundTests {
                 ColonyManager.get(level).kill(level, colony);
                 com.antcolonies.savanna.colony.DeadMounds.DeadMound dead = book.get(id);
                 helper.assertTrue(dead != null && dead.wears(), "the dead mound's wear was not written down");
+                java.util.List<BlockPos> holesAtDeath = book.holesLeftForTests(dead), galleriesAtDeath = book.galleriesLeftForTests(dead);
+                helper.assertTrue(holesAtDeath.contains(openHole) && holesAtDeath.contains(plugHole), "the foraging holes were not written down: "
+                        + book.describeWorksForTests(dead));
+                helper.assertTrue(galleriesAtDeath.containsAll(eastTunnel) && galleriesAtDeath.containsAll(feeding)
+                        && galleriesAtDeath.containsAll(southTunnel.subList(6, southTunnel.size())), "the galleries were not written down: "
+                        + book.describeWorksForTests(dead));
+                for (int i = 1; i <= shaftDepth; i++) {
+                    helper.assertTrue(!galleriesAtDeath.contains(center.below(i)), "the nest's shaft is to be filled in with the galleries");
+                }
 
                 book.updateForTests(level, dead, 0.1);
                 helper.assertTrue(snapshot(level, center).equals(before), "the mound changed on the day it died");
+                helper.assertTrue(mudLeft(level, mud) == mud.size() && level.getBlockState(openHole).isAir()
+                        && level.getBlockState(plugHole).getBlock() instanceof TermiteMoundBlock, "the works changed on the day it died: mud "
+                                + mudLeft(level, mud) + " of " + mud.size() + ", the open hole " + level.getBlockState(openHole) + ", the plug "
+                                + level.getBlockState(plugHole));
 
                 book.updateForTests(level, dead, 2.0);
                 java.util.Map<BlockPos, BlockState> day2 = snapshot(level, center);
@@ -435,23 +494,58 @@ public class TermiteMoundTests {
                 dead = book.reloadForTests(level, id); // saved and loaded: the wear carries on from where it was
                 book.updateForTests(level, dead, 6.0);
                 java.util.Map<BlockPos, BlockState> day6 = snapshot(level, center);
-                helper.assertTrue(pieces(day6) == 0, pieces(day6) + " pieces still stand on day 6");
+                BlockPos playersBlock = cobble;
+                long standing = day6.entrySet().stream().filter(entry -> isPiece(entry.getValue()) && !(entry.getKey().getX() == playersBlock.getX()
+                        && entry.getKey().getZ() == playersBlock.getZ() && entry.getKey().getY() < playersBlock.getY())).count();
+                helper.assertTrue(standing == 0, standing + " pieces still stand on day 6 (not counting any under the player's block)");
                 int body = highest(day6, center);
                 helper.assertTrue(body <= stood * 0.6 && body >= 8, "on day 6 the mound is " + body + " tall (stood " + stood + "): not down to its body");
                 helper.assertTrue(day6.values().stream().anyMatch(state -> state.is(Blocks.GRASS_BLOCK)), "no grass on the settled foot by day 6");
-                helper.assertTrue(windowsToTheSky(level, day6) == 0, "tunnels laid open to the sky by day 6 (the holes come in part 3)");
+                java.util.Set<BlockPos> waysIn = book.waysInForTests(dead);
+                helper.assertTrue(windowsToTheSky(level, day6, waysIn) == 0, "tunnels laid open to the sky by day 6 besides the ways in");
+                helper.assertTrue(mudLeft(level, mud) == 0, mudLeft(level, mud) + " plates of mud still stand on day 6");
+                helper.assertTrue(level.getBlockState(openHole).is(Blocks.GRASS_BLOCK) && level.getBlockState(plugHole).is(Blocks.GRASS_BLOCK),
+                        "on day 6 the open hole is " + level.getBlockState(openHole) + " and the plugged one " + level.getBlockState(plugHole));
+                helper.assertTrue(book.holesLeftForTests(dead).isEmpty(), "holes still open on day 6: " + book.describeWorksForTests(dead));
+                helper.assertTrue(level.getBlockState(hay).is(Blocks.HAY_BLOCK), "the hay the colony was eating is gone");
+                for (BlockPos pos : dug) {
+                    helper.assertTrue(level.getBlockState(pos).isAir(), "a gallery " + pos.subtract(center).toShortString() + " filled in by day 6");
+                }
 
                 book.updateForTests(level, dead, 18.0);
                 java.util.Map<BlockPos, BlockState> day18 = snapshot(level, center);
                 int slumping = highest(day18, center);
                 helper.assertTrue(slumping < body && slumping > 4, "on day 18 the mound is " + slumping + " tall (" + body + " on day 6)");
-                helper.assertTrue(windowsToTheSky(level, day18) == 0, "tunnels laid open to the sky by day 18 (the holes come in part 3)");
+                helper.assertTrue(windowsToTheSky(level, day18, book.waysInForTests(dead)) == 0, "tunnels laid open to the sky by day 18 besides the ways in");
+
+                book.updateForTests(level, dead, 30.0); // the galleries fill in, the far ends first
+                long filledFar = 0;
+                for (BlockPos pos : dug) {
+                    double out = Math.sqrt(Math.pow(pos.getX() - center.getX(), 2) + Math.pow(pos.getZ() - center.getZ(), 2));
+                    if (out <= 7) {
+                        helper.assertTrue(level.getBlockState(pos).isAir(), "a gallery " + pos.subtract(center).toShortString()
+                                + " near the nest filled in by day 30");
+                    } else if (out >= 16 && !level.getBlockState(pos).isAir()) {
+                        filledFar++;
+                    }
+                }
+                helper.assertTrue(filledFar > 0, "no far gallery filled in by day 30: " + book.describeWorksForTests(dead));
 
                 book.updateForTests(level, dead, 40.0);
                 java.util.Map<BlockPos, BlockState> hump = snapshot(level, center);
-                helper.assertTrue(highest(hump, center) == 4, "the hump is " + highest(hump, center) + " tall on day 40");
-                helper.assertTrue(level.getBlockState(center.above(3)).is(Blocks.GRASS_BLOCK), "the middle of the hump is "
-                        + level.getBlockState(center.above(3)) + ", not grass over the closed shaft");
+                helper.assertTrue(highest(hump, center) >= 3 && highest(hump, center) <= 4, "the hump is " + highest(hump, center) + " tall on day 40 (4, or 3 round the open chimney at its middle)");
+                waysIn = book.waysInForTests(dead);
+                helper.assertTrue(book.tunnelWaysForTests(dead) <= com.antcolonies.savanna.colony.MoundWear.MOST_TUNNEL_WAYS,
+                        book.tunnelWaysForTests(dead) + " tunnel tops open upward");
+                boolean seesSky = false;
+                for (BlockPos pos : waysIn) {
+                    seesSky |= pos.getY() - center.getY() < 4 && level.getBlockState(pos).isAir() && underTheSky(level, pos);
+                }
+                helper.assertTrue(level.getBlockState(center).isAir() && seesSky, "no way in down the old shaft on day 40: the entrance is "
+                        + level.getBlockState(center) + ", the shaft open to the sky: " + seesSky + "; its cells " + shaftInWords(level, center, waysIn)
+                        + "; the middle column " + book.describeColumnForTests(dead, 0, 0));
+                com.antcolonies.savanna.SavannaMod.LOGGER.info("Dead mound test: {} tunnel tops open, {}", book.tunnelWaysForTests(dead),
+                        book.describeWorksForTests(dead));
                 int apron = 0;
                 for (int dx = -11; dx <= 11; dx++) {
                     for (int dz = -11; dz <= 11; dz++) {
@@ -461,7 +555,7 @@ public class TermiteMoundTests {
                             if (state.canBeReplaced()) {
                                 continue;
                             }
-                            helper.assertTrue(y <= 4 && (state.is(Blocks.GRASS_BLOCK) || base.above(y).equals(cobble)),
+                            helper.assertTrue(y <= 4 && (state.is(Blocks.GRASS_BLOCK) || base.above(y).equals(cobble) || waysIn.contains(base.above(y))),
                                     "the top of the hump at " + dx + ", " + dz + " is " + state + " " + y + " blocks up on day 40 (was "
                                             + before.get(base.above(y)) + ", under it " + level.getBlockState(base.below()) + "; " + book.describeColumnForTests(dead, dx, dz) + ")");
                             if (y == 0 && !footprint.contains(BlockPos.asLong(base.getX(), 0, base.getZ()))) {
@@ -472,17 +566,28 @@ public class TermiteMoundTests {
                     }
                 }
                 helper.assertTrue(apron >= 20, "only " + apron + " places of washed soil round the foot");
-                helper.assertTrue(windowsToTheSky(level, hump) == 0, windowsToTheSky(level, hump) + " tunnel sides open to the sky in the hump");
+                helper.assertTrue(windowsToTheSky(level, hump, waysIn) == 0, windowsToTheSky(level, hump, waysIn)
+                        + " tunnel sides open to the sky in the hump besides the ways in");
                 helper.assertTrue(level.getBlockState(cobble).is(Blocks.COBBLESTONE), "the player's block is gone");
                 for (int y = 1; y <= 4; y++) {
-                    helper.assertTrue(level.getBlockState(cobble.below(y)).equals(underCobble.get(y - 1)), "the soil under the player's block changed");
+                    // (the same blocks: a tunnel block's side toward a column worn away beside it shuts, as it does anywhere)
+                    helper.assertTrue(level.getBlockState(cobble.below(y)).getBlock() == underCobble.get(y - 1).getBlock(), "the soil under the player's block changed " + y + " down, at " + cobble.subtract(center).toShortString() + ": " + underCobble.get(y - 1) + " to " + level.getBlockState(cobble.below(y)));
                 }
+                underground.keySet().removeAll(galleriesAtDeath); // (they fill in)
+                underground.keySet().removeAll(holesAtDeath);
                 underground.forEach((pos, state) -> helper.assertTrue(level.getBlockState(pos).equals(state),
                         "under the ground " + pos.subtract(center).toShortString() + " changed from " + state + " to " + level.getBlockState(pos)));
                 helper.assertTrue(dead.isSettled(), "the hump is not settled on day 40");
                 book.updateForTests(level, dead, 10.0);
                 book.updateForTests(level, dead, 1000.0);
                 helper.assertTrue(snapshot(level, center).equals(hump), "the settled hump changed");
+                for (BlockPos pos : dug) {
+                    helper.assertTrue(!level.getBlockState(pos).isAir(), "a gallery " + pos.subtract(center).toShortString() + " still open on day 1000");
+                }
+                helper.assertTrue(book.galleriesLeftForTests(dead).isEmpty(), "galleries left on day 1000: " + book.describeWorksForTests(dead));
+                for (int i = 1; i <= shaftDepth; i++) {
+                    helper.assertTrue(level.getBlockState(center.below(i)).isAir(), "the nest's shaft filled in at " + i + " down");
+                }
             } finally {
                 book.forgetForTests(id);
                 for (BlockPos pos : BlockPos.betweenClosed(center.offset(-11, 5, -11), center.offset(11, 40, 11))) {
@@ -518,23 +623,63 @@ public class TermiteMoundTests {
         return top;
     }
 
-    /** Sides of tunnel blocks in {@code blocks} (as they stand now) open to air under the open sky. */
-    private static int windowsToTheSky(ServerLevel level, java.util.Map<BlockPos, BlockState> blocks) {
+    /**
+     * Sides of tunnel blocks in {@code blocks} (as they stand now) open to air under the open sky, but for the ways in
+     * ({@code waysIn}: the old shaft and the tunnel tops fallen open, part 3).
+     */
+    private static int windowsToTheSky(ServerLevel level, java.util.Map<BlockPos, BlockState> blocks, java.util.Set<BlockPos> waysIn) {
         int open = 0;
         for (BlockPos pos : blocks.keySet()) {
             BlockState state = level.getBlockState(pos);
-            if (!(state.getBlock() instanceof com.antcolonies.savanna.block.TermiteTunnelBlock)) {
+            if (!(state.getBlock() instanceof com.antcolonies.savanna.block.TermiteTunnelBlock) || waysIn.contains(pos)) {
                 continue;
             }
             for (net.minecraft.core.Direction side : net.minecraft.core.Direction.values()) {
                 BlockPos beside = pos.relative(side);
-                if (state.getValue(com.antcolonies.savanna.block.TermiteTunnelBlock.OPEN.get(side)) && level.getBlockState(beside).isAir()
-                        && level.canSeeSky(beside)) {
+                if (!waysIn.contains(beside) && state.getValue(com.antcolonies.savanna.block.TermiteTunnelBlock.OPEN.get(side)) && level.getBlockState(beside).isAir()
+                        && underTheSky(level, beside)) {
                     open++;
                 }
             }
         }
         return open;
+    }
+
+    /**
+     * Whether nothing stands over this place up to the sky (by the height map: the sky light lags behind a whole mound
+     * worn away in one tick).
+     */
+    private static boolean underTheSky(ServerLevel level, BlockPos pos) {
+        return level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, pos.getX(), pos.getZ()) <= pos.getY();
+    }
+
+    /** The old shaft's cells up to the hump's top, low to high, told in words (for a failing check's message). */
+    private static String shaftInWords(ServerLevel level, BlockPos center, java.util.Set<BlockPos> waysIn) {
+        StringBuilder out = new StringBuilder();
+        waysIn.stream().filter(pos -> pos.getY() - center.getY() < 8).sorted(java.util.Comparator.comparingInt(BlockPos::getY))
+                .forEach(pos -> out.append(pos.subtract(center).toShortString()).append(' ').append(level.getBlockState(pos).getBlock())
+                        .append(underTheSky(level, pos) ? " sky" : "").append(", above it ").append(level.getBlockState(pos.above()).getBlock()).append("; "));
+        return out.toString();
+    }
+
+    /** Mud plastered round {@code cell} on every side but below it and toward {@code along} (a runway's own cells, the food). */
+    private static void plaster(ServerLevel level, BlockPos cell, java.util.List<BlockPos> along, java.util.List<BlockPos> mud) {
+        for (net.minecraft.core.Direction side : net.minecraft.core.Direction.values()) {
+            BlockPos wall = cell.relative(side);
+            BlockState state = level.getBlockState(wall);
+            if (side == net.minecraft.core.Direction.DOWN || along.contains(wall) || !(state.isAir() || com.antcolonies.block.FacedWall.isWall(state))) {
+                continue;
+            }
+            level.setBlock(wall, SavannaBlocks.MUD_CRUST.get().withFace(state, side.getOpposite()), 3);
+            if (!mud.contains(wall)) {
+                mud.add(wall);
+            }
+        }
+    }
+
+    /** How many of these places still hold mud. */
+    private static long mudLeft(ServerLevel level, java.util.List<BlockPos> mud) {
+        return mud.stream().filter(pos -> com.antcolonies.block.FacedWall.isWall(level.getBlockState(pos))).count();
     }
 
     private static long pieces(java.util.Map<BlockPos, BlockState> blocks) {
