@@ -7,6 +7,9 @@ import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.ColonyBorn;
 import com.antcolonies.entity.WorkerHunger;
 import com.antcolonies.entity.goal.AntWanderGoal;
+import com.antcolonies.entity.goal.DigGoal;
+import com.antcolonies.entity.goal.GoInsideGoal;
+import com.antcolonies.entity.goal.WaitAtNestGoal;
 import com.antcolonies.savanna.SavannaSpecies;
 import com.antcolonies.savanna.registry.SavannaEntities;
 import com.antcolonies.savanna.species.SavannaNumbers;
@@ -35,7 +38,8 @@ import net.minecraft.world.level.Level;
  * are one caste on a continuous spread of sizes (5 to 18 mm, the majors about twice the minors' length), so majors and
  * minors are both the colony's workers ({@link Caste#WORKER}); each rolls its own length from the species file's
  * {@code worker_sizes} once, keeps it for life, and is drawn (and its box sized) at that length with whichever of the
- * two models is nearer. For now it only walks about, climbs and looks round: its nest, the raids, the fights and the
+ * two models is nearer. Step 1d: it digs the way into its colony's nest (only to join the spaces already there) and
+ * stays inside (real Megaponera leave the nest only to raid, step 4); the raids, the fights and the
  * prey pile come with M8's steps ({@code docs/plans/m8-matabele.md}). It joins the nearest Matabele colony when put
  * down with a spawn egg, and it gets hungry (the user's pick, 2026-10-24: with no prey pile yet, a colony with workers
  * starves).
@@ -104,8 +108,11 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
     @Override
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));
-        this.goalSelector.addGoal(5, new AntWanderGoal(this, 1.0, 120, 8, () -> true));
-        this.goalSelector.addGoal(6, new RandomLookAroundGoal(this));
+        this.goalSelector.addGoal(3, new DigGoal(this, () -> true));
+        this.goalSelector.addGoal(4, new GoInsideGoal(this));
+        this.goalSelector.addGoal(5, new WaitAtNestGoal(this));
+        this.goalSelector.addGoal(6, new AntWanderGoal(this, 1.0, 120, 8, () -> true));
+        this.goalSelector.addGoal(7, new RandomLookAroundGoal(this));
     }
 
     /** The body a new worker of the colony gets, by the dice: the major's or the minor's, as often as the size spread draws each. */

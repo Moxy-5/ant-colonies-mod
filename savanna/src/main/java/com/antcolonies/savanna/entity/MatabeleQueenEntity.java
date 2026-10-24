@@ -4,6 +4,10 @@ import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.goal.AntWanderGoal;
+import com.antcolonies.entity.goal.GoInsideGoal;
+import com.antcolonies.entity.goal.QueenToRoomGoal;
+import com.antcolonies.entity.goal.WaitAtNestGoal;
+import com.antcolonies.savanna.colony.MatabeleNest;
 import com.antcolonies.species.SpeciesProfile;
 import com.antcolonies.species.SpeciesProfiles;
 
@@ -24,8 +28,9 @@ import net.minecraft.world.level.Level;
  * (a colony splits in two, M9), but until then one put down with a spawn egg starts an empty colony where she stands,
  * and spawn-egg majors and minors near her join it (the user's pick, 2026-10-24; {@code /antcolonies matabele} makes a
  * whole colony). Her colony ends when she dies; unfed for her species' {@code queen.starve_ticks} once she has workers
- * she starves (with no prey pile yet, M8 step 1e, she does). For now she only wanders, climbs and looks round: the nest
- * (step 1d) gives her somewhere to live and lay.
+ * she starves (with no prey pile yet, M8 step 1e, she does). Her colony settles in the best site near her (step 1d,
+ * {@link MatabeleNest}: a dead mound, a fallen log, else the ground); she walks to it and into her room once it is open
+ * (the user's pick, 2026-10-24: alone she digs nothing, her workers dig the way in).
  */
 public class MatabeleQueenEntity extends AbstractAntEntity {
     private boolean colonyChecked;
@@ -63,7 +68,10 @@ public class MatabeleQueenEntity extends AbstractAntEntity {
     @Override
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));
-        this.goalSelector.addGoal(5, new AntWanderGoal(this, 1.0, 120, 8, () -> true));
+        this.goalSelector.addGoal(2, new QueenToRoomGoal(this));
+        this.goalSelector.addGoal(3, new GoInsideGoal(this));
+        this.goalSelector.addGoal(4, new WaitAtNestGoal(this));
+        this.goalSelector.addGoal(5, new AntWanderGoal(this, 0.6, 400, 3, () -> QueenToRoomGoal.findFinishedRoom(this) == null));
         this.goalSelector.addGoal(6, new RandomLookAroundGoal(this));
     }
 
@@ -86,11 +94,11 @@ public class MatabeleQueenEntity extends AbstractAntEntity {
             return;
         }
         ColonyManager manager = ColonyManager.get(serverLevel);
-        // Once, on the first tick: make sure the brain has a colony for this queen.
+        // Once, on the first tick: make sure the brain has a colony for this queen, settled in the best site near her.
         if (!colonyChecked) {
             colonyChecked = true;
             if (getColonyId() == null || manager.getColony(getColonyId()) == null) {
-                Colony colony = manager.createColony(MatabeleEntity.SPECIES, getUUID(), blockPosition());
+                Colony colony = MatabeleNest.settle(serverLevel, MatabeleNest.pick(serverLevel, blockPosition(), null), getUUID());
                 setColonyId(colony.getId());
             }
         }

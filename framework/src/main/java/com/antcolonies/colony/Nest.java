@@ -45,6 +45,12 @@ public class Nest {
     @Nullable
     private NestLayout layout;
     /**
+     * M8 step 1d: what a nest of ready spaces moved into ({@link #settle}), a word for the colony list ("a dead mound",
+     * "under a fallen log", "the ground"); null for a nest dug from the plan ({@code nest.dug}).
+     */
+    @Nullable
+    private String site;
+    /**
      * How many levels of the nest the workers may dig (nest stages, see {@link #levelsUnlocked}): it only ever goes up.
      * Saved; nests from before nest stages may dig them all.
      */
@@ -90,6 +96,39 @@ public class Nest {
         insideTick = Long.MIN_VALUE;
     }
 
+    /**
+     * M8 step 1d, a nest of ready spaces: for a species whose nest is not dug from the plan ({@code nest.dug} false), the
+     * species lays out its rooms from what it found on the ground (an old termite mound's empty rooms, the soil under a
+     * fallen log, a few rooms in the ground) and the colony settles in them. {@code rooms} as the plan's levels: each
+     * room's {@code cells} are what is dug to reach it and the room itself, in digging order from the entrance (the
+     * colony's center), with {@code wayIn} every block from the entrance to the room's door; cells already open are
+     * simply not dug. The queen's room ({@link NestPlan.Kind#QUEEN}) is her home once its way in and its whole room are
+     * open. Saved with the nest. {@code site} is a word for the colony list.
+     */
+    public void settle(String site, List<NestPlan.Chamber> rooms) {
+        this.site = site;
+        this.layout = new NestLayout(List.copyOf(rooms), List.of(), List.of(), 0, Direction.NORTH, null, NestPlan.RoomSizes.DEFAULT);
+        waysChanged();
+    }
+
+    /** What a nest of ready spaces moved into (see {@link #settle}), or null for a nest dug from the plan. */
+    @Nullable
+    public String site() {
+        return site;
+    }
+
+    /** For the colony list: " | nest in a dead mound, rooms open 2 of 4" for a nest of ready spaces, nothing otherwise. */
+    public String describeSite(Level level) {
+        if (site == null || layout == null) {
+            return "";
+        }
+        int open = 0;
+        for (NestPlan.Chamber room : layout.chambers()) {
+            open += isFinished(level, room) ? 1 : 0;
+        }
+        return " | nest " + site + ", rooms open " + open + " of " + layout.chambers().size();
+    }
+
     /** The tunnels out to rich food, their feeding galleries and the runways of mud sheeting (see {@link FoodWays}). */
     public FoodWays foodWays() {
         return foodWays;
@@ -133,7 +172,9 @@ public class Nest {
     @Nullable
     private BlockPos findDigTarget(Level level, @Nullable java.util.UUID digger, boolean live) {
         if (!colony.profile().nest().dug()) {
-            return null; // a species whose nest is not dug from a plan (nest.dug false) digs nothing here
+            // A species whose nest is not dug from a plan (nest.dug false) digs only what joins the ready spaces it settled
+            // in (see settle), and only with workers: a queen alone digs nothing.
+            return site == null || colony.isFounding() ? null : readyDigTarget(level);
         }
         // A plant growing in the entrance (grass, a flower) is bitten away first: until it is gone nobody can stand over
         // the shaft's first block to dig it (the user's bug, 2026-10-15: founders that had stepped off the spot never dug).
@@ -250,6 +291,24 @@ public class Nest {
         }
         ColonyHooks.Structure structure = live ? colony.hooks().first(ColonyHooks.STRUCTURE) : null;
         return structure == null ? null : structure.digTarget(level, digger);
+    }
+
+    /** The next block a nest of ready spaces digs (see {@link #settle}): a plant in the entrance, then each room's blocks in order. */
+    @Nullable
+    private BlockPos readyDigTarget(Level level) {
+        if (layout == null) {
+            return null;
+        }
+        if (isPlantInEntrance(level)) {
+            return center;
+        }
+        for (NestPlan.Chamber room : layout.chambers()) {
+            BlockPos next = firstDiggable(level, room.cells());
+            if (next != null) {
+                return next;
+            }
+        }
+        return null;
     }
 
     /** The garden rooms the colony wants dug now: the first, and one more for every few workers (the profile's {@code garden}). */
@@ -763,7 +822,9 @@ public class Nest {
             cells.addAll(founding.cells());
         }
         BlockPos bottom = center.below(depth);
-        if (level.isLoaded(bottom) && level.getBlockState(bottom).isAir()) {
+        if (site != null && layout != null) {
+            cells.addAll(layout.cells()); // a nest of ready spaces: its ways and rooms (no shaft of its own, see settle)
+        } else if (level.isLoaded(bottom) && level.getBlockState(bottom).isAir()) {
             NestLayout layout = getLayout(level);
             if (layout != null) {
                 cells.addAll(layout.cells());
@@ -973,7 +1034,7 @@ public class Nest {
     @Nullable
     private NestLayout getLayout(Level level) {
         if (!colony.profile().nest().dug()) {
-            return null;
+            return layout; // a nest of ready spaces (see settle), or none yet
         }
         if (layout == null) {
             layout = new NestLayout.Planner(colony, center, NestLayout.sizesFor(colony)).choose(level);
@@ -1073,7 +1134,20 @@ public class Nest {
             }
             tag.put("fittedTunnels", fitted);
         }
-        if (layout != null) {
+        if (site != null && layout != null) {
+            tag.putString("nestSite", site);
+            ListTag rooms = new ListTag();
+            for (NestPlan.Chamber room : layout.chambers()) {
+                CompoundTag entry = new CompoundTag();
+                entry.putString("kind", room.kind().name());
+                entry.putLong("center", room.center().asLong());
+                entry.putLongArray("cells", room.cells().stream().mapToLong(BlockPos::asLong).toArray());
+                entry.putLongArray("wayIn", room.wayIn().stream().mapToLong(BlockPos::asLong).toArray());
+                entry.putLongArray("room", room.room().stream().mapToLong(BlockPos::asLong).toArray());
+                rooms.add(entry);
+            }
+            tag.put("nestReadyRooms", rooms);
+        } else if (layout != null) {
             tag.putInt("nestDepth", layout.shaftDepth());
             tag.putInt("nestDirection", layout.direction().get2DDataValue());
             tag.putInt("nestLevels", layout.chambers().size());
@@ -1103,8 +1177,24 @@ public class Nest {
         }
         foragingTunnelsFor = null;
         allForagingTunnelsStale = true;
-        // The nest plan it was digging (old saves have none: it is worked out again from the ground).
-        if (tag.contains("nestLevels")) {
+        // A nest of ready spaces (M8 step 1d), its rooms as they were laid out.
+        site = null;
+        if (tag.contains("nestSite")) {
+            List<NestPlan.Chamber> rooms = new ArrayList<>();
+            for (Tag element : tag.getList("nestReadyRooms", Tag.TAG_COMPOUND)) {
+                CompoundTag entry = (CompoundTag) element;
+                NestPlan.Kind kind;
+                try {
+                    kind = NestPlan.Kind.valueOf(entry.getString("kind"));
+                } catch (IllegalArgumentException e) {
+                    continue;
+                }
+                rooms.add(new NestPlan.Chamber(kind, positions(entry.getLongArray("cells")), BlockPos.of(entry.getLong("center")),
+                        positions(entry.getLongArray("wayIn")), positions(entry.getLongArray("room"))));
+            }
+            settle(tag.getString("nestSite"), rooms);
+        } else if (tag.contains("nestLevels")) {
+            // The nest plan it was digging (old saves have none: it is worked out again from the ground).
             int depth = tag.getInt("nestDepth");
             Direction direction = Direction.from2DDataValue(tag.getInt("nestDirection"));
             // Nests planned before founding chambers existed have none (the key is missing: false), and nests planned
@@ -1112,5 +1202,13 @@ public class Nest {
             NestPlan.RoomSizes sizes = NestPlan.RoomSizes.fromArray(tag.getIntArray("nestRoomSizes"));
             layout = new NestLayout.Planner(colony, center, sizes).rebuild(depth, direction, tag.getInt("nestLevels"), tag.getBoolean("nestFounding"));
         }
+    }
+
+    private static List<BlockPos> positions(long[] cells) {
+        List<BlockPos> out = new ArrayList<>(cells.length);
+        for (long cell : cells) {
+            out.add(BlockPos.of(cell));
+        }
+        return List.copyOf(out);
     }
 }

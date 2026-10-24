@@ -1,0 +1,13 @@
+{
+  "replace": false,
+  "values": [
+    "antcolonies:bleached_log",
+    "antcolonies:bleached_wood",
+    "antcolonies:peeling_bleached_log",
+    "antcolonies:rotten_wood",
+    "antcolonies:charred_log",
+    "antcolonies:charred_wood",
+    "antcolonies:dead_wood",
+    "#minecraft:logs"
+  ]
+}

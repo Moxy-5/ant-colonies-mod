@@ -6,6 +6,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.level.block.Block;
 
 /** The savanna's own tags (the split, step S6: moved out of the framework's {@code ModTags}). */
 public class SavannaTags {
@@ -19,4 +20,11 @@ public class SavannaTags {
      */
     public static final TagKey<EntityType<?>> FITS_TERMITE_TUNNELS = TagKey.create(Registries.ENTITY_TYPE,
             ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "fits_termite_tunnels"));
+
+    /**
+     * Lying wood a Matabele colony nests under (M8 step 1d; data/antcolonies/tags/block/matabele_nest_logs.json): the dead
+     * trees' logs, and any log, so a player can lay one down.
+     */
+    public static final TagKey<Block> MATABELE_NEST_LOGS = TagKey.create(Registries.BLOCK,
+            ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "matabele_nest_logs"));
 }
