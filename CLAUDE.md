@@ -206,6 +206,7 @@ A Minecraft mod where ants and termites live as real colonies: they dig, build, 
 - **M8 step 1, Matabele jaw height 2 picked and raised a little more 2026-10-23:** as high as it goes without touching the antennae; the toothed edge a shade less black, still standing out; one jaw left in the model viewer, waiting for the user's look; nothing in-game yet.
 - **M8 step 1, the Matabele model approved by the user 2026-10-23** ("it looks good"); its animations (idle, walk, attack, death, carrying termites) are being made in a linked session; nothing in-game yet.
 - **M8 step 1, the Matabele animations made 2026-10-23 as drafts** (branch `claude/matabele-anims-96ff7f`, not in the game): walks at three speeds, turns, standing, two attacks to pick from (A grab and sting under, B bite and stab down), dying, carrying a stack or one or two termites, for the major and the minor; every clip passes the anim lab; play them in `references/matabele_pose_viewer.html` (`python tools/ant_pose_viewer.py matabele`); the files live in `drafts/savanna/` (`tools/matabele_anims.py`); waiting for the user's picks (attack A or B, the game's tip-over when dying kept or not).
+- **M8 step 1, Matabele dying without the game's tip-over (the user's pick, 2026-10-23);** attacks: the user leans to both, sting or bite by where the termite is (planning).
 
 ## Other notes files (read only when the task needs them)
 - `docs/DESIGN.md`: every design decision for the species and shared systems (read the section for a feature before working on it).
