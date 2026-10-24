@@ -44,6 +44,7 @@ sys.path.insert(0, HERE)
 import ant_motion as mo  # noqa: E402
 import anim_lab as lab  # noqa: E402
 import body_plan  # noqa: E402
+import matabele_climb  # noqa: E402
 import matabele_models as mm  # noqa: E402
 
 MODELS = tuple(mm.MODELS)
@@ -378,6 +379,29 @@ def carry(name, clip):
     return {'loop': True, 'animation_length': WALK_SECONDS, 'bones': out}
 
 
+# --- feeling a wall ahead (climbing, 2026-10-23) --------------------------------------------------------------------
+# An ant walking up to a wall touches it with its antennae before its head gets there and lifts its head a little, then
+# climbs. The walk's antennae reach low and far ahead over the trail (past the jaws), so walking up to a wall the
+# major's went into the stone (tools/matabele_climb.py found it, up to 0.09 blocks); here they are raised in a V, the
+# whip bent up, the tips reaching just past the jaws, and they tap the wall ahead in turn (left, then right, twice a
+# second). Played by the head's own player at the foot of a wall until the body stands up it (in the game the
+# Matabele's entity would pick it there, as the carry is picked; the climbing preview shows where).
+CLIMB_FEEL = dict(scape=-60.0, out=25.0, whip=-15.0, tap_scape=12.0, tap_whip=10.0, head=-5.0, seconds=1.0)
+
+
+def climb_feel():
+    c = CLIMB_FEEL
+    T = c['seconds']
+    out = {'head': keys([(0, [c['head'], 0, 0])])}
+    for side, start, sy in (('l', 0.05, 1), ('r', 0.55, -1)):
+        a1, a2 = f'antenna_{side}_1', f'antenna_{side}_2'
+        rest1, rest2 = [c['scape'], -sy * c['out'], 0], [c['whip'], 0, 0]
+        tap1, tap2 = [c['scape'] + c['tap_scape'], -sy * c['out'], 0], [c['whip'] + c['tap_whip'], 0, 0]
+        out[a1] = keys([(0, rest1), (start, rest1), (start + 0.12, tap1), (start + 0.25, rest1), (T, rest1)])
+        out[a2] = keys([(0, rest2), (start, rest2), (start + 0.12, tap2), (start + 0.25, rest2), (T, rest2)])
+    return {'loop': True, 'animation_length': T, 'bones': out}
+
+
 def animations(name):
     clips = {}
     clips.update(walk_clips(name))
@@ -389,6 +413,7 @@ def animations(name):
         clips[clip] = made
     for clip in CARRY:
         clips[clip] = carry(name, clip)
+    clips['climb_feel'] = climb_feel()
     return {'format_version': '1.8.0', 'animations': clips}
 
 
@@ -447,7 +472,7 @@ def viewer_data(entry):
     """The page's data in ant_pose_viewer.py's format; entry(name, note, bones, bps, model) makes one option."""
     out = {'title': 'Matabele pose viewer', 'scale': lab.RENDER_SCALE['matabele_major'], 'view': 1.6,
            'intro': 'The Matabele ant (a draft, not in the game): the major and, smaller, the minor, every clip '
-                    'playing side by side on a floor with a block grid.',
+                    'playing side by side on a floor with a block grid; behind them, each climbing a stone pillar.',
            'models': {n: viewer_bones(n) for n in MODELS}, 'anims': []}
     for name in MODELS:
         minor = mm.MODELS[name]
@@ -493,6 +518,13 @@ def viewer_data(entry):
                 over_walk('walk', 'carry'), 2.5 * body_blocks, load=termites(name, 6))
             add('carrying two', 'only two: the jaws nearly shut, the head a little raised, as a minor carries',
                 over_walk('walk', 'carry_small'), 2.5 * body_blocks, load=termites(name, 2))
+        # The climbing course (2026-10-23, tools/matabele_climb.py): the game's climbing maths worked out tick by tick.
+        course = matabele_climb.viewer_course(name)
+        course.update(feel=clips['climb_feel']['bones'], lane=1 if minor else 0)
+        add('climbing', 'the slow walk, 1 body length a second, up a 3-block pillar, over the top edge, along the top, '
+                        "head first down the far side and round the corner at its foot (the game's climbing maths; "
+                        'the buttons under the scene pick the gaster and the antennae versions)',
+            clips['walk_slow']['bones'], climb=course, tips={})
     return out
 
 

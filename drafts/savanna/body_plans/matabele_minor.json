@@ -67,7 +67,7 @@
    "max_pitch": 60,
    "max_yaw": 25,
    "hinge": 0.26,
-   "from": 3.99,
+   "from": 1.61,
    "to": 10.75
   }
  ],
@@ -77,5 +77,9 @@
   "front_end": 12.27,
   "rear_end": 10.75,
   "tightest_curve": 6.22
+ },
+ "hand_set": {
+  "why": "The gaster begins right behind the one waist node (gaster_front, 1.61 units back), not at its pinch (gaster_back, 3.99, where the measuring rule puts it as the gaster is two bones): judged from there, the gaster follows the ground over an edge without cutting the corner (0.04 blocks for the major, as the approved harvester worker; 0.12 measured). My pick, to confirm in the pose viewer's climbing course (tools/matabele_climb.py, gaster versions A, B, C).",
+  "keys": ["spine.0.from"]
  }
 }

@@ -31,6 +31,8 @@ The files are <mod>/src/main/resources/assets/<mod name>/body_plans/<model>.json
             game works them out from the ends and the hitbox).
   approved  numbers the user has approved in-game (keys like "climb.front_feet" or "spine.0.from", and why): `measure`
             keeps them and only says what measuring would give.
+  hand_set  numbers set by hand, not approved yet (the same keys, and why; 2026-10-23, the Matabele's gaster start,
+            where the measuring rule does not fit the body): kept by `measure` like the approved ones.
   forebody  the bone that carries the thorax, the head and the legs (it sways with the stride).
   root      the bone that holds everything (the body's rise and fall goes there).
 
@@ -106,6 +108,7 @@ class Plan:
         self.waist = self.spine[0]['joints'] if self.spine else []     # the first piece's joints (the sway goes there)
         self.climb = dict(data.get('climb', {}))
         self.approved = set(data.get('approved', {}).get('keys', []))
+        self.hand_set = set(data.get('hand_set', {}).get('keys', []))
         self._leg_by_bone = {b: key for key, chain in self.legs.items() for b in chain}
         self._antenna_bones = {b for chain in self.antennae.values() for b in chain}
 
@@ -229,7 +232,7 @@ def stale(plan):
     out = []
     numbers = measured(plan.model)
     for key, value in numbers.items():
-        if key in plan.approved:
+        if key in plan.approved or key in plan.hand_set:
             continue
         written = get_number(plan.data, key)
         if written is None or abs(written - value) > 0.005:
@@ -322,6 +325,8 @@ def measure(model):
     for key, value in measured(model).items():
         if key in plan.approved:
             lines.append(f'  {key}: kept {get_number(data, key)} (approved; measuring gives {value})')
+        elif key in plan.hand_set:
+            lines.append(f'  {key}: kept {get_number(data, key)} (set by hand; measuring gives {value})')
         else:
             old = get_number(data, key)
             set_number(data, key, value)

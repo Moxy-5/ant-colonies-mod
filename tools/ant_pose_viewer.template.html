@@ -43,6 +43,7 @@
 <div class="controls" id="buttons"></div>
 <div class="controls" id="play"></div>
 <div class="controls" id="cams"></div>
+<div class="controls" id="climb"></div>
 <ol id="list"></ol>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -78,9 +79,13 @@ if (DATA.title) { document.title = DATA.title; document.getElementById('h1').tex
 if (DATA.intro) document.getElementById('intro').textContent = DATA.intro;
 // A sandy floor with a block grid (1 block = 16 model units; the game draws the worker at 0.65 of the model) and a
 // fine grid of single model units near each ant.
+// Climbing courses (anim.climb, 2026-10-23, tools/matabele_climb.py) stand behind the row, so the floor reaches back.
+const COURSES = DATA.anims.some(a => a.climb);
 const floorSize = SPACING * (n + 2);
-const floor = new THREE.Mesh(new THREE.PlaneGeometry(floorSize, 200), new THREE.MeshLambertMaterial({color: '#d8c391'}));
+const floorDepth = COURSES ? 300 : 200;
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(floorSize, floorDepth), new THREE.MeshLambertMaterial({color: '#d8c391'}));
 floor.rotation.x = -Math.PI / 2;
+if (COURSES) floor.position.z = -50;
 floor.receiveShadow = true;
 scene.add(floor);
 const block = 16 / (DATA.scale || 0.65);
@@ -88,7 +93,7 @@ const grid = new THREE.GridHelper(Math.ceil(floorSize / block) * block, Math.cei
 grid.position.y = 0.02;
 scene.add(grid);
 const sc = sun.shadow.camera;
-sc.left = -floorSize / 2; sc.right = floorSize / 2; sc.top = 100; sc.bottom = -100; sc.near = 1; sc.far = 150;
+sc.left = -floorSize / 2; sc.right = floorSize / 2; sc.top = floorDepth / 2 + 50; sc.bottom = -floorDepth / 2 - 50; sc.near = 1; sc.far = 150;
 
 function deg(v) { return v * Math.PI / 180; }
 function setRot(obj, r) { obj.rotation.set(deg(-r[0]), deg(r[1]), deg(-r[2]), 'ZYX'); }
@@ -165,11 +170,29 @@ function sample(list, t) {
 const trailMat = {};
 Object.entries(LEG_COLOURS).forEach(([k, c]) => trailMat[k] = new THREE.LineBasicMaterial({color: c}));
 const TRAIL_POINTS = 120;
+// A climbing course: a stone pillar of blocks (anim.climb.pillar: its near face, depth and height in blocks) on the
+// course's line, which runs along the base's -Z (here the world's +X), in the ant's own model units (climb.block).
+const STONE = ['#8f8a80', '#a29d92'];
+function buildCourse(base, c) {
+  const B = c.block, [wall, depth, height] = c.pillar;
+  for (let i = 0; i < depth; i++) for (let j = 0; j < height; j++) for (let k = -1; k < 1; k++) {
+    const cube = new THREE.Mesh(new THREE.BoxGeometry(B, B, B), new THREE.MeshLambertMaterial({color: STONE[(i + j + k + 2) % 2]}));
+    cube.position.set((k + 0.5) * B, (j + 0.5) * B, -(wall + i + 0.5) * B);
+    cube.castShadow = cube.receiveShadow = true;
+    base.add(cube);
+  }
+}
 const ants = DATA.anims.map((anim, i) => {
   const base = new THREE.Group();     // where the ant starts: its place in the row and its heading
   base.position.x = (i - (n - 1) / 2) * SPACING;
   base.rotation.y = -Math.PI / 2 - 0.5;
   if (anim.size) base.scale.setScalar(anim.size);    // drawn at its size beside the others (a minor beside a major)
+  if (anim.climb) {                   // its own lane behind the row (in blocks), the pillar's middle at x = 0
+    const c = anim.climb, worldBlock = 16 / (DATA.scale || 0.65);
+    base.position.set(-(c.pillar[0] + c.pillar[1] / 2) * worldBlock, 0, -(4.4 - 2.2 * c.lane) * worldBlock);
+    base.rotation.y = -Math.PI / 2;
+    buildCourse(base, c);
+  }
   scene.add(base);
   const ant = buildAnt(anim);
   base.add(ant.root);
@@ -178,6 +201,14 @@ const ants = DATA.anims.map((anim, i) => {
   ant.tracks = {};
   for (const [bone, channels] of Object.entries(anim.bones)) {
     ant.tracks[bone] = {rotation: channels.rotation && prepare(channels.rotation), position: channels.position && prepare(channels.position)};
+  }
+  if (anim.climb) {                   // the head clip played at the foot of the wall (climb.feel), on the head's bones
+    ant.feelTracks = {};
+    ant.feelLength = 0;
+    for (const [bone, channels] of Object.entries(anim.climb.feel)) {
+      ant.feelTracks[bone] = {rotation: channels.rotation && prepare(channels.rotation), position: channels.position && prepare(channels.position)};
+      [channels.rotation, channels.position].forEach(ch => ch && Object.keys(ch).forEach(k => ant.feelLength = Math.max(ant.feelLength, +k)));
+    }
   }
   ant.trailGroup = new THREE.Group();
   base.add(ant.trailGroup);
@@ -198,7 +229,7 @@ const ants = DATA.anims.map((anim, i) => {
 });
 
 // --- state: one animation clock for every ant ---
-const state = {tau: 0, paused: false, slow: 1, trails: true, walk: false, focus: -1, cam: 'three'};
+const state = {tau: 0, paused: false, slow: 1, trails: true, walk: false, focus: -1, cam: 'three', gaster: 'B', head: 'feel', middle: 'waist'};
 const STEP = 1 / 60;
 const list = document.getElementById('list');
 const buttons = document.getElementById('buttons');
@@ -209,7 +240,53 @@ const cams = document.getElementById('cams');
 // walking speed.
 const HEAD_BONE = /^(head|mandible|antenna|carry)/;
 
+// Climbing (anim.climb): each tick's frame from the game's climbing maths (tools/matabele_climb.py, viewer_course): where
+// the middle of the feet is (u along the course, y up, model units), the way the head points (F) and the back's normal
+// (N), the walk clip's time (one cycle a stride walked), the head clip's share, and the turn added to each of climb.joints
+// (the spine piece's bend by its shares, as BodyLanguage does, and the neck's nod). Between ticks the numbers are
+// blended; the last tick is held a second.
+function climbPose(ant, realTau) {
+  const c = ant.anim.climb, run = c.runs[state.gaster + state.head + state.middle], N = run.length;
+  const ft = Math.min((realTau * c.ticks) % (N + c.ticks), N - 1);
+  const k = Math.floor(ft), f = ft - k, a = run[k], b = run[Math.min(k + 1, N - 1)];
+  const v = a.map((x, j) => x + (b[j] - x) * f);
+  ant.climbTick = ft;
+  const t = v[6] % ant.anim.length, rot = {}, pos = {};
+  for (const [bone, tr] of Object.entries(ant.tracks)) {
+    if (tr.rotation) rot[bone] = sample(tr.rotation, t).slice();
+    if (tr.position) pos[bone] = sample(tr.position, t).slice();
+  }
+  const mix = v[7];
+  if (mix > 0) {
+    const tf = ant.feelLength ? (ft / c.ticks) % ant.feelLength : 0;
+    c.head.forEach(bone => {
+      const tr = ant.feelTracks[bone] || {};
+      const r = tr.rotation ? sample(tr.rotation, tf) : [0, 0, 0], p = tr.position ? sample(tr.position, tf) : [0, 0, 0];
+      rot[bone] = (rot[bone] || [0, 0, 0]).map((x, j) => x + (r[j] - x) * mix);
+      pos[bone] = (pos[bone] || [0, 0, 0]).map((x, j) => x + (p[j] - x) * mix);
+    });
+  }
+  c.joints.forEach((bone, i) => { (rot[bone] = rot[bone] || [0, 0, 0])[0] += v[8 + i]; });
+  Object.values(ant.groups).forEach(g => { setRot(g, g.userData.rest); g.position.copy(g.userData.base); });
+  for (const [bone, r] of Object.entries(rot)) {
+    const g = ant.groups[bone], q = g && g.userData.rest;
+    if (g) setRot(g, [r[0] + q[0], r[1] + q[1], r[2] + q[2]]);
+  }
+  for (const [bone, p] of Object.entries(pos)) {
+    const g = ant.groups[bone];
+    if (g) g.position.set(g.userData.base.x + p[0], g.userData.base.y + p[1], g.userData.base.z + p[2]);
+  }
+  // The course (u, y) is the base's (0, y, -u); the model's head points to its -Z, its back to its +Y.
+  const fl = Math.hypot(v[2], v[3]), nl = Math.hypot(v[4], v[5]);
+  const fu = v[2] / fl, fy = v[3] / fl, nu = v[4] / nl, ny = v[5] / nl;
+  const m = new THREE.Matrix4().makeBasis(new THREE.Vector3(ny * fu - nu * fy, 0, 0), new THREE.Vector3(0, ny, -nu),
+                                          new THREE.Vector3(0, -fy, fu));
+  ant.root.quaternion.setFromRotationMatrix(m);
+  ant.root.position.set(0, v[1], -v[0]);
+}
+
 function pose(ant, realTau) {
+  if (ant.anim.climb) return climbPose(ant, realTau);
   const rate = ant.anim.rate || 1;
   const tau = realTau * rate;
   // A clip played once (anim.once: dying) is held at its end for a while, then starts again.
@@ -260,8 +337,8 @@ function pose(ant, realTau) {
 const target = new THREE.Vector3();
 function antPoint(i) {
   const a = ants[i];
-  const p = new THREE.Vector3(0, 1.8 * VIEW, a.root.position.z);
-  return a.base.localToWorld(p);
+  const r = a.root.position;
+  return a.base.localToWorld(new THREE.Vector3(r.x, 1.8 * VIEW + r.y, r.z));
 }
 function place(cam) {
   if (state.focus < 0) {
@@ -277,7 +354,8 @@ function place(cam) {
   const spots = {side: [26, 1.8, 0], other: [-26, 1.8, 0], front: [0, 3, -26], back: [0, 4, 26], top: [0.01, 30, 0],
                  three: [16, 11, -18], low: [12, 0.6, -10]};
   const s = (spots[cam] || spots.three).map(c => c * VIEW);
-  const p = a.base.localToWorld(new THREE.Vector3(s[0], s[1], s[2] + a.root.position.z));
+  const r = a.root.position;
+  const p = a.base.localToWorld(new THREE.Vector3(s[0] + r.x, s[1] + r.y, s[2] + r.z));
   controls.target.copy(target);
   camera.position.copy(p);
   controls.update();
@@ -324,6 +402,32 @@ function setPaused(p) { state.paused = p; pauseBtn.textContent = p ? 'Play' : 'P
 function setSlow(s) { state.slow = s; Object.entries(speeds).forEach(([k, b]) => b.classList.toggle('on', +k === s)); }
 function setTrails(on) { state.trails = on; trailBtn.classList.toggle('on', on); }
 function setWalk(on) { state.walk = on; walkBtn.classList.toggle('on', on); }
+// The climbing versions (the user picks): where the gaster is judged to lie (A, B, C) and the antennae at the wall's foot.
+const climbRow = document.getElementById('climb');
+const climbBtns = {};
+function setClimb(gaster, head, middle) {
+  state.gaster = gaster || state.gaster; state.head = head || state.head; state.middle = middle || state.middle;
+  Object.entries(climbBtns).forEach(([k, b]) => b.classList.toggle('on', k === 'g' + state.gaster || k === 'h' + state.head || k === 'm' + state.middle));
+}
+if (COURSES) {
+  const c = DATA.anims.find(a => a.climb).climb;
+  [state.gaster, state.head, state.middle] = c.picked;
+  const label = document.createElement('span');
+  label.textContent = 'Climbing, the gaster:';
+  climbRow.appendChild(label);
+  c.gasters.forEach(g => climbBtns['g' + g] = button(climbRow, g + (g === c.picked[0] ? ' (my pick)' : ''), () => setClimb(g)));
+  const label2 = document.createElement('span');
+  label2.textContent = 'the antennae at the wall:';
+  climbRow.appendChild(label2);
+  c.heads.forEach(h => climbBtns['h' + h] = button(climbRow, ({walk: 'as walking', feel: 'feeling the wall'}[h] || h) +
+                                                   (h === c.picked[1] ? ' (my pick)' : ''), () => setClimb(null, h)));
+  const label3 = document.createElement('span');
+  label3.textContent = 'the middle:';
+  climbRow.appendChild(label3);
+  c.middles.forEach(m => climbBtns['m' + m] = button(climbRow, ({stiff: 'stiff', neck: 'neck nods', waist: 'neck and waist'}[m] || m) +
+                                                     (m === c.picked[2] ? ' (my pick)' : ''), () => setClimb(null, null, m)));
+  setClimb();
+}
 window.addEventListener('keydown', e => {
   if (e.key === ' ') { setPaused(!state.paused); e.preventDefault(); }
   if (e.key === ',') { setPaused(true); state.tau = Math.max(0, state.tau - STEP); }
@@ -351,6 +455,7 @@ window.lab = {
     if ('slow' in o) setSlow(+o.slow);
     if ('trails' in o) setTrails(!!+o.trails || o.trails === true);
     if ('walk' in o) setWalk(!!+o.walk || o.walk === true);
+    if ('gaster' in o || 'head' in o || 'middle' in o) setClimb(o.gaster, o.head, o.middle);
     if ('t' in o) state.tau = +o.t;
     frame(false);
     if (state.focus >= 0) place(state.cam);
@@ -358,6 +463,7 @@ window.lab = {
   },
   info() {
     return {t: +state.tau.toFixed(4), paused: state.paused, slow: state.slow, trails: state.trails, walk: state.walk, cam: state.cam,
+            gaster: state.gaster, head: state.head, middle: state.middle,
             focus: state.focus, ants: DATA.anims.map((a, i) => ({i, name: a.name, length: a.length, speed_units_s: +a.speed.toFixed(3)}))};
   },
 };
@@ -371,19 +477,21 @@ function frame(loop = true) {
   if (loop && !state.paused) state.tau += dt * state.slow;
   ants.forEach(ant => {
     pose(ant, state.tau);
-    v.copy(ant.base.localToWorld(new THREE.Vector3(0, 7.5 * VIEW, ant.root.position.z))).project(camera);
+    const r = ant.root.position;
+    v.copy(ant.base.localToWorld(new THREE.Vector3(r.x, 7.5 * VIEW + r.y, r.z))).project(camera);
     ant.tag.style.left = ((v.x + 1) / 2 * wrap.clientWidth) + 'px';
     ant.tag.style.top = ((1 - v.y) / 2 * wrap.clientHeight) + 'px';
     ant.tag.style.display = v.z < 1 ? '' : 'none';
   });
-  if (state.walk && state.focus >= 0) {
+  if (state.focus >= 0 && (state.walk || ants[state.focus].anim.climb)) {
     // keep the camera with the focused ant as it walks
     const p = antPoint(state.focus);
     camera.position.add(p.clone().sub(controls.target));
     controls.target.copy(p);
   }
   const shown = state.focus >= 0 ? ants[state.focus] : ants[0];
-  clockEl.textContent = 't ' + (state.tau % shown.anim.length).toFixed(3) + ' s of ' + shown.anim.length + (state.paused ? '  paused' : '') +
+  clockEl.textContent = (shown.anim.climb ? 'tick ' + shown.climbTick.toFixed(1) + ' of ' + (shown.anim.climb.runs[state.gaster + state.head + state.middle].length - 1)
+                         : 't ' + (state.tau % shown.anim.length).toFixed(3) + ' s of ' + shown.anim.length) + (state.paused ? '  paused' : '') +
                         (state.slow !== 1 ? '  ×' + state.slow : '');
   controls.update();
   renderer.render(scene, camera);
