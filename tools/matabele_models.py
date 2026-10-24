@@ -59,26 +59,27 @@ LIFT = 1.5   # the whole ant is drawn this much higher than its boxes say, the f
 # the same pixel size on the big head and the thin jaws, as on a Minecraft mob), packed into one texture by paint().
 # Each box names its swatch: what part of the ant it is, its colour from the look and its pattern.
 SWATCHES = {
-    'head': 'plate', 'thorax': 'plate', 'waist': 'plate', 'gaster': 'haired', 'rim': 'plate',
-    'leg': 'plain', 'antenna': 'plain', 'ring': 'plain', 'band': 'plain', 'tarsus': 'plain', 'joint': 'plain',
-    'eye': 'eye', 'eyerim': 'plain', 'jaw': 'plain', 'teeth': 'plain', 'sting': 'plain',
+    'head': 'flat', 'thorax': 'flat', 'waist': 'flat', 'gaster': 'flat', 'rim': 'flat',
+    'leg': 'flat', 'antenna': 'plain', 'ring': 'plain', 'band': 'plain', 'tarsus': 'flat', 'joint': 'flat',
+    'eye': 'flat', 'eyerim': 'flat', 'jaw': 'plain', 'teeth': 'plain', 'sting': 'flat',
     'whip': 'plain', 'bead': 'plain',
 }
 TEXELS = 3.0
 
+# 'flat' (the body and eyes, the user 2026-10-23): one even colour, no grain, specks, hairs or glint.
 # The colour: glossy black (the user's pick, the photo; "stick with the black colour", 2026-10-23). grain: how far a
 # pixel strays from its colour; flecks: how many pixels are lighter (or darker) specks; hair: how much the gaster's
 # fine pale hairs grey it.
 LOOKS = {
     'A': {'name': 'Black',
-          'note': "glossy black all over (the photo; the user, 2026-10-23: \"make the whole body black\"): legs, feet, "
-                  "sting and plate rims black too, the eyes a slightly lighter black; the antennae and the jaws as "
-                  "before",
+          'note': "plain black all over, no texture, like a real Matabele (the user, 2026-10-23: \"actually all black "
+                  "no texture\"): the whole body one even black, the eyes one even lighter black so they stand out a "
+                  "little; the antennae and the jaws as before",
           'grain': 7, 'flecks': 0.10, 'hair': 0.08,
-          'colours': {'head': (26, 25, 27), 'thorax': (28, 27, 29), 'waist': (28, 27, 29), 'gaster': (31, 30, 31),
-                      'rim': (34, 33, 36), 'leg': (27, 26, 28), 'antenna': (36, 29, 27), 'ring': (88, 50, 34),
-                      'band': (104, 46, 30), 'tarsus': (25, 24, 26), 'joint': (22, 20, 21), 'eye': (40, 40, 44),
-                      'eyerim': (16, 15, 17), 'jaw': (56, 30, 24), 'teeth': (132, 42, 26), 'sting': (30, 29, 31),
+          'colours': {'head': (22, 22, 24), 'thorax': (22, 22, 24), 'waist': (22, 22, 24), 'gaster': (22, 22, 24),
+                      'rim': (22, 22, 24), 'leg': (22, 22, 24), 'antenna': (36, 29, 27), 'ring': (88, 50, 34),
+                      'band': (104, 46, 30), 'tarsus': (22, 22, 24), 'joint': (22, 22, 24), 'eye': (50, 50, 55),
+                      'eyerim': (22, 22, 24), 'jaw': (56, 30, 24), 'teeth': (132, 42, 26), 'sting': (22, 22, 24),
                       'whip': (66, 42, 34), 'bead': (80, 51, 39)}},
 }
 
@@ -124,7 +125,9 @@ def paint(bones, look):
             for x in range(w):
                 d = rnd.uniform(-1, 1) * spec['grain']
                 roll = rnd.random()
-                if roll < spec['flecks']:
+                if pattern == 'flat':
+                    d = 0                                             # one even colour, no grain or specks
+                elif roll < spec['flecks']:
                     d += spec['grain'] * 2.2                          # a pale speck
                 elif roll < spec['flecks'] * 1.6:
                     d -= spec['grain'] * 1.6                          # a dark one
