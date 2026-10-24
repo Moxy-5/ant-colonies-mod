@@ -1,8 +1,8 @@
 """The Matabele ant's clips (M8 step 1, 2026-10-23): the walks, the turns, standing, the attack, dying and carrying
 termites, for the major and the minor, made from the model the user approved (tools/matabele_models.py) with the
 shared motion library (tools/ant_motion.py) and its gait maker, the way the termites' walks were made
-(docs/plans/termite-walks.md). Nothing here is in the game: the clips are written next to the draft model in
-drafts/savanna/ (tools/mod_paths.py, "Drafts"), where the animation lab and the pose viewer read them.
+(docs/plans/termite-walks.md). The clips are written next to the model in the savanna mod (drafts in drafts/savanna/
+until the user put the ant into the game, 2026-10-23), where the game, the animation lab and the pose viewer read them.
 
 Run from the project folder:
   python tools/matabele_anims.py                 writes the draft models (matabele_models.py), then every clip

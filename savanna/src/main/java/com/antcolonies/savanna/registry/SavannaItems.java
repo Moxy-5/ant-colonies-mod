@@ -87,6 +87,15 @@ public class SavannaItems {
             ITEMS.register("termite_major_soldier_spawn_egg",
                     () -> new DeferredSpawnEggItem(SavannaEntities.TERMITE_MAJOR_SOLDIER, 0xB25E24, 0x18100B, new Item.Properties()));
 
+    // The Matabele ants (2026-10-23, the user's colours): the major dark black with dark grey spots, the minor black with grey.
+    public static final DeferredItem<DeferredSpawnEggItem> MATABELE_MAJOR_SPAWN_EGG =
+            ITEMS.register("matabele_major_spawn_egg",
+                    () -> new DeferredSpawnEggItem(SavannaEntities.MATABELE_MAJOR, 0x0B0B0B, 0x2E2E2E, new Item.Properties()));
+
+    public static final DeferredItem<DeferredSpawnEggItem> MATABELE_MINOR_SPAWN_EGG =
+            ITEMS.register("matabele_minor_spawn_egg",
+                    () -> new DeferredSpawnEggItem(SavannaEntities.MATABELE_MINOR, 0x1C1C1C, 0x787878, new Item.Properties()));
+
     /** The items of the giant savanna trees' blocks (M7.5), in creative tab order. */
     public static final List<DeferredItem<BlockItem>> TREE_ITEMS = new ArrayList<>();
 

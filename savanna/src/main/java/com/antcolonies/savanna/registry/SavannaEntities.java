@@ -3,6 +3,7 @@ package com.antcolonies.savanna.registry;
 import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.entity.AntCorpseEntity;
 import com.antcolonies.entity.AntLarvaEntity;
+import com.antcolonies.savanna.entity.MatabeleEntity;
 import com.antcolonies.savanna.entity.TermiteKingEntity;
 import com.antcolonies.savanna.entity.TermiteQueenEntity;
 import com.antcolonies.savanna.entity.TermiteSoldierEntity;
@@ -76,6 +77,20 @@ public class SavannaEntities {
                     .clientTrackingRange(6)
                     .updateInterval(20)
                     .build("termite_nymph"));
+
+    // Matabele ants (M8 step 1, in the game 2026-10-23, the user): a major about 1.7 blocks long, a minor about 0.8 (the
+    // model's sizes; the user picks the real ones later). The boxes are the climbing preview's (tools/matabele_climb.py).
+    public static final DeferredHolder<EntityType<?>, EntityType<MatabeleEntity>> MATABELE_MAJOR =
+            ENTITY_TYPES.register("matabele_major", () -> EntityType.Builder
+                    .of(MatabeleEntity::new, MobCategory.CREATURE)
+                    .sized(0.6F, 0.45F)
+                    .build("matabele_major"));
+
+    public static final DeferredHolder<EntityType<?>, EntityType<MatabeleEntity>> MATABELE_MINOR =
+            ENTITY_TYPES.register("matabele_minor", () -> EntityType.Builder
+                    .of(MatabeleEntity::new, MobCategory.CREATURE)
+                    .sized(0.3F, 0.22F)
+                    .build("matabele_minor"));
 
     // Apex step 9c: the species' bodies, for the shared brood and population code (what eggs hatch into, the dead, each
     // caste's mob); the split, S3: with the looks of its young and its dead (the dead: pale and dull, drawn by

@@ -2,14 +2,6 @@
 
 A Minecraft mod where ants and termites live as real colonies: they dig, build, gather food, grow, start new colonies, and fight each other. Inspired by Empires of the Undergrowth, but the player is down at ant level.
 
-## TEMPORARY RULE: autonomous mode (the user, 2026-10-22, until the user says stop)
-**Everything is handled autonomously by Claude until the user says to stop.** While this section is here:
-- Don't stop to ask the user for an OK between steps: build, test, fix, commit, push and hand off to the next linked session yourself. Report what you did in plain English as you go, but don't wait for an answer.
-- The split's last steps are **scheduled tasks, one fresh chat each, no hand-offs** (the user, 2026-10-23, to save tokens): S7 at 5:00 AM (build only), S8 at 6:30 (then the full run), S9 at 8:00 (build only), S10 at 9:30 (the full run and the full check). Each waits for the step before to be committed, then stops and reports; none starts another session.
-- A real bug found along the way gets its own linked session (on its own branch), so the step stays focused. Old flakes (`docs/BUGS.md` 55, 62) don't.
-- **Still the user's, even now:** the in-game test at the end of the split, the merge into `master`, deleting branches or worlds, and anything that would change what is seen in-game or limit a future species. Stop at those and report.
-- Remove this section when the user says stop.
-
 ## How to work with me
 - I have zero coding experience. You write all the code; I test in-game and report bugs.
 - **Realism is all I care about with this mod** (I'm a nerd about real ants and termites). When choosing how anything behaves, go with what the real species does; explain the real behaviour when suggesting options, and only offer simpler versions as a fallback.
@@ -208,6 +200,7 @@ A Minecraft mod where ants and termites live as real colonies: they dig, build, 
 - **M8 step 1, the Matabele animations made 2026-10-23 as drafts** (branch `claude/matabele-anims-96ff7f`, not in the game): walks at three speeds, turns, standing, two attacks to pick from (A grab and sting under, B bite and stab down), dying, carrying a stack or one or two termites, for the major and the minor; every clip passes the anim lab; play them in `references/matabele_pose_viewer.html` (`python tools/ant_pose_viewer.py matabele`); the files live in `drafts/savanna/` (`tools/matabele_anims.py`); waiting for the user's picks (attack A or B, the game's tip-over when dying kept or not).
 - **M8 step 1, Matabele dying without the game's tip-over (the user's pick, 2026-10-23);** attacks: the user leans to both, sting or bite by where the termite is (planning).
 - **M8 step 1, the Matabele climbing made 2026-10-23 as drafts** (branch `claude/matabele-climbing-d8cbe5`, not in the game): climbing numbers in the draft body plans; a climbing course in the pose viewer (`python tools/ant_pose_viewer.py matabele`, "Major: climbing", "Minor: climbing") up a pillar, over the top, down the far side; the user's ask, the middle curving: the head nods at the neck and the waist bends more (the thorax itself is rigid in real ants); versions to pick with buttons (gaster A/B/C, antennae as walking or feeling the wall, middle stiff/neck/neck and waist; my picks B, feeling, neck and waist); checked against the blocks by `tools/matabele_climb.py`; waiting for the user's look.
+- **M8 step 1, the Matabele ant in the game 2026-10-23 (the user's ask):** `/summon antcolonies:matabele_major` or `matabele_minor`, or the spawn eggs (major dark black with dark grey spots, minor black with grey spots); for now they only wander and climb, no colony or fights yet; merged into `master` with the user's OK. Full run 144 of 144 on 6 servers (15 minutes); `legs` 22 of 22; anim lab 0 problems on both models; body plans all OK; not tried in-game yet.
 
 ## Other notes files (read only when the task needs them)
 - `docs/DESIGN.md`: every design decision for the species and shared systems (read the section for a feature before working on it).

@@ -33,8 +33,8 @@ public final class SavannaTests {
 
     /** Signs up the savanna's tests (once, from {@code SavannaMod}). */
     public static void signUp() {
-        // The legs: climbing, crawling through termite tunnels, reloads of climbing insects.
-        TestFilter.addCategory("legs", TermiteClimbingTests.class, TermiteTunnelTests.class);
+        // The legs: climbing, crawling through termite tunnels, reloads of climbing insects, the Matabele up a pillar.
+        TestFilter.addCategory("legs", TermiteClimbingTests.class, TermiteTunnelTests.class, MatabeleTests.class);
         // The termite mound: its blocks, the cathedral, doorways and chimney mouths, mending the nest.
         TestFilter.addCategory("mound", TermiteMoundTests.class, TermiteCathedralTests.class, TermiteRepairTests.class);
         // Termite food: foraging and its holes, the garden, new holes, dead wood, runways, bare patches, mushrooms.

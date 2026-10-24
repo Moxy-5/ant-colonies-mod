@@ -3,6 +3,7 @@ package com.antcolonies.savanna.client;
 import com.antcolonies.client.AntRenderer;
 import com.antcolonies.client.InsectModel;
 import com.antcolonies.savanna.SavannaMod;
+import com.antcolonies.savanna.entity.MatabeleEntity;
 import com.antcolonies.savanna.entity.TermiteKingEntity;
 import com.antcolonies.savanna.entity.TermiteSoldierEntity;
 import com.antcolonies.savanna.entity.TermiteWorkerEntity;
@@ -19,6 +20,10 @@ import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 /** How the termites are drawn (the split, step S4, out of the shared {@link ClientEvents}). */
 @EventBusSubscriber(modid = SavannaMod.MODID, value = Dist.CLIENT)
 public class SavannaClientEvents {
+    /** The Matabele models' drawing scales, as the animation lab's (tools/anim_lab.py RENDER_SCALE). */
+    static final float MATABELE_MAJOR_SCALE = 0.95F;
+    static final float MATABELE_MINOR_SCALE = 0.455F;
+
     @SubscribeEvent
     public static void onRegisterLayers(EntityRenderersEvent.RegisterLayerDefinitions event) {
         event.registerLayerDefinition(TermiteNymphRenderer.LAYER, TermiteNymphRenderer::createLayer);
@@ -52,5 +57,14 @@ public class SavannaClientEvents {
                 context, new InsectModel<TermiteSoldierEntity>(
                         ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "termite_major_soldier")))
                 .withScale(TermiteQueenModel.RENDER_SCALE));
+        // Matabele ants (tools/matabele_models.py, clips by tools/matabele_anims.py), drawn at the model viewer's sizes.
+        event.registerEntityRenderer(SavannaEntities.MATABELE_MAJOR.get(), context -> new AntRenderer<>(
+                context, new InsectModel<MatabeleEntity>(
+                        ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "matabele_major")))
+                .withScale(MATABELE_MAJOR_SCALE));
+        event.registerEntityRenderer(SavannaEntities.MATABELE_MINOR.get(), context -> new AntRenderer<>(
+                context, new InsectModel<MatabeleEntity>(
+                        ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "matabele_minor")))
+                .withScale(MATABELE_MINOR_SCALE));
     }
 }

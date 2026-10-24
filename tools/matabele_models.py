@@ -649,11 +649,10 @@ def gaster_cubes():
     return cubes
 
 
-# --- the draft game files (2026-10-23, for the animations) -----------------------------------------------------------
-# The model as the game would read it, a major and a minor, each with its own texture, written into drafts/savanna/
-# (tools/mod_paths.py, "Drafts"): every tool (the animation lab, the body plans, the motion library) reads them as if
-# they were in the savanna mod, while the game never sees them. Putting the ant into the game is moving these files
-# into the mod (the user's call). The clips are written next to them by tools/matabele_anims.py.
+# --- the game files (2026-10-23) ----------------------------------------------------------------------------------------
+# The model as the game reads it, a major and a minor, each with its own texture, written into the savanna mod (drafts
+# in drafts/savanna/ until the user put the ant into the game, 2026-10-23, with a spawn egg each). The clips are written
+# next to them by tools/matabele_anims.py.
 #   python tools/matabele_models.py      writes both models and textures
 import json  # noqa: E402
 import os  # noqa: E402
@@ -662,7 +661,7 @@ import sys  # noqa: E402
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import mod_paths  # noqa: E402
 
-DRAFTS = mod_paths.draft_assets('savanna')
+DRAFTS = mod_paths.assets('savanna')                          # where the files go (the name kept from the drafts)
 MODELS = {'matabele_major': False, 'matabele_minor': True}     # name -> minor
 JAW = '2'                                                       # the jaws the user picked (JAWS)
 LOOK = 'A'

@@ -5,6 +5,8 @@
     "termite_king",
     "termite_queen",
     "termite_minor_soldier",
-    "termite_major_soldier"
+    "termite_major_soldier",
+    "matabele_major",
+    "matabele_minor"
   ]
 }
