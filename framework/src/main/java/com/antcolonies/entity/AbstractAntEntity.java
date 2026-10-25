@@ -894,6 +894,16 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return colony == null || !hasColonyRole() ? 0 : colony.profile().worker().restNearEntrance();
     }
 
+    /**
+     * Whether this insect, while it stays in (see {@link #mayGoOut}), keeps to the nest's rooms: a worker of a species
+     * with {@code worker.rest_in_rooms} (real Megaponera crowd into their chamber with the queen and the brood), so it
+     * never settles in the shaft or a tunnel on its way in.
+     */
+    public boolean restsInRooms() {
+        Colony colony = getColony();
+        return colony != null && hasColonyRole() && colony.profile().worker().restInRooms() && !mayGoOut();
+    }
+
     /** Whether this cell may be the end of a walk now: anywhere while it may go out (see {@link #mayGoOut}), otherwise only inside. */
     public boolean mayBeAt(BlockPos cell) {
         Colony colony = getColony();
