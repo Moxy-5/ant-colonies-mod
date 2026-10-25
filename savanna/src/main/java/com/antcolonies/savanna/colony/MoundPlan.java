@@ -175,6 +175,21 @@ public final class MoundPlan {
         return false;
     }
 
+    /**
+     * The game tests: waits (at most this long) for the mounds being grown in the background. The test server runs its
+     * ticks as fast as it can, so a test's 400 ticks can pass in a third of a second, before the second of growing is
+     * done; in play 400 ticks are 20 seconds (docs/BUGS.md 73).
+     */
+    public static void awaitGrowingForTests(long millis) {
+        for (CompletableFuture<List<Shape>> growing : GROWING.values()) {
+            try {
+                growing.get(millis, java.util.concurrent.TimeUnit.MILLISECONDS);
+            } catch (Exception e) {
+                // (timed out or failed: the test's own check says so)
+            }
+        }
+    }
+
     /** How many blocks of mound soil a stage has (plain soil and soil with a tunnel through it). */
     public static int walls(Shape stage) {
         int walls = 0;

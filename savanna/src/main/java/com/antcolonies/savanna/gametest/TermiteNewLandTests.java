@@ -13,6 +13,7 @@ import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.block.DeadCombBlock;
 import com.antcolonies.savanna.block.FungusCombBlock;
 import com.antcolonies.savanna.colony.DeadMounds;
+import com.antcolonies.savanna.colony.MoundPlan;
 import com.antcolonies.savanna.colony.NewLandMounds;
 import com.antcolonies.savanna.entity.TermiteKingEntity;
 import com.antcolonies.savanna.tree.Forest;
@@ -85,6 +86,9 @@ public class TermiteNewLandTests {
         helper.succeedWhen(() -> {
             Colony colony = ColonyManager.get(level).getColonies().stream()
                     .filter(c -> c.getCenter().closerThan(middle, 3)).findFirst().orElse(null);
+            if (colony == null) {
+                MoundPlan.awaitGrowingForTests(10_000); // (the test server's ticks outrun the second of growing: BUGS 73)
+            }
             helper.assertTrue(colony != null, "not put in yet");
             double millis = NewLandMounds.get(level).lastMillisForTests();
             helper.assertTrue(millis < 400, "putting it in took " + millis + " ms");
