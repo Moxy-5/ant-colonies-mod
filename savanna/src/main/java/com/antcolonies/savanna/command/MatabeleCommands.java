@@ -58,7 +58,7 @@ public class MatabeleCommands {
         if (siteWord != null) {
             only = MatabeleNest.Kind.byWord(siteWord);
             if (only == null) {
-                source.sendFailure(Component.literal("Unknown site '" + siteWord + "': mound, log or ground."));
+                source.sendFailure(Component.literal("Unknown site '" + siteWord + "': mound, log, standing or ground."));
                 return 0;
             }
         }
