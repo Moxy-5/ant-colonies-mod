@@ -507,7 +507,7 @@ def ease_in(rig, leg, target, pose, q, steps=24):
 
 
 def walk(rig, seconds, cycles=1, sweep=3.4, duty=0.58, lift=0.9, phases=TRIPOD, bob=0.06, sway=2.0, gaster_sway=3.0,
-         wide=0.0, shift=None, raise_by=0.0, still=None, keys=40, track=None, middle_duty=None):
+         wide=0.0, shift=None, raise_by=0.0, still=None, keys=40, track=None, middle_duty=None, lost=()):
     """A walking clip with every leg worked out backwards from its foot's path (see foot_path).
 
     seconds: the clip's length; cycles: gait cycles in it. sweep (units), duty, lift (units): the step.
@@ -517,6 +517,8 @@ def walk(rig, seconds, cycles=1, sweep=3.4, duty=0.58, lift=0.9, phases=TRIPOD, 
     still: a still pose under it all (the hot look's raised gaster, ...).
     middle_duty: the middle legs' own duty (real ants keep them down longer than the front and hind ones, Wahl et al.
     2015); they then sweep further, so every planted foot still moves with the ground. Default: the same duty.
+    lost: legs bitten off (M8 step 2d): no step of their own (phases need not name them); the stump is held up still,
+    as its foot would be at the top of a step, and the game hides the leg from the knee down.
     Returns (track, stride in units per clip, report); report['swap'] is the moment in the cycle (0-1) when R2 is at
     the middle of its stance (see walk_swap)."""
     tr = track or Track(rig)
@@ -533,8 +535,9 @@ def walk(rig, seconds, cycles=1, sweep=3.4, duty=0.58, lift=0.9, phases=TRIPOD, 
     first = None
     per_cycle = sweep / duty                          # ground covered in one cycle
     duties = {key: (middle_duty if middle_duty and rig.is_middle(key) else duty) for key in rig.legs}
-    front = rig.front_left
+    front = rig.front_left if rig.front_left in phases else min(phases, key=lambda k: rig.legs[k].pair)
     mid = phases[front] + duty / 2                    # tripod 1's mid-stance: the body is highest
+    stumps = {key: None for key in lost}              # a lost leg's held pose, solved once
     for warm in (True, False):                        # one cycle to settle the solver, then the clip
         for i in range(n + 1 if not warm else keys):
             eased = warm and i == 0
@@ -549,12 +552,17 @@ def walk(rig, seconds, cycles=1, sweep=3.4, duty=0.58, lift=0.9, phases=TRIPOD, 
             pose_still['body_pos'] = body_pos
             pose = pose_of(pose_still)
             for key, leg in rig.legs.items():
-                target, _ = foot_path(centres[key], per_cycle * duties[key], duties[key], lift, 0.25 * leg.out, phases[key], p)
+                if key in stumps:
+                    cx, cy, cz = centres[key]
+                    target = (cx - 0.6 * leg.out, cy + 2.0 * lift, cz)
+                else:
+                    target, _ = foot_path(centres[key], per_cycle * duties[key], duties[key], lift, 0.25 * leg.out, phases[key], p)
                 if eased:
                     q[key] = ease_in(rig, leg, target, pose, q[key])
                 q[key], err = leg.reach(target, pose, q[key])
                 if not warm:
-                    worst[key] = max(worst[key], err)
+                    if key not in stumps:
+                        worst[key] = max(worst[key], err)
                     turns[key] = leg.file_turns(q[key], turns[key])
                     for bone, turn in zip((leg.hip, leg.knee, leg.foot), turns[key]):
                         tr.put(bone, t, turn)
@@ -578,7 +586,7 @@ def walk(rig, seconds, cycles=1, sweep=3.4, duty=0.58, lift=0.9, phases=TRIPOD, 
             tr.put(bone, seconds, a)
     stride = cycles * per_cycle
     report = {'worst_miss': max(worst.values()), 'misses': worst, 'seam': seam, 'stride': stride,
-              'swap': walk_swap(phases, duties[rig.swap_leg], rig.swap_leg),
+              'swap': walk_swap(phases, duties[rig.swap_leg], rig.swap_leg) if rig.swap_leg in phases else 0.0,
               'balance': balance(rig, phases, duty, sweep, middle_duty, shift, wide)}
     return tr, stride, report
 

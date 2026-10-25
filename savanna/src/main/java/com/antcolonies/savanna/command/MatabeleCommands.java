@@ -61,7 +61,37 @@ public class MatabeleCommands {
                                 .executes(context -> skirmish(context.getSource(), IntegerArgumentType.getInteger(context, "ants")))))
                 .then(Commands.literal("prey")
                         .then(Commands.argument("layers", IntegerArgumentType.integer(1, 64))
-                                .executes(context -> prey(context.getSource(), IntegerArgumentType.getInteger(context, "layers"))))));
+                                .executes(context -> prey(context.getSource(), IntegerArgumentType.getInteger(context, "layers")))))
+                .then(Commands.literal("loseleg")
+                        .executes(context -> loseLeg(context.getSource(), 1))
+                        .then(Commands.argument("legs", IntegerArgumentType.integer(1, 6))
+                                .executes(context -> loseLeg(context.getSource(), IntegerArgumentType.getInteger(context, "legs"))))));
+    }
+
+    /** How far (blocks) the leg command looks for an ant. */
+    private static final double LOSE_LEG_LOOK = 16.0;
+
+    /**
+     * M8 step 2d, for testing: the nearest Matabele within {@value #LOSE_LEG_LOOK} blocks loses this many more legs, as if
+     * termite soldiers bit them off (one at a time, by the dice; the pieces drop beside it).
+     */
+    private static int loseLeg(CommandSourceStack source, int legs) {
+        ServerLevel level = source.getLevel();
+        Vec3 at = source.getPosition();
+        MatabeleEntity ant = level.getEntitiesOfClass(MatabeleEntity.class, new AABB(at, at).inflate(LOSE_LEG_LOOK),
+                        a -> a.isAlive() && a.canLoseLegs() && com.antcolonies.entity.body.LostLegs.count(a.lostLegs()) < 6)
+                .stream().min(java.util.Comparator.comparingDouble(a -> a.distanceToSqr(at))).orElse(null);
+        if (ant == null) {
+            source.sendFailure(Component.literal("No Matabele major or minor with legs left within " + (int) LOSE_LEG_LOOK + " blocks."));
+            return 0;
+        }
+        for (int i = 0; i < legs; i++) {
+            ant.loseLeg();
+        }
+        java.util.List<String> gone = com.antcolonies.entity.body.LostLegs.gone(ant.lostLegs());
+        source.sendSuccess(() -> Component.literal("The Matabele at " + ant.blockPosition().toShortString() + " has lost "
+                + gone.size() + " leg(s): " + String.join(", ", gone) + (ant.isCrippled() ? " (it fights no more and limps home)" : "")), true);
+        return 1;
     }
 
     /** How far (blocks) the skirmish looks for a termite feeding spot, and how long (minutes) the ants fight there. */

@@ -24,6 +24,7 @@ import com.antcolonies.entity.body.Spine;
 import com.antcolonies.entity.load.CarriedLoad;
 import com.antcolonies.entity.load.FrameworkLoads;
 import com.antcolonies.entity.load.LoadKind;
+import com.antcolonies.entity.body.LostLegs;
 import com.antcolonies.fight.FightNumbers;
 import com.antcolonies.fight.Fights;
 import com.antcolonies.entity.goal.AntWanderGoal;
@@ -84,6 +85,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     private static final RawAnimation WALK_SLOW = RawAnimation.begin().thenLoop("walk_slow");
     private static final RawAnimation WALK_FAST = RawAnimation.begin().thenLoop("walk_fast");
     private static final List<RawAnimation> WALKS = List.of(WALK_SLOW, WALK, WALK_FAST);
+    /** The walks with legs bitten off, by clip name (M8 step 2d, {@link LostLegs#walkClip}). */
+    private static final java.util.Map<String, RawAnimation> LOST_WALKS = new java.util.concurrent.ConcurrentHashMap<>();
     /** Stepping round to turn where it stands (to the right, to the left; see {@link #measureWalk}). Ants and termites. */
     private static final RawAnimation TURN_R = RawAnimation.begin().thenLoop("turn_r");
     private static final RawAnimation TURN_L = RawAnimation.begin().thenLoop("turn_l");
@@ -195,6 +198,9 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
      */
     private static final EntityDataAccessor<String> DATA_STRIKE =
             SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.STRING);
+    /** The legs bitten off (M8 step 2d, six bits, {@link LostLegs}). Synced so the model hides them and walks without. */
+    private static final EntityDataAccessor<Byte> DATA_LOST_LEGS =
+            SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.BYTE);
 
     /**
      * What it holds (a soil pellet, a seed, bread, forage, a nodule in the jaws or the crop, an egg, a dead nestmate, or
@@ -265,6 +271,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         builder.define(DATA_YOUTH, (byte) 0);
         builder.define(DATA_LOAD, CarriedLoad.NONE);
         builder.define(DATA_STRIKE, "");
+        builder.define(DATA_LOST_LEGS, (byte) 0);
     }
 
     /** What it holds ({@link CarriedLoad#NONE}: nothing). */
@@ -731,6 +738,10 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     private long venomAt = NO_VENOM;
     /** The slowing of a body with the venom working in it (staggering). */
     private static final ResourceLocation STAGGER = ResourceLocation.fromNamespaceAndPath("colonyframework", "venom_stagger");
+    /** The slowing of an insect with legs bitten off (M8 step 2d, {@link LostLegs#slowing}). */
+    private static final ResourceLocation LIMP = ResourceLocation.fromNamespaceAndPath("colonyframework", "lost_legs");
+    /** The game time its last leg was bitten off (server; saved); none while it has all six. */
+    private long lostLegAt = Long.MIN_VALUE;
     /**
      * Until when (game time) it stays in after fleeing from a hunter (M8 fight polish, round B; not saved: after a
      * reload the danger is over).
@@ -800,6 +811,9 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         if (pinnedBy != null && (!pinnedBy.isAlive() || pinnedBy.attackTarget != this || !pinnedBy.gripping)) {
             pinnedBy = null; // let go (the clip's end, or the holder died or lost its grip)
         }
+        if (tickCount % 20 == 0 && lostLegs() != 0) {
+            updateLimp();
+        }
         if (venomAt != NO_VENOM && paralysedAt == NOT_PARALYSED
                 && level().getGameTime() - venomAt >= fightNumbers().map(FightNumbers.Body::venomTicks).orElse(0)) {
             fallParalysed();
@@ -836,6 +850,99 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     /** Server: whether another insect holds it in its jaws now (the blow under way, M8 fight polish, round A). */
     public boolean isPinned() {
         return pinnedBy != null;
+    }
+
+    /** The legs bitten off, six bits in {@link LostLegs#LEGS}' order (0: all six; synced). */
+    public int lostLegs() {
+        return entityData.get(DATA_LOST_LEGS) & 0x3F;
+    }
+
+    /** Whether so many legs are gone that it fights no more and limps home ({@link LostLegs#CRIPPLED}). */
+    public boolean isCrippled() {
+        return LostLegs.count(lostLegs()) >= LostLegs.CRIPPLED;
+    }
+
+    /** Whether its legs can be bitten off (its body's {@code loses_legs} in its species file; M8 step 2d). */
+    public boolean canLoseLegs() {
+        return fightNumbers().map(FightNumbers.Body::losesLegs).orElse(false);
+    }
+
+    /**
+     * A leg bitten off (M8 step 2d), one of those left by the dice, from the knee down: the piece drops to the ground
+     * ({@link LostLegEntity}, it lies there a while), and it walks slower at once, learning to walk without it over about
+     * a day ({@link LostLegs#slowing}). With {@link LostLegs#CRIPPLED} gone it stops fighting and limps home.
+     */
+    public void loseLeg() {
+        int lost = lostLegs();
+        List<Integer> left = new java.util.ArrayList<>();
+        for (int i = 0; i < LostLegs.LEGS.size(); i++) {
+            if (!LostLegs.isGone(lost, i)) {
+                left.add(i);
+            }
+        }
+        if (!left.isEmpty()) {
+            loseLeg(left.get(getRandom().nextInt(left.size())));
+        }
+    }
+
+    /** This leg (its index in {@link LostLegs#LEGS}) bitten off, as {@link #loseLeg()}. */
+    public void loseLeg(int leg) {
+        int lost = lostLegs();
+        if (LostLegs.isGone(lost, leg)) {
+            return;
+        }
+        entityData.set(DATA_LOST_LEGS, (byte) (lost | 1 << leg));
+        lostLegAt = level().getGameTime();
+        updateLimp();
+        if (level() instanceof ServerLevel level) {
+            LostLegEntity.drop(level, this, leg);
+        }
+        if (isCrippled()) {
+            endFightOrder(); // it fights no more: its usual work takes it home
+        }
+    }
+
+    /** Its walking speed by the legs it has left and how long since it lost the last ({@link LostLegs#slowing}). */
+    private void updateLimp() {
+        AttributeInstance speed = getAttribute(Attributes.MOVEMENT_SPEED);
+        if (speed == null) {
+            return;
+        }
+        long since = lostLegAt == Long.MIN_VALUE ? LostLegs.RECOVERY_TICKS : level().getGameTime() - lostLegAt;
+        double slowing = LostLegs.slowing(lostLegs(), since);
+        AttributeModifier was = speed.getModifier(LIMP);
+        if (was != null && Math.abs(was.amount() + slowing) < 1.0E-3) {
+            return;
+        }
+        speed.removeModifier(LIMP);
+        if (slowing > 0.0) {
+            speed.addTransientModifier(new AttributeModifier(LIMP, -slowing, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
+        }
+    }
+
+    /** How long (blocks) the bitten-off piece of leg is at its size: its box's width times 0.65 (the shin and foot). */
+    public float lostLegLength() {
+        return getBbWidth() * 0.65F;
+    }
+
+    /** Tests only: the chance its landed blows bite a leg off (below 0: its body's {@code leg_cut}). */
+    private double legCutForTests = -1.0;
+
+    /** Tests only: its landed blows bite a leg off with this chance (below 0 for its body's). */
+    public void setLegCutForTests(double chance) {
+        legCutForTests = chance;
+    }
+
+    /** The chance one of its landed blows bites a leg off a foe that can lose legs (its body's {@code leg_cut}). */
+    public double legCut() {
+        return legCutForTests >= 0.0 ? legCutForTests : fightNumbers().map(FightNumbers.Body::legCut).orElse(0.0);
+    }
+
+    /** Tests: these legs gone (six bits), the last lost {@code ticksAgo} ticks ago; no piece dropped. */
+    public void setLostLegsForTests(int lost, long ticksAgo) {
+        entityData.set(DATA_LOST_LEGS, (byte) (lost & 0x3F));
+        lostLegAt = lost == 0 ? Long.MIN_VALUE : level().getGameTime() - ticksAgo;
+        updateLimp();
     }
 
     /**
@@ -907,7 +1014,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
      */
     public boolean standsToFight() {
         return isAlive() && !isDowned() && pinnedBy == null && navigator.getSurface() == Direction.DOWN && !isClimbing()
-                && onGround();
+                && onGround() && !isCrippled();
     }
 
     /** Whether its jaws and sting reach the foe (their boxes nearly touch; a little more downward, into a broken tunnel). */
@@ -1926,6 +2033,10 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         if (venomAt != NO_VENOM) {
             tag.putLong("VenomAt", venomAt);
         }
+        if (lostLegs() != 0) {
+            tag.putByte("LostLegs", (byte) lostLegs());
+            tag.putLong("LostLegAt", lostLegAt);
+        }
         if (!Float.isNaN(boldness)) {
             tag.putFloat("Boldness", boldness);
             tag.putFloat("Curiosity", curiosity);
@@ -1953,6 +2064,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         stingsTaken = tag.getInt("StingsTaken");
         paralysedAt = tag.contains("ParalysedAt") ? tag.getLong("ParalysedAt") : NOT_PARALYSED;
         venomAt = tag.contains("VenomAt") ? tag.getLong("VenomAt") : paralysedAt != NOT_PARALYSED ? paralysedAt : NO_VENOM;
+        entityData.set(DATA_LOST_LEGS, (byte) (tag.getByte("LostLegs") & 0x3F));
+        lostLegAt = tag.contains("LostLegAt") ? tag.getLong("LostLegAt") : Long.MIN_VALUE;
         loadedFromSave = true;
         if (tag.contains("Boldness")) {
             boldness = tag.getFloat("Boldness");
@@ -2076,11 +2189,14 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         }
         turnReach = player.turnReach(TURN_R);
         RawAnimation clip = usualClip();
-        if (clip == WALK) {
+        RawAnimation lostWalk = clip == WALK || clip == WALK_HOT ? lostWalk() : null;
+        if (lostWalk != null) {
+            clip = lostWalk; // one walk for every speed with legs gone (M8 step 2d)
+        } else if (clip == WALK) {
             clip = player.gearFor(WALKS, WALK, walkSpeed);
         }
         settleInto(player, clip);
-        if (WALKS.contains(clip) || clip == WALK_HOT) {
+        if (WALKS.contains(clip) || clip == WALK_HOT || clip == lostWalk) {
             player.keepPace(walkSpeed, walkRateWithoutStride());
         } else if (clip == TURN_R || clip == TURN_L) {
             player.keepTurn(turnSpeed);
@@ -2090,6 +2206,13 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             player.playAt(ownPace(0));
         }
         return state.setAndContinue(clip);
+    }
+
+    /** The walk of its model for the legs it has lost ({@link LostLegs#walkClip}), or null with all six. */
+    @Nullable
+    private RawAnimation lostWalk() {
+        String name = LostLegs.walkClip(lostLegs());
+        return name == null ? null : LOST_WALKS.computeIfAbsent(name, c -> RawAnimation.begin().thenLoop(c));
     }
 
     /**

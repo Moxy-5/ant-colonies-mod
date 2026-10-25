@@ -69,10 +69,11 @@
   "fight": {
     "_note": "M8 step 2a, the shared fight system (fight.FightNumbers). Health and damage per body, my picks, to confirm in the user's first fight test (the numbers the bodies had in code before): a major 10 health (two to four soldier bites; real majors seldom die in a raid, minors more often), a minor 5, the queen 20. Damage only counts on what it does not hunt (a chicken; the player comes in step 2e): on termites, its prey, every blow is a paralysing sting that pricks for half a point and never kills (fight.Fights). prey: Macrotermes, the termites it lives on.",
     "bodies": {
-      "major": { "health": 10.0, "damage": 3.0 },
-      "minor": { "health": 5.0, "damage": 1.5 },
+      "major": { "health": 10.0, "damage": 3.0, "loses_legs": true },
+      "minor": { "health": 5.0, "damage": 1.5, "loses_legs": true },
       "queen": { "health": 20.0, "damage": 3.0 }
     },
+    "_legs_note": "M8 step 2d: majors and minors can have legs bitten off by termite soldiers (the chance is the soldier's leg_cut in macrotermes.json); the queen keeps hers until 2e gives her a fight.",
     "prey": ["antcolonies:macrotermes"],
     "_look_over_note": "M8 fight polish, round A: after felling a termite the ant stands over it, its antennae on it, this long (the shortest and longest, ticks: 1 to 2 s, my pick, to confirm), then turns to the next; one termite at a time, each blow played to its end (real raids: the attack at a feeding site lasts 5 to 30 minutes, Yusuf 2026).",
     "look_over_ticks": [20, 40],

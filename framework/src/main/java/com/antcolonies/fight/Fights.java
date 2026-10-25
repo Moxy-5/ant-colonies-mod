@@ -21,7 +21,8 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
  *
  * <p>A sting on prey (an insect of a species in the striker's {@code prey}) does not kill: it pricks (half a point,
  * never the last, so the prey's colony feels the attack) and gives one dose of venom; with {@code stings_to_fall} doses
- * the prey falls paralysed ({@link AbstractAntEntity#takeSting}). Every other blow does the striker's damage.
+ * the prey falls paralysed ({@link AbstractAntEntity#takeSting}). Every other blow does the striker's damage, and may
+ * bite a leg off ({@code leg_cut}, M8 step 2d).
  */
 public final class Fights {
     /** What a sting on prey does to its health (it is the venom that counts). */
@@ -96,7 +97,22 @@ public final class Fights {
             prey.takeSting();
             return true;
         }
-        return foe.hurt(striker.damageSources().mobAttack(striker), (float) striker.getAttributeValue(Attributes.ATTACK_DAMAGE));
+        boolean hit = foe.hurt(striker.damageSources().mobAttack(striker), (float) striker.getAttributeValue(Attributes.ATTACK_DAMAGE));
+        if (hit && foe.isAlive() && foe instanceof AbstractAntEntity insect) {
+            cutLeg(striker, insect);
+        }
+        return hit;
+    }
+
+    /**
+     * M8 step 2d: a blow that landed may bite a leg off: with the striker's body's {@code leg_cut} chance, if the foe's
+     * body {@code loses_legs} (the termite soldiers' cutting jaws on the Matabele's legs).
+     */
+    private static void cutLeg(AbstractAntEntity striker, AbstractAntEntity foe) {
+        double chance = striker.legCut();
+        if (chance > 0.0 && foe.canLoseLegs() && striker.getRandom().nextDouble() < chance) {
+            foe.loseLeg();
+        }
     }
 
     private static boolean isFoeType(@Nullable FightNumbers numbers, Entity entity) {

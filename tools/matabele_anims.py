@@ -138,6 +138,52 @@ GAITS = {'walk_slow': dict(sweep=4.4, duty=0.68, middle_duty=0.72, phases=mo.LOO
          'walk': dict(sweep=5.6, duty=0.62, middle_duty=0.67, keys=60),
          'walk_fast': dict(sweep=6.6, duty=0.55, keys=40)}
 LIFT_SHARE, BOB, SWAY, GASTER_SWAY = 0.33, 0.05, 1.5, 2.5
+# Walking with legs bitten off (M8 step 2d): one walk for every way of losing 1 or 2 legs ("walk_lost_l2",
+# "walk_lost_l1_r3"), played at any speed (the game slows a hurt ant anyway). The steps are the gait maker's rule over
+# the legs left, with the lag (how far each foot lands after the one behind it) and the feet's time down picked per
+# case: the shortest time down, then the lag closest to the tripod's 0.53, that keep 3 feet on the ground at every
+# moment with one leg gone, 2 with two gone (the four left then trot in diagonal pairs, Hughes 1957). The tripod rule
+# alone leaves too few down at times (the legs left on one side bunch up): a hurt insect goes over toward the wave gait
+# of slow walkers (a smaller lag, Wilson 1966). The stump is held up still.
+LOST_WALK = dict(sweep=5.6, keys=60)
+LOST_LAGS = [round(0.53 - 0.01 * i, 2) for i in range(34)]          # 0.53 down to 0.20
+LOST_DUTIES = [round(0.62 + 0.02 * i, 2) for i in range(12)]        # 0.62 up to 0.84
+LOST_MIDDLE_EXTRA = 0.03        # the middle legs a little longer down, as in the walks
+
+
+def feet_down_fewest(phases, duty, middle, samples=400, margin=0.02):
+    """The fewest feet down at any moment of the cycle (each foot's time down shortened by margin, for the lab's)."""
+    fewest = 6
+    for i in range(samples):
+        p = i / samples
+        down = 0
+        for key, at in phases.items():
+            d = (middle if key[1] == '2' else duty) - margin
+            down += ((p - at) % 1.0) < d
+        fewest = min(fewest, down)
+    return fewest
+
+
+def lost_gait(lost):
+    """The step moments and the time down for a walk with these legs gone (see LOST_WALK)."""
+    least = 3 if len(lost) == 1 else 2
+    for duty in LOST_DUTIES:
+        for lag in LOST_LAGS:
+            phases = mo.gait(lag=lag, lost=lost)
+            middle = round(duty + LOST_MIDDLE_EXTRA, 2)
+            if feet_down_fewest(phases, duty, middle) >= least:
+                return dict(phases=phases, duty=duty, middle_duty=middle)
+    raise ValueError(f'no gait keeps 3 feet down with {lost} gone')
+
+
+def lost_combos():
+    """Every way of losing 1 or 2 legs, as tuples of leg keys in the gait maker's order (l1 r1 l2 r2 l3 r3)."""
+    legs = mo.INSECT_LEGS
+    return [(a,) for a in legs] + [(a, b) for i, a in enumerate(legs) for b in legs[i + 1:]]
+
+
+def lost_clip_name(lost):
+    return 'walk_lost_' + '_'.join(lost)
 # Turning on the spot (the ant's way, 40 degrees a cycle): the long front legs step round 1.0 unit wider and stay down
 # a little less (so they clear the jaws), the others 0.4 wider; the forebody leads 2 degrees into the turn.
 TURN_DEGREES = 40.0
@@ -160,6 +206,17 @@ def walk_clips(name):
                        'timeline': {'0': f'stride {stride:.4f}', '0.001': f'swap {report["swap"]:.4f}',
                                     '0.002': f'speeds {band[0] * body:.2f} {band[1] * body:.2f}'},
                        'bones': tr.bones()}
+    if name != mm.QUEEN:                                    # the queen does not fight yet (2e), so keeps her legs
+        for lost in lost_combos():
+            g = dict(LOST_WALK, **lost_gait(lost))
+            tr, stride, report = mo.walk(r, WALK_SECONDS, lift=lift, bob=BOB, sway=SWAY, gaster_sway=GASTER_SWAY,
+                                         lost=lost, **g)
+            if report['worst_miss'] > 0.05:
+                raise ValueError(f'{name} {lost_clip_name(lost)}: a foot misses its path by {report["worst_miss"]:.3f}')
+            trail_antennae(tr, r, WALK_SECONDS)
+            clips[lost_clip_name(lost)] = {'loop': True, 'animation_length': WALK_SECONDS,
+                                           'timeline': {'0': f'stride {stride:.4f}', '0.001': f'swap {report["swap"]:.4f}'},
+                                           'bones': tr.bones()}
     for clip, degrees in (('turn_r', TURN_DEGREES), ('turn_l', -TURN_DEGREES)):
         tr, report = mo.turn(r, WALK_SECONDS, degrees, lift=lift, **TURN)
         if report['worst_miss'] > 0.05:

@@ -2,6 +2,7 @@ package com.antcolonies.client;
 
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.body.BodyPlans;
+import com.antcolonies.entity.body.LostLegs;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import net.minecraft.resources.ResourceLocation;
@@ -33,6 +34,8 @@ public class AntRenderer<T extends AbstractAntEntity> extends GeoEntityRenderer<
     /** The geo model last drawn and its body plan (the queen draws the worker's model, so she gets the worker's plan). */
     private ResourceLocation planModel;
     private BodyPlans.Plan plan;
+    /** Whether the last insect drawn had a leg hidden (so the next one shows all its legs again). */
+    private boolean anyLegHidden;
 
     public AntRenderer(EntityRendererProvider.Context context, GeoModel<T> model) {
         super(context, model);
@@ -52,6 +55,7 @@ public class AntRenderer<T extends AbstractAntEntity> extends GeoEntityRenderer<
         climbLift = (float) climb.liftFor(ant.getBbHeight(), drawHeight);
         climbIntoWall = (float) climb.intoWallFor(ant.getBbWidth(), drawWidth);
         ant.setClimbPose(climbLift * drawHeight, climbIntoWall * drawWidth); // for drawing it over an edge
+        showLegs(ant, plan);
         if (FilmDirector.active()) {
             // The in-game camera: every picture at the in-between time it asks for (a frozen game's own one jitters),
             // the insect's place included (the game put it where its own in-between time says).
@@ -65,6 +69,23 @@ public class AntRenderer<T extends AbstractAntEntity> extends GeoEntityRenderer<
             return;
         }
         super.render(ant, entityYaw, partialTick, poseStack, buffers, packedLight);
+    }
+
+    /**
+     * Hides the legs it has lost from the knee down (M8 step 2d, {@link LostLegs}), the thigh left as a stump. The model's
+     * bones are shared by every insect drawn with it, so each one sets all six before it is drawn.
+     */
+    private void showLegs(T ant, BodyPlans.Plan plan) {
+        int lost = ant.lostLegs();
+        if (lost == 0 && !anyLegHidden) {
+            return;
+        }
+        anyLegHidden = lost != 0;
+        for (int i = 0; i < LostLegs.LEGS.size(); i++) {
+            String role = LostLegs.lowerBone(i);
+            boolean gone = LostLegs.isGone(lost, i);
+            getGeoModel().getBone(plan != null ? plan.bone(role) : role).ifPresent(bone -> bone.setHidden(gone));
+        }
     }
 
     /**

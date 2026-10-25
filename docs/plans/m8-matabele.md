@@ -135,6 +135,9 @@ timings: all "my pick, to confirm" until then).
    - **2d, lost legs (legs only, the user's pick: antennae losses are not measured for Megaponera):** saved per ant,
      the leg hidden on the model (the Matabele model already has its six leg bones), 5- and 4-legged walks from the gait
      maker, a little slower; the lost leg lies on the ground a while; 1 or 2 gone, rest about a day, then raid again.
+     **BUILT 2026-10-25** (branch `claude/m8-fights`; the user's calls: the real study's recovery, about 30 percent
+     slower at first and nearly full speed after a day, no forced rest; only termite soldiers cut, majors more often;
+     3 or more gone, it stops fighting and limps home; details in `docs/DESIGN.md`, "Step 2d, lost legs").
    - **In-game test 2** (2c + 2d).
    - **2e, the player:** stung only when provoked (breaks into the nest, hits one, stands in a column), 2 hearts and the
      pain effect, armour as normal; defenders come out in waves and give up past the territory; the squeak.

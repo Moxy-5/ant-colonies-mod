@@ -251,6 +251,8 @@ A Minecraft mod where ants and termites live as real colonies: they dig, build, 
 
 - **M8 order changed by the user 2026-10-25: step 3 (drawn-only ants) before step 4 (scouts and raids)** (replaces "raids first" of 2026-10-24): the rest of step 2 (2c to 2f), then 3, then 4, then the test revamp, then 5 and 6 (`docs/plans/m8-matabele.md`).
 
+- **M8 step 2d, lost legs, BUILT 2026-10-25** (branch `claude/m8-fights`): termite soldiers' bites may cut a Matabele leg off at the knee (majors 30 percent, minors 15, my picks); the stump shows, the leg lies on the ground 5 minutes, 21 new walks for 5 and 4 legs; 30 percent slower at first, nearly full speed after a day (the real study); 3 or more gone, it stops fighting and limps home; `/antcolonies loseleg [1-6]`; not tried in-game yet. Next: 2c, clamping, in a linked session, then in-game test 2.
+
 ## Other notes files (read only when the task needs them)
 - `docs/DESIGN.md`: every design decision for the species and shared systems (read the section for a feature before working on it).
 - `docs/HISTORY.md`: the full change log of every feature (class names, numbers, tests, the user's confirmations) and the old handover notes for a code reviewer. Older bullets name methods as `Colony.something`: since the code review split they live in the colony's parts (`Nest`, `FoodStore`, `Brood`, ...).

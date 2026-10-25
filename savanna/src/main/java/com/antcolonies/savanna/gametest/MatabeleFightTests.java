@@ -10,6 +10,8 @@ import java.util.UUID;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.NestPlan;
+import com.antcolonies.entity.LostLegEntity;
+import com.antcolonies.entity.body.LostLegs;
 import com.antcolonies.gametest.TestAnts;
 import com.antcolonies.gametest.TestClock;
 import com.antcolonies.gametest.TestScenes;
@@ -119,6 +121,7 @@ public class MatabeleFightTests {
                 helper.assertTrue(major.getHealth() == 6.0F, "the soldier's bite should take 4 health, the major has " + major.getHealth());
                 helper.assertTrue(!major.isParalysed(), "a termite's bite should not paralyse a Matabele");
                 bitten[0] = true;
+                checkLostLegs(helper, soldier, major);
             }
             if (worker.isParalysed()) {
                 helper.assertTrue(worker.isAlive() && worker.getHealth() > 0.0F, "a stung termite should lie paralysed, alive");
@@ -338,6 +341,42 @@ public class MatabeleFightTests {
             helper.assertTrue(hid.size() >= Math.max(1, foragers.size() / 3), "only " + hid.size() + " of " + foragers.size()
                     + " foragers escaped down the holes; many should");
         });
+    }
+
+    /**
+     * M8 step 2d, in the soldier's bite above: a soldier's bite that cuts (its leg_cut made certain here) takes one leg
+     * off the Matabele from the knee down, the piece dropping beside it, and slows it about 30 percent at once; a day
+     * later it walks nearly as fast as before (Frank et al. 2017); with 3 gone it fights no more; the legs are saved.
+     */
+    private static void checkLostLegs(GameTestHelper helper, TermiteSoldierEntity soldier, MatabeleEntity major) {
+        net.minecraft.world.entity.ai.attributes.AttributeInstance speed =
+                major.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED);
+        major.setLostLegsForTests(0, 0); // the bite above may have cut one already (its own 30 percent)
+        double healthy = speed.getValue();
+        major.setHealth(major.getMaxHealth());
+        soldier.setLegCutForTests(1.0);
+        major.invulnerableTime = 0; // the bite just above leaves it a moment the game ignores new hits in
+        soldier.bite(major);
+        soldier.setLegCutForTests(-1.0);
+        major.setHealth(major.getMaxHealth());
+        helper.assertTrue(LostLegs.count(major.lostLegs()) == 1, "a cutting bite should take one leg off, gone: " + LostLegs.gone(major.lostLegs()));
+        helper.assertTrue(!helper.getLevel().getEntitiesOfClass(LostLegEntity.class, major.getBoundingBox().inflate(2.0)).isEmpty(),
+                "the bitten-off piece of leg should lie by the Matabele");
+        helper.assertTrue(Math.abs(speed.getValue() / healthy - 0.70) < 0.01,
+                "just after losing a leg it should walk 30 percent slower, walks at " + speed.getValue() / healthy);
+        helper.assertTrue(major.standsToFight() || !major.onGround(), "with one leg gone it should still fight");
+        net.minecraft.nbt.CompoundTag saved = new net.minecraft.nbt.CompoundTag();
+        major.addAdditionalSaveData(saved);
+        helper.assertTrue(saved.getByte("LostLegs") == major.lostLegs(), "the lost legs should be saved");
+        major.setLostLegsForTests(major.lostLegs(), LostLegs.RECOVERY_TICKS);
+        helper.assertTrue(Math.abs(speed.getValue() / healthy - 0.96) < 0.01,
+                "a day after losing a leg it should walk nearly as fast as before (0.96), walks at " + speed.getValue() / healthy);
+        major.setLostLegsForTests(0b000111, LostLegs.RECOVERY_TICKS);
+        helper.assertTrue(major.isCrippled() && !major.standsToFight(), "with 3 legs gone it should fight no more");
+        helper.assertTrue(Math.abs(speed.getValue() / healthy - 0.5) < 0.01, "with 3 legs gone it should limp at half speed");
+        helper.assertTrue("walk_lost_l1_r1".equals(LostLegs.walkClip(major.lostLegs())), "with 3 gone it walks the walk of the first two");
+        major.setLostLegsForTests(0, 0);
+        helper.assertTrue(Math.abs(speed.getValue() / healthy - 1.0) < 1.0E-3, "with all six it walks as before");
     }
 
     private static void floor(GameTestHelper helper) {

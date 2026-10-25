@@ -21,11 +21,13 @@ public class ClientEvents {
         event.registerLayerDefinition(AntEggRenderer.LAYER, AntEggRenderer::createLayer);
         event.registerLayerDefinition(AntLarvaRenderer.LAYER, AntLarvaRenderer::createLayer);
         event.registerLayerDefinition(AntCorpseRenderer.LAYER, AntCorpseRenderer::createLayer);
+        event.registerLayerDefinition(LostLegRenderer.LAYER, LostLegRenderer::createLayer);
     }
 
     @SubscribeEvent
     public static void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerEntityRenderer(ModEntities.ANT_EGG.get(), AntEggRenderer::new);
+        event.registerEntityRenderer(ModEntities.LOST_LEG.get(), LostLegRenderer::new);
         for (SpeciesBodies bodies : SpeciesBodies.all()) {
             event.registerEntityRenderer(bodies.corpse().get(), context -> new AntCorpseRenderer(context, bodies.corpseLook(), bodies.drawSize()));
         }

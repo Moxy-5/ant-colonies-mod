@@ -29,6 +29,8 @@ import net.minecraft.resources.ResourceLocation;
  * A body's {@code venom_ticks}: how long the venom that fells it takes to work (it staggers meanwhile, then flips onto
  * its back paralysed); 0 at once. Its {@code dodge}: the chance a hunter's grab at it fails (it twists away, M8 fight
  * polish, round B); its {@code bite_back}: the chance that, as the grab fails, it bites the hunter first (a soldier).
+ * Its {@code leg_cut}: the chance one of its blows that lands bites a leg off the foe, if the foe's body
+ * {@code loses_legs} (M8 step 2d: the termite soldiers' cutting jaws; the Matabele's legs).
  * <ul>
  * <li>{@code give_up_ticks}: how long one of its hunters sent to fight keeps searching round the spot with no foe in
  * reach before the fight is over (round B; 600 if the file says nothing).</li>
@@ -72,14 +74,17 @@ public record FightNumbers(Map<String, Body> bodies, List<String> foeTypes, List
     public static final SpeciesSection<FightNumbers> SECTION = SpeciesSection.signUp("fight", CODEC);
 
     /** One body's numbers. */
-    public record Body(double health, double damage, int stingsToFall, int venomTicks, double dodge, double biteBack) {
+    public record Body(double health, double damage, int stingsToFall, int venomTicks, double dodge, double biteBack,
+            double legCut, boolean losesLegs) {
         public static final Codec<Body> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.DOUBLE.fieldOf("health").forGetter(Body::health),
                 Codec.DOUBLE.fieldOf("damage").forGetter(Body::damage),
                 Codec.INT.optionalFieldOf("stings_to_fall", 1).forGetter(Body::stingsToFall),
                 Codec.INT.optionalFieldOf("venom_ticks", 0).forGetter(Body::venomTicks),
                 Codec.DOUBLE.optionalFieldOf("dodge", 0.0).forGetter(Body::dodge),
-                Codec.DOUBLE.optionalFieldOf("bite_back", 0.0).forGetter(Body::biteBack)
+                Codec.DOUBLE.optionalFieldOf("bite_back", 0.0).forGetter(Body::biteBack),
+                Codec.DOUBLE.optionalFieldOf("leg_cut", 0.0).forGetter(Body::legCut),
+                Codec.BOOL.optionalFieldOf("loses_legs", false).forGetter(Body::losesLegs)
         ).apply(i, Body::new));
     }
 

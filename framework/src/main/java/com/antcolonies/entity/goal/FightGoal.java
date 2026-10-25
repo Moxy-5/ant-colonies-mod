@@ -89,8 +89,8 @@ public class FightGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        if ((ant.tickCount + ant.getId()) % 5 != 0 || !(ant.level() instanceof ServerLevel level)) {
-            return false;
+        if ((ant.tickCount + ant.getId()) % 5 != 0 || !(ant.level() instanceof ServerLevel level) || ant.isCrippled()) {
+            return false; // with 3 or more legs gone it fights no more (M8 step 2d)
         }
         foe = pickFoe(level);
         return foe != null || ant.getFightSpot() != null;
@@ -98,7 +98,7 @@ public class FightGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        return foe != null && foe.isAlive() || ant.getFightSpot() != null || ant.isInABlow() || lookingOver > 0;
+        return !ant.isCrippled() && (foe != null && foe.isAlive() || ant.getFightSpot() != null || ant.isInABlow() || lookingOver > 0);
     }
 
     @Override

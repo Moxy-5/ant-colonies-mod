@@ -1136,9 +1136,13 @@ def check(model, clip, speed_bps=None, quiet=False):
             elif slip > 0.15:
                 out.append(('NOTE', f'foot {k} slips a little: {slip * 100:.0f}% of the walk speed at {t:.3f} s'))
         down_min = min(sum(gait.down[k][i] for k in gait.legs) for i in range(n + 1))
-        if down_min < 3 and len(gait.legs) == 6:
+        # A walk with legs bitten off (M8 step 2d, "walk_lost_l2", "walk_lost_l2_r2"): with one gone, still 3 down;
+        # with two gone the four left may trot in diagonal pairs, 2 down at a time, as real insects do (Hughes 1957).
+        lost = clip.name[len('walk_lost_'):].split('_') if clip.name.startswith('walk_lost_') else []
+        least = 2 if len(lost) >= 2 else 3
+        if down_min < least and len(gait.legs) == 6:
             first = next(gait.times[i] for i in range(n + 1) if sum(gait.down[k][i] for k in gait.legs) == down_min)
-            out.append(('BAD', f'only {down_min} feet on the ground at {first:.3f} s (a walking insect always has at least 3 down)'))
+            out.append(('BAD', f'only {down_min} feet on the ground at {first:.3f} s (a walking insect always has at least {least} down)'))
         duty = {k: sum(gait.down[k][:-1]) / n for k in gait.legs}
         phases = {}
         for k in gait.legs:
