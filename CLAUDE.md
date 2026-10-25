@@ -249,6 +249,8 @@ A Minecraft mod where ants and termites live as real colonies: they dig, build, 
 
 - **M8 fight polish confirmed in-game by the user 2026-10-25** ("its so much better"); fix the same day (`docs/BUGS.md` 76): ants camped a corner in a fight (they planned a way into the solid food block every tick); now they walk to any spot near it and keep searching; the targeting idea (food before soldiers) added to M8 step 4. Not tried in-game yet.
 
+- **M8 order changed by the user 2026-10-25: step 3 (drawn-only ants) before step 4 (scouts and raids)** (replaces "raids first" of 2026-10-24): the rest of step 2 (2c to 2f), then 3, then 4, then the test revamp, then 5 and 6 (`docs/plans/m8-matabele.md`).
+
 ## Other notes files (read only when the task needs them)
 - `docs/DESIGN.md`: every design decision for the species and shared systems (read the section for a feature before working on it).
 - `docs/HISTORY.md`: the full change log of every feature (class names, numbers, tests, the user's confirmations) and the old handover notes for a code reviewer. Older bullets name methods as `Colony.something`: since the code review split they live in the colony's parts (`Nest`, `FoodStore`, `Brood`, ...).

@@ -171,6 +171,9 @@ finish 1e (prey pile) and 1f (new-land colonies), then 2 (fights), then 4 (scout
 ants only (up to about 50 a raid; **step 4 before step 3 confirmed by the user 2026-10-24**, "do raids first i
 dont want to rush drawn only"), then the test revamp (`docs/plans/test-health.md`, step 4), then 3 (big columns of
 drawn-only ants), 5 and 6.
+**Order changed by the user 2026-10-25: step 3 before step 4** ("i did want to move step 3 before step 4"). Now:
+the rest of 2 (2c to 2f), then 3 (drawn-only ants), then 4 (scouts and raids, with the big columns from the start),
+then the test revamp, then 5 and 6. This replaces "step 4 before step 3" above.
 
 Later (M9): splitting into daughter colonies nearby, winged males mating in other
 colonies. After M8: harvester ant territory fights with their neighbours.
