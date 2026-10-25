@@ -6,12 +6,11 @@ import com.antcolonies.colony.Caste;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.savanna.SavannaMod;
+import com.antcolonies.savanna.colony.MatabeleColonies;
 import com.antcolonies.savanna.colony.MatabeleNest;
 import com.antcolonies.savanna.colony.PreyPile;
 import com.antcolonies.savanna.colony.SavannaParts;
 import com.antcolonies.savanna.entity.MatabeleEntity;
-import com.antcolonies.savanna.entity.MatabeleQueenEntity;
-import com.antcolonies.savanna.registry.SavannaEntities;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 
 import net.minecraft.commands.CommandSourceStack;
@@ -19,8 +18,8 @@ import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.util.Mth;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
@@ -100,49 +99,13 @@ public class MatabeleCommands {
 
     /**
      * A Matabele queen at {@code at} with her colony, settled in {@code site}, and {@code workers} workers (real ones
-     * round her up to the real-mob cap, the rest numbers), every age from just grown up to old, all just fed. Null if
-     * the queen could not be made.
+     * round her up to the real-mob cap, the rest numbers; {@link MatabeleColonies#make}). Null if the queen could not be made.
      */
     public static Colony makeColony(ServerLevel level, BlockPos at, MatabeleNest.Site site, int workers) {
-        MatabeleQueenEntity queen = SavannaEntities.MATABELE_QUEEN.get().create(level);
-        if (queen == null) {
-            return null;
-        }
-        ColonyManager manager = ColonyManager.get(level);
         // Never inside the ground (a dead mound's hump may rise round the spot asked for): up onto its top.
         if (!level.getBlockState(at).getCollisionShape(level, at).isEmpty()) {
             at = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, at);
         }
-        Colony colony = MatabeleNest.settle(level, site, queen.getUUID());
-        queen.moveTo(at.getX() + 0.5, at.getY(), at.getZ() + 0.5, colony.random().nextFloat() * 360.0F, 0.0F);
-        queen.becomeQueenOf(colony);
-        level.addFreshEntity(queen);
-        long now = level.getGameTime();
-        long oldest = Math.max(1, Math.round(colony.profile().worker().lifespanTicks() * 0.8));
-        int real = Math.min(workers, colony.profile().colony().realCap());
-        for (int i = 0; i < workers; i++) {
-            long grownUpAt = now - oldest * i / Math.max(1, workers);
-            if (i >= real) {
-                colony.population().addNewMembers(Caste.WORKER, grownUpAt, 1);
-                continue;
-            }
-            MatabeleEntity ant = MatabeleEntity.pickBody(colony.random()).create(level);
-            if (ant == null) {
-                continue;
-            }
-            // Round the queen, 1.5 to 4 blocks out, on the ground.
-            float angle = colony.random().nextFloat() * Mth.TWO_PI;
-            double distance = 1.5 + colony.random().nextDouble() * 2.5;
-            int x = Mth.floor(at.getX() + 0.5 + Math.cos(angle) * distance);
-            int z = Mth.floor(at.getZ() + 0.5 + Math.sin(angle) * distance);
-            int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
-            ant.moveTo(x + 0.5, y, z + 0.5, colony.random().nextFloat() * 360.0F, 0.0F);
-            ant.joinColony(colony);
-            ant.setGrownUpAt(grownUpAt);
-            ant.setLastMeal(now);
-            level.addFreshEntity(ant);
-        }
-        manager.markChanged();
-        return colony;
+        return MatabeleColonies.make(level, Vec3.atBottomCenterOf(at), site, workers, true);
     }
 }

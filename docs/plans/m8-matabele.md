@@ -62,6 +62,9 @@ timings: all "my pick, to confirm" until then).
    - **1f, new land and a command:** a few colonies placed in new savannas (dead mound, under a fallen tree, ground)
      kept away from living termite mounds, real sizes 100 to 2,300 (R1), mostly numbers; a command that makes one anywhere
      with a size you choose.
+     **Built 2026-10-24 (branch `claude/m8-newland-colonies-dcbea5`):** dead mounds only (the nest rule now), 2 in 3 of
+     new land's dead mounds get a colony, sizes 100 to 2,300 leaning small, a day's prey on the pile; not kept away from
+     living mounds (they lie about 96 apart anyway, real nests sit among the termites); `docs/DESIGN.md`, "Step 1f".
 2. **The shared fight system** (species-neutral, the harvester ants use it later
    against their neighbours): health and damage per caste from the profile, the
    sting (paralysis), termite soldiers clamping on and riding along, legs bitten

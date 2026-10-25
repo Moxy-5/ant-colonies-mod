@@ -97,7 +97,10 @@ public class TermiteCommands {
                         .then(Commands.literal("young").executes(context -> newMound(context.getSource(), "young", 0)))
                         .then(Commands.literal("dead").executes(context -> newMound(context.getSource(), "dead", 1))
                                 .then(Commands.argument("days", IntegerArgumentType.integer(0, 400))
-                                        .executes(context -> newMound(context.getSource(), "dead", IntegerArgumentType.getInteger(context, "days"))))))
+                                        .executes(context -> newMound(context.getSource(), "dead", IntegerArgumentType.getInteger(context, "days")))
+                                        // M8 step 1f: with a Matabele colony in it, as new land gives most dead mounds.
+                                        .then(Commands.literal("matabele")
+                                                .executes(context -> newMound(context.getSource(), "dead", IntegerArgumentType.getInteger(context, "days"), true))))))
                 .then(Commands.literal("age")
                         .then(Commands.argument("age", IntegerArgumentType.integer(0, MoundSoil.OLDEST))
                                 .executes(context -> age(context.getSource(), IntegerArgumentType.getInteger(context, "age"), 8))
@@ -108,16 +111,24 @@ public class TermiteCommands {
 
     /** A mound of new land put in at the player's feet now, as world generation would (M8 step 1b). */
     private static int newMound(CommandSourceStack source, String kind, int days) {
+        return newMound(source, kind, days, false);
+    }
+
+    private static int newMound(CommandSourceStack source, String kind, int days, boolean ants) {
         ServerLevel level = source.getLevel();
         BlockPos at = BlockPos.containing(source.getPosition());
         var pick = com.antcolonies.savanna.colony.NewLandMounds.pickFor(kind, days, level.getRandom().nextLong());
-        Colony colony = com.antcolonies.savanna.colony.NewLandMounds.get(level).put(level, at, pick);
+        var book = com.antcolonies.savanna.colony.NewLandMounds.get(level);
+        Colony colony = ants ? book.putWithAnts(level, at, pick, java.util.UUID.randomUUID(), true) : book.put(level, at, pick);
         if (colony == null) {
             source.sendFailure(Component.literal("No mound here (water, no soil, or another colony or dead mound within "
                     + com.antcolonies.savanna.colony.NewLandMounds.KEEP_APART + " blocks): see the log."));
             return 0;
         }
-        source.sendSuccess(() -> Component.literal("Put in: " + com.antcolonies.savanna.colony.NewLandMounds.describe(pick) + "."), false);
+        Colony matabele = ants ? book.lastAnts() : null;
+        source.sendSuccess(() -> Component.literal("Put in: " + com.antcolonies.savanna.colony.NewLandMounds.describe(pick)
+                + (matabele != null ? ", with a Matabele colony of " + matabele.getCount(com.antcolonies.colony.Caste.WORKER) + " workers"
+                        : ants ? ", but no Matabele colony (no way in yet)" : "") + "."), false);
         return 1;
     }
 

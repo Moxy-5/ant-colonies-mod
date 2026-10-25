@@ -88,7 +88,9 @@ public class NewLandMounds extends SavedData {
     private BlockPos lastBurrow;
     private double lastMillis;
     private final List<BlockPos> lastTrees = new ArrayList<>();
-    private int living, dead, skipped;
+    private int living, dead, skipped, ants;
+    /** The Matabele colony the last dead mound got (null if none; not saved). */
+    private Colony lastAnts;
 
     public static NewLandMounds get(ServerLevel level) {
         return level.getDataStorage().computeIfAbsent(new SavedData.Factory<>(NewLandMounds::new, NewLandMounds::load, null), DATA_NAME);
@@ -131,7 +133,7 @@ public class NewLandMounds extends SavedData {
             }
             book.waiting.remove(i);
             book.setDirty();
-            book.put(level, m, site.pick(), site.colony());
+            book.putWithAnts(level, m, site.pick(), site.colony(), false);
             return; // one a look: each is a few thousand blocks
         }
     }
@@ -180,6 +182,23 @@ public class NewLandMounds extends SavedData {
             lastMillis = (System.nanoTime() - start) / 1.0e6;
             SavannaMod.LOGGER.info("[new-land] {} at {} in {} ms", describe(pick), center.toShortString(),
                     String.format(Locale.ROOT, "%.1f", lastMillis));
+        }
+        return colony;
+    }
+
+    /**
+     * As {@link #put}, and a dead mound gets its Matabele colony by the dice ({@link MatabeleColonies#inNewLand}; with
+     * {@code alwaysAnts}, the command's, always): new land's mounds, M8 step 1f.
+     */
+    public Colony putWithAnts(ServerLevel level, BlockPos middle, Pick pick, UUID colonyId, boolean alwaysAnts) {
+        Colony colony = put(level, middle, pick, colonyId);
+        lastAnts = null;
+        if (colony != null && !pick.living()) {
+            lastAnts = MatabeleColonies.inNewLand(level, colony.getCenter(), pick.seed(), alwaysAnts);
+            if (lastAnts != null) {
+                ants++;
+                setDirty();
+            }
         }
         return colony;
     }
@@ -494,13 +513,18 @@ public class NewLandMounds extends SavedData {
 
     /** For the command: how many mounds new land has had, and how many places wait for their land. */
     public String describeBook() {
-        return String.format(Locale.ROOT, "Termite mounds of new land: %d living colonies and %d dead mounds put in, %d places skipped, %d waiting for their land to load.",
-                living, dead, skipped, waiting.size());
+        return String.format(Locale.ROOT, "Termite mounds of new land: %d living colonies and %d dead mounds put in (%d with a Matabele colony), %d places skipped, %d waiting for their land to load.",
+                living, dead, ants, skipped, waiting.size());
     }
 
     /** The game tests: the last old hump's burrow mouth (null if none) and its trees' feet. */
     public BlockPos lastBurrowForTests() {
         return lastBurrow;
+    }
+
+    /** The Matabele colony the last dead mound got (null if none). */
+    public Colony lastAnts() {
+        return lastAnts;
     }
 
     /** The game tests: how long the last mound took to put in (milliseconds). */
@@ -526,6 +550,7 @@ public class NewLandMounds extends SavedData {
         tag.putInt("living", living);
         tag.putInt("dead", dead);
         tag.putInt("skipped", skipped);
+        tag.putInt("ants", ants);
         return tag;
     }
 
@@ -538,6 +563,7 @@ public class NewLandMounds extends SavedData {
         book.living = tag.getInt("living");
         book.dead = tag.getInt("dead");
         book.skipped = tag.getInt("skipped");
+        book.ants = tag.getInt("ants");
         return book;
     }
 }
