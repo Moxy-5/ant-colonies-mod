@@ -403,6 +403,8 @@ Moved here from CLAUDE.md on 2026-10-13 (it was loaded into every chat and took 
 
 - **Guard film `p_burrow` removed (the user, 2026-10-25):** the Matabele no longer dig a burrow with soil ramps (dead mounds only), so the ramp walking film is gone; the other 15 guard films after the attack rework: 0 changed pictures.
 
+- **M8 steps 2a and 2b confirmed working in-game by the user 2026-10-25** ("everything works"), but not polished: the sting counts the moment the attack starts, so most termites fall before the clip shows the sting; ten ants cleared a feeding spot in about a minute ("walking death"); the user's rule: no attack while climbing sideways or down. A polish step is being planned.
+
 ## Handover notes for a code reviewer (written at the end of a very long session)
 - State: branch `master`, all committed, `./gradlew build` passes, `./gradlew runGameTestServer` passes 47 tests (about 8 minutes, in one world, tests run in parallel arena grids). Some tests are timing-sensitive under load (`antsOnBumpyGroundReachTheFoodStore` and `aStarvingWorkerSlowsDownAndDies` have each failed once and passed on a re-run): re-run before blaming a change.
 - Confirmed in-game by the user so far: everything up to and including dead ants and the refuse chamber, rich bread, worker hunger, colony starvation, and the hill-jam fix. Older bullets in "Current status" that still say "waiting for the user to confirm" are probably stale (the user tested them and reported no problems), but this was never written down: do not rely on those flags.
