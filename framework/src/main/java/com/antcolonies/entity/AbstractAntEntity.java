@@ -54,6 +54,7 @@ import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.FloatGoal;
 import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
@@ -710,13 +711,41 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     private boolean loadedFromSave;
     /** Ticks the attack clip still plays (server). */
     private int strikeTicks;
+    /** The blow under way (server, not saved): how it attacks, at whom, and how many ticks since it began. */
+    @Nullable
+    private Attack attack;
+    @Nullable
+    private LivingEntity attackTarget;
+    private int attackTick;
+    /** Whether the jaws of the blow under way have closed on its target (it is held). */
+    private boolean gripping;
+    /** The insect holding this one in its jaws (server, not saved), or null. */
+    @Nullable
+    private AbstractAntEntity pinnedBy;
+    /** {@link #venomAt} while no venom is working in it. */
+    private static final long NO_VENOM = Long.MIN_VALUE;
+    /**
+     * When the dose that fells it went in (game time; saved), or {@link #NO_VENOM}: it staggers, slowed, for its body's
+     * {@code venom_ticks}, then flips onto its back paralysed (M8 fight polish, round A).
+     */
+    private long venomAt = NO_VENOM;
+    /** The slowing of a body with the venom working in it (staggering). */
+    private static final ResourceLocation STAGGER = ResourceLocation.fromNamespaceAndPath("colonyframework", "venom_stagger");
     /** Where it was sent to fight (the skirmish command; step 4's raids later), and until when; not saved. */
     @Nullable
     private BlockPos fightSpot;
     private long fightUntil;
 
-    /** One way of attacking: the clip it plays and for how many ticks. */
-    public record Attack(String clip, int ticks) {
+    /**
+     * One way of attacking: the clip it plays and for how many ticks (the whole clip, played to its end), and the
+     * moments in it (ticks from its start) the jaws close on the foe ({@code gripAt}, from then the foe is held), the
+     * blow lands ({@code hitAt}: the sting goes in, the bite closes) and the jaws let go ({@code letGoAt}). A blow with
+     * no moments of its own lands at once.
+     */
+    public record Attack(String clip, int ticks, int gripAt, int hitAt, int letGoAt) {
+        public Attack(String clip, int ticks) {
+            this(clip, ticks, 0, 0, 0);
+        }
     }
 
     /**
@@ -760,6 +789,16 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         if (strikeTicks > 0 && --strikeTicks == 0) {
             entityData.set(DATA_STRIKE, "");
         }
+        if (attack != null) {
+            tickAttack();
+        }
+        if (pinnedBy != null && (!pinnedBy.isAlive() || pinnedBy.attackTarget != this || !pinnedBy.gripping)) {
+            pinnedBy = null; // let go (the clip's end, or the holder died or lost its grip)
+        }
+        if (venomAt != NO_VENOM && paralysedAt == NOT_PARALYSED
+                && level().getGameTime() - venomAt >= fightNumbers().map(FightNumbers.Body::venomTicks).orElse(0)) {
+            fallParalysed();
+        }
         if (paralysedAt != NOT_PARALYSED && tickCount % 20 == 0 && isAlive()) {
             int lasts = FightNumbers.of(profile()).map(FightNumbers::paralysedTicks).orElse(FightNumbers.DEFAULT_PARALYSED_TICKS);
             if (level().getGameTime() - paralysedAt >= lasts) {
@@ -779,35 +818,75 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return level().isClientSide ? (entityData.get(DATA_POSE_FLAGS) & PARALYSED) != 0 : paralysedAt != NOT_PARALYSED;
     }
 
+    /** Server: whether the dose that fells it is in and working (it staggers, not yet down). */
+    public boolean isEnvenomed() {
+        return venomAt != NO_VENOM && paralysedAt == NOT_PARALYSED;
+    }
+
+    /** Server: whether it is out of the fight: felled by venom (staggering or already lying paralysed). */
+    public boolean isDowned() {
+        return venomAt != NO_VENOM || paralysedAt != NOT_PARALYSED;
+    }
+
+    /** Server: whether another insect holds it in its jaws now (the blow under way, M8 fight polish, round A). */
+    public boolean isPinned() {
+        return pinnedBy != null;
+    }
+
     /**
      * A hunter's sting (see {@link Fights#strike}): one dose of venom; with its body's {@code stings_to_fall} doses (1 if
-     * the file names none) it falls paralysed: it drops what it holds, lets go of any wall and lies still, twitching,
-     * until it is taken or dies ({@code fight.paralysed_ticks}).
+     * the file names none) the venom fells it: for its body's {@code venom_ticks} it staggers, slowed, still on its feet
+     * (it cannot fight back), then it flips onto its back paralysed ({@link #fallParalysed}): it drops what it holds,
+     * lets go of any wall and lies still, twitching, until it is taken or dies ({@code fight.paralysed_ticks}).
      */
     public void takeSting() {
-        if (paralysedAt != NOT_PARALYSED) {
+        if (isDowned()) {
             return;
         }
         stingsTaken++;
         if (stingsTaken >= fightNumbers().map(FightNumbers.Body::stingsToFall).orElse(1)) {
-            paralysedAt = level().getGameTime();
-            navigator.stop();
-            setLoad(CarriedLoad.NONE);
-            asleep = false;
-            setDeltaMovement(Vec3.ZERO);
+            venomAt = level().getGameTime();
+            if (fightNumbers().map(FightNumbers.Body::venomTicks).orElse(0) <= 0) {
+                fallParalysed();
+                return;
+            }
+            AttributeInstance speed = getAttribute(Attributes.MOVEMENT_SPEED);
+            if (speed != null && !speed.hasModifier(STAGGER)) {
+                speed.addTransientModifier(new AttributeModifier(STAGGER, -0.7, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
+            }
         }
+    }
+
+    /** The venom has done its work: it falls paralysed (see {@link #takeSting}). */
+    private void fallParalysed() {
+        if (venomAt == NO_VENOM) {
+            venomAt = level().getGameTime();
+        }
+        paralysedAt = level().getGameTime();
+        AttributeInstance speed = getAttribute(Attributes.MOVEMENT_SPEED);
+        if (speed != null) {
+            speed.removeModifier(STAGGER);
+        }
+        navigator.stop();
+        setLoad(CarriedLoad.NONE);
+        asleep = false;
+        setDeltaMovement(Vec3.ZERO);
     }
 
     /** Tests: falls paralysed at once. */
     public void paralyseForTests() {
         stingsTaken = Integer.MAX_VALUE - 1;
         takeSting();
+        if (paralysedAt == NOT_PARALYSED) {
+            fallParalysed();
+        }
     }
 
-    // A paralysed insect thinks and walks no more (its goals and its legs stop; it still falls).
+    // A paralysed insect thinks and walks no more (its goals and its legs stop; it still falls); nor does one held in a
+    // hunter's jaws.
     @Override
     protected boolean isImmobile() {
-        return super.isImmobile() || isParalysed();
+        return super.isImmobile() || isParalysed() || !level().isClientSide && pinnedBy != null;
     }
 
     /** How it attacks this foe (its clip), or null if it has no attack clip of its own. */
@@ -816,14 +895,92 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return null;
     }
 
-    /** One blow at the foe by the shared rules ({@link Fights#strike}), playing its attack clip. True if it hit. */
+    /**
+     * Server: whether it may grab, sting or bite now (the user's rule, M8 fight polish, round A; shared by every
+     * species): only standing on a floor, not on a wall, sideways or head down, not on a ceiling, not falling; and not
+     * with venom working in it or held in another's jaws.
+     */
+    public boolean standsToFight() {
+        return isAlive() && !isDowned() && pinnedBy == null && navigator.getSurface() == Direction.DOWN && !isClimbing()
+                && onGround();
+    }
+
+    /** Whether its jaws and sting reach the foe (their boxes nearly touch; a little more downward, into a broken tunnel). */
+    public boolean reachesInFight(LivingEntity target) {
+        return getBoundingBox().inflate(0.35, 0.2, 0.35).expandTowards(0.0, -0.6, 0.0).intersects(target.getBoundingBox());
+    }
+
+    /**
+     * Begins one blow at the foe by the shared rules (M8 fight polish, round A): its attack clip plays to its end; the
+     * jaws close at the clip's {@code gripAt} (the foe, if an insect, is held still from then) and the blow lands at its
+     * {@code hitAt} ({@link Fights#strike}); a foe pulled out of reach before then, or the striker knocked off its feet,
+     * and the blow misses. A blow with no moments of its own lands at once. False if it may not strike now
+     * ({@link #standsToFight}) or is in the middle of a blow; else true (the blow begun, or landed at once).
+     */
     public boolean strike(LivingEntity foe) {
-        Attack attack = attackFor(foe);
-        if (attack != null) {
-            playAttack(attack);
+        if (attack != null || !standsToFight()) {
+            return false;
         }
+        Attack how = attackFor(foe);
         swing(net.minecraft.world.InteractionHand.MAIN_HAND);
-        return Fights.strike(this, foe);
+        if (how == null || how.hitAt() <= 0) {
+            if (how != null) {
+                playAttack(how);
+            }
+            return Fights.strike(this, foe);
+        }
+        playAttack(how);
+        attack = how;
+        attackTarget = foe;
+        attackTick = 0;
+        gripping = false;
+        return true;
+    }
+
+    /** The blow under way, one tick on: the grip, the moment it lands, the letting go, the clip's end. */
+    private void tickAttack() {
+        Attack how = attack;
+        LivingEntity target = attackTarget;
+        attackTick++;
+        boolean holds = target != null && target.isAlive() && isAlive() && reachesInFight(target)
+                && navigator.getSurface() == Direction.DOWN && !isClimbing() && pinnedBy == null;
+        if (attackTick == how.gripAt() && holds) {
+            if (target instanceof AbstractAntEntity prey) {
+                if (prey.pinnedBy == null && !prey.isParalysed()) {
+                    gripping = true;
+                    prey.pinnedBy = this;
+                    prey.navigator.stop();
+                    prey.setDeltaMovement(Vec3.ZERO);
+                }
+            } else {
+                gripping = true;
+            }
+        }
+        if (gripping && !holds) {
+            gripping = false; // pulled away, or the striker knocked off its feet: a miss
+        }
+        if (attackTick == how.hitAt() && gripping) {
+            Fights.strike(this, target);
+        }
+        if (attackTick >= how.letGoAt() && attackTick >= how.hitAt()) {
+            gripping = false;
+        }
+        if (attackTick >= how.ticks()) {
+            attack = null;
+            attackTarget = null;
+            gripping = false;
+        }
+    }
+
+    /** Server: whether a blow is under way (from its first frame to the clip's end). */
+    public boolean isInABlow() {
+        return attack != null;
+    }
+
+    /** Server: the foe of the blow under way, or null. */
+    @Nullable
+    public LivingEntity blowTarget() {
+        return attackTarget;
     }
 
     /** Plays an attack clip (a blow, or biting mud open) without hitting anything. */
@@ -1670,6 +1827,9 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         if (paralysedAt != NOT_PARALYSED) {
             tag.putLong("ParalysedAt", paralysedAt);
         }
+        if (venomAt != NO_VENOM) {
+            tag.putLong("VenomAt", venomAt);
+        }
         if (!Float.isNaN(boldness)) {
             tag.putFloat("Boldness", boldness);
             tag.putFloat("Curiosity", curiosity);
@@ -1696,6 +1856,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         seedForBread = tag.getBoolean("SeedForBread");
         stingsTaken = tag.getInt("StingsTaken");
         paralysedAt = tag.contains("ParalysedAt") ? tag.getLong("ParalysedAt") : NOT_PARALYSED;
+        venomAt = tag.contains("VenomAt") ? tag.getLong("VenomAt") : paralysedAt != NOT_PARALYSED ? paralysedAt : NO_VENOM;
         loadedFromSave = true;
         if (tag.contains("Boldness")) {
             boldness = tag.getFloat("Boldness");
@@ -1738,7 +1899,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     }
 
     /** Lying paralysed by a hunter's sting (M8 step 2b): the clip of every insect that can be stung so. */
-    private static final RawAnimation PARALYSED_CLIP = RawAnimation.begin().thenLoop("paralysed");
+    // Felled: it flips onto its back (paralysed_fall, M8 fight polish, round A), then lies twitching (paralysed).
+    private static final RawAnimation PARALYSED_CLIP = RawAnimation.begin().thenPlay("paralysed_fall").thenLoop("paralysed");
     /** The attack clips, by name (made once each). */
     private static final Map<String, RawAnimation> STRIKE_CLIPS = new HashMap<>();
 

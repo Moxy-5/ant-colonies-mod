@@ -9,6 +9,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.entity.AbstractAntEntity;
+import com.antcolonies.fight.FightNumbers;
 import com.antcolonies.fight.Fights;
 
 import net.minecraft.core.BlockPos;
@@ -27,14 +28,20 @@ import net.minecraft.world.phys.AABB;
  * ({@link AbstractAntEntity#openWayTo}: a Matabele major bites the mud open), else it leaves it for a while. With no foe
  * left round the spot for {@link #DONE_TICKS} the order ends and it goes back to its usual work (home, for one with a
  * colony). The legs walk it ({@code AntNavigator}); this goal only says where.
+ *
+ * <p>M8 fight polish, round A: one foe at a time, each blow finished. It strikes only standing on a floor
+ * ({@link AbstractAntEntity#standsToFight}: never from a wall or a ceiling) and facing the foe; the blow's clip plays to
+ * its end ({@link AbstractAntEntity#isInABlow}) while it holds still, and a foe it has felled it stands over a moment,
+ * feeling it with its antennae (the species file's {@code fight.look_over_ticks}), before it turns to the next. A foe
+ * another hunter holds in its jaws is left to that one.
  */
 public class FightGoal extends Goal {
     /** How far (blocks) round the spot it looks for foes. */
     public static final double SPOT_REACH = 12.0;
     /** How far (blocks) it follows one that hurt it. */
     private static final double FIGHT_BACK_REACH = 8.0;
-    /** Ticks between two blows (a blow's clip plays meanwhile). */
-    private static final int STRIKE_INTERVAL = 24;
+    /** How far off (degrees) its heading may be from the foe for it to strike: it turns to face it first. */
+    private static final float FACING = 30.0F;
     /** How often (ticks) it plans a new way to a moving foe. */
     private static final int CHASE_REPLAN = 10;
     /** A foe it found no way to is left alone this long (ticks). */
@@ -49,7 +56,10 @@ public class FightGoal extends Goal {
     private LivingEntity foe;
     @Nullable
     private BlockPos walkingTo;
-    private int strikeCooldown;
+    /** The foe of its last blow (to stand over it once felled), and how long it still stands over one. */
+    @Nullable
+    private LivingEntity struck;
+    private int lookingOver;
     private int replan;
     private int idleTicks;
     /** Foes it found no way to, and until when it leaves each alone. */
@@ -71,7 +81,7 @@ public class FightGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        return foe != null && foe.isAlive() || ant.getFightSpot() != null;
+        return foe != null && foe.isAlive() || ant.getFightSpot() != null || ant.isInABlow() || lookingOver > 0;
     }
 
     @Override
@@ -85,6 +95,8 @@ public class FightGoal extends Goal {
     public void stop() {
         ant.getNavigator().stop();
         foe = null;
+        struck = null;
+        lookingOver = 0;
         walkingTo = null;
     }
 
@@ -93,8 +105,29 @@ public class FightGoal extends Goal {
         if (!(ant.level() instanceof ServerLevel level)) {
             return;
         }
-        if (strikeCooldown > 0) {
-            strikeCooldown--;
+        // A blow under way plays to its end; it holds still, facing its foe.
+        if (ant.isInABlow()) {
+            ant.getNavigator().stop();
+            LivingEntity target = ant.blowTarget();
+            if (target != null) {
+                face(target.getX(), target.getZ());
+            }
+            return;
+        }
+        // After the blow: a foe it felled it stands over a moment, its antennae on it, before it turns to the next.
+        if (struck != null) {
+            if (struck instanceof AbstractAntEntity prey && prey.isDowned()) {
+                lookingOver = FightNumbers.of(ant.profile()).map(numbers -> numbers.lookOverTicks(ant.getRandom())).orElse(0);
+            }
+            if (lookingOver > 0) {
+                ant.getLookControl().setLookAt(struck);
+            }
+            struck = null;
+        }
+        if (lookingOver > 0) {
+            lookingOver--;
+            ant.getNavigator().stop();
+            return;
         }
         if (foe == null || !Fights.mayAttack(ant.profile(), foe) || (ant.tickCount + ant.getId()) % 20 == 0) {
             foe = pickFoe(level);
@@ -122,13 +155,12 @@ public class FightGoal extends Goal {
 
     /** At the foe: strikes it now and then; otherwise goes at it, or opens the way to it, or leaves it for a while. */
     private void fight(ServerLevel level, LivingEntity target) {
-        if (reaches(target)) {
+        // Only from a floor (the user's rule): reaching it from a wall or a ceiling, it goes on to the floor first.
+        if (ant.reachesInFight(target) && ant.standsToFight()) {
             ant.getNavigator().stop();
             walkingTo = null;
-            face(target.getX(), target.getZ());
-            if (strikeCooldown <= 0) {
-                ant.strike(target);
-                strikeCooldown = STRIKE_INTERVAL;
+            if (face(target.getX(), target.getZ()) && ant.strike(target)) {
+                struck = target;
             }
             return;
         }
@@ -165,24 +197,23 @@ public class FightGoal extends Goal {
     }
 
     private boolean usable(LivingEntity candidate) {
-        return candidate != ant && !unreachable.containsKey(candidate.getUUID()) && Fights.mayAttack(ant.profile(), candidate);
+        return candidate != ant && !unreachable.containsKey(candidate.getUUID()) && Fights.mayAttack(ant.profile(), candidate)
+                && !(candidate instanceof AbstractAntEntity insect && insect.isPinned() && candidate != ant.blowTarget());
     }
 
-    /** Whether its jaws and sting reach the foe (their boxes nearly touch; a little more downward, into a broken tunnel). */
-    private boolean reaches(LivingEntity target) {
-        return ant.getBoundingBox().inflate(0.35, 0.2, 0.35).expandTowards(0.0, -0.6, 0.0).intersects(target.getBoundingBox());
-    }
-
-    private void face(double x, double z) {
+    /** Turns toward the point; true once it faces it (within {@link #FACING} degrees). */
+    private boolean face(double x, double z) {
         double dx = x - ant.getX();
         double dz = z - ant.getZ();
         if (dx * dx + dz * dz < 1.0E-4) {
-            return;
+            return true;
         }
         float target = (float) (Mth.atan2(dz, dx) * Mth.RAD_TO_DEG) - 90.0F;
         float yaw = Mth.approachDegrees(ant.getYRot(), target, TURN);
         ant.setYRot(yaw);
         ant.setYBodyRot(yaw);
         ant.setYHeadRot(yaw);
+        return Math.abs(Mth.wrapDegrees(target - yaw)) <= FACING;
     }
+
 }

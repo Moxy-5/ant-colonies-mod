@@ -72,8 +72,15 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
 
     /** A foe this far below it (blocks) is stabbed down into. */
     private static final double BELOW = 0.4;
-    private static final Attack GRAB_AND_STING = new Attack("attack_a", 24);
-    private static final Attack STAB_DOWN = new Attack("attack_b", 17);
+    /**
+     * The two attacks, their moments read from the clips' key frames ({@code tools/matabele_anims.py}, M8 fight polish,
+     * round A): attack_a, 1.2 s, the jaws shut on the termite at 0.23 s, the sting in at 0.56 s, let go at 1.05 s;
+     * attack_b, 1.0 s, the bite into the hole at 0.21 s, the first stab at 0.55 s, let go at 0.88 s.
+     */
+    private static final Attack GRAB_AND_STING = new Attack("attack_a", 24, 5, 11, 21);
+    private static final Attack STAB_DOWN = new Attack("attack_b", 20, 4, 11, 18);
+    /** Biting a cover open: the clip of attack_b, a bite landing at once. */
+    private static final Attack BITE_COVER = new Attack("attack_b", 20);
     /** How near (blocks, to the block's middle) it must be to bite a cover open, and how many bites it takes. */
     private static final double BITE_REACH = 1.8;
     private static final int BITES_TO_OPEN = 3;
@@ -339,11 +346,17 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         }
         getNavigator().stop();
         getLookControl().setLookAt(Vec3.atCenterOf(cover));
+        if (isStriking()) {
+            return true; // the last bite's clip still plays
+        }
+        if (!standsToFight()) {
+            return false; // not from a wall (the user's rule)
+        }
         if (!cover.equals(breaking)) {
             breaking = cover;
             bites = 0;
         }
-        playAttack(STAB_DOWN);
+        playAttack(BITE_COVER);
         playSound(SoundEvents.ROOTED_DIRT_BREAK, 0.6F, 1.4F);
         if (++bites >= BITES_TO_OPEN) {
             level.destroyBlock(cover, false, this);

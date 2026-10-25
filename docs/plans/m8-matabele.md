@@ -123,6 +123,8 @@ timings: all "my pick, to confirm" until then).
         standing on the floor may still bite an ant climbing past its head, but the climbing ant never strikes back
         (agreed by the user).
      7. Pace target: ten ants against a feeding spot take several minutes, many termites escaping down the holes.
+     **Round A BUILT 2026-10-25 (pieces 1, 2, 5, 6; `docs/HISTORY.md`, "M8 fight polish, round A"); round B (3, 4, 7)
+     next.**
      Tests: an ant on a wall never strikes; a termite falls only after the sting moment; a ten-ant skirmish lasts
      minutes, not seconds; `soldiers,termitefood,colony,away`; guard films if a clip changes; then the user looks
      in-game with `/antcolonies skirmish 10`.

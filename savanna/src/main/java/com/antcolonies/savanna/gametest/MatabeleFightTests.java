@@ -22,10 +22,19 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * Matabele by the soldier's damage and does not paralyse it; a Matabele major bites open the mud over a termite it
  * cannot reach and stings it. The termite soldiers, major and minor, are stung still too (the user's ask, 2026-10-25:
  * the fights are tested on the soldier bodies as well as the worker's).
+ *
+ * <p>M8 fight polish, round A: a blow plays its clip and lands only at the sting moment (the termite falls no sooner
+ * than {@link #STING_MOMENT} ticks after the blow began), the venom then takes the termite's {@code venom_ticks} to fell
+ * it (it staggers, then lies paralysed), and an ant on a wall never strikes (the user's rule).
  */
 @GameTestHolder(SavannaMod.MODID)
 @PrefixGameTestTemplate(false)
 public class MatabeleFightTests {
+    /** Ticks from the start of a Matabele's blow to its sting going in (attack_a and attack_b, {@code MatabeleEntity}). */
+    private static final int STING_MOMENT = 11;
+    /** The venom's time on a termite worker (macrotermes.json, {@code venom_ticks}). */
+    private static final int WORKER_VENOM = 50;
+
     @GameTest(template = "arena", timeoutTicks = 1200, skyAccess = true)
     public static void matabeleStingParalysesATermiteAndASoldierBitesBack(GameTestHelper helper) {
         floor(helper);
@@ -42,7 +51,28 @@ public class MatabeleFightTests {
         MatabeleEntity hunterMinor = TestAnts.loneWithAMind(helper, SavannaEntities.MATABELE_MINOR.get(), 11, 1, 13);
         hunterMinor.orderToFight(helper.absolutePos(new BlockPos(14, 1, 13)), helper.getLevel().getGameTime() + 2400);
         boolean[] bitten = {false};
+        // When the minor's last blow began, and when the worker was felled (-1 for not yet).
+        long[] blowAt = {-1};
+        boolean[] inBlow = {false};
+        long[] felledAt = {-1};
+        long[] paralysedAt = {-1};
         helper.onEachTick(() -> {
+            long tick = helper.getTick();
+            if (minor.isInABlow() && !inBlow[0]) {
+                blowAt[0] = tick;
+            }
+            inBlow[0] = minor.isInABlow();
+            if (worker.isDowned() && felledAt[0] < 0) {
+                felledAt[0] = tick;
+                helper.assertTrue(blowAt[0] >= 0 && tick - blowAt[0] >= STING_MOMENT - 1,
+                        "the termite was felled " + (tick - blowAt[0]) + " ticks into the blow; the sting goes in at " + STING_MOMENT);
+                helper.assertTrue(!worker.isParalysed(), "the termite should stagger a while before it lies paralysed");
+            }
+            if (worker.isParalysed() && paralysedAt[0] < 0) {
+                paralysedAt[0] = tick;
+                helper.assertTrue(felledAt[0] >= 0 && tick - felledAt[0] >= WORKER_VENOM - 1,
+                        "the termite lay paralysed " + (tick - felledAt[0]) + " ticks after the sting; the venom takes " + WORKER_VENOM);
+            }
             if (helper.getTick() == 5) {
                 // 2a: each body's numbers from its species file (macrotermes.json, megaponera_analis.json).
                 helper.assertTrue(worker.getMaxHealth() == 3.0F, "a termite worker should have 3 health, has " + worker.getMaxHealth());
@@ -92,6 +122,42 @@ public class MatabeleFightTests {
             helper.assertTrue(helper.getBlockState(new BlockPos(8, 2, 6)).isAir(), "the major has not bitten the mud open yet (at "
                     + helper.relativePos(major.blockPosition()) + ")");
             helper.assertTrue(worker.isParalysed() && worker.isAlive(), "the termite under the mud has not been stung still yet");
+        });
+    }
+
+    /**
+     * The user's rule (M8 fight polish, round A): nothing strikes unless standing on a floor. A termite sits on top of a
+     * block two high; the Matabele sent at it climbs the side, and on the wall, with the termite within reach, it never
+     * begins a blow; once on top it stings it.
+     */
+    @GameTest(template = "arena", timeoutTicks = 1600, skyAccess = true)
+    public static void matabeleOnAWallNeverStrikes(GameTestHelper helper) {
+        floor(helper);
+        for (int x = 7; x <= 9; x++) {
+            for (int z = 5; z <= 7; z++) {
+                helper.setBlock(x, 1, z, Blocks.STONE);
+                helper.setBlock(x, 2, z, Blocks.STONE);
+            }
+        }
+        TermiteWorkerEntity worker = TestAnts.lone(helper, SavannaEntities.TERMITE_WORKER.get(), 8, 3, 6);
+        MatabeleEntity minor = TestAnts.loneWithAMind(helper, SavannaEntities.MATABELE_MINOR.get(), 3, 1, 6);
+        minor.orderToFight(helper.absolutePos(new BlockPos(8, 3, 6)), helper.getLevel().getGameTime() + 2400);
+        boolean[] climbed = {false};
+        boolean[] inBlow = {false};
+        helper.onEachTick(() -> {
+            if (minor.isClimbing()) {
+                climbed[0] = true;
+            }
+            if (minor.isInABlow() && !inBlow[0]) {
+                helper.assertTrue(!minor.isClimbing(), "the Matabele began a blow while on a wall (" + minor.getSurface() + ")");
+            }
+            inBlow[0] = minor.isInABlow();
+            helper.assertTrue(!worker.isPinned() || !minor.isClimbing(), "the termite is held by a Matabele on a wall");
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(climbed[0], "the Matabele has not climbed the block yet (at " + helper.relativePos(minor.blockPosition()) + ")");
+            helper.assertTrue(worker.isDowned() && worker.isAlive(), "the Matabele has not stung the termite on top yet (at "
+                    + helper.relativePos(minor.blockPosition()) + ", " + minor.getSurface() + ")");
         });
     }
 

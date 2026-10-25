@@ -18,7 +18,7 @@ The model checker: references/termites/preview/ gets one labelled picture per ca
 her face, front_above.png, side.png, top.png), each showing the king, the worker and the queen at 0%, 50%, 75% and
 100% grown, all at the same scale, and walk.png with four moments of a step.
 """
-import json, math, os, random, struct, zlib
+import json, math, os, random, struct, sys, zlib
 import mod_paths  # noqa: E402  (where each mod's files are: tools/mod_paths.py)
 
 # Where the forebody (head, thorax, legs) joins the abdomen, in model pixels.
@@ -451,6 +451,7 @@ def soldier_animations(name, bones):
     out.update({k: v for k, v in clips.items() if k.startswith(('walk', 'turn'))})
     out['head_bang'] = {'loop': True, 'animation_length': DRUM_SECONDS, 'bones': head_bang()}
     out['bite'] = {'loop': False, 'animation_length': BITE_SECONDS, 'bones': bite()}
+    out['paralysed_fall'] = clips['paralysed_fall']
     out['paralysed'] = clips['paralysed']
     return {'format_version': '1.8.0', 'animations': out}
 
@@ -676,6 +677,36 @@ def paralysed(name):
     bones['mandible_r'] = work(8)
     return bones
 
+# Falling over as the venom takes hold (M8 fight polish, round A; my pick, to confirm): the stung termite has staggered
+# a few seconds on its feet (the game slows it); now its legs give way, it rolls over onto its side and on onto its
+# back, the legs pawing the air and drawing up, ending in the first pose of the paralysed loop, which then plays on.
+# The roll is about the body's long axis at the floor, so mid-roll the body is lifted (FALL_LIFT, model units, measured
+# with the animation lab so nothing sinks into the floor).
+FALL_SECONDS = 0.6
+FALL_LIFT = {'termite_worker': 2.0, 'termite_king': 3.0, 'termite_queen': 3.0, 'termite_minor_soldier': 2.5,
+             'termite_major_soldier': 3.5}
+
+def paralysed_fall(name):
+    lift = PARALYSED_LIFT.get(name, 0.0)
+    mid = FALL_LIFT.get(name, 2.0)
+    end = f'{FALL_SECONDS:g}'
+    bones = {'body': {'rotation': {'0': [0, 0, 0], '0.12': [0, 0, -8], '0.3': [0, 0, 95], end: [0, 0, 180]},
+                      'position': {'0': [0, 0, 0], '0.12': [0, 0, 0], '0.3': [0, mid, 0], '0.45': [0, mid * 0.5, 0],
+                                   end: [0, lift, 0]}}}
+    for i, leg in enumerate(('l1', 'r2', 'l3', 'r1', 'l2', 'r3')):
+        side = 1 if leg[0] == 'l' else -1
+        paw = 22 if i % 2 == 0 else -22
+        # pawing the air: up and down, not fore and aft (a front leg swung forward would go through a soldier's head)
+        kick = abs(paw) * side
+        bones[f'leg_{leg}'] = {'rotation': {'0': [0, 0, 0], '0.2': [0, 0, kick], '0.35': [0, 0, -kick * 0.5], '0.5': [0, 0, kick * 0.5],
+                                            end: [0, 0, 0]}}
+        bones[f'leg_{leg}_lower'] = {'rotation': {'0': [0, 0, 0], '0.3': [0, 0, 15 * side], end: [0, 0, 40 * side]}}
+    bones['antenna_l_1'] = {'rotation': {'0': [0, 0, 0], '0.25': [30, 0, 0], end: [10, 0, 0]}}
+    bones['antenna_r_1'] = {'rotation': {'0': [0, 0, 0], '0.3': [25, 0, 0], end: [10, 0, 0]}}
+    bones['mandible_l'] = {'rotation': {'0': [0, 0, 0], '0.2': [0, -10, 0], end: [0, 0, 0]}}
+    bones['mandible_r'] = {'rotation': {'0': [0, 0, 0], '0.2': [0, 10, 0], end: [0, 0, 0]}}
+    return bones
+
 def animations(name='termite_king', bones=None):
     """A termite's clip file (in role names): idle, the walks and turns made for its own body (walk_clips, when its
     bones are given), the look round out of a chimney and the freeze."""
@@ -687,6 +718,7 @@ def animations(name='termite_king', bones=None):
         clips.update(walk_clips(name, bones))
     clips['peek'] = {'loop': False, 'animation_length': PEEK_SECONDS, 'bones': peek()}
     clips['freeze'] = {'loop': True, 'animation_length': FREEZE_SECONDS, 'bones': freeze()}
+    clips['paralysed_fall'] = {'loop': False, 'animation_length': FALL_SECONDS, 'bones': paralysed_fall(name)}
     clips['paralysed'] = {'loop': True, 'animation_length': PARALYSED_SECONDS, 'bones': paralysed(name)}
     return {'format_version': '1.8.0', 'animations': clips}
 
@@ -926,7 +958,22 @@ def dump_clips(name, data):
     import body_plan
     dump(f'animations/entity/{name}.animation.json', body_plan.load(name).animations_to_bones(data))
 
-if __name__ == '__main__':
+def write_clips():
+    """Only the five clip files (`python tools/termite_models.py clips`): the models, textures and pictures untouched."""
+    king = front_half() + king_abdomen()
+    queen = front_half() + queen_abdomen()
+    worker = worker_model()
+    minor, major = soldier_model(False), soldier_model(True)
+    dump_clips('termite_king', animations('termite_king', king))
+    dump_clips('termite_queen', animations('termite_queen', queen))
+    dump_clips('termite_worker', animations('termite_worker', worker))
+    dump_clips('termite_minor_soldier', soldier_animations('termite_minor_soldier', minor))
+    dump_clips('termite_major_soldier', soldier_animations('termite_major_soldier', major))
+
+if __name__ == '__main__' and sys.argv[1:] == ['clips']:
+    write_clips()
+    print('termite clips written')
+elif __name__ == '__main__':
     king = front_half() + king_abdomen()
     queen = front_half() + queen_abdomen()
     dump('geo/entity/termite_king.geo.json', geo('geometry.termite_king', king))

@@ -226,13 +226,13 @@
     }
   },
   "fight": {
-    "_note": "M8 step 2a, the shared fight system (fight.FightNumbers). Health and damage per body, the same numbers the bodies had in code before (nothing changes in-game). stings_to_fall: how many Matabele stings paralyse it (M8 step 2b, my picks, to confirm): a worker or minor 1, a major soldier 2 (the biggest, its head armoured), king and queen 3 (never reached: raids hit feeding spots, never the mound). foe_types: chickens peck termites (step 6c). foe_species: the Matabele, the termites' real enemy, fought wherever it comes from. paralysed_ticks: a stung termite nobody takes lies a day, then dies (my pick; real paralysed prey lives for days, but left in the open it is eaten or dries out).",
+    "_note": "M8 step 2a, the shared fight system (fight.FightNumbers). Health and damage per body, the same numbers the bodies had in code before (nothing changes in-game). stings_to_fall: how many Matabele stings paralyse it (M8 step 2b, my picks, to confirm): a worker or minor 1, a major soldier 2 (the biggest, its head armoured), king and queen 3 (never reached: raids hit feeding spots, never the mound). foe_types: chickens peck termites (step 6c). foe_species: the Matabele, the termites' real enemy, fought wherever it comes from. venom_ticks (M8 fight polish, round A; my picks, to confirm: the speed of Megaponera venom on termites is not measured in the papers): after the felling sting the termite staggers, slowed, this long, then flips onto its back paralysed; a worker 2.5 s, a minor soldier 3, a major soldier 5 (the biggest body), king 6, queen 8. paralysed_ticks: a stung termite nobody takes lies a day, then dies (my pick; real paralysed prey lives for days, but left in the open it is eaten or dries out).",
     "bodies": {
-      "worker": { "health": 3.0, "damage": 1.0, "stings_to_fall": 1 },
-      "minor_soldier": { "health": 6.0, "damage": 3.0, "stings_to_fall": 1 },
-      "major_soldier": { "health": 12.0, "damage": 4.0, "stings_to_fall": 2 },
-      "king": { "health": 10.0, "damage": 1.0, "stings_to_fall": 3 },
-      "queen": { "health": 20.0, "damage": 0.0, "stings_to_fall": 3 }
+      "worker": { "health": 3.0, "damage": 1.0, "stings_to_fall": 1, "venom_ticks": 50 },
+      "minor_soldier": { "health": 6.0, "damage": 3.0, "stings_to_fall": 1, "venom_ticks": 60 },
+      "major_soldier": { "health": 12.0, "damage": 4.0, "stings_to_fall": 2, "venom_ticks": 100 },
+      "king": { "health": 10.0, "damage": 1.0, "stings_to_fall": 3, "venom_ticks": 120 },
+      "queen": { "health": 20.0, "damage": 0.0, "stings_to_fall": 3, "venom_ticks": 160 }
     },
     "foe_types": ["minecraft:chicken"],
     "foe_species": ["antcolonies:megaponera_analis"],

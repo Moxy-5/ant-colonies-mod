@@ -33,7 +33,7 @@ public final class Fights {
     /**
      * Whether {@code entity} is an enemy of an insect of this species and colony (the alarm rises at it, defenders go at
      * it): an animal of the species' {@code foe_types}, an insect of another species (listed as a foe or prey, or of any
-     * colony), or an insect of another colony of the same species. Never a paralysed insect, never anything dead.
+     * colony), or an insect of another colony of the same species. Never a felled insect, never anything dead.
      */
     public static boolean isFoe(SpeciesProfile profile, ResourceLocation species, @Nullable UUID colony, Entity entity) {
         if (!(entity instanceof LivingEntity living) || !living.isAlive()) {
@@ -43,7 +43,7 @@ public final class Fights {
         if (isFoeType(numbers, entity)) {
             return true;
         }
-        if (!(entity instanceof AbstractAntEntity insect) || insect.isParalysed()) {
+        if (!(entity instanceof AbstractAntEntity insect) || insect.isDowned()) {
             return false;
         }
         if (!insect.species().equals(species)) {
@@ -54,8 +54,8 @@ public final class Fights {
 
     /**
      * Whether an insect of this species may attack {@code entity}: an animal of its {@code foe_types} or an insect of a
-     * species it lists as a foe or prey. Not the neighbours of its own species (they yield to each other), not a
-     * paralysed insect.
+     * species it lists as a foe or prey. Not the neighbours of its own species (they yield to each other), not an
+     * insect already felled (the venom working in it, or lying paralysed).
      */
     public static boolean mayAttack(SpeciesProfile profile, Entity entity) {
         if (!(entity instanceof LivingEntity living) || !living.isAlive()) {
@@ -65,7 +65,7 @@ public final class Fights {
         if (isFoeType(numbers, entity)) {
             return true;
         }
-        return entity instanceof AbstractAntEntity insect && !insect.isParalysed() && listed(numbers, insect.species());
+        return entity instanceof AbstractAntEntity insect && !insect.isDowned() && listed(numbers, insect.species());
     }
 
     /** Whether this species hunts the insect: its stings paralyse it instead of hurting it. */
@@ -76,15 +76,17 @@ public final class Fights {
 
     /**
      * One blow from {@code striker} on {@code foe}: on prey a paralysing sting (see the class comment), on anything else
-     * the striker's damage. True if the foe was hit (alive and not already lying paralysed for a sting).
+     * the striker's damage. True if the foe was hit (alive and not already felled, for a sting). Nothing is hit by a
+     * striker not standing on a floor (the user's rule, M8 fight polish, round A: {@link AbstractAntEntity#standsToFight}):
+     * an insect on a wall or a ceiling, or falling, never grabs, stings or bites.
      */
     public static boolean strike(AbstractAntEntity striker, LivingEntity foe) {
-        if (!foe.isAlive()) {
+        if (!foe.isAlive() || !striker.standsToFight()) {
             return false;
         }
         if (hunts(striker.profile(), foe)) {
             AbstractAntEntity prey = (AbstractAntEntity) foe;
-            if (prey.isParalysed()) {
+            if (prey.isDowned()) {
                 return false;
             }
             float prick = Math.min(STING_PRICK, prey.getHealth() - STING_PRICK);

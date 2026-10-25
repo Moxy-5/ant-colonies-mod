@@ -323,9 +323,13 @@ public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurs
 
     /**
      * Bites the enemy: its jaws snap shut on it (the bite animation) for the soldier's damage from the species file (a
-     * minor 3, a major 4), by the shared fight rules ({@link Fights#strike}, M8 step 2a; clamping on comes in 2c).
+     * minor 3, a major 4), by the shared fight rules ({@link Fights#strike}, M8 step 2a; clamping on comes in 2c). Only
+     * standing on a floor (the user's rule, M8 fight polish, round A); the enemy may be climbing past it.
      */
     public void bite(LivingEntity enemy) {
+        if (!standsToFight()) {
+            return;
+        }
         biteTicks = BITE_TICKS;
         swing(net.minecraft.world.InteractionHand.MAIN_HAND);
         Fights.strike(this, enemy);
