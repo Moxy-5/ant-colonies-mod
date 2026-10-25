@@ -371,7 +371,7 @@ public class NestLife {
     /** Takes a piece the brain knows is there; returns whether it was rich bread ({@code wantRich}: rich first, for the queen). */
     private boolean takePiece(boolean wantRich) {
         NurseFood food = colony.nurseFood();
-        boolean rich = colony.profile().food().makesBread() && food != null && food.takeCounted(wantRich);
+        boolean rich = food != null && food.takeCounted(wantRich); // (food the ledger counts alone, the garden's nodules, keeps no count of its own)
         colony.ledger().addNurseFood(-1);
         return rich;
     }

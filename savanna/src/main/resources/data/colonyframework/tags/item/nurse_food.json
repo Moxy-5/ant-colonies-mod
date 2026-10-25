@@ -1,6 +1,7 @@
 {
   "replace": false,
   "values": [
-    "antcolonies:fungus_nodule"
+    "antcolonies:fungus_nodule",
+    "antcolonies:paralysed_termite"
   ]
 }

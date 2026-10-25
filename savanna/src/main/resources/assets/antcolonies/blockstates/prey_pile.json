@@ -1,0 +1,52 @@
+{
+  "variants": {
+    "dead=false,layers=1": {
+      "model": "antcolonies:block/prey_pile_1_fresh"
+    },
+    "dead=true,layers=1": {
+      "model": "antcolonies:block/prey_pile_1_dead"
+    },
+    "dead=false,layers=2": {
+      "model": "antcolonies:block/prey_pile_2_fresh"
+    },
+    "dead=true,layers=2": {
+      "model": "antcolonies:block/prey_pile_2_dead"
+    },
+    "dead=false,layers=3": {
+      "model": "antcolonies:block/prey_pile_3_fresh"
+    },
+    "dead=true,layers=3": {
+      "model": "antcolonies:block/prey_pile_3_dead"
+    },
+    "dead=false,layers=4": {
+      "model": "antcolonies:block/prey_pile_4_fresh"
+    },
+    "dead=true,layers=4": {
+      "model": "antcolonies:block/prey_pile_4_dead"
+    },
+    "dead=false,layers=5": {
+      "model": "antcolonies:block/prey_pile_5_fresh"
+    },
+    "dead=true,layers=5": {
+      "model": "antcolonies:block/prey_pile_5_dead"
+    },
+    "dead=false,layers=6": {
+      "model": "antcolonies:block/prey_pile_6_fresh"
+    },
+    "dead=true,layers=6": {
+      "model": "antcolonies:block/prey_pile_6_dead"
+    },
+    "dead=false,layers=7": {
+      "model": "antcolonies:block/prey_pile_7_fresh"
+    },
+    "dead=true,layers=7": {
+      "model": "antcolonies:block/prey_pile_7_dead"
+    },
+    "dead=false,layers=8": {
+      "model": "antcolonies:block/prey_pile_8_fresh"
+    },
+    "dead=true,layers=8": {
+      "model": "antcolonies:block/prey_pile_8_dead"
+    }
+  }
+}

@@ -7,6 +7,8 @@ import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.colony.MatabeleNest;
+import com.antcolonies.savanna.colony.PreyPile;
+import com.antcolonies.savanna.colony.SavannaParts;
 import com.antcolonies.savanna.entity.MatabeleEntity;
 import com.antcolonies.savanna.entity.MatabeleQueenEntity;
 import com.antcolonies.savanna.registry.SavannaEntities;
@@ -30,6 +32,9 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  * spread draws them; the rest are numbers in the brain (they come out in the nest's finished rooms). Step 1d: the colony
  * settles in the nearest free dead termite mound within {@value MatabeleNest#LOOK} blocks (the only home for now, the
  * user's call, 2026-10-24); the ants appear where you stand and walk there. With no such mound the command says so.
+ *
+ * <p>Step 1e: {@code /antcolonies prey <layers>} lays that many bunches of fresh paralysed termites (about 10 a layer)
+ * on the prey pile of the nearest Matabele colony within 64 blocks, standing in for a raid until the raids exist (M8 step 4).
  */
 @EventBusSubscriber(modid = SavannaMod.MODID)
 public class MatabeleCommands {
@@ -39,7 +44,30 @@ public class MatabeleCommands {
                 .requires(source -> source.hasPermission(2))
                 .then(Commands.literal("matabele")
                         .then(Commands.argument("workers", IntegerArgumentType.integer(0, 2500))
-                                .executes(context -> colony(context.getSource(), IntegerArgumentType.getInteger(context, "workers"))))));
+                                .executes(context -> colony(context.getSource(), IntegerArgumentType.getInteger(context, "workers")))))
+                .then(Commands.literal("prey")
+                        .then(Commands.argument("layers", IntegerArgumentType.integer(1, 64))
+                                .executes(context -> prey(context.getSource(), IntegerArgumentType.getInteger(context, "layers"))))));
+    }
+
+    /** Fresh termites onto the nearest Matabele colony's prey pile, as a raid would bring them. */
+    private static int prey(CommandSourceStack source, int layers) {
+        ServerLevel level = source.getLevel();
+        Colony colony = ColonyManager.get(level).findNearest(BlockPos.containing(source.getPosition()), 64, MatabeleEntity.SPECIES);
+        PreyPile pile = colony == null ? null : colony.part(SavannaParts.PREY_PILE).orElse(null);
+        if (pile == null) {
+            source.sendFailure(Component.literal("No Matabele colony within 64 blocks (/antcolonies matabele <workers> makes one)."));
+            return 0;
+        }
+        int laid = pile.stock(level, layers);
+        if (laid == 0) {
+            source.sendFailure(Component.literal("No room for termites in the queen's room (is the nest settled yet?)."));
+            return 0;
+        }
+        source.sendSuccess(() -> Component.literal("Laid " + laid + " layers of paralysed termites (about " + laid * 10
+                + ") in the queen's room; the pile holds " + pile.edible() + " good layers"
+                + (laid < layers ? " (no room for the other " + (layers - laid) + ")" : "") + "."), false);
+        return laid;
     }
 
     private static int colony(CommandSourceStack source, int workers) {

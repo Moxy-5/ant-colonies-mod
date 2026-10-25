@@ -44,7 +44,7 @@ public final class SavannaTests {
         TestFilter.addCategory("soldiers", TermiteSoldierTests.class, TermiteAlarmTests.class);
         // The colony: founding, jobs by age, the virtual population, neighbours.
         TestFilter.addCategory("colony", TermiteTests.class, TermiteJobsByAgeTests.class, TermitePopulationTests.class,
-                TermiteNeighbourTests.class, MatabeleColonyTests.class, MatabeleNestTests.class);
+                TermiteNeighbourTests.class, MatabeleColonyTests.class, MatabeleNestTests.class, MatabeleFoodTests.class);
         // Colonies that live while the player is away: the termites' life while away.
         TestFilter.addCategory("away", TermiteAwayTests.class);
         // Hills and uneven ground: the side tunnels, the mound on a slope.

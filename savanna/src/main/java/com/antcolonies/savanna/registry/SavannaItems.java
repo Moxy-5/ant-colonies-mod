@@ -23,6 +23,8 @@ public class SavannaItems {
     public static final DeferredItem<BlockItem> FUNGUS_COMB = ITEMS.registerSimpleBlockItem(SavannaBlocks.FUNGUS_COMB);
     public static final DeferredItem<BlockItem> DEAD_COMB = ITEMS.registerSimpleBlockItem(SavannaBlocks.DEAD_COMB);
 
+    public static final DeferredItem<BlockItem> PREY_PILE = ITEMS.registerSimpleBlockItem(SavannaBlocks.PREY_PILE);
+    public static final DeferredItem<BlockItem> TERMITE_REMAINS = ITEMS.registerSimpleBlockItem(SavannaBlocks.TERMITE_REMAINS);
     public static final DeferredItem<BlockItem> TERMITE_MOUND = ITEMS.registerSimpleBlockItem(SavannaBlocks.TERMITE_MOUND);
 
     public static final DeferredItem<BlockItem> TERMITE_HOLE = ITEMS.registerSimpleBlockItem(SavannaBlocks.TERMITE_HOLE);
@@ -50,6 +52,9 @@ public class SavannaItems {
      * bale). What termites carry home to their food store, and what a broken forage pile drops.
      */
     public static final DeferredItem<Item> FORAGE = ITEMS.registerSimpleItem("forage");
+
+    /** A stung, paralysed termite, a piece of the Matabele prey pile (M8 step 1e): what a nurse carries to the queen or a larva. */
+    public static final DeferredItem<Item> PARALYSED_TERMITE = ITEMS.registerSimpleItem("paralysed_termite");
 
     /**
      * A fungus nodule: a small white ball of fungus that grows on the termites' fungus comb. What the nurses feed the

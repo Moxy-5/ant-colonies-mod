@@ -56,6 +56,21 @@ public class SavannaBlocks {
             BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLACK).strength(0.2F).sound(SoundType.WART_BLOCK)
                     .noOcclusion().pushReaction(PushReaction.DESTROY));
 
+    /**
+     * The Matabele prey pile (M8 step 1e, see PreyPileBlock): stung, paralysed termites heaped in the queen's room, a
+     * layer a bunch; fresh it twitches, then lies still and grey. Nothing collides with it.
+     */
+    public static final DeferredBlock<com.antcolonies.savanna.block.PreyPileBlock> PREY_PILE = BLOCKS.registerBlock("prey_pile",
+            com.antcolonies.savanna.block.PreyPileBlock::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_YELLOW).strength(0.1F).sound(SoundType.SLIME_BLOCK)
+                    .noCollission().noOcclusion().pushReaction(PushReaction.DESTROY));
+
+    /** The termite leftovers heaped beside a Matabele nest's entrance (M8 step 1e, see TermiteRemainsBlock); weathers away. */
+    public static final DeferredBlock<com.antcolonies.savanna.block.TermiteRemainsBlock> TERMITE_REMAINS = BLOCKS.registerBlock("termite_remains",
+            com.antcolonies.savanna.block.TermiteRemainsBlock::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_BROWN).strength(0.1F).sound(SoundType.GRAVEL)
+                    .noCollission().noOcclusion().pushReaction(PushReaction.DESTROY));
+
     /** Termite mound soil: built up in layers, then dries and hardens with age (see TermiteMoundBlock). */
     public static final DeferredBlock<TermiteMoundBlock> TERMITE_MOUND = BLOCKS.registerBlock("termite_mound", TermiteMoundBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_ORANGE).strength(0.6F, 3.0F).sound(SoundType.MUD)

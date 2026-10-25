@@ -7,6 +7,7 @@ import com.antcolonies.savanna.entity.MatabeleEntity;
 import com.antcolonies.savanna.entity.TermiteKingEntity;
 import com.antcolonies.savanna.entity.TermiteSoldierEntity;
 import com.antcolonies.savanna.entity.TermiteWorkerEntity;
+import com.antcolonies.savanna.registry.SavannaBlocks;
 import com.antcolonies.savanna.registry.SavannaEntities;
 import com.antcolonies.savanna.SavannaSpecies;
 import com.antcolonies.species.SpeciesBodies;
@@ -24,6 +25,8 @@ public class SavannaClientEvents {
     static final float MATABELE_MAJOR_SCALE = 0.633F;
     static final float MATABELE_MINOR_SCALE = 0.455F;
     static final float MATABELE_QUEEN_SCALE = 0.76F;
+    /** Carried termite leftovers are drawn this big (as a fraction of a full block). */
+    private static final float REMAINS_SIZE = 0.3F;
 
     @SubscribeEvent
     public static void onRegisterLayers(EntityRenderersEvent.RegisterLayerDefinitions event) {
@@ -32,6 +35,13 @@ public class SavannaClientEvents {
 
     @SubscribeEvent
     public static void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event) {
+        // M8 step 1e: termite leftovers carried out to the heap: a small heap of them in the jaws.
+        com.antcolonies.client.LoadLooks.signUp(com.antcolonies.savanna.entity.MatabeleLoads.TERMITE_REMAINS, context -> (pose, carrier, load, buffers, light, overlay) -> {
+            pose.scale(REMAINS_SIZE, REMAINS_SIZE, REMAINS_SIZE);
+            pose.translate(-0.5F, -0.3F, -0.5F);
+            net.minecraft.client.Minecraft.getInstance().getBlockRenderer().renderSingleBlock(SavannaBlocks.TERMITE_REMAINS.get().defaultBlockState()
+                    .setValue(com.antcolonies.block.SeedPileBlock.LAYERS, 3), pose, buffers, light, overlay);
+        });
         // Termites (placeholder models made by tools/termite_models.py). Each has its own animation file of the same name,
         // its walks made for its own legs (2026-10-18); the queen's swelling and pulsing are done in TermiteQueenModel.
         // (InsectModel: the live layer, its abdomen following the path over edges and round turns; termites are blind and

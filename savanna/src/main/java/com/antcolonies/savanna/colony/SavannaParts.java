@@ -265,6 +265,18 @@ public final class SavannaParts {
             .saves(BarePatches::save, BarePatches::load)
             .sample(BarePatches::fillForTests));
 
+    /**
+     * M8 step 1e: the Matabele prey pile, stung termites heaped in the queen's room, the workers', the queen's and the
+     * larvae's food; rotting in a day, the rotten layers and the leftovers carried out to a heap by the entrance.
+     */
+    public static final Type<PreyPile> PREY_PILE = listed("prey_pile", PreyPile::new, part -> part
+            .ticks(115, PreyPile::tick)
+            .ticksAway(85, PreyPile::tickAway)
+            .plugs(ColonyHooks.NURSE_FOOD, 30, pile -> pile) // the paralysed termites
+            .plugs(ColonyHooks.LIST_STORE, 20, pile -> pile::describe)
+            .saves(PreyPile::save, PreyPile::load)
+            .sample(PreyPile::fillForTests));
+
     private SavannaParts() {
     }
 

@@ -44,6 +44,7 @@ public class SavannaMod {
         SavannaItems.ITEMS.register(modEventBus);
         SavannaNumbers.signUp(); // its own sections of the species files (Apex part 3, T1), before they load
         SavannaParts.signUp();
+        com.antcolonies.savanna.entity.MatabeleLoads.signUp(); // its own loads, before any save is read
         SavannaEvents.signUpCreativeTab();
         SavannaTests.signUp();
         // How the giant savanna trees' blocks burn (Minecraft's fire table is filled once, at start).

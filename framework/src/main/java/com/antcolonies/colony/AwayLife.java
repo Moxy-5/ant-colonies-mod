@@ -238,11 +238,9 @@ public class AwayLife {
                         colony.ledger().addStore(1);
                     }
                     case NURSE_FOOD, RICH_NURSE_FOOD -> {
-                        if (colony.profile().food().makesBread()) {
-                            NurseFood food = colony.nurseFood();
-                            if (food != null) {
-                                food.countedIn(what.load() == Load.RICH_NURSE_FOOD);
-                            }
+                        NurseFood food = colony.nurseFood();
+                        if (food != null) {
+                            food.countedIn(what.load() == Load.RICH_NURSE_FOOD); // (food the ledger counts alone does nothing)
                         }
                         colony.ledger().addNurseFood(1);
                     }

@@ -7,10 +7,15 @@ import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.ColonyBorn;
 import com.antcolonies.entity.WorkerHunger;
 import com.antcolonies.entity.goal.AntWanderGoal;
+import com.antcolonies.entity.goal.CarryEggGoal;
 import com.antcolonies.entity.goal.DigGoal;
+import com.antcolonies.entity.goal.EatGoal;
+import com.antcolonies.entity.goal.FeedLarvaGoal;
+import com.antcolonies.entity.goal.FeedQueenGoal;
 import com.antcolonies.entity.goal.GoInsideGoal;
 import com.antcolonies.entity.goal.WaitAtNestGoal;
 import com.antcolonies.savanna.SavannaSpecies;
+import com.antcolonies.savanna.entity.goal.CarryRemainsGoal;
 import com.antcolonies.savanna.registry.SavannaEntities;
 import com.antcolonies.savanna.species.SavannaNumbers;
 import com.antcolonies.species.SpeciesProfile;
@@ -108,6 +113,13 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
     @Override
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));
+        // Step 1e: they eat from the prey pile, feed the queen and the larvae from it, carry eggs and carry the waste out
+        // (real Megaponera: any nestmate does any of it, no special nurses).
+        this.goalSelector.addGoal(1, new EatGoal(this, hunger()));
+        this.goalSelector.addGoal(2, new FeedQueenGoal(this));
+        this.goalSelector.addGoal(2, new FeedLarvaGoal(this));
+        this.goalSelector.addGoal(2, new CarryEggGoal(this));
+        this.goalSelector.addGoal(2, new CarryRemainsGoal(this));
         this.goalSelector.addGoal(3, new DigGoal(this, () -> true));
         this.goalSelector.addGoal(4, new GoInsideGoal(this));
         this.goalSelector.addGoal(5, new WaitAtNestGoal(this));

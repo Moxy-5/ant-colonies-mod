@@ -272,7 +272,39 @@ def xylaria_page(out):
     print("wrote", out)
 
 
+def prey_pile_page(out):
+    """The prey pile's looks (M8 step 1e): every look's pile models at each height, fresh and dead, their textures, the
+    twitching legs' frames and timing, and the leftover heap; the page draws the block models as the game would."""
+    import prey_pile_art as prey
+    soil = [[mix_soil(x, y) for x in range(S)] for y in range(S)]
+    data = {"soil": uri(png(soil)), "legs_dead": uri(png(prey.legs("dead", 0, 0))),
+            "colours": {st: uri(png(prey.sheet(st))) for st in prey.STAGES}, "legs": [],
+            "remains": [prey.remains_model(n) for n in range(1, prey.MAX_LAYERS + 1)], "looks": {}}
+    for v in range(prey.LEG_VARIANTS):
+        frames = prey.leg_animation(v)["animation"]["frames"]
+        data["legs"].append({"frames": [uri(png(prey.legs("fresh", v, f))) for f in range(4)],
+                             "order": {"frames": [[f["index"], f["time"]] for f in frames], "total": sum(f["time"] for f in frames)}})
+    for look in prey.LOOKS:
+        data["looks"][look] = {"core": {st: uri(png(prey.core(st, look))) for st in prey.STAGES},
+                               "remains": uri(png(prey.remains(look))),
+                               "piles": {st: [prey.pile(look, st, n) for n in range(1, prey.MAX_LAYERS + 1)] for st in prey.STAGES}}
+    template = (Path(__file__).resolve().parent / "prey_pile_viewer.template.html").read_text(encoding="utf-8")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")
+    print("wrote", out)
+
+
+def mix_soil(x, y):
+    """Plain mound soil for the viewer's floor and walls."""
+    rng = random.Random(x * 31 + y * 7)
+    k = rng.uniform(0.86, 1.08)
+    return tuple(clamp(c * k) for c in (150, 96, 60))
+
+
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "preypile":
+        prey_pile_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/prey_pile_viewer.html")
+        return
     if len(sys.argv) > 1 and sys.argv[1] == "xylaria":
         xylaria_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/xylaria_viewer.html")
         return
