@@ -202,7 +202,7 @@ tag('1 block', cubeBlock);
 // --- sizes and layout -----------------------------------------------------------------------------------------------
 // The major starts at twice the termite major soldier's length (the user, 2026-10-23).
 const termiteMajor = refs[2].userData.length * refs[2].scale.x;
-const settings = {major: Math.round(termiteMajor * 2 / 0.05) * 0.05, minor: 0.45, cam: 'overview'};
+const settings = {major: 1.0, minor: 0.68, cam: 'overview'};   // the game's sizes since 2026-10-24: a major about 1 block, a minor 0.68 of it (it stays as it was)
 location.hash.slice(1).split('&').filter(Boolean).forEach(kv => {
   const [k, v] = kv.split('=').map(decodeURIComponent);
   settings[k] = isNaN(parseFloat(v)) ? v : parseFloat(v);
