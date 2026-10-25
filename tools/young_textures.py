@@ -1,5 +1,5 @@
 """Draws the pale look of young workers (jobs by age, step 5b): a copy of each worker texture blended toward the pale
-colour a freshly grown insect has (callow harvester ants are a pale yellowish tan, young termite workers almost white).
+colour a freshly grown insect has (callow harvester ants are a pale yellowish tan, young termite workers almost white, young Matabele reddish brown).
 
 In the game the young texture is drawn over the normal one, strongest on the day the worker grows up and fading away
 by the end of its time as a nurse (`client/YoungPaleLayer`), so the worker darkens slowly with age.
@@ -18,6 +18,9 @@ ROOT = Path(__file__).resolve().parent.parent
 YOUNG = {
     "worker_ant": ((236, 208, 150), 0.55),
     "termite_worker": ((252, 248, 238), 0.5),
+    # Matabele callows: freshly grown ponerines are a reddish brown, darkening to black over days (my pick, to confirm).
+    "matabele_major": ((140, 88, 58), 0.45),
+    "matabele_minor": ((140, 88, 58), 0.45),
 }
 
 
