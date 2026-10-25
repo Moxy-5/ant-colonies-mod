@@ -88,6 +88,32 @@ timings: all "my pick, to confirm" until then).
    still eaten in the garden.
    Replaces `Alarm`/`Soldiers` using `TermiteSoldierEntity` directly with a shared
    defender idea.
+   **Pieces, planned with the user 2026-10-24** (decisions in `docs/DESIGN.md`, "The fight system, details"):
+   - **2a, the core:** health and damage per caste from the species files (numbers my picks, to confirm; a major
+     Matabele rarely dies to one termite, a Macrotermes major soldier is the termites' strongest), a shared defender
+     idea and "who is my enemy" question in the framework in place of `TermiteSoldierEntity` named in `Alarm`/`Soldiers`.
+     Nothing changes in-game (chickens and termite soldiers as today).
+   - **2b, the sting:** a stung termite falls paralysed and twitches, found by its nestmates if left; the attack picked by
+     where the termite is (grab and sting under in front, bite and stab down into a broken tunnel; both clips made).
+     **The skirmish command (the user's pick):** `/antcolonies skirmish <ants>` drops that many Matabeles from the
+     nearest colony (or new ones) at the nearest termite feeding spot (sheeting, feeding gallery, shallow gallery) to
+     break in and fight; step 4's scouts and columns replace it.
+   - **In-game test 1** (2a + 2b).
+   - **2c, clamping:** termite soldiers clamp on and ride along, slowing and hurting; a soldier killed while clamped
+     leaves its head locked on the leg (shown) until a nestmate bites it off in the nest.
+   - **2d, lost legs (legs only, the user's pick: antennae losses are not measured for Megaponera):** saved per ant,
+     the leg hidden on the model (the Matabele model already has its six leg bones), 5- and 4-legged walks from the gait
+     maker, a little slower; the lost leg lies on the ground a while; 1 or 2 gone, rest about a day, then raid again.
+   - **In-game test 2** (2c + 2d).
+   - **2e, the player:** stung only when provoked (breaks into the nest, hits one, stands in a column), 2 hearts and the
+     pain effect, armour as normal; defenders come out in waves and give up past the territory; the squeak.
+   - **2f, the termites' side:** soldiers drum (`head_bang`), workers further in retreat and seal behind them, the
+     soldiers shut out; those alive when the raid leaves wait by the seal and are let back in at night (the user's
+     pick); dead Matabeles and the termites' own old dead carried out and dropped by the nearest hole, fading (fresh
+     dead still eaten in the garden).
+   - **In-game test 3** (2e + 2f), then merge.
+   Tests: each piece runs `soldiers,termitefood,colony,away` (and `legs` for 2d, guard films for 2c and 2d); a full run
+   before the merge (2a changes the shared alarm).
 3. **Drawn-only ants** (brain step 4e, pulled forward): the column far from the
    player drawn by the player's game, almost free on the server.
 4. **Scouts and raids:** lone scouts by day, the scent line home, the column to a
