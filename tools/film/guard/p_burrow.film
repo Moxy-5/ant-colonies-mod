@@ -1,0 +1,26 @@
+# Guard film (the soil ramp, docs/plans/soil-ramp.md, 2026-10-24): a Matabele major walks down a burrow's floor of
+# 45-degree dirt ramps, one block down for every block forward, into the room 3 down, and back up. The trench is left
+# open on top so the camera sees the whole body on the slope (no part inside the ramps, no jump between them).
+cmd time set noon
+cmd weather clear
+cmd fill -6 -63 -2 8 -61 2 dirt
+cmd fill -6 -61 -2 8 -61 2 grass_block
+cmd setblock 0 -61 0 colonyframework:dirt_ramp[facing=west]
+cmd setblock 1 -61 0 air
+cmd setblock 1 -62 0 colonyframework:dirt_ramp[facing=west]
+cmd fill 2 -62 0 2 -61 0 air
+cmd setblock 2 -63 0 colonyframework:dirt_ramp[facing=west]
+cmd fill 3 -63 -1 5 -61 1 air
+lens 30
+walker matabele_major -3.5 -60 0.5 -90
+log burrow
+cmd tick freeze
+fov 14
+follow 0 2.6 -2.4 0 50
+go 4 -63 0
+burst burrow 110 1
+go -3 -60 0
+burst burrow_up 110 1
+log off
+follow off
+quit

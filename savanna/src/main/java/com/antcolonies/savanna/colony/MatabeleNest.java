@@ -100,8 +100,14 @@ public final class MatabeleNest {
         }
     }
 
-    /** A site: its kind, the entrance (the colony's center: the open cell over the way down) and the rooms laid out there. */
-    public record Site(Kind kind, BlockPos entrance, List<NestPlan.Chamber> rooms) {
+    /**
+     * A site: its kind, the entrance (the colony's center: the open cell over the way down), the rooms laid out there and
+     * the cells of their ways carved into soil ramps (each with its high side; a burrow's sloping floor).
+     */
+    public record Site(Kind kind, BlockPos entrance, List<NestPlan.Chamber> rooms, Map<BlockPos, Direction> ramps) {
+        public Site(Kind kind, BlockPos entrance, List<NestPlan.Chamber> rooms) {
+            this(kind, entrance, rooms, Map.of());
+        }
     }
 
     private MatabeleNest() {
@@ -138,7 +144,7 @@ public final class MatabeleNest {
     /** A colony of the Matabele with its queen ({@code queenId}) settled in {@code site}. */
     public static Colony settle(ServerLevel level, Site site, UUID queenId) {
         Colony colony = ColonyManager.get(level).createColony(MatabeleEntity.SPECIES, queenId, site.entrance());
-        colony.nest().settle(site.kind().words, site.rooms());
+        colony.nest().settle(site.kind().words, site.rooms(), site.ramps());
         ColonyManager.get(level).markChanged();
         return colony;
     }
@@ -681,14 +687,14 @@ public final class MatabeleNest {
             if (isTaken(level, spot)) {
                 continue;
             }
-            List<NestPlan.Chamber> rooms = groundRooms(spot, level);
-            if (rooms != null) {
-                return new Site(Kind.GROUND, spot, rooms);
+            Site site = groundSite(spot, level);
+            if (site != null) {
+                return site;
             }
         }
         BlockPos top = groundTop(level, feet.getX(), feet.getZ(), feet.getY());
         BlockPos spot = top != null ? top.above() : GroundReader.surface(level, feet.getX(), feet.getZ()).above();
-        return new Site(Kind.GROUND, spot, burrow(spot, Direction.from2DDataValue(Math.floorMod(spot.hashCode(), 4))));
+        return burrow(spot, Direction.from2DDataValue(Math.floorMod(spot.hashCode(), 4)));
     }
 
     /**
@@ -708,36 +714,41 @@ public final class MatabeleNest {
     }
 
     /**
-     * The rooms of a ground nest at {@code entrance} that fit the soil there and keep a block of soil from every other
+     * The burrow of a ground nest at {@code entrance} that fits the soil there and keeps a block of soil from every other
      * colony's rooms, the first side that does; null if none does.
      */
     @Nullable
-    private static List<NestPlan.Chamber> groundRooms(BlockPos entrance, ServerLevel level) {
+    private static Site groundSite(BlockPos entrance, ServerLevel level) {
         int first = Math.floorMod(entrance.hashCode(), 4);
         for (int i = 0; i < 4; i++) {
-            List<NestPlan.Chamber> rooms = burrow(entrance, Direction.from2DDataValue((first + i) % 4));
+            Site site = burrow(entrance, Direction.from2DDataValue((first + i) % 4));
             boolean fits = true;
-            for (NestPlan.Chamber room : rooms) {
+            for (NestPlan.Chamber room : site.rooms()) {
                 fits &= fits(level, room.cells()) && roofed(level, room.room());
             }
-            if (fits && !touchesAnother(level, entrance, rooms)) {
-                return rooms;
+            if (fits && !touchesAnother(level, entrance, site.rooms())) {
+                return site;
             }
         }
         return null;
     }
 
     /**
-     * The burrow at {@code entrance} sloping in toward {@code direction}: a stair tunnel one block wide going one block down
+     * The burrow at {@code entrance} sloping in toward {@code direction}: a tunnel one block wide going one block down
      * for every block forward (the mouth an open groove, then roofed by the soil over it), to one room
-     * {@link #WOOD_ROOM} blocks square {@link #BURROW_DEPTH} blocks down, the queen's.
+     * {@link #WOOD_ROOM} blocks square {@link #BURROW_DEPTH} blocks down, the queen's. The bottom block of each step is
+     * carved into a 45-degree soil ramp rising back toward the mouth (the user's pick, 2026-10-24,
+     * {@code docs/plans/soil-ramp.md}), so the floor is one smooth slope, as a real burrow's packed floor.
      */
-    private static List<NestPlan.Chamber> burrow(BlockPos entrance, Direction direction) {
+    private static Site burrow(BlockPos entrance, Direction direction) {
         List<BlockPos> way = new ArrayList<>(List.of(entrance.below()));
+        Map<BlockPos, Direction> ramps = new HashMap<>();
+        ramps.put(entrance.below(), direction.getOpposite());
         for (int k = 1; k < BURROW_DEPTH; k++) {
             BlockPos step = entrance.relative(direction, k);
             way.add(step.below(k));
             way.add(step.below(k + 1));
+            ramps.put(step.below(k + 1), direction.getOpposite());
         }
         BlockPos door = entrance.relative(direction, BURROW_DEPTH).below(BURROW_DEPTH);
         int reach = WOOD_ROOM / 2;
@@ -749,6 +760,6 @@ public final class MatabeleNest {
                 room.add(middle.relative(direction, a).relative(side, b));
             }
         }
-        return List.of(chamber(NestPlan.Kind.QUEEN, way, door, room));
+        return new Site(Kind.GROUND, entrance, List.of(chamber(NestPlan.Kind.QUEEN, way, door, room)), ramps);
     }
 }

@@ -12,6 +12,8 @@ import org.jetbrains.annotations.Nullable;
 import com.antcolonies.ColonyFrameworkMod;
 import com.antcolonies.block.FacedWall;
 import com.antcolonies.block.SeedPileBlock;
+import com.antcolonies.block.SoilRampBlock;
+import com.antcolonies.block.SoilRamps;
 import com.antcolonies.registry.ModTags;
 
 import net.minecraft.core.BlockPos;
@@ -50,6 +52,11 @@ public class Nest {
      */
     @Nullable
     private String site;
+    /**
+     * Cells of a nest of ready spaces that are carved into a soil ramp rather than dug out (a sloping burrow's floor,
+     * {@code docs/plans/soil-ramp.md}), each with the ramp's high side. Saved with the rooms.
+     */
+    private Map<BlockPos, Direction> ramps = Map.of();
     /**
      * How many levels of the nest the workers may dig (nest stages, see {@link #levelsUnlocked}): it only ever goes up.
      * Saved; nests from before nest stages may dig them all.
@@ -106,9 +113,28 @@ public class Nest {
      * open. Saved with the nest. {@code site} is a word for the colony list.
      */
     public void settle(String site, List<NestPlan.Chamber> rooms) {
+        settle(site, rooms, Map.of());
+    }
+
+    /**
+     * As {@link #settle(String, List)}, with cells of the rooms' ways carved into soil ramps ({@code ramps}: each
+     * cell's high side) instead of dug out: a burrow's sloping floor ({@code docs/plans/soil-ramp.md}).
+     */
+    public void settle(String site, List<NestPlan.Chamber> rooms, Map<BlockPos, Direction> ramps) {
         this.site = site;
+        this.ramps = Map.copyOf(ramps);
         this.layout = new NestLayout(List.copyOf(rooms), List.of(), List.of(), 0, Direction.NORTH, null, NestPlan.RoomSizes.DEFAULT);
         waysChanged();
+    }
+
+    /**
+     * What a dug block of soil becomes: the soil ramp its plan carves it into ({@link #settle(String, List, Map)}), or
+     * null if it is dug out whole (no ramp planned there, or none for that soil).
+     */
+    @Nullable
+    public BlockState carvedInto(BlockPos pos, BlockState soil) {
+        Direction highSide = ramps.get(pos);
+        return highSide == null ? null : SoilRamps.carved(soil, highSide);
     }
 
     /** What a nest of ready spaces moved into (see {@link #settle}), or null for a nest dug from the plan. */
@@ -740,13 +766,13 @@ public class Nest {
         return state.is(ModTags.DIGGABLE) || FacedWall.isWall(state);
     }
 
-    /** Open, or only a heap of seeds, bread or forage on the floor: the block is dug out. A chunk that is not loaded counts as not dug. */
+    /** Open, or only a heap of seeds, bread or forage on the floor, or carved into a soil ramp: the block is dug out. A chunk that is not loaded counts as not dug. */
     public static boolean isDugOut(Level level, BlockPos pos) {
         if (!level.isLoaded(pos)) {
             return false;
         }
         BlockState state = level.getBlockState(pos);
-        return state.isAir() || state.getBlock() instanceof SeedPileBlock;
+        return state.isAir() || state.getBlock() instanceof SeedPileBlock || state.getBlock() instanceof SoilRampBlock; // (a ramp is a floor)
     }
 
     private static boolean touchesSideways(BlockPos a, BlockPos b) {
@@ -1147,6 +1173,11 @@ public class Nest {
                 rooms.add(entry);
             }
             tag.put("nestReadyRooms", rooms);
+            if (!ramps.isEmpty()) {
+                List<Map.Entry<BlockPos, Direction>> carved = List.copyOf(ramps.entrySet());
+                tag.putLongArray("nestRampCells", carved.stream().mapToLong(entry -> entry.getKey().asLong()).toArray());
+                tag.putIntArray("nestRampSides", carved.stream().mapToInt(entry -> entry.getValue().get2DDataValue()).toArray());
+            }
         } else if (layout != null) {
             tag.putInt("nestDepth", layout.shaftDepth());
             tag.putInt("nestDirection", layout.direction().get2DDataValue());
@@ -1192,7 +1223,13 @@ public class Nest {
                 rooms.add(new NestPlan.Chamber(kind, positions(entry.getLongArray("cells")), BlockPos.of(entry.getLong("center")),
                         positions(entry.getLongArray("wayIn")), positions(entry.getLongArray("room"))));
             }
-            settle(tag.getString("nestSite"), rooms);
+            Map<BlockPos, Direction> carved = new HashMap<>();
+            long[] cells = tag.getLongArray("nestRampCells");
+            int[] sides = tag.getIntArray("nestRampSides");
+            for (int i = 0; i < cells.length && i < sides.length; i++) {
+                carved.put(BlockPos.of(cells[i]), Direction.from2DDataValue(sides[i]));
+            }
+            settle(tag.getString("nestSite"), rooms, carved);
         } else if (tag.contains("nestLevels")) {
             // The nest plan it was digging (old saves have none: it is worked out again from the ground).
             int depth = tag.getInt("nestDepth");

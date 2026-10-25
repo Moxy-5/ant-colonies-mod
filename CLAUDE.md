@@ -229,6 +229,7 @@ A Minecraft mod where ants and termites live as real colonies: they dig, build, 
 - **M8 step 1d, nest notes sorted out 2026-10-24** (branch `claude/m8-shallow-nest-e3f664`): the old nest lines in the design notes and M8 plan marked "Replaced by R1"; the foot of any big tree, dead or living, takes a colony (the user's pick); ground burrows 3 blocks apart, rooms never touching (was 10); not tried in-game yet.
 - **M8 step 1d, the bare-ground burrow slopes in 2026-10-24** (the user's ask: no harvester-style straight shaft): a stair tunnel to one room 3 down; not tried in-game yet.
 - **The soil ramp planned 2026-10-24** (`docs/plans/soil-ramp.md`): a shared block for smooth sloping burrow floors, carved from the soil dug in; looks in the burrow viewer (`python tools/burrow_viewer.py`); waiting for the user's pick of steepness (45 degrees or gentler); nothing in-game yet.
+- **The soil ramp BUILT 2026-10-24 at 45 degrees (the user's pick)** (`block/SoilRampBlock`, `SoilRamps`, one per soil): diggers carve the planned floor cells into ramps; the Matabele bare-ground burrow's floor is 3 dirt ramps; full run 156 of 156 on 6 servers; guard film `p_burrow` approved with small dips into the ramps; not tried in-game yet.
 
 ## Other notes files (read only when the task needs them)
 - `docs/DESIGN.md`: every design decision for the species and shared systems (read the section for a feature before working on it).

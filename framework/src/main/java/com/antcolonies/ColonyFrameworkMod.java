@@ -2,6 +2,7 @@ package com.antcolonies;
 
 import org.slf4j.Logger;
 
+import com.antcolonies.block.SoilRamps;
 import com.antcolonies.gametest.TestFilter;
 import com.antcolonies.entity.load.FrameworkLoads;
 import com.antcolonies.registry.ModDataSerializers;
@@ -28,6 +29,8 @@ public class ColonyFrameworkMod {
 
     public ColonyFrameworkMod(IEventBus modEventBus) {
         ModEntities.ENTITY_TYPES.register(modEventBus);
+        // The soil ramps, the floors of sloping burrows (docs/plans/soil-ramp.md).
+        SoilRamps.BLOCKS.register(modEventBus);
         // The one synced slot for what an insect carries, and the framework's rows of the load list (Apex part 3, T3).
         ModDataSerializers.SERIALIZERS.register(modEventBus);
         FrameworkLoads.signUp();

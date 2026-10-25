@@ -1,0 +1,23 @@
+{
+  "variants": {
+    "facing=east": {
+      "model": "colonyframework:block/rooted_dirt_ramp",
+      "uvlock": true
+    },
+    "facing=south": {
+      "model": "colonyframework:block/rooted_dirt_ramp",
+      "y": 90,
+      "uvlock": true
+    },
+    "facing=west": {
+      "model": "colonyframework:block/rooted_dirt_ramp",
+      "y": 180,
+      "uvlock": true
+    },
+    "facing=north": {
+      "model": "colonyframework:block/rooted_dirt_ramp",
+      "y": 270,
+      "uvlock": true
+    }
+  }
+}

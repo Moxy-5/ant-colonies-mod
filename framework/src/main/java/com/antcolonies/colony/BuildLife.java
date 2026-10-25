@@ -9,6 +9,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -378,7 +379,12 @@ public class BuildLife {
     public void dig(ServerLevel level, BlockPos pos) {
         colony.nest().clearDigProgress(pos);
         colony.news().tell(level, ColonyNews.BLOCK_DUG, new ColonyNews.BlockDug(pos)); // (the mound counts its soil)
-        level.removeBlock(pos, false);
+        BlockState ramp = colony.nest().carvedInto(pos, level.getBlockState(pos));
+        if (ramp != null) {
+            level.setBlock(pos, ramp, Block.UPDATE_ALL); // (a sloping burrow's floor, carved, see Nest.carvedInto)
+        } else {
+            level.removeBlock(pos, false);
+        }
     }
 
     /** The time (ticks) a pellet takes from where it was dug to where it goes, and the builder back. */

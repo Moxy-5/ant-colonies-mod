@@ -18,6 +18,7 @@ import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.ai.goal.Goal;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
@@ -194,6 +195,10 @@ public class DigGoal extends Goal {
             level.destroyBlockProgress(ant.getId(), target, -1);
             if (colony.nest().foodWays().isRunwayPlant(level, target) && colony.profile().food().plantFor(state) != null) {
                 colony.food().cutAwayForTheForagers(level, target); // food in the way of a runway: left for the foragers
+            } else if (colony.nest().carvedInto(target, state) instanceof BlockState ramp) {
+                // A sloping burrow's floor: the step is bitten down to a ramp of its own soil, not taken out whole.
+                level.levelEvent(2001, target, Block.getId(state)); // (the block's breaking dust and sound)
+                level.setBlock(target, ramp, Block.UPDATE_ALL);
             } else {
                 level.destroyBlock(target, false, ant);
             }

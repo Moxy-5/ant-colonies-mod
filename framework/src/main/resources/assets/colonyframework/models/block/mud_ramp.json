@@ -1,0 +1,6 @@
+{
+  "parent": "colonyframework:block/soil_ramp",
+  "textures": {
+    "soil": "minecraft:block/mud"
+  }
+}

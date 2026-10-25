@@ -1,3 +1,10 @@
 {
-  "entity.colonyframework.ant_egg": "Ant Egg"
+  "entity.colonyframework.ant_egg": "Ant Egg",
+  "block.colonyframework.dirt_ramp": "Dirt Ramp",
+  "block.colonyframework.coarse_dirt_ramp": "Coarse Dirt Ramp",
+  "block.colonyframework.rooted_dirt_ramp": "Rooted Dirt Ramp",
+  "block.colonyframework.clay_ramp": "Clay Ramp",
+  "block.colonyframework.mud_ramp": "Mud Ramp",
+  "block.colonyframework.sand_ramp": "Sand Ramp",
+  "block.colonyframework.red_sand_ramp": "Red Sand Ramp"
 }

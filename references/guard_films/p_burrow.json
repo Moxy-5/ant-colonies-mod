@@ -1,0 +1,428 @@
+{
+ "pictures": [
+  "burrow_00.png",
+  "burrow_01.png",
+  "burrow_02.png",
+  "burrow_03.png",
+  "burrow_04.png",
+  "burrow_05.png",
+  "burrow_06.png",
+  "burrow_07.png",
+  "burrow_08.png",
+  "burrow_09.png",
+  "burrow_10.png",
+  "burrow_11.png",
+  "burrow_12.png",
+  "burrow_13.png",
+  "burrow_14.png",
+  "burrow_15.png",
+  "burrow_16.png",
+  "burrow_17.png",
+  "burrow_18.png",
+  "burrow_19.png",
+  "burrow_20.png",
+  "burrow_21.png",
+  "burrow_22.png",
+  "burrow_23.png",
+  "burrow_24.png",
+  "burrow_25.png",
+  "burrow_26.png",
+  "burrow_27.png",
+  "burrow_28.png",
+  "burrow_29.png",
+  "burrow_30.png",
+  "burrow_31.png",
+  "burrow_32.png",
+  "burrow_33.png",
+  "burrow_34.png",
+  "burrow_35.png",
+  "burrow_36.png",
+  "burrow_37.png",
+  "burrow_38.png",
+  "burrow_39.png",
+  "burrow_40.png",
+  "burrow_41.png",
+  "burrow_42.png",
+  "burrow_43.png",
+  "burrow_44.png",
+  "burrow_45.png",
+  "burrow_46.png",
+  "burrow_47.png",
+  "burrow_48.png",
+  "burrow_49.png",
+  "burrow_50.png",
+  "burrow_51.png",
+  "burrow_52.png",
+  "burrow_53.png",
+  "burrow_54.png",
+  "burrow_55.png",
+  "burrow_56.png",
+  "burrow_57.png",
+  "burrow_58.png",
+  "burrow_59.png",
+  "burrow_60.png",
+  "burrow_61.png",
+  "burrow_62.png",
+  "burrow_63.png",
+  "burrow_64.png",
+  "burrow_65.png",
+  "burrow_66.png",
+  "burrow_67.png",
+  "burrow_68.png",
+  "burrow_69.png",
+  "burrow_70.png",
+  "burrow_71.png",
+  "burrow_72.png",
+  "burrow_73.png",
+  "burrow_74.png",
+  "burrow_75.png",
+  "burrow_76.png",
+  "burrow_77.png",
+  "burrow_78.png",
+  "burrow_79.png",
+  "burrow_80.png",
+  "burrow_81.png",
+  "burrow_82.png",
+  "burrow_83.png",
+  "burrow_84.png",
+  "burrow_85.png",
+  "burrow_86.png",
+  "burrow_87.png",
+  "burrow_88.png",
+  "burrow_89.png",
+  "burrow_90.png",
+  "burrow_91.png",
+  "burrow_92.png",
+  "burrow_93.png",
+  "burrow_94.png",
+  "burrow_95.png",
+  "burrow_96.png",
+  "burrow_97.png",
+  "burrow_98.png",
+  "burrow_99.png",
+  "burrow_100.png",
+  "burrow_101.png",
+  "burrow_102.png",
+  "burrow_103.png",
+  "burrow_104.png",
+  "burrow_105.png",
+  "burrow_106.png",
+  "burrow_107.png",
+  "burrow_108.png",
+  "burrow_109.png",
+  "burrow_up_00.png",
+  "burrow_up_01.png",
+  "burrow_up_02.png",
+  "burrow_up_03.png",
+  "burrow_up_04.png",
+  "burrow_up_05.png",
+  "burrow_up_06.png",
+  "burrow_up_07.png",
+  "burrow_up_08.png",
+  "burrow_up_09.png",
+  "burrow_up_10.png",
+  "burrow_up_11.png",
+  "burrow_up_12.png",
+  "burrow_up_13.png",
+  "burrow_up_14.png",
+  "burrow_up_15.png",
+  "burrow_up_16.png",
+  "burrow_up_17.png",
+  "burrow_up_18.png",
+  "burrow_up_19.png",
+  "burrow_up_20.png",
+  "burrow_up_21.png",
+  "burrow_up_22.png",
+  "burrow_up_23.png",
+  "burrow_up_24.png",
+  "burrow_up_25.png",
+  "burrow_up_26.png",
+  "burrow_up_27.png",
+  "burrow_up_28.png",
+  "burrow_up_29.png",
+  "burrow_up_30.png",
+  "burrow_up_31.png",
+  "burrow_up_32.png",
+  "burrow_up_33.png",
+  "burrow_up_34.png",
+  "burrow_up_35.png",
+  "burrow_up_36.png",
+  "burrow_up_37.png",
+  "burrow_up_38.png",
+  "burrow_up_39.png",
+  "burrow_up_40.png",
+  "burrow_up_41.png",
+  "burrow_up_42.png",
+  "burrow_up_43.png",
+  "burrow_up_44.png",
+  "burrow_up_45.png",
+  "burrow_up_46.png",
+  "burrow_up_47.png",
+  "burrow_up_48.png",
+  "burrow_up_49.png",
+  "burrow_up_50.png",
+  "burrow_up_51.png",
+  "burrow_up_52.png",
+  "burrow_up_53.png",
+  "burrow_up_54.png",
+  "burrow_up_55.png",
+  "burrow_up_56.png",
+  "burrow_up_57.png",
+  "burrow_up_58.png",
+  "burrow_up_59.png",
+  "burrow_up_60.png",
+  "burrow_up_61.png",
+  "burrow_up_62.png",
+  "burrow_up_63.png",
+  "burrow_up_64.png",
+  "burrow_up_65.png",
+  "burrow_up_66.png",
+  "burrow_up_67.png",
+  "burrow_up_68.png",
+  "burrow_up_69.png",
+  "burrow_up_70.png",
+  "burrow_up_71.png",
+  "burrow_up_72.png",
+  "burrow_up_73.png",
+  "burrow_up_74.png",
+  "burrow_up_75.png",
+  "burrow_up_76.png",
+  "burrow_up_77.png",
+  "burrow_up_78.png",
+  "burrow_up_79.png",
+  "burrow_up_80.png",
+  "burrow_up_81.png",
+  "burrow_up_82.png",
+  "burrow_up_83.png",
+  "burrow_up_84.png",
+  "burrow_up_85.png",
+  "burrow_up_86.png",
+  "burrow_up_87.png",
+  "burrow_up_88.png",
+  "burrow_up_89.png",
+  "burrow_up_90.png",
+  "burrow_up_91.png",
+  "burrow_up_92.png",
+  "burrow_up_93.png",
+  "burrow_up_94.png",
+  "burrow_up_95.png",
+  "burrow_up_96.png",
+  "burrow_up_97.png",
+  "burrow_up_98.png",
+  "burrow_up_99.png",
+  "burrow_up_100.png",
+  "burrow_up_101.png",
+  "burrow_up_102.png",
+  "burrow_up_103.png",
+  "burrow_up_104.png",
+  "burrow_up_105.png",
+  "burrow_up_106.png",
+  "burrow_up_107.png",
+  "burrow_up_108.png",
+  "burrow_up_109.png"
+ ],
+ "size": [
+  240,
+  136
+ ],
+ "findings": {
+  "jump leg_r2": [
+   2,
+   0.163
+  ],
+  "jump at burrow_up_46": [
+   2,
+   0.207
+  ],
+  "jump at burrow_up_49": [
+   1,
+   0.162
+  ],
+  "inside leg_r2_foot": [
+   1,
+   0.011
+  ],
+  "inside at burrow_up_45": [
+   2,
+   0.042
+  ],
+  "jump leg_l2": [
+   1,
+   0.164
+  ],
+  "jump at burrow_41": [
+   2,
+   0.216
+  ],
+  "inside head": [
+   5,
+   0.042
+  ],
+  "inside at burrow_up_15": [
+   7,
+   0.062
+  ],
+  "inside at burrow_up_16": [
+   10,
+   0.062
+  ],
+  "inside at burrow_up_17": [
+   9,
+   0.062
+  ],
+  "inside at burrow_up_18": [
+   10,
+   0.062
+  ],
+  "inside at burrow_up_19": [
+   11,
+   0.062
+  ],
+  "inside mandible_r": [
+   10,
+   0.062
+  ],
+  "inside at burrow_74": [
+   5,
+   0.104
+  ],
+  "inside at burrow_75": [
+   6,
+   0.078
+  ],
+  "inside at burrow_76": [
+   7,
+   0.062
+  ],
+  "inside at burrow_up_14": [
+   4,
+   0.062
+  ],
+  "inside at burrow_up_20": [
+   5,
+   0.062
+  ],
+  "inside antenna_l_1": [
+   4,
+   0.058
+  ],
+  "inside antenna_l_2": [
+   15,
+   0.115
+  ],
+  "inside at burrow_72": [
+   2,
+   0.1
+  ],
+  "inside at burrow_73": [
+   3,
+   0.115
+  ],
+  "inside at burrow_up_13": [
+   2,
+   0.062
+  ],
+  "inside at burrow_up_21": [
+   2,
+   0.062
+  ],
+  "inside at burrow_up_36": [
+   2,
+   0.043
+  ],
+  "inside mandible_l": [
+   10,
+   0.062
+  ],
+  "inside antenna_r_1": [
+   4,
+   0.062
+  ],
+  "inside antenna_r_2": [
+   17,
+   0.088
+  ],
+  "inside at burrow_71": [
+   1,
+   0.028
+  ],
+  "inside at burrow_up_27": [
+   1,
+   0.048
+  ],
+  "inside leg_r3_foot": [
+   5,
+   0.071
+  ],
+  "inside at burrow_up_46": [
+   2,
+   0.049
+  ],
+  "inside at burrow_up_47": [
+   4,
+   0.054
+  ],
+  "inside at burrow_up_48": [
+   3,
+   0.071
+  ],
+  "inside at burrow_up_49": [
+   3,
+   0.053
+  ],
+  "jump leg_r1": [
+   2,
+   0.216
+  ],
+  "jump at burrow_67": [
+   1,
+   0.208
+  ],
+  "inside leg_r1_lower": [
+   2,
+   0.05
+  ],
+  "inside leg_r1_foot": [
+   7,
+   0.062
+  ],
+  "jump leg_l1": [
+   1,
+   0.207
+  ],
+  "inside leg_l1_lower": [
+   3,
+   0.035
+  ],
+  "inside leg_l1_foot": [
+   9,
+   0.062
+  ],
+  "jump leg_l3": [
+   1,
+   0.214
+  ],
+  "jump at burrow_39": [
+   1,
+   0.214
+  ],
+  "inside leg_l3_lower": [
+   1,
+   0.014
+  ],
+  "inside leg_l3_foot": [
+   5,
+   0.054
+  ],
+  "inside gaster_back": [
+   4,
+   0.039
+  ],
+  "inside at burrow_77": [
+   1,
+   0.039
+  ]
+ },
+ "body_findings": {},
+ "known_bugs": "feet, jaws and antenna tips dip up to 0.12 block into the ramps' small steps and the room floor; a few leg jumps of about 0.2 block a tick where the slope meets the flat (the same kind as the termite ramp scene)"
+}

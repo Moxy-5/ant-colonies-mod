@@ -3,6 +3,7 @@ package com.antcolonies.savanna.gametest;
 import static com.antcolonies.gametest.TestScenes.MIDDLE;
 import static com.antcolonies.gametest.TestScenes.SURFACE;
 
+import com.antcolonies.block.SoilRampBlock;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.NestPlan;
 import com.antcolonies.gametest.TestScenes;
@@ -141,7 +142,8 @@ public class MatabeleNestTests {
      * No cover anywhere: the stand-in for an animal's burrow, a tunnel sloping in (never a straight shaft: no column of the
      * way more than 2 deep, the mouth's step and one more) to one room 3 blocks down. A second colony put down
      * at the same spot gets its own burrow close by (real nests lie as close as 2 m), 3 or more blocks off, with soil
-     * between the two nests.
+     * between the two nests. The floor of the way is carved into 45-degree soil ramps (the bottom block of every column, its
+     * high side toward the mouth), and the queen walks down them to her room.
      */
     @GameTest(template = "arena", timeoutTicks = 8000)
     public static void aMatabeleColonyMovesIntoABurrowInOpenGround(GameTestHelper helper) {
@@ -173,7 +175,20 @@ public class MatabeleNestTests {
                 }
             }
         }
-        queenEndsInHerRoom(helper, colony);
+        queenEndsInHerRoom(helper, colony, () -> {
+            for (NestPlan.Chamber room : colony.nest().getPlannedChambers(level)) {
+                java.util.Map<Long, BlockPos> floor = new java.util.HashMap<>();
+                for (BlockPos cell : room.wayIn()) {
+                    floor.merge(BlockPos.asLong(cell.getX(), 0, cell.getZ()), cell, (a, b) -> a.getY() < b.getY() ? a : b);
+                }
+                Direction out = Direction.getNearest(colony.getCenter().getX() - room.center().getX(), 0, colony.getCenter().getZ() - room.center().getZ());
+                for (BlockPos cell : floor.values()) {
+                    net.minecraft.world.level.block.state.BlockState state = level.getBlockState(cell);
+                    helper.assertTrue(state.getBlock() instanceof SoilRampBlock && state.getValue(SoilRampBlock.FACING) == out,
+                            "the floor at " + cell.toShortString() + " is " + state + ", not a soil ramp rising " + out);
+                }
+            }
+        });
     }
 
     /** A log 3 across, 3 high and 9 long, along X, with its middle at the arena's middle. */
@@ -198,6 +213,11 @@ public class MatabeleNestTests {
 
     /** The queen's room is opened and she ends in it. */
     private static void queenEndsInHerRoom(GameTestHelper helper, Colony colony) {
+        queenEndsInHerRoom(helper, colony, () -> { });
+    }
+
+    /** The queen's room is opened and she ends in it, and {@code also} holds then. */
+    private static void queenEndsInHerRoom(GameTestHelper helper, Colony colony, Runnable also) {
         ServerLevel level = helper.getLevel();
         helper.succeedWhen(() -> {
             BlockPos room = colony.nest().getFinishedRoomCenter(level);
@@ -210,6 +230,7 @@ public class MatabeleNestTests {
             helper.assertTrue(room != null, "the queen's room is not open yet" + colony.nest().describeSite(level) + why);
             helper.assertTrue(colony.getQueen(level) instanceof MatabeleQueenEntity queen && queen.blockPosition().closerThan(room, 2.5),
                     "the queen is not in her room at " + room.toShortString());
+            also.run();
         });
     }
 }
