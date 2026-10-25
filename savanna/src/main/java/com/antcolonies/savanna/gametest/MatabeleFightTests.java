@@ -1,6 +1,16 @@
 package com.antcolonies.savanna.gametest;
 
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+
+import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.NestPlan;
 import com.antcolonies.gametest.TestAnts;
+import com.antcolonies.gametest.TestClock;
+import com.antcolonies.gametest.TestScenes;
 import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.entity.MatabeleEntity;
 import com.antcolonies.savanna.entity.TermiteSoldierEntity;
@@ -9,8 +19,10 @@ import com.antcolonies.savanna.registry.SavannaBlocks;
 import com.antcolonies.savanna.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Blocks;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
@@ -26,6 +38,9 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * <p>M8 fight polish, round A: a blow plays its clip and lands only at the sting moment (the termite falls no sooner
  * than {@link #STING_MOMENT} ticks after the blow began), the venom then takes the termite's {@code venom_ticks} to fell
  * it (it staggers, then lies paralysed), and an ant on a wall never strikes (the user's rule).
+ *
+ * <p>Round B: grabs can fail (a termite twists away, a soldier bites first); a ten-ant skirmish at a feeding spot lasts
+ * minutes, with workers fleeing down the holes ({@link #tenMatabelesAtAFeedingSpotTakeMinutesAndManyTermitesEscape}).
  */
 @GameTestHolder(SavannaMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -50,6 +65,13 @@ public class MatabeleFightTests {
         TermiteSoldierEntity majorSoldier = TestAnts.lone(helper, SavannaEntities.TERMITE_MAJOR_SOLDIER.get(), 14, 1, 13);
         MatabeleEntity hunterMinor = TestAnts.loneWithAMind(helper, SavannaEntities.MATABELE_MINOR.get(), 11, 1, 13);
         hunterMinor.orderToFight(helper.absolutePos(new BlockPos(14, 1, 13)), helper.getLevel().getGameTime() + 2400);
+        // Round B: a termite major soldier that always twists out of the grab and bites first: the grabs miss, the
+        // Matabele is bitten, the soldier stays on its feet.
+        TermiteSoldierEntity dodger = TestAnts.lone(helper, SavannaEntities.TERMITE_MAJOR_SOLDIER.get(), 1, 1, 1);
+        dodger.setDodgeForTests(1.0, 1.0);
+        MatabeleEntity grabber = TestAnts.loneWithAMind(helper, SavannaEntities.MATABELE_MAJOR.get(), 1, 1, 4);
+        grabber.orderToFight(helper.absolutePos(new BlockPos(1, 1, 1)), helper.getLevel().getGameTime() + 2400);
+        boolean[] grabberBitten = {false};
         boolean[] bitten = {false};
         // When the minor's last blow began, and when the worker was felled (-1 for not yet).
         long[] blowAt = {-1};
@@ -58,6 +80,16 @@ public class MatabeleFightTests {
         long[] paralysedAt = {-1};
         helper.onEachTick(() -> {
             long tick = helper.getTick();
+            // The soldiers bite back now and then as they twist out of a grab (round B); the hunters are kept whole
+            // here, so the stings on the soldiers are seen through (a bitten hunter is checked on the grabber).
+            if (grabber.getHealth() < grabber.getMaxHealth()) {
+                grabberBitten[0] = true;
+            }
+            for (MatabeleEntity hunter : new MatabeleEntity[] {minor, hunterMajor, hunterMinor, grabber}) {
+                if (hunter.isAlive()) {
+                    hunter.setHealth(hunter.getMaxHealth());
+                }
+            }
             if (minor.isInABlow() && !inBlow[0]) {
                 blowAt[0] = tick;
             }
@@ -100,7 +132,14 @@ public class MatabeleFightTests {
             helper.assertTrue(minorSoldier.isParalysed() && minorSoldier.isAlive(),
                     "the termite minor soldier has not been stung still yet (the major at " + helper.relativePos(hunterMajor.blockPosition()) + ")");
             helper.assertTrue(majorSoldier.isParalysed() && majorSoldier.isAlive(),
-                    "the termite major soldier has not been stung still yet (the minor at " + helper.relativePos(hunterMinor.blockPosition()) + ")");
+                    "the termite major soldier has not been stung still yet (the minor at " + helper.relativePos(hunterMinor.blockPosition())
+                            + ", alive " + hunterMinor.isAlive() + ", goals " + hunterMinor.runningGoals() + ", spot " + hunterMinor.getFightSpot()
+                            + ", missed " + hunterMinor.grabsMissed() + "; the soldier at " + helper.relativePos(majorSoldier.blockPosition())
+                            + ", stings taken? downed " + majorSoldier.isDowned() + ")");
+            helper.assertTrue(grabber.grabsMissed() >= 2, "the soldier that always dodges should have made the grabs miss ("
+                    + grabber.grabsMissed() + " missed, the major at " + helper.relativePos(grabber.blockPosition()) + ")");
+            helper.assertTrue(grabberBitten[0], "the soldier should have bitten the Matabele as it twisted away");
+            helper.assertTrue(!dodger.isDowned(), "a soldier that dodges every grab should never be stung");
         });
     }
 
@@ -158,6 +197,127 @@ public class MatabeleFightTests {
             helper.assertTrue(climbed[0], "the Matabele has not climbed the block yet (at " + helper.relativePos(minor.blockPosition()) + ")");
             helper.assertTrue(worker.isDowned() && worker.isAlive(), "the Matabele has not stung the termite on top yet (at "
                     + helper.relativePos(minor.blockPosition()) + ", " + minor.getSurface() + ")");
+        });
+    }
+
+    /**
+     * The pace (M8 fight polish, round B; real raids: the attack at a feeding site lasts 5 to 30 minutes, Yusuf 2026). A
+     * termite colony with its nest dug and both foraging holes open; twelve old workers forage at night at a hay bale 5
+     * blocks from a hole, two minors on guard. Once four are at the hay, ten Matabele come from the far side, sent to
+     * fight there (as the skirmish command does). Checked: half a minute in, the fight is still on and not every
+     * worker is down; workers flee down the holes and hide; at least one termite is stung still; the ants search on
+     * and the fight is over only after minutes (2 or more), within the order's time.
+     */
+    @GameTest(template = "arena", timeoutTicks = 9000, skyAccess = true, batch = "matabele_pace")
+    public static void tenMatabelesAtAFeedingSpotTakeMinutesAndManyTermitesEscape(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        TestScenes.deepGround(helper);
+        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), TestScenes.MIDDLE, TestScenes.SURFACE, TestScenes.MIDDLE);
+        helper.runAfterDelay(5, () -> {
+            for (int i = 0; i < 12; i++) {
+                helper.spawn(SavannaEntities.TERMITE_WORKER.get(), TestScenes.MIDDLE - 3 + i % 6, TestScenes.SURFACE, TestScenes.MIDDLE - 2 - i / 6);
+            }
+        });
+        BlockPos[] hay = new BlockPos[1];
+        Direction[] out = new Direction[1];
+        List<MatabeleEntity> ants = new ArrayList<>();
+        long[] cameAt = {-1};
+        Set<UUID> foragers = new HashSet<>();
+        Set<UUID> downed = new HashSet<>();
+        Set<UUID> hid = new HashSet<>();
+        boolean[] overLogged = {false};
+        helper.runAfterDelay(10, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
+            TestClock.still(helper, 12.0); // midday: everybody stays in while the nest is made ready
+            long old = level.getGameTime() - colony.profile().worker().builderUntilTicks() - 1000;
+            for (TermiteWorkerEntity worker : level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds())) {
+                worker.setGrownUpAt(old);
+            }
+            TermiteSoldierTests.digNestAtOnce(level, colony);
+            level.setBlock(colony.nest().getEntrance(), Blocks.STONE.defaultBlockState(), 3);
+            List<NestPlan.ForagingTunnel> tunnels = colony.nest().getForagingTunnels(level);
+            for (NestPlan.ForagingTunnel tunnel : tunnels) {
+                level.setBlock(tunnel.hole(), Blocks.AIR.defaultBlockState(), 3);
+            }
+            out[0] = TermiteSoldierTests.intoArena(tunnels.get(0).side().getClockWise());
+            hay[0] = tunnels.get(0).hole().above().relative(out[0], 5);
+            colony.foodMap().knowForTests(hay[0]);
+            level.setBlock(hay[0], Blocks.HAY_BLOCK.defaultBlockState(), 3);
+            List<BlockPos> room = colony.nest().getHomeChamber(level).room();
+            for (int i = 0; i < 2; i++) {
+                TermiteSoldierTests.put(level, SavannaEntities.TERMITE_MINOR_SOLDIER.get(), room.get(i));
+            }
+        });
+        helper.runAfterDelay(40, () -> TestClock.still(helper, 0.0)); // midnight: the foragers go out
+        helper.onEachTick(() -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            if (colony == null || hay[0] == null || helper.getTick() < 40) {
+                return;
+            }
+            long tick = helper.getTick();
+            List<TermiteWorkerEntity> workers = level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds().inflate(8),
+                    worker -> colony.getId().equals(worker.getColonyId()));
+            if (cameAt[0] < 0) {
+                List<TermiteWorkerEntity> atTheHay = workers.stream().filter(worker -> worker.blockPosition().closerThan(hay[0], 4.0)).toList();
+                if (tick % 400 == 0) {
+                    SavannaMod.LOGGER.info("[pace-test] tick {}: {} workers, {} out, {} at the hay; foraging time {}", tick, workers.size(),
+                            workers.stream().filter(worker -> !colony.nest().isInside(level, worker.blockPosition())).count(), atTheHay.size(),
+                            colony.isForagingTime(level));
+                }
+                if (atTheHay.size() >= 4) {
+                    cameAt[0] = tick;
+                    for (TermiteWorkerEntity worker : workers) {
+                        if (!colony.nest().isInside(level, worker.blockPosition())) {
+                            foragers.add(worker.getUUID());
+                        }
+                    }
+                    BlockPos from = hay[0].relative(out[0], 8);
+                    for (int i = 0; i < 10; i++) {
+                        MatabeleEntity ant = (i % 2 == 0 ? SavannaEntities.MATABELE_MAJOR.get() : SavannaEntities.MATABELE_MINOR.get()).create(level);
+                        ant.moveTo(from.getX() + 0.2 + (i % 3) * 0.3, from.getY(), from.getZ() + 0.2 + (i / 3) * 0.2, 0.0F, 0.0F);
+                        ant.orderToFight(hay[0], level.getGameTime() + 6000);
+                        level.addFreshEntity(ant);
+                        ants.add(ant);
+                    }
+                    SavannaMod.LOGGER.info("[pace-test] tick {}: ten Matabele come, {} foragers out", tick, foragers.size());
+                }
+                return;
+            }
+            for (TermiteWorkerEntity worker : workers) {
+                if (worker.isDowned()) {
+                    downed.add(worker.getUUID());
+                }
+                // Escaped: a forager safe inside its nest (fled on its own, or gone in on the alarm), never stung.
+                if ((worker.isHiding() || foragers.contains(worker.getUUID()) && worker.isSheltered()) && !downed.contains(worker.getUUID())) {
+                    hid.add(worker.getUUID());
+                }
+            }
+            long since = tick - cameAt[0];
+            boolean on = ants.stream().anyMatch(ant -> ant.isAlive() && ant.getFightSpot() != null);
+            if (since == 600) {
+                helper.assertTrue(on, "the fight was over within half a minute");
+                helper.assertTrue(downed.size() < workers.size(), "every worker was stung still within half a minute");
+            }
+            if (since % 600 == 0) {
+                SavannaMod.LOGGER.info("[pace-test] {} s in: {} stung, {} hid, grabs missed {}, fight on {}", since / 20, downed.size(), hid.size(),
+                        ants.stream().mapToInt(MatabeleEntity::grabsMissed).sum(), on);
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(cameAt[0] >= 0, "the Matabele have not come yet (fewer than 4 foragers at the hay)");
+            long since = helper.getTick() - cameAt[0];
+            helper.assertTrue(ants.stream().noneMatch(ant -> ant.isAlive() && ant.getFightSpot() != null), "the fight is still on ("
+                    + since / 20 + " s, " + downed.size() + " stung, " + hid.size() + " hid)");
+            if (!overLogged[0]) {
+                overLogged[0] = true;
+                SavannaMod.LOGGER.info("[pace-test] over after {} s: {} of {} foragers stung, {} hid, grabs missed {}", since / 20, downed.size(),
+                        foragers.size(), hid.size(), ants.stream().mapToInt(MatabeleEntity::grabsMissed).sum());
+            }
+            helper.assertTrue(since >= 2400, "the fight was over after " + since / 20 + " s; it should take minutes");
+            helper.assertTrue(!downed.isEmpty(), "no termite was stung still");
+            helper.assertTrue(hid.size() >= 3, "only " + hid.size() + " workers escaped down the holes; many should");
         });
     }
 

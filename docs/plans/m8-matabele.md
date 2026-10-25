@@ -124,7 +124,7 @@ timings: all "my pick, to confirm" until then).
         (agreed by the user).
      7. Pace target: ten ants against a feeding spot take several minutes, many termites escaping down the holes.
      **Round A BUILT 2026-10-25 (pieces 1, 2, 5, 6; `docs/HISTORY.md`, "M8 fight polish, round A"); round B (3, 4, 7)
-     next.**
+     BUILT 2026-10-25 (`docs/HISTORY.md`, "M8 fight polish, round B"); the fight polish is ready for the user's in-game test.**
      Tests: an ant on a wall never strikes; a termite falls only after the sting moment; a ten-ant skirmish lasts
      minutes, not seconds; `soldiers,termitefood,colony,away`; guard films if a clip changes; then the user looks
      in-game with `/antcolonies skirmish 10`.

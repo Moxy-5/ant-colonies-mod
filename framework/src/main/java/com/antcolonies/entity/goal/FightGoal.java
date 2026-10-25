@@ -34,6 +34,12 @@ import net.minecraft.world.phys.AABB;
  * its end ({@link AbstractAntEntity#isInABlow}) while it holds still, and a foe it has felled it stands over a moment,
  * feeling it with its antennae (the species file's {@code fight.look_over_ticks}), before it turns to the next. A foe
  * another hunter holds in its jaws is left to that one.
+ *
+ * <p>Round B: with no foe in reach it searches round the spot, antennae down, walking from place to place within
+ * {@link #SEARCH_REACH} blocks of it, for its species' {@code fight.give_up_ticks} before the fight is over (real
+ * Megaponera search the opened galleries and the ground round a feeding site for many minutes); a foe in its own nest,
+ * past its feeding ways ({@link AbstractAntEntity#isSheltered}), is left alone: raids hit feeding sites, never the mound;
+ * one it chases for {@link #CHASE_TICKS} without a blow at it is left a while.
  */
 public class FightGoal extends Goal {
     /** How far (blocks) round the spot it looks for foes. */
@@ -46,8 +52,12 @@ public class FightGoal extends Goal {
     private static final int CHASE_REPLAN = 10;
     /** A foe it found no way to is left alone this long (ticks). */
     private static final int UNREACHABLE_TICKS = 200;
-    /** With no foe round the spot this long (ticks), the fight is over. */
-    private static final int DONE_TICKS = 600;
+    /** How far (blocks) from the spot it searches when no foe is in reach. */
+    private static final int SEARCH_REACH = 4;
+    /** How often (ticks) it picks a new place to search. */
+    private static final int SEARCH_EVERY = 60;
+    /** Chasing one foe this long (ticks) without a blow at it, it leaves it a while ({@link #UNREACHABLE_TICKS}). */
+    private static final int CHASE_TICKS = 200;
     /** How fast (degrees a tick) it turns to face its foe. */
     private static final float TURN = 20.0F;
 
@@ -62,6 +72,10 @@ public class FightGoal extends Goal {
     private int lookingOver;
     private int replan;
     private int idleTicks;
+    /** The foe it is chasing and for how long, without a blow at it. */
+    @Nullable
+    private LivingEntity chasing;
+    private int chaseTicks;
     /** Foes it found no way to, and until when it leaves each alone. */
     private final Map<UUID, Long> unreachable = new HashMap<>();
 
@@ -141,14 +155,20 @@ public class FightGoal extends Goal {
         if (spot == null) {
             return;
         }
-        // No foe in reach: to the spot, and once there, wait a while for more before the fight is over.
-        if (ant.blockPosition().distSqr(spot) > 4.0) {
+        // No foe in reach: to the spot, and once there, search round it a while for more before the fight is over.
+        if (ant.blockPosition().distSqr(spot) > (SEARCH_REACH + 2) * (SEARCH_REACH + 2)) {
             if (ant.getNavigator().isDone() || !spot.equals(walkingTo)) {
                 walkingTo = spot;
                 ant.getNavigator().moveTo(spot, 1.2);
             }
+        } else if (ant.getNavigator().isDone() && idleTicks % SEARCH_EVERY == 0) {
+            BlockPos look = spot.offset(ant.getRandom().nextInt(SEARCH_REACH * 2 + 1) - SEARCH_REACH, 0,
+                    ant.getRandom().nextInt(SEARCH_REACH * 2 + 1) - SEARCH_REACH);
+            walkingTo = look;
+            ant.getNavigator().moveTo(at -> at.cell().distManhattan(look) <= 2, look, 2, 0.8);
         }
-        if (++idleTicks >= DONE_TICKS) {
+        int giveUp = FightNumbers.of(ant.profile()).map(FightNumbers::giveUpTicks).orElse(FightNumbers.DEFAULT_GIVE_UP_TICKS);
+        if (++idleTicks >= giveUp) {
             ant.endFightOrder();
         }
     }
@@ -156,12 +176,24 @@ public class FightGoal extends Goal {
     /** At the foe: strikes it now and then; otherwise goes at it, or opens the way to it, or leaves it for a while. */
     private void fight(ServerLevel level, LivingEntity target) {
         // Only from a floor (the user's rule): reaching it from a wall or a ceiling, it goes on to the floor first.
+        if (target != chasing) {
+            chasing = target;
+            chaseTicks = 0;
+        }
         if (ant.reachesInFight(target) && ant.standsToFight()) {
             ant.getNavigator().stop();
             walkingTo = null;
             if (face(target.getX(), target.getZ()) && ant.strike(target)) {
                 struck = target;
+                chaseTicks = 0;
             }
+            return;
+        }
+        // A chase that gets nowhere (it keeps out of reach, in a hole too tight): left a while, the next foe instead.
+        if (++chaseTicks > CHASE_TICKS) {
+            unreachable.put(target.getUUID(), level.getGameTime() + UNREACHABLE_TICKS);
+            foe = null;
+            chasing = null;
             return;
         }
         BlockPos at = target.blockPosition();
@@ -198,7 +230,8 @@ public class FightGoal extends Goal {
 
     private boolean usable(LivingEntity candidate) {
         return candidate != ant && !unreachable.containsKey(candidate.getUUID()) && Fights.mayAttack(ant.profile(), candidate)
-                && !(candidate instanceof AbstractAntEntity insect && insect.isPinned() && candidate != ant.blowTarget());
+                && !(candidate instanceof AbstractAntEntity insect
+                        && (insect.isPinned() && candidate != ant.blowTarget() || insect.isSheltered()));
     }
 
     /** Turns toward the point; true once it faces it (within {@link #FACING} degrees). */

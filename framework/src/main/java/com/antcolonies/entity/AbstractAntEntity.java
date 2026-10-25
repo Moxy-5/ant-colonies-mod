@@ -731,6 +731,11 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     private long venomAt = NO_VENOM;
     /** The slowing of a body with the venom working in it (staggering). */
     private static final ResourceLocation STAGGER = ResourceLocation.fromNamespaceAndPath("colonyframework", "venom_stagger");
+    /**
+     * Until when (game time) it stays in after fleeing from a hunter (M8 fight polish, round B; not saved: after a
+     * reload the danger is over).
+     */
+    private long hideUntil = Long.MIN_VALUE;
     /** Where it was sent to fight (the skirmish command; step 4's raids later), and until when; not saved. */
     @Nullable
     private BlockPos fightSpot;
@@ -946,7 +951,9 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
                 && navigator.getSurface() == Direction.DOWN && !isClimbing() && pinnedBy == null;
         if (attackTick == how.gripAt() && holds) {
             if (target instanceof AbstractAntEntity prey) {
-                if (prey.pinnedBy == null && !prey.isParalysed()) {
+                if (prey.pinnedBy == null && !prey.isParalysed() && prey.dodges(this)) {
+                    grabsMissed++;
+                } else if (prey.pinnedBy == null && !prey.isParalysed()) {
                     gripping = true;
                     prey.pinnedBy = this;
                     prey.navigator.stop();
@@ -970,6 +977,64 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             attackTarget = null;
             gripping = false;
         }
+    }
+
+    /** Grabs of its that the foe twisted out of (server, not saved; for the game tests). */
+    private int grabsMissed;
+
+    /**
+     * A bite or sting from another insect does not fling it (M8 fight polish, round B): the game's knockback threw a
+     * Matabele bitten by termite soldiers blocks away; real insect bites clamp and cut, they do not throw. Anything
+     * bigger (a player, a chicken) still knocks it back.
+     */
+    @Override
+    public void knockback(double strength, double x, double z) {
+        if (getLastHurtByMob() instanceof AbstractAntEntity && getLastHurtByMobTimestamp() == tickCount) {
+            return;
+        }
+        super.knockback(strength, x, z);
+    }
+
+    /** Tests only: its chance to dodge a grab and to bite back as it does (below 0: its body's). */
+    private double dodgeForTests = -1.0;
+    private double biteBackForTests;
+
+    /** Tests only: it dodges a hunter's grab with this chance, and bites back as it does with that one. */
+    public void setDodgeForTests(double dodge, double biteBack) {
+        dodgeForTests = dodge;
+        biteBackForTests = biteBack;
+    }
+
+    /** Server: how many of its grabs the foe twisted out of since it was made (for the game tests). */
+    public int grabsMissed() {
+        return grabsMissed;
+    }
+
+    /**
+     * A hunter's jaws close on it (M8 fight polish, round B): by its body's {@code dodge} it twists away, the grab a
+     * miss; as it does, by its body's {@code bite_back}, it bites the hunter first if it may attack it (a termite soldier
+     * standing on the floor: a soldier is harder to grab than a worker). It jerks a step away from the hunter. True
+     * if it got away.
+     */
+    private boolean dodges(AbstractAntEntity hunter) {
+        if (isDowned() || !onGround()) {
+            return false;
+        }
+        FightNumbers.Body body = fightNumbers().orElse(null);
+        double dodge = dodgeForTests >= 0.0 ? dodgeForTests : body == null ? 0.0 : body.dodge();
+        double biteBack = dodgeForTests >= 0.0 ? biteBackForTests : body == null ? 0.0 : body.biteBack();
+        if (getRandom().nextDouble() >= dodge) {
+            return false;
+        }
+        if (getRandom().nextDouble() < biteBack && Fights.mayAttack(profile(), hunter)) {
+            strike(hunter);
+        }
+        // One short step back, walls and all (a push to its speed slid a still body on and on).
+        Vec3 away = position().subtract(hunter.position()).multiply(1.0, 0.0, 1.0);
+        if (away.lengthSqr() > 1.0E-4) {
+            move(net.minecraft.world.entity.MoverType.SELF, away.normalize().scale(0.15));
+        }
+        return true;
     }
 
     /** Server: whether a blow is under way (from its first frame to the clip's end). */
@@ -1000,6 +1065,34 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
      */
     public boolean openWayTo(ServerLevel level, LivingEntity foe) {
         return false;
+    }
+
+    /** It fled from a hunter: it stays in until then (game time), out of {@link #mayGoOut} (M8 fight polish, round B). */
+    public void hideUntil(long until) {
+        if (until > hideUntil) {
+            hideUntil = until;
+        }
+    }
+
+    /** Server: whether it is staying in after fleeing from a hunter. */
+    public boolean isKeepingIn() {
+        return level().getGameTime() < hideUntil;
+    }
+
+    /**
+     * Server: whether it is out of the hunters' reach in its own nest (M8 fight polish, round B): inside it, but not in
+     * a feeding way (a feeding gallery or runway, what a raid breaks into: real Megaponera raid the termites' feeding
+     * sites, never the mound). Following the termites down their galleries, and the termites sealing them behind, is
+     * the termites' side, step 2f.
+     */
+    public boolean isSheltered() {
+        Colony colony = getColony();
+        return colony != null && colony.nest().isInside(level(), blockPosition()) && !colony.nest().isFeedingWay(blockPosition());
+    }
+
+    /** Server: whether it fled from a hunter and is now hiding in its nest, out of reach ({@link #isSheltered}). */
+    public boolean isHiding() {
+        return isKeepingIn() && isSheltered();
     }
 
     /** Sends it to fight round this spot until then (game time; the skirmish command, M8 step 2b). */
@@ -1216,6 +1309,9 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         Colony colony = getColony();
         if (colony == null) {
             return true;
+        }
+        if (isKeepingIn()) {
+            return false; // it fled from a hunter: it stays in a while (M8 fight polish, round B)
         }
         if (colony.keepsASchedule()) {
             return colony.isForagingTime(level());

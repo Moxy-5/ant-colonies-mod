@@ -971,6 +971,22 @@ public class Nest {
      * foraging holes themselves (the way out), not the open air round the mound, and not the mound's hollow shaft while it
      * is still open to the sky (a young mound without its roof).
      */
+    /**
+     * Whether this cell is one of the colony's feeding ways (a feeding gallery under its food, a runway): the parts of the
+     * nest a raid breaks into (M8 fight polish, round B; the rest of the nest is out of the raiders' reach).
+     */
+    public boolean isFeedingWay(BlockPos cell) {
+        if (foodWays.galleryCells().contains(cell)) {
+            return true;
+        }
+        for (FoodWays.Runway runway : foodWays.getRunways()) {
+            if (runway.cells().contains(cell)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public boolean isInside(Level level, BlockPos cell) {
         long now = level.getGameTime();
         if (now != insideTick) {

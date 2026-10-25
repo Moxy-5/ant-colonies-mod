@@ -14,6 +14,7 @@ import com.antcolonies.entity.goal.CarryEggGoal;
 import com.antcolonies.entity.goal.ClipGrassGoal;
 import com.antcolonies.entity.goal.FeedLarvaGoal;
 import com.antcolonies.entity.goal.FeedQueenGoal;
+import com.antcolonies.entity.goal.FleeGoal;
 import com.antcolonies.entity.goal.GatherSeedGoal;
 import com.antcolonies.entity.goal.GoInsideGoal;
 import com.antcolonies.entity.goal.NoticeGoal;
@@ -88,6 +89,8 @@ public class TermiteWorkerEntity extends AbstractAntEntity implements ColonyBorn
     @Override
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));
+        // A worker that feels a Matabele close (or a stung nestmate) runs for the nearest hole and goes down (M8 2b+).
+        this.goalSelector.addGoal(0, new FleeGoal(this));
         // A hungry worker eats before anything else: a nodule (young) or old comb (older) in the fungus garden.
         this.goalSelector.addGoal(1, new EatGoal(this, hunger()));
         // What a termite holds goes where it belongs first: forage to the food store, soil to the mound.

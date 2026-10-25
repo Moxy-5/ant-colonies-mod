@@ -27,12 +27,23 @@ import net.minecraft.resources.ResourceLocation;
  * just felled, feeling it with its antennae, before it turns to the next (M8 fight polish, round A); none if empty.</li>
  * </ul>
  * A body's {@code venom_ticks}: how long the venom that fells it takes to work (it staggers meanwhile, then flips onto
- * its back paralysed); 0 at once.
+ * its back paralysed); 0 at once. Its {@code dodge}: the chance a hunter's grab at it fails (it twists away, M8 fight
+ * polish, round B); its {@code bite_back}: the chance that, as the grab fails, it bites the hunter first (a soldier).
+ * <ul>
+ * <li>{@code give_up_ticks}: how long one of its hunters sent to fight keeps searching round the spot with no foe in
+ * reach before the fight is over (round B; 600 if the file says nothing).</li>
+ * <li>{@code flee}: which of its bodies run from a hunter they feel close ({@code bodies}), how close
+ * ({@code feel_radius}, blocks), how fast ({@code speed}, times its walk) and how long they then stay in
+ * ({@code hide_ticks}); none if absent (round B: the termite workers dive down their holes).</li>
+ * </ul>
  * Insects of another colony of the same species stay enemies of the alarm (as before), but are not attacked: the
  * neighbours yield to each other ({@code colony.Neighbours}).
  */
 public record FightNumbers(Map<String, Body> bodies, List<String> foeTypes, List<ResourceLocation> foeSpecies,
-        List<ResourceLocation> prey, int paralysedTicks, List<Integer> lookOverTicks) {
+        List<ResourceLocation> prey, int paralysedTicks, List<Integer> lookOverTicks, int giveUpTicks, Optional<Flee> flee) {
+
+    /** How long a hunter searches round its spot with no foe before giving up, if its species file says nothing. */
+    public static final int DEFAULT_GIVE_UP_TICKS = 600;
 
     /** How long a paralysed insect lies before it dies, if its species file says nothing (a day, my pick). */
     public static final int DEFAULT_PARALYSED_TICKS = 24000;
@@ -43,18 +54,32 @@ public record FightNumbers(Map<String, Body> bodies, List<String> foeTypes, List
             ResourceLocation.CODEC.listOf().optionalFieldOf("foe_species", List.of()).forGetter(FightNumbers::foeSpecies),
             ResourceLocation.CODEC.listOf().optionalFieldOf("prey", List.of()).forGetter(FightNumbers::prey),
             Codec.INT.optionalFieldOf("paralysed_ticks", DEFAULT_PARALYSED_TICKS).forGetter(FightNumbers::paralysedTicks),
-            Codec.INT.listOf().optionalFieldOf("look_over_ticks", List.of()).forGetter(FightNumbers::lookOverTicks)
+            Codec.INT.listOf().optionalFieldOf("look_over_ticks", List.of()).forGetter(FightNumbers::lookOverTicks),
+            Codec.INT.optionalFieldOf("give_up_ticks", DEFAULT_GIVE_UP_TICKS).forGetter(FightNumbers::giveUpTicks),
+            Flee.CODEC.optionalFieldOf("flee").forGetter(FightNumbers::flee)
     ).apply(i, FightNumbers::new));
+
+    /** Who of a species runs from a hunter it feels close, how close, how fast, and how long it then stays in. */
+    public record Flee(List<String> bodies, double feelRadius, double speed, int hideTicks) {
+        public static final Codec<Flee> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.STRING.listOf().fieldOf("bodies").forGetter(Flee::bodies),
+                Codec.DOUBLE.optionalFieldOf("feel_radius", 3.0).forGetter(Flee::feelRadius),
+                Codec.DOUBLE.optionalFieldOf("speed", 1.3).forGetter(Flee::speed),
+                Codec.INT.optionalFieldOf("hide_ticks", 1200).forGetter(Flee::hideTicks)
+        ).apply(i, Flee::new));
+    }
 
     public static final SpeciesSection<FightNumbers> SECTION = SpeciesSection.signUp("fight", CODEC);
 
     /** One body's numbers. */
-    public record Body(double health, double damage, int stingsToFall, int venomTicks) {
+    public record Body(double health, double damage, int stingsToFall, int venomTicks, double dodge, double biteBack) {
         public static final Codec<Body> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.DOUBLE.fieldOf("health").forGetter(Body::health),
                 Codec.DOUBLE.fieldOf("damage").forGetter(Body::damage),
                 Codec.INT.optionalFieldOf("stings_to_fall", 1).forGetter(Body::stingsToFall),
-                Codec.INT.optionalFieldOf("venom_ticks", 0).forGetter(Body::venomTicks)
+                Codec.INT.optionalFieldOf("venom_ticks", 0).forGetter(Body::venomTicks),
+                Codec.DOUBLE.optionalFieldOf("dodge", 0.0).forGetter(Body::dodge),
+                Codec.DOUBLE.optionalFieldOf("bite_back", 0.0).forGetter(Body::biteBack)
         ).apply(i, Body::new));
     }
 
