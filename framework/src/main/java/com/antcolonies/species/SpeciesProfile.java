@@ -271,10 +271,12 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * the workers eat at all. {@code diet}: what they eat by age (see {@link WorkerDiet}). {@code restNearEntrance}: above
      * 0, a worker with nothing to do goes inside and rests within that many blocks of the nest's entrance (real red
      * harvester ants: the spare workers wait in the upper chambers by the entrance until they are needed, they do not
-     * stroll about outside); 0, it strolls about wherever it is.
+     * stroll about outside); 0, it strolls about wherever it is. {@code restInRooms}: a worker that stays in, with nothing
+     * to do, goes down into the nest's rooms and strolls only in them, never resting in the shafts and tunnels between
+     * (real Megaponera: the colony crowds into its chamber with the queen and the brood).
      */
     public record WorkerNumbers(int mealIntervalTicks, int slowAfterTicks, int starveAfterTicks, int nurseUntilTicks, int builderUntilTicks,
-            int lifespanTicks, boolean eats, WorkerDiet diet, int restNearEntrance) {
+            int lifespanTicks, boolean eats, WorkerDiet diet, int restNearEntrance, boolean restInRooms) {
         public static final Codec<WorkerNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("meal_interval_ticks").forGetter(WorkerNumbers::mealIntervalTicks),
                 Codec.INT.fieldOf("slow_after_ticks").forGetter(WorkerNumbers::slowAfterTicks),
@@ -284,12 +286,13 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 Codec.INT.optionalFieldOf("lifespan_ticks", 0).forGetter(WorkerNumbers::lifespanTicks),
                 Codec.BOOL.optionalFieldOf("eats", true).forGetter(WorkerNumbers::eats),
                 WorkerDiet.CODEC.optionalFieldOf("diet", WorkerDiet.STORE_ONLY).forGetter(WorkerNumbers::diet),
-                Codec.INT.optionalFieldOf("rest_near_entrance", 0).forGetter(WorkerNumbers::restNearEntrance)
+                Codec.INT.optionalFieldOf("rest_near_entrance", 0).forGetter(WorkerNumbers::restNearEntrance),
+                Codec.BOOL.optionalFieldOf("rest_in_rooms", false).forGetter(WorkerNumbers::restInRooms)
         ).apply(i, WorkerNumbers::new));
 
         public WorkerNumbers(int mealIntervalTicks, int slowAfterTicks, int starveAfterTicks, int nurseUntilTicks, int builderUntilTicks,
                 int lifespanTicks, boolean eats, WorkerDiet diet) {
-            this(mealIntervalTicks, slowAfterTicks, starveAfterTicks, nurseUntilTicks, builderUntilTicks, lifespanTicks, eats, diet, 0);
+            this(mealIntervalTicks, slowAfterTicks, starveAfterTicks, nurseUntilTicks, builderUntilTicks, lifespanTicks, eats, diet, 0, false);
         }
 
         public WorkerNumbers(int mealIntervalTicks, int slowAfterTicks, int starveAfterTicks, int nurseUntilTicks, int builderUntilTicks) {

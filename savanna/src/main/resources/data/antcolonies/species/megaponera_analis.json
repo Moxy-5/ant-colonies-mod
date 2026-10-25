@@ -28,7 +28,9 @@
     "builder_until_ticks": 192000,
     "lifespan_ticks": 360000,
     "eats": true,
-    "diet": { "young": "nurse_food", "older": "nurse_food", "workers_per_piece": 10, "mouth_to_mouth": false }
+    "diet": { "young": "nurse_food", "older": "nurse_food", "workers_per_piece": 10, "mouth_to_mouth": false },
+    "_rest_in_rooms_note": "With nothing to do the workers go down into the nest's rooms and stay there, never in the shaft (real Megaponera crowd into their chamber with the queen and the brood; the user's report 2026-10-24: they piled up at the top of the chimney).",
+    "rest_in_rooms": true
   },
   "queen": {
     "meal": 6,

@@ -19,7 +19,7 @@ import net.minecraft.world.entity.ai.goal.Goal;
  * Idle wandering: now and then walks to a random nearby spot, through tunnels too. Underground some insects now and
  * then pick a spot on the ceiling instead and hang there upside down for a while, like real ants in their nest
  * ({@link #hangsFromCeilings}). An insect that stays in (termites by day, see {@link AbstractAntEntity#mayGoOut}) only
- * strolls inside.
+ * strolls inside; one that keeps to the rooms ({@link AbstractAntEntity#restsInRooms}) strolls only in them.
  */
 public class AntWanderGoal extends Goal {
     private final AbstractAntEntity ant;
@@ -54,6 +54,8 @@ public class AntWanderGoal extends Goal {
         CellMap map = new LevelCellMap(ant.level(), ant);
         BlockPos here = ant.blockPosition();
         int rest = ant.restsNearEntrance();
+        Colony colony = ant.restsInRooms() ? ant.getColony() : null;
+        java.util.Set<BlockPos> rooms = colony == null ? java.util.Set.of() : new java.util.HashSet<>(colony.nest().getAllRoomCells(ant.level()));
         for (int attempt = 0; attempt < 6; attempt++) {
             int dx = ant.getRandom().nextInt(radius * 2 + 1) - radius;
             int dz = ant.getRandom().nextInt(radius * 2 + 1) - radius;
@@ -63,6 +65,9 @@ public class AntWanderGoal extends Goal {
             }
             if (rest > 0 && !restsAt(spot, here, rest)) {
                 continue; // a harvester ant with nothing to do stays in, up by the entrance
+            }
+            if (!rooms.isEmpty() && !rooms.contains(spot)) {
+                continue; // a Matabele ant stays in the rooms, with the queen
             }
             if (ceilingChance > 0.0F && ant.getRandom().nextFloat() < ceilingChance && !ant.level().canSeeSky(spot)
                     && Foothold.ceiling(spot).isValid(map)

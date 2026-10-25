@@ -1,6 +1,8 @@
 package com.antcolonies.entity.goal;
 
 import java.util.EnumSet;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -15,6 +17,8 @@ import net.minecraft.world.level.Level;
  * An insect whose colony keeps a schedule (termites: out only at night and in the rain) and that is still outside when
  * it is time to stay in goes back inside: to the nearest spot inside the nest or the mound past the doorway (through a
  * foraging hole while one is open, otherwise any way in there is, such as a chimney), never stopping in the doorway itself.
+ * An insect that keeps to the rooms ({@link AbstractAntEntity#restsInRooms}) goes on down into a room, and one inside
+ * but out of the rooms (in the shaft or a tunnel) is taken there too.
  */
 public class GoInsideGoal extends Goal {
     /** If it is not inside after this long (ticks) it stops trying for now (it tries again a little later). */
@@ -47,13 +51,18 @@ public class GoInsideGoal extends Goal {
             return false;
         }
         Level level = ant.level();
-        if (colony.nest().isInside(level, ant.blockPosition()) || level.getGameTime() < nextTry) {
+        if (level.getGameTime() < nextTry) {
+            return false;
+        }
+        Set<BlockPos> rooms = ant.restsInRooms() ? new HashSet<>(colony.nest().getAllRoomCells(level)) : Set.of();
+        if (rooms.isEmpty() ? colony.nest().isInside(level, ant.blockPosition()) : rooms.contains(ant.blockPosition())) {
             return false;
         }
         // Not to a doorway (the entrance or a foraging hole): one that stops there blocks it from being plugged.
         Colony home = colony;
-        boolean going = errand.setOff(at -> home.nest().isInside(level, at.cell()) && !home.foragingHoles().isDoorway(level, at.cell()),
-                colony.getCenter().below(), 1.0);
+        boolean going = rooms.isEmpty()
+                ? errand.setOff(at -> home.nest().isInside(level, at.cell()) && !home.foragingHoles().isDoorway(level, at.cell()), colony.getCenter().below(), 1.0)
+                : errand.setOff(at -> rooms.contains(at.cell()), colony.getCenter().below(), 1.0);
         if (!going) {
             nextTry = level.getGameTime() + RETRY_TICKS;
             com.antcolonies.ColonyFrameworkMod.LOGGER.debug("[go-inside] {} at {} ({}) found no way in", ant.getId(), ant.blockPosition().toShortString(),

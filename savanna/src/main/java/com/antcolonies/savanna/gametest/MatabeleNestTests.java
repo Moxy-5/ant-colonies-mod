@@ -29,7 +29,7 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 @GameTestHolder(SavannaMod.MODID)
 @PrefixGameTestTemplate(false)
 public class MatabeleNestTests {
-    /** A month-old dead mound: the colony moves in, the queen's room open from the start, and she goes down into it. */
+    /** A month-old dead mound: the colony moves in, the queen's room open from the start, and she and her workers go down into it. */
     @GameTest(template = "arena", timeoutTicks = 3000, skyAccess = true)
     public static void aMatabeleColonyMovesIntoADeadTermiteMound(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
@@ -100,6 +100,18 @@ public class MatabeleNestTests {
                     "the queen is not in her room at " + room.toShortString() + ": she is at "
                     + (queen == null ? "nowhere" : queen.blockPosition().toShortString() + " doing " + ((MatabeleQueenEntity) queen).goalSelector.getAvailableGoals().stream()
                     .filter(net.minecraft.world.entity.ai.goal.WrappedGoal::isRunning).map(g -> g.getGoal().getClass().getSimpleName()).toList()));
+            // The workers too, down in the rooms, not only the queen (the user, 2026-10-24: they all piled up at the top of the
+            // chimney, which counted as inside, while she walked down to her room).
+            java.util.Set<BlockPos> rooms = new java.util.HashSet<>(colony.nest().getAllRoomCells(level));
+            StringBuilder outside = new StringBuilder();
+            for (com.antcolonies.savanna.entity.MatabeleEntity ant : com.antcolonies.gametest.TestIsolation.insectsOf(level, colony, com.antcolonies.savanna.entity.MatabeleEntity.class)) {
+                if (!rooms.contains(ant.blockPosition())) {
+                    outside.append(" | ").append(ant.hasMajorBody() ? "major " : "minor ").append(ant.getLengthMm()).append(" mm at ")
+                            .append(ant.position()).append(" box ").append(ant.getBbWidth()).append(" doing ").append(ant.goalSelector.getAvailableGoals().stream()
+                            .filter(net.minecraft.world.entity.ai.goal.WrappedGoal::isRunning).map(g -> g.getGoal().getClass().getSimpleName()).toList());
+                }
+            }
+            helper.assertTrue(outside.isEmpty(), "workers not down in the rooms (entrance " + colony.getCenter().toShortString() + ")" + outside);
         });
     }
 }
