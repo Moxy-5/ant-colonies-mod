@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Set;
 
 import com.antcolonies.savanna.SavannaMod;
+import com.antcolonies.savanna.block.FungusCombBlock;
 import com.antcolonies.savanna.block.TermiteMoundBlock;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.registry.ModTags;
@@ -35,7 +36,7 @@ public class TermiteRepairTests {
     /**
      * By day, once the first fungus garden is dug, the nest is broken open the way a player digging down to look would:
      * the royal chamber and the garden are opened to the sky (a pit from the surface down into each), and a garden's side
-     * wall is cut. The workers pack every opening shut from inside with finished Termite Mound Soil (no Burrowed Dirt
+     * wall is cut; the garden's floor is all fungus comb first (docs/BUGS.md 70). The workers pack every opening shut from inside with finished Termite Mound Soil (no Burrowed Dirt
      * anywhere), and the nest has no opening left. The middle hole, plugged by day, is mound soil too.
      */
     @GameTest(template = "arena", timeoutTicks = 40000, skyAccess = true)
@@ -77,6 +78,19 @@ public class TermiteRepairTests {
             }
             for (NestPlan.Chamber room : gardens) {
                 planned.addAll(room.cells()); // every garden the plan may ever dig, with its doorway: the cut wall must stay a wall
+            }
+            // The garden's floor all comb, as in a grown nest (docs/BUGS.md 70: a hole over a garden full of comb was never
+            // sealed, no worker found a cell "empty" enough to stand in to close it).
+            for (BlockPos cell : garden.cells()) {
+                if (level.getBlockState(cell).isAir() && level.getBlockState(cell.below()).isFaceSturdy(level, cell.below(), Direction.UP)) {
+                    BlockState comb = FungusCombBlock.newComb(SavannaBlocks.FUNGUS_COMB.get().defaultBlockState());
+                    BlockState laid = FungusCombBlock.withLayerOnTop(FungusCombBlock.withLayerOnTop(comb));
+                    level.setBlock(cell, laid, 3);
+                    // Anyone standing there is lifted onto the comb, as when the game lays it (docs/BUGS.md 48).
+                    for (var insect : level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class, new net.minecraft.world.phys.AABB(cell))) {
+                        com.antcolonies.colony.NestWalls.liftOnto(level, insect, cell, cell.getY() + FungusCombBlock.topOf(laid));
+                    }
+                }
             }
             for (NestPlan.Chamber chamber : List.of(royal, garden)) {
                 BlockPos top = chamber.center().above();

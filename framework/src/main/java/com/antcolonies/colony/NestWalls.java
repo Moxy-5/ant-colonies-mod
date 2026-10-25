@@ -564,7 +564,7 @@ public class NestWalls {
                 for (int dy = -1; dy <= 1; dy++) {
                     for (int dz = -1; dz <= 1; dz++) {
                         BlockPos spot = hole.offset(dx, dy, dz);
-                        if (nest.contains(spot) && !spots.contains(spot) && level.isLoaded(spot) && level.getBlockState(spot).isAir()
+                        if (nest.contains(spot) && !spots.contains(spot) && level.isLoaded(spot) && hasRoomToStand(level, spot)
                                 && (needFloor ? hasFloor(level, spot) : hasWallToClingTo(level, spot))) {
                             found.add(spot);
                         }
@@ -590,7 +590,7 @@ public class NestWalls {
             for (int dy = -1; dy <= 1; dy++) {
                 for (int dz = -1; dz <= 1; dz++) {
                     BlockPos spot = hole.offset(dx, dy, dz);
-                    if (!nest.contains(spot) || !level.isLoaded(spot) || !level.getBlockState(spot).isAir()
+                    if (!nest.contains(spot) || !level.isLoaded(spot) || !hasRoomToStand(level, spot)
                             || !(needFloor ? hasFloor(level, spot) : hasWallToClingTo(level, spot))) {
                         continue;
                     }
@@ -603,6 +603,25 @@ public class NestWalls {
             }
         }
         return best;
+    }
+
+    /** A heap this low (in blocks) leaves room for an insect on it, even under a ceiling (as the legs, {@code Foothold}). */
+    private static final double LOW_HEAP = 0.5;
+
+    /**
+     * Whether an insect can be in this nest cell to work from it: empty, or a low heap it stands on (a fungus garden's
+     * comb, a seed heap; docs/BUGS.md 70: a hole over a garden full of comb was never sealed, no cell was "empty").
+     */
+    private static boolean hasRoomToStand(Level level, BlockPos spot) {
+        BlockState state = level.getBlockState(spot);
+        if (state.isAir()) {
+            return true;
+        }
+        if (!(state.getBlock() instanceof com.antcolonies.block.SeedPileBlock)) {
+            return false;
+        }
+        net.minecraft.world.phys.shapes.VoxelShape shape = state.getCollisionShape(level, spot);
+        return shape.isEmpty() || shape.max(Direction.Axis.Y) <= LOW_HEAP;
     }
 
     private static boolean hasFloor(Level level, BlockPos spot) {
