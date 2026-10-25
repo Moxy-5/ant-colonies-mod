@@ -101,5 +101,11 @@ timings: all "my pick, to confirm" until then).
    nest floods or is too small; scouts pick the site, the
    colony walks there in a column with brood and prey.
 
+**Order to playable (the user, 2026-10-24, "I just wanna get it playable before I go off to california"):**
+finish 1e (prey pile) and 1f (new-land colonies), then 2 (fights), then 4 (scouts and raids), at first with real
+ants only (up to about 50 a raid; my recommendation, the user to confirm: step 4 before step 3, so the hunting
+loop is playable sooner), then the test revamp (`docs/plans/test-health.md`, step 4), then 3 (big columns of
+drawn-only ants), 5 and 6.
+
 Later (M9): splitting into daughter colonies nearby, winged males mating in other
 colonies. After M8: harvester ant territory fights with their neighbours.
