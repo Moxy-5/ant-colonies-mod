@@ -316,6 +316,7 @@ public class TermiteSoldierTests {
         int[] phase = {0}; // 0 setting up, 1 night, 2 day, 3 everybody in
         long[] at = {0, -1, -1, -1}; // since when all guard outside, when the day began, last tick a worker was out, first tick a minor was in
         boolean[] stoodGuard = {false};
+        Set<Long> seenOut = new HashSet<>(); // (BUGS 75: logged once a second per worker)
         TestClock[] clock = {TestClock.still(helper, 12.0)}; // midday: setting up
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
@@ -378,8 +379,24 @@ public class TermiteSoldierTests {
             boolean workerOut = !level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds().inflate(8),
                     worker -> colony.getId().equals(worker.getColonyId()) && !colony.nest().isInside(level, worker.blockPosition())).isEmpty();
             boolean minorIn = minors.stream().anyMatch(minor -> colony.nest().isInside(level, minor.blockPosition()));
+            // (BUGS 75: every worker seen stepping out by day, with what it is doing, and the holes)
+            for (TermiteWorkerEntity worker : level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds().inflate(8),
+                    w -> colony.getId().equals(w.getColonyId()) && !colony.nest().isInside(level, w.blockPosition()))) {
+                if (seenOut.add(worker.getId() * 100000L + tick / 20)) {
+                    SavannaMod.LOGGER.info("[sentry-test] tick {} ({} into the day): worker {} out at {} doing {}; holes open {}, minors in {}",
+                            tick, tick - at[1], worker.getId(), worker.blockPosition().toShortString(), worker.runningGoals(),
+                            colony.nest().getForagingTunnels(level).stream().map(t -> t.hole().toShortString() + "="
+                                    + com.antcolonies.colony.ForagingHoles.isOpen(level, t.hole())).toList(), minorIn);
+                }
+            }
             if (workerOut) {
                 at[2] = tick;
+            }
+            Soldiers soldiersNow = colony.part(SavannaParts.SOLDIERS).orElseThrow();
+            if (minorIn && soldiersNow.minorsOut(level) && seenOut.add(-tick)) {
+                SavannaMod.LOGGER.info("[sentry-test] tick {} ({} into the day): a minor is in while the minors are out: {}; workers out (colony) {}; {}",
+                        tick, tick - at[1], minors.stream().map(minor -> minor.blockPosition().toShortString() + (colony.nest().isInside(level, minor.blockPosition())
+                                ? " in" : " out") + " " + minor.runningGoals()).toList(), colony.trails().workersOutside(level), soldiersNow.describe(level));
             }
             if (minorIn && at[3] < 0) {
                 at[3] = tick;
@@ -387,7 +404,20 @@ public class TermiteSoldierTests {
                         tick, tick - at[1], at[2] - at[1]);
             }
             if (phase[0] == 2 && tick - at[1] < colony.profile().section(SavannaNumbers.SOLDIERS).orElseThrow().escortHomeTicks() - 20) {
-                helper.assertFalse(workerOut && minorIn, "a minor went in while a worker was still outside");
+                if (workerOut && minorIn) {
+                    // (BUGS 75: name the worker outside, the minors in and what the colony counted outside)
+                    String out = level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds().inflate(8),
+                                    worker -> colony.getId().equals(worker.getColonyId()) && !colony.nest().isInside(level, worker.blockPosition()))
+                            .stream().map(worker -> worker.blockPosition().toShortString() + " (" + level.getBlockState(worker.blockPosition()).getBlock()
+                                    + ", on " + level.getBlockState(worker.blockPosition().below()).getBlock() + ", carrying " + worker.isCarrying()
+                                    + ", hidden " + worker.isRemoved() + ")").toList().toString();
+                    String in = minors.stream().filter(minor -> colony.nest().isInside(level, minor.blockPosition()))
+                            .map(minor -> minor.blockPosition().toShortString()).toList().toString();
+                    helper.fail("a minor went in while a worker was still outside: tick " + tick + " (" + (tick - at[1]) + " into the day, "
+                            + clock[0].describe() + "), workers out " + out + ", minors in " + in + ", the colony counts "
+                            + colony.trails().workersOutside(level) + " outside; holes " + colony.nest().getForagingTunnels(level).stream()
+                            .map(t -> t.hole().toShortString()).toList());
+                }
             }
             boolean everybodyIn = !workerOut && minors.stream().allMatch(minor -> colony.nest().isInside(level, minor.blockPosition()));
             if (everybodyIn && phase[0] == 2) {
