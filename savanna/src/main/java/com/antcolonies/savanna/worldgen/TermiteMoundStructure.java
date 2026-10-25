@@ -206,7 +206,9 @@ public class TermiteMoundStructure extends Structure {
 
     /**
      * Whether a tree of new land with this box (its crown and the wood lying round it) would stand on a mound's place:
-     * then it is not grown there (the mound has the place; the trees on old humps are put there on purpose).
+     * then it is not grown there (the mound has the place; the trees on old humps are put there on purpose). Only a
+     * mound that will really be made counts (in a savanna, on dry, fairly flat land, {@link #stands}): a place the
+     * mounds' spacing offers but no mound takes is free for trees (the user's report, 2026-10-24: far fewer trees).
      */
     public static boolean crowds(GenerationContext context, BoundingBox box) {
         StructureSet set = context.registryAccess().registryOrThrow(Registries.STRUCTURE_SET).get(SET);
@@ -221,7 +223,8 @@ public class TermiteMoundStructure extends Structure {
                 ChunkPos chunk = spread.getPotentialStructureChunk(context.seed(), cellX * spacing, cellZ * spacing);
                 BlockPos middle = middle(context.seed(), chunk);
                 if (middle.getX() >= box.minX() - CLEAR && middle.getX() <= box.maxX() + CLEAR
-                        && middle.getZ() >= box.minZ() - CLEAR && middle.getZ() <= box.maxZ() + CLEAR) {
+                        && middle.getZ() >= box.minZ() - CLEAR && middle.getZ() <= box.maxZ() + CLEAR
+                        && stands(context, set, middle) != null) {
                     return true;
                 }
             }
@@ -231,27 +234,46 @@ public class TermiteMoundStructure extends Structure {
 
     @Override
     protected Optional<GenerationStub> findGenerationPoint(GenerationContext context) {
-        BlockPos middle = middle(context.seed(), context.chunkPos());
+        BlockPos foot = stands(context, null, middle(context.seed(), context.chunkPos()));
+        if (foot == null) {
+            return Optional.empty();
+        }
+        Pick pick = pick(numbers, context.random());
+        BoundingBox box = new BoundingBox(foot);
+        return Optional.of(new GenerationStub(foot, builder -> builder.addPiece(new TermiteMoundPiece(pick, foot, box))));
+    }
+
+    /**
+     * The foot of a mound whose middle is {@code middle}, or null if no mound stands there: never in water, never on a
+     * steep slope (the colony's queen would not have founded there), and, asked for a tree ({@code set} given), only in
+     * the mounds' biomes (the game checks those itself for the mound's own start).
+     */
+    private static BlockPos stands(GenerationContext context, StructureSet set, BlockPos middle) {
         int x = middle.getX(), z = middle.getZ();
-        // Never in water, never on a steep slope (the colony's queen would not have founded there).
         int lowest = Integer.MAX_VALUE, highest = Integer.MIN_VALUE;
         int[][] around = {{0, 0}, {8, 0}, {-8, 0}, {0, 8}, {0, -8}, {6, 6}, {-6, 6}, {6, -6}, {-6, -6}};
         for (int[] o : around) {
             int surface = height(context, x + o[0], z + o[1], Heightmap.Types.WORLD_SURFACE_WG);
             int floor = height(context, x + o[0], z + o[1], Heightmap.Types.OCEAN_FLOOR_WG);
             if (surface != floor) {
-                return Optional.empty();
+                return null;
             }
             lowest = Math.min(lowest, surface);
             highest = Math.max(highest, surface);
         }
         if (highest - lowest > MAX_UNEVEN) {
-            return Optional.empty();
+            return null;
         }
-        Pick pick = pick(numbers, context.random());
         BlockPos foot = new BlockPos(x, height(context, x, z, Heightmap.Types.WORLD_SURFACE_WG), z);
-        BoundingBox box = new BoundingBox(foot);
-        return Optional.of(new GenerationStub(foot, builder -> builder.addPiece(new TermiteMoundPiece(pick, foot, box))));
+        if (set != null && !set.structures().isEmpty()) {
+            net.minecraft.core.Holder<net.minecraft.world.level.biome.Biome> biome = context.biomeSource().getNoiseBiome(
+                    net.minecraft.core.QuartPos.fromBlock(x), net.minecraft.core.QuartPos.fromBlock(foot.getY()),
+                    net.minecraft.core.QuartPos.fromBlock(z), context.randomState().sampler());
+            if (!set.structures().get(0).structure().value().biomes().contains(biome)) {
+                return null;
+            }
+        }
+        return foot;
     }
 
     private static int height(GenerationContext context, int x, int z, Heightmap.Types type) {

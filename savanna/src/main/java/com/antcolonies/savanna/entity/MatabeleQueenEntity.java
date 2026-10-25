@@ -28,11 +28,14 @@ import net.minecraft.world.level.Level;
  * (a colony splits in two, M9), but until then one put down with a spawn egg starts an empty colony where she stands,
  * and spawn-egg majors and minors near her join it (the user's pick, 2026-10-24; {@code /antcolonies matabele} makes a
  * whole colony). Her colony ends when she dies; unfed for her species' {@code queen.starve_ticks} once she has workers
- * she starves (with no prey pile yet, M8 step 1e, she does). Her colony settles in the best site near her (step 1d,
- * {@link MatabeleNest}: a dead mound, a fallen log, the foot of a tree, else the ground); she walks to it and into her room once it is open
- * (the user's pick, 2026-10-24: alone she digs nothing, her workers dig the way in).
+ * she starves (with no prey pile yet, M8 step 1e, she does). Her colony settles in the nearest free dead termite mound
+ * within {@value MatabeleNest#LOOK} blocks (step 1d, {@link MatabeleNest}, the user's call, 2026-10-24: only dead mounds
+ * for now); she walks to it and down into the old royal chamber. With none near she has no colony yet: she wanders and
+ * looks again every {@link #LOOK_AGAIN} ticks (a mound may die near her), and starts her colony once one is found.
  */
 public class MatabeleQueenEntity extends AbstractAntEntity {
+    /** How often a queen with no home yet looks again for a dead mound (ticks; my pick, 10 seconds). */
+    static final int LOOK_AGAIN = 200;
     private boolean colonyChecked;
 
     public MatabeleQueenEntity(EntityType<? extends MatabeleQueenEntity> type, Level level) {
@@ -94,12 +97,17 @@ public class MatabeleQueenEntity extends AbstractAntEntity {
             return;
         }
         ColonyManager manager = ColonyManager.get(serverLevel);
-        // Once, on the first tick: make sure the brain has a colony for this queen, settled in the best site near her.
-        if (!colonyChecked) {
-            colonyChecked = true;
-            if (getColonyId() == null || manager.getColony(getColonyId()) == null) {
-                Colony colony = MatabeleNest.settle(serverLevel, MatabeleNest.pick(serverLevel, blockPosition(), null), getUUID());
-                setColonyId(colony.getId());
+        // On the first tick, then every LOOK_AGAIN ticks until she has one: a colony for this queen, settled in the
+        // nearest free dead mound near her.
+        if (!colonyChecked && (tickCount <= 1 || tickCount % LOOK_AGAIN == 0)) {
+            if (getColonyId() != null && manager.getColony(getColonyId()) != null) {
+                colonyChecked = true;
+            } else {
+                MatabeleNest.Site site = MatabeleNest.pick(serverLevel, blockPosition());
+                if (site != null) {
+                    setColonyId(MatabeleNest.settle(serverLevel, site, getUUID()).getId());
+                    colonyChecked = true;
+                }
             }
         }
         // Once a second: unfed for days (here, or while away), she dies and the colony ends.

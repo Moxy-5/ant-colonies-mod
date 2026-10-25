@@ -53,6 +53,8 @@ timings: all "my pick, to confirm" until then).
      1 block down, the log its roof, 2 colonies at most), at the foot of any tree 3+ thick, dead or living (the same room,
      1 colony), else a burrow stand-in in bare ground (a tunnel sloping in to one room 3 down, 3+ blocks from another burrow, rooms
      never touching). The queen digs nothing; her workers dig the way in. Test: a queen near each (`MatabeleNestTests`).
+     **Changed by the user 2026-10-24: dead mounds only for now** (logs, trees and burrows dropped; a queen with no
+     dead mound within 32 blocks waits and looks again; `docs/DESIGN.md`, "Dead mounds only, for now").
      Still to add for step 1: two or more entrances, guests in the nest, returning to an old nest.
    - **1e, the prey pile and hunger:** the pile of dead termites in the nest, eaten by larvae and adults, off in about a
      day; hunger by the colony rules already built; stocked by a command until raids exist (step 4). Test: stock it

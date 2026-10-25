@@ -8,6 +8,8 @@ import com.antcolonies.colony.Colony;
 import com.antcolonies.gametest.TestIsolation;
 import com.antcolonies.gametest.TestScenes;
 import com.antcolonies.savanna.SavannaMod;
+import com.antcolonies.savanna.colony.MatabeleNest;
+import com.antcolonies.savanna.colony.NewLandMounds;
 import com.antcolonies.savanna.command.MatabeleCommands;
 import com.antcolonies.savanna.entity.MatabeleEntity;
 import com.antcolonies.savanna.entity.MatabeleQueenEntity;
@@ -31,25 +33,39 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 /**
  * The Matabele colony (M8 step 1c): a queen put down starts a colony; majors and minors put down near her join it and
  * are counted; each worker has its own length within the real spread, drawn (and its box sized) with the model nearer
- * its length, and keeps it through a save; the queen alone digs nothing, and both colonies settle in a site (step 1d,
- * {@code MatabeleNestTests}); a dead worker leaves the headcount;
+ * its length, and keeps it through a save; the queen alone digs nothing, and both colonies settle in a dead mound (step 1d,
+ * {@code MatabeleNestTests}; two dead mounds are put in for them); a dead worker leaves the headcount;
  * {@code /antcolonies matabele} makes a queen with her workers, real ones up to the cap and the rest numbers; and the
  * size spread gives the real mix (about half majors, a quarter between, a quarter minors).
  */
 @GameTestHolder(SavannaMod.MODID)
 @PrefixGameTestTemplate(false)
 public class MatabeleColonyTests {
-    @GameTest(template = "arena", timeoutTicks = 400)
+    @GameTest(template = "arena", timeoutTicks = 400, skyAccess = true)
     public static void aMatabeleQueenStartsAColonyThatMajorsAndMinorsJoinEachWithItsOwnSize(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         TestScenes.deepGround(helper);
+        // Soil for the second dead mound too (out in the arena's far corner, past the deep ground).
+        for (int x = MIDDLE + 26; x < 65; x++) {
+            for (int z = MIDDLE + 26; z < 65; z++) {
+                for (int y = 0; y < SURFACE - 1; y++) {
+                    helper.setBlock(x, y, z, net.minecraft.world.level.block.Blocks.DIRT);
+                }
+                helper.setBlock(x, SURFACE - 1, z, net.minecraft.world.level.block.Blocks.GRASS_BLOCK);
+            }
+        }
         SavannaNumbers.WorkerSizes sizes = SpeciesProfiles.get(MatabeleEntity.SPECIES).section(SavannaNumbers.WORKER_SIZES).orElseThrow();
         checkTheMix(helper, sizes);
-        MatabeleQueenEntity queen = helper.spawn(SavannaEntities.MATABELE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        // A home for each colony (dead mounds are the Matabele's only home for now): one here, one for the command's colony.
+        helper.assertTrue(NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE)),
+                NewLandMounds.pickFor("dead", 30, 5L)) != null, "no dead mound put in for the queen");
+        helper.assertTrue(NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(MIDDLE + 40, SURFACE, MIDDLE + 40)),
+                NewLandMounds.pickFor("dead", 30, 6L)) != null, "no dead mound put in for the command's colony");
+        MatabeleQueenEntity queen = helper.spawn(SavannaEntities.MATABELE_QUEEN.get(), MIDDLE + 9, top(helper, MIDDLE + 9, MIDDLE), MIDDLE);
         List<MatabeleEntity> workers = new ArrayList<>();
         Colony[] made = new Colony[1];
         helper.runAfterDelay(10, () -> {
-            Colony colony = TestScenes.colony(helper, MatabeleEntity.SPECIES);
+            Colony colony = queenColony(helper, queen);
             helper.assertTrue(colony != null, "the queen started no Matabele colony; colonies: " + com.antcolonies.colony.ColonyManager.get(level).getColonies().stream()
                     .map(c -> c.getSpecies() + "@" + c.getCenter().toShortString() + " queen " + c.getQueen(level)).toList() + " queen at " + queen.blockPosition().toShortString() + " id " + queen.getColonyId());
             helper.assertTrue(colony.getId().equals(queen.getColonyId()), "the queen is not the colony's queen");
@@ -57,8 +73,8 @@ public class MatabeleColonyTests {
             // Alone she digs nothing (the user's pick, 2026-10-24): her workers dig the way in.
             helper.assertTrue(colony.nest().findDigTarget(level) == null, "a Matabele queen alone has something to dig");
             for (int i = 0; i < 4; i++) {
-                workers.add(helper.spawn(SavannaEntities.MATABELE_MAJOR.get(), MIDDLE - 3 + 2 * i, SURFACE, MIDDLE + 3));
-                workers.add(helper.spawn(SavannaEntities.MATABELE_MINOR.get(), MIDDLE - 3 + 2 * i, SURFACE, MIDDLE - 3));
+                workers.add(helper.spawn(SavannaEntities.MATABELE_MAJOR.get(), MIDDLE + 6 + 2 * i, top(helper, MIDDLE + 6 + 2 * i, MIDDLE + 3), MIDDLE + 3));
+                workers.add(helper.spawn(SavannaEntities.MATABELE_MINOR.get(), MIDDLE + 6 + 2 * i, top(helper, MIDDLE + 6 + 2 * i, MIDDLE - 3), MIDDLE - 3));
             }
             made[0] = colony;
         });
@@ -88,7 +104,7 @@ public class MatabeleColonyTests {
             dead.kill();
             helper.assertTrue(colony.getCount(Caste.WORKER) == 7, "a dead worker stayed in the headcount");
             // The command: a queen with 60 workers, 50 real (the cap) round her, 10 numbers inside.
-            Colony whole = MatabeleCommands.makeColony(level, helper.absolutePos(new BlockPos(MIDDLE + 24, SURFACE, MIDDLE + 24)), 60);
+            Colony whole = MatabeleCommands.makeColony(level, helper.absolutePos(new BlockPos(MIDDLE + 31, SURFACE, MIDDLE + 40)), 60);
             helper.assertTrue(whole != null, "the command made no colony");
             made[0] = whole;
         });
@@ -104,9 +120,9 @@ public class MatabeleColonyTests {
                     "the command's 50 workers are not majors and minors both");
         });
         helper.runAfterDelay(300, () -> {
-            // Both colonies settled in a site (step 1d; on this open ground, in the ground).
-            for (Colony colony : List.of(made[0], TestScenes.colony(helper, MatabeleEntity.SPECIES))) {
-                helper.assertTrue(colony.nest().site() != null, "a Matabele colony settled nowhere");
+            // Both colonies settled in a dead mound (step 1d), each in its own.
+            for (Colony colony : List.of(made[0], queenColony(helper, queen))) {
+                helper.assertTrue(MatabeleNest.IN_A_MOUND.equals(colony.nest().site()), "a Matabele colony settled " + colony.nest().site());
             }
             helper.succeed();
         });
@@ -130,5 +146,17 @@ public class MatabeleColonyTests {
         helper.assertTrue(Math.abs(minors / (double) rolls - 0.25) < 0.04, minors + " minors in " + rolls);
         // Minors up to about 10.6 mm (the length as near the one model as the other) have the minor's model: about 23 in 100.
         helper.assertTrue(Math.abs(majorModels / (double) rolls - 0.77) < 0.04, majorModels + " with the major's model in " + rolls);
+    }
+
+    /** The queen's own colony (its middle, up the dead mound's chimney, may stand above the arena's box). */
+    private static Colony queenColony(GameTestHelper helper, MatabeleQueenEntity queen) {
+        return queen.getColonyId() == null ? null : com.antcolonies.colony.ColonyManager.get(helper.getLevel()).getColony(queen.getColonyId());
+    }
+
+    /** The height (in the arena's own numbers) to stand on at (x, z): on top of a dead mound's hump where it rises there. */
+    private static int top(GameTestHelper helper, int x, int z) {
+        BlockPos at = helper.absolutePos(new BlockPos(x, SURFACE, z));
+        return helper.getLevel().getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, at.getX(), at.getZ())
+                - helper.absolutePos(BlockPos.ZERO).getY();
     }
 }

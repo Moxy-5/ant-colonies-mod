@@ -1,5 +1,7 @@
 package com.antcolonies.savanna.command;
 
+import org.jetbrains.annotations.Nullable;
+
 import com.antcolonies.colony.Caste;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
@@ -9,7 +11,6 @@ import com.antcolonies.savanna.entity.MatabeleEntity;
 import com.antcolonies.savanna.entity.MatabeleQueenEntity;
 import com.antcolonies.savanna.registry.SavannaEntities;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
-import com.mojang.brigadier.arguments.StringArgumentType;
 
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -27,9 +28,8 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  * stand, a queen with that many workers (the user's pick, 2026-10-24: a real queen never founds alone, M9 has the colony
  * split). As many as the colony's real-mob cap come out as real ants round her, majors and minors as the real size
  * spread draws them; the rest are numbers in the brain (they come out in the nest's finished rooms). Step 1d: the colony
- * settles in the best site within {@value MatabeleNest#LOOK} blocks (a dead mound, a fallen log, the foot of a tree, else the ground), or
- * the kind named by a last word, {@code mound}, {@code log}, {@code standing} or {@code ground}; the ants appear where you stand and walk
- * there.
+ * settles in the nearest free dead termite mound within {@value MatabeleNest#LOOK} blocks (the only home for now, the
+ * user's call, 2026-10-24); the ants appear where you stand and walk there. With no such mound the command says so.
  */
 @EventBusSubscriber(modid = SavannaMod.MODID)
 public class MatabeleCommands {
@@ -39,32 +39,16 @@ public class MatabeleCommands {
                 .requires(source -> source.hasPermission(2))
                 .then(Commands.literal("matabele")
                         .then(Commands.argument("workers", IntegerArgumentType.integer(0, 2500))
-                                .executes(context -> colony(context.getSource(), IntegerArgumentType.getInteger(context, "workers"), null))
-                                .then(Commands.argument("site", StringArgumentType.word())
-                                        .suggests((context, builder) -> {
-                                            for (MatabeleNest.Kind kind : MatabeleNest.Kind.values()) {
-                                                builder.suggest(kind.name().toLowerCase(java.util.Locale.ROOT));
-                                            }
-                                            return builder.buildFuture();
-                                        })
-                                        .executes(context -> colony(context.getSource(), IntegerArgumentType.getInteger(context, "workers"),
-                                                StringArgumentType.getString(context, "site")))))));
+                                .executes(context -> colony(context.getSource(), IntegerArgumentType.getInteger(context, "workers"))))));
     }
 
-    private static int colony(CommandSourceStack source, int workers, String siteWord) {
+    private static int colony(CommandSourceStack source, int workers) {
         ServerLevel level = source.getLevel();
         BlockPos at = BlockPos.containing(source.getPosition());
-        MatabeleNest.Kind only = null;
-        if (siteWord != null) {
-            only = MatabeleNest.Kind.byWord(siteWord);
-            if (only == null) {
-                source.sendFailure(Component.literal("Unknown site '" + siteWord + "': mound, log, standing or ground."));
-                return 0;
-            }
-        }
-        MatabeleNest.Site site = MatabeleNest.pick(level, at, only);
+        MatabeleNest.Site site = MatabeleNest.pick(level, at);
         if (site == null) {
-            source.sendFailure(Component.literal("No free site " + only.words + " within " + MatabeleNest.LOOK + " blocks of you."));
+            source.sendFailure(Component.literal("No free dead termite mound with a way in within " + MatabeleNest.LOOK
+                    + " blocks of you (/antcolonies newmound dead 30 makes one)."));
             return 0;
         }
         Colony colony = makeColony(level, at, site, workers);
@@ -73,15 +57,17 @@ public class MatabeleCommands {
             return 0;
         }
         int real = colony.getCount(Caste.WORKER) - colony.population().inside(Caste.WORKER);
-        source.sendSuccess(() -> Component.literal("A Matabele colony settling " + site.kind().words + " at " + site.entrance().toShortString()
+        source.sendSuccess(() -> Component.literal("A Matabele colony settling in a dead termite mound at " + site.entrance().toShortString()
                 + ": the queen and " + colony.getCount(Caste.WORKER) + " workers (" + real
                 + " real round you, walking there; the rest inside the brain's numbers, out once the rooms are open)."), false);
         return 1;
     }
 
-    /** {@link #makeColony(ServerLevel, BlockPos, MatabeleNest.Site, int)} in the best site near {@code at}. */
+    /** {@link #makeColony(ServerLevel, BlockPos, MatabeleNest.Site, int)} in the nearest free dead mound near {@code at}; null if there is none. */
+    @Nullable
     public static Colony makeColony(ServerLevel level, BlockPos at, int workers) {
-        return makeColony(level, at, MatabeleNest.pick(level, at, null), workers);
+        MatabeleNest.Site site = MatabeleNest.pick(level, at);
+        return site == null ? null : makeColony(level, at, site, workers);
     }
 
     /**
@@ -95,6 +81,10 @@ public class MatabeleCommands {
             return null;
         }
         ColonyManager manager = ColonyManager.get(level);
+        // Never inside the ground (a dead mound's hump may rise round the spot asked for): up onto its top.
+        if (!level.getBlockState(at).getCollisionShape(level, at).isEmpty()) {
+            at = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, at);
+        }
         Colony colony = MatabeleNest.settle(level, site, queen.getUUID());
         queen.moveTo(at.getX() + 0.5, at.getY(), at.getZ() + 0.5, colony.random().nextFloat() * 360.0F, 0.0F);
         queen.becomeQueenOf(colony);

@@ -7,7 +7,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -16,13 +15,10 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
-import com.antcolonies.colony.GroundReader;
 import com.antcolonies.colony.NestPlan;
-import com.antcolonies.registry.ModTags;
 import com.antcolonies.savanna.block.DeadCombBlock;
 import com.antcolonies.savanna.block.FungusCombBlock;
 import com.antcolonies.savanna.entity.MatabeleEntity;
-import com.antcolonies.savanna.registry.SavannaTags;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -30,160 +26,47 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
- * The Matabele ant's shallow nest (M8 step 1d, {@code docs/DESIGN.md}, "Matabele colony, details", step 1d): real
- * Megaponera build nothing; they move into spaces other animals made. The user's choice (R1, 2026-10-24, a known departure
- * from the real ants, on purpose): under wood they dig one small room of their own; a dead mound is used as it is, nothing
- * dug. A colony picks its site when
- * it starts, within {@link #LOOK} blocks, the best kind first (the user's pick, 2026-10-24), nearer first among the same kind:
- * <ol>
- * <li><b>A dead termite mound</b> (the favourite): the old nest's rooms under the hump, reached down the open chimney.
+ * The Matabele ant's nest (M8 step 1d, {@code docs/DESIGN.md}, "Matabele colony, details", step 1d): real Megaponera
+ * build nothing; they move into spaces other animals made. The user's call (2026-10-24, after trying logs, trees and
+ * burrows: a lone log or tree has no room for a whole colony, and getting in under a log was needlessly fiddly): for now
+ * a colony lives only in <b>a dead termite mound</b>, the old nest's rooms under the hump, reached down the open chimney.
  * The empty royal chamber is the queen's at once; a garden room still holding its rotting Xylaria comb is taken up once
  * the comb is gone (the user's pick: ants neither eat nor clear that fungus). A mound whose chimney is still capped has
- * no way in yet and is passed over.</li>
- * <li><b>Under a fallen log</b> (the user, 2026-10-24, from the real ants, which nest in the shallow ground under dead wood
- * and build nothing): a log 3 or more blocks across and at least twice as long is a roof; a small room, 3 by 3 blocks, is
- * dug one block down in the soil under it, the log its ceiling, the entrance beside the log. A long log has room for two
- * colonies, one to every 4 blocks of its length, at most 2.</li>
- * <li><b>At the foot of a tree</b>: the same small room dug one block down at the foot of a standing trunk 3 or more blocks
- * across, dead or living (the user, 2026-10-24: real nests lie "under trees", Yusuf 2026); one colony to a tree.</li>
- * <li><b>The ground</b>: no site without cover is real; this stands in for an animal's burrow (aardvark, rodent) the ants
- * would move into: a tunnel sloping in to one room 3 blocks down, kept so a queen put down in bare land has a home.</li>
- * </ol>
- * The rooms are handed to the shared nest ({@code Nest.settle}); the digging, the queen's home and the numbers coming
- * out of the rooms are the shared code's.
+ * no way in yet and is passed over. One colony to a mound, the nearest free one within {@link #LOOK} blocks; nothing is
+ * dug. With none near, a queen has no home yet and looks again ({@code MatabeleQueenEntity}). The rooms are handed to the
+ * shared nest ({@code Nest.settle}); the queen's home and the numbers coming out of the rooms are the shared code's.
  */
 public final class MatabeleNest {
-    /** How far round her a queen looks for a site (blocks; my pick). */
+    /** How far round her a queen looks for a dead mound (blocks; my pick). */
     public static final int LOOK = 32;
-    /**
-     * No burrow this near another colony's entrance (blocks; the user, 2026-10-24: real nests lie as close as 2 m), and no
-     * burrow room within a block of another colony's rooms (a wall of soil between them always).
-     */
-    static final int TAKEN = 3;
-    /** The most colonies under one big dead fallen log, one to every {@link #LOG_SLOT} blocks of its length (the user, 2026-10-24). */
-    static final int LOG_COLONIES = 2;
-    static final int LOG_SLOT = 4;
+    /** The words in the colony list for a colony in a dead mound. */
+    public static final String IN_A_MOUND = "in a dead termite mound";
     /** How far round a dead mound's middle its old rooms are looked for (the termite gardens lie within about 6). */
     static final int MOUND_REACH = 10;
     /** How deep under a dead mound's entrance its old rooms are looked for. */
     static final int MOUND_DEPTH = 8;
     /** The most rooms a nest takes from a dead mound. */
     static final int MOST_ROOMS = 8;
-    /** A log is a roof only when this many blocks across (the user, 2026-10-24), and at least twice as long as it is wide. */
-    static final int LOG_WIDTH = 3;
-    /** The room dug under dead wood: this many blocks square, one block down. */
-    static final int WOOD_ROOM = 3;
-    /** How far from the queen open ground is looked for when her own spot will not take a nest (blocks; my pick). */
-    static final int GROUND_LOOK = 8;
-    /** How deep the burrow's room lies (blocks under the entrance; my pick: 2 blocks of soil over it, so the slope is roofed). */
-    static final int BURROW_DEPTH = 3;
 
-    /** The kinds of site, best first. */
-    public enum Kind {
-        MOUND("in a dead termite mound"), LOG("under a fallen log"), STANDING("at the foot of a tree"), GROUND("in the ground");
-
-        /** The words in the colony list. */
-        public final String words;
-
-        Kind(String words) {
-            this.words = words;
-        }
-
-        /** The kind by its command word ({@code mound}, {@code log}, {@code standing}, {@code ground}), or null. */
-        @Nullable
-        public static Kind byWord(String word) {
-            try {
-                return valueOf(word.toUpperCase(Locale.ROOT));
-            } catch (IllegalArgumentException e) {
-                return null;
-            }
-        }
-    }
-
-    /**
-     * A site: its kind, the entrance (the colony's center: the open cell over the way down), the rooms laid out there and
-     * the cells of their ways carved into soil ramps (each with its high side; a burrow's sloping floor).
-     */
-    public record Site(Kind kind, BlockPos entrance, List<NestPlan.Chamber> rooms, Map<BlockPos, Direction> ramps) {
-        public Site(Kind kind, BlockPos entrance, List<NestPlan.Chamber> rooms) {
-            this(kind, entrance, rooms, Map.of());
-        }
+    /** A site: the entrance (the colony's center: the open cell over the way down) and the rooms laid out there. */
+    public record Site(BlockPos entrance, List<NestPlan.Chamber> rooms) {
     }
 
     private MatabeleNest() {
     }
 
-    /**
-     * The site a colony starting at {@code feet} settles in: the best kind within {@link #LOOK} blocks, or only the kind
-     * asked for ({@code only}, the command's). Null only when the kind asked for is not found (open ground always is).
-     */
+    /** The nearest free dead mound with a way in within {@link #LOOK} blocks of {@code feet}; null when there is none. */
     @Nullable
-    public static Site pick(ServerLevel level, BlockPos feet, @Nullable Kind only) {
-        if (only == null || only == Kind.MOUND) {
-            Site site = nearestMound(level, feet);
-            if (site != null || only == Kind.MOUND) {
-                return site;
-            }
-        }
-        List<BlockPos> wood = woodBases(level, feet);
-        if (only == null || only == Kind.LOG) {
-            Site site = nearestLog(level, wood);
-            if (site != null || only == Kind.LOG) {
-                return site;
-            }
-        }
-        if (only == null || only == Kind.STANDING) {
-            Site site = nearestStanding(level, wood);
-            if (site != null || only == Kind.STANDING) {
-                return site;
-            }
-        }
-        return ground(level, feet);
+    public static Site pick(ServerLevel level, BlockPos feet) {
+        return nearestMound(level, feet);
     }
 
     /** A colony of the Matabele with its queen ({@code queenId}) settled in {@code site}. */
     public static Colony settle(ServerLevel level, Site site, UUID queenId) {
         Colony colony = ColonyManager.get(level).createColony(MatabeleEntity.SPECIES, queenId, site.entrance());
-        colony.nest().settle(site.kind().words, site.rooms(), site.ramps());
+        colony.nest().settle(IN_A_MOUND, site.rooms());
         ColonyManager.get(level).markChanged();
         return colony;
-    }
-
-    /** Whether another colony's entrance is within {@link #TAKEN} blocks of this one. */
-    private static boolean isTaken(ServerLevel level, BlockPos entrance) {
-        for (Colony colony : ColonyManager.get(level).getColonies()) {
-            if (colony.getCenter().distManhattan(entrance) <= TAKEN * 2 && horizontal(colony.getCenter(), entrance) <= TAKEN) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /** Whether any cell of {@code rooms} lies next to (or in) a cell of another colony's nest near {@code entrance}. */
-    private static boolean touchesAnother(ServerLevel level, BlockPos entrance, List<NestPlan.Chamber> rooms) {
-        Set<BlockPos> mine = new HashSet<>();
-        for (NestPlan.Chamber room : rooms) {
-            mine.addAll(room.cells());
-        }
-        for (Colony colony : ColonyManager.get(level).getColonies()) {
-            if (horizontal(colony.getCenter(), entrance) > 24) {
-                continue;
-            }
-            for (NestPlan.Chamber room : colony.nest().getPlannedChambers(level)) {
-                for (BlockPos cell : room.cells()) {
-                    for (int dx = -1; dx <= 1; dx++) {
-                        for (int dy = -1; dy <= 1; dy++) {
-                            for (int dz = -1; dz <= 1; dz++) {
-                                if (mine.contains(cell.offset(dx, dy, dz))) {
-                                    return true;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        return false;
     }
 
     private static int horizontal(BlockPos a, BlockPos b) {
@@ -231,7 +114,7 @@ public final class MatabeleNest {
         near.sort(Comparator.comparingDouble(mound -> distance(mound.center, feet)));
         for (DeadMounds.DeadMound mound : near) {
             Site site = fromMound(level, mound.center);
-            if (site != null && colonies(level, Kind.MOUND, site.entrance(), 1).isEmpty()) {
+            if (site != null && colonies(level, site.entrance(), 1).isEmpty()) {
                 return site; // (one colony to a dead mound: the user, 2026-10-24)
             }
         }
@@ -335,7 +218,7 @@ public final class MatabeleNest {
         }
         // The queen's room first, the others in the order they are reached.
         chambers.sort(Comparator.comparingInt(chamber -> chamber.kind() == NestPlan.Kind.QUEEN ? 0 : 1));
-        return new Site(Kind.MOUND, entrance, chambers);
+        return new Site(entrance, chambers);
     }
 
     /** Open air all round: the four sides open (out over the hump, or on open ground). */
@@ -431,335 +314,14 @@ public final class MatabeleNest {
         return new NestPlan.Chamber(kind, List.copyOf(cells), center, List.copyOf(wayIn), List.copyOf(ordered));
     }
 
-    // ----- Under wood: a fallen log, the foot of a tree -----
-
-    /** The Matabele colonies settled {@code kind} whose entrance lies within {@code reach} blocks (level) of {@code anchor}. */
-    private static List<Colony> colonies(ServerLevel level, Kind kind, BlockPos anchor, int reach) {
+    /** The Matabele colonies settled in a dead mound whose entrance lies within {@code reach} blocks (level) of {@code anchor}. */
+    private static List<Colony> colonies(ServerLevel level, BlockPos anchor, int reach) {
         List<Colony> near = new ArrayList<>();
         for (Colony colony : ColonyManager.get(level).getColonies()) {
-            if (kind.words.equals(colony.nest().site()) && horizontal(colony.getCenter(), anchor) <= reach) {
+            if (IN_A_MOUND.equals(colony.nest().site()) && horizontal(colony.getCenter(), anchor) <= reach) {
                 near.add(colony);
             }
         }
         return near;
-    }
-
-    /** The lowest wood blocks near {@code feet}: one per column, a dead wood block resting on soil, nearest first. */
-    private static List<BlockPos> woodBases(ServerLevel level, BlockPos feet) {
-        List<BlockPos> bases = new ArrayList<>();
-        for (int dx = -LOOK; dx <= LOOK; dx++) {
-            for (int dz = -LOOK; dz <= LOOK; dz++) {
-                if (dx * dx + dz * dz > LOOK * LOOK) {
-                    continue;
-                }
-                int x = feet.getX() + dx;
-                int z = feet.getZ() + dz;
-                if (!level.isLoaded(new BlockPos(x, feet.getY(), z))) {
-                    continue;
-                }
-                // A wood block of the column resting on the ground, near the queen's height.
-                for (int y = feet.getY() + 6; y >= feet.getY() - 8; y--) {
-                    BlockPos pos = new BlockPos(x, y, z);
-                    if (level.getBlockState(pos).is(SavannaTags.MATABELE_NEST_LOGS) && level.getBlockState(pos.below()).is(ModTags.DIGGABLE)) {
-                        bases.add(pos);
-                        break;
-                    }
-                }
-            }
-        }
-        bases.sort(Comparator.comparingDouble(pos -> distance(pos, feet)));
-        return bases;
-    }
-
-    @Nullable
-    private static Site nearestLog(ServerLevel level, List<BlockPos> wood) {
-        Set<BlockPos> tried = new HashSet<>();
-        for (BlockPos log : wood) {
-            if (!tried.add(log)) {
-                continue;
-            }
-            Site site = fromLog(level, log, tried);
-            if (site != null) {
-                return site;
-            }
-        }
-        return null;
-    }
-
-    @Nullable
-    private static Site nearestStanding(ServerLevel level, List<BlockPos> wood) {
-        Set<BlockPos> tried = new HashSet<>();
-        for (BlockPos base : wood) {
-            if (!tried.add(base)) {
-                continue;
-            }
-            Site site = fromStanding(level, base, tried);
-            if (site != null) {
-                return site;
-            }
-        }
-        return null;
-    }
-
-    /** How many wood blocks lie in a row from {@code pos} toward {@code side} (not counting {@code pos}), at the same height. */
-    private static int run(ServerLevel level, BlockPos pos, Direction side) {
-        int n = 0;
-        BlockPos at = pos.relative(side);
-        while (n < 32 && level.getBlockState(at).is(SavannaTags.MATABELE_NEST_LOGS)) {
-            n++;
-            at = at.relative(side);
-        }
-        return n;
-    }
-
-    /** {@code pos} moved along {@code axis}' line to the middle of the wood's row through it. */
-    private static BlockPos centred(ServerLevel level, BlockPos pos, Direction axis) {
-        return pos.relative(axis, (run(level, pos, axis) - run(level, pos, axis.getOpposite())) / 2);
-    }
-
-    /**
-     * The nest under the log lying on the ground at {@code log} (one of its lowest blocks): the log must be at least
-     * {@link #LOG_WIDTH} across and twice as long as wide (else it is no roof, or no log: a standing trunk's foot is as
-     * wide as it is long). It has room for one colony to every {@link #LOG_SLOT} blocks of its length, at most
-     * {@link #LOG_COLONIES}; the first free place gets the small room under the trunk (one block down, the log its roof)
-     * and the entrance beside the log. Null when the wood is no such log, its places are all taken, or the ground will
-     * not take the room. {@code tried}: the log's blocks are added (each log is tried once).
-     */
-    @Nullable
-    static Site fromLog(ServerLevel level, BlockPos log, Set<BlockPos> tried) {
-        int alongX = run(level, log, Direction.EAST) + run(level, log, Direction.WEST) + 1;
-        int alongZ = run(level, log, Direction.SOUTH) + run(level, log, Direction.NORTH) + 1;
-        Direction along = alongX >= alongZ ? Direction.EAST : Direction.SOUTH;
-        Direction across = along.getClockWise();
-        int length = Math.max(alongX, alongZ);
-        int width = Math.min(alongX, alongZ);
-        // (the log's blocks count as tried even when it is no roof)
-        int back = run(level, log, along.getOpposite());
-        BlockPos end = log.relative(along.getOpposite(), back);
-        for (int i = 0; i < length; i++) {
-            tried.add(end.relative(along, i));
-        }
-        if (width < LOG_WIDTH || length < 2 * width || length < LOG_SLOT) {
-            return null;
-        }
-        BlockPos start = centred(level, end, across);
-        int slots = Math.min(LOG_COLONIES, length / LOG_SLOT);
-        BlockPos middle = start.relative(along, length / 2);
-        for (int slot = 0; slot < slots; slot++) {
-            int a = (int) ((slot + 0.5) * length / slots);
-            BlockPos centre = start.relative(along, a);
-            boolean taken = false;
-            for (Colony colony : colonies(level, Kind.LOG, middle, length / 2 + width + 3)) {
-                int offset = Math.abs((colony.getCenter().getX() - centre.getX()) * along.getStepX()
-                        + (colony.getCenter().getZ() - centre.getZ()) * along.getStepZ());
-                taken |= offset <= LOG_SLOT / 2;
-            }
-            if (taken) {
-                continue;
-            }
-            Site site = roomUnder(level, Kind.LOG, centre, List.of(across, across.getOpposite()));
-            if (site != null) {
-                return site;
-            }
-        }
-        return null;
-    }
-
-    /**
-     * The nest at the foot of a standing tree, dead or living, whose lowest block is {@code base}: a trunk at least {@link #LOG_WIDTH}
-     * across both ways, not twice as long as wide (that is a lying log) and at least 4 blocks tall; the small room under
-     * the middle of its foot, one block down; one colony to a tree.
-     */
-    @Nullable
-    static Site fromStanding(ServerLevel level, BlockPos base, Set<BlockPos> tried) {
-        int alongX = run(level, base, Direction.EAST) + run(level, base, Direction.WEST) + 1;
-        int alongZ = run(level, base, Direction.SOUTH) + run(level, base, Direction.NORTH) + 1;
-        if (Math.min(alongX, alongZ) < LOG_WIDTH || Math.max(alongX, alongZ) >= 2 * Math.min(alongX, alongZ)
-                || !level.getBlockState(base.above(3)).is(SavannaTags.MATABELE_NEST_LOGS)) {
-            return null;
-        }
-        BlockPos centre = centred(level, centred(level, base, Direction.EAST), Direction.SOUTH);
-        for (int dx = -alongX; dx <= alongX; dx++) {
-            for (int dz = -alongZ; dz <= alongZ; dz++) {
-                tried.add(centre.offset(dx, 0, dz));
-            }
-        }
-        if (!colonies(level, Kind.STANDING, centre, Math.max(alongX, alongZ) + 3).isEmpty()) {
-            return null;
-        }
-        return roomUnder(level, Kind.STANDING, centre, List.of(Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST));
-    }
-
-    /**
-     * The small room dug one block down under the dead wood whose middle (on its lowest row) is {@code centre}: 3 by 3,
-     * every cell under wood (the wood is the roof), the entrance beside the wood on the first of {@code sides} where the
-     * ground takes it, a short way in at the room's level. Null when no side does.
-     */
-    @Nullable
-    private static Site roomUnder(ServerLevel level, Kind kind, BlockPos centre, List<Direction> sides) {
-        int y1 = centre.getY() - 1;
-        int reach = WOOD_ROOM / 2;
-        List<BlockPos> room = new ArrayList<>();
-        for (int dx = -reach; dx <= reach; dx++) {
-            for (int dz = -reach; dz <= reach; dz++) {
-                BlockPos cell = centre.offset(dx, 0, dz).atY(y1);
-                if (!level.getBlockState(cell.above()).is(SavannaTags.MATABELE_NEST_LOGS)) {
-                    return null; // the wood is not over the whole room: no roof
-                }
-                room.add(cell);
-            }
-        }
-        if (!fits(level, room) || !roofed(level, room)) {
-            return null;
-        }
-        for (Direction side : sides) {
-            int out = run(level, centre, side) + 1;
-            BlockPos entrance = centre.relative(side, out);
-            if (out < reach + 1 || !isOpen(level, entrance) || !level.getBlockState(entrance.below()).is(ModTags.DIGGABLE)) {
-                continue;
-            }
-            List<BlockPos> way = new ArrayList<>(List.of(entrance.below()));
-            for (int j = out - 1; j > reach; j--) {
-                way.add(centre.relative(side, j).atY(y1));
-            }
-            if (!fits(level, way)) {
-                continue;
-            }
-            BlockPos door = centre.relative(side, reach).atY(y1);
-            return new Site(kind, entrance, List.of(chamber(NestPlan.Kind.QUEEN, way, door, room)));
-        }
-        return null;
-    }
-
-    /** Every cell is soil to dig or already open under the ground (out of the sky), none beside water. */
-    private static boolean fits(ServerLevel level, List<BlockPos> cells) {
-        for (BlockPos pos : cells) {
-            if (!level.isLoaded(pos)) {
-                return false;
-            }
-            BlockState state = level.getBlockState(pos);
-            if (!(state.is(ModTags.DIGGABLE) || isOpen(level, pos) && !level.canSeeSky(pos))) {
-                return false;
-            }
-            for (Direction side : Direction.values()) {
-                if (!level.getFluidState(pos.relative(side)).isEmpty()) {
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
-
-    /** The room has a roof: no cell over it is open to the sky. */
-    private static boolean roofed(ServerLevel level, List<BlockPos> room) {
-        for (BlockPos pos : room) {
-            BlockPos above = pos.above();
-            if (isOpen(level, above) && level.canSeeSky(above)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    // ----- The ground -----
-
-    /**
-     * A stand-in for an animal's burrow (the user, 2026-10-24: no real site is without cover): a tunnel sloping in like an
-     * aardvark's or a rodent's ({@link #burrow}, the user's ask, 2026-10-24: no straight shaft as the harvester digs) to one
-     * room {@link #BURROW_DEPTH} blocks down, at the queen's own spot if the soil takes it, else at the nearest spot within
-     * {@link #GROUND_LOOK} that does; at her spot anyway when nowhere does (they dig what soil there is).
-     */
-    static Site ground(ServerLevel level, BlockPos feet) {
-        List<BlockPos> spots = new ArrayList<>();
-        for (int r = 0; r <= GROUND_LOOK; r++) {
-            for (int dx = -r; dx <= r; dx++) {
-                for (int dz = -r; dz <= r; dz++) {
-                    if (Math.max(Math.abs(dx), Math.abs(dz)) == r && level.isLoaded(feet.offset(dx, 0, dz))) {
-                        BlockPos top = groundTop(level, feet.getX() + dx, feet.getZ() + dz, feet.getY());
-                        if (top != null) {
-                            spots.add(top.above());
-                        }
-                    }
-                }
-            }
-        }
-        for (BlockPos spot : spots) {
-            if (isTaken(level, spot)) {
-                continue;
-            }
-            Site site = groundSite(spot, level);
-            if (site != null) {
-                return site;
-            }
-        }
-        BlockPos top = groundTop(level, feet.getX(), feet.getZ(), feet.getY());
-        BlockPos spot = top != null ? top.above() : GroundReader.surface(level, feet.getX(), feet.getZ()).above();
-        return burrow(spot, Direction.from2DDataValue(Math.floorMod(spot.hashCode(), 4)));
-    }
-
-    /**
-     * The top ground block of a column near the height {@code y} (3 above to 12 below, so a roof over the land, a
-     * cave's or a test arena's, is never taken for the ground): solid, with open air over it; plants count as air.
-     */
-    @Nullable
-    private static BlockPos groundTop(ServerLevel level, int x, int z, int y) {
-        for (int at = y + 3; at >= y - 12; at--) {
-            BlockPos pos = new BlockPos(x, at, z);
-            BlockState state = level.getBlockState(pos);
-            if (!state.canBeReplaced() && !isOpen(level, pos) && isOpen(level, pos.above())) {
-                return pos;
-            }
-        }
-        return null;
-    }
-
-    /**
-     * The burrow of a ground nest at {@code entrance} that fits the soil there and keeps a block of soil from every other
-     * colony's rooms, the first side that does; null if none does.
-     */
-    @Nullable
-    private static Site groundSite(BlockPos entrance, ServerLevel level) {
-        int first = Math.floorMod(entrance.hashCode(), 4);
-        for (int i = 0; i < 4; i++) {
-            Site site = burrow(entrance, Direction.from2DDataValue((first + i) % 4));
-            boolean fits = true;
-            for (NestPlan.Chamber room : site.rooms()) {
-                fits &= fits(level, room.cells()) && roofed(level, room.room());
-            }
-            if (fits && !touchesAnother(level, entrance, site.rooms())) {
-                return site;
-            }
-        }
-        return null;
-    }
-
-    /**
-     * The burrow at {@code entrance} sloping in toward {@code direction}: a tunnel one block wide going one block down
-     * for every block forward (the mouth an open groove, then roofed by the soil over it), to one room
-     * {@link #WOOD_ROOM} blocks square {@link #BURROW_DEPTH} blocks down, the queen's. The bottom block of each step is
-     * carved into a 45-degree soil ramp rising back toward the mouth (the user's pick, 2026-10-24,
-     * {@code docs/plans/soil-ramp.md}), so the floor is one smooth slope, as a real burrow's packed floor.
-     */
-    private static Site burrow(BlockPos entrance, Direction direction) {
-        List<BlockPos> way = new ArrayList<>(List.of(entrance.below()));
-        Map<BlockPos, Direction> ramps = new HashMap<>();
-        ramps.put(entrance.below(), direction.getOpposite());
-        for (int k = 1; k < BURROW_DEPTH; k++) {
-            BlockPos step = entrance.relative(direction, k);
-            way.add(step.below(k));
-            way.add(step.below(k + 1));
-            ramps.put(step.below(k + 1), direction.getOpposite());
-        }
-        BlockPos door = entrance.relative(direction, BURROW_DEPTH).below(BURROW_DEPTH);
-        int reach = WOOD_ROOM / 2;
-        BlockPos middle = door.relative(direction, reach);
-        Direction side = direction.getClockWise();
-        List<BlockPos> room = new ArrayList<>();
-        for (int a = -reach; a <= reach; a++) {
-            for (int b = -reach; b <= reach; b++) {
-                room.add(middle.relative(direction, a).relative(side, b));
-            }
-        }
-        return new Site(Kind.GROUND, entrance, List.of(chamber(NestPlan.Kind.QUEEN, way, door, room)), ramps);
     }
 }

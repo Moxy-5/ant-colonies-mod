@@ -3,7 +3,6 @@ package com.antcolonies.savanna.gametest;
 import static com.antcolonies.gametest.TestScenes.MIDDLE;
 import static com.antcolonies.gametest.TestScenes.SURFACE;
 
-import com.antcolonies.block.SoilRampBlock;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.NestPlan;
 import com.antcolonies.gametest.TestScenes;
@@ -13,25 +12,19 @@ import com.antcolonies.savanna.colony.MatabeleNest;
 import com.antcolonies.savanna.colony.NewLandMounds;
 import com.antcolonies.savanna.command.MatabeleCommands;
 import com.antcolonies.savanna.entity.MatabeleQueenEntity;
-import com.antcolonies.savanna.registry.TreeBlocks;
+import com.antcolonies.savanna.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.RotatedPillarBlock;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
- * The Matabele's shallow nest (M8 step 1d): a colony settles in the best site near its queen and its workers dig only
- * what joins the spaces there. Near a dead termite mound it moves into the old nest under the hump, down the chimney,
- * the empty royal chamber its queen's room at once (nothing to dig); near a fallen log 3 or more across, or the foot of a
- * standing tree, it digs a small room one block down under the wood (a long log has room for two colonies, a tree or a
- * mound for one); at the foot of a tree, dead or living, the same; in bare land a burrow stand-in sloping in to one room 3 down, a
- * second burrow 3 or more blocks off with soil between the rooms. In each the queen ends in her room.
+ * The Matabele's nest (M8 step 1d): a colony lives only in a dead termite mound for now (the user, 2026-10-24). It moves
+ * into the old nest under the hump, down the chimney, the empty royal chamber its queen's room at once (nothing to dig),
+ * and the queen ends in her room; with no dead mound near, a queen has no colony until one is near her.
  */
 @GameTestHolder(SavannaMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -47,7 +40,7 @@ public class MatabeleNestTests {
         DeadMounds.DeadMound dead = DeadMounds.get(level).get(termites.getId());
         helper.assertTrue(dead != null, "no dead mound in the book");
         BlockPos at = helper.absolutePos(new BlockPos(MIDDLE + 9, SURFACE, MIDDLE));
-        Colony colony = settled(helper, at, MatabeleNest.Kind.MOUND);
+        Colony colony = settled(helper, at);
         helper.assertTrue(colony.getCenter().getX() == dead.center.getX() && colony.getCenter().getZ() == dead.center.getZ()
                 && colony.getCenter().getY() > dead.center.getY(), "the entrance " + colony.getCenter().toShortString()
                 + " is not up the old chimney over " + dead.center.toShortString());
@@ -55,169 +48,43 @@ public class MatabeleNestTests {
         queenEndsInHerRoom(helper, colony);
     }
 
-    /** A thick log (3 across, 9 long) lying on the ground: the colony settles beside it and digs a small room one block down under it. */
-    @GameTest(template = "arena", timeoutTicks = 8000)
-    public static void aMatabeleColonyDigsInUnderAFallenLog(GameTestHelper helper) {
-        ServerLevel level = helper.getLevel();
-        TestScenes.deepGround(helper);
-        thickLog(helper);
-        BlockPos at = helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE + 7));
-        Colony colony = settled(helper, at, MatabeleNest.Kind.LOG);
-        BlockPos entrance = colony.getCenter();
-        BlockPos log = helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE));
-        helper.assertTrue(entrance.getY() == log.getY() && Math.abs(entrance.getZ() - log.getZ()) == 2 && Math.abs(entrance.getX() - log.getX()) <= 4,
-                "the entrance " + entrance.toShortString() + " is not beside the log's side, " + log.toShortString());
-        helper.assertTrue(colony.nest().getPlannedChambers(level).size() == 1, "not one room");
-        for (NestPlan.Chamber room : colony.nest().getPlannedChambers(level)) {
-            for (BlockPos cell : room.room()) {
-                helper.assertTrue(cell.getY() == log.getY() - 1, "a room cell " + cell.toShortString() + " is not one block down");
-                helper.assertTrue(level.getBlockState(cell.above()).is(net.minecraft.tags.BlockTags.LOGS), "the log is not the roof over " + cell.toShortString());
-            }
-        }
-        queenEndsInHerRoom(helper, colony);
-    }
-
-    /** A long log has room for two colonies, never a third; a thin log or a short one is no roof. */
-    @GameTest(template = "arena", timeoutTicks = 3000)
-    public static void aFallenLogTakesTwoColoniesAtMost(GameTestHelper helper) {
-        ServerLevel level = helper.getLevel();
-        TestScenes.deepGround(helper);
-        thickLog(helper);
-        BlockPos at = helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE + 7));
-        Colony first = settled(helper, at, MatabeleNest.Kind.LOG);
-        Colony second = settled(helper, at, MatabeleNest.Kind.LOG);
-        java.util.Set<BlockPos> cells = new java.util.HashSet<>();
-        for (Colony colony : java.util.List.of(first, second)) {
-            for (NestPlan.Chamber room : colony.nest().getPlannedChambers(level)) {
-                for (BlockPos cell : room.room()) {
-                    helper.assertTrue(cells.add(cell), "both colonies' rooms hold " + cell.toShortString());
-                }
-            }
-        }
-        helper.assertTrue(MatabeleNest.pick(level, at, MatabeleNest.Kind.LOG) == null, "a third colony found room under the log");
-        helper.succeed();
-    }
-
-    /** A log one block thick, however long, is no roof. */
-    @GameTest(template = "arena", timeoutTicks = 3000)
-    public static void aThinLogIsNoRoofForTheMatabele(GameTestHelper helper) {
-        ServerLevel level = helper.getLevel();
-        TestScenes.deepGround(helper);
-        for (int x = MIDDLE - 4; x <= MIDDLE + 4; x++) {
-            helper.setBlock(x, SURFACE, MIDDLE, Blocks.OAK_LOG.defaultBlockState().setValue(RotatedPillarBlock.AXIS, Direction.Axis.X));
-        }
-        BlockPos at = helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE + 7));
-        helper.assertTrue(MatabeleNest.pick(level, at, MatabeleNest.Kind.LOG) == null, "a one-block log was taken for a roof");
-        helper.succeed();
-    }
-
     /**
-     * A living giant umbrella thorn's trunk 4 across (living trees count, the user, 2026-10-24): one colony digs in at its
-     * foot, one block down, and no second.
+     * No dead mound near: a queen put down has no colony and the command makes none (dead mounds are the only home for
+     * now, the user, 2026-10-24); once a dead mound is put in near her she finds it on her next look and settles in it.
      */
-    @GameTest(template = "arena", timeoutTicks = 8000)
-    public static void aMatabeleColonyDigsInAtTheFootOfATree(GameTestHelper helper) {
+    @GameTest(template = "arena", timeoutTicks = 3000, skyAccess = true)
+    public static void aMatabeleQueenWithNoDeadMoundNearWaitsForOne(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         TestScenes.deepGround(helper);
-        for (int x = MIDDLE; x <= MIDDLE + 3; x++) {
-            for (int z = MIDDLE; z <= MIDDLE + 3; z++) {
-                for (int y = SURFACE; y <= SURFACE + 5; y++) {
-                    helper.setBlock(x, y, z, TreeBlocks.UMBRELLA_THORN.log().get().defaultBlockState());
-                }
-            }
-        }
-        BlockPos at = helper.absolutePos(new BlockPos(MIDDLE - 5, SURFACE, MIDDLE));
-        Colony colony = settled(helper, at, MatabeleNest.Kind.STANDING);
-        for (NestPlan.Chamber room : colony.nest().getPlannedChambers(level)) {
-            for (BlockPos cell : room.room()) {
-                helper.assertTrue(cell.getY() == helper.absolutePos(new BlockPos(0, SURFACE, 0)).getY() - 1
-                        && level.getBlockState(cell.above()).is(net.minecraft.tags.BlockTags.LOGS), "a room cell " + cell.toShortString() + " is not under the trunk");
-            }
-        }
-        helper.assertTrue(MatabeleNest.pick(level, at, MatabeleNest.Kind.STANDING) == null, "a second colony found room at the same tree");
-        queenEndsInHerRoom(helper, colony);
-    }
-
-    /**
-     * No cover anywhere: the stand-in for an animal's burrow, a tunnel sloping in (never a straight shaft: no column of the
-     * way more than 2 deep, the mouth's step and one more) to one room 3 blocks down. A second colony put down
-     * at the same spot gets its own burrow close by (real nests lie as close as 2 m), 3 or more blocks off, with soil
-     * between the two nests. The floor of the way is carved into 45-degree soil ramps (the bottom block of every column, its
-     * high side toward the mouth), and the queen walks down them to her room.
-     */
-    @GameTest(template = "arena", timeoutTicks = 8000)
-    public static void aMatabeleColonyMovesIntoABurrowInOpenGround(GameTestHelper helper) {
-        ServerLevel level = helper.getLevel();
-        TestScenes.deepGround(helper);
-        BlockPos at = helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE));
-        Colony colony = settled(helper, at, MatabeleNest.Kind.GROUND);
-        helper.assertTrue(colony.nest().getPlannedChambers(level).size() == 1, "not one room");
-        for (NestPlan.Chamber room : colony.nest().getPlannedChambers(level)) {
-            int depth = colony.getCenter().getY() - room.center().getY();
-            helper.assertTrue(depth == 3, "the room is " + depth + " blocks down, not 3");
-            java.util.Map<Long, Integer> columns = new java.util.HashMap<>();
-            for (BlockPos cell : room.wayIn()) {
-                int stacked = columns.merge(BlockPos.asLong(cell.getX(), 0, cell.getZ()), 1, Integer::sum);
-                helper.assertTrue(stacked <= 2, "the way goes straight down at " + cell.toShortString() + ", not sloping");
-            }
-            helper.assertTrue(columns.size() >= 3, "the way in is " + columns.size() + " columns long, no slope");
-        }
-        Colony second = settled(helper, at, MatabeleNest.Kind.GROUND);
-        int apart = Math.max(Math.abs(second.getCenter().getX() - colony.getCenter().getX()), Math.abs(second.getCenter().getZ() - colony.getCenter().getZ()));
-        helper.assertTrue(apart > 3 && apart <= 10, "the second burrow is " + apart + " blocks off, not 4 to 10");
-        for (NestPlan.Chamber mine : second.nest().getPlannedChambers(level)) {
-            for (BlockPos cell : mine.cells()) {
-                for (NestPlan.Chamber theirs : colony.nest().getPlannedChambers(level)) {
-                    for (BlockPos other : theirs.cells()) {
-                        helper.assertTrue(Math.max(Math.abs(cell.getX() - other.getX()), Math.max(Math.abs(cell.getY() - other.getY()),
-                                Math.abs(cell.getZ() - other.getZ()))) > 1, "the two burrows touch at " + cell.toShortString());
-                    }
-                }
-            }
-        }
-        queenEndsInHerRoom(helper, colony, () -> {
-            for (NestPlan.Chamber room : colony.nest().getPlannedChambers(level)) {
-                java.util.Map<Long, BlockPos> floor = new java.util.HashMap<>();
-                for (BlockPos cell : room.wayIn()) {
-                    floor.merge(BlockPos.asLong(cell.getX(), 0, cell.getZ()), cell, (a, b) -> a.getY() < b.getY() ? a : b);
-                }
-                Direction out = Direction.getNearest(colony.getCenter().getX() - room.center().getX(), 0, colony.getCenter().getZ() - room.center().getZ());
-                for (BlockPos cell : floor.values()) {
-                    net.minecraft.world.level.block.state.BlockState state = level.getBlockState(cell);
-                    helper.assertTrue(state.getBlock() instanceof SoilRampBlock && state.getValue(SoilRampBlock.FACING) == out,
-                            "the floor at " + cell.toShortString() + " is " + state + ", not a soil ramp rising " + out);
-                }
-            }
+        BlockPos at = helper.absolutePos(new BlockPos(MIDDLE + 9, SURFACE, MIDDLE));
+        helper.assertTrue(MatabeleCommands.makeColony(level, at, 10) == null, "the command made a colony with no dead mound near");
+        MatabeleQueenEntity queen = helper.spawn(SavannaEntities.MATABELE_QUEEN.get(), MIDDLE + 9, SURFACE, MIDDLE);
+        helper.runAfterDelay(40, () -> {
+            helper.assertTrue(queen.getColonyId() == null, "the queen started a colony with no dead mound near");
+            Colony termites = NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE)), NewLandMounds.pickFor("dead", 30, 5L));
+            helper.assertTrue(termites != null, "no dead mound put in");
+            // The hump may rise round her (a mound never appears under an ant in play): up onto its top.
+            queen.teleportTo(queen.getX(), level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                    queen.getBlockX(), queen.getBlockZ()), queen.getZ());
+            helper.succeedWhen(() -> {
+                Colony colony = queen.getColonyId() == null ? null : com.antcolonies.colony.ColonyManager.get(level).getColony(queen.getColonyId());
+                helper.assertTrue(colony != null, "the queen has not found the dead mound yet");
+                helper.assertTrue(MatabeleNest.IN_A_MOUND.equals(colony.nest().site()), "the queen's colony settled " + colony.nest().site());
+            });
         });
     }
 
-    /** A log 3 across, 3 high and 9 long, along X, with its middle at the arena's middle. */
-    private static void thickLog(GameTestHelper helper) {
-        for (int x = MIDDLE - 4; x <= MIDDLE + 4; x++) {
-            for (int z = MIDDLE - 1; z <= MIDDLE + 1; z++) {
-                for (int y = SURFACE; y <= SURFACE + 2; y++) {
-                    helper.setBlock(x, y, z, Blocks.OAK_LOG.defaultBlockState().setValue(RotatedPillarBlock.AXIS, Direction.Axis.X));
-                }
-            }
-        }
-    }
-
-    /** A colony of 10 made by the command's code at {@code at}: it settled in a site of {@code kind}. */
-    private static Colony settled(GameTestHelper helper, BlockPos at, MatabeleNest.Kind kind) {
+    /** A colony of 10 made by the command's code at {@code at}: it settled in a dead mound. */
+    private static Colony settled(GameTestHelper helper, BlockPos at) {
         ServerLevel level = helper.getLevel();
         Colony colony = MatabeleCommands.makeColony(level, at, 10);
         helper.assertTrue(colony != null, "no colony made");
-        helper.assertTrue(kind.words.equals(colony.nest().site()), "the colony settled " + colony.nest().site() + ", not " + kind.words);
+        helper.assertTrue(MatabeleNest.IN_A_MOUND.equals(colony.nest().site()), "the colony settled " + colony.nest().site());
         return colony;
     }
 
     /** The queen's room is opened and she ends in it. */
     private static void queenEndsInHerRoom(GameTestHelper helper, Colony colony) {
-        queenEndsInHerRoom(helper, colony, () -> { });
-    }
-
-    /** The queen's room is opened and she ends in it, and {@code also} holds then. */
-    private static void queenEndsInHerRoom(GameTestHelper helper, Colony colony, Runnable also) {
         ServerLevel level = helper.getLevel();
         helper.succeedWhen(() -> {
             BlockPos room = colony.nest().getFinishedRoomCenter(level);
@@ -228,9 +95,11 @@ public class MatabeleNestTests {
                         + net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(p).getBlock()).getPath()).toList());
             }
             helper.assertTrue(room != null, "the queen's room is not open yet" + colony.nest().describeSite(level) + why);
-            helper.assertTrue(colony.getQueen(level) instanceof MatabeleQueenEntity queen && queen.blockPosition().closerThan(room, 2.5),
-                    "the queen is not in her room at " + room.toShortString());
-            also.run();
+            net.minecraft.world.entity.Entity queen = colony.getQueen(level);
+            helper.assertTrue(queen instanceof MatabeleQueenEntity && queen.blockPosition().closerThan(room, 2.5),
+                    "the queen is not in her room at " + room.toShortString() + ": she is at "
+                    + (queen == null ? "nowhere" : queen.blockPosition().toShortString() + " doing " + ((MatabeleQueenEntity) queen).goalSelector.getAvailableGoals().stream()
+                    .filter(net.minecraft.world.entity.ai.goal.WrappedGoal::isRunning).map(g -> g.getGoal().getClass().getSimpleName()).toList()));
         });
     }
 }

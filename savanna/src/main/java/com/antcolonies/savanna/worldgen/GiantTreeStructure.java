@@ -49,6 +49,13 @@ public class GiantTreeStructure extends Structure {
     static final int FALLEN_UNEVEN = 3;
     /** How many fallen trees are tried before a standing dead one takes the place. */
     static final int FALLEN_TRIES = 4;
+    /**
+     * A tree whose place a termite mound has (its crown or its wood would reach within {@link TermiteMoundStructure#CLEAR}
+     * of the mound) tries this many places in all, the others up to {@link #MOVE} blocks from its chunk's middle, before
+     * it gives up (the user's report, 2026-10-24: far fewer trees since the mounds came; most were simply dropped).
+     */
+    static final int SPOTS = 8;
+    static final int MOVE = 24;
 
     private final String size;
 
@@ -118,37 +125,49 @@ public class GiantTreeStructure extends Structure {
         TreeKind kind = TreePlacer.kind(pick.kind());
         // Its foot: the lowest ground round the trunk (so the trunk sits in the ground, not over it); never in water.
         int reach = pick.age() < 0.45 ? 0 : (int) Math.ceil(kind.trunk().radius() * (kind.isBaobab() ? 1 : 1.5));
+        for (int spot = 0; spot < SPOTS; spot++) {
+            if (spot > 0) {
+                x = context.chunkPos().getMiddleBlockX() + random.nextInt(2 * MOVE + 1) - MOVE;
+                z = context.chunkPos().getMiddleBlockZ() + random.nextInt(2 * MOVE + 1) - MOVE;
+            }
+            BlockPos foot = foot(context, x, z, reach);
+            if (foot == null) {
+                if (spot == 0) {
+                    return Optional.empty(); // water or a steep slope where it was meant to be: no tree, as before the mounds
+                }
+                continue;
+            }
+            Pick chosen = pick.stage() == TreeStage.FALLEN && !GiantTreePiece.fallenYoung(pick) ? flatFall(context, foot, pick, random) : pick;
+            TreePlacer.Placed tree = GiantTreePiece.fallenYoung(chosen) ? null : TreePlacer.placed(chosen.kind(), chosen.seed(), chosen.age(), chosen.stage());
+            // Step 6c: the dead wood lying round it (on the land as the world's shape makes it) widens the piece to take it in.
+            TreePlacer.Placed litter = GiantTreePiece.litter(chosen, foot, (lx, lz) -> height(context, lx, lz, Heightmap.Types.WORLD_SURFACE_WG));
+            net.minecraft.world.level.levelgen.structure.BoundingBox box = tree != null ? tree.box(foot) : litter.box(foot);
+            if (tree != null && litter.size() > 0) {
+                box = box.encapsulate(litter.box(foot));
+            }
+            if (TermiteMoundStructure.crowds(context, box)) {
+                continue; // M8 step 1b: a termite mound has this place (trees on old humps are put there on purpose)
+            }
+            net.minecraft.world.level.levelgen.structure.BoundingBox pieceBox = box;
+            return Optional.of(new GenerationStub(foot, builder -> builder.addPiece(new GiantTreePiece(chosen, foot, pieceBox))));
+        }
+        return Optional.empty();
+    }
+
+    /** A tree's foot at (x, z): the lowest ground round the trunk (so the trunk sits in the ground, not over it); null in water or on a steep slope. */
+    private static BlockPos foot(GenerationContext context, int x, int z, int reach) {
         int lowest = Integer.MAX_VALUE, highest = Integer.MIN_VALUE;
         int[][] around = {{0, 0}, {reach, 0}, {-reach, 0}, {0, reach}, {0, -reach}};
         for (int[] o : around) {
             int surface = height(context, x + o[0], z + o[1], Heightmap.Types.WORLD_SURFACE_WG);
             int floor = height(context, x + o[0], z + o[1], Heightmap.Types.OCEAN_FLOOR_WG);
             if (surface != floor) {
-                return Optional.empty();
+                return null;
             }
             lowest = Math.min(lowest, surface);
             highest = Math.max(highest, surface);
         }
-        if (highest - lowest > MAX_UNEVEN) {
-            return Optional.empty();
-        }
-        BlockPos foot = new BlockPos(x, lowest, z);
-        if (pick.stage() == TreeStage.FALLEN && !GiantTreePiece.fallenYoung(pick)) {
-            pick = flatFall(context, foot, pick, random);
-        }
-        Pick chosen = pick;
-        TreePlacer.Placed tree = GiantTreePiece.fallenYoung(chosen) ? null : TreePlacer.placed(chosen.kind(), chosen.seed(), chosen.age(), chosen.stage());
-        // Step 6c: the dead wood lying round it (on the land as the world's shape makes it) widens the piece to take it in.
-        TreePlacer.Placed litter = GiantTreePiece.litter(chosen, foot, (lx, lz) -> height(context, lx, lz, Heightmap.Types.WORLD_SURFACE_WG));
-        net.minecraft.world.level.levelgen.structure.BoundingBox box = tree != null ? tree.box(foot) : litter.box(foot);
-        if (tree != null && litter.size() > 0) {
-            box = box.encapsulate(litter.box(foot));
-        }
-        if (TermiteMoundStructure.crowds(context, box)) {
-            return Optional.empty(); // M8 step 1b: a termite mound has this place (trees on old humps are put there on purpose)
-        }
-        net.minecraft.world.level.levelgen.structure.BoundingBox pieceBox = box;
-        return Optional.of(new GenerationStub(foot, builder -> builder.addPiece(new GiantTreePiece(chosen, foot, pieceBox))));
+        return highest - lowest > MAX_UNEVEN ? null : new BlockPos(x, lowest, z);
     }
 
     /**
