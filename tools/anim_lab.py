@@ -104,7 +104,7 @@ WALK_SPEED = {'worker_ant': 2.75, 'queen_ant': 0.9, 'termite_worker': 2.4, 'term
               'termite_minor_soldier': 2.6, 'termite_major_soldier': 1.9,
               # Matabele raid columns: majors and minors march together at one speed, about 2 major body lengths a
               # second (my estimate from Frank's raid films, to confirm; the game's speed is set when the ant goes in)
-              'matabele_major': 3.0, 'matabele_minor': 3.0,
+              'matabele_major': 2.5, 'matabele_minor': 2.5,
               # the queen walks with her colony when it moves house, slower than a raid (my pick, to confirm)
               'matabele_queen': 1.5}
 
