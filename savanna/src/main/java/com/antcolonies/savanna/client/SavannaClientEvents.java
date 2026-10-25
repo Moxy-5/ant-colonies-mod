@@ -21,9 +21,9 @@ import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 @EventBusSubscriber(modid = SavannaMod.MODID, value = Dist.CLIENT)
 public class SavannaClientEvents {
     /** The Matabele models' drawing scales, as the animation lab's (tools/anim_lab.py RENDER_SCALE). */
-    static final float MATABELE_MAJOR_SCALE = 0.95F;
+    static final float MATABELE_MAJOR_SCALE = 0.633F;
     static final float MATABELE_MINOR_SCALE = 0.455F;
-    static final float MATABELE_QUEEN_SCALE = 1.14F;
+    static final float MATABELE_QUEEN_SCALE = 0.76F;
 
     @SubscribeEvent
     public static void onRegisterLayers(EntityRenderersEvent.RegisterLayerDefinitions event) {

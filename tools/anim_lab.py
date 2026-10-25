@@ -94,9 +94,9 @@ RENDER_SCALE = {'worker_ant': 0.65, 'queen_ant': 1.3, 'termite_king': 0.75, 'ter
                 'termite_worker': 0.75, 'termite_minor_soldier': 0.75, 'termite_major_soldier': 0.75,
                 # the Matabele (2026-10-23, in the game since the same day, SavannaClientEvents): the major twice a termite major soldier's length,
                 # the minor 45% of it, the model viewer's starting sizes (the sizes are still the user's to pick)
-                'matabele_major': 0.95, 'matabele_minor': 0.455,
+                'matabele_major': 0.633, 'matabele_minor': 0.455,
                 # the queen (2026-10-24): her body 1.2 times a major's, the user's pick ("because it will be cool")
-                'matabele_queen': 1.14}
+                'matabele_queen': 0.76}
 # Normal walking speed in blocks a second (my estimate from the movement speed attribute: a ground mob's top speed is
 # about attribute x 0.25 / 0.454 blocks a tick at the normal speed modifier; the worker's 0.25 gives about 2.75 b/s,
 # about 6 body lengths a second, which is what real Pogonomyrmex walk). The in-game camera can measure the real one.

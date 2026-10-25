@@ -38,7 +38,7 @@ WALL, DEPTH, HEIGHT = 0.0, 3.0, 3.0
 START, END = -2.6, DEPTH + 2.6   # where the box starts and stops (its middle)
 # The preview's boxes (blocks, width and height), my picks for the preview only (the user picks the sizes): about the
 # body's own height, and no wider than fits a 1-block tunnel.
-BOX = {'matabele_major': (0.6, 0.45), 'matabele_minor': (0.3, 0.22), 'matabele_queen': (0.72, 0.54)}
+BOX = {'matabele_major': (0.4, 0.3), 'matabele_minor': (0.3, 0.22), 'matabele_queen': (0.48, 0.36)}
 # How fast it climbs: 1 body length a second, on the floor and the wall alike (my pick: real Megaponera climb well but
 # travel on the ground; a careful pace, the slow walk's band).
 BODY_LENGTHS_A_SECOND = 1.0

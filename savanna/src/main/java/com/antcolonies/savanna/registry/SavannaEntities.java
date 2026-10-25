@@ -83,7 +83,7 @@ public class SavannaEntities {
     public static final DeferredHolder<EntityType<?>, EntityType<MatabeleEntity>> MATABELE_MAJOR =
             ENTITY_TYPES.register("matabele_major", () -> EntityType.Builder
                     .of(MatabeleEntity::new, MobCategory.CREATURE)
-                    .sized(0.6F, 0.45F)
+                    .sized(0.4F, 0.3F)
                     .build("matabele_major"));
 
     public static final DeferredHolder<EntityType<?>, EntityType<MatabeleEntity>> MATABELE_MINOR =
@@ -96,7 +96,7 @@ public class SavannaEntities {
     public static final DeferredHolder<EntityType<?>, EntityType<com.antcolonies.savanna.entity.MatabeleQueenEntity>> MATABELE_QUEEN =
             ENTITY_TYPES.register("matabele_queen", () -> EntityType.Builder
                     .of(com.antcolonies.savanna.entity.MatabeleQueenEntity::new, MobCategory.CREATURE)
-                    .sized(0.72F, 0.54F)
+                    .sized(0.48F, 0.36F)
                     .build("matabele_queen"));
 
     // M8 step 1c: the Matabele young and dead, for the shared brood and refuse code (no nest to raise young in yet, step
