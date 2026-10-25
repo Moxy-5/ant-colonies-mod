@@ -400,4 +400,10 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         colonyChecked = true;
         hunger().eat();
     }
+
+    /** Its squeak (M8 step 2e): real Megaponera stridulate when held or when the nest is broken into. */
+    @Override
+    protected net.minecraft.sounds.SoundEvent squeakSound() {
+        return com.antcolonies.savanna.registry.SavannaSounds.MATABELE_SQUEAK.get();
+    }
 }

@@ -111,6 +111,16 @@ public final class ColonyQuestions {
     /** Step 9a: whether this place is on one of the colony's lasting trails (a neighbour stepping onto it meets the colony). */
     public static final Kind<BlockPos> ON_TRAIL = Kind.of("on_trail");
 
+    /** A member of the colony, and something it might attack. */
+    public record Provoked(AbstractAntEntity ant, net.minecraft.world.entity.Entity foe) {
+    }
+
+    /**
+     * M8 step 2e: whether this member may attack this foe because it provoked the colony (a player who broke into the
+     * nest, hit a member, stood in a column or stayed on the entrance), the nest's defence ({@code fight.NestDefence}).
+     */
+    public static final Kind<Provoked> PROVOKED_BY = Kind.of("provoked_by");
+
     // --- answering and asking ------------------------------------------------------------------------------------------
 
     private record Signed(int place, String who, Answerer<?> answerer) {

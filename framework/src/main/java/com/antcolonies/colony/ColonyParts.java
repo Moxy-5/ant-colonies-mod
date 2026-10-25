@@ -136,6 +136,17 @@ public final class ColonyParts {
             .saves(WorkerFood::save, WorkerFood::load)
             .sample(WorkerFood::fillForTests));
 
+    /**
+     * M8 step 2e: the nest's defence against a player, for species that list it (their numbers in the species file's
+     * {@code defence}): provocations, defenders out in waves, given up past their reach.
+     */
+    public static final Type<com.antcolonies.fight.NestDefence> NEST_DEFENCE = register("nest_defence", false, com.antcolonies.fight.NestDefence::new, part -> part
+            .ticks(125, com.antcolonies.fight.NestDefence::tick)
+            .hears(ColonyNews.MEMBER_HURT, 55, (defence, level, news) -> defence.memberHurt(level, news.member(), news.by())) // hit by a player
+            .hears(ColonyNews.BLOCK_BROKEN, 35, (defence, level, news) -> defence.blockBroken(level, news.where(), news.breaker())) // the nest broken into
+            .answers(ColonyQuestions.PROVOKED_BY, 10, com.antcolonies.fight.NestDefence::provokedBy)
+            .notSaved("after a load the nest has calmed: nobody provoking it, the defenders home"));
+
     private ColonyParts() {
     }
 

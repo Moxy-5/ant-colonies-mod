@@ -42,9 +42,9 @@ import net.minecraft.world.phys.AABB;
  * one it chases for {@link #CHASE_TICKS} without a blow at it is left a while.
  */
 public class FightGoal extends Goal {
-    /** How far (blocks) round the spot it looks for foes. */
+    /** How far (blocks) round the spot it looks for foes, unless its order says (a defender's, M8 step 2e). */
     public static final double SPOT_REACH = 12.0;
-    /** How far (blocks) it follows one that hurt it. */
+    /** How far (blocks) it follows one that hurt it, unless made with its own reach. */
     private static final double FIGHT_BACK_REACH = 8.0;
     /** How far off (degrees) its heading may be from the foe for it to strike: it turns to face it first. */
     private static final float FACING = 30.0F;
@@ -62,6 +62,8 @@ public class FightGoal extends Goal {
     private static final float TURN = 20.0F;
 
     private final AbstractAntEntity ant;
+    /** How far (blocks) it follows one that hurt it. */
+    private final double fightBackReach;
     @Nullable
     private LivingEntity foe;
     @Nullable
@@ -83,7 +85,13 @@ public class FightGoal extends Goal {
     private final Map<UUID, Long> unreachable = new HashMap<>();
 
     public FightGoal(AbstractAntEntity ant) {
+        this(ant, FIGHT_BACK_REACH);
+    }
+
+    /** With its own reach for fighting back (M8 step 2e: the Matabele queen, who never leaves her room). */
+    public FightGoal(AbstractAntEntity ant, double fightBackReach) {
         this.ant = ant;
+        this.fightBackReach = fightBackReach;
         setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
     }
 
@@ -147,7 +155,7 @@ public class FightGoal extends Goal {
             ant.getNavigator().stop();
             return;
         }
-        if (foe == null || !Fights.mayAttack(ant.profile(), foe) || (ant.tickCount + ant.getId()) % 20 == 0) {
+        if (foe == null || !Fights.mayAttack(ant, foe) || (ant.tickCount + ant.getId()) % 20 == 0) {
             foe = pickFoe(level);
         }
         if (foe != null) {
@@ -238,20 +246,20 @@ public class FightGoal extends Goal {
         long now = level.getGameTime();
         unreachable.values().removeIf(until -> until <= now);
         LivingEntity hurtBy = ant.getLastHurtByMob();
-        if (hurtBy != null && hurtBy.distanceToSqr(ant) <= FIGHT_BACK_REACH * FIGHT_BACK_REACH && usable(hurtBy)) {
+        if (hurtBy != null && hurtBy.distanceToSqr(ant) <= fightBackReach * fightBackReach && usable(hurtBy)) {
             return hurtBy;
         }
         BlockPos spot = ant.getFightSpot();
         if (spot == null) {
             return null;
         }
-        AABB area = new AABB(spot).inflate(SPOT_REACH);
+        AABB area = new AABB(spot).inflate(ant.getFightReach());
         return level.getEntitiesOfClass(LivingEntity.class, area, this::usable).stream()
                 .min(Comparator.comparingDouble(candidate -> candidate.distanceToSqr(ant))).orElse(null);
     }
 
     private boolean usable(LivingEntity candidate) {
-        return candidate != ant && !unreachable.containsKey(candidate.getUUID()) && Fights.mayAttack(ant.profile(), candidate)
+        return candidate != ant && !unreachable.containsKey(candidate.getUUID()) && Fights.mayAttack(ant, candidate)
                 && !(candidate instanceof AbstractAntEntity insect
                         && (insect.isPinned() && candidate != ant.blowTarget() || insect.isSheltered()));
     }

@@ -60,6 +60,23 @@ public final class Fights {
      * insect already felled (the venom working in it, or lying paralysed).
      */
     public static boolean mayAttack(SpeciesProfile profile, Entity entity) {
+        return mayAttack(profile, entity, null);
+    }
+
+    /**
+     * As {@link #mayAttack(SpeciesProfile, Entity)}, for this insect: also a foe that provoked its colony (M8 step 2e, a
+     * player who broke into the nest, hit a member, ...: the colony's question {@code PROVOKED_BY}).
+     */
+    public static boolean mayAttack(AbstractAntEntity insect, Entity entity) {
+        return mayAttack(insect.profile(), entity, insect);
+    }
+
+    private static boolean mayAttack(SpeciesProfile profile, Entity entity, @Nullable AbstractAntEntity asker) {
+        if (asker != null && entity instanceof net.minecraft.world.entity.player.Player && entity.isAlive()) {
+            com.antcolonies.colony.Colony colony = asker.getColonyId() == null ? null : asker.getColony();
+            return colony != null && colony.questions().ask(asker.level(), com.antcolonies.colony.ColonyQuestions.PROVOKED_BY,
+                    new com.antcolonies.colony.ColonyQuestions.Provoked(asker, entity));
+        }
         if (!(entity instanceof LivingEntity living) || !living.isAlive()) {
             return false;
         }
@@ -97,6 +114,17 @@ public final class Fights {
             }
             prey.takeSting();
             return true;
+        }
+        if (foe instanceof net.minecraft.world.entity.player.Player player) {
+            // M8 step 2e: a sting on a player, by the species' defence numbers (2 hearts before armour, and the pain).
+            DefenceNumbers defence = DefenceNumbers.of(striker.profile()).orElse(null);
+            if (defence != null) {
+                boolean stung = player.hurt(striker.damageSources().mobAttack(striker), defence.sting().damage());
+                if (stung && player.isAlive()) {
+                    Pain.stung(player, defence.sting());
+                }
+                return stung;
+            }
         }
         boolean hit = foe.hurt(striker.damageSources().mobAttack(striker), (float) striker.getAttributeValue(Attributes.ATTACK_DAMAGE));
         if (hit && foe.isAlive() && foe instanceof AbstractAntEntity insect && !com.antcolonies.entity.Clamp.tryClampOn(striker, insect)) {

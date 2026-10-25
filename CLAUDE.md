@@ -257,6 +257,7 @@ A Minecraft mod where ants and termites live as real colonies: they dig, build, 
 - **Fix 2026-10-25 (`docs/BUGS.md` 78, branch `claude/floating-heads-bb9829`):** a dead termite soldier's head no longer floats over the Matabele's back: it locks low on the held leg's shin, outside the leg, in plain orange-brown (no stripes, the user's ask); guard film `q_clamped_head`; not tried in-game yet.
 - **The clamped head fix (`docs/BUGS.md` 78) confirmed in-game by the user 2026-10-25 ("it works"); M8 steps 2a to 2d and the fix merged into `master` the same day with the user's OK.**
 - **M8 steps 2e and 2f planned with the user 2026-10-25** (`docs/DESIGN.md`, "Steps 2e and 2f"): all four provocations sting (breaking the nest, hitting one, standing in a column, walking on the nest), defenders in waves giving up 16 blocks out, the queen stings only in her room, termites eat a paralysed nestmate left behind; nothing built yet.
+- **M8 step 2e, the player, BUILT 2026-10-25** (branch `claude/m8-player-2e`): Matabeles sting a survival player who breaks their nest, hits one, stands in a column or stays on the entrance over 3 s; defenders in waves, giving up 16 blocks out; the sting does 2 hearts and a red-edged pain that slows; the squeak; the queen stings in her room (a plain blow, no clip yet); `MatabeleDefenceTests`; not tried in-game yet. Next: 2f.
 
 ## Other notes files (read only when the task needs them)
 - `docs/DESIGN.md`: every design decision for the species and shared systems (read the section for a feature before working on it).

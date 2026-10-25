@@ -42,6 +42,7 @@ public class SavannaMod {
         SavannaStructures.STRUCTURE_PIECES.register(modEventBus);
         SavannaEntities.ENTITY_TYPES.register(modEventBus);
         SavannaItems.ITEMS.register(modEventBus);
+        com.antcolonies.savanna.registry.SavannaSounds.SOUNDS.register(modEventBus); // M8 step 2e: the Matabele squeak
         SavannaNumbers.signUp(); // its own sections of the species files (Apex part 3, T1), before they load
         SavannaParts.signUp();
         com.antcolonies.savanna.entity.MatabeleLoads.signUp(); // its own loads, before any save is read

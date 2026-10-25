@@ -773,6 +773,9 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     @Nullable
     private BlockPos fightSpot;
     private long fightUntil;
+    private double fightReach = com.antcolonies.entity.goal.FightGoal.SPOT_REACH;
+    /** Until when (game time) it may not sting a player again (M8 step 2e: at most once every {@code defence.sting.every_ticks}). */
+    private long nextPlayerSting;
 
     /**
      * One way of attacking: the clip it plays and for how many ticks (the whole clip, played to its end), and the
@@ -1187,6 +1190,13 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         if (attack != null || !standsToFight()) {
             return false;
         }
+        if (foe instanceof net.minecraft.world.entity.player.Player) {
+            long now = level().getGameTime();
+            if (now < nextPlayerSting) {
+                return false;
+            }
+            nextPlayerSting = now + com.antcolonies.fight.DefenceNumbers.of(profile()).map(numbers -> numbers.sting().everyTicks()).orElse(0);
+        }
         Attack how = attackFor(foe);
         swing(net.minecraft.world.InteractionHand.MAIN_HAND);
         if (how == null || how.hitAt() <= 0) {
@@ -1358,9 +1368,46 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
 
     /** Sends it to fight round this spot until then (game time; the skirmish command, M8 step 2b). */
     public void orderToFight(BlockPos spot, long until) {
+        orderToFight(spot, until, com.antcolonies.entity.goal.FightGoal.SPOT_REACH);
+    }
+
+    /**
+     * Sends it to fight foes within {@code reach} blocks of this spot until then (M8 step 2e: a defender chases a
+     * provoking player up to its colony's {@code defence.reach} from where it was provoked).
+     */
+    public void orderToFight(BlockPos spot, long until, double reach) {
         fightSpot = spot.immutable();
         fightUntil = until;
+        fightReach = reach;
     }
+
+    /** How far (blocks) round its fight spot it looks for foes. */
+    public double getFightReach() {
+        return fightReach;
+    }
+
+    /**
+     * Its squeak (M8 step 2e; real Megaponera stridulate loudly when disturbed): when sent out to defend, when a foe
+     * clamps on, near a player at its column. At most once every {@link #SQUEAK_EVERY} ticks. Silent for a species
+     * with no {@link #squeakSound}.
+     */
+    public void squeak() {
+        net.minecraft.sounds.SoundEvent sound = squeakSound();
+        long now = level().getGameTime();
+        if (sound != null && !level().isClientSide && now - lastSqueak >= SQUEAK_EVERY) {
+            lastSqueak = now;
+            playSound(sound, 0.6F, 0.9F + getRandom().nextFloat() * 0.25F);
+        }
+    }
+
+    /** Its squeak's sound, or null for an insect that does not squeak. */
+    @Nullable
+    protected net.minecraft.sounds.SoundEvent squeakSound() {
+        return null;
+    }
+
+    private static final int SQUEAK_EVERY = 30;
+    private long lastSqueak = Long.MIN_VALUE / 2;
 
     /** Where it was sent to fight, if the order still holds (server). */
     @Nullable

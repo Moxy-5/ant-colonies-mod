@@ -41,7 +41,8 @@ public final class SavannaTests {
         TestFilter.addCategory("termitefood", TermiteFoodTests.class, TermiteForagingTests.class, TermiteNewHoleTests.class,
                 TermiteRunwayTests.class, TermiteBarePatchTests.class, TermitomycesTests.class);
         // Soldiers and the alarm; the fights (M8 step 2).
-        TestFilter.addCategory("soldiers", TermiteSoldierTests.class, TermiteAlarmTests.class, MatabeleFightTests.class);
+        TestFilter.addCategory("soldiers", TermiteSoldierTests.class, TermiteAlarmTests.class, MatabeleFightTests.class,
+                MatabeleDefenceTests.class);
         // The colony: founding, jobs by age, the virtual population, neighbours.
         TestFilter.addCategory("colony", TermiteTests.class, TermiteJobsByAgeTests.class, TermitePopulationTests.class,
                 TermiteNeighbourTests.class, MatabeleColonyTests.class, MatabeleNestTests.class, MatabeleFoodTests.class,
