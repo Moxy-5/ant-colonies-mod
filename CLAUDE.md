@@ -242,3 +242,4 @@ A Minecraft mod where ants and termites live as real colonies: they dig, build, 
 - **Body plans** (2026-10-18, read `tools/body_plan.py`'s top comment): `python tools/body_plan.py check` after any model or plan change; `python tools/body_plan.py new <model>` writes a starter plan for a new model; `rename-test` proves renaming bones changes nothing. When the user's Blockbench worker arrives, change only the right-hand side of `body_plans/worker_ant.json`.
 - `docs/plans/`: full plans of steps planned but not built yet (code parts and tests), e.g. `4b-parts-2-3.md`.
 - `docs/BUGS.md`: every bug we have had and its lesson. **Read it before touching `AntNavigator`, `AntPathFinder`, the goals, or anything that places blocks.**
+- **M8 raids before drawn-only ants confirmed by the user 2026-10-24** ("do raids first i dont want to rush drawn only"): order 1e, 1f, 2, 4, test revamp, 3, 5, 6.
