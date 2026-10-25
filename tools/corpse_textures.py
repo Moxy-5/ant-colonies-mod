@@ -35,12 +35,16 @@ def pixels():
 
 
 def write_png(path, rows):
+    write_png_sized(path, rows, SIZE, SIZE)
+
+
+def write_png_sized(path, rows, width, height):
     raw = b"".join(b"\x00" + bytes(c for px in row for c in px) for row in rows)
 
     def chunk(kind, data):
         return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
 
-    header = struct.pack(">IIBBBBB", SIZE, SIZE, 8, 6, 0, 0, 0)
+    header = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)
     with open(path, "wb") as f:
         f.write(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b""))
 

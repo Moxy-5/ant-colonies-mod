@@ -67,17 +67,20 @@ public class MatabeleCommands {
                         .then(Commands.argument("legs", IntegerArgumentType.integer(1, 6))
                                 .executes(context -> loseLeg(context.getSource(), IntegerArgumentType.getInteger(context, "legs")))))
                 .then(Commands.literal("clamp")
-                        .executes(context -> clamp(context.getSource(), false))
+                        .executes(context -> clamp(context.getSource(), false, -1))
                         .then(Commands.literal("dead")
-                                .executes(context -> clamp(context.getSource(), true)))));
+                                .executes(context -> clamp(context.getSource(), true, -1))
+                                .then(Commands.argument("leg", IntegerArgumentType.integer(1, 6))
+                                        .executes(context -> clamp(context.getSource(), true,
+                                                IntegerArgumentType.getInteger(context, "leg") - 1))))));
     }
 
     /**
      * M8 step 2c, for testing: a termite major soldier (of no colony) clamps on to a leg of the nearest Matabele within
      * {@value #LOSE_LEG_LOOK} blocks, as if its bite had locked on; with {@code dead}, it dies at once and only its head
-     * stays locked on the leg.
+     * stays locked on the leg; with a leg (1 to 6, in {@code LostLegs.LEGS}' order) on that leg, for the guard films.
      */
-    private static int clamp(CommandSourceStack source, boolean dead) {
+    private static int clamp(CommandSourceStack source, boolean dead, int whichLeg) {
         ServerLevel level = source.getLevel();
         Vec3 at = source.getPosition();
         MatabeleEntity ant = level.getEntitiesOfClass(MatabeleEntity.class, new AABB(at, at).inflate(LOSE_LEG_LOOK),
@@ -93,7 +96,9 @@ public class MatabeleCommands {
         }
         soldier.moveTo(ant.getX(), ant.getY(), ant.getZ(), 0.0F, 0.0F);
         level.addFreshEntity(soldier);
-        if (!ant.clamp().clampOn(soldier)) {
+        if (whichLeg >= 0 && !com.antcolonies.entity.body.LostLegs.isGone(ant.lostLegs(), whichLeg)) {
+            ant.clamp().clampOn(soldier, whichLeg);
+        } else if (!ant.clamp().clampOn(soldier)) {
             soldier.discard();
             source.sendFailure(Component.literal("That Matabele has no legs left to clamp."));
             return 0;

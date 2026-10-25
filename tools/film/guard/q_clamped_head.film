@@ -1,0 +1,29 @@
+# Guard film (docs/BUGS.md 78, 2026-10-25): a Matabele major with a dead termite soldier's head locked on its left
+# middle leg (M8 step 2c, client/ClampedHeadLayer). The head must sit low on the shin of that leg and move with it, small
+# (about half a termite soldier's head), never floating up over the back (the head layer once turned the leg a second
+# time round the model's middle). Seen from the left side, from above, then walking.
+cmd time set noon
+cmd weather clear
+lens 30
+walker matabele_major -2.5 -60 0.5 -90
+log clamped
+cmd antcolonies clamp dead 3
+step 60
+# the killed soldier's body is left lying under the ant; it is not what this scene checks
+cmd tp @e[type=antcolonies:termite_major_soldier] 0 -120 0
+cmd kill @e[type=antcolonies:termite_major_soldier]
+step 5
+cmd tick freeze
+fov 15
+follow 0 0.3 -4 0 0
+burst side 10 1
+follow 0 3.5 0 0 90
+burst above 10 1
+follow 0.8 1.2 -2.6 20 20
+burst three_quarter 10 1
+follow 0 0.3 -4 0 0
+go 4 -60 0 1.0
+burst walk_side 40 1
+log off
+follow off
+quit
