@@ -51,8 +51,8 @@ timings: all "my pick, to confirm" until then).
    - **1d, the shallow nest (as built, after R1 and the user's last answers, 2026-10-24):** the queen picks once, within
      32 blocks, best first: a dead mound (used as it is, nothing dug, 1 colony), under a fallen log 3+ thick (one 3x3 room
      1 block down, the log its roof, 2 colonies at most), at the foot of any tree 3+ thick, dead or living (the same room,
-     1 colony), else a burrow stand-in in bare ground (one room 2 down, 3+ blocks from another burrow, rooms never
-     touching). The queen digs nothing; her workers dig the way in. Test: a queen near each (`MatabeleNestTests`).
+     1 colony), else a burrow stand-in in bare ground (a tunnel sloping in to one room 3 down, 3+ blocks from another burrow, rooms
+     never touching). The queen digs nothing; her workers dig the way in. Test: a queen near each (`MatabeleNestTests`).
      Still to add for step 1: two or more entrances, guests in the nest, returning to an old nest.
    - **1e, the prey pile and hunger:** the pile of dead termites in the nest, eaten by larvae and adults, off in about a
      day; hunger by the colony rules already built; stocked by a command until raids exist (step 4). Test: stock it

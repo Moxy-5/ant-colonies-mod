@@ -23,7 +23,6 @@ import com.antcolonies.savanna.block.DeadCombBlock;
 import com.antcolonies.savanna.block.FungusCombBlock;
 import com.antcolonies.savanna.entity.MatabeleEntity;
 import com.antcolonies.savanna.registry.SavannaTags;
-import com.antcolonies.species.SpeciesProfiles;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -48,7 +47,7 @@ import net.minecraft.world.level.block.state.BlockState;
  * <li><b>At the foot of a tree</b>: the same small room dug one block down at the foot of a standing trunk 3 or more blocks
  * across, dead or living (the user, 2026-10-24: real nests lie "under trees", Yusuf 2026); one colony to a tree.</li>
  * <li><b>The ground</b>: no site without cover is real; this stands in for an animal's burrow (aardvark, rodent) the ants
- * would move into: one room 2 blocks down and a short shaft, kept so a queen put down in bare land has a home.</li>
+ * would move into: a tunnel sloping in to one room 3 blocks down, kept so a queen put down in bare land has a home.</li>
  * </ol>
  * The rooms are handed to the shared nest ({@code Nest.settle}); the digging, the queen's home and the numbers coming
  * out of the rooms are the shared code's.
@@ -76,6 +75,8 @@ public final class MatabeleNest {
     static final int WOOD_ROOM = 3;
     /** How far from the queen open ground is looked for when her own spot will not take a nest (blocks; my pick). */
     static final int GROUND_LOOK = 8;
+    /** How deep the burrow's room lies (blocks under the entrance; my pick: 2 blocks of soil over it, so the slope is roofed). */
+    static final int BURROW_DEPTH = 3;
 
     /** The kinds of site, best first. */
     public enum Kind {
@@ -657,12 +658,12 @@ public final class MatabeleNest {
     // ----- The ground -----
 
     /**
-     * A stand-in for an animal's burrow (the user, 2026-10-24: no real site is without cover): a short shaft and one room 2
-     * blocks down, as the shared plan lays it out, at the queen's own spot if the soil takes it, else at the nearest spot
-     * within {@link #GROUND_LOOK} that does; at her spot anyway when nowhere does (they dig what soil there is).
+     * A stand-in for an animal's burrow (the user, 2026-10-24: no real site is without cover): a tunnel sloping in like an
+     * aardvark's or a rodent's ({@link #burrow}, the user's ask, 2026-10-24: no straight shaft as the harvester digs) to one
+     * room {@link #BURROW_DEPTH} blocks down, at the queen's own spot if the soil takes it, else at the nearest spot within
+     * {@link #GROUND_LOOK} that does; at her spot anyway when nowhere does (they dig what soil there is).
      */
     static Site ground(ServerLevel level, BlockPos feet) {
-        NestPlan.RoomSizes sizes = SpeciesProfiles.get(MatabeleEntity.SPECIES).nest().roomSizes();
         List<BlockPos> spots = new ArrayList<>();
         for (int r = 0; r <= GROUND_LOOK; r++) {
             for (int dx = -r; dx <= r; dx++) {
@@ -676,20 +677,18 @@ public final class MatabeleNest {
                 }
             }
         }
-        for (int[] plan : new int[][] {{2, 1}}) {
-            for (BlockPos spot : spots) {
-                if (isTaken(level, spot)) {
-                    continue;
-                }
-                List<NestPlan.Chamber> rooms = groundRooms(spot, plan[0], plan[1], sizes, level);
-                if (rooms != null) {
-                    return new Site(Kind.GROUND, spot, rooms);
-                }
+        for (BlockPos spot : spots) {
+            if (isTaken(level, spot)) {
+                continue;
+            }
+            List<NestPlan.Chamber> rooms = groundRooms(spot, level);
+            if (rooms != null) {
+                return new Site(Kind.GROUND, spot, rooms);
             }
         }
         BlockPos top = groundTop(level, feet.getX(), feet.getZ(), feet.getY());
         BlockPos spot = top != null ? top.above() : GroundReader.surface(level, feet.getX(), feet.getZ()).above();
-        return new Site(Kind.GROUND, spot, laidOut(spot, 2, 1, Direction.from2DDataValue(Math.floorMod(spot.hashCode(), 4)), sizes));
+        return new Site(Kind.GROUND, spot, burrow(spot, Direction.from2DDataValue(Math.floorMod(spot.hashCode(), 4))));
     }
 
     /**
@@ -713,10 +712,10 @@ public final class MatabeleNest {
      * colony's rooms, the first side that does; null if none does.
      */
     @Nullable
-    private static List<NestPlan.Chamber> groundRooms(BlockPos entrance, int depth, int levels, NestPlan.RoomSizes sizes, ServerLevel level) {
+    private static List<NestPlan.Chamber> groundRooms(BlockPos entrance, ServerLevel level) {
         int first = Math.floorMod(entrance.hashCode(), 4);
         for (int i = 0; i < 4; i++) {
-            List<NestPlan.Chamber> rooms = laidOut(entrance, depth, levels, Direction.from2DDataValue((first + i) % 4), sizes);
+            List<NestPlan.Chamber> rooms = burrow(entrance, Direction.from2DDataValue((first + i) % 4));
             boolean fits = true;
             for (NestPlan.Chamber room : rooms) {
                 fits &= fits(level, room.cells()) && roofed(level, room.room());
@@ -728,20 +727,28 @@ public final class MatabeleNest {
         return null;
     }
 
-    /** The shared plan's levels under {@code entrance}, each with the shaft put in front of its way (a ready nest has no shaft of its own). */
-    private static List<NestPlan.Chamber> laidOut(BlockPos entrance, int depth, int levels, Direction direction, NestPlan.RoomSizes sizes) {
-        List<BlockPos> shaft = new ArrayList<>();
-        for (int i = 1; i <= depth; i++) {
-            shaft.add(entrance.below(i));
+    /**
+     * The burrow at {@code entrance} sloping in toward {@code direction}: a stair tunnel one block wide going one block down
+     * for every block forward (the mouth an open groove, then roofed by the soil over it), to one room
+     * {@link #WOOD_ROOM} blocks square {@link #BURROW_DEPTH} blocks down, the queen's.
+     */
+    private static List<NestPlan.Chamber> burrow(BlockPos entrance, Direction direction) {
+        List<BlockPos> way = new ArrayList<>(List.of(entrance.below()));
+        for (int k = 1; k < BURROW_DEPTH; k++) {
+            BlockPos step = entrance.relative(direction, k);
+            way.add(step.below(k));
+            way.add(step.below(k + 1));
         }
-        List<NestPlan.Chamber> rooms = new ArrayList<>();
-        for (NestPlan.Chamber level : NestPlan.chambers(entrance.below(depth), direction, levels, sizes)) {
-            List<BlockPos> cells = new ArrayList<>(shaft);
-            cells.addAll(level.cells());
-            List<BlockPos> wayIn = new ArrayList<>(shaft);
-            wayIn.addAll(level.wayIn());
-            rooms.add(new NestPlan.Chamber(level.kind(), List.copyOf(cells), level.center(), List.copyOf(wayIn), level.room()));
+        BlockPos door = entrance.relative(direction, BURROW_DEPTH).below(BURROW_DEPTH);
+        int reach = WOOD_ROOM / 2;
+        BlockPos middle = door.relative(direction, reach);
+        Direction side = direction.getClockWise();
+        List<BlockPos> room = new ArrayList<>();
+        for (int a = -reach; a <= reach; a++) {
+            for (int b = -reach; b <= reach; b++) {
+                room.add(middle.relative(direction, a).relative(side, b));
+            }
         }
-        return rooms;
+        return List.of(chamber(NestPlan.Kind.QUEEN, way, door, room));
     }
 }

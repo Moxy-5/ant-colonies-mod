@@ -29,7 +29,7 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * what joins the spaces there. Near a dead termite mound it moves into the old nest under the hump, down the chimney,
  * the empty royal chamber its queen's room at once (nothing to dig); near a fallen log 3 or more across, or the foot of a
  * standing tree, it digs a small room one block down under the wood (a long log has room for two colonies, a tree or a
- * mound for one); at the foot of a tree, dead or living, the same; in bare land a burrow stand-in, one room 2 down, a
+ * mound for one); at the foot of a tree, dead or living, the same; in bare land a burrow stand-in sloping in to one room 3 down, a
  * second burrow 3 or more blocks off with soil between the rooms. In each the queen ends in her room.
  */
 @GameTestHolder(SavannaMod.MODID)
@@ -138,7 +138,8 @@ public class MatabeleNestTests {
     }
 
     /**
-     * No cover anywhere: the stand-in for an animal's burrow, a shaft and one room 2 blocks down. A second colony put down
+     * No cover anywhere: the stand-in for an animal's burrow, a tunnel sloping in (never a straight shaft: no column of the
+     * way more than 2 deep, the mouth's step and one more) to one room 3 blocks down. A second colony put down
      * at the same spot gets its own burrow close by (real nests lie as close as 2 m), 3 or more blocks off, with soil
      * between the two nests.
      */
@@ -151,7 +152,13 @@ public class MatabeleNestTests {
         helper.assertTrue(colony.nest().getPlannedChambers(level).size() == 1, "not one room");
         for (NestPlan.Chamber room : colony.nest().getPlannedChambers(level)) {
             int depth = colony.getCenter().getY() - room.center().getY();
-            helper.assertTrue(depth == 2, "the room is " + depth + " blocks down, not 2");
+            helper.assertTrue(depth == 3, "the room is " + depth + " blocks down, not 3");
+            java.util.Map<Long, Integer> columns = new java.util.HashMap<>();
+            for (BlockPos cell : room.wayIn()) {
+                int stacked = columns.merge(BlockPos.asLong(cell.getX(), 0, cell.getZ()), 1, Integer::sum);
+                helper.assertTrue(stacked <= 2, "the way goes straight down at " + cell.toShortString() + ", not sloping");
+            }
+            helper.assertTrue(columns.size() >= 3, "the way in is " + columns.size() + " columns long, no slope");
         }
         Colony second = settled(helper, at, MatabeleNest.Kind.GROUND);
         int apart = Math.max(Math.abs(second.getCenter().getX() - colony.getCenter().getX()), Math.abs(second.getCenter().getZ() - colony.getCenter().getZ()));
