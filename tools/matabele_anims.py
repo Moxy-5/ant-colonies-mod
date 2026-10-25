@@ -184,6 +184,84 @@ def lost_combos():
 
 def lost_clip_name(lost):
     return 'walk_lost_' + '_'.join(lost)
+# Dragging a termite soldier clamped on a leg (M8 step 2c; Frank et al. 2017: the worst handicap measured, the ant
+# crawling home at a crawl): one walk for each leg it may hold ("walk_clamped_l2"). The held leg takes no step: it is
+# held stiff out to the side and back (CLAMP_HELD, units), the soldier's weight dragging on it; the other five step by
+# the gait maker's rule for a leg gone (lost_gait), short and slow, the body low (CLAMP_LOW). CLAMP_LEAN (degrees of
+# the forebody's roll), CLAMP_LOOK and CLAMP_HEAD (its turn and the head's toward the foe) are left at 0: any lean or
+# turn the anim lab tried put an antenna in the floor or a front leg through the head. Played at the crawl the game
+# gives it (75 percent slower). Standing, it twists round to bite at the termite (clamp_twist_l, _r, by the side held):
+# the front leg on that side braced out wide (CLAMP_BRACE: out, forward), the forebody and head swing round and down
+# toward the leg, the jaws snap at it twice and pull, then it straightens (CLAMP_TWIST; a stiff-bodied ant: past about
+# 16 degrees of turn in all the front leg goes through the head). All my picks, to confirm.
+CLAMP_WALK = dict(sweep=3.2, keys=60)
+CLAMP_HELD = (2.2, 0.4, 1.6)
+CLAMP_LOW, CLAMP_LEAN, CLAMP_LOOK, CLAMP_HEAD = -0.3, 0.0, 0.0, 0.0
+CLAMP_BRACE = (1.5, -0.6)
+CLAMP_TWIST = dict(seconds=2.4, fore=8.0, head=8.0, bow=8.0)
+
+
+def clamp_side(leg):
+    return 1 if leg[0] == 'l' else -1
+
+
+def clamped_walk(name, leg):
+    """The walk dragging a soldier clamped on this leg (see CLAMP_WALK)."""
+    r = rig(name)
+    lift = LIFT_SHARE * r.legs['l2'].H[1] * 0.8
+    side = clamp_side(leg)
+    g = dict(CLAMP_WALK, **lost_gait((leg,)))
+    turn = -side * CLAMP_LOOK                       # a positive Y turn swings the head to the right
+    still_ = {'forebody': [2.0, turn, side * CLAMP_LEAN], 'head': [-4.0, -side * CLAMP_HEAD, 0], 'body_pos': [0, CLAMP_LOW, 0]}
+    tr, stride, report = mo.walk(r, WALK_SECONDS, lift=lift, bob=BOB * 0.6, sway=SWAY, gaster_sway=GASTER_SWAY,
+                                 still=still_, held={leg: CLAMP_HELD}, **g)
+    if report['worst_miss'] > 0.05:
+        raise ValueError(f'{name} walk_clamped_{leg}: a foot misses its path by {report["worst_miss"]:.3f}')
+    trail_antennae(tr, r, WALK_SECONDS, raise_by=4.0, extra={'head': still_['head']})
+    return {'loop': True, 'animation_length': WALK_SECONDS,
+            'timeline': {'0': f'stride {stride:.4f}', '0.001': f'swap {report["swap"]:.4f}'}, 'bones': tr.bones()}
+
+
+def clamp_twist(name, side_word):
+    """Standing, twisting round to bite at the soldier on a leg of this side (see CLAMP_TWIST)."""
+    r = rig(name)
+    side = 1 if side_word == 'l' else -1
+    T, F, H, B = (CLAMP_TWIST[k] for k in ('seconds', 'fore', 'head', 'bow'))
+    held = f'{side_word}2'
+    fore = [(0, [0, 0, 0]), (0.35, [6, -side * F, side * 3]), (1.6, [6, -side * F, side * 3]), (2.0, [0, 0, 0]), (T, [0, 0, 0])]
+    head = [(0, [0, 0, 0]), (0.4, [B, -side * H, 0]), (0.7, [B + 2, -side * H, 0]), (0.85, [B, -side * H, 0]),
+            (1.15, [B + 2, -side * H, 0]), (1.3, [B - 4, -side * (H - 4), 0]), (1.6, [B, -side * H, 0]),
+            (2.0, [0, 0, 0]), (T, [0, 0, 0])]
+    jaw = [(0, 0), (0.45, 22), (0.62, -8), (0.8, 18), (1.0, -8), (1.45, -8), (1.6, 0), (T, 0)]
+
+    def body_at(t):
+        out = {'forebody': curve(fore, t), 'head': curve(head, t), 'body_pos': [0, CLAMP_LOW, 0]}
+        out.update(jaws(curve([(a, [b, 0, 0]) for a, b in jaw], t)[0]))
+        return out
+
+    leg = r.legs[held]
+    sx, sy, sz = r.stance(held)
+    out_ = (sx + CLAMP_HELD[0] * leg.out, sy + CLAMP_HELD[1], sz + CLAMP_HELD[2])
+    front = f'{side_word}1'                         # the front leg on that side braced out wide, clear of the turning head
+    fx, fy, fz = r.stance(front)
+    front_ = (fx + CLAMP_BRACE[0] * r.legs[front].out, fy, fz + CLAMP_BRACE[1])
+    clip, worst = posed_clip(name, T, body_at, feet_at=lambda t: {held: out_, front: front_}, loop=True)
+    return clip, worst
+
+
+def clamp_clips(name):
+    """Every clamped walk and the two twists of one model."""
+    clips = {}
+    for leg in mo.INSECT_LEGS:
+        clips[f'walk_clamped_{leg}'] = clamped_walk(name, leg)
+    for side in ('l', 'r'):
+        made, miss = clamp_twist(name, side)
+        if miss > 0.05:
+            raise ValueError(f'{name} clamp_twist_{side}: a planted foot misses its place by {miss:.3f}')
+        clips[f'clamp_twist_{side}'] = made
+    return clips
+
+
 # Turning on the spot (the ant's way, 40 degrees a cycle): the long front legs step round 1.0 unit wider and stay down
 # a little less (so they clear the jaws), the others 0.4 wider; the forebody leads 2 degrees into the turn.
 TURN_DEGREES = 40.0
@@ -611,6 +689,7 @@ def animations(name):
     if name != mm.QUEEN:                                    # a queen never carries prey (her workers feed her)
         for clip in CARRY:
             clips[clip] = carry(name, clip)
+        clips.update(clamp_clips(name))                     # M8 step 2c: a termite soldier clamped on a leg
     clips['climb_feel'] = climb_feel()
     return {'format_version': '1.8.0', 'animations': clips}
 
@@ -653,6 +732,22 @@ def termites(name, count):
         cubes.append({'origin': [x0 if right else x0 + body, y0 + w * 0.1, z0 + w * 0.1], 'size': [head, w * 0.8, w * 0.8],
                       'colour': TERMITE_HEAD})
     return {'bone': 'carry', 'cubes': cubes}
+
+
+def clinging(name, leg):
+    """A termite soldier clinging at the knee of this leg (the page draws it; in the game it is the soldier itself):
+    its head clamped on, its body hanging out from the leg."""
+    bone = body_plan.load(name).to_bone.get(f'leg_{leg}_lower', f'leg_{leg}_lower')
+    piv = next(b['pivot'] for b in rig(name).model.bones if b['name'] == bone)
+    out = 1 if leg[0] == 'l' else -1
+    k = 1.0 / MINOR_SIZE if mm.MODELS.get(name) else 1.0
+    head, body = 2.2 * k, 4.5 * k
+    x0 = piv[0] + out * 0.4 * k
+    cubes = [{'origin': [x0 if out > 0 else x0 - head, piv[1] - head * 0.7, piv[2] - head / 2], 'size': [head, head * 0.8, head],
+              'colour': TERMITE_HEAD},
+             {'origin': [x0 + head if out > 0 else x0 - head - body, piv[1] - head * 0.8, piv[2] - head * 0.35],
+              'size': [body, head * 0.6, head * 0.7], 'colour': TERMITE_BODY}]
+    return {'bone': bone, 'cubes': cubes}
 
 
 def viewer_bones(name):
@@ -704,6 +799,13 @@ def viewer_data(entry):
                 ('walk_fast', 4.5, 'fast walk', 'a raid column, 4.5 body lengths a second: long strides')):
             add(label, words + '; the feelers low, sweeping the scent trail', clips[clip]['bones'], bl * body_blocks)
         add('turning', 'stepping round to the right on the spot, 40 degrees a step cycle', clips['turn_r']['bones'])
+        if 'walk_clamped_l2' in clips:                  # M8 step 2c (the workers; the soldier is drawn by the page only)
+            add('dragging a clamped soldier', 'a termite soldier clamped on the left middle leg: that leg held stiff out to '
+                                              'the side, the five others stepping short and slow, the body low, turned to it',
+                clips['walk_clamped_l2']['bones'], 0.4 * body_blocks, load=clinging(name, 'l2'))
+            add('twisting to bite it', 'standing, it swings round and down to the soldier on its left leg, snaps at it '
+                                       'twice and pulls, then straightens', clips['clamp_twist_l']['bones'],
+                load=clinging(name, 'l2'))
         if 'attack_a' in clips:                         # the workers only (the queen does not fight yet)
             add('attack A', 'grab and sting, a termite in front: lunges, the jaws snap shut on it, it rises and bows, '
                             'the gaster swings forward under it and the sting goes in, held while the venom is '

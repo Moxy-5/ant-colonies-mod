@@ -201,6 +201,20 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     /** The legs bitten off (M8 step 2d, six bits, {@link LostLegs}). Synced so the model hides them and walks without. */
     private static final EntityDataAccessor<Byte> DATA_LOST_LEGS =
             SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.BYTE);
+    /**
+     * A foe clamped on to a leg (M8 step 2c, {@link Clamp}): 0 for none, else the leg's index plus 1, and
+     * {@link #CLAMP_DEAD} for a dead head (drawn on the leg); with the head's look and size. Synced so the client draws it.
+     */
+    private static final EntityDataAccessor<Byte> DATA_CLAMP =
+            SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.BYTE);
+    private static final EntityDataAccessor<String> DATA_CLAMP_LOOK =
+            SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.STRING);
+    private static final EntityDataAccessor<Float> DATA_CLAMP_SIZE =
+            SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.FLOAT);
+    private static final byte CLAMP_DEAD = 8;
+    /** It is clamped on to another insect's leg (M8 step 2c): the client plays its hold-on clip. */
+    private static final EntityDataAccessor<Boolean> DATA_CLAMPING =
+            SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.BOOLEAN);
 
     /**
      * What it holds (a soil pellet, a seed, bread, forage, a nodule in the jaws or the crop, an egg, a dead nestmate, or
@@ -272,6 +286,10 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         builder.define(DATA_LOAD, CarriedLoad.NONE);
         builder.define(DATA_STRIKE, "");
         builder.define(DATA_LOST_LEGS, (byte) 0);
+        builder.define(DATA_CLAMP, (byte) 0);
+        builder.define(DATA_CLAMP_LOOK, "");
+        builder.define(DATA_CLAMP_SIZE, 0.1F);
+        builder.define(DATA_CLAMPING, false);
     }
 
     /** What it holds ({@link CarriedLoad#NONE}: nothing). */
@@ -498,7 +516,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
 
     /** Whether it may go back into its colony's numbers now: not while it holds anything or is after an enemy. */
     public boolean mayGoIntoNest() {
-        return isAlive() && !hasFullMandibles() && getTarget() == null && !isPassenger();
+        return isAlive() && !hasFullMandibles() && getTarget() == null && !isPassenger() && !clamp.isOn() && clampingOn == null;
     }
 
     /** The kind of body this insect leaves: its species' dead ({@link com.antcolonies.species.SpeciesBodies}). */
@@ -623,6 +641,10 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
      */
     @Override
     public boolean hurt(DamageSource source, float amount) {
+        if (clampingOn != null && (source.is(net.minecraft.world.damagesource.DamageTypes.IN_WALL)
+                || source.is(net.minecraft.tags.DamageTypeTags.IS_FALL))) {
+            return false; // dragged along on a leg, past walls (M8 step 2c)
+        }
         boolean hurt = super.hurt(source, amount);
         if (hurt && level() instanceof ServerLevel serverLevel && source.getEntity() instanceof net.minecraft.world.entity.LivingEntity attacker
                 && !(attacker instanceof AbstractAntEntity insect && getColonyId() != null && getColonyId().equals(insect.getColonyId()))) {
@@ -814,6 +836,10 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         if (tickCount % 20 == 0 && lostLegs() != 0) {
             updateLimp();
         }
+        if (level() instanceof ServerLevel level) {
+            clamp.tick(level);
+            tickClamping(level);
+        }
         if (venomAt != NO_VENOM && paralysedAt == NOT_PARALYSED
                 && level().getGameTime() - venomAt >= fightNumbers().map(FightNumbers.Body::venomTicks).orElse(0)) {
             fallParalysed();
@@ -862,6 +888,132 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return LostLegs.count(lostLegs()) >= LostLegs.CRIPPLED;
     }
 
+    /**
+     * Whether it fights no more and goes home: crippled (3 or more legs gone, M8 step 2d) or with a living foe clamped on
+     * a leg (M8 step 2c: real Matabele with a termite clinging crawl and cannot keep up).
+     */
+    public boolean fightsNoMore() {
+        return isCrippled() || clamp.isLiving();
+    }
+
+    // --- M8 step 2c, clamping (Clamp) ---
+
+    /** What is clamped on to its legs (server; nothing: {@link Clamp#isOn} false). */
+    private final Clamp clamp = new Clamp(this);
+    /** The insect it is clamped on to (server), and its id (saved, found again after a reload). */
+    @Nullable
+    private AbstractAntEntity clampingOn;
+    @Nullable
+    private UUID clampingOnId;
+    private int clampingMissing;
+    /** Tests only: the chance its landed blows clamp on (below 0: its body's {@code clamp}). */
+    private double clampForTests = -1.0;
+
+    /** What is clamped on to its legs (server). */
+    public Clamp clamp() {
+        return clamp;
+    }
+
+    /** The insect it is clamped on to now (server), or null. */
+    @Nullable
+    public AbstractAntEntity clampingOn() {
+        return clampingOn;
+    }
+
+    /** Its jaws lock on to that insect's leg: it is dragged along beside it, holding still, out of the fight. */
+    void startClamping(AbstractAntEntity victim) {
+        clampingOn = victim;
+        clampingOnId = victim.getUUID();
+        clampingMissing = 0;
+        noPhysics = true;
+        setNoGravity(true);
+        entityData.set(DATA_CLAMPING, true);
+        navigator.stop();
+        attack = null;
+        attackTarget = null;
+        gripping = false;
+    }
+
+    /** It lets go (or died on the leg): it walks and falls again. */
+    void stopClamping() {
+        clampingOn = null;
+        clampingOnId = null;
+        noPhysics = false;
+        setNoGravity(false);
+        entityData.set(DATA_CLAMPING, false);
+    }
+
+    /** Each server tick, for one clamped on: finds its insect again after a reload; lets go once it is gone. */
+    private void tickClamping(ServerLevel level) {
+        if (clampingOnId == null) {
+            return;
+        }
+        if (clampingOn == null) {
+            if (level.getEntity(clampingOnId) instanceof AbstractAntEntity victim && victim.isAlive()) {
+                clampingOn = victim; // the insect finds it again by its own save (Clamp.tick)
+            } else if (++clampingMissing > 100) {
+                stopClamping();
+            }
+            return;
+        }
+        AbstractAntEntity holder = clampingOn.clamp().holder();
+        if (!clampingOn.isAlive() || clampingOn.isRemoved() || !clampingOn.clamp().isLiving() || holder != null && holder != this) {
+            stopClamping();
+        }
+    }
+
+    /** The chance one of its landed blows clamps on to a foe's leg (its body's {@code clamp}, M8 step 2c). */
+    public double clampChance() {
+        return clampForTests >= 0.0 ? clampForTests : fightNumbers().map(FightNumbers.Body::clamp).orElse(0.0);
+    }
+
+    /** Tests only: its landed blows clamp on with this chance (below 0 for its body's). */
+    public void setClampForTests(double chance) {
+        clampForTests = chance;
+    }
+
+    /** Sets what the client draws of the clamp on its legs ({@link Clamp}). */
+    void showClamp(int leg, boolean dead, String look, float size) {
+        entityData.set(DATA_CLAMP, (byte) (leg < 0 ? 0 : (leg + 1) | (dead ? CLAMP_DEAD : 0)));
+        entityData.set(DATA_CLAMP_LOOK, look);
+        entityData.set(DATA_CLAMP_SIZE, size);
+    }
+
+    /** The leg a living foe is clamped on to (synced, for its clips), or -1 for none or a dead head. */
+    public int clampedLegLiving() {
+        int shown = entityData.get(DATA_CLAMP);
+        return shown == 0 || (shown & CLAMP_DEAD) != 0 ? -1 : (shown & 7) - 1;
+    }
+
+    /** Whether it is clamped on to another insect's leg (synced, for its hold-on clip). */
+    public boolean isClampingOn() {
+        return entityData.get(DATA_CLAMPING);
+    }
+
+    /**
+     * Whether its model has the clamping clips (M8 step 2c): {@code clamp_hold} for one that clamps on (a termite
+     * soldier), {@code walk_clamped_<leg>} and {@code clamp_twist_l}/{@code _r} for one that is clamped (a Matabele).
+     */
+    protected boolean hasClampClips() {
+        return false;
+    }
+
+    /** The leg a dead head is locked on to (synced, for drawing it), or -1 for none. */
+    public int clampedHeadLeg() {
+        int shown = entityData.get(DATA_CLAMP);
+        return shown == 0 || (shown & CLAMP_DEAD) == 0 ? -1 : (shown & 7) - 1;
+    }
+
+    /** The look (a texture) of the head locked on its leg. */
+    public String clampedHeadLook() {
+        return entityData.get(DATA_CLAMP_LOOK);
+    }
+
+    /** How big (blocks) the head locked on its leg is. */
+    public float clampedHeadSize() {
+        return entityData.get(DATA_CLAMP_SIZE);
+    }
+
     /** Whether its legs can be bitten off (its body's {@code loses_legs} in its species file; M8 step 2d). */
     public boolean canLoseLegs() {
         return fightNumbers().map(FightNumbers.Body::losesLegs).orElse(false);
@@ -894,6 +1046,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         entityData.set(DATA_LOST_LEGS, (byte) (lost | 1 << leg));
         lostLegAt = level().getGameTime();
         updateLimp();
+        clamp.legLost(leg); // a foe holding that leg comes off with it
         if (level() instanceof ServerLevel level) {
             LostLegEntity.drop(level, this, leg);
         }
@@ -998,7 +1151,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     // hunter's jaws.
     @Override
     protected boolean isImmobile() {
-        return super.isImmobile() || isParalysed() || !level().isClientSide && pinnedBy != null;
+        return super.isImmobile() || isParalysed()
+                || !level().isClientSide && (pinnedBy != null || clampingOn != null || clamp.isHeldStill());
     }
 
     /** How it attacks this foe (its clip), or null if it has no attack clip of its own. */
@@ -1013,8 +1167,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
      * with venom working in it or held in another's jaws.
      */
     public boolean standsToFight() {
-        return isAlive() && !isDowned() && pinnedBy == null && navigator.getSurface() == Direction.DOWN && !isClimbing()
-                && onGround() && !isCrippled();
+        return isAlive() && !isDowned() && pinnedBy == null && clampingOn == null && navigator.getSurface() == Direction.DOWN
+                && !isClimbing() && onGround() && !fightsNoMore();
     }
 
     /** Whether its jaws and sting reach the foe (their boxes nearly touch; a little more downward, into a broken tunnel). */
@@ -2037,6 +2191,10 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             tag.putByte("LostLegs", (byte) lostLegs());
             tag.putLong("LostLegAt", lostLegAt);
         }
+        clamp.save(tag);
+        if (clampingOnId != null) {
+            tag.putUUID("ClampingOn", clampingOnId);
+        }
         if (!Float.isNaN(boldness)) {
             tag.putFloat("Boldness", boldness);
             tag.putFloat("Curiosity", curiosity);
@@ -2066,6 +2224,13 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         venomAt = tag.contains("VenomAt") ? tag.getLong("VenomAt") : paralysedAt != NOT_PARALYSED ? paralysedAt : NO_VENOM;
         entityData.set(DATA_LOST_LEGS, (byte) (tag.getByte("LostLegs") & 0x3F));
         lostLegAt = tag.contains("LostLegAt") ? tag.getLong("LostLegAt") : Long.MIN_VALUE;
+        clamp.load(tag);
+        if (tag.hasUUID("ClampingOn")) {
+            clampingOnId = tag.getUUID("ClampingOn");
+            noPhysics = true;
+            setNoGravity(true);
+            entityData.set(DATA_CLAMPING, true);
+        }
         loadedFromSave = true;
         if (tag.contains("Boldness")) {
             boldness = tag.getFloat("Boldness");
@@ -2110,6 +2275,12 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     /** Lying paralysed by a hunter's sting (M8 step 2b): the clip of every insect that can be stung so. */
     // Felled: it flips onto its back (paralysed_fall, M8 fight polish, round A), then lies twitching (paralysed).
     private static final RawAnimation PARALYSED_CLIP = RawAnimation.begin().thenPlay("paralysed_fall").thenLoop("paralysed");
+    // Clamped on to a foe's leg and dragged (M8 step 2c): jaws locked, legs scrabbling.
+    private static final RawAnimation CLAMP_HOLD = RawAnimation.begin().thenLoop("clamp_hold");
+    // With a foe clamped on a leg: dragging it (one walk per leg held), and standing, twisting round to bite at it.
+    private static final Map<Integer, RawAnimation> CLAMPED_WALKS = new HashMap<>();
+    private static final RawAnimation CLAMP_TWIST_L = RawAnimation.begin().thenLoop("clamp_twist_l");
+    private static final RawAnimation CLAMP_TWIST_R = RawAnimation.begin().thenLoop("clamp_twist_r");
     /** The attack clips, by name (made once each). */
     private static final Map<String, RawAnimation> STRIKE_CLIPS = new HashMap<>();
 
@@ -2164,6 +2335,9 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         if (isParalysed()) {
             return PARALYSED_CLIP;
         }
+        if (isClampingOn() && hasClampClips()) {
+            return CLAMP_HOLD;
+        }
         String strike = entityData.get(DATA_STRIKE);
         if (!strike.isEmpty()) {
             return STRIKE_CLIPS.computeIfAbsent(strike, c -> RawAnimation.begin().thenPlay(c));
@@ -2196,7 +2370,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             clip = player.gearFor(WALKS, WALK, walkSpeed);
         }
         settleInto(player, clip);
-        if (WALKS.contains(clip) || clip == WALK_HOT || clip == lostWalk) {
+        if (WALKS.contains(clip) || clip == WALK_HOT || clip == lostWalk || CLAMPED_WALKS.containsValue(clip)) {
             player.keepPace(walkSpeed, walkRateWithoutStride());
         } else if (clip == TURN_R || clip == TURN_L) {
             player.keepTurn(turnSpeed);
@@ -2206,6 +2380,22 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             player.playAt(ownPace(0));
         }
         return state.setAndContinue(clip);
+    }
+
+    /**
+     * With a living foe clamped on a leg and all six legs (M8 step 2c): dragging it, or standing, twisting round to bite
+     * at it. Null otherwise (with legs gone it plays the walk for those, the foe dragged along all the same).
+     */
+    @Nullable
+    private RawAnimation clampedClip() {
+        int leg = clampedLegLiving();
+        if (leg < 0 || !hasClampClips() || lostLegs() != 0) {
+            return null;
+        }
+        if (walking) {
+            return CLAMPED_WALKS.computeIfAbsent(leg, l -> RawAnimation.begin().thenLoop("walk_clamped_" + LostLegs.LEGS.get(l)));
+        }
+        return leg % 2 == 0 ? CLAMP_TWIST_L : CLAMP_TWIST_R;
     }
 
     /** The walk of its model for the legs it has lost ({@link LostLegs#walkClip}), or null with all six. */
@@ -2256,6 +2446,10 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         }
         if (turning) {
             return turnSpeed > 0.0 ? TURN_R : TURN_L;
+        }
+        RawAnimation clamped = clampedClip();
+        if (clamped != null) {
+            return clamped;
         }
         RawAnimation noticing = walking ? null : noticingClip(false);
         if (noticing != null) {

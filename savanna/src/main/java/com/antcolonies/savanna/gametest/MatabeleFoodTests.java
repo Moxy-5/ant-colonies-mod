@@ -18,6 +18,7 @@ import com.antcolonies.savanna.colony.SavannaParts;
 import com.antcolonies.savanna.command.MatabeleCommands;
 import com.antcolonies.savanna.entity.MatabeleEntity;
 import com.antcolonies.savanna.registry.SavannaBlocks;
+import com.antcolonies.savanna.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -43,6 +44,7 @@ public class MatabeleFoodTests {
         PreyPile pile = colony.part(SavannaParts.PREY_PILE).orElse(null);
         helper.assertTrue(pile != null, "a Matabele colony has no prey pile");
         long[] hungrySince = new long[1];
+        MatabeleEntity[] clamped = new MatabeleEntity[1];
         helper.startSequence()
                 .thenWaitUntil(() -> helper.assertTrue(colony.nest().getFinishedRoomCenter(level) != null, "the queen's room is not open yet"))
                 .thenExecute(() -> {
@@ -53,6 +55,19 @@ public class MatabeleFoodTests {
                     for (BlockPos pos : heaps) {
                         helper.assertFalse(level.getBlockState(pos).getValue(PreyPileBlock.DEAD), "a fresh pile looks dead");
                     }
+                    // M8 step 2c: a worker in the nest comes home with a dead termite soldier's head locked on a leg.
+                    MatabeleEntity hurt = TestIsolation.insectsOf(level, colony, MatabeleEntity.class).stream()
+                            .filter(MatabeleEntity::canLoseLegs).findFirst().orElse(null);
+                    helper.assertTrue(hurt != null, "no Matabele worker to put a clamped head on");
+                    BlockPos room = colony.nest().getFinishedRoomCenter(level);
+                    hurt.moveTo(room.getX() + 0.5, room.getY(), room.getZ() + 0.5, hurt.getYRot(), 0.0F); // home in the queen's room
+                    com.antcolonies.entity.AbstractAntEntity holder = SavannaEntities.TERMITE_MAJOR_SOLDIER.get().create(level);
+                    holder.moveTo(hurt.getX(), hurt.getY(), hurt.getZ(), 0.0F, 0.0F);
+                    level.addFreshEntity(holder);
+                    helper.assertTrue(hurt.clamp().clampOn(holder), "the soldier could not clamp on");
+                    holder.kill();
+                    hurt.clamp().becomeHead();
+                    clamped[0] = hurt;
                     // Every worker a day and a quarter without a meal: hungry, not yet slow.
                     hungrySince[0] = level.getGameTime() - 30000;
                     for (MatabeleEntity ant : TestIsolation.insectsOf(level, colony, MatabeleEntity.class)) {
@@ -64,6 +79,10 @@ public class MatabeleFoodTests {
                     helper.assertTrue(fed >= 3, "only " + fed + " hungry workers have eaten from the pile" + pile.describe(level));
                     helper.assertTrue(pile.edible() < 6, "nobody took a termite off the pile" + pile.describe(level));
                 })
+                // M8 step 2c: a nestmate in the nest takes the head off (real: 9 in 10 within a day, Frank et al. 2017).
+                .thenWaitUntil(() -> helper.assertTrue(!clamped[0].isAlive() || !clamped[0].clamp().isOn(),
+                        "nobody in the nest has bitten the termite head off the worker at " + helper.relativePos(clamped[0].blockPosition())
+                                + " (goals " + clamped[0].runningGoals() + ")"))
                 .thenExecute(() -> {
                     pile.stock(level, 2); // (the queen may have been fed the rest meanwhile)
                     int good = pile.edible();

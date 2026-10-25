@@ -440,6 +440,38 @@ def bite():
     return {'head': keys([-8, 0, 0], [8, 0, 0]), 'forebody': keys([-2, 0, 0], [3, 0, 0]),
             'mandible_l': keys([0, -30, 0], [0, 6, 0]), 'mandible_r': keys([0, 30, 0], [0, -6, 0])}
 
+# Clamped on (M8 step 2c; real Macrotermes soldiers bite a raider's leg or antenna and hang on, dragged along, Frank
+# et al. 2017): the jaws locked shut past each other on the leg, the head tipped up to it and held, the antennae pulled
+# back; dragged sideways, the body jerks and rolls a little and the abdomen swings behind; the legs scrabble for a hold
+# by turns, each one swinging and pawing and planted again, out of step (a dragged insect bracing, not walking). One
+# loop of CLAMP_SECONDS; the leg moves (degrees) and their moments my picks, to confirm.
+CLAMP_SECONDS = 1.6
+CLAMP_SCRABBLE = {'l1': (0.1, 8), 'r3': (0.35, -14), 'r1': (0.55, -8), 'l2': (0.8, 16), 'l3': (1.05, 12), 'r2': (1.3, -16)}
+
+def clamp_hold():
+    T = f'{CLAMP_SECONDS:g}'
+    jerk = lambda a, b: {'0': [0, 0, 0], '0.4': [0, a, b], '0.5': [0, -a * 0.5, -b], '1.0': [0, a * 0.6, b * 0.5],
+                         '1.2': [0, -a, -b * 0.6], T: [0, 0, 0]}
+    bones = {'body': {'rotation': jerk(3, 3)},
+             'head': {'rotation': {'0': [-10, 0, 0], '0.45': [-13, 3, 0], '0.55': [-9, -2, 0], '1.15': [-12, -3, 0], T: [-10, 0, 0]}},
+             'forebody': {'rotation': {'0': [-3, 0, 0], T: [-3, 0, 0]}},
+             'mandible_l': {'rotation': {'0': [0, 10, 0], '0.6': [0, 12, 0], '0.7': [0, 10, 0], T: [0, 10, 0]}},
+             'mandible_r': {'rotation': {'0': [0, -10, 0], '0.6': [0, -12, 0], '0.7': [0, -10, 0], T: [0, -10, 0]}},
+             'antenna_l_1': {'rotation': {'0': [-25, -15, 0], '0.7': [-15, -10, 0], '0.8': [-28, -18, 0], T: [-25, -15, 0]}},
+             'antenna_r_1': {'rotation': {'0': [-25, 15, 0], '1.1': [-18, 10, 0], '1.2': [-28, 18, 0], T: [-25, 15, 0]}}}
+    n = len(KING_SEGMENTS)
+    for i in range(n):
+        bone = abdomen_bone(i)
+        swing = 1.5                     # each segment on the one before: the whole abdomen swings in a curve
+        bones[bone] = {'rotation': {'0': [0, 0, 0], '0.5': [0, swing, 0], '1.2': [0, -swing, 0], T: [0, 0, 0]}}
+    for leg, (at, swing) in CLAMP_SCRABBLE.items():
+        side = 1 if leg[0] == 'l' else -1
+        a, b, c = f'{at:g}', f'{at + 0.08:g}', f'{at + 0.2:g}'
+        bones[f'leg_{leg}'] = {'rotation': {'0': [0, 0, 0], a: [0, 0, 0], b: [0, swing, 12 * side], c: [0, swing * 0.4, 0],
+                                            f'{at + 0.32:g}': [0, 0, 0], T: [0, 0, 0]}}
+        bones[f'leg_{leg}_lower'] = {'rotation': {'0': [0, 0, 0], a: [0, 0, 0], b: [0, 0, -15 * side], c: [0, 0, 0], T: [0, 0, 0]}}
+    return bones
+
 def soldier_animations(name, bones):
     """A soldier's clip file: its own walks and turns, the worker's idle (a slow jaw twitch added), the head bang and the
     bite."""
@@ -451,6 +483,7 @@ def soldier_animations(name, bones):
     out.update({k: v for k, v in clips.items() if k.startswith(('walk', 'turn'))})
     out['head_bang'] = {'loop': True, 'animation_length': DRUM_SECONDS, 'bones': head_bang()}
     out['bite'] = {'loop': False, 'animation_length': BITE_SECONDS, 'bones': bite()}
+    out['clamp_hold'] = {'loop': True, 'animation_length': CLAMP_SECONDS, 'bones': clamp_hold()}
     out['paralysed_fall'] = clips['paralysed_fall']
     out['paralysed'] = clips['paralysed']
     return {'format_version': '1.8.0', 'animations': out}

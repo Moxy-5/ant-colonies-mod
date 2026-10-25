@@ -41,6 +41,7 @@ public class AntRenderer<T extends AbstractAntEntity> extends GeoEntityRenderer<
         super(context, model);
         addRenderLayer(new YoungPaleLayer<>(this));
         addRenderLayer(new CarriedLoadLayer<>(this, context));
+        addRenderLayer(new ClampedHeadLayer<>(this, context));
     }
 
     @Override

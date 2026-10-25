@@ -131,7 +131,8 @@ timings: all "my pick, to confirm" until then).
      minutes, not seconds; `soldiers,termitefood,colony,away`; guard films if a clip changes; then the user looks
      in-game with `/antcolonies skirmish 10`.
    - **2c, clamping:** termite soldiers clamp on and ride along, slowing and hurting; a soldier killed while clamped
-     leaves its head locked on the leg (shown) until a nestmate bites it off in the nest.
+     leaves its head locked on the leg (shown) until a nestmate bites it off in the nest. **BUILT 2026-10-25**
+     (branch `claude/great-cannon-1d028b`; `docs/DESIGN.md` "Step 2c, clamping"; not tried in-game yet).
    - **2d, lost legs (legs only, the user's pick: antennae losses are not measured for Megaponera):** saved per ant,
      the leg hidden on the model (the Matabele model already has its six leg bones), 5- and 4-legged walks from the gait
      maker, a little slower; the lost leg lies on the ground a while; 1 or 2 gone, rest about a day, then raid again.

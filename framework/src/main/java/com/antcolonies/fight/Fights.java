@@ -22,7 +22,8 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
  * <p>A sting on prey (an insect of a species in the striker's {@code prey}) does not kill: it pricks (half a point,
  * never the last, so the prey's colony feels the attack) and gives one dose of venom; with {@code stings_to_fall} doses
  * the prey falls paralysed ({@link AbstractAntEntity#takeSting}). Every other blow does the striker's damage, and may
- * bite a leg off ({@code leg_cut}, M8 step 2d).
+ * bite a leg off ({@code leg_cut}, M8 step 2d), or clamp on to one instead ({@code clamp}, M8 step 2c,
+ * {@link com.antcolonies.entity.Clamp}).
  */
 public final class Fights {
     /** What a sting on prey does to its health (it is the venom that counts). */
@@ -98,10 +99,25 @@ public final class Fights {
             return true;
         }
         boolean hit = foe.hurt(striker.damageSources().mobAttack(striker), (float) striker.getAttributeValue(Attributes.ATTACK_DAMAGE));
-        if (hit && foe.isAlive() && foe instanceof AbstractAntEntity insect) {
+        if (hit && foe.isAlive() && foe instanceof AbstractAntEntity insect && !com.antcolonies.entity.Clamp.tryClampOn(striker, insect)) {
             cutLeg(striker, insect);
         }
         return hit;
+    }
+
+    /**
+     * M8 step 2c: a foe clamped on to an insect's leg squeezes: {@code share} of its bite's damage, and its
+     * {@code leg_cut} chance takes the held leg off (it drops off with it).
+     */
+    public static void squeeze(AbstractAntEntity holder, AbstractAntEntity insect, double share) {
+        float damage = (float) (holder.getAttributeValue(Attributes.ATTACK_DAMAGE) * share);
+        if (damage > 0.0F) {
+            insect.hurt(holder.damageSources().mobAttack(holder), damage);
+        }
+        double chance = holder.legCut();
+        if (insect.isAlive() && chance > 0.0 && insect.canLoseLegs() && holder.getRandom().nextDouble() < chance) {
+            insect.loseLeg(insect.clamp().leg());
+        }
     }
 
     /**

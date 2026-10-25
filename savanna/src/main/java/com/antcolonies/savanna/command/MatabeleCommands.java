@@ -65,7 +65,48 @@ public class MatabeleCommands {
                 .then(Commands.literal("loseleg")
                         .executes(context -> loseLeg(context.getSource(), 1))
                         .then(Commands.argument("legs", IntegerArgumentType.integer(1, 6))
-                                .executes(context -> loseLeg(context.getSource(), IntegerArgumentType.getInteger(context, "legs"))))));
+                                .executes(context -> loseLeg(context.getSource(), IntegerArgumentType.getInteger(context, "legs")))))
+                .then(Commands.literal("clamp")
+                        .executes(context -> clamp(context.getSource(), false))
+                        .then(Commands.literal("dead")
+                                .executes(context -> clamp(context.getSource(), true)))));
+    }
+
+    /**
+     * M8 step 2c, for testing: a termite major soldier (of no colony) clamps on to a leg of the nearest Matabele within
+     * {@value #LOSE_LEG_LOOK} blocks, as if its bite had locked on; with {@code dead}, it dies at once and only its head
+     * stays locked on the leg.
+     */
+    private static int clamp(CommandSourceStack source, boolean dead) {
+        ServerLevel level = source.getLevel();
+        Vec3 at = source.getPosition();
+        MatabeleEntity ant = level.getEntitiesOfClass(MatabeleEntity.class, new AABB(at, at).inflate(LOSE_LEG_LOOK),
+                        a -> a.isAlive() && a.canLoseLegs() && !a.clamp().isOn() && com.antcolonies.entity.body.LostLegs.count(a.lostLegs()) < 6)
+                .stream().min(java.util.Comparator.comparingDouble(a -> a.distanceToSqr(at))).orElse(null);
+        if (ant == null) {
+            source.sendFailure(Component.literal("No Matabele major or minor without a clamp within " + (int) LOSE_LEG_LOOK + " blocks."));
+            return 0;
+        }
+        AbstractAntEntity soldier = com.antcolonies.savanna.registry.SavannaEntities.TERMITE_MAJOR_SOLDIER.get().create(level);
+        if (soldier == null) {
+            return 0;
+        }
+        soldier.moveTo(ant.getX(), ant.getY(), ant.getZ(), 0.0F, 0.0F);
+        level.addFreshEntity(soldier);
+        if (!ant.clamp().clampOn(soldier)) {
+            soldier.discard();
+            source.sendFailure(Component.literal("That Matabele has no legs left to clamp."));
+            return 0;
+        }
+        if (dead) {
+            soldier.kill();
+            ant.clamp().becomeHead();
+        }
+        String leg = com.antcolonies.entity.body.LostLegs.LEGS.get(ant.clamp().leg());
+        source.sendSuccess(() -> Component.literal((dead ? "A dead termite soldier's head is locked on the " : "A termite major soldier clamped on to the ")
+                + leg + " leg of the Matabele at " + ant.blockPosition().toShortString()
+                + (dead ? " (a little slower; a nestmate in the nest bites it off)" : " (it crawls home and fights no more; a nestmate's sting leaves the head)")), true);
+        return 1;
     }
 
     /** How far (blocks) the leg command looks for an ant. */

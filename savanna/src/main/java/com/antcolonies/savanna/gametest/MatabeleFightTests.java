@@ -73,6 +73,10 @@ public class MatabeleFightTests {
         // Matabele is bitten, the soldier stays on its feet.
         TermiteSoldierEntity dodger = TestAnts.lone(helper, SavannaEntities.TERMITE_MAJOR_SOLDIER.get(), 1, 1, 1);
         dodger.setDodgeForTests(1.0, 1.0);
+        // The soldiers' bites never clamp here (2c is checked on its own in checkClamp): a clamped hunter fights no more.
+        for (TermiteSoldierEntity biter : new TermiteSoldierEntity[] {soldier, minorSoldier, majorSoldier, dodger}) {
+            biter.setClampForTests(0.0);
+        }
         MatabeleEntity grabber = TestAnts.loneWithAMind(helper, SavannaEntities.MATABELE_MAJOR.get(), 1, 1, 4);
         grabber.orderToFight(helper.absolutePos(new BlockPos(1, 1, 1)), helper.getLevel().getGameTime() + 2400);
         boolean[] grabberBitten = {false};
@@ -122,6 +126,10 @@ public class MatabeleFightTests {
                 helper.assertTrue(!major.isParalysed(), "a termite's bite should not paralyse a Matabele");
                 bitten[0] = true;
                 checkLostLegs(helper, soldier, major);
+                checkClamp(helper, soldier, major);
+            }
+            if (helper.getTick() == 8) {
+                checkClampedHead(helper, major);
             }
             if (worker.isParalysed()) {
                 helper.assertTrue(worker.isAlive() && worker.getHealth() > 0.0F, "a stung termite should lie paralysed, alive");
@@ -377,6 +385,70 @@ public class MatabeleFightTests {
         helper.assertTrue("walk_lost_l1_r1".equals(LostLegs.walkClip(major.lostLegs())), "with 3 gone it walks the walk of the first two");
         major.setLostLegsForTests(0, 0);
         helper.assertTrue(Math.abs(speed.getValue() / healthy - 1.0) < 1.0E-3, "with all six it walks as before");
+    }
+
+    /** The major's leg the dead head is locked on (M8 step 2c, set by {@link #checkClamp}). */
+    private static final Map<UUID, Integer> HEAD_LEG = new HashMap<>();
+
+    /**
+     * M8 step 2c, in the soldier's bite above: a soldier's bite that clamps (its clamp chance made certain here) locks on
+     * to one of the Matabele's legs instead of cutting it: the soldier rides along on it, the ant 75 percent slower and
+     * fighting no more; a squeeze that cuts takes the held leg off and the soldier with it; clamped again, the clamp is
+     * saved, and the soldier killed on the leg (as a nestmate's sting does) leaves its head ({@link #checkClampedHead}).
+     */
+    private static void checkClamp(GameTestHelper helper, TermiteSoldierEntity soldier, MatabeleEntity major) {
+        net.minecraft.world.entity.ai.attributes.AttributeInstance speed =
+                major.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED);
+        double healthy = speed.getValue();
+        major.setHealth(major.getMaxHealth());
+        soldier.setClampForTests(1.0);
+        major.invulnerableTime = 0;
+        soldier.bite(major);
+        soldier.setClampForTests(0.0);
+        major.setHealth(major.getMaxHealth());
+        helper.assertTrue(major.clamp().isLiving() && soldier.clampingOn() == major, "a clamping bite should lock the soldier on a leg");
+        helper.assertTrue(LostLegs.count(major.lostLegs()) == 0, "a clamping bite should not cut the leg, gone: " + LostLegs.gone(major.lostLegs()));
+        helper.assertTrue(Math.abs(speed.getValue() / healthy - 0.25) < 0.01,
+                "with a soldier clamped on it should crawl 75 percent slower, walks at " + speed.getValue() / healthy);
+        helper.assertTrue(major.fightsNoMore() && !major.standsToFight(), "with a soldier clamped on it should fight no more");
+        // A squeeze that cuts: the held leg off, the soldier with it.
+        int held = major.clamp().leg();
+        soldier.setLegCutForTests(1.0);
+        com.antcolonies.fight.Fights.squeeze(soldier, major, 0.33);
+        soldier.setLegCutForTests(-1.0);
+        helper.assertTrue(LostLegs.isGone(major.lostLegs(), held), "a cutting squeeze should take the held leg off");
+        helper.assertTrue(!major.clamp().isOn() && soldier.clampingOn() == null, "the soldier should come off with the leg");
+        helper.assertTrue(Math.abs(speed.getValue() / healthy - 0.70) < 0.01,
+                "one leg gone, nothing clamped: 30 percent slower, walks at " + speed.getValue() / healthy);
+        major.setLostLegsForTests(0, 0);
+        major.setHealth(major.getMaxHealth());
+        // Clamped again and saved; then the soldier dies on the leg.
+        helper.assertTrue(major.clamp().clampOn(soldier), "the soldier could not clamp on again");
+        net.minecraft.nbt.CompoundTag saved = new net.minecraft.nbt.CompoundTag();
+        major.addAdditionalSaveData(saved);
+        helper.assertTrue(saved.getByte("ClampLeg") == major.clamp().leg() && !saved.getBoolean("ClampDead"), "the clamp should be saved");
+        HEAD_LEG.put(major.getUUID(), major.clamp().leg());
+        soldier.kill();
+    }
+
+    /**
+     * A few ticks on: the soldier killed on the leg left its head locked on (shown on the leg), the ant only 10 percent
+     * slower and able to fight again; a nestmate's work takes it off (the care itself in the nest is checked in
+     * {@code MatabeleFoodTests}).
+     */
+    private static void checkClampedHead(GameTestHelper helper, MatabeleEntity major) {
+        net.minecraft.world.entity.ai.attributes.AttributeInstance speed =
+                major.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED);
+        Integer leg = HEAD_LEG.remove(major.getUUID());
+        helper.assertTrue(major.clamp().isHead(), "the soldier killed on the leg should leave its head locked on");
+        helper.assertTrue(leg != null && major.clampedHeadLeg() == leg, "the head should be shown on leg " + leg + ", is on " + major.clampedHeadLeg());
+        helper.assertTrue(!major.clampedHeadLook().isEmpty() && major.clampedHeadSize() > 0.05F, "the head has no look or size");
+        helper.assertTrue(!major.fightsNoMore(), "with only a dead head on it should fight again");
+        double slowed = speed.getValue();
+        helper.assertTrue(major.clamp().takeOff(helper.getLevel()), "taking the head off should finish the work");
+        helper.assertTrue(!major.clamp().isOn() && major.clampedHeadLeg() < 0, "the head should be gone");
+        major.setLostLegsForTests(0, 0); // (one time in ten the leg comes off with it)
+        helper.assertTrue(Math.abs(slowed / speed.getValue() - 0.90) < 0.01, "a head on the leg should slow it 10 percent, walks at " + slowed / speed.getValue());
     }
 
     private static void floor(GameTestHelper helper) {

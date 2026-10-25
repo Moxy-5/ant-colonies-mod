@@ -274,6 +274,7 @@ public final class SavannaParts {
             .ticksAway(85, PreyPile::tickAway)
             .plugs(ColonyHooks.NURSE_FOOD, 30, pile -> pile) // the paralysed termites
             .plugs(ColonyHooks.LIST_STORE, 20, pile -> pile::describe)
+            .hears(ColonyNews.SCRAPS_LEFT, 10, (pile, level, news) -> pile.scrapsLeft(news.pieces())) // M8 2c: heads off legs
             .saves(PreyPile::save, PreyPile::load)
             .sample(PreyPile::fillForTests));
 

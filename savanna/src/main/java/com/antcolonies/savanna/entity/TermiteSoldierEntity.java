@@ -341,6 +341,12 @@ public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurs
         return entityData.get(DATA_BITING);
     }
 
+    /** Soldiers have the hold-on clip for when they clamp on a leg (M8 step 2c). */
+    @Override
+    protected boolean hasClampClips() {
+        return true;
+    }
+
     @Override
     @Nullable
     protected RawAnimation specialAnimation() {

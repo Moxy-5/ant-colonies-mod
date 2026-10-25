@@ -78,6 +78,8 @@
     "_look_over_note": "M8 fight polish, round A: after felling a termite the ant stands over it, its antennae on it, this long (the shortest and longest, ticks: 1 to 2 s, my pick, to confirm), then turns to the next; one termite at a time, each blow played to its end (real raids: the attack at a feeding site lasts 5 to 30 minutes, Yusuf 2026).",
     "look_over_ticks": [20, 40],
     "_give_up_note": "M8 fight polish, round B: with no termite in reach the ant searches round the feeding spot, antennae down, this long (ticks: 2 minutes, my pick, to confirm) before its fight is over (real raids: the attack lasts 5 to 30 minutes, the ants searching the opened galleries and the ground, Yusuf 2026).",
-    "give_up_ticks": 2400
+    "give_up_ticks": 2400,
+    "_clamped_note": "M8 step 2c, a termite soldier clamped on a leg (the user's calls 2026-10-25; Frank et al. 2017: the worst handicap measured, the ant crawling home; nestmates took the termites off in 9 cases in 10, the leg kept): slowing, a living soldier on the leg slows it this share (75 percent), it fights no more and goes home; head_slowing, a dead head left locked on slows it 10 percent and it may fight again; care_ticks, a nestmate in the nest works this long (30 s) to take it off; clean, the chance the leg is kept (9 in 10, else the leg comes off with it). slowing, head_slowing and care_ticks are my picks, to confirm.",
+    "clamped": { "slowing": 0.75, "head_slowing": 0.1, "care_ticks": 600, "clean": 0.9 }
   }
 }

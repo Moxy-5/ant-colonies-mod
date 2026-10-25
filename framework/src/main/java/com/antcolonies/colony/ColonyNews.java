@@ -186,6 +186,15 @@ public final class ColonyNews {
 
     public static final Kind<ColonyEnded> COLONY_ENDED = Kind.of("colony_ended");
 
+    /**
+     * M8 step 2c: leftovers to go out on the colony's heap: {@code pieces} of them at {@code where} (a dead termite
+     * soldier's head bitten off a nestmate's leg in the nest), heard by a species' store of leftovers (the prey pile).
+     */
+    public record ScrapsLeft(BlockPos where, int pieces) {
+    }
+
+    public static final Kind<ScrapsLeft> SCRAPS_LEFT = Kind.of("scraps_left");
+
     public static final Kind<SetOut> SET_OUT = Kind.of("set_out");
     public static final Kind<SearchStarted> SEARCH_STARTED = Kind.of("search_started");
     public static final Kind<SearchOver> SEARCH_OVER = Kind.of("search_over");

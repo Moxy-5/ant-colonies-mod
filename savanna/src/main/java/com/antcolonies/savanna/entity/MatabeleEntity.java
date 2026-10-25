@@ -8,6 +8,7 @@ import com.antcolonies.entity.ColonyBorn;
 import com.antcolonies.entity.WorkerHunger;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.entity.goal.CarryEggGoal;
+import com.antcolonies.entity.goal.ClampCareGoal;
 import com.antcolonies.entity.goal.DigGoal;
 import com.antcolonies.entity.goal.EatGoal;
 import com.antcolonies.entity.goal.FightGoal;
@@ -142,6 +143,12 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
                 .add(Attributes.ATTACK_DAMAGE, 1.5);
     }
 
+    /** Majors and minors have the clamped walks and the twist (M8 step 2c). */
+    @Override
+    protected boolean hasClampClips() {
+        return true;
+    }
+
     @Override
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));
@@ -154,6 +161,7 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         this.goalSelector.addGoal(2, new FeedLarvaGoal(this));
         this.goalSelector.addGoal(2, new CarryEggGoal(this));
         this.goalSelector.addGoal(2, new CarryRemainsGoal(this));
+        this.goalSelector.addGoal(2, new ClampCareGoal(this)); // M8 2c: termites off nestmates' legs in the nest
         this.goalSelector.addGoal(3, new DigGoal(this, () -> true));
         this.goalSelector.addGoal(4, new GoInsideGoal(this));
         this.goalSelector.addGoal(5, new WaitAtNestGoal(this));

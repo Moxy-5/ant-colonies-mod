@@ -22,6 +22,7 @@ public class ClientEvents {
         event.registerLayerDefinition(AntLarvaRenderer.LAYER, AntLarvaRenderer::createLayer);
         event.registerLayerDefinition(AntCorpseRenderer.LAYER, AntCorpseRenderer::createLayer);
         event.registerLayerDefinition(LostLegRenderer.LAYER, LostLegRenderer::createLayer);
+        event.registerLayerDefinition(ClampedHeadLayer.LAYER, ClampedHeadLayer::createLayer);
     }
 
     @SubscribeEvent

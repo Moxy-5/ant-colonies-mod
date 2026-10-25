@@ -192,6 +192,11 @@ public class PreyPile implements NurseFood {
 
     // --- the carriers ----------------------------------------------------------------------------------------------
 
+    /** Leftovers brought in from elsewhere (a termite head bitten off a nestmate's leg, M8 step 2c) join the scraps. */
+    public void scrapsLeft(int pieces) {
+        scraps += Math.max(0, pieces);
+    }
+
     /** Loads waiting to be carried out: each rotten layer, and every {@link #SCRAPS_PER_LOAD} pieces' leftovers. */
     public int loadsWaiting() {
         return rotten + scraps / SCRAPS_PER_LOAD;
