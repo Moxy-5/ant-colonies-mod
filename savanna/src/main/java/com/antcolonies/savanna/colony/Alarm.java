@@ -16,6 +16,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.entity.AbstractAntEntity;
+import com.antcolonies.fight.Fights;
 import com.antcolonies.savanna.entity.TermiteSoldierEntity;
 import com.antcolonies.savanna.entity.TermiteSoldierEntity.Rank;
 import com.antcolonies.species.SpeciesProfile;
@@ -28,7 +29,6 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.animal.Chicken;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
@@ -346,20 +346,13 @@ public class Alarm {
         testArea = area;
     }
 
-    /** An enemy of the colony: a chicken (they eat termites), or an ant or termite of another colony. */
+    /**
+     * An enemy of the colony, by the shared fight rules ({@link Fights#isFoe}, M8 step 2a): an animal of the species
+     * file's {@code fight.foe_types} (chickens eat termites), an insect of a species it lists (the Matabele), or an ant
+     * or termite of another colony.
+     */
     public boolean isEnemy(Entity entity) {
-        if (!(entity instanceof LivingEntity living) || !living.isAlive()) {
-            return false;
-        }
-        if (entity instanceof Chicken) {
-            return true;
-        }
-        return entity instanceof AbstractAntEntity ant && ant.getColonyId() != null && !colony.getId().equals(ant.getColonyId());
-    }
-
-    /** Whether a soldier may bite this (for now only chickens; fighting players and ants comes with M8). */
-    public static boolean mayBite(Entity entity) {
-        return entity instanceof Chicken && entity.isAlive();
+        return Fights.isFoe(colony.profile(), colony.getSpecies(), colony.getId(), entity);
     }
 
     // --- the drumming spreading ---------------------------------------------------------------------------------

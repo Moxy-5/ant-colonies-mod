@@ -10,20 +10,32 @@ import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.entity.goal.CarryEggGoal;
 import com.antcolonies.entity.goal.DigGoal;
 import com.antcolonies.entity.goal.EatGoal;
+import com.antcolonies.entity.goal.FightGoal;
 import com.antcolonies.entity.goal.FeedLarvaGoal;
 import com.antcolonies.entity.goal.FeedQueenGoal;
 import com.antcolonies.entity.goal.GoInsideGoal;
 import com.antcolonies.entity.goal.WaitAtNestGoal;
 import com.antcolonies.savanna.SavannaSpecies;
 import com.antcolonies.savanna.entity.goal.CarryRemainsGoal;
+import com.antcolonies.savanna.registry.SavannaBlocks;
 import com.antcolonies.savanna.registry.SavannaEntities;
+import com.antcolonies.savanna.registry.SavannaTags;
 import com.antcolonies.savanna.species.SavannaNumbers;
 import com.antcolonies.species.SpeciesProfile;
 import com.antcolonies.species.SpeciesProfiles;
 
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.Vec3;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
@@ -58,7 +70,19 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
     private static final double JOIN_RADIUS = 32.0;
     private static final String LENGTH_TAG = "BodyLength";
 
+    /** A foe this far below it (blocks) is stabbed down into. */
+    private static final double BELOW = 0.4;
+    private static final Attack GRAB_AND_STING = new Attack("attack_a", 24);
+    private static final Attack STAB_DOWN = new Attack("attack_b", 17);
+    /** How near (blocks, to the block's middle) it must be to bite a cover open, and how many bites it takes. */
+    private static final double BITE_REACH = 1.8;
+    private static final int BITES_TO_OPEN = 3;
+
     private boolean colonyChecked;
+    /** The cover it is biting open, and how many bites it has given it (not saved). */
+    @Nullable
+    private BlockPos breaking;
+    private int bites;
     /** Its length in mm (0 until rolled, on its first tick). */
     private float lengthMm;
     @Nullable
@@ -92,7 +116,8 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
     }
 
     /**
-     * A major: big and strong (health and bite my picks, to be set with the fights, M8 step 2). Majors and minors march
+     * A major: big and strong (the health and damage it really has come from the species file's {@code fight} numbers,
+     * M8 step 2a; these are only the game's starting values). Majors and minors march
      * at one speed, about 2.5 blocks a second (the user's pick, 2026-10-24, lowered from 3 with the smaller majors; attribute 0.2275), the speed their walks are fitted to ({@code tools/anim_lab.py WALK_SPEED}).
      */
     public static AttributeSupplier.Builder createMajorAttributes() {
@@ -113,6 +138,8 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
     @Override
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));
+        // M8 step 2b: sent to fight (the skirmish command; the raids later), or hurt by a termite, it fights.
+        this.goalSelector.addGoal(0, new FightGoal(this));
         // Step 1e: they eat from the prey pile, feed the queen and the larvae from it, carry eggs and carry the waste out
         // (real Megaponera: any nestmate does any of it, no special nurses).
         this.goalSelector.addGoal(1, new EatGoal(this, hunger()));
@@ -264,6 +291,86 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
     @Override
     public String nestCaste() {
         return CASTE;
+    }
+
+    /** Its body in the species file's fight numbers: the major's or the minor's (M8 step 2a). */
+    @Override
+    public String fightBody() {
+        return hasMajorBody() ? "major" : "minor";
+    }
+
+    /**
+     * How it attacks (M8 step 2b, the user's pick, 2026-10-23): a termite in front is grabbed in the jaws and stung under
+     * the body (attack_a); one below it, down in a broken tunnel, is bitten and stabbed down into (attack_b).
+     */
+    @Override
+    protected Attack attackFor(LivingEntity foe) {
+        return foe.getY() < getY() - BELOW ? STAB_DOWN : GRAB_AND_STING;
+    }
+
+    /**
+     * A termite it cannot reach, under mud or in a gallery just under the ground (M8 step 2b): a major bites the cover
+     * open (real Megaponera: the big workers break the termites' mud open, the small ones go in and sting). The cover is
+     * the termites' mud over or beside the termite (sheeting, a cast), or the one block of soil over its gallery when
+     * the sky is right above that; never the mound. It walks up to the cover, bites at it {@link #BITES_TO_OPEN} times
+     * and the block falls away. A minor leaves it.
+     */
+    @Override
+    public boolean openWayTo(ServerLevel level, LivingEntity foe) {
+        if (!hasMajorBody()) {
+            return false;
+        }
+        BlockPos cover = coverOver(level, foe.blockPosition());
+        if (cover == null) {
+            breaking = null;
+            return false;
+        }
+        if (distanceToSqr(Vec3.atCenterOf(cover)) > BITE_REACH * BITE_REACH) {
+            breaking = null;
+            List<BlockPos> stands = new ArrayList<>();
+            stands.add(cover.above());
+            for (Direction side : Direction.Plane.HORIZONTAL) {
+                BlockPos beside = cover.relative(side);
+                if (!beside.equals(foe.blockPosition()) && level.getBlockState(beside).getCollisionShape(level, beside).isEmpty()) {
+                    stands.add(beside);
+                }
+            }
+            return getNavigator().moveTo(stands, 1.2);
+        }
+        getNavigator().stop();
+        getLookControl().setLookAt(Vec3.atCenterOf(cover));
+        if (!cover.equals(breaking)) {
+            breaking = cover;
+            bites = 0;
+        }
+        playAttack(STAB_DOWN);
+        playSound(SoundEvents.ROOTED_DIRT_BREAK, 0.6F, 1.4F);
+        if (++bites >= BITES_TO_OPEN) {
+            level.destroyBlock(cover, false, this);
+            breaking = null;
+        }
+        return true;
+    }
+
+    /** What covers this termite's cell that a major may bite open, nearest the sky first; null for nothing it may open. */
+    @Nullable
+    private static BlockPos coverOver(ServerLevel level, BlockPos cell) {
+        BlockPos above = cell.above();
+        BlockState roof = level.getBlockState(above);
+        if (roof.is(SavannaTags.MATABELE_BREAKS_OPEN) && (isMud(roof) || level.canSeeSky(above.above()))) {
+            return above;
+        }
+        for (Direction side : Direction.Plane.HORIZONTAL) {
+            BlockPos beside = cell.relative(side);
+            if (isMud(level.getBlockState(beside))) {
+                return beside;
+            }
+        }
+        return null;
+    }
+
+    private static boolean isMud(BlockState state) {
+        return state.is(SavannaBlocks.MUD_CRUST.get()) || state.is(SavannaBlocks.MUD_CAST.get());
     }
 
     @Override

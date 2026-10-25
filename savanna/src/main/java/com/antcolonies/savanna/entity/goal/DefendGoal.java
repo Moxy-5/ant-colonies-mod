@@ -6,6 +6,7 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.savanna.colony.Alarm;
 import com.antcolonies.colony.Colony;
+import com.antcolonies.fight.Fights;
 import com.antcolonies.savanna.colony.SavannaParts;
 import com.antcolonies.savanna.entity.TermiteSoldierEntity;
 
@@ -110,7 +111,7 @@ public class DefendGoal extends Goal {
             soldier.getNavigator().stop();
             walkingTo = null;
             face(enemy.getX(), enemy.getZ());
-            if (biteCooldown <= 0 && Alarm.mayBite(enemy)) {
+            if (biteCooldown <= 0 && Fights.mayAttack(soldier.profile(), enemy)) {
                 soldier.bite(enemy);
                 biteCooldown = BITE_INTERVAL;
             }

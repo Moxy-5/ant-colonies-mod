@@ -24,6 +24,8 @@ import com.antcolonies.entity.body.Spine;
 import com.antcolonies.entity.load.CarriedLoad;
 import com.antcolonies.entity.load.FrameworkLoads;
 import com.antcolonies.entity.load.LoadKind;
+import com.antcolonies.fight.FightNumbers;
+import com.antcolonies.fight.Fights;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.entity.goal.GroomGoal;
 import com.antcolonies.entity.goal.NapGoal;
@@ -43,6 +45,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -50,6 +53,8 @@ import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.FloatGoal;
 import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.entity.player.Player;
@@ -182,6 +187,13 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     private static final int IN_CHANNEL = 4;
     private static final int ASLEEP = 8;
     private static final int ON_HOT_GROUND = 16;
+    private static final int PARALYSED = 32;
+    /**
+     * The attack clip it is playing (M8 step 2b, the Matabele's grab and sting or bite and stab down; empty for none),
+     * chosen by {@link #attackFor}. Synced so the client plays it.
+     */
+    private static final EntityDataAccessor<String> DATA_STRIKE =
+            SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.STRING);
 
     /**
      * What it holds (a soil pellet, a seed, bread, forage, a nodule in the jaws or the crop, an egg, a dead nestmate, or
@@ -251,6 +263,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         builder.define(DATA_ACTIVITY, ACTIVITY_NONE);
         builder.define(DATA_YOUTH, (byte) 0);
         builder.define(DATA_LOAD, CarriedLoad.NONE);
+        builder.define(DATA_STRIKE, "");
     }
 
     /** What it holds ({@link CarriedLoad#NONE}: nothing). */
@@ -683,6 +696,169 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return colony != null ? colony.profile() : SpeciesProfiles.get(species());
     }
 
+    // --- fighting (M8 step 2, the shared fight system: com.antcolonies.fight) --------------------------------------
+
+    /** {@link #paralysedAt} while it is not paralysed. */
+    private static final long NOT_PARALYSED = Long.MIN_VALUE;
+    /** How many hunter's stings it has taken (saved): it falls paralysed at its body's {@code stings_to_fall}. */
+    private int stingsTaken;
+    /** When it fell paralysed (game time; saved), or {@link #NOT_PARALYSED}. */
+    private long paralysedAt = NOT_PARALYSED;
+    /** Whether its body's health and damage from the species file are set (on its first server tick). */
+    private boolean fightNumbersSet;
+    /** Whether it came from a save (it keeps the health it had; a new one starts at full health). */
+    private boolean loadedFromSave;
+    /** Ticks the attack clip still plays (server). */
+    private int strikeTicks;
+    /** Where it was sent to fight (the skirmish command; step 4's raids later), and until when; not saved. */
+    @Nullable
+    private BlockPos fightSpot;
+    private long fightUntil;
+
+    /** One way of attacking: the clip it plays and for how many ticks. */
+    public record Attack(String clip, int ticks) {
+    }
+
+    /**
+     * The name of its body in its species file's {@code fight.bodies} ({@link FightNumbers}): its nest caste unless a
+     * species says otherwise (the termite king and queen, the Matabele's major and minor), null for none.
+     */
+    @Nullable
+    public String fightBody() {
+        return nestCaste();
+    }
+
+    /** Its body's fight numbers from its species file, if any. */
+    public java.util.Optional<FightNumbers.Body> fightNumbers() {
+        String body = fightBody();
+        return body == null ? java.util.Optional.empty() : FightNumbers.of(profile()).flatMap(numbers -> numbers.body(body));
+    }
+
+    /** Once, on its first server tick: its health and damage from its species file (a new one at full health). */
+    private void setFightNumbers() {
+        fightNumbersSet = true;
+        fightNumbers().ifPresent(body -> {
+            AttributeInstance health = getAttribute(Attributes.MAX_HEALTH);
+            AttributeInstance damage = getAttribute(Attributes.ATTACK_DAMAGE);
+            if (health != null) {
+                health.setBaseValue(body.health());
+            }
+            if (damage != null) {
+                damage.setBaseValue(body.damage());
+            }
+            if (!loadedFromSave || getHealth() > getMaxHealth()) {
+                setHealth(getMaxHealth());
+            }
+        });
+    }
+
+    /** Each server tick: the fight numbers once, the attack clip running out, and a paralysed insect dying in time. */
+    private void tickFight() {
+        if (!fightNumbersSet) {
+            setFightNumbers();
+        }
+        if (strikeTicks > 0 && --strikeTicks == 0) {
+            entityData.set(DATA_STRIKE, "");
+        }
+        if (paralysedAt != NOT_PARALYSED && tickCount % 20 == 0 && isAlive()) {
+            int lasts = FightNumbers.of(profile()).map(FightNumbers::paralysedTicks).orElse(FightNumbers.DEFAULT_PARALYSED_TICKS);
+            if (level().getGameTime() - paralysedAt >= lasts) {
+                kill(); // nobody took it: it dies where it lies
+            }
+        }
+    }
+
+    /** Whether it lies paralysed by a hunter's sting (synced: true on the client too). */
+    public boolean isParalysed() {
+        return level().isClientSide ? (entityData.get(DATA_POSE_FLAGS) & PARALYSED) != 0 : paralysedAt != NOT_PARALYSED;
+    }
+
+    /**
+     * A hunter's sting (see {@link Fights#strike}): one dose of venom; with its body's {@code stings_to_fall} doses (1 if
+     * the file names none) it falls paralysed: it drops what it holds, lets go of any wall and lies still, twitching,
+     * until it is taken or dies ({@code fight.paralysed_ticks}).
+     */
+    public void takeSting() {
+        if (paralysedAt != NOT_PARALYSED) {
+            return;
+        }
+        stingsTaken++;
+        if (stingsTaken >= fightNumbers().map(FightNumbers.Body::stingsToFall).orElse(1)) {
+            paralysedAt = level().getGameTime();
+            navigator.stop();
+            setLoad(CarriedLoad.NONE);
+            asleep = false;
+            setDeltaMovement(Vec3.ZERO);
+        }
+    }
+
+    /** Tests: falls paralysed at once. */
+    public void paralyseForTests() {
+        stingsTaken = Integer.MAX_VALUE - 1;
+        takeSting();
+    }
+
+    // A paralysed insect thinks and walks no more (its goals and its legs stop; it still falls).
+    @Override
+    protected boolean isImmobile() {
+        return super.isImmobile() || isParalysed();
+    }
+
+    /** How it attacks this foe (its clip), or null if it has no attack clip of its own. */
+    @Nullable
+    protected Attack attackFor(LivingEntity foe) {
+        return null;
+    }
+
+    /** One blow at the foe by the shared rules ({@link Fights#strike}), playing its attack clip. True if it hit. */
+    public boolean strike(LivingEntity foe) {
+        Attack attack = attackFor(foe);
+        if (attack != null) {
+            playAttack(attack);
+        }
+        swing(net.minecraft.world.InteractionHand.MAIN_HAND);
+        return Fights.strike(this, foe);
+    }
+
+    /** Plays an attack clip (a blow, or biting mud open) without hitting anything. */
+    protected void playAttack(Attack attack) {
+        strikeTicks = attack.ticks();
+        entityData.set(DATA_STRIKE, attack.clip());
+    }
+
+    /** Whether its attack clip is still playing. */
+    public boolean isStriking() {
+        return !entityData.get(DATA_STRIKE).isEmpty();
+    }
+
+    /**
+     * When it cannot reach the foe (it is under mud, in a closed gallery), it may open the way to it (a Matabele major
+     * bites the mud open, M8 step 2b). True if it did something about it this tick. None by default.
+     */
+    public boolean openWayTo(ServerLevel level, LivingEntity foe) {
+        return false;
+    }
+
+    /** Sends it to fight round this spot until then (game time; the skirmish command, M8 step 2b). */
+    public void orderToFight(BlockPos spot, long until) {
+        fightSpot = spot.immutable();
+        fightUntil = until;
+    }
+
+    /** Where it was sent to fight, if the order still holds (server). */
+    @Nullable
+    public BlockPos getFightSpot() {
+        if (fightSpot != null && level().getGameTime() >= fightUntil) {
+            fightSpot = null;
+        }
+        return fightSpot;
+    }
+
+    /** Ends its fight order (nothing left to fight). */
+    public void endFightOrder() {
+        fightSpot = null;
+    }
+
     /** Server: whether it is having a nap (set by {@code NapGoal}; not saved: after a reload the nap is over). */
     private boolean asleep;
     /** Server: whether it stands on hot ground (see {@link #checkHeat}). */
@@ -1040,7 +1216,9 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             entityData.set(DATA_SURFACE, (byte) (navigator.getSurface().get3DDataValue() | navigator.getCeilingRef().get3DDataValue() << 3));
             entityData.set(DATA_HEADING, navigator.getHeading());
             entityData.set(DATA_POSE_FLAGS, (byte) ((navigator.isPeeking() ? PEEKING : 0) | (navigator.isTurningSlowly() ? TURNING_SLOWLY : 0)
-                    | (navigator.isInChannel() ? IN_CHANNEL : 0) | (asleep ? ASLEEP : 0) | (onHotGround ? ON_HOT_GROUND : 0)));
+                    | (navigator.isInChannel() ? IN_CHANNEL : 0) | (asleep ? ASLEEP : 0) | (onHotGround ? ON_HOT_GROUND : 0)
+                    | (paralysedAt != NOT_PARALYSED ? PARALYSED : 0)));
+            tickFight();
         } else {
             turnBody();
             tiltOnSlope();
@@ -1480,6 +1658,12 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             load.kind().write(tag, load, registryAccess());
         }
         tag.putBoolean("SeedForBread", seedForBread);
+        if (stingsTaken > 0) {
+            tag.putInt("StingsTaken", stingsTaken);
+        }
+        if (paralysedAt != NOT_PARALYSED) {
+            tag.putLong("ParalysedAt", paralysedAt);
+        }
         if (!Float.isNaN(boldness)) {
             tag.putFloat("Boldness", boldness);
             tag.putFloat("Curiosity", curiosity);
@@ -1504,6 +1688,9 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         grownUpAt = tag.contains("GrownUpAt") ? tag.getLong("GrownUpAt") : AGE_NOT_SET;
         entityData.set(DATA_LOAD, LoadKind.readFrom(tag, registryAccess()));
         seedForBread = tag.getBoolean("SeedForBread");
+        stingsTaken = tag.getInt("StingsTaken");
+        paralysedAt = tag.contains("ParalysedAt") ? tag.getLong("ParalysedAt") : NOT_PARALYSED;
+        loadedFromSave = true;
         if (tag.contains("Boldness")) {
             boldness = tag.getFloat("Boldness");
             curiosity = tag.getFloat("Curiosity");
@@ -1543,6 +1730,11 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         controllers.add(new AntAnimationController<>(this, HEAD_PLAYER, 3, this::animateHead, AntAnimationController.HEAD_BONES));
         controllers.add(new AntAnimationController<>(this, EXTRA_PLAYER, 3, state -> PlayState.STOP, AntAnimationController.ALL_BONES));
     }
+
+    /** Lying paralysed by a hunter's sting (M8 step 2b): the clip of every insect that can be stung so. */
+    private static final RawAnimation PARALYSED_CLIP = RawAnimation.begin().thenLoop("paralysed");
+    /** The attack clips, by name (made once each). */
+    private static final Map<String, RawAnimation> STRIKE_CLIPS = new HashMap<>();
 
     /** Clips asked for by the in-game camera, by name (made once each). */
     private static final Map<String, RawAnimation> FILM_CLIPS = new HashMap<>();
@@ -1591,6 +1783,13 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         RawAnimation film = filmClip();
         if (film != null) {
             return film;
+        }
+        if (isParalysed()) {
+            return PARALYSED_CLIP;
+        }
+        String strike = entityData.get(DATA_STRIKE);
+        if (!strike.isEmpty()) {
+            return STRIKE_CLIPS.computeIfAbsent(strike, c -> RawAnimation.begin().thenPlay(c));
         }
         RawAnimation special = specialAnimation();
         if (special != null) {

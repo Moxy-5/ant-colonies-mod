@@ -40,8 +40,8 @@ public final class SavannaTests {
         // Termite food: foraging and its holes, the garden, new holes, dead wood, runways, bare patches, mushrooms.
         TestFilter.addCategory("termitefood", TermiteFoodTests.class, TermiteForagingTests.class, TermiteNewHoleTests.class,
                 TermiteRunwayTests.class, TermiteBarePatchTests.class, TermitomycesTests.class);
-        // Soldiers and the alarm.
-        TestFilter.addCategory("soldiers", TermiteSoldierTests.class, TermiteAlarmTests.class);
+        // Soldiers and the alarm; the fights (M8 step 2).
+        TestFilter.addCategory("soldiers", TermiteSoldierTests.class, TermiteAlarmTests.class, MatabeleFightTests.class);
         // The colony: founding, jobs by age, the virtual population, neighbours.
         TestFilter.addCategory("colony", TermiteTests.class, TermiteJobsByAgeTests.class, TermitePopulationTests.class,
                 TermiteNeighbourTests.class, MatabeleColonyTests.class, MatabeleNestTests.class, MatabeleFoodTests.class,

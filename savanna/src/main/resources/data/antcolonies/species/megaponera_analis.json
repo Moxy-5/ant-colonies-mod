@@ -65,5 +65,14 @@
   "body_language": {
     "_note": "Personality ranges all open (as before 1c, when the ant read the termites' numbers); no naps, hot ground or noticing yet.",
     "traits": { "boldness": [0.0, 1.0], "curiosity": [0.0, 1.0], "restlessness": [0.0, 1.0], "older_bolder": 0.3 }
+  },
+  "fight": {
+    "_note": "M8 step 2a, the shared fight system (fight.FightNumbers). Health and damage per body, my picks, to confirm in the user's first fight test (the numbers the bodies had in code before): a major 10 health (two to four soldier bites; real majors seldom die in a raid, minors more often), a minor 5, the queen 20. Damage only counts on what it does not hunt (a chicken; the player comes in step 2e): on termites, its prey, every blow is a paralysing sting that pricks for half a point and never kills (fight.Fights). prey: Macrotermes, the termites it lives on.",
+    "bodies": {
+      "major": { "health": 10.0, "damage": 3.0 },
+      "minor": { "health": 5.0, "damage": 1.5 },
+      "queen": { "health": 20.0, "damage": 3.0 }
+    },
+    "prey": ["antcolonies:macrotermes"]
   }
 }

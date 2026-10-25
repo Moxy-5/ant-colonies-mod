@@ -34,6 +34,8 @@ public class ColonyFrameworkMod {
         // The one synced slot for what an insect carries, and the framework's rows of the load list (Apex part 3, T3).
         ModDataSerializers.SERIALIZERS.register(modEventBus);
         FrameworkLoads.signUp();
+        // The fight numbers of the species files (M8 step 2a), signed up before they load.
+        com.antcolonies.fight.FightNumbers.signUp();
         // Only some game tests when ANTCOLONIES_TESTS is set (quick checks while working).
         NeoForge.EVENT_BUS.addListener((ServerAboutToStartEvent event) -> TestFilter.apply(event.getServer()));
         // Species profiles (data/<namespace>/species/*.json), loaded with the world's data and on /reload.

@@ -5,12 +5,15 @@ import org.jetbrains.annotations.Nullable;
 import com.antcolonies.colony.Caste;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.savanna.SavannaMod;
+import com.antcolonies.savanna.SavannaSpecies;
 import com.antcolonies.savanna.colony.MatabeleColonies;
 import com.antcolonies.savanna.colony.MatabeleNest;
 import com.antcolonies.savanna.colony.PreyPile;
 import com.antcolonies.savanna.colony.SavannaParts;
 import com.antcolonies.savanna.entity.MatabeleEntity;
+import com.antcolonies.savanna.registry.SavannaBlocks;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 
 import net.minecraft.commands.CommandSourceStack;
@@ -18,6 +21,9 @@ import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -34,6 +40,12 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  *
  * <p>Step 1e: {@code /antcolonies prey <layers>} lays that many bunches of fresh paralysed termites (about 10 a layer)
  * on the prey pile of the nearest Matabele colony within 64 blocks, standing in for a raid until the raids exist (M8 step 4).
+ *
+ * <p>Step 2b: {@code /antcolonies skirmish <ants>} drops that many Matabele workers (majors and minors by the real size
+ * spread) a few blocks from the nearest termite feeding spot within {@value #SKIRMISH_LOOK} blocks (the termites' mud
+ * over the wood they eat, else the nearest termite out), and sends them in to fight there for
+ * {@value #SKIRMISH_MINUTES} minutes: majors bite the mud open, everyone stings the termites, the soldiers fight back.
+ * Standing in for a raid column until step 4. They join the nearest Matabele colony within 32 blocks, if there is one.
  */
 @EventBusSubscriber(modid = SavannaMod.MODID)
 public class MatabeleCommands {
@@ -44,9 +56,86 @@ public class MatabeleCommands {
                 .then(Commands.literal("matabele")
                         .then(Commands.argument("workers", IntegerArgumentType.integer(0, 2500))
                                 .executes(context -> colony(context.getSource(), IntegerArgumentType.getInteger(context, "workers")))))
+                .then(Commands.literal("skirmish")
+                        .then(Commands.argument("ants", IntegerArgumentType.integer(1, 60))
+                                .executes(context -> skirmish(context.getSource(), IntegerArgumentType.getInteger(context, "ants")))))
                 .then(Commands.literal("prey")
                         .then(Commands.argument("layers", IntegerArgumentType.integer(1, 64))
                                 .executes(context -> prey(context.getSource(), IntegerArgumentType.getInteger(context, "layers"))))));
+    }
+
+    /** How far (blocks) the skirmish looks for a termite feeding spot, and how long (minutes) the ants fight there. */
+    private static final int SKIRMISH_LOOK = 32;
+    private static final int SKIRMISH_MINUTES = 5;
+
+    /** Matabele ants dropped near the nearest termite feeding spot, sent to fight there. */
+    private static int skirmish(CommandSourceStack source, int ants) {
+        ServerLevel level = source.getLevel();
+        BlockPos at = BlockPos.containing(source.getPosition());
+        BlockPos spot = feedingSpot(level, at);
+        if (spot == null) {
+            source.sendFailure(Component.literal("No termites feeding within " + SKIRMISH_LOOK
+                    + " blocks (no termite mud over wood, no termite out)."));
+            return 0;
+        }
+        // A few blocks off, on the surface, so they walk in (the way a raid column arrives).
+        RandomSource random = level.getRandom();
+        BlockPos drop = spot;
+        for (int tries = 0; tries < 12; tries++) {
+            double angle = random.nextDouble() * Math.PI * 2.0;
+            BlockPos column = spot.offset((int) Math.round(Math.cos(angle) * 4.0), 0, (int) Math.round(Math.sin(angle) * 4.0));
+            BlockPos top = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, column);
+            if (Math.abs(top.getY() - spot.getY()) <= 3 && !level.getBlockState(top.below()).getFluidState().isSource()) {
+                drop = top;
+                break;
+            }
+        }
+        long until = level.getGameTime() + SKIRMISH_MINUTES * 1200L;
+        int made = 0;
+        for (int i = 0; i < ants; i++) {
+            MatabeleEntity ant = MatabeleEntity.pickBody(random).create(level);
+            if (ant == null) {
+                continue;
+            }
+            ant.moveTo(drop.getX() + 0.2 + random.nextDouble() * 0.6, drop.getY(), drop.getZ() + 0.2 + random.nextDouble() * 0.6,
+                    random.nextFloat() * 360.0F, 0.0F);
+            ant.orderToFight(spot, until);
+            level.addFreshEntity(ant);
+            made++;
+        }
+        int count = made;
+        BlockPos from = drop;
+        source.sendSuccess(() -> Component.literal(count + " Matabele ants at " + from.toShortString()
+                + ", sent to fight round the termites at " + spot.toShortString() + " for " + SKIRMISH_MINUTES + " minutes."), false);
+        return count;
+    }
+
+    /**
+     * The nearest termite feeding spot to {@code at}: the nearest termite mud on the surface (sheeting, a cast, mud over
+     * wood: where termites eat by day under cover), else the nearest Macrotermes insect out of its mound; null for none.
+     */
+    @Nullable
+    private static BlockPos feedingSpot(ServerLevel level, BlockPos at) {
+        BlockPos best = null;
+        double bestDist = Double.MAX_VALUE;
+        for (BlockPos pos : BlockPos.betweenClosed(at.offset(-SKIRMISH_LOOK, -8, -SKIRMISH_LOOK), at.offset(SKIRMISH_LOOK, 8, SKIRMISH_LOOK))) {
+            BlockState state = level.getBlockState(pos);
+            if (!state.is(SavannaBlocks.MUD_CRUST.get()) && !state.is(SavannaBlocks.MUD_CAST.get())) {
+                continue;
+            }
+            double dist = pos.distSqr(at);
+            if (dist < bestDist) {
+                bestDist = dist;
+                best = pos.immutable();
+            }
+        }
+        if (best != null) {
+            return best;
+        }
+        return level.getEntitiesOfClass(AbstractAntEntity.class, new AABB(at).inflate(SKIRMISH_LOOK),
+                        ant -> SavannaSpecies.MACROTERMES.equals(ant.species()) && ant.isAlive() && !ant.isParalysed())
+                .stream().min(java.util.Comparator.comparingDouble(ant -> ant.distanceToSqr(Vec3.atCenterOf(at))))
+                .map(ant -> ant.blockPosition()).orElse(null);
     }
 
     /** Fresh termites onto the nearest Matabele colony's prey pile, as a raid would bring them. */

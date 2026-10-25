@@ -27,4 +27,11 @@ public class SavannaTags {
      */
     public static final TagKey<Block> MATABELE_NEST_LOGS = TagKey.create(Registries.BLOCK,
             ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "matabele_nest_logs"));
+
+    /**
+     * What a Matabele major bites open to reach termites (M8 step 2b; data/antcolonies/tags/block/matabele_breaks_open.json):
+     * the termites' mud (sheeting, casts) and thin soil over a gallery, never the mound.
+     */
+    public static final TagKey<Block> MATABELE_BREAKS_OPEN = TagKey.create(Registries.BLOCK,
+            ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "matabele_breaks_open"));
 }

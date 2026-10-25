@@ -21,7 +21,7 @@ fights") and what each clip takes from it:
             slowly breathing.
   attack    Majors bite (they break the termites' mud and crush), minors sting (the sting paralyses); either can do
             both. A ponerine stings by curling its gaster forward under its body, the sting reaching ahead between
-            its legs to the prey in its jaws. Two ways to pick from (see ATTACKS).
+            its legs to the prey in its jaws. Two, by where the termite is (see ATTACKS); the queen has none yet.
   death     The legs kick, give way and curl in under the body (a dead insect's legs fold as its muscles contract),
             the antennae and the gaster curl, and it tips onto its side. The clip does the whole fall itself, so in
             the game the renderer's own tip-over must be switched off for this ant (when it goes in).
@@ -192,28 +192,38 @@ def curve(frames, t):
     return list(frames[-1][1])
 
 
-def lowest_body(rig_, still_):
-    """The lowest point of the body without its legs and antennae in a still pose."""
+def lowest_body(rig_, still_, rim=None):
+    """The lowest point of the body without its legs and antennae in a still pose; with rim (z), only of the parts
+    behind it (ahead of the rim is a hole: a broken tunnel the head and the sting reach down into)."""
     m = rig_.model
     pose = mo.pose_of(still_)
     xf = m.transforms(pose)
     return min(p[1] for b, corners, _ in m.posed(pose, xf)
-               if m.leg_of(b) is None and not m.is_antenna(b) for p in corners)
+               if m.leg_of(b) is None and not m.is_antenna(b) for p in corners if rim is None or p[2] > rim)
 
 
-def posed_clip(name, seconds, body_at, feet_at=None, antennae_at=None, gap=0.2, loop=False, tol=0.005):
+def posed_clip(name, seconds, body_at, feet_at=None, antennae_at=None, gap=0.2, loop=False, tol=0.005, smooth=0.0,
+               rim=None):
     """A clip solved pose by pose: body_at(t) -> a still pose of the body (body_pos and role -> turn, no legs);
     feet_at(t) -> {leg: where its foot is} (default: planted where it stands); antennae_at(t, pose) -> the antennae's
     turns for the finished body pose. The body is lifted so nothing but legs and antennae comes nearer the floor than
-    gap. Returns the clip and the worst foot miss (units)."""
+    gap; smooth (seconds): the lift eased over about that long, so the body rises ahead of a part swinging down and
+    settles after it, never jerked up from one frame to the next; rim (z): a hole ahead of it, where parts may go down
+    below the floor. Returns the clip and the worst foot miss (units)."""
     r = rig(name)
     tr = mo.Track(r)
     n = max(2, round(seconds / FRAME))
     guess, worst = None, 0.0
+    needs = [r.ground + gap - lowest_body(r, body_at(seconds * i / n), rim) for i in range(n + 1)]
+    if smooth > 0:
+        w = max(1, round(smooth / FRAME))
+        peak = [max(needs[max(0, i - w):i + w + 1]) for i in range(n + 1)]
+        eased = [sum(peak[max(0, i - w):i + w + 1]) / len(peak[max(0, i - w):i + w + 1]) for i in range(n + 1)]
+        needs = [max(a, b) for a, b in zip(needs, eased)]
     for i in range(n + 1):
         t = seconds * i / n
         body = body_at(t)
-        need = r.ground + gap - lowest_body(r, body)
+        need = needs[i]
         if need > 0:
             x, y, z = body.get('body_pos', [0, 0, 0])
             body['body_pos'] = [x, y + need, z]
@@ -266,17 +276,31 @@ def idle(name=None):
     }
 
 
-# --- the attack, two ways to pick from ---------------------------------------------------------------------------
+# --- the attack, by where the termite is ---------------------------------------------------------------------------
 # A Matabele grabs a termite in its jaws and stings it: the sting paralyses (real; Frank's raids bring the termites home
-# alive and paralysed). Both ways draw back, lunge with the jaws flung wide and snap them shut on the prey, then sting.
-# The model's gaster is long for its legs (as the real one's: about a third of the body), so a ponerine stinging under
-# itself tips its rear up, tilting at the waist, and rises on its legs (the clip lifts it just enough that nothing but
-# the feet touches the floor):
-#   attack_a  stand tall and sting forward: the head pulls the prey down and back, the rear tips up 35 degrees and the
-#             gaster curls under as far as it goes (the sting under the hind legs' hips), two jabs, then back.
-#   attack_b  a quick bite and stab down: the rear tips up less (25 degrees), the gaster stabs down behind the hind legs
-#             twice, the ant staying low.
+# alive and paralysed). The sting itself slides out of the gaster's tip only about a millimetre; a ponerine reaches its
+# prey by bending, not by a long sting: the gaster swings forward and down under the body at its hinge behind the waist
+# node (the helcium, the bend's biggest share), the node tilts a little, and the gaster's own plates telescope round
+# the rest of the curl, so the sting comes forward between the legs to the prey held in the jaws under the head; the
+# ant rises on its legs and leans over the prey to make room, the head bowed (2026-10-25, the user's report: the old
+# curl stopped under the hind legs and never touched the termite).
+#   attack_a  grab and sting: the jaws open wide, the ant lunges and snaps them shut on the prey, its feelers drumming
+#             on it; it rises, bows its head and leans in as the gaster swings forward under it, the plates curling the
+#             sting in last (the thrust), held there while the gaster pumps the venom, then pulled out and the gaster
+#             swung back as the ant settles and lets go.
+#   attack_b  a termite below, in a broken tunnel: the ant steps up to the edge, front feet over it onto the hole's
+#             wall, dives nose down and bites into the hole, hauls the termite up to the rim (front feet back on top)
+#             and stings it as in attack_a, two quick stabs, then lets go and steps back. A stiff 1-block ant cannot
+#             reach far down, and a real Matabele does not sting down into a hole: it pulls the prey out first.
+# Each worker's sting pose (where the body, the head and the gaster are with the sting in) was found by a search over
+# the model: the gaster bent mostly at its hinge, nothing through anything, the feet planted, the sting's tip on a
+# termite held where the jaws closed. (lift, lean, rear up, forebody, head, the node, the hinge, the plates): my picks.
+STING_POSE = {'matabele_major': (1.1, -2.6, 1.0, -8.5, 49.4, 40.0, 79.3, 9.3),
+              'matabele_minor': (0.7, -2.5, -0.6, -7.9, 54.1, 39.8, 80.0, 16.1)}
 ATTACKS = ('attack_a', 'attack_b')
+CHANNELS = ('lift', 'lean', 'pitch', 'fb', 'head', 'node', 'hinge', 'plates')
+BITE = -10                  # the jaws shut on a termite (their tips crossing; -16 would shut them tip to tip)
+CURL_IN = 85                # the gaster's plates curled tight while it swings under (degrees)
 
 
 def tipped(pitch):
@@ -284,36 +308,139 @@ def tipped(pitch):
     return {'body': [pitch, 0, 0], 'forebody': [-pitch, 0, 0]}
 
 
-def attack(name, T, pos, fb, hd, jw, pitch, cu):
-    """An attack from its curves: body offset, forebody, head (turns), jaws (open by), rear tip, gaster curl."""
+def attack(name, T, keys, tap=None, plates=None, rim=None, feet=None):
+    """An attack from key frames, keys[channel] = [(time, value)]: the body raised and moved forward (lift, lean), the
+    rear tipped up, the forebody and the head bowed, the gaster's three bends (the node, the hinge, the plates) and the
+    jaws (open by); tap: (from, to) seconds the feelers drum on the prey; plates(t, at): the plates' bend worked out from
+    the other channels (at(channel, t)), in place of key frames; rim: a hole ahead of this z (posed_clip)."""
+    def at(c, t):
+        if c == 'plates' and plates:
+            return plates(t, at)
+        return curve([(k, [x]) for k, x in keys.get(c, [(0, 0)])], t)[0]
+
     def body(t):
-        pose = dict(tipped(curve(pitch, t)[0]), body_pos=curve(pos, t), head=curve(hd, t), **jaws(curve(jw, t)[0]),
-                    **gaster(curve(cu, t)[0], name))
-        pose['forebody'] = [pose['forebody'][0] + curve(fb, t)[0], 0, 0]
+        pose = dict(tipped(at('pitch', t)), body_pos=[0, at('lift', t), at('lean', t)], head=[at('head', t), 0, 0],
+                    petiole=[-at('node', t), 0, 0], gaster_front=[-at('hinge', t), 0, 0],
+                    gaster_back=[-at('plates', t), 0, 0], **jaws(at('jaws', t)))
+        pose['forebody'] = [pose['forebody'][0] + at('fb', t), 0, 0]
         return pose
-    return posed_clip(name, T, body)
+
+    def antennae(t, pose):
+        up = -0.45 * max(0.0, pose['head'][0] + pose['forebody'][0] + pose['body'][0])   # held up as the head bows,
+        a = 0.0                                                                          # so they never dig in
+        if tap and tap[0] <= t <= tap[1]:
+            fade = min(1.0, (t - tap[0]) / 0.06, (tap[1] - t) / 0.06)
+            a = 9 * fade * math.sin(2 * math.pi * 7 * (t - tap[0]))      # drumming on the prey, seven taps a second
+        return {'antenna_l_1': [up + a, 0, 0], 'antenna_r_1': [up - a, 0, 0]}
+    made, miss = posed_clip(name, T, body, feet_at=feet, antennae_at=antennae, smooth=0.08, rim=rim)
+    if rim is not None:
+        made['timeline'] = {'0': f'hole {rim:.3f}'}          # for the lab: past this z is a hole, not floor
+    return made, miss
 
 
 def attack_a(name):
     T = 1.2
-    return attack(name, T,
-                  pos=[(0, [0, 0, 0]), (0.15, [0, 0, 0.7]), (0.25, [0, 0, -1.2]), (0.45, [0, 0, -0.4]), (0.95, [0, 0, -0.4]), (T, [0, 0, 0])],
-                  fb=[(0, [0]), (0.15, [-8]), (0.25, [2]), (0.45, [4]), (0.95, [4]), (T, [0])],
-                  hd=[(0, [0, 0, 0]), (0.15, [-8, 0, 0]), (0.25, [4, 0, 0]), (0.45, [14, 0, 0]), (0.95, [14, 0, 0]), (T, [0, 0, 0])],
-                  jw=[(0, [0]), (0.15, [26]), (0.23, [26]), (0.27, [-14]), (1.0, [-14]), (T, [0])],
-                  pitch=[(0, [0]), (0.3, [0]), (0.5, [35]), (0.95, [35]), (T, [0])],
-                  cu=[(0, [0]), (0.3, [0]), (0.52, [72]), (0.6, [84]), (0.68, [72]), (0.76, [84]), (0.86, [72]), (T, [0])])
+    p = dict(zip(CHANNELS, STING_POSE[name]))
+
+    def to_sting(c, shares, times=(0.0, 0.12, 0.22, 0.42, 0.56, 0.86, 1.0, T)):
+        return [(t, p[c] * f) for t, f in zip(times, shares)]
+    # rest, drawn back, the lunge and bite, rising, the sting thrust in, held (the venom pumped), pulled out, let go
+    keys = {c: to_sting(c, [0, 0, 0.1, 0.75, 1.0, 1.0, 0.45, 0]) for c in ('lift', 'pitch', 'fb')}
+    keys.update(
+        node=to_sting('node', [0, 0, 0.1, 0.9, 1.0, 1.0, 0.4, 0]),           # the node tilts first,
+        hinge=to_sting('hinge', [0, 0, 0.05, 0.75, 1.0, 1.0, 0.45, 0]),      # then the gaster swings on its hinge,
+        lean=[(0, 0), (0.12, 0.6), (0.22, -1.2), (0.42, p['lean'] * 0.8), (0.56, p['lean']), (0.86, p['lean']),
+              (1.0, p['lean'] * 0.5), (T, 0)],
+        head=[(0, 0), (0.12, -10), (0.22, 10), (0.42, p['head'] * 0.8), (0.56, p['head']), (0.86, p['head']),
+              (1.0, p['head'] * 0.45), (T, 0)],
+        jaws=[(0, 0), (0.12, 26), (0.19, 26), (0.23, BITE), (1.0, BITE), (1.1, 4), (T, 0)],
+        # the venom pumped: the plates squeeze in and out a little while the sting is in
+        pump=[(0, 0), (0.56, 0), (0.64, 5), (0.71, 0), (0.78, 4), (0.86, 0), (T, 0)])
+
+    def plates(t, at):
+        # The plates curl the tip in tight while the gaster swings under (a long gaster held straight would dig into the
+        # ground halfway), most when it hangs straight down, and straighten it forward into the prey at the end of the
+        # swing (the thrust); the same on the way back.
+        g = min(1.0, max(0.0, (at('node', t) + at('hinge', t)) / (p['node'] + p['hinge'])))
+        return CURL_IN * math.sin(math.pi * g) ** 2 + p['plates'] * g ** 4 + at('pump', t)
+    return attack(name, T, keys, tap=(0.22, 0.9), plates=plates)
 
 
-def attack_b(name):
-    T = 0.85
-    return attack(name, T,
-                  pos=[(0, [0, 0, 0]), (0.1, [0, 0, 0.5]), (0.18, [0, 0, -1.0]), (0.65, [0, 0, -0.6]), (T, [0, 0, 0])],
-                  fb=[(0, [0]), (0.1, [-7]), (0.18, [2]), (0.65, [2]), (T, [0])],
-                  hd=[(0, [0, 0, 0]), (0.1, [-6, 0, 0]), (0.18, [6, 0, 0]), (0.65, [6, 0, 0]), (T, [0, 0, 0])],
-                  jw=[(0, [0]), (0.1, [26]), (0.16, [26]), (0.2, [-14]), (0.68, [-14]), (T, [0])],
-                  pitch=[(0, [0]), (0.2, [0]), (0.32, [25]), (0.65, [25]), (T, [0])],
-                  cu=[(0, [0]), (0.22, [0]), (0.34, [40]), (0.4, [52]), (0.46, [40]), (0.52, [52]), (0.6, [40]), (T, [0])])
+def attack_b(name, dive=None, reach=None, bow=None, hauled=6.0, edge=-0.4, down=3.0):
+    """A termite below, in a broken tunnel: the ant steps up to the edge, its front feet over it onto the hole's wall,
+    and dives nose down (the whole stiff body turned down by dive degrees, leaning out by reach units, the head bowed
+    by bow) to bite it; then hauls it up to the rim (hauled degrees still tipped) and stings it as in attack_a, two
+    quick stabs, no time to pump; then lets go and steps back."""
+    T = 1.0
+    p = dict(zip(CHANNELS, STING_POSE[name]))
+    d0, r0, b0 = DIVE[name]
+    dive, reach, bow = (d0 if dive is None else dive), (r0 if reach is None else reach), (b0 if bow is None else bow)
+    rim = min(f[2] for f in rig(name).model.foot_tips({}).values()) + edge   # the edge, just past its front feet
+    # rest, drawn back, the dive and bite, a tug, hauled up with the gaster swung under, the sting in, two stabs, out,
+    # let go
+    times = (0.0, 0.08, 0.2, 0.28, 0.45, 0.5, 0.74, 0.82, T)
+
+    def keyed(values):
+        return list(zip(times, values))
+
+    def to_sting(c, shares, extra=(0,) * 9):
+        return keyed([p[c] * f + e for f, e in zip(shares, extra)])
+    tip_down = (0, 0, dive, dive, hauled, hauled, hauled, hauled * 0.5, 0)
+    out = (0, 0, reach, reach, reach, reach, reach, reach * 0.6, 0)
+    swing = [0, 0, 0, 0, 0.9, 1, 1, 0.45, 0]
+    keys = {'lift': to_sting('lift', swing),
+            'pitch': to_sting('pitch', swing, tip_down),
+            'fb': to_sting('fb', swing, tip_down),
+            'node': to_sting('node', [0, 0, 0.1, 0.1, 0.95, 1, 1, 0.4, 0]),
+            'hinge': to_sting('hinge', [0, 0, 0, 0.05, 0.9, 1, 1, 0.45, 0]),
+            'lean': keyed([lv - o for lv, o in zip((0, 0.6, -1.2, -1.2, p['lean'] * 0.9, p['lean'], p['lean'],
+                                                    p['lean'] * 0.5, 0), out)]),
+            'head': keyed([0, -10, bow, bow, p['head'] * 0.9, p['head'], p['head'], p['head'] * 0.45, 0]),
+            'jaws': [(0, 0), (0.08, 26), (0.17, 26), (0.21, BITE), (0.84, BITE), (0.92, 4), (T, 0)],
+            'stab': [(0, 0), (0.5, 0), (0.55, -16), (0.6, 3), (0.65, -14), (0.7, 3), (0.74, 0), (T, 0)]}
+
+    def plates(t, at):
+        g = min(1.0, max(0.0, (at('node', t) + at('hinge', t)) / (p['node'] + p['hinge'])))
+        return CURL_IN * math.sin(math.pi * g) ** 2 + p['plates'] * g ** 4 + at('stab', t)
+    r = rig(name)
+
+    def feet(t):
+        # the step up to the edge as it dives, by tripods (L1 R2 L3, then R1 L2 R3), the front feet over the edge and
+        # down onto the hole's wall, back up onto its rim with the prey; and the same step back as it lets go
+        if t <= 0.04 or t >= 0.96:
+            return None
+        placed = {}
+        for k in r.legs:
+            first = k in ('l1', 'r2', 'l3')
+            on, off = (0.04, 0.12) if first else (0.09, 0.17)
+            back_on, back_off = (0.82, 0.89) if first else (0.88, 0.95)
+            if t < 0.5:
+                g = min(1.0, max(0.0, (t - on) / (off - on)))
+                stepping = on < t < off
+            else:
+                g = 1.0 - min(1.0, max(0.0, (t - back_on) / (back_off - back_on)))
+                stepping = back_on < t < back_off
+            g = g * g * (3 - 2 * g)
+            x, y, z = r.stance(k)
+            arc = 1.2 * math.sin(math.pi * g) if stepping else 0.0
+            if k not in ('l1', 'r1'):
+                placed[k] = (x, y + arc, z - reach * g)
+                continue
+            # a front foot: down onto the hole's wall for the dive, back up onto the rim as the prey is hauled up
+            up = min(1.0, max(0.0, (t - (0.3 if first else 0.34)) / 0.07))
+            up = up * up * (3 - 2 * up)
+            wall = (x, y - down, rim - 0.15)
+            top = (x, y, rim + 0.5)
+            dest = tuple(a + (b - a) * up for a, b in zip(wall, top))
+            lift = 1.5 * math.sin(math.pi * up) if 0.0 < up < 1.0 else 0.0
+            placed[k] = (x, y + (dest[1] - y) * g + arc + lift, z + (dest[2] - z) * g)
+        return placed
+    return attack(name, T, keys, tap=(0.2, 0.78), plates=plates, rim=rim, feet=feet)
+
+
+# attack_b for each worker: how far it tips nose down into a broken tunnel (degrees), leans out over the edge (model
+# units, the step it takes up to it) and bows its head as it bites: my picks, the jaws as deep in as the legs allow.
+DIVE = {'matabele_major': (25.0, 5.5, 20.0), 'matabele_minor': (25.0, 5.5, 20.0)}
 
 
 # --- dying --------------------------------------------------------------------------------------------------------
@@ -418,6 +545,8 @@ def animations(name):
     clips.update(walk_clips(name))
     clips['idle'] = {'loop': True, 'animation_length': IDLE_SECONDS, 'bones': idle(name)}
     for clip, make in (('attack_a', attack_a), ('attack_b', attack_b), ('death', death)):
+        if clip in ATTACKS and name not in STING_POSE:      # the queen does not fight yet (her sting comes with 2e)
+            continue
         made, miss = make(name)
         if miss > 0.05 and clip != 'death':
             raise ValueError(f'{name} {clip}: a planted foot misses its place by {miss:.3f}')
@@ -518,10 +647,13 @@ def viewer_data(entry):
                 ('walk_fast', 4.5, 'fast walk', 'a raid column, 4.5 body lengths a second: long strides')):
             add(label, words + '; the feelers low, sweeping the scent trail', clips[clip]['bones'], bl * body_blocks)
         add('turning', 'stepping round to the right on the spot, 40 degrees a step cycle', clips['turn_r']['bones'])
-        add('attack A', 'grab and sting under: draws back, lunges, the jaws snap shut, the rear tips up and the gaster '
-                        'curls under as far as it goes, two jabs', clips['attack_a']['bones'], once=0.6)
-        add('attack B', 'a quick bite and stab down: the jaws snap shut, the gaster stabs down behind the hind legs '
-                        'twice', clips['attack_b']['bones'], once=0.6)
+        if 'attack_a' in clips:                         # the workers only (the queen does not fight yet)
+            add('attack A', 'grab and sting, a termite in front: lunges, the jaws snap shut on it, it rises and bows, '
+                            'the gaster swings forward under it and the sting goes in, held while the venom is '
+                            'pumped, then out and let go', clips['attack_a']['bones'], once=0.6)
+            add('attack B', 'a termite below in a broken tunnel: steps to the edge, dives nose down and bites into the '
+                            'hole, hauls it up to the rim and stings it, two quick stabs, lets go and steps back',
+                clips['attack_b']['bones'], once=0.6)
         add('dying, as the game tips it', "the clip with Minecraft's own tip-over of a dying mob onto its side "
                                           '(about its middle, at the floor)', clips['death']['bones'], once=2.0, tip=True)
         add('dying, no tip-over', 'the clip alone: kicks, the legs giving way, the body settling on the ground',

@@ -1,6 +1,7 @@
 package com.antcolonies.savanna.entity;
 
 import com.antcolonies.entity.AbstractAntEntity;
+import com.antcolonies.fight.Fights;
 import com.antcolonies.entity.ColonyBorn;
 import com.antcolonies.entity.FedByNurses;
 import java.util.EnumSet;
@@ -321,13 +322,13 @@ public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurs
     }
 
     /**
-     * Bites the enemy: its jaws snap shut on it (the bite animation) for the soldier's attack damage (a minor 3). A
-     * simple first version (the user's "something simple for now"; M8 refines the fighting).
+     * Bites the enemy: its jaws snap shut on it (the bite animation) for the soldier's damage from the species file (a
+     * minor 3, a major 4), by the shared fight rules ({@link Fights#strike}, M8 step 2a; clamping on comes in 2c).
      */
     public void bite(LivingEntity enemy) {
         biteTicks = BITE_TICKS;
         swing(net.minecraft.world.InteractionHand.MAIN_HAND);
-        enemy.hurt(damageSources().mobAttack(this), (float) getAttributeValue(Attributes.ATTACK_DAMAGE));
+        Fights.strike(this, enemy);
         playSound(SoundEvents.TURTLE_EGG_CRACK, 0.5F, 1.8F + getRandom().nextFloat() * 0.2F);
     }
 

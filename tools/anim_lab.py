@@ -584,6 +584,9 @@ class Clip:
         self.turn = next((float(w.split()[1]) for w in self.notes.values() if w.startswith('turn ')), None)
         # A walk made for a band of speeds says which (model units a second: "speeds 19.56 45.23").
         self.speeds = next((tuple(map(float, w.split()[1:3])) for w in self.notes.values() if w.startswith('speeds ')), None)
+        # A clip played over a hole (an attack down into a broken tunnel) says where the hole starts ("hole -11.9": in
+        # front of that z, model units): parts there may go below the floor.
+        self.hole = next((float(w.split()[1]) for w in self.notes.values() if w.startswith('hole ')), None)
 
     def pose(self, t):
         if self.loop:
@@ -659,7 +662,10 @@ class Gait:
         legs = list(model.feet)
         self.legs = legs
         low = min(tips[k][1] for tips in self.tips for k in legs) if legs else 0.0
-        self.ground = low
+        # The floor is never above where the feet stand at rest (2026-10-24: a termite lying paralysed on its back has
+        # every foot in the air; the floor is still under its back, not up at its feet).
+        rest = min(t[1] for t in model.foot_tips({}).values()) if legs else low
+        self.ground = min(low, rest)
         # A foot is down when its tip is within 0.15 units of the lowest any foot gets (a lifting foot is up at once).
         self.down = {k: [tips[k][1] <= low + 0.15 for tips in self.tips] for k in legs}
         # The treadmill: planted feet move back (+Z) in the body's frame at the walk's speed.
@@ -1189,7 +1195,7 @@ def check(model, clip, speed_bps=None, quiet=False):
         posed = model.posed(pose, xf)
         if sunk is None:
             for b, corners, _ in posed:
-                low = min(p[1] for p in corners)
+                low = min((p[1] for p in corners if clip.hole is None or p[2] > clip.hole), default=floor)
                 if low < floor - 0.35:
                     sunk = (b, t, floor - low)
                     break

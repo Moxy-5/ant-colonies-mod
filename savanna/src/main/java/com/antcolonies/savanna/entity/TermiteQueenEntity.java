@@ -210,4 +210,10 @@ public class TermiteQueenEntity extends AbstractAntEntity implements SwellingQue
             ColonyManager.queenDied(serverLevel, getColonyId());
         }
     }
+
+    /** Its body in the species file's fight numbers (M8 step 2a). */
+    @Override
+    public String fightBody() {
+        return "queen";
+    }
 }

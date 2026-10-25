@@ -1,0 +1,8 @@
+{
+  "replace": false,
+  "values": [
+    "antcolonies:mud_crust",
+    "antcolonies:mud_cast",
+    "#minecraft:dirt"
+  ]
+}

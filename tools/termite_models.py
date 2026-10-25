@@ -451,6 +451,7 @@ def soldier_animations(name, bones):
     out.update({k: v for k, v in clips.items() if k.startswith(('walk', 'turn'))})
     out['head_bang'] = {'loop': True, 'animation_length': DRUM_SECONDS, 'bones': head_bang()}
     out['bite'] = {'loop': False, 'animation_length': BITE_SECONDS, 'bones': bite()}
+    out['paralysed'] = clips['paralysed']
     return {'format_version': '1.8.0', 'animations': out}
 
 def render_head_bang(bones, path, frames=6):
@@ -644,6 +645,37 @@ def freeze():
                              for i in range(n + 1)}}
     return {'antenna_l_1': quiver(0.0), 'antenna_r_1': quiver(0.5), 'head': {'rotation': {'0': [-6, 0, 0]}}}
 
+# Lying paralysed by a Matabele's sting (M8 step 2b; my pick, to confirm). A stung termite falls over onto its back
+# and lies there alive, its legs drawn up toward the belly, now and then one leg or an antenna jerking, the jaws
+# slowly working: the look of the paralysed termites in the Matabele's prey pile (look B, the user's pick, 2026-10-24,
+# many on their backs with legs in the air). The whole body turns over on its long axis round its pivot (which sits at
+# the floor in the game's reckoning, so the body turns below the floor); LIFT puts its back on the floor, measured
+# with the animation lab (python tools/anim_lab.py check <model> paralysed: nothing sinking into the floor).
+PARALYSED_SECONDS = 3.0
+PARALYSED_LIFT = {'termite_minor_soldier': 0.18, 'termite_major_soldier': 0.64}
+# When each leg jerks (seconds into the loop) and how far (degrees, the leg swinging forward or back).
+PARALYSED_JERKS = {'l1': (0.4, -18), 'r2': (0.9, -16), 'l3': (1.5, 14), 'r1': (1.9, 20), 'l2': (2.3, 15), 'r3': (2.65, -12)}
+
+def paralysed(name):
+    lift = PARALYSED_LIFT.get(name, 0.0)
+    rock = lambda a: {'0': [0, 0, 180], '1.5': [0, 0, 180 + a], f'{PARALYSED_SECONDS:g}': [0, 0, 180]}
+    bones = {'body': {'rotation': rock(4), 'position': {'0': [0, lift, 0]}}}
+    for leg, (at, swing) in PARALYSED_JERKS.items():
+        side = 1 if leg[0] == 'l' else -1
+        curl = [0, 0, 40 * side]
+        bones[f'leg_{leg}'] = {'rotation': {'0': [0, 0, 0], f'{at:g}': [0, 0, 0], f'{at + 0.06:g}': [0, swing, 0],
+                                            f'{at + 0.2:g}': [0, 0, 0], f'{PARALYSED_SECONDS:g}': [0, 0, 0]}}
+        bones[f'leg_{leg}_lower'] = {'rotation': {'0': curl}}
+    def flick(at, a):
+        return {'rotation': {'0': [10, 0, 0], f'{at:g}': [10, 0, 0], f'{at + 0.05:g}': [10 + a, 0, 0],
+                             f'{at + 0.18:g}': [10, 0, 0], f'{PARALYSED_SECONDS:g}': [10, 0, 0]}}
+    bones['antenna_l_1'] = flick(1.1, 25)
+    bones['antenna_r_1'] = flick(2.5, 25)
+    work = lambda o: {'rotation': {'0': [0, 0, 0], '0.8': [0, o, 0], '1.6': [0, 0, 0], f'{PARALYSED_SECONDS:g}': [0, 0, 0]}}
+    bones['mandible_l'] = work(-8)
+    bones['mandible_r'] = work(8)
+    return bones
+
 def animations(name='termite_king', bones=None):
     """A termite's clip file (in role names): idle, the walks and turns made for its own body (walk_clips, when its
     bones are given), the look round out of a chimney and the freeze."""
@@ -655,6 +687,7 @@ def animations(name='termite_king', bones=None):
         clips.update(walk_clips(name, bones))
     clips['peek'] = {'loop': False, 'animation_length': PEEK_SECONDS, 'bones': peek()}
     clips['freeze'] = {'loop': True, 'animation_length': FREEZE_SECONDS, 'bones': freeze()}
+    clips['paralysed'] = {'loop': True, 'animation_length': PARALYSED_SECONDS, 'bones': paralysed(name)}
     return {'format_version': '1.8.0', 'animations': clips}
 
 def sample(bones_anim, t):

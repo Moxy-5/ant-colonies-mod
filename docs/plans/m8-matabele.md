@@ -98,6 +98,10 @@ timings: all "my pick, to confirm" until then).
      **The skirmish command (the user's pick):** `/antcolonies skirmish <ants>` drops that many Matabeles from the
      nearest colony (or new ones) at the nearest termite feeding spot (sheeting, feeding gallery, shallow gallery) to
      break in and fight; step 4's scouts and columns replace it.
+   - **2a and 2b BUILT 2026-10-25** (branch `claude/m8-fights`; `docs/HISTORY.md`): the skirmish drops new Matabeles
+   - **The attack clips redone 2026-10-25** (the user's report: the sting never reached): A swings the gaster forward under the body into the termite held in the jaws; B dives into a broken tunnel, hauls the termite up to the rim and stings it there; the queen has no attack until 2e.
+     (they join the nearest colony within 32 blocks) rather than taking them from a colony's numbers; "found by its
+     nestmates if left" moves to 2f (the termites' side); carrying the paralysed home is step 4.
    - **In-game test 1** (2a + 2b).
    - **2c, clamping:** termite soldiers clamp on and ride along, slowing and hurting; a soldier killed while clamped
      leaves its head locked on the leg (shown) until a nestmate bites it off in the nest.

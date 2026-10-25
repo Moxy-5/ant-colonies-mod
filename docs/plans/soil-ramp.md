@@ -48,4 +48,4 @@ removing it whole; no soil is carried in.
    `BuildLife.dig` (away). A carved ramp counts as dug out (`Nest.isDugOut`: rooms finish, diggers stand in it).
 3. `MatabeleNest.burrow`: the bottom cell of every column of the way is a ramp rising toward the mouth. Test: the
    burrow scene checks every floor cell is a ramp facing the mouth once the queen is in her room. Guard film
-   `p_burrow` (a Matabele major down and up the ramps).
+   `p_burrow` (a Matabele major down and up the ramps; removed 2026-10-25 by the user, nothing builds ramps now).
