@@ -226,6 +226,7 @@ A Minecraft mod where ants and termites live as real colonies: they dig, build, 
 
 - **M8 step 1, R2 BUILT 2026-10-24** (branch `claude/m8-shallow-nest-e3f664`): Matabele majors about 1 block long (was 1.5) and the queen 1.2 times that; minors unchanged (the user's pick: only majors and queen); build and `legs,colony` pass; not tried in-game yet. R1 (nesting) still to do.
 - **M8 step 1, R1 BUILT 2026-10-24** (branch `claude/m8-shallow-nest-e3f664`): the Matabele nest sites follow the real ants: a small room one block down under a log 3 or more across (2 colonies at most to a long log) or at the foot of a standing dead tree (1), a dead mound takes 1, bare land only a burrow stand-in (one room 2 down); `MatabeleNestTests` 6 of 6, `colony,legs,away,mound` 72 of 72; not tried in-game yet. Still to do for step 1: two entrances, guests, colony sizes 100 to 2,300, the prey pile (1e), world-gen colonies (1f); moving every 40 days is step 6.
+- **M8 step 1d, nest notes sorted out 2026-10-24** (branch `claude/m8-shallow-nest-e3f664`): the old nest lines in the design notes and M8 plan marked "Replaced by R1"; the foot of any big tree, dead or living, takes a colony (the user's pick); ground burrows 3 blocks apart, rooms never touching (was 10); not tried in-game yet.
 
 ## Other notes files (read only when the task needs them)
 - `docs/DESIGN.md`: every design decision for the species and shared systems (read the section for a feature before working on it).

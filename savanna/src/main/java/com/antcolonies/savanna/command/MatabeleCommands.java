@@ -27,8 +27,8 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  * stand, a queen with that many workers (the user's pick, 2026-10-24: a real queen never founds alone, M9 has the colony
  * split). As many as the colony's real-mob cap come out as real ants round her, majors and minors as the real size
  * spread draws them; the rest are numbers in the brain (they come out in the nest's finished rooms). Step 1d: the colony
- * settles in the best site within {@value MatabeleNest#LOOK} blocks (a dead mound, a fallen log, else the ground), or
- * the kind named by a last word, {@code mound}, {@code log} or {@code ground}; the ants appear where you stand and walk
+ * settles in the best site within {@value MatabeleNest#LOOK} blocks (a dead mound, a fallen log, the foot of a tree, else the ground), or
+ * the kind named by a last word, {@code mound}, {@code log}, {@code standing} or {@code ground}; the ants appear where you stand and walk
  * there.
  */
 @EventBusSubscriber(modid = SavannaMod.MODID)

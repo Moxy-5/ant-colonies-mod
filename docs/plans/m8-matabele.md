@@ -7,7 +7,7 @@ step are planned with the user at its start (sizes in numbers, health, damage,
 timings: all "my pick, to confirm" until then).
 
 ## The real animal (Megaponera analis, Erik Frank's studies)
-- Majors about 16-18 mm, minors about 5-10 mm, few in between; colony 400-2,500;
+- Majors about 16-18 mm, minors about 5-10 mm, few in between; colony 400-2,500 (100-2,300 by Yusuf 2026, R1);
   one wingless (ergatoid) queen; winged males.
 - Eats only termites. Lone scouts find termites feeding under mud cover, lay a scent
   line home and lead a column of 200-500 back; 2-4 raids a day, morning and late
@@ -20,6 +20,8 @@ timings: all "my pick, to confirm" until then).
   kill about 80% untreated, about 10% treated. Ants walk on 4-5 legs after losses.
 - Nests in old termite mounds, under logs, in the ground; shallow; dig little;
   move house now and then; new colonies by splitting.
+  (Yusuf 2026, R1: they build no nest, they modify spaces other animals made, about
+  0.7 m down; one brood chamber, two or more entrances; move every 2-3 months.)
 
 **Before step 1: M7.5, giant savanna trees** (user, 2026-10-18; `docs/DESIGN.md`,
 "Giant savanna trees"): the fallen hollow giants are the Matabele log homes.
@@ -46,13 +48,17 @@ timings: all "my pick, to confirm" until then).
      the look picked in the model viewer first), her eggs hatching into larvae and then majors or minors in the real
      two-humped mix, each ant its own size inside its caste. Test: summon a queen, `/antcolonies list`, watch the
      eggs, larvae and sizes. The colony has no nest yet (1d).
-   - **1d, the shallow nest:** the colony settles in a dead mound (favourite), under a fallen tree, or in a few shallow
-     ground rooms (2 to 5 blocks down), reusing ready spaces and digging only to join them. Test: a queen near each.
+   - **1d, the shallow nest (as built, after R1 and the user's last answers, 2026-10-24):** the queen picks once, within
+     32 blocks, best first: a dead mound (used as it is, nothing dug, 1 colony), under a fallen log 3+ thick (one 3x3 room
+     1 block down, the log its roof, 2 colonies at most), at the foot of any tree 3+ thick, dead or living (the same room,
+     1 colony), else a burrow stand-in in bare ground (one room 2 down, 3+ blocks from another burrow, rooms never
+     touching). The queen digs nothing; her workers dig the way in. Test: a queen near each (`MatabeleNestTests`).
+     Still to add for step 1: two or more entrances, guests in the nest, returning to an old nest.
    - **1e, the prey pile and hunger:** the pile of dead termites in the nest, eaten by larvae and adults, off in about a
      day; hunger by the colony rules already built; stocked by a command until raids exist (step 4). Test: stock it
      and watch it eaten and rot; leave it empty and watch them starve.
    - **1f, new land and a command:** a few colonies placed in new savannas (dead mound, under a fallen tree, ground)
-     kept away from living termite mounds, real sizes 400 to 2,500, mostly numbers; a command that makes one anywhere
+     kept away from living termite mounds, real sizes 100 to 2,300 (R1), mostly numbers; a command that makes one anywhere
      with a size you choose.
 2. **The shared fight system** (species-neutral, the harvester ants use it later
    against their neighbours): health and damage per caste from the profile, the
@@ -88,8 +94,9 @@ timings: all "my pick, to confirm" until then).
 5. **Rescue and wound care:** the help smell, pulling clamped soldiers off, carrying
    the hurt home (legs tucked), the badly hurt left; wounds and infection in the
    nest, care by any nestmate.
-6. **Moving house:** when prey runs out nearby, after repeated attacks, when the
-   nest floods or is too small, and now and then anyway; scouts pick the site, the
+6. **Moving house:** every 40 game days per colony, the first move day random from 1 to
+   40 (R1, the user, 2026-10-24), and on top when prey runs out nearby, after repeated attacks, when the
+   nest floods or is too small; scouts pick the site, the
    colony walks there in a column with brood and prey.
 
 Later (M9): splitting into daughter colonies nearby, winged males mating in other

@@ -12,6 +12,7 @@ import com.antcolonies.savanna.colony.MatabeleNest;
 import com.antcolonies.savanna.colony.NewLandMounds;
 import com.antcolonies.savanna.command.MatabeleCommands;
 import com.antcolonies.savanna.entity.MatabeleQueenEntity;
+import com.antcolonies.savanna.registry.TreeBlocks;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -27,8 +28,9 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * The Matabele's shallow nest (M8 step 1d): a colony settles in the best site near its queen and its workers dig only
  * what joins the spaces there. Near a dead termite mound it moves into the old nest under the hump, down the chimney,
  * the empty royal chamber its queen's room at once (nothing to dig); near a fallen log 3 or more across, or the foot of a
- * standing dead tree, it digs a small room one block down under the wood (a long log has room for two colonies, a tree or a
- * mound for one); in bare land a burrow stand-in, one room 2 down. In each the queen ends in her room.
+ * standing tree, it digs a small room one block down under the wood (a long log has room for two colonies, a tree or a
+ * mound for one); at the foot of a tree, dead or living, the same; in bare land a burrow stand-in, one room 2 down, a
+ * second burrow 3 or more blocks off with soil between the rooms. In each the queen ends in her room.
  */
 @GameTestHolder(SavannaMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -108,15 +110,18 @@ public class MatabeleNestTests {
         helper.succeed();
     }
 
-    /** A standing dead trunk 4 across: one colony digs in at its foot, one block down, and no second. */
+    /**
+     * A living giant umbrella thorn's trunk 4 across (living trees count, the user, 2026-10-24): one colony digs in at its
+     * foot, one block down, and no second.
+     */
     @GameTest(template = "arena", timeoutTicks = 8000)
-    public static void aMatabeleColonyDigsInAtTheFootOfAStandingDeadTree(GameTestHelper helper) {
+    public static void aMatabeleColonyDigsInAtTheFootOfATree(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         TestScenes.deepGround(helper);
         for (int x = MIDDLE; x <= MIDDLE + 3; x++) {
             for (int z = MIDDLE; z <= MIDDLE + 3; z++) {
                 for (int y = SURFACE; y <= SURFACE + 5; y++) {
-                    helper.setBlock(x, y, z, Blocks.OAK_LOG.defaultBlockState());
+                    helper.setBlock(x, y, z, TreeBlocks.UMBRELLA_THORN.log().get().defaultBlockState());
                 }
             }
         }
@@ -132,7 +137,11 @@ public class MatabeleNestTests {
         queenEndsInHerRoom(helper, colony);
     }
 
-    /** No cover anywhere: the stand-in for an animal's burrow, a shaft and one room 2 blocks down. */
+    /**
+     * No cover anywhere: the stand-in for an animal's burrow, a shaft and one room 2 blocks down. A second colony put down
+     * at the same spot gets its own burrow close by (real nests lie as close as 2 m), 3 or more blocks off, with soil
+     * between the two nests.
+     */
     @GameTest(template = "arena", timeoutTicks = 8000)
     public static void aMatabeleColonyMovesIntoABurrowInOpenGround(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
@@ -143,6 +152,19 @@ public class MatabeleNestTests {
         for (NestPlan.Chamber room : colony.nest().getPlannedChambers(level)) {
             int depth = colony.getCenter().getY() - room.center().getY();
             helper.assertTrue(depth == 2, "the room is " + depth + " blocks down, not 2");
+        }
+        Colony second = settled(helper, at, MatabeleNest.Kind.GROUND);
+        int apart = Math.max(Math.abs(second.getCenter().getX() - colony.getCenter().getX()), Math.abs(second.getCenter().getZ() - colony.getCenter().getZ()));
+        helper.assertTrue(apart > 3 && apart <= 10, "the second burrow is " + apart + " blocks off, not 4 to 10");
+        for (NestPlan.Chamber mine : second.nest().getPlannedChambers(level)) {
+            for (BlockPos cell : mine.cells()) {
+                for (NestPlan.Chamber theirs : colony.nest().getPlannedChambers(level)) {
+                    for (BlockPos other : theirs.cells()) {
+                        helper.assertTrue(Math.max(Math.abs(cell.getX() - other.getX()), Math.max(Math.abs(cell.getY() - other.getY()),
+                                Math.abs(cell.getZ() - other.getZ()))) > 1, "the two burrows touch at " + cell.toShortString());
+                    }
+                }
+            }
         }
         queenEndsInHerRoom(helper, colony);
     }

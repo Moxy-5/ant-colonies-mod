@@ -29,7 +29,7 @@ import net.minecraft.world.level.Level;
  * and spawn-egg majors and minors near her join it (the user's pick, 2026-10-24; {@code /antcolonies matabele} makes a
  * whole colony). Her colony ends when she dies; unfed for her species' {@code queen.starve_ticks} once she has workers
  * she starves (with no prey pile yet, M8 step 1e, she does). Her colony settles in the best site near her (step 1d,
- * {@link MatabeleNest}: a dead mound, a fallen log, else the ground); she walks to it and into her room once it is open
+ * {@link MatabeleNest}: a dead mound, a fallen log, the foot of a tree, else the ground); she walks to it and into her room once it is open
  * (the user's pick, 2026-10-24: alone she digs nothing, her workers dig the way in).
  */
 public class MatabeleQueenEntity extends AbstractAntEntity {

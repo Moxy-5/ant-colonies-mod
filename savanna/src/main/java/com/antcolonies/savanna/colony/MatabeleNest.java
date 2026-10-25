@@ -32,7 +32,9 @@ import net.minecraft.world.level.block.state.BlockState;
 
 /**
  * The Matabele ant's shallow nest (M8 step 1d, {@code docs/DESIGN.md}, "Matabele colony, details", step 1d): real
- * Megaponera build nothing; they move into spaces already there and dig only to join them. A colony picks its site when
+ * Megaponera build nothing; they move into spaces other animals made. The user's choice (R1, 2026-10-24, a known departure
+ * from the real ants, on purpose): under wood they dig one small room of their own; a dead mound is used as it is, nothing
+ * dug. A colony picks its site when
  * it starts, within {@link #LOOK} blocks, the best kind first (the user's pick, 2026-10-24), nearer first among the same kind:
  * <ol>
  * <li><b>A dead termite mound</b> (the favourite): the old nest's rooms under the hump, reached down the open chimney.
@@ -43,8 +45,8 @@ import net.minecraft.world.level.block.state.BlockState;
  * and build nothing): a log 3 or more blocks across and at least twice as long is a roof; a small room, 3 by 3 blocks, is
  * dug one block down in the soil under it, the log its ceiling, the entrance beside the log. A long log has room for two
  * colonies, one to every 4 blocks of its length, at most 2.</li>
- * <li><b>Under a standing dead tree</b>: the same small room dug one block down at the foot of a standing dead trunk 3 or
- * more blocks across; one colony to a tree.</li>
+ * <li><b>At the foot of a tree</b>: the same small room dug one block down at the foot of a standing trunk 3 or more blocks
+ * across, dead or living (the user, 2026-10-24: real nests lie "under trees", Yusuf 2026); one colony to a tree.</li>
  * <li><b>The ground</b>: no site without cover is real; this stands in for an animal's burrow (aardvark, rodent) the ants
  * would move into: one room 2 blocks down and a short shaft, kept so a queen put down in bare land has a home.</li>
  * </ol>
@@ -54,8 +56,11 @@ import net.minecraft.world.level.block.state.BlockState;
 public final class MatabeleNest {
     /** How far round her a queen looks for a site (blocks; my pick). */
     public static final int LOOK = 32;
-    /** No burrow this near another colony's entrance (blocks; my pick; whether open ground needs a gap at all is open). */
-    static final int TAKEN = 10;
+    /**
+     * No burrow this near another colony's entrance (blocks; the user, 2026-10-24: real nests lie as close as 2 m), and no
+     * burrow room within a block of another colony's rooms (a wall of soil between them always).
+     */
+    static final int TAKEN = 3;
     /** The most colonies under one big dead fallen log, one to every {@link #LOG_SLOT} blocks of its length (the user, 2026-10-24). */
     static final int LOG_COLONIES = 2;
     static final int LOG_SLOT = 4;
@@ -74,7 +79,7 @@ public final class MatabeleNest {
 
     /** The kinds of site, best first. */
     public enum Kind {
-        MOUND("in a dead termite mound"), LOG("under a fallen log"), STANDING("under a standing dead tree"), GROUND("in the ground");
+        MOUND("in a dead termite mound"), LOG("under a fallen log"), STANDING("at the foot of a tree"), GROUND("in the ground");
 
         /** The words in the colony list. */
         public final String words;
@@ -83,7 +88,7 @@ public final class MatabeleNest {
             this.words = words;
         }
 
-        /** The kind by its command word ({@code mound}, {@code log}, {@code ground}), or null. */
+        /** The kind by its command word ({@code mound}, {@code log}, {@code standing}, {@code ground}), or null. */
         @Nullable
         public static Kind byWord(String word) {
             try {
@@ -142,6 +147,33 @@ public final class MatabeleNest {
         for (Colony colony : ColonyManager.get(level).getColonies()) {
             if (colony.getCenter().distManhattan(entrance) <= TAKEN * 2 && horizontal(colony.getCenter(), entrance) <= TAKEN) {
                 return true;
+            }
+        }
+        return false;
+    }
+
+    /** Whether any cell of {@code rooms} lies next to (or in) a cell of another colony's nest near {@code entrance}. */
+    private static boolean touchesAnother(ServerLevel level, BlockPos entrance, List<NestPlan.Chamber> rooms) {
+        Set<BlockPos> mine = new HashSet<>();
+        for (NestPlan.Chamber room : rooms) {
+            mine.addAll(room.cells());
+        }
+        for (Colony colony : ColonyManager.get(level).getColonies()) {
+            if (horizontal(colony.getCenter(), entrance) > 24) {
+                continue;
+            }
+            for (NestPlan.Chamber room : colony.nest().getPlannedChambers(level)) {
+                for (BlockPos cell : room.cells()) {
+                    for (int dx = -1; dx <= 1; dx++) {
+                        for (int dy = -1; dy <= 1; dy++) {
+                            for (int dz = -1; dz <= 1; dz++) {
+                                if (mine.contains(cell.offset(dx, dy, dz))) {
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
         return false;
@@ -392,7 +424,7 @@ public final class MatabeleNest {
         return new NestPlan.Chamber(kind, List.copyOf(cells), center, List.copyOf(wayIn), List.copyOf(ordered));
     }
 
-    // ----- Under dead wood: a fallen log, a standing dead tree -----
+    // ----- Under wood: a fallen log, the foot of a tree -----
 
     /** The Matabele colonies settled {@code kind} whose entrance lies within {@code reach} blocks (level) of {@code anchor}. */
     private static List<Colony> colonies(ServerLevel level, Kind kind, BlockPos anchor, int reach) {
@@ -527,7 +559,7 @@ public final class MatabeleNest {
     }
 
     /**
-     * The nest at the foot of a standing dead tree whose lowest block is {@code base}: a trunk at least {@link #LOG_WIDTH}
+     * The nest at the foot of a standing tree, dead or living, whose lowest block is {@code base}: a trunk at least {@link #LOG_WIDTH}
      * across both ways, not twice as long as wide (that is a lying log) and at least 4 blocks tall; the small room under
      * the middle of its foot, one block down; one colony to a tree.
      */
@@ -676,7 +708,10 @@ public final class MatabeleNest {
         return null;
     }
 
-    /** The rooms of a ground nest at {@code entrance} that fit the soil there, the first side that does; null if none does. */
+    /**
+     * The rooms of a ground nest at {@code entrance} that fit the soil there and keep a block of soil from every other
+     * colony's rooms, the first side that does; null if none does.
+     */
     @Nullable
     private static List<NestPlan.Chamber> groundRooms(BlockPos entrance, int depth, int levels, NestPlan.RoomSizes sizes, ServerLevel level) {
         int first = Math.floorMod(entrance.hashCode(), 4);
@@ -686,7 +721,7 @@ public final class MatabeleNest {
             for (NestPlan.Chamber room : rooms) {
                 fits &= fits(level, room.cells()) && roofed(level, room.room());
             }
-            if (fits) {
+            if (fits && !touchesAnother(level, entrance, rooms)) {
                 return rooms;
             }
         }
