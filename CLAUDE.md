@@ -243,3 +243,4 @@ A Minecraft mod where ants and termites live as real colonies: they dig, build, 
 - `docs/plans/`: full plans of steps planned but not built yet (code parts and tests), e.g. `4b-parts-2-3.md`.
 - `docs/BUGS.md`: every bug we have had and its lesson. **Read it before touching `AntNavigator`, `AntPathFinder`, the goals, or anything that places blocks.**
 - **M8 raids before drawn-only ants confirmed by the user 2026-10-24** ("do raids first i dont want to rush drawn only"): order 1e, 1f, 2, 4, test revamp, 3, 5, 6.
+- **M8 order to playable and the test revamp (the user, 2026-10-24):** M8 playable before the user's trip to California: 1e, 1f, 2 (fights), 4 (scouts and raids, real ants only at first; step 4 before step 3 is my recommendation, the user to confirm), then the **test revamp** (`docs/plans/test-health.md` step 4: scene kit, colonies found by owner, quick rule tests, new-land tests), then 3, 5, 6.

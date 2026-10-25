@@ -43,3 +43,8 @@ Done 2026-10-16 (steps 1 to 3; details in `docs/HISTORY.md`, "Test health, part 
    jobs, feeding the queen, the seed count, the numbers foraging), the scene kit ("a colony with 6 workers and the
    nest already dug"), fixed dice (seeded randomness), loosening exact numbers, and handing the clock and weather in
    instead of the ForTests switches.
+   **Scheduled (the user, 2026-10-24): the test revamp comes right after M8 step 4 (scouts and raids)**, once the
+   Matabele hunt and eat termites, so M8 is playable before the user's trip to California. What it covers (from the
+   M8 work so far): the scene kit, finding a test's colony by its owner (queen) rather than by the arena box, quick
+   rule tests, tests on new land (mounds and trees put in by world-gen), rules in place of exact numbers, and rerunning
+   a failure on its own before calling it a flake. To be planned with the user then.
