@@ -103,6 +103,29 @@ timings: all "my pick, to confirm" until then).
      (they join the nearest colony within 32 blocks) rather than taking them from a colony's numbers; "found by its
      nestmates if left" moves to 2f (the termites' side); carrying the paralysed home is step 4.
    - **In-game test 1** (2a + 2b).
+   - **In-game test 1 done 2026-10-25:** everything works, but not polished ("walking death": termites fall before the
+     sting is seen, ten ants cleared a feeding spot in about a minute).
+   - **2b+, fight polish (planned with the user 2026-10-25, all seven pieces agreed; before 2c).** First a source check
+     (Yusuf 2026 review and Frank's raid papers) for the real pace: how long the fight at a feeding spot lasts, termites
+     taken per ant, how fast the venom paralyses, how many termites escape; the numbers below are set from it.
+     1. The sting lands when it is seen: the termite is pinned from the moment the jaws close (attack A about 0.2 s,
+        B likewise) and falls only at the sting moment (A about 0.56 s); pulled away or the ant knocked off before
+        then, it is a miss.
+     2. One termite at a time, finished: the clip plays to its end, the ant lets go and antennates the prey a second or
+        two, then turns to the next (turning takes real time).
+     3. Grabs can fail: termites dodge; a soldier is harder to grab than a worker (it bites first); odds per body in
+        the species file.
+     4. The termites flee: workers near arriving Matabeles run for the nearest hole and go down (an early piece of
+        2f).
+     5. Paralysis takes a few seconds (from the source check): the termite staggers, then flips onto its back.
+     6. No fighting while climbing (the user's rule): nothing grabs, stings or bites unless standing on a floor (not
+        on a wall sideways or head down, not on a ceiling, not falling); shared, termite soldiers too. A soldier
+        standing on the floor may still bite an ant climbing past its head, but the climbing ant never strikes back
+        (agreed by the user).
+     7. Pace target: ten ants against a feeding spot take several minutes, many termites escaping down the holes.
+     Tests: an ant on a wall never strikes; a termite falls only after the sting moment; a ten-ant skirmish lasts
+     minutes, not seconds; `soldiers,termitefood,colony,away`; guard films if a clip changes; then the user looks
+     in-game with `/antcolonies skirmish 10`.
    - **2c, clamping:** termite soldiers clamp on and ride along, slowing and hurting; a soldier killed while clamped
      leaves its head locked on the leg (shown) until a nestmate bites it off in the nest.
    - **2d, lost legs (legs only, the user's pick: antennae losses are not measured for Megaponera):** saved per ant,
