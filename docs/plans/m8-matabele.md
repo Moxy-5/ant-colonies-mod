@@ -146,6 +146,13 @@ timings: all "my pick, to confirm" until then).
      soldiers shut out; those alive when the raid leaves wait by the seal and are let back in at night (the user's
      pick); dead Matabeles and the termites' own old dead carried out and dropped by the nearest hole, fading (fresh
      dead still eaten in the garden).
+   - **2e and 2f planned with the user 2026-10-25** (details and my picks in `docs/DESIGN.md`, "Steps 2e and 2f"):
+     all four provocations count (breaking the nest, hitting one, standing in a column, walking on the nest, the last
+     only a few ants out); defenders in waves, giving up 16 blocks from the nest; the queen stings only in her room;
+     termites carry a paralysed nestmate left behind into the nest and eat it in the garden. Build order: 2e (the
+     provocations, the waves and going home, the sting's pain, the queen's sting, the squeak), then 2f (the raid
+     break-in drumming down the gallery, the seal behind the soldiers, let back in at night, dead carried out, the
+     paralysed eaten).
    - **In-game test 3** (2e + 2f), then merge.
    Tests: each piece runs `soldiers,termitefood,colony,away` (and `legs` for 2d, guard films for 2c and 2d); a full run
    before the merge (2a changes the shared alarm).
