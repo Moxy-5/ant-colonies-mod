@@ -1,16 +1,13 @@
 # Every game test on GitHub's computers (test health plan, docs/plans/test-health.md), split over 4 servers that run
-# at the same time (one job each). It runs:
-#   - on every push to master,
-#   - on a push to any branch whose last commit message contains "[full run]",
-#   - by hand: GitHub, Actions tab, "Game tests", "Run workflow" (pick the branch; optionally only some tests).
-# The minutes of all 4 jobs count against the account's free minutes, so it does not run on every push.
+# at the same time (one job each). It runs only by hand (the user, 2026-10-25: the game tests run on the user's PC,
+# never by themselves on GitHub): GitHub, Actions tab, "Game tests", "Run workflow" (pick the branch; optionally only
+# some tests). The minutes of all 4 jobs count against the account's free minutes.
 # Since the split (docs/plans/mod-split.md, step S8) the repository holds three mods (framework\, savanna\, desert\,
 # tools/mod_paths.py); every test server loads all three and runs both species mods' game tests. A fifth job, at the
 # same time, builds the three mods with their unit tests and runs the tools' own checks (body plans, anim lab).
 name: Game tests
 
 on:
-  push:
   workflow_dispatch:
     inputs:
       tests:

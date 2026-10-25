@@ -1,6 +1,8 @@
 name: Build
 
-on: [push, pull_request]
+# Only by hand (the user, 2026-10-25: builds and tests run on the user's PC, nothing by itself on GitHub):
+# GitHub, Actions tab, this workflow, "Run workflow".
+on: [workflow_dispatch]
 
 jobs:
   build:

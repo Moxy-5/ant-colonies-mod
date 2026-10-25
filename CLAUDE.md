@@ -243,6 +243,7 @@ A Minecraft mod where ants and termites live as real colonies: they dig, build, 
 - **M8 steps 2a and 2b work in-game (the user, 2026-10-25),** not polished: termites fall before the sting is seen, fights far too fast, and no attacking while climbing (the user's rule); the polish is being planned.
 - **BUGS 75 looked into 2026-10-25** (branch `claude/festive-mirzakhani-d70ff6`): not a leak from the fight tests; the minors-at-the-holes test's own rare flake (about 1 in 100, a worker wedged beside the test's stone entrance); diagnostics added, still open.
 - **New GitHub backup (2026-10-25):** the old account was suspended (no email, maybe automatic); every branch now lives in the private repository `https://github.com/Moxy-5/ant-colonies-mod` (remote `origin`), the old `urbad150-hub` address no longer works.
+- **Nothing runs by itself on GitHub any more (the user, 2026-10-25, "only on my pc"):** the game tests and the build workflow start only by hand (Actions tab, "Run workflow"); a push to `master` or a `[full run]` commit message no longer starts them. All testing is on the user's PC, as before.
 
 ## Other notes files (read only when the task needs them)
 - `docs/DESIGN.md`: every design decision for the species and shared systems (read the section for a feature before working on it).
