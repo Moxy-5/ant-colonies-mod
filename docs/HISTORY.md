@@ -403,6 +403,8 @@ Moved here from CLAUDE.md on 2026-10-13 (it was loaded into every chat and took 
 
 - **Guard film `p_burrow` removed (the user, 2026-10-25):** the Matabele no longer dig a burrow with soil ramps (dead mounds only), so the ramp walking film is gone; the other 15 guard films after the attack rework: 0 changed pictures.
 
+- **BUGS 75 looked into 2026-10-25** (branch `claude/festive-mirzakhani-d70ff6`): the minors-at-the-holes test's failure beside the Matabele fight test is not a leak from the fight code; it is the test's own 1-in-100 flake (a worker wedged beside the stone entrance the test makes). Added: richer failure messages and day logging in `minorsGuardTheHolesAndLineTheForagersTrailThenGoInLast`, and `AbstractAntEntity.runningGoals()` for debug lines. Nothing changes in-game. Still open, `docs/BUGS.md` 75.
+
 ## Handover notes for a code reviewer (written at the end of a very long session)
 - State: branch `master`, all committed, `./gradlew build` passes, `./gradlew runGameTestServer` passes 47 tests (about 8 minutes, in one world, tests run in parallel arena grids). Some tests are timing-sensitive under load (`antsOnBumpyGroundReachTheFoodStore` and `aStarvingWorkerSlowsDownAndDies` have each failed once and passed on a re-run): re-run before blaming a change.
 - Confirmed in-game by the user so far: everything up to and including dead ants and the refuse chamber, rich bread, worker hunger, colony starvation, and the hill-jam fix. Older bullets in "Current status" that still say "waiting for the user to confirm" are probably stale (the user tested them and reported no problems), but this was never written down: do not rely on those flags.

@@ -768,6 +768,12 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         }
     }
 
+    /** The goals it is running now, by class name (for test failure messages and debug lines). */
+    public String runningGoals() {
+        return goalSelector.getAvailableGoals().stream().filter(net.minecraft.world.entity.ai.goal.WrappedGoal::isRunning)
+                .map(goal -> goal.getGoal().getClass().getSimpleName()).toList().toString();
+    }
+
     /** Whether it lies paralysed by a hunter's sting (synced: true on the client too). */
     public boolean isParalysed() {
         return level().isClientSide ? (entityData.get(DATA_POSE_FLAGS) & PARALYSED) != 0 : paralysedAt != NOT_PARALYSED;
