@@ -1,0 +1,305 @@
+<title>Burrow Ramp Looks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+  /* Layout: a field-notebook bench, as the other viewers. The 3D scene on the stage, the switches on a label beside it. */
+  :root {
+    --bg: #eceee6; --panel: #f7f8f3; --fg: #1d221d; --muted: #5a6157; --line: #c9cdc0; --accent: #8a5a2c; --sky: #c9dbe6;
+    --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+    --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #151915; --panel: #1d221d; --fg: #e5e8df; --muted: #a3ab9d; --line: #353c34; --accent: #d69a5e; --sky: #2b3b46;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #151915; --panel: #1d221d; --fg: #e5e8df; --muted: #a3ab9d; --line: #353c34; --accent: #d69a5e; --sky: #2b3b46;
+    color-scheme: dark;
+  }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.5; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 28px; display: grid; gap: 16px; }
+  header h1 { font-family: var(--display); font-weight: 800; font-size: clamp(1.6rem, 3vw, 2.2rem); line-height: 1.1; margin: 0; text-wrap: balance; }
+  header p { margin: 6px 0 0; color: var(--muted); max-width: 70ch; }
+  .bench { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
+  @media (max-width: 820px) { .bench { grid-template-columns: minmax(0, 1fr); } }
+  .stage { position: relative; background: var(--sky); border-radius: 10px; overflow: hidden; aspect-ratio: 4 / 3; max-width: 100%; }
+  .stage canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+  .stage canvas:active { cursor: grabbing; }
+  .hint { position: absolute; left: 12px; bottom: 10px; font-size: 12px; color: var(--fg); background: color-mix(in srgb, var(--panel) 80%, transparent); padding: 3px 8px; border-radius: 6px; }
+  .label { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 16px; min-width: 0; }
+  .label h2 { font-family: var(--display); font-weight: 600; font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+  .choices { display: flex; flex-wrap: wrap; gap: 4px; }
+  .choices button { font: inherit; font-size: 0.85rem; color: inherit; background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+  .choices button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--panel); }
+  .choices button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .note { color: var(--muted); font-size: 0.85rem; margin: 0; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Burrow Ramp Looks</h1>
+    <p>A Matabele burrow in bare ground, cut open from the side: the tunnel down to its 3&times;3 room. The ramps are carved from the soil the burrow is dug in, so they wear that soil's own Minecraft texture. Compare the two slopes, and the ramps against today's stairs.</p>
+  </header>
+  <div class="bench">
+    <div class="stage">
+      <canvas id="view" aria-label="3D view of a burrow cut open from the side"></canvas>
+      <div class="hint">Drag to turn, scroll or pinch to zoom</div>
+    </div>
+    <aside class="label">
+      <div><h2>Soil</h2><div class="choices" id="soils"></div></div>
+      <div><h2>Steepness</h2><div class="choices" id="steep"></div></div>
+      <div><h2>Floor</h2><div class="choices" id="floor"></div></div>
+      <div><h2>View</h2><div class="choices" id="view-choices"></div></div>
+      <p class="note" id="steep-note"></p>
+      <p class="note">The black ant is a Matabele major, about 1 block long, for size. Real burrows slope in with a floor packed smooth by feet; in the game a worker would bite the step's block down into a ramp, carrying no soil in.</p>
+    </aside>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const DATA = /*DATA*/null;
+const SAVANNA_GRASS = [191, 183, 85];
+
+// The two slopes. The tunnel runs along +x at z = 0 from the entrance over column 0; a ramp's high side faces the
+// entrance (-x). "full" rises a whole block over its length, "high" and "low" are the upper and lower halves of a
+// two-block ramp. air: the dug cells over the ramps; the room is 3x3 at y -3 from roomX.
+const SLOPES = {
+  steep: { name: "45°", note: "45°: one block down for every block forward. The mouth is open for two blocks, then the soil roofs the tunnel.",
+    ramps: [[0, -1, "full"], [1, -2, "full"], [2, -3, "full"]], air: [[1, -1], [2, -2]], roomX: 3,
+    ant: { x: 1.5, y: -1.5, angle: Math.PI / 4 } },
+  gentle: { name: "Gentler", note: "Gentler: one block down for every two forward (about 27°, near a real aardvark burrow). The mouth is an open sloping trench for about four blocks before the soil roofs it, as real burrow mouths are.",
+    ramps: [[0, -1, "high"], [1, -1, "low"], [2, -2, "high"], [3, -2, "low"], [4, -3, "high"], [5, -3, "low"]],
+    air: [[2, -1], [3, -1], [4, -2], [5, -2]], roomX: 6,
+    ant: { x: 3.5, y: -1.75, angle: Math.atan(0.5) } },
+};
+const AREA = { x0: -4, x1: 12, z0: -4, z1: 5, y0: -7 };
+
+let soil = "dirt", steep = "steep", ramps = true, cut = true, showAnt = true;
+try {
+  const saved = JSON.parse(localStorage.getItem("burrow-viewer") || "{}");
+  if (DATA.soils[saved.soil]) soil = saved.soil;
+  if (SLOPES[saved.steep]) steep = saved.steep;
+  if (typeof saved.ramps === "boolean") ramps = saved.ramps;
+  if (typeof saved.cut === "boolean") cut = saved.cut;
+} catch (e) {}
+function save() {
+  try { localStorage.setItem("burrow-viewer", JSON.stringify({ soil, steep, ramps, cut })); } catch (e) {}
+}
+
+const canvas = document.getElementById("view");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40, 4 / 3, 0.1, 100);
+camera.position.set(4, 1, 11);
+const controls = new THREE.OrbitControls(camera, canvas);
+controls.target.set(3.5, -2.5, 0);
+controls.enableDamping = true;
+controls.minDistance = 2; controls.maxDistance = 25;
+
+// Textures: Minecraft's own, the grass tinted savanna yellow-green on canvases (as the game tints it by biome).
+const images = {};
+function loadImage(name) {
+  return new Promise(resolve => { const img = new Image(); img.onload = () => resolve(img); img.src = DATA.textures[name]; });
+}
+function canvasTexture(draw) {
+  const c = document.createElement("canvas"); c.width = c.height = 16;
+  const g = c.getContext("2d"); g.imageSmoothingEnabled = false; draw(g);
+  const t = new THREE.CanvasTexture(c);
+  t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.encoding = THREE.sRGBEncoding;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+function tinted(g, img) {
+  const c = document.createElement("canvas"); c.width = c.height = 16;
+  const h = c.getContext("2d"); h.drawImage(img, 0, 0);
+  const px = h.getImageData(0, 0, 16, 16);
+  for (let i = 0; i < px.data.length; i += 4) {
+    for (let k = 0; k < 3; k++) px.data[i + k] = px.data[i + k] * SAVANNA_GRASS[k] / 255;
+  }
+  h.putImageData(px, 0, 0);
+  g.drawImage(c, 0, 0);
+}
+const textures = {};
+const materials = {};
+function material(key) {
+  if (!materials[key]) {
+    materials[key] = new THREE.MeshBasicMaterial({ map: textures[key], vertexColors: true, side: THREE.DoubleSide });
+  }
+  return materials[key];
+}
+
+// Minecraft's flat face shading: top full, north/south 0.8, east/west 0.6, bottom 0.5.
+const SHADE = { px: 0.6, nx: 0.6, py: 1.0, ny: 0.5, pz: 0.8, nz: 0.8 };
+let batches = {};
+function quad(key, corners, uvs, shade) {
+  const b = batches[key] || (batches[key] = { pos: [], uv: [], col: [] });
+  for (const i of [0, 1, 2, 0, 2, 3]) {
+    b.pos.push(...corners[i]); b.uv.push(...uvs[i]); b.col.push(shade, shade, shade);
+  }
+}
+// A box's faces, each with its texture key (faces: px nx py ny pz nz), UVs from world coordinates so textures line up
+// block by block. skip(face) leaves a face out.
+function box(x0, y0, z0, x1, y1, z1, keys, skip, dim) {
+  const f = (name, corners, uvs) => { if (!skip || !skip(name)) quad(keys[name], corners, uvs, SHADE[name] * (dim ? dim(name) : 1)); };
+  f("px", [[x1, y0, z0], [x1, y0, z1], [x1, y1, z1], [x1, y1, z0]], [[-z0, y0], [-z1, y0], [-z1, y1], [-z0, y1]]);
+  f("nx", [[x0, y0, z1], [x0, y0, z0], [x0, y1, z0], [x0, y1, z1]], [[z1, y0], [z0, y0], [z0, y1], [z1, y1]]);
+  f("py", [[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], [[x0, -z0], [x1, -z0], [x1, -z1], [x0, -z1]]);
+  f("ny", [[x0, y0, z1], [x1, y0, z1], [x1, y0, z0], [x0, y0, z0]], [[x0, z1], [x1, z1], [x1, z0], [x0, z0]]);
+  f("pz", [[x1, y0, z1], [x0, y0, z1], [x0, y1, z1], [x1, y1, z1]], [[-x1, y0], [-x0, y0], [-x0, y1], [-x1, y1]]);
+  f("nz", [[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0]], [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]);
+}
+
+// How high (pixels) the 2-pixel-wide slice i (0 at the high side) of a ramp of this kind stands: 8 steps, as the
+// termite ramp in the game.
+function sliceHeight(kind, i) {
+  return kind === "full" ? 16 - 2 * i : kind === "high" ? 16 - i : 8 - i;
+}
+
+let world = new THREE.Group();
+scene.add(world);
+let ant = null;
+
+function build() {
+  scene.remove(world);
+  world.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+  world = new THREE.Group();
+  scene.add(world);
+  batches = {};
+  const slope = SLOPES[steep];
+  const info = DATA.soils[soil];
+  const grassy = info.top === "grass";
+  // The cells: "soil", "air" or a ramp kind; anything not listed in the area is soil.
+  const cells = new Map();
+  const key = (x, y, z) => x + "," + y + "," + z;
+  for (const [x, y, kind] of slope.ramps) cells.set(key(x, y, 0), ramps ? kind : "air");
+  for (const [x, y] of slope.air) cells.set(key(x, y, 0), "air");
+  for (let x = slope.roomX; x < slope.roomX + 3; x++) for (let z = -1; z <= 1; z++) cells.set(key(x, -3, z), "air");
+  // Cut open: the ground on the near side of the tunnel (z > 0) is taken away, so the tunnel shows from the side.
+  const zEnd = cut ? 1 : AREA.z1;
+  const inArea = (x, y, z) => x >= AREA.x0 && x < AREA.x1 && z >= AREA.z0 && z < zEnd && y >= AREA.y0 && y <= -1;
+  const isAir = (x, y, z) => cells.get(key(x, y, z)) === "air" || (cells.get(key(x, y, z)) || "soil") !== "soil";
+  const solid = (x, y, z) => inArea(x, y, z) && (cells.get(key(x, y, z)) || "soil") === "soil";
+  const SIDES = { px: [1, 0, 0], nx: [-1, 0, 0], py: [0, 1, 0], ny: [0, -1, 0], pz: [0, 0, 1], nz: [0, 0, -1] };
+  for (let x = AREA.x0; x < AREA.x1; x++) {
+    for (let z = AREA.z0; z < zEnd; z++) {
+      for (let y = AREA.y0; y <= -1; y++) {
+        const what = cells.get(key(x, y, z)) || "soil";
+        if (what === "air") continue;
+        if (what === "soil") {
+          const top = y === -1;
+          const keys = top && grassy
+            ? { px: "grass_side", nx: "grass_side", pz: "grass_side", nz: "grass_side", py: "grass_top", ny: info.soil }
+            : top ? { px: info.top, nx: info.top, py: info.top, ny: info.top, pz: info.top, nz: info.top }
+            : { px: info.soil, nx: info.soil, py: info.soil, ny: info.soil, pz: info.soil, nz: info.soil };
+          // Walls inside the tunnel and the room are in shade (floors a little less), so the hole reads at a glance.
+          box(x, y, z, x + 1, y + 1, z + 1, keys, face => { const d = SIDES[face]; return solid(x + d[0], y + d[1], z + d[2]); },
+              face => { const d = SIDES[face]; return isAir(x + d[0], y + d[1], z + d[2]) && y + d[1] <= -1 ? (face === "py" ? 0.8 : 0.5) : 1; });
+        } else {
+          // A ramp carved from this soil: its high side toward the entrance (-x), in 8 slices.
+          const keys = { px: info.soil, nx: info.soil, py: info.soil, ny: info.soil, pz: info.soil, nz: info.soil };
+          for (let i = 0; i < 8; i++) {
+            const h = sliceHeight(what, i) / 16;
+            box(x + i / 8, y, z, x + (i + 1) / 8, y + h, z + 1, keys, face => face === "ny" && solid(x, y - 1, z));
+          }
+        }
+      }
+    }
+  }
+  for (const [k, b] of Object.entries(batches)) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(b.pos, 3));
+    g.setAttribute("uv", new THREE.Float32BufferAttribute(b.uv, 2));
+    g.setAttribute("color", new THREE.Float32BufferAttribute(b.col, 3));
+    world.add(new THREE.Mesh(g, material(k)));
+  }
+  // The ant: on the slope with ramps, on the room's floor on stairs (it would hop down the steps).
+  if (ant) { scene.remove(ant); ant = null; }
+  if (showAnt) {
+    ant = makeAnt();
+    if (ramps) {
+      ant.position.set(slope.ant.x, slope.ant.y, 0.5);
+      ant.rotation.z = -slope.ant.angle;
+    } else {
+      ant.position.set(slope.roomX + 1.5, -3, 0.5);
+    }
+    scene.add(ant);
+  }
+  draw();
+}
+
+// A Matabele major, about 1 block long, head toward +x: gaster, waist, thorax, head, jaws, six legs.
+function makeAnt() {
+  const group = new THREE.Group();
+  // (colours given as seen: the renderer works in linear light)
+  const colour = hex => new THREE.MeshBasicMaterial({ color: new THREE.Color(hex).convertSRGBToLinear() });
+  const black = colour(0x141414);
+  const shell = colour(0x2a2a2a);
+  const part = (rx, ry, rz, x, y, mat) => {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), mat);
+    m.scale.set(rx, ry, rz); m.position.set(x, y, 0); group.add(m);
+  };
+  part(0.2, 0.13, 0.14, -0.28, 0.17, black);   // gaster
+  part(0.05, 0.06, 0.05, -0.07, 0.15, shell);  // waist
+  part(0.16, 0.08, 0.08, 0.06, 0.15, black);   // thorax
+  part(0.1, 0.08, 0.09, 0.3, 0.16, shell);     // head
+  part(0.07, 0.02, 0.03, 0.42, 0.11, black);   // jaws
+  const legMat = colour(0x0c0c0c);
+  for (const [x, spread] of [[0.14, 0.15], [0.05, 0.0], [-0.04, -0.17]]) {
+    for (const side of [-1, 1]) {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.3, 5), legMat);
+      leg.position.set(x + spread * 0.5, 0.08, side * 0.13);
+      leg.rotation.x = side * 1.0; leg.rotation.z = -spread * 2.0;
+      group.add(leg);
+    }
+  }
+  return group;
+}
+
+function resize() {
+  const r = canvas.getBoundingClientRect();
+  if (!r.width) return;
+  renderer.setSize(r.width, r.height, false);
+  camera.aspect = r.width / r.height; camera.updateProjectionMatrix();
+}
+function draw() { renderer.render(scene, camera); }
+new ResizeObserver(() => { resize(); draw(); }).observe(canvas);
+controls.addEventListener("change", draw);
+(function loop() { controls.update(); requestAnimationFrame(loop); })();
+
+function choices(id, items, current, pick) {
+  const el = document.getElementById(id);
+  el.innerHTML = "";
+  for (const [value, label] of items) {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = label; b.setAttribute("aria-pressed", String(value === current()));
+    b.addEventListener("click", () => { pick(value); save(); refresh(); build(); });
+    el.appendChild(b);
+  }
+}
+function refresh() {
+  choices("soils", Object.entries(DATA.soils).map(([k, v]) => [k, v.name]), () => soil, v => soil = v);
+  choices("steep", Object.entries(SLOPES).map(([k, v]) => [k, v.name]), () => steep, v => steep = v);
+  choices("floor", [[true, "Ramps"], [false, "Stairs (today)"]], () => ramps, v => ramps = v);
+  const view = [["cut", "Cut open"], ["whole", "Whole ground"], ["ant", showAnt ? "Hide ant" : "Show ant"]];
+  choices("view-choices", view, () => cut ? "cut" : "whole", v => { if (v === "ant") showAnt = !showAnt; else cut = v === "cut"; });
+  document.getElementById("steep-note").textContent = SLOPES[steep].note;
+}
+
+Promise.all(Object.keys(DATA.textures).map(n => loadImage(n).then(img => images[n] = img))).then(() => {
+  for (const n of ["dirt", "coarse_dirt", "rooted_dirt", "clay", "mud", "sand", "red_sand"]) {
+    textures[n] = canvasTexture(g => g.drawImage(images[n], 0, 0));
+  }
+  textures.grass_top = canvasTexture(g => tinted(g, images.grass_block_top));
+  textures.grass_side = canvasTexture(g => { g.drawImage(images.grass_block_side, 0, 0); tinted(g, images.grass_block_side_overlay); });
+  refresh(); resize(); build();
+});
+</script>
