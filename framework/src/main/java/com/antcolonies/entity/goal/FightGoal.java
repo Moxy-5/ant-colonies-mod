@@ -72,6 +72,9 @@ public class FightGoal extends Goal {
     private int lookingOver;
     private int replan;
     private int idleTicks;
+    /** Whether its walking is the search round the spot (not a chase), and the idle tick it picks its next walk at. */
+    private boolean searching;
+    private int nextStep;
     /** The foe it is chasing and for how long, without a blow at it. */
     @Nullable
     private LivingEntity chasing;
@@ -103,6 +106,7 @@ public class FightGoal extends Goal {
         walkingTo = null;
         replan = 0;
         idleTicks = 0;
+        searching = false;
     }
 
     @Override
@@ -148,6 +152,7 @@ public class FightGoal extends Goal {
         }
         if (foe != null) {
             idleTicks = 0;
+            searching = false;
             fight(level, foe);
             return;
         }
@@ -155,17 +160,34 @@ public class FightGoal extends Goal {
         if (spot == null) {
             return;
         }
-        // No foe in reach: to the spot, and once there, search round it a while for more before the fight is over.
-        if (ant.blockPosition().distSqr(spot) > (SEARCH_REACH + 2) * (SEARCH_REACH + 2)) {
-            if (ant.getNavigator().isDone() || !spot.equals(walkingTo)) {
+        // No foe in reach: to the spot, and once there, search round it a while for more before the fight is over. The
+        // spot is often the food itself (a hay bale, dead wood): it walks to any foothold near it, never into it (the
+        // user's bug of 2026-10-25: ants far off planned a way into the solid spot every tick, found none and stood in
+        // a corner till a termite came by). With no way to the spot it searches round where it is, and tries again later.
+        if (!searching) {
+            searching = true;
+            ant.getNavigator().stop();
+            nextStep = idleTicks;
+        }
+        if (ant.getNavigator().isDone() && idleTicks >= nextStep) {
+            nextStep = idleTicks + SEARCH_EVERY;
+            boolean far = ant.blockPosition().distSqr(spot) > (SEARCH_REACH + 2) * (SEARCH_REACH + 2);
+            if (far && ant.getNavigator().moveTo(at -> at.cell().closerThan(spot, SEARCH_REACH), spot, SEARCH_REACH, 1.2)) {
                 walkingTo = spot;
-                ant.getNavigator().moveTo(spot, 1.2);
+            } else {
+                // Each search step goes somewhere new (never a place it already stands at: it kept "searching" on the
+                // spot, the same bug report).
+                BlockPos here = ant.blockPosition();
+                BlockPos round = far ? here : spot;
+                BlockPos pick = round;
+                for (int tries = 0; tries < 6 && pick.distManhattan(here) < 3; tries++) {
+                    pick = round.offset(ant.getRandom().nextInt(SEARCH_REACH * 2 + 1) - SEARCH_REACH, 0,
+                            ant.getRandom().nextInt(SEARCH_REACH * 2 + 1) - SEARCH_REACH);
+                }
+                BlockPos look = pick;
+                walkingTo = look;
+                ant.getNavigator().moveTo(at -> at.cell().distManhattan(look) <= 2 && !at.cell().equals(here), look, 2, 0.8);
             }
-        } else if (ant.getNavigator().isDone() && idleTicks % SEARCH_EVERY == 0) {
-            BlockPos look = spot.offset(ant.getRandom().nextInt(SEARCH_REACH * 2 + 1) - SEARCH_REACH, 0,
-                    ant.getRandom().nextInt(SEARCH_REACH * 2 + 1) - SEARCH_REACH);
-            walkingTo = look;
-            ant.getNavigator().moveTo(at -> at.cell().distManhattan(look) <= 2, look, 2, 0.8);
         }
         int giveUp = FightNumbers.of(ant.profile()).map(FightNumbers::giveUpTicks).orElse(FightNumbers.DEFAULT_GIVE_UP_TICKS);
         if (++idleTicks >= giveUp) {

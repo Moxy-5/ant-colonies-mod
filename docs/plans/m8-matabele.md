@@ -125,6 +125,8 @@ timings: all "my pick, to confirm" until then).
      7. Pace target: ten ants against a feeding spot take several minutes, many termites escaping down the holes.
      **Round A BUILT 2026-10-25 (pieces 1, 2, 5, 6; `docs/HISTORY.md`, "M8 fight polish, round A"); round B (3, 4, 7)
      BUILT 2026-10-25 (`docs/HISTORY.md`, "M8 fight polish, round B"); the fight polish is ready for the user's in-game test.**
+     **In-game test of the fight polish done 2026-10-25 (the user: "its so much better").** Found: ants camping one
+     corner till a termite came by (fixed the same day, `docs/BUGS.md` 76); the targeting idea below goes to step 4.
      Tests: an ant on a wall never strikes; a termite falls only after the sting moment; a ten-ant skirmish lasts
      minutes, not seconds; `soldiers,termitefood,colony,away`; guard films if a clip changes; then the user looks
      in-game with `/antcolonies skirmish 10`.
@@ -151,6 +153,11 @@ timings: all "my pick, to confirm" until then).
    in the galleries shown on break-in (`HiddenTrips`), the termites plugging and
    closing (`ClosedHoles`, danger memory), the column home with prey; 2-4 raids a
    day by hunger, morning and late afternoon.
+   **Targeting (the user, 2026-10-25, from the fight polish test):** today the ants go at every termite near the spot,
+   as if exploring the nest; the user wants them to go for the food (the workers at the feeding spot) before the
+   soldiers pile up. Real raids: the column hits the feeding site, the minors take the workers in the opened galleries,
+   and the soldiers that come up are fought only as they get in the way. To plan with the raids (the user said "part 3";
+   it fits here, with the raid's target, not step 3's drawn-only ants).
 5. **Rescue and wound care:** the help smell, pulling clamped soldiers off, carrying
    the hurt home (legs tucked), the badly hurt left; wounds and infection in the
    nest, care by any nestmate.

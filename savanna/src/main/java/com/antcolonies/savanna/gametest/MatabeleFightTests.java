@@ -1,8 +1,10 @@
 package com.antcolonies.savanna.gametest;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -227,6 +229,8 @@ public class MatabeleFightTests {
         Set<UUID> downed = new HashSet<>();
         Set<UUID> hid = new HashSet<>();
         boolean[] overLogged = {false};
+        Map<UUID, BlockPos> standsAt = new HashMap<>();
+        Map<UUID, Long> standsSince = new HashMap<>();
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
@@ -294,6 +298,20 @@ public class MatabeleFightTests {
                     hid.add(worker.getUUID());
                 }
             }
+            // Never camping (the user's bug of 2026-10-25): an ant sent to fight never stands in one block for half a
+            // minute (it planned a way into the solid hay every tick and stood in a corner).
+            for (MatabeleEntity ant : ants) {
+                if (!ant.isAlive() || ant.getFightSpot() == null) {
+                    continue;
+                }
+                if (!ant.blockPosition().equals(standsAt.get(ant.getUUID()))) {
+                    standsAt.put(ant.getUUID(), ant.blockPosition());
+                    standsSince.put(ant.getUUID(), tick);
+                }
+                helper.assertTrue(tick - standsSince.get(ant.getUUID()) < 600, "a Matabele has stood at "
+                        + helper.relativePos(ant.blockPosition()) + " for half a minute while the fight is on (the hay at "
+                        + helper.relativePos(hay[0]) + ")");
+            }
             long since = tick - cameAt[0];
             boolean on = ants.stream().anyMatch(ant -> ant.isAlive() && ant.getFightSpot() != null);
             if (since == 600) {
@@ -317,7 +335,8 @@ public class MatabeleFightTests {
             }
             helper.assertTrue(since >= 2400, "the fight was over after " + since / 20 + " s; it should take minutes");
             helper.assertTrue(!downed.isEmpty(), "no termite was stung still");
-            helper.assertTrue(hid.size() >= 3, "only " + hid.size() + " workers escaped down the holes; many should");
+            helper.assertTrue(hid.size() >= Math.max(1, foragers.size() / 3), "only " + hid.size() + " of " + foragers.size()
+                    + " foragers escaped down the holes; many should");
         });
     }
 
