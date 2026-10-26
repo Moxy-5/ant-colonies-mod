@@ -156,6 +156,49 @@ timings: all "my pick, to confirm" until then).
    - **In-game test 3** (2e + 2f), then merge.
    Tests: each piece runs `soldiers,termitefood,colony,away` (and `legs` for 2d, guard films for 2c and 2d); a full run
    before the merge (2a changes the shared alarm).
+   - **2g, smarter hunters at the feeding spot (planned 2026-10-25, from the user's in-game report: "the ants are very
+     janky how they move ... it took a minute of waiting to get them to break the mud wall and it only happened when a
+     termite got right up against the mud wall ... they need to be smarter").** Nothing built yet; waiting for the user's OK.
+     - **Measured** (a probe game test: 5 termites in the feeding gallery under a fallen log, the log's top plastered with
+       mud, 10 Matabele sent at the log; 3 runs of 3 the same): **in 2 minutes no termite stung and nothing opened.**
+       Every ant tried each termite in turn, planned a walk to it, found none (they are under the soil), gave it up for
+       10 s and went to the next: 600 failed route searches for 10 ants, a fresh one every 2 s each. Between those it
+       searched at random round the spot, stopping dead every 3 s. With termites in the open (the first probe) it picked a
+       new target 46 times in 20 s.
+     - **Why:** (1) the ants hunt only termites they "see" and plan a walk straight to each, so termites under the ground
+       cost a failed search apiece, again and again; (2) a major opens only mud lying right over or beside the termite it
+       is chasing, or the one soil block over it with sky right above; under a log the roof is wood and the walls are
+       plain soil, so nothing qualifies until a termite steps right beside a mud wall (exactly what the user saw);
+       (3) every time a target is given up or a search step is picked, the ant is stopped dead, and the nearest termite
+       is picked afresh every second, so it turns from one to another.
+     - **What real Megaponera do** (Longhurst and Howse 1979; Yusuf 2026, section 3.1.3): the column stops a few
+       centimetres short of the feeding site, spreads out and attacks at once; **the majors break open the galleries and
+       sheeting** with their jaws, **the minors go into the opened galleries** and pull termites out, sting them and
+       pile them by the gallery. They find the termites by smell and touch (termite scent soaks the galleries and their
+       mud), not by sight.
+     - **The fix (all my picks, by the real animal):**
+       1. **Termite scent:** at the spot, an ant knows the termite works round it by smell (termite mud, mud casts, and
+          the galleries of any termite colony there, filled or empty, plus termites felt through a block of soil), within
+          the search reach. It hunts the scent, not only the termites it can walk to.
+       2. **Majors break in:** each major picks its own breach on the scent (a block of soil or termite mud touching a
+          gallery, over it or beside it, that it can stand by on the surface; never the mound, never wood) and bites it
+          open; then the next block along the gallery while the scent holds, up to about 6 blocks a major at one spot
+          (my pick, so a raid leaves a few broken trenches, not a quarry). Majors spread over different breaches. They
+          dig even when no termite is right there (the scent says termites use it).
+       3. **Minors go in:** a minor goes to an open breach, steps into the gallery and hunts the termites in it (the
+          grab and sting as now; attack B from the edge if it cannot fit), up to a few blocks along, then comes out.
+          They meet the termites' 2f plug and soldiers there, as real raiders do.
+       4. **No more failed searches:** a termite with no way to it is not chased (no route search); it is left to the
+          breach work. A target is kept until it is caught, lost or a much nearer one turns up (no flipping every
+          second). The search round the spot walks on smoothly from one scent to the next, at one pace, never stopping
+          dead between steps.
+       5. **Kept as is:** the 2-minute search before giving up, the 5-minute skirmish, stings only from a floor, the
+          termites fleeing down the holes, raids never into the mound proper.
+     - **Test:** the probe becomes a real game test in `soldiers` (`MatabeleFightTests`): under the log a breach opens
+       within 30 s, a termite stung within 60 s, at most a handful of failed route searches, no ant stopping dead more
+       than about once every 5 s; the ten-ant hay test and the mud test kept. Then `soldiers,away` on 6 servers, guard
+       films only if the walk code changes.
+     - **In-game:** `/antcolonies skirmish 10` beside a termite colony eating a fallen log or branch by day.
 3. **Drawn-only ants** (brain step 4e, pulled forward): the column far from the
    player drawn by the player's game, almost free on the server.
 4. **Scouts and raids:** lone scouts by day, the scent line home, the column to a
