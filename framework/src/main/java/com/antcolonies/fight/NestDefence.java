@@ -56,6 +56,14 @@ public final class NestDefence {
     private final Set<UUID> defenders = new HashSet<>();
     /** The players standing on the entrance and since when (game time). */
     private final Map<UUID, Long> onNest = new HashMap<>();
+    /** When each player on the entrance was last seen on it (game time). */
+    private final Map<UUID, Long> lastOnNest = new HashMap<>();
+    /**
+     * A player off the entrance for no longer than this (ticks) has not stepped off: a jump, a stumble (BUGS 79: a
+     * player jumping on the mound was out of its height now and then, so the lookers were called off and the wait
+     * before they sting began again at every landing; real ants feel a jumping player's thuds all the more).
+     */
+    private static final long OFF_FOR = 40;
     /** The players touching a column, and for how many ticks so far. */
     private final Map<UUID, Integer> touching = new HashMap<>();
     /** When the next wave comes out (game time), and where the trouble at the nest is. */
@@ -223,6 +231,7 @@ public final class NestDefence {
             touchesAColumn(level, members, numbers);
         } else {
             onNest.clear();
+            lastOnNest.clear();
             touching.clear();
         }
         // The defenders: their orders kept while a full provocation holds, the next wave out, the rest sent home.
@@ -315,6 +324,7 @@ public final class NestDefence {
                 continue;
             }
             here.add(player.getUUID());
+            lastOnNest.put(player.getUUID(), now);
             Long since = onNest.get(player.getUUID());
             if (since == null) {
                 onNest.put(player.getUUID(), now);
@@ -342,7 +352,11 @@ public final class NestDefence {
             Map.Entry<UUID, Long> entry = it.next();
             Provoker provoker = provokers.get(entry.getKey());
             if (!here.contains(entry.getKey())) {
+                if (now - lastOnNest.getOrDefault(entry.getKey(), now - OFF_FOR - 1) <= OFF_FOR) {
+                    continue; // only up in the air a moment (a jump): still on it
+                }
                 it.remove();
+                lastOnNest.remove(entry.getKey());
                 if (provoker != null && provoker.light) {
                     if (provoker.until == Long.MAX_VALUE && !provoker.stinging) {
                         provokers.remove(entry.getKey()); // stepped off in time: nothing happened
