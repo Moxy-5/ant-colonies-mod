@@ -259,6 +259,8 @@ A Minecraft mod where ants and termites live as real colonies: they dig, build, 
 - **M8 steps 2e and 2f planned with the user 2026-10-25** (`docs/DESIGN.md`, "Steps 2e and 2f"): all four provocations sting (breaking the nest, hitting one, standing in a column, walking on the nest), defenders in waves giving up 16 blocks out, the queen stings only in her room, termites eat a paralysed nestmate left behind; nothing built yet.
 - **M8 step 2e, the player, BUILT 2026-10-25** (branch `claude/m8-player-2e`): Matabeles sting a survival player who breaks their nest, hits one, stands in a column or stays on the entrance over 3 s; defenders in waves, giving up 16 blocks out; the sting does 2 hearts and a red-edged pain that slows; the squeak; the queen stings in her room (a plain blow, no clip yet); `MatabeleDefenceTests`; not tried in-game yet. Next: 2f.
 
+- **Research for drawn-only insects (2026-10-25):** `docs/research/crowds-and-performance.md`, every crowd technique with a verdict and a recommended stack (baked poses, impostor particles, the dark line, one message a column); no game code.
+
 ## Other notes files (read only when the task needs them)
 - `docs/DESIGN.md`: every design decision for the species and shared systems (read the section for a feature before working on it).
 - `docs/HISTORY.md`: the full change log of every feature (class names, numbers, tests, the user's confirmations) and the old handover notes for a code reviewer. Older bullets name methods as `Colony.something`: since the code review split they live in the colony's parts (`Nest`, `FoodStore`, `Brood`, ...).
