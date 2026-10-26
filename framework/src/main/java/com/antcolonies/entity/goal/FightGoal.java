@@ -2,7 +2,9 @@ package com.antcolonies.entity.goal;
 
 import java.util.Comparator;
 import java.util.EnumSet;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -40,6 +42,14 @@ import net.minecraft.world.phys.AABB;
  * Megaponera search the opened galleries and the ground round a feeding site for many minutes); a foe in its own nest,
  * past its feeding ways ({@link AbstractAntEntity#isSheltered}), is left alone: raids hit feeding sites, never the mound;
  * one it chases for {@link #CHASE_TICKS} without a blow at it is left a while.
+ *
+ * <p>Step 2g (the user's report of 2026-10-25, "they need to be smarter"): real Megaponera find termites by smell, not
+ * sight, and the majors break the galleries open while the minors go in. An insect foe shut in under cover
+ * ({@link Fights#isShutIn}: under a log, mud or soil) is not chased (no walk planned that cannot be found); a breaker
+ * ({@link AbstractAntEntity#breaksIn}) leaves every foe under cover alone unless it can already strike it, and with no
+ * foe it opens the way in ({@link AbstractAntEntity#breakIn}); the others search where they smell prey
+ * ({@link AbstractAntEntity#scentNear}) first. A foe is kept until it is caught, lost or a much nearer one turns up,
+ * and the search walks on from place to place without stopping dead.
  */
 public class FightGoal extends Goal {
     /** How far (blocks) round the spot it looks for foes, unless its order says (a defender's, M8 step 2e). */
@@ -48,8 +58,14 @@ public class FightGoal extends Goal {
     private static final double FIGHT_BACK_REACH = 8.0;
     /** How far off (degrees) its heading may be from the foe for it to strike: it turns to face it first. */
     private static final float FACING = 30.0F;
-    /** How often (ticks) it plans a new way to a moving foe. */
-    private static final int CHASE_REPLAN = 10;
+    /** A new foe is taken over the one it is after only if it is this much nearer (as a share of the squared distance). */
+    private static final double MUCH_NEARER = 0.25;
+    /**
+     * At one search place in this many it stops a moment, feeling about ({@link #SEARCH_PAUSE} ticks at most, my picks);
+     * at the others it walks straight on to the next, choosing it just before it arrives (it stopped dead at every one).
+     */
+    private static final int PAUSE_ONE_IN = 3;
+    private static final int SEARCH_PAUSE = 20;
     /** A foe it found no way to is left alone this long (ticks). */
     private static final int UNREACHABLE_TICKS = 200;
     /** How far (blocks) from the spot it searches when no foe is in reach. */
@@ -72,11 +88,12 @@ public class FightGoal extends Goal {
     @Nullable
     private LivingEntity struck;
     private int lookingOver;
-    private int replan;
     private int idleTicks;
     /** Whether its walking is the search round the spot (not a chase), and the idle tick it picks its next walk at. */
     private boolean searching;
     private int nextStep;
+    /** Whether it stops a moment at the place it is walking to before the next (see {@link #PAUSE_ONE_IN}). */
+    private boolean pauseNext;
     /** The foe it is chasing and for how long, without a blow at it. */
     @Nullable
     private LivingEntity chasing;
@@ -112,7 +129,6 @@ public class FightGoal extends Goal {
     @Override
     public void start() {
         walkingTo = null;
-        replan = 0;
         idleTicks = 0;
         searching = false;
     }
@@ -156,7 +172,12 @@ public class FightGoal extends Goal {
             return;
         }
         if (foe == null || !Fights.mayAttack(ant, foe) || (ant.tickCount + ant.getId()) % 20 == 0) {
-            foe = pickFoe(level);
+            LivingEntity was = foe;
+            LivingEntity next = pickFoe(level);
+            // Kept until caught or lost: a new one only if it is much nearer (it turned from one to another every second).
+            boolean keep = was != null && next != null && next != was && was.isAlive() && usable(was) && Fights.mayAttack(ant, was)
+                    && worthChasing(level, was) && next.distanceToSqr(ant) > MUCH_NEARER * was.distanceToSqr(ant);
+            foe = keep ? was : next;
         }
         if (foe != null) {
             idleTicks = 0;
@@ -168,33 +189,59 @@ public class FightGoal extends Goal {
         if (spot == null) {
             return;
         }
-        // No foe in reach: to the spot, and once there, search round it a while for more before the fight is over. The
-        // spot is often the food itself (a hay bale, dead wood): it walks to any foothold near it, never into it (the
-        // user's bug of 2026-10-25: ants far off planned a way into the solid spot every tick, found none and stood in
-        // a corner till a termite came by). With no way to the spot it searches round where it is, and tries again later.
+        // No foe in reach: a breaker opens the way in to the prey it smells (step 2g); the rest go to the spot, and once
+        // there search round it a while for more before the fight is over. The spot is often the food itself (a hay
+        // bale, dead wood): it walks to any foothold near it, never into it (the user's bug of 2026-10-25: ants far off
+        // planned a way into the solid spot every tick, found none and stood in a corner till a termite came by). With
+        // no way to the spot it searches round where it is, and tries again later.
+        if (ant.breaksIn() && ant.breakIn(level, spot, ant.getFightReach())) {
+            searching = false;
+            idleTicks = 0; // breaking in is work at the spot, not an empty search
+            return;
+        }
         if (!searching) {
-            searching = true;
-            ant.getNavigator().stop();
+            searching = true; // (no stop: it walks on from where it was going)
             nextStep = idleTicks;
         }
-        if (ant.getNavigator().isDone() && idleTicks >= nextStep) {
-            nextStep = idleTicks + SEARCH_EVERY;
+        boolean walkOn = !pauseNext && walkingTo != null && stepsLeft() <= 1;
+        if ((ant.getNavigator().isDone() || walkOn) && idleTicks >= nextStep) {
             boolean far = ant.blockPosition().distSqr(spot) > (SEARCH_REACH + 2) * (SEARCH_REACH + 2);
             if (far && ant.getNavigator().moveTo(at -> at.cell().closerThan(spot, SEARCH_REACH), spot, SEARCH_REACH, 1.2)) {
                 walkingTo = spot;
+            } else if (!far && searchScent(level, spot)) {
+                nextStep = idleTicks; // walking to where it smells prey
             } else {
                 // Each search step goes somewhere new (never a place it already stands at: it kept "searching" on the
                 // spot, the same bug report).
                 BlockPos here = ant.blockPosition();
                 BlockPos round = far ? here : spot;
+                // Mostly ahead of it, a meander rather than a zigzag: a place behind it means turning round on the spot.
                 BlockPos pick = round;
-                for (int tries = 0; tries < 6 && pick.distManhattan(here) < 3; tries++) {
-                    pick = round.offset(ant.getRandom().nextInt(SEARCH_REACH * 2 + 1) - SEARCH_REACH, 0,
+                double bestAhead = -2.0;
+                for (int tries = 0; tries < 8; tries++) {
+                    BlockPos next = round.offset(ant.getRandom().nextInt(SEARCH_REACH * 2 + 1) - SEARCH_REACH, 0,
                             ant.getRandom().nextInt(SEARCH_REACH * 2 + 1) - SEARCH_REACH);
+                    if (next.distManhattan(here) < 3) {
+                        continue;
+                    }
+                    double ahead = ahead(next);
+                    if (ahead > bestAhead) {
+                        bestAhead = ahead;
+                        pick = next;
+                    }
+                    if (ahead > 0.5) {
+                        break;
+                    }
                 }
                 BlockPos look = pick;
                 walkingTo = look;
-                ant.getNavigator().moveTo(at -> at.cell().distManhattan(look) <= 2 && !at.cell().equals(here), look, 2, 0.8);
+                if (!ant.getNavigator().moveTo(at -> at.cell().distManhattan(look) <= 2 && !at.cell().equals(here), look, 2, 0.8)) {
+                    nextStep = idleTicks + SEARCH_EVERY; // no way there: it feels about here a while before trying again
+                }
+            }
+            pauseNext = ant.getRandom().nextInt(PAUSE_ONE_IN) == 0;
+            if (nextStep <= idleTicks && pauseNext) {
+                nextStep = idleTicks + ant.getRandom().nextInt(SEARCH_PAUSE + 1); // a short feel about, then on
             }
         }
         int giveUp = FightNumbers.of(ant.profile()).map(FightNumbers::giveUpTicks).orElse(FightNumbers.DEFAULT_GIVE_UP_TICKS);
@@ -227,10 +274,10 @@ public class FightGoal extends Goal {
             return;
         }
         BlockPos at = target.blockPosition();
-        if (--replan <= 0 || ant.getNavigator().isDone() || walkingTo == null || walkingTo.distSqr(at) > 2) {
-            replan = CHASE_REPLAN;
+        if (ant.getNavigator().isDone() || walkingTo == null || walkingTo.distSqr(at) > 2) {
             walkingTo = at;
             if (!ant.getNavigator().moveTo(at, 1.2) && !ant.openWayTo(level, target)) {
+                ant.countChaseNotFound();
                 unreachable.put(target.getUUID(), level.getGameTime() + UNREACHABLE_TICKS);
                 foe = null;
             }
@@ -254,7 +301,7 @@ public class FightGoal extends Goal {
             return null;
         }
         AABB area = new AABB(spot).inflate(ant.getFightReach());
-        return level.getEntitiesOfClass(LivingEntity.class, area, this::usable).stream()
+        return level.getEntitiesOfClass(LivingEntity.class, area, candidate -> usable(candidate) && worthChasing(level, candidate)).stream()
                 .min(Comparator.comparingDouble(candidate -> candidate.distanceToSqr(ant))).orElse(null);
     }
 
@@ -262,6 +309,58 @@ public class FightGoal extends Goal {
         return candidate != ant && !unreachable.containsKey(candidate.getUUID()) && Fights.mayAttack(ant, candidate)
                 && !(candidate instanceof AbstractAntEntity insect
                         && (insect.isPinned() && candidate != ant.blowTarget() || insect.isSheltered()));
+    }
+
+    /**
+     * One search step to where it smells prey round the spot (step 2g: an opened gallery, a termite in it), not where it
+     * stands; true if it is walking there.
+     */
+    private boolean searchScent(ServerLevel level, BlockPos spot) {
+        List<BlockPos> scent = new ArrayList<>(ant.scentNear(level, spot, ant.getFightReach()));
+        BlockPos here = ant.blockPosition();
+        scent.removeIf(cell -> cell.distManhattan(here) <= 1);
+        for (int tries = 0; tries < 3 && !scent.isEmpty(); tries++) {
+            BlockPos smell = scent.remove(ant.getRandom().nextInt(scent.size()));
+            if (ant.getNavigator().moveTo(at -> at.cell().distManhattan(smell) <= 1, smell, 1, 0.9)) {
+                walkingTo = smell;
+                return true;
+            }
+            scent.removeIf(cell -> cell.distManhattan(smell) <= 2); // (no way there: not its neighbours either)
+        }
+        return false;
+    }
+
+    /**
+     * Whether it goes after this foe (step 2g): one it can strike now, anything not an insect, or an insect in the open;
+     * an insect under cover only if it is not shut in, and never by a breaker, who opens the way in instead.
+     */
+    private boolean worthChasing(ServerLevel level, LivingEntity candidate) {
+        if (!(candidate instanceof AbstractAntEntity) || ant.reachesInFight(candidate)) {
+            return true;
+        }
+        BlockPos at = candidate.blockPosition();
+        if (Fights.isInTheOpen(level, at)) {
+            return true;
+        }
+        return !ant.breaksIn() && !Fights.isShutIn(level, at);
+    }
+
+    /** How far this place lies ahead of it: 1 straight ahead, 0 to the side, -1 behind. */
+    private double ahead(BlockPos place) {
+        double dx = place.getX() + 0.5 - ant.getX();
+        double dz = place.getZ() + 0.5 - ant.getZ();
+        double length = Math.sqrt(dx * dx + dz * dz);
+        if (length < 1.0E-3) {
+            return 0.0;
+        }
+        float yaw = ant.getYRot() * Mth.DEG_TO_RAD;
+        return (-Mth.sin(yaw) * dx + Mth.cos(yaw) * dz) / length;
+    }
+
+    /** How many steps of its walk are left (0 with none). */
+    private int stepsLeft() {
+        var route = ant.getNavigator().getPlannedRoute();
+        return route == null || ant.getNavigator().isDone() ? 0 : route.steps().size() - ant.getNavigator().getNextWaypoint();
     }
 
     /** Turns toward the point; true once it faces it (within {@link #FACING} degrees). */

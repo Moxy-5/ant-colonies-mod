@@ -15,6 +15,7 @@ Keep this short. The full story is in `docs/HISTORY.md`; the long status is at t
 - **Red harvester ant:** lives in its own mod (Desert Colonies), waiting for its rework later.
 
 ## Built, not tried in-game yet
+- Smarter hunters at a feeding spot: majors break into the galleries they smell, minors go in, smooth searching (step 2g).
 - Matabele defend their nest against the player (step 2e).
 - The termites' side of a raid: soldiers drum, workers go deeper, galleries sealed, the dead dragged out (step 2f).
 - Termite mounds and Matabele colonies placed in new savannas (steps 1b, 1f).

@@ -158,7 +158,7 @@ timings: all "my pick, to confirm" until then).
    before the merge (2a changes the shared alarm).
    - **2g, smarter hunters at the feeding spot (planned 2026-10-25, from the user's in-game report: "the ants are very
      janky how they move ... it took a minute of waiting to get them to break the mud wall and it only happened when a
-     termite got right up against the mud wall ... they need to be smarter").** Nothing built yet; waiting for the user's OK.
+     termite got right up against the mud wall ... they need to be smarter").** **BUILT 2026-10-25 with the user's OK** (branch `claude/m8-matabele-smarter-5d130b`): the new test `matabeleMajorsBreakIntoAFeedingGalleryUnderALog` opens the ground in 3 to 4 s (4 to 5 blocks), stings the first termite in 7 to 9 s, all 5 of 5 stung, 0 walks not found, 168 to 191 stops for 10 ants in 2 minutes (was: nothing opened or stung, 600 walks not found, about 300 stops); `matabelefighttests` 6 of 6 on every server; `soldiers,away` 30 of 30 on 6 servers; not tried in-game yet.
      - **Measured** (a probe game test: 5 termites in the feeding gallery under a fallen log, the log's top plastered with
        mud, 10 Matabele sent at the log; 3 runs of 3 the same): **in 2 minutes no termite stung and nothing opened.**
        Every ant tried each termite in turn, planned a walk to it, found none (they are under the soil), gave it up for

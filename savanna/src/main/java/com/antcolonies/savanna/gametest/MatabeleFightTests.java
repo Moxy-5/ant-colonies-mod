@@ -28,6 +28,7 @@ import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.RotatedPillarBlock;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
@@ -449,6 +450,101 @@ public class MatabeleFightTests {
         helper.assertTrue(!major.clamp().isOn() && major.clampedHeadLeg() < 0, "the head should be gone");
         major.setLostLegsForTests(0, 0); // (one time in ten the leg comes off with it)
         helper.assertTrue(Math.abs(slowed / speed.getValue() - 0.90) < 0.01, "a head on the leg should slow it 10 percent, walks at " + slowed / speed.getValue());
+    }
+
+    /**
+     * M8 step 2g (the user's report of 2026-10-25: "it took a minute of waiting to get them to break the mud wall ... they
+     * need to be smarter"): ten Matabele sent at a real feeding spot, five termites eating a fallen log from the gallery
+     * under it (soil all round, the log for a roof, mud on its top, the tunnel on to the nest under the ground). On the old
+     * code nothing was opened and no termite stung in 2 minutes, and the ants planned 600 walks to termites they could
+     * not reach. Now the majors bite the soil beside the gallery open within 30 s, never the log, a few blocks each; the
+     * minors go in and a termite is stung within a minute; hardly a walk is planned that cannot be found; and the ants,
+     * searching on, stop dead at most about once every 5 s each.
+     */
+    @GameTest(template = "arena", timeoutTicks = 2600, skyAccess = true)
+    public static void matabeleMajorsBreakIntoAFeedingGalleryUnderALog(GameTestHelper helper) {
+        for (int x = 0; x < 20; x++) {
+            for (int z = 0; z < 20; z++) {
+                for (int y = 0; y <= 2; y++) {
+                    helper.setBlock(x, y, z, Blocks.DIRT);
+                }
+            }
+        }
+        List<TermiteWorkerEntity> termites = new ArrayList<>();
+        for (int x = 6; x <= 10; x++) {
+            helper.setBlock(new BlockPos(x, 3, 10), Blocks.OAK_LOG.defaultBlockState().setValue(RotatedPillarBlock.AXIS, Direction.Axis.X));
+            helper.setBlock(x, 2, 10, Blocks.AIR); // the feeding gallery: the ground under the log
+            termites.add(TestAnts.lone(helper, SavannaEntities.TERMITE_WORKER.get(), x, 2, 10));
+        }
+        for (int x = 10; x <= 15; x++) {
+            helper.setBlock(x, 1, 10, Blocks.AIR); // the tunnel on to the nest, under a block of soil
+        }
+        helper.setBlock(new BlockPos(8, 4, 10), SavannaBlocks.MUD_CRUST.get().defaultBlockState()); // mud on the log top
+        List<MatabeleEntity> ants = new ArrayList<>();
+        BlockPos spot = helper.absolutePos(new BlockPos(8, 3, 10));
+        for (int i = 0; i < 10; i++) {
+            MatabeleEntity ant = TestAnts.loneWithAMind(helper, (i % 2 == 0 ? SavannaEntities.MATABELE_MAJOR : SavannaEntities.MATABELE_MINOR).get(),
+                    4 + i % 5, 3, 3 + i / 5);
+            ant.orderToFight(spot, helper.getLevel().getGameTime() + 6000);
+            ants.add(ant);
+        }
+        long[] openedAt = {-1};
+        long[] stungAt = {-1};
+        int[] stops = {0};
+        Map<UUID, Boolean> moving = new HashMap<>();
+        helper.onEachTick(() -> {
+            long tick = helper.getTick();
+            for (MatabeleEntity ant : ants) {
+                boolean now = ant.getDeltaMovement().horizontalDistanceSqr() > 1.0E-4;
+                if (Boolean.TRUE.equals(moving.get(ant.getUUID())) && !now) {
+                    stops[0]++;
+                }
+                moving.put(ant.getUUID(), now);
+            }
+            if (openedAt[0] < 0 && opened(helper) > 0) {
+                openedAt[0] = tick;
+            }
+            if (stungAt[0] < 0 && termites.stream().anyMatch(termite -> termite.isParalysed() || !termite.isAlive())) {
+                stungAt[0] = tick;
+            }
+            for (int x = 6; x <= 10; x++) {
+                helper.assertBlockPresent(Blocks.OAK_LOG, x, 3, 10); // never the wood
+            }
+            if (tick == 600) {
+                helper.assertTrue(openedAt[0] >= 0, "no way into the gallery opened within 30 s");
+            }
+            if (tick == 1200) {
+                helper.assertTrue(stungAt[0] >= 0, "no termite in the gallery stung within a minute");
+            }
+        });
+        helper.runAtTickTime(2400, () -> {
+            int notFound = ants.stream().mapToInt(MatabeleEntity::chasesNotFoundForTests).sum();
+            long stung = termites.stream().filter(termite -> termite.isParalysed() || !termite.isAlive()).count();
+            SavannaMod.LOGGER.info("[break-in test] opened at {} ({} blocks), first stung at {}, {} of 5 stung, {} walks not found, {} stops",
+                    openedAt[0], opened(helper), stungAt[0], stung, notFound, stops[0]);
+            helper.assertTrue(notFound <= 10, notFound + " walks planned to termites that could not be reached (600 on the old code)");
+            helper.assertTrue(opened(helper) <= 5 * 6, opened(helper) + " blocks opened: more than 6 a major");
+            helper.assertTrue(stung >= 3, "only " + stung + " of the 5 termites in the gallery stung in 2 minutes");
+            int allowed = ants.size() * 2400 / 20 / 5;
+            helper.assertTrue(stops[0] <= allowed, stops[0] + " stops in 2 minutes for 10 ants (at most " + allowed + ": once every 5 s each)");
+            helper.succeed();
+        });
+    }
+
+    /** How many blocks of the break-in test's ground have been opened (the gallery and tunnel dug by the test aside). */
+    private static int opened(GameTestHelper helper) {
+        int count = 0;
+        for (int x = 0; x < 20; x++) {
+            for (int z = 0; z < 20; z++) {
+                for (int y = 1; y <= 2; y++) {
+                    boolean dug = y == 2 && z == 10 && x >= 6 && x <= 10 || y == 1 && z == 10 && x >= 10 && x <= 15;
+                    if (!dug && helper.getBlockState(new BlockPos(x, y, z)).isAir()) {
+                        count++;
+                    }
+                }
+            }
+        }
+        return count;
     }
 
     private static void floor(GameTestHelper helper) {

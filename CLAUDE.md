@@ -265,6 +265,7 @@ A Minecraft mod where ants and termites live as real colonies: they dig, build, 
 - **Dead wood for the raids planned 2026-10-25** (the user's idea, `docs/plans/dead-wood-for-raids.md`; nothing built): termites only build surface works at dead wood, so raids need more of it: more trees, faster tree lives, a dead tree beside every new-land mound, heart rot hollowing trees from inside, and a count of feeding spots; before M8 step 4; taking our time (the user).
 - **M8 steps 2e and 2f confirmed in-game by the user 2026-10-25** ("it works"); found: jumping repeatedly "breaks them" (details asked for).
 - **Fix 2026-10-25 (`docs/BUGS.md` 79, branch `claude/m8-bug79-jumping` from the 2f branch):** jumping on a Matabele mound no longer stops the defenders (a jump counted as stepping off the entrance); `soldiers` 15 of 15; not tried in-game yet.
+- **M8 step 2g, smarter hunters, BUILT 2026-10-25** (branch `claude/m8-matabele-smarter-5d130b`, the user's report "they need to be smarter"): the ants smell termites in the galleries round a feeding spot; majors bite their way in from above (never wood or the mound, 6 blocks each), minors go in; no more chasing termites shut in under cover, no more target switching every second, no more stopping dead at each search step; new break-in test passes; `soldiers,away` 30 of 30 on 6 servers; not tried in-game yet.
 
 ## Other notes files (read only when the task needs them)
 - `docs/DESIGN.md`: every design decision for the species and shared systems (read the section for a feature before working on it).

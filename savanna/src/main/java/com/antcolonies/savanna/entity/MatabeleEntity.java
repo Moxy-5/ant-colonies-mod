@@ -28,7 +28,11 @@ import com.antcolonies.species.SpeciesProfiles;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+
+import com.antcolonies.fight.Fights;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -36,6 +40,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -85,12 +90,28 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
     /** How near (blocks, to the block's middle) it must be to bite a cover open, and how many bites it takes. */
     private static final double BITE_REACH = 1.8;
     private static final int BITES_TO_OPEN = 3;
+    /** At most this many blocks a major opens at one fight spot (my pick: a few broken trenches, not a quarry). */
+    private static final int OPENS_PER_SPOT = 6;
+    /** A breach it found no way to is left this long (ticks). */
+    private static final int NO_WAY_TICKS = 200;
 
     private boolean colonyChecked;
     /** The cover it is biting open, and how many bites it has given it (not saved). */
     @Nullable
     private BlockPos breaking;
     private int bites;
+    /**
+     * Step 2g, breaking in (not saved): the fight spot its count is for, the blocks it has opened there, the breach it is
+     * working at (others leave it to it), where it is walking to bite it, and breaches it found no way to, until when.
+     */
+    @Nullable
+    private BlockPos breachSpot;
+    private int opened;
+    @Nullable
+    private BlockPos breach;
+    @Nullable
+    private BlockPos walkingToBreach;
+    private final java.util.Map<BlockPos, Long> noWayTo = new java.util.HashMap<>();
     /** Its length in mm (0 until rolled, on its first tick). */
     private float lengthMm;
     @Nullable
@@ -352,6 +373,11 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
             }
             return getNavigator().moveTo(stands, 1.2);
         }
+        return bite(level, cover);
+    }
+
+    /** One bite at the cover it is in reach of (its clip, the third bite opening it); false if it may not bite now. */
+    private boolean bite(ServerLevel level, BlockPos cover) {
         getNavigator().stop();
         getLookControl().setLookAt(Vec3.atCenterOf(cover));
         if (isStriking()) {
@@ -369,6 +395,7 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         if (++bites >= BITES_TO_OPEN) {
             level.destroyBlock(cover, false, this);
             breaking = null;
+            opened++;
             // M8 step 2f: the colonies whose ground it is hear of it (the termites drum and seal the gallery behind them).
             for (Colony colony : com.antcolonies.colony.ColonyManager.get(level).getColonies()) {
                 double reach = colony.foragingRadius() + 8.0;
@@ -378,6 +405,169 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
             }
         }
         return true;
+    }
+
+    /** Step 2g: the majors break in; the minors go in after the termites. */
+    @Override
+    public boolean breaksIn() {
+        return hasMajorBody();
+    }
+
+    /**
+     * Step 2g, the majors break in (real Megaponera: on arrival the big workers bite the termites' galleries and sheeting
+     * open at once, the small ones go in): with no termite to go at, a major picks its own breach where it smells
+     * termites round the spot ({@link #scentCells}): a block of soil or termite mud over or beside a closed gallery cell
+     * (or a mud cast itself), with open air over it to stand in; never wood, never the mound, never one another major
+     * is at. It walks there and bites it open, then the next, up to {@link #OPENS_PER_SPOT} at the spot.
+     */
+    @Override
+    public boolean breakIn(ServerLevel level, BlockPos spot, double reach) {
+        if (!hasMajorBody()) {
+            return false;
+        }
+        if (!spot.equals(breachSpot)) {
+            breachSpot = spot.immutable();
+            opened = 0;
+            breach = null;
+        }
+        long now = level.getGameTime();
+        noWayTo.values().removeIf(until -> until <= now);
+        if (breach != null && (!isCover(level, breach) || noWayTo.containsKey(breach))) {
+            breach = null; // opened (by it or another), or no way to it
+        }
+        if (breach == null) {
+            if (opened >= OPENS_PER_SPOT) {
+                return false;
+            }
+            breach = pickBreach(level, spot, reach);
+            walkingToBreach = null;
+            if (breach == null) {
+                return false;
+            }
+        }
+        if (distanceToSqr(Vec3.atCenterOf(breach)) <= BITE_REACH * BITE_REACH && standsToFight()) {
+            walkingToBreach = null;
+            return bite(level, breach);
+        }
+        if (walkingToBreach != null && !getNavigator().isDone()) {
+            return true; // on its way
+        }
+        BlockPos target = breach;
+        walkingToBreach = target;
+        if (!getNavigator().moveTo(at -> at.cell().distToCenterSqr(Vec3.atCenterOf(target)) <= (BITE_REACH - 0.3) * (BITE_REACH - 0.3)
+                && !at.cell().equals(target), target, 2, 1.2)) {
+            noWayTo.put(target, now + NO_WAY_TICKS);
+            breach = null;
+            walkingToBreach = null;
+            return false;
+        }
+        return true;
+    }
+
+    /** The breach to work at: the nearest cover over a cell it smells termites in, cells with a termite first. */
+    @Nullable
+    private BlockPos pickBreach(ServerLevel level, BlockPos spot, double reach) {
+        Set<BlockPos> taken = new HashSet<>();
+        for (MatabeleEntity other : level.getEntitiesOfClass(MatabeleEntity.class, getBoundingBox().inflate(reach * 2),
+                other -> other != this && other.breach != null)) {
+            taken.add(other.breach);
+        }
+        Set<BlockPos> termites = termiteCells(level, spot, reach);
+        BlockPos best = null;
+        double bestScore = Double.MAX_VALUE;
+        for (BlockPos cell : scentCells(level, spot, reach, termites)) {
+            if (!Fights.isShutIn(level, cell) && !isMud(level.getBlockState(cell))) {
+                continue; // open already: the minors go in
+            }
+            for (BlockPos cover : coversOf(level, cell)) {
+                if (noWayTo.containsKey(cover) || taken.stream().anyMatch(other -> other.distManhattan(cover) <= 1)) {
+                    continue;
+                }
+                double score = distanceToSqr(Vec3.atCenterOf(cover)) + (termites.contains(cell) ? 0.0 : 16.0);
+                if (score < bestScore) {
+                    bestScore = score;
+                    best = cover;
+                }
+            }
+        }
+        return best;
+    }
+
+    /**
+     * The covers a major may bite open into this closed cell: the cell itself if it is termite mud (a cast, a crust),
+     * the block over it, or one beside it, each soil or termite mud with open air over it to stand in.
+     */
+    private static List<BlockPos> coversOf(ServerLevel level, BlockPos cell) {
+        List<BlockPos> covers = new ArrayList<>();
+        if (isMud(level.getBlockState(cell))) {
+            covers.add(cell.immutable());
+        }
+        BlockPos above = cell.above();
+        if (isCover(level, above)) {
+            covers.add(above);
+        }
+        for (Direction side : Direction.Plane.HORIZONTAL) {
+            BlockPos beside = cell.relative(side);
+            if (isCover(level, beside)) {
+                covers.add(beside);
+            }
+        }
+        return covers;
+    }
+
+    /** Whether a major may bite this block open from above it: soil or termite mud, with open air over it. */
+    private static boolean isCover(ServerLevel level, BlockPos pos) {
+        BlockState state = level.getBlockState(pos);
+        if (!state.is(SavannaTags.MATABELE_BREAKS_OPEN)) {
+            return false;
+        }
+        BlockPos up = pos.above();
+        return level.getBlockState(up).getCollisionShape(level, up).isEmpty() && Fights.isInTheOpen(level, up);
+    }
+
+    /** Where termites are round the spot, out or shut in (felt through the ground with the antennae). */
+    private static Set<BlockPos> termiteCells(ServerLevel level, BlockPos spot, double reach) {
+        Set<BlockPos> cells = new HashSet<>();
+        for (AbstractAntEntity termite : level.getEntitiesOfClass(AbstractAntEntity.class, new AABB(spot).inflate(reach),
+                insect -> SavannaSpecies.MACROTERMES.equals(insect.species()) && insect.isAlive() && !insect.isDowned()
+                        && !insect.isSheltered())) {
+            cells.add(termite.blockPosition());
+        }
+        return cells;
+    }
+
+    /**
+     * Where it smells termites round the spot (step 2g): the termites themselves, and the feeding galleries and sheeting
+     * runways of the termite colonies there (termite scent soaks their galleries), within {@code reach} of the spot.
+     */
+    private static Set<BlockPos> scentCells(ServerLevel level, BlockPos spot, double reach, Set<BlockPos> termites) {
+        Set<BlockPos> cells = new HashSet<>(termites);
+        for (Colony colony : ColonyManager.get(level).getColonies()) {
+            if (!SavannaSpecies.MACROTERMES.equals(colony.getSpecies())) {
+                continue;
+            }
+            for (BlockPos cell : colony.nest().foodWays().galleryCells()) {
+                if (cell.closerThan(spot, reach)) {
+                    cells.add(cell);
+                }
+            }
+        }
+        return cells;
+    }
+
+    /**
+     * Step 2g: where it smells termites round the spot that it may walk to, the galleries opened and the termites in
+     * them (the minors go in after them); for a major too, when it has nothing to break.
+     */
+    @Override
+    public List<BlockPos> scentNear(ServerLevel level, BlockPos spot, double reach) {
+        List<BlockPos> open = new ArrayList<>();
+        for (BlockPos cell : scentCells(level, spot, reach, termiteCells(level, spot, reach))) {
+            if (level.getBlockState(cell).getCollisionShape(level, cell).isEmpty() && !Fights.isShutIn(level, cell)) {
+                open.add(cell);
+            }
+        }
+        return open;
     }
 
     /** What covers this termite's cell that a major may bite open, nearest the sky first; null for nothing it may open. */
