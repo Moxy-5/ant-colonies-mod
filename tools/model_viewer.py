@@ -33,6 +33,9 @@ python tools/model_viewer.py queen [out.html]   (default references/queen_viewer
 Sixth scene, Xylaria on a dead colony's fungus comb (M8 step 1a, 2026-10-24, xylaria_art.py; its own template,
 xylaria_viewer.template.html): three looks, each through the dead comb's stages, beside the living comb:
 python tools/model_viewer.py xylaria [out.html]   (default references/xylaria_viewer.html)
+Bracket fungus (dead wood for the raids, part 4, 2026-10-26, bracket_art.py; bracket_viewer.template.html): the game's
+bracket model on each kind of trunk, at the bracket stage and hollow (cut open):
+python tools/model_viewer.py bracket [out.html]   (default references/bracket_viewer.html)
 """
 import base64
 import json
@@ -294,6 +297,28 @@ def prey_pile_page(out):
     print("wrote", out)
 
 
+def bracket_page(out):
+    """Dead wood for the raids, part 4: the bracket fungus (the game's own block model and textures, from
+    bracket_art.py) on each kind of trunk, at the bracket stage and hollow (cut open, rotten wood inside)."""
+    models = mod_paths.assets("savanna") / "models/block"
+    bracket = json.loads((models / "bracket_fungus.json").read_text(encoding="utf-8"))
+
+    def texture_of(ref):
+        return file_uri(ref.split("/")[-1] + ".png")
+
+    data = {"grass": uri(png(grass())), "dirt": uri(png([[mix_soil(x, y) for x in range(S)] for y in range(S)])),
+            "rotten": file_uri("rotten_wood.png"), "logs": {},
+            "bracket": {"model": bracket, "textures": {k: texture_of(v) for k, v in bracket["textures"].items()}}}
+    for key, name in (("umbrella", "umbrella_thorn_log"), ("camel", "camel_thorn_log"), ("baobab", "baobab_log"),
+                      ("bleached", "bleached_log"), ("charred", "charred_log")):
+        t = json.loads((models / f"{name}.json").read_text(encoding="utf-8"))["textures"]
+        data["logs"][key] = {"side": texture_of(t["side"]), "end": texture_of(t["end"])}
+    template = (Path(__file__).resolve().parent / "bracket_viewer.template.html").read_text(encoding="utf-8")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")
+    print("wrote", out)
+
+
 def mix_soil(x, y):
     """Plain mound soil for the viewer's floor and walls."""
     rng = random.Random(x * 31 + y * 7)
@@ -302,6 +327,9 @@ def mix_soil(x, y):
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "bracket":
+        bracket_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/bracket_viewer.html")
+        return
     if len(sys.argv) > 1 and sys.argv[1] == "preypile":
         prey_pile_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/prey_pile_viewer.html")
         return

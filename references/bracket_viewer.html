@@ -1,0 +1,236 @@
+<title>Bracket Fungus Viewer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+  /* Layout: the same field-notebook bench as the other viewers: the 3D trees on the stage, the choices on a label. */
+  :root {
+    --bg: #ede9e1;
+    --panel: #f8f6f1;
+    --fg: #231d17;
+    --muted: #64594d;
+    --line: #d2c8b9;
+    --accent: #6b4426;
+    --stage: #9fb7c9;
+    --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+    --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #17130f; --panel: #211b16; --fg: #ece5da; --muted: #b0a495; --line: #3d342b; --accent: #d39a68; --stage: #44576a;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #17130f; --panel: #211b16; --fg: #ece5da; --muted: #b0a495; --line: #3d342b; --accent: #d39a68; --stage: #44576a;
+    color-scheme: dark;
+  }
+  html, body { height: 100%; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.5; margin: 0; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 28px; display: grid; gap: 16px; }
+  header h1 { font-family: var(--display); font-weight: 800; font-size: clamp(1.6rem, 3vw, 2.2rem); line-height: 1.1; margin: 0; text-wrap: balance; }
+  header p { margin: 6px 0 0; color: var(--muted); max-width: 72ch; }
+  .bench { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 16px; align-items: start; }
+  @media (max-width: 820px) { .bench { grid-template-columns: minmax(0, 1fr); } }
+  .stage { position: relative; background: var(--stage); border-radius: 10px; overflow: hidden; aspect-ratio: 4 / 3; max-width: 100%; }
+  .stage canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+  .stage canvas:active { cursor: grabbing; }
+  .hint { position: absolute; left: 12px; bottom: 10px; font-size: 12px; color: #f3ece2; background: rgba(0, 0, 0, 0.45); padding: 3px 8px; border-radius: 6px; }
+  .label { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 18px; min-width: 0; }
+  .label h2 { font-family: var(--display); font-weight: 600; font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+  .list { display: grid; gap: 6px; }
+  .choice { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; align-items: start; text-align: left; font: inherit; color: inherit;
+            background: transparent; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; cursor: pointer; }
+  .choice b { font-family: var(--display); font-size: 1.1rem; line-height: 1.2; }
+  .choice span { display: block; }
+  .choice small { color: var(--muted); font-size: 0.82rem; line-height: 1.35; display: block; }
+  .choice[aria-pressed="true"] { border-color: var(--fg); box-shadow: inset 0 0 0 1px var(--fg); }
+  .choice:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .swatches { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .swatch { display: grid; gap: 4px; justify-items: center; font-size: 0.8rem; color: var(--muted); }
+  .swatch img { width: 100%; max-width: 72px; aspect-ratio: 1; image-rendering: pixelated; border-radius: 4px; border: 1px solid var(--line); }
+  .note { color: var(--muted); font-size: 0.85rem; margin: 0; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Bracket Fungus on the Trees</h1>
+    <p>Heart rot fungi eat a tree's core while it stays green. Their hard woody shelves on the bark show the rot is well along. In the game, 2 brackets come out about 6 days after the rot gets in, and 4 once the trunk is hollow (from day 16). They stay on when the tree dies, bleached or burnt, and drop off when the wood behind them goes. The bracket is the game's own block model, drawn here on each kind of trunk.</p>
+  </header>
+  <div class="bench">
+    <div class="stage">
+      <canvas id="view" aria-label="3D view of tree trunks with bracket fungi on their bark"></canvas>
+      <div class="hint">Drag to turn, scroll or pinch to zoom</div>
+    </div>
+    <aside class="label">
+      <div>
+        <h2>Tree</h2>
+        <div class="list" id="trees"></div>
+      </div>
+      <div>
+        <h2>Stage</h2>
+        <div class="list" id="stages"></div>
+      </div>
+      <div>
+        <h2>Bracket textures</h2>
+        <div class="swatches" id="swatches"></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const DATA = {"grass": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAC9ElEQVR42hWT62LhUBSF83RBEeISwjxMp6OthLjnIkIkQVSpqT7gN3v+n7PX2utbW3m9dbC3dcJLkd/XGrthne2iz8FScb81hqHKcKNjLcosXJVk3+L9x2TgGUR/ayjJsYL/1WWVqFiXGu/7NpugxuqiM92q/D71CdYlVo8O7q3M6rvBYtXgNOyQfBko+12DuW3iz3WWfhU3a7KwyrwnJvtLF/va5o+42S2LrP0Cb3GJUV7HiVSm4RPK4K4zTLs8WyW2U1Hfl8lF3Tpo+F6LF7dP5pqMvw1mS5XM7nJKSmSPNqugijI8im2nxWhXJbvLvt4vYv+JzbWH89Vm+VNmOy5xmHcIrhqODAu+TV73ktnIRImvVYKLqC2K2F8NjlGF+KqyGRdFrcw5LPK2MBjcNfJ7RQIvEtoquSuregWUw6PPYN4kj9uEywZj2XX0ECqHPlO3yvgm9r0GflrmeVnAGxVYux2WNwn2IgNO0w75Z5XBrsfoLlatKofPHum5zfumRHQs8/Lo4sUmi3UV22oxSwpMJuJYsCuz/5NjnXDTFv5CYlHDu8uwQ4GXncnbhzg4dZmeDIJbTwJ8wp432Nny3tdR3s4FcdDCvvd5FWzhqc7xobEXdceRD06TmSO7n1VxpLIWYkPpwSgps5H3Sr7XST8aTFdF9o6BJ4XJJzq+qzOJVeabCrOL0BCsw2GF4H/pfuokoSFBllDWscbzusbs1mR7N1ieW4RZjXXWI5aaJ6nsnZt40y7LqMDqXGNyUKWRbWanpvRgbmKPuriBLkVqEX2KyqLB28XEkZuIBOkhqzL/6PCelcg3PbZpBXciAQdSZSs3GDsay/ETL6nJ0GqTPJo41yLRWG4iKGF91qXqBk7a42x3SD3pjRxS9iErHKXCoa3xGnU52AVSu8JgLGEJxvSosX60sEY9fL8pKAWf9D8LxenZkPvoC4W/pnySACNpmq0zn2hEX3LK444ckcbWK7H/FJRhGc+rEn83GRzqnPMuUdzjH931ghy72dMeAAAAAElFTkSuQmCC", "dirt": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAB2klEQVR42j3Ta1qTMRAF4CyKFsqtsAaQIiKKIrgNkYvUothyk4sFNxrnjQk/8nxJZubMOWfypce9fv6yNpOf9lfyNNbzwUq+fLeQR1tzZS/+800vT3YWyv3xq04+25zN5xE/HXRzGr2ey9fvF/Pt7lI+2ejm73H+uj6TL6PA1/r1dj5fbM/nP5/6+TCayTuN5ZwgDisiZKi+Ch8jASAA3RVqhq0ajJPL54PVkqSwdRnH+f7jctlfRTEpd3E+3+oVdoqxKAy+DWZjdfPReqeAuQPgq0BXewAY8QbodD8kTIrWTqGO2o8wzBkbDH5/WCoxxTe7i/kmwDQb1niC7gBVAlqTShF9+2GVhlWbCMlWYpaEh9BYxhcUsWhjHEeyJkchQRwDMfeMT5IYeRtUUbdn0qjOmXZ3Yu0NqKEfaLrY7lXK/UIJKqOw8n3YWy6F5DST5b54QCtqTZsCjwqYs72YPOZpgJ2HdbIRDKDo4DnbN0+K+9VQHmDKH7J4pKaYKHEaDrugTbG9hyOxjRN1TO4iH0sjtxJdxvP382opPnz5sfqlG5qtG6lkYGRq5CWa2l/mseiGNqDmS2OBkfvr+pjGOyHBAwFwNvj/A5mvoHmLGZWC+wp+FXugJoT9P+S4JgX6wq+UAAAAAElFTkSuQmCC", "rotten": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAC40lEQVR42j1T2U5TURS9PwG8yCCUUqClc0tBQUFmReYZFJBJBCyUSksLhVKKDIJAiOFPDCbqiw9GURMDmuCQiA/G4ReWax+MD03vGfbaa9hHW66zYqXBjli9Fbudbjzq8SDeYMNMuREDHh06bWm44UyH97IBwSoTNpocODp8zBoblq5boa1zI0aQ7XY3ttqc2O1wI8p1sNKIkQt6DObr0JefgRDXK/VSZMHpyQvVZP6qGdpirUV9RIm2Rwb7PQVYI2io2gR7SiKGC/WYKsnGbJUR6012LNVZ8Of74T8GFmihShMiNWbEib7d7sJaswMPWpwK0EGAD28P8OPrSyxcs2Cz1YmdDhd+fnvFtRkBstLC7BSoMOLT0TOcvH+K/W4P9rryVbGsjwkwU56r9O+wwWfek/9wdR6kueYvy8UsP9xpSTh+c6A8eNjmUh2nefabdL8cP1cAH989wQYZbjQ7sVxnUz5p48UGTFLjr9PXStdZsRnzNXlK/1hRlmJjPZdAb+yUIGa7EKPEMdZqI4WZjCgbftKM033pEGF32RtkjLbkBKaRiQgpi0/O1CQFFKHxckcbZVTeSwb4SrOVq2KgpCKF/e4MdFhTMeTJRIBzIcZuMmqRO0/j73I2tHFSFJpiZJSRRkjfxS7jxVkYKtCh1ZKCEUqZvpKLLaawyu7CcpH3JnhHk0u3L+oRpklinGibo/4xHt7iAHVxEnvJJEBDZV/oi1f3KFkaab7SHKLnIEQAe3LifwNlv9eVjm7HeQyyyWiRHsEKk3Je6PtYI3dUCn7Si7BIAMSoKJlIMkK9y56m3sQkDZOicFWe6j5Fz+6IBNmcpX6JKs5so7VWLFOGt8SAPnc6+sjiJn8+Aorrc0xDEhEm/jIymCX1GN1flFFtcSiN98lCDocLdRjgYxImE2QqzeZIX4qDHL4FeUxrjQ7Ik5b4JDoZU3mdXlLsp4k99KDPlUEPslTBaqNdTWS8/uw5/wUUrwHIf9uIlgAAAABJRU5ErkJggg==", "logs": {"umbrella": {"side": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAB7UlEQVR42k1TWXbCMAzMbYBH+1OgF2hpyx4SQlb2nbCnC7dXNXLsx4dBtuXRzEixfrYxHWdDqj4V6XsT0SbpS3xZ+nRdBfRSLlC2DmnitWjmd6jC+wufL4KuxFaNk2vPJdkAYB3bsgfAMuoK2HkxpJHbFADsM85bhD3CW+vMiWdGrAqQXgpgHnQkzjYhjQdNStyG7F95IQ/sGCCg6bCdV/L5oQYrmf8bS0COlnCYDWTh3sq2kVwgEQBx/0su0umAjnPlDbzQElAVkvxOXQHAEKAD4DDzmGpLkk78OLQ/DZPqg1fp1JVCYuLjBeijEuLtyCG/W8/9CBjQZykRVTi/8iDRgpYTU8LBdRVS4jTkYj9xyWu/KQ/4HPTn8CCXhNbiztpPHK7akKq3HADxbuyQ13mXGMDoiGkjP96NXMUAbQx6H5J4Yg8Q4+KejhgwMADwCUvPyzK0FQB+VF9LlDLtMAfAYz1UAMAczAM1WGjrKrKViRhlLG1KpawWzmCkVOT4d5eImWoOPOmSeAA9+Ba0B/d0LHHGjq9i23RnzRWXPL4ocuAZ0fMiDA6TgTFnn8eoCJpKgvp4ACAMGEB3ywK9beLI5m+fGG2IIQFDpaQVZOmhQiwSUGmXa8UjfM4186BomIHFlTsmc8FdOHEMBv/ZI92frjojfwAAAABJRU5ErkJggg==", "end": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAB80lEQVR42k2Ty1bCQAyG+zxC0UMpC4XKShDcgQrvoHjDlRdAC4pvIogIiDxezJcyRxfpdHL5k/zJeHuBL7vZtIov/Ef5HTt3VYrhthRyGRN80P8X7B6G5VNTvp+b8tk9lo+HhkzuG7IetOSrd6K2U5n3T2UVN832o/rp47Gs1N8A9oKMLNQBZ2ShAQ6AkyD0cxWXZHxXl5meBhDpB3ScCPqJW9IrZyWu5KRT8k2eK4E8lQP1a1kFVEVS2rQWCAYR5fAwCSRgVAvt/lbLy0UxJa96JwGVfWob8OZBGgDvWtZLNZTLYtqCO/tJ9uv9tAX3DrJyGaUlVkAqJlmU1xZg2BGEEccrHDdlm+g/IH39R780nup/UxjrZaZV3GjWvvbfLqQscKCA7sSWVJiydgExDqgABezeljIGgDO9wwHB/Ls2zgtb1jIVk9xjIQiG4ZGShRNAw2rOwJiAA2UygLIXs+6JRMke+Dbj6WPDAMjwdpQ3HpAzvUNsvGmDiiCQZWIAHkSwGCjpi1HhyAl5VEQQVZGA7CwUbZPcAJgpRDojjgDQd1uFNqiKLaVSt5U2RlDI7PYePlgW7oyXf2S9eQMAcF8ZwE4yBRdMFbTDaeu6mTfOVDdR5rG7dbYW7FnyXO0pbxuqPV3Vcf9vs+euLRfD5ImzSL9QLRy+6NagCQAAAABJRU5ErkJggg=="}, "camel": {"side": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACTklEQVR42kWTx3KbABCGeZyMHUsyQqiDCiB6L+qRJ87NcS5J7EPam2/2XzT2AWlo3/5lUTYrg6a6Sk0WUhG5VMUelXwknkXOck7GeED9zke5//lY07nJKPUtMiY6mWOdlNBZ0i6P6Fgm/KJLRbjhB2yKN2uyzCktpkPSeu+AU51SuFnRfKjJoQRXwK6IBJB4tkz3LZNsBqznE9K6DEgDejw1dOBBvr2k2YgBowEpsWvJxX0Ri/TUdyjha769EIDauSVd7ciQL+ct7cuY3DVs99keW4hYapO1CurUpyxwxMLvH0+04QzUuxsa9O5kCCwA4FsL+vvyTCYUeHxScnjwCAsZvwwV0TWD3u0HUbHNQ1EgGThtBgYALreQc3DlNf068alKWiVQ0L1pAXno0uVQ0cO+5KAdCdecDEnBQ/9ev8lUNFBGnuRRJR55a5Nm7BUPI9hPu0KCRNWW0TYkgMF9R2QBAtifn1/FEoI0Rq3UgJO/MAA5wA5ygEUBoKaAH0YjmHysUvEaMHQ27POhCexUZwyoGBC9A3ADKUMuFgTbiJcBQRvwORmocn/LqmAD/wgZ+XELpgBAhA0EeW5ygUARuh5r99y9KZPP2/wNgFVXnMVcAO7KpF/fn6TSY5XQiXc+dtdS10zXpJEDX0cOWCp8AvZixjXyVg3VroQUsYWaVxZT0IT0zSEiB2R0ZFUPXCUUwJIA8KMzADWhBewAtg3/8IgGEGLM9zH9si/EJr7itxrhsf2UfVHQZIEsEuCYjnXO+Rw78Mg14tnVfMwB6/QfxBXY3Ch7Of4AAAAASUVORK5CYII=", "end": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABsklEQVR42lWTXV7CQAzEuYkUaAF/IodQvl4UkEdKKXggRRAE7xrzz2YrPIQs2clkdnZbazcT6aZN6bYawjqG1TTazdt6jI7i2a+x2BcDOayHcipHssuf5aj5930iH8snOWr9W+O8GctBcdQv27H1QFTjh0YKBMBPJaGZ+NmMLCCFaLcKAxjEcCO4bCfypRswQ7bpZ7LVmGZ1WXQS+18+pooZGAZiyEwB56AJeWyuFTht1y0Tq17LmhfdRMp+WqkBbx7AYtJUUv7Qkpk2M/1NJ891jQoyexAvNYM9FFcKkM+5C50GMMpmvfR4ye6kUCXU8WEfFfCDLM41c+mvCiYjnaZciVFU9FLLHPmsxzUTIYgOz1wikplkJP3gA6SFZ66cqAgwj/suvWneCT4EgszI5q4ORfZmVPW9magsnB9jAEb5+MCaCDeQmUIw4LnSygMUnP1+S1OQmNx4jblLR9XJHtbYXmR1BBjxAC8IfGASKqbaaDeiJAxisr0DxbuChk2PRpL3DuJ/bML5mKmjovqYjmV44wRkvLKTEwFGbpgcHlwYNPz/mCCJET/lzHPcv8ZZ3dd/LvrYQwIVQR0AAAAASUVORK5CYII="}, "baobab": {"side": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACdUlEQVR42jVTaVPiQBDN/7TWY71QRBDkCLkJCciNqBwiEPEut7Zq/+Db153yw1QmSfe7esawc78xcPKYxTU8tut4GQV4Hnr4uo+xHfj4u+jge9bG2yTENKpg1bUxZ62TO8TYL8Lwr47x0Kxg3XXw1LHZ7HMF2I58vLNJgJKBh2XHwvLGUqJ5y0Tj6hRT9hnm+R4mQUlRt2TesPhj0sTruIHvaQtvtyHWfQcv44AktqqcNMoIiycYe1dUkD9SBZuei3UvLdz0XTY28MrmZODqu6jY9D3MopoqDahciA0re4C7xjUSskvRlhY+7yO18nEXaR7SIBYESP7PWjV4JNYMSkc7kCCrmV94JkBCFgGQp+TywjwW9LySPQMWC7O4CunzCkcwHDY/hGm6UpAqiNXOiktYH5plfg90Em/MZkVFzVKGWZTSEEXKfVjG1zRmeIECPBFwQmvCviSrAIoyIXTzh6ic/MLQZYi1zC4+viKVJsn/W/a0UNRISCMmPYuqHGFdCf7M22o1pALNwDrf140AJFsGtrb1+f7ZxMgtMuCyjnjRNjXkdeLq/3p2Hx3zIrVww03XulQbMtI5U77jXti7Vk6XHKBEpvAaKKBfOEZUPqOFs10tGNh5OJeHEEB5VmmtVcti6BTUa5//RenYS1VVOLVW9RxG+WSHSBlV0WORKKkRxOWcTcq0Lg60UO6LNA/sAvcFmGd7iCtUIEzh9Sl6bOzUc5RdVEYBvPVLuu/yu7CKgnlsqk2ZRquShSGHSBpT/1X1/3iTHpafTFY9mzexqt8XXEO3oBmIovQgsUhGJeORIlEl8sWGEMjlkpM5JcEPsE1rAvQfAAKLHXrXyp0AAAAASUVORK5CYII=", "end": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACXUlEQVR42kVT2VYaQRCdf42JMS9m0yxGh1GB5AeEDOuwGQaCihzIYnABg6AMKCAkmPzKTd3iSB76THd1ddVdagzf0wVYzx4iuPoEgZUlbCw/mO1Xl7D98jH8snxyzzPv/CuML2puQPIMJg0aGdycpfHnqoC7SxfXpykMmxl4x0mNdesJ9GQ/lbtf7TzcnVeYdlywubH5/JEWYDKDTLz9mcNeZG1+/tst6p45o/Msxq1dzSE6g1V4YKInnQ5i62hXQ7io7sCNmKjlPuDmOI7ud1vzRuc5lOMbilARkH9eIPHyt8AbniRQim/i9iyJ7jcbl1/D6P+Iopp9r3e1lKV0eyeOamRYQoEHr57EdT2Gw3QAk2YKe4ktFKMW9pPbujq1EFzbFDQxpeSGXoP0/2sg8DtfwtrhsyAYnia0Y+8oIig+KhXSGgkyIqDYdEIpDBppLbIffYeRPCzGLHjCedxw9AHp8I50qlJo2MyqoEqB3rIilc0LRPJVyIKG3blK9lst2jsSLRyfWPlJXdl6sQiDVtAaIiD3K4F74PhREhs9eUxdSKeSDuo9z+zOpoqAGtAF1UFgFyI+jJuOislZKKf8WpCPK5mgWky0RDFzQTRggLx0HgiZIoqAFI2qD2RPV2gr6XBSp/ciksfkYletoZiE1hbLKJwraKgHCw1kmMrxdfTlMXXg1xT9tMBApupOZn7cys2HpC+LMCtJE4XwG+3KQaNeKiIRyA9mEMakNUPAqqTBceajoYorqBqzoswp2Wuaw1GeDxIrmTLX5vKCBvklMsZ55szTbn7vY8znb/4PxOvtwlGtHZMAAAAASUVORK5CYII="}, "bleached": {"side": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAC6ElEQVR42k2T21baahSF81y96tW+rLK7a2spbGvbJ0CrrRJQjklADnIMCUnkmJBA5CCSgNUnm10kDtuL3Myxxvy/NecKo9cEPI0tcDyLf16/wnw5xK3VgeN0MaiXPO3etHB7b+CO9IexiVA4AIE7w5ePe2Dk2jXc8Rj55Lk3vDC7sB0NQvwUn/b+9bRfloLNxMJypuHJ7uNzMIB0hsVB+C2YvpjD3UJFS77yhteGholtIpvxDbffo6XjcTqGbQ7x5IxwGNpBMn6GwyARtCQettuB1vFxV5MOFraBq0TkxcC9H8IZTbC41bEyNXwKvkEiFcO3D0TwLbwD29AhNXmEgz7yZqpAiLF/EShY20MsVwYWyxEZBMAJLELBXTChDwGsZxZUsYLw/u5zkD38v/cO+YRv4lp9PDpDPIwMTKcD6LUahEvKKPQOTJgwnPsO1GYdn8nMe3GqUVA7SKV+/lmD0OeuBcceoC3XUbz4iYMQZfA19B/aWg1SrYAvlOp2+I5QD6kiPnX6YuAsNPxyB0RhodetIk8t8dkfYLYYSrWKfvsaQvr4uQmT9nyLYuL4xcBeDbF2FdjWCHK1gl6zgUz8BMzB+12oSh2GnEORj3rD0k0JydgPQjbQEgv+WnRsG70LlyqWb/KQWyVwcZYM9gOQtGvMZwZ49sw3UGnH2Cmmyy5EpeEHO+nBpXCF7DlumrRyo4CrGBFk2O8YqDXcmiqSiRNvWKyWkYsfYz7VvXy22nJFTZGeujiiwIt0NwK4bBTMdu+eeE33PkQ27RsMWwKyiSNsZib69bJ/G2MVmlSm4KLoUmNaNYcCPc6U6KYVtQKRBq9Yv7bEZRQ8d4wUhdiRKp72tOyg3yyDS0XgzjpotStIZo/AcMkTtBo59J9RdZHCIecC/Z3FuF+jEIvgYaZDafFIk/l6NYAsl5BIn4HJshFCKkFv8z6+1EAhHUX6IkKX6BukL04wH43QFcvIcyw2VheqVELm8hy/AaAskume/unKAAAAAElFTkSuQmCC", "end": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAC1UlEQVR42h2TW5OiSBSE/Uc7T7PTsTsxET3RMXsJb+3tAeUOtm1JUVAFYj+ISiv86txkHwgKKM7J/E7WQMsAZRYiEz7KPIZK3lGlMXIRQ+8FjIyQyxgfaYBTKriHz8kORrzD7GMMTvIdV+OhzT3clY1bbqGWPro8wL8/v6JREa6ph2sV4Z5v0JgQTRXgqtds1hfQEWq9gQyH2PsjyO0r71Okzgp/Pz9BeEsk4RQHbwbtvEJv+D0co9EOTmKHgWaHWlrYO0t0KsS59NFmLs6U/OvHE66FzYvqpI1PrjtjI3OHOOcONO2wQIyLtpDGI7QmgtnMoewZkniMv74/IaMiFU1gtlQVzFHzJ8MCn8cNjPExyM0OLTsovrwqC9ob4ZNdHuz48vMbGip6FD2XECJc4MYfe6sP6aAQAQZV9oYrASbhDHW6hvYXLOBDbCcYfv9KNQsc/DEuykVGNg/JAlRTl2scNRlUop+Cg9Qdo+PI9vErO4aQ0Rzt0cenold/xWl4ELTVUYH0J2gJ/9QrKP8fi0vqU5yPFnL7FbXaQIcrtFR0qXx6JmCq1O6cal0kVNmVfW7eMCjkjkAsSGeBexkS1AwtZeb2HMZfQtpTUl/hn+cvePnzC3798RtefnzD8Pl3VMzLoEpC1BmnYI9wowUZr+g3ovQ1HpzOQwVcM2BFABGQBQOmohVuxkWuWKBkHDsSPdhj1FSSuAsGheBoQRFeHk9If4nU43M8RJeRyXbJghGnwBwUQtA7q4W9d4s2AgbJYnTXaAjsxkA95BrXo0NrFs7FhgwmaMjkQ5OBOrzhzk25t4B0Z4Q5oYIZSc9gAkbXnXIiI+yDKTOygmFiU6ptU5tBooKPLEBHr/ejjQtfPki+yUO01QY1r3N/mHjA+rE1VHohjzMh9yM3RmBwpI9c7XDKdzzGW5QEow4hCp40ne6htUChtqi4T6chqoTfuTbpO477GP8B76I9bxJ11MwAAAAASUVORK5CYII="}, "charred": {"side": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACFUlEQVR42jWTWVoiQRCE+wwj9E5v9MbijFcRFXQEHMH7XyEn/qR5yK/WjIqIzApOh2er8tTqRWZNkdv1dLDvzzcfz+87W3WNdXVhTZnbsKzsuH+27dBpXtvTerRgWS6UnHsyIJfj3uL5zJJwbl8fL8b5Zlha31TWCojz+wNpNLeAjVFoRZbYqm0s02YWh35IZElkJzEhiTgddhbNfnkk4cwCaFZ55iBllnoyDKLZgycs0tjyJPR95kiO5w/ai24AXBpErxL9Ul6w7urSHqUTmjeASOeppQL5/vvqAKEYMAZlmuhS4j7kceQa193SNn1rGxm4amvrpf1pM8iP3P5NAIAWAncGWSR6SewAUMRpJP2IwdhWNorhqAr0k4mwunsUkNCIPl6A7mtVBPeZE18fr34GYK6Hfs4HXx91FrC5nShvFRzWAihlbKnKELxYywP65fz+4uYhm1IHXVUYQQkJkEmiJ2oloBuGrLl3dRbRBCIP0E/DFELEA6Rcjm9uEBSpCHtIwZebzJ3n4EfQFAuvf5Gl3g+YijnUHikryQOkqyt1ZOtA635pf9aDxvbGgIABAXIczpwiL7RIVDK9TzvzH7pGfTJ2KndjAUl3EBxeTProRujeqwMYIx48jr2vYROgBwmNGgmQy+dNPwBc4EV+pH8qUec+AL9XvTdc4KgTGvRZ+ydSXE97p9tDW01ERWhlvjNfGYD/7o6RQ7QihL8AAAAASUVORK5CYII=", "end": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAB3UlEQVR42lWT4XaiQAyFeYVWUcAiCLbbau1ztLsVbYu4iu//Gtl8IcM5+2POZGaSOzc3SdR9/ZFr20h/aqQ7/pa/35/SHj5sP+nOG+usfpefvfRqc8+ZPbq2e7mdDsOjgmATvF2XsqkL2T2u5FXttnm3xRuftg3ge4nOX58WTCCom7qUl3opVZ7KMp1Jkc1k9ZDIc5XbW69+BN+6ozGLjIpS54FfcU6md7KYT+UhiW1ls4mk8b3Uy8xAOvcnNuo8t7dftTnMJ3cKksruqZJXpc9OKjBKpvf2wUY/unUOEAR6rpaS+S8EsueaAgwIDneJ+mzWy1FIA4B6qchQxa5w1N/QgIVd5ZkxWcwn4yfoEN089zxR52xulHMPDJXA5m6rQeENP7SLyH8AiEcAaBdqv3n+2HkaW+4BgDdKGg2lK0wclN49Dbmm8cQCy0ViNncvVWHVWXs1DAAxoLJ9LKx8VABGQUQLKDJjhpjoRE9c6R00AAADUXBIvVSAhBUqAJPS37rj0I2mAS1JG+MYUuGn3MVL1eYcgK8W01gzRQwHIKSBHtv16r9WRtyxlX0m8D35wI3DRGdx0fv0BeosRL54zr033tkG6n2ogjE4+ChrXp2PKuDcXZwyexg8/NHhH0aUm8T/O4IUAAAAAElFTkSuQmCC"}}, "bracket": {"model": {"parent": "minecraft:block/block", "ambientocclusion": false, "textures": {"particle": "antcolonies:block/bracket_fungus_top", "top": "antcolonies:block/bracket_fungus_top", "under": "antcolonies:block/bracket_fungus_under", "edge": "antcolonies:block/bracket_fungus_edge"}, "elements": [{"from": [3, 4, 10], "to": [13, 7, 16], "faces": {"up": {"uv": [3, 10, 13, 16], "texture": "#top"}, "down": {"uv": [3, 10, 13, 16], "texture": "#under"}, "north": {"uv": [3, 0, 13, 3], "texture": "#edge"}, "east": {"uv": [10, 0, 16, 3], "texture": "#edge"}, "west": {"uv": [10, 0, 16, 3], "texture": "#edge"}}}, {"from": [5, 4, 8], "to": [11, 7, 10], "faces": {"up": {"uv": [5, 8, 11, 10], "texture": "#top"}, "down": {"uv": [5, 8, 11, 10], "texture": "#under"}, "north": {"uv": [5, 0, 11, 3], "texture": "#edge"}, "east": {"uv": [8, 0, 10, 3], "texture": "#edge"}, "west": {"uv": [8, 0, 10, 3], "texture": "#edge"}}}, {"from": [5, 8, 12], "to": [11, 10, 16], "faces": {"up": {"uv": [5, 12, 11, 16], "texture": "#top"}, "down": {"uv": [5, 12, 11, 16], "texture": "#under"}, "north": {"uv": [5, 0, 11, 2], "texture": "#edge"}, "east": {"uv": [12, 0, 16, 2], "texture": "#edge"}, "west": {"uv": [12, 0, 16, 2], "texture": "#edge"}}}, {"from": [6, 8, 11], "to": [10, 10, 12], "faces": {"up": {"uv": [6, 11, 10, 12], "texture": "#top"}, "down": {"uv": [6, 11, 10, 12], "texture": "#under"}, "north": {"uv": [6, 0, 10, 2], "texture": "#edge"}, "east": {"uv": [11, 0, 12, 2], "texture": "#edge"}, "west": {"uv": [11, 0, 12, 2], "texture": "#edge"}}}]}, "textures": {"particle": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACWElEQVR42k1S2VITURC9/2ESHg0zk8Q/SCbJTKL/QCSB7Cz+gZSiFuozlmtJoe+AqAgKPosLhUI2wAUV9CeOfXoI5cNN3+k+fc7pvjHdj8/Q2lzE/vYLtN8vYXdzAQdy/7P/FkfddfzuvkFHMN93XqH3aRntD0uKZ44Yc9RbVyBPR4q9rec4bK3hV+c1jnsbON7bUNIfu6v42V7Dty8rSvL184rkF2H+CgtBqrC1rKy8z9+axPzNSTy63sSD6YYSHGy/1GaKUHjn3QIMfw5bq7h3ta7gh9eauD9dx9Pbl3D3Sk2bGR/fGFMMa3MzE9gTEgqZJ6J0Z6qK2amKAsfycdRzMZSzNiqeo7HmOxjJWGjmYyCe5HMz4xrN7OUKqgKcuJAQQBxV38a4RD8eQT4xgGwsjIwTFoyN0ax1imVkrxnNsGArO8E8aSeE8+cG4J008ztth/SeE2IS0VHdj8GUPUvBLFI1J6plJYyjIpFAfhddSwmzgqMzHo5myMwkCUbSwpwelB04KEocdoN7Rew38tyLhYbspy+US0RgPPko/ddIiwTQNsdhvR/pgLuo+cHYdGHyYr8kSlTwEwE4ZZ9RexclXxNFjsKcawekdFSXOnsNbQ+7UVVNWSeNqag28ej2M5bGohD2l0y3wRJlLlWV5kJqUMFp2YcXi+heUlboVJlihVQgxlFJKK9gCzCk78qEKw0kyMbDGEpG9VCRhMyXZFd06fUJyEQFbp2z9d+7kDyr7z0kkXdiePis/LNxoa64Nv1t0x4jQUFTVImSAmJNyZ3gyYMxQzrKPxBRGoULgkzlAAAAAElFTkSuQmCC", "top": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACWElEQVR42k1S2VITURC9/2ESHg0zk8Q/SCbJTKL/QCSB7Cz+gZSiFuozlmtJoe+AqAgKPosLhUI2wAUV9CeOfXoI5cNN3+k+fc7pvjHdj8/Q2lzE/vYLtN8vYXdzAQdy/7P/FkfddfzuvkFHMN93XqH3aRntD0uKZ44Yc9RbVyBPR4q9rec4bK3hV+c1jnsbON7bUNIfu6v42V7Dty8rSvL184rkF2H+CgtBqrC1rKy8z9+axPzNSTy63sSD6YYSHGy/1GaKUHjn3QIMfw5bq7h3ta7gh9eauD9dx9Pbl3D3Sk2bGR/fGFMMa3MzE9gTEgqZJ6J0Z6qK2amKAsfycdRzMZSzNiqeo7HmOxjJWGjmYyCe5HMz4xrN7OUKqgKcuJAQQBxV38a4RD8eQT4xgGwsjIwTFoyN0ax1imVkrxnNsGArO8E8aSeE8+cG4J008ztth/SeE2IS0VHdj8GUPUvBLFI1J6plJYyjIpFAfhddSwmzgqMzHo5myMwkCUbSwpwelB04KEocdoN7Rew38tyLhYbspy+US0RgPPko/ddIiwTQNsdhvR/pgLuo+cHYdGHyYr8kSlTwEwE4ZZ9RexclXxNFjsKcawekdFSXOnsNbQ+7UVVNWSeNqag28ej2M5bGohD2l0y3wRJlLlWV5kJqUMFp2YcXi+heUlboVJlihVQgxlFJKK9gCzCk78qEKw0kyMbDGEpG9VCRhMyXZFd06fUJyEQFbp2z9d+7kDyr7z0kkXdiePis/LNxoa64Nv1t0x4jQUFTVImSAmJNyZ3gyYMxQzrKPxBRGoULgkzlAAAAAElFTkSuQmCC", "under": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAB80lEQVR42jWT2VrCQAyF590VN5BrAVtaFmVxRT9QURQssqogvE/MnzIX/abNnJyck6RuNYpl/VmRzbhmT9I7k8UglJ+PSDZJTb6eCnIVHcj3e9medpSRaf88vXsuiiP5vn6iwKIk3TOZvJTs2Y7rBtwqKYnEKPA7jOUvqcpM7+avgThYeK7iA6sKyez13ACQX8eHslRFJHZbeVO4GlXsXOvp7mrH9pH0CtJt5mXyXDIA1SCiysNlTsZqhTjVwXMPuaMqwM1OKsGJKiKhc5GV7VfdFFJ9qffzt8Asrz+rsngLxS00MNbqsCL1Ty8eNBFCyCECCAm2eIeU3hgBVUikYa1yxiQDIJk46pjCeicfO1ihJ5yOBJIBE6CKr94I9szWVCfAaGmqt8zJCji8EIAdVqQtB2Xzi+yNfYe7irH1BzWdixPBvqOqsSkAC/jiG2s2Vu1PWy3QJ3alrRhI6NlNZTcFPLJZ7ADvdJoNxB5AMIwbpVjCCtU5jQAgo+HS+/e2WuG+xYmBIQYeVfTLmohvFFCdFcYz+8A0eL+tHpl8UxunE6F3qHJMgACdnvZLtjAw+4pptys6vqzFaS4knEzGFABoBvvpuLSJyES2/ZnqlXemgBqUkvPYOLW1d4+NnHXYr6ZXxAhJ8OvNN+9g+TNp4O8wkn+udBog1xTNdwAAAABJRU5ErkJggg==", "edge": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAB9UlEQVR42k2TaU4CQRCF+yAuB3C7g1HxSCKL4HIAUQEdGBAQF/zjFmM0egBjNDHGBRNjNNFblPVVTyf+6OmZ11X1Xr3qcamJYZnVNT02JFOjgzI5MiAz40P2nZpQbGxQiOGMHWxaMWJSutzr3bF8Pl3Iz9u1vN2f2v79ciW//Rt5fziT59sjw1gfj+f2/Xp3Il/Pl9LXeNdrLMvOVkHi9Yx0o6Jsl3NyoBirs7lg2G6tKHv1Jek1V6S2mrYYcpobWXG81EtpOYh9Qn1t3pKa5awVbVc91tD3/XjJikWrc1pwUfe0uMAYKm5XctLSRdIhjFq8Vclr4qLhqGhsZGwnz8EGe6uaNwakoqRdzRsbySikQEMJUAR7vJbxCmCCHSU+IG+VeSeZ4kEdZyxyUGoewEi/KAmyOLSkctZkB1YMJwkPKER7Dlc5rJfmTSZKCKQdAjAyTApFxO4rKUUp4kgkKbRiU0neOWOhLrQGjjfEQOJgAQyzZ5mBUdEr08BegmM0GDutUMgKhEsCSDAY1e1bcTMTXNtlIrTQjQo2LfOAkdAGiSQEw2AIOP6gJowYD7yJ+gCkEHusQTCzd8y4nN1CVmfTt4oii9MpOQ7wANZO8k9wYDdSmSjAjfz/X3Qj/2+gzoX5x+FCVbxkG28i21xPphWUQgj5H8o+sdp5nM/PAAAAAElFTkSuQmCC"}}};
+const TREES = [
+  { id: "all", letter: "★", name: "All side by side", text: "Every trunk below in a row, to compare." },
+  { id: "umbrella", letter: "1", name: "Umbrella thorn", text: "Living, its dark furrowed bark." },
+  { id: "camel", letter: "2", name: "Camel thorn", text: "Living, its grey cracked bark." },
+  { id: "bleached", letter: "3", name: "Dead, bleached", text: "A dead acacia's silver wood: the brackets stay on after the tree dies." },
+  { id: "charred", letter: "4", name: "Dead, burnt", text: "A tree killed by fire (a hollow trunk burns like a chimney)." },
+  { id: "baobab", letter: "5", name: "Baobab", text: "Shown only to compare: baobabs never get heart rot in the game (they hollow with age on their own)." },
+];
+const STAGES = [
+  { id: "brackets", letter: "6", name: "Brackets (day 6)", text: "Two brackets on the lower trunk; the core is still solid." },
+  { id: "hollow", letter: "16", name: "Hollow (day 16), cut open", text: "Four brackets; the near half of the trunk cut away to show the rotten wood lining the hollow (the game's shape: the bark stays, a block of rotten wood inside it, the middle empty)." },
+];
+let treeId = "all", stageId = "hollow";
+try { treeId = localStorage.getItem("bracket-tree") || "all"; stageId = localStorage.getItem("bracket-stage") || "hollow"; } catch (e) {}
+
+const canvas = document.getElementById("view");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40, 4 / 3, 0.05, 200);
+const controls = new THREE.OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI * 0.52;
+controls.minDistance = 1; controls.maxDistance = 60;
+
+const images = {};
+function sources() {
+  const out = [DATA.grass, DATA.dirt, DATA.rotten];
+  for (const k of Object.values(DATA.logs)) out.push(k.side, k.end);
+  out.push(...Object.values(DATA.bracket.textures));
+  return out;
+}
+const loaded = Promise.all(sources().map(src => new Promise(done => {
+  const img = new Image(); img.onload = img.onerror = () => done(); img.src = src; images[src] = img;
+})));
+const texCache = {};
+function tex(src) {
+  if (!texCache[src]) {
+    const t = new THREE.Texture(images[src]);
+    t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.encoding = THREE.sRGBEncoding; t.needsUpdate = true;
+    texCache[src] = t;
+  }
+  return texCache[src];
+}
+// Minecraft's flat shading: up 1, down 0.5, north/south 0.8, east/west 0.6. Three's box faces: +x -x +y -y +z -z.
+const FACES = ["east", "west", "up", "down", "south", "north"];
+const SHADE = { east: 0.6, west: 0.6, up: 1, down: 0.5, south: 0.8, north: 0.8 };
+function mat(src, face) {
+  return new THREE.MeshBasicMaterial({ map: tex(src), color: new THREE.Color(SHADE[face], SHADE[face], SHADE[face]), alphaTest: 0.5 });
+}
+// One model element as a box, with Minecraft's uv.
+function element(el, textures) {
+  const [x0, y0, z0] = el.from, [x1, y1, z1] = el.to;
+  const g = new THREE.BoxGeometry((x1 - x0) / 16, (y1 - y0) / 16, (z1 - z0) / 16);
+  const uv = g.attributes.uv;
+  const mats = [];
+  FACES.forEach((face, i) => {
+    const f = el.faces[face];
+    if (!f) { mats.push(new THREE.MeshBasicMaterial({ visible: false })); return; }
+    const [u0, v0, u1, v1] = f.uv;
+    for (let k = 0; k < 4; k++) {
+      const s = uv.getX(i * 4 + k), t = 1 - uv.getY(i * 4 + k);
+      uv.setXY(i * 4 + k, (u0 + s * (u1 - u0)) / 16, 1 - (v0 + t * (v1 - v0)) / 16);
+    }
+    mats.push(mat(textures[f.texture.slice(1)], face));
+  });
+  const mesh = new THREE.Mesh(g, mats);
+  mesh.position.set((x0 + x1) / 32, (y0 + y1) / 32, (z0 + z1) / 32);
+  return mesh;
+}
+const world = new THREE.Group();
+scene.add(world);
+// A whole block: a log (bark round the sides, the cut end on top and bottom), rotten wood or ground.
+function cube(x, y, z, side, top, bottom) {
+  const mats = FACES.map(f => mat(f === "up" ? top : f === "down" ? (bottom || top) : side, f));
+  const b = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), mats);
+  b.position.set(x + 0.5, y + 0.5, z + 0.5);
+  world.add(b);
+}
+// The blockstate's turn for each facing (the model faces north); Minecraft turns clockwise seen from above.
+const TURN = { north: 0, east: 90, south: 180, west: 270 };
+function bracket(x, y, z, facing) {
+  const inner = new THREE.Group();
+  for (const el of DATA.bracket.model.elements) inner.add(element(el, DATA.bracket.textures));
+  inner.position.set(-0.5, 0, -0.5);
+  const pivot = new THREE.Group();
+  pivot.add(inner);
+  pivot.position.set(x + 0.5, y, z + 0.5);
+  pivot.rotation.y = -TURN[facing] * Math.PI / 180;
+  world.add(pivot);
+}
+// A grown trunk 5 wide (corners off), 7 high; hollow: the game's heart rot shape (the bark ring, rotten wood inside it,
+// the middle empty) with the near half (z > 0) cut away.
+const BRACKETS = [[3, 1, -1, "east"], [-3, 2, 0, "west"], [0, 3, -3, "north"], [3, 4, 0, "east"]];
+function trunk(kind, ox, hollow) {
+  const log = DATA.logs[kind];
+  for (let x = -3; x <= 3; x++) for (let z = -3; z <= 3; z++) cube(ox + x, -1, z, DATA.dirt, DATA.grass, DATA.dirt);
+  for (let y = 0; y < 7; y++) {
+    for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) {
+      if (Math.abs(x) === 2 && Math.abs(z) === 2) continue;
+      if (hollow && y > 0 && z > 0) continue; // cut away to look in
+      const d = Math.hypot(x, z), r = 2.2;
+      if (hollow && y > 0 && d < r - 1.2) continue; // the empty middle
+      if (hollow && y > 0 && d < r - 0.6) { cube(ox + x, y, z, DATA.rotten, DATA.rotten); continue; }
+      cube(ox + x, y, z, log.side, log.end);
+    }
+  }
+  for (const [x, y, z, f] of BRACKETS.slice(0, hollow ? 4 : 2)) bracket(ox + x, y, z, f);
+}
+function build() {
+  world.clear();
+  const hollow = stageId === "hollow";
+  const kinds = treeId === "all" ? ["umbrella", "camel", "bleached", "charred", "baobab"] : [treeId];
+  kinds.forEach((k, i) => trunk(k, i * 8, hollow));
+  const n = kinds.length, mid = (n - 1) * 4;
+  camera.position.set(mid + 5 + n * 2.2, 6, 9 + n * 3.4); controls.target.set(mid, 2.5, 0); controls.update();
+}
+function resize() {
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (!w || !h) return;
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+function frame() { controls.update(); renderer.render(scene, camera); requestAnimationFrame(frame); }
+new ResizeObserver(resize).observe(canvas);
+
+function button(parent, id, letter, name, text, onClick) {
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "choice"; b.id = id;
+  b.innerHTML = `<b>${letter}</b><span>${name}<small>${text}</small></span>`;
+  b.addEventListener("click", onClick); parent.appendChild(b);
+}
+for (const t of TREES) button(document.getElementById("trees"), "tree-" + t.id, t.letter, t.name, t.text,
+  () => { treeId = t.id; try { localStorage.setItem("bracket-tree", treeId); } catch (e) {} sync(); build(); });
+for (const s of STAGES) button(document.getElementById("stages"), "stage-" + s.id, s.letter, s.name, s.text,
+  () => { stageId = s.id; try { localStorage.setItem("bracket-stage", stageId); } catch (e) {} sync(); build(); });
+for (const [name, label] of [["top", "Top"], ["under", "Underside"], ["edge", "Rim"]]) {
+  const d = document.createElement("div"); d.className = "swatch";
+  d.innerHTML = `<img alt="${label} texture" src="${DATA.bracket.textures[name]}"><span>${label}</span>`;
+  document.getElementById("swatches").appendChild(d);
+}
+function sync() {
+  for (const t of TREES) document.getElementById("tree-" + t.id).setAttribute("aria-pressed", String(t.id === treeId));
+  for (const s of STAGES) document.getElementById("stage-" + s.id).setAttribute("aria-pressed", String(s.id === stageId));
+}
+if (!TREES.some(t => t.id === treeId)) treeId = "all";
+if (!STAGES.some(s => s.id === stageId)) stageId = "hollow";
+sync(); resize();
+loaded.then(() => { build(); resize(); requestAnimationFrame(frame); });
+</script>
