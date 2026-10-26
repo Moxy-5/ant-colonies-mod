@@ -261,6 +261,8 @@ A Minecraft mod where ants and termites live as real colonies: they dig, build, 
 
 - **Research for drawn-only insects (2026-10-25):** `docs/research/crowds-and-performance.md`, every crowd technique with a verdict and a recommended stack (baked poses, impostor particles, the dark line, one message a column); no game code.
 
+- **M8 order changed by the user 2026-10-25: raids before drawn ants** (replaces "step 3 before step 4" of the same day): 2f, then 4 (raids, real ants only at first), then the test revamp, then 3 (drawn-only ants), then 5 and 6; the user's idea for step 3, about 100 v 100 at the breach at a time, to plan then (`docs/plans/m8-matabele.md`).
+
 ## Other notes files (read only when the task needs them)
 - `docs/DESIGN.md`: every design decision for the species and shared systems (read the section for a feature before working on it).
 - `docs/HISTORY.md`: the full change log of every feature (class names, numbers, tests, the user's confirmations) and the old handover notes for a code reviewer. Older bullets name methods as `Colony.something`: since the code review split they live in the colony's parts (`Nest`, `FoodStore`, `Brood`, ...).

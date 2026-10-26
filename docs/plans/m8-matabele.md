@@ -185,6 +185,7 @@ drawn-only ants), 5 and 6.
 **Order changed by the user 2026-10-25: step 3 before step 4** ("i did want to move step 3 before step 4"). Now:
 the rest of 2 (2c to 2f), then 3 (drawn-only ants), then 4 (scouts and raids, with the big columns from the start),
 then the test revamp, then 5 and 6. This replaces "step 4 before step 3" above.
+**Order changed again by the user 2026-10-25: raids before drawn ants** ("Put the raids before the drawn ants"). Now: the rest of 2 (2f, then in-game test 3 and the merge), then 4 (scouts and raids, with real ants only at first, up to about 50 a raid), then the test revamp, then 3 (drawn-only ants, built to copy the raids as they really look in the game), then 5 and 6. This replaces both orders above. **The user's idea for step 3 (2026-10-25, not decided):** about 100 v 100 fighting at the breach at a time, the rest of the column waiting and carrying (real raids: only a few ants reach the breach at once); the tools for step 3 are in `docs/research/crowds-and-performance.md`.
 
 Later (M9): splitting into daughter colonies nearby, winged males mating in other
 colonies. After M8: harvester ant territory fights with their neighbours.
