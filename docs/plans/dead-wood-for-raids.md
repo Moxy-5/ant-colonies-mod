@@ -22,8 +22,8 @@ it is built.
   the `Perf.NewLand` numbers before and after; lower the numbers if it lags.
 
 ### Part 2: trees live faster (die sooner, spread faster)
-- Lifespans (`tree_kind/*.json`, `lifespan`): umbrella thorn 150-250 days to 50-80, camel thorn 300-500 to 90-140,
-  baobab 1000-2000 to 250-500. **If part 4 (heart rot) is built, these come down less** (see "Your calls").
+- Lifespans (`tree_kind/*.json`, `lifespan`), cut by about half (the user, 2026-10-25), heart rot (part 4) doing the
+  rest: umbrella thorn 150-250 days to 75-125, camel thorn 300-500 to 150-250, baobab 1000-2000 to 500-1000.
 - Seedlings after rain (`tree/Forest`): `SPROUT_TRIES` 2 to 4, `SPROUT_CHANCE` 0.35 to 0.6.
 - Seedling survival (`tree/TreeLife`): `SEEDLING_SURVIVAL` 0.1 to 0.2.
 - About 3 to 4 times as many new trees. The `TreeLife` unit checks change their totals with the numbers.
@@ -83,8 +83,7 @@ touched while the user plays.
 - Rotten wood reused for the hollow core; only the brackets are a new block.
 
 ## Your calls
-- **Shorter lifespans and heart rot together, or heart rot in their place?** My recommendation: both, with the
-  lifespans cut less than part 2 says (about half today's), and heart rot doing the rest, so how long a tree lives
-  depends on what happens to it.
+- **Decided (the user, 2026-10-25): both.** Lifespans cut by about half (part 2), heart rot doing the rest, so how
+  long a tree lives depends on what happens to it.
 - **Your time:** parts 1 to 3 need one in-game look (new land, a savanna). Part 4 needs a look at the brackets in the
   model viewer and one in-game look.
