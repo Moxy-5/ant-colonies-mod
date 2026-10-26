@@ -35,7 +35,7 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * The Matabele nest's defence against a player (M8 step 2e, {@code fight.NestDefence}), one scene: a colony of 10 in a
  * dead mound and a player in survival mode. Standing near the nest provokes nobody, nor does a player in creative mode
  * on the entrance; a survival player on the entrance brings a few ants out to look, who sting only once the player has
- * stayed 3 s (the sting hurts and leaves the pain); far off, out of reach, the defence ends and the ants go home;
+ * stayed 3 s, jumping or not (BUGS 79) (the sting hurts and leaves the pain); far off, out of reach, the defence ends and the ants go home;
  * hitting one provokes the colony, and breaking the nest brings out a whole wave.
  */
 @GameTestHolder(SavannaMod.MODID)
@@ -55,6 +55,14 @@ public class MatabeleDefenceTests {
         ServerPlayer player = survivalPlayer(helper);
         ServerPlayer builder = helper.makeMockServerPlayerInLevel(); // the game's test player plays in creative
         long[] since = new long[1];
+        // BUGS 79: the player on the entrance jumps (high, now and then out of the entrance's height at the once-a-second
+        // check) all the while; the ants still come out, and sting once it has stayed 3 s.
+        BlockPos[] hopping = new BlockPos[1];
+        helper.onEachTick(() -> {
+            if (hopping[0] != null) {
+                stand(player, helper.getTick() % 13 < 6 ? hopping[0].above(5) : hopping[0]);
+            }
+        });
         helper.startSequence()
                 .thenWaitUntil(() -> helper.assertTrue(colony.nest().getFinishedRoomCenter(level) != null, "the queen's room is not open yet"))
                 .thenExecute(() -> {
@@ -71,7 +79,8 @@ public class MatabeleDefenceTests {
                     stand(builder, colony.getCenter().offset(30, 0, 30));
                     // On the entrance (beside the chimney's open top, on the ground): a few come out to look, and do
                     // not sting yet.
-                    stand(player, beside(level, colony.getCenter()));
+                    hopping[0] = beside(level, colony.getCenter());
+                    stand(player, hopping[0]);
                     since[0] = level.getGameTime();
                 })
                 .thenWaitUntil(() -> helper.assertTrue(defence.defendersOut() > 0, "nobody came out to look at a player on the entrance"))
@@ -83,10 +92,15 @@ public class MatabeleDefenceTests {
                 })
                 // Still there after 3 s: they sting, it hurts and the pain lasts.
                 .thenWaitUntil(() -> helper.assertTrue(defence.isProvoking(player), "a player staying on the entrance is not stung"))
+                .thenExecute(() -> {
+                    hopping[0] = null; // (lands: hopping 5 high, it is out of their reach half the time)
+                    stand(player, beside(level, colony.getCenter()));
+                })
                 .thenWaitUntil(() -> helper.assertTrue(player.getHealth() < player.getMaxHealth() && player.hasEffect(ModEffects.STING_PAIN),
                         "the player on the entrance was not stung (health " + player.getHealth() + ")"))
                 .thenExecute(() -> {
                     player.setHealth(player.getMaxHealth());
+                    hopping[0] = null;
                     // Far off, out of reach: the defence ends, everyone goes home.
                     stand(player, colony.getCenter().offset(0, 0, 40));
                 })

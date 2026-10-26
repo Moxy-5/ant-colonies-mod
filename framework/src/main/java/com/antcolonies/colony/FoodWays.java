@@ -102,8 +102,11 @@ public class FoodWays {
         return true;
     }
 
-    /** The cells of every feeding gallery planned (dug or not), and of every runway of mud sheeting. */
-    List<BlockPos> galleryCells() {
+    /**
+     * The cells of every feeding gallery planned (dug or not), and of every runway of mud sheeting (public for the
+     * hunters' scent, M8 step 2g: what a raid breaks into).
+     */
+    public List<BlockPos> galleryCells() {
         List<BlockPos> cells = new ArrayList<>();
         for (NewTunnel tunnel : newTunnels) {
             if (tunnel.gallery() != null && !isSpent(tunnel.tunnel().hole())) {

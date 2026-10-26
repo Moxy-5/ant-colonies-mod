@@ -7,11 +7,22 @@ import org.jetbrains.annotations.Nullable;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.species.SpeciesProfile;
 
+import java.util.ArrayDeque;
+import java.util.HashSet;
+import java.util.Set;
+
+import com.antcolonies.block.FacedWall;
+
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.Heightmap;
 
 /**
  * The shared fight rules (M8 step 2a, {@code docs/plans/m8-matabele.md}): who is an enemy, who may be attacked, and what
@@ -165,5 +176,50 @@ public final class Fights {
 
     private static boolean listed(@Nullable FightNumbers numbers, ResourceLocation species) {
         return numbers != null && (numbers.foeSpecies().contains(species) || numbers.prey().contains(species));
+    }
+
+    /** How many cells {@link #isShutIn} walks before it calls a place shut in. */
+    private static final int SHUT_IN_SEARCH = 40;
+
+    /**
+     * Whether this cell is out in the open (M8 step 2g): nothing solid over it (the ground's top, leaves aside, is at or
+     * below it). A termite under a log, under its mud or in a gallery under the ground is not.
+     */
+    public static boolean isInTheOpen(Level level, BlockPos cell) {
+        return cell.getY() >= level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, cell.getX(), cell.getZ());
+    }
+
+    /**
+     * Whether this cell is shut in (M8 step 2g): no way out of it into the open within {@value #SHUT_IN_SEARCH} cells,
+     * through cells that are not solid and past no plate of termite mud ({@link FacedWall}). A termite eating under a
+     * log, in a closed feeding gallery or under its sheeting is shut in, so a hunter does not plan a walk to it that it
+     * cannot find (the user's report of 2026-10-25: 600 failed route searches in 2 minutes): the way in must be opened
+     * first. A cheap check only; the route search still has the last word.
+     */
+    public static boolean isShutIn(Level level, BlockPos cell) {
+        ArrayDeque<BlockPos> queue = new ArrayDeque<>();
+        Set<BlockPos> seen = new HashSet<>();
+        queue.add(cell.immutable());
+        seen.add(cell.immutable());
+        while (!queue.isEmpty() && seen.size() <= SHUT_IN_SEARCH) {
+            BlockPos at = queue.poll();
+            if (isInTheOpen(level, at)) {
+                return false;
+            }
+            BlockState here = level.getBlockState(at);
+            for (Direction side : Direction.values()) {
+                BlockPos next = at.relative(side);
+                if (seen.contains(next) || FacedWall.hasFace(here, side)) {
+                    continue;
+                }
+                BlockState there = level.getBlockState(next);
+                if (there.isCollisionShapeFullBlock(level, next) || FacedWall.hasFace(there, side.getOpposite())) {
+                    continue;
+                }
+                seen.add(next);
+                queue.add(next);
+            }
+        }
+        return true;
     }
 }
