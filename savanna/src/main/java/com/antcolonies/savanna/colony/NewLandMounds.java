@@ -71,8 +71,11 @@ public class NewLandMounds extends SavedData {
     private static final String DATA_NAME = SavannaMod.MODID + "_new_land_mounds";
     /** How often (ticks) the book looks for a place whose land is loaded. */
     static final int LOOK_TICKS = 10;
-    /** The land this far round a place (blocks) must be loaded before its mound goes in (the mound reaches about 13). */
-    static final int LOADED_ROUND = 24;
+    /**
+     * The land this far round a place (blocks) must be loaded before its mound goes in: the mound reaches about 13, its
+     * dead tree's foot up to 30 past that and the tree's crown or log about 20 more (my pick).
+     */
+    static final int LOADED_ROUND = 64;
     /** No mound goes in this near (blocks) another colony or dead mound (a player's own colony, say). */
     public static final int KEEP_APART = 40;
 
@@ -96,6 +99,8 @@ public class NewLandMounds extends SavedData {
     private final List<BlockPos> lastTrees = new ArrayList<>();
     /** The game tests: the foot of the last mound's dead tree (null if it found no room), and a box its low parts must stay inside. */
     private BlockPos lastDeadTree, lastDeadWood;
+    /** The game tests: how far (blocks) the last mound's foot reached from its middle, as its dead tree was placed. */
+    private int lastDeadTreeReach;
     private static BoundingBox fence;
     private int living, dead, skipped, ants;
     /** The Matabele colony the last dead mound got (null if none; not saved). */
@@ -523,12 +528,15 @@ public class NewLandMounds extends SavedData {
 
     // ---------------------------------------------------------------- the dead tree by the mound
 
-    /** The dead tree's foot stands at least this far (blocks) past the mound's foot, and at least {@link #DEAD_TREE_NEAREST} from the middle. */
-    static final int DEAD_TREE_GAP = 2;
-    static final int DEAD_TREE_NEAREST = 6;
-    /** How far out past its nearest the dead tree's foot may be (blocks), and how many places are tried. */
-    static final int DEAD_TREE_SPREAD = 6;
+    /**
+     * The dead tree's foot stands this far (blocks) past the mound's foot, spread evenly between the two (the user's ask,
+     * 2026-10-25: 10 to 30 blocks away, so the galleries have a way to dig to it).
+     */
+    public static final int DEAD_TREE_NEAREST = 10;
+    public static final int DEAD_TREE_FARTHEST = 30;
+    /** How many dead trees are tried, and how many places each (the ring is wide, much of it may be uneven or unloaded). */
     static final int DEAD_TREE_TRIES = 10;
+    static final int DEAD_TREE_SPOTS = 3;
     /** The ground round a standing dead tree's trunk may rise and fall this much; under a fallen log, this much from its foot. */
     static final int DEAD_TREE_UNEVEN = 2;
     static final int DEAD_LOG_UNEVEN = 3;
@@ -538,9 +546,10 @@ public class NewLandMounds extends SavedData {
      * dead, gets one dead thorn tree near it, a standing dead tree (bare, mud-climbed or shed of its limbs) or a fallen
      * log, half and half (my picks), into the tree book so it wears on from there. Real: a fungus-growing colony hollows
      * and kills the trees round it (M7.5 step 5f), so a dead tree by a mound is a common sight, and it is where the
-     * termites feed by day under their mud, the spots Matabele scouts look for. Its foot 6 blocks or more from the
-     * middle and 2 past the mound's foot (a full cathedral's foot reaches about 12, so there it stands 14 to 20 off; my
-     * picks), on fairly flat soil, with nothing in its way, all of it on loaded land. A living colony knows the wood at
+     * termites feed by day under their mud, the spots Matabele scouts look for. Its foot 10 to 30 blocks past the
+     * mound's foot, any distance between alike (the user's ask, 2026-10-25; even spread my pick: a full cathedral's foot
+     * reaches about 12, so there it stands 22 to 42 off the middle, inside the galleries' reach of 50; real Macrotermes
+     * forage tens of metres out through their galleries), on fairly flat soil, with nothing in its way, all of it on loaded land. A living colony knows the wood at
      * once (it has lived beside it), so its galleries reach it first. Returns its foot, or null if no place suited.
      */
     private BlockPos deadTree(ServerLevel level, BlockPos center, Pick pick, Colony living) {
@@ -561,19 +570,20 @@ public class NewLandMounds extends SavedData {
         } else {
             reach = (int) Math.round(pick.height() * 12); // (a dead mound's shape is worn: its old foot by its stage)
         }
-        int nearest = Math.max(DEAD_TREE_NEAREST, reach + DEAD_TREE_GAP);
+        lastDeadTreeReach = reach;
         int noGround = 0, unloaded = 0, inTheWay = 0;
         String why = "";
-        for (int attempt = 0; attempt < DEAD_TREE_TRIES; attempt++) {
+        for (int spot = 0; spot < DEAD_TREE_TRIES * DEAD_TREE_SPOTS; spot++) {
+            int attempt = spot / DEAD_TREE_SPOTS;
             DeadTreeTry t = tries.get(attempt);
             String kind = t.kind();
             double age = t.age();
             long seed = t.seed();
             TreeStage stage = t.stage();
-            double bearing = random.nextDouble() * Math.PI * 2, r = nearest + random.nextDouble() * DEAD_TREE_SPREAD;
+            double bearing = random.nextDouble() * Math.PI * 2, r = reach + DEAD_TREE_NEAREST + random.nextDouble() * (DEAD_TREE_FARTHEST - DEAD_TREE_NEAREST);
             int x = (int) Math.floor(center.getX() + 0.5 + Math.cos(bearing) * r), z = (int) Math.floor(center.getZ() + 0.5 + Math.sin(bearing) * r);
             BlockPos foot = deadTreeFoot(level, x, z, (int) Math.ceil(TreePlacer.kind(kind).trunk().radius() * 1.5), center.getY());
-            if (foot == null || Forest.get(level).at(foot) != null) {
+            if (foot == null || Forest.get(level).at(foot) != null || fence != null && (foot.getX() < fence.minX() || foot.getX() > fence.maxX() || foot.getZ() < fence.minZ() || foot.getZ() > fence.maxZ())) {
                 noGround++;
                 continue;
             }
@@ -596,13 +606,13 @@ public class NewLandMounds extends SavedData {
             TreePlacer.place(level, tree, foot, box, Block.UPDATE_CLIENTS);
             Forest.get(level).add(new Forest.Tree(kind, foot, seed, age, stage, age, Forest.today(level))); // (wears on from here)
             lastDeadWood = living == null ? null : learnWood(level, living, tree, foot);
-            SavannaMod.LOGGER.info("[new-land] a dead {} ({}) by the mound at {}, {} blocks off, try {}, in {} ms", kind, stage.id, foot.toShortString(),
-                    String.format(Locale.ROOT, "%.0f", Math.sqrt(foot.distSqr(center))), attempt + 1,
+            SavannaMod.LOGGER.info("[new-land] a dead {} ({}) by the mound at {}, {} blocks off ({} past its foot), try {}, in {} ms", kind, stage.id, foot.toShortString(),
+                    String.format(Locale.ROOT, "%.0f", Math.sqrt(foot.distSqr(center))), String.format(Locale.ROOT, "%.0f", Math.sqrt(foot.distSqr(center)) - reach), spot + 1,
                     String.format(Locale.ROOT, "%.1f", (System.nanoTime() - start) / 1.0e6));
             return foot;
         }
-        SavannaMod.LOGGER.info("[new-land] no room for a dead tree by the mound at {} (no flat soil {}, land not loaded {}, something in the way {}, the last {}; {} ms)",
-                center.toShortString(), noGround, unloaded, inTheWay, why, String.format(Locale.ROOT, "%.1f", (System.nanoTime() - start) / 1.0e6));
+        SavannaMod.LOGGER.info("[new-land] no room for a dead tree by the mound at {} ({} places tried, {} to {} blocks off: no flat soil {} (or past a test's fence), land not loaded {}, something in the way {}, the last {}; {} ms)",
+                center.toShortString(), DEAD_TREE_TRIES * DEAD_TREE_SPOTS, reach + DEAD_TREE_NEAREST, reach + DEAD_TREE_FARTHEST, noGround, unloaded, inTheWay, why, String.format(Locale.ROOT, "%.1f", (System.nanoTime() - start) / 1.0e6));
         return null;
     }
 
@@ -734,12 +744,17 @@ public class NewLandMounds extends SavedData {
         return lastDeadTree;
     }
 
+    /** The game tests: how far the last mound's foot reached from its middle (the dead tree stands 10 to 30 past it). */
+    public int lastDeadTreeReachForTests() {
+        return lastDeadTreeReach;
+    }
+
     /** The game tests: the foot of the dead wood the last living colony learnt (null if none). */
     public BlockPos lastDeadWoodForTests() {
         return lastDeadWood;
     }
 
-    /** The game tests: the dead tree's parts on the ground (its foot, a fallen log, lying limbs) must lie inside this box (null: anywhere on loaded land). */
+    /** The game tests: the dead tree's foot and its parts on the ground (a fallen log, lying limbs) must lie inside this box (null: anywhere on loaded land). */
     public static void fenceForTests(BoundingBox box) {
         fence = box;
     }

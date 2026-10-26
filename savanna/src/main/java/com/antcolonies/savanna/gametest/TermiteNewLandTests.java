@@ -36,7 +36,11 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 @GameTestHolder(SavannaMod.MODID)
 @PrefixGameTestTemplate(false)
 public class TermiteNewLandTests {
-    /** The whole 65-block arena flat ground (room for the dead tree beside a full mound), the dead tree's low parts fenced inside it. */
+    /**
+     * The whole 65-block arena flat ground (room for the dead tree beside a full mound), the dead tree's foot and low parts
+     * fenced inside it (a cathedral's foot reaches about 12 and its tree stands up to 30 past that, past the arena's
+     * side: only places inside are taken).
+     */
     private static void flatArena(GameTestHelper helper) {
         TestScenes.shapeGround(helper, 65, (x, z) -> 0);
         net.minecraft.world.phys.AABB b = helper.getBounds();
@@ -44,18 +48,38 @@ public class TermiteNewLandTests {
                 (int) b.maxX - 1, (int) b.maxY - 1, (int) b.maxZ - 1));
     }
 
-    /** The dead wood for the raids, part 3: a dead tree beside the mound, past its foot, in the tree book (dead), its wood in the world. */
+    /**
+     * The dead wood for the raids, part 3: a dead tree beside the mound, 10 to 30 blocks past its foot (the user's ask,
+     * 2026-10-25), in the tree book (dead), its wood in the world.
+     */
     private static void deadTreeIsThere(GameTestHelper helper, NewLandMounds book, BlockPos center) {
         ServerLevel level = helper.getLevel();
         BlockPos foot = book.lastDeadTreeForTests();
         helper.assertTrue(foot != null, "no dead tree by the mound");
         double off = Math.sqrt(foot.distSqr(new BlockPos(center.getX(), foot.getY(), center.getZ())));
-        helper.assertTrue(off >= 6 && off <= 22, "the dead tree stands " + off + " blocks from the mound's middle");
+        int reach = book.lastDeadTreeReachForTests();
+        helper.assertTrue(off >= reach + NewLandMounds.DEAD_TREE_NEAREST - 1 && off <= reach + NewLandMounds.DEAD_TREE_FARTHEST + 1,
+                "the dead tree stands " + Math.round(off) + " blocks from the mound's middle, " + Math.round(off - reach) + " past its foot (it reaches " + reach + ")");
         Forest.Tree tree = Forest.get(level).at(foot);
         helper.assertTrue(tree != null && !tree.living(), "the dead tree at " + foot.toShortString() + " is not a dead tree in the tree book");
         long wood = BlockPos.betweenClosedStream(foot.offset(-20, -2, -20), foot.offset(20, 20, 20))
                 .filter(pos -> level.getBlockState(pos).getBlock() instanceof com.antcolonies.savanna.block.DeadTreeWoodBlock).count();
         helper.assertTrue(wood >= 10, "only " + wood + " blocks of dead wood by the mound");
+    }
+
+    /**
+     * Whether the colony's works reach the dead wood at {@code wood}: a gallery piece or new tunnel dug out to it, or a
+     * runway of mud from a hole near it (the way real Macrotermes feed at wood near a hole).
+     */
+    private static boolean galleryNear(GameTestHelper helper, Colony colony, BlockPos wood) {
+        com.antcolonies.colony.FoodWays ways = colony.nest().foodWays();
+        java.util.function.Predicate<BlockPos> ofIt = food -> near(food, wood, 16) // (any block of the same dead tree: the far log and the tree stand well apart)
+                && helper.getLevel().getBlockState(food).getBlock() instanceof com.antcolonies.savanna.block.DeadTreeWoodBlock;
+        return ways.getRunways().stream().anyMatch(r -> ofIt.test(r.food())) || ways.getNewTunnels().stream().anyMatch(t -> ofIt.test(t.food()));
+    }
+
+    private static boolean near(BlockPos a, BlockPos b, double within) {
+        return Math.hypot(a.getX() - b.getX(), a.getZ() - b.getZ()) <= within;
     }
 
     private static BlockPos middle(GameTestHelper helper) {
@@ -66,9 +90,10 @@ public class TermiteNewLandTests {
      * A full living colony: the queen, swollen, and the king together in the royal chamber; hundreds of workers and
      * their soldiers in the numbers; the nest dug; comb in the gardens; the mound near full height; its builders' time
      * waiting to grow the galleries out of sight; a dead tree beside it, in the tree book and known to the colony (the
-     * dead wood for the raids, part 3). A second mound 20 blocks off is refused (too near).
+     * dead wood for the raids, part 3). A second mound 20 blocks off is refused (too near). Then its galleries reach the
+     * dead tree, 10 to 30 blocks past the mound's foot, and big dead wood 30 past it.
      */
-    @GameTest(template = "arena", timeoutTicks = 200, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 9000, skyAccess = true)
     public static void aFullColonyOfNewLandIsAWholeLivingColony(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         TestScenes.deepGround(helper);
@@ -99,7 +124,45 @@ public class TermiteNewLandTests {
         helper.assertTrue(colony.building().hasWork(), "no builders' time left for the galleries");
         Colony second = book.put(level, at.offset(20, 0, 0), NewLandMounds.pickFor("young", 0, 99L));
         helper.assertTrue(second == null, "a second colony put in 20 blocks off");
-        helper.succeed();
+        // Then the galleries grown as the builders' time grows them out of sight (dug at once here), the colony living on
+        // (a way it found no route to yet is tried again after 5 minutes): a piece or a runway goes out to the dead tree's
+        // wood, and to big dead wood as far as a dead tree may stand, 30 past the cathedral's foot between two arms
+        // (toward the arena's corner; 27 blocks of bleached log the colony knows).
+        int reach = book.lastDeadTreeReachForTests();
+        double diagonal = (reach + NewLandMounds.DEAD_TREE_FARTHEST) / Math.sqrt(2);
+        BlockPos far = new BlockPos(colony.getCenter().getX() + (int) Math.round(diagonal), helper.absolutePos(new BlockPos(0, SURFACE, 0)).getY(),
+                colony.getCenter().getZ() + (int) Math.round(diagonal));
+        helper.assertTrue(far.getX() <= (int) helper.getBounds().maxX - 3 && far.getZ() <= (int) helper.getBounds().maxZ - 3,
+                "the farthest dead wood at " + far.toShortString() + " is past the arena");
+        boolean farPut = level.getBlockState(far).isAir();
+        if (farPut) {
+            for (BlockPos log : BlockPos.betweenClosed(far.offset(-1, 0, -1), far.offset(1, 2, 1))) {
+                level.setBlock(log, com.antcolonies.savanna.registry.TreeBlocks.BLEACHED_LOG.get().defaultBlockState(), 3);
+            }
+            colony.foodMap().learn(far);
+        }
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        com.antcolonies.savanna.colony.Galleries galleries = com.antcolonies.savanna.colony.Galleries.of(colony);
+        helper.onEachTick(() -> {
+            for (NestPlan.ForagingTunnel tunnel : colony.foragingHoles().tunnels(level)) {
+                for (BlockPos cell : galleries.digCells(tunnel)) {
+                    if (!com.antcolonies.colony.Nest.isDugOut(level, cell)) {
+                        level.setBlock(cell, Blocks.AIR.defaultBlockState(), 3);
+                    }
+                }
+            }
+            if (helper.getTick() % 20 == 0) {
+                galleries.growNow(level);
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(galleryNear(helper, colony, wood), "no gallery out to the dead tree's wood at " + wood.toShortString() + " ("
+                    + Math.round(Math.sqrt(wood.distSqr(new BlockPos(colony.getCenter().getX(), wood.getY(), colony.getCenter().getZ())))) + " blocks out):"
+                    + galleries.describe(level) + colony.foragingHoles().whyNoRunway(level, wood));
+            helper.assertTrue(!farPut || galleryNear(helper, colony, far), "no gallery out to the big dead wood at " + far.toShortString() + " ("
+                    + Math.round(Math.sqrt(far.distSqr(new BlockPos(colony.getCenter().getX(), far.getY(), colony.getCenter().getZ())))) + " blocks out):"
+                    + galleries.describe(level));
+        });
     }
 
     /**

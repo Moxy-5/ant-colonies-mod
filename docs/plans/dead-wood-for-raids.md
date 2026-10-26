@@ -39,6 +39,9 @@ it is built.
 - Why not "only make a mound where a dead tree already stands": the game makes trees and mounds separately while
   building new land, so that rule would leave almost no mounds. Pairing them keeps mounds about every 96 blocks.
 - Colonies founded in play (eggs, commands) still settle anywhere.
+- **Distance changed (the user, 2026-10-25, after trying parts 1 to 3 in-game):** the trees stood too close; now the
+  tree's foot is 10 to 30 blocks past the mound's foot (its edge), spread evenly (my pick), so the galleries have a way to
+  dig to it (inside their reach of 50 from the middle); 3 places tried for each of the 10 trees.
 
 ### Part 4: heart rot (trees rotting from the inside)
 Real biology: the core of a trunk (heartwood) is already dead wood. Heart rot fungi (*Ganoderma*, *Phellinus*) get in
