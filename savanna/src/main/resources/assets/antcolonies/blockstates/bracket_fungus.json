@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=north": {
+      "model": "antcolonies:block/bracket_fungus"
+    },
+    "facing=east": {
+      "model": "antcolonies:block/bracket_fungus",
+      "y": 90
+    },
+    "facing=south": {
+      "model": "antcolonies:block/bracket_fungus",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "antcolonies:block/bracket_fungus",
+      "y": 270
+    }
+  }
+}

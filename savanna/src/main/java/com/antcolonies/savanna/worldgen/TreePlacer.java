@@ -63,9 +63,10 @@ public final class TreePlacer {
     private TreePlacer() {
     }
 
-    /** A tree's kind by name (umbrella_thorn, camel_thorn, baobab), read once ({@link #HOLLOWED} on the name aside). */
+    /** A tree's kind by name (umbrella_thorn, camel_thorn, baobab), read once ({@link #HOLLOWED} and {@link #ROTTED} on the name aside). */
     public static TreeKind kind(String name) {
-        String base = name.endsWith(HOLLOWED) ? name.substring(0, name.length() - HOLLOWED.length()) : name;
+        String base = name.endsWith(ROTTED) ? name.substring(0, name.length() - ROTTED.length()) : name;
+        base = base.endsWith(HOLLOWED) ? base.substring(0, base.length() - HOLLOWED.length()) : base;
         synchronized (KINDS) {
             return KINDS.computeIfAbsent(base, TreeKind::load);
         }
@@ -76,6 +77,12 @@ public final class TreePlacer {
      * apart from the plain shape everywhere a shape is kept.
      */
     public static final String HOLLOWED = "+termites";
+
+    /**
+     * Dead wood for the raids, part 4: put after a kind's name (after {@link #HOLLOWED} if both), the tree's trunk is
+     * hollowed by heart rot ({@code TreeShapes.hollowOut}, {@code tree/HeartRot}).
+     */
+    public static final String ROTTED = "+rot";
 
     /**
      * A tree worked out into blocks, around its foot at (0, 0, 0): each block's place and state, which ones hold the
@@ -261,7 +268,7 @@ public final class TreePlacer {
                 return p;
             }
         }
-        Placed p = s < 0 ? work(kind(kindName), TreeShapes.build(kind(kindName), seed, age, stage, false, kindName.endsWith(HOLLOWED)), stage) : between(kindName, seed, age, stage, s);
+        Placed p = s < 0 ? work(kind(kindName), TreeShapes.build(kind(kindName), seed, age, stage, false, kindName.contains(HOLLOWED), kindName.endsWith(ROTTED)), stage) : between(kindName, seed, age, stage, s);
         synchronized (CACHE) {
             CACHE.put(key, p);
         }

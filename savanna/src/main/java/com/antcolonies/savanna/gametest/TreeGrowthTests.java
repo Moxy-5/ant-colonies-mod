@@ -1036,7 +1036,9 @@ public class TreeGrowthTests {
         forest.update(level, t, base + 2);
         com.antcolonies.colony.ColonyManager.get(level).removeColony(colony.getId());
         helper.assertTrue(t.termites && t.placedTermites, "the termites did not come into the tree");
-        helper.assertTrue(t.lived == lived + 2, "a tree with termites aged " + (t.lived - lived) + " days in a day, not 2");
+        // Part 4: termites may carry heart rot in the same day (a hidden rot ages it half a day more).
+        double expected = lived + 2 + (t.rotFrom != com.antcolonies.savanna.tree.HeartRot.NONE ? 0.5 : 0);
+        helper.assertTrue(t.lived == expected, "a tree with termites aged " + (t.lived - lived) + " days in a day, not 2");
         int lining = countNear(level, foot, 4, 1, 7, rotten), floor = countNear(level, foot, 4, 0, 0, frass);
         helper.assertTrue(lining >= 4 && floor >= 1, "the trunk is not hollow: " + lining + " rotten wood, " + floor + " frass; " + column(level, foot));
         int open = 0;
@@ -1054,6 +1056,67 @@ public class TreeGrowthTests {
         }
         helper.assertTrue(byFireTermites > 1.6 * byFire && byStrikeTermites > 1.6 * byStrike,
                 "termites did not make fire (" + byFire + " to " + byFireTermites + ") or lightning (" + byStrike + " to " + byStrikeTermites + ") deadlier");
+        clearAbove(helper, foot);
+        forest.forgetInside(helper.getBounds());
+        helper.succeed();
+    }
+
+    /**
+     * Dead wood for the raids, part 4, heart rot: a grown tree with the rot in it shows nothing at first but ages half again
+     * as fast; then bracket fungi come out on its bark and it ages twice as fast; then its trunk is hollow (rotten wood
+     * inside the bark, air in the middle) with more brackets; a bracket drops when the wood behind it is gone.
+     */
+    @GameTest(template = "arena", timeoutTicks = 100, skyAccess = true)
+    public static void heartRotShowsBracketsThenHollowsTheTrunk(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        grassland(helper);
+        Forest.shapesAtOnce = true;
+        Forest forest = Forest.get(level);
+        long base = Forest.today(level);
+        BlockPos foot = helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE));
+        Forest.Tree t = forest.add(new Forest.Tree("umbrella_thorn", foot, 5, 1.0, TreeStage.LIVING, -1, base));
+        forest.update(level, t, base);
+        helper.assertTrue(t.placedAge >= 0, "the tree was not placed");
+        java.util.function.Predicate<BlockState> rotten = b -> b.is(TreeBlocks.ROTTEN_WOOD.get());
+        java.util.function.Predicate<BlockState> bracket = b -> b.is(TreeBlocks.BRACKET_FUNGUS.get());
+        // Hidden rot: nothing to see, half a day more of its life a day.
+        t.rotFrom = base + 1;
+        double lived = t.lived;
+        forest.update(level, t, base + 1);
+        helper.assertTrue(t.lived == lived + 1.5, "a tree with hidden rot aged " + (t.lived - lived) + " days in a day, not 1.5");
+        helper.assertTrue(countNear(level, foot, 6, 0, 7, bracket) == 0, "brackets showed while the rot was hidden");
+        helper.assertTrue(countNear(level, foot, 4, 0, 7, rotten) == 0, "the trunk is hollow while the rot is hidden");
+        // Brackets: on the bark, facing out; two days a day.
+        t.rotFrom = base + 2 - (long) com.antcolonies.savanna.tree.HeartRot.BRACKETS_FROM;
+        lived = t.lived;
+        forest.update(level, t, base + 2);
+        helper.assertTrue(t.lived == lived + 2, "a tree with brackets aged " + (t.lived - lived) + " days in a day, not 2");
+        int shown = countNear(level, foot, 6, 1, 5, bracket);
+        helper.assertTrue(shown >= 1 && shown == t.brackets, "no brackets on the bark: " + shown + " (the book says " + t.brackets + ")");
+        helper.assertTrue(countNear(level, foot, 4, 0, 7, rotten) == 0, "the trunk is hollow at the bracket stage");
+        // Hollow: the core rotten and open, more brackets.
+        t.rotFrom = base + 3 - (long) com.antcolonies.savanna.tree.HeartRot.HOLLOW_FROM;
+        forest.update(level, t, base + 3);
+        helper.assertTrue(t.placedRot, "the rot-hollowed shape was not placed");
+        int lining = countNear(level, foot, 4, 1, 10, rotten);
+        int open = 0;
+        for (int y = 1; y <= 5; y++) {
+            open += level.getBlockState(foot.above(y)).isAir() ? 1 : 0;
+        }
+        helper.assertTrue(lining >= 4 && open >= 3, "the trunk is not hollow: " + lining + " rotten wood, " + open + " open; " + column(level, foot.above(4)));
+        int more = countNear(level, foot, 6, 1, 5, bracket);
+        helper.assertTrue(more > shown, "no more brackets once hollow: " + more);
+        // A bracket drops when the wood behind it is gone.
+        BlockPos one = null;
+        for (BlockPos pos : BlockPos.betweenClosed(foot.offset(-6, 1, -6), foot.offset(6, 5, 6))) {
+            if (level.getBlockState(pos).is(TreeBlocks.BRACKET_FUNGUS.get())) {
+                one = pos.immutable();
+                break;
+            }
+        }
+        BlockPos behind = one.relative(level.getBlockState(one).getValue(com.antcolonies.savanna.block.BracketFungusBlock.FACING).getOpposite());
+        level.setBlock(behind, Blocks.AIR.defaultBlockState(), 3);
+        helper.assertTrue(level.getBlockState(one).isAir(), "a bracket stayed on with no wood behind it");
         clearAbove(helper, foot);
         forest.forgetInside(helper.getBounds());
         helper.succeed();

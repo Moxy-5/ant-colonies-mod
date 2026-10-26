@@ -68,6 +68,9 @@ public class TreeTests {
             if (block == TreeBlocks.CAMEL_THORN_PODS) {
                 helper.setBlock(pos.above(), TreeBlocks.CAMEL_THORN.leaves().get()); // pods hang from the crown
             }
+            if (block == TreeBlocks.BRACKET_FUNGUS) {
+                helper.setBlock(pos.south(), TreeBlocks.UMBRELLA_THORN.log().get()); // a bracket grows out of the bark behind it
+            }
             helper.setBlock(pos, state);
             x += 2;
         }
@@ -85,7 +88,7 @@ public class TreeTests {
         helper.setBlock(second.north(), TreeBlocks.UMBRELLA_THORN.leaves().get());
         helper.succeedWhen(() -> {
             for (int i = 0; i < TreeBlocks.ALL.size(); i++) {
-                BlockPos pos = new BlockPos(2 + 2 * i, SURFACE, 2);
+                BlockPos pos = new BlockPos(2 + 2 * (i % 30), SURFACE, 2 + 3 * (i / 30)); // 30 to a row, as placed
                 Block block = TreeBlocks.ALL.get(i).get();
                 helper.assertBlockPresent(block, pos);
             }

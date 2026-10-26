@@ -5,6 +5,7 @@ import java.util.List;
 
 import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.block.BleachedBranchBlock;
+import com.antcolonies.savanna.block.BracketFungusBlock;
 import com.antcolonies.savanna.block.DeadTreeWoodBlock;
 import com.antcolonies.savanna.block.FrassBlock;
 import com.antcolonies.savanna.block.HangingPodsBlock;
@@ -90,6 +91,13 @@ public final class TreeBlocks {
     public static final DeferredBlock<FrassBlock> FRASS = add(SavannaBlocks.BLOCKS.registerBlock("frass", FrassBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.SAND).strength(0.1F).sound(SoundType.SAND).ignitedByLava()
                     .pushReaction(PushReaction.DESTROY)));
+    /**
+     * Dead wood for the raids, part 4: the shelf of a heart rot fungus on the bark of a tree rotting inside (its look my
+     * pick: a <i>Ganoderma</i> shelf, banded brown on top with a pale growing rim, cream pores underneath).
+     */
+    public static final DeferredBlock<BracketFungusBlock> BRACKET_FUNGUS = add(SavannaBlocks.BLOCKS.registerBlock("bracket_fungus", BracketFungusBlock::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_BROWN).strength(0.6F).sound(SoundType.WOOD).noCollission()
+                    .noOcclusion().pushReaction(PushReaction.DESTROY)));
     /** What a dead baobab slumps into: a soggy heap of fibres (it leaves no log). */
     public static final DeferredBlock<SoftDeadWoodBlock> BAOBAB_FIBRE = add(SavannaBlocks.BLOCKS.registerBlock("baobab_fibre", SoftDeadWoodBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_BROWN).strength(0.4F).sound(SoundType.WET_GRASS)));

@@ -1,4 +1,4 @@
-# Dead wood for the raids (plan, 2026-10-25; parts 1 to 3 built 2026-10-25, see `docs/HISTORY.md`; parts 4 and 5 not built)
+# Dead wood for the raids (plan, 2026-10-25; parts 1 to 3 built 2026-10-25, part 4 built 2026-10-26, see `docs/HISTORY.md`; part 5 not built)
 
 ## Why (the user's idea, 2026-10-25)
 Termites only build their interesting surface works (feeding galleries, mud over branches, plastered logs, mud
@@ -66,6 +66,8 @@ What it gives:
   rotten limbs): the intricate works the raids need.
 - Hollows as homes later (Matabele nest at tree feet and in rotten wood, M8 step 6 moving house; centipedes and
   scorpions in M9.5).
+
+**Built 2026-10-26** (branch `claude/heart-rot`, `tree/HeartRot`; all numbers my picks): the rot gets in through a shed limb (1 in 80 a limb), a fire on the trunk the tree lives through (1 in 2), a lightning strike it lives through (3 in 4), termites in it (1 in 10 a day) or old age (up to 1 in 100 a day for an ancient tree); only grown acacias (baobabs hollow with age on their own). Days 0 to 6 hidden (the tree uses up 1.5 days of life a day); from day 6, 2 bracket fungi on the lower trunk's bark (2 days a day); from day 16 the trunk hollow up to the fork (rotten wood inside the bark, air in the middle, frass on the floor, one limb hole up the trunk, no door at the foot), 4 brackets, branches shed twice as often, fire and lightning as deadly as for a termite tree, and each second of a thunderstorm 1 in 2,400 that it dies (cause "storm"); then its own dead stages. New land: an old living tree is already rotting with a chance of 0.6 times how old it is, the rot up to 30 days in. The bracket is one new block, `antcolonies:bracket_fungus` (a two-tier *Ganoderma* shelf, banded brown top, pale rim, cream pores; `tools/bracket_art.py`), stuck to the bark, dropping when the wood behind it goes. `/antcolonies trees rot [days]` puts the rot in the nearest grown acacia (default 16, hollow); `/antcolonies trees` lists the rotting trees. The bracket's look was my pick, not the model viewer (the user's "Claude decides" rule, 2026-10-25).
 
 ### Part 5: the check
 - A test command (my pick: `/antcolonies feedingspots`) that counts the termite feeding spots (galleries, mud casing,

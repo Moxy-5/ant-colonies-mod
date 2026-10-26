@@ -137,6 +137,14 @@ public class Forest extends SavedData {
          * shape in the world is the hollowed one.
          */
         public boolean termites, placedTermites;
+        /**
+         * Dead wood for the raids, part 4 ({@link HeartRot}): the day heart rot got into its trunk ({@link HeartRot#NONE}:
+         * sound); {@code placedRot}: whether the shape in the world is the rot-hollowed one; {@code brackets}: how many
+         * bracket fungi have been put on its bark.
+         */
+        public long rotFrom = HeartRot.NONE;
+        public boolean placedRot;
+        public int brackets;
 
         public Tree(String kind, BlockPos foot, long seed, double age, TreeStage stage, double placedAge, long lastDay) {
             this.kind = kind;
@@ -170,7 +178,8 @@ public class Forest extends SavedData {
 
         /** Whether the shape in the world is the one it should have now. */
         boolean upToDate() {
-            return placedAge == TreeLife.shapeAge(age) && placedStage == stage && placedStep == step && placedTermites == termites;
+            return placedAge == TreeLife.shapeAge(age) && placedStage == stage && placedStep == step && placedTermites == termites
+                    && placedRot == HeartRot.hollow(this);
         }
 
         TreeKind treeKind() {
@@ -178,12 +187,12 @@ public class Forest extends SavedData {
         }
 
         TreePlacer.Placed shape(double atAge) {
-            return TreePlacer.placed(shapeKind(termites), seed, TreeLife.shapeAge(atAge), stage);
+            return TreePlacer.placed(shapeKind(termites, HeartRot.hollow(this)), seed, TreeLife.shapeAge(atAge), stage);
         }
 
-        /** The name its shapes are kept under: its kind, hollowed by termites or not (step 5f). */
-        String shapeKind(boolean hollowed) {
-            return hollowed ? kind + TreePlacer.HOLLOWED : kind;
+        /** The name its shapes are kept under: its kind, hollowed by termites (step 5f) and by heart rot (part 4) or not. */
+        String shapeKind(boolean hollowed, boolean rotted) {
+            return kind + (hollowed ? TreePlacer.HOLLOWED : "") + (rotted ? TreePlacer.ROTTED : "");
         }
 
         public CompoundTag save() {
@@ -206,6 +215,9 @@ public class Forest extends SavedData {
             tag.putBoolean("toppling", toppling);
             tag.putBoolean("termites", termites);
             tag.putBoolean("placedTermites", placedTermites);
+            tag.putLong("rotFrom", rotFrom);
+            tag.putBoolean("placedRot", placedRot);
+            tag.putInt("brackets", brackets);
             return tag;
         }
 
@@ -224,6 +236,11 @@ public class Forest extends SavedData {
                 t.toppling = tag.getBoolean("toppling");
                 t.termites = tag.getBoolean("termites");
                 t.placedTermites = tag.getBoolean("placedTermites");
+            }
+            if (tag.contains("rotFrom")) {
+                t.rotFrom = tag.getLong("rotFrom");
+                t.placedRot = tag.getBoolean("placedRot");
+                t.brackets = tag.getInt("brackets");
             }
             return t;
         }
@@ -370,6 +387,7 @@ public class Forest extends SavedData {
         for (Queued q; (q = QUEUE.peek()) != null && q.dimension() == level.dimension(); ) {
             QUEUE.poll();
             q.tree().lastDay = today(level);
+            HeartRot.newLand(q.tree(), today(level));
             forest.add(q.tree());
         }
         boolean timed = Perf.begin(Perf.Part.TREES);
@@ -405,11 +423,17 @@ public class Forest extends SavedData {
             }
             if (t.living() && t.placedAge >= 0 && BranchShedding.stormShakes(level, t.age, t.foot)) {
                 // Step 6b: a thunderstorm shakes a dead branch out of a grown tree's crown.
-                TreePlacer.Placed now = soon(t, t.placedAge, t.placedStage, t.placedStep, t.placedTermites);
+                TreePlacer.Placed now = soon(t, t.placedAge, t.placedStage, t.placedStep, t.placedTermites, t.placedRot);
                 if (now != null && loaded(level, now.box(t.foot))
                         && BranchShedding.shed(level, t.foot, now, new Random(level.getRandom().nextLong()), true)) {
                     shed++;
+                    if (HeartRot.wound(t, today, HeartRot.SHED_CHANCE, new Random(level.getRandom().nextLong()))) {
+                        setDirty(); // the rot got in where the limb broke
+                    }
                 }
+            }
+            if (HeartRot.stormKills(level, t)) {
+                kill(t, today, "storm"); // part 4: the storm breaks the hollow tree
             }
             if (t.dead() && !t.fell && t.died != DIED_UNKNOWN && stormFells(level, t)) {
                 t.fell = true; // the storm brings it down
@@ -486,7 +510,7 @@ public class Forest extends SavedData {
         if (!level.hasChunkAt(t.foot)) {
             return false;
         }
-        TreePlacer.Placed now = t.placedAge >= 0 ? soon(t, t.placedAge, t.placedStage, t.placedStep, t.placedTermites) : null;
+        TreePlacer.Placed now = t.placedAge >= 0 ? soon(t, t.placedAge, t.placedStage, t.placedStep, t.placedTermites, t.placedRot) : null;
         if (t.placedAge >= 0 && now == null) {
             return false; // its shape is being worked out
         }
@@ -513,7 +537,8 @@ public class Forest extends SavedData {
             if (!t.termites && t.age >= TreeLife.YOUNG_END && termitesUnder(level, t.foot)) {
                 t.termites = true; // termites have come in from below: its heartwood is eaten from now on
             }
-            t.lived += t.termites ? 2 : 1;
+            HeartRot.daily(t, t.lastDay);
+            t.lived += 1 + (t.termites ? 1 : 0) + HeartRot.extraAgeing(t);
             if (t.age >= TreeLife.YOUNG_END && t.lived >= TreeLife.lifespan(t.treeKind(), t.seed)) {
                 kill(t, t.lastDay, "age");
                 continue;
@@ -529,9 +554,11 @@ public class Forest extends SavedData {
             grownSteps++;
             // Step 6b: a grown tree drops a dead branch under its crown now and then (more when old).
             Random shedDice = TreeLife.dice(t.seed, t.lastDay * 31 + 17);
-            if (now != null && shedDice.nextDouble() < BranchShedding.chance(t.age)
+            double shedChance = BranchShedding.chance(t.age) * (HeartRot.hollow(t) ? 2 : 1); // a hollow tree sheds more
+            if (now != null && shedDice.nextDouble() < shedChance
                     && BranchShedding.shed(level, t.foot, now, shedDice, t.lastDay == today)) {
                 shed++;
+                HeartRot.wound(t, t.lastDay, HeartRot.SHED_CHANCE, shedDice);
             }
         }
         int stageSteps = 0;
@@ -550,11 +577,15 @@ public class Forest extends SavedData {
             stageSteps = Math.abs(TreeLife.stageIndex(t.treeKind(), t.stage) - TreeLife.stageIndex(t.treeKind(), t.placedStage));
         }
         setDirty();
+        if (now != null && t.living() && t.brackets < HeartRot.bracketsWanted(t)) {
+            // Part 4: the shelf fungi come out on the bark.
+            t.brackets += HeartRot.placeBrackets(level, t.foot, now, HeartRot.bracketsWanted(t) - t.brackets, TreeLife.dice(t.seed, today * 61 + 3));
+        }
         if (t.upToDate()) {
             t.pendingDays = 0;
             return true;
         }
-        TreePlacer.Placed next = soon(t, t.age, t.stage, t.step, t.termites);
+        TreePlacer.Placed next = soon(t, t.age, t.stage, t.step, t.termites, HeartRot.hollow(t));
         boolean jump = t.dead() ? stageSteps > 1 : t.pendingDays > 1;
         if (next == null || !loaded(level, next.box(t.foot)) || jump && !outOfSight(level, t, next)) {
             return false;
@@ -593,9 +624,10 @@ public class Forest extends SavedData {
         if (kind.isBaobab() || t.fell || t.toppling || falling(t) || t.placedAge < 0 || !level.hasChunkAt(t.foot)) {
             return false;
         }
-        TreePlacer.Placed now = burnt(t, TreePlacer.placed(t.shapeKind(t.placedTermites), t.seed, t.placedAge, t.placedStage, t.placedStep), t.placedStage);
-        TreePlacer.Placed shed = burnt(t, TreePlacer.placed(t.shapeKind(t.termites), t.seed, TreeLife.shapeAge(t.age), TreeStage.SHED), TreeStage.SHED);
-        TreePlacer.Placed lying = burnt(t, TreePlacer.placed(t.shapeKind(t.termites), t.seed, TreeLife.shapeAge(t.age), TreeStage.FALLEN), TreeStage.FALLEN);
+        boolean rot = HeartRot.hollow(t);
+        TreePlacer.Placed now = burnt(t, TreePlacer.placed(t.shapeKind(t.placedTermites, t.placedRot), t.seed, t.placedAge, t.placedStage, t.placedStep), t.placedStage);
+        TreePlacer.Placed shed = burnt(t, TreePlacer.placed(t.shapeKind(t.termites, rot), t.seed, TreeLife.shapeAge(t.age), TreeStage.SHED), TreeStage.SHED);
+        TreePlacer.Placed lying = burnt(t, TreePlacer.placed(t.shapeKind(t.termites, rot), t.seed, TreeLife.shapeAge(t.age), TreeStage.FALLEN), TreeStage.FALLEN);
         if (t.living()) {
             t.cause = "age";
             killed++;
@@ -631,8 +663,8 @@ public class Forest extends SavedData {
     }
 
     /** A tree's shape at an age and stage, if worked out (or being worked out in the background: null). */
-    private static TreePlacer.Placed soon(Tree t, double age, TreeStage stage, int step, boolean hollowed) {
-        String kind = t.shapeKind(hollowed);
+    private static TreePlacer.Placed soon(Tree t, double age, TreeStage stage, int step, boolean hollowed, boolean rotted) {
+        String kind = t.shapeKind(hollowed, rotted);
         return burnt(t, shapesAtOnce ? TreePlacer.placed(kind, t.seed, TreeLife.shapeAge(age), stage, step)
                 : TreePlacer.placedSoon(kind, t.seed, TreeLife.shapeAge(age), stage, step), stage);
     }
@@ -672,7 +704,7 @@ public class Forest extends SavedData {
             if (!t.living() || t.placedAge < 0 || falling(t)) {
                 continue;
             }
-            TreePlacer.Placed now = soon(t, t.placedAge, t.placedStage, t.placedStep, t.placedTermites);
+            TreePlacer.Placed now = soon(t, t.placedAge, t.placedStage, t.placedStep, t.placedTermites, t.placedRot);
             if (now == null) {
                 continue;
             }
@@ -696,11 +728,13 @@ public class Forest extends SavedData {
                 continue;
             }
             fireDays.put(t.foot.asLong(), today);
-            if (TreeLife.fireKills(t.seed, today, t.age, t.termites)) {
+            if (TreeLife.fireKills(t.seed, today, t.age, t.termites || HeartRot.hollow(t))) {
                 kill(t, today, "fire");
-                if (TreeLife.smoulders(t.age)) {
+                if (TreeLife.smoulders(t.age) || HeartRot.hollow(t)) {
                     smoulders.put(t.foot.asLong(), new Smoulder(trunkTop(now, t.foot), time(level) + SMOULDER_DAYS));
                 }
+            } else {
+                HeartRot.wound(t, today, HeartRot.FIRE_CHANCE, TreeLife.dice(t.seed, today * 67 + 1)); // the fire scar lets the rot in
             }
         }
     }
@@ -726,7 +760,7 @@ public class Forest extends SavedData {
                     || t.placedStage == TreeStage.FALLEN || t.placedStage == TreeStage.HEAP || t.placedStage == TreeStage.HEAP_DRY) {
                 continue;
             }
-            TreePlacer.Placed now = soon(t, t.placedAge, t.placedStage, t.placedStep, t.placedTermites);
+            TreePlacer.Placed now = soon(t, t.placedAge, t.placedStage, t.placedStep, t.placedTermites, t.placedRot);
             if (now == null || !loaded(level, now.box(t.foot))) {
                 continue;
             }
@@ -755,7 +789,7 @@ public class Forest extends SavedData {
      */
     private void struck(ServerLevel level, Tree t, TreePlacer.Placed now) {
         long today = today(level);
-        TreeLife.Strike strike = TreeLife.strike(t.seed, today, t.termites);
+        TreeLife.Strike strike = TreeLife.strike(t.seed, today, t.termites || HeartRot.hollow(t));
         double sx = Math.cos(strike.side()), sz = Math.sin(strike.side());
         int height = trunkTop(now, t.foot).getY() - t.foot.getY();
         // The trunk's outermost block on the struck side at each height.
@@ -803,6 +837,8 @@ public class Forest extends SavedData {
         }
         if (strike.kills() && t.living()) {
             kill(t, today, "lightning");
+        } else {
+            HeartRot.wound(t, today, HeartRot.LIGHTNING_CHANCE, TreeLife.dice(t.seed, today * 71 + 2)); // the burst bark lets the rot in
         }
     }
 
@@ -870,6 +906,7 @@ public class Forest extends SavedData {
         t.placedStage = t.stage;
         t.placedStep = t.step;
         t.placedTermites = t.termites;
+        t.placedRot = HeartRot.hollow(t);
         t.pendingDays = 0;
         setDirty();
         if (!shed.isEmpty() && t.living()) {
