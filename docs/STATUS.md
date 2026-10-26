@@ -23,7 +23,7 @@ Keep this short. The full story is in `docs/HISTORY.md`; the long status is at t
 ## Left before the finish line
 1. **In-game test 3** (2e + 2f): the user tries them.
 2. **Step 3, drawn-only ants:** big raid columns of 200 to 500 without lag.
-3. **Dead wood for the raids** (`docs/plans/dead-wood-for-raids.md`): parts 1 to 3 (more trees, faster tree lives, a dead tree by every new-land mound) confirmed in-game 2026-10-25; the dead tree now 10 to 30 blocks from the mound's edge (the user's ask) and heart rot (part 4: trees rot from inside, bracket fungi, hollow trunks) built 2026-10-26, both not tried in-game yet; the feeding spot count (part 5) next.
+3. **Dead wood for the raids** (`docs/plans/dead-wood-for-raids.md`): parts 1 to 3 (more trees, faster tree lives, a dead tree by every new-land mound) confirmed in-game 2026-10-25; the dead tree now 10 to 30 blocks from the mound's edge (the user's ask) and heart rot (part 4: trees rot from inside, bracket fungi, hollow trunks) built 2026-10-26, both not tried in-game yet; the feeding spot count (part 5, `/antcolonies feedingspots`) built 2026-10-26, not tried in-game yet. That is every part of the plan.
 4. **Step 4, scouts and raids:** a scout finds a feeding spot, comes home, leads a column out, the fight, the carry home.
 
 ## Optional, after the finish line

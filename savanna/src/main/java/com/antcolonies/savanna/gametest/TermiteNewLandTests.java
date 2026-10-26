@@ -162,6 +162,12 @@ public class TermiteNewLandTests {
             helper.assertTrue(!farPut || galleryNear(helper, colony, far), "no gallery out to the big dead wood at " + far.toShortString() + " ("
                     + Math.round(Math.sqrt(far.distSqr(new BlockPos(colony.getCenter().getX(), far.getY(), colony.getCenter().getZ())))) + " blocks out):"
                     + galleries.describe(level));
+            // The dead wood for the raids, part 5: the living colony ends with a feeding spot fed at by day (a gallery
+            // under dead wood or a runway of mud sheeting closed all round), what a Matabele raid needs (looked at every
+            // 2 seconds: the count looks at the mud round each spot).
+            helper.assertTrue(helper.getTick() % 40 == 0, "(the feeding spots are counted every 2 seconds)");
+            java.util.List<com.antcolonies.savanna.colony.FeedingSpots.Spot> spots = com.antcolonies.savanna.colony.FeedingSpots.of(level, colony);
+            helper.assertTrue(com.antcolonies.savanna.colony.FeedingSpots.byDay(spots) >= 1, "no feeding spot fed at by day: " + spots);
         });
     }
 
