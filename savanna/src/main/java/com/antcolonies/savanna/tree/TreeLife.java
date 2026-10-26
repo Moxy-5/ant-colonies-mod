@@ -30,8 +30,8 @@ public final class TreeLife {
     static final double YOUNG_DAYS = 27;
     /** Days a grown tree takes to be ancient, at normal speed. */
     static final double GROWN_DAYS = 100;
-    /** Of the seedlings, how many live to be young (my pick: 1 in 10). */
-    static final double SEEDLING_SURVIVAL = 0.1;
+    /** Of the seedlings, how many live to be young (my pick: 1 in 5; was 1 in 10 before the dead wood for the raids). */
+    static final double SEEDLING_SURVIVAL = 0.2;
     /** Of the young, how many live to be grown (my pick: about half). */
     static final double YOUNG_SURVIVAL = 0.5;
 
@@ -91,13 +91,25 @@ public final class TreeLife {
 
     /**
      * How many days this tree lives after it came up (the user's decision, step 5: real ratios, each tree its own
-     * number from its kind's range by its seed; umbrella thorn 150 to 250, camel thorn 300 to 500, baobab 1,000 to
-     * 2,000).
+     * number from its kind's range by its seed; halved 2026-10-25 for the dead wood the raids need, heart rot to do the
+     * rest: umbrella thorn 75 to 125, camel thorn 150 to 250, baobab 500 to 1,000).
      */
     public static double lifespan(TreeKind kind, long seed) {
         List<Integer> range = kind.lifespan();
         double from = range.get(0), to = range.get(range.size() - 1);
         return from + (to - from) * new TreeRandom(seed * 4513 + 29).next();
+    }
+
+    /**
+     * The days a tree of new land has already lived when it is made at this age: the days its growth took, but never
+     * past its lifespan. An old tree of new land whose growth alone took longer than its life (a near-ancient umbrella
+     * thorn, since the lifespans were halved) has lived 60 to 95 percent of it instead, by its seed (my pick), so new
+     * land's old trees die over the following days and weeks, not all at once the day they are first seen.
+     */
+    public static double livedAtStart(TreeKind kind, long seed, double age) {
+        double grew = daysAt(Math.min(age, TreeShapes.ANCIENT));
+        double life = lifespan(kind, seed);
+        return grew < life ? grew : life * (0.6 + 0.35 * new TreeRandom(seed * 6271 + 13).next());
     }
 
     /**

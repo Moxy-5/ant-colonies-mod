@@ -32,7 +32,7 @@
     "seedling": "antcolonies:baobab_seedling"
   },
   "lifespan": [
-    1000,
-    2000
+    500,
+    1000
   ]
 }

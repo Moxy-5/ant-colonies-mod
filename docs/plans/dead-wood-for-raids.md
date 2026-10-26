@@ -1,4 +1,4 @@
-# Dead wood for the raids (plan, 2026-10-25; nothing built)
+# Dead wood for the raids (plan, 2026-10-25; parts 1 to 3 built 2026-10-25, see `docs/HISTORY.md`; parts 4 and 5 not built)
 
 ## Why (the user's idea, 2026-10-25)
 Termites only build their interesting surface works (feeding galleries, mud over branches, plastered logs, mud

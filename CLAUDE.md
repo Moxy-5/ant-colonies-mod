@@ -264,6 +264,7 @@ A Minecraft mod where ants and termites live as real colonies: they dig, build, 
 - **New way of working (the user, 2026-10-25):** Claude decides small things itself, the finish line is M8 playable (through step 4), and the short "where we are" is `docs/STATUS.md` (see "How to work with me").
 - **Dead wood for the raids planned 2026-10-25** (the user's idea, `docs/plans/dead-wood-for-raids.md`; nothing built): termites only build surface works at dead wood, so raids need more of it: more trees, faster tree lives, a dead tree beside every new-land mound, heart rot hollowing trees from inside, and a count of feeding spots; before M8 step 4; taking our time (the user).
 - **M8 steps 2e and 2f confirmed in-game by the user 2026-10-25** ("it works"); found: jumping repeatedly "breaks them" (details asked for).
+- **Dead wood for the raids, parts 1 to 3, BUILT 2026-10-25** (branch `claude/dead-wood-raids-901352`): about twice as many trees in new savannas; lifespans halved (umbrella 75-125, camel 150-250, baobab 500-1,000), 3 to 4 times the seedlings; new land's old trees no longer all die the day they load (found and fixed); a dead thorn tree, standing or fallen, beside every new-land mound, the living colony knowing its wood (`NewLandMounds.deadTree`); my picks in `docs/HISTORY.md`; not tried in-game yet. Next: the user's look, then heart rot (part 4) planned.
 
 ## Other notes files (read only when the task needs them)
 - `docs/DESIGN.md`: every design decision for the species and shared systems (read the section for a feature before working on it).

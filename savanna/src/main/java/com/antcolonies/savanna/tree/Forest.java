@@ -82,9 +82,10 @@ public class Forest extends SavedData {
     static final int REGION = 64;
     /** How far round each player land gets its seedlings after rain. */
     static final int SPROUT_RANGE = 96;
-    /** Per square of land and day of rain: how many places are tried, and the chance one that suits takes (my picks). */
-    static final int SPROUT_TRIES = 2;
-    static final double SPROUT_CHANCE = 0.35;
+    /** Per square of land and day of rain: how many places are tried, and the chance one that suits takes (my picks;
+     * doubled-ish for the dead wood the raids need, 2026-10-25: was 2 and 0.35). */
+    static final int SPROUT_TRIES = 4;
+    static final double SPROUT_CHANCE = 0.6;
     /** No seedling comes up this close to another tree's foot or a colony's middle. */
     static final int SPROUT_SPACING = 4;
     static final int COLONY_SPACING = 8;
@@ -146,7 +147,7 @@ public class Forest extends SavedData {
             this.placedAge = placedAge;
             this.lastDay = lastDay;
             this.placedStage = stage;
-            this.lived = TreeLife.daysAt(Math.min(age, TreeShapes.ANCIENT));
+            this.lived = TreeLife.livedAtStart(treeKind(), seed, age);
             if (stage != TreeStage.LIVING) {
                 died = DIED_UNKNOWN;
                 step = placedStep = TreeLife.fullStep(stage); // new land shows the stage's finished shape

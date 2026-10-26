@@ -109,6 +109,24 @@ final class DeadWoodCall {
         return wood != null && wood.blocks() >= call.minBlocks();
     }
 
+    /**
+     * Learns the dead wood touching {@code start} at once, from no distance (new land's dead tree by its mound, which the
+     * colony has lived beside for years): its foot goes into the food map. Returns the foot, or null if it is not wood
+     * the colony eats or none of it rests on the ground.
+     */
+    @Nullable
+    BlockPos learnNow(ServerLevel level, BlockPos start) {
+        if (!isDeadWood(level.getBlockState(start))) {
+            return null;
+        }
+        Wood wood = measure(level, start, new HashSet<>());
+        if (wood == null) {
+            return null;
+        }
+        colony.foodMap().learn(wood.foot());
+        return wood.foot();
+    }
+
     /** A piece of dead wood: how many blocks and its foot. */
     record Wood(int blocks, BlockPos foot) {
     }

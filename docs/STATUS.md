@@ -22,7 +22,7 @@ Keep this short. The full story is in `docs/HISTORY.md`; the long status is at t
 ## Left before the finish line
 1. **In-game test 3** (2e + 2f): the user tries them.
 2. **Step 3, drawn-only ants:** big raid columns of 200 to 500 without lag.
-3. **Dead wood for the raids** (`docs/plans/dead-wood-for-raids.md`, planned, not built): more trees and dead wood so raids have feeding spots to hit.
+3. **Dead wood for the raids** (`docs/plans/dead-wood-for-raids.md`): parts 1 to 3 built (more trees, faster tree lives, a dead tree by every new-land mound), not tried in-game yet; heart rot (part 4) to plan after the user's look.
 4. **Step 4, scouts and raids:** a scout finds a feeding spot, comes home, leads a column out, the fight, the carry home.
 
 ## Optional, after the finish line

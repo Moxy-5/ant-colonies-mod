@@ -446,7 +446,7 @@ public class TreeGrowthTests {
     }
 
     /**
-     * Step 5: a grown umbrella thorn that has lived its lifespan (150 to 250 days) dies of old age, and its dead stages
+     * Step 5: a grown umbrella thorn that has lived its lifespan (75 to 125 days) dies of old age, and its dead stages
      * follow day by day as decided: the day it dies it still stands as it was (withering), then a bare silver snag (no
      * leaves, no living wood), termite mud climbing it, the limbs broken off and lying round it, and the fall: nothing
      * stands above the stump and the hollow log lies on the ground. A fallen log then stays in the book as it is.
@@ -487,7 +487,7 @@ public class TreeGrowthTests {
             }
         }
         double life = TreeLife.lifespan(kind, seed);
-        helper.assertTrue(life >= 150 && life <= 250, "an umbrella thorn's lifespan is " + life);
+        helper.assertTrue(life >= 75 && life <= 125, "an umbrella thorn's lifespan is " + life);
         // It has lived nearly all its days: it dies of old age on the next one.
         t.lived = life - 0.5;
         forest.update(level, t, base + 1);
