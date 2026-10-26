@@ -1,4 +1,4 @@
-<title>Bracket Fungus Viewer</title>
+<title>Heart Rot Looks</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
@@ -50,30 +50,47 @@
   .swatch { display: grid; gap: 4px; justify-items: center; font-size: 0.8rem; color: var(--muted); }
   .swatch img { width: 100%; max-width: 72px; aspect-ratio: 1; image-rendering: pixelated; border-radius: 4px; border: 1px solid var(--line); }
   .note { color: var(--muted); font-size: 0.85rem; margin: 0; }
+  .label .group[hidden] { display: none; }
+  .swatch span { text-align: center; line-height: 1.25; }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 
+
 <div class="wrap">
   <header>
-    <h1>Bracket Fungus on the Trees</h1>
-    <p>Heart rot fungi eat a tree's core while it stays green. Their hard woody shelves on the bark show the rot is well along. In the game, 2 brackets come out about 6 days after the rot gets in, and 4 once the trunk is hollow (from day 16). They stay on when the tree dies, bleached or burnt, and drop off when the wood behind them goes. The bracket is the game's own block model, drawn here on each kind of trunk.</p>
+    <h1>Heart Rot on the Trees</h1>
+    <p>Heart rot fungi eat a tree's core while it stays green. They get in through a wound, and their hard woody brackets on the bark show the rot is well along. Here are new looks to pick from: the bracket at each age, brackets in tiers, bark dusted brown by their spores, and the wound where the rot got in, beside today's game bracket. Drafts only: none of this is in the game yet.</p>
   </header>
   <div class="bench">
     <div class="stage">
-      <canvas id="view" aria-label="3D view of tree trunks with bracket fungi on their bark"></canvas>
+      <canvas id="view" aria-label="3D view of tree trunks with heart rot brackets and bark"></canvas>
       <div class="hint">Drag to turn, scroll or pinch to zoom</div>
     </div>
     <aside class="label">
       <div>
-        <h2>Tree</h2>
-        <div class="list" id="trees"></div>
+        <h2>Scene</h2>
+        <div class="list" id="views"></div>
       </div>
       <div>
-        <h2>Stage</h2>
+        <h2>Bracket, close up</h2>
         <div class="list" id="stages"></div>
       </div>
       <div>
-        <h2>Bracket textures</h2>
+        <h2>Bark look, close up</h2>
+        <div class="list" id="barklooks"></div>
+      </div>
+      <div class="group" id="kind-group">
+        <h2>Bark</h2>
+        <div class="list" id="kinds"></div>
+      </div>
+      <div class="group" id="old-group" hidden>
+        <h2>Today's game: tree</h2>
+        <div class="list" id="trees"></div>
+        <h2 style="margin-top:12px">Today's game: stage</h2>
+        <div class="list" id="oldstages"></div>
+      </div>
+      <div>
+        <h2>Textures</h2>
         <div class="swatches" id="swatches"></div>
       </div>
     </aside>
@@ -84,37 +101,67 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script>
 const DATA = /*DATA*/null;
+// Today's bracket as one more stage, so every scene can show it beside the new ones.
+DATA.stages.today = { name: "today's bracket", elements: DATA.bracket.model.elements, textures: DATA.bracket.textures };
+const VIEWS = [
+  { id: "story", letter: "★", name: "The whole story", text: "One rotting trunk: the wound low on the front where the rot got in (gum dribbling), a new white knob beside it, a young shelf, a mature hoof and an old dusty one higher up, tiers on the left side, the bark under each grown bracket stained brown by its spores." },
+  { id: "row", letter: "≡", name: "Every bracket in a row", text: "Left to right: today's bracket, then a, b, c, d, the tiers on one block, and the tower (a mature shelf with a young one on the block above)." },
+  { id: "barkrow", letter: "▦", name: "Every bark look", text: "For each bark (umbrella thorn, camel thorn, bleached dead, burnt): plain, spore-dusted under an old bracket, and the wound." },
+  { id: "today", letter: "◷", name: "Today's game", text: "The trunks as the game draws them now, for comparison." },
+];
+const STAGE_BUTTONS = [
+  { id: "today", letter: "0", name: "Today's bracket", text: "The single two-tier shelf in the game now." },
+  { id: "knob", letter: "a", name: "Knob (first days)", text: "A small soft white lump pushing out of the bark: how every Ganoderma bracket starts." },
+  { id: "young", letter: "b", name: "Young shelf", text: "Thin and pale, a wide bright white growing rim, white pores underneath." },
+  { id: "mature", letter: "c", name: "Mature hoof", text: "Thick and woody, banded brown with a ridge for each year's new layer, a narrow cream rim, cream pores underneath." },
+  { id: "old", letter: "d", name: "Old", text: "Stopped growing: darker, cracked, its top dusted cocoa-brown with its own spores, the pores gone dingy." },
+  { id: "stacked", letter: "e", name: "Tiers on one block", text: "Three shelves one over another, the newest on top with its white rim still showing." },
+  { id: "tower", letter: "f", name: "Tiers on two blocks", text: "A mature shelf with a young one on the block above it." },
+];
+const BARK_BUTTONS = [
+  { id: "plain", letter: "−", name: "Plain bark", text: "Today's log, to compare." },
+  { id: "dusted", letter: "g", name: "Spore-dusted", text: "For the block under a bracket: cocoa-brown spore dust, heavy at the top, fading down in patches, thickest in the bark's furrows." },
+  { id: "wound", letter: "h", name: "Wound", text: "Where the rot got in: a sunken scar of bare cracked wood going pale and soft, thin black lines of the rot, a raised roll of new bark round it, amber gum beads and dribbles (old dark gum on a dead tree, none on a burnt one)." },
+];
+const KINDS = [
+  { id: "umbrella", letter: "1", name: "Umbrella thorn", text: "Living." },
+  { id: "camel", letter: "2", name: "Camel thorn", text: "Living." },
+  { id: "bleached", letter: "3", name: "Dead, bleached", text: "Brackets stay on after the tree dies." },
+  { id: "charred", letter: "4", name: "Dead, burnt", text: "Fire scars are a common way in for heart rot." },
+];
 const TREES = [
-  { id: "all", letter: "★", name: "All side by side", text: "Every trunk below in a row, to compare." },
-  { id: "umbrella", letter: "1", name: "Umbrella thorn", text: "Living, its dark furrowed bark." },
-  { id: "camel", letter: "2", name: "Camel thorn", text: "Living, its grey cracked bark." },
-  { id: "bleached", letter: "3", name: "Dead, bleached", text: "A dead acacia's silver wood: the brackets stay on after the tree dies." },
-  { id: "charred", letter: "4", name: "Dead, burnt", text: "A tree killed by fire (a hollow trunk burns like a chimney)." },
-  { id: "baobab", letter: "5", name: "Baobab", text: "Shown only to compare: baobabs never get heart rot in the game (they hollow with age on their own)." },
+  { id: "all", letter: "★", name: "All side by side", text: "Every trunk below in a row." },
+  { id: "umbrella", letter: "1", name: "Umbrella thorn", text: "" },
+  { id: "camel", letter: "2", name: "Camel thorn", text: "" },
+  { id: "bleached", letter: "3", name: "Dead, bleached", text: "" },
+  { id: "charred", letter: "4", name: "Dead, burnt", text: "" },
+  { id: "baobab", letter: "5", name: "Baobab", text: "Only to compare: baobabs never get heart rot in the game." },
 ];
-const STAGES = [
-  { id: "brackets", letter: "6", name: "Brackets (day 6)", text: "Two brackets on the lower trunk; the core is still solid." },
-  { id: "hollow", letter: "16", name: "Hollow (day 16), cut open", text: "Four brackets; the near half of the trunk cut away to show the rotten wood lining the hollow (the game's shape: the bark stays, a block of rotten wood inside it, the middle empty)." },
+const OLD_STAGES = [
+  { id: "brackets", letter: "6", name: "Brackets (day 6)", text: "Two brackets; the core still solid." },
+  { id: "hollow", letter: "16", name: "Hollow (day 16), cut open", text: "Four brackets; the near half cut away to show the rotten wood inside." },
 ];
-let treeId = "all", stageId = "hollow";
-try { treeId = localStorage.getItem("bracket-tree") || "all"; stageId = localStorage.getItem("bracket-stage") || "hollow"; } catch (e) {}
+const state = { view: "story", kind: "umbrella", tree: "all", oldStage: "hollow" };
+try { Object.assign(state, JSON.parse(localStorage.getItem("rot-looks") || "{}")); } catch (e) {}
+function save() { try { localStorage.setItem("rot-looks", JSON.stringify(state)); } catch (e) {} }
 
 const canvas = document.getElementById("view");
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(40, 4 / 3, 0.05, 200);
+const camera = new THREE.PerspectiveCamera(40, 4 / 3, 0.05, 300);
 const controls = new THREE.OrbitControls(camera, canvas);
 controls.enableDamping = true;
 controls.maxPolarAngle = Math.PI * 0.52;
-controls.minDistance = 1; controls.maxDistance = 60;
+controls.minDistance = 0.8; controls.maxDistance = 90;
 
 const images = {};
 function sources() {
   const out = [DATA.grass, DATA.dirt, DATA.rotten];
   for (const k of Object.values(DATA.logs)) out.push(k.side, k.end);
-  out.push(...Object.values(DATA.bracket.textures));
+  for (const s of Object.values(DATA.stages)) out.push(...Object.values(s.textures));
+  for (const b of Object.values(DATA.barks)) out.push(...Object.values(b));
   return out;
 }
 const loaded = Promise.all(sources().map(src => new Promise(done => {
@@ -157,18 +204,26 @@ function element(el, textures) {
 }
 const world = new THREE.Group();
 scene.add(world);
-// A whole block: a log (bark round the sides, the cut end on top and bottom), rotten wood or ground.
 function cube(x, y, z, side, top, bottom) {
   const mats = FACES.map(f => mat(f === "up" ? top : f === "down" ? (bottom || top) : side, f));
   const b = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), mats);
   b.position.set(x + 0.5, y + 0.5, z + 0.5);
   world.add(b);
 }
+// A log block of a kind with one of the bark looks on its sides.
+function log(x, y, z, kind, look) {
+  cube(x, y, z, look ? DATA.barks[kind][look] : DATA.logs[kind].side, DATA.logs[kind].end);
+}
+function ground(x0, x1, z0, z1) {
+  for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) cube(x, -1, z, DATA.dirt, DATA.grass, DATA.dirt);
+}
 // The blockstate's turn for each facing (the model faces north); Minecraft turns clockwise seen from above.
 const TURN = { north: 0, east: 90, south: 180, west: 270 };
-function bracket(x, y, z, facing) {
+function bracket(x, y, z, facing, stageId) {
+  if (stageId === "tower") { bracket(x, y, z, facing, "mature"); bracket(x, y + 1, z, facing, "young"); return; }
+  const st = DATA.stages[stageId];
   const inner = new THREE.Group();
-  for (const el of DATA.bracket.model.elements) inner.add(element(el, DATA.bracket.textures));
+  for (const el of st.elements) inner.add(element(el, st.textures));
   inner.position.set(-0.5, 0, -0.5);
   const pivot = new THREE.Group();
   pivot.add(inner);
@@ -176,31 +231,108 @@ function bracket(x, y, z, facing) {
   pivot.rotation.y = -TURN[facing] * Math.PI / 180;
   world.add(pivot);
 }
-// A grown trunk 5 wide (corners off), 7 high; hollow: the game's heart rot shape (the bark ring, rotten wood inside it,
-// the middle empty) with the near half (z > 0) cut away.
-const BRACKETS = [[3, 1, -1, "east"], [-3, 2, 0, "west"], [0, 3, -3, "north"], [3, 4, 0, "east"]];
-function trunk(kind, ox, hollow) {
-  const log = DATA.logs[kind];
+// A floating name over a pillar.
+function tag(text, x, y, z) {
+  const c = document.createElement("canvas"); c.width = 256; c.height = 64;
+  const g = c.getContext("2d");
+  g.fillStyle = "rgba(0,0,0,0.55)"; g.fillRect(0, 8, 256, 48);
+  g.fillStyle = "#f3ece2"; g.font = "bold 26px Atkinson Hyperlegible, Segoe UI, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle";
+  g.fillText(text, 128, 33);
+  const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false }));
+  s.scale.set(2.2, 0.55, 1); s.position.set(x, y, z); world.add(s);
+}
+
+// ---- Scenes ----
+// The whole story: a grown trunk 5 wide (corners off), 8 high, its front (south, +z) to the camera.
+function story(kind) {
+  ground(-4, 4, -4, 5);
+  const looks = {
+    "0,1,2": "wound",     // the way in, low on the front
+    "0,4,2": "dusted",    // under the mature hoof
+    "2,3,0": "dusted",    // under the old one (east side)
+    "-2,1,0": "dusted",   // under the tiers (west side)
+  };
+  for (let y = 0; y < 8; y++) for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) {
+    if (Math.abs(x) === 2 && Math.abs(z) === 2) continue;
+    log(x, y, z, kind, looks[`${x},${y},${z}`]);
+  }
+  bracket(1, 2, 3, "south", "knob");     // new, right beside the wound
+  bracket(-1, 3, 3, "south", "young");
+  bracket(0, 5, 3, "south", "mature");
+  bracket(3, 4, 0, "east", "old");
+  bracket(-3, 2, 0, "west", "tower");
+  bracket(-3, 4, 0, "west", "stacked");
+  camera.position.set(9, 6.5, 15); controls.target.set(0, 3.4, 0.5); controls.update();
+}
+const ROW = ["today", "knob", "young", "mature", "old", "stacked", "tower"];
+function row(kind) {
+  ground(-2, ROW.length * 3, -2, 3);
+  ROW.forEach((id, i) => {
+    const x = i * 3;
+    for (let y = 0; y < 3; y++) log(x, y, 0, kind, id === "mature" || id === "old" || id === "stacked" ? (y === 0 ? "dusted" : null) : null);
+    bracket(x, 1, 1, "south", id);
+    tag(id === "today" ? "today" : STAGE_BUTTONS.find(b => b.id === id).letter + ", " + STAGE_BUTTONS.find(b => b.id === id).name.toLowerCase(), x + 0.5, 3.6, 0.5);
+  });
+  const mid = (ROW.length - 1) * 1.5 + 0.5;
+  camera.position.set(mid, 4.5, 21); controls.target.set(mid, 1.6, 0); controls.update();
+}
+function barkPillar(x, kind, look) {
+  for (let y = 0; y < 3; y++) log(x, y, 0, kind, y === 1 ? look : null);
+  if (look === "dusted") bracket(x, 2, 1, "south", "old");
+}
+function barkRow() {
+  ground(-2, 4 * 10, -2, 3);
+  KINDS.forEach((k, g) => {
+    ["plain", "dusted", "wound"].forEach((look, i) => barkPillar(g * 10 + i * 3, k.id, look === "plain" ? null : look));
+    tag(k.name, g * 10 + 3.5, 3.9, 0.5);
+  });
+  camera.position.set(17.5, 5, 30); controls.target.set(17.5, 1.5, 0); controls.update();
+}
+function closeStage(kind, id) {
+  ground(-2, 2, -2, 3);
+  for (let y = 0; y < 3; y++) log(0, y, 0, kind, y === 0 && (id === "mature" || id === "old" || id === "stacked") ? "dusted" : null);
+  bracket(0, 1, 1, "south", id);
+  camera.position.set(1.7, 2.05, 2.5); controls.target.set(0.5, 1.35, 1.3); controls.update();
+}
+function closeBark(kind, look) {
+  ground(-2, 2, -2, 3);
+  barkPillar(0, kind, look === "plain" ? null : look);
+  camera.position.set(1.4, 2.0, 2.6); controls.target.set(0.5, 1.6, 0.5); controls.update();
+}
+// Today's game, as before: the game's heart rot shape, hollow cut open.
+const OLD_BRACKETS = [[3, 1, -1, "east"], [-3, 2, 0, "west"], [0, 3, -3, "north"], [3, 4, 0, "east"]];
+function oldTrunk(kind, ox, hollow) {
+  const lg = DATA.logs[kind];
   for (let x = -3; x <= 3; x++) for (let z = -3; z <= 3; z++) cube(ox + x, -1, z, DATA.dirt, DATA.grass, DATA.dirt);
   for (let y = 0; y < 7; y++) {
     for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) {
       if (Math.abs(x) === 2 && Math.abs(z) === 2) continue;
-      if (hollow && y > 0 && z > 0) continue; // cut away to look in
+      if (hollow && y > 0 && z > 0) continue;
       const d = Math.hypot(x, z), r = 2.2;
-      if (hollow && y > 0 && d < r - 1.2) continue; // the empty middle
+      if (hollow && y > 0 && d < r - 1.2) continue;
       if (hollow && y > 0 && d < r - 0.6) { cube(ox + x, y, z, DATA.rotten, DATA.rotten); continue; }
-      cube(ox + x, y, z, log.side, log.end);
+      cube(ox + x, y, z, lg.side, lg.end);
     }
   }
-  for (const [x, y, z, f] of BRACKETS.slice(0, hollow ? 4 : 2)) bracket(ox + x, y, z, f);
+  for (const [x, y, z, f] of OLD_BRACKETS.slice(0, hollow ? 4 : 2)) bracket(ox + x, y, z, f, "today");
+}
+function today() {
+  const hollow = state.oldStage === "hollow";
+  const kinds = state.tree === "all" ? ["umbrella", "camel", "bleached", "charred", "baobab"] : [state.tree];
+  kinds.forEach((k, i) => oldTrunk(k, i * 8, hollow));
+  const n = kinds.length, mid = (n - 1) * 4;
+  camera.position.set(mid + 5 + n * 2.2, 6, 9 + n * 3.4); controls.target.set(mid, 2.5, 0); controls.update();
 }
 function build() {
   world.clear();
-  const hollow = stageId === "hollow";
-  const kinds = treeId === "all" ? ["umbrella", "camel", "bleached", "charred", "baobab"] : [treeId];
-  kinds.forEach((k, i) => trunk(k, i * 8, hollow));
-  const n = kinds.length, mid = (n - 1) * 4;
-  camera.position.set(mid + 5 + n * 2.2, 6, 9 + n * 3.4); controls.target.set(mid, 2.5, 0); controls.update();
+  const [kind, id] = state.view.split(":");
+  if (state.view === "story") story(state.kind);
+  else if (state.view === "row") row(state.kind);
+  else if (state.view === "barkrow") barkRow();
+  else if (state.view === "today") today();
+  else if (kind === "stage") closeStage(state.kind, id);
+  else if (kind === "bark") closeBark(state.kind, id);
 }
 function resize() {
   const w = canvas.clientWidth, h = canvas.clientHeight;
@@ -210,27 +342,52 @@ function resize() {
 function frame() { controls.update(); renderer.render(scene, camera); requestAnimationFrame(frame); }
 new ResizeObserver(resize).observe(canvas);
 
-function button(parent, id, letter, name, text, onClick) {
+// ---- The label ----
+const groups = [];
+function button(parent, id, letter, name, text, isOn, onClick) {
   const b = document.createElement("button");
-  b.type = "button"; b.className = "choice"; b.id = id;
-  b.innerHTML = `<b>${letter}</b><span>${name}<small>${text}</small></span>`;
-  b.addEventListener("click", onClick); parent.appendChild(b);
+  b.type = "button"; b.className = "choice";
+  b.innerHTML = `<b>${letter}</b><span>${name}${text ? `<small>${text}</small>` : ""}</span>`;
+  b.addEventListener("click", () => { onClick(); save(); sync(); build(); });
+  parent.appendChild(b); groups.push([b, isOn]);
 }
-for (const t of TREES) button(document.getElementById("trees"), "tree-" + t.id, t.letter, t.name, t.text,
-  () => { treeId = t.id; try { localStorage.setItem("bracket-tree", treeId); } catch (e) {} sync(); build(); });
-for (const s of STAGES) button(document.getElementById("stages"), "stage-" + s.id, s.letter, s.name, s.text,
-  () => { stageId = s.id; try { localStorage.setItem("bracket-stage", stageId); } catch (e) {} sync(); build(); });
-for (const [name, label] of [["top", "Top"], ["under", "Underside"], ["edge", "Rim"]]) {
-  const d = document.createElement("div"); d.className = "swatch";
-  d.innerHTML = `<img alt="${label} texture" src="${DATA.bracket.textures[name]}"><span>${label}</span>`;
-  document.getElementById("swatches").appendChild(d);
+const $ = id => document.getElementById(id);
+for (const v of VIEWS) button($("views"), v.id, v.letter, v.name, v.text, () => state.view === v.id, () => { state.view = v.id; });
+for (const s of STAGE_BUTTONS) button($("stages"), s.id, s.letter, s.name, s.text, () => state.view === "stage:" + s.id, () => { state.view = "stage:" + s.id; });
+for (const b of BARK_BUTTONS) button($("barklooks"), b.id, b.letter, b.name, b.text, () => state.view === "bark:" + b.id, () => { state.view = "bark:" + b.id; });
+for (const k of KINDS) button($("kinds"), k.id, k.letter, k.name, k.text, () => state.kind === k.id, () => { state.kind = k.id; });
+for (const t of TREES) button($("trees"), t.id, t.letter, t.name, t.text, () => state.tree === t.id, () => { state.tree = t.id; });
+for (const s of OLD_STAGES) button($("oldstages"), s.id, s.letter, s.name, s.text, () => state.oldStage === s.id, () => { state.oldStage = s.id; });
+function swatches() {
+  const box = $("swatches"); box.innerHTML = "";
+  const add = (src, label) => {
+    const d = document.createElement("div"); d.className = "swatch";
+    d.innerHTML = `<img alt="${label} texture" src="${src}"><span>${label}</span>`; box.appendChild(d);
+  };
+  const [kind, id] = state.view.split(":");
+  const NAMES = { top: "top", under: "underside", edge: "side", knob: "knob", ytop: "top tier: top", yunder: "top tier: under", yedge: "top tier: side" };
+  if (kind === "stage") {
+    const ids = id === "tower" ? ["mature", "young"] : [id];
+    for (const s of ids) for (const [k, src] of Object.entries(DATA.stages[s].textures))
+      if (k !== "particle") add(src, (ids.length > 1 ? s + ": " : "") + (NAMES[k] || k));
+  } else if (state.view === "today") {
+    for (const k of ["top", "under", "edge"]) add(DATA.bracket.textures[k], NAMES[k]);
+  } else if (state.view === "barkrow" || kind === "bark") {
+    const looks = kind === "bark" ? [id] : ["dusted", "wound"];
+    for (const k of KINDS) for (const l of looks) add(DATA.barks[k.id][l], k.name.toLowerCase() + ", " + l);
+  } else {
+    for (const l of ["plain", "dusted", "wound"]) add(DATA.barks[state.kind][l], l);
+  }
 }
 function sync() {
-  for (const t of TREES) document.getElementById("tree-" + t.id).setAttribute("aria-pressed", String(t.id === treeId));
-  for (const s of STAGES) document.getElementById("stage-" + s.id).setAttribute("aria-pressed", String(s.id === stageId));
+  for (const [b, isOn] of groups) b.setAttribute("aria-pressed", String(isOn()));
+  $("old-group").hidden = state.view !== "today";
+  $("kind-group").hidden = state.view === "today" || state.view === "barkrow";
+  swatches();
 }
-if (!TREES.some(t => t.id === treeId)) treeId = "all";
-if (!STAGES.some(s => s.id === stageId)) stageId = "hollow";
+const known = VIEWS.map(v => v.id).concat(STAGE_BUTTONS.map(s => "stage:" + s.id), BARK_BUTTONS.map(b => "bark:" + b.id));
+if (!known.includes(state.view)) state.view = "story";
+if (!KINDS.some(k => k.id === state.kind)) state.kind = "umbrella";
 sync(); resize();
 loaded.then(() => { build(); resize(); requestAnimationFrame(frame); });
 </script>
