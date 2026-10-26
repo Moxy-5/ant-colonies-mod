@@ -38,7 +38,7 @@ class SpeciesProfileTest {
     void eachSpeciesListsItsOwnColonyParts() throws Exception {
         // Project Apex, colony parts step 2: the parts besides the shared ones (the names are checked against the parts
         // registry when the game loads the files).
-        assertEquals(java.util.List.of("king_care", "mound", "galleries", "closed_holes", "hidden_trips", "fungus_garden", "mushrooms", "soldiers", "alarm", "bare_patches"),
+        assertEquals(java.util.List.of("king_care", "mound", "galleries", "closed_holes", "hidden_trips", "fungus_garden", "mushrooms", "soldiers", "alarm", "raid_defence", "bare_patches"),
                 read("macrotermes").parts());
     }
 

@@ -98,6 +98,8 @@ public class Alarm {
     private final List<Long> breakIns = new ArrayList<>();
     /** When the current wave of drumming started, and who has felt it (where and when it started drumming). */
     private long waveStart;
+    /** M8 step 2f: how far from the trouble the drumming of this wave reaches (0: no limit, through the whole nest). */
+    private double waveReach;
     private final Map<UUID, Heard> heard = new HashMap<>();
     /** The minors sent to look at footsteps. */
     private final Set<UUID> lookers = new LinkedHashSet<>();
@@ -230,10 +232,32 @@ public class Alarm {
         if (numbers == null || !isBreakIn(world, pos)) {
             return;
         }
+        waveReach = 0;
         long now = world.getGameTime();
         breakIns.removeIf(time -> now - time > numbers.breakInWindowTicks() || time > now);
         breakIns.add(now);
         raise(world, breakIns.size() >= numbers.breakInsForLevel4() ? 4 : 3, pos, breaker);
+    }
+
+    /**
+     * M8 step 2f: a raider broke a gallery open at {@code pos} ({@code colony.RaidDefence}): a break-in, the third level,
+     * but the drumming only reaches the soldiers within {@code reach} blocks of it (real soldiers' drumming runs a way
+     * down the gallery; the rest of the nest goes on). Those soldiers feel it at once.
+     */
+    public void raidBreakIn(ServerLevel world, BlockPos pos, @Nullable Entity raider, double reach) {
+        if (numbers() == null) {
+            return;
+        }
+        if (level(world) < 3) {
+            waveReach = reach;
+        }
+        raise(world, 3, pos, raider);
+        long time = world.getGameTime();
+        for (TermiteSoldierEntity soldier : colony.part(SavannaParts.SOLDIERS).map(part -> part.getSoldiers(world)).orElse(List.of())) {
+            if (!heard.containsKey(soldier.getUUID()) && soldier.blockPosition().distSqr(pos) <= reach * reach) {
+                hear(soldier, time);
+            }
+        }
     }
 
     /** Whether breaking this block breaks into the colony's home: a block of the mound, or a wall of the dug-out nest. */
@@ -373,6 +397,9 @@ public class Alarm {
         int now = level(world);
         if (now < 2 || heard.containsKey(soldier.getUUID()) || (now == 2 && soldier.getRank() != Rank.MINOR)) {
             return;
+        }
+        if (now >= 3 && waveReach > 0 && spot != null && soldier.blockPosition().distSqr(spot) > waveReach * waveReach) {
+            return; // a raid's break-in: the drumming does not reach this far
         }
         long time = world.getGameTime();
         if (now >= 3 && time - waveStart >= WAVE_FALLBACK_TICKS) {

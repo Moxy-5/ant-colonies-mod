@@ -369,6 +369,13 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         if (++bites >= BITES_TO_OPEN) {
             level.destroyBlock(cover, false, this);
             breaking = null;
+            // M8 step 2f: the colonies whose ground it is hear of it (the termites drum and seal the gallery behind them).
+            for (Colony colony : com.antcolonies.colony.ColonyManager.get(level).getColonies()) {
+                double reach = colony.foragingRadius() + 8.0;
+                if (colony.getCenter().distSqr(cover) <= reach * reach) {
+                    colony.news().tell(level, com.antcolonies.colony.ColonyNews.BROKEN_OPEN, new com.antcolonies.colony.ColonyNews.BrokenOpen(cover.immutable(), this));
+                }
+            }
         }
         return true;
     }

@@ -7,6 +7,7 @@ import org.jetbrains.annotations.Nullable;
 import com.antcolonies.savanna.colony.Alarm;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.fight.Fights;
+import com.antcolonies.savanna.colony.RaidDefence;
 import com.antcolonies.savanna.colony.SavannaParts;
 import com.antcolonies.savanna.entity.TermiteSoldierEntity;
 
@@ -60,7 +61,7 @@ public class DefendGoal extends Goal {
         }
         colony = soldier.getColony();
         alarm = colony == null ? null : colony.part(SavannaParts.ALARM).orElse(null);
-        task = alarm == null ? null : alarm.taskFor(level, soldier);
+        task = alarm == null ? null : taskNow(level);
         return task != null;
     }
 
@@ -89,7 +90,7 @@ public class DefendGoal extends Goal {
         if (colony == null || alarm == null || !(soldier.level() instanceof ServerLevel level)) {
             return;
         }
-        Alarm.Task now = alarm.taskFor(level, soldier);
+        Alarm.Task now = taskNow(level);
         if (now == null) {
             task = null;
             return;
@@ -103,6 +104,23 @@ public class DefendGoal extends Goal {
         } else if (task.cell() != null) {
             stand(task.cell(), task.facing(), task.drumOnArrival());
         }
+    }
+
+    /**
+     * The alarm's task for it; with none, a soldier shut out by a seal (M8 step 2f, {@link RaidDefence}) waits by the
+     * seal. A soldier inside is not sent at a breach past a seal (it cannot get there).
+     */
+    @Nullable
+    private Alarm.Task taskNow(ServerLevel level) {
+        RaidDefence raid = colony.part(SavannaParts.RAID_DEFENCE).orElse(null);
+        Alarm.Task now = alarm.taskFor(level, soldier);
+        if (now != null && raid != null && now.enemy() == null && now.cell() != null && raid.cutOff(soldier, now.cell())) {
+            now = null;
+        }
+        if (now == null && raid != null) {
+            now = raid.waitTaskFor(level, soldier);
+        }
+        return now;
     }
 
     /** Goes at the enemy; once it touches it, it holds still facing it and bites it now and then (if it may). */

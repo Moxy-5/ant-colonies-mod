@@ -716,20 +716,39 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * refuse chamber. With {@code eatFreshTicks} (termites) there is no refuse chamber: a body younger than that is carried
      * into the fungus garden and eaten (it becomes a layer of comb, like a piece of forage), an older one is walled up with
      * soil where it lies, as real termites do.
+     *
+     * <p>M8 step 2f: with {@code carryOutFadeTicks} the old ones are not walled up: they, and the bodies of strangers (a
+     * dead raider) lying in the nest, are dragged out to the nearest open hole and left beside it, where they fade after
+     * that long. {@code quietReach}: no body and no paralysed nestmate is fetched while a foe is that near it (0: no such
+     * rule). {@code eatParalysed}: a nestmate left lying paralysed by a hunter's sting is carried in and eaten like the
+     * fresh dead.
      */
-    public record RefuseNumbers(int corpseDecayTicks, Optional<Integer> eatFreshTicks) {
+    public record RefuseNumbers(int corpseDecayTicks, Optional<Integer> eatFreshTicks, Optional<Integer> carryOutFadeTicks,
+            int quietReach, boolean eatParalysed) {
         public static final Codec<RefuseNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("corpse_decay_ticks").forGetter(RefuseNumbers::corpseDecayTicks),
-                Codec.INT.optionalFieldOf("eat_fresh_ticks").forGetter(RefuseNumbers::eatFreshTicks)
+                Codec.INT.optionalFieldOf("eat_fresh_ticks").forGetter(RefuseNumbers::eatFreshTicks),
+                Codec.INT.optionalFieldOf("carry_out_fade_ticks").forGetter(RefuseNumbers::carryOutFadeTicks),
+                Codec.INT.optionalFieldOf("quiet_reach", 0).forGetter(RefuseNumbers::quietReach),
+                Codec.BOOL.optionalFieldOf("eat_paralysed", false).forGetter(RefuseNumbers::eatParalysed)
         ).apply(i, RefuseNumbers::new));
 
         public RefuseNumbers(int corpseDecayTicks) {
             this(corpseDecayTicks, Optional.empty());
         }
 
+        public RefuseNumbers(int corpseDecayTicks, Optional<Integer> eatFreshTicks) {
+            this(corpseDecayTicks, eatFreshTicks, Optional.empty(), 0, false);
+        }
+
         /** Whether this species eats its fresh dead and buries the old ones (instead of using a refuse chamber). */
         public boolean eatsOrBuries() {
             return eatFreshTicks.isPresent();
+        }
+
+        /** Whether this species drags its old dead and strangers' bodies out of the nest (instead of walling them up). */
+        public boolean carriesOut() {
+            return eatsOrBuries() && carryOutFadeTicks.isPresent();
         }
     }
 
