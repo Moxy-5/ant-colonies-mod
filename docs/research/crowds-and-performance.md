@@ -1,6 +1,6 @@
 # Big crowds at 60 fps: every tool we could use (research, 2026-10-25)
 
-Research only, no game code. It was written for the session planning M8 step 3, the **drawn-only** insects: raid columns of 200 to 500 Matabele ants, the termites they fight, and colonies of thousands. The user's decisions so far (2026-10-25): 60 frames a second in a big raid; insects within 16 blocks of a player are real mobs; the fight front mixes real and drawn insects, the drawn ones playing fights the server has worked out; a drawn insect turns real in the same spot, so nothing blinks in view.
+Research only, no game code. It was written for the session planning M8 step 4 (numbered step 3 until 2026-10-25), the **drawn-only** insects: raid columns of 200 to 500 Matabele ants, the termites they fight, and colonies of thousands. The user's decisions so far (2026-10-25): 60 frames a second in a big raid; insects within 16 blocks of a player are real mobs; the fight front mixes real and drawn insects, the drawn ones playing fights the server has worked out; a drawn insect turns real in the same spot, so nothing blinks in view.
 
 ## Where we stand today (measured)
 
@@ -275,7 +275,7 @@ Words used below:
 
 ---
 
-## Recommended stack for the drawn-only plan (M8 step 3)
+## Recommended stack for the drawn-only plan (M8 step 4)
 
 **Who is what:**
 - **Real mobs** (full GeckoLib + live layer): every insect within 16 blocks of a player, the user's rule; at the fight front, cap it at about 60 to 80 real insects in all near one player (both sides), the rest drawn. Cheapened by 2.12 (animation throttled past 12 blocks, live layer skipped when it cannot show).
