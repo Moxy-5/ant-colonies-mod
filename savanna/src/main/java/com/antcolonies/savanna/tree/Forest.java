@@ -145,6 +145,8 @@ public class Forest extends SavedData {
         public long rotFrom = HeartRot.NONE;
         public boolean placedRot, woundShown;
         public int brackets;
+        /** How many columns of a rot-killed log have crumbled to pulp ({@link HeartRot#crumbleColumn}). */
+        public int crumbled;
 
         public Tree(String kind, BlockPos foot, long seed, double age, TreeStage stage, double placedAge, long lastDay) {
             this.kind = kind;
@@ -219,6 +221,7 @@ public class Forest extends SavedData {
             tag.putBoolean("placedRot", placedRot);
             tag.putInt("brackets", brackets);
             tag.putBoolean("woundShown", woundShown);
+            tag.putInt("crumbled", crumbled);
             return tag;
         }
 
@@ -243,6 +246,7 @@ public class Forest extends SavedData {
                 t.placedRot = tag.getBoolean("placedRot");
                 t.brackets = tag.getInt("brackets");
                 t.woundShown = tag.getBoolean("woundShown");
+                t.crumbled = tag.getInt("crumbled");
             }
             return t;
         }
@@ -423,6 +427,9 @@ public class Forest extends SavedData {
                 break; // the rest next second
             }
             if (t.settled()) {
+                if (HeartRot.diedOfRot(t) && t.placedAge >= 0) {
+                    crumble(level, t);
+                }
                 continue;
             }
             if (t.living() && t.placedAge >= 0 && BranchShedding.stormShakes(level, t.age, t.foot)) {
@@ -548,7 +555,7 @@ public class Forest extends SavedData {
             HeartRot.daily(t, t.lastDay);
             t.lived += 1 + (t.termites ? 1 : 0) + HeartRot.extraAgeing(t);
             if (t.age >= TreeLife.YOUNG_END && t.lived >= TreeLife.lifespan(t.treeKind(), t.seed)) {
-                kill(t, t.lastDay, "age");
+                kill(t, t.lastDay, HeartRot.hollow(t) ? "rot" : "age"); // a hollow tree's life ran out with the rot
                 continue;
             }
             Random dice = TreeLife.dice(t.seed, t.lastDay);
@@ -641,7 +648,7 @@ public class Forest extends SavedData {
         if (!t.living()) {
             return false;
         }
-        kill(t, today(level), "age");
+        kill(t, today(level), HeartRot.hollow(t) ? "rot" : "age");
         return true;
     }
 
@@ -659,7 +666,7 @@ public class Forest extends SavedData {
         TreePlacer.Placed shed = burnt(t, TreePlacer.placed(t.shapeKind(t.termites, rot), t.seed, TreeLife.shapeAge(t.age), TreeStage.SHED), TreeStage.SHED);
         TreePlacer.Placed lying = burnt(t, TreePlacer.placed(t.shapeKind(t.termites, rot), t.seed, TreeLife.shapeAge(t.age), TreeStage.FALLEN), TreeStage.FALLEN);
         if (t.living()) {
-            t.cause = "age";
+            t.cause = rot ? "rot" : "age";
             killed++;
         }
         // Dead long enough to be due to fall today.
@@ -672,6 +679,34 @@ public class Forest extends SavedData {
         t.step = 0;
         topple(level, t, shed, lying);
         return true;
+    }
+
+    /**
+     * A log of a tree the rot killed crumbles to pulp, a column a second from its far end in to the stump, over
+     * {@link HeartRot#CRUMBLE_DAYS} days once its time has come ({@link HeartRot#crumbleFrom}); when the last column has
+     * gone the tree's record ends and only the pulp is left, sinking into the soil. Called each second for every
+     * rot-killed log (public for the tests).
+     */
+    public void crumble(ServerLevel level, Tree t) {
+        double f = (time(level) - HeartRot.crumbleFrom(t)) / HeartRot.CRUMBLE_DAYS;
+        if (f <= 0) {
+            return;
+        }
+        TreePlacer.Placed lying = soon(t, t.placedAge, t.placedStage, t.placedStep, t.placedTermites, t.placedRot);
+        if (lying == null || !loaded(level, lying.box(t.foot))) {
+            return;
+        }
+        List<int[]> columns = HeartRot.crumbleOrder(lying);
+        int due = (int) Math.min(columns.size(), Math.ceil(f * columns.size()));
+        if (t.crumbled < due) {
+            pulpHeaps += HeartRot.crumbleColumn(level, t.foot, columns.get(t.crumbled), TreeLife.dice(t.seed, -71 - t.crumbled));
+            t.crumbled++;
+            setDirty();
+        }
+        if (t.crumbled >= columns.size()) {
+            remove(t);
+            setDirty();
+        }
     }
 
     /** Whether a tree is being drawn falling. */

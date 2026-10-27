@@ -116,8 +116,9 @@ public class TreeCommands {
                 continue;
             }
             String since = t.died == Forest.DIED_UNKNOWN ? "dead in new land" : "died " + (today - t.died) + " days ago";
-            String cause = t.cause.isEmpty() ? "" : " (" + (t.cause.equals("age") ? "old age" : t.cause)
-                    + (t.rotFrom != HeartRot.NONE ? ", heart rot" : "") + ")";
+            String cause = t.cause.isEmpty() ? "" : " (" + (t.cause.equals("age") ? "old age" : t.cause.equals("rot") ? "heart rot" : t.cause)
+                    + (t.rotFrom != HeartRot.NONE && !t.cause.equals("rot") ? ", heart rot" : "")
+                    + (t.crumbled > 0 ? ", crumbling to pulp" : "") + ")";
             String stage = t.stage == TreeStage.LIVING ? "withering" : t.stage.id;
             out.append(String.format("\n  dead %s at %d %d %d: %s, %s%s", t.kind.replace('_', ' '), t.foot.getX(), t.foot.getY(), t.foot.getZ(),
                     stage, since, cause));

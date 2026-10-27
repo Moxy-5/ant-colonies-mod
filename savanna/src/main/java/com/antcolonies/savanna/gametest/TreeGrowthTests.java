@@ -1164,6 +1164,29 @@ public class TreeGrowthTests {
         helper.assertTrue(countNear(level, foot, 1, 1, 3, b -> b.isAir() || b.is(TreeBlocks.FRASS.get())) >= 1, "the stump is not hollow");
         int pulp = countNear(level, foot, 50, -4, 12, b -> b.is(TreeBlocks.PULP_HEAP.get())); // the top may lie 40 out
         helper.assertTrue(pulp >= 3 && forest.pulpHeaps - heaps == pulp, "no pulp round the snapped tree: " + pulp + " (book " + (forest.pulpHeaps - heaps) + ")");
+        // Killed by the rot, it does not lie for good (the user, 2026-10-26): the log crumbles to pulp, far end first, and
+        // the tree's record ends.
+        helper.assertTrue(com.antcolonies.savanna.tree.HeartRot.diedOfRot(t), "the storm-snapped hollow tree did not die of the rot: " + t.cause);
+        t.died = (long) Forest.time(level) - 60; // long past its crumbling time
+        for (int sec = 0; sec < 2000 && forest.all().contains(t); sec++) {
+            forest.crumble(level, t);
+        }
+        helper.assertTrue(!forest.all().contains(t), "the rotted log never finished crumbling: " + t.crumbled + " columns");
+        int woodLeft = countNear(level, foot, 50, 0, 12, wood);
+        int pulpAfter = countNear(level, foot, 50, -4, 12, b -> b.is(TreeBlocks.PULP_HEAP.get()));
+        if (woodLeft > 0) {
+            StringBuilder where = new StringBuilder();
+            for (BlockPos pos : BlockPos.betweenClosed(foot.offset(-50, 0, -50), foot.offset(50, 12, 50))) {
+                if (wood.test(level.getBlockState(pos)) && where.length() < 600) {
+                    BlockPos d = pos.subtract(foot);
+                    where.append(" ").append(d.getX()).append(",").append(d.getY()).append(",").append(d.getZ()).append("=")
+                            .append(level.getBlockState(pos).getBlock().getDescriptionId().replace("block.antcolonies.", ""))
+                            .append("/").append(level.getBlockState(pos.below()).getBlock().getDescriptionId().replace("block.minecraft.", ""));
+                }
+            }
+            helper.fail("wood was left where the rotted log lay: " + woodLeft + where);
+        }
+        helper.assertTrue(pulpAfter > pulp + 5, "the rotted log left too little pulp: " + pulpAfter + " heaps (" + pulp + " before)");
         // Any tree past its young look can rot, not only the grown (the user's report 2026-10-26); and in new land a
         // share of them already are, more of the older.
         helper.assertTrue(com.antcolonies.savanna.tree.HeartRot.canRot(new Forest.Tree("umbrella_thorn", foot, 7, 0.5, TreeStage.LIVING, -1, base))
@@ -1171,15 +1194,21 @@ public class TreeGrowthTests {
                 && !com.antcolonies.savanna.tree.HeartRot.canRot(new Forest.Tree("baobab", foot, 7, 1.0, TreeStage.LIVING, -1, base)),
                 "the wrong trees can rot");
         int[] rotting = new int[2];
+        int[] stages = new int[com.antcolonies.savanna.tree.HeartRot.Stage.values().length];
         for (int seed = 0; seed < 400; seed++) {
             for (int i = 0; i < 2; i++) {
                 Forest.Tree n = new Forest.Tree("camel_thorn", foot, seed, i == 0 ? 0.5 : com.antcolonies.savanna.tree.TreeShapes.ANCIENT, TreeStage.LIVING, -1, base);
                 com.antcolonies.savanna.tree.HeartRot.newLand(n, base);
                 rotting[i] += n.rotFrom != com.antcolonies.savanna.tree.HeartRot.NONE ? 1 : 0;
+                stages[com.antcolonies.savanna.tree.HeartRot.stage(n, base).ordinal()]++;
             }
         }
         helper.assertTrue(rotting[0] > 60 && rotting[0] < 150 && rotting[1] > 220 && rotting[1] < 310,
                 "new land's rotting trees of 400: " + rotting[0] + " young-looking (about 100), " + rotting[1] + " ancient (about 270)");
+        // ... at every stage, most far gone (the user, 2026-10-26: "more variety on the trees that are rotted").
+        int rotted = rotting[0] + rotting[1];
+        helper.assertTrue(stages[1] > rotted / 20 && stages[2] > rotted / 10 && stages[3] > rotted / 2,
+                "new land's rotting trees by stage (hidden, brackets, hollow): " + stages[1] + ", " + stages[2] + ", " + stages[3]);
         // Marked wood is the tree's own, and its mark goes with it as the wood dies or burns.
         BlockState umbrellaWound = RotMarks.marked(TreeBlocks.UMBRELLA_THORN.wood().get().defaultBlockState(), RotMarks.Mark.WOUND);
         helper.assertTrue(TreePlacer.same(umbrellaWound, TreeBlocks.UMBRELLA_THORN.wood().get().defaultBlockState()), "wounded wood is not the tree's own");

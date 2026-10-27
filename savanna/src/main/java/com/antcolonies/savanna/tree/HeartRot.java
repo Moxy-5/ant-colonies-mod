@@ -53,8 +53,22 @@ public final class HeartRot {
      * have some heart rot, as every wound over decades may let it in).
      */
     static final double NEW_LAND_SHARE = 0.25, NEW_LAND_SHARE_OLD = 2 / 3.0;
-    /** A rotting tree of new land got the rot up to this many days before (so some are already hollow). */
-    static final double NEW_LAND_DAYS = 30;
+    /**
+     * A rotting tree of new land got the rot up to this many days before, so new land shows every stage: about 1 in 10 a
+     * hidden wound, 1 in 6 young brackets, the rest hollow with more and older brackets the longer it has rotted (my pick,
+     * 2026-10-26, from 30: the user saw too few far-gone trees).
+     */
+    static final double NEW_LAND_DAYS = 60;
+    /** A hollow tree's brackets: {@link #BRACKETS_HOLLOW} once hollow, one more every this many days, up to {@link #BRACKETS_MOST}. */
+    static final double DAYS_A_BRACKET = 8;
+    static final int BRACKETS_MOST = 8;
+    /**
+     * A log of a tree the rot killed crumbles to pulp: from {@code CRUMBLE_AFTER} to {@code CRUMBLE_AFTER + CRUMBLE_SPREAD}
+     * days after it was due down (by its dice), over {@code CRUMBLE_DAYS} days, its far end first and the stump last (my
+     * picks, 2026-10-26; real: a log hollowed and softened by heart rot is broken down by termites and fungi far faster
+     * than sound wood, into a heap of punk).
+     */
+    static final double CRUMBLE_AFTER = 2, CRUMBLE_SPREAD = 4, CRUMBLE_DAYS = 3;
 
     public enum Stage { NONE, HIDDEN, BRACKETS, HOLLOW }
 
@@ -134,7 +148,7 @@ public final class HeartRot {
     static int bracketsWanted(Forest.Tree t) {
         return switch (stage(t, t.lastDay)) {
             case BRACKETS -> BRACKETS_SHOWN;
-            case HOLLOW -> BRACKETS_HOLLOW;
+            case HOLLOW -> Math.min(BRACKETS_MOST, BRACKETS_HOLLOW + (int) ((t.lastDay - t.rotFrom - HOLLOW_FROM) / DAYS_A_BRACKET));
             default -> 0;
         };
     }
@@ -227,6 +241,89 @@ public final class HeartRot {
     /** Whether a dead tree, now lying, came down snapped at its rotted hollow (its fallen shape is the snapped one). */
     static boolean snapped(Forest.Tree t) {
         return !t.treeKind().isBaobab() && hollow(t);
+    }
+
+    /**
+     * Whether a dead tree died of the rot (the user, 2026-10-26: those end as pulp, not as a log for good): it was hollow
+     * when its life ran out, or a storm broke it at the hollow.
+     */
+    public static boolean diedOfRot(Forest.Tree t) {
+        return t.rotFrom != NONE && ("rot".equals(t.cause) || "storm".equals(t.cause));
+    }
+
+    /** The day (with its part) a rot-killed log starts crumbling. */
+    static double crumbleFrom(Forest.Tree t) {
+        return t.died + TreeLife.stageFrom(t.treeKind(), t.seed, TreeStage.FALLEN) + TreeLife.RAIN_WAIT + CRUMBLE_AFTER
+                + CRUMBLE_SPREAD * TreeLife.dice(t.seed, -67).nextDouble();
+    }
+
+    /**
+     * The columns (x, z, the shape's top y there) of a lying tree's shape, in the order they crumble: the farthest from
+     * the foot first (the thin top end goes first, the stump last).
+     */
+    static List<int[]> crumbleOrder(TreePlacer.Placed lying) {
+        it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap top = new it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap();
+        top.defaultReturnValue(Integer.MIN_VALUE);
+        for (int i = 0; i < lying.size(); i++) {
+            long key = BlockPos.asLong(lying.xs()[i], 0, lying.zs()[i]);
+            top.put(key, Math.max(top.get(key), lying.ys()[i]));
+        }
+        List<int[]> columns = new ArrayList<>();
+        for (var e : top.long2IntEntrySet()) {
+            columns.add(new int[] {BlockPos.getX(e.getLongKey()), BlockPos.getZ(e.getLongKey()), e.getIntValue()});
+        }
+        columns.sort((a, b) -> Integer.compare(b[0] * b[0] + b[1] * b[1], a[0] * a[0] + a[1] * a[1]));
+        return columns;
+    }
+
+    /** Whether a block is part of a dead tree that crumbles (its wood, branches, rotten core, frass and the brackets on it). */
+    private static boolean crumbles(BlockState state) {
+        return state.is(TreeBlocks.TREE_WOOD) || state.getBlock() instanceof com.antcolonies.savanna.block.TreeBranchBlock
+                || state.is(TreeBlocks.ROTTEN_WOOD.get()) || state.is(TreeBlocks.FRASS.get()) || state.is(TreeBlocks.BRACKET_FUNGUS.get());
+    }
+
+    /**
+     * One column of a rot-killed log crumbles: its wood, from the shape's top down to the ground under it (at the stump
+     * never below the foot, its buried roots stay), goes, and a pulp heap lies where it lay, 2 layers for each block of
+     * wood (a lone branch block only half the time). Returns the heaps placed (0 or 1).
+     */
+    static int crumbleColumn(ServerLevel level, BlockPos foot, int[] column, Random dice) {
+        int x = foot.getX() + column[0], z = foot.getZ() + column[1];
+        boolean stump = column[0] * column[0] + column[1] * column[1] <= 9;
+        int wood = 0, lowest = Integer.MAX_VALUE;
+        for (int y = foot.getY() + column[2] + 1; y >= foot.getY() + column[2] - 24; y--) {
+            if (stump && y < foot.getY()) {
+                break;
+            }
+            BlockPos at = new BlockPos(x, y, z);
+            BlockState there = level.getBlockState(at);
+            if (crumbles(there)) {
+                if (!there.is(TreeBlocks.BRACKET_FUNGUS.get()) && !there.is(TreeBlocks.FRASS.get())) {
+                    wood++;
+                }
+                lowest = y;
+                level.setBlock(at, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+            } else if (wood == 0 && there.is(com.antcolonies.savanna.registry.SavannaBlocks.MUD_CRUST.get())) {
+                // The termites' mud cased over the log falls in with it.
+                level.setBlock(at, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+            } else if (!there.isAir() && !there.canBeReplaced()) {
+                break; // the ground under the log
+            }
+        }
+        if (wood == 0 || wood == 1 && dice.nextBoolean()) {
+            return 0;
+        }
+        for (int y = lowest; y > lowest - 4; y--) {
+            BlockPos at = new BlockPos(x, y, z);
+            if (!level.getBlockState(at).isAir() && !level.getBlockState(at).canBeReplaced()) {
+                return 0;
+            }
+            if (level.getBlockState(at.below()).isFaceSturdy(level, at.below(), Direction.UP)) {
+                level.setBlock(at, TreeBlocks.PULP_HEAP.get().withLayers(Math.min(8, wood * 2)), Block.UPDATE_ALL);
+                return 1;
+            }
+        }
+        return 0;
     }
 
     /**
