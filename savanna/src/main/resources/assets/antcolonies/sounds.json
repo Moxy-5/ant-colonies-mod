@@ -1,0 +1,10 @@
+{
+  "matabele_squeak": {
+    "subtitle": "subtitles.antcolonies.matabele_squeak",
+    "sounds": [
+      { "name": "antcolonies:entity/matabele_squeak", "volume": 0.7 },
+      { "name": "antcolonies:entity/matabele_squeak", "volume": 0.7, "pitch": 1.15 },
+      { "name": "antcolonies:entity/matabele_squeak", "volume": 0.7, "pitch": 0.9 }
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "variants": {
+    "axis=y": {
+      "model": "antcolonies:block/camel_thorn_wood_wound"
+    },
+    "axis=z": {
+      "model": "antcolonies:block/camel_thorn_wood_wound_horizontal",
+      "x": 90
+    },
+    "axis=x": {
+      "model": "antcolonies:block/camel_thorn_wood_wound_horizontal",
+      "x": 90,
+      "y": 90
+    }
+  }
+}

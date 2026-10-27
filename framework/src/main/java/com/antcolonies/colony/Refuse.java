@@ -8,11 +8,18 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.AntCorpseEntity;
+import com.antcolonies.fight.Fights;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * The colony's dead: bodies left where an ant or termite died. Ants carry them to the refuse chamber (one to a cell).
@@ -153,6 +160,10 @@ public class Refuse {
      * chamber already, not one another worker is on its way to, not one at a spot {@code canGo} rules out (a termite stays
      * in by day). Ants only take one while there is a free spot in the refuse chamber; termites only take a fresh one
      * while there is room on the comb (an old one they bury where it lies). {@code avoid}: bodies this worker found no way to.
+     *
+     * <p>M8 step 2f, a species that carries its dead out ({@link #carriesOut}): an old body, or a stranger's (a dead
+     * raider), is only taken while it lies in the nest and a hole is open to drag it out by; one left out by a hole is
+     * never taken again; and none is taken while a foe is within the species' {@code quiet_reach} of it.
      */
     @Nullable
     public AntCorpseEntity findLooseCorpse(Level level, BlockPos near, Set<UUID> avoid, java.util.function.Predicate<BlockPos> canGo) {
@@ -161,13 +172,21 @@ public class Refuse {
             return null;
         }
         boolean roomToEat = eats && colony.food().pickFoodSpot(level, colony.random()) != null;
+        boolean out = carriesOut();
+        boolean wayOut = out && !colony.foragingHoles().waysOut(level).isEmpty();
         claimedCorpses.prune(level.getGameTime());
         Set<BlockPos> chamber = new HashSet<>(colony.nest().getRefuseCells(level));
         AntCorpseEntity best = null;
         double bestDistance = Double.MAX_VALUE;
-        for (AntCorpseEntity corpse : getCorpses(level)) {
-            if (corpse.isPlaced() || chamber.contains(corpse.blockPosition()) || claimedCorpses.contains(corpse.getUUID())
-                    || avoid.contains(corpse.getUUID()) || !canGo.test(corpse.blockPosition()) || eats && isFresh(corpse) && !roomToEat) {
+        for (AntCorpseEntity corpse : out ? bodiesInReach(level) : getCorpses(level)) {
+            if (corpse.isPlaced() || corpse.isOut() || chamber.contains(corpse.blockPosition()) || claimedCorpses.contains(corpse.getUUID())
+                    || avoid.contains(corpse.getUUID()) || !canGo.test(corpse.blockPosition())) {
+                continue;
+            }
+            if (mustCarryOut(corpse) ? !wayOut || !colony.nest().isInside(level, corpse.blockPosition()) : eats && isFresh(corpse) && !roomToEat) {
+                continue;
+            }
+            if (foeNear(level, corpse.blockPosition())) {
                 continue;
             }
             double distance = corpse.distanceToSqr(near.getX() + 0.5, near.getY() + 0.5, near.getZ() + 0.5);
@@ -177,6 +196,104 @@ public class Refuse {
             }
         }
         return best;
+    }
+
+    // --- M8 step 2f: the dead carried out, the paralysed carried in ------------------------------------------------------
+
+    /** Whether this colony drags its old dead and strangers' bodies out by a hole (termites) instead of walling them up. */
+    public boolean carriesOut() {
+        return colony.profile().refuse().carriesOut();
+    }
+
+    /** Whether this body is one to drag out of the nest (a carry-out species: an old nestmate, or a stranger's body). */
+    public boolean mustCarryOut(AntCorpseEntity corpse) {
+        return carriesOut() && (!id.equals(corpse.getColonyId()) || !isFresh(corpse));
+    }
+
+    /** Whether this body is one to wall up where it lies (a species that eats its fresh dead and buries the old ones). */
+    public boolean mustBury(AntCorpseEntity corpse) {
+        return eatsOrBuries() && !carriesOut() && !isFresh(corpse);
+    }
+
+    /** The colony's own bodies round the nest, and strangers' bodies lying anywhere in its nest and galleries. */
+    private List<AntCorpseEntity> bodiesInReach(Level level) {
+        return level.getEntitiesOfClass(AntCorpseEntity.class, groundBox(2.0), corpse -> corpse.isAlive()
+                && (id.equals(corpse.getColonyId()) || colony.nest().isInside(level, corpse.blockPosition())));
+    }
+
+    /** The colony's ground, its foraging radius and {@code more} blocks round the middle (as {@link Colony#nestArea}, deeper). */
+    private AABB groundBox(double more) {
+        double reach = colony.foragingRadius() + more;
+        return new AABB(colony.getCenter()).inflate(reach, 0, reach).expandTowards(0, 8, 0).expandTowards(0, -12, 0);
+    }
+
+    /** Whether a foe of the colony is within the species' {@code quiet_reach} of {@code pos} (no such rule: never). */
+    public boolean foeNear(Level level, BlockPos pos) {
+        int reach = colony.profile().refuse().quietReach();
+        if (reach <= 0) {
+            return false;
+        }
+        Vec3 at = Vec3.atCenterOf(pos);
+        return !level.getEntitiesOfClass(LivingEntity.class, new AABB(pos).inflate(reach),
+                living -> living.distanceToSqr(at) <= reach * reach && Fights.isFoe(colony.profile(), colony.getSpecies(), id, living)).isEmpty();
+    }
+
+    /**
+     * Where a worker leaves a body it dragged out: the ground right beside each hole open now, on its outward side (the
+     * air over the hole itself has no floor to stand on); empty while every hole is shut.
+     */
+    public List<BlockPos> wayOutMouths(Level level) {
+        List<BlockPos> spots = new java.util.ArrayList<>();
+        for (ForagingHoles.WayOut way : colony.foragingHoles().waysOut(level)) {
+            BlockPos beside = way.outward() == null ? null : way.mouth().relative(way.outward());
+            spots.add(beside != null && level.getBlockState(beside).getCollisionShape(level, beside).isEmpty() ? beside : way.mouth());
+        }
+        return spots;
+    }
+
+    /** A worker leaves the body it dragged out at {@code spot}, beside a hole: it fades there after the species' time. */
+    public void setOut(Level level, AntCorpseEntity corpse, BlockPos spot) {
+        corpse.dragTo(Vec3.atBottomCenterOf(spot));
+        corpse.setOut(level.getGameTime(), colony.profile().refuse().carryOutFadeTicks().orElse(0));
+        releaseCorpse(corpse);
+        level.playSound(null, spot, SoundEvents.ROOTED_DIRT_PLACE, SoundSource.NEUTRAL, 0.2F, 1.5F);
+    }
+
+    /**
+     * The nestmate lying paralysed by a hunter's sting nearest {@code near} that a worker should fetch and carry in to be
+     * eaten (a species with {@code eat_paralysed}), or null: one no hunter holds, with no foe within {@code quiet_reach},
+     * not claimed by another worker, at a spot {@code canGo} allows, while there is room on the comb.
+     */
+    @Nullable
+    public AbstractAntEntity findParalysed(Level level, BlockPos near, Set<UUID> avoid, java.util.function.Predicate<BlockPos> canGo) {
+        if (!colony.profile().refuse().eatParalysed() || colony.food().pickFoodSpot(level, colony.random()) == null) {
+            return null;
+        }
+        claimedCorpses.prune(level.getGameTime());
+        AbstractAntEntity best = null;
+        double bestDistance = Double.MAX_VALUE;
+        for (AbstractAntEntity body : level.getEntitiesOfClass(AbstractAntEntity.class, groundBox(8.0),
+                insect -> insect.isAlive() && id.equals(insect.getColonyId()) && insect.isParalysed() && !insect.isPinned())) {
+            if (claimedCorpses.contains(body.getUUID()) || avoid.contains(body.getUUID()) || !canGo.test(body.blockPosition())
+                    || foeNear(level, body.blockPosition())) {
+                continue;
+            }
+            double distance = body.distanceToSqr(near.getX() + 0.5, near.getY() + 0.5, near.getZ() + 0.5);
+            if (distance < bestDistance) {
+                best = body;
+                bestDistance = distance;
+            }
+        }
+        return best;
+    }
+
+    /** A worker is on its way to this paralysed nestmate: the others leave it alone for a while. */
+    public void claimBody(Level level, UUID body) {
+        claimedCorpses.put(body, level.getGameTime() + CORPSE_CLAIM_TICKS);
+    }
+
+    public void releaseBody(UUID body) {
+        claimedCorpses.remove(body);
     }
 
     /** A worker is on its way to this dead ant: the others leave it alone for a while. */

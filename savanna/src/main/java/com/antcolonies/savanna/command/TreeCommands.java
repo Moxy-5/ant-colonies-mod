@@ -2,6 +2,7 @@ package com.antcolonies.savanna.command;
 
 import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.tree.Forest;
+import com.antcolonies.savanna.tree.HeartRot;
 import com.antcolonies.savanna.tree.TreeLife;
 import com.antcolonies.savanna.tree.TreeShapes;
 import com.antcolonies.savanna.tree.TreeStage;
@@ -10,6 +11,7 @@ import java.util.Comparator;
 
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -32,7 +34,12 @@ public class TreeCommands {
                 // Step 5, for testing: "kill" (the nearest grown tree dies now) and "fell" (the nearest acacia sheds and falls now).
                 .then(Commands.literal("trees").executes(context -> trees(context.getSource()))
                         .then(Commands.literal("kill").executes(context -> treeDeath(context.getSource(), false)))
-                        .then(Commands.literal("fell").executes(context -> treeDeath(context.getSource(), true)))));
+                        .then(Commands.literal("fell").executes(context -> treeDeath(context.getSource(), true)))
+                        // Dead wood for the raids, part 4, for testing: heart rot in the nearest grown acacia, got in so many
+                        // days ago (0 hidden, 6 brackets, 16 hollow).
+                        .then(Commands.literal("rot").executes(context -> rot(context.getSource(), (int) HeartRot.HOLLOW_FROM))
+                                .then(Commands.argument("days", IntegerArgumentType.integer(0, 1000))
+                                        .executes(context -> rot(context.getSource(), IntegerArgumentType.getInteger(context, "days")))))));
     }
 
     /** Step 5, for testing: the nearest grown tree within 32 blocks dies now, or (fell) an acacia sheds and falls now. */
@@ -51,6 +58,32 @@ public class TreeCommands {
             return 1;
         }
         source.sendFailure(Component.literal(fell ? "No standing grown acacia within 32 blocks." : "No living grown tree within 32 blocks."));
+        return 0;
+    }
+
+    /** Part 4, for testing: heart rot got into the nearest living grown acacia within 32 blocks {@code days} days ago. */
+    private static int rot(CommandSourceStack source, int days) {
+        ServerLevel level = source.getLevel();
+        Forest forest = Forest.get(level);
+        BlockPos at = BlockPos.containing(source.getPosition());
+        java.util.List<Forest.Tree> near = forest.near(at, 32);
+        near.sort(Comparator.comparingDouble(t -> t.foot.distSqr(at)));
+        for (Forest.Tree t : near) {
+            if (!t.living() || !HeartRot.canRot(t) || t.placedAge < 0) {
+                continue;
+            }
+            long today = Forest.today(level);
+            forest.update(level, t, today); // any days owed first
+            t.rotFrom = today - days;
+            forest.setDirty();
+            forest.update(level, t, today);
+            String what = t.kind.replace('_', ' ') + " at " + t.foot.getX() + " " + t.foot.getY() + " " + t.foot.getZ();
+            String stage = HeartRot.stage(t, today).name().toLowerCase(java.util.Locale.ROOT);
+            source.sendSuccess(() -> Component.literal("Heart rot in the " + what + ", " + days + " days in: " + stage
+                    + " (brackets from day " + (int) HeartRot.BRACKETS_FROM + ", hollow from day " + (int) HeartRot.HOLLOW_FROM + ")."), false);
+            return 1;
+        }
+        source.sendFailure(Component.literal("No living grown acacia within 32 blocks."));
         return 0;
     }
 
@@ -83,11 +116,23 @@ public class TreeCommands {
                 continue;
             }
             String since = t.died == Forest.DIED_UNKNOWN ? "dead in new land" : "died " + (today - t.died) + " days ago";
-            String cause = t.cause.isEmpty() ? "" : " (" + (t.cause.equals("age") ? "old age" : t.cause) + ")";
+            String cause = t.cause.isEmpty() ? "" : " (" + (t.cause.equals("age") ? "old age" : t.cause.equals("rot") ? "heart rot" : t.cause)
+                    + (t.rotFrom != HeartRot.NONE && !t.cause.equals("rot") ? ", heart rot" : "")
+                    + (t.crumbled > 0 ? ", crumbling to pulp" : "") + ")";
             String stage = t.stage == TreeStage.LIVING ? "withering" : t.stage.id;
             out.append(String.format("\n  dead %s at %d %d %d: %s, %s%s", t.kind.replace('_', ' '), t.foot.getX(), t.foot.getY(), t.foot.getZ(),
                     stage, since, cause));
             dead++;
+        }
+        // Part 4: the nearest living trees with heart rot, and how far along.
+        int rotting = 0;
+        for (Forest.Tree t : near) {
+            if (!t.living() || t.rotFrom == HeartRot.NONE || rotting >= 6) {
+                continue;
+            }
+            out.append(String.format("\n  heart rot in %s at %d %d %d: %s, day %d", t.kind.replace('_', ' '), t.foot.getX(), t.foot.getY(), t.foot.getZ(),
+                    HeartRot.stage(t, today).name().toLowerCase(java.util.Locale.ROOT), today - t.rotFrom));
+            rotting++;
         }
         source.sendSuccess(() -> Component.literal(out.toString()), false);
         return 1;

@@ -6,5 +6,6 @@
   "block.colonyframework.clay_ramp": "Clay Ramp",
   "block.colonyframework.mud_ramp": "Mud Ramp",
   "block.colonyframework.sand_ramp": "Sand Ramp",
-  "block.colonyframework.red_sand_ramp": "Red Sand Ramp"
+  "block.colonyframework.red_sand_ramp": "Red Sand Ramp",
+  "effect.colonyframework.sting_pain": "Sting Pain"
 }

@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column",
+  "textures": {
+    "side": "antcolonies:block/camel_thorn_wood_spores",
+    "end": "antcolonies:block/camel_thorn_wood_spores"
+  }
+}

@@ -71,6 +71,8 @@ public class MatabeleQueenEntity extends AbstractAntEntity {
     @Override
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));
+        // M8 step 2e: she stings only in her room, a player who broke in (the nest's defence keeps her order there)
+        this.goalSelector.addGoal(1, new com.antcolonies.entity.goal.FightGoal(this, 3.0));
         this.goalSelector.addGoal(2, new QueenToRoomGoal(this));
         this.goalSelector.addGoal(3, new GoInsideGoal(this));
         this.goalSelector.addGoal(4, new WaitAtNestGoal(this));
@@ -132,5 +134,11 @@ public class MatabeleQueenEntity extends AbstractAntEntity {
     @Override
     public String fightBody() {
         return "queen";
+    }
+
+    /** Its squeak (M8 step 2e): real Megaponera stridulate when held or when the nest is broken into. */
+    @Override
+    protected net.minecraft.sounds.SoundEvent squeakSound() {
+        return com.antcolonies.savanna.registry.SavannaSounds.MATABELE_SQUEAK.get();
     }
 }

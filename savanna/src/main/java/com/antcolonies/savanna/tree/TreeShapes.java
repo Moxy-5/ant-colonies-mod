@@ -26,13 +26,19 @@ public final class TreeShapes {
 
     /** hollowed: a tree over a fungus-growing termite colony, its lower trunk eaten hollow ({@link #hollowOut}, step 5f). */
     public static TreeVoxels build(TreeKind kind, long seed, double age, TreeStage stage, boolean leafless, boolean hollowed) {
+        return build(kind, seed, age, stage, leafless, hollowed, false);
+    }
+
+    /** rotted: its trunk hollowed by heart rot up to the fork (dead wood for the raids, part 4, {@code HeartRot}). */
+    public static TreeVoxels build(TreeKind kind, long seed, double age, TreeStage stage, boolean leafless, boolean hollowed, boolean rotted) {
         TreeVoxels v = kind.isBaobab() ? new BaobabShape(kind, seed).build(age, stage, leafless)
-                : kind.isUmbrella() ? new UmbrellaShape(kind, seed).build(age, stage) : new AcaciaShape(kind, seed).build(age, stage);
+                : kind.isUmbrella() ? new UmbrellaShape(kind, seed).snapped(rotted).build(age, stage)
+                : new AcaciaShape(kind, seed).snapped(rotted).build(age, stage);
         if (!kind.isBaobab() && (stage == TreeStage.SNAG || stage == TreeStage.MUD || stage == TreeStage.SHED)) {
             keepWithinLiving(v, build(kind, seed, age, TreeStage.LIVING), stage == TreeStage.SHED ? 2 : 0);
         }
-        if (hollowed && (stage == TreeStage.LIVING || stage == TreeStage.SNAG || stage == TreeStage.MUD || stage == TreeStage.SHED)) {
-            hollowOut(v, seed);
+        if ((hollowed || rotted) && (stage == TreeStage.LIVING || stage == TreeStage.SNAG || stage == TreeStage.MUD || stage == TreeStage.SHED)) {
+            hollowOut(v, seed, hollowed, rotted);
         }
         v.clearLooseFoliage();
         return v;
@@ -40,6 +46,8 @@ public final class TreeShapes {
 
     /** How high up the trunk termites eat it hollow (my pick: the lower trunk, about 7 m). */
     static final int HOLLOW_HEIGHT = 7;
+    /** How high up the trunk heart rot hollows it (my pick: up to the fork, which stops it first in most trees). */
+    static final int ROT_HEIGHT = 14;
 
     /**
      * Step 5f: the lower trunk eaten hollow by termites. Real: Macrotermes build at a tree's foot and eat its dead
@@ -49,10 +57,22 @@ public final class TreeShapes {
      * hollow; a grown trunk 5 wide gets a hollow 1 wide, an ancient one more).
      */
     static void hollowOut(TreeVoxels v, long seed) {
+        hollowOut(v, seed, true, false);
+    }
+
+    /**
+     * As {@link #hollowOut(TreeVoxels, long)}, by termites ({@code termites}: the hole at the foot where they came in),
+     * by heart rot ({@code rot}: the hollow runs on up to {@link #ROT_HEIGHT} or the fork, and opens to the air through
+     * one hole up the trunk where a limb broke off and let the rot in; real hollow acacias show such a hole), or both.
+     */
+    static void hollowOut(TreeVoxels v, long seed, boolean termites, boolean rot) {
         double cx = 0, cz = 0;
-        double door = new java.util.Random(seed * 31 + 7).nextDouble() * Math.PI * 2;
+        java.util.Random dice = new java.util.Random(seed * 31 + 7);
+        double door = dice.nextDouble() * Math.PI * 2;
+        double limbSide = dice.nextDouble() * Math.PI * 2, limbAt = dice.nextDouble();
         double[] first = null; // the lowest trunk layer's middle and radius, for the floor under it (the roots flare there)
-        for (int y = 1; y <= HOLLOW_HEIGHT; y++) {
+        java.util.List<double[]> layers = new java.util.ArrayList<>(); // each hollowed layer's y, middle and radius
+        for (int y = 1; y <= (rot ? ROT_HEIGHT : HOLLOW_HEIGHT); y++) {
             java.util.List<int[]> trunk = new java.util.ArrayList<>();
             double sx = 0, sz = 0;
             for (int x = (int) Math.floor(cx) - 5; x <= (int) Math.ceil(cx) + 5; x++) {
@@ -83,9 +103,24 @@ public final class TreeShapes {
             for (int[] b : trunk) {
                 eat(v, b[0], y, b[1], Math.hypot(b[0] - cx, b[1] - cz), r, false);
             }
+            layers.add(new double[] {y, cx, cz, r});
         }
         if (first == null) {
             return;
+        }
+        if (rot && layers.size() >= 3) {
+            // The limb hole: one block through the bark ring, somewhere from the third hollow layer up.
+            double[] at = layers.get(2 + (int) (limbAt * (layers.size() - 2)));
+            int y = (int) at[0];
+            for (double t = 0; t <= 8; t += 0.5) {
+                int x = (int) Math.round(at[1] + t * Math.cos(limbSide)), z = (int) Math.round(at[2] + t * Math.sin(limbSide));
+                TreePart p = v.get(x, y, z);
+                if (p != null && log(p) || p == TreePart.ROTTEN) {
+                    v.set(x, y, z, null);
+                } else if (t > at[3]) {
+                    break; // through the bark
+                }
+            }
         }
         // The floor (frass inside, at ground level among the roots) and the way in at the foot, on one side.
         double r = first[2];
@@ -97,7 +132,7 @@ public final class TreeShapes {
                 }
             }
         }
-        for (int y = 0; y <= 1; y++) {
+        for (int y = 0; y <= (termites ? 1 : -1); y++) {
             boolean out = false;
             for (double t = 0; t <= 8 && !out; t += 0.5) {
                 int x = (int) Math.round(first[0] + t * Math.cos(door)), z = (int) Math.round(first[1] + t * Math.sin(door));

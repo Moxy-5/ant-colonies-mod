@@ -1,0 +1,248 @@
+{
+  "parent": "minecraft:block/block",
+  "ambientocclusion": false,
+  "textures": {
+    "particle": "antcolonies:block/bracket_fungus_old_top",
+    "top": "antcolonies:block/bracket_fungus_old_top",
+    "under": "antcolonies:block/bracket_fungus_old_under",
+    "edge": "antcolonies:block/bracket_fungus_old_edge"
+  },
+  "elements": [
+    {
+      "from": [
+        1,
+        2,
+        10
+      ],
+      "to": [
+        15,
+        9,
+        16
+      ],
+      "faces": {
+        "up": {
+          "uv": [
+            1,
+            10,
+            15,
+            16
+          ],
+          "texture": "#top"
+        },
+        "down": {
+          "uv": [
+            1,
+            10,
+            15,
+            16
+          ],
+          "texture": "#under"
+        },
+        "north": {
+          "uv": [
+            1,
+            9,
+            15,
+            16
+          ],
+          "texture": "#edge"
+        },
+        "east": {
+          "uv": [
+            10,
+            9,
+            16,
+            16
+          ],
+          "texture": "#edge"
+        },
+        "west": {
+          "uv": [
+            10,
+            9,
+            16,
+            16
+          ],
+          "texture": "#edge"
+        }
+      }
+    },
+    {
+      "from": [
+        2,
+        2,
+        8
+      ],
+      "to": [
+        14,
+        8,
+        10
+      ],
+      "faces": {
+        "up": {
+          "uv": [
+            2,
+            8,
+            14,
+            10
+          ],
+          "texture": "#top"
+        },
+        "down": {
+          "uv": [
+            2,
+            8,
+            14,
+            10
+          ],
+          "texture": "#under"
+        },
+        "north": {
+          "uv": [
+            2,
+            10,
+            14,
+            16
+          ],
+          "texture": "#edge"
+        },
+        "east": {
+          "uv": [
+            8,
+            10,
+            10,
+            16
+          ],
+          "texture": "#edge"
+        },
+        "west": {
+          "uv": [
+            8,
+            10,
+            10,
+            16
+          ],
+          "texture": "#edge"
+        }
+      }
+    },
+    {
+      "from": [
+        4,
+        2,
+        6
+      ],
+      "to": [
+        12,
+        7,
+        8
+      ],
+      "faces": {
+        "up": {
+          "uv": [
+            4,
+            6,
+            12,
+            8
+          ],
+          "texture": "#top"
+        },
+        "down": {
+          "uv": [
+            4,
+            6,
+            12,
+            8
+          ],
+          "texture": "#under"
+        },
+        "north": {
+          "uv": [
+            4,
+            11,
+            12,
+            16
+          ],
+          "texture": "#edge"
+        },
+        "east": {
+          "uv": [
+            6,
+            11,
+            8,
+            16
+          ],
+          "texture": "#edge"
+        },
+        "west": {
+          "uv": [
+            6,
+            11,
+            8,
+            16
+          ],
+          "texture": "#edge"
+        }
+      }
+    },
+    {
+      "from": [
+        6,
+        2,
+        5
+      ],
+      "to": [
+        10,
+        6,
+        6
+      ],
+      "faces": {
+        "up": {
+          "uv": [
+            6,
+            5,
+            10,
+            6
+          ],
+          "texture": "#top"
+        },
+        "down": {
+          "uv": [
+            6,
+            5,
+            10,
+            6
+          ],
+          "texture": "#under"
+        },
+        "north": {
+          "uv": [
+            6,
+            12,
+            10,
+            16
+          ],
+          "texture": "#edge"
+        },
+        "east": {
+          "uv": [
+            5,
+            12,
+            6,
+            16
+          ],
+          "texture": "#edge"
+        },
+        "west": {
+          "uv": [
+            5,
+            12,
+            6,
+            16
+          ],
+          "texture": "#edge"
+        }
+      }
+    }
+  ]
+}

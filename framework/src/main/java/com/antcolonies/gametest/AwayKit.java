@@ -180,7 +180,8 @@ public final class AwayKit {
                 Map.entry(com.antcolonies.colony.ColonyNews.SEARCH_OVER, List.of("recruits", "forager_spots", "door")),
                 Map.entry(com.antcolonies.colony.ColonyNews.MEMBER_ROUND, List.of("door", "recruits")),
                 Map.entry(com.antcolonies.colony.ColonyNews.PLAYER_STAMPED, List.of("alarm")),
-                Map.entry(com.antcolonies.colony.ColonyNews.BLOCK_BROKEN, List.of("alarm")));
+                Map.entry(com.antcolonies.colony.ColonyNews.BLOCK_BROKEN, List.of("alarm")),
+                Map.entry(com.antcolonies.colony.ColonyNews.BROKEN_OPEN, List.of("raid_defence"))); // M8 step 2f
         for (Map.Entry<com.antcolonies.colony.ColonyNews.Kind<?>, List<String>> kind : order.entrySet()) {
             List<String> hearing = kind.getValue().stream().filter(has::contains).toList();
             helper.assertTrue(colony.news().listenersOf(kind.getKey()).equals(hearing) && colony.news().listens(kind.getKey()) == !hearing.isEmpty(),
@@ -242,7 +243,7 @@ public final class AwayKit {
                 // step 9b: the parts' words in the colony list, slot by slot, in the order the list wrote them
                 Map.entry(com.antcolonies.colony.ColonyHooks.LIST_STORE, List.of("bakery")),
                 Map.entry(com.antcolonies.colony.ColonyHooks.LIST_FOOD, List.of("fungus_garden")),
-                Map.entry(com.antcolonies.colony.ColonyHooks.LIST_BROOD, List.of("soldiers", "alarm")),
+                Map.entry(com.antcolonies.colony.ColonyHooks.LIST_BROOD, List.of("soldiers", "alarm", "raid_defence")),
                 Map.entry(com.antcolonies.colony.ColonyHooks.LIST_SEARCH, List.of("forager_spots", "recruits", "trunk_trails")),
                 Map.entry(com.antcolonies.colony.ColonyHooks.LIST_DANGER, List.of("closed_holes")),
                 Map.entry(com.antcolonies.colony.ColonyHooks.LIST_BUILDING, List.of("mound")),

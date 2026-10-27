@@ -195,6 +195,15 @@ public final class ColonyNews {
 
     public static final Kind<ScrapsLeft> SCRAPS_LEFT = Kind.of("scraps_left");
 
+    /**
+     * M8 step 2f: a foe ({@code by}, a raiding Matabele major) bit open the cover over the colony's ground at
+     * {@code where} (the soil over a shallow gallery, a mud runway or cast): heard by a species' defence of its galleries.
+     */
+    public record BrokenOpen(BlockPos where, LivingEntity by) {
+    }
+
+    public static final Kind<BrokenOpen> BROKEN_OPEN = Kind.of("broken_open");
+
     public static final Kind<SetOut> SET_OUT = Kind.of("set_out");
     public static final Kind<SearchStarted> SEARCH_STARTED = Kind.of("search_started");
     public static final Kind<SearchOver> SEARCH_OVER = Kind.of("search_over");

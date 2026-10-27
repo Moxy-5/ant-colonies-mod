@@ -1,6 +1,7 @@
 {
   "replace": false,
   "values": [
-    "antcolonies:frass"
+    "antcolonies:frass",
+    "antcolonies:pulp_heap"
   ]
 }

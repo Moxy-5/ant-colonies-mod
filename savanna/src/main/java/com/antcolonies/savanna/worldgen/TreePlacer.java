@@ -63,9 +63,10 @@ public final class TreePlacer {
     private TreePlacer() {
     }
 
-    /** A tree's kind by name (umbrella_thorn, camel_thorn, baobab), read once ({@link #HOLLOWED} on the name aside). */
+    /** A tree's kind by name (umbrella_thorn, camel_thorn, baobab), read once ({@link #HOLLOWED} and {@link #ROTTED} on the name aside). */
     public static TreeKind kind(String name) {
-        String base = name.endsWith(HOLLOWED) ? name.substring(0, name.length() - HOLLOWED.length()) : name;
+        String base = name.endsWith(ROTTED) ? name.substring(0, name.length() - ROTTED.length()) : name;
+        base = base.endsWith(HOLLOWED) ? base.substring(0, base.length() - HOLLOWED.length()) : base;
         synchronized (KINDS) {
             return KINDS.computeIfAbsent(base, TreeKind::load);
         }
@@ -76,6 +77,12 @@ public final class TreePlacer {
      * apart from the plain shape everywhere a shape is kept.
      */
     public static final String HOLLOWED = "+termites";
+
+    /**
+     * Dead wood for the raids, part 4: put after a kind's name (after {@link #HOLLOWED} if both), the tree's trunk is
+     * hollowed by heart rot ({@code TreeShapes.hollowOut}, {@code tree/HeartRot}).
+     */
+    public static final String ROTTED = "+rot";
 
     /**
      * A tree worked out into blocks, around its foot at (0, 0, 0): each block's place and state, which ones hold the
@@ -261,7 +268,7 @@ public final class TreePlacer {
                 return p;
             }
         }
-        Placed p = s < 0 ? work(kind(kindName), TreeShapes.build(kind(kindName), seed, age, stage, false, kindName.endsWith(HOLLOWED)), stage) : between(kindName, seed, age, stage, s);
+        Placed p = s < 0 ? work(kind(kindName), TreeShapes.build(kind(kindName), seed, age, stage, false, kindName.contains(HOLLOWED), kindName.endsWith(ROTTED)), stage) : between(kindName, seed, age, stage, s);
         synchronized (CACHE) {
             CACHE.put(key, p);
         }
@@ -907,6 +914,12 @@ public final class TreePlacer {
 
     /** The charred block a giant tree's wood turns to in a fire (null: not wood that chars). */
     public static Block charredOf(Block b) {
+        Block plain = com.antcolonies.savanna.tree.RotMarks.base(b);
+        if (plain != b) {
+            // A heart rot mark stays on the charred bark.
+            Block c = charredOf(plain);
+            return c == null ? null : com.antcolonies.savanna.tree.RotMarks.marked(c, com.antcolonies.savanna.tree.RotMarks.mark(b));
+        }
         if (b == TreeBlocks.CHARRED_LOG.get() || b == TreeBlocks.CHARRED_WOOD.get() || b == TreeBlocks.CHARRED_BRANCH.get()) {
             return null;
         }
@@ -935,7 +948,8 @@ public final class TreePlacer {
 
     /** Whether a block is burnt wood. */
     public static boolean isCharred(BlockState state) {
-        return state.is(TreeBlocks.CHARRED_LOG.get()) || state.is(TreeBlocks.CHARRED_WOOD.get()) || state.is(TreeBlocks.CHARRED_BRANCH.get());
+        Block b = com.antcolonies.savanna.tree.RotMarks.base(state.getBlock());
+        return b == TreeBlocks.CHARRED_LOG.get() || b == TreeBlocks.CHARRED_WOOD.get() || b == TreeBlocks.CHARRED_BRANCH.get();
     }
 
     /** A wood block charred (its axis or branch arms kept); itself if it does not char. */
@@ -963,8 +977,8 @@ public final class TreePlacer {
         if (com.antcolonies.savanna.block.DeadTreeWoodBlock.isEaten(there)) {
             return false;
         }
-        Block b = was.getBlock();
-        return there.is(b) || there.getBlock() == charredOf(b) || there.getBlock() == scorchedOf(b);
+        Block b = was.getBlock(), t = com.antcolonies.savanna.tree.RotMarks.base(there.getBlock()); // a heart rot mark is the same wood
+        return t == b || t == charredOf(b) || t == scorchedOf(b);
     }
 
     /** Charred shapes: a tree killed by fire stands and lies black, not silver (kept as long as their shape is). */
@@ -1019,6 +1033,9 @@ public final class TreePlacer {
             }
             if (own && isCharred(there) && charredOf(was.getBlock()) != null) {
                 state = charred(state); // a fire's scar stays as the wood changes (step 5d)
+            }
+            if (own) {
+                state = com.antcolonies.savanna.tree.RotMarks.keep(there, state); // and a heart rot mark
             }
             level.setBlock(pos, state, flags);
             changed++;

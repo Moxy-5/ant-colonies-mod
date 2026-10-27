@@ -91,6 +91,8 @@ public class TermiteWorkerEntity extends AbstractAntEntity implements ColonyBorn
         this.goalSelector.addGoal(0, new FloatGoal(this));
         // A worker that feels a Matabele close (or a stung nestmate) runs for the nearest hole and goes down (M8 2b+).
         this.goalSelector.addGoal(0, new FleeGoal(this));
+        // A raid broke into the gallery: workers between the break and the nest go deeper, and pack it shut behind them (M8 2f).
+        this.goalSelector.addGoal(0, new com.antcolonies.savanna.entity.goal.RetreatGoal(this));
         // A hungry worker eats before anything else: a nodule (young) or old comb (older) in the fungus garden.
         this.goalSelector.addGoal(1, new EatGoal(this, hunger()));
         // What a termite holds goes where it belongs first: forage to the food store, soil to the mound.

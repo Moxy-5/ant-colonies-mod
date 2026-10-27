@@ -86,6 +86,9 @@ public class TermiteCommands {
                             com.antcolonies.savanna.colony.DeadMounds.get(context.getSource().getLevel()).describe(context.getSource().getLevel())), false);
                     return 1;
                 }))
+                // The dead wood for the raids, part 5: the nearest mound's termite feeding spots (galleries under dead
+                // wood, runways of mud sheeting), how far out, on what wood, and which are fed at by day.
+                .then(Commands.literal("feedingspots").executes(context -> feedingSpots(context.getSource())))
                 .then(Commands.literal("newmounds").executes(context -> {
                     context.getSource().sendSuccess(() -> Component.literal(
                             com.antcolonies.savanna.colony.NewLandMounds.get(context.getSource().getLevel()).describeBook()), false);
@@ -107,6 +110,50 @@ public class TermiteCommands {
                                 .then(Commands.argument("radius", IntegerArgumentType.integer(1, 32))
                                         .executes(context -> age(context.getSource(), IntegerArgumentType.getInteger(context, "age"),
                                                 IntegerArgumentType.getInteger(context, "radius")))))));
+    }
+
+    /** How far (blocks) loose termite mud is looked for round a mound with no feeding spot on record. */
+    private static final int LOOSE_MUD_LOOK = 48;
+
+    /**
+     * The dead wood for the raids, part 5: the nearest termite mound's feeding spots, from the colony's own record, one
+     * line each (what, where, how far, on what, mud round it, by day or night only), the count by day first.
+     */
+    private static int feedingSpots(CommandSourceStack source) {
+        ServerLevel level = source.getLevel();
+        Colony colony = nearestTermiteColony(level, BlockPos.containing(source.getPosition()));
+        if (colony == null) {
+            source.sendFailure(Component.literal("No termite colony within 64 blocks."));
+            return 0;
+        }
+        var spots = com.antcolonies.savanna.colony.FeedingSpots.of(level, colony);
+        int byDay = com.antcolonies.savanna.colony.FeedingSpots.byDay(spots);
+        int reach = com.antcolonies.savanna.colony.FeedingSpots.moundReach(level, colony);
+        StringBuilder text = new StringBuilder("Termite mound at " + colony.getCenter().toShortString() + " (its foot reaches " + reach
+                + " blocks): " + spots.size() + " feeding spot" + (spots.size() == 1 ? "" : "s") + ", " + byDay + " fed at by day.");
+        int i = 1;
+        for (var spot : spots) {
+            text.append("\n ").append(i++).append(". ").append(spot.kind().equals("gallery") ? "Gallery under " : "Runway of mud sheeting to ")
+                    .append(spot.wood()).append(" at ").append(spot.food().toShortString()).append(", ").append(spot.fromMiddle())
+                    .append(" blocks ").append(com.antcolonies.savanna.colony.FeedingSpots.bearing(colony, spot.food()))
+                    .append(" (").append(spot.fromMiddle() - reach).append(" past the foot); ").append(spot.cells()).append(" cells, ")
+                    .append(spot.casts()).append(" mud casts, ").append(spot.crust()).append(" mud crust; ")
+                    .append(spot.byDay() ? "BY DAY (closed all round)" : "night only (not closed yet)");
+        }
+        if (spots.isEmpty()) {
+            // (a block scan as the fallback: termite mud with no spot on record, e.g. a dead colony's leftovers)
+            BlockPos center = colony.getCenter();
+            long mud = BlockPos.betweenClosedStream(center.offset(-LOOSE_MUD_LOOK, -8, -LOOSE_MUD_LOOK), center.offset(LOOSE_MUD_LOOK, 16, LOOSE_MUD_LOOK))
+                    .filter(level::isLoaded)
+                    .filter(pos -> {
+                        BlockState state = level.getBlockState(pos);
+                        return state.is(SavannaBlocks.MUD_CAST.get()) || state.is(SavannaBlocks.MUD_CRUST.get());
+                    }).count();
+            text.append("\n No gallery or runway on record; ").append(mud).append(" blocks of termite mud within ").append(LOOSE_MUD_LOOK)
+                    .append(" blocks. (The colony learns big dead wood within about 16 to 20 blocks of its holes and tunnel tips, then digs out to it.)");
+        }
+        source.sendSuccess(() -> Component.literal(text.toString()), false);
+        return spots.size();
     }
 
     /** A mound of new land put in at the player's feet now, as world generation would (M8 step 1b). */

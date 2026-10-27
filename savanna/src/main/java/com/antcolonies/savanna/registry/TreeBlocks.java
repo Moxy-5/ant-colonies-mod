@@ -5,8 +5,10 @@ import java.util.List;
 
 import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.block.BleachedBranchBlock;
+import com.antcolonies.savanna.block.BracketFungusBlock;
 import com.antcolonies.savanna.block.DeadTreeWoodBlock;
 import com.antcolonies.savanna.block.FrassBlock;
+import com.antcolonies.savanna.block.PulpHeapBlock;
 import com.antcolonies.savanna.block.HangingPodsBlock;
 import com.antcolonies.savanna.block.SoftDeadWoodBlock;
 import com.antcolonies.savanna.block.TaperingBranchBlock;
@@ -90,6 +92,37 @@ public final class TreeBlocks {
     public static final DeferredBlock<FrassBlock> FRASS = add(SavannaBlocks.BLOCKS.registerBlock("frass", FrassBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.SAND).strength(0.1F).sound(SoundType.SAND).ignitedByLava()
                     .pushReaction(PushReaction.DESTROY)));
+    /**
+     * Dead wood for the raids, part 4: the shelf of a heart rot fungus on the bark of a tree rotting inside (its look my
+     * pick: a <i>Ganoderma</i> shelf, banded brown on top with a pale growing rim, cream pores underneath).
+     */
+    public static final DeferredBlock<BracketFungusBlock> BRACKET_FUNGUS = add(SavannaBlocks.BLOCKS.registerBlock("bracket_fungus", BracketFungusBlock::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_BROWN).strength(0.6F).sound(SoundType.WOOD).noCollission()
+                    .noOcclusion().pushReaction(PushReaction.DESTROY)));
+    /**
+     * Heart rot: the crumbly rotten heartwood spilled where a hollow tree snapped, a heap in layers like snow that
+     * termites eat and that sinks into the soil ({@code block/PulpHeapBlock}).
+     */
+    public static final DeferredBlock<PulpHeapBlock> PULP_HEAP = add(SavannaBlocks.BLOCKS.registerBlock("pulp_heap", PulpHeapBlock::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_BROWN).strength(0.2F).sound(SoundType.ROOTED_DIRT).randomTicks()
+                    .pushReaction(PushReaction.DESTROY)));
+    /**
+     * Heart rot marks on the bark (the looks picked by the user 2026-10-26, tools/rot_looks_art.py), one pair for each bark
+     * a rotting acacia can have, on its wood (the trunk's outside, bark all round): spore-dusted, the bark under a grown bracket stained cocoa-brown by its spores; and the
+     * wound, the sunken scar where the rot got in, beaded with amber gum on a living tree. They are the same wood as the
+     * plain wood block ({@code tree/RotMarks}) and keep their mark as the tree dies or burns.
+     */
+    public static final List<RotBark> ROT_BARKS = List.of(
+            rotBark(UMBRELLA_THORN.wood(), "umbrella_thorn_wood", () -> wood(MapColor.COLOR_GRAY, 2.0F), RotatedPillarBlock::new),
+            rotBark(CAMEL_THORN.wood(), "camel_thorn_wood", () -> wood(MapColor.TERRACOTTA_GRAY, 2.5F), RotatedPillarBlock::new),
+            rotBark(BLEACHED_WOOD, "bleached_wood", TreeBlocks::deadWood, DeadTreeWoodBlock::new),
+            rotBark(CHARRED_WOOD, "charred_wood", () -> wood(MapColor.COLOR_BLACK, 1.5F), RotatedPillarBlock::new));
+
+    /** A plain wood block (the trunk's bark) and its two heart rot marks. */
+    public record RotBark(DeferredBlock<? extends RotatedPillarBlock> base, DeferredBlock<? extends RotatedPillarBlock> spores,
+                          DeferredBlock<? extends RotatedPillarBlock> wound) {
+    }
+
     /** What a dead baobab slumps into: a soggy heap of fibres (it leaves no log). */
     public static final DeferredBlock<SoftDeadWoodBlock> BAOBAB_FIBRE = add(SavannaBlocks.BLOCKS.registerBlock("baobab_fibre", SoftDeadWoodBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_BROWN).strength(0.4F).sound(SoundType.WET_GRASS)));
@@ -116,6 +149,13 @@ public final class TreeBlocks {
                 BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).noCollission().instabreak().sound(SoundType.GRASS)
                         .pushReaction(PushReaction.DESTROY)));
         return new Kind(name, log, wood, branch, leaves, seedling, deadLeaves);
+    }
+
+    private static RotBark rotBark(DeferredBlock<? extends RotatedPillarBlock> base, String name,
+                                   java.util.function.Supplier<BlockBehaviour.Properties> properties,
+                                   java.util.function.Function<BlockBehaviour.Properties, ? extends RotatedPillarBlock> make) {
+        return new RotBark(base, add(SavannaBlocks.BLOCKS.registerBlock(name + "_spores", make, properties.get())),
+                add(SavannaBlocks.BLOCKS.registerBlock(name + "_wound", make, properties.get())));
     }
 
     private static BlockBehaviour.Properties leaves(MapColor colour) {
@@ -173,7 +213,14 @@ public final class TreeBlocks {
         for (DeferredBlock<? extends Block> charred : List.of(CHARRED_LOG, CHARRED_WOOD, CHARRED_BRANCH)) {
             fire.setFlammable(charred.get(), 5, 0);
         }
+        for (RotBark r : ROT_BARKS) {
+            // Burn like the plain log they mark.
+            int feeds = r.base() == BLEACHED_LOG ? 10 : 5;
+            fire.setFlammable(r.spores().get(), feeds, 0);
+            fire.setFlammable(r.wound().get(), feeds, 0);
+        }
         fire.setFlammable(FRASS.get(), 60, 100);
+        fire.setFlammable(PULP_HEAP.get(), 30, 60);
         fire.setFlammable(BAOBAB_FIBRE.get(), 5, 5);
     }
 }

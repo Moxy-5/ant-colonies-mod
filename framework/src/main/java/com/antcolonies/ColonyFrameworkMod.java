@@ -36,6 +36,9 @@ public class ColonyFrameworkMod {
         FrameworkLoads.signUp();
         // The fight numbers of the species files (M8 step 2a), signed up before they load.
         com.antcolonies.fight.FightNumbers.signUp();
+        // M8 step 2e: how a colony defends its nest against a player, and the pain of a sting.
+        com.antcolonies.fight.DefenceNumbers.signUp();
+        com.antcolonies.registry.ModEffects.EFFECTS.register(modEventBus);
         // Only some game tests when ANTCOLONIES_TESTS is set (quick checks while working).
         NeoForge.EVENT_BUS.addListener((ServerAboutToStartEvent event) -> TestFilter.apply(event.getServer()));
         // Species profiles (data/<namespace>/species/*.json), loaded with the world's data and on /reload.

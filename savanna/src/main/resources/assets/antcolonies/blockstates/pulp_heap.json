@@ -1,0 +1,28 @@
+{
+  "variants": {
+    "layers=1": {
+      "model": "antcolonies:block/pulp_heap_height2"
+    },
+    "layers=2": {
+      "model": "antcolonies:block/pulp_heap_height4"
+    },
+    "layers=3": {
+      "model": "antcolonies:block/pulp_heap_height6"
+    },
+    "layers=4": {
+      "model": "antcolonies:block/pulp_heap_height8"
+    },
+    "layers=5": {
+      "model": "antcolonies:block/pulp_heap_height10"
+    },
+    "layers=6": {
+      "model": "antcolonies:block/pulp_heap_height12"
+    },
+    "layers=7": {
+      "model": "antcolonies:block/pulp_heap_height14"
+    },
+    "layers=8": {
+      "model": "antcolonies:block/pulp_heap_height16"
+    }
+  }
+}

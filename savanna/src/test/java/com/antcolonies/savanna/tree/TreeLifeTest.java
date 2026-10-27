@@ -61,17 +61,17 @@ class TreeLifeTest {
             }
         }
         double toYoung = reachedYoung / (double) seedlings, youngToGrown = reachedGrown / (double) reachedYoung;
-        assertTrue(toYoung > 0.07 && toYoung < 0.13, "seedlings reaching young: " + toYoung);
+        assertTrue(toYoung > 0.16 && toYoung < 0.24, "seedlings reaching young: " + toYoung);
         assertTrue(youngToGrown > 0.4 && youngToGrown < 0.6, "young reaching grown: " + youngToGrown);
         // High at first, falling: a seedling's day is far riskier than a half-grown tree's.
         assertTrue(TreeLife.deathChance(0, 0.02) > 10 * TreeLife.deathChance(0.5, 0.535), "the risk does not fall with age");
         assertTrue(TreeLife.deathChance(1, 1.01) == 0, "grown trees die here");
     }
 
-    /** Step 5: each kind's lifespans in the user's ranges (umbrella 150-250, camel 300-500, baobab 1,000-2,000), spread. */
+    /** Step 5: each kind's lifespans in the user's ranges (halved 2026-10-25: umbrella 75-125, camel 150-250, baobab 500-1,000), spread. */
     @Test
     void lifespansByKind() {
-        int[][] ranges = {{150, 250}, {300, 500}, {1000, 2000}};
+        int[][] ranges = {{75, 125}, {150, 250}, {500, 1000}};
         String[] kinds = {"umbrella_thorn", "camel_thorn", "baobab"};
         for (int i = 0; i < kinds.length; i++) {
             TreeKind kind = TreeKind.load(kinds[i]);
@@ -86,6 +86,15 @@ class TreeLifeTest {
             int[] r = ranges[i];
             assertTrue(lo >= r[0] && hi <= r[1], () -> k + ": " + l + " to " + h);
             assertTrue(hi - lo > (r[1] - r[0]) * 0.9, () -> k + " not spread: " + l + " to " + h);
+        }
+        // New land's old trees never start past their lifespan (an ancient umbrella thorn grew 130 days, it lives 75-125),
+        // and a young one has lived just the days its growth took.
+        TreeKind umbrella = TreeKind.load("umbrella_thorn");
+        for (long seed = 1; seed <= 2000; seed++) {
+            double life = TreeLife.lifespan(umbrella, seed), start = TreeLife.livedAtStart(umbrella, seed, TreeShapes.ANCIENT);
+            long s = seed;
+            assertTrue(start >= life * 0.6 && start < life * 0.96, () -> "seed " + s + ": an ancient tree starts at " + start + " of " + life);
+            assertTrue(TreeLife.livedAtStart(umbrella, seed, 0.5) == TreeLife.daysAt(0.5), () -> "seed " + s + ": a young tree's days");
         }
     }
 

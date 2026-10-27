@@ -105,22 +105,28 @@ final class DeadWood {
      * @param trunkTop   the height of the trunk's tip
      * @param limbLength the grown length of each of its first limbs (at most 3 are kept as stubs)
      * @param fallPoints where its branches end, for the pieces round it
+     * @param snapped    heart rot hollowed the trunk (dead wood for the raids, part 4): it snapped at the hollow, real
+     *                   "stem snap", leaving a tall jagged hollow stump (3 to 6 blocks, my pick) and its top lying beside
+     *                   it, hollow from end to end; a sound dead tree is uprooted or breaks at its foot instead
      */
     static void fallen(TreeVoxels v, long seed, double r0, double k, double g, double old, double fallAz, double trunkTop,
-            double[] limbLength, List<double[]> fallPoints) {
+            double[] limbLength, List<double[]> fallPoints, boolean snapped) {
         TreeRandom r = new TreeRandom(seed * 977 + 13);
         double hf = g < 0.5 ? 0 : 0.4 + 0.25 * old;
+        double hollow = snapped ? Math.max(hf, 0.55) : hf; // the rot ate the core out, however young the tree
         double[] d = {Math.cos(fallAz), 0, Math.sin(fallAz)};
-        double stumpH = 1.5 + 2 * r.next();
+        double stumpH = snapped ? 3 + 3 * r.next() : 1.5 + 2 * r.next();
         seg(v, new double[] {0, -1, 0}, new double[] {0, 1.5, 0}, r0 + (k > 0.25 ? 1.5 : 0.2), r0, DEAD);
-        seg(v, new double[] {0, -1, 0}, new double[] {0, stumpH + 2, 0}, r0, r0 * 0.97, DEAD, true, hf * 0.8);
+        seg(v, new double[] {0, -1, 0}, new double[] {0, stumpH + 2, 0}, r0, r0 * 0.97, DEAD, true, snapped ? hollow : hf * 0.8);
         v.forEach((x, y, z, b) -> {
-            if (y > stumpH + TreeRandom.hash(x, 0, z, 41) * 2.2) {
+            // A snapped stump's top is torn: a few long splinters of the shell standing over the break.
+            double splinter = snapped ? Math.pow(TreeRandom.hash(x, 0, z, 41), 2) * 4 : TreeRandom.hash(x, 0, z, 41) * 2.2;
+            if (y > stumpH + splinter) {
                 v.set(x, y, z, null);
             }
         });
         v.markStump();
-        double length = Math.max(3, trunkTop + 1);
+        double length = Math.max(3, trunkTop + 1 - (snapped ? stumpH - 2 : 0)); // the top only, above the break
         double lift = r0 - 0.75;
         double[] a0 = add(mul(d, r0 + 1.6), new double[] {0, lift, 0}), b0 = add(a0, mul(d, length));
         List<double[][]> logs = new ArrayList<>();
@@ -135,7 +141,8 @@ final class DeadWood {
             logs.add(new double[][] {add(s, new double[] {0, Math.max(0.2, ra - 0.75), 0}), add(e, new double[] {0, Math.max(0.2, rb - 0.75), 0}), {ra, rb}});
         }
         for (double[][] log : logs) {
-            seg(v, log[0], log[1], log[2][0], log[2][1], DEAD, true, Math.max(log[2][0], log[2][1]) > 1.6 ? hf : 0);
+            double wide = Math.max(log[2][0], log[2][1]);
+            seg(v, log[0], log[1], log[2][0], log[2][1], DEAD, true, log == logs.get(0) && snapped && wide > 1.2 ? hollow : wide > 1.6 ? hf : 0);
             v.addLog(log[0][0], log[0][2], log[1][0], log[1][2]);
         }
         // Galleries: beetle larvae and termites, out from the hollow through the wood, a few right through the bark.

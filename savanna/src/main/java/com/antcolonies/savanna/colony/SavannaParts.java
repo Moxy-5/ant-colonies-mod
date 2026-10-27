@@ -255,6 +255,16 @@ public final class SavannaParts {
             .saves(Alarm::save, Alarm::load)
             .sample(Alarm::fillForTests));
     /**
+     * M8 step 2f: a raid breaking into a gallery: the soldiers near drum, the workers go deeper and pack the gallery shut
+     * behind the soldiers, who are let back in at night ({@link RaidDefence}).
+     */
+    public static final Type<RaidDefence> RAID_DEFENCE = listed("raid_defence", RaidDefence::new, part -> part
+            .ticks(65, RaidDefence::tick)
+            .hears(ColonyNews.BROKEN_OPEN, 10, (defence, level, news) -> defence.brokenOpen(level, news.where(), news.by()))
+            .plugs(ColonyHooks.LIST_BROOD, 25, defence -> defence::describe)
+            .saves(RaidDefence::save, RaidDefence::load)
+            .sample(RaidDefence::fillForTests));
+    /**
      * The split, step S3: eaten grass growing back and the bare patches round the holes (was held by the food store; same
      * tick place, same save).
      */

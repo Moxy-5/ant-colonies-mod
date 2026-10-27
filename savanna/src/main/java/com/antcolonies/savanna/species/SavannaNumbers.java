@@ -28,6 +28,7 @@ public final class SavannaNumbers {
     public static final SpeciesSection<GardenNumbers> GARDEN = SpeciesSection.signUp("garden", GardenNumbers.CODEC);
     public static final SpeciesSection<SoldierNumbers> SOLDIERS = SpeciesSection.signUp("soldiers", SoldierNumbers.CODEC);
     public static final SpeciesSection<AlarmNumbers> ALARM = SpeciesSection.signUp("alarm", AlarmNumbers.CODEC);
+    public static final SpeciesSection<RaidNumbers> RAID = SpeciesSection.signUp("alarm.raid", RaidNumbers.CODEC);
     public static final SpeciesSection<GalleryNumbers> GALLERIES = SpeciesSection.signUp("nest.galleries", GalleryNumbers.CODEC);
     public static final SpeciesSection<Regrowth> REGROWTH = SpeciesSection.signUp("food.regrowth", Regrowth.CODEC);
     public static final SpeciesSection<WorkerSizes> WORKER_SIZES = SpeciesSection.signUp("worker_sizes", WorkerSizes.CODEC);
@@ -279,6 +280,26 @@ public final class SavannaNumbers {
             }
             return calmTicks.get(Math.max(0, Math.min(calmTicks.size() - 1, level - 1)));
         }
+    }
+
+    /**
+     * M8 step 2f, a raid breaking into a gallery ({@code colony.RaidDefence}; real Macrotermes: the soldiers drum, the
+     * workers further in go deeper and plug the gallery behind them, shutting the soldiers out): the drumming reaches
+     * {@code drumReach} blocks from the break; the plug goes {@code plugBack} blocks back along the gallery toward the nest,
+     * packed {@code plugAfterTicks} after the break (sooner never: the workers need the time to get behind it), or by
+     * {@code plugGiveUpTicks} if the worker meant to pack it has not got there; the shut-out soldiers wait by the seal
+     * once no foe is within {@code quietReach} of them; the seal is bitten open again in the foraging time (at night)
+     * once no foe has been within {@code drumReach} of the break for {@code overAfterTicks}. My picks, to confirm.
+     */
+    public record RaidNumbers(int drumReach, int plugBack, int plugAfterTicks, int plugGiveUpTicks, int quietReach, int overAfterTicks) {
+        public static final Codec<RaidNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.INT.optionalFieldOf("drum_reach", 16).forGetter(RaidNumbers::drumReach),
+                Codec.INT.optionalFieldOf("plug_back", 4).forGetter(RaidNumbers::plugBack),
+                Codec.INT.optionalFieldOf("plug_after_ticks", 40).forGetter(RaidNumbers::plugAfterTicks),
+                Codec.INT.optionalFieldOf("plug_give_up_ticks", 200).forGetter(RaidNumbers::plugGiveUpTicks),
+                Codec.INT.optionalFieldOf("quiet_reach", 8).forGetter(RaidNumbers::quietReach),
+                Codec.INT.optionalFieldOf("over_after_ticks", 600).forGetter(RaidNumbers::overAfterTicks)
+        ).apply(i, RaidNumbers::new));
     }
 
     /**

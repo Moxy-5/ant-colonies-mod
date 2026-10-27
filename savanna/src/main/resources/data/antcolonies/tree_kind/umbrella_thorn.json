@@ -41,7 +41,7 @@
     "seedling": "antcolonies:umbrella_thorn_seedling"
   },
   "lifespan": [
-    150,
-    250
+    75,
+    125
   ]
 }

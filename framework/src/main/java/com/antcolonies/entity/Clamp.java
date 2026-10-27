@@ -97,7 +97,11 @@ public final class Clamp {
                 || !victim.canLoseLegs() || clampedNumbers(victim) == null || striker.getRandom().nextDouble() >= chance) {
             return false;
         }
-        return victim.clamp().clampOn(striker);
+        boolean on = victim.clamp().clampOn(striker);
+        if (on) {
+            victim.squeak(); // M8 step 2e: it squeaks (real Megaponera stridulate when held)
+        }
+        return on;
     }
 
     /** The holder's jaws close on one of its legs left, by the dice. False if it has none left. */

@@ -773,6 +773,9 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     @Nullable
     private BlockPos fightSpot;
     private long fightUntil;
+    private double fightReach = com.antcolonies.entity.goal.FightGoal.SPOT_REACH;
+    /** Until when (game time) it may not sting a player again (M8 step 2e: at most once every {@code defence.sting.every_ticks}). */
+    private long nextPlayerSting;
 
     /**
      * One way of attacking: the clip it plays and for how many ticks (the whole clip, played to its end), and the
@@ -1187,6 +1190,13 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         if (attack != null || !standsToFight()) {
             return false;
         }
+        if (foe instanceof net.minecraft.world.entity.player.Player) {
+            long now = level().getGameTime();
+            if (now < nextPlayerSting) {
+                return false;
+            }
+            nextPlayerSting = now + com.antcolonies.fight.DefenceNumbers.of(profile()).map(numbers -> numbers.sting().everyTicks()).orElse(0);
+        }
         Attack how = attackFor(foe);
         swing(net.minecraft.world.InteractionHand.MAIN_HAND);
         if (how == null || how.hitAt() <= 0) {
@@ -1328,6 +1338,45 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return false;
     }
 
+    /** How many foes it went after and found no way to (M8 step 2g, for the tests: it was 600 in 2 minutes for 10 ants). */
+    private int chasesNotFound;
+
+    /** Counts one foe it found no way to ({@code FightGoal}). */
+    public void countChaseNotFound() {
+        chasesNotFound++;
+    }
+
+    /** How many foes it found no way to, for the tests. */
+    public int chasesNotFoundForTests() {
+        return chasesNotFound;
+    }
+
+    /**
+     * Whether it is one that breaks the way in at a fight spot (M8 step 2g: a Matabele major) rather than going after
+     * prey under cover itself: it leaves prey shut in under logs, mud and soil to {@link #breakIn}. False by default.
+     */
+    public boolean breaksIn() {
+        return false;
+    }
+
+    /**
+     * At its fight spot with no foe to go at (M8 step 2g): it works at breaking the way in to the prey it smells round
+     * the spot, within {@code reach} blocks of it (a Matabele major bites open the galleries and sheeting). True while it
+     * has such work (walking to it, biting). None by default.
+     */
+    public boolean breakIn(ServerLevel level, BlockPos spot, double reach) {
+        return false;
+    }
+
+    /**
+     * Where it smells prey round its fight spot, within {@code reach} blocks of it, that it may walk to (M8 step 2g: the
+     * opened galleries and the termites in them, for the minors to go into). Its search round the spot goes there
+     * first. None by default.
+     */
+    public List<BlockPos> scentNear(ServerLevel level, BlockPos spot, double reach) {
+        return List.of();
+    }
+
     /** It fled from a hunter: it stays in until then (game time), out of {@link #mayGoOut} (M8 fight polish, round B). */
     public void hideUntil(long until) {
         if (until > hideUntil) {
@@ -1358,9 +1407,46 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
 
     /** Sends it to fight round this spot until then (game time; the skirmish command, M8 step 2b). */
     public void orderToFight(BlockPos spot, long until) {
+        orderToFight(spot, until, com.antcolonies.entity.goal.FightGoal.SPOT_REACH);
+    }
+
+    /**
+     * Sends it to fight foes within {@code reach} blocks of this spot until then (M8 step 2e: a defender chases a
+     * provoking player up to its colony's {@code defence.reach} from where it was provoked).
+     */
+    public void orderToFight(BlockPos spot, long until, double reach) {
         fightSpot = spot.immutable();
         fightUntil = until;
+        fightReach = reach;
     }
+
+    /** How far (blocks) round its fight spot it looks for foes. */
+    public double getFightReach() {
+        return fightReach;
+    }
+
+    /**
+     * Its squeak (M8 step 2e; real Megaponera stridulate loudly when disturbed): when sent out to defend, when a foe
+     * clamps on, near a player at its column. At most once every {@link #SQUEAK_EVERY} ticks. Silent for a species
+     * with no {@link #squeakSound}.
+     */
+    public void squeak() {
+        net.minecraft.sounds.SoundEvent sound = squeakSound();
+        long now = level().getGameTime();
+        if (sound != null && !level().isClientSide && now - lastSqueak >= SQUEAK_EVERY) {
+            lastSqueak = now;
+            playSound(sound, 0.6F, 0.9F + getRandom().nextFloat() * 0.25F);
+        }
+    }
+
+    /** Its squeak's sound, or null for an insect that does not squeak. */
+    @Nullable
+    protected net.minecraft.sounds.SoundEvent squeakSound() {
+        return null;
+    }
+
+    private static final int SQUEAK_EVERY = 30;
+    private long lastSqueak = Long.MIN_VALUE / 2;
 
     /** Where it was sent to fight, if the order still holds (server). */
     @Nullable

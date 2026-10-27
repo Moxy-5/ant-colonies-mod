@@ -43,7 +43,7 @@
     "seedling": "antcolonies:camel_thorn_seedling"
   },
   "lifespan": [
-    300,
-    500
+    150,
+    250
   ]
 }
