@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column",
+  "textures": {
+    "side": "antcolonies:block/bleached_wood_wound",
+    "end": "antcolonies:block/bleached_wood_wound"
+  }
+}

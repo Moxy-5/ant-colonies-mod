@@ -303,15 +303,16 @@ def bracket_page(out):
     """Dead wood for the raids, part 4: the bracket fungus (the game's own block model and textures, from
     bracket_art.py) on each kind of trunk, at the bracket stage and hollow (cut open, rotten wood inside); and the new
     heart rot looks to pick from (rot_looks_art.py: bracket stages, stacked tiers, spore-dusted and wound bark)."""
+    import bracket_art
     models = mod_paths.assets("savanna") / "models/block"
-    bracket = json.loads((models / "bracket_fungus.json").read_text(encoding="utf-8"))
+    first, first_tex = bracket_art.first_look()  # the first look (before 2026-10-26), for comparison
 
     def texture_of(ref):
         return file_uri(ref.split("/")[-1] + ".png")
 
     data = {"grass": uri(png(grass())), "dirt": uri(png([[mix_soil(x, y) for x in range(S)] for y in range(S)])),
             "rotten": file_uri("rotten_wood.png"), "logs": {},
-            "bracket": {"model": bracket, "textures": {k: texture_of(v) for k, v in bracket["textures"].items()}}}
+            "bracket": {"model": {"elements": first}, "textures": {k: uri(png(v)) for k, v in first_tex.items()}}}
     for key, name in (("umbrella", "umbrella_thorn_log"), ("camel", "camel_thorn_log"), ("baobab", "baobab_log"),
                       ("bleached", "bleached_log"), ("charred", "charred_log")):
         t = json.loads((models / f"{name}.json").read_text(encoding="utf-8"))["textures"]

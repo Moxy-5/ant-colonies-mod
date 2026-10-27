@@ -23,8 +23,10 @@ import net.minecraft.world.level.block.state.BlockState;
  * <ol>
  * <li><b>Infection</b> ({@link Forest.Tree#rotFrom}, the day it got in): a chance from each wound: a shed limb, a fire on
  * the trunk it lived through, a lightning strike it lived through, termites in it (each day), old age (each day).</li>
- * <li><b>Hidden rot</b> (from day 0): nothing to see; the tree ages half again as fast.</li>
- * <li><b>Brackets</b> (from {@link #BRACKETS_FROM}): shelf fungi on the trunk's bark; it ages twice as fast.</li>
+ * <li><b>Hidden rot</b> (from day 0): only the wound shows, a sunken scar low on the trunk beaded with gum
+ * ({@link RotMarks.Mark#WOUND}); the tree ages half again as fast.</li>
+ * <li><b>Brackets</b> (from {@link #BRACKETS_FROM}): shelf fungi on the trunk's bark, growing from a white knob to an old
+ * spore-dusted hoof ({@link BracketFungusBlock#AGE}), dusting the bark under them; it ages twice as fast.</li>
  * <li><b>Hollow core</b> (from {@link #HOLLOW_FROM}): the trunk is a shell up to the fork round a core of rotten wood and
  * air, open through one limb hole ({@code TreeShapes.hollowOut}); more brackets; fire and lightning kill it as surely as
  * a termite-hollowed tree; it sheds limbs twice as often, and a thunderstorm may kill it outright.</li>
@@ -124,11 +126,25 @@ public final class HeartRot {
         };
     }
 
+    /** Days a bracket spends at each age before the next (as {@link BracketFungusBlock}'s growing, my picks). */
+    static final double[] DAYS_AT_AGE = {1, 3, 10};
+
+    /** The age of a bracket that came out {@code days} ago (a tree of new land, or one rotting while nobody was near). */
+    static int ageAfter(double days) {
+        int age = 0;
+        double until = 0;
+        while (age < DAYS_AT_AGE.length && days >= (until += DAYS_AT_AGE[age])) {
+            age++;
+        }
+        return age;
+    }
+
     /**
      * Puts up to {@code count} brackets on the bark of the tree standing as {@code shape}: on the outside of its lower
-     * trunk (1 to 5 blocks up), in air, facing out. Returns how many were placed.
+     * trunk (1 to 5 blocks up), in air, facing out, as old as brackets out for about {@code days} days (a few days more or
+     * less each); grown ones may have tiers and dust the bark under them. Returns how many were placed.
      */
-    static int placeBrackets(ServerLevel level, BlockPos foot, TreePlacer.Placed shape, int count, Random dice) {
+    static int placeBrackets(ServerLevel level, BlockPos foot, TreePlacer.Placed shape, int count, double days, Random dice) {
         List<BlockPos> spots = new ArrayList<>();
         List<Direction> faces = new ArrayList<>();
         for (int i = 0; i < shape.size(); i++) {
@@ -153,11 +169,46 @@ public final class HeartRot {
             BlockPos at = spots.remove(i);
             Direction d = faces.remove(i);
             if (level.getBlockState(at).isAir()) {
-                BlockState bracket = TreeBlocks.BRACKET_FUNGUS.get().defaultBlockState().setValue(BracketFungusBlock.FACING, d);
+                int age = ageAfter(days + (dice.nextDouble() - 0.5) * 6);
+                BlockState bracket = TreeBlocks.BRACKET_FUNGUS.get().aged(d, age, dice.nextDouble() < 1 / 3.0);
                 level.setBlock(at, bracket, Block.UPDATE_ALL);
+                if (age >= BracketFungusBlock.GROWN) {
+                    BracketFungusBlock.dust(level, at, bracket);
+                }
                 placed++;
             }
         }
         return placed;
+    }
+
+    /**
+     * The wound where the rot got in: a log of the tree standing as {@code shape} low on its trunk (0 to 2 blocks up),
+     * with open air in front of it, turns to its wound look. Returns whether one did (false: no such log, try again later).
+     */
+    static boolean placeWound(ServerLevel level, BlockPos foot, TreePlacer.Placed shape, Random dice) {
+        List<BlockPos> spots = new ArrayList<>();
+        for (int i = 0; i < shape.size(); i++) {
+            int x = shape.xs()[i], y = shape.ys()[i], z = shape.zs()[i];
+            if (y < 0 || y > 2 || x * x + z * z > 25) {
+                continue;
+            }
+            BlockPos wood = foot.offset(x, y, z);
+            BlockState there = level.getBlockState(wood);
+            if (RotMarks.marked(there, RotMarks.Mark.WOUND) == null) {
+                continue;
+            }
+            for (Direction d : Direction.Plane.HORIZONTAL) {
+                if (d.getStepX() * x + d.getStepZ() * z >= 0 && level.getBlockState(wood.relative(d)).isAir()) {
+                    spots.add(wood);
+                    break;
+                }
+            }
+        }
+        if (spots.isEmpty()) {
+            return false;
+        }
+        BlockPos at = spots.get(dice.nextInt(spots.size()));
+        level.setBlock(at, RotMarks.marked(level.getBlockState(at), RotMarks.Mark.WOUND), Block.UPDATE_ALL);
+        return true;
     }
 }

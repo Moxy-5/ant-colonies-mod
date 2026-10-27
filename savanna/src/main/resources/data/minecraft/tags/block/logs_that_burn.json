@@ -9,6 +9,12 @@
     "antcolonies:baobab_wood",
     "antcolonies:bleached_log",
     "antcolonies:bleached_wood",
-    "antcolonies:peeling_bleached_log"
+    "antcolonies:peeling_bleached_log",
+    "antcolonies:umbrella_thorn_wood_spores",
+    "antcolonies:umbrella_thorn_wood_wound",
+    "antcolonies:camel_thorn_wood_spores",
+    "antcolonies:camel_thorn_wood_wound",
+    "antcolonies:bleached_wood_spores",
+    "antcolonies:bleached_wood_wound"
   ]
 }

@@ -1,18 +1,123 @@
 {
   "variants": {
-    "facing=north": {
-      "model": "antcolonies:block/bracket_fungus"
+    "age=0,facing=north,tiers=false": {
+      "model": "antcolonies:block/bracket_fungus_knob"
     },
-    "facing=east": {
-      "model": "antcolonies:block/bracket_fungus",
+    "age=0,facing=north,tiers=true": {
+      "model": "antcolonies:block/bracket_fungus_knob"
+    },
+    "age=1,facing=north,tiers=false": {
+      "model": "antcolonies:block/bracket_fungus_young"
+    },
+    "age=1,facing=north,tiers=true": {
+      "model": "antcolonies:block/bracket_fungus_young"
+    },
+    "age=2,facing=north,tiers=false": {
+      "model": "antcolonies:block/bracket_fungus_mature"
+    },
+    "age=2,facing=north,tiers=true": {
+      "model": "antcolonies:block/bracket_fungus_tiers"
+    },
+    "age=3,facing=north,tiers=false": {
+      "model": "antcolonies:block/bracket_fungus_old"
+    },
+    "age=3,facing=north,tiers=true": {
+      "model": "antcolonies:block/bracket_fungus_tiers_old"
+    },
+    "age=0,facing=east,tiers=false": {
+      "model": "antcolonies:block/bracket_fungus_knob",
       "y": 90
     },
-    "facing=south": {
-      "model": "antcolonies:block/bracket_fungus",
+    "age=0,facing=east,tiers=true": {
+      "model": "antcolonies:block/bracket_fungus_knob",
+      "y": 90
+    },
+    "age=1,facing=east,tiers=false": {
+      "model": "antcolonies:block/bracket_fungus_young",
+      "y": 90
+    },
+    "age=1,facing=east,tiers=true": {
+      "model": "antcolonies:block/bracket_fungus_young",
+      "y": 90
+    },
+    "age=2,facing=east,tiers=false": {
+      "model": "antcolonies:block/bracket_fungus_mature",
+      "y": 90
+    },
+    "age=2,facing=east,tiers=true": {
+      "model": "antcolonies:block/bracket_fungus_tiers",
+      "y": 90
+    },
+    "age=3,facing=east,tiers=false": {
+      "model": "antcolonies:block/bracket_fungus_old",
+      "y": 90
+    },
+    "age=3,facing=east,tiers=true": {
+      "model": "antcolonies:block/bracket_fungus_tiers_old",
+      "y": 90
+    },
+    "age=0,facing=south,tiers=false": {
+      "model": "antcolonies:block/bracket_fungus_knob",
       "y": 180
     },
-    "facing=west": {
-      "model": "antcolonies:block/bracket_fungus",
+    "age=0,facing=south,tiers=true": {
+      "model": "antcolonies:block/bracket_fungus_knob",
+      "y": 180
+    },
+    "age=1,facing=south,tiers=false": {
+      "model": "antcolonies:block/bracket_fungus_young",
+      "y": 180
+    },
+    "age=1,facing=south,tiers=true": {
+      "model": "antcolonies:block/bracket_fungus_young",
+      "y": 180
+    },
+    "age=2,facing=south,tiers=false": {
+      "model": "antcolonies:block/bracket_fungus_mature",
+      "y": 180
+    },
+    "age=2,facing=south,tiers=true": {
+      "model": "antcolonies:block/bracket_fungus_tiers",
+      "y": 180
+    },
+    "age=3,facing=south,tiers=false": {
+      "model": "antcolonies:block/bracket_fungus_old",
+      "y": 180
+    },
+    "age=3,facing=south,tiers=true": {
+      "model": "antcolonies:block/bracket_fungus_tiers_old",
+      "y": 180
+    },
+    "age=0,facing=west,tiers=false": {
+      "model": "antcolonies:block/bracket_fungus_knob",
+      "y": 270
+    },
+    "age=0,facing=west,tiers=true": {
+      "model": "antcolonies:block/bracket_fungus_knob",
+      "y": 270
+    },
+    "age=1,facing=west,tiers=false": {
+      "model": "antcolonies:block/bracket_fungus_young",
+      "y": 270
+    },
+    "age=1,facing=west,tiers=true": {
+      "model": "antcolonies:block/bracket_fungus_young",
+      "y": 270
+    },
+    "age=2,facing=west,tiers=false": {
+      "model": "antcolonies:block/bracket_fungus_mature",
+      "y": 270
+    },
+    "age=2,facing=west,tiers=true": {
+      "model": "antcolonies:block/bracket_fungus_tiers",
+      "y": 270
+    },
+    "age=3,facing=west,tiers=false": {
+      "model": "antcolonies:block/bracket_fungus_old",
+      "y": 270
+    },
+    "age=3,facing=west,tiers=true": {
+      "model": "antcolonies:block/bracket_fungus_tiers_old",
       "y": 270
     }
   }

@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column_horizontal",
+  "textures": {
+    "side": "antcolonies:block/camel_thorn_wood_wound",
+    "end": "antcolonies:block/camel_thorn_wood_wound"
+  }
+}

@@ -16,6 +16,14 @@
     "antcolonies:bleached_branch",
     "antcolonies:charred_log",
     "antcolonies:charred_wood",
-    "antcolonies:charred_branch"
+    "antcolonies:charred_branch",
+    "antcolonies:umbrella_thorn_wood_spores",
+    "antcolonies:umbrella_thorn_wood_wound",
+    "antcolonies:camel_thorn_wood_spores",
+    "antcolonies:camel_thorn_wood_wound",
+    "antcolonies:bleached_wood_spores",
+    "antcolonies:bleached_wood_wound",
+    "antcolonies:charred_wood_spores",
+    "antcolonies:charred_wood_wound"
   ]
 }

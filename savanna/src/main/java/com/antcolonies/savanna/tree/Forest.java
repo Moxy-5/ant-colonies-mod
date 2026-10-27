@@ -140,10 +140,10 @@ public class Forest extends SavedData {
         /**
          * Dead wood for the raids, part 4 ({@link HeartRot}): the day heart rot got into its trunk ({@link HeartRot#NONE}:
          * sound); {@code placedRot}: whether the shape in the world is the rot-hollowed one; {@code brackets}: how many
-         * bracket fungi have been put on its bark.
+         * bracket fungi have been put on its bark; {@code woundShown}: whether the scar where the rot got in is on its bark.
          */
         public long rotFrom = HeartRot.NONE;
-        public boolean placedRot;
+        public boolean placedRot, woundShown;
         public int brackets;
 
         public Tree(String kind, BlockPos foot, long seed, double age, TreeStage stage, double placedAge, long lastDay) {
@@ -218,6 +218,7 @@ public class Forest extends SavedData {
             tag.putLong("rotFrom", rotFrom);
             tag.putBoolean("placedRot", placedRot);
             tag.putInt("brackets", brackets);
+            tag.putBoolean("woundShown", woundShown);
             return tag;
         }
 
@@ -241,6 +242,7 @@ public class Forest extends SavedData {
                 t.rotFrom = tag.getLong("rotFrom");
                 t.placedRot = tag.getBoolean("placedRot");
                 t.brackets = tag.getInt("brackets");
+                t.woundShown = tag.getBoolean("woundShown");
             }
             return t;
         }
@@ -579,7 +581,12 @@ public class Forest extends SavedData {
         setDirty();
         if (now != null && t.living() && t.brackets < HeartRot.bracketsWanted(t)) {
             // Part 4: the shelf fungi come out on the bark.
-            t.brackets += HeartRot.placeBrackets(level, t.foot, now, HeartRot.bracketsWanted(t) - t.brackets, TreeLife.dice(t.seed, today * 61 + 3));
+            t.brackets += HeartRot.placeBrackets(level, t.foot, now, HeartRot.bracketsWanted(t) - t.brackets, t.lastDay - t.rotFrom - HeartRot.BRACKETS_FROM,
+                    TreeLife.dice(t.seed, today * 61 + 3));
+        }
+        if (now != null && t.living() && !t.woundShown && HeartRot.stage(t, t.lastDay) != HeartRot.Stage.NONE) {
+            // The scar where the rot got in, low on the trunk (the looks picked 2026-10-26).
+            t.woundShown = HeartRot.placeWound(level, t.foot, now, TreeLife.dice(t.seed, -43));
         }
         if (t.upToDate()) {
             t.pendingDays = 0;

@@ -8,6 +8,10 @@
     "antcolonies:charred_log",
     "antcolonies:charred_wood",
     "antcolonies:dead_wood",
-    "#minecraft:logs"
+    "#minecraft:logs",
+    "antcolonies:bleached_wood_spores",
+    "antcolonies:bleached_wood_wound",
+    "antcolonies:charred_wood_spores",
+    "antcolonies:charred_wood_wound"
   ]
 }

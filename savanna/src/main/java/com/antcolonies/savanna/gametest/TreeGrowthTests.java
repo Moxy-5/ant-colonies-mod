@@ -7,7 +7,9 @@ import java.util.List;
 
 import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.block.FallenBranchBlock;
+import com.antcolonies.savanna.block.BracketFungusBlock;
 import com.antcolonies.savanna.registry.TreeBlocks;
+import com.antcolonies.savanna.tree.RotMarks;
 import com.antcolonies.savanna.tree.Forest;
 import com.antcolonies.savanna.tree.TreeFall;
 import com.antcolonies.savanna.tree.TreeLife;
@@ -1064,7 +1066,10 @@ public class TreeGrowthTests {
     /**
      * Dead wood for the raids, part 4, heart rot: a grown tree with the rot in it shows nothing at first but ages half again
      * as fast; then bracket fungi come out on its bark and it ages twice as fast; then its trunk is hollow (rotten wood
-     * inside the bark, air in the middle) with more brackets; a bracket drops when the wood behind it is gone.
+     * inside the bark, air in the middle) with more brackets; a bracket drops when the wood behind it is gone. The looks
+     * picked 2026-10-26: the wound shows low on the trunk from the start; brackets come out as knobs and young shelves,
+     * later ones grown, dusting the bark under them; a bracket grows from knob to old; a heart rot mark is the tree's own
+     * wood and goes with it when it dies or burns.
      */
     @GameTest(template = "arena", timeoutTicks = 100, skyAccess = true)
     public static void heartRotShowsBracketsThenHollowsTheTrunk(GameTestHelper helper) {
@@ -1086,6 +1091,10 @@ public class TreeGrowthTests {
         helper.assertTrue(t.lived == lived + 1.5, "a tree with hidden rot aged " + (t.lived - lived) + " days in a day, not 1.5");
         helper.assertTrue(countNear(level, foot, 6, 0, 7, bracket) == 0, "brackets showed while the rot was hidden");
         helper.assertTrue(countNear(level, foot, 4, 0, 7, rotten) == 0, "the trunk is hollow while the rot is hidden");
+        java.util.function.Predicate<BlockState> wound = b -> RotMarks.mark(b.getBlock()) == RotMarks.Mark.WOUND;
+        java.util.function.Predicate<BlockState> spores = b -> RotMarks.mark(b.getBlock()) == RotMarks.Mark.SPORES;
+        helper.assertTrue(t.woundShown && countNear(level, foot, 6, 0, 2, wound) == 1,
+                "no wound low on the trunk: " + countNear(level, foot, 6, 0, 2, wound) + " (shown " + t.woundShown + ")");
         // Brackets: on the bark, facing out; two days a day.
         t.rotFrom = base + 2 - (long) com.antcolonies.savanna.tree.HeartRot.BRACKETS_FROM;
         lived = t.lived;
@@ -1094,6 +1103,8 @@ public class TreeGrowthTests {
         int shown = countNear(level, foot, 6, 1, 5, bracket);
         helper.assertTrue(shown >= 1 && shown == t.brackets, "no brackets on the bark: " + shown + " (the book says " + t.brackets + ")");
         helper.assertTrue(countNear(level, foot, 4, 0, 7, rotten) == 0, "the trunk is hollow at the bracket stage");
+        helper.assertTrue(countNear(level, foot, 6, 1, 5, b -> bracket.test(b) && b.getValue(BracketFungusBlock.AGE) <= BracketFungusBlock.YOUNG) == shown,
+                "new brackets are not knobs or young shelves");
         // Hollow: the core rotten and open, more brackets.
         t.rotFrom = base + 3 - (long) com.antcolonies.savanna.tree.HeartRot.HOLLOW_FROM;
         forest.update(level, t, base + 3);
@@ -1106,6 +1117,10 @@ public class TreeGrowthTests {
         helper.assertTrue(lining >= 4 && open >= 3, "the trunk is not hollow: " + lining + " rotten wood, " + open + " open; " + column(level, foot.above(4)));
         int more = countNear(level, foot, 6, 1, 5, bracket);
         helper.assertTrue(more > shown, "no more brackets once hollow: " + more);
+        helper.assertTrue(countNear(level, foot, 6, 1, 5, b -> bracket.test(b) && b.getValue(BracketFungusBlock.AGE) >= BracketFungusBlock.GROWN) >= 1,
+                "brackets out 10 days are none of them grown");
+        helper.assertTrue(countNear(level, foot, 6, 0, 5, spores) >= 1, "no spore-dusted bark under a grown bracket");
+        helper.assertTrue(countNear(level, foot, 6, 0, 2, wound) == 1, "the wound went when the trunk hollowed");
         // A bracket drops when the wood behind it is gone.
         BlockPos one = null;
         for (BlockPos pos : BlockPos.betweenClosed(foot.offset(-6, 1, -6), foot.offset(6, 5, 6))) {
@@ -1114,9 +1129,23 @@ public class TreeGrowthTests {
                 break;
             }
         }
-        BlockPos behind = one.relative(level.getBlockState(one).getValue(com.antcolonies.savanna.block.BracketFungusBlock.FACING).getOpposite());
+        BlockPos behind = one.relative(level.getBlockState(one).getValue(BracketFungusBlock.FACING).getOpposite());
+        // It grows: a knob turns young, grown, then old, and its spores dust the bark below the wood it grows from.
+        level.setBlock(behind.below(), TreeBlocks.UMBRELLA_THORN.wood().get().defaultBlockState(), 3);
+        level.setBlock(one, TreeBlocks.BRACKET_FUNGUS.get().aged(level.getBlockState(one).getValue(BracketFungusBlock.FACING), BracketFungusBlock.KNOB, false), 3);
+        for (int i = 0; i < 20000 && level.getBlockState(one).getValue(BracketFungusBlock.AGE) < BracketFungusBlock.OLD; i++) {
+            level.getBlockState(one).randomTick(level, one, level.getRandom());
+        }
+        helper.assertTrue(level.getBlockState(one).getValue(BracketFungusBlock.AGE) == BracketFungusBlock.OLD, "a knob never grew old: " + level.getBlockState(one));
+        helper.assertTrue(spores.test(level.getBlockState(behind.below())), "a grown bracket left the bark under it clean: " + level.getBlockState(behind.below()));
         level.setBlock(behind, Blocks.AIR.defaultBlockState(), 3);
         helper.assertTrue(level.getBlockState(one).isAir(), "a bracket stayed on with no wood behind it");
+        // Marked wood is the tree's own, and its mark goes with it as the wood dies or burns.
+        BlockState umbrellaWound = RotMarks.marked(TreeBlocks.UMBRELLA_THORN.wood().get().defaultBlockState(), RotMarks.Mark.WOUND);
+        helper.assertTrue(TreePlacer.same(umbrellaWound, TreeBlocks.UMBRELLA_THORN.wood().get().defaultBlockState()), "wounded wood is not the tree's own");
+        helper.assertTrue(RotMarks.keep(umbrellaWound, TreeBlocks.BLEACHED_WOOD.get().defaultBlockState()).is(TreeBlocks.ROT_BARKS.get(2).wound().get()),
+                "the wound went when the tree died");
+        helper.assertTrue(TreePlacer.charred(umbrellaWound).is(TreeBlocks.ROT_BARKS.get(3).wound().get()), "the wound went in a fire");
         clearAbove(helper, foot);
         forest.forgetInside(helper.getBounds());
         helper.succeed();

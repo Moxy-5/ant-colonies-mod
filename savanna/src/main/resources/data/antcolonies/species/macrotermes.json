@@ -85,6 +85,8 @@
       { "block": "antcolonies:fallen_branch", "pieces": 8, "rich": true },
       { "block": "antcolonies:dead_wood", "pieces": 32, "foragers": 2, "rich": true },
       { "block": "antcolonies:bleached_log", "pieces": 32, "foragers": 2, "rich": true },
+      { "block": "antcolonies:bleached_wood_spores", "pieces": 32, "foragers": 2, "rich": true },
+      { "block": "antcolonies:bleached_wood_wound", "pieces": 32, "foragers": 2, "rich": true },
       { "block": "antcolonies:bleached_wood", "pieces": 32, "foragers": 2, "rich": true },
       { "block": "antcolonies:peeling_bleached_log", "pieces": 32, "foragers": 2, "rich": true },
       { "block": "antcolonies:bleached_branch", "pieces": 8, "rich": true },
