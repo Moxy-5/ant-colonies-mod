@@ -102,6 +102,14 @@ final class UmbrellaShape {
         double start, l1, l2, brk;
     }
 
+    /** Heart rot hollowed its trunk: once dead it snaps at the hollow instead of falling whole ({@link DeadWood#fallen}). */
+    private boolean snapped;
+
+    UmbrellaShape snapped(boolean snapped) {
+        this.snapped = snapped;
+        return this;
+    }
+
     UmbrellaShape(TreeKind kind, long seed) {
         this.kind = kind;
         this.seed = seed;
@@ -269,7 +277,7 @@ final class UmbrellaShape {
                 fallPoints(gr, limb, fallAt);
             }
             DeadWood.fallen(v, seed, gr.r0(), gr.k, gr.g, gr.old, DeadWood.heavierSide(build(age, TreeStage.SHED), fallAz), gr.trunkTip()[1],
-                    lengths.stream().mapToDouble(Double::doubleValue).toArray(), fallAt);
+                    lengths.stream().mapToDouble(Double::doubleValue).toArray(), fallAt, snapped);
             return v;
         }
         TreePart[] blocks = gr.living ? LIVE : DEAD;

@@ -261,6 +261,8 @@ public class Forest extends SavedData {
     public int killed, deadSteps;
     /** Step 6b: dead branches the grown trees have dropped (for the stopwatch and the tests). */
     public int shed;
+    /** Part 4: pulp heaps spilled where hollow trees snapped (for the tests). */
+    public int pulpHeaps;
 
     /** The trees being drawn falling right now (step 5c), by their foot. Not saved: one cut off by a stop is placed at once. */
     private final Long2ObjectOpenHashMap<TreeFall> falls = new Long2ObjectOpenHashMap<>();
@@ -436,6 +438,9 @@ public class Forest extends SavedData {
             }
             if (HeartRot.stormKills(level, t)) {
                 kill(t, today, "storm"); // part 4: the storm breaks the hollow tree
+                if (!fellNow(level, t)) {
+                    t.fell = true; // snapped at the hollow, its top comes down now (drawn falling where it can be)
+                }
             }
             if (t.dead() && !t.fell && t.died != DIED_UNKNOWN && stormFells(level, t)) {
                 t.fell = true; // the storm brings it down
@@ -531,6 +536,7 @@ public class Forest extends SavedData {
             double roll = TreeLife.dice(t.seed, -9).nextDouble();
             t.died = today - TreeLife.daysDeadIn(t.treeKind(), t.seed, t.stage, roll);
         }
+        long fromDay = t.lastDay;
         while (t.lastDay < today) {
             t.lastDay++;
             if (t.dead()) {
@@ -584,6 +590,10 @@ public class Forest extends SavedData {
             t.brackets += HeartRot.placeBrackets(level, t.foot, now, HeartRot.bracketsWanted(t) - t.brackets, t.lastDay - t.rotFrom - HeartRot.BRACKETS_FROM,
                     TreeLife.dice(t.seed, today * 61 + 3));
         }
+        if (now != null && t.lastDay > fromDay && t.brackets > 0 && t.rotFrom != HeartRot.NONE) {
+            // The brackets already out grow on with the days gone by (their own growing needs a player near).
+            HeartRot.ageBrackets(level, t.foot, now, t.lastDay - t.rotFrom - HeartRot.BRACKETS_FROM);
+        }
         if (now != null && t.living() && !t.woundShown && HeartRot.stage(t, t.lastDay) != HeartRot.Stage.NONE) {
             // The scar where the rot got in, low on the trunk (the looks picked 2026-10-26).
             t.woundShown = HeartRot.placeWound(level, t.foot, now, TreeLife.dice(t.seed, -43));
@@ -594,7 +604,20 @@ public class Forest extends SavedData {
         }
         TreePlacer.Placed next = soon(t, t.age, t.stage, t.step, t.termites, HeartRot.hollow(t));
         boolean jump = t.dead() ? stageSteps > 1 : t.pendingDays > 1;
-        if (next == null || !loaded(level, next.box(t.foot)) || jump && !outOfSight(level, t, next)) {
+        if (next == null || !loaded(level, next.box(t.foot))) {
+            return false;
+        }
+        if (jump && !outOfSight(level, t, next)) {
+            if (now != null && t.living() && t.placedRot != HeartRot.hollow(t)) {
+                // The core rots inside the trunk, unseen: its hollow is put in now, at the shape's old age (the growth
+                // still waits until nobody looks, one day's step at a time in sight).
+                TreePlacer.Placed rotted = soon(t, t.placedAge, t.placedStage, t.placedStep, t.placedTermites, HeartRot.hollow(t));
+                if (rotted != null) {
+                    TreePlacer.grow(level, now, rotted, t.foot, Block.UPDATE_ALL, new ArrayList<>(), null);
+                    t.placedRot = HeartRot.hollow(t);
+                    setDirty();
+                }
+            }
             return false;
         }
         if (t.stage == TreeStage.FALLEN && now != null && !t.toppling && !outOfSight(level, t, next)) {
@@ -907,6 +930,9 @@ public class Forest extends SavedData {
         fallingLimbs(level, wood);
         if (t.stage == TreeStage.FALLEN && t.placedStage != TreeStage.FALLEN && !t.toppling) {
             TreeFall.crushUnder(level, t.foot, next, java.util.Set.of()); // it fell out of sight: what lay where it lies is crushed all the same
+        }
+        if (t.stage == TreeStage.FALLEN && t.placedStage != TreeStage.FALLEN && HeartRot.snapped(t)) {
+            pulpHeaps += HeartRot.spillPulp(level, t.foot, next, TreeLife.dice(t.seed, -61)); // the rotten core spills out
         }
         t.toppling = false;
         t.placedAge = TreeLife.shapeAge(t.age);

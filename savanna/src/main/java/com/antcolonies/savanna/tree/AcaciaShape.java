@@ -65,6 +65,14 @@ final class AcaciaShape {
         double[] from, to;
     }
 
+    /** Heart rot hollowed its trunk: once dead it snaps at the hollow instead of falling whole ({@link DeadWood#fallen}). */
+    private boolean snapped;
+
+    AcaciaShape snapped(boolean snapped) {
+        this.snapped = snapped;
+        return this;
+    }
+
     AcaciaShape(TreeKind kind, long seed) {
         this.kind = kind;
         this.seed = seed;
@@ -543,7 +551,7 @@ final class AcaciaShape {
             lengths[i] = gr.limbUpto(limbs.get(i));
             limbFallPoints(gr, limbs.get(i), points);
         }
-        DeadWood.fallen(v, seed, gr.r0, gr.k, gr.g, gr.old, fallAz, gr.trunkTip()[1], lengths, points);
+        DeadWood.fallen(v, seed, gr.r0, gr.k, gr.g, gr.old, fallAz, gr.trunkTip()[1], lengths, points, snapped);
     }
 
     private static double sq(double x) {

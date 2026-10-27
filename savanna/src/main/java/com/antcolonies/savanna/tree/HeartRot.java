@@ -47,8 +47,12 @@ public final class HeartRot {
     static final int BRACKETS_SHOWN = 2, BRACKETS_HOLLOW = 4;
     /** Each second of a thunderstorm over a living hollow tree: the chance it is killed (my pick: about 2 minutes of thunder). */
     static final int STORM_ONE_IN = 2400;
-    /** Of the living grown trees in new land, the share already rotting is this times how old (0 just grown, 1 ancient). */
-    static final double NEW_LAND_SHARE = 0.6;
+    /**
+     * Of the living grown-looking trees in new land, the share already rotting: {@code NEW_LAND_SHARE} at the end of the
+     * young look, rising to {@code NEW_LAND_SHARE_OLD} at ancient (my picks, 2026-10-26; real: most old savanna acacias
+     * have some heart rot, as every wound over decades may let it in).
+     */
+    static final double NEW_LAND_SHARE = 0.25, NEW_LAND_SHARE_OLD = 2 / 3.0;
     /** A rotting tree of new land got the rot up to this many days before (so some are already hollow). */
     static final double NEW_LAND_DAYS = 30;
 
@@ -57,9 +61,17 @@ public final class HeartRot {
     private HeartRot() {
     }
 
-    /** Whether a tree can get heart rot: a grown acacia (the young ones die of other things; baobabs hollow on their own). */
+    /**
+     * Whether a tree can get heart rot: an acacia past its young look, with a trunk thick enough to have heartwood (the
+     * little ones die of other things; baobabs hollow on their own). Until 2026-10-26 only fully grown ones (age 1).
+     */
     public static boolean canRot(Forest.Tree t) {
-        return t.age >= TreeShapes.GROWN && !t.treeKind().isBaobab();
+        return t.age >= TreeLife.YOUNG_END && !t.treeKind().isBaobab();
+    }
+
+    /** How far from the end of the young look (0) to ancient (1) a tree is. */
+    static double maturity(double age) {
+        return Math.clamp((age - TreeLife.YOUNG_END) / (TreeShapes.ANCIENT - TreeLife.YOUNG_END), 0, 1);
     }
 
     /** How far the rot is on this day. */
@@ -96,17 +108,18 @@ public final class HeartRot {
 
     /** Each day a tree lives: the rot may get in with the termites or with old age. */
     static boolean daily(Forest.Tree t, long day) {
-        double chance = (t.termites ? TERMITE_CHANCE : 0) + OLD_AGE_CHANCE * TreeLife.old(t.age);
+        double chance = (t.termites ? TERMITE_CHANCE : 0) + OLD_AGE_CHANCE * maturity(t.age);
         return wound(t, day, chance, TreeLife.dice(t.seed, day * 53 + 29));
     }
 
     /** A tree of new land, written into the book today: an old one may be rotting already. */
-    static void newLand(Forest.Tree t, long today) {
+    public static void newLand(Forest.Tree t, long today) {
         if (!t.living() || !canRot(t)) {
             return;
         }
         Random dice = TreeLife.dice(t.seed, -21);
-        if (dice.nextDouble() < NEW_LAND_SHARE * TreeLife.old(t.age)) {
+        double share = NEW_LAND_SHARE + (NEW_LAND_SHARE_OLD - NEW_LAND_SHARE) * maturity(t.age);
+        if (dice.nextDouble() < share) {
             t.rotFrom = today - (long) (dice.nextDouble() * NEW_LAND_DAYS);
         }
     }
@@ -176,6 +189,94 @@ public final class HeartRot {
                     BracketFungusBlock.dust(level, at, bracket);
                 }
                 placed++;
+            }
+        }
+        return placed;
+    }
+
+    /**
+     * The brackets on the bark of the tree standing as {@code shape} catch up with the clock: each grows to the age of a
+     * bracket out about {@code days} days (a few days more or less each, by where it sits), never younger than it is; a
+     * grown one dusts the bark under it. Brackets grow by themselves only while near a player ({@link BracketFungusBlock}'s
+     * random ticks), so after the clock jumps ({@code /time add}) or the land was away they are brought up to date here.
+     */
+    static void ageBrackets(ServerLevel level, BlockPos foot, TreePlacer.Placed shape, double days) {
+        for (int i = 0; i < shape.size(); i++) {
+            int x = shape.xs()[i], y = shape.ys()[i], z = shape.zs()[i];
+            if (y < 1 || y > 5 || x * x + z * z > 25 || !shape.states()[i].is(TreeBlocks.TREE_WOOD)) {
+                continue;
+            }
+            for (Direction d : Direction.Plane.HORIZONTAL) {
+                BlockPos at = foot.offset(x, y, z).relative(d);
+                BlockState there = level.getBlockState(at);
+                if (!there.is(TreeBlocks.BRACKET_FUNGUS.get()) || there.getValue(BracketFungusBlock.FACING) != d) {
+                    continue;
+                }
+                int age = ageAfter(days + (new Random(at.asLong()).nextDouble() - 0.5) * 6);
+                if (age > there.getValue(BracketFungusBlock.AGE)) {
+                    BlockState grown = there.setValue(BracketFungusBlock.AGE, age);
+                    level.setBlock(at, grown, Block.UPDATE_ALL);
+                    if (age >= BracketFungusBlock.GROWN) {
+                        BracketFungusBlock.dust(level, at, grown);
+                    }
+                }
+            }
+        }
+    }
+
+    /** Whether a dead tree, now lying, came down snapped at its rotted hollow (its fallen shape is the snapped one). */
+    static boolean snapped(Forest.Tree t) {
+        return !t.treeKind().isBaobab() && hollow(t);
+    }
+
+    /**
+     * A hollow tree just snapped and its top landed (lying as {@code lying}): the rotten heartwood spills out as pulp
+     * heaps on the ground, 4 to 7 round the stump's foot (2 to 6 layers) and 2 to 4 round the far end of the lying top
+     * (1 to 4 layers), my picks. Returns how many heaps.
+     */
+    static int spillPulp(ServerLevel level, BlockPos foot, TreePlacer.Placed lying, Random dice) {
+        double stump = 0, far = 0;
+        int farI = -1;
+        for (int i = 0; i < lying.size(); i++) {
+            if (!lying.states()[i].is(TreeBlocks.TREE_WOOD)) {
+                continue;
+            }
+            double d = Math.hypot(lying.xs()[i], lying.zs()[i]);
+            if (lying.ys()[i] == 1 && d < 6) {
+                stump = Math.max(stump, d);
+            }
+            if (d > far) {
+                far = d;
+                farI = i;
+            }
+        }
+        int heaps = spill(level, foot, stump + 1, stump + 3, 4 + dice.nextInt(4), 2, 6, dice);
+        if (farI >= 0 && far > stump + 4) {
+            heaps += spill(level, foot.offset(lying.xs()[farI], lying.ys()[farI], lying.zs()[farI]), 0.8, 2.5, 2 + dice.nextInt(3), 1, 4, dice);
+        }
+        return heaps;
+    }
+
+    private static int spill(ServerLevel level, BlockPos centre, double from, double to, int count, int least, int most, Random dice) {
+        int placed = 0;
+        for (int tries = 0; tries < count * 5 && placed < count; tries++) {
+            double a = dice.nextDouble() * Math.PI * 2, d = from + dice.nextDouble() * (to - from);
+            int x = centre.getX() + (int) Math.round(Math.cos(a) * d), z = centre.getZ() + (int) Math.round(Math.sin(a) * d);
+            for (int y = centre.getY() + 3; y >= centre.getY() - 4; y--) {
+                BlockPos at = new BlockPos(x, y, z);
+                BlockState there = level.getBlockState(at);
+                if (!there.isAir() && !there.canBeReplaced()) {
+                    break; // wood or ground here: no room on this spot
+                }
+                BlockState under = level.getBlockState(at.below());
+                if (under.is(TreeBlocks.TREE_WOOD) || under.is(TreeBlocks.PULP_HEAP.get())) {
+                    break; // it falls to the ground, not onto the log
+                }
+                if (under.isFaceSturdy(level, at.below(), Direction.UP)) {
+                    level.setBlock(at, TreeBlocks.PULP_HEAP.get().withLayers(least + dice.nextInt(most - least + 1)), Block.UPDATE_ALL);
+                    placed++;
+                    break;
+                }
             }
         }
         return placed;

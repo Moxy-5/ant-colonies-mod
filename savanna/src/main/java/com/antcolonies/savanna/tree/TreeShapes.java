@@ -32,7 +32,8 @@ public final class TreeShapes {
     /** rotted: its trunk hollowed by heart rot up to the fork (dead wood for the raids, part 4, {@code HeartRot}). */
     public static TreeVoxels build(TreeKind kind, long seed, double age, TreeStage stage, boolean leafless, boolean hollowed, boolean rotted) {
         TreeVoxels v = kind.isBaobab() ? new BaobabShape(kind, seed).build(age, stage, leafless)
-                : kind.isUmbrella() ? new UmbrellaShape(kind, seed).build(age, stage) : new AcaciaShape(kind, seed).build(age, stage);
+                : kind.isUmbrella() ? new UmbrellaShape(kind, seed).snapped(rotted).build(age, stage)
+                : new AcaciaShape(kind, seed).snapped(rotted).build(age, stage);
         if (!kind.isBaobab() && (stage == TreeStage.SNAG || stage == TreeStage.MUD || stage == TreeStage.SHED)) {
             keepWithinLiving(v, build(kind, seed, age, TreeStage.LIVING), stage == TreeStage.SHED ? 2 : 0);
         }

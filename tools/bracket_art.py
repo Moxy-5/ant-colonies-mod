@@ -3,6 +3,8 @@ heart rot bark, from the looks the user picked in the bracket viewer 2026-10-26 
 
 - bracket_fungus: one model per age (knob, young, grown, old) and the tiers (grown and old), turned by its facing;
   the item shows a grown one.
+- pulp_heap: the crumbly rotten heartwood spilled where a hollow tree snapped, in 8 layers like snow: dark brown
+  cube-cracked brown rot with pale stringy punk (white rot) through it (my pick, 2026-10-26).
 - for each bark a rotting acacia can have (umbrella thorn, camel thorn, bleached, charred): <wood>_spores, the bark under
   a grown bracket stained cocoa-brown by its spores, and <wood>_wound, the scar where the rot got in.
 
@@ -86,9 +88,53 @@ def bark_files():
                 tree_art.log(name, side, side)
 
 
+def pulp_texture(seed, side):
+    """Brown rot broken into little cubes (dark cracks on a grid) with pale punk strands; the sides darker, damp below."""
+    rng = random.Random(seed)
+    n = tree_art.noise(seed + "n", 4)
+    img = [[tree_art.mix((78, 46, 28), (138, 88, 52), n(x, y)) for x in range(16)] for y in range(16)]
+    for y in range(16):
+        for x in range(16):
+            if (x + (y // 3) % 2 * 2) % 4 == 0 or y % 3 == 0 and rng.random() < 0.7:
+                img[y][x] = shade(img[y][x], 0.62)  # the cracks between the cubes
+    for _ in range(4):
+        x, y = rng.uniform(0, 16), rng.uniform(0, 16)
+        for _ in range(rng.randint(4, 9)):
+            img[int(y) % 16][int(x) % 16] = shade((214, 196, 158), rng.uniform(0.9, 1.06))  # white-rot punk strands
+            x += rng.uniform(-1, 1)
+            y += rng.choice([0, 1]) if side else rng.uniform(-1, 1)
+    if side:
+        for y in range(16):
+            for x in range(16):
+                img[y][x] = shade(img[y][x], 0.95 - 0.12 * y / 15)
+    for _ in range(14):
+        img[rng.randrange(16)][rng.randrange(16)] = (52, 32, 22)
+    return img
+
+
+def pulp_files():
+    texture("pulp_heap", pulp_texture("pulp", False))
+    texture("pulp_heap_side", pulp_texture("pulpside", True))
+    variants = {}
+    for layers in range(1, 9):
+        h = layers * 2
+        sides = {f: {"uv": [0, 16 - h, 16, 16], "texture": "#side", "cullface": f} for f in ("north", "south", "east", "west")}
+        el = {"from": [0, 0, 0], "to": [16, h, 16], "faces": dict({
+            "down": {"uv": [0, 0, 16, 16], "texture": "#top", "cullface": "down"},
+            "up": dict({"uv": [0, 0, 16, 16], "texture": "#top"}, **({"cullface": "up"} if h == 16 else {}))}, **sides)}
+        model(f"pulp_heap_height{h}", {"parent": "minecraft:block/block", "textures": {
+            "particle": "antcolonies:block/pulp_heap", "top": "antcolonies:block/pulp_heap", "side": "antcolonies:block/pulp_heap_side"},
+            "elements": [el]})
+        variants[f"layers={layers}"] = {"model": f"antcolonies:block/pulp_heap_height{h}"}
+    write_json(ASSETS / "blockstates/pulp_heap.json", {"variants": variants})
+    item_from_block("pulp_heap", "pulp_heap_height6")
+    drops_itself("pulp_heap")
+
+
 def game_files():
     bracket_files()
     bark_files()
+    pulp_files()
 
 
 # ---- The first bracket look, for the viewer's comparison only (not written into the game) ----

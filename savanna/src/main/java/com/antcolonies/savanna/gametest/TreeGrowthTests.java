@@ -1140,6 +1140,46 @@ public class TreeGrowthTests {
         helper.assertTrue(spores.test(level.getBlockState(behind.below())), "a grown bracket left the bark under it clean: " + level.getBlockState(behind.below()));
         level.setBlock(behind, Blocks.AIR.defaultBlockState(), 3);
         helper.assertTrue(level.getBlockState(one).isAir(), "a bracket stayed on with no wood behind it");
+        // After a jump of the clock (/time add, nobody near to random-tick them) the brackets catch up (2026-10-26).
+        BlockPos knob = null;
+        for (BlockPos pos : BlockPos.betweenClosed(foot.offset(-6, 1, -6), foot.offset(6, 5, 6))) {
+            if (level.getBlockState(pos).is(TreeBlocks.BRACKET_FUNGUS.get())) {
+                knob = pos.immutable();
+                break;
+            }
+        }
+        helper.assertTrue(knob != null, "no bracket left to grow");
+        level.setBlock(knob, TreeBlocks.BRACKET_FUNGUS.get().aged(level.getBlockState(knob).getValue(BracketFungusBlock.FACING), BracketFungusBlock.KNOB, false), 3);
+        forest.update(level, t, base + 12);
+        helper.assertTrue(level.getBlockState(knob).getValue(BracketFungusBlock.AGE) == BracketFungusBlock.OLD,
+                "a bracket out 19 days did not catch up after the clock jumped: " + level.getBlockState(knob));
+        // The hollow tree snaps (2026-10-26): a tall jagged hollow stump, the top lying by it, pulp spilled round.
+        int heaps = forest.pulpHeaps;
+        forest.kill(t, base + 12, "storm");
+        t.fell = true;
+        forest.update(level, t, base + 12);
+        helper.assertTrue(t.placedStage == TreeStage.FALLEN, "the snapped tree is not lying: " + t.placedStage);
+        java.util.function.Predicate<BlockState> wood = b -> b.is(TreeBlocks.TREE_WOOD);
+        helper.assertTrue(countNear(level, foot, 3, 3, 3, wood) >= 4, "no stump 3 or more blocks tall: " + column(level, foot.above(3)));
+        helper.assertTrue(countNear(level, foot, 1, 1, 3, b -> b.isAir() || b.is(TreeBlocks.FRASS.get())) >= 1, "the stump is not hollow");
+        int pulp = countNear(level, foot, 50, -4, 12, b -> b.is(TreeBlocks.PULP_HEAP.get())); // the top may lie 40 out
+        helper.assertTrue(pulp >= 3 && forest.pulpHeaps - heaps == pulp, "no pulp round the snapped tree: " + pulp + " (book " + (forest.pulpHeaps - heaps) + ")");
+        // Any tree past its young look can rot, not only the grown (the user's report 2026-10-26); and in new land a
+        // share of them already are, more of the older.
+        helper.assertTrue(com.antcolonies.savanna.tree.HeartRot.canRot(new Forest.Tree("umbrella_thorn", foot, 7, 0.5, TreeStage.LIVING, -1, base))
+                && !com.antcolonies.savanna.tree.HeartRot.canRot(new Forest.Tree("umbrella_thorn", foot, 7, 0.3, TreeStage.LIVING, -1, base))
+                && !com.antcolonies.savanna.tree.HeartRot.canRot(new Forest.Tree("baobab", foot, 7, 1.0, TreeStage.LIVING, -1, base)),
+                "the wrong trees can rot");
+        int[] rotting = new int[2];
+        for (int seed = 0; seed < 400; seed++) {
+            for (int i = 0; i < 2; i++) {
+                Forest.Tree n = new Forest.Tree("camel_thorn", foot, seed, i == 0 ? 0.5 : com.antcolonies.savanna.tree.TreeShapes.ANCIENT, TreeStage.LIVING, -1, base);
+                com.antcolonies.savanna.tree.HeartRot.newLand(n, base);
+                rotting[i] += n.rotFrom != com.antcolonies.savanna.tree.HeartRot.NONE ? 1 : 0;
+            }
+        }
+        helper.assertTrue(rotting[0] > 60 && rotting[0] < 150 && rotting[1] > 220 && rotting[1] < 310,
+                "new land's rotting trees of 400: " + rotting[0] + " young-looking (about 100), " + rotting[1] + " ancient (about 270)");
         // Marked wood is the tree's own, and its mark goes with it as the wood dies or burns.
         BlockState umbrellaWound = RotMarks.marked(TreeBlocks.UMBRELLA_THORN.wood().get().defaultBlockState(), RotMarks.Mark.WOUND);
         helper.assertTrue(TreePlacer.same(umbrellaWound, TreeBlocks.UMBRELLA_THORN.wood().get().defaultBlockState()), "wounded wood is not the tree's own");

@@ -8,6 +8,7 @@ import com.antcolonies.savanna.block.BleachedBranchBlock;
 import com.antcolonies.savanna.block.BracketFungusBlock;
 import com.antcolonies.savanna.block.DeadTreeWoodBlock;
 import com.antcolonies.savanna.block.FrassBlock;
+import com.antcolonies.savanna.block.PulpHeapBlock;
 import com.antcolonies.savanna.block.HangingPodsBlock;
 import com.antcolonies.savanna.block.SoftDeadWoodBlock;
 import com.antcolonies.savanna.block.TaperingBranchBlock;
@@ -98,6 +99,13 @@ public final class TreeBlocks {
     public static final DeferredBlock<BracketFungusBlock> BRACKET_FUNGUS = add(SavannaBlocks.BLOCKS.registerBlock("bracket_fungus", BracketFungusBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_BROWN).strength(0.6F).sound(SoundType.WOOD).noCollission()
                     .noOcclusion().pushReaction(PushReaction.DESTROY)));
+    /**
+     * Heart rot: the crumbly rotten heartwood spilled where a hollow tree snapped, a heap in layers like snow that
+     * termites eat and that sinks into the soil ({@code block/PulpHeapBlock}).
+     */
+    public static final DeferredBlock<PulpHeapBlock> PULP_HEAP = add(SavannaBlocks.BLOCKS.registerBlock("pulp_heap", PulpHeapBlock::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_BROWN).strength(0.2F).sound(SoundType.ROOTED_DIRT).randomTicks()
+                    .pushReaction(PushReaction.DESTROY)));
     /**
      * Heart rot marks on the bark (the looks picked by the user 2026-10-26, tools/rot_looks_art.py), one pair for each bark
      * a rotting acacia can have, on its wood (the trunk's outside, bark all round): spore-dusted, the bark under a grown bracket stained cocoa-brown by its spores; and the
@@ -212,6 +220,7 @@ public final class TreeBlocks {
             fire.setFlammable(r.wound().get(), feeds, 0);
         }
         fire.setFlammable(FRASS.get(), 60, 100);
+        fire.setFlammable(PULP_HEAP.get(), 30, 60);
         fire.setFlammable(BAOBAB_FIBRE.get(), 5, 5);
     }
 }
