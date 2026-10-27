@@ -57,7 +57,7 @@ timings: all "my pick, to confirm" until then).
      dead mound within 32 blocks waits and looks again; `docs/DESIGN.md`, "Dead mounds only, for now").
      Still to add for step 1: two or more entrances, guests in the nest, returning to an old nest.
    - **1e, the prey pile and hunger:** the pile of dead termites in the nest, eaten by larvae and adults, off in about a
-     day; hunger by the colony rules already built; stocked by a command until raids exist (step 4). Test: stock it
+     day; hunger by the colony rules already built; stocked by a command until raids exist (step 3). Test: stock it
      and watch it eaten and rot; leave it empty and watch them starve.
    - **1f, new land and a command:** a few colonies placed in new savannas (dead mound, under a fallen tree, ground)
      kept away from living termite mounds, real sizes 100 to 2,300 (R1), mostly numbers; a command that makes one anywhere
@@ -97,11 +97,11 @@ timings: all "my pick, to confirm" until then).
      where the termite is (grab and sting under in front, bite and stab down into a broken tunnel; both clips made).
      **The skirmish command (the user's pick):** `/antcolonies skirmish <ants>` drops that many Matabeles from the
      nearest colony (or new ones) at the nearest termite feeding spot (sheeting, feeding gallery, shallow gallery) to
-     break in and fight; step 4's scouts and columns replace it.
+     break in and fight; step 3's scouts and columns replace it.
    - **2a and 2b BUILT 2026-10-25** (branch `claude/m8-fights`; `docs/HISTORY.md`): the skirmish drops new Matabeles
    - **The attack clips redone 2026-10-25** (the user's report: the sting never reached): A swings the gaster forward under the body into the termite held in the jaws; B dives into a broken tunnel, hauls the termite up to the rim and stings it there; the queen has no attack until 2e.
      (they join the nearest colony within 32 blocks) rather than taking them from a colony's numbers; "found by its
-     nestmates if left" moves to 2f (the termites' side); carrying the paralysed home is step 4.
+     nestmates if left" moves to 2f (the termites' side); carrying the paralysed home is step 3.
    - **In-game test 1** (2a + 2b).
    - **In-game test 1 done 2026-10-25:** everything works, but not polished ("walking death": termites fall before the
      sting is seen, ten ants cleared a feeding spot in about a minute).
@@ -126,7 +126,7 @@ timings: all "my pick, to confirm" until then).
      **Round A BUILT 2026-10-25 (pieces 1, 2, 5, 6; `docs/HISTORY.md`, "M8 fight polish, round A"); round B (3, 4, 7)
      BUILT 2026-10-25 (`docs/HISTORY.md`, "M8 fight polish, round B"); the fight polish is ready for the user's in-game test.**
      **In-game test of the fight polish done 2026-10-25 (the user: "its so much better").** Found: ants camping one
-     corner till a termite came by (fixed the same day, `docs/BUGS.md` 76); the targeting idea below goes to step 4.
+     corner till a termite came by (fixed the same day, `docs/BUGS.md` 76); the targeting idea below goes to step 3.
      Tests: an ant on a wall never strikes; a termite falls only after the sting moment; a ten-ant skirmish lasts
      minutes, not seconds; `soldiers,termitefood,colony,away`; guard films if a clip changes; then the user looks
      in-game with `/antcolonies skirmish 10`.
@@ -199,9 +199,7 @@ timings: all "my pick, to confirm" until then).
        than about once every 5 s; the ten-ant hay test and the mud test kept. Then `soldiers,away` on 6 servers, guard
        films only if the walk code changes.
      - **In-game:** `/antcolonies skirmish 10` beside a termite colony eating a fallen log or branch by day.
-3. **Drawn-only ants** (brain step 4e, pulled forward): the column far from the
-   player drawn by the player's game, almost free on the server.
-4. **Scouts and raids:** lone scouts by day, the scent line home, the column to a
+3. **Scouts and raids:** lone scouts by day, the scent line home, the column to a
    termite feeding spot (sheeting, feeding gallery, shallow gallery, the holes by
    them; never the mound), majors opening the mud, minors in, termites as numbers
    in the galleries shown on break-in (`HiddenTrips`), the termites plugging and
@@ -211,7 +209,9 @@ timings: all "my pick, to confirm" until then).
    as if exploring the nest; the user wants them to go for the food (the workers at the feeding spot) before the
    soldiers pile up. Real raids: the column hits the feeding site, the minors take the workers in the opened galleries,
    and the soldiers that come up are fought only as they get in the way. To plan with the raids (the user said "part 3";
-   it fits here, with the raid's target, not step 3's drawn-only ants).
+   it fits here, with the raid's target, not step 4's drawn-only ants (the step numbers were swapped later, 2026-10-25)).
+4. **Drawn-only ants** (brain step 4e, pulled forward): the column far from the
+   player drawn by the player's game, almost free on the server.
 5. **Rescue and wound care:** the help smell, pulling clamped soldiers off, carrying
    the hurt home (legs tucked), the badly hurt left; wounds and infection in the
    nest, care by any nestmate.
@@ -228,6 +228,8 @@ drawn-only ants), 5 and 6.
 **Order changed by the user 2026-10-25: step 3 before step 4** ("i did want to move step 3 before step 4"). Now:
 the rest of 2 (2c to 2f), then 3 (drawn-only ants), then 4 (scouts and raids, with the big columns from the start),
 then the test revamp, then 5 and 6. This replaces "step 4 before step 3" above.
+**Order changed again by the user 2026-10-25: raids before drawn ants** ("Put the raids before the drawn ants"). Now: the rest of 2 (2f, then in-game test 3 and the merge), then 3 (scouts and raids, with real ants only at first, up to about 50 a raid), then the test revamp, then 4 (drawn-only ants, built to copy the raids as they really look in the game), then 5 and 6. This replaces both orders above. **The user's idea for step 4, drawn-only ants (2026-10-25, not decided):** about 100 v 100 fighting at the breach at a time, the rest of the column waiting and carrying (real raids: only a few ants reach the breach at once); the tools for it are in `docs/research/crowds-and-performance.md`.
+**Steps renumbered by the user 2026-10-25, to avoid confusion: step 3 is now scouts and raids, step 4 drawn-only ants** (the order above). Older notes that say "step 3, drawn-only" or "step 4, raids" mean the old numbers.
 
 Later (M9): splitting into daughter colonies nearby, winged males mating in other
 colonies. After M8: harvester ant territory fights with their neighbours.
