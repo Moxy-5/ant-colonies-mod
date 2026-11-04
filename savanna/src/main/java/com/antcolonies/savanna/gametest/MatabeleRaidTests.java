@@ -1004,6 +1004,103 @@ public class MatabeleRaidTests {
                 .thenSucceed();
     }
 
+    /**
+     * Raid rework R6, the mound as a clue (the user's idea): a hungry colony of 10 in a dead mound in the arena's middle,
+     * a living young termite mound 41 blocks off in its north-east corner, two tunnels of its termites dug out from it by
+     * hand (as if the colony had dug them to food): one south-east to four termites feeding under two logs 40 blocks from
+     * the nest, one west to a lone termite under a log 40 out. Both lie past the first search ring's reach (its arcs go
+     * out to 25 blocks, the scent 5 more), so the plain search never finds them. A scout searching toward the mound
+     * notices it, rings it, smells the east tunnel on the first ring and follows it out to the four termites: the find is
+     * there, worth a raid that far out (R5's choosing), made by the mound clue, with the range never grown; no find at
+     * the lone termite (too poor that far out for a starving colony: passed over if smelt), and no scout harms a termite.
+     */
+    @GameTest(template = "arena", timeoutTicks = 60000, skyAccess = true, batch = "matabele_scouts")
+    public static void aScoutRingsALivingMoundItComesNearAndFollowsATermiteTunnelOutToTheFeeding(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        TestClock.still(helper, 13.0); // (between the raid hours: the find waits, no raid)
+        TestScenes.shapeGround(helper, 65, (x, z) -> 0);
+        Colony dead = NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(24, SURFACE, 38)), NewLandMounds.pickFor("dead", 30, 5L));
+        helper.assertTrue(dead != null, "no dead mound put in");
+        Colony termites = NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(52, SURFACE, 8)), NewLandMounds.pickFor("young", 0, 11L));
+        helper.assertTrue(termites != null, "no living termite mound put in");
+        termites.foodMap().setTestArea(helper.getBounds().expandTowards(0, 16, 0));
+        termites.part(SavannaParts.ALARM).ifPresent(alarm -> alarm.setTestArea(helper.getBounds()));
+        // the east tunnel, 2 under the ground, from the mound's middle out to the logs, and its feeding gallery under the first
+        List<BlockPos> east = new ArrayList<>();
+        for (int z = 8; z <= 19; z++) {
+            east.add(new BlockPos(52 + Math.min(7, z - 8), SURFACE - 2, z));
+        }
+        List<TermiteWorkerEntity> group = new ArrayList<>();
+        group.addAll(feedingUnderALog(helper, 58, 20));
+        group.addAll(feedingUnderALog(helper, 58, 22));
+        List<BlockPos> eastGallery = List.of(new BlockPos(58, SURFACE - 1, 20), new BlockPos(59, SURFACE - 1, 20),
+                new BlockPos(60, SURFACE - 1, 20), new BlockPos(61, SURFACE - 1, 20));
+        // the west tunnel out to one termite under a log
+        List<BlockPos> west = new ArrayList<>();
+        for (int x = 52; x >= 37; x--) {
+            west.add(new BlockPos(x, SURFACE - 2, Math.max(1, 8 - (52 - x) / 2)));
+        }
+        List<TermiteWorkerEntity> lone = feedingUnderALog(helper, 34, 0, 1);
+        List<BlockPos> westGallery = List.of(new BlockPos(35, SURFACE - 1, 0), new BlockPos(36, SURFACE - 1, 0));
+        com.antcolonies.colony.FoodWays ways = termites.nest().foodWays();
+        for (List<BlockPos> tunnel : List.of(east, west)) {
+            List<BlockPos> absolute = new ArrayList<>();
+            for (BlockPos cell : tunnel) {
+                helper.setBlock(cell, Blocks.AIR);
+                absolute.add(helper.absolutePos(cell));
+            }
+            boolean isEast = tunnel == east;
+            BlockPos end = absolute.get(absolute.size() - 1);
+            ways.addNewTunnelForTests(new com.antcolonies.colony.FoodWays.NewTunnel(
+                    new com.antcolonies.colony.NestPlan.ForagingTunnel(List.copyOf(absolute), end.above(), isEast ? Direction.SOUTH : Direction.WEST),
+                    helper.absolutePos(isEast ? new BlockPos(59, SURFACE, 20) : new BlockPos(35, SURFACE, 0)),
+                    (isEast ? eastGallery : westGallery).stream().map(helper::absolutePos).toList()));
+        }
+        Colony colony = MatabeleCommands.makeColony(level, helper.absolutePos(new BlockPos(28, SURFACE, 38)), 10);
+        helper.assertTrue(colony != null, "no Matabele colony made");
+        Raids raids = colony.part(SavannaParts.RAIDS).orElse(null);
+        helper.assertTrue(raids != null, "a Matabele colony has no raids part");
+        for (BlockPos far : List.of(new BlockPos(59, SURFACE, 21), new BlockPos(35, SURFACE, 0), new BlockPos(59, SURFACE, 19), new BlockPos(40, SURFACE, 1))) {
+            helper.assertTrue(flat(colony.getCenter(), helper.absolutePos(far)) > 37, far.toShortString() + " is only "
+                    + flat(colony.getCenter(), helper.absolutePos(far)) + " blocks from the nest (the scene wants it past the first ring's reach)");
+        }
+        SavannaMod.LOGGER.info("[mound clue test] the living mound's foot reaches {} blocks from its middle, {} blocks from the nest",
+                com.antcolonies.savanna.colony.FeedingSpots.moundReach(level, termites), flat(colony.getCenter(), termites.getCenter()));
+        helper.onEachTick(() -> {
+            for (TermiteWorkerEntity termite : lone) {
+                helper.assertTrue(termite.isAlive() && !termite.isParalysed(), "a scout attacked the lone termite (scouts only look)");
+            }
+            for (TermiteWorkerEntity termite : group) {
+                helper.assertTrue(termite.isAlive() && !termite.isParalysed(), "a scout attacked a termite of the group (scouts only look)");
+            }
+            for (Raids.Find find : raids.finds()) {
+                for (TermiteWorkerEntity termite : lone) {
+                    helper.assertTrue(!termite.blockPosition().closerThan(find.at(), 6),
+                            "a find was made at the lone termite (worth " + find.worth() + ") at " + find.at().toShortString() + "; " + raids.describe(level));
+                }
+            }
+        });
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(raids.moundsNoticed() >= 1, "no scout noticed the living mound yet; " + raids.describe(level)))
+                .thenWaitUntil(() -> helper.assertTrue(!raids.finds().isEmpty(), "no find yet; " + raids.describe(level)))
+                .thenExecute(() -> {
+                    Raids.Find find = raids.finds().get(0);
+                    helper.assertTrue(group.stream().anyMatch(termite -> termite.blockPosition().closerThan(find.at(), 6)),
+                            "the find at " + find.at().toShortString() + " is not at the four termites at the east tunnel's end; " + raids.describe(level));
+                    helper.assertTrue(find.worth() >= 9, "the four termites scored worth only " + find.worth());
+                    helper.assertTrue(raids.tunnelsFollowed() >= 1 && raids.clueFinds() >= 1,
+                            "the find was not made by following a tunnel from the mound (" + raids.tunnelsFollowed() + " followed, "
+                                    + raids.clueFinds() + " clue finds); " + raids.describe(level));
+                    helper.assertTrue(raids.range() == 32, "the search range grew to " + raids.range() + ": the find came from the plain search, not the mound");
+                    List<BlockPos> line = find.trail();
+                    helper.assertTrue(line.size() >= 5 && line.get(0).closerThan(colony.getCenter(), 4)
+                            && line.get(line.size() - 1).closerThan(find.at(), 8), "no scent line from the nest to the find");
+                    SavannaMod.LOGGER.info("[mound clue test] found at {}: {}", helper.getTick(), raids.describe(level));
+                })
+                .thenSucceed();
+    }
+
     private static double flat(BlockPos a, BlockPos b) {
         return Math.hypot(a.getX() - b.getX(), a.getZ() - b.getZ());
     }
