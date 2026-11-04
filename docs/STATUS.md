@@ -23,7 +23,7 @@ Keep this short. The full story is in `docs/HISTORY.md`; the long status is at t
 - Heart rot: wounds, bracket fungi (knob to old, tiers, spore dust), hollow trunks, snapped trees, pulp heaps.
 - The feeding spot count, `/antcolonies feedingspots`.
 - Fixes: fungus garden crash (BUGS 71), a hole dug into a full garden sealed again (BUGS 70).
-- Faster savanna loading: trees remember the ground's height, mounds appear within seconds and quietly (branch `claude/savanna-loading`, not in `master` yet).
+- Faster savanna loading: trees remember the ground's height, mounds appear within seconds and quietly (branch `claude/savanna-loading`, not in `master` yet); on the same branch, new-land mounds get their dead tree on uneven ground again (BUGS 81) and every mound stage can be built from inside (BUGS 82).
 
 ## Left before the finish line
 1. **In-game test 4:** everything in the list above.
