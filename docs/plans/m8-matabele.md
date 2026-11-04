@@ -216,7 +216,9 @@ timings: all "my pick, to confirm" until then).
      first, then search outward to 96 blocks (the real foraging range is about 95 m; the mod counts a block as a metre
      for distances, as with moving house). A scout knows a termite feeding spot when it smells termites under the mud
      there (`FeedingSpots`, the galleries round it), stops, and runs home laying a scent line (the `Recruits` line).
-     Test: `/antcolonies scout`, watch one go out and come back.
+     Test: `/antcolonies scout`, watch one go out and come back. **BUILT 2026-11-03** (`colony/Raids`,
+     `MatabeleScoutGoal`, `MatabeleRaidTests`; with the colony's own scouts going first, a fast run home and the
+     finder named on the find; `docs/HISTORY.md`). Not tried in-game yet.
    - **3b The column.** At home the scout recruits by what it found, capped by the colony's size and hunger (big spots
      the most; 30 to 75 percent of the colony, the paper); up to about 50 real ants walk, the rest stay numbers till
      step 4. The scout leads; single file, then widening; the column stops a few blocks short, bunches, and attacks at

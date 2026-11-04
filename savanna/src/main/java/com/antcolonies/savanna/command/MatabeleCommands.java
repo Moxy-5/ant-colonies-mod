@@ -46,6 +46,9 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  * over the wood they eat, else the nearest termite out), and sends them in to fight there for
  * {@value #SKIRMISH_MINUTES} minutes: majors bite the mud open, everyone stings the termites, the soldiers fight back.
  * Standing in for a raid column until step 4. They join the nearest Matabele colony within 32 blocks, if there is one.
+ *
+ * <p>Step 3a: {@code /antcolonies scout} sends a scout out now from the nearest Matabele colony within 64 blocks (a
+ * major, whatever the hour or the colony's hunger); {@code /antcolonies list} shows the good spots the scouts found.
  */
 @EventBusSubscriber(modid = SavannaMod.MODID)
 public class MatabeleCommands {
@@ -59,6 +62,8 @@ public class MatabeleCommands {
                 .then(Commands.literal("skirmish")
                         .then(Commands.argument("ants", IntegerArgumentType.integer(1, 60))
                                 .executes(context -> skirmish(context.getSource(), IntegerArgumentType.getInteger(context, "ants")))))
+                .then(Commands.literal("scout")
+                        .executes(context -> scout(context.getSource())))
                 .then(Commands.literal("prey")
                         .then(Commands.argument("layers", IntegerArgumentType.integer(1, 64))
                                 .executes(context -> prey(context.getSource(), IntegerArgumentType.getInteger(context, "layers")))))
@@ -212,6 +217,26 @@ public class MatabeleCommands {
                         ant -> SavannaSpecies.MACROTERMES.equals(ant.species()) && ant.isAlive() && !ant.isParalysed())
                 .stream().min(java.util.Comparator.comparingDouble(ant -> ant.distanceToSqr(Vec3.atCenterOf(at))))
                 .map(ant -> ant.blockPosition()).orElse(null);
+    }
+
+    /** A scout out now from the nearest Matabele colony (step 3a). */
+    private static int scout(CommandSourceStack source) {
+        ServerLevel level = source.getLevel();
+        Colony colony = ColonyManager.get(level).findNearest(BlockPos.containing(source.getPosition()), 64, MatabeleEntity.SPECIES);
+        com.antcolonies.savanna.colony.Raids raids = colony == null ? null : colony.part(SavannaParts.RAIDS).orElse(null);
+        if (raids == null) {
+            source.sendFailure(Component.literal("No Matabele colony within 64 blocks (/antcolonies matabele <workers> makes one)."));
+            return 0;
+        }
+        MatabeleEntity scout = raids.sendNow(level);
+        if (scout == null) {
+            source.sendFailure(Component.literal("No major there fit to scout (real ones only; not hurt, fighting or hungry)."));
+            return 0;
+        }
+        source.sendSuccess(() -> Component.literal("A scout (a major at " + scout.blockPosition().toShortString()
+                + ") sets out from the Matabele nest at " + colony.getCenter().toShortString() + ", searching up to "
+                + raids.range() + " blocks out; /antcolonies list shows what the scouts found."), false);
+        return 1;
     }
 
     /** Fresh termites onto the nearest Matabele colony's prey pile, as a raid would bring them. */

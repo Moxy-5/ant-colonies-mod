@@ -18,6 +18,7 @@ import com.antcolonies.entity.goal.GoInsideGoal;
 import com.antcolonies.entity.goal.WaitAtNestGoal;
 import com.antcolonies.savanna.SavannaSpecies;
 import com.antcolonies.savanna.entity.goal.CarryRemainsGoal;
+import com.antcolonies.savanna.entity.goal.MatabeleScoutGoal;
 import com.antcolonies.savanna.registry.SavannaBlocks;
 import com.antcolonies.savanna.registry.SavannaEntities;
 import com.antcolonies.savanna.registry.SavannaTags;
@@ -62,7 +63,8 @@ import net.minecraft.world.level.Level;
  * minors are both the colony's workers ({@link Caste#WORKER}); each rolls its own length from the species file's
  * {@code worker_sizes} once, keeps it for life, and is drawn (and its box sized) at that length with whichever of the
  * two models is nearer. Step 1d: it digs the way into its colony's nest (only to join the spaces already there) and
- * stays inside (real Megaponera leave the nest only to raid, step 4); the raids, the fights and the
+ * stays inside (real Megaponera leave the nest only to raid), except a scout out on its trip (step 3a,
+ * {@link MatabeleScoutGoal}); the raids, the fights and the
  * prey pile come with M8's steps ({@code docs/plans/m8-matabele.md}). It joins the nearest Matabele colony when put
  * down with a spawn egg, and it gets hungry (the user's pick, 2026-10-24: with no prey pile yet, a colony with workers
  * starves).
@@ -183,6 +185,7 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         this.goalSelector.addGoal(2, new CarryEggGoal(this));
         this.goalSelector.addGoal(2, new CarryRemainsGoal(this));
         this.goalSelector.addGoal(2, new ClampCareGoal(this)); // M8 2c: termites off nestmates' legs in the nest
+        this.goalSelector.addGoal(2, new MatabeleScoutGoal(this)); // M8 3a: a major out scouting for termites
         this.goalSelector.addGoal(3, new DigGoal(this, () -> true));
         this.goalSelector.addGoal(4, new GoInsideGoal(this));
         this.goalSelector.addGoal(5, new WaitAtNestGoal(this));
@@ -596,6 +599,17 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         super.comeOutOfNest(colony, grownUpAt);
         colonyChecked = true;
         hunger().eat();
+    }
+
+    /** Out scouting it may be outside (M8 step 3a); otherwise the colony keeps it in (it leaves the nest only to raid). */
+    @Override
+    public boolean mayGoOut() {
+        if (super.mayGoOut()) {
+            return true;
+        }
+        Colony colony = getColony();
+        return colony != null && colony.part(com.antcolonies.savanna.colony.SavannaParts.RAIDS)
+                .map(raids -> raids.isScouting(getUUID())).orElse(false);
     }
 
     /** Its squeak (M8 step 2e): real Megaponera stridulate when held or when the nest is broken into. */

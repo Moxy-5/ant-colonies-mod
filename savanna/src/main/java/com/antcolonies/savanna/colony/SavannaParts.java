@@ -288,6 +288,16 @@ public final class SavannaParts {
             .saves(PreyPile::save, PreyPile::load)
             .sample(PreyPile::fillForTests));
 
+    /**
+     * M8 step 3: the Matabele raids. Step 3a, the scouts: who is out scouting, the good spots found with their scent lines
+     * home, the slices searched empty lately and how far out they search ({@link Raids}).
+     */
+    public static final Type<Raids> RAIDS = listed("raids", Raids::new, part -> part
+            .ticks(117, Raids::tick)
+            .plugs(ColonyHooks.LIST_SEARCH, 40, raids -> raids::describe)
+            .saves(Raids::save, Raids::load)
+            .sample(Raids::fillForTests));
+
     private SavannaParts() {
     }
 

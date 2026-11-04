@@ -32,6 +32,7 @@ public final class SavannaNumbers {
     public static final SpeciesSection<GalleryNumbers> GALLERIES = SpeciesSection.signUp("nest.galleries", GalleryNumbers.CODEC);
     public static final SpeciesSection<Regrowth> REGROWTH = SpeciesSection.signUp("food.regrowth", Regrowth.CODEC);
     public static final SpeciesSection<WorkerSizes> WORKER_SIZES = SpeciesSection.signUp("worker_sizes", WorkerSizes.CODEC);
+    public static final SpeciesSection<ScoutNumbers> SCOUTING = SpeciesSection.signUp("raids.scouting", ScoutNumbers.CODEC);
 
     private SavannaNumbers() {
     }
@@ -478,6 +479,51 @@ public final class SavannaNumbers {
 
         private static <T extends Comparable<T>> BlockState withValue(BlockState state, Property<T> property, String name) {
             return property.getValue(name).map(value -> state.setValue(property, value)).orElse(state);
+        }
+    }
+
+    /**
+     * M8 step 3a, the raid scouts ({@code colony.Raids}; real Megaponera: lone scouts search for termites feeding under
+     * cover, then run home laying a scent line). They go out in the raid {@code hours} (clock hours, each a from and a
+     * to: the mornings and evenings, Yusuf 2026), never in the rain, while the prey pile holds less than a day's food:
+     * one scout for every {@code workersPerScout} workers, at least 1, at most {@code mostScouts}, majors only. A scout
+     * checks the colony's remembered good spots first, then searches a slice of {@code sliceDegrees} round the nest in arcs
+     * {@code arcStep} blocks apart, out to the colony's search range ({@code firstRange}; every slice searched empty adds
+     * {@code rangeStep} once all are, up to {@code mostRange}, the real ant's foraging range of about 95 m); a searched
+     * slice is tried again after {@code sliceFadeTicks}. It smells termites (out of their mound, or in their feeding
+     * galleries and runways) within {@code smell} blocks, looks the find over {@code inspectTicks}, and goes home; it gives
+     * up after {@code tripTicks}. A good spot is remembered {@code spotFadeTicks}, and forgotten after {@code spotMisses}
+     * empty checks. Every number my pick, to confirm.
+     */
+    public record ScoutNumbers(List<List<Double>> hours, int workersPerScout, int mostScouts, int firstRange, int rangeStep,
+                               int mostRange, int sliceDegrees, int arcStep, int smell, int inspectTicks, int tripTicks,
+                               int sliceFadeTicks, int spotFadeTicks, int spotMisses) {
+        public static final Codec<ScoutNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.DOUBLE.listOf().listOf().optionalFieldOf("hours", List.of(List.of(6.0, 11.0), List.of(16.0, 19.5))).forGetter(ScoutNumbers::hours),
+                Codec.INT.optionalFieldOf("workers_per_scout", 100).forGetter(ScoutNumbers::workersPerScout),
+                Codec.INT.optionalFieldOf("most_scouts", 3).forGetter(ScoutNumbers::mostScouts),
+                Codec.INT.optionalFieldOf("first_range", 32).forGetter(ScoutNumbers::firstRange),
+                Codec.INT.optionalFieldOf("range_step", 16).forGetter(ScoutNumbers::rangeStep),
+                Codec.INT.optionalFieldOf("most_range", 96).forGetter(ScoutNumbers::mostRange),
+                Codec.INT.optionalFieldOf("slice_degrees", 90).forGetter(ScoutNumbers::sliceDegrees),
+                Codec.INT.optionalFieldOf("arc_step", 10).forGetter(ScoutNumbers::arcStep),
+                Codec.INT.optionalFieldOf("smell", 5).forGetter(ScoutNumbers::smell),
+                Codec.INT.optionalFieldOf("inspect_ticks", 40).forGetter(ScoutNumbers::inspectTicks),
+                Codec.INT.optionalFieldOf("trip_ticks", 2400).forGetter(ScoutNumbers::tripTicks),
+                Codec.INT.optionalFieldOf("slice_fade_ticks", 24000).forGetter(ScoutNumbers::sliceFadeTicks),
+                Codec.INT.optionalFieldOf("spot_fade_ticks", 72000).forGetter(ScoutNumbers::spotFadeTicks),
+                Codec.INT.optionalFieldOf("spot_misses", 2).forGetter(ScoutNumbers::spotMisses)
+        ).apply(i, ScoutNumbers::new));
+
+        /** Whether this time of day ({@code Level#getDayTime}'s scale: 0 is 6:00) is in the raid hours. */
+        public boolean isRaidHour(long dayTime) {
+            double hour = (6.0 + (dayTime % 24000) / 1000.0) % 24.0;
+            for (List<Double> span : hours) {
+                if (span.size() == 2 && hour >= span.get(0) && hour < span.get(1)) {
+                    return true;
+                }
+            }
+            return false;
         }
     }
 }
