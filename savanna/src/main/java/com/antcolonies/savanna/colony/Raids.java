@@ -840,6 +840,14 @@ public class Raids {
         }
     }
 
+    /** R5, the diary: a scout found termites worth a raid this far out with the colony this hungry, and runs home. */
+    public void takes(ServerLevel level, BlockPos at, int worth, UUID scout) {
+        int away = (int) Math.round(RaidGround.flat(at, colony.getCenter()));
+        say(level, "scout " + scout.toString().substring(0, 8) + " takes the termites at " + at.toShortString() + ", " + away
+                + " blocks out: worth " + worth + ", a raid that far needs " + String.format(java.util.Locale.ROOT, "%.1f", need(at))
+                + " with the colony " + Math.round(fedShare() * 100) + " percent fed");
+    }
+
     /** R5: how many finds scouts passed over as too poor since the colony was loaded (tests). */
     public int passedOverCount() {
         return passedOverCount;

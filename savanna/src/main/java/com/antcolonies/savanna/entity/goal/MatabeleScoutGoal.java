@@ -462,6 +462,7 @@ public class MatabeleScoutGoal extends Goal {
         worth = 3 * Math.max(termitesSeen, hiddenSeen);
         double need = raids.need(find);
         if (worth > 0 && worth >= need) {
+            raids.takes(level, find, worth, ant.getUUID());
             ant.getNavigator().stop();
             goHome();
             return;

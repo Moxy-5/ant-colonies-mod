@@ -943,10 +943,10 @@ public class MatabeleRaidTests {
     }
 
     /**
-     * Raid rework R5, a choosy scout on a real walk: a colony of 40, about half fed (its prey pile kept between two fifths
-     * and two thirds of a day's food), has a lone termite feeding under a log about 17 blocks out in the middle of
+     * Raid rework R5, a choosy scout on a real walk: a colony of 40, about half fed (its prey pile kept between a half and
+     * three quarters of a day's food), has a lone termite feeding under a log about 17 blocks out in the middle of
      * every slice, and a group of four under two logs about 28 blocks out to the south-east. A lone termite (worth 3)
-     * that far out is too poor for a raid with the colony half fed (it needs 3.3 or more), so the scouts pass them over
+     * that far out is too poor for a raid with the colony half fed (it needs 3.5 or more), so the scouts pass them over
      * and search on; the group (worth 12) is taken. No find is ever made at a lone termite, and no scout harms one.
      */
     @GameTest(template = "arena", timeoutTicks = 30000, skyAccess = true, batch = "matabele_scouts")
@@ -971,8 +971,9 @@ public class MatabeleRaidTests {
         PreyPile pile = colony.part(SavannaParts.PREY_PILE).orElse(null);
         helper.assertTrue(raids != null && pile != null, "a Matabele colony has no raids part or prey pile");
         helper.onEachTick(() -> {
-            if (helper.getTick() % 40 == 0 && pile.edibleTermites() < 16) {
-                pile.stock(level, 1); // (about half fed: never a day's food, so still hungry, never starving)
+            if (helper.getTick() > 20 && helper.getTick() % 5 == 0 && pile.edibleTermites() < 20) {
+                pile.stock(level, 1); // (about half fed: never a day's food, so still hungry, never starving; a new
+                                      // colony's 40 hungry workers eat its first meals fast)
             }
             for (TermiteWorkerEntity termite : lone) {
                 helper.assertTrue(termite.isAlive() && !termite.isParalysed(), "a scout attacked a lone termite (scouts only look)");
@@ -986,7 +987,9 @@ public class MatabeleRaidTests {
         });
         helper.startSequence()
                 .thenIdle(20)
-                .thenExecute(() -> pile.stock(level, 2))
+                .thenExecute(() -> helper.assertTrue(pile.stock(level, 2) == 2, "the pile did not take 2 layers"))
+                .thenExecute(() -> helper.assertTrue(raids.fedShare() >= 0.4 && raids.isHungry(),
+                        "the colony is " + Math.round(raids.fedShare() * 100) + " percent fed, not about half"))
                 .thenWaitUntil(() -> helper.assertTrue(!raids.finds().isEmpty(), "no find yet (" + raids.passedOverCount() + " passed over); "
                         + raids.describe(level)))
                 .thenExecute(() -> {
