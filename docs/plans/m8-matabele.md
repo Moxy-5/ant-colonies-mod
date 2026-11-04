@@ -276,9 +276,10 @@ timings: all "my pick, to confirm" until then).
        my pick, as the feeding spots stand 10 to 30 blocks past the mound's foot) searches round it in widening rings
        out to about 30 blocks past the foot; a gallery smelt on the way is followed outward, away from the mound, to its
        end, where the feeding is.
-     - **R7 Hours and sound.** The night question to the user (a raid finishing into the night, the termites then out
-       in the open, against raids leaving only early enough to be home by dusk); the scout command keeps the hours
-       unless told otherwise. **The column squeaks as it passes, louder as the player comes near, before anyone
+     - **R7 Hours and sound.** **Raids end by dusk (the user's answer, 2026-11-04):** no raid leaves after 19:00 (my
+       pick: time to reach a spot and come home); a raid still out at 19:30 stops where it is, picks up what is stung
+       and walks home (my pick); a find made after 19:00 waits for the morning raid hours. Rare night raids in the hot
+       season wait for Serene Seasons. The scout command keeps the hours unless told otherwise. **The column squeaks as it passes, louder as the player comes near, before anyone
        stings** (Hoelldobler 1994: the columns' stridulation is no message between ants but a warning to big
        animals). Raids heading into unloaded land turn back at its edge until drawn-only ants (step 4).
      - **R8 One scale for real distances.** The mod counts distances as a block a metre (range 96 for the real 95 m)
