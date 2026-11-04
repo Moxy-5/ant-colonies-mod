@@ -265,7 +265,7 @@ timings: all "my pick, to confirm" until then).
        stops at the gap, the ants cast about, pick the trail up on the far side, or a former scout leads them on (a
        hypothesis in AntWiki, not tested; a trail cut is a classic ant experiment, not shown for Megaponera). A
        **debug view** `/antcolonies raid show` draws the trails and each raider's state with particles.
-     - **R5 Scouts that choose.** The range grows only when scouts come back empty, trips search from near to far,
+     - **R5 Scouts that choose.** (**BUILT 2026-11-04**, `colony/Raids`, `MatabeleScoutGoal`, `FeedingSpots.byDayPlaces`, `raids.choosing`; as built in `docs/DESIGN.md`, "R5, scouts that choose, as built".) The range grows only when scouts come back empty, trips search from near to far,
        and the range shrinks back over the days after finds. A find needs real feeding: termites there, or a feeding
        spot fed at by day, not any gallery cell. **Choosiness** (Frank and Linsenmair 2017): a find must be richer the
        farther it is, and less rich the hungrier the colony; a hungry colony sends more scouts and bigger raids.
