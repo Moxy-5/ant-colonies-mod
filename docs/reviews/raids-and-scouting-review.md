@@ -2,6 +2,8 @@
 
 **Status (2026-11-04):** findings 1 to 7, 12, 14, 16 and 17 fixed on branch `claude/m8-prey-home-44beec` (the first batch; details in `docs/HISTORY.md`, "Raid code review, first batch of fixes"). Still open: 8, 9, 10, 11, 13, 15, 18, and the other points of 16 and 17.
 
+**Status, batch 2 (2026-11-04):** findings 8, 9, 11, 15, 16, 17 and 18 fixed too (`docs/HISTORY.md`, "Raid code review, second batch"). Left on purpose, to come after R5 to R8 so the rework is not done twice: 10 (split `RaidColumn` into stage classes) and 13 (trails, routes and the walk home into the framework), now steps R9 and R10 of the plan (`docs/plans/m8-matabele.md`, 3R). Finding 15's trails' nest end stays with M8 step 6 (moving house).
+
 A read-only review of the M8 raid and scout code, done the way a seasoned Java and NeoForge 1.21.1 modder would look at it. No code was changed. The review covers the code as it stood on branch `claude/m8-prey-home-44beec` on 2026-11-04. That branch includes R4, the scent trails, which was not committed yet (`ScentTrails.java` and `RaidView.java` were still untracked).
 
 **Files read:**
@@ -191,7 +193,7 @@ Line numbers are from the working copy on 2026-11-04 and may drift slightly whil
 - **Size:** S.
 - **Plan:** **new**. It is R4's code; R4 is built but not committed.
 
-### 8. Timing that leans on "the part ticks on multiples of 20"
+### 8. Timing that leans on "the part ticks on multiples of 20" (FIXED 2026-11-04)
 - **Where:**
   - `Raids.tick`, L224: `getGameTime() % 20`, which is redundant
   - `ScentTrails.tick`, L255: `now % CHECK_EVERY` with `CHECK_EVERY` 40
@@ -209,7 +211,7 @@ Line numbers are from the working copy on 2026-11-04 and may drift slightly whil
 - **Size:** S.
 - **Plan:** **new**.
 
-### 9. Per-update cost grows with trail length times column size
+### 9. Per-update cost grows with trail length times column size (FIXED 2026-11-04)
 - **Where:**
   - `RaidColumn.gapAhead`, L681: for each trail point it calls `Route.along`, a linear scan of the route, and builds lists
   - `Route.along`, L1220: called per ant per update
@@ -235,7 +237,7 @@ Line numbers are from the working copy on 2026-11-04 and may drift slightly whil
 - **Size:** M.
 - **Plan:** **new**. Do it before or with R8.
 
-### 10. `RaidColumn` is one 1,243-line class holding nine stages
+### 10. `RaidColumn` is one 1,243-line class holding nine stages (left on purpose: plan step R9, after R5 to R8)
 - **Where:** `RaidColumn.java`: about 35 mutable fields, about 25 timing and distance constants, timers reset by hand in `next()`.
 - **What:**
   - Every stage reads and writes shared fields, so the order in which they are reset matters.
@@ -256,7 +258,7 @@ Line numbers are from the working copy on 2026-11-04 and may drift slightly whil
 - **Size:** L.
 - **Plan:** **new**. It fits after R5 to R8 rather than before, so the rework is not split across two shapes.
 
-### 11. Small duplications that will drift apart
+### 11. Small duplications that will drift apart (FIXED 2026-11-04)
 - **Where and what:**
   - Three "can an ant stand here" checks:
     - `RaidColumn.standAt` (L1108)
@@ -296,7 +298,7 @@ Line numbers are from the working copy on 2026-11-04 and may drift slightly whil
 - **Size:** S.
 - **Plan:** range and worth: R5. `checkedAt` and the lost finds: **new**.
 
-### 13. Pieces that belong in the framework
+### 13. Pieces that belong in the framework (left on purpose: plan step R10, after R5 to R8)
 - **What:**
   - Several raid pieces are not Matabele-specific. Army ants, leafcutters (future species) and the harvester's neighbour fights will want them:
     - `ScentTrails`: lasting, breakable trails with an age
@@ -332,7 +334,7 @@ Line numbers are from the working copy on 2026-11-04 and may drift slightly whil
 
 ## Low: worth knowing, can wait
 
-### 15. Trail housekeeping
+### 15. Trail housekeeping (FIXED 2026-11-04 (the nest end left for step 6))
 - `ScentTrails.Trail.points()` copies the list on every call. The raid view calls it every 10 ticks per trail.
 - `box()` is recomputed in full on every block event.
 - Points that lie in unloaded chunks when the trail is laid are never watched.
@@ -340,14 +342,14 @@ Line numbers are from the working copy on 2026-11-04 and may drift slightly whil
 - **Size:** S.
 - **Plan:** step 6 for the nest end; the rest is **new**.
 
-### 16. Save and load (raidWaiting FIXED 2026-11-04; the veterans point open)
+### 16. Save and load (FIXED 2026-11-04: raidWaiting in batch 1, the veterans in batch 2)
 - The column is not saved (by design: a raid out when the world closes is lost).
 - `raidWaiting` is saved as an *index* into the finds list. If the order or count of finds changes between saving and loading, it points at the wrong find. Save the find's position instead.
 - `veterans` only lose ants that are loaded and dead (L235). A veteran that died in an unloaded chunk stays on the list. The list is capped, so the cost is only a wasted slot.
 - **Size:** S.
 - **Plan:** **new**. 3f will decide whether columns are saved.
 
-### 17. Small code notes (the straight hop FIXED 2026-11-04: ants going home or catching up are given places a few blocks along the trail; the other points open)
+### 17. Small code notes (FIXED 2026-11-04: the straight hop in batch 1 and 2, the rest in batch 2)
 - `MatabeleRaidGoal.walkToward` hops in a straight line toward the place, not along the trail. On a curved trail the hop cuts corners, which may go into ground the trail avoided. `limpOrder` already hops along the route; the raid goal could too.
 - `BringPreyGoal` finds its colony through `ColonyManager.get(level).getColony(id)`, unlike the other goals' `ant.getColony()`.
 - `Raids.outOfMound` takes a `level` it does not use.
@@ -359,7 +361,7 @@ Line numbers are from the working copy on 2026-11-04 and may drift slightly whil
 
 ## Tests
 
-### 18. What the raid tests do and do not prove
+### 18. What the raid tests do and do not prove (FIXED 2026-11-04 (the hill and bend, the stage times, the dying carrier))
 - **Where:** `gametest/MatabeleRaidTests.java`, 5 tests.
 - **Gaps:**
   - Tests 2, 3 and 5 build the trail by hand on flat ground (`raidForTests`, `shapeGround(..., 0)`). That skips the scout, and none walks a slope, a hill or a curved trail.

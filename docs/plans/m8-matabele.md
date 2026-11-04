@@ -285,6 +285,16 @@ timings: all "my pick, to confirm" until then).
      - **R8 One scale for real distances.** The mod counts distances as a block a metre (range 96 for the real 95 m)
        but bodies as a major a block (about 1.5 cm); every real distance copied in says which scale it uses (the
        column halting 20 to 50 cm short of the termites is under a block by one, 13 to 33 by the other; 4 kept).
+     - **R9 The column in stage pieces** (the raid code review's finding 10, left from its batch 2 on purpose so the
+       rework is not done twice; code only, nothing changes in-game): `RaidColumn` split into one small piece per stage
+       (forming, march, attack, collect, home), each with its own timers, sharing the members, routes, numbers and the
+       diary; `Route` in its own file; every numbers record with a default so the fallbacks go; the timings the user may
+       want to tune moved into `megaponera_analis.json`.
+     - **R10 Trails into the framework** (finding 13, after R9; code only, nothing changes in-game): the scent trail
+       store, the route line, the stand-here rule (`RaidGround`) and the walk home along a trail (`WayHome`) moved into
+       the framework under neutral names, so army ants, leafcutters and harvester neighbour fights reuse them; the
+       raid stages, find scoring and prey stay in the savanna mod; check whether `Recruits`' single-file following can
+       share the march's follower rule.
      - Then the raid tests and in-game test 5 again.
    - **3d The termites' losses.** Termites in the galleries round the spot are numbers until broken into
      (`HiddenTrips`), so a raid takes from the colony's real count; plugging, closing and danger memory (2f, 4g) dry
