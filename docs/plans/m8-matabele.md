@@ -271,7 +271,7 @@ timings: all "my pick, to confirm" until then).
        farther it is, and less rich the hungrier the colony; a hungry colony sends more scouts and bigger raids.
        Real colonies have 10 to 20 scouts and scout in two sessions a day, sometimes over an hour (the user's 1 per 50
        up to 5 and all-day scouting kept, noted only).
-     - **R6 The mound as a clue** (the user's idea, 2026-11-03; not described in the papers, believable as termites
+     - **R6 The mound as a clue** (**BUILT 2026-11-04**, `MatabeleScoutGoal`, `Raids`, `FeedingSpots.waysOut`, `raids.mound_clue`; as built in `docs/DESIGN.md`, "R6, the mound as a clue, as built") (the user's idea, 2026-11-03; not described in the papers, believable as termites
        feed in galleries spreading out from their mound): a scout that notices a living mound (about 16 blocks off,
        my pick, as the feeding spots stand 10 to 30 blocks past the mound's foot) searches round it in widening rings
        out to about 30 blocks past the foot; a gallery smelt on the way is followed outward, away from the mound, to its
