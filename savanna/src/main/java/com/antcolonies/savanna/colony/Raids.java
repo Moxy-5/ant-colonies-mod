@@ -159,6 +159,10 @@ public class Raids {
     /** A find a scout brought home between the raid hours: the raid sets out to it when they come, the colony hungry. */
     @Nullable
     private Find waiting;
+    /** R7: the waiting find was brought home by the scout command's scout (it waits for the raid hours, hungry or not). */
+    private boolean waitingCommanded;
+    /** R7: ants the scout command sent with "anytime": their find raids at once, whatever the hour (not saved). */
+    private final Set<UUID> sentAnyHour = new HashSet<>();
     /**
      * Step 3c and the raid code review, finding 2: ants let go out in the field going home along a trail by themselves
      * (a real Megaponera that loses legs, has a termite clinging or falls behind makes its own way home on the scent
@@ -189,6 +193,8 @@ public class Raids {
     /** Why the last raid could not set out (the raid command's answer), or null. */
     @Nullable
     private String whyNoRaid;
+    /** R7: the last raid could not set out because its spot is in land not loaded (the find waits). */
+    private boolean unloadedFind;
     /**
      * R6, the mound as a clue: the living termite mounds the scouts ringed lately and found nothing round, by their
      * middle, and when (game time). Not saved (my pick: after a reload a mound may be ringed again, no harm).
@@ -267,6 +273,9 @@ public class Raids {
     private void tickTimed(ServerLevel level) {
         trails.tick(level, level.getGameTime(), trailNumbers(), column == null ? null : column.trail(), what -> say(level, what));
         if (column != null) {
+            if (column.stage() != RaidColumn.Stage.DONE && !column.keepsNoHours() && !column.turnedAtDusk() && isDusk(level)) {
+                column.callDusk(); // (R7: raids end by dusk: it stops where it is, picks up what it stung and walks home)
+            }
             column.update(level); // (the raiders ask it every few ticks; this keeps it going with none of them loaded)
             for (RaidColumn.LetGo one : column.takeLetGo()) {
                 wayHome.send(one.ant(), column.back(), level.getGameTime(), one.why());
@@ -292,6 +301,7 @@ public class Raids {
         // (the raid code review, finding 1: one only out of sight is kept a grace first; only the dead or long unseen go)
         scouts.removeIf(id -> goneFor(level, id, now));
         sent.removeIf(id -> !scouts.contains(id) && goneFor(level, id, now));
+        sentAnyHour.retainAll(sent);
         finds.removeIf(find -> now - find.checkedAt > numbers.spotFadeTicks());
         veterans.removeIf(id -> veteranGone(level, id, now));
         veteranMissingSince.keySet().retainAll(veterans);
@@ -302,11 +312,13 @@ public class Raids {
             waiting = null; // (forgotten meanwhile)
         }
         if (waiting != null && column == null && isRaidTime(level)) {
-            if (!isHungry()) {
+            if (!isHungry() && !waitingCommanded) {
                 waiting = null; // (fed by now: the spot stays remembered for the next hungry spell)
             } else if (startRaid(level, waiting) != null) {
-                say(level, "the raid hours: the waiting find at " + column.find().at().toShortString() + " gets its raid");
+                say(level, "the raid hours: the waiting find at " + column.find().at().toShortString() + " gets its raid"
+                        + (waitingCommanded ? " (brought home by the scout command's scout)" : ""));
                 waiting = null;
+                waitingCommanded = false;
             }
         }
         SavannaNumbers.CarryNumbers carry = carryNumbers();
@@ -1006,19 +1018,36 @@ public class Raids {
         // scout command's scout, whatever the hour), and no raid out already. Found between the raid hours (scouts search
         // all day), the find waits for them (tick), the colony hungry then.
         boolean commanded = scout != null && sent.contains(scout);
+        // R7: the scout command keeps the raid hours (a find it brings home after 19:00 waits for the morning, hungry or
+        // not) unless sent with "anytime" (its find raids at once, whatever the hour)
+        boolean anyHour = scout != null && sentAnyHour.contains(scout);
         Find made = known != null ? known : finds.get(finds.size() - 1);
-        if (column == null && !colony.rainsNow(level) && (commanded || isRaidTime(level) && isHungry())) {
+        if (column == null && !colony.rainsNow(level) && (anyHour || isRaidTime(level) && (commanded || isHungry()))) {
             say(level, "a scout (" + (scout == null ? "?" : scout.toString().substring(0, 8)) + ") is home from " + at.toShortString()
-                    + ", worth " + worth + (commanded ? ", sent by the command" : "") + ": a raid sets out");
+                    + ", worth " + worth + (anyHour ? ", sent by the command at any hour" : commanded ? ", sent by the command" : "") + ": a raid sets out");
             RaidColumn started = startRaid(level, made);
             if (started == null) {
-                say(level, "nobody fit to raid: the find is only remembered");
-            } else if (waiting == made) {
-                waiting = null;
+                if (unloadedFind) {
+                    say(level, "no raid: " + whyNoRaid + "; the find waits");
+                    waiting = made;
+                    waitingCommanded = commanded;
+                } else {
+                    say(level, "nobody fit to raid: the find is only remembered");
+                }
+            } else {
+                if (anyHour && !isRaidTime(level)) {
+                    started.keepNoHours();
+                }
+                if (waiting == made) {
+                    waiting = null;
+                    waitingCommanded = false;
+                }
             }
-        } else if (column == null && !commanded && isHungry() && !isRaidTime(level)) {
-            say(level, "a scout is home from " + at.toShortString() + ", worth " + worth + ", outside the raid hours: it waits for them");
+        } else if (column == null && (commanded || isHungry()) && !isRaidTime(level)) {
+            say(level, "a scout is home from " + at.toShortString() + ", worth " + worth + ", outside the raid hours ("
+                    + RaidGround.clock(colony, level) + "): it waits for them" + (commanded ? " (sent by the command, which keeps the hours)" : ""));
             waiting = made;
+            waitingCommanded = commanded;
         } else {
             say(level, "a scout is home from " + at.toShortString() + ", worth " + worth + ", no raid: " + (column != null ? "one is out already"
                     : colony.rainsNow(level) ? "it rains" : "the colony is not hungry"));
@@ -1086,7 +1115,15 @@ public class Raids {
     @Nullable
     private RaidColumn startRaid(ServerLevel level, Find find) {
         SavannaNumbers.ColumnNumbers numbers = columnNumbers();
+        unloadedFind = false;
         if (numbers == null) {
+            return null;
+        }
+        if (!level.isPositionEntityTicking(find.at)) {
+            // R7: no raid sets out to a spot in land not loaded (no ant can walk there till drawn-only ants, M8 step 4)
+            unloadedFind = true;
+            whyNoRaid = "the spot at " + find.at.toShortString() + " is in land not loaded";
+            say(level, "no raid to " + find.at.toShortString() + ": " + whyNoRaid);
             return null;
         }
         int size = raidSize(find);
@@ -1146,7 +1183,29 @@ public class Raids {
         if (column != null || finds.isEmpty()) {
             return null;
         }
-        return startRaid(level, finds().get(0));
+        return keepNoHoursOutsideThem(level, startRaid(level, finds().get(0)));
+    }
+
+    /** R7: a raid a command (or a test) sets out outside the raid hours keeps no hours: dusk does not turn it home. */
+    @Nullable
+    private RaidColumn keepNoHoursOutsideThem(ServerLevel level, @Nullable RaidColumn raid) {
+        if (raid != null && !isRaidTime(level)) {
+            raid.keepNoHours();
+            say(level, "set out by a command outside the raid hours (" + RaidGround.clock(colony, level) + "): it keeps no hours");
+        }
+        return raid;
+    }
+
+    /** R7: whether it is dusk for the raids now (from {@code raids.hours_and_sound.dusk}, 19:30, till the morning's first raid hour). */
+    public boolean isDusk(ServerLevel level) {
+        SavannaNumbers.ScoutNumbers numbers = numbers();
+        return numbers != null && colony.profile().section(SavannaNumbers.HOURS_SOUND).orElse(SavannaNumbers.HoursSoundNumbers.DEFAULT)
+                .isDusk(colony.timeOfDay(level), numbers);
+    }
+
+    /** R7, tests: whether a find waits for the raid hours. */
+    public boolean hasWaitingFind() {
+        return waiting != null;
     }
 
     /** A raid to this find sets out now (tests: a find put in by hand, with its scent line and scout). */
@@ -1155,7 +1214,7 @@ public class Raids {
         Find find = new Find(at.immutable(), worth, level.getGameTime(), level.getGameTime(), 0, List.copyOf(trail), scout);
         finds.add(find);
         trails.lay(level, colony.getCenter(), at, trail, level.getGameTime(), false); // (R4: the scout's line, laid as it ran home)
-        return startRaid(level, find);
+        return keepNoHoursOutsideThem(level, startRaid(level, find));
     }
 
     /** A remembered spot was checked and nothing smelt there: forgotten after {@code spot_misses} such checks. */
@@ -1178,6 +1237,15 @@ public class Raids {
      */
     @Nullable
     public MatabeleEntity sendNow(ServerLevel level) {
+        return sendNow(level, false);
+    }
+
+    /**
+     * The scout command: as {@link #sendNow(ServerLevel)}; R7: its find keeps the raid hours (after 19:00 it waits for
+     * the morning) unless {@code anyHour} (its find raids at once, whatever the hour).
+     */
+    @Nullable
+    public MatabeleEntity sendNow(ServerLevel level, boolean anyHour) {
         BlockPos entrance = colony.getCenter();
         MatabeleEntity ant = colony.population().realMembers(level).stream()
                 .filter(member -> member instanceof MatabeleEntity matabele && fit(matabele) && !scouts.contains(member.getUUID())
@@ -1187,6 +1255,9 @@ public class Raids {
                         .thenComparingDouble(member -> member.blockPosition().distSqr(entrance))).orElse(null);
         if (ant != null) {
             sent.add(ant.getUUID());
+            if (anyHour) {
+                sentAnyHour.add(ant.getUUID());
+            }
             sentCheckAt.put(ant.getUUID(), level.getGameTime() + 40); // (BUGS 89: two seconds later it should be out)
             say(level, "the scout command sends " + ant.getUUID().toString().substring(0, 8) + " (it runs " + ant.runningGoals() + ")");
         }

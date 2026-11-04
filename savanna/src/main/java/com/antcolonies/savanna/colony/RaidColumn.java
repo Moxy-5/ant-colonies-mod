@@ -95,6 +95,14 @@ public final class RaidColumn {
      * in, so a column walking right to it stalled on the hump's side).
      */
     private static final double HOME = 8.0;
+    /** R7: on the way home an ant this much past the home reach from the entrance leaves the line and walks in (my pick). */
+    private static final double STREAM_IN = 4.0;
+    /**
+     * R7: on the way home, if for this long (ticks) no ant got a block farther along the way home and nobody new came
+     * home, the line breaks up and every ant walks in by its own way (my pick, 10 s; a front stuck at the foot of a dead
+     * mound's hump, unable to reach its place on the slope, held the whole line still in the R7 chain test).
+     */
+    private static final long HOME_STALL = 200;
     /** How often (ticks) the column works out its places. */
     private static final int EVERY = 5;
     /**
@@ -200,6 +208,18 @@ public final class RaidColumn {
     private boolean lostFromSight;
     /** Whether the raid reached its spot and found nothing there (gathered nothing, spread out and gathered nothing). */
     private boolean foundNothing;
+    /** R7: dusk was called (Raids, at 19:30): the column stops where it is, picks up what it stung and walks home. */
+    private boolean duskCalled;
+    /** R7: dusk has been dealt with (the column turned for home). */
+    private boolean duskDone;
+    /** R7: sent outside the raid hours by a command: it keeps no hours (no dusk turn). */
+    private boolean keepsNoHours;
+    /** R7: when a termite was last about the spot in the attack (game time), or -1. */
+    private long termiteSeenAt = -1;
+    /** R7: when the column last squeaked at each player near it (game time). */
+    private final Map<UUID, Long> squeakedAt = new HashMap<>();
+    /** R7: the column turned home at the edge of land not ticking (tests and the log). */
+    private boolean turnedAtEdge;
     /** The raid code review, finding 4: since when each member is held by another fight order (drafted by the nest's defence). */
     private final Map<UUID, Long> draftedSince = new HashMap<>();
     /** A member drafted away from the column longer than this (ticks) is let go of it (my pick, 30 s). */
@@ -242,6 +262,14 @@ public final class RaidColumn {
     private double turnedAt = -1.0;
     /** The front's wait is told in the log after this long, and again every this long while it lasts (ticks). */
     private static final long WAIT_SAY_EVERY = 200;
+    /** R7, the diary: when the walk home was last told (game time). */
+    private long homeSaidAt = Long.MIN_VALUE / 2;
+    /** R7: on the way home, the farthest along any ant got, the count home then, and since when (game time). */
+    private double homeBest = -1.0;
+    private int homeBestCame;
+    private long homeBestAt = -1;
+    /** R7: the line broke up on the way home (no headway): every ant walks in by its own way. */
+    private boolean streamAll;
 
     RaidColumn(ServerLevel level, Colony colony, SavannaNumbers.ColumnNumbers numbers, @Nullable SavannaNumbers.CarryNumbers carry,
                SavannaNumbers.TrailNumbers trailNumbers, Raids.Find find, ScentTrails.Trail scent, List<MatabeleEntity> raiders,
@@ -523,6 +551,9 @@ public final class RaidColumn {
         if (attackedAt >= 0) {
             attackedAt += by;
         }
+        if (termiteSeenAt >= 0) {
+            termiteSeenAt += by;
+        }
         if (castingSince >= 0) {
             castingSince += by;
         }
@@ -631,6 +662,17 @@ public final class RaidColumn {
             leader = members.get(0); // the front fell: the next ant follows the scent on
         }
         orders.clear();
+        squeak(level, ants, now); // (R7: a warning to a player near the column, before anyone stings)
+        if (duskCalled && !duskDone) {
+            dusk(ants, now);
+        }
+        if (stage == Stage.DONE) {
+            return;
+        }
+        if (stage == Stage.MARCHING && edgeAhead(level, ants)) {
+            homeOrder(ants);
+            next(Stage.HOMING, now); // (R7: the land ahead is not loaded: home, the find not counted as checked)
+        }
         Stage was = stage;
         switch (stage) {
             case FORMING -> form(level, ants, now);
@@ -670,6 +712,21 @@ public final class RaidColumn {
      * it). The ants out of sight go last.
      */
     private void homeOrder(List<MatabeleEntity> ants) {
+        UUID was = sortHomeward(ants);
+        if (!leader.equals(was)) {
+            say("turned round: " + shortId(leader) + ", nearest home, leads the way back");
+        }
+    }
+
+    /**
+     * R7 (the R1 diary's slow walk home): the column's order by where each ant is along the way home, the nearest home
+     * in front and leading. After the attack the ants stand bunched in no order, and each follows the ant ahead of it
+     * in the column's order: kept in the order they marched out, the ant "ahead" of most stood beside them at the spot,
+     * so only the front few walked and the rest waited (about 3 home every 10 s, 170 s for 17 blocks with 47 ants).
+     * Sorted every update on the way home, each follows the one really ahead of it and the whole column flows home.
+     * Gives the leader before.
+     */
+    private UUID sortHomeward(List<MatabeleEntity> ants) {
         Map<UUID, Double> along = new HashMap<>();
         for (MatabeleEntity ant : ants) {
             along.put(ant.getUUID(), alongOf(back, ant));
@@ -677,9 +734,146 @@ public final class RaidColumn {
         members.sort(java.util.Comparator.comparingDouble(id -> -along.getOrDefault(id, -1.0)));
         UUID was = leader;
         leader = members.get(0);
-        if (!leader.equals(was)) {
-            say("turned round: " + shortId(leader) + ", nearest home, leads the way back");
+        return was;
+    }
+
+    /** R7's numbers (the species file's {@code raids.hours_and_sound}). */
+    private SavannaNumbers.HoursSoundNumbers hoursSound() {
+        return colony.profile().section(SavannaNumbers.HOURS_SOUND).orElse(SavannaNumbers.HoursSoundNumbers.DEFAULT);
+    }
+
+    /**
+     * R7, raids end by dusk (the user's answer, 2026-11-04): called by the colony at 19:30 for a raid still out; the
+     * column stops where it is at its next update, picks up what it stung and walks home.
+     */
+    public void callDusk() {
+        if (!keepsNoHours) {
+            duskCalled = true;
         }
+    }
+
+    /** R7: whether dusk turned this raid home. */
+    public boolean turnedAtDusk() {
+        return duskDone;
+    }
+
+    /** R7: sent outside the raid hours by a command (it keeps no hours: no dusk turn). */
+    public void keepNoHours() {
+        keepsNoHours = true;
+        duskCalled = false;
+    }
+
+    /** R7: whether it keeps no hours. */
+    public boolean keepsNoHours() {
+        return keepsNoHours;
+    }
+
+    /** R7: whether it turned home at the edge of land not loaded. */
+    public boolean turnedAtEdge() {
+        return turnedAtEdge;
+    }
+
+    /**
+     * R7, dusk: still forming at the entrance, the raid is called off (everyone goes in); on the march, it turns round
+     * where it is; gathering, it regroups and goes home (nothing stung yet); attacking or spreading out, the fight ends
+     * and they pick up what lies stung (no spreading out); collecting, regrouping or on the way home, it carries on (no
+     * spreading out). The find is never counted as checked empty for a raid dusk turned home.
+     */
+    private void dusk(List<MatabeleEntity> ants, long now) {
+        duskDone = true;
+        say("dusk (" + RaidGround.clock(colony, lastLevel) + "): the raid stops where it is at " + stage.name().toLowerCase()
+                + ", picks up what it stung and walks home");
+        switch (stage) {
+            case FORMING -> end("called off at dusk before it set out");
+            case MARCHING -> {
+                homeOrder(ants);
+                next(Stage.HOMING, now);
+            }
+            case GATHERING -> next(Stage.REGROUPING, now);
+            case ATTACKING, SPREADING -> {
+                endFights(ants);
+                next(Stage.COLLECTING, now);
+            }
+            default -> {
+            }
+        }
+    }
+
+    /** Every raider's fight for the column ends now (the attack is over). */
+    private void endFights(List<MatabeleEntity> ants) {
+        for (MatabeleEntity ant : ants) {
+            if (ant.fightOrderBy() == this) {
+                ant.endFightOrder(this);
+            }
+        }
+    }
+
+    /**
+     * R7: whether the land ahead of the marching front is not loaded (not ticking) within {@code edge_look} blocks along
+     * the way out: real ants would walk on, but no ant can walk there till drawn-only ants (M8 step 4), so the column
+     * turns home at the edge, and the find is not counted as checked (it was never reached).
+     */
+    private boolean edgeAhead(ServerLevel level, List<MatabeleEntity> ants) {
+        MatabeleEntity front = ants.stream().filter(ant -> ant.getUUID().equals(leader)).findFirst().orElse(ants.get(0));
+        double from = alongOf(out, front);
+        double look = hoursSound().edgeLook();
+        for (double along = from; along <= Math.min(out.length(), from + look); along += 1.0) {
+            BlockPos at = point(out, along);
+            if (!level.isPositionEntityTicking(at)) {
+                turnedAtEdge = true;
+                say("the land ahead is not loaded at " + at.toShortString() + " (" + Math.round(along) + " of " + Math.round(out.length())
+                        + " along the way out): the raid turns home at its edge");
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * R7, the squeak (Hoelldobler et al. 1994: a raid column stridulates as it goes, no message between the ants but a
+     * warning to big animals): for each player within {@code squeak_hear} blocks of a raider, the raider nearest them
+     * squeaks, louder and more often the nearer the player, before anyone stings (a player standing in the column
+     * provokes it: {@code NestDefence}). Spectators hear nothing.
+     */
+    private void squeak(ServerLevel level, List<MatabeleEntity> ants, long now) {
+        SavannaNumbers.HoursSoundNumbers numbers = hoursSound();
+        double hear = numbers.squeakHear();
+        for (net.minecraft.server.level.ServerPlayer player : level.players()) {
+            if (player.isSpectator()) {
+                continue;
+            }
+            MatabeleEntity nearest = null;
+            double best = hear * hear;
+            for (MatabeleEntity ant : ants) {
+                double d = ant.distanceToSqr(player);
+                if (d <= best) {
+                    best = d;
+                    nearest = ant;
+                }
+            }
+            if (nearest == null) {
+                continue;
+            }
+            double distance = Math.sqrt(best);
+            Long last = squeakedAt.get(player.getUUID());
+            if (last != null && now - last < numbers.everyAt(distance)) {
+                continue;
+            }
+            squeakedAt.put(player.getUUID(), now);
+            nearest.warningSqueak(numbers.loudnessAt(distance));
+        }
+    }
+
+    /**
+     * R7: whether a termite still stands about the spot (alive, not stung, within {@code collect_reach} of the find): the
+     * attack goes on while one does, and ends {@code quiet_ticks} after the last.
+     */
+    private boolean termitesAbout(ServerLevel level) {
+        double reach = carry.collectReach();
+        BlockPos at = find.at();
+        return !level.getEntitiesOfClass(AbstractAntEntity.class, new AABB(at).inflate(reach, 6.0, reach),
+                insect -> insect.isAlive() && !insect.isParalysed() && !insect.isDowned() && !(insect instanceof MatabeleEntity)
+                        && !colony.getId().equals(insect.getColonyId()) && flat(insect.blockPosition(), at) <= reach).isEmpty();
     }
 
     /** The column's numbers (the species file's {@code raids.column}; the tests check the stages' times by them). */
@@ -1154,6 +1348,18 @@ public final class RaidColumn {
         }
         bunch(level, ants); // (the places of those not fighting: stragglers on their way, and those done)
         boolean stragglers = ants.stream().anyMatch(ant -> !sentIn.contains(ant.getUUID()));
+        // R7: the attack is over once no termite has been about the spot for quiet_ticks (the R1 diary: each raider
+        // searched round on its own for minutes after the last termite, the attack lasting about 4 minutes, 4 game hours)
+        if (termitesAbout(level)) {
+            termiteSeenAt = now;
+        }
+        long quietFor = now - Math.max(attackedAt, termiteSeenAt);
+        if (quietFor >= hoursSound().quietTicks()) {
+            say("no termite about the spot for " + quietFor / 20 + " s: the attack is over");
+            endFights(ants);
+            next(Stage.COLLECTING, now);
+            return;
+        }
         if (!fighting && (!stragglers || now - attackedAt >= numbers.fightTicks()) || now - attackedAt >= numbers.fightTicks() + 200) {
             next(Stage.COLLECTING, now); // step 3c: the stung termites gathered first
         }
@@ -1226,8 +1432,8 @@ public final class RaidColumn {
         }
         if (!anyFetching || now - stageSince >= carry.collectTicks()) {
             taking.clear();
-            boolean spreadNow = carried == 0 && !spread && now - stageSince < carry.collectTicks();
-            foundNothing = carried == 0 && !spreadNow; // (at the spot and nothing to bring: an empty check of it)
+            boolean spreadNow = carried == 0 && !spread && !duskDone && now - stageSince < carry.collectTicks();
+            foundNothing = carried == 0 && !spreadNow && !duskDone; // (at the spot and nothing to bring: an empty check of it; R7, never at dusk)
             next(spreadNow ? Stage.SPREADING : Stage.REGROUPING, now);
             spread |= spreadNow;
         }
@@ -1344,14 +1550,54 @@ public final class RaidColumn {
         if (!memberSet.contains(leader)) {
             leader = members.get(0);
         }
-        if (march(level, ants, back, now)) {
-            for (MatabeleEntity ant : ants) {
+        sortHomeward(ants); // (R7: each follows the ant really ahead of it on the way home)
+        ants.sort(java.util.Comparator.comparingInt(ant -> members.indexOf(ant.getUUID())));
+        double farthest = ants.stream().mapToDouble(ant -> alongOf(back, ant)).max().orElse(0.0);
+        if (homeBestAt < stageSince) {
+            homeBest = farthest;
+            homeBestCame = cameHome;
+            homeBestAt = now;
+            streamAll = false;
+        } else if (farthest > homeBest + 1.0 || cameHome > homeBestCame) {
+            homeBest = Math.max(homeBest, farthest);
+            homeBestCame = cameHome;
+            homeBestAt = now;
+        } else if (!streamAll && now - homeBestAt >= HOME_STALL) {
+            streamAll = true;
+            say("no headway home for " + (now - homeBestAt) / 20 + " s (the farthest along " + Math.round(farthest) + " of "
+                    + Math.round(back.length()) + "): the line breaks up and each walks in by its own way");
+        }
+        // R7 (the slow walk home): near the nest the column breaks up and every ant streams in by itself, side by side
+        // (real raiders crowd into the entrance; kept in the line, they climbed a dead mound's hump one at a time, each
+        // waiting for the one ahead at its foot, just outside the home reach).
+        // (to the first cell beside the entrance an ant can stand in, as the march's line starts there: in a dead mound
+        // the entrance itself is the chimney's open mouth, no place to walk to)
+        BlockPos doorstep = place(level, back, back.length(), 0.0);
+        List<MatabeleEntity> line = new ArrayList<>();
+        for (MatabeleEntity ant : ants) {
+            if (streamAll || flat(ant.blockPosition(), entrance) <= HOME + STREAM_IN) {
+                orders.put(ant.getUUID(), new Order(doorstep, 1.0, null));
+            } else {
+                line.add(ant);
+            }
+        }
+        if (!line.isEmpty() && march(level, line, back, now)) {
+            for (MatabeleEntity ant : line) {
                 orders.put(ant.getUUID(), new Order(entrance, 1.0, null)); // (the front is at the entrance: the rest come in behind it)
             }
         }
         if (carriers > 0) {
             // Step 3c: laden, the column walks home a little slower (my pick).
             orders.replaceAll((id, order) -> new Order(order.to(), order.pace() * carry.ladenPace(), order.lookAt(), order.take()));
+        }
+        if (now - homeSaidAt >= WAIT_SAY_EVERY) {
+            // R7, the diary: how the walk home goes, every 10 s (the R1 diary found it slow): who is home, who is hindmost
+            homeSaidAt = now;
+            MatabeleEntity hindmost = ants.stream().min(java.util.Comparator.comparingDouble(ant -> alongOf(back, ant))).orElse(null);
+            say("on the way home " + (now - stageSince) / 20 + " s: " + cameHome + " home, " + ants.size() + " out, the front "
+                    + ants.stream().filter(ant -> ant.getUUID().equals(leader)).findFirst().map(ant -> who(ant, back)).orElse("?")
+                    + "; the hindmost " + (hindmost == null ? "?" : who(hindmost, back)) + "; the way home " + Math.round(back.length()) + " blocks from "
+                    + point(back, 0.0).toShortString() + " to " + point(back, back.length()).toShortString() + ", the entrance " + colony.getCenter().toShortString());
         }
     }
 

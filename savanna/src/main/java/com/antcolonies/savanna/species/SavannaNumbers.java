@@ -38,6 +38,7 @@ public final class SavannaNumbers {
     public static final SpeciesSection<TrailNumbers> TRAILS = SpeciesSection.signUp("raids.trails", TrailNumbers.CODEC);
     public static final SpeciesSection<ChooseNumbers> CHOOSING = SpeciesSection.signUp("raids.choosing", ChooseNumbers.CODEC);
     public static final SpeciesSection<MoundClueNumbers> MOUND_CLUE = SpeciesSection.signUp("raids.mound_clue", MoundClueNumbers.CODEC);
+    public static final SpeciesSection<HoursSoundNumbers> HOURS_SOUND = SpeciesSection.signUp("raids.hours_and_sound", HoursSoundNumbers.CODEC);
 
     private SavannaNumbers() {
     }
@@ -507,7 +508,7 @@ public final class SavannaNumbers {
                                int mostRange, int sliceDegrees, int arcStep, int smell, int inspectTicks, int tripTicks,
                                int sliceFadeTicks, int spotFadeTicks, int spotMisses, List<List<Double>> scoutHours) {
         public static final Codec<ScoutNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
-                Codec.DOUBLE.listOf().listOf().optionalFieldOf("hours", List.of(List.of(6.0, 11.0), List.of(16.0, 19.5))).forGetter(ScoutNumbers::hours),
+                Codec.DOUBLE.listOf().listOf().optionalFieldOf("hours", List.of(List.of(6.0, 11.0), List.of(16.0, 19.0))).forGetter(ScoutNumbers::hours),
                 Codec.INT.optionalFieldOf("workers_per_scout", 50).forGetter(ScoutNumbers::workersPerScout),
                 Codec.INT.optionalFieldOf("most_scouts", 5).forGetter(ScoutNumbers::mostScouts),
                 Codec.INT.optionalFieldOf("first_range", 32).forGetter(ScoutNumbers::firstRange),
@@ -534,14 +535,75 @@ public final class SavannaNumbers {
             return inHours(scoutHours, dayTime);
         }
 
+        /** The earliest hour a raid may leave (the morning's first raid hour; 6.0 if none). */
+        public double firstRaidHour() {
+            return hours.stream().filter(span -> span.size() == 2).mapToDouble(span -> span.get(0)).min().orElse(6.0);
+        }
+
+        /** The clock hour of this time of day ({@code Level#getDayTime}'s scale: 0 is 6:00). */
+        public static double hourOf(long dayTime) {
+            return (6.0 + Math.floorMod(dayTime, 24000L) / 1000.0) % 24.0;
+        }
+
         private static boolean inHours(List<List<Double>> spans, long dayTime) {
-            double hour = (6.0 + (dayTime % 24000) / 1000.0) % 24.0;
+            double hour = hourOf(dayTime);
             for (List<Double> span : spans) {
                 if (span.size() == 2 && hour >= span.get(0) && hour < span.get(1)) {
                     return true;
                 }
             }
             return false;
+        }
+    }
+
+    /**
+     * Raid rework R7, hours and sound ({@code colony.Raids}, {@code colony.RaidColumn}). Raids end by dusk (the user's
+     * answer, 2026-11-04): none leaves after the evening raid hours end (19:00 in {@code raids.scouting.hours}), and a raid
+     * still out at {@code dusk} (19:30) stops where it is, picks up what it stung and walks home; until the morning's first
+     * raid hour it stays dusk (a find made meanwhile waits for the morning). Rare night raids in the hot season wait for
+     * the shared season source (Serene Seasons). The attack ends once no termite has been about the spot for
+     * {@code quietTicks} (real raids: the attack at the feeding site lasts about 10 to 20 minutes, Yusuf 2026; the
+     * termites stung, fled or sealed in). The column squeaks at a player within {@code squeakHear} blocks of a raider,
+     * louder and more often the nearer (from {@code squeakQuiet} at that distance every {@code squeakEveryFar} ticks to
+     * {@code squeakLoud} at {@code squeakLoudAt} blocks every {@code squeakEveryNear}; Hoelldobler et al. 1994: the
+     * columns' stridulation is no message between the ants but a warning to big animals). A column marching into land
+     * not ticking within {@code edgeLook} blocks ahead of its front turns home at that edge (until drawn-only ants, M8 step
+     * 4). Every number my pick, to confirm.
+     */
+    public record HoursSoundNumbers(double dusk, int quietTicks, double squeakHear, double squeakLoudAt, double squeakQuiet,
+                                    double squeakLoud, int squeakEveryFar, int squeakEveryNear, double edgeLook) {
+        public static final HoursSoundNumbers DEFAULT = new HoursSoundNumbers(19.5, 600, 12.0, 2.0, 0.25, 1.0, 60, 8, 8.0);
+        public static final Codec<HoursSoundNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.DOUBLE.optionalFieldOf("dusk", DEFAULT.dusk()).forGetter(HoursSoundNumbers::dusk),
+                Codec.INT.optionalFieldOf("quiet_ticks", DEFAULT.quietTicks()).forGetter(HoursSoundNumbers::quietTicks),
+                Codec.DOUBLE.optionalFieldOf("squeak_hear", DEFAULT.squeakHear()).forGetter(HoursSoundNumbers::squeakHear),
+                Codec.DOUBLE.optionalFieldOf("squeak_loud_at", DEFAULT.squeakLoudAt()).forGetter(HoursSoundNumbers::squeakLoudAt),
+                Codec.DOUBLE.optionalFieldOf("squeak_quiet", DEFAULT.squeakQuiet()).forGetter(HoursSoundNumbers::squeakQuiet),
+                Codec.DOUBLE.optionalFieldOf("squeak_loud", DEFAULT.squeakLoud()).forGetter(HoursSoundNumbers::squeakLoud),
+                Codec.INT.optionalFieldOf("squeak_every_far", DEFAULT.squeakEveryFar()).forGetter(HoursSoundNumbers::squeakEveryFar),
+                Codec.INT.optionalFieldOf("squeak_every_near", DEFAULT.squeakEveryNear()).forGetter(HoursSoundNumbers::squeakEveryNear),
+                Codec.DOUBLE.optionalFieldOf("edge_look", DEFAULT.edgeLook()).forGetter(HoursSoundNumbers::edgeLook)
+        ).apply(i, HoursSoundNumbers::new));
+
+        /** Whether this time of day is dusk for the raids: from {@code dusk} till the morning's first raid hour. */
+        public boolean isDusk(long dayTime, ScoutNumbers scouting) {
+            double hour = ScoutNumbers.hourOf(dayTime);
+            return hour >= dusk || hour < scouting.firstRaidHour();
+        }
+
+        /** How near a player is, 0 at {@code squeakHear} to 1 at {@code squeakLoudAt} or nearer. */
+        private double nearness(double distance) {
+            return Math.max(0.0, Math.min(1.0, (squeakHear - distance) / Math.max(0.1, squeakHear - squeakLoudAt)));
+        }
+
+        /** How loud the column's squeak is for a player this far from the nearest raider (0 past {@code squeakHear}). */
+        public float loudnessAt(double distance) {
+            return distance > squeakHear ? 0.0F : (float) (squeakQuiet + (squeakLoud - squeakQuiet) * nearness(distance));
+        }
+
+        /** How many ticks between the column's squeaks at a player this far off. */
+        public int everyAt(double distance) {
+            return (int) Math.round(squeakEveryFar + (squeakEveryNear - squeakEveryFar) * nearness(distance));
         }
     }
 
@@ -576,7 +638,7 @@ public final class SavannaNumbers {
                 Codec.INT.optionalFieldOf("stretch", 8).forGetter(ColumnNumbers::stretch),
                 Codec.INT.optionalFieldOf("stop_short", 4).forGetter(ColumnNumbers::stopShort),
                 Codec.INT.optionalFieldOf("gather_ticks", 300).forGetter(ColumnNumbers::gatherTicks),
-                Codec.INT.optionalFieldOf("fight_ticks", 6000).forGetter(ColumnNumbers::fightTicks),
+                Codec.INT.optionalFieldOf("fight_ticks", 2400).forGetter(ColumnNumbers::fightTicks),
                 Codec.INT.optionalFieldOf("regroup_ticks", 400).forGetter(ColumnNumbers::regroupTicks),
                 Codec.INT.optionalFieldOf("home_ticks", 3600).forGetter(ColumnNumbers::homeTicks)
         ).apply(i, ColumnNumbers::new));

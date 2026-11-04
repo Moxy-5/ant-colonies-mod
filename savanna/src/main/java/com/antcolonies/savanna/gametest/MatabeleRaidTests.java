@@ -691,7 +691,7 @@ public class MatabeleRaidTests {
     public static void aRaidWithNoFormerScoutTurnsHomeAtAWideGapAndAFadedTrailWithNobodyWhoKnowsTheWayMeansNoRaid(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
-        TestClock.still(helper, 21.0); // (night: no scout sets out by itself, so the colony has no former scouts)
+        TestClock clock = TestClock.still(helper, 21.0); // (night: no scout sets out by itself, so the colony has no former scouts)
         TestScenes.shapeGround(helper, 45, (x, z) -> 0);
         Colony dead = NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(NEST, SURFACE, NEST)), NewLandMounds.pickFor("dead", 30, 5L));
         helper.assertTrue(dead != null, "no dead mound put in");
@@ -758,6 +758,8 @@ public class MatabeleRaidTests {
                     RaidColumn raid = raids.raidForTests(level, at, 2, trail, null);
                     helper.assertTrue(raid != null, "no raid set out; " + raids.describe(level));
                     helper.assertTrue(!raids.isVeteran(raid.leader()), "the raid's leader is a former scout");
+                    // R7: set out by hand at 21:00, outside the raid hours, it keeps no hours (dusk does not turn it)
+                    helper.assertTrue(raids.isDusk(level) && raid.keepsNoHours(), "a raid set out by hand at night does not keep no hours");
                     // A wall on the trail from 10 to 18 blocks out: a gap of about 10 blocks, past casting reach.
                     for (BlockPos p : raid.trail().points()) {
                         double out = flat(p, entrance);
@@ -839,6 +841,46 @@ public class MatabeleRaidTests {
                                             + " (going home: " + raids.whyGoingHome(id) + ")");
                         }
                     }
+                })
+                // Raid rework R7, dusk: a raid set out at 18:45, in the evening raid hours, keeps them; at 19:30 on the
+                // march it turns home where it is, attacks nothing, and the spot is no empty check (never reached).
+                .thenExecute(() -> {
+                    clock.skipTo(18.75);
+                    helper.assertTrue(raids.isRaidTime(level) && !raids.isDusk(level), "18:45 is not in the raid hours");
+                    BlockPos entrance = colony.getCenter();
+                    BlockPos there = helper.absolutePos(new BlockPos(52, SURFACE, 52));
+                    List<BlockPos> trail = new ArrayList<>();
+                    int steps = (int) Math.ceil(Math.hypot(there.getX() - entrance.getX(), there.getZ() - entrance.getZ()) / 2.0);
+                    for (int i = 0; i <= steps; i++) {
+                        double t = i / (double) steps;
+                        int x = entrance.getX() + (int) Math.round((there.getX() - entrance.getX()) * t);
+                        int z = entrance.getZ() + (int) Math.round((there.getZ() - entrance.getZ()) * t);
+                        trail.add(level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                                new BlockPos(x, entrance.getY(), z)));
+                    }
+                    RaidColumn raid = raids.raidForTests(level, there, 2, trail, null);
+                    helper.assertTrue(raid != null, "no dusk raid set out; " + raids.describe(level));
+                    helper.assertTrue(!raid.keepsNoHours(), "a raid set out in the raid hours keeps no hours");
+                    column[0] = raid;
+                })
+                .thenWaitUntil(() -> helper.assertTrue(column[0].stage() == RaidColumn.Stage.MARCHING
+                        && level.getEntity(column[0].leader()) instanceof MatabeleEntity leader && column[0].alongOut(leader.blockPosition()) > 4.0,
+                        "the dusk raid is not out on the march yet; " + raids.describe(level)))
+                .thenExecute(() -> clock.skipTo(19.5))
+                .thenWaitUntil(() -> helper.assertTrue(column[0].turnedAtDusk(), "the raid out at 19:30 did not turn home at dusk; " + raids.describe(level)))
+                .thenWaitUntil(() -> helper.assertTrue(raids.column() == null, "the raid turned home at dusk is not home yet; " + raids.describe(level)))
+                .thenExecute(() -> {
+                    RaidColumn raid = column[0];
+                    helper.assertTrue(raid.attackedAt() < 0, "the raid turned home at dusk on the march attacked");
+                    helper.assertTrue(raid.cameHome() >= 1, "nobody came home with the dusk raid: " + raid.endedWhy());
+                    Raids.Find find = raid.find();
+                    helper.assertTrue(raids.finds().contains(find) && find.misses() == 0,
+                            "a raid turned home at dusk counted as an empty check of the spot; " + raids.describe(level));
+                    // R7, unloaded land: no raid sets out to a spot in land not loaded (the find is only remembered).
+                    BlockPos far = colony.getCenter().offset(600, 0, 0);
+                    RaidColumn none = raids.raidForTests(level, far, 2, List.of(colony.getCenter(), far), null);
+                    helper.assertTrue(none == null && raids.whyNoRaid() != null && raids.whyNoRaid().contains("not loaded"),
+                            "a raid set out to land not loaded, or not for that: " + raids.whyNoRaid());
                 })
                 .thenSucceed();
     }

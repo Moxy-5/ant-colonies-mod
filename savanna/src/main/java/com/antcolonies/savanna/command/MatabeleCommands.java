@@ -49,10 +49,13 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  *
  * <p>Step 3a: {@code /antcolonies scout} sends a scout out now from the nearest Matabele colony within 64 blocks (a
  * major, whatever the hour or the colony's hunger); {@code /antcolonies list} shows the good spots the scouts found.
- * A scout the command sent recruits a raid when it comes home with a find, whatever the hour or hunger (step 3b).
+ * A scout the command sent recruits a raid when it comes home with a find, whatever the colony's hunger (step 3b); R7:
+ * in the raid hours only (a find brought home after 19:00 waits for the morning), unless sent with
+ * {@code /antcolonies scout anytime} (its find raids at once, whatever the hour, and that raid keeps no hours).
  *
  * <p>Step 3b: {@code /antcolonies raid} sends a raid column out now from the nearest Matabele colony within 64 blocks to
- * the best spot its scouts know, led by the spot's scout (whatever the hour, the hunger or the rain).
+ * the best spot its scouts know, led by the spot's scout (whatever the hour, the hunger or the rain; R7: one set out
+ * outside the raid hours keeps no hours, so dusk does not turn it home).
  */
 @EventBusSubscriber(modid = SavannaMod.MODID)
 public class MatabeleCommands {
@@ -67,7 +70,9 @@ public class MatabeleCommands {
                         .then(Commands.argument("ants", IntegerArgumentType.integer(1, 60))
                                 .executes(context -> skirmish(context.getSource(), IntegerArgumentType.getInteger(context, "ants")))))
                 .then(Commands.literal("scout")
-                        .executes(context -> scout(context.getSource())))
+                        .executes(context -> scout(context.getSource(), false))
+                        .then(Commands.literal("anytime")
+                                .executes(context -> scout(context.getSource(), true))))
                 .then(Commands.literal("raid")
                         .executes(context -> raid(context.getSource()))
                         .then(Commands.literal("show")
@@ -228,7 +233,7 @@ public class MatabeleCommands {
     }
 
     /** A scout out now from the nearest Matabele colony (step 3a). */
-    private static int scout(CommandSourceStack source) {
+    private static int scout(CommandSourceStack source, boolean anyHour) {
         ServerLevel level = source.getLevel();
         Colony colony = ColonyManager.get(level).findNearest(BlockPos.containing(source.getPosition()), 64, MatabeleEntity.SPECIES);
         com.antcolonies.savanna.colony.Raids raids = colony == null ? null : colony.part(SavannaParts.RAIDS).orElse(null);
@@ -236,14 +241,15 @@ public class MatabeleCommands {
             source.sendFailure(Component.literal("No Matabele colony within 64 blocks (/antcolonies matabele <workers> makes one)."));
             return 0;
         }
-        MatabeleEntity scout = raids.sendNow(level);
+        MatabeleEntity scout = raids.sendNow(level, anyHour);
         if (scout == null) {
             source.sendFailure(Component.literal("No major there fit to scout (real ones only; not hurt, fighting or hungry)."));
             return 0;
         }
         source.sendSuccess(() -> Component.literal("A scout (a major at " + scout.blockPosition().toShortString()
                 + ") sets out from the Matabele nest at " + colony.getCenter().toShortString() + ", searching up to "
-                + raids.range() + " blocks out; /antcolonies list shows what the scouts found."), false);
+                + raids.range() + " blocks out; /antcolonies list shows what the scouts found"
+                + (anyHour ? ". Its find raids at once, whatever the hour." : ". Its find raids in the raid hours (6 to 11, 16 to 19), else waits for them.")), false);
         return 1;
     }
 

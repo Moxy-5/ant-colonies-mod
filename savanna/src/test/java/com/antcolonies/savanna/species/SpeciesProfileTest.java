@@ -161,4 +161,26 @@ class SpeciesProfileTest {
                 "termites eat their fresh dead and bury the old ones before they crumble");
     }
 
+    @Test
+    void matabeleRaidsEndByDuskAndTheColumnSqueaksLouderNearer() throws Exception {
+        // Raid rework R7: no raid leaves after 19:00, dusk from 19:30 till the morning's first raid hour (6:00).
+        SpeciesProfile profile = read("megaponera_analis");
+        SavannaNumbers.ScoutNumbers scouting = profile.section(SavannaNumbers.SCOUTING).orElseThrow();
+        SavannaNumbers.HoursSoundNumbers hours = profile.section(SavannaNumbers.HOURS_SOUND).orElseThrow();
+        java.util.function.DoubleFunction<Long> at = hour -> Math.floorMod(Math.round((hour - 6.0) * 1000.0), 24000L);
+        assertTrue(scouting.isRaidHour(at.apply(18.9)), "18:54 is in the evening raid hours");
+        assertFalse(scouting.isRaidHour(at.apply(19.1)), "no raid leaves after 19:00");
+        assertFalse(hours.isDusk(at.apply(19.4), scouting), "19:24 is not dusk yet");
+        assertTrue(hours.isDusk(at.apply(19.5), scouting), "19:30 is dusk");
+        assertTrue(hours.isDusk(at.apply(3.0), scouting), "3:00 is still dusk for the raids");
+        assertFalse(hours.isDusk(at.apply(6.5), scouting), "6:30 is the morning raid hours");
+        assertFalse(hours.isDusk(at.apply(13.0), scouting), "13:00 is between the raid hours, not dusk");
+        assertEquals(19.0, SavannaNumbers.ScoutNumbers.hourOf(at.apply(19.0)), 1.0E-9);
+        assertEquals(0.0F, hours.loudnessAt(hours.squeakHear() + 0.5), "no squeak heard past its range");
+        assertTrue(hours.loudnessAt(2.0) > hours.loudnessAt(8.0), "louder nearer");
+        assertTrue(hours.everyAt(2.0) < hours.everyAt(8.0), "more often nearer");
+        assertTrue(hours.quietTicks() < profile.section(SavannaNumbers.COLUMN).orElseThrow().fightTicks(),
+                "the attack ends after a quiet spell, well before its longest");
+    }
+
 }

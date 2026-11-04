@@ -700,6 +700,16 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
     /** A termite soldier this near a raider (blocks) is in its way, and fought like any termite. */
     private static final double IN_THE_WAY = 2.5;
 
+    /**
+     * Raid rework R7: a raider's warning squeak at a player near its column, this loud (real Megaponera columns
+     * stridulate as a warning to big animals, Hoelldobler et al. 1994); the column decides who squeaks and how often.
+     */
+    public void warningSqueak(float volume) {
+        if (!level().isClientSide && volume > 0.0F) {
+            playSound(squeakSound(), volume, 0.9F + getRandom().nextFloat() * 0.25F);
+        }
+    }
+
     /** Its squeak (M8 step 2e): real Megaponera stridulate when held or when the nest is broken into. */
     @Override
     protected net.minecraft.sounds.SoundEvent squeakSound() {
