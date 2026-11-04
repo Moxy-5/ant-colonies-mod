@@ -231,6 +231,10 @@ timings: all "my pick, to confirm" until then).
      trail and the prey goes on the pile (the stocking command stays for tests only). An empty raid spreads round the
      spot a short while, takes any it finds, and goes home; hunger sends a scout out sooner. A lightly hurt ant nobody
      picks up limps home along the trail (carrying the hurt is step 5). **In-game test 5 here:** a whole raid seen.
+     **BUILT 2026-11-03** (branch `claude/m8-prey-home-44beec`: `RaidColumn` collecting and spreading out,
+     `BringPreyGoal`, `PreyPile.bringIn`, limpers in `Raids`, the stack look and `carried_termite.png`, numbers in
+     `raids.carry`; `MatabeleRaidTests`; my picks in `docs/DESIGN.md`, "Step 3c, home with the prey, as built").
+     Not tried in-game yet.
    - **3d The termites' losses.** Termites in the galleries round the spot are numbers until broken into
      (`HiddenTrips`), so a raid takes from the colony's real count; plugging, closing and danger memory (2f, 4g) dry
      the spot up, so later scouts hunt farther. Young termite colonies can die from repeated raids; big ones shrug it off.

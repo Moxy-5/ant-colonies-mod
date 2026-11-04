@@ -43,6 +43,10 @@ import net.minecraft.server.level.ServerLevel;
  * by the colony's size and hunger, and the colony keeps the {@link RaidColumn} while it is out (one at a time).
  * Numbers: the species file's {@code raids.scouting} ({@link SavannaNumbers.ScoutNumbers}) and {@code raids.column}
  * ({@link SavannaNumbers.ColumnNumbers}).
+ *
+ * <p>Step 3c, home with the prey: a raid home with termites keeps its spot fresh, one home empty counts as an empty
+ * check of it ({@link #raidHome}); raiders who left the column hurt limp home along its trail ({@link #limpOrder}).
+ * Numbers: {@code raids.carry} ({@link SavannaNumbers.CarryNumbers}).
  */
 public class Raids {
     /** A good spot a scout found: where, how much termite it smelt there, when found and last checked, empty checks, by whom. */
@@ -80,6 +84,10 @@ public class Raids {
             return checkedAt;
         }
 
+        public int misses() {
+            return misses;
+        }
+
         public List<BlockPos> trail() {
             return trail;
         }
@@ -114,6 +122,24 @@ public class Raids {
     /** The raid out now, or null (not saved: after a reload the raiders are just ants outside, and go home). */
     @Nullable
     private RaidColumn column;
+    /** The last raid home (tests and the colony list), or null. */
+    @Nullable
+    private RaidColumn last;
+    /**
+     * Step 3c: raiders who left a column hurt, limping home along its trail by themselves (a real Megaponera that loses
+     * legs or has a termite clinging falls behind, and makes its own way home on the scent line; carrying the hurt home
+     * is step 5). Not saved: after a reload they are just ants outside, and go home.
+     */
+    private final Map<UUID, Limp> limping = new HashMap<>();
+
+    /** One limping raider: the trail home it follows, and since when. */
+    private record Limp(RaidColumn.Route route, long since) {
+    }
+
+    /** How far ahead of itself along the trail (blocks) a limper walks to at a time. */
+    private static final double LIMP_STEP = 6.0;
+    /** A limper is home this near the entrance (blocks; the column's own home line). */
+    private static final double LIMP_HOME = 8.0;
 
     public Raids(Colony colony) {
         this.colony = colony;
@@ -129,10 +155,20 @@ public class Raids {
         return colony.profile().section(SavannaNumbers.COLUMN).orElse(null);
     }
 
+    @Nullable
+    public SavannaNumbers.CarryNumbers carryNumbers() {
+        return colony.profile().section(SavannaNumbers.CARRY).orElse(null);
+    }
+
     void tick(ServerLevel level) {
         if (column != null) {
             column.update(level); // (the raiders ask it every few ticks; this keeps it going with none of them loaded)
+            for (UUID hurt : column.takeHurt()) {
+                limping.put(hurt, new Limp(column.back(), level.getGameTime()));
+            }
             if (column.stage() == RaidColumn.Stage.DONE) {
+                raidHome(level, column);
+                last = column;
                 column = null;
             }
         }
@@ -149,6 +185,64 @@ public class Raids {
         finds.removeIf(find -> now - find.checkedAt > numbers.spotFadeTicks());
         veterans.removeIf(id -> level.getEntity(id) instanceof AbstractAntEntity ant && !ant.isAlive());
         searched.values().removeIf(when -> now - when > numbers.sliceFadeTicks());
+        SavannaNumbers.CarryNumbers carry = carryNumbers();
+        int limpTicks = carry == null ? RaidColumn.DEFAULT_CARRY.limpTicks() : carry.limpTicks();
+        limping.entrySet().removeIf(entry -> now - entry.getValue().since() > limpTicks
+                || !(level.getEntity(entry.getKey()) instanceof AbstractAntEntity ant) || !ant.isAlive());
+    }
+
+    /**
+     * Step 3c: a raid is home. One that brought termites back keeps its spot fresh (the termites may well be there
+     * again); one that came back empty counts as an empty check of the spot, forgotten after {@code spot_misses} such
+     * (the next scouts, sent out at once while the colony is hungry, look elsewhere first).
+     */
+    private void raidHome(ServerLevel level, RaidColumn raid) {
+        Raids.Find find = raid.find();
+        if (!finds.contains(find)) {
+            return;
+        }
+        if (raid.carried() > 0) {
+            find.checkedAt = level.getGameTime();
+            find.misses = 0;
+        } else {
+            foundEmpty(level, find);
+        }
+    }
+
+    /** The last raid home, or null (tests and the colony list). */
+    @Nullable
+    public RaidColumn lastRaid() {
+        return last;
+    }
+
+    /** Whether this ant limps home from a raid by itself (step 3c). */
+    public boolean isLimping(UUID ant) {
+        return limping.containsKey(ant);
+    }
+
+    /**
+     * Where a limping raider should walk now: a little ahead of itself along the raid's trail home; null once it is home
+     * (near the entrance or in the nest; it is let go) or not limping.
+     */
+    @Nullable
+    public BlockPos limpOrder(ServerLevel level, MatabeleEntity ant) {
+        Limp limp = limping.get(ant.getUUID());
+        if (limp == null) {
+            return null;
+        }
+        BlockPos entrance = colony.getCenter();
+        if (RaidColumn.flat(ant.blockPosition(), entrance) <= LIMP_HOME && Math.abs(ant.getY() - entrance.getY()) <= LIMP_HOME
+                || colony.nest().isInside(level, ant.blockPosition())) {
+            limping.remove(ant.getUUID());
+            return null;
+        }
+        double along = limp.route().along(ant.getX(), ant.getZ());
+        return along + LIMP_STEP >= limp.route().length() ? entrance : RaidColumn.place(level, limp.route(), along + LIMP_STEP, 0.0);
+    }
+
+    /** Tests: this ant limps home along this column's trail. */
+    public void limpForTests(MatabeleEntity ant, RaidColumn raid, long now) {
+        limping.put(ant.getUUID(), new Limp(raid.back(), now));
     }
 
     /** How many slices the land round the nest is searched in. */
@@ -418,7 +512,7 @@ public class Raids {
         fit.add(0, leader);
         int real = Math.min(Math.min(size, numbers.mostReal()), fit.size());
         int along = Math.max(0, Math.min(size - real, colony.population().inside(Caste.WORKER)));
-        column = new RaidColumn(colony, numbers, find, fit.subList(0, real), along, level.getGameTime());
+        column = new RaidColumn(colony, numbers, carryNumbers(), find, fit.subList(0, real), along, level.getGameTime());
         find.scout = leader.getUUID(); // (it leads: the one to lead the next raid there too)
         return column;
     }
@@ -490,6 +584,12 @@ public class Raids {
         }
         if (!best.isEmpty()) {
             line.append(")");
+        }
+        if (column == null && last != null) {
+            line.append("; the last raid brought home ").append(last.carried()).append(" termite(s)");
+        }
+        if (!limping.isEmpty()) {
+            line.append("; ").append(limping.size()).append(" hurt raider(s) limping home");
         }
         if (column != null) {
             line.append(column.describe());

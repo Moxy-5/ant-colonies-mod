@@ -118,6 +118,23 @@
       "fight_ticks": 6000,
       "regroup_ticks": 400,
       "home_ticks": 3600
+    },
+    "carry": {
+      "_note": "M8 step 3c, home with the prey (colony.RaidColumn, BringPreyGoal). Real Megaponera (Longhurst and Howse 1979, Yusuf 2026): after the fight the raiders gather the stung termites, a major holding a bundle of up to about 12 under its jaws, a minor 1 to 3, and walk home as a column; the prey is eaten in the nest. A worker holds least_major (the shortest drawn as a major) to most_major (the longest major), least_minor to most_minor for a minor, by its length. The raiders pick up the paralysed termites within collect_reach blocks of the find, workers before soldiers, at most collect_ticks, each pick-up pick_ticks. A raid that found nothing spreads round the spot up to spread_reach blocks for spread_ticks, a raider seeing a termite within spread_see blocks going for it, then gathers what it stung; still nothing: home, and the find counts an empty check. Laden, the column walks home at laden_pace of its pace. At home each carrier lays its termites on the prey pile, termites_per_layer to a layer (one that finds no way to the pile in bring_ticks has them laid there out of sight). A raider that leaves the column hurt (crippled, or a soldier clamped on a leg) follows the raid's trail home alone, at most limp_ticks. Every number my pick, to confirm, but the loads (real).",
+      "least_major": 4,
+      "most_major": 10,
+      "least_minor": 1,
+      "most_minor": 3,
+      "collect_reach": 10.0,
+      "collect_ticks": 1200,
+      "pick_ticks": 10,
+      "spread_ticks": 600,
+      "spread_reach": 8.0,
+      "spread_see": 5.0,
+      "laden_pace": 0.85,
+      "termites_per_layer": 10,
+      "bring_ticks": 2400,
+      "limp_ticks": 6000
     }
   },
   "defence": {

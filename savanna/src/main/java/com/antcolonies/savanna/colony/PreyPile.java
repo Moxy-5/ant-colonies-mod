@@ -79,6 +79,9 @@ public class PreyPile implements NurseFood {
     private final Claims<UUID> carriers = new Claims<>();
     /** The game time at the last tick (here or away), for a piece counted in with no clock at hand. Not saved. */
     private long lastTime;
+    /** Step 3c: termites brought home by raiders not yet making a whole layer (saved), and all brought since loading (not saved). */
+    private int looseTermites;
+    private int broughtIn;
 
     PreyPile(Colony colony) {
         this.colony = colony;
@@ -100,6 +103,43 @@ public class PreyPile implements NurseFood {
         lookAfter(level);
         ColonyManager.get(level).markChanged();
         return laid;
+    }
+
+    // --- step 3c, the raids' prey brought home -----------------------------------------------------------------------
+
+    /**
+     * A raider home from a raid lays the termites it carried on the pile ({@code BringPreyGoal}): every
+     * {@code termites_per_layer} of them, counting the odd ones brought before, make one fresh layer, laid at
+     * {@code spot} (the queen's room; another place in it if that one is full; counted all the same if the room has no
+     * place left, as the numbers' pieces are). Null {@code spot}: laid out of sight (a carrier that found no way to the
+     * pile). The odd ones wait for the next carrier's.
+     */
+    public void bringIn(ServerLevel level, @Nullable BlockPos spot, int termites) {
+        int perLayer = colony.profile().section(com.antcolonies.savanna.species.SavannaNumbers.CARRY)
+                .map(com.antcolonies.savanna.species.SavannaNumbers.CarryNumbers::termitesPerLayer).orElse(10);
+        looseTermites += Math.max(0, termites);
+        broughtIn += Math.max(0, termites);
+        while (looseTermites >= Math.max(1, perLayer)) {
+            looseTermites -= Math.max(1, perLayer);
+            if (spot == null || !addLayerAt(level, spot)) {
+                BlockPos other = pickReturnSpot(level, colony.random());
+                if (other != null) {
+                    addLayerAt(level, other);
+                }
+            }
+            edible.addLast(level.getGameTime());
+        }
+        lookAfter(level);
+        ColonyManager.get(level).markChanged();
+    }
+
+    /** Termites brought home by raiders since the colony was loaded (tests and the colony list), and the odd ones not yet a layer. */
+    public int broughtIn() {
+        return broughtIn;
+    }
+
+    public int looseTermites() {
+        return looseTermites;
     }
 
     // --- once a second ---------------------------------------------------------------------------------------------
@@ -480,7 +520,8 @@ public class PreyPile implements NurseFood {
         long now = level.getGameTime();
         String oldest = edible.isEmpty() ? "" : String.format(", oldest %.1f days", (now - edible.peekFirst()) / 24000.0);
         return " | prey pile " + edible.size() + " (" + (isDead(now) ? "dead" : "fresh") + oldest + "), " + rotten + " rotten, "
-                + loadsWaiting() + " to carry out" + (heapOwed > 0 ? ", heap " + heapOwed + " owed" : "");
+                + loadsWaiting() + " to carry out" + (heapOwed > 0 ? ", heap " + heapOwed + " owed" : "")
+                + (broughtIn > 0 || looseTermites > 0 ? ", " + broughtIn + " termite(s) brought home by raids" + (looseTermites > 0 ? " (" + looseTermites + " not yet a layer)" : "") : "");
     }
 
     /** How many pieces are good to eat (for tests and the command). */
@@ -506,6 +547,7 @@ public class PreyPile implements NurseFood {
         pile.putInt("scraps", scraps);
         pile.putInt("heapOwed", heapOwed);
         pile.putLong("waitingSince", waitingSince);
+        pile.putInt("looseTermites", looseTermites);
         if (heap != null) {
             pile.putLong("heap", heap.asLong());
         }
@@ -522,6 +564,7 @@ public class PreyPile implements NurseFood {
         scraps = pile.getInt("scraps");
         heapOwed = pile.getInt("heapOwed");
         waitingSince = pile.contains("waitingSince") ? pile.getLong("waitingSince") : Colony.NOT_SET;
+        looseTermites = pile.getInt("looseTermites");
         heap = pile.contains("heap") ? BlockPos.of(pile.getLong("heap")) : null;
     }
 
@@ -545,5 +588,6 @@ public class PreyPile implements NurseFood {
         heapOwed = 1;
         waitingSince = level.getGameTime() - 5;
         heap = colony.getCenter().offset(2, 0, 1);
+        looseTermites = 7;
     }
 }

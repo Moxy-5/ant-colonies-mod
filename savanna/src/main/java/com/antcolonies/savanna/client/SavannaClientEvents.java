@@ -27,12 +27,28 @@ public class SavannaClientEvents {
     static final float MATABELE_QUEEN_SCALE = 0.76F;
     /** Carried termite leftovers are drawn this big (as a fraction of a full block). */
     private static final float REMAINS_SIZE = 0.3F;
+    /**
+     * M8 step 3c: a carried termite is drawn 7 pixels long in the major's model (0.3 of a major's body, a real
+     * Macrotermes worker beside a Matabele major, as in the pose viewer's stack, tools/matabele_anims.py); its boxes are
+     * 8 long, so this.
+     */
+    private static final float CARRIED_TERMITE_SIZE = 7.0F / 8.0F;
+    private static final ResourceLocation CARRIED_TERMITE_TEXTURE =
+            ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "textures/entity/carried_termite.png");
 
     @SubscribeEvent
     public static void onRegisterLayers(EntityRenderersEvent.RegisterLayerDefinitions event) {
         event.registerLayerDefinition(TermiteNymphRenderer.LAYER, TermiteNymphRenderer::createLayer);
     }
 
+    /** One carried termite (textures from tools/carried_termite_art.py): the soft body, 6 pixels long, and the head. */
+    private static net.minecraft.client.model.geom.ModelPart carriedTermite() {
+        net.minecraft.client.model.geom.builders.MeshDefinition mesh = new net.minecraft.client.model.geom.builders.MeshDefinition();
+        mesh.getRoot().addOrReplaceChild("termite", net.minecraft.client.model.geom.builders.CubeListBuilder.create()
+                .texOffs(0, 0).addBox(-2.0F, -1.0F, -1.0F, 6.0F, 2.0F, 2.0F)
+                .texOffs(0, 4).addBox(-4.0F, -1.0F, -1.0F, 2.0F, 2.0F, 2.0F), net.minecraft.client.model.geom.PartPose.ZERO);
+        return net.minecraft.client.model.geom.builders.LayerDefinition.create(mesh, 16, 16).bakeRoot();
+    }
     @SubscribeEvent
     public static void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event) {
         // M8 step 1e: termite leftovers carried out to the heap: a small heap of them in the jaws.
@@ -41,6 +57,34 @@ public class SavannaClientEvents {
             pose.translate(-0.5F, -0.3F, -0.5F);
             net.minecraft.client.Minecraft.getInstance().getBlockRenderer().renderSingleBlock(SavannaBlocks.TERMITE_REMAINS.get().defaultBlockState()
                     .setValue(com.antcolonies.block.SeedPileBlock.LAYERS, 3), pose, buffers, light, overlay);
+        });
+        // M8 step 3c: paralysed termites carried home from a raid: held crosswise under the jaws in rows of two, one row
+        // under the other, the heads to alternate sides (real Megaponera majors carry a bundle so, minors one to three);
+        // always a real termite's size, however big the carrier.
+        com.antcolonies.client.LoadLooks.signUp(com.antcolonies.savanna.entity.MatabeleLoads.TERMITES, context -> {
+            net.minecraft.client.model.geom.ModelPart termite = carriedTermite();
+            return (pose, carrier, load, buffers, light, overlay) -> {
+                float k = CARRIED_TERMITE_SIZE / Math.max(0.1F, carrier.getScale());
+                if (carrier instanceof MatabeleEntity ant && !ant.hasMajorBody()) {
+                    k *= MATABELE_MAJOR_SCALE / MATABELE_MINOR_SCALE;
+                }
+                float thick = 2.0F / 16.0F * k;
+                int count = load.item().getCount();
+                com.mojang.blaze3d.vertex.VertexConsumer consumer = buffers.getBuffer(
+                        net.minecraft.client.renderer.RenderType.entityCutoutNoCull(CARRIED_TERMITE_TEXTURE));
+                for (int i = 0; i < count; i++) {
+                    int row = i / 2;
+                    int col = i % 2;
+                    pose.pushPose();
+                    pose.translate(0.0F, -(0.1F + row) * thick, count > 1 ? (col - 0.5F) * thick : 0.0F);
+                    if (col == 1) {
+                        pose.mulPose(com.mojang.math.Axis.YP.rotationDegrees(180.0F));
+                    }
+                    pose.scale(k, k, k);
+                    termite.render(pose, consumer, light, overlay);
+                    pose.popPose();
+                }
+            };
         });
         // Termites (placeholder models made by tools/termite_models.py). Each has its own animation file of the same name,
         // its walks made for its own legs (2026-10-18); the queen's swelling and pulsing are done in TermiteQueenModel.

@@ -17,6 +17,7 @@ import com.antcolonies.entity.goal.FeedQueenGoal;
 import com.antcolonies.entity.goal.GoInsideGoal;
 import com.antcolonies.entity.goal.WaitAtNestGoal;
 import com.antcolonies.savanna.SavannaSpecies;
+import com.antcolonies.savanna.entity.goal.BringPreyGoal;
 import com.antcolonies.savanna.entity.goal.CarryRemainsGoal;
 import com.antcolonies.savanna.entity.goal.MatabeleRaidGoal;
 import com.antcolonies.savanna.entity.goal.MatabeleScoutGoal;
@@ -187,7 +188,8 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         this.goalSelector.addGoal(2, new CarryRemainsGoal(this));
         this.goalSelector.addGoal(2, new ClampCareGoal(this)); // M8 2c: termites off nestmates' legs in the nest
         this.goalSelector.addGoal(2, new MatabeleScoutGoal(this)); // M8 3a: a major out scouting for termites
-        this.goalSelector.addGoal(2, new MatabeleRaidGoal(this)); // M8 3b: walking in a raid column
+        this.goalSelector.addGoal(2, new MatabeleRaidGoal(this)); // M8 3b: walking in a raid column (3c: fetching the stung, limping home)
+        this.goalSelector.addGoal(2, new BringPreyGoal(this)); // M8 3c: the termites carried home onto the prey pile
         this.goalSelector.addGoal(3, new DigGoal(this, () -> true));
         this.goalSelector.addGoal(4, new GoInsideGoal(this));
         this.goalSelector.addGoal(5, new WaitAtNestGoal(this));
@@ -206,6 +208,37 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
     private static SavannaNumbers.WorkerSizes sizes() {
         return SpeciesProfiles.get(SPECIES).section(SavannaNumbers.WORKER_SIZES).orElse(null);
     }
+
+    /**
+     * How many paralysed termites it can carry home from a raid (M8 step 3c): a major 4 to 10, a minor 1 to 3, the bigger
+     * the more (real Megaponera: majors a bundle of up to about 12, minors 1 to 3; the species file's {@code raids.carry}).
+     */
+    public int termitesItCanCarry() {
+        SavannaNumbers.WorkerSizes sizes = sizes();
+        SavannaNumbers.CarryNumbers carry = SpeciesProfiles.get(SPECIES).section(SavannaNumbers.CARRY).orElse(null);
+        if (sizes == null || carry == null) {
+            return hasMajorBody() ? 6 : 2;
+        }
+        float length = lengthMm > 0.0F ? lengthMm : hasMajorBody() ? sizes.majorModelMm() : sizes.minorModelMm();
+        return carry.loadFor(hasMajorBody(), length, sizes);
+    }
+
+    /**
+     * Carrying termites the head is held up (M8 step 3c, the clips made in step 1): a stack of three or more with the
+     * jaws opened round it ({@code carry}), one or two with the jaws nearly shut ({@code carry_small}). Any other load
+     * as before (none: the head as the walk has it).
+     */
+    @Override
+    @Nullable
+    protected software.bernie.geckolib.animation.RawAnimation carryClip() {
+        int held = MatabeleLoads.termitesHeldBy(this);
+        return held >= 3 ? CARRY_STACK : held > 0 ? CARRY_FEW : null;
+    }
+
+    private static final software.bernie.geckolib.animation.RawAnimation CARRY_STACK =
+            software.bernie.geckolib.animation.RawAnimation.begin().thenLoop("carry");
+    private static final software.bernie.geckolib.animation.RawAnimation CARRY_FEW =
+            software.bernie.geckolib.animation.RawAnimation.begin().thenLoop("carry_small");
 
     /** Whether this ant has the major's model (else the minor's). */
     public boolean hasMajorBody() {
@@ -611,7 +644,7 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         }
         Colony colony = getColony();
         return colony != null && colony.part(com.antcolonies.savanna.colony.SavannaParts.RAIDS)
-                .map(raids -> raids.isScouting(getUUID()) || raids.isRaider(getUUID())).orElse(false);
+                .map(raids -> raids.isScouting(getUUID()) || raids.isRaider(getUUID()) || raids.isLimping(getUUID())).orElse(false);
     }
 
     /** M8 step 3b: whether it walks in its colony's raid column now. */

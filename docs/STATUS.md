@@ -17,7 +17,7 @@ Keep this short. The full story is in `docs/HISTORY.md`; the long status is at t
 - **Red harvester ant:** lives in its own mod (Desert Colonies), waiting for its rework later.
 
 ## Left before the finish line
-1. **Step 3, scouts and raids:** a scout finds a feeding spot, comes home, leads a column out, the fight, the carry home (real ants only at first). **3a, the scouts, built 2026-11-03** (branch `claude/m8-raids`), not tried in-game yet; **3b, the column, built 2026-11-03** (branch `claude/m8-raid-column-20c0fc`: the scout leads a raid out, it stops short, attacks, comes home empty-handed), not tried in-game yet; next 3c, home with the prey.
+1. **Step 3, scouts and raids:** a scout finds a feeding spot, comes home, leads a column out, the fight, the carry home (real ants only at first). **3a, the scouts, built 2026-11-03** (branch `claude/m8-raids`), not tried in-game yet; **3b, the column, built 2026-11-03** (branch `claude/m8-raid-column-20c0fc`: the scout leads a raid out, it stops short, attacks, comes home empty-handed), not tried in-game yet; **3c, home with the prey, built 2026-11-03** (branch `claude/m8-prey-home-44beec`: the raiders carry the stung termites home in their jaws onto the prey pile, an empty raid looks round first, the hurt limp home), not tried in-game yet; next in-game test 5, one whole raid.
 2. **Step 4, drawn-only ants:** big raid columns of 200 to 500 without lag.
 
 ## Optional, after the finish line

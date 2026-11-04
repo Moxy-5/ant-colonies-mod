@@ -34,6 +34,7 @@ public final class SavannaNumbers {
     public static final SpeciesSection<WorkerSizes> WORKER_SIZES = SpeciesSection.signUp("worker_sizes", WorkerSizes.CODEC);
     public static final SpeciesSection<ScoutNumbers> SCOUTING = SpeciesSection.signUp("raids.scouting", ScoutNumbers.CODEC);
     public static final SpeciesSection<ColumnNumbers> COLUMN = SpeciesSection.signUp("raids.column", ColumnNumbers.CODEC);
+    public static final SpeciesSection<CarryNumbers> CARRY = SpeciesSection.signUp("raids.carry", CarryNumbers.CODEC);
 
     private SavannaNumbers() {
     }
@@ -563,5 +564,51 @@ public final class SavannaNumbers {
                 Codec.INT.optionalFieldOf("regroup_ticks", 400).forGetter(ColumnNumbers::regroupTicks),
                 Codec.INT.optionalFieldOf("home_ticks", 3600).forGetter(ColumnNumbers::homeTicks)
         ).apply(i, ColumnNumbers::new));
+    }
+    /**
+     * M8 step 3c, home with the prey ({@code colony.RaidColumn}, {@code entity.goal.BringPreyGoal}; real Megaponera: after
+     * the fight the raiders gather the stung termites, a major carrying a bundle of up to about 12 in its jaws, a minor 1 to
+     * 3, Yusuf 2026, and walk home as a column). How many a worker can hold grows with its length: a major from
+     * {@code leastMajor} (the shortest drawn with the major's model) to {@code mostMajor} (the longest), a minor from
+     * {@code leastMinor} to {@code mostMinor}. After the fight the raiders pick up the paralysed termites lying within
+     * {@code collectReach} blocks of the find, workers first (at most {@code collectTicks}), each pick-up a pause of
+     * {@code pickTicks}. A raid that found nothing spreads out round the spot up to {@code spreadReach} blocks for
+     * {@code spreadTicks}, any raider seeing a termite within {@code spreadSee} blocks going for it, then collects what it
+     * stung. Laden, the column walks home at {@code ladenPace} of its pace. At home the carriers lay their termites on the
+     * prey pile, {@code termitesPerLayer} to a layer (a carrier that finds no way to the pile in {@code bringTicks} has them
+     * laid there out of sight). A raider that leaves the column hurt (crippled, or a termite soldier clamped on a leg)
+     * follows the raid's trail home by itself, for at most {@code limpTicks}. Every number my pick, to confirm, but the
+     * loads (real).
+     */
+    public record CarryNumbers(int leastMajor, int mostMajor, int leastMinor, int mostMinor, double collectReach, int collectTicks,
+                               int pickTicks, int spreadTicks, double spreadReach, double spreadSee, double ladenPace,
+                               int termitesPerLayer, int bringTicks, int limpTicks) {
+        public static final Codec<CarryNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.INT.optionalFieldOf("least_major", 4).forGetter(CarryNumbers::leastMajor),
+                Codec.INT.optionalFieldOf("most_major", 10).forGetter(CarryNumbers::mostMajor),
+                Codec.INT.optionalFieldOf("least_minor", 1).forGetter(CarryNumbers::leastMinor),
+                Codec.INT.optionalFieldOf("most_minor", 3).forGetter(CarryNumbers::mostMinor),
+                Codec.DOUBLE.optionalFieldOf("collect_reach", 10.0).forGetter(CarryNumbers::collectReach),
+                Codec.INT.optionalFieldOf("collect_ticks", 1200).forGetter(CarryNumbers::collectTicks),
+                Codec.INT.optionalFieldOf("pick_ticks", 10).forGetter(CarryNumbers::pickTicks),
+                Codec.INT.optionalFieldOf("spread_ticks", 600).forGetter(CarryNumbers::spreadTicks),
+                Codec.DOUBLE.optionalFieldOf("spread_reach", 8.0).forGetter(CarryNumbers::spreadReach),
+                Codec.DOUBLE.optionalFieldOf("spread_see", 5.0).forGetter(CarryNumbers::spreadSee),
+                Codec.DOUBLE.optionalFieldOf("laden_pace", 0.85).forGetter(CarryNumbers::ladenPace),
+                Codec.INT.optionalFieldOf("termites_per_layer", 10).forGetter(CarryNumbers::termitesPerLayer),
+                Codec.INT.optionalFieldOf("bring_ticks", 2400).forGetter(CarryNumbers::bringTicks),
+                Codec.INT.optionalFieldOf("limp_ticks", 6000).forGetter(CarryNumbers::limpTicks)
+        ).apply(i, CarryNumbers::new));
+
+        /** How many termites a worker this long can hold: by its length along its model's part of the size spread. */
+        public int loadFor(boolean majorModel, float lengthMm, WorkerSizes sizes) {
+            float split = (float) Math.sqrt(sizes.majorModelMm() * sizes.minorModelMm());
+            float from = majorModel ? split : sizes.shortest();
+            float to = majorModel ? sizes.longest() : split;
+            double t = to <= from ? 1.0 : Math.max(0.0, Math.min(1.0, (lengthMm - from) / (to - from)));
+            int least = majorModel ? leastMajor : leastMinor;
+            int most = majorModel ? mostMajor : mostMinor;
+            return Math.max(1, (int) Math.round(least + (most - least) * t));
+        }
     }
 }

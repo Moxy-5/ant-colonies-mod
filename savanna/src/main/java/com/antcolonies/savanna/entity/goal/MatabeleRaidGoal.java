@@ -20,7 +20,10 @@ import net.minecraft.world.entity.ai.goal.Goal;
  * where this ant should be now: round the entrance while the raid forms, its place in the line on the march, bunched
  * up short of the termites, home again after the fight. This goal only walks there through the ant's navigator, hop by
  * hop for a far place, and faces where the column is heading. The fight itself is {@code FightGoal}'s: the column gives
- * each raider a fight order at the attack, and this goal stands aside while one holds. Mind layer only.
+ * each raider a fight order at the attack, and this goal stands aside while one holds. Step 3c: after the fight the
+ * column gives each raider with room a stung termite to fetch ({@code take}): it walks to it and picks it up; and a
+ * raider that left the column hurt (crippled, a soldier clamped on a leg) limps home along the raid's trail with this
+ * goal, the colony's raids saying where ({@code Raids.limpOrder}). Mind layer only.
  */
 public class MatabeleRaidGoal extends Goal {
     /** The longest hop (blocks) it walks in one go. */
@@ -38,6 +41,9 @@ public class MatabeleRaidGoal extends Goal {
     @Nullable
     private BlockPos walkingTo;
     private int waitUntil;
+    /** Step 3c: whether it limps home along a raid's trail (else it walks in its column), and whether it stands picking a termite up. */
+    private boolean limping;
+    private boolean picking;
 
     public MatabeleRaidGoal(MatabeleEntity ant) {
         this.ant = ant;
@@ -45,25 +51,40 @@ public class MatabeleRaidGoal extends Goal {
     }
 
     @Nullable
-    private RaidColumn myColumn() {
+    private Raids raids() {
         Colony colony = ant.getColony();
-        Raids raids = colony == null ? null : colony.part(SavannaParts.RAIDS).orElse(null);
+        return colony == null ? null : colony.part(SavannaParts.RAIDS).orElse(null);
+    }
+
+    @Nullable
+    private RaidColumn myColumn() {
+        Raids raids = raids();
         RaidColumn found = raids == null ? null : raids.column();
         return found != null && found.has(ant.getUUID()) && found.stage() != RaidColumn.Stage.DONE ? found : null;
     }
 
+    /** Step 3c: whether it limps home from a raid by itself (hurt, out of the column). */
+    private boolean limps() {
+        Raids raids = raids();
+        return raids != null && raids.isLimping(ant.getUUID());
+    }
+
     @Override
     public boolean canUse() {
-        if (ant.getFightSpot() != null || ant.fightsNoMore() || ant.isDowned() || !(ant.level() instanceof ServerLevel)) {
+        if (ant.getFightSpot() != null || ant.isDowned() || !(ant.level() instanceof ServerLevel)) {
             return false;
         }
-        column = myColumn();
-        return column != null;
+        column = ant.fightsNoMore() ? null : myColumn();
+        limping = column == null && limps();
+        return column != null || limping;
     }
 
     @Override
     public boolean canContinueToUse() {
-        return column != null && ant.getFightSpot() == null && !ant.fightsNoMore() && !ant.isDowned() && column == myColumn();
+        if (ant.getFightSpot() != null || ant.isDowned()) {
+            return false;
+        }
+        return limping ? limps() : column != null && !ant.fightsNoMore() && column == myColumn();
     }
 
     @Override
@@ -81,18 +102,33 @@ public class MatabeleRaidGoal extends Goal {
     public void stop() {
         ant.getNavigator().stop();
         column = null;
+        limping = false;
         walkingTo = null;
     }
 
     @Override
     public void tick() {
-        if (!(ant.level() instanceof ServerLevel level) || column == null) {
+        if (!(ant.level() instanceof ServerLevel level)) {
             return;
         }
-        RaidColumn.Order order = column.orderFor(level, ant);
+        RaidColumn.Order order;
+        if (limping) {
+            Raids raids = raids();
+            BlockPos to = raids == null ? null : raids.limpOrder(level, ant);
+            if (to == null) {
+                return; // (home: it is let go, and goes in as any ant)
+            }
+            order = new RaidColumn.Order(to, 1.0, null);
+        } else {
+            order = column == null ? null : column.orderFor(level, ant);
+        }
         if (order == null) {
             return;
         }
+        if (ant.tickCount < waitUntil && picking) {
+            return; // (picking a termite up: it stands)
+        }
+        picking = false;
         if (order.lookAt() != null && ant.getNavigator().isDone()) {
             ant.getLookControl().setLookAt(order.lookAt().getX() + 0.5, order.lookAt().getY() + 0.3, order.lookAt().getZ() + 0.5);
         }
@@ -102,18 +138,33 @@ public class MatabeleRaidGoal extends Goal {
             walkingTo = null;
             return;
         }
+        if (order.take() != null && column != null && level.getEntity(order.take()) instanceof net.minecraft.world.entity.Entity prey
+                && prey.distanceTo(ant) <= RaidColumn.PICK_REACH) {
+            // Step 3c: at its stung termite: it stops, takes it up in its jaws, and stands a moment.
+            ant.getNavigator().stop();
+            ant.getLookControl().setLookAt(prey);
+            if (column.pickUp(level, ant, order.take())) {
+                picking = true;
+                waitUntil = ant.tickCount + column.pickTicks();
+            }
+            walkingTo = null;
+            return;
+        }
         double off = flat(ant.blockPosition(), to);
         boolean moved = walkingTo == null || flat(walkingTo, to) >= MOVED;
         boolean idleAndOff = ant.getNavigator().isDone() && off > AT;
         if (!moved && !idleAndOff || ant.tickCount < waitUntil) {
             return;
         }
-        if (off <= AT && ant.getNavigator().isDone()) {
+        if (off <= AT && ant.getNavigator().isDone() && order.take() == null) {
             walkingTo = to;
             return;
         }
         if (!walkToward(level, to, order.pace())) {
             waitUntil = ant.tickCount + RETRY; // no way now: a little later (BUGS 76: never searched every tick)
+            if (order.take() != null && column != null) {
+                column.noWayTo(level, ant, order.take()); // (another may reach it, or this one later)
+            }
         }
     }
 

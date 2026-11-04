@@ -1141,6 +1141,20 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         setDeltaMovement(Vec3.ZERO);
     }
 
+    /**
+     * A hunter carries it off where it lay paralysed (M8 step 3c: the Matabele take stung termites home to eat): it leaves
+     * its colony's headcount and the world.
+     */
+    public void carriedOff(ServerLevel level) {
+        Colony colony = getColonyId() == null ? null : ColonyManager.get(level).getColony(getColonyId());
+        String caste = nestCaste();
+        if (colony != null && caste != null) {
+            colony.setCount(caste, Math.max(0, colony.getCount(caste) - 1));
+            ColonyManager.get(level).markChanged();
+        }
+        discard();
+    }
+
     /** Tests: falls paralysed at once. */
     public void paralyseForTests() {
         stingsTaken = Integer.MAX_VALUE - 1;
@@ -2520,8 +2534,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         if (clip == null) {
             clip = noticingClip(true);
         }
-        if (clip == null && hasWorkClips() && hasFullMandibles() && !isAsleep()) {
-            clip = CARRY;
+        if (clip == null && hasFullMandibles() && !isAsleep()) {
+            clip = carryClip();
         }
         if (clip == null) {
             clip = usualClip();
@@ -2596,6 +2610,16 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
      */
     protected boolean hasWorkClips() {
         return false;
+    }
+
+    /**
+     * What the head plays over the walk while the jaws hold something: the model's "carry" when it has the work clips,
+     * else nothing. A species may pick by its load (M8 step 3c: the Matabele hold a stack of termites high, one or two
+     * lower).
+     */
+    @Nullable
+    protected RawAnimation carryClip() {
+        return hasWorkClips() ? CARRY : null;
     }
 
     /** Whether this clip plays at the speed it was made (a piece of work played once), not at the insect's own pace. */

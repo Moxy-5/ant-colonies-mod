@@ -11,12 +11,18 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
+import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.savanna.entity.MatabeleEntity;
+import com.antcolonies.savanna.entity.MatabeleLoads;
+import com.antcolonies.savanna.entity.TermiteSoldierEntity;
 import com.antcolonies.savanna.species.SavannaNumbers;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
+import net.minecraft.world.phys.AABB;
 
 /**
  * M8 step 3b, one raid column ({@link Raids}; {@code docs/DESIGN.md}, "Step 3b, the column"). Real Megaponera
@@ -31,13 +37,37 @@ import net.minecraft.util.Mth;
  * place through its navigator; the fight at the spot is step 2's ({@code FightGoal}), each raider sent there with a
  * fight order. Not saved: after a reload the raiders are just ants outside, and go home.
  * Numbers: the species file's {@code raids.column} ({@link SavannaNumbers.ColumnNumbers}).
+ *
+ * <p>Step 3c, home with the prey ({@code docs/DESIGN.md}, "Step 3c, home with the prey"): after the fight the raiders
+ * gather the stung termites lying round the spot ({@link Stage#COLLECTING}: each one with room in its jaws is given the
+ * nearest one nobody has, the termite workers first, and picks it up, {@link #pickUp}), a major a bundle of up to 10, a
+ * minor 1 to 3 (real: Yusuf 2026), then regroup and walk home, a little slower laden; at home each lays its termites on
+ * the prey pile ({@code BringPreyGoal}). A raid that found nobody to sting spreads out round the spot for a while
+ * ({@link Stage#SPREADING}), going for any termite it sees, and gathers what it stung; none: home empty, and the find
+ * counts an empty check. A raider that leaves the column hurt (crippled, or a termite soldier clamped on a leg) is
+ * handed to the colony's raids to limp home along the trail ({@link #takeHurt}). Numbers: {@code raids.carry}
+ * ({@link SavannaNumbers.CarryNumbers}).
  */
 public final class RaidColumn {
-    public enum Stage { FORMING, MARCHING, GATHERING, ATTACKING, REGROUPING, HOMING, DONE }
+    public enum Stage { FORMING, MARCHING, GATHERING, ATTACKING, COLLECTING, SPREADING, REGROUPING, HOMING, DONE }
 
-    /** Where a raider should walk now and how fast, or that it should stand where it is ({@code to} null). */
-    public record Order(@Nullable BlockPos to, double pace, @Nullable BlockPos lookAt) {
+    /**
+     * Where a raider should walk now and how fast, or that it should stand where it is ({@code to} null); {@code take}:
+     * the stung termite it is to pick up there (step 3c), null for none.
+     */
+    public record Order(@Nullable BlockPos to, double pace, @Nullable BlockPos lookAt, @Nullable UUID take) {
+        public Order(@Nullable BlockPos to, double pace, @Nullable BlockPos lookAt) {
+            this(to, pace, lookAt, null);
+        }
     }
+
+    /** The carry numbers when a species file has none (the same as Megaponera's). */
+    public static final SavannaNumbers.CarryNumbers DEFAULT_CARRY =
+            new SavannaNumbers.CarryNumbers(4, 10, 1, 3, 10.0, 1200, 10, 600, 8.0, 5.0, 0.85, 10, 2400, 6000);
+    /** A raider picks up a termite this near it (blocks). */
+    public static final double PICK_REACH = 1.6;
+    /** A termite a raider found no way to is left to the others this long (ticks; BUGS 76: never searched every tick). */
+    private static final int NO_WAY_TICKS = 200;
 
     /** The front's pace: a little slower than the rest, so the ants behind catch up (my pick). */
     private static final double LEAD_PACE = 0.9;
@@ -61,6 +91,7 @@ public final class RaidColumn {
 
     private final Colony colony;
     private final SavannaNumbers.ColumnNumbers numbers;
+    private final SavannaNumbers.CarryNumbers carry;
     private final Raids.Find find;
     /** The march out, from the entrance to the gathering place, and the walk home, the other way. */
     private final Route out;
@@ -87,10 +118,20 @@ public final class RaidColumn {
     private int gatheredAtAttack;
     private String ended = "";
     private final Map<String, Integer> lost = new java.util.TreeMap<>();
+    /** Step 3c: each prey-taker's termite, the termites nobody found a way to (till when), and what was carried. */
+    private final Map<UUID, UUID> taking = new HashMap<>();
+    private final Map<UUID, Long> noWay = new HashMap<>();
+    private int carried;
+    private int carriers;
+    private boolean spread;
+    /** The raiders who left the column hurt since the colony last asked ({@link #takeHurt}). */
+    private final List<UUID> hurt = new ArrayList<>();
 
-    RaidColumn(Colony colony, SavannaNumbers.ColumnNumbers numbers, Raids.Find find, List<MatabeleEntity> raiders, int numbersAlong, long now) {
+    RaidColumn(Colony colony, SavannaNumbers.ColumnNumbers numbers, @Nullable SavannaNumbers.CarryNumbers carry, Raids.Find find,
+               List<MatabeleEntity> raiders, int numbersAlong, long now) {
         this.colony = colony;
         this.numbers = numbers;
+        this.carry = carry != null ? carry : DEFAULT_CARRY;
         this.find = find;
         this.startedAt = now;
         this.stageSince = now;
@@ -163,6 +204,32 @@ public final class RaidColumn {
         return cameHome;
     }
 
+    /** How many stung termites the raiders picked up, and how many raiders carried some (step 3c). */
+    public int carried() {
+        return carried;
+    }
+
+    public int carriers() {
+        return carriers;
+    }
+
+    /** Whether the raid has spread out round the spot, finding nobody to sting at first. */
+    public boolean spread() {
+        return spread;
+    }
+
+    /** The walk home along the trail (from the gathering place to the entrance): hurt raiders limp home on it. */
+    Route back() {
+        return back;
+    }
+
+    /** The raiders who left the column hurt since last asked (the colony's raids lead them home); the list is emptied. */
+    List<UUID> takeHurt() {
+        List<UUID> out = List.copyOf(hurt);
+        hurt.clear();
+        return out;
+    }
+
     /** The gathering place, a few blocks short of the find. */
     public BlockPos gatheringPlace() {
         return out.end();
@@ -195,6 +262,7 @@ public final class RaidColumn {
         members.remove(ant);
         orders.remove(ant);
         sentIn.remove(ant);
+        taking.remove(ant);
     }
 
     /** The column's stages and every raider's place, every {@link #EVERY} ticks (asked by the raiders and the colony). */
@@ -212,6 +280,9 @@ public final class RaidColumn {
                 // dead, crippled, clamped, stung still, or out of the loaded world: out of the column
                 lost.merge(!(level.getEntity(id) instanceof MatabeleEntity ant) ? "gone from the world" : !ant.isAlive() ? "dead"
                         : ant.fightsNoMore() ? "fights no more" : "downed", 1, Integer::sum);
+                if (level.getEntity(id) instanceof MatabeleEntity ant && ant.isAlive() && ant.fightsNoMore()) {
+                    hurt.add(id); // step 3c: it limps home along the trail by itself
+                }
                 drop(id);
             }
         }
@@ -232,6 +303,8 @@ public final class RaidColumn {
             }
             case GATHERING -> gather(level, ants, now);
             case ATTACKING -> attack(level, ants, now);
+            case COLLECTING -> collect(level, ants, now);
+            case SPREADING -> spreadOut(level, ants, now);
             case REGROUPING -> regroup(level, ants, now);
             case HOMING -> home(level, ants, now);
             default -> {
@@ -404,7 +477,139 @@ public final class RaidColumn {
         bunch(level, ants); // (the places of those not fighting: stragglers on their way, and those done)
         boolean stragglers = ants.stream().anyMatch(ant -> !sentIn.contains(ant.getUUID()));
         if (!fighting && (!stragglers || now - attackedAt >= numbers.fightTicks()) || now - attackedAt >= numbers.fightTicks() + 200) {
-            next(Stage.REGROUPING, now);
+            next(Stage.COLLECTING, now); // step 3c: the stung termites gathered first
+        }
+    }
+
+    // --- step 3c, home with the prey ------------------------------------------------------------------------------
+
+    /**
+     * The stung termites lying round the spot (within {@code collect_reach} of the find): paralysed insects not of this
+     * colony's kind, the termite workers before the soldiers (a raid is for the workers, Frank 2017), then the nearest to
+     * the find first.
+     */
+    private List<AbstractAntEntity> preyRound(ServerLevel level) {
+        double reach = carry.collectReach();
+        BlockPos at = find.at();
+        long now = level.getGameTime();
+        return level.getEntitiesOfClass(AbstractAntEntity.class, new AABB(at).inflate(reach, 6.0, reach),
+                        insect -> insect.isAlive() && insect.isParalysed() && !(insect instanceof MatabeleEntity)
+                                && !insect.isPinned() && flat(insect.blockPosition(), at) <= reach
+                                && noWay.getOrDefault(insect.getUUID(), Long.MIN_VALUE) <= now).stream()
+                .sorted(java.util.Comparator.<AbstractAntEntity>comparingInt(insect -> insect instanceof TermiteSoldierEntity ? 1 : 0)
+                        .thenComparingDouble(insect -> insect.distanceToSqr(at.getX() + 0.5, at.getY(), at.getZ() + 0.5)))
+                .toList();
+    }
+
+    /** Whether this raider has room in its jaws for another termite (empty, or holding fewer than it can carry). */
+    private static boolean hasRoom(MatabeleEntity ant) {
+        int held = MatabeleLoads.termitesHeldBy(ant);
+        return held > 0 ? held < ant.termitesItCanCarry() : !ant.hasFullMandibles();
+    }
+
+    /**
+     * The stung termites gathered: each raider with room is given the nearest one nobody has (it walks there and picks it
+     * up, {@link #pickUp}); the rest wait round the gathering place. Done once none is left untaken (or after
+     * {@code collect_ticks}): home, or, if nothing was carried and the raid has not spread out yet, out round the spot.
+     */
+    private void collect(ServerLevel level, List<MatabeleEntity> ants, long now) {
+        List<AbstractAntEntity> prey = preyRound(level);
+        Set<UUID> left = new HashSet<>();
+        for (AbstractAntEntity insect : prey) {
+            left.add(insect.getUUID());
+        }
+        taking.entrySet().removeIf(entry -> !left.contains(entry.getValue())); // (taken, dead, or no way: free again)
+        Set<UUID> taken = new HashSet<>(taking.values());
+        bunch(level, ants); // (the places of those with no termite to fetch)
+        boolean anyFetching = false;
+        for (MatabeleEntity ant : ants) {
+            UUID mine = taking.get(ant.getUUID());
+            if (mine == null && hasRoom(ant)) {
+                AbstractAntEntity nearest = prey.stream().filter(insect -> !taken.contains(insect.getUUID()))
+                        .min(java.util.Comparator.comparingDouble(insect -> insect.distanceToSqr(ant))).orElse(null);
+                if (nearest != null) {
+                    mine = nearest.getUUID();
+                    taking.put(ant.getUUID(), mine);
+                    taken.add(mine);
+                }
+            }
+            if (mine != null && level.getEntity(mine) instanceof AbstractAntEntity insect) {
+                orders.put(ant.getUUID(), new Order(insect.blockPosition(), 1.0, insect.blockPosition(), mine));
+                anyFetching = true;
+            }
+        }
+        if (!anyFetching || now - stageSince >= carry.collectTicks()) {
+            taking.clear();
+            boolean spreadNow = carried == 0 && !spread && now - stageSince < carry.collectTicks();
+            next(spreadNow ? Stage.SPREADING : Stage.REGROUPING, now);
+            spread |= spreadNow;
+        }
+    }
+
+    /**
+     * A raider at its termite picks it up: the termite leaves the world (and its colony), one more in the raider's
+     * jaws. False if it is not there to take (gone, taken, too far, no room).
+     */
+    public boolean pickUp(ServerLevel level, MatabeleEntity ant, UUID prey) {
+        if (!prey.equals(taking.get(ant.getUUID())) || !(level.getEntity(prey) instanceof AbstractAntEntity insect)
+                || !insect.isAlive() || !insect.isParalysed() || insect.distanceTo(ant) > PICK_REACH + 0.5 || !hasRoom(ant)) {
+            return false;
+        }
+        int held = MatabeleLoads.termitesHeldBy(ant);
+        insect.carriedOff(level);
+        ant.setLoad(MatabeleLoads.termites(held + 1));
+        taking.remove(ant.getUUID());
+        carried++;
+        if (held == 0) {
+            carriers++;
+        }
+        level.playSound(null, ant.blockPosition(), SoundEvents.ITEM_PICKUP, SoundSource.NEUTRAL, 0.15F, 1.6F);
+        return true;
+    }
+
+    /** How long a raider stands after each pick-up (ticks). */
+    public int pickTicks() {
+        return carry.pickTicks();
+    }
+
+    /** The raider found no way to its termite: someone else may try it, a little later. */
+    public void noWayTo(ServerLevel level, MatabeleEntity ant, UUID prey) {
+        if (prey.equals(taking.get(ant.getUUID()))) {
+            taking.remove(ant.getUUID());
+        }
+        noWay.put(prey, level.getGameTime() + NO_WAY_TICKS);
+    }
+
+    /**
+     * Nobody stung at the spot: the raiders spread out round it up to {@code spread_reach} blocks (each to its own place
+     * on a ring), and one that sees a termite out in the open within {@code spread_see} blocks goes for it. After
+     * {@code spread_ticks}, or once something lies stung and nobody fights, they gather what there is.
+     */
+    private void spreadOut(ServerLevel level, List<MatabeleEntity> ants, long now) {
+        BlockPos at = find.at();
+        for (int i = 0; i < ants.size(); i++) {
+            MatabeleEntity ant = ants.get(i);
+            if (ant.getFightSpot() != null) {
+                continue; // (going for one)
+            }
+            AbstractAntEntity seen = level.getEntitiesOfClass(AbstractAntEntity.class,
+                            ant.getBoundingBox().inflate(carry.spreadSee(), 3.0, carry.spreadSee()),
+                            insect -> insect.isAlive() && !insect.isDowned() && !(insect instanceof MatabeleEntity)
+                                    && !colony.getId().equals(insect.getColonyId()) && level.canSeeSky(insect.blockPosition()))
+                    .stream().min(java.util.Comparator.comparingDouble(insect -> insect.distanceToSqr(ant))).orElse(null);
+            if (seen != null) {
+                ant.orderToFight(seen.blockPosition(), now + carry.spreadTicks());
+                continue;
+            }
+            double angle = i * 2.39996;
+            double radius = 3.0 + (carry.spreadReach() - 3.0) * ((i * 7) % 10) / 10.0;
+            BlockPos spot = standAt(level, at.getX() + 0.5 + Math.cos(angle) * radius, at.getZ() + 0.5 + Math.sin(angle) * radius, at.getY());
+            orders.put(ant.getUUID(), new Order(spot, 1.0, at));
+        }
+        boolean fighting = ants.stream().anyMatch(ant -> ant.getFightSpot() != null);
+        boolean stung = !preyRound(level).isEmpty();
+        if (!fighting && (stung || now - stageSince >= carry.spreadTicks()) || now - stageSince >= carry.spreadTicks() + 200) {
+            next(stung ? Stage.COLLECTING : Stage.REGROUPING, now);
         }
     }
 
@@ -442,10 +647,14 @@ public final class RaidColumn {
                 orders.put(ant.getUUID(), new Order(entrance, 1.0, null)); // (the front is at the entrance: the rest come in behind it)
             }
         }
+        if (carriers > 0) {
+            // Step 3c: laden, the column walks home a little slower (my pick).
+            orders.replaceAll((id, order) -> new Order(order.to(), order.pace() * carry.ladenPace(), order.lookAt(), order.take()));
+        }
     }
 
     /** The cell to stand in at this place along a route, {@code side} blocks to its right; the route's own point if none. */
-    private BlockPos place(ServerLevel level, Route route, double along, double side) {
+    static BlockPos place(ServerLevel level, Route route, double along, double side) {
         double[] p = route.at(along);
         if (side != 0.0) {
             double[] d = route.direction(along);
@@ -493,6 +702,9 @@ public final class RaidColumn {
         StringBuilder line = new StringBuilder("; a raid of ").append(size).append(" (").append(members.size()).append(" real out")
                 .append(numbersAlong > 0 ? ", " + numbersAlong + " as numbers" : "").append(") ").append(stage.name().toLowerCase())
                 .append(" to ").append(find.at().toShortString());
+        if (carried > 0 || spread) {
+            line.append(", carrying ").append(carried).append(" termite(s)").append(spread ? ", spread out round the spot" : "");
+        }
         return line.toString();
     }
 

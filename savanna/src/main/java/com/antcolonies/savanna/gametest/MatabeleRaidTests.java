@@ -10,11 +10,13 @@ import com.antcolonies.gametest.TestAnts;
 import com.antcolonies.gametest.TestScenes;
 import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.colony.NewLandMounds;
+import com.antcolonies.savanna.colony.PreyPile;
 import com.antcolonies.savanna.colony.RaidColumn;
 import com.antcolonies.savanna.colony.Raids;
 import com.antcolonies.savanna.colony.SavannaParts;
 import com.antcolonies.savanna.command.MatabeleCommands;
 import com.antcolonies.savanna.entity.MatabeleEntity;
+import com.antcolonies.savanna.entity.MatabeleLoads;
 import com.antcolonies.savanna.entity.TermiteSoldierEntity;
 import com.antcolonies.savanna.entity.TermiteWorkerEntity;
 import com.antcolonies.savanna.registry.SavannaEntities;
@@ -29,7 +31,10 @@ import net.minecraft.world.level.block.RotatedPillarBlock;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
-/** M8 step 3, the Matabele raids ({@code colony.Raids}). Step 3a, the scouts; step 3b, the column ({@code colony.RaidColumn}). */
+/**
+ * M8 step 3, the Matabele raids ({@code colony.Raids}). Step 3a, the scouts; step 3b, the column ({@code colony.RaidColumn});
+ * step 3c, home with the prey (the stung termites carried home onto the prey pile, the empty raid spreading out, limpers).
+ */
 @GameTestHolder(SavannaMod.MODID)
 @PrefixGameTestTemplate(false)
 public class MatabeleRaidTests {
@@ -108,7 +113,8 @@ public class MatabeleRaidTests {
      * the 2 termites smelt is 8; the hungry colony could spare 15), the find's scout in front. They mill round the entrance, then walk the scent line with the scout
      * leading, stop a few blocks short of the termites and bunch up, attack together and sting the termite workers
      * (food first: a termite soldier further off ranks below the workers), then walk home along the trail and go in;
-     * nobody is left at the termites.
+     * nobody is left at the termites. Step 3c: they pick the stung termites up and carry them home (no more than each
+     * can hold), and every termite carried home goes onto the colony's prey pile.
      */
     @GameTest(template = "arena", timeoutTicks = 14000, skyAccess = true, batch = "matabele_raids")
     public static void aScoutLeadsARaidColumnAlongItsTrailThatStopsShortAttacksTheWorkersAndComesHome(GameTestHelper helper) {
@@ -222,6 +228,114 @@ public class MatabeleRaidTests {
                         }
                     }
                     SavannaMod.LOGGER.info("[raid test] home at {}, {} came home ({})", helper.getTick(), raid.cameHome(), raid.endedWhy());
+                    // Step 3c: the stung termites came home in the raiders' jaws.
+                    helper.assertTrue(raid.carried() >= 1, "the raid came home with no termites; " + raids.describe(level));
+                    long taken = termites.stream().filter(termite -> !termite.isAlive()).count();
+                    helper.assertTrue(taken >= raid.carried(), raid.carried() + " termites carried but only " + taken + " taken off the ground");
+                    for (MatabeleEntity ant : raiders) {
+                        helper.assertTrue(MatabeleLoads.termitesHeldBy(ant) <= ant.termitesItCanCarry(),
+                                "a raider holds " + MatabeleLoads.termitesHeldBy(ant) + " termites, more than its " + ant.termitesItCanCarry());
+                    }
+                })
+                .thenWaitUntil(() -> helper.assertTrue(raiders.stream().noneMatch(ant -> ant.isAlive() && ant.isCarrying(MatabeleLoads.TERMITES)),
+                        "a raider still holds its termites; " + colony.part(SavannaParts.PREY_PILE).map(pile -> pile.describe(level)).orElse("no pile")))
+                .thenExecute(() -> {
+                    RaidColumn raid = column[0];
+                    PreyPile pile = colony.part(SavannaParts.PREY_PILE).orElse(null);
+                    helper.assertTrue(pile != null, "a Matabele colony has no prey pile");
+                    boolean anyDied = raiders.stream().anyMatch(ant -> !ant.isAlive());
+                    helper.assertTrue(anyDied ? pile.broughtIn() <= raid.carried() && pile.broughtIn() >= 1 : pile.broughtIn() == raid.carried(),
+                            raid.carried() + " termites carried home but " + pile.broughtIn() + " laid on the pile; " + pile.describe(level));
+                    SavannaMod.LOGGER.info("[raid test] on the pile: {}", pile.describe(level));
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Step 3c, the empty raid: a raid to a find where no termite is any more (the log is there, the termites gone) bunches
+     * up and attacks nothing, spreads round the spot a while looking, then comes home empty; the find counts one empty
+     * check. A raider crippled on the march (3 legs gone) leaves the column and limps home along the trail by itself.
+     */
+    @GameTest(template = "arena", timeoutTicks = 14000, skyAccess = true, batch = "matabele_raids")
+    public static void aRaidThatFindsNoTermitesSpreadsOutThenComesHomeEmptyAndALimperFollowsTheTrailHome(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        TestScenes.shapeGround(helper, 45, (x, z) -> 0);
+        Colony dead = NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(NEST, SURFACE, NEST)), NewLandMounds.pickFor("dead", 30, 5L));
+        helper.assertTrue(dead != null, "no dead mound put in");
+        List<TermiteWorkerEntity> gone = feedingUnderALog(helper, 36, NEST + 4);
+        BlockPos at = gone.get(0).blockPosition();
+        gone.forEach(termite -> termite.discard()); // (the termites have left the log)
+        Colony colony = MatabeleCommands.makeColony(level, helper.absolutePos(new BlockPos(NEST + 6, SURFACE, NEST)), 20);
+        helper.assertTrue(colony != null, "no Matabele colony made");
+        Raids raids = colony.part(SavannaParts.RAIDS).orElse(null);
+        helper.assertTrue(raids != null, "a Matabele colony has no raids part");
+        RaidColumn[] column = {null};
+        Raids.Find[] find = {null};
+        MatabeleEntity[] limper = {null};
+        boolean[] spread = {false};
+        helper.onEachTick(() -> {
+            if (column[0] != null && column[0].stage() == RaidColumn.Stage.SPREADING) {
+                spread[0] = true;
+            }
+        });
+        helper.startSequence()
+                .thenIdle(40)
+                .thenExecute(() -> {
+                    BlockPos entrance = colony.getCenter();
+                    MatabeleEntity scout = colony.population().realMembers(level).stream()
+                            .filter(ant -> ant instanceof MatabeleEntity matabele && matabele.hasMajorBody() && !raids.isScouting(ant.getUUID()))
+                            .map(ant -> (MatabeleEntity) ant)
+                            .findFirst().orElse(null);
+                    helper.assertTrue(scout != null, "no real major to be the scout");
+                    List<BlockPos> trail = new ArrayList<>();
+                    int steps = (int) Math.ceil(Math.hypot(at.getX() - entrance.getX(), at.getZ() - entrance.getZ()) / 2.0);
+                    for (int i = 0; i <= steps; i++) {
+                        double t = i / (double) steps;
+                        int x = entrance.getX() + (int) Math.round((at.getX() - entrance.getX()) * t);
+                        int z = entrance.getZ() + (int) Math.round((at.getZ() - entrance.getZ()) * t);
+                        trail.add(level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                                new BlockPos(x, entrance.getY(), z)));
+                    }
+                    RaidColumn raid = raids.raidForTests(level, at, 2, trail, scout.getUUID());
+                    helper.assertTrue(raid != null, "no raid set out; " + raids.describe(level));
+                    column[0] = raid;
+                    find[0] = raid.find();
+                })
+                .thenWaitUntil(() -> helper.assertTrue(column[0].stage() == RaidColumn.Stage.MARCHING
+                        && level.getEntity(column[0].leader()) instanceof MatabeleEntity leader && column[0].alongOut(leader.blockPosition()) > 6.0,
+                        "the column is not well out on the march yet; " + raids.describe(level)))
+                .thenExecute(() -> {
+                    RaidColumn raid = column[0];
+                    for (java.util.UUID id : raid.members()) {
+                        if (!id.equals(raid.leader()) && level.getEntity(id) instanceof MatabeleEntity ant && ant.isAlive()) {
+                            limper[0] = ant;
+                            break;
+                        }
+                    }
+                    helper.assertTrue(limper[0] != null, "no raider to cripple");
+                    limper[0].setLostLegsForTests(0b000111, 0);
+                })
+                .thenWaitUntil(() -> helper.assertTrue(raids.isLimping(limper[0].getUUID()),
+                        "the crippled raider was not sent limping home; " + raids.describe(level)))
+                .thenWaitUntil(() -> helper.assertTrue(raids.column() == null, "the raid is not home yet; " + raids.describe(level)))
+                .thenExecute(() -> {
+                    RaidColumn raid = column[0];
+                    helper.assertTrue(spread[0] && raid.spread(), "the empty raid did not spread out round the spot");
+                    helper.assertTrue(raid.carried() == 0, "the empty raid carried " + raid.carried() + " termites home");
+                    helper.assertTrue(raid.cameHome() >= 1, "nobody came home with the column: " + raid.endedWhy());
+                    helper.assertTrue(find[0].misses() >= 1 || !raids.finds().contains(find[0]),
+                            "the empty raid did not count as an empty check of the spot; " + raids.describe(level));
+                    SavannaMod.LOGGER.info("[empty raid test] home at {}: {}", helper.getTick(), raids.describe(level));
+                })
+                .thenWaitUntil(() -> helper.assertTrue(!limper[0].isAlive() || !raids.isLimping(limper[0].getUUID()),
+                        "the limper is still on its way home, at " + limper[0].blockPosition().toShortString()))
+                .thenExecute(() -> {
+                    if (limper[0].isAlive()) {
+                        BlockPos entrance = colony.getCenter();
+                        helper.assertTrue(flat(limper[0].blockPosition(), entrance) <= 9.0 || colony.nest().isInside(level, limper[0].blockPosition()),
+                                "the limper gave up short of home, at " + limper[0].blockPosition().toShortString());
+                    }
                 })
                 .thenSucceed();
     }
