@@ -140,6 +140,8 @@ public class Raids {
     private long shrankAt = -1;
     private long lastFindAt = -1;
     private int findEdge;
+    /** R5: finds passed over as too poor since the colony was loaded (not saved; tests and the diary). */
+    private int passedOverCount;
     /** The scouts out now (not saved: after a reload they are just ants again). */
     private final Set<UUID> scouts = new HashSet<>();
     /** Ants sent out by the scout command, whatever the hour or hunger (not saved). */
@@ -832,9 +834,29 @@ public class Raids {
         say(level, "scout " + scout.toString().substring(0, 8) + " passes over termites at " + at.toShortString() + ", " + away
                 + " blocks out: worth " + worth + ", a raid that far needs " + String.format(java.util.Locale.ROOT, "%.1f", need(at))
                 + " with the colony " + Math.round(fedShare() * 100) + " percent fed");
+        passedOverCount++;
         if (rechecking != null && finds.contains(rechecking)) {
             foundEmpty(level, rechecking);
         }
+    }
+
+    /** R5: how many finds scouts passed over as too poor since the colony was loaded (tests). */
+    public int passedOverCount() {
+        return passedOverCount;
+    }
+
+    /** R5, tests: the range's shrinking checked as if the game time were {@code now}. */
+    public void shrinkForTests(ServerLevel level, long now) {
+        SavannaNumbers.ScoutNumbers numbers = numbers();
+        if (numbers != null) {
+            shrinkAfterFinds(level, numbers, now);
+        }
+    }
+
+    /** R5, tests: whether this piece (ring, slice) counts as searched empty now. */
+    public boolean isSearchedForTests(int ring, int slice) {
+        SavannaNumbers.ScoutNumbers numbers = numbers();
+        return numbers != null && searched.containsKey(ring * slices(numbers) + slice);
     }
 
     /** The compass word for a slice's middle angle (the diary; Minecraft: +x east, +z south). */
