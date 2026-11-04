@@ -5,6 +5,7 @@ A Minecraft mod where ants and termites live as real colonies: they dig, build, 
 ## How to work with me
 - I have zero coding experience. You write all the code; I test in-game and report bugs.
 - **Realism is all I care about with this mod** (I'm a nerd about real ants and termites). When choosing how anything behaves, go with what the real species does; explain the real behaviour when suggesting options, and only offer simpler versions as a fallback.
+- **Rule: think like an ant nerd and a Minecraft coder at once (user, 2026-11-04, "I'm an ant nerd but I can't code").** The user brings the ant knowledge and the eye for what looks right; Claude must bring both halves itself. As the ant nerd: know what the real species does (the papers, the numbers, the little behaviours) and look for cool real details the plan missed. As the Minecraft coder: make it work in blocks and ticks (open holes, slopes, chunk loading, the 20-minute day, tick rates, many mobs) so it is solid in the real game, not only on flat test ground. Check every design and every bug from both sides.
 - Work in small steps, one feature at a time. Don't add features that aren't in this plan without asking.
 - After every change, run `./gradlew build` and fix compile errors yourself before asking me to test.
 - Tell me exactly how to test each change: what to summon, where to go, what to look for.
