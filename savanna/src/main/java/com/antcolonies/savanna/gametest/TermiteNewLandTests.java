@@ -49,6 +49,21 @@ public class TermiteNewLandTests {
     }
 
     /**
+     * Like {@link #flatArena}, but past 12 blocks from the middle the land rolls gently, up and down by 1 to 2 blocks as
+     * savanna does ({@code docs/BUGS.md} 81: in the user's world 16 mounds of 21 found no room for their dead tree, as a
+     * trunk's foot on ground rising a block beside it counted as "in the way"); flat round the mound itself.
+     */
+    private static void rollingArena(GameTestHelper helper) {
+        TestScenes.shapeGround(helper, 65, (x, z) -> {
+            double fade = Math.max(0, Math.min(1, (Math.hypot(x - 32, z - 32) - 12) / 6.0));
+            return (int) Math.round(fade * (1.3 * Math.sin(x * 0.4) + 1.3 * Math.sin(z * 0.33 + 1)));
+        });
+        net.minecraft.world.phys.AABB b = helper.getBounds();
+        NewLandMounds.fenceForTests(new net.minecraft.world.level.levelgen.structure.BoundingBox((int) b.minX, (int) b.minY, (int) b.minZ,
+                (int) b.maxX - 1, (int) b.maxY - 1, (int) b.maxZ - 1));
+    }
+
+    /**
      * The dead wood for the raids, part 3: a dead tree beside the mound, 10 to 30 blocks past its foot (the user's ask,
      * 2026-10-25), in the tree book (dead), its wood in the world.
      */
@@ -215,14 +230,17 @@ public class TermiteNewLandTests {
         helper.succeed();
     }
 
-    /** An old hump (120 days dead): low and grassy, its trees in the tree book, an aardvark's burrow open at its foot. */
+    /**
+     * An old hump (120 days dead): low and grassy, its trees in the tree book, an aardvark's burrow open at its foot; its
+     * dead tree found on the gently rolling land round it ({@code docs/BUGS.md} 81).
+     */
     @GameTest(template = "arena", timeoutTicks = 200, skyAccess = true)
     public static void anOldHumpOfNewLandIsGrassyWithTreesAndABurrow(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         TestScenes.deepGround(helper);
         NewLandMounds book = NewLandMounds.get(level);
         long seed = 3L; // (woods: 1 + 3 mod 3 = a thicket)
-        flatArena(helper);
+        rollingArena(helper);
         Colony old = book.put(level, helper.absolutePos(new BlockPos(32, SURFACE, 32)), NewLandMounds.pickFor("dead", 120, seed)); // (the arena's middle: room all round for the dead tree)
         NewLandMounds.fenceForTests(null);
         helper.assertTrue(old != null, "no old hump put in");

@@ -537,8 +537,12 @@ public class NewLandMounds extends SavedData {
     /** How many dead trees are tried, and how many places each (the ring is wide, much of it may be uneven or unloaded). */
     static final int DEAD_TREE_TRIES = 10;
     static final int DEAD_TREE_SPOTS = 3;
-    /** The ground round a standing dead tree's trunk may rise and fall this much; under a fallen log, this much from its foot. */
-    static final int DEAD_TREE_UNEVEN = 2;
+    /**
+     * The ground round a standing dead tree's trunk may rise and fall this much (its foot on the lowest of it, the trunk
+     * standing into the higher side as new land's giant trees do; was 2, and with the trunk's base counted as in the way it
+     * was in truth 0: {@code docs/BUGS.md} 81; 4 my pick, the giants take 6); under a fallen log, this much from its foot.
+     */
+    static final int DEAD_TREE_UNEVEN = 4;
     static final int DEAD_LOG_UNEVEN = 3;
 
     /**
@@ -571,7 +575,8 @@ public class NewLandMounds extends SavedData {
             reach = (int) Math.round(pick.height() * 12); // (a dead mound's shape is worn: its old foot by its stage)
         }
         lastDeadTreeReach = reach;
-        int noGround = 0, unloaded = 0, inTheWay = 0;
+        int[] noGround = new int[NO_GROUND_WHY.length];
+        int unloaded = 0, inTheWay = 0;
         String why = "";
         for (int spot = 0; spot < DEAD_TREE_TRIES * DEAD_TREE_SPOTS; spot++) {
             int attempt = spot / DEAD_TREE_SPOTS;
@@ -582,9 +587,16 @@ public class NewLandMounds extends SavedData {
             TreeStage stage = t.stage();
             double bearing = random.nextDouble() * Math.PI * 2, r = reach + DEAD_TREE_NEAREST + random.nextDouble() * (DEAD_TREE_FARTHEST - DEAD_TREE_NEAREST);
             int x = (int) Math.floor(center.getX() + 0.5 + Math.cos(bearing) * r), z = (int) Math.floor(center.getZ() + 0.5 + Math.sin(bearing) * r);
-            BlockPos foot = deadTreeFoot(level, x, z, (int) Math.ceil(TreePlacer.kind(kind).trunk().radius() * 1.5), center.getY());
-            if (foot == null || Forest.get(level).at(foot) != null || fence != null && (foot.getX() < fence.minX() || foot.getX() > fence.maxX() || foot.getZ() < fence.minZ() || foot.getZ() > fence.maxZ())) {
-                noGround++;
+            if (fence != null && (x < fence.minX() || x > fence.maxX() || z < fence.minZ() || z > fence.maxZ())) {
+                noGround[0]++;
+                continue;
+            }
+            BlockPos foot = deadTreeFoot(level, x, z, (int) Math.ceil(TreePlacer.kind(kind).trunk().radius() * 1.5), center.getY(), noGround);
+            if (foot == null) {
+                continue;
+            }
+            if (Forest.get(level).at(foot) != null) {
+                noGround[4]++;
                 continue;
             }
             TreePlacer.Placed tree = shapes != null ? shapes.get(attempt) : TreePlacer.placed(kind, seed, age, stage);
@@ -611,8 +623,15 @@ public class NewLandMounds extends SavedData {
                     String.format(Locale.ROOT, "%.1f", (System.nanoTime() - start) / 1.0e6));
             return foot;
         }
-        SavannaMod.LOGGER.info("[new-land] no room for a dead tree by the mound at {} ({} places tried, {} to {} blocks off: no flat soil {} (or past a test's fence), land not loaded {}, something in the way {}, the last {}; {} ms)",
-                center.toShortString(), DEAD_TREE_TRIES * DEAD_TREE_SPOTS, reach + DEAD_TREE_NEAREST, reach + DEAD_TREE_FARTHEST, noGround, unloaded, inTheWay, why, String.format(Locale.ROOT, "%.1f", (System.nanoTime() - start) / 1.0e6));
+        StringBuilder noGroundWhy = new StringBuilder();
+        for (int w = 0; w < noGround.length; w++) {
+            if (noGround[w] > 0) {
+                noGroundWhy.append(noGroundWhy.isEmpty() ? "" : ", ").append(NO_GROUND_WHY[w]).append(' ').append(noGround[w]);
+            }
+        }
+        SavannaMod.LOGGER.info("[new-land] no room for a dead tree by the mound at {} ({} places tried, {} to {} blocks off: no ground {} ({}), land not loaded {}, something in the way {}, the last {}; {} ms)",
+                center.toShortString(), DEAD_TREE_TRIES * DEAD_TREE_SPOTS, reach + DEAD_TREE_NEAREST, reach + DEAD_TREE_FARTHEST, java.util.Arrays.stream(noGround).sum(),
+                noGroundWhy, unloaded, inTheWay, why, String.format(Locale.ROOT, "%.1f", (System.nanoTime() - start) / 1.0e6));
         return null;
     }
 
@@ -650,29 +669,49 @@ public class NewLandMounds extends SavedData {
                 .map(t -> TreePlacer.placed(t.kind(), t.seed(), t.age(), t.stage())).toList())).isDone();
     }
 
-    /** A dead tree's foot near (x, z): the lowest ground round its trunk, on soil near the mound's own ground; null on water, a slope or no soil. */
-    private static BlockPos deadTreeFoot(ServerLevel level, int x, int z, int reach, int groundY) {
+    /** Why a place had no ground for a dead tree, for the log (counted in {@link #deadTreeFoot}'s {@code why}). */
+    private static final String[] NO_GROUND_WHY = {"past a test's fence", "not soil (water, sand, rock or something lying)", "too steep",
+            "too far above or below the mound", "another tree's place", "land round it not loaded"};
+
+    /**
+     * A dead tree's foot near (x, z): the lowest ground round its trunk, on soil near the mound's own ground (within twice
+     * {@link #DEAD_TREE_UNEVEN}: the galleries follow the land up and down, so a tree on a rise or in a dip is still
+     * theirs); null on water, a steep slope or no soil, counting why in {@code why} (see {@link #NO_GROUND_WHY}).
+     */
+    private static BlockPos deadTreeFoot(ServerLevel level, int x, int z, int reach, int groundY, int[] why) {
         int lowest = Integer.MAX_VALUE, highest = Integer.MIN_VALUE;
         int[][] around = {{0, 0}, {reach, 0}, {-reach, 0}, {0, reach}, {0, -reach}};
         for (int[] o : around) {
             if (!level.hasChunk((x + o[0]) >> 4, (z + o[1]) >> 4)) {
+                why[5]++;
                 return null;
             }
             BlockPos at = top(level, x + o[0], z + o[1]);
             if (!level.getFluidState(at.below()).isEmpty() || !level.getBlockState(at.below()).is(BlockTags.DIRT)) {
+                why[1]++;
                 return null;
             }
             lowest = Math.min(lowest, at.getY());
             highest = Math.max(highest, at.getY());
         }
-        return highest - lowest > DEAD_TREE_UNEVEN || Math.abs(lowest - groundY) > 2 * DEAD_TREE_UNEVEN ? null : new BlockPos(x, lowest, z);
+        if (highest - lowest > DEAD_TREE_UNEVEN) {
+            why[2]++;
+            return null;
+        }
+        if (Math.abs(lowest - groundY) > 2 * DEAD_TREE_UNEVEN) {
+            why[3]++;
+            return null;
+        }
+        return new BlockPos(x, lowest, z);
     }
 
     /**
      * Whether the dead tree has its room (its trunk's foot already stands past the mound's foot): a fallen log not over
      * the mound's foot (or, for a dead mound, inside its old reach); its limbs free to reach over the mound as a real
      * dead giant's do and its broken limbs free to lie on it, in open air; its roots in soil, never filling a tunnel or room;
-     * every block of it above the ground in open air (no other tree, hump wood, bush or mound in its way); and a fallen
+     * every block of it above the ground in open air (no other tree, hump wood, bush or mound in its way), save the
+     * trunk's (or stump's) lowest {@link #DEAD_TREE_UNEVEN} blocks, which may stand into the higher side of the ground
+     * round its foot as new land's giant trees do (the placer leaves those blocks out; {@code docs/BUGS.md} 81); and a fallen
      * log lying on land within {@link #DEAD_LOG_UNEVEN} of its foot. Returns what is in the way, or null if it fits.
      */
     private static String blocked(ServerLevel level, TreePlacer.Placed tree, BlockPos foot, LongOpenHashSet footprint, BlockPos center, int reach) {
@@ -688,19 +727,35 @@ public class NewLandMounds extends SavedData {
             }
             pos.set(x, foot.getY() + tree.ys()[i], z);
             if (tree.ys()[i] < 0) {
+                if (fence != null && (x < fence.minX() || x > fence.maxX() || z < fence.minZ() || z > fence.maxZ())) {
+                    return "a test's fence (a root at " + pos.toShortString() + ")"; // (past a test arena is empty space, no soil)
+                }
                 if (level.getBlockState(pos).isAir()) {
-                    return "a root in a tunnel or room at " + pos.toShortString(); // (roots run on through the soil only)
+                    int overGround = pos.getY() - top(level, x, z).getY();
+                    if (overGround < 0) {
+                        return "a root in a tunnel or room at " + pos.toShortString(); // (roots run on through the soil only)
+                    }
+                    if (overGround > 1) {
+                        return "a root hanging over a dip at " + pos.toShortString();
+                    }
+                    // (over a dip in the land, out in the open on the ground: an exposed root, as on a real tree; BUGS 81)
                 }
                 continue;
             }
-            if (!TreePlacer.isOpen(level.getBlockState(pos))) {
-                return level.getBlockState(pos).getBlock().getName().getString() + " at " + pos.toShortString();
+            BlockState there = level.getBlockState(pos);
+            if (!TreePlacer.isOpen(there) && !(slice == TreePlacer.FIXED && tree.ys()[i] <= DEAD_TREE_UNEVEN && isGround(there))) {
+                return there.getBlock().getName().getString() + " at " + pos.toShortString();
             }
             if (slice >= 0 && Math.abs(top(level, x, z).getY() - foot.getY()) > DEAD_LOG_UNEVEN) {
                 return "uneven land under the log at " + pos.toShortString();
             }
         }
         return null;
+    }
+
+    /** The land itself (soil, sand, gravel or rock), which a dead tree's foot may stand into; never a mound, a tree or a player's block. */
+    private static boolean isGround(BlockState state) {
+        return state.is(BlockTags.DIRT) || state.is(BlockTags.SAND) || state.is(Blocks.GRAVEL) || state.is(BlockTags.BASE_STONE_OVERWORLD);
     }
 
     /** A living colony learns its dead tree: the first block of dead wood put in, measured, its foot into the food map. */

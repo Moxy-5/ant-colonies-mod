@@ -282,6 +282,7 @@ A Minecraft mod where ants and termites live as real colonies: they dig, build, 
 - **M8 order changed by the user 2026-10-25: raids before drawn ants** (replaces "step 3 before step 4" of the same day): 2f, then raids (now step 3, real ants only at first), then the test revamp, then drawn-only ants (now step 4), then 5 and 6; the user's idea for drawn-only ants, about 100 v 100 at the breach at a time, to plan then (`docs/plans/m8-matabele.md`).
 
 - **M8 steps renumbered by the user 2026-10-25:** step 3 is now scouts and raids, step 4 drawn-only ants (older notes saying "step 3, drawn-only" use the old numbers); order: 2f, 3, the test revamp, 4, 5, 6.
+- **Fix 2026-11-03 (`docs/BUGS.md` 81, branch `claude/stoic-shirley-28a1d9`):** new-land mounds get their dead tree on uneven ground again (16 of 21 in the user's world had none: the trunk's base and roots on gently sloping ground counted as in the way); `mound,termitefood,trees` 57 of 57 on 6 servers; not tried in-game yet.
 
 ## Other notes files (read only when the task needs them)
 - `docs/DESIGN.md`: every design decision for the species and shared systems (read the section for a feature before working on it).
