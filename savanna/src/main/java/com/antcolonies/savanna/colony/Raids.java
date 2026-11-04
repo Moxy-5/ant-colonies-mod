@@ -152,6 +152,16 @@ public class Raids {
     private final Map<UUID, Long> unseenSince = new HashMap<>();
     /** Every this many ticks the colony's real ants left outside with nothing to do there are sent home (my pick, 5 s). */
     private static final long SWEEP_EVERY = 100;
+    /** When the next sweep is due (game time; not saved: the first comes at once after a load). */
+    private long nextSweepAt;
+    /**
+     * The raid code review, finding 16: since when each former scout has been missing from the world while the colony's
+     * own land ticked (not saved). One missing a whole {@link #VETERAN_GRACE} died or was folded into the numbers out of
+     * sight: it no longer counts as an ant that knows the way.
+     */
+    private final Map<UUID, Long> veteranMissingSince = new HashMap<>();
+    /** How long a former scout may be missing before it leaves the job (ticks; a game day, my pick). */
+    private static final long VETERAN_GRACE = 24000;
     /** BUGS 89: when to see whether the raiders took up their raid (game time, -1 none). */
     private long raidCheckAt = -1;
     /** BUGS 89: ants the scout command sent, and when to see whether they set out. */
@@ -217,6 +227,15 @@ public class Raids {
     }
 
     void tick(ServerLevel level) {
+        RaidCost.begin();
+        try {
+            tickTimed(level);
+        } finally {
+            RaidCost.end();
+        }
+    }
+
+    private void tickTimed(ServerLevel level) {
         trails.tick(level, level.getGameTime(), trailNumbers(), column == null ? null : column.trail(), what -> say(level, what));
         if (column != null) {
             column.update(level); // (the raiders ask it every few ticks; this keeps it going with none of them loaded)
@@ -235,9 +254,7 @@ public class Raids {
             }
         }
         checkSent(level);
-        if (level.getGameTime() % 20 != 0) {
-            return;
-        }
+        // (once a second: the colony's parts tick once a second; the raid code review, finding 8)
         SavannaNumbers.ScoutNumbers numbers = numbers();
         if (numbers == null) {
             return;
@@ -247,7 +264,8 @@ public class Raids {
         scouts.removeIf(id -> goneFor(level, id, now));
         sent.removeIf(id -> !scouts.contains(id) && goneFor(level, id, now));
         finds.removeIf(find -> now - find.checkedAt > numbers.spotFadeTicks());
-        veterans.removeIf(id -> level.getEntity(id) instanceof AbstractAntEntity ant && !ant.isAlive());
+        veterans.removeIf(id -> veteranGone(level, id, now));
+        veteranMissingSince.keySet().retainAll(veterans);
         searched.values().removeIf(when -> now - when > numbers.sliceFadeTicks());
         if (waiting != null && !finds.contains(waiting)) {
             waiting = null; // (forgotten meanwhile)
@@ -263,7 +281,8 @@ public class Raids {
         SavannaNumbers.CarryNumbers carry = carryNumbers();
         int limpTicks = carry == null ? RaidColumn.DEFAULT_CARRY.limpTicks() : carry.limpTicks();
         wayHome.forgetIf(id -> now - wayHome.since(id) > limpTicks || goneFor(level, id, now));
-        if (now % SWEEP_EVERY == 0) {
+        if (now >= nextSweepAt) {
+            nextSweepAt = now + SWEEP_EVERY; // (a clock of its own, no game-time remainder: the raid code review, finding 8)
             sweep(level, now);
         }
         unseenSince.keySet().removeIf(id -> !scouts.contains(id) && !sent.contains(id) && !wayHome.isGoingHome(id));
@@ -290,15 +309,35 @@ public class Raids {
     }
 
     /**
-     * The raid code review, finding 2: the colony's real ants left outside, far from the entrance, with no job out there
-     * any more (a raid that ended while they were out of sight, a reload, a goal that let go) are sent home along a trail.
+     * The raid code review, finding 16: whether a former scout is gone for good: dead, or missing from the world (died
+     * or folded into the numbers out of sight) for {@link #VETERAN_GRACE}. Seen alive, its count starts again.
      */
+    private boolean veteranGone(ServerLevel level, UUID id, long now) {
+        net.minecraft.world.entity.Entity entity = level.getEntity(id);
+        if (entity != null) {
+            veteranMissingSince.remove(id);
+            return !entity.isAlive();
+        }
+        long since = veteranMissingSince.computeIfAbsent(id, key -> now);
+        if (now - since <= VETERAN_GRACE) {
+            return false;
+        }
+        veteranMissingSince.remove(id);
+        say(level, id.toString().substring(0, 8) + ", a former scout, has been missing " + VETERAN_GRACE / 1200
+                + " minutes: it no longer counts as one that knows the way");
+        return true;
+    }
+
     /**
      * The sweep only sends home ants out in the field, farther than this from the entrance (blocks, flat; my pick): nearer,
      * an ant is in or round its own nest (a dead mound's rooms lie a few blocks off its chimney) and finds its own way in.
      */
     private static final double SWEEP_FROM = 16.0;
 
+    /**
+     * The raid code review, finding 2: the colony's real ants left outside, far from the entrance, with no job out there
+     * any more (a raid that ended while they were out of sight, a reload, a goal that let go) are sent home along a trail.
+     */
     private void sweep(ServerLevel level, long now) {
         for (AbstractAntEntity member : colony.population().realMembers(level)) {
             if (!(member instanceof MatabeleEntity ant) || !ant.isAlive() || ant.isDowned() || ant.getFightSpot() != null
@@ -307,7 +346,7 @@ public class Raids {
             }
             UUID id = ant.getUUID();
             if (scouts.contains(id) || isRaider(id) || wayHome.isGoingHome(id) || ant.hasFullMandibles() || ant.mayGoOut()
-                    || WayHome.isHome(level, ant, colony) || RaidColumn.flat(ant.blockPosition(), colony.getCenter()) <= SWEEP_FROM) {
+                    || WayHome.isHome(level, ant, colony) || RaidGround.flat(ant.blockPosition(), colony.getCenter()) <= SWEEP_FROM) {
                 continue;
             }
             wayHome.send(id, null, now, "left outside with nothing to do there");
@@ -440,12 +479,21 @@ public class Raids {
     }
 
     /**
-     * Whether the colony wants food: its prey pile holds less than a day's food (a layer about 10 termites, one termite
-     * per ant a day, as the pile is eaten).
+     * Whether the colony wants food: its prey pile holds less than a day's food (one termite per ant a day, as the pile
+     * is eaten; {@link #fedShare}).
      */
     public boolean isHungry() {
+        return fedShare() < 1.0;
+    }
+
+    /**
+     * How well fed the colony is, 0 (nothing on the pile) to 1 (a day's food or more): the termites in the pile's good
+     * layers ({@code termites_per_layer} a layer) against one termite per worker a day. The raid code review, finding
+     * 11: once, for the hunger and the raid's size.
+     */
+    public double fedShare() {
         PreyPile pile = colony.part(SavannaParts.PREY_PILE).orElse(null);
-        return pile == null || pile.edible() * 10 < Math.max(1, colony.getCount(Caste.WORKER));
+        return pile == null ? 0.0 : Math.min(1.0, pile.edibleTermites() / (double) Math.max(1, colony.getCount(Caste.WORKER)));
     }
 
     /** Whether it is the scouting hours at the nest (all day, the user's pick 2026-11-03) and dry. */
@@ -466,15 +514,13 @@ public class Raids {
         return waiting;
     }
 
-    /** How many scouts the colony sends at once: one per {@code workers_per_scout} workers, at least 1, at most {@code most_scouts}. */
     /** Raid rework R1, the raid diary: one {@code [raid]} line in the log for the colony as a whole (the column says its own). */
     private void say(ServerLevel level, String what) {
-        long dayTime = colony.timeOfDay(level) % 24000;
         com.antcolonies.savanna.SavannaMod.LOGGER.info("[raid] nest {} at {} (tick {}): {}", colony.getCenter().toShortString(),
-                String.format(java.util.Locale.ROOT, "%02d:%02d", (dayTime / 1000 + 6) % 24, (dayTime % 1000) * 60 / 1000),
-                level.getGameTime(), what);
+                RaidGround.clock(colony, level), level.getGameTime(), what);
     }
 
+    /** How many scouts the colony sends at once: one per {@code workers_per_scout} workers, at least 1, at most {@code most_scouts}. */
     public int scoutsWanted() {
         SavannaNumbers.ScoutNumbers numbers = numbers();
         if (numbers == null) {
@@ -752,8 +798,7 @@ public class Raids {
             return 0;
         }
         int workers = Math.max(1, colony.getCount(Caste.WORKER));
-        PreyPile pile = colony.part(SavannaParts.PREY_PILE).orElse(null);
-        double fed = pile == null ? 0.0 : Math.min(1.0, pile.edible() * 10.0 / workers);
+        double fed = fedShare();
         double share = numbers.leastShare() + (numbers.mostShare() - numbers.leastShare()) * (1.0 - fed);
         int spare = Math.max(1, (int) Math.floor(workers * share));
         return Math.min(spare, Math.max(numbers.leastRaid(), find.worth * numbers.antsPerWorth()));
@@ -980,7 +1025,7 @@ public class Raids {
     }
 
     /** Whether a termite there counts as feeding (out of its mound): not within its colony's mound and a little round it. */
-    public static boolean outOfMound(ServerLevel level, BlockPos at, List<MoundAt> mounds) {
+    public static boolean outOfMound(BlockPos at, List<MoundAt> mounds) {
         for (MoundAt mound : mounds) {
             if (mound.center.closerThan(at, mound.reach + 2.0)) {
                 return false;

@@ -20,6 +20,7 @@ import com.antcolonies.savanna.entity.MatabeleEntity;
 import com.antcolonies.savanna.entity.MatabeleLoads;
 import com.antcolonies.savanna.entity.TermiteSoldierEntity;
 import com.antcolonies.savanna.entity.TermiteWorkerEntity;
+import com.antcolonies.savanna.species.SavannaNumbers;
 import com.antcolonies.savanna.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
@@ -28,6 +29,7 @@ import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.RotatedPillarBlock;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
@@ -465,6 +467,10 @@ public class MatabeleRaidTests {
         List<MatabeleEntity> raiders = new ArrayList<>();
         java.util.Map<RaidColumn.Stage, Long> stageAt = new java.util.EnumMap<>(RaidColumn.Stage.class);
         boolean[] hung = {false};
+        // The raid code review, finding 18: a carrier killed on the way home drops its stung termites where it died.
+        BlockPos[] diedAt = {null};
+        int[] diedHolding = {0};
+        int[] dropped = {-1};
         helper.onEachTick(() -> {
             RaidColumn raid = column[0] != null ? column[0] : raids.column();
             if (raid == null) {
@@ -482,15 +488,35 @@ public class MatabeleRaidTests {
             RaidColumn.Stage stage = raid.stage();
             stageAt.putIfAbsent(stage, now);
             long since = now - stageAt.get(stage);
-            long most = switch (stage) {
-                case FORMING -> 900; // (form is 600 at most, and a little)
-                case MARCHING -> 1200; // (about 17 blocks: 60 s is three times a slow walk)
-                case GATHERING -> 600;
-                case ATTACKING -> 6600;
-                case COLLECTING, SPREADING, REGROUPING -> 1800;
-                case HOMING -> 3900;
-                case DONE -> Long.MAX_VALUE;
+            // (the raid code review, finding 18: each stage's longest time from the species file's own numbers, a little
+            // over for the column's update every few ticks; no number of its own here)
+            SavannaNumbers.ColumnNumbers numbers = raid.columnNumbers();
+            SavannaNumbers.CarryNumbers carry = raid.carryNumbers();
+            long most = SLACK + switch (stage) {
+                case FORMING -> numbers.formTicks();
+                case MARCHING -> raid.marchLimit();
+                case GATHERING -> numbers.gatherTicks();
+                case ATTACKING -> numbers.fightTicks() + 200; // (the fight's own hard end)
+                case COLLECTING -> carry.collectTicks();
+                case SPREADING -> carry.spreadTicks() + 200;
+                case REGROUPING -> numbers.regroupTicks();
+                case HOMING -> numbers.homeTicks();
+                case DONE -> Long.MAX_VALUE - SLACK;
             };
+            if (stage == RaidColumn.Stage.HOMING && diedAt[0] == null) {
+                for (java.util.UUID id : raid.members()) {
+                    if (level.getEntity(id) instanceof MatabeleEntity ant && MatabeleLoads.termitesHeldBy(ant) > 0
+                            && flat(ant.blockPosition(), raid.find().at()) >= 10.0) {
+                        diedAt[0] = ant.blockPosition();
+                        diedHolding[0] = MatabeleLoads.termitesHeldBy(ant);
+                        ant.kill();
+                        break;
+                    }
+                }
+            } else if (diedAt[0] != null && dropped[0] < 0) {
+                dropped[0] = level.getEntitiesOfClass(TermiteWorkerEntity.class, new net.minecraft.world.phys.AABB(diedAt[0]).inflate(2.5),
+                        termite -> termite.isParalysed() && termite.getColonyId() == null).size();
+            }
             if (since > most && !hung[0]) {
                 hung[0] = true;
                 helper.fail("the raid hung in " + stage.name().toLowerCase() + " for " + since / 20 + " s (most " + most / 20 + " s); "
@@ -502,6 +528,7 @@ public class MatabeleRaidTests {
                 .thenExecute(() -> helper.assertTrue(raids.sendNow(level) != null, "the scout command found no fit major"))
                 .thenWaitUntil(() -> helper.assertTrue(column[0] != null, "no raid yet; " + raids.describe(level)))
                 .thenExecute(() -> {
+                    com.antcolonies.savanna.colony.RaidCost.reset(); // (the raid review, finding 9: the raid's own cost, out and home)
                     RaidColumn raid = column[0];
                     Raids.Find find = raid.find();
                     helper.assertTrue(termites.stream().anyMatch(termite -> termite.blockPosition().closerThan(find.at(), 6)),
@@ -520,7 +547,11 @@ public class MatabeleRaidTests {
                     RaidColumn raid = column[0];
                     SavannaMod.LOGGER.info("[raid chain test] home at {}, stages {}, {} came home ({}), {} carried", helper.getTick(), stageAt,
                             raid.cameHome(), raid.endedWhy(), raid.carried());
+                    SavannaMod.LOGGER.info("[raid chain test] the raid's cost: {}", com.antcolonies.savanna.colony.RaidCost.report());
                     helper.assertTrue(raid.carried() >= 1, "the raid came home with no termites: " + raid.endedWhy());
+                    helper.assertTrue(diedAt[0] != null, "no carrier was out on the way home to kill");
+                    helper.assertTrue(dropped[0] >= diedHolding[0], "a carrier killed on the way home held " + diedHolding[0]
+                            + " stung termite(s), but " + Math.max(0, dropped[0]) + " lie where it died at " + diedAt[0].toShortString());
                     helper.assertTrue(raid.cameHome() * 2 >= raid.members().size(),
                             "only " + raid.cameHome() + " of " + raid.members().size() + " came home with the column: " + raid.endedWhy());
                 })
@@ -536,6 +567,111 @@ public class MatabeleRaidTests {
                     }
                 })
                 .thenSucceed();
+    }
+
+    /**
+     * The raid code review, finding 18: a trail over a hill and round a bend, all of it a real scout's own. Between the
+     * nest (a dead mound) and termites feeding under three logs about 20 blocks east lie a pond (a strip of water 3 wide
+     * and 12 long, across the straight way) and a ridge 3 blocks high. The scout command's scout searches by itself,
+     * finds the termites past the ridge and runs home, round the pond's end and over the ridge, laying its scent line:
+     * the line climbs the ridge (2 or more blocks over the plain), bends round the pond (3 or more blocks off the
+     * straight way), and never lies in the water. The raid it leads walks that line out (hopping along it, not straight
+     * across the pond: finding 17), stings termites and carries them home.
+     */
+    @GameTest(template = "arena", timeoutTicks = 24000, skyAccess = true, batch = "matabele_raids")
+    public static void aScoutsTrailOverARidgeAndRoundAPondLeadsTheRaidThereAndHome(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        TestClock.moving(helper, 7.0); // (the morning raid hours)
+        TestScenes.shapeGround(helper, 45, (x, z) -> Math.max(0, 3 - Math.abs(x - 33))); // (the ridge, top at x 33, its foot at 30 and 36)
+        for (int x = 27; x <= 29; x++) {
+            for (int z = 15; z <= 27; z++) {
+                helper.setBlock(x, SURFACE - 1, z, Blocks.WATER);
+                helper.setBlock(x, SURFACE - 2, z, Blocks.WATER);
+            }
+        }
+        Colony dead = NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(NEST, SURFACE, NEST)), NewLandMounds.pickFor("dead", 30, 5L));
+        helper.assertTrue(dead != null, "no dead mound put in");
+        // (the mound's own dead tree off the plain past the hump: it may lie across the logs or the ridge, and a log
+        // with a trunk lying over it is no feeding spot a major can break into from the open)
+        for (int x = 27; x < 45; x++) {
+            for (int z = 0; z < 45; z++) {
+                for (int y = SURFACE - 1; y < SURFACE + 40; y++) { // (a standing dead tree stands tall)
+                    BlockState state = helper.getBlockState(new BlockPos(x, y, z));
+                    if (!state.isAir() && !state.is(Blocks.DIRT) && !state.is(Blocks.GRASS_BLOCK) && !state.is(Blocks.WATER)) {
+                        helper.setBlock(x, y, z, Blocks.AIR);
+                    }
+                }
+            }
+        }
+        List<TermiteWorkerEntity> termites = new ArrayList<>();
+        termites.addAll(feedingUnderALog(helper, 36, NEST + 3));
+        termites.addAll(feedingUnderALog(helper, 36, NEST + 5));
+        termites.addAll(feedingUnderALog(helper, 36, NEST + 7));
+        Colony colony = MatabeleCommands.makeColony(level, helper.absolutePos(new BlockPos(NEST + 6, SURFACE, NEST)), 60);
+        helper.assertTrue(colony != null, "no Matabele colony made");
+        Raids raids = colony.part(SavannaParts.RAIDS).orElse(null);
+        helper.assertTrue(raids != null, "a Matabele colony has no raids part");
+        int plain = helper.absolutePos(new BlockPos(0, SURFACE, 0)).getY();
+        RaidColumn[] column = {null};
+        helper.onEachTick(() -> {
+            if (column[0] == null && raids.column() != null) {
+                column[0] = raids.column();
+            }
+        });
+        helper.startSequence()
+                .thenIdle(40)
+                .thenExecute(() -> helper.assertTrue(raids.sendNow(level) != null, "the scout command found no fit major"))
+                .thenWaitUntil(() -> helper.assertTrue(column[0] != null, "no raid yet; " + raids.describe(level)))
+                .thenExecute(() -> {
+                    RaidColumn raid = column[0];
+                    Raids.Find find = raid.find();
+                    helper.assertTrue(termites.stream().anyMatch(termite -> termite.blockPosition().closerThan(find.at(), 6)),
+                            "the scout's find at " + find.at().toShortString() + " is not by the termites");
+                    List<BlockPos> line = find.trail();
+                    // (over the ridge itself, not the mound's hump at the nest end)
+                    int ridge = helper.absolutePos(new BlockPos(33, SURFACE, NEST)).getX();
+                    int top = line.stream().filter(p -> Math.abs(p.getX() - ridge) <= 1).mapToInt(BlockPos::getY).max().orElse(plain);
+                    helper.assertTrue(top >= plain + 2, "the scent line does not climb the ridge: its highest point on the ridge is "
+                            + (top - plain) + " over the plain; " + line);
+                    BlockPos a = line.get(0), b = line.get(line.size() - 1);
+                    double off = 0.0;
+                    int pondMiddle = helper.absolutePos(new BlockPos(28, SURFACE, NEST)).getX();
+                    for (BlockPos p : line) {
+                        off = Math.max(off, offLine(p, a, b));
+                        // (over the pond's middle row: an ant skirting the rim may hang its middle over the edge a moment)
+                        helper.assertTrue(p.getX() != pondMiddle || level.getFluidState(p).isEmpty() && level.getFluidState(p.below()).isEmpty(),
+                                "a point of the scent line lies in the pond at " + p.toShortString());
+                    }
+                    helper.assertTrue(off >= 3.0, "the scent line does not bend round the pond: at most "
+                            + Math.round(off * 10) / 10.0 + " blocks off the straight way; " + line);
+                    SavannaMod.LOGGER.info("[raid hill test] set out at {}, the line {} blocks off the straight way, {} up: {}{}", helper.getTick(),
+                            Math.round(off * 10) / 10.0, top - plain, raids.describe(level), raid.describe());
+                })
+                .thenWaitUntil(() -> helper.assertTrue(column[0].stage().ordinal() >= RaidColumn.Stage.ATTACKING.ordinal(),
+                        "the column did not reach the termites over the ridge and round the pond; " + raids.describe(level) + column[0].describe()))
+                .thenWaitUntil(() -> helper.assertTrue(termites.stream().anyMatch(termite -> !termite.isAlive() || termite.isParalysed()),
+                        "no termite stung; " + raids.describe(level) + column[0].describe()))
+                .thenWaitUntil(() -> helper.assertTrue(raids.column() != column[0], "the raid is not home yet; " + column[0].describe()))
+                .thenExecute(() -> {
+                    RaidColumn raid = column[0];
+                    SavannaMod.LOGGER.info("[raid hill test] home at {}: {} came home ({}), {} carried", helper.getTick(), raid.cameHome(),
+                            raid.endedWhy(), raid.carried());
+                    helper.assertTrue(raid.carried() >= 1, "the raid came home with no termites: " + raid.endedWhy());
+                    helper.assertTrue(raid.cameHome() * 2 >= raid.members().size(),
+                            "only " + raid.cameHome() + " of " + raid.members().size() + " came home with the column: " + raid.endedWhy());
+                })
+                .thenSucceed();
+    }
+
+    /** How far (flat) this place lies from the straight line through a and b. */
+    private static double offLine(BlockPos p, BlockPos a, BlockPos b) {
+        double dx = b.getX() - a.getX(), dz = b.getZ() - a.getZ();
+        double length = Math.hypot(dx, dz);
+        if (length < 1.0E-6) {
+            return flat(p, a);
+        }
+        return Math.abs((p.getX() - a.getX()) * dz - (p.getZ() - a.getZ()) * dx) / length;
     }
 
     /**
@@ -706,6 +842,9 @@ public class MatabeleRaidTests {
     private static double flat(BlockPos a, BlockPos b) {
         return Math.hypot(a.getX() - b.getX(), a.getZ() - b.getZ());
     }
+
+    /** A stage may last this much past its own longest time (ticks): the column works itself out every few ticks. */
+    private static final long SLACK = 300;
 
     /** Two termite workers feeding in a gallery under a 4-block log (along x from {@code x}) at row {@code z}. */
     private static List<TermiteWorkerEntity> feedingUnderALog(GameTestHelper helper, int x, int z) {

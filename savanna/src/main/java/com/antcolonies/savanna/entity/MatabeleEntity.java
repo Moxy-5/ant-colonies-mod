@@ -497,9 +497,20 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         if (walkingToBreach != null && !getNavigator().isDone()) {
             return true; // on its way
         }
+        if (walkingToBreach != null && !standsToFight()) {
+            // (BUGS 91: there, but not on a floor to bite from, a wall's foot say: it leaves this breach a while rather
+            // than hold it for ever, so the others may take one near it)
+            noWayTo.put(breach, now + NO_WAY_TICKS);
+            breach = null;
+            walkingToBreach = null;
+            return false;
+        }
         BlockPos target = breach;
         walkingToBreach = target;
-        if (!getNavigator().moveTo(at -> at.cell().distToCenterSqr(Vec3.atCenterOf(target)) <= (BITE_REACH - 0.3) * (BITE_REACH - 0.3)
+        // (BUGS 91: a spot on a floor, as it bites only standing; a foothold on a bank's foot beside the cover was in
+        // reach, but on the wall, so it waited there for ever)
+        if (!getNavigator().moveTo(at -> at.surface() == Direction.DOWN
+                && at.cell().distToCenterSqr(Vec3.atCenterOf(target)) <= (BITE_REACH - 0.3) * (BITE_REACH - 0.3)
                 && !at.cell().equals(target), target, 2, 1.2)) {
             noWayTo.put(target, now + NO_WAY_TICKS);
             breach = null;

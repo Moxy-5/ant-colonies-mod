@@ -130,7 +130,7 @@ public final class WayHome {
     /** Whether this insect is home: within {@link #HOME} of the entrance (flat and up or down), or in the nest. */
     static boolean isHome(ServerLevel level, AbstractAntEntity ant, Colony colony) {
         BlockPos entrance = colony.getCenter();
-        return RaidColumn.flat(ant.blockPosition(), entrance) <= HOME && Math.abs(ant.getY() - entrance.getY()) <= HOME
+        return RaidGround.flat(ant.blockPosition(), entrance) <= HOME && Math.abs(ant.getY() - entrance.getY()) <= HOME
                 || colony.nest().isInside(level, ant.blockPosition());
     }
 }

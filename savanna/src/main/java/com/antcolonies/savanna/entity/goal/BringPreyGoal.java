@@ -5,7 +5,6 @@ import java.util.EnumSet;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.goal.Errand;
 import com.antcolonies.entity.load.CarriedLoad;
 import com.antcolonies.savanna.colony.PreyPile;
@@ -59,7 +58,7 @@ public class BringPreyGoal extends Goal {
                 || level.getGameTime() < nextTry || ant.isInAColumn()) {
             return false;
         }
-        Colony colony = ant.getColonyId() == null ? null : ColonyManager.get(level).getColony(ant.getColonyId());
+        Colony colony = ant.getColony();
         pile = colony == null ? null : colony.part(SavannaParts.PREY_PILE).orElse(null);
         if (pile == null) {
             ant.setLoad(CarriedLoad.NONE); // (no colony or no pile any more: nowhere for them)
@@ -121,7 +120,7 @@ public class BringPreyGoal extends Goal {
     private void noWay(ServerLevel level) {
         nextTry = level.getGameTime() + RETRY_TICKS;
         Colony colony = ant.getColony();
-        if (colony != null && RaidColumn.flat(ant.blockPosition(), colony.getCenter()) > FAR_OUT) {
+        if (colony != null && com.antcolonies.savanna.colony.RaidGround.flat(ant.blockPosition(), colony.getCenter()) > FAR_OUT) {
             // (the raid code review, finding 2: far out with no way to the pile, it goes home along a trail with its
             // termites first, and tries again from the entrance)
             colony.part(SavannaParts.RAIDS).ifPresent(raids -> raids.sendHome(level, ant, "a carrier with no way to the prey pile"));

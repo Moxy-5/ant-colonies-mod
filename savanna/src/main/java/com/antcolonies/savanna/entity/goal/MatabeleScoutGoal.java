@@ -10,13 +10,13 @@ import com.antcolonies.colony.Colony;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.savanna.SavannaSpecies;
 import com.antcolonies.savanna.colony.FeedingSpots;
+import com.antcolonies.savanna.colony.RaidGround;
 import com.antcolonies.savanna.colony.Raids;
 import com.antcolonies.savanna.colony.SavannaParts;
 import com.antcolonies.savanna.entity.MatabeleEntity;
 import com.antcolonies.savanna.species.SavannaNumbers;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.ai.goal.Goal;
@@ -83,6 +83,10 @@ public class MatabeleScoutGoal extends Goal {
     private final List<BlockPos> line = new ArrayList<>();
     /** Whether its find was told at home. */
     private boolean told;
+    /** When it next asks whether a scouting trip is wanted (game time). */
+    private long nextLookAt;
+    /** How often it asks (ticks). */
+    private static final long LOOK_EVERY = 20;
 
     public MatabeleScoutGoal(MatabeleEntity ant) {
         this.ant = ant;
@@ -91,9 +95,10 @@ public class MatabeleScoutGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        if (ant.tickCount % 20 != 0 || ant.getColonyId() == null || !(ant.level() instanceof ServerLevel level)) {
+        if (!(ant.level() instanceof ServerLevel level) || level.getGameTime() < nextLookAt || ant.getColonyId() == null) {
             return false;
         }
+        nextLookAt = level.getGameTime() + LOOK_EVERY; // (the raid code review, finding 8: a clock of its own, no tick count)
         Colony mine = ant.getColony();
         Raids part = mine == null ? null : mine.part(SavannaParts.RAIDS).orElse(null);
         if (part == null || part.numbers() == null || !part.mayScout(level, ant)) {
@@ -142,12 +147,13 @@ public class MatabeleScoutGoal extends Goal {
         mounds.clear();
         feedingCells.clear();
         double reach = trip.range() + numbers.smell() + 32.0;
-        for (Colony termites : Raids.termiteColonies(level, colony.getCenter(), reach)) {
+        java.util.List<Colony> near = Raids.termiteColonies(level, colony.getCenter(), reach); // (once: the review, finding 11)
+        for (Colony termites : near) {
             mounds.add(new Raids.MoundAt(termites.getCenter(), FeedingSpots.moundReach(level, termites)));
         }
-        for (Colony termites : Raids.termiteColonies(level, colony.getCenter(), reach)) {
+        for (Colony termites : near) {
             for (BlockPos cell : termites.nest().foodWays().galleryCells()) {
-                if (cell.closerThan(colony.getCenter(), trip.range() + numbers.smell()) && Raids.outOfMound(level, cell, mounds)) {
+                if (cell.closerThan(colony.getCenter(), trip.range() + numbers.smell()) && Raids.outOfMound(cell, mounds)) {
                     feedingCells.add(cell);
                 }
             }
@@ -293,11 +299,9 @@ public class MatabeleScoutGoal extends Goal {
             return null;
         }
         BlockPos cell = new BlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z), z);
-        BlockPos below = cell.below();
-        if (Math.abs(cell.getY() - center.getY()) > 12 || !level.getFluidState(cell).isEmpty() || !level.getFluidState(below).isEmpty()
-                || !level.getBlockState(cell).getCollisionShape(level, cell).isEmpty()
-                || !level.getBlockState(below).isFaceSturdy(level, below, Direction.UP)
-                || !Raids.outOfMound(level, cell, mounds) || !colony.mayForageAt(level, cell)) {
+        // (the raid code review, finding 11: the raiders' own ground rule, so a scout's line only goes where a column can stand)
+        if (Math.abs(cell.getY() - center.getY()) > 12 || !RaidGround.canStand(level, cell)
+                || !Raids.outOfMound(cell, mounds) || !colony.mayForageAt(level, cell)) {
             return null;
         }
         return cell;
@@ -316,7 +320,7 @@ public class MatabeleScoutGoal extends Goal {
         int termites = 0;
         for (AbstractAntEntity termite : level.getEntitiesOfClass(AbstractAntEntity.class, ant.getBoundingBox().inflate(smell),
                 insect -> SavannaSpecies.MACROTERMES.equals(insect.species()) && insect.isAlive() && !insect.isDowned()
-                        && !insect.isSheltered() && Raids.outOfMound(level, insect.blockPosition(), mounds))) {
+                        && !insect.isSheltered() && Raids.outOfMound(insect.blockPosition(), mounds))) {
             termites++;
             double distance = termite.distanceToSqr(ant);
             if (distance < nearestDistance) {
@@ -409,7 +413,6 @@ public class MatabeleScoutGoal extends Goal {
     }
 
     private static double flat(BlockPos a, BlockPos b) {
-        double dx = a.getX() - b.getX(), dz = a.getZ() - b.getZ();
-        return Math.sqrt(dx * dx + dz * dz);
+        return RaidGround.flat(a, b);
     }
 }

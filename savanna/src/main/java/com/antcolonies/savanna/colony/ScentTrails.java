@@ -49,18 +49,30 @@ public final class ScentTrails {
         /** The points broken now, and the points watched for breaks (laid on a floor, not by the entrance). */
         private final BitSet broken;
         private final BitSet watched;
+        /**
+         * The raid code review, finding 15: points laid in land not loaded then (no ground known to put them on): each is
+         * moved onto its ground and watched once its land is loaded ({@link ScentTrails#tick}), instead of never.
+         */
+        private final BitSet unsure;
+        /** Counts every change to the points' places (laid, mended): the column keeps its gap look-up till it changes. */
+        private int shape;
+        /** The box round the points, kept till the shape changes (the block events ask it often). */
+        @Nullable
+        private AABB box;
         private long laidAt;
         private boolean byColumn;
         /** How often a column has walked it, and how many gaps were mended (the colony list, tests). */
         private int walks;
         private int mended;
 
-        Trail(int id, BlockPos to, List<BlockPos> points, BitSet broken, BitSet watched, long laidAt, boolean byColumn, int walks, int mended) {
+        Trail(int id, BlockPos to, List<BlockPos> points, BitSet broken, BitSet watched, BitSet unsure, long laidAt, boolean byColumn,
+                int walks, int mended) {
             this.id = id;
             this.to = to.immutable();
             this.points = new ArrayList<>(points);
             this.broken = broken;
             this.watched = watched;
+            this.unsure = unsure;
             this.laidAt = laidAt;
             this.byColumn = byColumn;
             this.walks = walks;
@@ -76,9 +88,22 @@ public final class ScentTrails {
             return to;
         }
 
-        /** Its points on the ground, the nest end first. */
+        /**
+         * Its points on the ground, the nest end first: a view, not a copy (the raid code review, finding 15: the raid
+         * view drew every trail four times a second); it changes as the trail is mended.
+         */
         public List<BlockPos> points() {
-            return List.copyOf(points);
+            return java.util.Collections.unmodifiableList(points);
+        }
+
+        /** Counts the changes to the points' places (the column's gap look-up is kept till it changes). */
+        int shape() {
+            return shape;
+        }
+
+        /** How many of its points wait for their land to load (tests). */
+        public int unsureCount() {
+            return unsure.cardinality();
         }
 
         public boolean isBroken(int point) {
@@ -145,7 +170,7 @@ public final class ScentTrails {
                     continue;
                 }
                 BlockPos was = points.get(i);
-                BlockPos ground = RaidColumn.standAt(level, was.getX() + 0.5, was.getZ() + 0.5, was.getY());
+                BlockPos ground = RaidGround.standAt(level, was.getX() + 0.5, was.getZ() + 0.5, was.getY());
                 if (ground != null) {
                     points.set(i, ground.immutable());
                     broken.clear(i);
@@ -154,11 +179,13 @@ public final class ScentTrails {
                     points.remove(i);
                     shift(broken, i);
                     shift(watched, i);
+                    shift(unsure, i);
                 }
                 count++;
             }
             if (count > 0) {
                 mended++;
+                changed();
             }
             return count;
         }
@@ -178,8 +205,21 @@ public final class ScentTrails {
             }
         }
 
-        /** The box round all its points (a little wider), for the block events. */
+        /** Its points' places changed: the kept box and the column's gap look-up are worked out again. */
+        private void changed() {
+            shape++;
+            box = null;
+        }
+
+        /** The box round all its points (a little wider), for the block events; kept till the points change. */
         AABB box() {
+            if (box == null) {
+                box = workOutBox();
+            }
+            return box;
+        }
+
+        private AABB workOutBox() {
             int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE;
             int maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE, maxZ = Integer.MIN_VALUE;
             for (BlockPos p : points) {
@@ -202,6 +242,37 @@ public final class ScentTrails {
 
     private final List<Trail> trails = new ArrayList<>();
     private int nextId = 1;
+    /** When the trails are next checked (game time; not saved: the first check comes at once after a load). */
+    private long nextCheckAt;
+
+    /**
+     * The raid code review, finding 15: the points laid where the land was not loaded, now loaded: each moved onto the
+     * ground to stand on next to it and watched from now on (as {@link #lay} does), else kept as it is, never watched.
+     */
+    private static void settle(ServerLevel level, Trail trail) {
+        if (trail.unsure.isEmpty()) {
+            return;
+        }
+        boolean moved = false;
+        for (int i = trail.unsure.nextSetBit(0); i >= 0; i = trail.unsure.nextSetBit(i + 1)) {
+            BlockPos p = trail.points.get(i);
+            if (!level.hasChunkAt(p)) {
+                continue;
+            }
+            trail.unsure.clear(i);
+            BlockPos ground = RaidGround.standAt(level, p.getX() + 0.5, p.getZ() + 0.5, p.getY());
+            if (ground != null && Math.abs(ground.getY() - p.getY()) <= 1) {
+                trail.watched.set(i);
+                if (!ground.equals(p)) {
+                    trail.points.set(i, ground.immutable());
+                    moved = true;
+                }
+            }
+        }
+        if (moved) {
+            trail.changed();
+        }
+    }
 
     /** The trails kept now (alive or not yet dropped), oldest first. */
     public List<Trail> all() {
@@ -216,9 +287,15 @@ public final class ScentTrails {
     public Trail lay(ServerLevel level, BlockPos entrance, BlockPos to, List<BlockPos> line, long now, boolean byColumn) {
         List<BlockPos> points = new ArrayList<>();
         BitSet watched = new BitSet();
+        BitSet unsure = new BitSet();
         for (BlockPos p : line) {
-            BlockPos ground = RaidColumn.standAt(level, p.getX() + 0.5, p.getZ() + 0.5, p.getY());
-            boolean byEntrance = RaidColumn.flat(p, entrance) <= ENTRANCE_FREE;
+            boolean byEntrance = RaidGround.flat(p, entrance) <= ENTRANCE_FREE;
+            if (!byEntrance && !level.hasChunkAt(p)) {
+                unsure.set(points.size()); // (its land not loaded: put on its ground once it is; finding 15)
+                points.add(p.immutable());
+                continue;
+            }
+            BlockPos ground = RaidGround.standAt(level, p.getX() + 0.5, p.getZ() + 0.5, p.getY());
             if (ground != null && !byEntrance && Math.abs(ground.getY() - p.getY()) <= 1) {
                 watched.set(points.size());
                 points.add(ground.immutable());
@@ -226,7 +303,7 @@ public final class ScentTrails {
                 points.add(p.immutable());
             }
         }
-        Trail trail = new Trail(nextId++, to, points, new BitSet(), watched, now, byColumn, 0, 0);
+        Trail trail = new Trail(nextId++, to, points, new BitSet(), watched, unsure, now, byColumn, 0, 0);
         trails.add(trail);
         while (trails.size() > MOST) {
             trails.remove(0);
@@ -258,7 +335,7 @@ public final class ScentTrails {
                 continue;
             }
             for (BlockPos p : trail.points) {
-                if (RaidColumn.flat(p, at) <= within && Math.abs(p.getY() - at.getY()) <= within) {
+                if (RaidGround.flat(p, at) <= within && Math.abs(p.getY() - at.getY()) <= within) {
                     best = trail;
                     break;
                 }
@@ -280,11 +357,13 @@ public final class ScentTrails {
      * {@code say} gets a line for the raid diary for each trail newly broken.
      */
     void tick(ServerLevel level, long now, SavannaNumbers.TrailNumbers numbers, @Nullable Trail inUse, Consumer<String> say) {
-        if (now % CHECK_EVERY != 0) {
+        if (now < nextCheckAt) {
             return;
         }
+        nextCheckAt = now + CHECK_EVERY; // (a clock of its own, no game-time remainder: the raid code review, finding 8)
         trails.removeIf(trail -> trail != inUse && !trail.alive(numbers, now));
         for (Trail trail : trails) {
+            settle(level, trail);
             int newly = 0;
             BlockPos first = null;
             for (int i = 0; i < trail.points.size(); i++) {
@@ -295,7 +374,7 @@ public final class ScentTrails {
                 if (!level.hasChunkAt(p) || p.closerThan(trail.to, SPOT_FREE)) {
                     continue;
                 }
-                if (!scentHolds(level, p)) {
+                if (!RaidGround.canStand(level, p)) { // (the scent holds where an ant can stand)
                     trail.broken.set(i);
                     newly++;
                     if (first == null) {
@@ -308,13 +387,6 @@ public final class ScentTrails {
                         + " point(s) filled, flooded or dug away; " + trail.brokenCount() + " broken in all)");
             }
         }
-    }
-
-    /** Whether the scent on the ground at this cell still holds: the cell free and dry, the ground under it there. */
-    static boolean scentHolds(ServerLevel level, BlockPos cell) {
-        BlockPos below = cell.below();
-        return level.getBlockState(cell).getCollisionShape(level, cell).isEmpty() && level.getFluidState(cell).isEmpty()
-                && level.getFluidState(below).isEmpty() && !level.getBlockState(below).getCollisionShape(level, below).isEmpty();
     }
 
     /**
@@ -364,6 +436,7 @@ public final class ScentTrails {
             one.put("points", new LongArrayTag(trail.points.stream().mapToLong(BlockPos::asLong).toArray()));
             one.putLongArray("broken", trail.broken.toLongArray());
             one.putLongArray("watched", trail.watched.toLongArray());
+            one.putLongArray("unsure", trail.unsure.toLongArray());
             one.putLong("laidAt", trail.laidAt);
             one.putBoolean("byColumn", trail.byColumn);
             one.putInt("walks", trail.walks);
@@ -388,7 +461,7 @@ public final class ScentTrails {
                 points.add(BlockPos.of(point));
             }
             trails.add(new Trail(one.getInt("id"), to, points, BitSet.valueOf(one.getLongArray("broken")),
-                    BitSet.valueOf(one.getLongArray("watched")), one.getLong("laidAt"), one.getBoolean("byColumn"),
+                    BitSet.valueOf(one.getLongArray("watched")), BitSet.valueOf(one.getLongArray("unsure")), one.getLong("laidAt"), one.getBoolean("byColumn"),
                     one.getInt("walks"), one.getInt("mended")));
         }
         nextId = Math.max(1, tag.getInt("raidTrailNext"));
@@ -399,8 +472,10 @@ public final class ScentTrails {
         BitSet broken = new BitSet();
         broken.set(2);
         BitSet watched = new BitSet();
-        watched.set(1, 4);
+        watched.set(1, 3);
+        BitSet unsure = new BitSet();
+        unsure.set(3);
         trails.add(new Trail(nextId++, entrance.offset(20, 0, 6), List.of(entrance, entrance.east(2), entrance.east(4), entrance.offset(18, 0, 6)),
-                broken, watched, 130, true, 2, 1));
+                broken, watched, unsure, 130, true, 2, 1));
     }
 }

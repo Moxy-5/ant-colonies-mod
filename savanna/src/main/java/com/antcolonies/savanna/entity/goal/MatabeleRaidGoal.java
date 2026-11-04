@@ -6,6 +6,7 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.savanna.colony.RaidColumn;
+import com.antcolonies.savanna.colony.RaidGround;
 import com.antcolonies.savanna.colony.Raids;
 import com.antcolonies.savanna.colony.SavannaParts;
 import com.antcolonies.savanna.entity.MatabeleEntity;
@@ -172,7 +173,11 @@ public class MatabeleRaidGoal extends Goal {
         }
     }
 
-    /** Straight to its place when near, else a hop of {@link #HOP} blocks its way; false if no way was found. */
+    /**
+     * Straight to its place when near, else a hop of {@link #HOP} blocks its way: along the column's trail when it and
+     * its place both lie by the trail (the raid code review, finding 17: a hop straight across cut the trail's bends),
+     * else straight; false if no way was found.
+     */
     private boolean walkToward(ServerLevel level, BlockPos to, double pace) {
         BlockPos from = ant.blockPosition();
         double distance = flat(from, to);
@@ -183,11 +188,16 @@ public class MatabeleRaidGoal extends Goal {
             }
             return false;
         }
+        BlockPos along = column == null ? null : column.hopAlong(level, from, to, HOP);
+        if (along != null && ant.getNavigator().moveTo(along, pace)) {
+            walkingTo = to;
+            return true;
+        }
         double share = HOP / distance;
         double x = from.getX() + 0.5 + (to.getX() - from.getX()) * share;
         double z = from.getZ() + 0.5 + (to.getZ() - from.getZ()) * share;
         int y = Mth.floor(Mth.lerp(share, from.getY(), to.getY()));
-        BlockPos hop = RaidColumn.standAt(level, x, z, y);
+        BlockPos hop = RaidGround.standAt(level, x, z, y);
         if (hop != null && ant.getNavigator().moveTo(hop, pace)) {
             walkingTo = to;
             return true;
@@ -196,7 +206,6 @@ public class MatabeleRaidGoal extends Goal {
     }
 
     private static double flat(BlockPos a, BlockPos b) {
-        double dx = a.getX() - b.getX(), dz = a.getZ() - b.getZ();
-        return Math.sqrt(dx * dx + dz * dz);
+        return RaidGround.flat(a, b);
     }
 }

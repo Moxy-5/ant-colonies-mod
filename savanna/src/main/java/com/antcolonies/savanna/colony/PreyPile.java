@@ -115,8 +115,7 @@ public class PreyPile implements NurseFood {
      * pile). The odd ones wait for the next carrier's.
      */
     public void bringIn(ServerLevel level, @Nullable BlockPos spot, int termites) {
-        int perLayer = colony.profile().section(com.antcolonies.savanna.species.SavannaNumbers.CARRY)
-                .map(com.antcolonies.savanna.species.SavannaNumbers.CarryNumbers::termitesPerLayer).orElse(10);
+        int perLayer = termitesPerLayer();
         looseTermites += Math.max(0, termites);
         broughtIn += Math.max(0, termites);
         while (looseTermites >= Math.max(1, perLayer)) {
@@ -527,6 +526,17 @@ public class PreyPile implements NurseFood {
     /** How many pieces are good to eat (for tests and the command). */
     public int edible() {
         return edible.size();
+    }
+
+    /** How many termites make one layer of the pile (the species file's {@code termites_per_layer}, 10 if it has none). */
+    public int termitesPerLayer() {
+        return Math.max(1, colony.profile().section(com.antcolonies.savanna.species.SavannaNumbers.CARRY)
+                .map(com.antcolonies.savanna.species.SavannaNumbers.CarryNumbers::termitesPerLayer).orElse(10));
+    }
+
+    /** The termites in the layers good to eat (one termite feeds one ant a day). */
+    public int edibleTermites() {
+        return edible.size() * termitesPerLayer();
     }
 
     /** Rotten layers still in the pile (for tests). */

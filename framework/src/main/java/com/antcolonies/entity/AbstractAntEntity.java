@@ -1169,6 +1169,14 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
 
     /** Tests: falls paralysed at once. */
     public void paralyseForTests() {
+        fallParalysedNow();
+    }
+
+    /**
+     * Falls paralysed at once, the venom already worked (an insect stung earlier, dropped from a hunter's jaws when the
+     * hunter died, say); it dies of the venom as any stung insect does.
+     */
+    public void fallParalysedNow() {
         stingsTaken = Integer.MAX_VALUE - 1;
         takeSting();
         if (paralysedAt == NOT_PARALYSED) {

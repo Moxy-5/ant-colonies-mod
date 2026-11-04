@@ -118,6 +118,8 @@ public final class RaidColumn {
     private static final double GAP_STOP = 1.5;
     /** R4: a trail point counts as on the route this near it (blocks, flat). */
     private static final double ON_ROUTE = 2.0;
+    /** A raider and its place both this near the trail (blocks) hop along it, not straight ({@link #hopAlong}; my pick). */
+    private static final double HOP_OFF = 4.0;
     /** R4: how many ants at the front cast about at a gap (the front and the next ones out). */
     private static final int CASTERS = 3;
     /** R4: the casters turn to a new loop every this many ticks. */
@@ -135,6 +137,22 @@ public final class RaidColumn {
     private final Route back;
     /** The raiders in marching order, the front first. */
     private final List<UUID> members = new ArrayList<>();
+    /** The same raiders as a set (the raid code review, finding 9: "is it a raider?" is asked of every ant, often). */
+    private final Set<UUID> memberSet = new HashSet<>();
+    /**
+     * The raid code review, finding 9, kept for one update only: each raider's place along each route (asked many times
+     * an update), the stung termites round the spot, and the gap look-up (kept till the trail's points change).
+     */
+    private final Map<MatabeleEntity, Double> alongOutNow = new java.util.IdentityHashMap<>();
+    private final Map<MatabeleEntity, Double> alongBackNow = new java.util.IdentityHashMap<>();
+    @Nullable
+    private List<AbstractAntEntity> preyNow;
+    @Nullable
+    private Route gapRoute;
+    private int gapShape = -1;
+    private double gapTurnedAt = Double.NaN;
+    private double[] gapAlong = new double[0];
+    private int[] gapIndex = new int[0];
     private UUID leader;
     /** The whole raid's size, real ants and the numbers who go along (the numbers walk in step 4). */
     private final int size;
@@ -238,6 +256,7 @@ public final class RaidColumn {
         this.stageSince = now;
         for (MatabeleEntity raider : raiders) {
             members.add(raider.getUUID());
+            memberSet.add(raider.getUUID());
         }
         this.leader = members.get(0);
         this.size = members.size() + numbersAlong;
@@ -293,10 +312,8 @@ public final class RaidColumn {
      * time of day, and the stage now ({@code docs/plans/m8-matabele.md}, 3R).
      */
     void say(String what) {
-        long dayTime = lastLevel == null ? -1 : colony.timeOfDay(lastLevel) % 24000;
-        String clock = dayTime < 0 ? "?" : String.format(java.util.Locale.ROOT, "%02d:%02d", (dayTime / 1000 + 6) % 24,
-                (dayTime % 1000) * 60 / 1000);
-        com.antcolonies.savanna.SavannaMod.LOGGER.info("[raid] nest {} at {} (tick {}), {}: {}", colony.getCenter().toShortString(), clock,
+        com.antcolonies.savanna.SavannaMod.LOGGER.info("[raid] nest {} at {} (tick {}), {}: {}", colony.getCenter().toShortString(),
+                RaidGround.clock(colony, lastLevel),
                 lastLevel == null ? -1 : lastLevel.getGameTime(), stage.name().toLowerCase(), what);
     }
 
@@ -316,7 +333,7 @@ public final class RaidColumn {
     /** One raider in the diary: its id, where it is, how far along the march, and what it is doing. */
     private String who(MatabeleEntity ant, Route route) {
         Order order = orders.get(ant.getUUID());
-        return shortId(ant.getUUID()) + " at " + ant.blockPosition().toShortString() + ", " + Math.round(route.along(ant.getX(), ant.getZ()) * 10) / 10.0
+        return shortId(ant.getUUID()) + " at " + ant.blockPosition().toShortString() + ", " + Math.round(alongOf(route, ant) * 10) / 10.0
                 + " along" + (order == null || order.to() == null ? ", no place" : ", its place " + order.to().toShortString()
                 + " (" + Math.round(Math.sqrt(ant.blockPosition().distSqr(order.to())) * 10) / 10.0 + " off)")
                 + (colony.nest().isInside(ant.level(), ant.blockPosition()) ? ", inside the nest" : "")
@@ -359,7 +376,7 @@ public final class RaidColumn {
     }
 
     public boolean has(UUID ant) {
-        return members.contains(ant);
+        return memberSet.contains(ant);
     }
 
     public int size() {
@@ -432,7 +449,7 @@ public final class RaidColumn {
 
     /** Tests: this member counts as out of sight from now on (as if its land stopped ticking). */
     public void hideForTests(UUID ant) {
-        if (members.contains(ant)) {
+        if (memberSet.contains(ant)) {
             hiddenForTests.add(ant);
         }
     }
@@ -465,13 +482,19 @@ public final class RaidColumn {
     /** Where this raider should be now, or null to stand (worked out every few ticks). */
     @Nullable
     public Order orderFor(ServerLevel level, MatabeleEntity ant) {
-        update(level);
+        RaidCost.begin();
+        try {
+            update(level);
+        } finally {
+            RaidCost.end();
+        }
         return orders.get(ant.getUUID());
     }
 
     /** It leaves the column (gone home on its own, crippled, dead). */
     void drop(UUID ant) {
         members.remove(ant);
+        memberSet.remove(ant);
         orders.remove(ant);
         sentIn.remove(ant);
         taking.remove(ant);
@@ -525,6 +548,10 @@ public final class RaidColumn {
         long previous = updatedAt;
         updatedAt = now;
         lastLevel = level;
+        RaidCost.updated();
+        alongOutNow.clear();
+        alongBackNow.clear();
+        preyNow = null;
         if (previous >= 0 && now - previous > HOLD_AFTER) {
             say("the raid was not worked out for " + (now - previous) / 20 + " s (the colony's land not ticking): its clocks waited");
             holdClocks(now - previous - EVERY);
@@ -600,7 +627,7 @@ public final class RaidColumn {
             end("nobody left in it at " + stage.name().toLowerCase());
             return;
         }
-        if (!members.contains(leader)) {
+        if (!memberSet.contains(leader)) {
             leader = members.get(0); // the front fell: the next ant follows the scent on
         }
         orders.clear();
@@ -645,7 +672,7 @@ public final class RaidColumn {
     private void homeOrder(List<MatabeleEntity> ants) {
         Map<UUID, Double> along = new HashMap<>();
         for (MatabeleEntity ant : ants) {
-            along.put(ant.getUUID(), back.along(ant.getX(), ant.getZ()));
+            along.put(ant.getUUID(), alongOf(back, ant));
         }
         members.sort(java.util.Comparator.comparingDouble(id -> -along.getOrDefault(id, -1.0)));
         UUID was = leader;
@@ -655,8 +682,18 @@ public final class RaidColumn {
         }
     }
 
+    /** The column's numbers (the species file's {@code raids.column}; the tests check the stages' times by them). */
+    public SavannaNumbers.ColumnNumbers columnNumbers() {
+        return numbers;
+    }
+
+    /** The carrying numbers (the species file's {@code raids.carry}). */
+    public SavannaNumbers.CarryNumbers carryNumbers() {
+        return carry;
+    }
+
     /** R3: how long the march out may last (ticks): {@link #MARCH_BASE} and {@link #MARCH_PER_BLOCK} a block of it. */
-    long marchLimit() {
+    public long marchLimit() {
         return MARCH_BASE + (long) Math.ceil(out.length() * MARCH_PER_BLOCK);
     }
 
@@ -766,7 +803,7 @@ public final class RaidColumn {
      */
     private boolean march(ServerLevel level, List<MatabeleEntity> ants, Route route, long now) {
         MatabeleEntity front = ants.stream().filter(ant -> ant.getUUID().equals(leader)).findFirst().orElse(ants.get(0));
-        frontAt = route.along(front.getX(), front.getZ());
+        frontAt = alongOf(route, front);
         if (frontAt >= route.length() - 1.5) {
             return true; // the front is at the route's end
         }
@@ -785,7 +822,7 @@ public final class RaidColumn {
         }
         Map<UUID, Double> at = new HashMap<>();
         for (MatabeleEntity ant : line) {
-            at.put(ant.getUUID(), route.along(ant.getX(), ant.getZ()));
+            at.put(ant.getUUID(), alongOf(route, ant));
         }
         int rows = (int) Math.ceil(line.size() / (double) Math.max(1, numbers.abreast()));
         double length = rows * numbers.spacing();
@@ -859,32 +896,65 @@ public final class RaidColumn {
      */
     @Nullable
     private Gap gapAhead(Route route, double frontAt) {
-        List<double[]> on = new ArrayList<>();
-        trail.forEachPoint((index, at, broken) -> {
-            double x = at.getX() + 0.5, z = at.getZ() + 0.5;
-            double along = route.along(x, z);
-            // (on the way home after turning back, the gap turned back at lies behind: the casters' loops may have
-            // carried the front a little into it, so it is skipped by where it was, not by where the front is)
-            boolean turnedGap = route == back && turnedAt >= 0.0 && along <= route.length() - turnedAt + 0.5;
-            if (route.offBy(x, z) <= ON_ROUTE && !turnedGap) {
-                on.add(new double[] {along, broken ? 1.0 : 0.0});
-            }
-        });
-        on.sort(java.util.Comparator.comparingDouble(p -> p[0]));
+        onRoute(route);
         Double near = null;
-        for (double[] p : on) {
+        for (int k = 0; k < gapAlong.length; k++) {
+            double along = gapAlong[k];
+            boolean broken = trail.isBroken(gapIndex[k]); // (read now: only the points' places are kept)
             if (near == null) {
-                if (p[1] > 0.5 && p[0] >= frontAt - 1.0) {
-                    if (p[0] > frontAt + GAP_LOOK) {
+                if (broken && along >= frontAt - 1.0) {
+                    if (along > frontAt + GAP_LOOK) {
                         return null;
                     }
-                    near = p[0];
+                    near = along;
                 }
-            } else if (p[1] < 0.5 && p[0] > near) {
-                return new Gap(near, p[0]);
+            } else if (!broken && along > near) {
+                return new Gap(near, along);
             }
         }
         return near == null ? null : new Gap(near, route.length());
+    }
+
+    /**
+     * The raid code review, finding 9: the trail's points on this route (within {@link #ON_ROUTE} of it), by how far
+     * along it, worked out again only when the route, the trail's points or the turned-back place change (it was every
+     * update, every point).
+     */
+    private void onRoute(Route route) {
+        if (route == gapRoute && trail.shape() == gapShape && Double.compare(turnedAt, gapTurnedAt) == 0) {
+            return;
+        }
+        gapRoute = route;
+        gapShape = trail.shape();
+        gapTurnedAt = turnedAt;
+        List<double[]> on = new ArrayList<>();
+        trail.forEachPoint((index, at, broken) -> {
+            double x = at.getX() + 0.5, z = at.getZ() + 0.5;
+            double[] near = route.nearest(x, z);
+            double along = near[0];
+            // (on the way home after turning back, the gap turned back at lies behind: the casters' loops may have
+            // carried the front a little into it, so it is skipped by where it was, not by where the front is)
+            boolean turnedGap = route == back && turnedAt >= 0.0 && along <= route.length() - turnedAt + 0.5;
+            if (near[1] <= ON_ROUTE && !turnedGap) {
+                on.add(new double[] {along, index});
+            }
+        });
+        on.sort(java.util.Comparator.comparingDouble(p -> p[0]));
+        gapAlong = new double[on.size()];
+        gapIndex = new int[on.size()];
+        for (int k = 0; k < on.size(); k++) {
+            gapAlong[k] = on.get(k)[0];
+            gapIndex[k] = (int) on.get(k)[1];
+        }
+    }
+
+    /** This raider's place along this route, worked out once an update (finding 9). */
+    private double alongOf(Route route, MatabeleEntity ant) {
+        Map<MatabeleEntity, Double> now = route == out ? alongOutNow : route == back ? alongBackNow : null;
+        if (now == null) {
+            return route.along(ant.getX(), ant.getZ());
+        }
+        return now.computeIfAbsent(ant, key -> route.along(key.getX(), key.getZ()));
     }
 
     /**
@@ -906,7 +976,7 @@ public final class RaidColumn {
             castGap = gap;
             casters.clear();
             casters.add(front.getUUID());
-            line.stream().sorted(java.util.Comparator.comparingDouble(ant -> -route.along(ant.getX(), ant.getZ())))
+            line.stream().sorted(java.util.Comparator.comparingDouble(ant -> -alongOf(route, ant)))
                     .limit(CASTERS - 1).forEach(ant -> casters.add(ant.getUUID()));
             say("the scent trail is broken ahead, a gap of " + Math.round(width * 10) / 10.0 + " blocks at " + Math.round(gap.near() * 10) / 10.0
                     + " along: the front stops and casts about");
@@ -931,9 +1001,8 @@ public final class RaidColumn {
             return false;
         }
         int laid = trail.mend(level, p -> {
-            double x = p.getX() + 0.5, z = p.getZ() + 0.5;
-            double along = route.along(x, z);
-            return route.offBy(x, z) <= ON_ROUTE && along >= gap.near() - 1.0 && along <= gap.far() + 1.0;
+            double[] near = route.nearest(p.getX() + 0.5, p.getZ() + 0.5);
+            return near[1] <= ON_ROUTE && near[0] >= gap.near() - 1.0 && near[0] <= gap.far() + 1.0;
         });
         gapsCrossed++;
         say((pickedUp ? "the trail is picked up past the gap after casting " : givenUp && route == back ? "home past the gap anyway after casting "
@@ -1042,7 +1111,7 @@ public final class RaidColumn {
             if (flat(ant.blockPosition(), middle) > STRAGGLER_FAR) {
                 // (a straggler far behind, left by the march's time limit or a fight: it walks the trail up, not straight
                 // across; the raid code review, findings 2 and 17)
-                double along = out.along(ant.getX(), ant.getZ());
+                double along = alongOf(out, ant);
                 orders.put(ant.getUUID(), new Order(place(level, out, Math.min(out.length(), along + LEAD_STEP), 0.0), HURRY_PACE, find.at()));
                 continue;
             }
@@ -1098,6 +1167,13 @@ public final class RaidColumn {
      * the find first.
      */
     private List<AbstractAntEntity> preyRound(ServerLevel level) {
+        if (preyNow == null) {
+            preyNow = findPrey(level); // (once an update: the raid code review, finding 9)
+        }
+        return preyNow;
+    }
+
+    private List<AbstractAntEntity> findPrey(ServerLevel level) {
         double reach = carry.collectReach();
         BlockPos at = find.at();
         long now = level.getGameTime();
@@ -1123,11 +1199,11 @@ public final class RaidColumn {
      */
     private void collect(ServerLevel level, List<MatabeleEntity> ants, long now) {
         List<AbstractAntEntity> prey = preyRound(level);
-        Set<UUID> left = new HashSet<>();
+        Map<UUID, AbstractAntEntity> left = new HashMap<>();
         for (AbstractAntEntity insect : prey) {
-            left.add(insect.getUUID());
+            left.put(insect.getUUID(), insect);
         }
-        taking.entrySet().removeIf(entry -> !left.contains(entry.getValue())); // (taken, dead, or no way: free again)
+        taking.entrySet().removeIf(entry -> !left.containsKey(entry.getValue())); // (taken, dead, or no way: free again)
         Set<UUID> taken = new HashSet<>(taking.values());
         bunch(level, ants); // (the places of those with no termite to fetch)
         boolean anyFetching = false;
@@ -1142,7 +1218,8 @@ public final class RaidColumn {
                     taken.add(mine);
                 }
             }
-            if (mine != null && level.getEntity(mine) instanceof AbstractAntEntity insect) {
+            AbstractAntEntity insect = mine == null ? null : left.get(mine); // (the prey looked up once, finding 9)
+            if (insect != null) {
                 orders.put(ant.getUUID(), new Order(insect.blockPosition(), 1.0, insect.blockPosition(), mine));
                 anyFetching = true;
             }
@@ -1197,16 +1274,25 @@ public final class RaidColumn {
      */
     private void spreadOut(ServerLevel level, List<MatabeleEntity> ants, long now) {
         BlockPos at = find.at();
+        // (the raid code review, finding 9: one look round for the whole raid, each ant then taking those near itself)
+        AABB all = null;
+        for (MatabeleEntity ant : ants) {
+            if (ant.getFightSpot() == null) {
+                AABB own = ant.getBoundingBox().inflate(carry.spreadSee(), 3.0, carry.spreadSee());
+                all = all == null ? own : all.minmax(own);
+            }
+        }
+        List<AbstractAntEntity> inTheOpen = all == null ? List.of() : level.getEntitiesOfClass(AbstractAntEntity.class, all,
+                insect -> insect.isAlive() && !insect.isDowned() && !(insect instanceof MatabeleEntity)
+                        && !colony.getId().equals(insect.getColonyId()) && level.canSeeSky(insect.blockPosition()));
         for (int i = 0; i < ants.size(); i++) {
             MatabeleEntity ant = ants.get(i);
             if (ant.getFightSpot() != null) {
                 continue; // (going for one)
             }
-            AbstractAntEntity seen = level.getEntitiesOfClass(AbstractAntEntity.class,
-                            ant.getBoundingBox().inflate(carry.spreadSee(), 3.0, carry.spreadSee()),
-                            insect -> insect.isAlive() && !insect.isDowned() && !(insect instanceof MatabeleEntity)
-                                    && !colony.getId().equals(insect.getColonyId()) && level.canSeeSky(insect.blockPosition()))
-                    .stream().min(java.util.Comparator.comparingDouble(insect -> insect.distanceToSqr(ant))).orElse(null);
+            AABB sees = ant.getBoundingBox().inflate(carry.spreadSee(), 3.0, carry.spreadSee());
+            AbstractAntEntity seen = inTheOpen.stream().filter(insect -> insect.getBoundingBox().intersects(sees))
+                    .min(java.util.Comparator.comparingDouble(insect -> insect.distanceToSqr(ant))).orElse(null);
             if (seen != null) {
                 ant.orderToFight(seen.blockPosition(), now + carry.spreadTicks(), com.antcolonies.entity.goal.FightGoal.SPOT_REACH, this);
                 continue;
@@ -1249,13 +1335,13 @@ public final class RaidColumn {
             List<UUID> leftOut = List.copyOf(members);
             end(ants.isEmpty() ? "all home" : "home time up with " + ants.size() + " out, nearest "
                     + ants.stream().mapToDouble(ant -> flat(ant.blockPosition(), entrance)).min().orElse(0) + " flat from the entrance "
-                    + entrance.toShortString() + ", one at " + back.along(ants.get(0).getX(), ants.get(0).getZ()) + " of " + back.length() + " along the way home");
+                    + entrance.toShortString() + ", one at " + alongOf(back, ants.get(0)) + " of " + back.length() + " along the way home");
             for (UUID id : leftOut) {
                 letGo(id, "the column's time home ran out");
             }
             return;
         }
-        if (!members.contains(leader)) {
+        if (!memberSet.contains(leader)) {
             leader = members.get(0);
         }
         if (march(level, ants, back, now)) {
@@ -1305,23 +1391,28 @@ public final class RaidColumn {
         return BlockPos.containing(p[0], p[2], p[1]);
     }
 
-    /** A cell an ant can stand in at this column of the world near height {@code y}: free, dry, with a floor; null if none. */
+    /**
+     * The raid code review, finding 17: a hop of {@code hop} blocks from {@code from} toward {@code to} along the
+     * column's trail (out and home are one line), when both lie within {@link #HOP_OFF} of it and more than a hop apart
+     * along it; null otherwise (the raider walks straight). A raider far behind, or told to the entrance from the far
+     * end, so follows the trail's bends instead of cutting across them.
+     */
     @Nullable
-    public static BlockPos standAt(ServerLevel level, double x, double z, int y) {
-        int bx = Mth.floor(x);
-        int bz = Mth.floor(z);
-        for (int dy : new int[] {0, 1, -1, 2, -2, 3, -3}) {
-            BlockPos cell = new BlockPos(bx, y + dy, bz);
-            if (!level.hasChunkAt(cell)) {
-                return null;
-            }
-            BlockPos below = cell.below();
-            if (level.getBlockState(cell).getCollisionShape(level, cell).isEmpty() && level.getFluidState(cell).isEmpty()
-                    && level.getFluidState(below).isEmpty() && !level.getBlockState(below).getCollisionShape(level, below).isEmpty()) {
-                return cell;
-            }
+    public BlockPos hopAlong(ServerLevel level, BlockPos from, BlockPos to, double hop) {
+        double fx = from.getX() + 0.5, fz = from.getZ() + 0.5, tx = to.getX() + 0.5, tz = to.getZ() + 0.5;
+        if (out.offBy(fx, fz) > HOP_OFF || out.offBy(tx, tz) > HOP_OFF) {
+            return null;
         }
-        return null;
+        double a = out.along(fx, fz), b = out.along(tx, tz);
+        if (Math.abs(b - a) <= hop) {
+            return null;
+        }
+        return place(level, out, a + Math.signum(b - a) * hop, 0.0);
+    }
+
+    @Nullable
+    private static BlockPos standAt(ServerLevel level, double x, double z, int y) {
+        return RaidGround.standAt(level, x, z, y);
     }
 
     /** The column in words (the colony list). */
@@ -1351,9 +1442,8 @@ public final class RaidColumn {
         return line.toString();
     }
 
-    public static double flat(BlockPos a, BlockPos b) {
-        double dx = a.getX() - b.getX(), dz = a.getZ() - b.getZ();
-        return Math.sqrt(dx * dx + dz * dz);
+    private static double flat(BlockPos a, BlockPos b) {
+        return RaidGround.flat(a, b);
     }
 
     /** A line of points (block middles) with the distance walked along it to each (blocks, flat). */
@@ -1387,26 +1477,39 @@ public final class RaidColumn {
             return points.get(points.size() - 1);
         }
 
+        /**
+         * The first piece's end at or past {@code along} (1 to n - 1): a binary search of the distances walked (the raid
+         * code review, finding 9; it was a walk from the start every time).
+         */
+        private int pieceAt(double along) {
+            int lo = 1, hi = xs.length - 1;
+            while (lo < hi) {
+                int mid = (lo + hi) >>> 1;
+                if (along <= sums[mid]) {
+                    hi = mid;
+                } else {
+                    lo = mid + 1;
+                }
+            }
+            return lo;
+        }
+
         /** The place {@code along} blocks along the line: x, z, y. */
         double[] at(double along) {
             int n = xs.length;
             if (n == 1 || along <= 0.0) {
                 return new double[] {xs[0], zs[0], ys[0]};
             }
-            for (int i = 1; i < n; i++) {
-                if (along <= sums[i] || i == n - 1) {
-                    double piece = sums[i] - sums[i - 1];
-                    double t = piece <= 1.0E-6 ? 1.0 : Mth.clamp((along - sums[i - 1]) / piece, 0.0, 1.0);
-                    return new double[] {Mth.lerp(t, xs[i - 1], xs[i]), Mth.lerp(t, zs[i - 1], zs[i]), Mth.lerp(t, ys[i - 1], ys[i])};
-                }
-            }
-            return new double[] {xs[n - 1], zs[n - 1], ys[n - 1]};
+            int i = pieceAt(along);
+            double piece = sums[i] - sums[i - 1];
+            double t = piece <= 1.0E-6 ? 1.0 : Mth.clamp((along - sums[i - 1]) / piece, 0.0, 1.0);
+            return new double[] {Mth.lerp(t, xs[i - 1], xs[i]), Mth.lerp(t, zs[i - 1], zs[i]), Mth.lerp(t, ys[i - 1], ys[i])};
         }
 
         /** The line's heading at this place along it (a unit x, z). */
         double[] direction(double along) {
             int n = xs.length;
-            for (int i = 1; i < n; i++) {
+            for (int i = n == 1 ? n : pieceAt(along); i < n; i++) {
                 if (along <= sums[i] || i == n - 1) {
                     double dx = xs[i] - xs[i - 1], dz = zs[i] - zs[i - 1];
                     double length = Math.hypot(dx, dz);
@@ -1428,7 +1531,8 @@ public final class RaidColumn {
             return nearest(x, z)[1];
         }
 
-        private double[] nearest(double x, double z) {
+        /** The nearest place on the line to (x, z): how far along it, and how far off it. */
+        double[] nearest(double x, double z) {
             int n = xs.length;
             if (n == 1) {
                 return new double[] {0.0, Math.hypot(x - xs[0], z - zs[0])};
