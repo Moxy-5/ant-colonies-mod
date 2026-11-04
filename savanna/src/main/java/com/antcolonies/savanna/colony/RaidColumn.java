@@ -88,6 +88,22 @@ public final class RaidColumn {
     private static final double HOME = 8.0;
     /** How often (ticks) the column works out its places. */
     private static final int EVERY = 5;
+    /**
+     * Raid rework R3: the front waits for the line at most this long at a time (ticks), then walks on at least
+     * {@link #LEAD_STEP} before it may wait again: real columns halt in surges and move on (my pick, a few seconds).
+     */
+    private static final long FRONT_PAUSE = 80;
+    /**
+     * Raid rework R3: a raider whose place is more than {@link #HEADWAY_FAR} blocks off and that has not got
+     * {@link #HEADWAY_MOVE} blocks anywhere for this long (ticks) leaves the column and goes home along the trail, never
+     * holding the rest (BUGS 87; my pick, 15 s).
+     */
+    private static final long NO_HEADWAY = 300;
+    private static final double HEADWAY_FAR = 2.5;
+    private static final double HEADWAY_MOVE = 1.5;
+    /** Raid rework R3: the march has this long at most (ticks), and this much more for each block of it (my picks). */
+    private static final long MARCH_BASE = 400;
+    private static final long MARCH_PER_BLOCK = 60;
 
     private final Colony colony;
     private final SavannaNumbers.ColumnNumbers numbers;
@@ -134,11 +150,17 @@ public final class RaidColumn {
     private ServerLevel lastLevel;
     private long waitingSince = -1;
     private long waitSaidAt = -1;
+    /** R3: since when the front has paused for the line now (-1 not), and how far along it must walk before it may again. */
+    private long pausedSince = -1;
+    private double noPauseUntil = -1.0;
+    /** R3: where each raider last got somewhere, and since when (for its headway). */
+    private final Map<UUID, BlockPos> anchor = new HashMap<>();
+    private final Map<UUID, Long> anchorSince = new HashMap<>();
     /** The front's wait is told in the log after this long, and again every this long while it lasts (ticks). */
     private static final long WAIT_SAY_EVERY = 200;
 
-    RaidColumn(Colony colony, SavannaNumbers.ColumnNumbers numbers, @Nullable SavannaNumbers.CarryNumbers carry, Raids.Find find,
-               List<MatabeleEntity> raiders, int numbersAlong, long now) {
+    RaidColumn(ServerLevel level, Colony colony, SavannaNumbers.ColumnNumbers numbers, @Nullable SavannaNumbers.CarryNumbers carry,
+               Raids.Find find, List<MatabeleEntity> raiders, int numbersAlong, long now) {
         this.colony = colony;
         this.numbers = numbers;
         this.carry = carry != null ? carry : DEFAULT_CARRY;
@@ -154,9 +176,13 @@ public final class RaidColumn {
         // The scent line starts at the entrance itself: points right over it are the shaft (a dead mound's chimney is an
         // open hole, so the ground's height there is the room at its foot), and a route through them dives into the hump
         // (BUGS 85: the column home stuck at the hump's foot).
+        // Raid rework R3: the line starts at the first cell to stand in beside the entrance, toward the find, never on the
+        // entrance itself (a dead mound's open chimney: a place there is in the air over the hole, BUGS 87).
         List<BlockPos> trail = new ArrayList<>(find.trail());
-        trail.removeIf(p -> flat(p, colony.getCenter()) < 1.5);
-        trail.add(0, colony.getCenter());
+        BlockPos start = lineStart(level, colony.getCenter(), trail.isEmpty() ? find.at() : trail.get(trail.size() - 1), trail);
+        double startOut = flat(start, colony.getCenter());
+        trail.removeIf(p -> flat(p, colony.getCenter()) < Math.max(1.5, startOut + 0.5));
+        trail.add(0, start);
         // The gathering place: the last point of the scent line at least stop_short from the find.
         int gather = 0;
         for (int i = 0; i < trail.size(); i++) {
@@ -170,6 +196,26 @@ public final class RaidColumn {
         java.util.Collections.reverse(backPoints);
         this.back = new Route(backPoints);
         this.head = 0.0;
+    }
+
+    /**
+     * Raid rework R3: where the line starts: a cell to stand in 1 to 4 blocks out from the entrance, toward the trail's
+     * first point past the entrance (or the find), turning a little either way if that is no ground; the entrance
+     * itself only if none is found.
+     */
+    private static BlockPos lineStart(ServerLevel level, BlockPos entrance, BlockPos far, List<BlockPos> trail) {
+        BlockPos toward = trail.stream().filter(p -> flat(p, entrance) >= 2.0).findFirst().orElse(far);
+        double angle = Math.atan2(toward.getZ() - entrance.getZ(), toward.getX() - entrance.getX());
+        for (double r = 1.5; r <= 4.0; r += 0.5) {
+            for (double turn : new double[] {0.0, 0.4, -0.4, 0.8, -0.8, 1.2, -1.2}) {
+                BlockPos cell = standAt(level, entrance.getX() + 0.5 + Math.cos(angle + turn) * r, entrance.getZ() + 0.5 + Math.sin(angle + turn) * r,
+                        entrance.getY());
+                if (cell != null && flat(cell, entrance) >= 1.0 && Math.abs(cell.getY() - entrance.getY()) <= 2) {
+                    return cell;
+                }
+            }
+        }
+        return entrance;
     }
 
     /**
@@ -342,10 +388,16 @@ public final class RaidColumn {
             leader = members.get(0); // the front fell: the next ant follows the scent on
         }
         orders.clear();
+        Stage was = stage;
         switch (stage) {
             case FORMING -> form(level, ants, now);
             case MARCHING -> {
-                if (march(level, ants, out)) {
+                if (march(level, ants, out, now)) {
+                    next(Stage.GATHERING, now);
+                } else if (now - stageSince > marchLimit()) {
+                    // R3: no march goes on for ever: the column goes on to the gathering place with whoever is near the
+                    // front; the rest follow the scent there by themselves.
+                    say("the march's time is up (" + marchLimit() / 20 + " s for " + Math.round(out.length()) + " blocks): on to the gathering place");
                     next(Stage.GATHERING, now);
                 }
             }
@@ -356,6 +408,42 @@ public final class RaidColumn {
             case REGROUPING -> regroup(level, ants, now);
             case HOMING -> home(level, ants, now);
             default -> {
+            }
+        }
+        if (stage == was && (stage == Stage.MARCHING || stage == Stage.HOMING)) {
+            headway(level, ants, now);
+        }
+    }
+
+    /** R3: how long the march out may last (ticks): {@link #MARCH_BASE} and {@link #MARCH_PER_BLOCK} a block of it. */
+    long marchLimit() {
+        return MARCH_BASE + (long) Math.ceil(out.length() * MARCH_PER_BLOCK);
+    }
+
+    /**
+     * R3: a raider sent somewhere more than {@link #HEADWAY_FAR} blocks off that got nowhere for {@link #NO_HEADWAY}
+     * ticks leaves the column and goes home along the trail (with the hurt, {@link #takeHurt}); nobody stuck holds the
+     * rest. One standing at its place, or told to stand, makes headway enough.
+     */
+    private void headway(ServerLevel level, List<MatabeleEntity> ants, long now) {
+        for (MatabeleEntity ant : ants) {
+            UUID id = ant.getUUID();
+            BlockPos here = ant.blockPosition();
+            BlockPos last = anchor.get(id);
+            Order order = orders.get(id);
+            boolean far = order != null && order.to() != null && Math.sqrt(here.distSqr(order.to())) > HEADWAY_FAR;
+            if (last == null || !far || Math.sqrt(here.distSqr(last)) >= HEADWAY_MOVE) {
+                anchor.put(id, here);
+                anchorSince.put(id, now);
+                continue;
+            }
+            if (now - anchorSince.getOrDefault(id, now) > NO_HEADWAY && ants.size() > 1) {
+                say(shortId(id) + " leaves the column, no headway for " + NO_HEADWAY / 20 + " s, and goes home: " + who(ant, stage == Stage.HOMING ? back : out));
+                lost.merge("no headway", 1, Integer::sum);
+                hurt.add(id); // (home along the trail by itself, as the hurt do)
+                drop(id);
+                anchor.remove(id);
+                anchorSince.remove(id);
             }
         }
     }
@@ -376,6 +464,10 @@ public final class RaidColumn {
         say("on to " + to.name().toLowerCase() + " after " + (now - stageSince) / 20 + " s, " + members.size() + " real raider(s)"
                 + (carried > 0 ? ", " + carried + " termite(s) carried" : ""));
         waitingSince = -1;
+        pausedSince = -1;
+        noPauseUntil = -1.0;
+        anchor.clear();
+        anchorSince.clear();
         stage = to;
         stageSince = now;
         head = 0.0;
@@ -416,65 +508,101 @@ public final class RaidColumn {
     }
 
     /**
-     * On the march: the front walks the route ahead of itself, waiting while the ants keeping up are strung out too far
-     * behind it; every other ant walks to its place behind the front, single file near the entrance, up to
-     * {@code abreast} side by side further out. At the route's end the next stage.
+     * On the march (raid rework R3, trail-following): the front walks the trail ahead of itself and waits for the line
+     * to close up, but never more than {@link #FRONT_PAUSE} at a time (then it walks on at least {@link #LEAD_STEP}: the
+     * column moves in surges). Every other raider out of the nest follows the trail and keeps a gap of {@code spacing}
+     * to the ant ahead of it in the marching order ({@code abreast} side by side further out, so the one a row ahead),
+     * walking up to {@link #LEAD_STEP} ahead of itself at a time; it never waits on anyone behind it. A raider still in
+     * the nest comes up to the line's start; only raiders out count for the line the front waits for. At the route's end
+     * true (the next stage).
      */
-    private boolean march(ServerLevel level, List<MatabeleEntity> ants, Route route) {
+    private boolean march(ServerLevel level, List<MatabeleEntity> ants, Route route, long now) {
         MatabeleEntity front = ants.stream().filter(ant -> ant.getUUID().equals(leader)).findFirst().orElse(ants.get(0));
         frontAt = route.along(front.getX(), front.getZ());
-        Map<UUID, Double> at = new HashMap<>();
-        for (MatabeleEntity ant : ants) {
-            at.put(ant.getUUID(), route.along(ant.getX(), ant.getZ()));
-        }
-        int rows = (int) Math.ceil((ants.size() - 1) / (double) Math.max(1, numbers.abreast()));
-        double length = rows * numbers.spacing();
-        double rear = frontAt;
-        for (MatabeleEntity ant : ants) {
-            double along = at.get(ant.getUUID());
-            if (along >= frontAt - length - numbers.stretch() * 2.0) {
-                rear = Math.min(rear, along); // (stragglers far behind are not waited for: they follow the scent on their own)
-            }
-        }
-        boolean strung = frontAt - rear > length + numbers.stretch();
-        sayWait(ants, route, front, strung, rear, at);
-        if (!strung && frontAt >= head - LEAD_STEP / 2) {
-            head = Math.min(route.length(), frontAt + LEAD_STEP);
-        }
         if (frontAt >= route.length() - 1.5) {
             return true; // the front is at the route's end
         }
-        BlockPos ahead = point(route, Math.min(route.length(), frontAt + 4.0));
-        orders.put(front.getUUID(), strung ? new Order(null, LEAD_PACE, ahead) : new Order(place(level, route, head, 0.0), LEAD_PACE, ahead));
-        // The others, row by row behind the front.
-        double cursor = frontAt;
-        int lanes = 0;
-        int lane = 0;
+        List<MatabeleEntity> line = new ArrayList<>();
+        List<MatabeleEntity> notOut = new ArrayList<>();
         for (MatabeleEntity ant : ants) {
-            if (ant == front) {
-                continue;
+            if (ant != front) {
+                (isOut(level, ant) ? line : notOut).add(ant);
             }
-            if (lane >= lanes) {
-                cursor -= numbers.spacing();
-                lanes = lanesAt(route, Math.max(0.0, cursor));
-                lane = 0;
+        }
+        Map<UUID, Double> at = new HashMap<>();
+        for (MatabeleEntity ant : line) {
+            at.put(ant.getUUID(), route.along(ant.getX(), ant.getZ()));
+        }
+        int rows = (int) Math.ceil(line.size() / (double) Math.max(1, numbers.abreast()));
+        double length = rows * numbers.spacing();
+        double rear = frontAt;
+        MatabeleEntity hindmost = null;
+        for (MatabeleEntity ant : line) {
+            double along = at.get(ant.getUUID());
+            if (along >= frontAt - length - numbers.stretch() * 2.0 && along < rear) {
+                rear = along; // (stragglers far behind are not waited for: they follow the scent on their own)
+                hindmost = ant;
             }
-            double along = Math.max(0.0, cursor);
-            double side = lanes == 1 ? 0.0 : lane - (lanes - 1) / 2.0; // (a block apart side by side)
-            lane++;
-            double pace = at.get(ant.getUUID()) < along - HURRY_BEHIND ? HURRY_PACE : 1.0;
-            orders.put(ant.getUUID(), new Order(place(level, route, along, side), pace, point(route, Math.min(route.length(), along + 3.0))));
+        }
+        boolean strung = frontAt - rear > length + numbers.stretch();
+        boolean waits = false;
+        if (strung && frontAt >= noPauseUntil) {
+            if (pausedSince < 0) {
+                pausedSince = now;
+            }
+            waits = now - pausedSince < FRONT_PAUSE;
+            if (!waits) {
+                noPauseUntil = frontAt + LEAD_STEP; // (on again: no new halt till it has walked a stretch)
+                pausedSince = -1;
+                head = Math.min(route.length(), frontAt + LEAD_STEP);
+            }
+        } else if (!strung) {
+            pausedSince = -1;
+        }
+        sayWait(route, front, waits, hindmost);
+        if (!waits && frontAt >= head - LEAD_STEP / 2) {
+            head = Math.min(route.length(), frontAt + LEAD_STEP);
+        }
+        BlockPos ahead = point(route, Math.min(route.length(), frontAt + 4.0));
+        orders.put(front.getUUID(), waits ? new Order(null, LEAD_PACE, ahead) : new Order(place(level, route, head, 0.0), LEAD_PACE, ahead));
+        // The others, each behind the one ahead of it in the marching order.
+        for (int k = 0; k < line.size(); k++) {
+            MatabeleEntity ant = line.get(k);
+            double own = at.get(ant.getUUID());
+            int lanes = lanesAt(route, own);
+            double aheadAt = k - lanes < 0 ? frontAt : at.get(line.get(k - lanes).getUUID());
+            double target = Math.max(own, Math.min(aheadAt - numbers.spacing(), own + LEAD_STEP));
+            target = Math.max(0.0, Math.min(route.length(), target));
+            double side = lanes == 1 ? 0.0 : k % lanes - (lanes - 1) / 2.0; // (a block apart side by side)
+            double pace = own < target - HURRY_BEHIND ? HURRY_PACE : 1.0;
+            orders.put(ant.getUUID(), new Order(place(level, route, target, side), pace, point(route, Math.min(route.length(), target + 3.0))));
+        }
+        BlockPos lineStart = place(level, route, 0.0, 0.0);
+        for (MatabeleEntity ant : notOut) {
+            orders.put(ant.getUUID(), new Order(lineStart, HURRY_PACE, ahead)); // (up out of the nest to the line)
         }
         return false;
     }
 
     /**
-     * The diary: while the front waits for the line to close up, every {@link #WAIT_SAY_EVERY} ticks who it waits for
-     * (the hindmost ant it counts), and when the wait ends, how long it lasted.
+     * R3: whether this raider is out of the nest: not in it, and not down the hole under the entrance (a raider down a
+     * dead mound's chimney is right under the line's start, flat, but not out).
      */
-    private void sayWait(List<MatabeleEntity> ants, Route route, MatabeleEntity front, boolean strung, double rear, Map<UUID, Double> at) {
+    private boolean isOut(ServerLevel level, MatabeleEntity ant) {
+        BlockPos entrance = colony.getCenter();
+        if (colony.nest().isInside(level, ant.blockPosition())) {
+            return false;
+        }
+        return !(flat(ant.blockPosition(), entrance) <= NEAR && ant.getY() < entrance.getY() - 1.5);
+    }
+
+    /**
+     * The diary: while the front waits for the line to close up, every {@link #WAIT_SAY_EVERY} ticks who it waits for
+     * (the hindmost ant it counts), and when a long wait ends, how long it lasted.
+     */
+    private void sayWait(Route route, MatabeleEntity front, boolean waits, @Nullable MatabeleEntity hindmost) {
         long now = lastLevel == null ? 0 : lastLevel.getGameTime();
-        if (!strung) {
+        if (!waits) {
             if (waitingSince >= 0 && now - waitingSince >= WAIT_SAY_EVERY) {
                 say("the front goes on after waiting " + (now - waitingSince) / 20 + " s");
             }
@@ -490,9 +618,8 @@ public final class RaidColumn {
             return;
         }
         waitSaidAt = now;
-        MatabeleEntity last = ants.stream().filter(ant -> Math.abs(at.get(ant.getUUID()) - rear) < 1.0E-6).findFirst().orElse(null);
         say("the front (" + who(front, route) + ") has waited " + (now - waitingSince) / 20 + " s for the line, its hindmost "
-                + (last == null ? "?" : who(last, route)));
+                + (hindmost == null ? "?" : who(hindmost, route)));
     }
 
     /** How many side by side at this place along a route: single file near the entrance, wider further out. */
@@ -724,7 +851,7 @@ public final class RaidColumn {
         if (!members.contains(leader)) {
             leader = members.get(0);
         }
-        if (march(level, ants, back)) {
+        if (march(level, ants, back, now)) {
             for (MatabeleEntity ant : ants) {
                 orders.put(ant.getUUID(), new Order(entrance, 1.0, null)); // (the front is at the entrance: the rest come in behind it)
             }
@@ -751,6 +878,17 @@ public final class RaidColumn {
             BlockPos top = level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
                     BlockPos.containing(p[0], p[2], p[1]));
             on = Math.abs(top.getY() - p[2]) <= 6 ? standAt(level, p[0], p[1], top.getY()) : null;
+        }
+        for (int step = 1; on == null && step <= 4; step++) {
+            // (R3: nothing to stand in here, an open hole say: the nearest ground a little along the line, never the air over it)
+            for (int sign : new int[] {1, -1}) {
+                double[] q = route.at(Math.max(0.0, Math.min(route.length(), along + sign * step)));
+                BlockPos near = standAt(level, q[0], q[1], (int) Math.round(q[2]));
+                if (near != null) {
+                    on = near;
+                    break;
+                }
+            }
         }
         return on != null ? on : BlockPos.containing(p[0], p[2], p[1]);
     }

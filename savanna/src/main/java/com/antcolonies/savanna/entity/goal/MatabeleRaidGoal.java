@@ -32,6 +32,8 @@ public class MatabeleRaidGoal extends Goal {
     private static final double MOVED = 1.5;
     /** It counts as at its place this near it (blocks). */
     private static final double AT = 1.2;
+    /** ... and this near it up or down (blocks). */
+    private static final double UP_DOWN = 1.5;
     /** After no way to its place it tries again this many ticks later. */
     private static final int RETRY = 20;
 
@@ -150,13 +152,15 @@ public class MatabeleRaidGoal extends Goal {
             walkingTo = null;
             return;
         }
-        double off = flat(ant.blockPosition(), to);
-        boolean moved = walkingTo == null || flat(walkingTo, to) >= MOVED;
-        boolean idleAndOff = ant.getNavigator().isDone() && off > AT;
+        // At its place counts in height too (R3, BUGS 87: a raider down a dead mound's chimney, right under its place by
+        // the entrance, counted as there by the flat distance and stood still 8 blocks down).
+        boolean atPlace = flat(ant.blockPosition(), to) <= AT && Math.abs(ant.getY() - to.getY()) <= UP_DOWN;
+        boolean moved = walkingTo == null || flat(walkingTo, to) >= MOVED || Math.abs(walkingTo.getY() - to.getY()) > UP_DOWN;
+        boolean idleAndOff = ant.getNavigator().isDone() && !atPlace;
         if (!moved && !idleAndOff || ant.tickCount < waitUntil) {
             return;
         }
-        if (off <= AT && ant.getNavigator().isDone() && order.take() == null) {
+        if (atPlace && ant.getNavigator().isDone() && order.take() == null) {
             walkingTo = to;
             return;
         }

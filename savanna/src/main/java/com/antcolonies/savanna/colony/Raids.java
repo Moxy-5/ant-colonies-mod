@@ -567,7 +567,11 @@ public class Raids {
         fit.add(0, leader);
         int real = Math.min(Math.min(size, numbers.mostReal()), fit.size());
         int along = Math.max(0, Math.min(size - real, colony.population().inside(Caste.WORKER)));
-        column = new RaidColumn(colony, numbers, carryNumbers(), find, fit.subList(0, real), along, level.getGameTime());
+        // R3, the marching order (Frank 2017 via AntWiki): the scout in front, the colony's other scouts right behind it,
+        // then the rest, the majors at the back as the rear guard.
+        List<MatabeleEntity> going = new ArrayList<>(fit.subList(0, real));
+        going.sort(Comparator.comparingInt(ant -> ant == leader ? 0 : veterans.contains(ant.getUUID()) ? 1 : ant.hasMajorBody() ? 3 : 2));
+        column = new RaidColumn(level, colony, numbers, carryNumbers(), find, going, along, level.getGameTime());
         column.sayStart(level);
         find.scout = leader.getUUID(); // (it leads: the one to lead the next raid there too)
         return column;
