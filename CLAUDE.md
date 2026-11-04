@@ -284,6 +284,8 @@ A Minecraft mod where ants and termites live as real colonies: they dig, build, 
 - **M8 steps renumbered by the user 2026-10-25:** step 3 is now scouts and raids, step 4 drawn-only ants (older notes saying "step 3, drawn-only" use the old numbers); order: 2f, 3, the test revamp, 4, 5, 6.
 - **Fix 2026-11-03 (`docs/BUGS.md` 81, branch `claude/stoic-shirley-28a1d9`):** new-land mounds get their dead tree on uneven ground again (16 of 21 in the user's world had none: the trunk's base and roots on gently sloping ground counted as in the way); `mound,termitefood,trees` 57 of 57 on 6 servers; not tried in-game yet.
 
+- **Fix 2026-11-03 (`docs/BUGS.md` 82, branch `claude/quizzical-hermann-0ed0e4`):** about 1 termite mound in 80 had a late stage no termite could finish from inside (a new side spire on old soil; the user's log, "stage 30 ... cannot be built from inside"); now every stage of 8,000 swept seeds builds; only those mounds change, by a block; `mound` 14 of 14; not tried in-game yet.
+
 ## Other notes files (read only when the task needs them)
 - `docs/DESIGN.md`: every design decision for the species and shared systems (read the section for a feature before working on it).
 - `docs/HISTORY.md`: the full change log of every feature (class names, numbers, tests, the user's confirmations) and the old handover notes for a code reviewer. Older bullets name methods as `Colony.something`: since the code review split they live in the colony's parts (`Nest`, `FoodStore`, `Brood`, ...).

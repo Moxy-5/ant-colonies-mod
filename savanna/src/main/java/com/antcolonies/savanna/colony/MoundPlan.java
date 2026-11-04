@@ -517,6 +517,68 @@ public final class MoundPlan {
                     full.remove(cell);
                 }
             }
+            holdUpLooseLumps();
+        }
+
+        /**
+         * A lump of soil in a layer that only holds itself up (two or more blocks side by side, none with soil under it
+         * or beside soil that has) could never be built (docs/BUGS.md 82): a one-block gap under it is filled from the
+         * soil below where there is one, else the lump goes. Layer by layer from the bottom up.
+         */
+        private void holdUpLooseLumps() {
+            int highest = full.stream().mapToInt(BlockPos::getY).max().orElse(0);
+            for (int y = 1; y <= highest; y++) {
+                List<BlockPos> layer = new ArrayList<>();
+                for (BlockPos cell : full) {
+                    if (cell.getY() == y) {
+                        layer.add(cell);
+                    }
+                }
+                Collections.sort(layer);
+                Set<BlockPos> held = new HashSet<>();
+                for (BlockPos cell : layer) {
+                    if (full.contains(cell.below())) {
+                        spreadHold(cell, held);
+                    }
+                }
+                for (BlockPos cell : layer) {
+                    if (held.contains(cell) || !full.contains(cell)) {
+                        continue; // (or a lump already gone)
+                    }
+                    Set<BlockPos> lump = new HashSet<>();
+                    spreadHold(cell, lump);
+                    List<BlockPos> inOrder = new ArrayList<>(lump);
+                    Collections.sort(inOrder);
+                    BlockPos gap = null;
+                    for (BlockPos at : inOrder) {
+                        if (gap == null && full.contains(at.below(2)) && !parts.containsKey(at.below())) {
+                            gap = at.below();
+                        }
+                    }
+                    if (gap != null) {
+                        full.add(gap);
+                        held.addAll(lump);
+                    } else {
+                        full.removeAll(lump);
+                    }
+                }
+            }
+        }
+
+        /** Every block of soil joined side to side in its layer to {@code from}, into {@code into}. */
+        private void spreadHold(BlockPos from, Set<BlockPos> into) {
+            if (!into.add(from)) {
+                return;
+            }
+            List<BlockPos> queue = new ArrayList<>(List.of(from));
+            for (int i = 0; i < queue.size(); i++) {
+                for (Direction side : Direction.Plane.HORIZONTAL) {
+                    BlockPos next = queue.get(i).relative(side);
+                    if (full.contains(next) && into.add(next)) {
+                        queue.add(next);
+                    }
+                }
+            }
         }
 
         /**
