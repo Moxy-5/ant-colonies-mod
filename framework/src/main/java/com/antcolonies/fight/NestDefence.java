@@ -371,11 +371,11 @@ public final class NestDefence {
         }
     }
 
-    /** Players touching a member out on a fight order (a column) long enough provoke the colony there. */
+    /** Players touching a member out on a fight order or walking in a column (a raid, M8 step 3b) long enough provoke the colony there. */
     private void touchesAColumn(ServerLevel level, List<AbstractAntEntity> members, DefenceNumbers numbers) {
         Set<UUID> touchingNow = new HashSet<>();
         for (AbstractAntEntity member : members) {
-            if (member.getFightSpot() == null || defenders.contains(member.getUUID())) {
+            if (member.getFightSpot() == null && !member.isInAColumn() || defenders.contains(member.getUUID())) {
                 continue;
             }
             for (ServerPlayer player : level.players()) {

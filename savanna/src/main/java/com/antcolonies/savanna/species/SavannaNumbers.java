@@ -33,6 +33,7 @@ public final class SavannaNumbers {
     public static final SpeciesSection<Regrowth> REGROWTH = SpeciesSection.signUp("food.regrowth", Regrowth.CODEC);
     public static final SpeciesSection<WorkerSizes> WORKER_SIZES = SpeciesSection.signUp("worker_sizes", WorkerSizes.CODEC);
     public static final SpeciesSection<ScoutNumbers> SCOUTING = SpeciesSection.signUp("raids.scouting", ScoutNumbers.CODEC);
+    public static final SpeciesSection<ColumnNumbers> COLUMN = SpeciesSection.signUp("raids.column", ColumnNumbers.CODEC);
 
     private SavannaNumbers() {
     }
@@ -525,5 +526,42 @@ public final class SavannaNumbers {
             }
             return false;
         }
+    }
+
+    /**
+     * M8 step 3b, the raid column ({@code colony.RaidColumn}; real Megaponera: the scout home from a find recruits a raid
+     * in proportion to the termites it found, Frank et al. 2018, and leads it out along its scent line). The raid's size:
+     * {@code antsPerWorth} ants for each point of the find's worth, at least {@code leastRaid}, and never more than a share
+     * of the colony's workers, from {@code leastShare} for a fed colony to {@code mostShare} for a starving one (30 to 75
+     * percent, Yusuf 2026); at most {@code mostReal} of them walk as real ants, the rest are numbers till step 4. The
+     * recruits gather at the entrance at least {@code leastFormTicks} and at most {@code formTicks}. On the march they
+     * keep {@code spacing} blocks apart, single file for the first {@code singleFile} blocks of the trail, then up to
+     * {@code abreast} side by side; the scout at the front waits when the ants keeping up are strung out more than
+     * {@code stretch} blocks behind it. The column stops {@code stopShort} blocks short of the find and bunches up (at
+     * most {@code gatherTicks}), then attacks all at once, fighting at most {@code fightTicks}; after the fight it
+     * regroups there (at most {@code regroupTicks}) and walks home, everyone home or let go after {@code homeTicks}.
+     * Every number my pick, to confirm.
+     */
+    public record ColumnNumbers(int antsPerWorth, int leastRaid, double leastShare, double mostShare, int mostReal, int formTicks,
+                                int leastFormTicks, double spacing, int singleFile, int abreast, int stretch, int stopShort,
+                                int gatherTicks, int fightTicks, int regroupTicks, int homeTicks) {
+        public static final Codec<ColumnNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.INT.optionalFieldOf("ants_per_worth", 4).forGetter(ColumnNumbers::antsPerWorth),
+                Codec.INT.optionalFieldOf("least_raid", 10).forGetter(ColumnNumbers::leastRaid),
+                Codec.DOUBLE.optionalFieldOf("least_share", 0.3).forGetter(ColumnNumbers::leastShare),
+                Codec.DOUBLE.optionalFieldOf("most_share", 0.75).forGetter(ColumnNumbers::mostShare),
+                Codec.INT.optionalFieldOf("most_real", 50).forGetter(ColumnNumbers::mostReal),
+                Codec.INT.optionalFieldOf("form_ticks", 600).forGetter(ColumnNumbers::formTicks),
+                Codec.INT.optionalFieldOf("least_form_ticks", 100).forGetter(ColumnNumbers::leastFormTicks),
+                Codec.DOUBLE.optionalFieldOf("spacing", 1.2).forGetter(ColumnNumbers::spacing),
+                Codec.INT.optionalFieldOf("single_file", 8).forGetter(ColumnNumbers::singleFile),
+                Codec.INT.optionalFieldOf("abreast", 3).forGetter(ColumnNumbers::abreast),
+                Codec.INT.optionalFieldOf("stretch", 8).forGetter(ColumnNumbers::stretch),
+                Codec.INT.optionalFieldOf("stop_short", 4).forGetter(ColumnNumbers::stopShort),
+                Codec.INT.optionalFieldOf("gather_ticks", 300).forGetter(ColumnNumbers::gatherTicks),
+                Codec.INT.optionalFieldOf("fight_ticks", 6000).forGetter(ColumnNumbers::fightTicks),
+                Codec.INT.optionalFieldOf("regroup_ticks", 400).forGetter(ColumnNumbers::regroupTicks),
+                Codec.INT.optionalFieldOf("home_ticks", 3600).forGetter(ColumnNumbers::homeTicks)
+        ).apply(i, ColumnNumbers::new));
     }
 }

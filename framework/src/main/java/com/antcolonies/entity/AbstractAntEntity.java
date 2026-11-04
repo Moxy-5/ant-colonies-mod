@@ -1426,6 +1426,19 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     }
 
     /**
+     * How much it would rather leave this foe for later (0 first, higher later; nearest first among equals; M8 step 3b:
+     * raiders go for the prey first, a species' own rule). A foe that hurt it is always fought first.
+     */
+    public int foeRank(LivingEntity foe) {
+        return 0;
+    }
+
+    /** Server: whether it walks in one of its colony's columns now (M8 step 3b, a raid column; a player standing in one provokes it). */
+    public boolean isInAColumn() {
+        return false;
+    }
+
+    /**
      * Its squeak (M8 step 2e; real Megaponera stridulate loudly when disturbed): when sent out to defend, when a foe
      * clamps on, near a player at its column. At most once every {@link #SQUEAK_EVERY} ticks. Silent for a species
      * with no {@link #squeakSound}.

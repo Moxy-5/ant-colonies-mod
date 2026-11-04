@@ -224,7 +224,9 @@ timings: all "my pick, to confirm" until then).
      step 4. The scout leads; single file, then widening; the column stops a few blocks short, bunches, and attacks at
      once: majors break the mud, minors go in. **Food first** (the user, 2026-10-25): the workers at the feeding spot
      are the target; soldiers are fought only when in the way. The fights are step 2's (the skirmish command stays for
-     testing).
+     testing). **BUILT 2026-11-03** (`colony/RaidColumn`, `MatabeleRaidGoal`, `/antcolonies raid`, `MatabeleRaidTests`;
+     milling at the entrance, surges, regrouping and a column home, my picks; `docs/DESIGN.md`, "Step 3b, the column, as
+     built"). Not tried in-game yet.
    - **3c Home with the prey.** Majors carry visible stacks (up to 10), minors 1 to 3; the column walks home on its own
      trail and the prey goes on the pile (the stocking command stays for tests only). An empty raid spreads round the
      spot a short while, takes any it finds, and goes home; hunger sends a scout out sooner. A lightly hurt ant nobody

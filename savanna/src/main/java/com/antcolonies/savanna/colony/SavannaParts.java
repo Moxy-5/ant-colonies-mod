@@ -294,7 +294,7 @@ public final class SavannaParts {
      */
     public static final Type<Raids> RAIDS = listed("raids", Raids::new, part -> part
             .ticks(117, Raids::tick)
-            .plugs(ColonyHooks.LIST_SEARCH, 40, raids -> raids::describe)
+            .plugs(ColonyHooks.LIST_SEARCH, 40, raids -> raids::describe).plugs(ColonyHooks.REACH, 10, raids -> raids::reach)
             .saves(Raids::save, Raids::load)
             .sample(Raids::fillForTests));
 

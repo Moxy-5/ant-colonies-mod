@@ -38,7 +38,11 @@ import net.minecraft.server.level.ServerLevel;
  * scouts are a small set of workers who scout again and again): the colony remembers its scouts and sends them first.
  * Each find remembers the scout who found it, who leads the raid there (step 3b). The scout's walk itself is
  * {@code MatabeleScoutGoal}.
- * Numbers: the species file's {@code raids.scouting} ({@link SavannaNumbers.ScoutNumbers}).
+ *
+ * <p>Step 3b, the column: a scout home with a find recruits a raid there ({@link #found}), sized by the find and capped
+ * by the colony's size and hunger, and the colony keeps the {@link RaidColumn} while it is out (one at a time).
+ * Numbers: the species file's {@code raids.scouting} ({@link SavannaNumbers.ScoutNumbers}) and {@code raids.column}
+ * ({@link SavannaNumbers.ColumnNumbers}).
  */
 public class Raids {
     /** A good spot a scout found: where, how much termite it smelt there, when found and last checked, empty checks, by whom. */
@@ -107,6 +111,9 @@ public class Raids {
     private final Set<UUID> veterans = new LinkedHashSet<>();
     /** Since when a scout's place has stood open (game time, -1 none): a new ant takes it if no old scout comes soon. */
     private long openSince = -1;
+    /** The raid out now, or null (not saved: after a reload the raiders are just ants outside, and go home). */
+    @Nullable
+    private RaidColumn column;
 
     public Raids(Colony colony) {
         this.colony = colony;
@@ -117,7 +124,18 @@ public class Raids {
         return colony.profile().section(SavannaNumbers.SCOUTING).orElse(null);
     }
 
+    @Nullable
+    public SavannaNumbers.ColumnNumbers columnNumbers() {
+        return colony.profile().section(SavannaNumbers.COLUMN).orElse(null);
+    }
+
     void tick(ServerLevel level) {
+        if (column != null) {
+            column.update(level); // (the raiders ask it every few ticks; this keeps it going with none of them loaded)
+            if (column.stage() == RaidColumn.Stage.DONE) {
+                column = null;
+            }
+        }
         if (level.getGameTime() % 20 != 0) {
             return;
         }
@@ -178,13 +196,14 @@ public class Raids {
         if (scouts.contains(ant.getUUID())) {
             return true;
         }
-        if (!fit(ant)) {
+        if (!fit(ant) || isRaider(ant.getUUID())) {
             return false;
         }
         if (sent.contains(ant.getUUID())) {
             return true;
         }
-        if (scouts.size() >= scoutsWanted() || !isScoutingTime(level) || !isHungry()) {
+        if (column != null || scouts.size() >= scoutsWanted() || !isScoutingTime(level) || !isHungry()) {
+            // (with a raid out the colony sends no new scouts till it is home: my pick)
             return false;
         }
         if (veterans.contains(ant.getUUID())) {
@@ -322,6 +341,109 @@ public class Raids {
         if (numbers != null) {
             searched.remove(sliceOf(at, slices(numbers)));
         }
+        // Step 3b: home with a find, the scout recruits a raid there: in the raid hours, dry, the colony hungry (or the
+        // scout command's scout, whatever the hour), and no raid out already.
+        boolean commanded = scout != null && sent.contains(scout);
+        if (column == null && !colony.rainsNow(level) && (commanded || isScoutingTime(level) && isHungry())) {
+            Find made = known != null ? known : finds.get(finds.size() - 1);
+            startRaid(level, made);
+        }
+    }
+
+    /** The raid out now, or null. */
+    @Nullable
+    public RaidColumn column() {
+        return column;
+    }
+
+    /** Whether this ant walks in the raid out now. */
+    public boolean isRaider(UUID ant) {
+        return column != null && column.has(ant) && column.stage() != RaidColumn.Stage.DONE;
+    }
+
+    /**
+     * How far out the colony reaches while a raid is out (the find and a little past it, so its raiders out there still
+     * count as the colony's real members); 0 with none out.
+     */
+    int reach() {
+        if (column == null) {
+            return 0;
+        }
+        BlockPos at = column.find().at();
+        return (int) Math.ceil(Math.hypot(at.getX() - colony.getCenter().getX(), at.getZ() - colony.getCenter().getZ())) + 8;
+    }
+
+    /**
+     * How many ants a raid to this find takes: {@code ants_per_worth} for each termite smelt there, at least
+     * {@code least_raid}, and never more than the colony can spare: a share of its workers from {@code least_share}
+     * (well fed) to {@code most_share} (starving), by its hunger (real raids take 30 to 75 percent of a colony, Yusuf 2026).
+     */
+    public int raidSize(Find find) {
+        SavannaNumbers.ColumnNumbers numbers = columnNumbers();
+        if (numbers == null) {
+            return 0;
+        }
+        int workers = Math.max(1, colony.getCount(Caste.WORKER));
+        PreyPile pile = colony.part(SavannaParts.PREY_PILE).orElse(null);
+        double fed = pile == null ? 0.0 : Math.min(1.0, pile.edible() * 10.0 / workers);
+        double share = numbers.leastShare() + (numbers.mostShare() - numbers.leastShare()) * (1.0 - fed);
+        int spare = Math.max(1, (int) Math.floor(workers * share));
+        return Math.min(spare, Math.max(numbers.leastRaid(), find.worth * numbers.antsPerWorth()));
+    }
+
+    /**
+     * A raid sets out to this find: the scout leads if it is fit (else the major nearest the entrance), then the real
+     * workers nearest the entrance, up to {@code most_real} (majors and minors as they come), and the rest of the raid's
+     * size from the numbers inside (they go along as numbers: drawn-only ants, step 4). Null if nobody is fit.
+     */
+    @Nullable
+    private RaidColumn startRaid(ServerLevel level, Find find) {
+        SavannaNumbers.ColumnNumbers numbers = columnNumbers();
+        if (numbers == null) {
+            return null;
+        }
+        int size = raidSize(find);
+        BlockPos entrance = colony.getCenter();
+        List<MatabeleEntity> fit = new ArrayList<>(colony.population().realMembers(level).stream()
+                .filter(member -> member instanceof MatabeleEntity matabele && raiderFit(matabele)
+                        && (!scouts.contains(member.getUUID()) || member.getUUID().equals(find.scout))) // (scouts out searching stay at it)
+                .map(member -> (MatabeleEntity) member)
+                .sorted(Comparator.comparingDouble(member -> member.blockPosition().distSqr(entrance))).toList());
+        MatabeleEntity leader = fit.stream().filter(ant -> ant.getUUID().equals(find.scout)).findFirst()
+                .orElse(fit.stream().filter(MatabeleEntity::hasMajorBody).findFirst().orElse(null));
+        if (leader == null) {
+            return null;
+        }
+        fit.remove(leader);
+        fit.add(0, leader);
+        int real = Math.min(Math.min(size, numbers.mostReal()), fit.size());
+        int along = Math.max(0, Math.min(size - real, colony.population().inside(Caste.WORKER)));
+        column = new RaidColumn(colony, numbers, find, fit.subList(0, real), along, level.getGameTime());
+        find.scout = leader.getUUID(); // (it leads: the one to lead the next raid there too)
+        return column;
+    }
+
+    /** Whether this ant may go raiding: a worker, whole, not clamped, not downed or fighting. */
+    private static boolean raiderFit(MatabeleEntity ant) {
+        return ant.isAlive() && ant.isColonyWorker() && !ant.isCrippled() && !ant.clamp().isOn() && !ant.isDowned()
+                && !ant.fightsNoMore() && ant.getFightSpot() == null;
+    }
+
+    /** The raid command: a raid sets out now to the best known find, whatever the hour or hunger; null if none could. */
+    @Nullable
+    public RaidColumn raidNow(ServerLevel level) {
+        if (column != null || finds.isEmpty()) {
+            return null;
+        }
+        return startRaid(level, finds().get(0));
+    }
+
+    /** A raid to this find sets out now (tests: a find put in by hand, with its scent line and scout). */
+    @Nullable
+    public RaidColumn raidForTests(ServerLevel level, BlockPos at, int worth, List<BlockPos> trail, @Nullable UUID scout) {
+        Find find = new Find(at.immutable(), worth, level.getGameTime(), level.getGameTime(), 0, List.copyOf(trail), scout);
+        finds.add(find);
+        return startRaid(level, find);
     }
 
     /** A remembered spot was checked and nothing smelt there: forgotten after {@code spot_misses} such checks. */
@@ -368,6 +490,9 @@ public class Raids {
         }
         if (!best.isEmpty()) {
             line.append(")");
+        }
+        if (column != null) {
+            line.append(column.describe());
         }
         return line.toString();
     }

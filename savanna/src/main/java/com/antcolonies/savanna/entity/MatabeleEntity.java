@@ -18,6 +18,7 @@ import com.antcolonies.entity.goal.GoInsideGoal;
 import com.antcolonies.entity.goal.WaitAtNestGoal;
 import com.antcolonies.savanna.SavannaSpecies;
 import com.antcolonies.savanna.entity.goal.CarryRemainsGoal;
+import com.antcolonies.savanna.entity.goal.MatabeleRaidGoal;
 import com.antcolonies.savanna.entity.goal.MatabeleScoutGoal;
 import com.antcolonies.savanna.registry.SavannaBlocks;
 import com.antcolonies.savanna.registry.SavannaEntities;
@@ -186,6 +187,7 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         this.goalSelector.addGoal(2, new CarryRemainsGoal(this));
         this.goalSelector.addGoal(2, new ClampCareGoal(this)); // M8 2c: termites off nestmates' legs in the nest
         this.goalSelector.addGoal(2, new MatabeleScoutGoal(this)); // M8 3a: a major out scouting for termites
+        this.goalSelector.addGoal(2, new MatabeleRaidGoal(this)); // M8 3b: walking in a raid column
         this.goalSelector.addGoal(3, new DigGoal(this, () -> true));
         this.goalSelector.addGoal(4, new GoInsideGoal(this));
         this.goalSelector.addGoal(5, new WaitAtNestGoal(this));
@@ -609,8 +611,29 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         }
         Colony colony = getColony();
         return colony != null && colony.part(com.antcolonies.savanna.colony.SavannaParts.RAIDS)
-                .map(raids -> raids.isScouting(getUUID())).orElse(false);
+                .map(raids -> raids.isScouting(getUUID()) || raids.isRaider(getUUID())).orElse(false);
     }
+
+    /** M8 step 3b: whether it walks in its colony's raid column now. */
+    @Override
+    public boolean isInAColumn() {
+        Colony colony = getColony();
+        return colony != null && colony.part(com.antcolonies.savanna.colony.SavannaParts.RAIDS)
+                .map(raids -> raids.isRaider(getUUID())).orElse(false);
+    }
+
+    /**
+     * M8 step 3b, food first (the user, 2026-10-25; real raiders go for the termite workers, the prey, and fight the
+     * soldiers only when they are in the way): on a raid a termite soldier is left for later unless it is right there
+     * (within {@link #IN_THE_WAY} blocks). Off a raid (the skirmish, defending the nest) every foe ranks the same, nearest first.
+     */
+    @Override
+    public int foeRank(LivingEntity foe) {
+        return foe instanceof TermiteSoldierEntity && foe.distanceToSqr(this) > IN_THE_WAY * IN_THE_WAY && isInAColumn() ? 1 : 0;
+    }
+
+    /** A termite soldier this near a raider (blocks) is in its way, and fought like any termite. */
+    private static final double IN_THE_WAY = 2.5;
 
     /** Its squeak (M8 step 2e): real Megaponera stridulate when held or when the nest is broken into. */
     @Override

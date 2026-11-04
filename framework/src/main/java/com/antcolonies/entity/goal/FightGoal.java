@@ -176,7 +176,8 @@ public class FightGoal extends Goal {
             LivingEntity next = pickFoe(level);
             // Kept until caught or lost: a new one only if it is much nearer (it turned from one to another every second).
             boolean keep = was != null && next != null && next != was && was.isAlive() && usable(was) && Fights.mayAttack(ant, was)
-                    && worthChasing(level, was) && next.distanceToSqr(ant) > MUCH_NEARER * was.distanceToSqr(ant);
+                    && worthChasing(level, was) && next.distanceToSqr(ant) > MUCH_NEARER * was.distanceToSqr(ant)
+                    && ant.foeRank(next) >= ant.foeRank(was); // (one it would rather fight first is taken at once: step 3b, prey first)
             foe = keep ? was : next;
         }
         if (foe != null) {
@@ -302,7 +303,7 @@ public class FightGoal extends Goal {
         }
         AABB area = new AABB(spot).inflate(ant.getFightReach());
         return level.getEntitiesOfClass(LivingEntity.class, area, candidate -> usable(candidate) && worthChasing(level, candidate)).stream()
-                .min(Comparator.comparingDouble(candidate -> candidate.distanceToSqr(ant))).orElse(null);
+                .min(Comparator.<LivingEntity>comparingInt(ant::foeRank).thenComparingDouble(candidate -> candidate.distanceToSqr(ant))).orElse(null);
     }
 
     private boolean usable(LivingEntity candidate) {

@@ -49,6 +49,10 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  *
  * <p>Step 3a: {@code /antcolonies scout} sends a scout out now from the nearest Matabele colony within 64 blocks (a
  * major, whatever the hour or the colony's hunger); {@code /antcolonies list} shows the good spots the scouts found.
+ * A scout the command sent recruits a raid when it comes home with a find, whatever the hour or hunger (step 3b).
+ *
+ * <p>Step 3b: {@code /antcolonies raid} sends a raid column out now from the nearest Matabele colony within 64 blocks to
+ * the best spot its scouts know, led by the spot's scout (whatever the hour, the hunger or the rain).
  */
 @EventBusSubscriber(modid = SavannaMod.MODID)
 public class MatabeleCommands {
@@ -64,6 +68,8 @@ public class MatabeleCommands {
                                 .executes(context -> skirmish(context.getSource(), IntegerArgumentType.getInteger(context, "ants")))))
                 .then(Commands.literal("scout")
                         .executes(context -> scout(context.getSource())))
+                .then(Commands.literal("raid")
+                        .executes(context -> raid(context.getSource())))
                 .then(Commands.literal("prey")
                         .then(Commands.argument("layers", IntegerArgumentType.integer(1, 64))
                                 .executes(context -> prey(context.getSource(), IntegerArgumentType.getInteger(context, "layers")))))
@@ -236,6 +242,34 @@ public class MatabeleCommands {
         source.sendSuccess(() -> Component.literal("A scout (a major at " + scout.blockPosition().toShortString()
                 + ") sets out from the Matabele nest at " + colony.getCenter().toShortString() + ", searching up to "
                 + raids.range() + " blocks out; /antcolonies list shows what the scouts found."), false);
+        return 1;
+    }
+
+    /** A raid column out now from the nearest Matabele colony to the best spot its scouts know (step 3b). */
+    private static int raid(CommandSourceStack source) {
+        ServerLevel level = source.getLevel();
+        Colony colony = ColonyManager.get(level).findNearest(BlockPos.containing(source.getPosition()), 64, MatabeleEntity.SPECIES);
+        com.antcolonies.savanna.colony.Raids raids = colony == null ? null : colony.part(SavannaParts.RAIDS).orElse(null);
+        if (raids == null) {
+            source.sendFailure(Component.literal("No Matabele colony within 64 blocks (/antcolonies matabele <workers> makes one)."));
+            return 0;
+        }
+        if (raids.column() != null) {
+            source.sendFailure(Component.literal("A raid is out already:" + raids.column().describe().substring(1) + "."));
+            return 0;
+        }
+        if (raids.finds().isEmpty()) {
+            source.sendFailure(Component.literal("Its scouts know no termites yet (/antcolonies scout sends one; it raids by itself when home with a find)."));
+            return 0;
+        }
+        com.antcolonies.savanna.colony.RaidColumn column = raids.raidNow(level);
+        if (column == null) {
+            source.sendFailure(Component.literal("Nobody there fit to raid (real workers only; not hurt, clamped or fighting)."));
+            return 0;
+        }
+        source.sendSuccess(() -> Component.literal("A raid of " + column.size() + " (" + column.members().size()
+                + " real) forms at the Matabele nest at " + colony.getCenter().toShortString() + " for the termites at "
+                + column.find().at().toShortString() + "; /antcolonies list follows it."), false);
         return 1;
     }
 

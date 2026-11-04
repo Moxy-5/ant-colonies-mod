@@ -1,6 +1,6 @@
 {
   "_note": "The Matabele ant, Megaponera analis (M8 step 1c, docs/DESIGN.md 'Matabele colony, details'). Castes: the ergatoid (wingless) queen, and the workers, majors and minors on one continuous size spread (real Megaponera: one worker caste whose sizes run from about 5 to 18 mm, monophasic, Longhurst and Howse 1979; no soldiers, every worker raids and stings). Founding is colony_fission: a real queen never founds alone, a colony splits in two with a new queen (M9); until then a summoned queen starts an empty colony that spawn-egg workers near her join, or /antcolonies matabele <workers> makes one whole (the user's pick, 2026-10-24). So there is no founding section: a queen alone is never sealed in, digs nothing and lays nothing. nest.dug false: no planned nest is dug; the shallow nest (step 1d, MatabeleNest) is the best site within 32 blocks, a dead termite mound first, then under a fallen log, else the ground (a shaft and two rooms 3 and 5 down), and the workers dig only to open and join its spaces (the queen digs nothing); a room still holding dead comb is taken once it has rotted away. Hunger is on from the start (the user's pick, 2026-10-24): a colony whose prey pile (step 1e) runs empty goes hungry and starves; worker: slow after 2 days without a meal, dead after 4 (my picks, to confirm; real colonies raid termites 2 to 4 times a day and keep no store, so a colony cut off from termites dies fast); the queen dies after starve_ticks wanting food (5 days, my pick), but never while she is alone (a queen with no workers counts as founding). The brood numbers wait for the nest (1d). colony.max_workers 2500, the top of a real colony (400 to 2,500); real_cap and crew 50 as the termites. food: they eat only termites, from the prey pile (step 1e, the colony part prey_pile: stung, paralysed termites in the queen's room, a layer about 10 termites, rotten after a day and carried out to a heap beside the entrance; stocked by /antcolonies prey until the raids exist); the items tag is empty, no plants, the store's heap block an unused stand-in (they keep no store); worker.diet: young and old eat from the prey pile (nurse_food), one layer makes workers_per_piece 10 meals, one termite per ant a day (the user's pick, 2026-10-24), no mouth-to-mouth feeding (real Megaponera larvae are laid on the prey and eat it themselves, the queen eats from the pile); forage_at is empty: they stay in the nest (real Megaponera leave it only to raid, by day, step 4; my pick, 2026-10-24). refuse: a dead ant's body crumbles after corpse_decay_ticks (the dead are carried home in step 5).",
-  "_parts_note": "prey_pile (M8 step 1e): the colony's food, termites in the queen's room, the nurses' food too. nest_defence (M8 step 2e): the colony stings a player who provokes it (the defence section). raids (M8 step 3): the scouts (3a, the raids.scouting section), then the columns.",
+  "_parts_note": "prey_pile (M8 step 1e): the colony's food, termites in the queen's room, the nurses' food too. nest_defence (M8 step 2e): the colony stings a player who provokes it (the defence section). raids (M8 step 3): the scouts (3a, the raids.scouting section) and the raid columns (3b, the raids.column section).",
   "parts": ["prey_pile", "nest_defence", "raids"],
   "worker_sizes": {
     "_note": "The real size spread of Megaponera workers (Longhurst and Howse 1979, from head widths: about half the workers majors, a quarter in between, a quarter minors; majors about 15 mm long, minors 9 to 11, the whole spread 5 to 18; the user's pick 'real count', 2026-10-24). Each new worker rolls its length from groups (share, the shortest, the commonest, the longest; a triangle between them), keeps it for life (saved) and is drawn at that length: with the major's model (made for major_model_mm) or the minor's (minor_model_mm), whichever its length is nearer (by ratio), scaled from it. The minor model is half the major's (2:1), so a real 10 mm minor is drawn a third bigger than the minor model.",
@@ -99,6 +99,25 @@
       "slice_fade_ticks": 24000,
       "spot_fade_ticks": 72000,
       "spot_misses": 2
+    },
+    "column": {
+      "_note": "M8 step 3b, the raid column (colony.RaidColumn, MatabeleRaidGoal). Real Megaponera (Longhurst and Howse 1979, Hoelldobler et al. 1994, Frank et al. 2017-2018, Yusuf 2026): the scout home from a find recruits nestmates at the entrance and leads them out along its scent line; the raid's size follows what the scout found (Frank 2018), 30 to 75 percent of the colony (Yusuf 2026). ants_per_worth ants for each point of the find's worth (a feeding gallery cell 1, a termite 3), at least least_raid, at most least_share (a fed colony) to most_share (a starving one) of the workers; at most most_real walk as real ants, the rest are numbers till step 4. The recruits mill round the entrance least_form_ticks to form_ticks (those not out by then stay home). The march: spacing blocks between ants, single file for the first single_file blocks, then up to abreast side by side; the scout at the front waits while the ants keeping up are strung out more than stretch blocks behind (the column moves in surges). It stops stop_short blocks before the find and bunches up (at most gather_ticks), then every ant attacks at once (majors break the mud open, minors go in; the termite workers first, soldiers only in the way), at most fight_ticks; then they regroup there (at most regroup_ticks) and walk home along the trail as a column, every ant home or let go after home_ticks. Every number my pick, to confirm.",
+      "ants_per_worth": 4,
+      "least_raid": 10,
+      "least_share": 0.3,
+      "most_share": 0.75,
+      "most_real": 50,
+      "form_ticks": 600,
+      "least_form_ticks": 100,
+      "spacing": 1.2,
+      "single_file": 8,
+      "abreast": 3,
+      "stretch": 8,
+      "stop_short": 4,
+      "gather_ticks": 300,
+      "fight_ticks": 6000,
+      "regroup_ticks": 400,
+      "home_ticks": 3600
     }
   },
   "defence": {
