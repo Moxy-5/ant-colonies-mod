@@ -163,11 +163,19 @@ public final class MoundGrowth {
         return text.toString();
     }
 
-    /** The plan with every soil cell that is a tunnel in the pretend world marked as one. */
+    /**
+     * The plan with every soil cell that is a tunnel in the pretend world marked as one, and soil kept where a spire piece
+     * was planned (see {@code PretendMound.take}).
+     */
     private static Shape withTunnels(Shape plan, PretendMound world) {
         Map<BlockPos, Part> parts = new LinkedHashMap<>();
-        plan.parts().forEach((pos, part) -> parts.put(pos, part == Part.WALL && world.kind(pos) == Kind.TUNNEL ? Part.TUNNEL : part));
-        return new Shape(parts, plan.thickness(), plan.facing(), plan.corner(), plan.age());
+        world.parts.forEach((pos, part) -> parts.put(pos, part == Part.WALL && world.kind(pos) == Kind.TUNNEL ? Part.TUNNEL : part));
+        Map<BlockPos, Integer> thickness = plan.thickness();
+        if (world.parts != plan.parts()) {
+            thickness = new HashMap<>(thickness);
+            thickness.keySet().removeIf(pos -> parts.get(pos) != plan.parts().get(pos));
+        }
+        return new Shape(parts, thickness, plan.facing(), plan.corner(), plan.age());
     }
 
     /**
@@ -297,6 +305,8 @@ public final class MoundGrowth {
         private Shape plan;
         /** Cells that cannot be worked on now (surprises, for tests). */
         private Set<BlockPos> blocked = Set.of();
+        /** Cells where soil is kept although a spire piece or a mouth is planned ({@link #keepSoilUnder}). */
+        private final Set<BlockPos> soilKept = new HashSet<>();
 
         Kind kind(BlockPos pos) {
             return cells.get(pos);
@@ -508,9 +518,46 @@ public final class MoundGrowth {
             }
         }
 
+        /** Takes up a plan, with soil kept where a spire piece or mouth is planned in the cells of {@link #soilKept}. */
         private void take(Shape plan) {
             this.plan = plan;
-            this.parts = plan.parts();
+            Map<BlockPos, Part> kept = null;
+            for (BlockPos pos : soilKept) {
+                Part part = plan.parts().get(pos);
+                if ((part == Part.SPIRE || part == Part.MOUTH) && isSoil(pos)) {
+                    if (kept == null) {
+                        kept = new LinkedHashMap<>(plan.parts());
+                    }
+                    kept.put(pos, cells.get(pos) == Kind.TUNNEL ? Part.TUNNEL : Part.WALL);
+                }
+            }
+            this.parts = kept != null ? kept : plan.parts();
+        }
+
+        /**
+         * When the termites are stuck on a spire piece (or could not mend it): soil from an earlier stage standing in the
+         * column of planned pieces down from it (a new spire starting where the dome was) stays soil, as in the game
+         * ({@link #jobAt}: soil is never reshaped), so the plan says soil there from now on; else no tunnel could be
+         * carved through it up to the spire's channel, and no termite could ever get up the spire (docs/BUGS.md 82). Only
+         * under a stuck spire, so every other mound keeps its pieces. Whether any soil was found to keep.
+         */
+        private boolean keepSoilUnder(List<BlockPos> stuck) {
+            boolean found = false;
+            for (BlockPos cell : stuck) {
+                for (BlockPos pos = cell; pos.getY() >= 0; pos = pos.below()) {
+                    Part part = parts.get(pos);
+                    if (part != Part.SPIRE && part != Part.MOUTH) {
+                        break;
+                    }
+                    if (isSoil(pos) && soilKept.add(pos.immutable())) {
+                        found = true;
+                    }
+                }
+            }
+            if (found) {
+                take(plan);
+            }
+            return found;
         }
 
         /** A new stage begins: the pieces of earlier stages where the plan has nothing now crumble away. */
@@ -570,7 +617,7 @@ public final class MoundGrowth {
                                 : "nothing to " + job.name().toLowerCase() + " it on"));
                     }
                 }
-                if (left.isEmpty() || !carve || !carveToward(left, reachable)) {
+                if (left.isEmpty() || !carve || !carveToward(left, reachable) && !keepSoilUnder(left.stream().map(Stuck::cell).toList())) {
                     return left;
                 }
             }
@@ -695,7 +742,7 @@ public final class MoundGrowth {
                         break;
                     }
                 }
-                if (!carved) {
+                if (!carved && !keepSoilUnder(missing)) {
                     return; // nothing more can be done for the rest (left for the tests to report)
                 }
             }

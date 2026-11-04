@@ -1,4 +1,4 @@
-# Savanna loading speed (planned 2026-11-03, nothing built)
+# Savanna loading speed (planned 2026-11-03; steps 1 to 3 BUILT 2026-11-03, step 4 waits for the user)
 
 The user's report (2026-11-03): new savanna loads slowly, and a termite mound sometimes pops into a loaded chunk about
 20 seconds late.
@@ -47,10 +47,10 @@ A dead mound is then built whole and worn down to its age at once, every block b
 Steps 1 to 3 change nothing in what is seen except speed (the same trees in the same places, the same mounds sooner).
 Step 4 changes how mounds are made and needs the user's OK.
 
-**Step 1, measure.** Split the tree stopwatch (`Perf.NewLand`) into: shapes, ground height asks (how many, how long),
+**Step 1, measure (BUILT 2026-11-03: the ground height counts; the shapes, mound checks and fitting are all ground asks underneath, so counting those was enough).** Split the tree stopwatch (`Perf.NewLand`) into: shapes, ground height asks (how many, how long),
 mound checks, fitting. One look in-game at the new numbers confirms the diagnosis.
 
-**Step 2, the trees: ask once, keep the answers.**
+**Step 2, the trees: ask once, keep the answers (BUILT 2026-11-03, `worldgen/GroundHeights`; 256 shapes and fitted logs kept, 512 dead wood).**
 - **One shared memory of ground heights** for world making: each column's height worked out once and kept (it never
   changes before the chunk is made: it comes from the world's seed alone), shared by every tree, every place tried,
   every chunk and the mound checks. A column is 8 bytes; 100,000 kept is under 2 MB.
@@ -62,7 +62,7 @@ mound checks, fitting. One look in-game at the new numbers confirms the diagnosi
   dead wood are fitted, not after.
 Expected: tree planning from about 100 ms to a few ms each; putting down from 15 to 65 ms a chunk to about 1 to 3.
 
-**Step 3, the mounds: sooner, and quietly.**
+**Step 3, the mounds: sooner, and quietly (BUILT 2026-11-03: 24 blocks round loaded, the tree on its own at 64).**
 - Start growing the mound's shape and its dead tree's shapes the moment world making notes its place, not once the
   land round it is loaded (they are ready by the time the land is).
 - Put the mound in once its own land is loaded (about 2 chunks round it); its dead tree goes in on its own once its

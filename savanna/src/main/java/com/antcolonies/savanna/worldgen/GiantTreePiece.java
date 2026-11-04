@@ -63,14 +63,27 @@ public class GiantTreePiece extends StructurePiece {
         tag.putInt("z", foot.getZ());
     }
 
-    /** Trees with something lying (a fallen log, broken limbs round a dead one) fitted to their land, kept while their chunks are put in (each chunk would work it out the same). */
-    private static final java.util.Map<String, TreePlacer.Placed> FITTED = java.util.Collections.synchronizedMap(
-            new java.util.LinkedHashMap<>(32, 0.75F, true) {
-                @Override
-                protected boolean removeEldestEntry(java.util.Map.Entry<String, TreePlacer.Placed> eldest) {
-                    return size() > 16;
-                }
-            });
+    /**
+     * Trees with something lying (a fallen log, broken limbs round a dead one) fitted to their land, kept while their
+     * chunks are put in (each chunk would work it out the same). Enough are kept for every tree being made round a
+     * player (was 16, docs/plans/savanna-loading.md).
+     */
+    private static final java.util.Map<String, TreePlacer.Placed> FITTED = kept(256);
+    /** The dead wood round each tree fitted to its land: worked out when the tree is planned, kept for its chunks. */
+    private static final java.util.Map<String, TreePlacer.Placed> LITTER = kept(512);
+
+    private static java.util.Map<String, TreePlacer.Placed> kept(int most) {
+        return java.util.Collections.synchronizedMap(new java.util.LinkedHashMap<>(most * 2, 0.75F, true) {
+            @Override
+            protected boolean removeEldestEntry(java.util.Map.Entry<String, TreePlacer.Placed> eldest) {
+                return size() > most;
+            }
+        });
+    }
+
+    private static String key(GiantTreeStructure.Pick pick, BlockPos foot) {
+        return pick.kind() + "|" + pick.seed() + "|" + pick.age() + "|" + pick.stage().id + "|" + foot.asLong();
+    }
 
     /**
      * A dead tree in new land with what lies on the ground fitted to it (see {@link TreePlacer#rest}). The land's height comes from the
@@ -78,12 +91,7 @@ public class GiantTreePiece extends StructurePiece {
      * to it are not made yet.
      */
     private TreePlacer.Placed lying(WorldGenLevel level, ChunkGenerator generator, TreePlacer.Placed tree) {
-        String key = pick.kind() + "|" + pick.seed() + "|" + pick.age() + "|" + foot.asLong();
-        return FITTED.computeIfAbsent(key, k -> {
-            net.minecraft.world.level.levelgen.RandomState random = level.getLevel().getChunkSource().randomState();
-            return TreePlacer.rest(tree, foot, (x, z) -> generator.getFirstFreeHeight(x, z,
-                    net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE_WG, level, random));
-        });
+        return FITTED.computeIfAbsent(key(pick, foot), k -> TreePlacer.rest(tree, foot, ground(level, generator)));
     }
 
     /** Step 6c: a young tree of new land that is instead a dead young tree lying in the grass (no tree in the book). */
@@ -111,6 +119,26 @@ public class GiantTreePiece extends StructurePiece {
         return TreePlacer.rest(TreePlacer.litter(v), foot, ground);
     }
 
+    /**
+     * {@link #litter} for a tree of new land, on the land as the world's shape makes it: worked out once when the tree is
+     * planned and kept for its chunks (docs/plans/savanna-loading.md; every chunk would work it out the same).
+     */
+    static TreePlacer.Placed newLandLitter(GiantTreeStructure.Pick pick, BlockPos foot, TreePlacer.Ground ground) {
+        String key = key(pick, foot);
+        TreePlacer.Placed kept = LITTER.get(key);
+        if (kept == null) {
+            kept = litter(pick, foot, ground);
+            LITTER.put(key, kept);
+        }
+        return kept;
+    }
+
+    /** The land's height as the world's shape makes it (the same answer for every chunk, made yet or not). */
+    private static TreePlacer.Ground ground(WorldGenLevel level, ChunkGenerator generator) {
+        net.minecraft.world.level.levelgen.RandomState random = level.getLevel().getChunkSource().randomState();
+        return (x, z) -> GroundHeights.at(generator, x, z, net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE_WG, level, random);
+    }
+
     @Override
     public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random,
                             BoundingBox box, ChunkPos chunkPos, BlockPos pivot) {
@@ -123,9 +151,7 @@ public class GiantTreePiece extends StructurePiece {
     }
 
     private void putDown(WorldGenLevel level, ChunkGenerator generator, BoundingBox box) {
-        net.minecraft.world.level.levelgen.RandomState randomState = level.getLevel().getChunkSource().randomState();
-        TreePlacer.Placed litter = litter(pick, foot, (x, z) -> generator.getFirstFreeHeight(x, z,
-                net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE_WG, level, randomState));
+        TreePlacer.Placed litter = newLandLitter(pick, foot, ground(level, generator));
         if (fallenYoung(pick)) {
             TreePlacer.place(level, litter, foot, box, Block.UPDATE_CLIENTS);
             return; // only dead wood: nothing for the tree book

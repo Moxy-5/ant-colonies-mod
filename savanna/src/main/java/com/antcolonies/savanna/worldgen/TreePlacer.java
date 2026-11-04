@@ -51,7 +51,8 @@ import net.minecraft.world.level.levelgen.structure.BoundingBox;
 public final class TreePlacer {
     /** How far a trunk goes down to meet ground that dips under its foot. */
     public static final int MAX_FILL_DOWN = 8;
-    private static final int CACHE_SIZE = 48;
+    /** Shapes kept: enough for the trees being made round a player at once (about 200 at view distance 12; was 48, docs/plans/savanna-loading.md). */
+    private static final int CACHE_SIZE = 256;
     private static final Map<String, Placed> CACHE = new LinkedHashMap<>(64, 0.75F, true) {
         @Override
         protected boolean removeEldestEntry(Map.Entry<String, Placed> eldest) {

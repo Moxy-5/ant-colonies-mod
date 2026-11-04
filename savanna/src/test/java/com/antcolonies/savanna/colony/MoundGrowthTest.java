@@ -25,9 +25,16 @@ import net.minecraft.core.BlockPos;
  */
 class MoundGrowthTest {
     private static final MoundNumbers NUMBERS = new MoundNumbers(32, 2.0F, 0.5F, 3, 13);
-    /** The usual six, and more colonies picked at random once (fixed, so a failure can be looked at again). */
+    /**
+     * The usual six, and more colonies picked at random once (fixed, so a failure can be looked at again), and seven a
+     * sweep of thousands found stuck or not mendable (docs/BUGS.md 82: a new spire starting on old soil, a lump of soil
+     * over a gap).
+     */
     private static final long[] SEEDS = {1, 7, 42, 2024, -987654321L, 31337, 5, 99, 123456789L, -42, 777, 2718281828L, 31415926L,
-            -1L, 8675309L, 4242, 1999, 65536, -7777777L, 13};
+            -1L, 8675309L, 4242, 1999, 65536, -7777777L, 13, 6746626102635787809L, -2256830643955015227L, -8951133505651067036L,
+            997394442843989895L, 4619323497592152298L, -3070628618211979387L, -7929930569154781686L};
+    /** How many more colonies, picked at random (fixed), the sweep grows (side by side; about 1 in 80 was stuck before BUGS 82). */
+    private static final int SWEEP = 200;
 
     /** Each colony's stages, grown once for all the tests here (growing takes a moment). */
     private static final Map<Long, List<Shape>> GROWN = new java.util.HashMap<>();
@@ -46,6 +53,16 @@ class MoundGrowthTest {
             List<String> problems = MoundGrowth.problems(NUMBERS.maxHeight(), h -> MoundPlan.shapeOf(h, NUMBERS, seed));
             assertTrue(problems.isEmpty(), "seed " + seed + ": " + problems);
         }
+    }
+
+    @Test
+    void manyMoreMoundsCanBeGrownFromInside() {
+        Random random = new Random(82);
+        long[] seeds = java.util.stream.LongStream.range(0, SWEEP).map(i -> random.nextLong()).toArray();
+        List<String> problems = java.util.Arrays.stream(seeds).parallel()
+                .mapToObj(seed -> MoundGrowth.problems(NUMBERS.maxHeight(), h -> MoundPlan.shapeOf(h, NUMBERS, seed)).stream().map(p -> "seed " + seed + ": " + p).toList())
+                .flatMap(List::stream).toList();
+        assertTrue(problems.isEmpty(), problems.toString());
     }
 
     @Test
@@ -114,7 +131,8 @@ class MoundGrowthTest {
                 assertEquals(plain.keySet(), withTunnels.keySet(), "seed " + seed + ", stage " + h);
                 for (Map.Entry<BlockPos, Part> entry : withTunnels.entrySet()) {
                     Part was = plain.get(entry.getKey());
-                    assertTrue(entry.getValue() == was || entry.getValue() == Part.TUNNEL && was == Part.WALL,
+                    boolean soilKept = (was == Part.SPIRE || was == Part.MOUTH) && (entry.getValue() == Part.WALL || entry.getValue() == Part.TUNNEL);
+                    assertTrue(entry.getValue() == was || entry.getValue() == Part.TUNNEL && was == Part.WALL || soilKept,
                             "seed " + seed + ", stage " + h + ": " + entry.getKey() + " was " + was + " and is " + entry.getValue());
                 }
             }
