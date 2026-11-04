@@ -235,6 +235,56 @@ timings: all "my pick, to confirm" until then).
      `BringPreyGoal`, `PreyPile.bringIn`, limpers in `Raids`, the stack look and `carried_termite.png`, numbers in
      `raids.carry`; `MatabeleRaidTests`; my picks in `docs/DESIGN.md`, "Step 3c, home with the prey, as built").
      Not tried in-game yet.
+   - **3R The raid rework (planned 2026-11-04, before 3d; the user: "refine the scouting and raiding by a lot, I want
+     it consistent and great", every idea below taken, "Yes, all of them").** In-game test 5 found the column
+     freezing just out of the nest. Read in the code (not yet proven by a test): the march is the only stage with no
+     time limit; its line starts at the nest's middle, which in a dead mound is the open chimney mouth, so the back
+     raiders are sent into the hole; ants down the chimney still count as "at the start of the line", so the front waits
+     for them for ever. Also found: the search range grows when slices are only *taken* by scouts (not found empty),
+     never shrinks, and later trips search only the far band; any dug gallery cell within 5 blocks counts as a find,
+     however deep, and a long gallery scores high (big raids to empty ground); the scout command makes raids leave at
+     any hour; the raid writes nothing to the log; no test runs the whole chain. Real behaviour checked 2026-11-04
+     (Hoelldobler et al. 1994; Frank and Linsenmair 2017; Frank's thesis; AntWiki; Yusuf 2026). Steps, in order:
+     - **R1 The raid diary.** Every stage change, its time and why, who the column waits for, who dropped out and why,
+       into the log (`[raid]` lines) and `/antcolonies list`.
+     - **R2 The whole chain in one test.** A real dead-mound colony, a real scout finding real termites under real mud,
+       40+ real raiders out of the chimney, the attack, home with the prey (no hand-made trail). It should show the
+       freeze before R3 fixes it.
+     - **R3 The march rebuilt as trail-following** (real columns follow the scent, each ant keeping near the one ahead;
+       they halt in surges and move on). Each raider walks the trail and keeps a gap to the ant ahead; the front pauses
+       a few seconds at most at a time; an ant making no headway for a while leaves the column and goes home instead of
+       holding it; every stage has a hard time limit; no place is ever on an open hole (the line starts at the first
+       standable cell beside the entrance); only raiders really out of the nest count for the line. Real details folded
+       in: **the column's order** (the scout first, former scouts right behind, majors at the back as the rear guard
+       picking up dropped termites and the hurt, Frank 2017 via AntWiki); **ants that slip off the trail rejoin the
+       column by its smell in the air** if near it (Yusuf 2026's airborne odours) rather than standing lost.
+     - **R4 Every raider lays scent; the trail is a thing in the world.** Each colony keeps its scent trails with their
+       age (real: all raiders lay trail on the way out, so the way home does not hang on the scout; the poison gland's
+       trail lasts up to about 29 hours, Hoelldobler 1994): trails fade, later raids to the same spot follow the old
+       trail, limpers use it. **The player can break a trail** (digging across it, water, a block on it): the column
+       stops at the gap, the ants cast about, pick the trail up on the far side, or a former scout leads them on (a
+       hypothesis in AntWiki, not tested; a trail cut is a classic ant experiment, not shown for Megaponera). A
+       **debug view** `/antcolonies raid show` draws the trails and each raider's state with particles.
+     - **R5 Scouts that choose.** The range grows only when scouts come back empty, trips search from near to far,
+       and the range shrinks back over the days after finds. A find needs real feeding: termites there, or a feeding
+       spot fed at by day, not any gallery cell. **Choosiness** (Frank and Linsenmair 2017): a find must be richer the
+       farther it is, and less rich the hungrier the colony; a hungry colony sends more scouts and bigger raids.
+       Real colonies have 10 to 20 scouts and scout in two sessions a day, sometimes over an hour (the user's 1 per 50
+       up to 5 and all-day scouting kept, noted only).
+     - **R6 The mound as a clue** (the user's idea, 2026-11-03; not described in the papers, believable as termites
+       feed in galleries spreading out from their mound): a scout that notices a living mound (about 16 blocks off,
+       my pick, as the feeding spots stand 10 to 30 blocks past the mound's foot) searches round it in widening rings
+       out to about 30 blocks past the foot; a gallery smelt on the way is followed outward, away from the mound, to its
+       end, where the feeding is.
+     - **R7 Hours and sound.** The night question to the user (a raid finishing into the night, the termites then out
+       in the open, against raids leaving only early enough to be home by dusk); the scout command keeps the hours
+       unless told otherwise. **The column squeaks as it passes, louder as the player comes near, before anyone
+       stings** (Hoelldobler 1994: the columns' stridulation is no message between ants but a warning to big
+       animals). Raids heading into unloaded land turn back at its edge until drawn-only ants (step 4).
+     - **R8 One scale for real distances.** The mod counts distances as a block a metre (range 96 for the real 95 m)
+       but bodies as a major a block (about 1.5 cm); every real distance copied in says which scale it uses (the
+       column halting 20 to 50 cm short of the termites is under a block by one, 13 to 33 by the other; 4 kept).
+     - Then the raid tests and in-game test 5 again.
    - **3d The termites' losses.** Termites in the galleries round the spot are numbers until broken into
      (`HiddenTrips`), so a raid takes from the colony's real count; plugging, closing and danger memory (2f, 4g) dry
      the spot up, so later scouts hunt farther. Young termite colonies can die from repeated raids; big ones shrug it off.
