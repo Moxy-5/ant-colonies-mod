@@ -443,6 +443,8 @@ Moved here from CLAUDE.md on 2026-10-13 (it was loaded into every chat and took 
 
 - **The two mound fixes merged into `claude/savanna-loading` 2026-11-03 (the user's OK):** `claude/stoic-shirley-28a1d9` (dead trees by new-land mounds on uneven ground, `docs/BUGS.md` 81) and `claude/quizzical-hermann-0ed0e4` (every mound stage buildable from inside, 82), clean merges; `trees,mound,termitefood` 58 of 58 on 6 servers (13.5 minutes). Not tried in-game yet.
 
+- **In-game test 4 passed (the user, 2026-11-03, "I've tested everything"):** smarter hunters (2g), BUGS 76 and 79, new-land mounds and Matabele colonies (1b, 1f), BUGS 74, the dead tree's distance, heart rot and its looks, snapped trees and pulp heaps, the feeding spot count, BUGS 70 and 71, faster savanna loading steps 1 to 3, and the mound fixes BUGS 81 and 82, all confirmed. `claude/savanna-loading` merged into `master` the same day with the user's OK.
+
 ## Handover notes for a code reviewer (written at the end of a very long session)
 - State: branch `master`, all committed, `./gradlew build` passes, `./gradlew runGameTestServer` passes 47 tests (about 8 minutes, in one world, tests run in parallel arena grids). Some tests are timing-sensitive under load (`antsOnBumpyGroundReachTheFoodStore` and `aStarvingWorkerSlowsDownAndDies` have each failed once and passed on a re-run): re-run before blaming a change.
 - Confirmed in-game by the user so far: everything up to and including dead ants and the refuse chamber, rich bread, worker hunger, colony starvation, and the hill-jam fix. Older bullets in "Current status" that still say "waiting for the user to confirm" are probably stale (the user tested them and reported no problems), but this was never written down: do not rely on those flags.

@@ -285,6 +285,7 @@ A Minecraft mod where ants and termites live as real colonies: they dig, build, 
 - **Fix 2026-11-03 (`docs/BUGS.md` 81, branch `claude/stoic-shirley-28a1d9`):** new-land mounds get their dead tree on uneven ground again (16 of 21 in the user's world had none: the trunk's base and roots on gently sloping ground counted as in the way); `mound,termitefood,trees` 57 of 57 on 6 servers; not tried in-game yet.
 
 - **Fix 2026-11-03 (`docs/BUGS.md` 82, branch `claude/quizzical-hermann-0ed0e4`):** about 1 termite mound in 80 had a late stage no termite could finish from inside (a new side spire on old soil; the user's log, "stage 30 ... cannot be built from inside"); now every stage of 8,000 swept seeds builds; only those mounds change, by a block; `mound` 14 of 14; not tried in-game yet.
+- **In-game test 4 passed, confirmed by the user 2026-11-03** (everything built since test 3: 2g, BUGS 70, 71, 74, 76, 79, 81, 82, new-land mounds and Matabele colonies, the dead tree distance, heart rot, the feeding spot count, savanna loading steps 1 to 3); `claude/savanna-loading` merged into `master`. Next: M8 step 3, scouts and raids, to plan.
 
 ## Other notes files (read only when the task needs them)
 - `docs/DESIGN.md`: every design decision for the species and shared systems (read the section for a feature before working on it).

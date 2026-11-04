@@ -13,25 +13,15 @@ Keep this short. The full story is in `docs/HISTORY.md`; the long status is at t
 - **Matabele ants:** model, animations, climbing, the queen, the colony living in a dead mound, the prey pile.
 - **Fights:** the sting (paralysed termites), termites dodging and hiding, lost legs, termite soldiers clamping on, the Matabele defending their nest against the player (2e), the termites' side of a raid (2f).
 - **Dead wood for the raids, parts 1 to 3:** more trees, faster tree lives, a dead tree by every new-land mound.
+- **Confirmed by the user 2026-11-03 (in-game test 4):** smarter hunters breaking into galleries (2g) and no corner camping (BUGS 76); jumping on a nest (BUGS 79); termite mounds and Matabele colonies in new savannas (1b, 1f) and young Matabele colours (BUGS 74); the dead tree 10 to 30 blocks out; heart rot, brackets, hollow and snapped trees, pulp heaps; `/antcolonies feedingspots`; the garden fixes (BUGS 70, 71); faster savanna loading (steps 1 to 3) and the two mound fixes (BUGS 81, 82).
 - **Red harvester ant:** lives in its own mod (Desert Colonies), waiting for its rework later.
 
-## Built, not tried in-game yet (all in `master`)
-- Smarter hunters at a feeding spot: majors break into the galleries they smell, minors go in, smooth searching (step 2g); ants no longer camp a corner (BUGS 76).
-- Jumping on a Matabele nest no longer stops the defenders (BUGS 79).
-- Termite mounds (sizes and spacing) and Matabele colonies placed in new savannas (steps 1b, 1f); young Matabele no longer purple squares (BUGS 74).
-- The dead tree 10 to 30 blocks past the mound's edge.
-- Heart rot: wounds, bracket fungi (knob to old, tiers, spore dust), hollow trunks, snapped trees, pulp heaps.
-- The feeding spot count, `/antcolonies feedingspots`.
-- Fixes: fungus garden crash (BUGS 71), a hole dug into a full garden sealed again (BUGS 70).
-- Faster savanna loading: trees remember the ground's height, mounds appear within seconds and quietly (branch `claude/savanna-loading`, not in `master` yet); on the same branch, new-land mounds get their dead tree on uneven ground again (BUGS 81) and every mound stage can be built from inside (BUGS 82).
-
 ## Left before the finish line
-1. **In-game test 4:** everything in the list above.
-2. **Step 3, scouts and raids:** a scout finds a feeding spot, comes home, leads a column out, the fight, the carry home (real ants only at first).
-3. **Step 4, drawn-only ants:** big raid columns of 200 to 500 without lag.
+1. **Step 3, scouts and raids:** a scout finds a feeding spot, comes home, leads a column out, the fight, the carry home (real ants only at first).
+2. **Step 4, drawn-only ants:** big raid columns of 200 to 500 without lag.
 
 ## Optional, after the finish line
-The test revamp, rescue and wound care, moving house, polish (M8.5), flying queens (M9), the savanna animals (M9.5), more species.
+Savanna loading step 4 (mounds made with the world itself), the test revamp, rescue and wound care, moving house, polish (M8.5), flying queens (M9), the savanna animals (M9.5), more species.
 
 ## Open bugs
 Only rare test flakes (`docs/BUGS.md`); none seen in play.
