@@ -111,6 +111,15 @@
       "fed_scouts": 0.5,
       "shrink_ticks": 24000
     },
+    "mound_clue": {
+      "_note": "Raid rework R6, the mound as a clue (the user's idea, 2026-11-03; colony.Raids, MatabeleScoutGoal). Not described in the papers; believable, as Macrotermes feed in galleries spreading out from their mound, the feeding spots 10 to 30 blocks past its foot. A scout searching that comes within notice blocks of a living termite mound's foot (a mound the colony has not ringed lately and no other scout is ringing) searches round it in widening rings ring_step apart, the first ring_step / 2 past the foot, out to past_foot blocks past it (its smell covers the gaps); its trip is extra_ticks longer, once a trip; points past the colony's most_range are left out. A mound ringed with nothing found is left fade_ticks. A tunnel of termites going to food (a gallery out to a feeding place, or the way to a mud runway) smelt within smell blocks on the way, wherever the scout is, is followed outward, away from the mound, to its end, a point every follow_every blocks along it; what it finds there must still pass the choosing rules. Every number my pick, to confirm.",
+      "notice": 16,
+      "past_foot": 30,
+      "ring_step": 10,
+      "extra_ticks": 2400,
+      "fade_ticks": 24000,
+      "follow_every": 4
+    },
     "column": {
       "_note": "M8 step 3b, the raid column (colony.RaidColumn, MatabeleRaidGoal). Real Megaponera (Longhurst and Howse 1979, Hoelldobler et al. 1994, Frank et al. 2017-2018, Yusuf 2026): the scout home from a find recruits nestmates at the entrance and leads them out along its scent line; the raid's size follows what the scout found (Frank 2018), 30 to 75 percent of the colony (Yusuf 2026). ants_per_worth ants for each point of the find's worth (a feeding gallery cell 1, a termite 3), at least least_raid, at most least_share (a fed colony) to most_share (a starving one) of the workers; at most most_real walk as real ants, the rest are numbers till step 4. The recruits mill round the entrance least_form_ticks to form_ticks (those not out by then stay home). The march: spacing blocks between ants, single file for the first single_file blocks, then up to abreast side by side; the scout at the front waits while the ants keeping up are strung out more than stretch blocks behind (the column moves in surges). It stops stop_short blocks before the find and bunches up (at most gather_ticks), then every ant attacks at once (majors break the mud open, minors go in; the termite workers first, soldiers only in the way), at most fight_ticks; then they regroup there (at most regroup_ticks) and walk home along the trail as a column, every ant home or let go after home_ticks. Every number my pick, to confirm.",
       "ants_per_worth": 4,

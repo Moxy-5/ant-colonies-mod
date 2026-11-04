@@ -189,6 +189,17 @@ public class Raids {
     /** Why the last raid could not set out (the raid command's answer), or null. */
     @Nullable
     private String whyNoRaid;
+    /**
+     * R6, the mound as a clue: the living termite mounds the scouts ringed lately and found nothing round, by their
+     * middle, and when (game time). Not saved (my pick: after a reload a mound may be ringed again, no harm).
+     */
+    private final Map<BlockPos, Long> moundsRinged = new HashMap<>();
+    /** R6: the mounds a scout is ringing now, and who (not saved). */
+    private final Map<BlockPos, UUID> moundsTaken = new HashMap<>();
+    /** R6, tests and the colony list: mounds noticed, tunnels followed and finds made by the mound clue since loaded (not saved). */
+    private int moundsNoticed;
+    private int tunnelsFollowed;
+    private int clueFinds;
 
 
     public Raids(Colony colony) {
@@ -726,6 +737,7 @@ public class Raids {
             }
         }
         taken.values().removeIf(id::equals);
+        moundsTaken.values().removeIf(id::equals);
         if (scouts.contains(id) && ant.level() instanceof ServerLevel level) {
             say(level, "scout " + id.toString().substring(0, 8) + " is back or gave up, at " + ant.blockPosition().toShortString());
             if (untold != null) {
@@ -846,6 +858,85 @@ public class Raids {
         say(level, "scout " + scout.toString().substring(0, 8) + " takes the termites at " + at.toShortString() + ", " + away
                 + " blocks out: worth " + worth + ", a raid that far needs " + String.format(java.util.Locale.ROOT, "%.1f", need(at))
                 + " with the colony " + Math.round(fedShare() * 100) + " percent fed");
+    }
+
+    /** R6: the numbers of the mound as a clue. */
+    public SavannaNumbers.MoundClueNumbers moundClue() {
+        return colony.profile().section(SavannaNumbers.MOUND_CLUE).orElse(SavannaNumbers.MoundClueNumbers.DEFAULT);
+    }
+
+    /**
+     * R6: whether a scout may ring this living termite mound (by its middle) now: not ringed with nothing found within
+     * {@code fade_ticks}, and no other scout out ringing it.
+     */
+    public boolean mayRingMound(ServerLevel level, BlockPos mound) {
+        Long ringed = moundsRinged.get(mound);
+        if (ringed != null && level.getGameTime() - ringed < moundClue().fadeTicks()) {
+            return false;
+        }
+        UUID by = moundsTaken.get(mound);
+        return by == null || !scouts.contains(by);
+    }
+
+    /** R6, the diary: a scout noticed a living termite mound and searches round it in rings. */
+    public void ringsMound(ServerLevel level, BlockPos mound, int reach, int rings, int points, UUID scout) {
+        moundsTaken.put(mound.immutable(), scout);
+        moundsNoticed++;
+        int away = (int) Math.round(RaidGround.flat(mound, colony.getCenter()));
+        say(level, "scout " + scout.toString().substring(0, 8) + " notices a living termite mound at " + mound.toShortString() + ", "
+                + away + " blocks from the nest (its foot " + reach + " blocks from its middle), and searches round it in " + rings
+                + " ring(s) out to " + moundClue().pastFoot() + " blocks past its foot (" + points + " points)");
+    }
+
+    /** R6, the diary: a scout starts the next ring round a mound. */
+    public void ringOn(ServerLevel level, BlockPos mound, int ring, int pastFoot, UUID scout) {
+        say(level, "scout " + scout.toString().substring(0, 8) + " rings the termite mound at " + mound.toShortString() + ": ring " + (ring + 1)
+                + ", " + pastFoot + " blocks past its foot");
+    }
+
+    /**
+     * R6: a scout is done ringing a mound ({@code found}: it took a find there or on a tunnel from it). Nothing found,
+     * the mound is left {@code fade_ticks}.
+     */
+    public void moundRinged(ServerLevel level, BlockPos mound, UUID scout, boolean found) {
+        moundsTaken.remove(mound);
+        if (!found) {
+            moundsRinged.put(mound.immutable(), level.getGameTime());
+            say(level, "scout " + scout.toString().substring(0, 8) + " ringed the termite mound at " + mound.toShortString()
+                    + " and found nothing worth a raid round it");
+        }
+    }
+
+    /** R6, the diary: a scout smelt termites going along a tunnel to food and follows it outward. */
+    public void followsTunnel(ServerLevel level, BlockPos smelt, BlockPos food, int points, UUID scout) {
+        tunnelsFollowed++;
+        say(level, "scout " + scout.toString().substring(0, 8) + " smells termites going along a tunnel under " + smelt.toShortString()
+                + " and follows it out, away from their mound, toward its end by " + food.toShortString() + " (" + points + " points)");
+    }
+
+    /** R6, the diary: a scout followed a tunnel to its end and found nothing worth a raid there. */
+    public void tunnelEnd(ServerLevel level, BlockPos food, UUID scout) {
+        say(level, "scout " + scout.toString().substring(0, 8) + " followed the tunnel to its end by " + food.toShortString()
+                + ": nothing worth a raid there");
+    }
+
+    /** R6, the diary: the find a scout takes came from the mound clue ({@code how}: ringing a mound, following a tunnel). */
+    public void clueFind(ServerLevel level, BlockPos at, String how, UUID scout) {
+        clueFinds++;
+        say(level, "scout " + scout.toString().substring(0, 8) + "'s find at " + at.toShortString() + " came from " + how);
+    }
+
+    /** R6, tests: mounds noticed, tunnels followed and finds made by the mound clue since the colony was loaded. */
+    public int moundsNoticed() {
+        return moundsNoticed;
+    }
+
+    public int tunnelsFollowed() {
+        return tunnelsFollowed;
+    }
+
+    public int clueFinds() {
+        return clueFinds;
     }
 
     /** R5: how many finds scouts passed over as too poor since the colony was loaded (tests). */
@@ -1121,6 +1212,10 @@ public class Raids {
         }
         if (wayHome.size() > 0) {
             line.append("; ").append(wayHome.size()).append(" raider(s) going home by themselves");
+        }
+        if (moundsNoticed > 0) {
+            line.append("; mound clue: ").append(moundsNoticed).append(" mound(s) ringed, ").append(tunnelsFollowed)
+                    .append(" tunnel(s) followed, ").append(clueFinds).append(" find(s)");
         }
         line.append(trails.describe(trailNumbers(), level.getGameTime()));
         if (column != null) {

@@ -37,6 +37,7 @@ public final class SavannaNumbers {
     public static final SpeciesSection<CarryNumbers> CARRY = SpeciesSection.signUp("raids.carry", CarryNumbers.CODEC);
     public static final SpeciesSection<TrailNumbers> TRAILS = SpeciesSection.signUp("raids.trails", TrailNumbers.CODEC);
     public static final SpeciesSection<ChooseNumbers> CHOOSING = SpeciesSection.signUp("raids.choosing", ChooseNumbers.CODEC);
+    public static final SpeciesSection<MoundClueNumbers> MOUND_CLUE = SpeciesSection.signUp("raids.mound_clue", MoundClueNumbers.CODEC);
 
     private SavannaNumbers() {
     }
@@ -678,5 +679,24 @@ public final class SavannaNumbers {
             double ease = hungryEase + (1.0 - hungryEase) * Math.max(0.0, Math.min(1.0, fed));
             return (leastWorth + distance * worthPerBlock) * ease;
         }
+    }
+
+    /**
+     * Raid rework R6, the mound as a clue (the user's idea, 2026-11-03; {@code colony.Raids}, {@code MatabeleScoutGoal}): a
+     * scout that comes within {@code notice} blocks of a living termite mound's foot searches round it in rings
+     * {@code ring_step} apart, out to {@code past_foot} blocks past the foot (once a trip, its trip {@code extra_ticks}
+     * longer); a mound ringed with nothing found is left {@code fade_ticks}. A gallery of termites going to food smelt
+     * on the way is followed out to its end, a point every {@code follow_every} blocks along it.
+     */
+    public record MoundClueNumbers(int notice, int pastFoot, int ringStep, int extraTicks, int fadeTicks, int followEvery) {
+        public static final MoundClueNumbers DEFAULT = new MoundClueNumbers(16, 30, 10, 2400, 24000, 4);
+        public static final Codec<MoundClueNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.INT.optionalFieldOf("notice", DEFAULT.notice()).forGetter(MoundClueNumbers::notice),
+                Codec.INT.optionalFieldOf("past_foot", DEFAULT.pastFoot()).forGetter(MoundClueNumbers::pastFoot),
+                Codec.INT.optionalFieldOf("ring_step", DEFAULT.ringStep()).forGetter(MoundClueNumbers::ringStep),
+                Codec.INT.optionalFieldOf("extra_ticks", DEFAULT.extraTicks()).forGetter(MoundClueNumbers::extraTicks),
+                Codec.INT.optionalFieldOf("fade_ticks", DEFAULT.fadeTicks()).forGetter(MoundClueNumbers::fadeTicks),
+                Codec.INT.optionalFieldOf("follow_every", DEFAULT.followEvery()).forGetter(MoundClueNumbers::followEvery)
+        ).apply(i, MoundClueNumbers::new));
     }
 }

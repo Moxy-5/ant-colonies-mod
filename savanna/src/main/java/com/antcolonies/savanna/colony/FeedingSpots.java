@@ -94,6 +94,49 @@ public final class FeedingSpots {
         return places;
     }
 
+    /**
+     * Raid rework R6: a way termites walk out to food: {@code cells} in order from the mound outward (the tunnel from
+     * the shaft, then its feeding gallery; or the tunnel to a runway's hole, then the runway), ending by {@code food}.
+     */
+    public record WayOut(BlockPos food, List<BlockPos> cells) {
+    }
+
+    /**
+     * Raid rework R6: the colony's ways out to food in use (its tunnels to feeding places not spent, and its runways
+     * with the tunnel to their hole), for the Matabele scouts to smell and follow outward. From the colony's own records
+     * ({@link FoodWays}, the foraging tunnels), no block scan.
+     */
+    public static List<WayOut> waysOut(ServerLevel level, Colony colony) {
+        List<WayOut> ways = new ArrayList<>();
+        FoodWays foodWays = colony.nest().foodWays();
+        for (FoodWays.NewTunnel tunnel : foodWays.getNewTunnels()) {
+            if (foodWays.isSpent(tunnel.tunnel().hole())) {
+                continue;
+            }
+            List<BlockPos> cells = new ArrayList<>(tunnel.tunnel().tunnel());
+            if (tunnel.gallery() != null) {
+                cells.addAll(tunnel.gallery());
+            }
+            ways.add(new WayOut(tunnel.food(), List.copyOf(cells)));
+        }
+        List<FoodWays.Runway> runways = foodWays.getRunways();
+        if (!runways.isEmpty()) {
+            List<com.antcolonies.colony.NestPlan.ForagingTunnel> tunnels = colony.foragingHoles().tunnels(level);
+            for (FoodWays.Runway runway : runways) {
+                List<BlockPos> cells = new ArrayList<>();
+                for (com.antcolonies.colony.NestPlan.ForagingTunnel tunnel : tunnels) {
+                    if (tunnel.hole().equals(runway.hole())) {
+                        cells.addAll(tunnel.tunnel());
+                        break;
+                    }
+                }
+                cells.addAll(runway.cells());
+                ways.add(new WayOut(runway.food(), List.copyOf(cells)));
+            }
+        }
+        return ways;
+    }
+
     /** How many of these spots termites can feed at by day. */
     public static int byDay(List<Spot> spots) {
         return (int) spots.stream().filter(Spot::byDay).count();
