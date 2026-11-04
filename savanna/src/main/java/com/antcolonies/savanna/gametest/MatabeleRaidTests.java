@@ -211,14 +211,17 @@ public class MatabeleRaidTests {
                 .thenWaitUntil(() -> helper.assertTrue(raids.column() == null, "the raid is not home yet; " + raids.describe(level)))
                 .thenExecute(() -> {
                     RaidColumn raid = column[0];
-                    helper.assertTrue(raid.cameHome() >= 1, "nobody came home with the column");
+                    helper.assertTrue(raid.cameHome() >= 1, "nobody came home with the column: " + raid.endedWhy());
                     BlockPos at = raid.find().at();
                     for (MatabeleEntity ant : raiders) {
                         if (ant.isAlive() && !ant.isCrippled() && ant.getFightSpot() == null) {
-                            helper.assertTrue(!ant.blockPosition().closerThan(at, 8), "a raider stayed at the termites, at " + ant.blockPosition().toShortString());
+                            helper.assertTrue(!ant.blockPosition().closerThan(at, 8), "a raider stayed at the termites, at " + ant.blockPosition().toShortString()
+                                    + " fights no more " + ant.fightsNoMore() + " downed " + ant.isDowned() + " health " + ant.getHealth() + " doing "
+                                    + ant.goalSelector.getAvailableGoals().stream().filter(net.minecraft.world.entity.ai.goal.WrappedGoal::isRunning)
+                                    .map(g -> g.getGoal().getClass().getSimpleName()).toList() + "; the raid " + raid.endedWhy());
                         }
                     }
-                    SavannaMod.LOGGER.info("[raid test] home at {}, {} came home", helper.getTick(), raid.cameHome());
+                    SavannaMod.LOGGER.info("[raid test] home at {}, {} came home ({})", helper.getTick(), raid.cameHome(), raid.endedWhy());
                 })
                 .thenSucceed();
     }

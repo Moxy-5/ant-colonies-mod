@@ -50,8 +50,12 @@ public final class RaidColumn {
     private static final double NEAR = 4.0;
     /** The share of the raiders that must be at the gathering place before the attack or the walk home (my pick). */
     private static final double MOST_THERE = 0.75;
-    /** A raider is home this near the entrance (blocks, flat). */
-    private static final double HOME = 2.5;
+    /**
+     * A raider is home this near the entrance (blocks, flat and up or down): there the column breaks up and each ant goes
+     * in by itself, down whatever hole it likes (BUGS 85: a dead mound's chimney mouth is an open hole, no cell to stand
+     * in, so a column walking right to it stalled on the hump's side).
+     */
+    private static final double HOME = 8.0;
     /** How often (ticks) the column works out its places. */
     private static final int EVERY = 5;
 
@@ -81,6 +85,8 @@ public final class RaidColumn {
     private int cameHome;
     private long attackedAt = -1;
     private int gatheredAtAttack;
+    private String ended = "";
+    private final Map<String, Integer> lost = new java.util.TreeMap<>();
 
     RaidColumn(Colony colony, SavannaNumbers.ColumnNumbers numbers, Raids.Find find, List<MatabeleEntity> raiders, int numbersAlong, long now) {
         this.colony = colony;
@@ -94,10 +100,12 @@ public final class RaidColumn {
         this.leader = members.get(0);
         this.size = members.size() + numbersAlong;
         this.numbersAlong = numbersAlong;
+        // The scent line starts at the entrance itself: points right over it are the shaft (a dead mound's chimney is an
+        // open hole, so the ground's height there is the room at its foot), and a route through them dives into the hump
+        // (BUGS 85: the column home stuck at the hump's foot).
         List<BlockPos> trail = new ArrayList<>(find.trail());
-        if (trail.isEmpty() || !trail.get(0).closerThan(colony.getCenter(), 3)) {
-            trail.add(0, colony.getCenter());
-        }
+        trail.removeIf(p -> flat(p, colony.getCenter()) < 1.5);
+        trail.add(0, colony.getCenter());
         // The gathering place: the last point of the scent line at least stop_short from the find.
         int gather = 0;
         for (int i = 0; i < trail.size(); i++) {
@@ -201,11 +209,14 @@ public final class RaidColumn {
             if (level.getEntity(id) instanceof MatabeleEntity ant && ant.isAlive() && !ant.fightsNoMore() && !ant.isDowned()) {
                 ants.add(ant);
             } else {
-                drop(id); // dead, crippled, clamped, stung still, or out of the loaded world: out of the column
+                // dead, crippled, clamped, stung still, or out of the loaded world: out of the column
+                lost.merge(!(level.getEntity(id) instanceof MatabeleEntity ant) ? "gone from the world" : !ant.isAlive() ? "dead"
+                        : ant.fightsNoMore() ? "fights no more" : "downed", 1, Integer::sum);
+                drop(id);
             }
         }
         if (ants.isEmpty()) {
-            stage = Stage.DONE;
+            end("nobody left in it at " + stage.name().toLowerCase());
             return;
         }
         if (!members.contains(leader)) {
@@ -226,6 +237,16 @@ public final class RaidColumn {
             default -> {
             }
         }
+    }
+
+    private void end(String why) {
+        stage = Stage.DONE;
+        ended = why;
+    }
+
+    /** Why the column ended, and who left it on the way (tests and the log). */
+    public String endedWhy() {
+        return ended + (lost.isEmpty() ? "" : ", lost on the way: " + lost);
     }
 
     private void next(Stage to, long now) {
@@ -399,14 +420,18 @@ public final class RaidColumn {
     private void home(ServerLevel level, List<MatabeleEntity> ants, long now) {
         BlockPos entrance = colony.getCenter();
         for (MatabeleEntity ant : List.copyOf(ants)) {
-            if (flat(ant.blockPosition(), entrance) <= HOME && Math.abs(ant.getY() - entrance.getY()) <= 3) {
+            if (flat(ant.blockPosition(), entrance) <= HOME && Math.abs(ant.getY() - entrance.getY()) <= HOME
+                    || colony.nest().isInside(level, ant.blockPosition())) {
                 drop(ant.getUUID());
                 ants.remove(ant);
                 cameHome++;
             }
         }
         if (ants.isEmpty() || now - stageSince >= numbers.homeTicks()) {
-            stage = Stage.DONE; // (any left out now go in by themselves)
+            // (any left out now go in by themselves)
+            end(ants.isEmpty() ? "all home" : "home time up with " + ants.size() + " out, nearest "
+                    + ants.stream().mapToDouble(ant -> flat(ant.blockPosition(), entrance)).min().orElse(0) + " flat from the entrance "
+                    + entrance.toShortString() + ", one at " + back.along(ants.get(0).getX(), ants.get(0).getZ()) + " of " + back.length() + " along the way home");
             return;
         }
         if (!members.contains(leader)) {
@@ -430,6 +455,12 @@ public final class RaidColumn {
             }
         }
         BlockPos on = standAt(level, p[0], p[1], (int) Math.round(p[2]));
+        if (on == null) {
+            // (nothing near the line's height: the ground's top there, if it is not far off, never a cell in the ground)
+            BlockPos top = level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                    BlockPos.containing(p[0], p[2], p[1]));
+            on = Math.abs(top.getY() - p[2]) <= 6 ? standAt(level, p[0], p[1], top.getY()) : null;
+        }
         return on != null ? on : BlockPos.containing(p[0], p[2], p[1]);
     }
 

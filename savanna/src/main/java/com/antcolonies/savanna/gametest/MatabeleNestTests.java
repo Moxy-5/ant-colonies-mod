@@ -102,9 +102,16 @@ public class MatabeleNestTests {
                     .filter(net.minecraft.world.entity.ai.goal.WrappedGoal::isRunning).map(g -> g.getGoal().getClass().getSimpleName()).toList()));
             // The workers too, down in the rooms, not only the queen (the user, 2026-10-24: they all piled up at the top of the
             // chimney, which counted as inside, while she walked down to her room).
+            // Not the ants out on the colony's work (BUGS 83, M8 step 3a): a new colony's prey pile is empty, so it is
+            // hungry, and the test's still 7:00 is in the raid hours, so a major or two go out scouting (or raiding), as
+            // real hungry colonies do.
             java.util.Set<BlockPos> rooms = new java.util.HashSet<>(colony.nest().getAllRoomCells(level));
+            com.antcolonies.savanna.colony.Raids raids = colony.part(com.antcolonies.savanna.colony.SavannaParts.RAIDS).orElse(null);
             StringBuilder outside = new StringBuilder();
             for (com.antcolonies.savanna.entity.MatabeleEntity ant : com.antcolonies.gametest.TestIsolation.insectsOf(level, colony, com.antcolonies.savanna.entity.MatabeleEntity.class)) {
+                if (raids != null && (raids.isScouting(ant.getUUID()) || raids.isRaider(ant.getUUID()))) {
+                    continue;
+                }
                 if (!rooms.contains(ant.blockPosition())) {
                     outside.append(" | ").append(ant.hasMajorBody() ? "major " : "minor ").append(ant.getLengthMm()).append(" mm at ")
                             .append(ant.position()).append(" box ").append(ant.getBbWidth()).append(" doing ").append(ant.goalSelector.getAvailableGoals().stream()
