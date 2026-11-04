@@ -277,6 +277,6 @@ public class TermiteMoundStructure extends Structure {
     }
 
     private static int height(GenerationContext context, int x, int z, Heightmap.Types type) {
-        return context.chunkGenerator().getFirstFreeHeight(x, z, type, context.heightAccessor(), context.randomState());
+        return GroundHeights.at(context.chunkGenerator(), x, z, type, context.heightAccessor(), context.randomState());
     }
 }

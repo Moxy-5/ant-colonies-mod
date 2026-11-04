@@ -190,6 +190,8 @@ public class TermiteNewLandTests {
             helper.assertTrue(colony != null, "not put in yet");
             double millis = NewLandMounds.get(level).lastMillisForTests();
             helper.assertTrue(millis < 400, "putting it in took " + millis + " ms");
+            // Its dead tree goes in on its own once its land is loaded, after the mound (docs/plans/savanna-loading.md).
+            helper.assertTrue(NewLandMounds.get(level).treesWaitingForTests() == 0, "its dead tree still waits");
         });
     }
 

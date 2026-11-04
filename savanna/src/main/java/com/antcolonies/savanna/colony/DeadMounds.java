@@ -276,9 +276,26 @@ public class DeadMounds extends SavedData {
             return null;
         }
         mound.diedAt = level.getDayTime() - Math.round(days * 24000.0);
-        update(level, mound, mound.days(level), Integer.MAX_VALUE);
+        quiet = true; // (no breaking sounds or crumbs: thousands at once flooded the sound player, docs/plans/savanna-loading.md)
+        try {
+            update(level, mound, mound.days(level), Integer.MAX_VALUE);
+        } finally {
+            quiet = false;
+        }
         setDirty();
         return mound;
+    }
+
+    /** While a dead mound of new land is worn to its day at once: blocks go without a sound or crumbs (server thread only). */
+    static boolean quiet;
+
+    /** A block of a dead mound crumbles away: with its sound and crumbs, or without while {@link #quiet}. */
+    static void crumble(ServerLevel level, BlockPos pos) {
+        if (quiet) {
+            level.setBlock(pos, level.getFluidState(pos).createLegacyBlock(), Block.UPDATE_ALL);
+        } else {
+            level.destroyBlock(pos, false);
+        }
     }
 
     /** The game tests: one column of the wear, told in words (for a failing check's message). */
@@ -384,7 +401,7 @@ public class DeadMounds extends SavedData {
                 continue;
             }
             if (Mound.isPieceBlock(level.getBlockState(pos)) && !underPlayersBlock(level, pos)) {
-                level.destroyBlock(pos, false);
+                crumble(level, pos);
                 used += 1 + closeBeside(level, pos);
             }
             it.remove();
@@ -402,7 +419,7 @@ public class DeadMounds extends SavedData {
             BlockPos pos = base(mound, column).above(column.now - 1);
             BlockState state = level.getBlockState(pos);
             if (Mound.isMoundBlock(state)) {
-                level.destroyBlock(pos, false);
+                crumble(level, pos);
                 used++;
             } else if (!state.canBeReplaced()) {
                 column.kept = true; // a player's block: it stays, and the column under it with it

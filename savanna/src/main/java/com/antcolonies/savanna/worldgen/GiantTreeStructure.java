@@ -139,14 +139,22 @@ public class GiantTreeStructure extends Structure {
             }
             Pick chosen = pick.stage() == TreeStage.FALLEN && !GiantTreePiece.fallenYoung(pick) ? flatFall(context, foot, pick, random) : pick;
             TreePlacer.Placed tree = GiantTreePiece.fallenYoung(chosen) ? null : TreePlacer.placed(chosen.kind(), chosen.seed(), chosen.age(), chosen.stage());
-            // Step 6c: the dead wood lying round it (on the land as the world's shape makes it) widens the piece to take it in.
-            TreePlacer.Placed litter = GiantTreePiece.litter(chosen, foot, (lx, lz) -> height(context, lx, lz, Heightmap.Types.WORLD_SURFACE_WG));
-            net.minecraft.world.level.levelgen.structure.BoundingBox box = tree != null ? tree.box(foot) : litter.box(foot);
-            if (tree != null && litter.size() > 0) {
-                box = box.encapsulate(litter.box(foot));
+            // M8 step 1b: a termite mound has this place (trees on old humps are put there on purpose). The tree alone is
+            // checked first, before its dead wood is fitted to the land (the slow part, docs/plans/savanna-loading.md).
+            if (tree != null && TermiteMoundStructure.crowds(context, tree.box(foot))) {
+                continue;
             }
-            if (TermiteMoundStructure.crowds(context, box)) {
-                continue; // M8 step 1b: a termite mound has this place (trees on old humps are put there on purpose)
+            // Step 6c: the dead wood lying round it (on the land as the world's shape makes it) widens the piece to take it in.
+            TreePlacer.Placed litter = GiantTreePiece.newLandLitter(chosen, foot, (lx, lz) -> height(context, lx, lz, Heightmap.Types.WORLD_SURFACE_WG));
+            net.minecraft.world.level.levelgen.structure.BoundingBox box = tree != null ? tree.box(foot) : litter.box(foot);
+            boolean wider = tree == null;
+            if (tree != null && litter.size() > 0) {
+                net.minecraft.world.level.levelgen.structure.BoundingBox l = litter.box(foot);
+                wider = l.minX() < box.minX() || l.minZ() < box.minZ() || l.maxX() > box.maxX() || l.maxZ() > box.maxZ();
+                box = box.encapsulate(l);
+            }
+            if (wider && TermiteMoundStructure.crowds(context, box)) {
+                continue; // (the dead wood reaches farther than the tree: checked again with it)
             }
             net.minecraft.world.level.levelgen.structure.BoundingBox pieceBox = box;
             return Optional.of(new GenerationStub(foot, builder -> builder.addPiece(new GiantTreePiece(chosen, foot, pieceBox))));
@@ -205,6 +213,6 @@ public class GiantTreeStructure extends Structure {
     }
 
     private static int height(GenerationContext context, int x, int z, Heightmap.Types type) {
-        return context.chunkGenerator().getFirstFreeHeight(x, z, type, context.heightAccessor(), context.randomState());
+        return GroundHeights.at(context.chunkGenerator(), x, z, type, context.heightAccessor(), context.randomState());
     }
 }

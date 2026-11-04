@@ -149,11 +149,15 @@ public final class Perf {
      * New land (M7.5 step 7): the giant trees' share of world generation. It runs on the world's builder threads, not in
      * the server tick, so it is counted apart (any thread, safely) and shown as its own lines: planning a tree (picking
      * it and working out its shape, once per tree) and putting it down (once per chunk it reaches). Slow here means
-     * new land loads slowly, not a slow tick.
+     * new land loads slowly, not a slow tick. The ground's height before a chunk is made is worked out from the world's
+     * shape (slow, docs/plans/savanna-loading.md), so how often that is done and how often a remembered answer serves are
+     * counted too.
      */
     public enum NewLand {
         PLANNING("planned"),
-        PLACING("put down, chunk by chunk");
+        PLACING("put down, chunk by chunk"),
+        GROUND("ground heights worked out from the world's shape"),
+        GROUND_KEPT("ground heights remembered");
 
         final String label;
         final java.util.concurrent.atomic.LongAdder count = new java.util.concurrent.atomic.LongAdder();
@@ -185,7 +189,8 @@ public final class Perf {
                 out.append("\nNew land, giant trees (world builder threads, not in the tick):");
                 any = true;
             }
-            out.append(String.format("\n  %d %s, %.2f ms each, longest %.1f ms", n, part.label, ms(total) / n, ms(longest)));
+            out.append(total == 0 ? String.format("\n  %d %s", n, part.label)
+                    : String.format("\n  %d %s, %.3f ms each, longest %.1f ms", n, part.label, ms(total) / n, ms(longest)));
         }
     }
 

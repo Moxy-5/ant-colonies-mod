@@ -190,7 +190,9 @@ final class DeadWorks {
             BlockState state = level.getBlockState(wall);
             if (FacedWall.hasFace(state, side.getOpposite()) && (!openSkyOnly || underTheSky(level, wall))) {
                 BlockState less = FacedWall.withoutFace(state, side.getOpposite());
-                level.levelEvent(LevelEvent.PARTICLES_DESTROY_BLOCK, wall, Block.getId(state));
+                if (!DeadMounds.quiet) {
+                    level.levelEvent(LevelEvent.PARTICLES_DESTROY_BLOCK, wall, Block.getId(state));
+                }
                 if (FacedWall.hasNoFace(less)) {
                     level.removeBlock(wall, false);
                 } else {
@@ -216,7 +218,9 @@ final class DeadWorks {
         for (BlockPos piece : FeedingGallery.foodBlocks(level, food, pos -> isWoodOrCast(level.getBlockState(pos)))) {
             BlockState state = level.getBlockState(piece);
             if (MudCastBlock.isCast(state)) {
-                level.levelEvent(LevelEvent.PARTICLES_DESTROY_BLOCK, piece, Block.getId(state));
+                if (!DeadMounds.quiet) {
+                    level.levelEvent(LevelEvent.PARTICLES_DESTROY_BLOCK, piece, Block.getId(state));
+                }
                 level.removeBlock(piece, false);
                 changed++;
             }
