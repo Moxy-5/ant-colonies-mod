@@ -136,6 +136,15 @@
       "termites_per_layer": 10,
       "bring_ticks": 2400,
       "limp_ticks": 6000
+    },
+    "trails": {
+      "_note": "M8 raid rework R4, the scent trails (colony.ScentTrails). Real Megaponera lay their trail from the poison gland, every raider on the way out (so the way home does not hang on the scout), and it lasts up to about 29 hours (Hoelldobler et al. 1994; a game day counted as a real day, so 29,000 ticks). A trail a raid column walked lasts lasting_ticks after it was last walked; a lone scout's line, weaker, scout_lasting_ticks; a later raid to the same spot follows a trail still smelt, and with the trail gone and the scout dead nobody knows the way. A trail is broken where a block is dug or put on it or water covers it: the column stops at the gap and the front ants cast about at least cast_ticks, plus cast_per_block for each block of the gap; a far side within cast_reach blocks is picked up and the gap mended with new scent; a wider gap, after cast_give_ticks, is crossed only if a former scout walks in the column (it leads on from memory, a hypothesis in AntWiki, never tested), else the raid turns home (the way home is always found). Every number my pick, to confirm, but the 29 hours.",
+      "lasting_ticks": 29000,
+      "scout_lasting_ticks": 12000,
+      "cast_reach": 5.0,
+      "cast_ticks": 60,
+      "cast_per_block": 20,
+      "cast_give_ticks": 240
     }
   },
   "defence": {

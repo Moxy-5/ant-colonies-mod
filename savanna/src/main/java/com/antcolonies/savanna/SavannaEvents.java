@@ -79,6 +79,23 @@ public class SavannaEvents {
             com.antcolonies.savanna.tree.Forest.tick(level);
             com.antcolonies.savanna.colony.DeadMounds.tick(level);
             com.antcolonies.savanna.colony.NewLandMounds.tick(level);
+            com.antcolonies.savanna.command.RaidView.tick(level);
+        }
+    }
+
+    /** M8 raid rework R4: a block dug on a Matabele scent trail (or the ground under it) breaks the trail there. */
+    @SubscribeEvent
+    public static void onBreak(BlockEvent.BreakEvent event) {
+        if (event.getLevel() instanceof ServerLevel level) {
+            com.antcolonies.savanna.colony.Raids.blockChangedNear(level, event.getPos());
+        }
+    }
+
+    /** M8 raid rework R4: a block put on a Matabele scent trail breaks the trail there. */
+    @SubscribeEvent
+    public static void onPlace(BlockEvent.EntityPlaceEvent event) {
+        if (event.getLevel() instanceof ServerLevel level) {
+            com.antcolonies.savanna.colony.Raids.blockChangedNear(level, event.getPos());
         }
     }
 

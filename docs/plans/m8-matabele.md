@@ -258,7 +258,7 @@ timings: all "my pick, to confirm" until then).
        in: **the column's order** (the scout first, former scouts right behind, majors at the back as the rear guard
        picking up dropped termites and the hurt, Frank 2017 via AntWiki); **ants that slip off the trail rejoin the
        column by its smell in the air** if near it (Yusuf 2026's airborne odours) rather than standing lost.
-     - **R4 Every raider lays scent; the trail is a thing in the world.** Each colony keeps its scent trails with their
+     - **R4 Every raider lays scent; the trail is a thing in the world.** (**BUILT 2026-11-04**, `colony/ScentTrails`, `command/RaidView`; as built in `docs/DESIGN.md`, "R4, scent trails, as built".) Each colony keeps its scent trails with their
        age (real: all raiders lay trail on the way out, so the way home does not hang on the scout; the poison gland's
        trail lasts up to about 29 hours, Hoelldobler 1994): trails fade, later raids to the same spot follow the old
        trail, limpers use it. **The player can break a trail** (digging across it, water, a block on it): the column

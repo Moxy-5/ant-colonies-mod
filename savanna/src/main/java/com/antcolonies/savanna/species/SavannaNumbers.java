@@ -35,6 +35,7 @@ public final class SavannaNumbers {
     public static final SpeciesSection<ScoutNumbers> SCOUTING = SpeciesSection.signUp("raids.scouting", ScoutNumbers.CODEC);
     public static final SpeciesSection<ColumnNumbers> COLUMN = SpeciesSection.signUp("raids.column", ColumnNumbers.CODEC);
     public static final SpeciesSection<CarryNumbers> CARRY = SpeciesSection.signUp("raids.carry", CarryNumbers.CODEC);
+    public static final SpeciesSection<TrailNumbers> TRAILS = SpeciesSection.signUp("raids.trails", TrailNumbers.CODEC);
 
     private SavannaNumbers() {
     }
@@ -623,5 +624,27 @@ public final class SavannaNumbers {
             int most = majorModel ? mostMajor : mostMinor;
             return Math.max(1, (int) Math.round(least + (most - least) * t));
         }
+    }
+
+    /**
+     * M8 raid rework R4, the scent trails ({@code colony.ScentTrails}; real Megaponera lay their trail from the poison
+     * gland, every raider on the way out, and it lasts up to about 29 hours, Hoelldobler et al. 1994). A trail laid by a
+     * raid column lasts {@code lastingTicks} after it was last walked; a lone scout's line, weaker, {@code scoutLastingTicks}.
+     * A trail broken (a block dug, put or flooded on it) stops the column at the gap: the front ants cast about at least
+     * {@code castTicks}, and {@code castPerBlock} more for each block of the gap; the far side within {@code castReach}
+     * blocks is picked up and the gap mended; a wider gap, after {@code castGiveTicks}, is crossed only if a former scout
+     * walks in the column (it leads on from memory, a hypothesis in AntWiki), else the raid turns home. Every number my
+     * pick, to confirm, but the 29 hours (real; a game day counted as a real day).
+     */
+    public record TrailNumbers(int lastingTicks, int scoutLastingTicks, double castReach, int castTicks, int castPerBlock, int castGiveTicks) {
+        public static final TrailNumbers DEFAULT = new TrailNumbers(29000, 12000, 5.0, 60, 20, 240);
+        public static final Codec<TrailNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.INT.optionalFieldOf("lasting_ticks", DEFAULT.lastingTicks()).forGetter(TrailNumbers::lastingTicks),
+                Codec.INT.optionalFieldOf("scout_lasting_ticks", DEFAULT.scoutLastingTicks()).forGetter(TrailNumbers::scoutLastingTicks),
+                Codec.DOUBLE.optionalFieldOf("cast_reach", DEFAULT.castReach()).forGetter(TrailNumbers::castReach),
+                Codec.INT.optionalFieldOf("cast_ticks", DEFAULT.castTicks()).forGetter(TrailNumbers::castTicks),
+                Codec.INT.optionalFieldOf("cast_per_block", DEFAULT.castPerBlock()).forGetter(TrailNumbers::castPerBlock),
+                Codec.INT.optionalFieldOf("cast_give_ticks", DEFAULT.castGiveTicks()).forGetter(TrailNumbers::castGiveTicks)
+        ).apply(i, TrailNumbers::new));
     }
 }

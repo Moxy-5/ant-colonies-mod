@@ -130,7 +130,9 @@ public class MatabeleRaidTests {
      * leading, stop a few blocks short of the termites and bunch up, attack together and sting the termite workers
      * (food first: a termite soldier further off ranks below the workers), then walk home along the trail and go in;
      * nobody is left at the termites. Step 3c: they pick the stung termites up and carry them home (no more than each
-     * can hold), and every termite carried home goes onto the colony's prey pile.
+     * can hold), and every termite carried home goes onto the colony's prey pile. Raid rework R4: a block put on the
+     * trail half way out breaks it; the column stops there, casts about, picks the trail up past the gap and lays new
+     * scent over it (the trail whole again), and the trail is a column's trail once walked.
      */
     @GameTest(template = "arena", timeoutTicks = 14000, skyAccess = true, batch = "matabele_raids")
     public static void aScoutLeadsARaidColumnAlongItsTrailThatStopsShortAttacksTheWorkersAndComesHome(GameTestHelper helper) {
@@ -152,12 +154,14 @@ public class MatabeleRaidTests {
         int[] leaderBehind = {0};
         double[] mostOffTrail = {0.0};
         boolean[] rankChecked = {false};
+        BlockPos[] blocked = {null};
         helper.onEachTick(() -> {
             RaidColumn raid = column[0];
             if (raid == null) {
                 return;
             }
-            if (raid.stage() == RaidColumn.Stage.MARCHING && level.getEntity(raid.leader()) instanceof MatabeleEntity leader) {
+            if (raid.stage() == RaidColumn.Stage.MARCHING && level.getEntity(raid.leader()) instanceof MatabeleEntity leader
+                    && !raid.isCasting(raid.leader())) { // (R4: casting about at the gap, the front's helpers range ahead of it)
                 marchTicks[0]++;
                 double front = raid.alongOut(leader.blockPosition());
                 boolean behind = false;
@@ -213,6 +217,10 @@ public class MatabeleRaidTests {
                         }
                     }
                     column[0] = raid;
+                    // R4: a block put on the trail half way out (no event in a test: the trail's own check finds it).
+                    List<BlockPos> points = raid.trail().points();
+                    blocked[0] = points.get(points.size() / 2);
+                    level.setBlockAndUpdate(blocked[0], Blocks.STONE.defaultBlockState());
                     SavannaMod.LOGGER.info("[raid test] set out: {}", raids.describe(level));
                 })
                 .thenWaitUntil(() -> helper.assertTrue(column[0].stage().ordinal() >= RaidColumn.Stage.ATTACKING.ordinal(),
@@ -234,6 +242,12 @@ public class MatabeleRaidTests {
                 .thenExecute(() -> {
                     RaidColumn raid = column[0];
                     helper.assertTrue(raid.cameHome() >= 1, "nobody came home with the column: " + raid.endedWhy());
+                    // R4: the gap was met and crossed, the trail mended and walked by the column.
+                    helper.assertTrue(raid.gapsCrossed() >= 1, "the column never crossed the gap in its trail at " + blocked[0].toShortString()
+                            + "; " + raid.endedWhy());
+                    helper.assertTrue(raid.trail().brokenCount() == 0, raid.trail().brokenCount() + " trail point(s) still broken after the column crossed");
+                    helper.assertTrue(raid.trail().byColumn() && raid.trail().walks() >= 1, "the trail is not a column's trail after the raid");
+                    helper.assertTrue(!raid.lostTrail(), "the column turned home at a short gap");
                     BlockPos at = raid.find().at();
                     for (MatabeleEntity ant : raiders) {
                         if (ant.isAlive() && !ant.isCrippled() && ant.getFightSpot() == null) {
@@ -453,6 +467,81 @@ public class MatabeleRaidTests {
                                             + Math.round(flat(ant.blockPosition(), colony.getCenter())) + " from the nest, doing " + ant.runningGoals());
                         }
                     }
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Raid rework R4, the scent trail lost: a raid led by an ant that never scouted (no former scout in the column) meets
+     * a gap in its trail too wide to pick up (a wall put on 8 blocks of it): it stops, casts about, gives up and turns
+     * home, and the spot is no empty check (it was never reached). The trails are saved with their age; once this one
+     * has faded and the ant that led there is gone, nobody knows the way: no raid sets out to the spot.
+     */
+    @GameTest(template = "arena", timeoutTicks = 12000, skyAccess = true, batch = "matabele_raids")
+    public static void aRaidWithNoFormerScoutTurnsHomeAtAWideGapAndAFadedTrailWithNobodyWhoKnowsTheWayMeansNoRaid(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        TestClock.still(helper, 21.0); // (night: no scout sets out by itself, so the colony has no former scouts)
+        TestScenes.shapeGround(helper, 45, (x, z) -> 0);
+        Colony dead = NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(NEST, SURFACE, NEST)), NewLandMounds.pickFor("dead", 30, 5L));
+        helper.assertTrue(dead != null, "no dead mound put in");
+        Colony colony = MatabeleCommands.makeColony(level, helper.absolutePos(new BlockPos(NEST + 6, SURFACE, NEST)), 20);
+        helper.assertTrue(colony != null, "no Matabele colony made");
+        Raids raids = colony.part(SavannaParts.RAIDS).orElse(null);
+        helper.assertTrue(raids != null, "a Matabele colony has no raids part");
+        BlockPos at = helper.absolutePos(new BlockPos(52, SURFACE, NEST + 4));
+        RaidColumn[] column = {null};
+        boolean[] cast = {false};
+        helper.onEachTick(() -> {
+            if (column[0] != null && column[0].isCasting(column[0].leader())) {
+                cast[0] = true;
+            }
+        });
+        helper.startSequence()
+                .thenIdle(40)
+                .thenExecute(() -> {
+                    BlockPos entrance = colony.getCenter();
+                    List<BlockPos> trail = new ArrayList<>();
+                    int steps = (int) Math.ceil(Math.hypot(at.getX() - entrance.getX(), at.getZ() - entrance.getZ()) / 2.0);
+                    for (int i = 0; i <= steps; i++) {
+                        double t = i / (double) steps;
+                        int x = entrance.getX() + (int) Math.round((at.getX() - entrance.getX()) * t);
+                        int z = entrance.getZ() + (int) Math.round((at.getZ() - entrance.getZ()) * t);
+                        trail.add(level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                                new BlockPos(x, entrance.getY(), z)));
+                    }
+                    RaidColumn raid = raids.raidForTests(level, at, 2, trail, null);
+                    helper.assertTrue(raid != null, "no raid set out; " + raids.describe(level));
+                    helper.assertTrue(!raids.isVeteran(raid.leader()), "the raid's leader is a former scout");
+                    // A wall on the trail from 10 to 18 blocks out: a gap of about 10 blocks, past casting reach.
+                    for (BlockPos p : raid.trail().points()) {
+                        double out = flat(p, entrance);
+                        if (out >= 10.0 && out <= 18.0) {
+                            level.setBlockAndUpdate(p, Blocks.STONE.defaultBlockState());
+                        }
+                    }
+                    column[0] = raid;
+                })
+                .thenWaitUntil(() -> helper.assertTrue(column[0].lostTrail(), "the raid did not turn home at the wide gap; " + raids.describe(level)))
+                .thenWaitUntil(() -> helper.assertTrue(raids.column() == null, "the raid is not home yet; " + raids.describe(level)))
+                .thenExecute(() -> {
+                    RaidColumn raid = column[0];
+                    helper.assertTrue(cast[0], "the front never cast about at the gap");
+                    helper.assertTrue(raid.gapsCrossed() == 0, "the raid crossed a gap too wide to pick up, with no former scout");
+                    helper.assertTrue(raid.attackedAt() < 0, "the raid attacked after losing its trail");
+                    Raids.Find find = raid.find();
+                    helper.assertTrue(raids.finds().contains(find) && find.misses() == 0,
+                            "a raid that lost its trail counted as an empty check of the spot; " + raids.describe(level));
+                    helper.assertTrue(raid.trail().brokenCount() > 0, "the wall's trail points are not broken");
+                    // The trail fades and the ant that led there is gone: nobody knows the way.
+                    raid.trail().ageForTests(raid.trail().lasting(raids.trailNumbers()) + 1);
+                    if (find.scout() != null && level.getEntity(find.scout()) != null) {
+                        level.getEntity(find.scout()).discard();
+                    }
+                    RaidColumn again = raids.raidNow(level);
+                    helper.assertTrue(again == null, "a raid set out along a faded trail with nobody who knows the way");
+                    helper.assertTrue(raids.whyNoRaid() != null && raids.whyNoRaid().contains("faded"),
+                            "no raid, but not for the faded trail: " + raids.whyNoRaid());
                 })
                 .thenSucceed();
     }

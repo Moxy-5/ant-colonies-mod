@@ -69,7 +69,9 @@ public class MatabeleCommands {
                 .then(Commands.literal("scout")
                         .executes(context -> scout(context.getSource())))
                 .then(Commands.literal("raid")
-                        .executes(context -> raid(context.getSource())))
+                        .executes(context -> raid(context.getSource()))
+                        .then(Commands.literal("show")
+                                .executes(context -> show(context.getSource()))))
                 .then(Commands.literal("prey")
                         .then(Commands.argument("layers", IntegerArgumentType.integer(1, 64))
                                 .executes(context -> prey(context.getSource(), IntegerArgumentType.getInteger(context, "layers")))))
@@ -264,12 +266,25 @@ public class MatabeleCommands {
         }
         com.antcolonies.savanna.colony.RaidColumn column = raids.raidNow(level);
         if (column == null) {
-            source.sendFailure(Component.literal("Nobody there fit to raid (real workers only; not hurt, clamped or fighting)."));
+            String why = raids.whyNoRaid();
+            source.sendFailure(Component.literal("No raid: " + (why != null ? why : "nobody there fit to raid (real workers only; not hurt, clamped or fighting)") + "."));
             return 0;
         }
         source.sendSuccess(() -> Component.literal("A raid of " + column.size() + " (" + column.members().size()
                 + " real) forms at the Matabele nest at " + colony.getCenter().toShortString() + " for the termites at "
                 + column.find().at().toShortString() + "; /antcolonies list follows it."), false);
+        return 1;
+    }
+
+    /** R4: the raid view on or off for the player running the command ({@link RaidView}). */
+    private static int show(CommandSourceStack source) throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+        boolean on = RaidView.toggle(source.getPlayerOrException());
+        source.sendSuccess(() -> Component.literal(on
+                ? "Raid view on. Trails: green fresh, brown fading, grey gone, red broken; yellow the spot they lead to. Over the ants: "
+                        + "white marching (the front bigger), grey forming, yellow gathering or regrouping, red fighting, pink collecting, "
+                        + "blue carrying, orange casting about at a gap, light green homing, cyan a scout, purple limping home. "
+                        + "/antcolonies raid show again turns it off."
+                : "Raid view off."), false);
         return 1;
     }
 

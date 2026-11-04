@@ -47,6 +47,12 @@ import net.minecraft.server.level.ServerLevel;
  * <p>Step 3c, home with the prey: a raid home with termites keeps its spot fresh, one home empty counts as an empty
  * check of it ({@link #raidHome}); raiders who left the column hurt limp home along its trail ({@link #limpOrder}).
  * Numbers: {@code raids.carry} ({@link SavannaNumbers.CarryNumbers}).
+ *
+ * <p>Raid rework R4, the scent trails ({@link ScentTrails}): a scout home with a find lays its line as a trail in the
+ * world (unless a trail still smelt leads there already); a raid follows the trail to its find, and the column walking it
+ * makes it a column's trail, lasting longer; a trail no longer smelt with its scout gone means nobody knows the way, so
+ * no raid (the scouts must find the spot again). The player breaking a trail ({@link #blockChanged}) leaves a gap the
+ * column casts about at. Numbers: {@code raids.trails} ({@link SavannaNumbers.TrailNumbers}).
  */
 public class Raids {
     /** A good spot a scout found: where, how much termite it smelt there, when found and last checked, empty checks, by whom. */
@@ -134,6 +140,11 @@ public class Raids {
      * is step 5). Not saved: after a reload they are just ants outside, and go home.
      */
     private final Map<UUID, Limp> limping = new HashMap<>();
+    /** R4: the colony's scent trails in the world (saved). */
+    private final ScentTrails trails = new ScentTrails();
+    /** Why the last raid could not set out (the raid command's answer), or null. */
+    @Nullable
+    private String whyNoRaid;
 
     /** One limping raider: the trail home it follows, and since when. */
     private record Limp(RaidColumn.Route route, long since) {
@@ -163,7 +174,42 @@ public class Raids {
         return colony.profile().section(SavannaNumbers.CARRY).orElse(null);
     }
 
+    /** R4: the scent trail numbers (the defaults if the species file has none). */
+    public SavannaNumbers.TrailNumbers trailNumbers() {
+        return colony.profile().section(SavannaNumbers.TRAILS).orElse(SavannaNumbers.TrailNumbers.DEFAULT);
+    }
+
+    /** R4: the colony's scent trails. */
+    public ScentTrails trails() {
+        return trails;
+    }
+
+    /** The ants out scouting now (the raid view). */
+    public Set<UUID> scoutsOut() {
+        return Set.copyOf(scouts);
+    }
+
+    /** The raiders limping home by themselves now (the raid view). */
+    public Set<UUID> limpers() {
+        return Set.copyOf(limping.keySet());
+    }
+
+    /** Why the last raid could not set out, or null. */
+    @Nullable
+    public String whyNoRaid() {
+        return whyNoRaid;
+    }
+
+    /**
+     * R4: a block was dug or put here by a player: the scent on the ground there is gone (the trail broken). How many
+     * trail points broke.
+     */
+    public int blockChanged(ServerLevel level, BlockPos pos) {
+        return trails.blockChanged(pos, what -> say(level, what));
+    }
+
     void tick(ServerLevel level) {
+        trails.tick(level, level.getGameTime(), trailNumbers(), column == null ? null : column.trail(), what -> say(level, what));
         if (column != null) {
             column.update(level); // (the raiders ask it every few ticks; this keeps it going with none of them loaded)
             for (UUID hurt : column.takeHurt()) {
@@ -218,6 +264,9 @@ public class Raids {
         if (raid.carried() > 0) {
             find.checkedAt = level.getGameTime();
             find.misses = 0;
+        } else if (raid.lostTrail()) {
+            // R4: turned home at a gap in the trail: the spot was never reached, so it is no empty check (a scout
+            // rechecks it later and lays a new line).
         } else {
             foundEmpty(level, find);
         }
@@ -476,6 +525,11 @@ public class Raids {
         if (numbers != null) {
             searched.remove(sliceOf(at, slices(numbers)));
         }
+        // R4: the scout's line home is a scent trail in the world now, unless a trail still smelt leads there already (the
+        // raid follows that one: a column's trail is stronger than one scout's line).
+        if (trails.liveTo(at, trailReach(), trailNumbers(), now) == null) {
+            trails.lay(level, colony.getCenter(), at, trail, now, false);
+        }
         // Step 3b: home with a find, the scout recruits a raid there: in the raid hours, dry, the colony hungry (or the
         // scout command's scout, whatever the hour), and no raid out already. Found between the raid hours (scouts search
         // all day), the find waits for them (tick), the colony hungry then.
@@ -497,6 +551,12 @@ public class Raids {
             say(level, "a scout is home from " + at.toShortString() + ", worth " + worth + ", no raid: " + (column != null ? "one is out already"
                     : colony.rainsNow(level) ? "it rains" : "the colony is not hungry"));
         }
+    }
+
+    /** R4: a trail leads to a find if it ends this near it (blocks: two smelling distances). */
+    private double trailReach() {
+        SavannaNumbers.ScoutNumbers numbers = numbers();
+        return numbers == null ? 10.0 : numbers.smell() * 2.0;
     }
 
     /** The raid out now, or null. */
@@ -558,10 +618,24 @@ public class Raids {
                         && (!scouts.contains(member.getUUID()) || member.getUUID().equals(find.scout))) // (scouts out searching stay at it)
                 .map(member -> (MatabeleEntity) member)
                 .sorted(Comparator.comparingDouble(member -> member.blockPosition().distSqr(entrance))).toList());
-        MatabeleEntity leader = fit.stream().filter(ant -> ant.getUUID().equals(find.scout)).findFirst()
-                .orElse(fit.stream().filter(MatabeleEntity::hasMajorBody).findFirst().orElse(null));
+        MatabeleEntity scoutHere = fit.stream().filter(ant -> ant.getUUID().equals(find.scout)).findFirst().orElse(null);
+        MatabeleEntity leader = scoutHere != null ? scoutHere : fit.stream().filter(MatabeleEntity::hasMajorBody).findFirst().orElse(null);
         if (leader == null) {
+            whyNoRaid = "nobody fit to raid (real workers only; not hurt, clamped or fighting)";
             return null;
+        }
+        // R4: the raid follows the scent trail to the find if it is still smelt (whoever leads); with the trail gone only
+        // the scout knows the way, and it lays a new one as it leads; with the scout gone too, nobody knows the way.
+        long now = level.getGameTime();
+        ScentTrails.Trail trail = trails.liveTo(find.at, trailReach(), trailNumbers(), now);
+        if (trail == null) {
+            if (scoutHere == null) {
+                whyNoRaid = "the scent trail to " + find.at.toShortString() + " has faded and its scout is not here to lead: nobody knows the way";
+                say(level, "no raid to " + find.at.toShortString() + ": " + whyNoRaid);
+                return null;
+            }
+            trail = trails.lay(level, colony.getCenter(), find.at, find.trail, now, false);
+            say(level, "the trail to " + find.at.toShortString() + " has faded: its scout leads from memory, laying a new one");
         }
         fit.remove(leader);
         fit.add(0, leader);
@@ -571,8 +645,9 @@ public class Raids {
         // then the rest, the majors at the back as the rear guard.
         List<MatabeleEntity> going = new ArrayList<>(fit.subList(0, real));
         going.sort(Comparator.comparingInt(ant -> ant == leader ? 0 : veterans.contains(ant.getUUID()) ? 1 : ant.hasMajorBody() ? 3 : 2));
-        column = new RaidColumn(level, colony, numbers, carryNumbers(), find, going, along, level.getGameTime());
+        column = new RaidColumn(level, colony, numbers, carryNumbers(), trailNumbers(), find, trail, going, along, now);
         column.sayStart(level);
+        whyNoRaid = null;
         find.scout = leader.getUUID(); // (it leads: the one to lead the next raid there too)
         return column;
     }
@@ -597,6 +672,7 @@ public class Raids {
     public RaidColumn raidForTests(ServerLevel level, BlockPos at, int worth, List<BlockPos> trail, @Nullable UUID scout) {
         Find find = new Find(at.immutable(), worth, level.getGameTime(), level.getGameTime(), 0, List.copyOf(trail), scout);
         finds.add(find);
+        trails.lay(level, colony.getCenter(), at, trail, level.getGameTime(), false); // (R4: the scout's line, laid as it ran home)
         return startRaid(level, find);
     }
 
@@ -651,6 +727,7 @@ public class Raids {
         if (!limping.isEmpty()) {
             line.append("; ").append(limping.size()).append(" hurt raider(s) limping home");
         }
+        line.append(trails.describe(trailNumbers(), level.getGameTime()));
         if (column != null) {
             line.append(column.describe());
         }
@@ -681,6 +758,7 @@ public class Raids {
         ListTag old = new ListTag();
         veterans.forEach(id -> old.add(NbtUtils.createUUID(id)));
         tag.put("raidScouts", old);
+        trails.save(tag);
     }
 
     void load(CompoundTag tag) {
@@ -714,6 +792,7 @@ public class Raids {
         for (Tag t : tag.getList("raidScouts", Tag.TAG_INT_ARRAY)) {
             veterans.add(NbtUtils.loadUUID(t));
         }
+        trails.load(tag);
     }
 
     void fillForTests(ServerLevel level) {
@@ -724,6 +803,7 @@ public class Raids {
         range = 48;
         veterans.add(new UUID(7, 11));
         veterans.add(new UUID(7, 12));
+        trails.fillForTests(colony.getCenter());
     }
 
     /** Whether a termite there counts as feeding (out of its mound): not within its colony's mound and a little round it. */
@@ -734,6 +814,15 @@ public class Raids {
             }
         }
         return true;
+    }
+
+    /** R4: a block dug or put here: every Matabele colony within 128 blocks hears of it (its scent trails may break). */
+    public static void blockChangedNear(ServerLevel level, BlockPos pos) {
+        for (Colony other : com.antcolonies.colony.ColonyManager.get(level).getColonies()) {
+            if (MatabeleEntity.SPECIES.equals(other.getSpecies()) && other.getCenter().closerThan(pos, 128)) {
+                other.part(SavannaParts.RAIDS).ifPresent(raids -> raids.blockChanged(level, pos));
+            }
+        }
     }
 
     /** A living termite mound near: its middle and how far its foot reaches (blocks). */
