@@ -276,7 +276,7 @@ timings: all "my pick, to confirm" until then).
        my pick, as the feeding spots stand 10 to 30 blocks past the mound's foot) searches round it in widening rings
        out to about 30 blocks past the foot; a gallery smelt on the way is followed outward, away from the mound, to its
        end, where the feeding is.
-     - **R7 Hours and sound.** **Raids end by dusk (the user's answer, 2026-11-04):** no raid leaves after 19:00 (my
+     - **R7 Hours and sound** (**BUILT 2026-11-04**, `RaidColumn`, `Raids`, `raids.hours_and_sound`; as built in `docs/DESIGN.md`, "R7, hours and sound, as built"; also the attack ending 30 s after the last termite, at most 2 minutes, and a faster walk home, the R1 diary's open findings; BUGS 88 and 89 already fixed by review batch 1). **Raids end by dusk (the user's answer, 2026-11-04):** no raid leaves after 19:00 (my
        pick: time to reach a spot and come home); a raid still out at 19:30 stops where it is, picks up what is stung
        and walks home (my pick); a find made after 19:00 waits for the morning raid hours. Rare night raids in the hot
        season wait for Serene Seasons. The scout command keeps the hours unless told otherwise. **The column squeaks as it passes, louder as the player comes near, before anyone
