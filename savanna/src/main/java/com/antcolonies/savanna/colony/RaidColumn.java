@@ -126,6 +126,16 @@ public final class RaidColumn {
     private boolean spread;
     /** The raiders who left the column hurt since the colony last asked ({@link #takeHurt}). */
     private final List<UUID> hurt = new ArrayList<>();
+    /**
+     * Raid rework R1, the raid diary: the world the column last worked in (for the time of day in its log lines), since
+     * when the front has waited for the line to close up (game time, -1 not waiting), and when it last said so.
+     */
+    @Nullable
+    private ServerLevel lastLevel;
+    private long waitingSince = -1;
+    private long waitSaidAt = -1;
+    /** The front's wait is told in the log after this long, and again every this long while it lasts (ticks). */
+    private static final long WAIT_SAY_EVERY = 200;
 
     RaidColumn(Colony colony, SavannaNumbers.ColumnNumbers numbers, @Nullable SavannaNumbers.CarryNumbers carry, Raids.Find find,
                List<MatabeleEntity> raiders, int numbersAlong, long now) {
@@ -160,6 +170,41 @@ public final class RaidColumn {
         java.util.Collections.reverse(backPoints);
         this.back = new Route(backPoints);
         this.head = 0.0;
+    }
+
+    /**
+     * Raid rework R1, the raid diary: one line in the log, {@code [raid]} first, with the nest, the game time and the
+     * time of day, and the stage now ({@code docs/plans/m8-matabele.md}, 3R).
+     */
+    void say(String what) {
+        long dayTime = lastLevel == null ? -1 : colony.timeOfDay(lastLevel) % 24000;
+        String clock = dayTime < 0 ? "?" : String.format(java.util.Locale.ROOT, "%02d:%02d", (dayTime / 1000 + 6) % 24,
+                (dayTime % 1000) * 60 / 1000);
+        com.antcolonies.savanna.SavannaMod.LOGGER.info("[raid] nest {} at {} (tick {}), {}: {}", colony.getCenter().toShortString(), clock,
+                lastLevel == null ? -1 : lastLevel.getGameTime(), stage.name().toLowerCase(), what);
+    }
+
+    /** The diary's first line: the raid sets out (said by the colony's raids once the column is made). */
+    void sayStart(ServerLevel level) {
+        lastLevel = level;
+        say("a raid of " + size + " (" + members.size() + " real, " + numbersAlong + " as numbers) to " + find.at().toShortString()
+                + ", " + Math.round(flat(find.at(), colony.getCenter())) + " out, worth " + find.worth() + "; the march "
+                + Math.round(out.length()) + " blocks along " + out.points.size() + " points to the gathering place "
+                + out.end().toShortString() + "; led by " + shortId(leader));
+    }
+
+    private static String shortId(UUID id) {
+        return id.toString().substring(0, 8);
+    }
+
+    /** One raider in the diary: its id, where it is, how far along the march, and what it is doing. */
+    private String who(MatabeleEntity ant, Route route) {
+        Order order = orders.get(ant.getUUID());
+        return shortId(ant.getUUID()) + " at " + ant.blockPosition().toShortString() + ", " + Math.round(route.along(ant.getX(), ant.getZ()) * 10) / 10.0
+                + " along" + (order == null || order.to() == null ? ", no place" : ", its place " + order.to().toShortString()
+                + " (" + Math.round(Math.sqrt(ant.blockPosition().distSqr(order.to())) * 10) / 10.0 + " off)")
+                + (colony.nest().isInside(ant.level(), ant.blockPosition()) ? ", inside the nest" : "")
+                + ", walking " + !ant.getNavigator().isDone() + ", goals " + ant.runningGoals();
     }
 
     public Stage stage() {
@@ -272,14 +317,17 @@ public final class RaidColumn {
             return;
         }
         updatedAt = now;
+        lastLevel = level;
         List<MatabeleEntity> ants = new ArrayList<>();
         for (UUID id : List.copyOf(members)) {
             if (level.getEntity(id) instanceof MatabeleEntity ant && ant.isAlive() && !ant.fightsNoMore() && !ant.isDowned()) {
                 ants.add(ant);
             } else {
                 // dead, crippled, clamped, stung still, or out of the loaded world: out of the column
-                lost.merge(!(level.getEntity(id) instanceof MatabeleEntity ant) ? "gone from the world" : !ant.isAlive() ? "dead"
-                        : ant.fightsNoMore() ? "fights no more" : "downed", 1, Integer::sum);
+                String why = !(level.getEntity(id) instanceof MatabeleEntity gone) ? "gone from the world" : !gone.isAlive() ? "dead"
+                        : gone.fightsNoMore() ? "fights no more" : "downed";
+                lost.merge(why, 1, Integer::sum);
+                say(shortId(id) + " leaves the column: " + why);
                 if (level.getEntity(id) instanceof MatabeleEntity ant && ant.isAlive() && ant.fightsNoMore()) {
                     hurt.add(id); // step 3c: it limps home along the trail by itself
                 }
@@ -313,6 +361,8 @@ public final class RaidColumn {
     }
 
     private void end(String why) {
+        say("the raid is over: " + why + ", " + cameHome + " came home, " + carried + " termite(s) carried"
+                + (lost.isEmpty() ? "" : ", lost on the way: " + lost));
         stage = Stage.DONE;
         ended = why;
     }
@@ -323,6 +373,9 @@ public final class RaidColumn {
     }
 
     private void next(Stage to, long now) {
+        say("on to " + to.name().toLowerCase() + " after " + (now - stageSince) / 20 + " s, " + members.size() + " real raider(s)"
+                + (carried > 0 ? ", " + carried + " termite(s) carried" : ""));
+        waitingSince = -1;
         stage = to;
         stageSince = now;
         head = 0.0;
@@ -354,6 +407,7 @@ public final class RaidColumn {
             // Off they go; the recruits not out by now stay home.
             for (MatabeleEntity ant : ants) {
                 if (!ant.getUUID().equals(leader) && !(flat(ant.blockPosition(), entrance) <= NEAR + 2 && ant.getY() >= entrance.getY() - 2)) {
+                    say(shortId(ant.getUUID()) + " stays home, not out at the entrance in time: " + who(ant, out));
                     drop(ant.getUUID());
                 }
             }
@@ -383,6 +437,7 @@ public final class RaidColumn {
             }
         }
         boolean strung = frontAt - rear > length + numbers.stretch();
+        sayWait(ants, route, front, strung, rear, at);
         if (!strung && frontAt >= head - LEAD_STEP / 2) {
             head = Math.min(route.length(), frontAt + LEAD_STEP);
         }
@@ -411,6 +466,33 @@ public final class RaidColumn {
             orders.put(ant.getUUID(), new Order(place(level, route, along, side), pace, point(route, Math.min(route.length(), along + 3.0))));
         }
         return false;
+    }
+
+    /**
+     * The diary: while the front waits for the line to close up, every {@link #WAIT_SAY_EVERY} ticks who it waits for
+     * (the hindmost ant it counts), and when the wait ends, how long it lasted.
+     */
+    private void sayWait(List<MatabeleEntity> ants, Route route, MatabeleEntity front, boolean strung, double rear, Map<UUID, Double> at) {
+        long now = lastLevel == null ? 0 : lastLevel.getGameTime();
+        if (!strung) {
+            if (waitingSince >= 0 && now - waitingSince >= WAIT_SAY_EVERY) {
+                say("the front goes on after waiting " + (now - waitingSince) / 20 + " s");
+            }
+            waitingSince = -1;
+            return;
+        }
+        if (waitingSince < 0) {
+            waitingSince = now;
+            waitSaidAt = now;
+            return;
+        }
+        if (now - waitSaidAt < WAIT_SAY_EVERY) {
+            return;
+        }
+        waitSaidAt = now;
+        MatabeleEntity last = ants.stream().filter(ant -> Math.abs(at.get(ant.getUUID()) - rear) < 1.0E-6).findFirst().orElse(null);
+        say("the front (" + who(front, route) + ") has waited " + (now - waitingSince) / 20 + " s for the line, its hindmost "
+                + (last == null ? "?" : who(last, route)));
     }
 
     /** How many side by side at this place along a route: single file near the entrance, wider further out. */
@@ -704,6 +786,13 @@ public final class RaidColumn {
                 .append(" to ").append(find.at().toShortString());
         if (carried > 0 || spread) {
             line.append(", carrying ").append(carried).append(" termite(s)").append(spread ? ", spread out round the spot" : "");
+        }
+        if (lastLevel != null) {
+            long now = lastLevel.getGameTime();
+            line.append(", ").append((now - stageSince) / 20).append(" s in this stage");
+            if (waitingSince >= 0) {
+                line.append(", the front waiting ").append((now - waitingSince) / 20).append(" s for the line");
+            }
         }
         return line.toString();
     }

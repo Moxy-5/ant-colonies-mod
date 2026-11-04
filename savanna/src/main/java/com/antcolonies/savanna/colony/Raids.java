@@ -195,6 +195,7 @@ public class Raids {
             if (!isHungry()) {
                 waiting = null; // (fed by now: the spot stays remembered for the next hungry spell)
             } else if (startRaid(level, waiting) != null) {
+                say(level, "the raid hours: the waiting find at " + column.find().at().toShortString() + " gets its raid");
                 waiting = null;
             }
         }
@@ -297,6 +298,14 @@ public class Raids {
     }
 
     /** How many scouts the colony sends at once: one per {@code workers_per_scout} workers, at least 1, at most {@code most_scouts}. */
+    /** Raid rework R1, the raid diary: one {@code [raid]} line in the log for the colony as a whole (the column says its own). */
+    private void say(ServerLevel level, String what) {
+        long dayTime = colony.timeOfDay(level) % 24000;
+        com.antcolonies.savanna.SavannaMod.LOGGER.info("[raid] nest {} at {} (tick {}): {}", colony.getCenter().toShortString(),
+                String.format(java.util.Locale.ROOT, "%02d:%02d", (dayTime / 1000 + 6) % 24, (dayTime % 1000) * 60 / 1000),
+                level.getGameTime(), what);
+    }
+
     public int scoutsWanted() {
         SavannaNumbers.ScoutNumbers numbers = numbers();
         if (numbers == null) {
@@ -361,6 +370,10 @@ public class Raids {
 
     /** It sets out (counted as a scout until {@link #back}), and is one of the colony's scouts from now on. */
     public void setOut(MatabeleEntity ant) {
+        if (ant.level() instanceof ServerLevel level) {
+            say(level, "scout " + ant.getUUID().toString().substring(0, 8) + " sets out" + (sent.contains(ant.getUUID()) ? " (sent by the command)" : "")
+                    + (veterans.contains(ant.getUUID()) ? ", an old scout" : ", a new scout") + ", search range " + range());
+        }
         scouts.add(ant.getUUID());
         openSince = -1;
         veterans.remove(ant.getUUID());
@@ -374,6 +387,9 @@ public class Raids {
 
     /** It is back, or gave up. */
     public void back(MatabeleEntity ant) {
+        if (scouts.contains(ant.getUUID()) && ant.level() instanceof ServerLevel level) {
+            say(level, "scout " + ant.getUUID().toString().substring(0, 8) + " is back or gave up, at " + ant.blockPosition().toShortString());
+        }
         scouts.remove(ant.getUUID());
         sent.remove(ant.getUUID());
     }
@@ -466,11 +482,20 @@ public class Raids {
         boolean commanded = scout != null && sent.contains(scout);
         Find made = known != null ? known : finds.get(finds.size() - 1);
         if (column == null && !colony.rainsNow(level) && (commanded || isRaidTime(level) && isHungry())) {
-            if (startRaid(level, made) != null && waiting == made) {
+            say(level, "a scout (" + (scout == null ? "?" : scout.toString().substring(0, 8)) + ") is home from " + at.toShortString()
+                    + ", worth " + worth + (commanded ? ", sent by the command" : "") + ": a raid sets out");
+            RaidColumn started = startRaid(level, made);
+            if (started == null) {
+                say(level, "nobody fit to raid: the find is only remembered");
+            } else if (waiting == made) {
                 waiting = null;
             }
         } else if (column == null && !commanded && isHungry() && !isRaidTime(level)) {
+            say(level, "a scout is home from " + at.toShortString() + ", worth " + worth + ", outside the raid hours: it waits for them");
             waiting = made;
+        } else {
+            say(level, "a scout is home from " + at.toShortString() + ", worth " + worth + ", no raid: " + (column != null ? "one is out already"
+                    : colony.rainsNow(level) ? "it rains" : "the colony is not hungry"));
         }
     }
 
@@ -543,6 +568,7 @@ public class Raids {
         int real = Math.min(Math.min(size, numbers.mostReal()), fit.size());
         int along = Math.max(0, Math.min(size - real, colony.population().inside(Caste.WORKER)));
         column = new RaidColumn(colony, numbers, carryNumbers(), find, fit.subList(0, real), along, level.getGameTime());
+        column.sayStart(level);
         find.scout = leader.getUUID(); // (it leads: the one to lead the next raid there too)
         return column;
     }
