@@ -210,6 +210,31 @@ timings: all "my pick, to confirm" until then).
    soldiers pile up. Real raids: the column hits the feeding site, the minors take the workers in the opened galleries,
    and the soldiers that come up are fought only as they get in the way. To plan with the raids (the user said "part 3";
    it fits here, with the raid's target, not step 4's drawn-only ants (the step numbers were swapped later, 2026-10-25)).
+   **Step 3 in pieces (planned 2026-11-03, after in-game test 4; built from the decisions already in `docs/DESIGN.md`,
+   "Scouts and raids, details", and the R1 questionnaire; numbers my picks, to confirm):**
+   - **3a Scouts.** A hungry colony sends lone scouts out in the raid hours; they check the colony's past good spots
+     first, then search outward to 96 blocks (the real foraging range is about 95 m; the mod counts a block as a metre
+     for distances, as with moving house). A scout knows a termite feeding spot when it smells termites under the mud
+     there (`FeedingSpots`, the galleries round it), stops, and runs home laying a scent line (the `Recruits` line).
+     Test: `/antcolonies scout`, watch one go out and come back.
+   - **3b The column.** At home the scout recruits by what it found, capped by the colony's size and hunger (big spots
+     the most; 30 to 75 percent of the colony, the paper); up to about 50 real ants walk, the rest stay numbers till
+     step 4. The scout leads; single file, then widening; the column stops a few blocks short, bunches, and attacks at
+     once: majors break the mud, minors go in. **Food first** (the user, 2026-10-25): the workers at the feeding spot
+     are the target; soldiers are fought only when in the way. The fights are step 2's (the skirmish command stays for
+     testing).
+   - **3c Home with the prey.** Majors carry visible stacks (up to 10), minors 1 to 3; the column walks home on its own
+     trail and the prey goes on the pile (the stocking command stays for tests only). An empty raid spreads round the
+     spot a short while, takes any it finds, and goes home; hunger sends a scout out sooner. A lightly hurt ant nobody
+     picks up limps home along the trail (carrying the hurt is step 5). **In-game test 5 here:** a whole raid seen.
+   - **3d The termites' losses.** Termites in the galleries round the spot are numbers until broken into
+     (`HiddenTrips`), so a raid takes from the colony's real count; plugging, closing and danger memory (2f, 4g) dry
+     the spot up, so later scouts hunt farther. Young termite colonies can die from repeated raids; big ones shrug it off.
+   - **3e The raid day.** 1 to 4 raids a day by hunger, mornings (6 to 11) and evenings (16 to 19:30), none at night or
+     in heavy rain; a rare night raid in hot weather (the season asked of the shared source, fixed default for now).
+   - **3f Out of sight.** Raids happen while the player is away too, as numbers by the same rates (termites taken,
+     ants hurt or lost, heads left clamped, holes plugged); the away report lists them.
+   - **3g Tests and the full run, then in-game test 6** (3d to 3f), then the merge.
 4. **Drawn-only ants** (brain step 4e, pulled forward): the column far from the
    player drawn by the player's game, almost free on the server.
 5. **Rescue and wound care:** the help smell, pulling clamped soldiers off, carrying
