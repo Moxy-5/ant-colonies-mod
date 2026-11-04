@@ -47,18 +47,51 @@ public final class FeedingSpots {
                 continue; // (its food is gone, the hole plugged for good)
             }
             List<BlockPos> gallery = tunnel.gallery() == null ? List.of() : tunnel.gallery();
-            boolean byDay = colony.food().isFeedableFromInside(level, tunnel.food());
-            for (int i = 0; i < gallery.size() && !byDay; i++) {
-                BlockPos over = gallery.get(i).above();
-                byDay = !level.getBlockState(over).isAir() && colony.food().isFeedableFromInside(level, over);
-            }
-            spots.add(spot(level, colony, "gallery", tunnel.food(), gallery, byDay));
+            spots.add(spot(level, colony, "gallery", tunnel.food(), gallery, galleryByDay(level, colony, tunnel.food(), gallery)));
         }
         for (FoodWays.Runway runway : ways.getRunways()) {
             spots.add(spot(level, colony, "runway", runway.food(), runway.cells(), ways.isRunwayClosed(level, runway)));
         }
         spots.sort(java.util.Comparator.comparingInt(Spot::fromMiddle));
         return spots;
+    }
+
+    /** Whether termites can eat at this gallery by day, from inside: its food, or wood over one of its cells. */
+    private static boolean galleryByDay(ServerLevel level, Colony colony, BlockPos food, List<BlockPos> gallery) {
+        boolean byDay = colony.food().isFeedableFromInside(level, food);
+        for (int i = 0; i < gallery.size() && !byDay; i++) {
+            BlockPos over = gallery.get(i).above();
+            byDay = !level.getBlockState(over).isAir() && colony.food().isFeedableFromInside(level, over);
+        }
+        return byDay;
+    }
+
+    /** A feeding place termites eat at by day out of sight: the food and the gallery or runway cells round it. */
+    public record ByDay(BlockPos food, List<BlockPos> cells) {
+    }
+
+    /**
+     * Raid rework R5: the colony's feeding places fed at by day (the {@link Spot#byDay} ones), with their cells, for the
+     * Matabele scouts to smell; no mud count (cheap enough for every scout's trip).
+     */
+    public static List<ByDay> byDayPlaces(ServerLevel level, Colony colony) {
+        List<ByDay> places = new ArrayList<>();
+        FoodWays ways = colony.nest().foodWays();
+        for (FoodWays.NewTunnel tunnel : ways.getNewTunnels()) {
+            if (ways.isSpent(tunnel.tunnel().hole())) {
+                continue;
+            }
+            List<BlockPos> gallery = tunnel.gallery() == null ? List.of() : tunnel.gallery();
+            if (galleryByDay(level, colony, tunnel.food(), gallery)) {
+                places.add(new ByDay(tunnel.food(), List.copyOf(gallery)));
+            }
+        }
+        for (FoodWays.Runway runway : ways.getRunways()) {
+            if (ways.isRunwayClosed(level, runway)) {
+                places.add(new ByDay(runway.food(), List.copyOf(runway.cells())));
+            }
+        }
+        return places;
     }
 
     /** How many of these spots termites can feed at by day. */

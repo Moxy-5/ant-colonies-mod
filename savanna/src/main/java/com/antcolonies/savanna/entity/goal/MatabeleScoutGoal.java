@@ -21,6 +21,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -72,13 +73,27 @@ public class MatabeleScoutGoal extends Goal {
     private int skips;
     private int ticks;
     private int stageTicks;
-    /** The living termite mounds near (never walked over, never smelt as a find) and the termites' feeding ways near. */
+    /**
+     * The living termite mounds near (never walked over, never smelt as a find) and, R5, the termites' feeding places fed
+     * at by day near (a gallery under dead wood or a mud runway, termites eating there out of sight); a bare gallery cell
+     * no longer counts as a find.
+     */
     private final List<Raids.MoundAt> mounds = new ArrayList<>();
-    private final List<BlockPos> feedingCells = new ArrayList<>();
+    private final List<FeedingSpots.ByDay> byDay = new ArrayList<>();
     /** What it found: where, and how much termite it smelt. */
     @Nullable
     private BlockPos find;
     private int worth;
+    /** R5: on its look at a find, the most termites it counted there at once, and the termites hidden in by-day places there. */
+    private int termitesSeen;
+    private int hiddenSeen;
+    /** R5: ticks of its look spent near enough to count. */
+    private int lookTicks;
+    /** R5: places it passed over this trip as too poor (not smelt again this trip). */
+    private final List<BlockPos> passed = new ArrayList<>();
+    /** R5: how many points of its search it reached, and whether its recheck of a remembered spot is done. */
+    private int reached;
+    private boolean recheckDone;
     /** Its scent line home, the find end first. */
     private final List<BlockPos> line = new ArrayList<>();
     /** Whether its find was told at home. */
@@ -131,45 +146,49 @@ public class MatabeleScoutGoal extends Goal {
         skips = 0;
         find = null;
         worth = 0;
+        passed.clear();
+        reached = 0;
+        recheckDone = false;
         line.clear();
         lookRound(level);
         points.clear();
         if (trip.find() != null) {
             points.add(trip.find().at());
         } else {
-            planSlice(trip.angle(), trip.range());
+            planSlice(trip.angle(), trip.inner(), trip.outer());
         }
         walkOn(level);
     }
 
-    /** The living termite mounds and their feeding ways out to the trip's range (looked up once a trip). */
+    /** The living termite mounds and their by-day feeding places out to the trip's reach (looked up once a trip). */
     private void lookRound(ServerLevel level) {
         mounds.clear();
-        feedingCells.clear();
-        double reach = trip.range() + numbers.smell() + 32.0;
+        byDay.clear();
+        int far = Math.max(trip.range(), trip.outer());
+        double reach = far + numbers.smell() + 32.0;
         java.util.List<Colony> near = Raids.termiteColonies(level, colony.getCenter(), reach); // (once: the review, finding 11)
         for (Colony termites : near) {
             mounds.add(new Raids.MoundAt(termites.getCenter(), FeedingSpots.moundReach(level, termites)));
         }
         for (Colony termites : near) {
-            for (BlockPos cell : termites.nest().foodWays().galleryCells()) {
-                if (cell.closerThan(colony.getCenter(), trip.range() + numbers.smell()) && Raids.outOfMound(cell, mounds)) {
-                    feedingCells.add(cell);
+            for (FeedingSpots.ByDay place : FeedingSpots.byDayPlaces(level, termites)) {
+                if (place.food().closerThan(colony.getCenter(), far + numbers.smell() + 8.0) && Raids.outOfMound(place.food(), mounds)) {
+                    byDay.add(place);
                 }
             }
         }
     }
 
     /**
-     * The search of a slice: arcs {@code arc_step} apart across the slice, out to {@code range}, the far band only
-     * ({@code first_range} deep: the near land was searched before the range grew), one way then back the other.
+     * R5, the search of one ring of a slice: arcs {@code arc_step} apart across the slice, from {@code inner} out to
+     * {@code outer} (the near rings are searched on earlier trips: trips go from near to far), one way then back the
+     * other.
      */
-    private void planSlice(double angle, int range) {
+    private void planSlice(double angle, int inner, int outer) {
         double half = Math.toRadians(numbers.sliceDegrees()) / 2.0;
-        int inner = Math.max(0, range - numbers.firstRange());
         int step = Math.max(2, numbers.arcStep());
         boolean forward = colony.random().nextBoolean();
-        for (int radius = inner + step; radius <= range; radius += step) {
+        for (int radius = inner + step / 2; radius <= outer; radius += step) {
             int count = Math.max(1, (int) Math.ceil(half * 2 * radius / step));
             for (int i = 0; i <= count; i++) {
                 double a = angle - half + half * 2 * (forward ? i : count - i) / count;
@@ -238,16 +257,24 @@ public class MatabeleScoutGoal extends Goal {
         walkOn(level);
     }
 
-    /** At a point of its trip: at a remembered spot it smelt nothing at, it searches that spot's slice instead. */
+    /** At a point of its trip: at a remembered spot it smelt nothing at, it searches that spot's piece of land instead. */
     private void arrived(ServerLevel level) {
         next++;
         tries = 0;
-        if (trip.find() != null && next >= points.size() && find == null) {
+        reached++;
+        if (trip.find() != null && !recheckDone && next >= points.size() && find == null) {
             raids.foundEmpty(level, trip.find());
-            points.clear();
-            next = 0;
-            planSlice(trip.angle(), trip.range());
+            searchRecheckedPiece();
         }
+    }
+
+    /** R5: the recheck is done (empty or too poor): it searches the remembered spot's own piece of land. */
+    private void searchRecheckedPiece() {
+        recheckDone = true;
+        points.clear();
+        next = 0;
+        reached = 0;
+        planSlice(trip.angle(), trip.inner(), trip.outer());
     }
 
     /** On to its next point, a hop at a time; a point it finds no way to is skipped after a few tries. */
@@ -267,7 +294,12 @@ public class MatabeleScoutGoal extends Goal {
                 return; // another try next time
             }
         }
-        goHome(); // the whole slice searched: home empty
+        // the whole piece searched: home empty. R5: it counts as searched empty only if most of it was walked (my pick:
+        // half its points or more); a scout cut off from most of it leaves it for another
+        if ((trip.find() == null || recheckDone) && find == null && reached * 2 >= points.size()) {
+            raids.searchedEmpty(level, trip, ant.getUUID());
+        }
+        goHome();
     }
 
     /** One hop toward this point (straight to it when near, else {@link #HOP} blocks its way); false if no way was found. */
@@ -308,56 +340,145 @@ public class MatabeleScoutGoal extends Goal {
     }
 
     /**
-     * Whether it smells termites here: termites out of their mound (not sheltered in their nest) and the termites'
-     * feeding ways, within {@code smell} blocks; a dug way counts, a way only planned not. Sets the find (the nearest
-     * termite, else the nearest way) and its worth (a way's cell 1, a termite 3).
+     * Whether it smells termites feeding here (R5: real feeding only): termites out of their mound (not sheltered in
+     * their nest), or a feeding place fed at by day (a dug gallery or runway cell of it, or its food, within
+     * {@code smell} blocks); a place it passed over this trip is not smelt again. Sets the find: the nearest termite, else
+     * the place's nearest dug cell. How much termite is there is counted on the look ({@link #inspect}).
      */
     private boolean smell(ServerLevel level) {
         int smell = numbers.smell();
         BlockPos at = ant.blockPosition();
         BlockPos nearest = null;
         double nearestDistance = Double.MAX_VALUE;
-        int termites = 0;
-        for (AbstractAntEntity termite : level.getEntitiesOfClass(AbstractAntEntity.class, ant.getBoundingBox().inflate(smell),
-                insect -> SavannaSpecies.MACROTERMES.equals(insect.species()) && insect.isAlive() && !insect.isDowned()
-                        && !insect.isSheltered() && Raids.outOfMound(insect.blockPosition(), mounds))) {
-            termites++;
+        for (AbstractAntEntity termite : termitesNear(level, ant.getBoundingBox().inflate(smell))) {
             double distance = termite.distanceToSqr(ant);
-            if (distance < nearestDistance) {
+            if (distance < nearestDistance && !wasPassed(termite.blockPosition())) {
                 nearestDistance = distance;
                 nearest = termite.blockPosition();
             }
         }
-        int cells = 0;
-        BlockPos nearestCell = null;
-        double nearestCellDistance = Double.MAX_VALUE;
-        for (BlockPos cell : feedingCells) {
-            if (!cell.closerThan(at, smell) || !level.getBlockState(cell).getCollisionShape(level, cell).isEmpty()) {
-                continue;
-            }
-            cells++;
-            double distance = cell.distSqr(at);
-            if (distance < nearestCellDistance) {
-                nearestCellDistance = distance;
-                nearestCell = cell;
+        if (nearest == null) {
+            for (FeedingSpots.ByDay place : byDay) {
+                BlockPos cell = nearestSmelt(level, place, at, smell);
+                if (cell != null && !wasPassed(cell) && (nearest == null || cell.distSqr(at) < nearestDistance)) {
+                    nearest = cell;
+                    nearestDistance = cell.distSqr(at);
+                }
             }
         }
-        if (termites == 0 && cells == 0) {
+        if (nearest == null) {
             return false;
         }
-        find = (nearest != null ? nearest : nearestCell).immutable();
-        worth = cells + termites * 3;
+        find = nearest.immutable();
+        worth = 0;
+        termitesSeen = 0;
+        hiddenSeen = 0;
+        lookTicks = 0;
         return true;
     }
 
-    /** It stands at its find and looks it over, antennae on the ground, then turns for home. */
+    /** The termites feeding (out of their mound, not sheltered, not downed) in this box. */
+    private List<AbstractAntEntity> termitesNear(ServerLevel level, AABB box) {
+        return level.getEntitiesOfClass(AbstractAntEntity.class, box,
+                insect -> SavannaSpecies.MACROTERMES.equals(insect.species()) && insect.isAlive() && !insect.isDowned()
+                        && !insect.isSheltered() && Raids.outOfMound(insect.blockPosition(), mounds));
+    }
+
+    /** A by-day feeding place's dug cell (or its food) within {@code smell} of here, the nearest; null if none. */
+    @Nullable
+    private static BlockPos nearestSmelt(ServerLevel level, FeedingSpots.ByDay place, BlockPos at, int smell) {
+        BlockPos best = null;
+        double bestDistance = Double.MAX_VALUE;
+        for (BlockPos cell : place.cells()) {
+            if (cell.closerThan(at, smell) && cell.distSqr(at) < bestDistance && level.isLoaded(cell)
+                    && level.getBlockState(cell).getCollisionShape(level, cell).isEmpty()) {
+                best = cell;
+                bestDistance = cell.distSqr(at);
+            }
+        }
+        if (best == null && place.food().closerThan(at, smell)) {
+            best = place.food();
+        }
+        return best;
+    }
+
+    /** Whether this place lies near one it passed over this trip (two smelling distances; my pick). */
+    private boolean wasPassed(BlockPos at) {
+        double reach = numbers.smell() * 2.0;
+        for (BlockPos old : passed) {
+            if (old.closerThan(at, reach)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * R5, the look: it walks up to its find (to {@code inspect_from} blocks, just outside the termites' feel) and counts
+     * the termites feeding within {@code smell} blocks of it all through its look, keeping the most it counted at once
+     * (the raid diary's R1 finding: counting only at the first whiff, it scored 6 termites as worth 3 to 6), and the
+     * termites hidden in the by-day places there ({@code by_day_termites} each). After {@code inspect_ticks} near (or
+     * four times that, if it cannot get near) it chooses: worth a raid this far out with the colony this hungry, it goes
+     * home with it; too poor, it passes it over and searches on (Frank and Linsenmair 2017).
+     */
     private void inspect(ServerLevel level) {
-        if (find != null) {
-            ant.getLookControl().setLookAt(Vec3.atCenterOf(find));
+        if (find == null) {
+            stage = Stage.OUT;
+            return;
         }
-        if (stageTicks >= numbers.inspectTicks()) {
+        ant.getLookControl().setLookAt(Vec3.atCenterOf(find));
+        SavannaNumbers.ChooseNumbers choose = raids.choosing();
+        double from = flat(ant.blockPosition(), find);
+        boolean near = from <= choose.inspectFrom() + 1.0;
+        if (!near && ant.getNavigator().isDone()) {
+            double share = Math.max(0.0, (from - choose.inspectFrom()) / Math.max(0.01, from));
+            BlockPos at = ant.blockPosition();
+            BlockPos cell = openGround(level, at.getX() + Mth.floor((find.getX() - at.getX()) * share),
+                    at.getZ() + Mth.floor((find.getZ() - at.getZ()) * share));
+            if (cell != null) {
+                ant.getNavigator().moveTo(cell, 1.0);
+            }
+        }
+        if (near) {
+            lookTicks++;
+        }
+        if (stageTicks % SMELL_EVERY == 1) {
+            int smell = numbers.smell();
+            BlockPos here = find;
+            int counted = (int) termitesNear(level, new AABB(here).inflate(smell)).stream()
+                    .filter(termite -> termite.blockPosition().closerThan(here, smell + 0.5)).count();
+            termitesSeen = Math.max(termitesSeen, counted);
+            int hidden = 0;
+            for (FeedingSpots.ByDay place : byDay) {
+                if (nearestSmelt(level, place, here, smell) != null) {
+                    hidden += choose.byDayTermites();
+                }
+            }
+            hiddenSeen = Math.max(hiddenSeen, hidden);
+        }
+        if (lookTicks < numbers.inspectTicks() && stageTicks < numbers.inspectTicks() * 4) {
+            return;
+        }
+        worth = 3 * Math.max(termitesSeen, hiddenSeen);
+        double need = raids.need(find);
+        if (worth > 0 && worth >= need) {
+            ant.getNavigator().stop();
             goHome();
+            return;
         }
+        // too poor for a raid this far out now: passed over (a recheck of a remembered spot counts as an empty check)
+        Raids.Find rechecking = trip.find() != null && !recheckDone && trip.find().at().closerThan(find, numbers.smell() * 2.0) ? trip.find() : null;
+        raids.passedOver(level, find, worth, rechecking, ant.getUUID());
+        passed.add(find);
+        find = null;
+        worth = 0;
+        stage = Stage.OUT;
+        stageTicks = 0;
+        ant.getNavigator().stop();
+        if (rechecking != null) {
+            searchRecheckedPiece();
+        }
+        walkOn(level);
     }
 
     private void goHome() {

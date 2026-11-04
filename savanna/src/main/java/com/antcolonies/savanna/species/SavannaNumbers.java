@@ -36,6 +36,7 @@ public final class SavannaNumbers {
     public static final SpeciesSection<ColumnNumbers> COLUMN = SpeciesSection.signUp("raids.column", ColumnNumbers.CODEC);
     public static final SpeciesSection<CarryNumbers> CARRY = SpeciesSection.signUp("raids.carry", CarryNumbers.CODEC);
     public static final SpeciesSection<TrailNumbers> TRAILS = SpeciesSection.signUp("raids.trails", TrailNumbers.CODEC);
+    public static final SpeciesSection<ChooseNumbers> CHOOSING = SpeciesSection.signUp("raids.choosing", ChooseNumbers.CODEC);
 
     private SavannaNumbers() {
     }
@@ -646,5 +647,36 @@ public final class SavannaNumbers {
                 Codec.INT.optionalFieldOf("cast_per_block", DEFAULT.castPerBlock()).forGetter(TrailNumbers::castPerBlock),
                 Codec.INT.optionalFieldOf("cast_give_ticks", DEFAULT.castGiveTicks()).forGetter(TrailNumbers::castGiveTicks)
         ).apply(i, TrailNumbers::new));
+    }
+
+    /**
+     * Raid rework R5, scouts that choose (Frank and Linsenmair 2017: Megaponera raid rich termite sites over the whole
+     * range but poor ones only near the nest; the raid's size follows the termites the scout found). A find is taken only
+     * if its worth (3 for each termite counted there) reaches {@code leastWorth} plus {@code worthPerBlock} for each block
+     * it lies from the nest, times a hunger factor from {@code hungryEase} (starving: the colony takes poorer finds) to 1
+     * (nearly fed). A feeding gallery or runway fed at by day, with its termites inside out of sight, counts as
+     * {@code byDayTermites} termites. The scout looks a find over from {@code inspectFrom} blocks (just outside the
+     * termites' feel), counting all the while. A nearly fed colony sends {@code fedScouts} of its scouts (rounded up),
+     * a starving one all. The search range shrinks one ring every {@code shrinkTicks} after a find, back toward the find's
+     * ring. Every number my pick, to confirm.
+     */
+    public record ChooseNumbers(double leastWorth, double worthPerBlock, double hungryEase, int byDayTermites, double inspectFrom,
+                                double fedScouts, int shrinkTicks) {
+        public static final ChooseNumbers DEFAULT = new ChooseNumbers(3.0, 0.1, 0.5, 2, 3.5, 0.5, 24000);
+        public static final Codec<ChooseNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.DOUBLE.optionalFieldOf("least_worth", DEFAULT.leastWorth()).forGetter(ChooseNumbers::leastWorth),
+                Codec.DOUBLE.optionalFieldOf("worth_per_block", DEFAULT.worthPerBlock()).forGetter(ChooseNumbers::worthPerBlock),
+                Codec.DOUBLE.optionalFieldOf("hungry_ease", DEFAULT.hungryEase()).forGetter(ChooseNumbers::hungryEase),
+                Codec.INT.optionalFieldOf("by_day_termites", DEFAULT.byDayTermites()).forGetter(ChooseNumbers::byDayTermites),
+                Codec.DOUBLE.optionalFieldOf("inspect_from", DEFAULT.inspectFrom()).forGetter(ChooseNumbers::inspectFrom),
+                Codec.DOUBLE.optionalFieldOf("fed_scouts", DEFAULT.fedScouts()).forGetter(ChooseNumbers::fedScouts),
+                Codec.INT.optionalFieldOf("shrink_ticks", DEFAULT.shrinkTicks()).forGetter(ChooseNumbers::shrinkTicks)
+        ).apply(i, ChooseNumbers::new));
+
+        /** The least worth a find this far from the nest (blocks, flat) must have, with the colony this well fed (0 to 1). */
+        public double need(double distance, double fed) {
+            double ease = hungryEase + (1.0 - hungryEase) * Math.max(0.0, Math.min(1.0, fed));
+            return (leastWorth + distance * worthPerBlock) * ease;
+        }
     }
 }
