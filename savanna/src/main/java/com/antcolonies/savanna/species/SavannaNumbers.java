@@ -486,8 +486,11 @@ public final class SavannaNumbers {
 
     /**
      * M8 step 3a, the raid scouts ({@code colony.Raids}; real Megaponera: lone scouts search for termites feeding under
-     * cover, then run home laying a scent line). They go out in the raid {@code hours} (clock hours, each a from and a
-     * to: the mornings and evenings, Yusuf 2026), never in the rain, while the prey pile holds less than a day's food:
+     * cover, then run home laying a scent line). They search in the {@code scoutHours} (clock hours, each a from and a
+     * to: all day, 6:00 to 19:30, the user's pick 2026-11-03, so a colony finds its termites sooner; night scouting in
+     * the hot season waits for the shared season source), never in the rain, while the prey pile holds less than a day's
+     * food; a raid only leaves in the raid {@code hours} (the mornings and evenings, Yusuf 2026), so a find made between
+     * them is kept till the next raid hours:
      * one scout for every {@code workersPerScout} workers, at least 1, at most {@code mostScouts}, majors only. A scout
      * checks the colony's remembered good spots first, then searches a slice of {@code sliceDegrees} round the nest in arcs
      * {@code arcStep} blocks apart, out to the colony's search range ({@code firstRange}; every slice searched empty adds
@@ -499,11 +502,11 @@ public final class SavannaNumbers {
      */
     public record ScoutNumbers(List<List<Double>> hours, int workersPerScout, int mostScouts, int firstRange, int rangeStep,
                                int mostRange, int sliceDegrees, int arcStep, int smell, int inspectTicks, int tripTicks,
-                               int sliceFadeTicks, int spotFadeTicks, int spotMisses) {
+                               int sliceFadeTicks, int spotFadeTicks, int spotMisses, List<List<Double>> scoutHours) {
         public static final Codec<ScoutNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.DOUBLE.listOf().listOf().optionalFieldOf("hours", List.of(List.of(6.0, 11.0), List.of(16.0, 19.5))).forGetter(ScoutNumbers::hours),
-                Codec.INT.optionalFieldOf("workers_per_scout", 100).forGetter(ScoutNumbers::workersPerScout),
-                Codec.INT.optionalFieldOf("most_scouts", 3).forGetter(ScoutNumbers::mostScouts),
+                Codec.INT.optionalFieldOf("workers_per_scout", 50).forGetter(ScoutNumbers::workersPerScout),
+                Codec.INT.optionalFieldOf("most_scouts", 5).forGetter(ScoutNumbers::mostScouts),
                 Codec.INT.optionalFieldOf("first_range", 32).forGetter(ScoutNumbers::firstRange),
                 Codec.INT.optionalFieldOf("range_step", 16).forGetter(ScoutNumbers::rangeStep),
                 Codec.INT.optionalFieldOf("most_range", 96).forGetter(ScoutNumbers::mostRange),
@@ -514,13 +517,23 @@ public final class SavannaNumbers {
                 Codec.INT.optionalFieldOf("trip_ticks", 2400).forGetter(ScoutNumbers::tripTicks),
                 Codec.INT.optionalFieldOf("slice_fade_ticks", 24000).forGetter(ScoutNumbers::sliceFadeTicks),
                 Codec.INT.optionalFieldOf("spot_fade_ticks", 72000).forGetter(ScoutNumbers::spotFadeTicks),
-                Codec.INT.optionalFieldOf("spot_misses", 2).forGetter(ScoutNumbers::spotMisses)
+                Codec.INT.optionalFieldOf("spot_misses", 2).forGetter(ScoutNumbers::spotMisses),
+                Codec.DOUBLE.listOf().listOf().optionalFieldOf("scout_hours", List.of(List.of(6.0, 19.5))).forGetter(ScoutNumbers::scoutHours)
         ).apply(i, ScoutNumbers::new));
 
         /** Whether this time of day ({@code Level#getDayTime}'s scale: 0 is 6:00) is in the raid hours. */
         public boolean isRaidHour(long dayTime) {
+            return inHours(hours, dayTime);
+        }
+
+        /** Whether this time of day is in the scouting hours. */
+        public boolean isScoutHour(long dayTime) {
+            return inHours(scoutHours, dayTime);
+        }
+
+        private static boolean inHours(List<List<Double>> spans, long dayTime) {
             double hour = (6.0 + (dayTime % 24000) / 1000.0) % 24.0;
-            for (List<Double> span : hours) {
+            for (List<Double> span : spans) {
                 if (span.size() == 2 && hour >= span.get(0) && hour < span.get(1)) {
                     return true;
                 }

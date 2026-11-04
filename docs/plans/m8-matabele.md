@@ -240,6 +240,9 @@ timings: all "my pick, to confirm" until then).
      the spot up, so later scouts hunt farther. Young termite colonies can die from repeated raids; big ones shrug it off.
    - **3e The raid day.** 1 to 4 raids a day by hunger, mornings (6 to 11) and evenings (16 to 19:30), none at night or
      in heavy rain; a rare night raid in hot weather (the season asked of the shared source, fixed default for now).
+     **Night scouting in the hot season** (the user, 2026-11-03): scouts search at night too, but only in the hot
+     season, so it waits until Serene Seasons is added (the last steps of M9) and asks the shared season source; until
+     then scouts search by day only (6:00 to 19:30, built 2026-11-03).
    - **3f Out of sight.** Raids happen while the player is away too, as numbers by the same rates (termites taken,
      ants hurt or lost, heads left clamped, holes plugged); the away report lists them.
    - **3g Tests and the full run, then in-game test 6** (3d to 3f), then the merge.

@@ -7,6 +7,7 @@ import java.util.List;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.gametest.TestAnts;
+import com.antcolonies.gametest.TestClock;
 import com.antcolonies.gametest.TestScenes;
 import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.colony.NewLandMounds;
@@ -42,16 +43,19 @@ public class MatabeleRaidTests {
     private static final int NEST = 20;
 
     /**
-     * A hungry colony in the raid hours (the test's still 7:00, the prey pile empty) sends a scout out by itself; it finds
+     * A hungry colony (the prey pile empty) sends a scout out by itself, at 13:00 too, between the raid hours (scouts
+     * search all day, the user's pick 2026-11-03); it finds
      * termites feeding under a log 17 to 18 blocks out (there are two such logs, in opposite slices), never the termites'
      * harm, and comes home with a scent line from the nest to the find; the next scout rechecks the remembered spot first,
      * and it is the same ant (the colony's old scout goes first), named on the find. Step 3b: home with its find, the
-     * scout leads a raid there (no scout attacks a termite before then); the recheck waits till the raid is home.
+     * scout leads a raid there (no scout attacks a termite before then): found at 13:00, the find waits (no raid, no new
+     * scout) till the evening raid hours, 16:00, and the raid leaves then; the recheck waits till the raid is home.
      */
     @GameTest(template = "arena", timeoutTicks = 24000, skyAccess = true, batch = "matabele_scouts")
     public static void aHungryMatabeleColonySendsAScoutWhoFindsTermitesAndComesHomeWithAScentLine(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F); // (step 3b: a raid goes out between the find and the recheck)
+        TestClock clock = TestClock.still(helper, 13.0); // (between the raid hours: the scouts search, no raid leaves)
         TestScenes.shapeGround(helper, 45, (x, z) -> 0);
         Colony dead = NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(NEST, SURFACE, NEST)), NewLandMounds.pickFor("dead", 30, 5L));
         helper.assertTrue(dead != null, "no dead mound put in");
@@ -78,7 +82,7 @@ public class MatabeleRaidTests {
             }
         });
         helper.startSequence()
-                .thenWaitUntil(() -> helper.assertTrue(outAt[0] >= 0, "no scout out yet (hungry, 7:00)"))
+                .thenWaitUntil(() -> helper.assertTrue(outAt[0] >= 0, "no scout out yet (hungry, 13:00: scouts search all day)"))
                 .thenWaitUntil(() -> helper.assertTrue(!raids.finds().isEmpty(), "no find yet; " + raids.describe(level)))
                 .thenExecute(() -> {
                     foundAt[0] = level.getGameTime();
@@ -94,10 +98,22 @@ public class MatabeleRaidTests {
                     }
                     helper.assertTrue(find.scout() != null && scouted.contains(find.scout()) && raids.isVeteran(find.scout()),
                             "the find does not name its scout as one of the colony's scouts");
-                    RaidColumn column = raids.column();
-                    helper.assertTrue(column != null && column.leader().equals(find.scout()),
-                            "home with its find in the raid hours, the scout led no raid there; " + raids.describe(level));
+                    helper.assertTrue(raids.column() == null, "a raid left at 13:00, between the raid hours; " + raids.describe(level));
+                    helper.assertTrue(raids.waiting() == find, "the 13:00 find is not waiting for the raid hours; " + raids.describe(level));
                     SavannaMod.LOGGER.info("[scout test] out at {}, found at {}: {}", outAt[0], helper.getTick(), raids.describe(level));
+                })
+                .thenIdle(100)
+                .thenExecute(() -> {
+                    helper.assertTrue(raids.column() == null && scouted.size() == 1,
+                            "with a find waiting, a raid or a new scout went out before the raid hours (" + scouted.size() + " scouts)");
+                    clock.skipTo(16.25); // the evening raid hours
+                })
+                .thenWaitUntil(() -> {
+                    Raids.Find find = raids.finds().get(0);
+                    RaidColumn column = raids.column();
+                    helper.assertTrue(column != null && column.leader().equals(find.scout()) && column.find() == find,
+                            "in the raid hours the waiting find's scout led no raid there; " + raids.describe(level));
+                    helper.assertTrue(raids.waiting() == null, "the find still waits with its raid out");
                 })
                 .thenWaitUntil(() -> helper.assertTrue(raids.finds().stream().anyMatch(find -> find.checkedAt() > foundAt[0]),
                         "the remembered spot was not rechecked; " + raids.describe(level)))

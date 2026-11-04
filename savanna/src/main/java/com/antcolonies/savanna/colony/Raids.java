@@ -125,6 +125,9 @@ public class Raids {
     /** The last raid home (tests and the colony list), or null. */
     @Nullable
     private RaidColumn last;
+    /** A find a scout brought home between the raid hours: the raid sets out to it when they come, the colony hungry. */
+    @Nullable
+    private Find waiting;
     /**
      * Step 3c: raiders who left a column hurt, limping home along its trail by themselves (a real Megaponera that loses
      * legs or has a termite clinging falls behind, and makes its own way home on the scent line; carrying the hurt home
@@ -185,6 +188,16 @@ public class Raids {
         finds.removeIf(find -> now - find.checkedAt > numbers.spotFadeTicks());
         veterans.removeIf(id -> level.getEntity(id) instanceof AbstractAntEntity ant && !ant.isAlive());
         searched.values().removeIf(when -> now - when > numbers.sliceFadeTicks());
+        if (waiting != null && !finds.contains(waiting)) {
+            waiting = null; // (forgotten meanwhile)
+        }
+        if (waiting != null && column == null && isRaidTime(level)) {
+            if (!isHungry()) {
+                waiting = null; // (fed by now: the spot stays remembered for the next hungry spell)
+            } else if (startRaid(level, waiting) != null) {
+                waiting = null;
+            }
+        }
         SavannaNumbers.CarryNumbers carry = carryNumbers();
         int limpTicks = carry == null ? RaidColumn.DEFAULT_CARRY.limpTicks() : carry.limpTicks();
         limping.entrySet().removeIf(entry -> now - entry.getValue().since() > limpTicks
@@ -265,10 +278,22 @@ public class Raids {
         return pile == null || pile.edible() * 10 < Math.max(1, colony.getCount(Caste.WORKER));
     }
 
-    /** Whether it is the raid hours at the nest and dry. */
+    /** Whether it is the scouting hours at the nest (all day, the user's pick 2026-11-03) and dry. */
     public boolean isScoutingTime(ServerLevel level) {
         SavannaNumbers.ScoutNumbers numbers = numbers();
+        return numbers != null && numbers.isScoutHour(colony.timeOfDay(level)) && !colony.rainsNow(level);
+    }
+
+    /** Whether it is the raid hours at the nest (mornings and evenings, Yusuf 2026) and dry: the hours a raid may leave. */
+    public boolean isRaidTime(ServerLevel level) {
+        SavannaNumbers.ScoutNumbers numbers = numbers();
         return numbers != null && numbers.isRaidHour(colony.timeOfDay(level)) && !colony.rainsNow(level);
+    }
+
+    /** The find a scout brought home outside the raid hours, waiting for them; null if none. */
+    @Nullable
+    public Find waiting() {
+        return waiting;
     }
 
     /** How many scouts the colony sends at once: one per {@code workers_per_scout} workers, at least 1, at most {@code most_scouts}. */
@@ -296,8 +321,8 @@ public class Raids {
         if (sent.contains(ant.getUUID())) {
             return true;
         }
-        if (column != null || scouts.size() >= scoutsWanted() || !isScoutingTime(level) || !isHungry()) {
-            // (with a raid out the colony sends no new scouts till it is home: my pick)
+        if (column != null || waiting != null || scouts.size() >= scoutsWanted() || !isScoutingTime(level) || !isHungry()) {
+            // (with a raid out, or a find waiting for the raid hours, the colony sends no new scouts: my pick)
             return false;
         }
         if (veterans.contains(ant.getUUID())) {
@@ -436,11 +461,16 @@ public class Raids {
             searched.remove(sliceOf(at, slices(numbers)));
         }
         // Step 3b: home with a find, the scout recruits a raid there: in the raid hours, dry, the colony hungry (or the
-        // scout command's scout, whatever the hour), and no raid out already.
+        // scout command's scout, whatever the hour), and no raid out already. Found between the raid hours (scouts search
+        // all day), the find waits for them (tick), the colony hungry then.
         boolean commanded = scout != null && sent.contains(scout);
-        if (column == null && !colony.rainsNow(level) && (commanded || isScoutingTime(level) && isHungry())) {
-            Find made = known != null ? known : finds.get(finds.size() - 1);
-            startRaid(level, made);
+        Find made = known != null ? known : finds.get(finds.size() - 1);
+        if (column == null && !colony.rainsNow(level) && (commanded || isRaidTime(level) && isHungry())) {
+            if (startRaid(level, made) != null && waiting == made) {
+                waiting = null;
+            }
+        } else if (column == null && !commanded && isHungry() && !isRaidTime(level)) {
+            waiting = made;
         }
     }
 
@@ -617,6 +647,7 @@ public class Raids {
         searched.forEach((slice, when) -> slices.putLong(Integer.toString(slice), when));
         tag.put("raidSearched", slices);
         tag.putInt("raidRange", range);
+        tag.putInt("raidWaiting", waiting == null ? -1 : finds.indexOf(waiting));
         ListTag old = new ListTag();
         veterans.forEach(id -> old.add(NbtUtils.createUUID(id)));
         tag.put("raidScouts", old);
@@ -647,6 +678,8 @@ public class Raids {
             }
         }
         range = tag.getInt("raidRange");
+        int wait = tag.contains("raidWaiting") ? tag.getInt("raidWaiting") : -1;
+        waiting = wait >= 0 && wait < finds.size() ? finds.get(wait) : null;
         veterans.clear();
         for (Tag t : tag.getList("raidScouts", Tag.TAG_INT_ARRAY)) {
             veterans.add(NbtUtils.loadUUID(t));

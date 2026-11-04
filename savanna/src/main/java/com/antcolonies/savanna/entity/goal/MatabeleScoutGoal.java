@@ -32,7 +32,7 @@ import net.minecraft.world.phys.Vec3;
  * within {@code smell} blocks: termites out of their mound (never the mound itself), and the feeding galleries and
  * runways of the termite colonies there. A find: it stops and looks it over, then walks home on the straightest way,
  * laying its scent line point by point, and tells the colony at the entrance. Nothing found by {@code trip_ticks}, or the
- * raid hours over, or rain: home empty. Mind layer only: it says where to go, in hops, through the ant's navigator.
+ * scouting hours over, or rain: home empty. Mind layer only: it says where to go, in hops, through the ant's navigator.
  */
 public class MatabeleScoutGoal extends Goal {
     /** The longest hop (blocks) it walks in one go; a farther point is reached hop by hop. */
@@ -210,7 +210,7 @@ public class MatabeleScoutGoal extends Goal {
     private void searchOn(ServerLevel level) {
         boolean commanded = raids.wasSent(ant.getUUID());
         if (ticks > numbers.tripTicks() || !commanded && !raids.isScoutingTime(level)) {
-            goHome(); // nothing found in time, or the raid hours are over: home empty
+            goHome(); // nothing found in time, or the scouting hours are over: home empty
             return;
         }
         if (ticks % SMELL_EVERY == 0 && smell(level)) {
