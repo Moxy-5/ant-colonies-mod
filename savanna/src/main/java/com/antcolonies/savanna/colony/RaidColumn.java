@@ -10,6 +10,7 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import com.antcolonies.colony.AwayLife;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.savanna.entity.MatabeleEntity;
@@ -45,7 +46,7 @@ import net.minecraft.world.phys.AABB;
  * the prey pile ({@code BringPreyGoal}). A raid that found nobody to sting spreads out round the spot for a while
  * ({@link Stage#SPREADING}), going for any termite it sees, and gathers what it stung; none: home empty, and the find
  * counts an empty check. A raider that leaves the column hurt (crippled, or a termite soldier clamped on a leg) is
- * handed to the colony's raids to limp home along the trail ({@link #takeHurt}). Numbers: {@code raids.carry}
+ * handed to the colony's raids to limp home along the trail ({@link #takeLetGo}). Numbers: {@code raids.carry}
  * ({@link SavannaNumbers.CarryNumbers}).
  *
  * <p>Raid rework R4, the scent trail ({@link ScentTrails}): the column walks its colony's trail to the find, and every
@@ -160,8 +161,37 @@ public final class RaidColumn {
     private int carried;
     private int carriers;
     private boolean spread;
-    /** The raiders who left the column hurt since the colony last asked ({@link #takeHurt}). */
-    private final List<UUID> hurt = new ArrayList<>();
+    /**
+     * The raiders let go of the column out in the field since the colony last asked ({@link #takeLetGo}), and why: the
+     * hurt, the stuck, the leftovers when the time at home ran out, a raid lost from sight. The colony's raids send each
+     * one home along the trail ({@link WayHome}; the raid code review, finding 2, BUGS 88).
+     */
+    private final List<LetGo> letGo = new ArrayList<>();
+
+    /** One raider let go of the column, and why. */
+    record LetGo(UUID ant, String why) {
+    }
+
+    /**
+     * The raid code review, finding 1: since when each member has been out of sight (not in the world, or in land that
+     * does not tick now). One out of sight is kept in the column for the colony's away grace ({@code AwayLife}, a
+     * minute) before it is dropped as lost from sight; a raid whose leader stays out of sight that long ends, lost from
+     * sight, and is no empty check of its spot.
+     */
+    private final Map<UUID, Long> unseenSince = new HashMap<>();
+    private boolean lostFromSight;
+    /** Whether the raid reached its spot and found nothing there (gathered nothing, spread out and gathered nothing). */
+    private boolean foundNothing;
+    /** The raid code review, finding 4: since when each member is held by another fight order (drafted by the nest's defence). */
+    private final Map<UUID, Long> draftedSince = new HashMap<>();
+    /** A member drafted away from the column longer than this (ticks) is let go of it (my pick, 30 s). */
+    private static final long DRAFT_KEEP = 600;
+    /** The column's clocks wait while it was not worked out for longer than this (ticks: the colony out of sight; my pick). */
+    private static final long HOLD_AFTER = 100;
+    /** A raider farther than this (blocks, flat) from its place round the gathering place walks the trail up to it. */
+    private static final double STRAGGLER_FAR = 10.0;
+    /** Tests: the members made out of sight by hand. */
+    private final Set<UUID> hiddenForTests = new HashSet<>();
     /**
      * Raid rework R1, the raid diary: the world the column last worked in (for the time of day in its log lines), since
      * when the front has waited for the line to close up (game time, -1 not waiting), and when it last said so.
@@ -373,11 +403,43 @@ public final class RaidColumn {
         return back;
     }
 
-    /** The raiders who left the column hurt since last asked (the colony's raids lead them home); the list is emptied. */
-    List<UUID> takeHurt() {
-        List<UUID> out = List.copyOf(hurt);
-        hurt.clear();
+    /** The raiders let go of the column since last asked (the colony's raids send them home); the list is emptied. */
+    List<LetGo> takeLetGo() {
+        List<LetGo> out = List.copyOf(letGo);
+        letGo.clear();
         return out;
+    }
+
+    /** Whether the raid ended lost from sight (its leader out of sight past the grace): no empty check of the spot. */
+    public boolean lostFromSight() {
+        return lostFromSight;
+    }
+
+    /** Whether the raid reached its spot and found nothing to sting or carry there. */
+    public boolean foundNothing() {
+        return foundNothing;
+    }
+
+    /** Whether this member is out of sight now (tests and the diary). */
+    public boolean isUnseen(UUID ant) {
+        return unseenSince.containsKey(ant);
+    }
+
+    /** Whether this member is held by another job's fight order now (drafted by the nest's defence). */
+    public boolean isDrafted(UUID ant) {
+        return draftedSince.containsKey(ant);
+    }
+
+    /** Tests: this member counts as out of sight from now on (as if its land stopped ticking). */
+    public void hideForTests(UUID ant) {
+        if (members.contains(ant)) {
+            hiddenForTests.add(ant);
+        }
+    }
+
+    /** Tests: this member is back in sight. */
+    public void showForTests(UUID ant) {
+        hiddenForTests.remove(ant);
     }
 
     /** The gathering place, a few blocks short of the find. */
@@ -413,6 +475,45 @@ public final class RaidColumn {
         orders.remove(ant);
         sentIn.remove(ant);
         taking.remove(ant);
+        unseenSince.remove(ant);
+        draftedSince.remove(ant);
+    }
+
+    /** It leaves the column out in the field: dropped, and handed to the colony's raids to go home along the trail. */
+    private void letGo(UUID ant, String why) {
+        drop(ant);
+        anchor.remove(ant);
+        anchorSince.remove(ant);
+        letGo.add(new LetGo(ant, why));
+    }
+
+    /**
+     * The raid code review, finding 1: the column was not worked out for a while (the colony out of sight) or every
+     * member is out of sight: its clocks wait that long, so a raid coming back into sight does not end its stages in a
+     * burst. A fight under way is sent in again (the fight orders ran out meanwhile).
+     */
+    private void holdClocks(long by) {
+        if (by <= 0) {
+            return;
+        }
+        stageSince += by;
+        if (attackedAt >= 0) {
+            attackedAt += by;
+        }
+        if (castingSince >= 0) {
+            castingSince += by;
+        }
+        if (pausedSince >= 0) {
+            pausedSince += by;
+        }
+        if (waitingSince >= 0) {
+            waitingSince += by;
+        }
+        anchorSince.replaceAll((id, since) -> since + by);
+        draftedSince.replaceAll((id, since) -> since + by);
+        if (stage == Stage.ATTACKING) {
+            sentIn.clear(); // (sent in again at the spot, with fresh orders)
+        }
     }
 
     /** The column's stages and every raider's place, every {@link #EVERY} ticks (asked by the raiders and the colony). */
@@ -421,25 +522,81 @@ public final class RaidColumn {
         if (now - updatedAt < EVERY || stage == Stage.DONE) {
             return;
         }
+        long previous = updatedAt;
         updatedAt = now;
         lastLevel = level;
+        if (previous >= 0 && now - previous > HOLD_AFTER) {
+            say("the raid was not worked out for " + (now - previous) / 20 + " s (the colony's land not ticking): its clocks waited");
+            holdClocks(now - previous - EVERY);
+        }
         List<MatabeleEntity> ants = new ArrayList<>();
         for (UUID id : List.copyOf(members)) {
-            if (level.getEntity(id) instanceof MatabeleEntity ant && ant.isAlive() && !ant.fightsNoMore() && !ant.isDowned()) {
+            net.minecraft.world.entity.Entity entity = level.getEntity(id);
+            boolean seen = entity instanceof MatabeleEntity && level.isPositionEntityTicking(entity.blockPosition()) && !hiddenForTests.contains(id);
+            if (!seen && (entity == null || entity.isAlive())) {
+                // The raid code review, finding 1: out of sight (its land not loaded or not ticking): kept in the column for
+                // the away grace, then lost from sight; never dropped at once as "gone from the world".
+                long since = unseenSince.computeIfAbsent(id, key -> {
+                    say(shortId(key) + " is out of sight: kept in the column for " + AwayLife.GRACE_TICKS / 20 + " s");
+                    return now;
+                });
+                if (now - since > AwayLife.GRACE_TICKS) {
+                    lost.merge("lost from sight", 1, Integer::sum);
+                    say(shortId(id) + " leaves the column: lost from sight " + (now - since) / 20 + " s");
+                    if (id.equals(leader)) {
+                        lostFromSight = true;
+                    }
+                    letGo(id, "lost from sight"); // (seen again, it goes home along the trail)
+                }
+                continue;
+            }
+            if (unseenSince.remove(id) != null) {
+                say(shortId(id) + " is in sight again");
+            }
+            if (entity instanceof MatabeleEntity ant && ant.isAlive() && !ant.fightsNoMore() && !ant.isDowned()) {
                 ants.add(ant);
+                if (ant.getFightSpot() != null && ant.fightOrderBy() != this) {
+                    // The raid code review, finding 4: drafted by the nest's defence (or another job): it stays in the
+                    // column, its place kept, and catches up once that is over; held too long, it is let go.
+                    long since = draftedSince.computeIfAbsent(id, key -> {
+                        say(shortId(key) + " is called away to fight (" + (stage == Stage.FORMING ? "it rejoins the column after" : "it catches up after") + ")");
+                        return now;
+                    });
+                    if (now - since > DRAFT_KEEP && !id.equals(leader)) {
+                        lost.merge("kept by another fight", 1, Integer::sum);
+                        say(shortId(id) + " leaves the column: called away to fight for " + (now - since) / 20 + " s");
+                        ants.remove(ant);
+                        letGo(id, "kept by another fight");
+                    }
+                } else if (draftedSince.remove(id) != null) {
+                    say(shortId(id) + " is back with the column after fighting");
+                }
             } else {
-                // dead, crippled, clamped, stung still, or out of the loaded world: out of the column
-                String why = !(level.getEntity(id) instanceof MatabeleEntity gone) ? "gone from the world" : !gone.isAlive() ? "dead"
+                // dead, crippled, clamped or stung still: out of the column
+                String why = !(entity instanceof MatabeleEntity gone) ? "gone from the world" : !gone.isAlive() ? "dead"
                         : gone.fightsNoMore() ? "fights no more" : "downed";
                 lost.merge(why, 1, Integer::sum);
                 say(shortId(id) + " leaves the column: " + why);
-                if (level.getEntity(id) instanceof MatabeleEntity ant && ant.isAlive() && ant.fightsNoMore()) {
-                    hurt.add(id); // step 3c: it limps home along the trail by itself
+                if (entity instanceof MatabeleEntity ant && ant.isAlive() && ant.fightsNoMore()) {
+                    letGo(id, "hurt: " + why); // step 3c: it limps home along the trail by itself
+                } else {
+                    drop(id);
                 }
-                drop(id);
             }
         }
+        if (lostFromSight) {
+            for (UUID id : List.copyOf(members)) {
+                letGo(id, "the raid was lost from sight");
+            }
+            end("lost from sight: its leader out of sight over " + AwayLife.GRACE_TICKS / 20 + " s");
+            return;
+        }
         if (ants.isEmpty()) {
+            if (!members.isEmpty()) {
+                holdClocks(EVERY); // (every member out of sight: the raid waits for them)
+                return;
+            }
+            lostFromSight = lost.containsKey("lost from sight") && cameHome == 0;
             end("nobody left in it at " + stage.name().toLowerCase());
             return;
         }
@@ -456,6 +613,7 @@ public final class RaidColumn {
                     next(Stage.GATHERING, now);
                 } else if (turnBack) {
                     turnBack = false;
+                    homeOrder(ants);
                     next(Stage.HOMING, now); // (R4: the trail lost at a wide gap: home on the way they came)
                 } else if (now - stageSince - castTotal - (castingSince >= 0 ? now - castingSince : 0) > marchLimit()) {
                     // (R4: time spent casting about at a gap does not count)
@@ -479,6 +637,24 @@ public final class RaidColumn {
         }
     }
 
+    /**
+     * The raid code review, finding 6: turned home on the march, the column's order is turned round too, the ant nearest
+     * home in front (each keeps its gap to the one ahead of it, so with the front farthest out the rest stood waiting for
+     * it). The ants out of sight go last.
+     */
+    private void homeOrder(List<MatabeleEntity> ants) {
+        Map<UUID, Double> along = new HashMap<>();
+        for (MatabeleEntity ant : ants) {
+            along.put(ant.getUUID(), back.along(ant.getX(), ant.getZ()));
+        }
+        members.sort(java.util.Comparator.comparingDouble(id -> -along.getOrDefault(id, -1.0)));
+        UUID was = leader;
+        leader = members.get(0);
+        if (!leader.equals(was)) {
+            say("turned round: " + shortId(leader) + ", nearest home, leads the way back");
+        }
+    }
+
     /** R3: how long the march out may last (ticks): {@link #MARCH_BASE} and {@link #MARCH_PER_BLOCK} a block of it. */
     long marchLimit() {
         return MARCH_BASE + (long) Math.ceil(out.length() * MARCH_PER_BLOCK);
@@ -486,28 +662,31 @@ public final class RaidColumn {
 
     /**
      * R3: a raider sent somewhere more than {@link #HEADWAY_FAR} blocks off that got nowhere for {@link #NO_HEADWAY}
-     * ticks leaves the column and goes home along the trail (with the hurt, {@link #takeHurt}); nobody stuck holds the
-     * rest. One standing at its place, or told to stand, makes headway enough.
+     * ticks leaves the column and goes home along the trail (let go, {@link #takeLetGo}); nobody stuck holds the rest.
+     * One standing at its place, or told to stand, makes headway enough; so does one standing for a known reason (the
+     * raid code review, finding 5): fighting, eating, picking a termite up, casting about at a gap. Only no reason and
+     * no progress is stuck.
      */
     private void headway(ServerLevel level, List<MatabeleEntity> ants, long now) {
-        for (MatabeleEntity ant : ants) {
+        for (MatabeleEntity ant : List.copyOf(ants)) {
             UUID id = ant.getUUID();
             BlockPos here = ant.blockPosition();
             BlockPos last = anchor.get(id);
             Order order = orders.get(id);
             boolean far = order != null && order.to() != null && Math.sqrt(here.distSqr(order.to())) > HEADWAY_FAR;
-            if (last == null || !far || Math.sqrt(here.distSqr(last)) >= HEADWAY_MOVE) {
+            boolean held = ant.getFightSpot() != null || taking.containsKey(id) || isCasting(id)
+                    || ant.runsGoal(com.antcolonies.entity.goal.EatGoal.class);
+            if (last == null || !far || held || Math.sqrt(here.distSqr(last)) >= HEADWAY_MOVE) {
                 anchor.put(id, here);
                 anchorSince.put(id, now);
                 continue;
             }
             if (now - anchorSince.getOrDefault(id, now) > NO_HEADWAY && ants.size() > 1) {
-                say(shortId(id) + " leaves the column, no headway for " + NO_HEADWAY / 20 + " s, and goes home: " + who(ant, stage == Stage.HOMING ? back : out));
-                lost.merge("no headway", 1, Integer::sum);
-                hurt.add(id); // (home along the trail by itself, as the hurt do)
-                drop(id);
-                anchor.remove(id);
-                anchorSince.remove(id);
+                say(shortId(id) + " leaves the column, stuck: no headway for " + NO_HEADWAY / 20 + " s and no reason to stand, and goes home: "
+                        + who(ant, stage == Stage.HOMING ? back : out));
+                lost.merge("stuck", 1, Integer::sum);
+                ants.remove(ant);
+                letGo(id, "stuck: no headway"); // (home along the trail by itself, as the hurt do)
             }
         }
     }
@@ -548,8 +727,8 @@ public final class RaidColumn {
         int outside = 0;
         for (int i = 0; i < ants.size(); i++) {
             MatabeleEntity ant = ants.get(i);
-            if (flat(ant.blockPosition(), entrance) <= NEAR && ant.getY() >= entrance.getY() - 1) {
-                outside++;
+            if (flat(ant.blockPosition(), entrance) <= NEAR && ant.getY() >= entrance.getY() - 1 || draftedSince.containsKey(ant.getUUID())) {
+                outside++; // (one called away to defend the nest is out: it rejoins)
             }
             BlockPos spot;
             if (ant.getUUID().equals(leader)) {
@@ -566,7 +745,8 @@ public final class RaidColumn {
         if (outside >= ants.size() && since >= numbers.leastFormTicks() || since >= numbers.formTicks()) {
             // Off they go; the recruits not out by now stay home.
             for (MatabeleEntity ant : ants) {
-                if (!ant.getUUID().equals(leader) && !(flat(ant.blockPosition(), entrance) <= NEAR + 2 && ant.getY() >= entrance.getY() - 2)) {
+                if (!ant.getUUID().equals(leader) && !draftedSince.containsKey(ant.getUUID())
+                        && !(flat(ant.blockPosition(), entrance) <= NEAR + 2 && ant.getY() >= entrance.getY() - 2)) {
                     say(shortId(ant.getUUID()) + " stays home, not out at the entrance in time: " + who(ant, out));
                     drop(ant.getUUID());
                 }
@@ -859,6 +1039,13 @@ public final class RaidColumn {
             }
             double angle = i * 2.39996;
             double radius = i == 0 ? 0.0 : 1.0 + 1.5 * Math.sqrt(i / (double) ants.size());
+            if (flat(ant.blockPosition(), middle) > STRAGGLER_FAR) {
+                // (a straggler far behind, left by the march's time limit or a fight: it walks the trail up, not straight
+                // across; the raid code review, findings 2 and 17)
+                double along = out.along(ant.getX(), ant.getZ());
+                orders.put(ant.getUUID(), new Order(place(level, out, Math.min(out.length(), along + LEAD_STEP), 0.0), HURRY_PACE, find.at()));
+                continue;
+            }
             BlockPos spot = standAt(level, middle.getX() + 0.5 + Math.cos(angle) * radius, middle.getZ() + 0.5 + Math.sin(angle) * radius,
                     middle.getY());
             orders.put(ant.getUUID(), new Order(spot, 1.0, find.at()));
@@ -868,8 +1055,17 @@ public final class RaidColumn {
 
     /** One raider sent in to fight round the find (step 2's fight: the majors break in, the minors go in after). */
     private void sendIn(MatabeleEntity ant) {
-        ant.orderToFight(find.at(), attackedAt + numbers.fightTicks());
+        if (ant.getFightSpot() != null && ant.fightOrderBy() != this) {
+            return; // (called away by another fight: sent in once that is over, as a straggler)
+        }
+        // (the order is the column's own: only the column ends it, the nest's defence keeps off it; finding 4)
+        ant.orderToFight(find.at(), attackedAt + numbers.fightTicks(), com.antcolonies.entity.goal.FightGoal.SPOT_REACH, this);
         sentIn.add(ant.getUUID());
+    }
+
+    /** Whether this raider holds the column's own fight order now (the nest's defence keeps off it). */
+    public boolean fightsForTheColumn(AbstractAntEntity ant) {
+        return ant.getFightSpot() != null && ant.fightOrderBy() == this;
     }
 
     /**
@@ -954,6 +1150,7 @@ public final class RaidColumn {
         if (!anyFetching || now - stageSince >= carry.collectTicks()) {
             taking.clear();
             boolean spreadNow = carried == 0 && !spread && now - stageSince < carry.collectTicks();
+            foundNothing = carried == 0 && !spreadNow; // (at the spot and nothing to bring: an empty check of it)
             next(spreadNow ? Stage.SPREADING : Stage.REGROUPING, now);
             spread |= spreadNow;
         }
@@ -1011,7 +1208,7 @@ public final class RaidColumn {
                                     && !colony.getId().equals(insect.getColonyId()) && level.canSeeSky(insect.blockPosition()))
                     .stream().min(java.util.Comparator.comparingDouble(insect -> insect.distanceToSqr(ant))).orElse(null);
             if (seen != null) {
-                ant.orderToFight(seen.blockPosition(), now + carry.spreadTicks());
+                ant.orderToFight(seen.blockPosition(), now + carry.spreadTicks(), com.antcolonies.entity.goal.FightGoal.SPOT_REACH, this);
                 continue;
             }
             double angle = i * 2.39996;
@@ -1022,6 +1219,7 @@ public final class RaidColumn {
         boolean fighting = ants.stream().anyMatch(ant -> ant.getFightSpot() != null);
         boolean stung = !preyRound(level).isEmpty();
         if (!fighting && (stung || now - stageSince >= carry.spreadTicks()) || now - stageSince >= carry.spreadTicks() + 200) {
+            foundNothing = !stung && carried == 0;
             next(stung ? Stage.COLLECTING : Stage.REGROUPING, now);
         }
     }
@@ -1046,11 +1244,15 @@ public final class RaidColumn {
             }
         }
         if (ants.isEmpty() || now - stageSince >= numbers.homeTicks()) {
-            // (any left out now go in by themselves)
+            // (any left out now go home along the trail by themselves: the raid code review, finding 2, BUGS 88)
             trail.walked(now); // (R4: they laid scent on the way home too)
+            List<UUID> leftOut = List.copyOf(members);
             end(ants.isEmpty() ? "all home" : "home time up with " + ants.size() + " out, nearest "
                     + ants.stream().mapToDouble(ant -> flat(ant.blockPosition(), entrance)).min().orElse(0) + " flat from the entrance "
                     + entrance.toShortString() + ", one at " + back.along(ants.get(0).getX(), ants.get(0).getZ()) + " of " + back.length() + " along the way home");
+            for (UUID id : leftOut) {
+                letGo(id, "the column's time home ran out");
+            }
             return;
         }
         if (!members.contains(leader)) {
@@ -1149,7 +1351,7 @@ public final class RaidColumn {
         return line.toString();
     }
 
-    static double flat(BlockPos a, BlockPos b) {
+    public static double flat(BlockPos a, BlockPos b) {
         double dx = a.getX() - b.getX(), dz = a.getZ() - b.getZ();
         return Math.sqrt(dx * dx + dz * dz);
     }

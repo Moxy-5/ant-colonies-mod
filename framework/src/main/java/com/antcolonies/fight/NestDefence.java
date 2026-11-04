@@ -200,12 +200,17 @@ public final class NestDefence {
         if (defenders.add(member.getUUID())) {
             member.squeak();
         }
-        member.orderToFight(at, level.getGameTime() + numbers.keepGoing(), numbers.reach());
+        member.orderToFight(at, level.getGameTime() + numbers.keepGoing(), numbers.reach(), this);
     }
 
-    /** A worker that can fight (the queen keeps to her room, the young and the hurt stay in). */
-    private static boolean mayDefend(AbstractAntEntity member) {
-        return Caste.WORKER.equals(member.nestCaste()) && !member.fightsNoMore() && !member.isDowned() && member.fightBody() != null;
+    /**
+     * A worker that can fight (the queen keeps to her room, the young and the hurt stay in), and that no other job of the
+     * colony's keeps from the defence (the question {@link ColonyQuestions#KEEP_FROM_DEFENCE}: a species' scouts out
+     * searching, its raiders sent in to fight at their spot; the raid code review, finding 4).
+     */
+    private boolean mayDefend(AbstractAntEntity member) {
+        return Caste.WORKER.equals(member.nestCaste()) && !member.fightsNoMore() && !member.isDowned() && member.fightBody() != null
+                && !colony.questions().ask(member.level(), ColonyQuestions.KEEP_FROM_DEFENCE, member);
     }
 
     // --- once a second -------------------------------------------------------------------------------------------------
@@ -252,11 +257,13 @@ public final class NestDefence {
                     continue;
                 }
                 Provoker nearest = nearestFor(level, defender);
-                if (nearest == null) {
-                    defender.endFightOrder(); // nothing left to defend against: home
+                if (defender.getFightSpot() != null && defender.fightOrderBy() != this) {
+                    it.remove(); // another job gave it a fight order since: that one stands (the raid code review, finding 4)
+                } else if (nearest == null) {
+                    defender.endFightOrder(this); // nothing left to defend against: home (only its own order ended)
                     it.remove();
                 } else {
-                    defender.orderToFight(nearest.at, now + numbers.keepGoing(), numbers.reach());
+                    defender.orderToFight(nearest.at, now + numbers.keepGoing(), numbers.reach(), this);
                 }
             }
         }
@@ -337,13 +344,13 @@ public final class NestDefence {
                     provokers.put(player.getUUID(), provoker);
                 }
                 if (provoker.light) {
-                    List<AbstractAntEntity> may = new ArrayList<>(members.stream().filter(NestDefence::mayDefend)
+                    List<AbstractAntEntity> may = new ArrayList<>(members.stream().filter(this::mayDefend)
                             .filter(member -> !defenders.contains(member.getUUID())).toList());
                     may.sort(Comparator.comparingDouble(member -> member.distanceToSqr(entrance)));
                     for (AbstractAntEntity member : may.subList(0, Math.min(look.ants(), may.size()))) {
                         provoker.lookers.add(member.getUUID());
                         sendOut(level, member, colony.getCenter(), numbers);
-                        member.orderToFight(colony.getCenter(), now + look.lasts(), look.radius() + 2.0);
+                        member.orderToFight(colony.getCenter(), now + look.lasts(), look.radius() + 2.0, this);
                     }
                 }
             }
@@ -409,7 +416,7 @@ public final class NestDefence {
         for (Map.Entry<UUID, Provoker> entry : provokers.entrySet()) {
             Player player = level.getPlayerByUUID(entry.getKey());
             if (!entry.getValue().light && player != null && player.distanceToSqr(queen) <= numbers.queenReach() * numbers.queenReach()) {
-                queen.orderToFight(queen.blockPosition(), now + 40, numbers.queenReach());
+                queen.orderToFight(queen.blockPosition(), now + 40, numbers.queenReach(), this);
                 return;
             }
         }

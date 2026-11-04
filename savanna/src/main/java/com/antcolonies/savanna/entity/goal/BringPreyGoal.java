@@ -120,10 +120,20 @@ public class BringPreyGoal extends Goal {
     /** No way to the pile now: it tries again a little later, and after a few tries the termites are laid out of sight. */
     private void noWay(ServerLevel level) {
         nextTry = level.getGameTime() + RETRY_TICKS;
+        Colony colony = ant.getColony();
+        if (colony != null && RaidColumn.flat(ant.blockPosition(), colony.getCenter()) > FAR_OUT) {
+            // (the raid code review, finding 2: far out with no way to the pile, it goes home along a trail with its
+            // termites first, and tries again from the entrance)
+            colony.part(SavannaParts.RAIDS).ifPresent(raids -> raids.sendHome(level, ant, "a carrier with no way to the prey pile"));
+            return;
+        }
         if (++tries >= MOST_TRIES) {
             layOutOfSight(level);
         }
     }
+
+    /** Farther than this from the entrance (blocks, flat), a carrier with no way to the pile goes home along a trail first (my pick). */
+    private static final double FAR_OUT = 16.0;
 
     private void layOutOfSight(ServerLevel level) {
         if (pile != null && ant.isCarrying(MatabeleLoads.TERMITES)) {

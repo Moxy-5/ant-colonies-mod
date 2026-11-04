@@ -51,8 +51,11 @@ import net.minecraft.world.phys.Vec3;
  * <p>Species-neutral: any insect with a colony and a nest caste, and every egg and larva (or nymph).
  */
 public class AwayLife {
-    /** How long (ticks) the nest's middle or an insect must have been frozen before it counts as away (a minute; my pick). */
-    static final long GRACE_TICKS = 1200;
+    /**
+     * How long (ticks) the nest's middle or an insect must have been frozen before it counts as away (a minute; my pick).
+     * Public: a species' group job out in the field (a raid column) gives a member out of sight the same grace.
+     */
+    public static final long GRACE_TICKS = 1200;
 
     private final Colony colony;
     /** The game time the nest's middle was first seen out of range, or {@link Colony#NOT_SET} while it is here. Saved. */

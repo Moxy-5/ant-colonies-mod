@@ -81,6 +81,8 @@ public class MatabeleScoutGoal extends Goal {
     private int worth;
     /** Its scent line home, the find end first. */
     private final List<BlockPos> line = new ArrayList<>();
+    /** Whether its find was told at home. */
+    private boolean told;
 
     public MatabeleScoutGoal(MatabeleEntity ant) {
         this.ant = ant;
@@ -114,7 +116,8 @@ public class MatabeleScoutGoal extends Goal {
             stage = Stage.DONE;
             return;
         }
-        raids.setOut(ant);
+        raids.setOut(ant, trip);
+        told = false;
         stage = Stage.OUT;
         ticks = 0;
         stageTicks = 0;
@@ -181,7 +184,7 @@ public class MatabeleScoutGoal extends Goal {
     public void stop() {
         ant.getNavigator().stop();
         if (raids != null) {
-            raids.back(ant);
+            raids.back(ant, told ? null : find); // (far out, it goes home along a trail; an untold find is lost: the diary says so)
         }
         stage = Stage.DONE;
         colony = null;
@@ -376,6 +379,7 @@ public class MatabeleScoutGoal extends Goal {
                 List<BlockPos> nestFirst = new ArrayList<>(line);
                 java.util.Collections.reverse(nestFirst);
                 raids.found(level, find, worth, nestFirst, ant.getUUID());
+                told = true;
             }
             stage = Stage.DONE; // (going in takes over)
             return;

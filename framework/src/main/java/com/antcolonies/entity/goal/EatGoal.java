@@ -60,7 +60,8 @@ public class EatGoal extends Goal {
     @Override
     public boolean canUse() {
         if (ant.getColonyId() == null || !(ant.level() instanceof ServerLevel level) || !hunger.isHungry() || ant.hasFullMandibles()
-                || level.getGameTime() < nextTry || ant.getRandom().nextInt(10) != 0) {
+                || level.getGameTime() < nextTry || ant.getRandom().nextInt(10) != 0 || ant.isOnColonyErrand()) {
+            // (out on a colony errand, a raid say: it eats once home, raid code review finding 3)
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
@@ -74,7 +75,8 @@ public class EatGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        return colony != null && !done && (eating || ticks < GIVE_UP_TICKS);
+        // (food already in its mandibles it finishes; on its way to a meal, a colony errand calls it away)
+        return colony != null && !done && (eating || ticks < GIVE_UP_TICKS && !ant.isOnColonyErrand());
     }
 
     @Override

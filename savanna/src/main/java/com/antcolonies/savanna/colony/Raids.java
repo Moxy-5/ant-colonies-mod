@@ -45,7 +45,7 @@ import net.minecraft.server.level.ServerLevel;
  * ({@link SavannaNumbers.ColumnNumbers}).
  *
  * <p>Step 3c, home with the prey: a raid home with termites keeps its spot fresh, one home empty counts as an empty
- * check of it ({@link #raidHome}); raiders who left the column hurt limp home along its trail ({@link #limpOrder}).
+ * check of it ({@link #raidHome}); ants let go out in the field go home along a trail by themselves ({@link #wayHomeOrder}).
  * Numbers: {@code raids.carry} ({@link SavannaNumbers.CarryNumbers}).
  *
  * <p>Raid rework R4, the scent trails ({@link ScentTrails}): a scout home with a find lays its line as a trail in the
@@ -67,6 +67,13 @@ public class Raids {
         /** The scout who last found it (it leads the raid there, step 3b), or null. */
         @Nullable
         private UUID scout;
+        /**
+         * The raid code review, finding 12: the scout on its way to recheck it now (not saved), and when it was picked
+         * for a trip. {@code checkedAt} is set only when a recheck really happens (found again, or found empty).
+         */
+        @Nullable
+        private UUID checking;
+        private long pickedAt = -RECHECK_AFTER;
 
         Find(BlockPos at, int worth, long foundAt, long checkedAt, int misses, List<BlockPos> trail, @Nullable UUID scout) {
             this.at = at;
@@ -135,25 +142,26 @@ public class Raids {
     @Nullable
     private Find waiting;
     /**
-     * Step 3c: raiders who left a column hurt, limping home along its trail by themselves (a real Megaponera that loses
-     * legs or has a termite clinging falls behind, and makes its own way home on the scent line; carrying the hurt home
-     * is step 5). Not saved: after a reload they are just ants outside, and go home.
+     * Step 3c and the raid code review, finding 2: ants let go out in the field going home along a trail by themselves
+     * (a real Megaponera that loses legs, has a termite clinging or falls behind makes its own way home on the scent
+     * line; carrying the hurt home is step 5): the hurt, the stuck, the column's leftovers, a raid lost from sight, a
+     * scout that gave up. Not saved: after a reload the sweep ({@link #SWEEP_EVERY}) finds them outside and sends them home.
      */
-    private final Map<UUID, Limp> limping = new HashMap<>();
+    private final WayHome wayHome = new WayHome();
+    /** The raid code review, finding 1: since when scouts and ants going home have been out of sight (kept a grace first). */
+    private final Map<UUID, Long> unseenSince = new HashMap<>();
+    /** Every this many ticks the colony's real ants left outside with nothing to do there are sent home (my pick, 5 s). */
+    private static final long SWEEP_EVERY = 100;
+    /** BUGS 89: when to see whether the raiders took up their raid (game time, -1 none). */
+    private long raidCheckAt = -1;
+    /** BUGS 89: ants the scout command sent, and when to see whether they set out. */
+    private final Map<UUID, Long> sentCheckAt = new HashMap<>();
     /** R4: the colony's scent trails in the world (saved). */
     private final ScentTrails trails = new ScentTrails();
     /** Why the last raid could not set out (the raid command's answer), or null. */
     @Nullable
     private String whyNoRaid;
 
-    /** One limping raider: the trail home it follows, and since when. */
-    private record Limp(RaidColumn.Route route, long since) {
-    }
-
-    /** How far ahead of itself along the trail (blocks) a limper walks to at a time. */
-    private static final double LIMP_STEP = 6.0;
-    /** A limper is home this near the entrance (blocks; the column's own home line). */
-    private static final double LIMP_HOME = 8.0;
 
     public Raids(Colony colony) {
         this.colony = colony;
@@ -189,9 +197,9 @@ public class Raids {
         return Set.copyOf(scouts);
     }
 
-    /** The raiders limping home by themselves now (the raid view). */
+    /** The ants going home by themselves now (the raid view). */
     public Set<UUID> limpers() {
-        return Set.copyOf(limping.keySet());
+        return wayHome.ids();
     }
 
     /** Why the last raid could not set out, or null. */
@@ -212,8 +220,13 @@ public class Raids {
         trails.tick(level, level.getGameTime(), trailNumbers(), column == null ? null : column.trail(), what -> say(level, what));
         if (column != null) {
             column.update(level); // (the raiders ask it every few ticks; this keeps it going with none of them loaded)
-            for (UUID hurt : column.takeHurt()) {
-                limping.put(hurt, new Limp(column.back(), level.getGameTime()));
+            for (RaidColumn.LetGo one : column.takeLetGo()) {
+                wayHome.send(one.ant(), column.back(), level.getGameTime(), one.why());
+                say(level, one.ant().toString().substring(0, 8) + " goes home along the trail by itself (" + one.why() + ")");
+            }
+            if (raidCheckAt >= 0 && level.getGameTime() >= raidCheckAt) {
+                raidCheckAt = -1;
+                checkRaiders(level, column);
             }
             if (column.stage() == RaidColumn.Stage.DONE) {
                 raidHome(level, column);
@@ -221,6 +234,7 @@ public class Raids {
                 column = null;
             }
         }
+        checkSent(level);
         if (level.getGameTime() % 20 != 0) {
             return;
         }
@@ -229,8 +243,9 @@ public class Raids {
             return;
         }
         long now = level.getGameTime();
-        scouts.removeIf(id -> !(level.getEntity(id) instanceof AbstractAntEntity ant) || !ant.isAlive());
-        sent.removeIf(id -> !(level.getEntity(id) instanceof AbstractAntEntity ant) || !ant.isAlive());
+        // (the raid code review, finding 1: one only out of sight is kept a grace first; only the dead or long unseen go)
+        scouts.removeIf(id -> goneFor(level, id, now));
+        sent.removeIf(id -> !scouts.contains(id) && goneFor(level, id, now));
         finds.removeIf(find -> now - find.checkedAt > numbers.spotFadeTicks());
         veterans.removeIf(id -> level.getEntity(id) instanceof AbstractAntEntity ant && !ant.isAlive());
         searched.values().removeIf(when -> now - when > numbers.sliceFadeTicks());
@@ -247,8 +262,93 @@ public class Raids {
         }
         SavannaNumbers.CarryNumbers carry = carryNumbers();
         int limpTicks = carry == null ? RaidColumn.DEFAULT_CARRY.limpTicks() : carry.limpTicks();
-        limping.entrySet().removeIf(entry -> now - entry.getValue().since() > limpTicks
-                || !(level.getEntity(entry.getKey()) instanceof AbstractAntEntity ant) || !ant.isAlive());
+        wayHome.forgetIf(id -> now - wayHome.since(id) > limpTicks || goneFor(level, id, now));
+        if (now % SWEEP_EVERY == 0) {
+            sweep(level, now);
+        }
+        unseenSince.keySet().removeIf(id -> !scouts.contains(id) && !sent.contains(id) && !wayHome.isGoingHome(id));
+    }
+
+    /**
+     * The raid code review, finding 1: whether this ant is gone for the raids: dead, or out of sight (not in the world,
+     * or in land not ticking now) longer than the colony's away grace ({@code AwayLife}, a minute). The grace is counted
+     * from when the colony first missed it while its own land ticked, so a colony coming back into sight drops nobody
+     * at once.
+     */
+    private boolean goneFor(ServerLevel level, UUID id, long now) {
+        net.minecraft.world.entity.Entity entity = level.getEntity(id);
+        if (entity != null && !entity.isAlive()) {
+            unseenSince.remove(id);
+            return true;
+        }
+        if (entity != null && level.isPositionEntityTicking(entity.blockPosition())) {
+            unseenSince.remove(id);
+            return false;
+        }
+        long since = unseenSince.computeIfAbsent(id, key -> now);
+        return now - since > com.antcolonies.colony.AwayLife.GRACE_TICKS;
+    }
+
+    /**
+     * The raid code review, finding 2: the colony's real ants left outside, far from the entrance, with no job out there
+     * any more (a raid that ended while they were out of sight, a reload, a goal that let go) are sent home along a trail.
+     */
+    /**
+     * The sweep only sends home ants out in the field, farther than this from the entrance (blocks, flat; my pick): nearer,
+     * an ant is in or round its own nest (a dead mound's rooms lie a few blocks off its chimney) and finds its own way in.
+     */
+    private static final double SWEEP_FROM = 16.0;
+
+    private void sweep(ServerLevel level, long now) {
+        for (AbstractAntEntity member : colony.population().realMembers(level)) {
+            if (!(member instanceof MatabeleEntity ant) || !ant.isAlive() || ant.isDowned() || ant.getFightSpot() != null
+                    || !level.isPositionEntityTicking(ant.blockPosition())) {
+                continue;
+            }
+            UUID id = ant.getUUID();
+            if (scouts.contains(id) || isRaider(id) || wayHome.isGoingHome(id) || ant.hasFullMandibles() || ant.mayGoOut()
+                    || WayHome.isHome(level, ant, colony) || RaidColumn.flat(ant.blockPosition(), colony.getCenter()) <= SWEEP_FROM) {
+                continue;
+            }
+            wayHome.send(id, null, now, "left outside with nothing to do there");
+            say(level, id.toString().substring(0, 8) + " is outside at " + ant.blockPosition().toShortString()
+                    + " with nothing to do there: it goes home along a trail");
+        }
+    }
+
+    /** BUGS 89: the raiders a moment after the raid was called: one not walking with it says why (the goals it runs). */
+    private void checkRaiders(ServerLevel level, RaidColumn raid) {
+        for (UUID id : raid.members()) {
+            if (level.getEntity(id) instanceof MatabeleEntity ant && ant.getFightSpot() == null
+                    && !ant.runsGoal(com.antcolonies.savanna.entity.goal.MatabeleRaidGoal.class)) {
+                say(level, id.toString().substring(0, 8) + " was called to the raid but is not walking with it a second later: it runs "
+                        + ant.runningGoals());
+            }
+        }
+    }
+
+    /** BUGS 89: an ant the scout command sent that did not set out two seconds later says why (the goals it runs). */
+    private void checkSent(ServerLevel level) {
+        long now = level.getGameTime();
+        sentCheckAt.entrySet().removeIf(entry -> {
+            if (now < entry.getValue()) {
+                return false;
+            }
+            UUID id = entry.getKey();
+            if (!scouts.contains(id)) {
+                String runs = level.getEntity(id) instanceof AbstractAntEntity ant ? ant.runningGoals() : "(not in the world)";
+                say(level, "scout command: " + id.toString().substring(0, 8) + " has not set out 2 s later: it runs " + runs
+                        + (mayScoutWhy(level, id)));
+            }
+            return true;
+        });
+    }
+
+    private String mayScoutWhy(ServerLevel level, UUID id) {
+        if (!(level.getEntity(id) instanceof MatabeleEntity ant)) {
+            return "";
+        }
+        return fit(ant) ? "" : ", and it is not fit to scout now";
     }
 
     /**
@@ -264,11 +364,13 @@ public class Raids {
         if (raid.carried() > 0) {
             find.checkedAt = level.getGameTime();
             find.misses = 0;
-        } else if (raid.lostTrail()) {
-            // R4: turned home at a gap in the trail: the spot was never reached, so it is no empty check (a scout
-            // rechecks it later and lays a new line).
-        } else {
-            foundEmpty(level, find);
+        } else if (raid.lostTrail() || raid.lostFromSight()) {
+            // R4: turned home at a gap in the trail, or (the raid code review, finding 1) lost from sight: the spot was
+            // never looked over, so it is no empty check (a scout rechecks it later and lays a new line).
+            say(level, "the raid to " + find.at.toShortString() + " never looked the spot over (" + (raid.lostFromSight() ? "lost from sight" : "the trail lost")
+                    + "): it still counts as a good spot");
+        } else if (raid.foundNothing()) {
+            foundEmpty(level, find); // (they were there and found nothing)
         }
     }
 
@@ -278,34 +380,52 @@ public class Raids {
         return last;
     }
 
-    /** Whether this ant limps home from a raid by itself (step 3c). */
+    /** Whether this ant goes home along a trail by itself (step 3c's limpers and every ant let go out in the field). */
+    public boolean isGoingHome(UUID ant) {
+        return wayHome.isGoingHome(ant);
+    }
+
+    /** Step 3c's name for {@link #isGoingHome}. */
     public boolean isLimping(UUID ant) {
-        return limping.containsKey(ant);
+        return isGoingHome(ant);
+    }
+
+    /** Why this ant was sent home by itself (the diary and the tests), or null. */
+    @Nullable
+    public String whyGoingHome(UUID ant) {
+        return wayHome.why(ant);
     }
 
     /**
-     * Where a limping raider should walk now: a little ahead of itself along the raid's trail home; null once it is home
-     * (near the entrance or in the nest; it is let go) or not limping.
+     * Where an ant going home by itself should walk now: a little ahead of itself along its way home ({@link WayHome});
+     * null once it is home (near the entrance or in the nest; it is let go) or not going home.
      */
     @Nullable
-    public BlockPos limpOrder(ServerLevel level, MatabeleEntity ant) {
-        Limp limp = limping.get(ant.getUUID());
-        if (limp == null) {
-            return null;
-        }
-        BlockPos entrance = colony.getCenter();
-        if (RaidColumn.flat(ant.blockPosition(), entrance) <= LIMP_HOME && Math.abs(ant.getY() - entrance.getY()) <= LIMP_HOME
-                || colony.nest().isInside(level, ant.blockPosition())) {
-            limping.remove(ant.getUUID());
-            return null;
-        }
-        double along = limp.route().along(ant.getX(), ant.getZ());
-        return along + LIMP_STEP >= limp.route().length() ? entrance : RaidColumn.place(level, limp.route(), along + LIMP_STEP, 0.0);
+    public BlockPos wayHomeOrder(ServerLevel level, AbstractAntEntity ant) {
+        return wayHome.orderFor(level, ant, colony, trails, trailNumbers());
     }
 
     /** Tests: this ant limps home along this column's trail. */
     public void limpForTests(MatabeleEntity ant, RaidColumn raid, long now) {
-        limping.put(ant.getUUID(), new Limp(raid.back(), now));
+        wayHome.send(ant.getUUID(), raid.back(), now, "hurt (test)");
+    }
+
+    /** A carrier (or any ant) far out with no way to where it was going goes home along a trail by itself. */
+    public void sendHome(ServerLevel level, AbstractAntEntity ant, String why) {
+        if (!wayHome.isGoingHome(ant.getUUID()) && !WayHome.isHome(level, ant, colony)) {
+            wayHome.send(ant.getUUID(), null, level.getGameTime(), why);
+            say(level, ant.getUUID().toString().substring(0, 8) + " goes home along a trail by itself (" + why + ")");
+        }
+    }
+
+    /**
+     * The raid code review, finding 4 (the colony question {@code keep_from_defence}): a scout out searching is never
+     * called to defend the nest, nor a raider on the column's own fight; raiders milling at the entrance may be (they
+     * rejoin the column, or catch it up along the trail).
+     */
+    static boolean keptFromDefence(Raids raids, net.minecraft.world.level.Level level, AbstractAntEntity ant) {
+        UUID id = ant.getUUID();
+        return raids.scouts.contains(id) && !raids.isRaider(id) || raids.column != null && raids.column.fightsForTheColumn(ant);
     }
 
     /** How many slices the land round the nest is searched in. */
@@ -373,11 +493,14 @@ public class Raids {
         if (scouts.contains(ant.getUUID())) {
             return true;
         }
-        if (!fit(ant) || isRaider(ant.getUUID())) {
+        if (!fit(ant) || isRaider(ant.getUUID()) || wayHome.isGoingHome(ant.getUUID())) {
             return false;
         }
         if (sent.contains(ant.getUUID())) {
             return true;
+        }
+        if (ant.isBusyWithChore()) {
+            return false; // (one feeding the queen or the young, or carrying, finishes first: another goes)
         }
         if (column != null || waiting != null || scouts.size() >= scoutsWanted() || !isScoutingTime(level) || !isHungry()) {
             // (with a raid out, or a find waiting for the raid hours, the colony sends no new scouts: my pick)
@@ -411,14 +534,26 @@ public class Raids {
         return veterans.contains(ant);
     }
 
-    /** Whether this ant is fit to scout: a major (the scouts in Longhurst and Howse 1979; my reading), whole, not busy fighting, not hungry. */
+    /**
+     * Whether this ant is fit to scout: a major (the scouts in Longhurst and Howse 1979; my reading), whole, not busy
+     * fighting, carrying nothing. A hungry one may scout (the raid code review, finding 3: a hungry colony's ants are
+     * hungry, and kept in they could never find it food; my pick).
+     */
     private static boolean fit(MatabeleEntity ant) {
         return ant.isAlive() && ant.hasMajorBody() && !ant.isCrippled() && !ant.clamp().isOn() && !ant.isDowned()
-                && ant.getFightSpot() == null && !ant.isHungry();
+                && ant.getFightSpot() == null && !ant.hasFullMandibles();
     }
 
     /** It sets out (counted as a scout until {@link #back}), and is one of the colony's scouts from now on. */
     public void setOut(MatabeleEntity ant) {
+        setOut(ant, null);
+    }
+
+    /** It sets out on this trip; a recheck's spot is marked as on its way (no second scout to it meanwhile; finding 12). */
+    public void setOut(MatabeleEntity ant, @Nullable Trip trip) {
+        if (trip != null && trip.find() != null) {
+            trip.find().checking = ant.getUUID();
+        }
         if (ant.level() instanceof ServerLevel level) {
             say(level, "scout " + ant.getUUID().toString().substring(0, 8) + " sets out" + (sent.contains(ant.getUUID()) ? " (sent by the command)" : "")
                     + (veterans.contains(ant.getUUID()) ? ", an old scout" : ", a new scout") + ", search range " + range());
@@ -436,11 +571,32 @@ public class Raids {
 
     /** It is back, or gave up. */
     public void back(MatabeleEntity ant) {
-        if (scouts.contains(ant.getUUID()) && ant.level() instanceof ServerLevel level) {
-            say(level, "scout " + ant.getUUID().toString().substring(0, 8) + " is back or gave up, at " + ant.blockPosition().toShortString());
+        back(ant, null);
+    }
+
+    /**
+     * It is back, or gave up ({@code untold}: a find it never got home to tell, lost with it). One that gave up far from
+     * home goes home along a trail by itself (the raid code review, finding 2).
+     */
+    public void back(MatabeleEntity ant, @Nullable BlockPos untold) {
+        UUID id = ant.getUUID();
+        for (Find find : finds) {
+            if (id.equals(find.checking)) {
+                find.checking = null;
+            }
         }
-        scouts.remove(ant.getUUID());
-        sent.remove(ant.getUUID());
+        if (scouts.contains(id) && ant.level() instanceof ServerLevel level) {
+            say(level, "scout " + id.toString().substring(0, 8) + " is back or gave up, at " + ant.blockPosition().toShortString());
+            if (untold != null) {
+                say(level, "scout " + id.toString().substring(0, 8) + " never got home to tell of its find at " + untold.toShortString()
+                        + ": the find is lost");
+            }
+            if (ant.isAlive() && !isRaider(id) && !WayHome.isHome(level, ant, colony)) {
+                sendHome(level, ant, "a scout that gave up on its way home");
+            }
+        }
+        scouts.remove(id);
+        sent.remove(id);
     }
 
     /** Whether the scout command sent this ant out (it keeps no hours). */
@@ -466,10 +622,13 @@ public class Raids {
         }
         long now = level.getGameTime();
         int slices = slices(numbers);
-        Find best = finds.stream().filter(find -> now - find.checkedAt >= RECHECK_AFTER)
+        Find best = finds.stream().filter(find -> now - find.checkedAt >= RECHECK_AFTER && now - find.pickedAt >= RECHECK_AFTER
+                        && (find.checking == null || !scouts.contains(find.checking)))
                 .max(Comparator.comparingInt(Find::worth)).orElse(null);
         if (best != null) {
-            best.checkedAt = now; // (no second scout to it at once)
+            // (no second scout to it while one is on its way; its check time is set when the check really happens,
+            // finding 12)
+            best.pickedAt = now;
             return new Trip(best, sliceOf(best.at, slices), angleOf(best.at), range());
         }
         List<Integer> free = new ArrayList<>();
@@ -613,11 +772,14 @@ public class Raids {
         }
         int size = raidSize(find);
         BlockPos entrance = colony.getCenter();
+        // (the raid code review, finding 3: ants not busy with a nest chore first, then the nearest the entrance; hungry
+        // ones go too, as real raiders do)
         List<MatabeleEntity> fit = new ArrayList<>(colony.population().realMembers(level).stream()
-                .filter(member -> member instanceof MatabeleEntity matabele && raiderFit(matabele)
+                .filter(member -> member instanceof MatabeleEntity matabele && raiderFit(matabele) && !wayHome.isGoingHome(member.getUUID())
                         && (!scouts.contains(member.getUUID()) || member.getUUID().equals(find.scout))) // (scouts out searching stay at it)
                 .map(member -> (MatabeleEntity) member)
-                .sorted(Comparator.comparingDouble(member -> member.blockPosition().distSqr(entrance))).toList());
+                .sorted(Comparator.comparing(MatabeleEntity::isBusyWithChore)
+                        .thenComparingDouble(member -> member.blockPosition().distSqr(entrance))).toList());
         MatabeleEntity scoutHere = fit.stream().filter(ant -> ant.getUUID().equals(find.scout)).findFirst().orElse(null);
         MatabeleEntity leader = scoutHere != null ? scoutHere : fit.stream().filter(MatabeleEntity::hasMajorBody).findFirst().orElse(null);
         if (leader == null) {
@@ -647,15 +809,16 @@ public class Raids {
         going.sort(Comparator.comparingInt(ant -> ant == leader ? 0 : veterans.contains(ant.getUUID()) ? 1 : ant.hasMajorBody() ? 3 : 2));
         column = new RaidColumn(level, colony, numbers, carryNumbers(), trailNumbers(), find, trail, going, along, now);
         column.sayStart(level);
+        raidCheckAt = now + 20; // (BUGS 89: a second later, every raider should be walking with it)
         whyNoRaid = null;
         find.scout = leader.getUUID(); // (it leads: the one to lead the next raid there too)
         return column;
     }
 
-    /** Whether this ant may go raiding: a worker, whole, not clamped, not downed or fighting. */
+    /** Whether this ant may go raiding: a worker, whole, not clamped, not downed or fighting, carrying nothing (finding 3). */
     private static boolean raiderFit(MatabeleEntity ant) {
         return ant.isAlive() && ant.isColonyWorker() && !ant.isCrippled() && !ant.clamp().isOn() && !ant.isDowned()
-                && !ant.fightsNoMore() && ant.getFightSpot() == null;
+                && !ant.fightsNoMore() && ant.getFightSpot() == null && !ant.hasFullMandibles();
     }
 
     /** The raid command: a raid sets out now to the best known find, whatever the hour or hunger; null if none could. */
@@ -698,11 +861,15 @@ public class Raids {
     public MatabeleEntity sendNow(ServerLevel level) {
         BlockPos entrance = colony.getCenter();
         MatabeleEntity ant = colony.population().realMembers(level).stream()
-                .filter(member -> member instanceof MatabeleEntity matabele && fit(matabele) && !scouts.contains(member.getUUID()))
+                .filter(member -> member instanceof MatabeleEntity matabele && fit(matabele) && !scouts.contains(member.getUUID())
+                        && !isRaider(member.getUUID()) && !wayHome.isGoingHome(member.getUUID()))
                 .map(member -> (MatabeleEntity) member)
-                .min(Comparator.comparingDouble(member -> member.blockPosition().distSqr(entrance))).orElse(null);
+                .min(Comparator.comparing(MatabeleEntity::isBusyWithChore)
+                        .thenComparingDouble(member -> member.blockPosition().distSqr(entrance))).orElse(null);
         if (ant != null) {
             sent.add(ant.getUUID());
+            sentCheckAt.put(ant.getUUID(), level.getGameTime() + 40); // (BUGS 89: two seconds later it should be out)
+            say(level, "the scout command sends " + ant.getUUID().toString().substring(0, 8) + " (it runs " + ant.runningGoals() + ")");
         }
         return ant;
     }
@@ -724,8 +891,8 @@ public class Raids {
         if (column == null && last != null) {
             line.append("; the last raid brought home ").append(last.carried()).append(" termite(s)");
         }
-        if (!limping.isEmpty()) {
-            line.append("; ").append(limping.size()).append(" hurt raider(s) limping home");
+        if (wayHome.size() > 0) {
+            line.append("; ").append(wayHome.size()).append(" raider(s) going home by themselves");
         }
         line.append(trails.describe(trailNumbers(), level.getGameTime()));
         if (column != null) {
@@ -754,7 +921,9 @@ public class Raids {
         searched.forEach((slice, when) -> slices.putLong(Integer.toString(slice), when));
         tag.put("raidSearched", slices);
         tag.putInt("raidRange", range);
-        tag.putInt("raidWaiting", waiting == null ? -1 : finds.indexOf(waiting));
+        if (waiting != null) {
+            tag.putLong("raidWaitingAt", waiting.at.asLong()); // (the find's place, not its place in the list: finding 16)
+        }
         ListTag old = new ListTag();
         veterans.forEach(id -> old.add(NbtUtils.createUUID(id)));
         tag.put("raidScouts", old);
@@ -786,8 +955,11 @@ public class Raids {
             }
         }
         range = tag.getInt("raidRange");
-        int wait = tag.contains("raidWaiting") ? tag.getInt("raidWaiting") : -1;
-        waiting = wait >= 0 && wait < finds.size() ? finds.get(wait) : null;
+        waiting = null;
+        if (tag.contains("raidWaitingAt")) {
+            BlockPos at = BlockPos.of(tag.getLong("raidWaitingAt"));
+            waiting = finds.stream().filter(find -> find.at.equals(at)).findFirst().orElse(null);
+        }
         veterans.clear();
         for (Tag t : tag.getList("raidScouts", Tag.TAG_INT_ARRAY)) {
             veterans.add(NbtUtils.loadUUID(t));
@@ -801,6 +973,7 @@ public class Raids {
                 new UUID(7, 11)));
         searched.put(2, 120L);
         range = 48;
+        waiting = finds.get(finds.size() - 1);
         veterans.add(new UUID(7, 11));
         veterans.add(new UUID(7, 12));
         trails.fillForTests(colony.getCenter());

@@ -295,6 +295,7 @@ public final class SavannaParts {
     public static final Type<Raids> RAIDS = listed("raids", Raids::new, part -> part
             .ticks(117, Raids::tick)
             .plugs(ColonyHooks.LIST_SEARCH, 40, raids -> raids::describe).plugs(ColonyHooks.REACH, 10, raids -> raids::reach)
+            .answers(ColonyQuestions.KEEP_FROM_DEFENCE, 10, Raids::keptFromDefence) // (scouts out, raiders on their own fight)
             .saves(Raids::save, Raids::load)
             .sample(Raids::fillForTests));
 

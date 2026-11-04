@@ -774,6 +774,13 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     private BlockPos fightSpot;
     private long fightUntil;
     private double fightReach = com.antcolonies.entity.goal.FightGoal.SPOT_REACH;
+    /**
+     * Who gave the fight order (the raid code review, finding 4): a colony part or a group job, or null for anyone (the
+     * skirmish command, the tests). Only its giver ends an order with {@link #endFightOrder(Object)}, so one part
+     * calling its fighters off never clears an order another gave.
+     */
+    @Nullable
+    private Object fightOrderBy;
     /** Until when (game time) it may not sting a player again (M8 step 2e: at most once every {@code defence.sting.every_ticks}). */
     private long nextPlayerSting;
 
@@ -859,6 +866,11 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     public String runningGoals() {
         return goalSelector.getAvailableGoals().stream().filter(net.minecraft.world.entity.ai.goal.WrappedGoal::isRunning)
                 .map(goal -> goal.getGoal().getClass().getSimpleName()).toList().toString();
+    }
+
+    /** Whether it is running a goal of this kind now (group jobs ask, to tell an insect held for a reason from a stuck one). */
+    public boolean runsGoal(Class<?> kind) {
+        return goalSelector.getAvailableGoals().stream().anyMatch(goal -> goal.isRunning() && kind.isInstance(goal.getGoal()));
     }
 
     /** Whether it lies paralysed by a hunter's sting (synced: true on the client too). */
@@ -1429,9 +1441,29 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
      * provoking player up to its colony's {@code defence.reach} from where it was provoked).
      */
     public void orderToFight(BlockPos spot, long until, double reach) {
+        orderToFight(spot, until, reach, null);
+    }
+
+    /** As {@link #orderToFight(BlockPos, long, double)}, the order given by {@code by} (a part or a group job; null for anyone). */
+    public void orderToFight(BlockPos spot, long until, double reach, @Nullable Object by) {
         fightSpot = spot.immutable();
         fightUntil = until;
         fightReach = reach;
+        fightOrderBy = by;
+    }
+
+    /** Who gave the fight order that holds now (null if none holds, or it was given by anyone). */
+    @Nullable
+    public Object fightOrderBy() {
+        return getFightSpot() == null ? null : fightOrderBy;
+    }
+
+    /**
+     * Server: whether it is out on a job for its colony that a meal must not interrupt (a species' own: walking in a raid
+     * column, out scouting, on its way home from one). {@code EatGoal} stands aside while it is.
+     */
+    public boolean isOnColonyErrand() {
+        return false;
     }
 
     /** How far (blocks) round its fight spot it looks for foes. */
@@ -1484,9 +1516,17 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return fightSpot;
     }
 
-    /** Ends its fight order (nothing left to fight). */
+    /** Ends its fight order, whoever gave it (nothing left to fight, or it can fight no more). */
     public void endFightOrder() {
         fightSpot = null;
+        fightOrderBy = null;
+    }
+
+    /** Ends its fight order only if {@code by} gave it (one part calling its fighters off never clears another's order). */
+    public void endFightOrder(Object by) {
+        if (fightSpot != null && fightOrderBy == by) {
+            endFightOrder();
+        }
     }
 
     /** Server: whether it is having a nap (set by {@code NapGoal}; not saved: after a reload the nap is over). */

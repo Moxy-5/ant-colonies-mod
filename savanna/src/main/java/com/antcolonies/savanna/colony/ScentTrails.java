@@ -247,6 +247,34 @@ public final class ScentTrails {
     }
 
     /**
+     * The raid code review, finding 2: the freshest trail still smelt one of whose points lies within {@code within}
+     * blocks (flat) of this place, the way home for an insect out there; null if none.
+     */
+    @Nullable
+    public Trail nearestLive(BlockPos at, double within, SavannaNumbers.TrailNumbers numbers, long now) {
+        Trail best = null;
+        for (Trail trail : trails) {
+            if (!trail.alive(numbers, now) || best != null && trail.laidAt <= best.laidAt) {
+                continue;
+            }
+            for (BlockPos p : trail.points) {
+                if (RaidColumn.flat(p, at) <= within && Math.abs(p.getY() - at.getY()) <= within) {
+                    best = trail;
+                    break;
+                }
+            }
+        }
+        return best;
+    }
+
+    /**
+     * The raid code review, finding 7: watched points this near a trail's spot (blocks) are not checked by the world's
+     * own changes: the raiders bite the termites' mud and soil open round the spot, and that is no break in the way there
+     * (my pick; the world's changes elsewhere along it, mud, fallen trees, soil wearing away, still break it).
+     */
+    private static final double SPOT_FREE = 6.0;
+
+    /**
      * Every {@link #CHECK_EVERY} ticks: trails no longer smelt are dropped (not one a raid walks now), and the watched
      * points where loaded are checked: a point whose cell is filled or flooded, or whose ground is gone, is broken.
      * {@code say} gets a line for the raid diary for each trail newly broken.
@@ -264,7 +292,7 @@ public final class ScentTrails {
                     continue;
                 }
                 BlockPos p = trail.points.get(i);
-                if (!level.hasChunkAt(p)) {
+                if (!level.hasChunkAt(p) || p.closerThan(trail.to, SPOT_FREE)) {
                     continue;
                 }
                 if (!scentHolds(level, p)) {

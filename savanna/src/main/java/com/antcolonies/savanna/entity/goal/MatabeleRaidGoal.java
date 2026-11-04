@@ -23,7 +23,7 @@ import net.minecraft.world.entity.ai.goal.Goal;
  * each raider a fight order at the attack, and this goal stands aside while one holds. Step 3c: after the fight the
  * column gives each raider with room a stung termite to fetch ({@code take}): it walks to it and picks it up; and a
  * raider that left the column hurt (crippled, a soldier clamped on a leg) limps home along the raid's trail with this
- * goal, the colony's raids saying where ({@code Raids.limpOrder}). Mind layer only.
+ * goal, the colony's raids saying where ({@code Raids.wayHomeOrder}); so does every ant the raid code lets go out in the field (the raid code review, finding 2). Mind layer only.
  */
 public class MatabeleRaidGoal extends Goal {
     /** The longest hop (blocks) it walks in one go. */
@@ -68,7 +68,7 @@ public class MatabeleRaidGoal extends Goal {
     /** Step 3c: whether it limps home from a raid by itself (hurt, out of the column). */
     private boolean limps() {
         Raids raids = raids();
-        return raids != null && raids.isLimping(ant.getUUID());
+        return raids != null && raids.isGoingHome(ant.getUUID());
     }
 
     @Override
@@ -116,7 +116,7 @@ public class MatabeleRaidGoal extends Goal {
         RaidColumn.Order order;
         if (limping) {
             Raids raids = raids();
-            BlockPos to = raids == null ? null : raids.limpOrder(level, ant);
+            BlockPos to = raids == null ? null : raids.wayHomeOrder(level, ant);
             if (to == null) {
                 return; // (home: it is let go, and goes in as any ant)
             }

@@ -139,7 +139,7 @@ public class MatabeleDefenceTests {
     }
 
     /** Where a player stands on the entrance: the ground next to the chimney's open top. */
-    private static BlockPos beside(ServerLevel level, BlockPos entrance) {
+    static BlockPos beside(ServerLevel level, BlockPos entrance) {
         for (BlockPos pos : new BlockPos[] {entrance.east(), entrance.west(), entrance.north(), entrance.south()}) {
             BlockPos top = level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, pos);
             if (Math.abs(top.getY() - entrance.getY()) <= 2) {
@@ -149,12 +149,12 @@ public class MatabeleDefenceTests {
         return entrance;
     }
 
-    private static void stand(ServerPlayer player, BlockPos at) {
+    static void stand(ServerPlayer player, BlockPos at) {
         player.moveTo(at.getX() + 0.5, at.getY(), at.getZ() + 0.5);
     }
 
     /** A mock player in survival mode (the game's own test player plays in creative, which the ants ignore). */
-    private static ServerPlayer survivalPlayer(GameTestHelper helper) {
+    static ServerPlayer survivalPlayer(GameTestHelper helper) {
         CommonListenerCookie cookie = CommonListenerCookie.createInitial(new GameProfile(UUID.randomUUID(), "test-survival-player"), false);
         ServerPlayer player = new ServerPlayer(helper.getLevel().getServer(), helper.getLevel(), cookie.gameProfile(), cookie.clientInformation()) {
             @Override

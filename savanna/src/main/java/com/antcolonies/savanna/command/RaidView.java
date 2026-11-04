@@ -41,6 +41,16 @@ public final class RaidView {
     private RaidView() {
     }
 
+    /** This player left: the view forgets it. */
+    public static void forget(UUID player) {
+        watching.remove(player);
+    }
+
+    /** The server stops: nobody watches any more (a new world starts with the view off). */
+    public static void clear() {
+        watching.clear();
+    }
+
     /** Turns the view on or off for this player; true if it is on now. */
     public static boolean toggle(ServerPlayer player) {
         if (!watching.remove(player.getUUID())) {

@@ -120,6 +120,12 @@ public final class ColonyQuestions {
      * nest, hit a member, stood in a column or stayed on the entrance), the nest's defence ({@code fight.NestDefence}).
      */
     public static final Kind<Provoked> PROVOKED_BY = Kind.of("provoked_by");
+    /**
+     * The raid code review, finding 4: whether this member is kept from the nest's defence ({@code fight.NestDefence})
+     * by another job of the colony's that must not be dropped (a species' own: a scout out searching, a raider sent in
+     * to fight at its spot).
+     */
+    public static final Kind<AbstractAntEntity> KEEP_FROM_DEFENCE = Kind.of("keep_from_defence");
 
     // --- answering and asking ------------------------------------------------------------------------------------------
 

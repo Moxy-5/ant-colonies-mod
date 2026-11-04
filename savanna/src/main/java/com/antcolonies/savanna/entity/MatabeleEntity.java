@@ -187,8 +187,10 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         this.goalSelector.addGoal(2, new CarryEggGoal(this));
         this.goalSelector.addGoal(2, new CarryRemainsGoal(this));
         this.goalSelector.addGoal(2, new ClampCareGoal(this)); // M8 2c: termites off nestmates' legs in the nest
-        this.goalSelector.addGoal(2, new MatabeleScoutGoal(this)); // M8 3a: a major out scouting for termites
-        this.goalSelector.addGoal(2, new MatabeleRaidGoal(this)); // M8 3b: walking in a raid column (3c: fetching the stung, limping home)
+        // (the raid code review, finding 3: priority 1, so a scout or raider is really taken off its nest chores; chores
+        // that carry something are never called to a raid or a scout's trip, and eating stands aside while it is out)
+        this.goalSelector.addGoal(1, new MatabeleScoutGoal(this)); // M8 3a: a major out scouting for termites
+        this.goalSelector.addGoal(1, new MatabeleRaidGoal(this)); // M8 3b: walking in a raid column (3c: fetching the stung, going home)
         this.goalSelector.addGoal(2, new BringPreyGoal(this)); // M8 3c: the termites carried home onto the prey pile
         this.goalSelector.addGoal(3, new DigGoal(this, () -> true));
         this.goalSelector.addGoal(4, new GoInsideGoal(this));
@@ -293,6 +295,11 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
     /** Whether it has gone long enough without a meal to slow down. */
     public boolean isHungry() {
         return hunger().isHungry();
+    }
+
+    /** Tests: it last ate a meal interval and a little ago (hungry now, not yet slowed). */
+    public void hungryForTests() {
+        hunger().setLastAte(level().getGameTime() - profile().worker().mealIntervalTicks() - 20);
     }
 
     @Override
@@ -644,7 +651,21 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         }
         Colony colony = getColony();
         return colony != null && colony.part(com.antcolonies.savanna.colony.SavannaParts.RAIDS)
-                .map(raids -> raids.isScouting(getUUID()) || raids.isRaider(getUUID()) || raids.isLimping(getUUID())).orElse(false);
+                .map(raids -> raids.isScouting(getUUID()) || raids.isRaider(getUUID()) || raids.isGoingHome(getUUID())).orElse(false);
+    }
+
+    /** The raid code review, finding 3: scouting, in a raid column or going home from one, it does not leave to eat. */
+    @Override
+    public boolean isOnColonyErrand() {
+        Colony colony = getColony();
+        return colony != null && colony.part(com.antcolonies.savanna.colony.SavannaParts.RAIDS)
+                .map(raids -> raids.isScouting(getUUID()) || raids.isRaider(getUUID()) || raids.isGoingHome(getUUID())).orElse(false);
+    }
+
+    /** Whether it is busy with a nest chore now (feeding the queen or the young, carrying eggs, waste or prey, care). */
+    public boolean isBusyWithChore() {
+        return runsGoal(FeedQueenGoal.class) || runsGoal(FeedLarvaGoal.class) || runsGoal(CarryEggGoal.class)
+                || runsGoal(CarryRemainsGoal.class) || runsGoal(ClampCareGoal.class) || runsGoal(com.antcolonies.savanna.entity.goal.BringPreyGoal.class);
     }
 
     /** M8 step 3b: whether it walks in its colony's raid column now. */

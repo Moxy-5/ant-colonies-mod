@@ -84,19 +84,30 @@ public class SavannaEvents {
     }
 
     /** M8 raid rework R4: a block dug on a Matabele scent trail (or the ground under it) breaks the trail there. */
-    @SubscribeEvent
+    @SubscribeEvent(priority = EventPriority.LOWEST) // (last: a break another mod or a claim stopped is no break; finding 7)
     public static void onBreak(BlockEvent.BreakEvent event) {
-        if (event.getLevel() instanceof ServerLevel level) {
+        if (!event.isCanceled() && event.getLevel() instanceof ServerLevel level) {
             com.antcolonies.savanna.colony.Raids.blockChangedNear(level, event.getPos());
         }
     }
 
     /** M8 raid rework R4: a block put on a Matabele scent trail breaks the trail there. */
-    @SubscribeEvent
+    @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onPlace(BlockEvent.EntityPlaceEvent event) {
-        if (event.getLevel() instanceof ServerLevel level) {
+        if (!event.isCanceled() && event.getLevel() instanceof ServerLevel level) {
             com.antcolonies.savanna.colony.Raids.blockChangedNear(level, event.getPos());
         }
+    }
+
+    /** The raid view forgets a player who leaves, and everyone when the server stops (the raid code review, finding 14). */
+    @SubscribeEvent
+    public static void onLogOut(net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerLoggedOutEvent event) {
+        com.antcolonies.savanna.command.RaidView.forget(event.getEntity().getUUID());
+    }
+
+    @SubscribeEvent
+    public static void onServerStopping(net.neoforged.neoforge.event.server.ServerStoppingEvent event) {
+        com.antcolonies.savanna.command.RaidView.clear();
     }
 
     /** Bone meal on a giant savanna tree's seedling or young tree grows it a day's step (M7.5 step 4, {@code Forest}). */
