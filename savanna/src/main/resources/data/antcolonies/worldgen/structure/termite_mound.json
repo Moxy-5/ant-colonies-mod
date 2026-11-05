@@ -21,7 +21,7 @@
       {"from": 20, "to": 24, "weight": 18},
       {"from": 25, "to": 32, "weight": 12}
     ],
-    "dead_stages": [15, 20, 20, 45],
+    "dead_stages": [10, 35, 35, 20],
     "hump_woods": 0.5,
     "aardvark_burrows": 0.4,
     "hump_grass": true,

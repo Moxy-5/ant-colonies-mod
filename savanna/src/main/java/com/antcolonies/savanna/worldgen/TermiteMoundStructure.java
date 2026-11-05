@@ -78,14 +78,14 @@ public class TermiteMoundStructure extends Structure {
                 Codec.DOUBLE.optionalFieldOf("dead_share", 0.33).forGetter(Numbers::deadShare),
                 Band.CODEC.listOf().optionalFieldOf("living_stages", Band.LIVING).forGetter(Numbers::livingStages),
                 Band.CODEC.listOf().optionalFieldOf("dead_sizes", Band.DEAD).forGetter(Numbers::deadSizes),
-                Codec.INT.listOf().optionalFieldOf("dead_stages", List.of(15, 20, 20, 45)).forGetter(Numbers::deadStages),
+                Codec.INT.listOf().optionalFieldOf("dead_stages", List.of(10, 35, 35, 20)).forGetter(Numbers::deadStages),
                 Codec.DOUBLE.optionalFieldOf("hump_woods", 0.5).forGetter(Numbers::humpWoods),
                 Codec.DOUBLE.optionalFieldOf("aardvark_burrows", 0.4).forGetter(Numbers::burrows),
                 Codec.BOOL.optionalFieldOf("hump_grass", true).forGetter(Numbers::humpGrass),
                 MoundPlaces.Numbers.CODEC.optionalFieldOf("places", MoundPlaces.Numbers.DEFAULT).forGetter(Numbers::places)
         ).apply(i, Numbers::new));
 
-        public static final Numbers DEFAULT = new Numbers(0.33, Band.LIVING, Band.DEAD, List.of(15, 20, 20, 45), 0.5, 0.4, true,
+        public static final Numbers DEFAULT = new Numbers(0.33, Band.LIVING, Band.DEAD, List.of(10, 35, 35, 20), 0.5, 0.4, true,
                 MoundPlaces.Numbers.DEFAULT);
     }
 

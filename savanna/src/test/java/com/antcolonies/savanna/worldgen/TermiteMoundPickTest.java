@@ -47,8 +47,8 @@ class TermiteMoundPickTest {
             assertTrue(Math.abs(living[b] / (double) alive - livingShares[b]) < 0.025, "living band " + b + " share " + living[b] / (double) alive);
             assertTrue(Math.abs(deadBands[b] / (double) dead - deadShares[b]) < 0.03, "dead band " + b + " share " + deadBands[b] / (double) dead);
         }
-        // Dead at every stage, the old humps the most (45 in 100); of them half wooded, 4 in 10 burrowed.
-        assertTrue(Math.abs(oldHumps / (double) dead - 0.45) < 0.03, "old hump share " + oldHumps / (double) dead);
+        // Dead at every stage, the old humps 20 in 100 (most still standing, worn: real dead mounds erode for years); of them half wooded, 4 in 10 burrowed.
+        assertTrue(Math.abs(oldHumps / (double) dead - 0.20) < 0.03, "old hump share " + oldHumps / (double) dead);
         assertTrue(Math.abs(wooded / (double) oldHumps - 0.5) < 0.04, "wooded share " + wooded / (double) oldHumps);
         assertTrue(Math.abs(burrowed / (double) oldHumps - 0.4) < 0.04, "burrowed share " + burrowed / (double) oldHumps);
     }
