@@ -55,6 +55,7 @@ public class MatabeleDefenceTests {
         ServerPlayer player = survivalPlayer(helper);
         ServerPlayer builder = helper.makeMockServerPlayerInLevel(); // the game's test player plays in creative
         long[] since = new long[1];
+        String[] hitAndBroken = {"not yet"}; // (BUGS 100: what the failure says)
         // BUGS 79: the player on the entrance jumps (high, now and then out of the entrance's height at the once-a-second
         // check) all the while; the ants still come out, and sting once it has stayed 3 s.
         BlockPos[] hopping = new BlockPos[1];
@@ -113,13 +114,17 @@ public class MatabeleDefenceTests {
                     ant.hurt(level.damageSources().playerAttack(player), 0.5F);
                     helper.assertTrue(defence.isProvoking(player), "hitting a Matabele did not provoke its colony");
                     // Breaking the nest brings out a wave.
-                    BlockPos broken = nestBlock(level, colony);
+                    BlockPos broken = nestBlock(level, colony, defence, numbers);
                     helper.assertTrue(broken != null, "no block of the nest to break");
                     stand(player, broken.above());
+                    String afterHit = defence.explainForTests(level);
                     helper.assertTrue(player.gameMode.destroyBlock(broken), "the player could not break " + broken.toShortString());
+                    hitAndBroken[0] = "hit " + ant.getType().toShortString() + " at " + ant.blockPosition().toShortString() + ", broke "
+                            + broken.toShortString() + "; after the hit: " + afterHit + "; after the break: " + defence.explainForTests(level);
                 })
                 .thenWaitUntil(() -> helper.assertTrue(defence.defendersOut() >= numbers.firstWave(),
-                        "only " + defence.defendersOut() + " defenders out after the nest was broken"))
+                        "only " + defence.defendersOut() + " defenders out after the nest was broken (" + hitAndBroken[0] + "; now "
+                                + defence.explainForTests(level) + ")"))
                 .thenExecute(() -> {
                     player.discard();
                     builder.discard();
@@ -127,15 +132,21 @@ public class MatabeleDefenceTests {
                 .thenSucceed();
     }
 
-    /** A block of the nest a player could break: solid, just round the entrance. */
-    private static BlockPos nestBlock(ServerLevel level, Colony colony) {
+    /**
+     * A block of the nest a player could break: solid, round the entrance, one the game counts as the nest's
+     * ({@link NestDefence#isNest}), the nearest the entrance first. (BUGS 100: the first solid block of a box round the
+     * entrance was at times its corner, 3.5 blocks off, past the nest's 3-block radius: no provocation, no wave.)
+     */
+    private static BlockPos nestBlock(ServerLevel level, Colony colony, NestDefence defence, DefenceNumbers numbers) {
         BlockPos entrance = colony.getCenter();
+        BlockPos best = null;
         for (BlockPos pos : BlockPos.betweenClosed(entrance.offset(-2, -2, -2), entrance.offset(2, 1, 2))) {
-            if (!level.getBlockState(pos).isAir() && level.getBlockState(pos).getDestroySpeed(level, pos) >= 0) {
-                return pos.immutable();
+            if (!level.getBlockState(pos).isAir() && level.getBlockState(pos).getDestroySpeed(level, pos) >= 0
+                    && defence.isNest(level, pos, numbers) && (best == null || pos.distSqr(entrance) < best.distSqr(entrance))) {
+                best = pos.immutable();
             }
         }
-        return null;
+        return best;
     }
 
     /** Where a player stands on the entrance: the ground next to the chimney's open top. */

@@ -465,6 +465,28 @@ public final class NestDefence {
         return defenders.size();
     }
 
+    /**
+     * For the game tests (BUGS 100): why nobody came out, in one line: the real members and why each may not defend, the
+     * next wave's time, the provocations and the trouble spot.
+     */
+    public String explainForTests(ServerLevel level) {
+        Map<String, Integer> why = new java.util.TreeMap<>();
+        List<AbstractAntEntity> members = members(level);
+        for (AbstractAntEntity member : members) {
+            String reason = !Caste.WORKER.equals(member.nestCaste()) ? "caste " + member.nestCaste()
+                    : member.fightsNoMore() ? "fights no more" : member.isDowned() ? "downed" : member.fightBody() == null ? "no fight body"
+                    : colony.questions().ask(member.level(), ColonyQuestions.KEEP_FROM_DEFENCE, member) ? "kept from defence"
+                    : defenders.contains(member.getUUID()) ? "defending" : "may defend";
+            why.merge(reason, 1, Integer::sum);
+        }
+        StringBuilder out = new StringBuilder(members.size() + " real members " + why + ", next wave in " + (nextWave - level.getGameTime())
+                + " ticks, trouble " + (trouble == null ? "none" : trouble.toShortString()) + ", entrance " + colony.getCenter().toShortString()
+                + ", provokers:");
+        provokers.forEach((id, provoker) -> out.append(" [at ").append(provoker.at.toShortString()).append(provoker.light ? " light" : " full")
+                .append(", ends in ").append(provoker.until == Long.MAX_VALUE ? "never" : String.valueOf(provoker.until - level.getGameTime())).append("]"));
+        return out.toString();
+    }
+
     /** For the game tests: whether this player is provoking the colony now (a light one only once the lookers may sting). */
     public boolean isProvoking(Player player) {
         Provoker provoker = provokers.get(player.getUUID());
