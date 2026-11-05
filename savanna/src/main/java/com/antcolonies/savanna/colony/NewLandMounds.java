@@ -291,20 +291,25 @@ public class NewLandMounds extends SavedData {
                 .get(MoundPlaces.STRUCTURE) instanceof TermiteMoundStructure mounds)) {
             return false;
         }
-        TermiteMoundStructure.Numbers numbers = mounds.numbers();
-        long seed = level.getSeed();
-        MoundPlaces.Land land = MoundPlaces.Land.of(level, mounds.biomes());
+        return livingPlaceNear(MoundPlaces.Land.of(level, mounds.biomes()), mounds.numbers(), center);
+    }
+
+    /**
+     * Whether new land puts a living mound whose foot lies within {@link #ANTS_NEAR_LIVING} blocks of {@code center}, by
+     * the place pattern and the ground alone (made yet or not): the half of {@link #livingMoundNear} world generation
+     * answers, also asked of land no world holds (the survey game test, BUGS 104).
+     */
+    public static boolean livingPlaceNear(MoundPlaces.Land land, TermiteMoundStructure.Numbers numbers, BlockPos center) {
+        long seed = land.seed();
+        MoundPlaces.Numbers places = numbers.places();
         int look = ANTS_NEAR_LIVING + (int) Math.ceil(MoundPlaces.footReach(TermiteMoundStructure.FULL_STAGE));
-        for (MoundPlaces.Place place : MoundPlaces.near(seed, center.getX(), center.getZ(), look, numbers.places())) {
-            if (!MoundPlaces.living(seed, place, numbers.deadShare())) {
-                continue; // (the cheap question first)
-            }
-            BlockPos foot = MoundPlaces.holds(land, place, numbers.places());
+        for (MoundPlaces.Place place : MoundPlaces.near(seed, center.getX(), center.getZ(), look, places)) {
+            BlockPos foot = MoundPlaces.holds(land, place, places);
             if (foot == null) {
                 continue;
             }
-            Pick pick = TermiteMoundStructure.pickAt(numbers, seed, place, MoundPlaces.sizeQuantile(land, place, numbers.places()));
-            if (sideways(foot, center) - MoundPlaces.footReach(pick.stage()) <= ANTS_NEAR_LIVING) {
+            Pick pick = TermiteMoundStructure.pickAt(numbers, land, place, MoundPlaces.sizeQuantile(land, place, places));
+            if (pick.living() && sideways(foot, center) - MoundPlaces.footReach(pick.stage()) <= ANTS_NEAR_LIVING) {
                 return true;
             }
         }

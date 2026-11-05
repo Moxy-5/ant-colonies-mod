@@ -25,6 +25,9 @@ import random
 CELL = 16                 # one candidate place a chunk
 TERRITORY = (21.0, 41.0)  # a place's territory (blocks): two places stand at least their two territories apart
 GROUND_CHANCE = 2 / 3     # the model's flat stand-in for the chance by the ground (flat, dry, open)
+# (BUGS 104: on Minecraft's real rolling savanna only about 1 place in 3 holds a mound, the game test
+#  deadMoundsOfRealSavannaHaveLivingTermitesInReach measures it; the game then turns a Matabele dead mound with no
+#  living mound within 70 living, so the dead share is about a quarter, from dice of 0.5)
 DEAD_SHARE = 0.33
 EMPTY_LEAN = 0.75         # next to each empty place a mound leans bigger: its size quantile's rest times this
 LIVING_BANDS = [(4, 9, 40), (10, 14, 28), (15, 19, 17), (20, 24, 10), (25, 32, 5)]
