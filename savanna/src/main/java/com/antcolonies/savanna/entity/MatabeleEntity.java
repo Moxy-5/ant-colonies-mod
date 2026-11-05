@@ -311,6 +311,26 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         if (tickCount % 20 == 0 && level() instanceof ServerLevel serverLevel) {
             hunger().tick(serverLevel);
         }
+        if ((tickCount + getId()) % HEAL_EVERY == 0 && getHealth() < getMaxHealth() && isAlive() && !isDowned()) {
+            Colony colony = getColony();
+            if (colony != null && colony.nest().isInside(level(), blockPosition())) {
+                heal(1.0F); // (resting in the nest, its wounds close slowly; wound care by nestmates is step 5)
+            }
+        }
+    }
+
+    /**
+     * M8 step 3S: below this share of its health a raider is badly wounded, leaves the fight and walks home along the
+     * trail (my pick, 40 percent: two soldier bites send a major home, one a minor). Real: hurt Matabele call for help
+     * and are carried home or limp (Frank et al. 2017); the carrying is step 5.
+     */
+    private static final float BADLY_WOUNDED = 0.4F;
+    /** In its nest it gets back 1 health this often (ticks, a minute; my pick: a major badly hurt is well in about 8). */
+    private static final int HEAL_EVERY = 1200;
+
+    @Override
+    public boolean badlyWounded() {
+        return isAlive() && getHealth() <= getMaxHealth() * BADLY_WOUNDED;
     }
 
     /** What it remembers of its own scouting (its direction, its reach; saved). */
@@ -771,12 +791,19 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
 
     /**
      * M8 step 3b, food first (the user, 2026-10-25; real raiders go for the termite workers, the prey, and fight the
-     * soldiers only when they are in the way): on a raid a termite soldier is left for later unless it is right there
-     * (within {@link #IN_THE_WAY} blocks). Off a raid (the skirmish, defending the nest) every foe ranks the same, nearest first.
+     * soldiers only when they are in the way): on a raid a minor leaves a termite soldier for later unless it is right
+     * there (within {@link #IN_THE_WAY} blocks) or clamped on a nestmate. M8 step 3S: a major takes on the soldiers as
+     * readily as the workers (real Matabele majors attack termite soldiers more than the minors do, Corbara and Dejean
+     * 2000). Off a raid (the skirmish, defending the nest) every foe ranks the same, nearest first.
      */
     @Override
     public int foeRank(LivingEntity foe) {
-        return foe instanceof TermiteSoldierEntity && foe.distanceToSqr(this) > IN_THE_WAY * IN_THE_WAY && isInAColumn() ? 1 : 0;
+        if (!(foe instanceof TermiteSoldierEntity soldier) || !isInAColumn() || hasMajorBody()
+                || foe.distanceToSqr(this) <= IN_THE_WAY * IN_THE_WAY) {
+            return 0;
+        }
+        AbstractAntEntity held = soldier.clampingOn();
+        return held != null && held.getColonyId() != null && held.getColonyId().equals(getColonyId()) ? 0 : 1;
     }
 
     /** A termite soldier this near a raider (blocks) is in its way, and fought like any termite. */

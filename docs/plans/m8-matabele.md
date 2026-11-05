@@ -383,12 +383,12 @@ timings: all "my pick, to confirm" until then).
        ... these raids and the ecosystem are already complicated enough").** No memory of costly spots: a spot is rated
        only by its termites and distance, as built, so a colony never shuns its nearest feeding spots (the user's worry:
        the next termite nest may be 100 to 150 blocks off, across water). Instead each raider that is badly hurt leaves
-       the fight and walks home along the trail (`WayHome`, as built): below a third of its health (new, my pick), 3 or
+       the fight and walks home along the trail (`WayHome`, as built): at or below 40 percent of its health (new, my pick; planned as a third), 3 or
        more legs gone or a soldier clamped on (both as built). Real: hurt Matabele call for help and are carried or limp
        home (Frank et al. 2017); the carrying is step 5. The raid as a whole never pulls back for soldiers.
      - **S6 Tests and balance.** In `soldiers` and `raids`: a soldier at a breach bites a raider walking past (S1);
        soldiers within the drumming come out and spread (S2); waves stop at the colony's tenth (S3); a major stings a
-       soldier and a minor goes for a worker (S4); a raider below a third of its health leaves the fight and gets home
+       soldier and a minor goes for a worker (S4); a raider at 30 percent of its health leaves the fight and gets home
        (S5). One whole-raid
        measure against a big termite colony, 10 runs: hurt raiders (target 1 to 5 of 20 to 50, clamped or a leg off),
        dead (0 to 2), soldiers stung (2 to 8), termites home; numbers tuned until they fall in. `soldiers,raids,away,

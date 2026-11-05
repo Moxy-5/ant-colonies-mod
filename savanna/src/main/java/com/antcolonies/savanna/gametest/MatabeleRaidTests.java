@@ -139,7 +139,8 @@ public class MatabeleRaidTests {
      * scout's scent line to them put in by hand) sends a raid: 10 real ants (the least raid; 4 an ant for each of
      * the 2 termites smelt is 8; the hungry colony could spare 15), the find's scout in front. They mill round the entrance, then walk the scent line with the scout
      * leading, stop a few blocks short of the termites and bunch up, attack together and sting the termite workers
-     * (food first: a termite soldier further off ranks below the workers), then walk home along the trail and go in;
+     * (food first: for a minor a termite soldier further off ranks below the workers; M8 step 3S: a major ranks it with
+     * them), then walk home along the trail and go in;
      * nobody is left at the termites. Step 3c: they pick the stung termites up and carry them home (no more than each
      * can hold), and every termite carried home goes onto the colony's prey pile. Raid rework R4: a block put on the
      * trail half way out breaks it; the column stops there, casts about, picks the trail up past the gap and lays new
@@ -222,11 +223,20 @@ public class MatabeleRaidTests {
                 }
             }
             if (!rankChecked[0] && raid.stage() == RaidColumn.Stage.MARCHING && !raiders.isEmpty()) {
-                MatabeleEntity raider = raiders.get(raiders.size() - 1);
-                helper.assertTrue(raider.isInAColumn(), "a raider on the march is not in a column");
-                helper.assertTrue(raider.foeRank(soldier) > raider.foeRank(termites.get(0)),
-                        "a raider ranks a termite soldier further off no lower than the workers (food first)");
-                rankChecked[0] = true;
+                // Food first for the minors; M8 step 3S: a major ranks the soldiers with the workers (Corbara and Dejean 2000).
+                for (MatabeleEntity raider : raiders) {
+                    if (!raider.isAlive() || !raider.isInAColumn()) {
+                        continue;
+                    }
+                    if (raider.hasMajorBody()) {
+                        helper.assertTrue(raider.foeRank(soldier) == raider.foeRank(termites.get(0)),
+                                "a major raider ranks a termite soldier below the workers (it should take on the soldiers too)");
+                    } else {
+                        helper.assertTrue(raider.foeRank(soldier) > raider.foeRank(termites.get(0)),
+                                "a minor raider ranks a termite soldier further off no lower than the workers (food first)");
+                    }
+                    rankChecked[0] = true;
+                }
             }
         });
         helper.startSequence()
@@ -334,7 +344,8 @@ public class MatabeleRaidTests {
     /**
      * Step 3c, the empty raid: a raid to a find where no termite is any more (the log is there, the termites gone) bunches
      * up and attacks nothing, spreads round the spot a while looking, then comes home empty; the find counts one empty
-     * check. A raider crippled on the march (3 legs gone) leaves the column and limps home along the trail by itself.
+     * check. A raider crippled on the march (3 legs gone) leaves the column and limps home along the trail by itself;
+     * M8 step 3S: so does one badly wounded (below 40 percent of its health, every leg kept).
      * The raid code review, finding 4: a survival player stands on the entrance while the raid forms: raiders milling
      * there are called away to defend the nest, stay in the column and rejoin it once the player is gone, and at the
      * spot the raid's own fight orders stand (the nest's defence never ends them).
@@ -356,6 +367,7 @@ public class MatabeleRaidTests {
         RaidColumn[] column = {null};
         Raids.Find[] find = {null};
         MatabeleEntity[] limper = {null};
+        MatabeleEntity[] wounded = {null};
         boolean[] spread = {false};
         int[] columnOrders = {0};
         net.minecraft.server.level.ServerPlayer player = MatabeleDefenceTests.survivalPlayer(helper);
@@ -415,15 +427,24 @@ public class MatabeleRaidTests {
                     RaidColumn raid = column[0];
                     for (java.util.UUID id : raid.members()) {
                         if (!id.equals(raid.leader()) && level.getEntity(id) instanceof MatabeleEntity ant && ant.isAlive()) {
-                            limper[0] = ant;
-                            break;
+                            if (limper[0] == null) {
+                                limper[0] = ant;
+                            } else {
+                                wounded[0] = ant;
+                                break;
+                            }
                         }
                     }
-                    helper.assertTrue(limper[0] != null, "no raider to cripple");
+                    helper.assertTrue(limper[0] != null && wounded[0] != null, "no two raiders to cripple and to wound");
                     limper[0].setLostLegsForTests(0b000111, 0);
+                    wounded[0].setHealth(wounded[0].getMaxHealth() * 0.3F);
+                    helper.assertTrue(wounded[0].badlyWounded() && wounded[0].fightsNoMore(), "a raider at 30 percent health should fight no more");
                 })
                 .thenWaitUntil(() -> helper.assertTrue(raids.isLimping(limper[0].getUUID()),
                         "the crippled raider was not sent limping home; " + raids.describe(level)))
+                .thenWaitUntil(() -> helper.assertTrue(!wounded[0].isAlive() || raids.isLimping(wounded[0].getUUID())
+                        || !column[0].members().contains(wounded[0].getUUID()),
+                        "the badly wounded raider was not sent home; " + raids.describe(level)))
                 .thenWaitUntil(() -> helper.assertTrue(raids.column() == null, "the raid is not home yet; " + raids.describe(level)))
                 .thenExecute(() -> {
                     RaidColumn raid = column[0];
@@ -438,11 +459,18 @@ public class MatabeleRaidTests {
                 })
                 .thenWaitUntil(() -> helper.assertTrue(!limper[0].isAlive() || !raids.isLimping(limper[0].getUUID()),
                         "the limper is still on its way home, at " + limper[0].blockPosition().toShortString()))
+                .thenWaitUntil(() -> helper.assertTrue(!wounded[0].isAlive() || !raids.isLimping(wounded[0].getUUID()),
+                        "the wounded raider is still on its way home, at " + wounded[0].blockPosition().toShortString()))
                 .thenExecute(() -> {
                     if (limper[0].isAlive()) {
                         BlockPos entrance = colony.getCenter();
                         helper.assertTrue(flat(limper[0].blockPosition(), entrance) <= 9.0 || colony.nest().isInside(level, limper[0].blockPosition()),
                                 "the limper gave up short of home, at " + limper[0].blockPosition().toShortString());
+                    }
+                    if (wounded[0].isAlive()) {
+                        BlockPos entrance = colony.getCenter();
+                        helper.assertTrue(flat(wounded[0].blockPosition(), entrance) <= 9.0 || colony.nest().isInside(level, wounded[0].blockPosition()),
+                                "the wounded raider gave up short of home, at " + wounded[0].blockPosition().toShortString());
                     }
                 })
                 .thenSucceed();

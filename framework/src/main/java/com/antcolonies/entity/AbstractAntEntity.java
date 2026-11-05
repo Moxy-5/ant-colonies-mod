@@ -904,11 +904,20 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     }
 
     /**
-     * Whether it fights no more and goes home: crippled (3 or more legs gone, M8 step 2d) or with a living foe clamped on
-     * a leg (M8 step 2c: real Matabele with a termite clinging crawl and cannot keep up).
+     * Whether it fights no more and goes home: crippled (3 or more legs gone, M8 step 2d), with a living foe clamped on
+     * a leg (M8 step 2c: real Matabele with a termite clinging crawl and cannot keep up) or badly wounded (M8 step 3S,
+     * {@link #badlyWounded}).
      */
     public boolean fightsNoMore() {
-        return isCrippled() || clamp.isLiving();
+        return isCrippled() || clamp.isLiving() || badlyWounded();
+    }
+
+    /**
+     * M8 step 3S (the user, 2026-11-05: "just retreat when badly wounded"): whether it is hurt so badly it leaves the
+     * fight and goes home. A species says when (none by default).
+     */
+    public boolean badlyWounded() {
+        return false;
     }
 
     // --- M8 step 2c, clamping (Clamp) ---

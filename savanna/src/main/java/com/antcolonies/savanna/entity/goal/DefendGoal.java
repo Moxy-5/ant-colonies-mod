@@ -6,6 +6,7 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.savanna.colony.Alarm;
 import com.antcolonies.colony.Colony;
+import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.goal.Errand;
 import com.antcolonies.fight.Fights;
 import com.antcolonies.savanna.colony.RaidDefence;
@@ -17,12 +18,18 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * A soldier answers the alarm (see {@link Alarm#taskFor}): it goes at an enemy (and bites it, if it is one it may bite:
  * for now only chickens), or it walks to a spot near the trouble (the breach, the nest cell nearest the footsteps) and
  * stands there facing it, drumming once on arrival at footsteps. When the alarm has nothing more for it, it goes back to
  * its post.
+ *
+ * <p>M8 step 3S, S1 (the user's raid test of 2026-11-05: "the majors ignore them back"): standing at its spot it is no
+ * statue. Real Macrotermes soldiers are blind and bite whatever touches them: it snaps at a foe its jaws reach and lunges
+ * at one it feels within {@link #LUNGE} blocks, never one farther than {@link Alarm#STAND_LEASH} from the place it
+ * guards, then goes back to its spot.
  */
 public class DefendGoal extends Goal {
     /** Ticks between two bites. */
@@ -37,6 +44,8 @@ public class DefendGoal extends Goal {
      * spike of 2026-11-05: ten minors chasing Matabeles they could not reach ran 64 failed 6,000-step searches a second).
      */
     private static final int NO_WAY_TICKS = 200;
+    /** S1: a standing soldier lunges at a foe it feels this near (blocks; my pick). */
+    private static final double LUNGE = 2.0;
 
     private final TermiteSoldierEntity soldier;
     @Nullable
@@ -55,6 +64,9 @@ public class DefendGoal extends Goal {
     /** The spot it drummed at on arrival (kept while drumming stops this goal, so it drums there only once). */
     @Nullable
     private BlockPos drummedAt;
+    /** S1: the foe it lunges at from its spot (looked for every few ticks), or null. */
+    @Nullable
+    private LivingEntity lungingAt;
 
     public DefendGoal(TermiteSoldierEntity soldier) {
         this.soldier = soldier;
@@ -83,6 +95,7 @@ public class DefendGoal extends Goal {
     public void start() {
         walkingTo = null;
         replan = 0;
+        lungingAt = null;
     }
 
     @Override
@@ -108,9 +121,16 @@ public class DefendGoal extends Goal {
             biteCooldown--;
         }
         if (task.enemy() != null) {
-            chase(task.enemy());
+            chase(task.enemy(), true);
         } else if (task.cell() != null) {
-            stand(task.cell(), task.facing(), task.drumOnArrival());
+            if (lungingAt == null || !lungingAt.isAlive() || (soldier.tickCount + soldier.getId()) % 4 == 0) {
+                lungingAt = foeNear(level, task);
+            }
+            if (lungingAt != null) {
+                chase(lungingAt, false);
+            } else {
+                stand(task.cell(), task.facing(), task.drumOnArrival());
+            }
         }
     }
 
@@ -137,8 +157,38 @@ public class DefendGoal extends Goal {
         return now;
     }
 
-    /** Goes at the enemy; once it touches it, it holds still facing it and bites it now and then (if it may). */
-    private void chase(LivingEntity enemy) {
+    /**
+     * S1: the nearest foe it may bite within {@link #LUNGE} blocks of it and {@link Alarm#STAND_LEASH} of the place it
+     * guards, or null.
+     */
+    @Nullable
+    private LivingEntity foeNear(ServerLevel level, Alarm.Task task) {
+        BlockPos guard = task.guard() != null ? task.guard() : task.cell();
+        Vec3 guarded = Vec3.atBottomCenterOf(guard);
+        double leash = Alarm.STAND_LEASH * Alarm.STAND_LEASH;
+        LivingEntity best = null;
+        double bestDistance = Double.MAX_VALUE;
+        for (LivingEntity foe : level.getEntitiesOfClass(LivingEntity.class, soldier.getBoundingBox().inflate(LUNGE), LivingEntity::isAlive)) {
+            if (foe == soldier || foe.position().distanceToSqr(guarded) > leash || noWay.isLeftAlone(foe.getUUID())
+                    || foe instanceof AbstractAntEntity insect && insect.isDowned()
+                    || !alarm.isEnemy(foe) || !Fights.mayAttack(soldier.profile(), foe)) {
+                continue;
+            }
+            double distance = foe.distanceToSqr(soldier);
+            if (distance < bestDistance) {
+                best = foe;
+                bestDistance = distance;
+            }
+        }
+        return best;
+    }
+
+    /**
+     * Goes at the enemy; once it touches it, it holds still facing it and bites it now and then (if it may). With no way
+     * to it, it leaves it alone a while; {@code dropTask}: and gives up its task (a chase), else it goes back to its spot
+     * (a lunge from its spot, S1).
+     */
+    private void chase(LivingEntity enemy, boolean dropTask) {
         if (reaches(enemy)) {
             soldier.getNavigator().stop();
             walkingTo = null;
@@ -156,7 +206,12 @@ public class DefendGoal extends Goal {
             // No way there (behind a seal, up a wall, on a runway's top): the soldier lets it be for a while.
             if (!soldier.getNavigator().moveTo(at, 1.2)) {
                 noWay.leaveAlone(enemy.getUUID());
-                task = null;
+                if (dropTask) {
+                    task = null;
+                } else {
+                    lungingAt = null;
+                    walkingTo = null;
+                }
             }
         }
     }
@@ -181,6 +236,7 @@ public class DefendGoal extends Goal {
             walkingTo = cell;
             if (!soldier.getNavigator().moveTo(cell, 1.2)) {
                 noWay.leaveAlone(cell);
+                alarm.noWayTo(soldier, cell); // (S2: a place round a raid's breach it cannot reach is given to nobody for a while)
                 task = null;
             }
         }

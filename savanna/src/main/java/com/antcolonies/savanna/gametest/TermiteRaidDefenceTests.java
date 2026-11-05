@@ -35,6 +35,11 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * break, behind it; the soldiers by the break are shut out; once the raiders have gone they wait by the seal; at night
  * the seal is bitten open and they are let back in.
  *
+ * <p>{@link #soldiersPourOutToARaidsBreakInWavesTakeTheirOwnPlacesAndBite} (M8 step 3S): a colony with 40 soldiers
+ * kept as numbers (30 minor, 10 major) and none real; a raider breaks into a gallery; soldiers come out of the gallery
+ * near the break in waves until a tenth of the colony's soldiers (4) have come, then no more; they take places of their
+ * own round the break (not one cell each in a line) and bite the raider standing at it; the seal waits for them.
+ *
  * <p>{@link #theDeadAreCarriedOutAndTheParalysedCarriedIn}: at night a raider's body in a tunnel and an old body of the
  * colony's own are dragged out to a hole and left there; a body left out fades; a nestmate lying paralysed is not
  * fetched while a Matabele is within 8 blocks of it, and is carried in and eaten once it has gone.
@@ -214,6 +219,82 @@ public class TermiteRaidDefenceTests {
 
     /** The colony and the tunnel the scene was made ready with (set 10 ticks in). */
     private record Scene(Colony[] colony, NestPlan.ForagingTunnel[] tunnel) {}
+
+    @GameTest(template = "arena", timeoutTicks = 3000, skyAccess = true, batch = "termite_raid_waves")
+    public static void soldiersPourOutToARaidsBreakInWavesTakeTheirOwnPlacesAndBite(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        Scene scene = scene(helper, 12.0);
+        @SuppressWarnings("unchecked")
+        java.util.function.Supplier<String>[] failAt = new java.util.function.Supplier[1];
+        Runnable[] each = new Runnable[1];
+        helper.onEachTick(() -> {
+            if (each[0] != null) {
+                each[0].run();
+            }
+        });
+        helper.runAfterDelay(15, () -> {
+            Colony colony = scene.colony[0];
+            List<BlockPos> cells = scene.tunnel[0].tunnel();
+            int at = cells.size() - 2;
+            helper.assertTrue(at - PLUG_BACK - 1 >= 1, "the foraging tunnel is too short for the test: " + cells.size() + " cells");
+            BlockPos breakAt = cells.get(at);
+            BlockPos plug = cells.get(at - PLUG_BACK);
+            colony.population().addNewMembers(TermiteSoldierEntity.Rank.MINOR.caste(), level.getGameTime(), 30);
+            colony.population().addNewMembers(TermiteSoldierEntity.Rank.MAJOR.caste(), level.getGameTime(), 10);
+            MatabeleEntity raider = raider(level, breakAt);
+            Alarm alarm = colony.part(SavannaParts.ALARM).orElseThrow();
+            RaidDefence raid = colony.part(SavannaParts.RAID_DEFENCE).orElseThrow();
+            long tellAt = helper.getTick() + 10;
+            boolean[] told = {false};
+            boolean[] bitten = {false};
+            int[] mostPlaces = {0};
+            int[] wavesAtSeal = {-1};
+            long[] sealedAt = {-1};
+            each[0] = () -> {
+                long tick = helper.getTick();
+                if (!told[0]) {
+                    if (tick < tellAt) {
+                        return;
+                    }
+                    told[0] = true;
+                    colony.news().tell(level, ColonyNews.BROKEN_OPEN, new ColonyNews.BrokenOpen(breakAt, raider));
+                    helper.assertTrue(alarm.waveTarget() == 4, "a tenth of 40 soldiers (4) should come, not " + alarm.waveTarget());
+                }
+                if (raider.isAlive()) {
+                    if (raider.getHealth() < raider.getMaxHealth()) {
+                        bitten[0] = true;
+                    }
+                    raider.setHealth(raider.getMaxHealth()); // (it stays at the break)
+                }
+                int waves = alarm.cameInWaves(TermiteSoldierEntity.Rank.MINOR) + alarm.cameInWaves(TermiteSoldierEntity.Rank.MAJOR);
+                helper.assertTrue(waves <= 4, waves + " soldiers came in waves, more than the colony's tenth (4)");
+                int places = 0;
+                for (TermiteSoldierEntity soldier : level.getEntitiesOfClass(TermiteSoldierEntity.class, helper.getBounds())) {
+                    if (alarm.holdsPlace(soldier.getUUID())) {
+                        places++;
+                    }
+                }
+                mostPlaces[0] = Math.max(mostPlaces[0], places);
+                if (sealedAt[0] < 0 && level.getBlockState(plug).is(colony.profile().nest().plugState().getBlock())) {
+                    sealedAt[0] = tick;
+                    wavesAtSeal[0] = waves;
+                }
+                if (sealedAt[0] >= 0 && bitten[0] && waves >= 2 && mostPlaces[0] >= 2) {
+                    helper.assertTrue(wavesAtSeal[0] >= 2 || sealedAt[0] - tellAt >= 600,
+                            "the seal was packed at " + (sealedAt[0] - tellAt) + " ticks with only " + wavesAtSeal[0] + " soldiers come in waves");
+                    SavannaMod.LOGGER.info("[raid-waves-test] {} minor and {} major came in waves, {} held places, sealed after {} ticks with {} come",
+                            alarm.cameInWaves(TermiteSoldierEntity.Rank.MINOR), alarm.cameInWaves(TermiteSoldierEntity.Rank.MAJOR), mostPlaces[0],
+                            sealedAt[0] - tellAt, wavesAtSeal[0]);
+                    helper.succeed();
+                }
+            };
+            failAt[0] = () -> "bitten " + bitten[0] + ", came in waves " + alarm.cameInWaves(TermiteSoldierEntity.Rank.MINOR) + " minor "
+                    + alarm.cameInWaves(TermiteSoldierEntity.Rank.MAJOR) + " major, most holding places " + mostPlaces[0] + ", sealed at "
+                    + sealedAt[0] + " with " + wavesAtSeal[0] + "; wave cells " + raid.waveCells(level, breakAt).size() + ", break "
+                    + breakAt.toShortString() + ", plug " + plug.toShortString() + alarm.describe(level) + raid.describe(level);
+        });
+        helper.runAtTickTime(2990, () -> helper.fail(failAt[0] == null ? "the scene never got ready" : failAt[0].get()));
+    }
 
     /**
      * A queen and six old workers (builders, who carry the dead); at tick 10 the clock is still at {@code hour}, the

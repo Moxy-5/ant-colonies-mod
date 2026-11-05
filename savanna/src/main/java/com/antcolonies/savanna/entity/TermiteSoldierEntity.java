@@ -62,6 +62,19 @@ import software.bernie.geckolib.animation.RawAnimation;
  * They do not fit the termite tunnel blocks (only workers do).
  */
 public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurses, ColonyBorn {
+
+    /**
+     * M8 step 3S: a soldier holding a place at a raid's breach stands out in the open jaws first, in the gallery mouth
+     * or round it, to be fought: not sheltered in its nest even where that place is a nest cell.
+     */
+    @Override
+    public boolean isSheltered() {
+        Colony colony = getColony();
+        if (colony != null && colony.part(SavannaParts.ALARM).map(alarm -> alarm.holdsPlace(getUUID())).orElse(false)) {
+            return false;
+        }
+        return super.isSheltered();
+    }
     /** The two kinds of soldier. Each is counted in the colony under its own caste name. */
     public enum Rank {
         MINOR("minor_soldier"), MAJOR("major_soldier");

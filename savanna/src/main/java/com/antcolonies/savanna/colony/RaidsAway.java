@@ -12,6 +12,7 @@ import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.FoodWays;
 import com.antcolonies.savanna.SavannaSpecies;
+import com.antcolonies.savanna.entity.TermiteSoldierEntity;
 import com.antcolonies.savanna.registry.SavannaEntities;
 import com.antcolonies.savanna.species.SavannaNumbers;
 
@@ -239,6 +240,7 @@ public final class RaidsAway {
         out.attacked = true;
         Colony termites = out.termites == null ? null : ColonyManager.get(level).getColony(out.termites);
         Raids.Find find = raids.findAt(out.at);
+        int answering = 0; // (M8 step 3S: the termite soldiers that come to the break, as near)
         if (termites == null || termites.keepsOff(level, out.at)) {
             raids.diary(level, "out of sight: the raid reached " + out.at.toShortString() + " and found nothing to sting");
             if (find != null) {
@@ -249,6 +251,14 @@ public final class RaidsAway {
             int most = (int) Math.floor(termites.population().inside(Caste.WORKER) * numbers.mostTakeShare());
             int taken = termites.population().loseInside(level, Caste.WORKER, Math.min(wanted, most), AwayReport.What.TAKEN_BY_RAIDERS);
             out.caught += taken;
+            // M8 step 3S, as near: a tenth of the termite colony's soldiers (1 to 12) comes to the break; the majors sting
+            // about half of them and carry them home with the workers (my picks)
+            int soldiers = termites.getCount(TermiteSoldierEntity.Rank.MINOR.caste()) + termites.getCount(TermiteSoldierEntity.Rank.MAJOR.caste());
+            answering = soldiers <= 0 ? 0 : Math.max(1, Math.min(Alarm.MOST_IN_WAVES, (int) Math.round(soldiers * 0.1)));
+            int stung = count(random, answering, STUNG_SOLDIER_SHARE);
+            int stungMinors = termites.population().loseInside(level, TermiteSoldierEntity.Rank.MINOR.caste(), stung, AwayReport.What.TAKEN_BY_RAIDERS);
+            out.caught += stungMinors + termites.population().loseInside(level, TermiteSoldierEntity.Rank.MAJOR.caste(), stung - stungMinors,
+                    AwayReport.What.TAKEN_BY_RAIDERS);
             // the termites remember the attack: they keep off the spot a few days and plug the holes there (brain step 4g)
             termites.danger().hurt(level, out.at, SavannaEntities.MATABELE_MAJOR.get().toShortString(), true);
             if (find != null) {
@@ -260,10 +270,11 @@ public final class RaidsAway {
             }
             raids.diary(level, "out of sight: the raid attacks at " + out.at.toShortString() + ": " + taken + " termite(s) stung and taken (of "
                     + wanted + " the raiders could carry; the termite colony had " + (termites.population().inside(Caste.WORKER) + taken)
-                    + " workers inside, at most " + most + " to take)");
+                    + " workers inside, at most " + most + " to take; " + answering + " soldier(s) came to the break)");
         }
-        out.lost = count(random, out.raiders, numbers.lostShare());
-        out.hurt = count(random, out.raiders - out.lost, numbers.hurtShare());
+        // M8 step 3S: each soldier that came may kill a raider or send one home hurt, on top of the raid's own losses
+        out.lost = Math.min(out.raiders, count(random, out.raiders, numbers.lostShare()) + count(random, answering, SOLDIER_KILLS));
+        out.hurt = Math.min(out.raiders - out.lost, count(random, out.raiders - out.lost, numbers.hurtShare()) + count(random, answering, SOLDIER_HURTS));
         ColonyManager.get(level).markChanged();
     }
 
@@ -283,6 +294,15 @@ public final class RaidsAway {
     }
 
     /** How many of {@code of} by a chance {@code share} each (a coin per ant, at most 2,500 ants). */
+    /**
+     * M8 step 3S out of sight (my picks, to the balance targets of {@code docs/DESIGN.md}, "Step 3S": of a raid, 0 to 2
+     * dead and 1 to 5 hurt, 2 to 8 soldiers stung): the share of the soldiers at the break that each kill a raider, send
+     * one home hurt, are stung and carried home.
+     */
+    private static final double SOLDIER_KILLS = 0.12;
+    private static final double SOLDIER_HURTS = 0.3;
+    private static final double STUNG_SOLDIER_SHARE = 0.5;
+
     private static int count(RandomSource random, int of, double share) {
         int hit = 0;
         for (int i = 0; i < of; i++) {

@@ -463,7 +463,7 @@ public class Population {
                 if (rooms == null) {
                     rooms = hiddenRoomCells(level, eyes);
                 }
-                if (rooms.isEmpty() || !comeOut(level, caste, rooms.get(colony.random().nextInt(rooms.size())))) {
+                if (rooms.isEmpty() || comeOut(level, caste, rooms.get(colony.random().nextInt(rooms.size()))) == null) {
                     break;
                 }
                 have++;
@@ -549,16 +549,35 @@ public class Population {
         return cells;
     }
 
-    /** One of this caste comes out of the numbers as a real mob in this cell. False if it could not be made. */
-    private boolean comeOut(ServerLevel level, String caste, BlockPos cell) {
+    /**
+     * One of this caste comes out of the numbers as a real mob in this cell, called by a species' part (a termite
+     * colony's soldiers coming out of the galleries at a raid's break in waves, M8 step 3S). The caller picks the cell
+     * (in the colony's own galleries or rooms) and keeps the real mob wanted (or it goes back into the numbers when
+     * out of sight). Null if none of the caste is inside or it could not be made.
+     */
+    @Nullable
+    public AbstractAntEntity comeOutAt(ServerLevel level, String caste, BlockPos cell) {
+        if (inside(caste) <= 0) {
+            return null;
+        }
+        AbstractAntEntity mob = comeOut(level, caste, cell);
+        if (mob != null) {
+            ColonyManager.get(level).markChanged();
+        }
+        return mob;
+    }
+
+    /** One of this caste comes out of the numbers as a real mob in this cell. Null if it could not be made. */
+    @Nullable
+    private AbstractAntEntity comeOut(ServerLevel level, String caste, BlockPos cell) {
         Long minute = pickAge(level, caste);
         EntityType<? extends AbstractAntEntity> type = typeFor(caste);
         if (minute == null || type == null) {
-            return false;
+            return null;
         }
         AbstractAntEntity mob = type.create(level);
         if (mob == null) {
-            return false;
+            return null;
         }
         mob.moveTo(cell.getX() + 0.5, cell.getY(), cell.getZ() + 0.5, colony.random().nextFloat() * 360.0F, 0.0F);
         // Somewhere in the minute it grew up, so the ones of the same minute are not all exactly the same age.
@@ -571,7 +590,7 @@ public class Population {
         if (Caste.WORKER.equals(caste) && mob.mayDo(ColonyRole.FORAGER)) {
             colony.news().tell(level, ColonyNews.OUT_OF_NUMBERS, new ColonyNews.OutOfNumbers(mob.getUUID())); // (a forager takes a spot from the numbers' pool)
         }
-        return true;
+        return mob;
 
     }
 

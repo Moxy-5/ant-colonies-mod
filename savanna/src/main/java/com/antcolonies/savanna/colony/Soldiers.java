@@ -31,6 +31,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
 
 /**
  * The colony's soldiers (species with {@code soldiers} in their profile: termites). How many it wants (about 1 in 10
@@ -148,9 +149,14 @@ public class Soldiers {
         return soldiers.toString();
     }
 
-    /** This colony's soldiers around the nest (loaded and alive). */
+    /**
+     * This colony's soldiers around the nest and out along its galleries (loaded and alive): the nest's area, or the
+     * foraging reach plus 16 if wider (M8 step 3S: a raid's break at a feeding spot 40 or more blocks out is the
+     * soldiers' fight too, and the nest's area alone did not reach it).
+     */
     public List<TermiteSoldierEntity> getSoldiers(Level level) {
-        return level.getEntitiesOfClass(TermiteSoldierEntity.class, colony.nestArea(),
+        AABB area = colony.nestArea().minmax(new AABB(colony.getCenter()).inflate(colony.foragingRadius() + 16, 16, colony.foragingRadius() + 16));
+        return level.getEntitiesOfClass(TermiteSoldierEntity.class, area,
                 soldier -> soldier.isAlive() && colony.getId().equals(soldier.getColonyId()));
     }
 
@@ -451,11 +457,16 @@ public class Soldiers {
         }
         int soldiers = 0;
         int alarm = colony.part(SavannaParts.ALARM).map(part -> part.level(level)).orElse(0);
-        int soldierCap = cap / 4;
+        Alarm alarmPart = colony.part(SavannaParts.ALARM).orElse(null);
+        int waves = alarmPart == null || alarm < 3 ? 0 : alarmPart.cameInWaves(Rank.MINOR) + alarmPart.cameInWaves(Rank.MAJOR);
+        int soldierCap = cap / 4 + waves; // (3S: the ones that came to a raid's break in waves stay real; the workers hide)
         for (Rank rank : Rank.values()) {
             int posts = posts(level, rank).size();
             if (rank == Rank.MINOR && alarm >= 3) {
                 posts += BREACH_MINORS;
+            }
+            if (alarmPart != null && alarm >= 3) {
+                posts += alarmPart.cameInWaves(rank);
             }
             // (no more than the colony has, so the workers get the rest of the cap)
             int want = watched || alarm >= 2 ? Math.min(Math.min(posts, colony.getCount(rank.caste())), soldierCap - soldiers) : 0;

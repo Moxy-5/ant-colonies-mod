@@ -52,12 +52,35 @@ import net.minecraft.world.phys.AABB;
  * <li><b>Repeated break-ins</b> ({@code break_ins_for_level_4} within {@code break_in_window_ticks}): as 3, and everybody
  * stays in for a whole day; the colony wants more soldiers for a while ({@code soldier_boost}, {@code boost_ticks}).</li>
  * </ol>
- * Saved: the level, when it was last raised, the soldier boost. Not saved: where the trouble is, who heard it.
+ * <p>M8 step 3S (the user's raid test of 2026-11-05, "the major soldiers stand guard in a line and don't swarm"): at a
+ * raid's break into a feeding gallery ({@link #raidBreakIn}) every soldier the drumming reaches comes, majors too,
+ * leaving its post; a major holds the gallery mouth and the rest spread round the opening facing out, each in a place of
+ * its own ({@link #raidTasks}), and bite the raiders that come near (S1, {@code DefendGoal}). The colony's soldiers kept
+ * as numbers in the galleries pour out at the break in waves ({@link #sendWave}), minors first, until a tenth of the
+ * colony's soldiers have come (at least 1, at most {@link #MOST_IN_WAVES}: the user's pick, "waves, up to about 12");
+ * real Macrotermes soldiers are drawn along the galleries to where the drumming comes from (Hager and Kirchner 2013).
+ *
+ * Saved: the level, when it was last raised, the soldier boost. Not saved: where the trouble is, who heard it, the
+ * places and waves of a raid.
  */
 public class Alarm {
-    /** What a soldier is to do about the alarm: go at an enemy, or stand in a cell facing the trouble. */
-    public record Task(@Nullable LivingEntity enemy, @Nullable BlockPos cell, BlockPos facing, boolean drumOnArrival) {
+    /**
+     * What a soldier is to do about the alarm: go at an enemy, or stand in a cell facing the trouble. {@code guard}: the
+     * place it guards (M8 step 3S, S1): standing, it snaps at a foe touching it and lunges at one it feels near, but
+     * never one farther than {@link #STAND_LEASH} blocks from this place (its own cell, unless said).
+     */
+    public record Task(@Nullable LivingEntity enemy, @Nullable BlockPos cell, BlockPos facing, boolean drumOnArrival, @Nullable BlockPos guard) {
+        public Task(@Nullable LivingEntity enemy, @Nullable BlockPos cell, BlockPos facing, boolean drumOnArrival) {
+            this(enemy, cell, facing, drumOnArrival, cell);
+        }
     }
+
+    /**
+     * M8 step 3S, S1: a soldier standing at the trouble lunges only at a foe within this many blocks of the place it
+     * guards (the breach): blind soldiers defend the opening, they do not hunt (my pick; the chase at the foragers keeps
+     * its 16).
+     */
+    public static final double STAND_LEASH = 4.0;
 
     /** How long (ticks) a soldier drums when it feels the alarm, before it acts. */
     public static final int DRUM_ON_HEARING = 24;
@@ -83,8 +106,22 @@ public class Alarm {
     /** Within this many blocks of the entrance (sideways) a player counts as on the mound, even without mound blocks. */
     private static final int ON_MOUND_RADIUS = 3;
 
-    private record Heard(BlockPos at, long time) {
+    private record Heard(BlockPos at, long time, Rank rank) {
     }
+
+    /** S3: the share of the colony's soldiers that come to a raid's break (a tenth), and the most (the user's pick). */
+    private static final double WAVE_SHARE = 0.1;
+    public static final int MOST_IN_WAVES = 12;
+    /** S3: ticks between two waves (5 s), the first this long after the break (2 s), and how many a wave (2 or 3); my picks. */
+    private static final int WAVE_EVERY = 100;
+    private static final int FIRST_WAVE = 40;
+    private static final int WAVE_LEAST = 2;
+    private static final int WAVE_MOST = 3;
+    /** S2: how far (blocks, sideways) round a raid's breach the soldiers' places are, and up or down. */
+    private static final int RING = 3;
+    private static final int RING_HEIGHT = 2;
+    /** S2: a place round the breach a soldier found no way to is given to nobody this long (ticks). */
+    private static final int BAD_PLACE_TICKS = 200;
 
     private final Colony colony;
     private int level;
@@ -118,6 +155,18 @@ public class Alarm {
     @Nullable
     private BlockPos spotsFor;
     private long spotsAt = Long.MIN_VALUE;
+    /** S2: each soldier's place round a raid's breach (kept, so one coming or going moves nobody), and places no way to. */
+    private final Map<UUID, BlockPos> places = new HashMap<>();
+    private final Map<BlockPos, Long> badPlaces = new HashMap<>();
+    /** S2: the places round the breach, kept for a second. */
+    private List<BlockPos> ring = List.of();
+    @Nullable
+    private BlockPos ringFor;
+    private long ringAt = Long.MIN_VALUE;
+    /** S3: how many soldiers come to this raid's break in all (-1: no raid), when the next wave comes, and who came by wave. */
+    private int waveTarget = -1;
+    private long nextWaveAt;
+    private final Map<Rank, Integer> cameInWaves = new HashMap<>();
 
     Alarm(Colony colony) {
         this.colony = colony;
@@ -142,6 +191,9 @@ public class Alarm {
         while (level > 0 && now - raisedAt >= numbers.calmTicksFor(level)) {
             raisedAt += numbers.calmTicksFor(level);
             level--;
+            if (level < 3) {
+                endRaidWave();
+            }
             if (level < 2) {
                 heard.clear();
                 enemy = null;
@@ -199,6 +251,7 @@ public class Alarm {
         level = to;
         heard.clear();
         lookers.clear();
+        places.clear();
         waveStart = time;
         List<TermiteSoldierEntity> soldiers = new ArrayList<>(colony.part(SavannaParts.SOLDIERS).map(part -> part.getSoldiers(world)).orElse(List.of()));
         soldiers.sort(Comparator.comparingDouble(soldier -> soldier.blockPosition().distSqr(at)));
@@ -256,6 +309,7 @@ public class Alarm {
         }
         if (level(world) < 3) {
             waveReach = reach;
+            startRaidWave(world);
         }
         raise(world, 3, pos, raider);
         long time = world.getGameTime();
@@ -325,6 +379,7 @@ public class Alarm {
         }
         tickedAt = now;
         level(world);
+        sendWave(world, now);
         BlockPos center = colony.getCenter();
         for (Player player : world.getEntitiesOfClass(Player.class, new AABB(center).inflate(16, 12, 16),
                 player -> player.isSprinting() && player.onGround())) {
@@ -389,7 +444,7 @@ public class Alarm {
 
     /** The soldier feels the alarm: it drums for a moment (the others round it feel that in turn), then acts. */
     private void hear(TermiteSoldierEntity soldier, long time) {
-        heard.put(soldier.getUUID(), new Heard(soldier.blockPosition(), time));
+        heard.put(soldier.getUUID(), new Heard(soldier.blockPosition(), time, soldier.getRank()));
         soldier.drum(DRUM_ON_HEARING);
         tasksAt = Long.MIN_VALUE;
     }
@@ -483,6 +538,9 @@ public class Alarm {
             }
             return out;
         }
+        if (waveReach > 0) {
+            return raidTasks(world, soldiers); // a raid's break into a feeding gallery (M8 step 3S)
+        }
         // A break-in: the minors to the breach and the nest cells nearest it, the majors behind them.
         List<BlockPos> cells = spotsNear(world, spot);
         int next = 0;
@@ -494,6 +552,209 @@ public class Alarm {
             }
         }
         return out;
+    }
+
+    // --- M8 step 3S: a raid's break, the places round it and the waves ------------------------------------------
+
+    /**
+     * S2: every soldier that heard the drumming comes to the breach, majors too: the nearest major (else the nearest
+     * minor) holds the gallery mouth itself, the others take the places round the opening (nearest the breach first,
+     * minors before majors, the ones nearer coming first), facing out, each keeping its own place; any past the places
+     * stand at the nest cells nearest the breach. Every one guards the breach (S1: bites raiders within the leash of it).
+     */
+    private Map<UUID, Task> raidTasks(ServerLevel world, List<TermiteSoldierEntity> soldiers) {
+        long time = world.getGameTime();
+        badPlaces.values().removeIf(until -> until <= time || until > time + BAD_PLACE_TICKS);
+        List<BlockPos> cells = ringNear(world, spot);
+        List<TermiteSoldierEntity> answering = new ArrayList<>();
+        for (TermiteSoldierEntity soldier : soldiers) {
+            if (heard.containsKey(soldier.getUUID())) {
+                answering.add(soldier);
+            }
+        }
+        Set<UUID> ids = new HashSet<>();
+        answering.forEach(soldier -> ids.add(soldier.getUUID()));
+        places.keySet().retainAll(ids);
+        places.values().removeIf(cell -> !cells.contains(cell) || badPlaces.containsKey(cell));
+        Set<BlockPos> taken = new HashSet<>(places.values());
+        BlockPos mouth = !cells.isEmpty() && cells.get(0).equals(spot) ? spot : null;
+        if (mouth != null && !taken.contains(mouth) && !badPlaces.containsKey(mouth)) {
+            TermiteSoldierEntity holder = null;
+            for (TermiteSoldierEntity soldier : answering) {
+                if (!places.containsKey(soldier.getUUID()) && (holder == null || holder.getRank() != Rank.MAJOR && soldier.getRank() == Rank.MAJOR)) {
+                    holder = soldier; // (the nearest major; the nearest minor if no major is free)
+                }
+            }
+            if (holder != null) {
+                places.put(holder.getUUID(), mouth);
+                taken.add(mouth);
+            }
+        }
+        List<BlockPos> behind = null;
+        int next = 0;
+        Map<UUID, Task> out = new HashMap<>();
+        for (Rank rank : new Rank[] {Rank.MINOR, Rank.MAJOR}) {
+            for (TermiteSoldierEntity soldier : answering) {
+                if (soldier.getRank() != rank) {
+                    continue;
+                }
+                BlockPos place = places.get(soldier.getUUID());
+                if (place == null) {
+                    for (BlockPos cell : cells) {
+                        if (!taken.contains(cell) && !badPlaces.containsKey(cell)) {
+                            place = cell;
+                            places.put(soldier.getUUID(), cell);
+                            taken.add(cell);
+                            break;
+                        }
+                    }
+                }
+                if (place != null) {
+                    BlockPos facing = place.equals(spot) ? spot : place.offset(place.getX() - spot.getX(), 0, place.getZ() - spot.getZ());
+                    out.put(soldier.getUUID(), new Task(null, place, facing, false, spot));
+                    continue;
+                }
+                if (behind == null) {
+                    behind = spotsNear(world, spot);
+                }
+                if (next < behind.size()) {
+                    out.put(soldier.getUUID(), new Task(null, behind.get(next++), spot, false, spot));
+                }
+            }
+        }
+        return out;
+    }
+
+    /**
+     * S2: the places round a raid's breach, nearest it first: the breach itself if one can stand in it (the gallery
+     * mouth), then the open cells with a floor within {@link #RING} blocks sideways and {@link #RING_HEIGHT} up or down
+     * that open into the breach (outside through the broken cover, or along the gallery; never the ground over a
+     * gallery still roofed, which no soldier could reach). Kept for a second.
+     */
+    private List<BlockPos> ringNear(Level world, BlockPos at) {
+        long now = world.getGameTime();
+        if (!at.equals(ringFor) || ringAt == Long.MIN_VALUE || now - ringAt >= 20 || now < ringAt) {
+            List<BlockPos> cells = new ArrayList<>();
+            double most = (RING + 0.5) * (RING + 0.5);
+            java.util.ArrayDeque<BlockPos> open = new java.util.ArrayDeque<>();
+            Set<BlockPos> seen = new HashSet<>();
+            seen.add(at.immutable());
+            if (passable(world, at)) {
+                open.add(at.immutable());
+            } else {
+                for (Direction side : Direction.values()) {
+                    BlockPos next = at.relative(side);
+                    if (passable(world, next) && seen.add(next)) {
+                        open.add(next);
+                    }
+                }
+            }
+            while (!open.isEmpty()) {
+                BlockPos cell = open.poll();
+                if (!cell.equals(at) && standable(world, cell)) {
+                    cells.add(cell);
+                }
+                for (Direction side : Direction.values()) {
+                    BlockPos next = cell.relative(side);
+                    if (Math.abs(next.getY() - at.getY()) <= RING_HEIGHT && next.distSqr(at) <= most && passable(world, next) && seen.add(next)) {
+                        open.add(next);
+                    }
+                }
+            }
+            cells.sort(Comparator.comparingDouble((BlockPos cell) -> cell.distSqr(at)).thenComparingLong(BlockPos::asLong));
+            if (standable(world, at)) {
+                cells.add(0, at.immutable());
+            }
+            ring = List.copyOf(cells);
+            ringFor = at.immutable();
+            ringAt = now;
+        }
+        return ring;
+    }
+
+    /** S2: this soldier found no way to its place round the breach: nobody is given it for a while. */
+    public void noWayTo(TermiteSoldierEntity soldier, BlockPos cell) {
+        if (cell.equals(places.get(soldier.getUUID()))) {
+            places.remove(soldier.getUUID());
+            badPlaces.put(cell.immutable(), soldier.level().getGameTime() + BAD_PLACE_TICKS);
+            tasksAt = Long.MIN_VALUE;
+        }
+    }
+
+    /** S2: whether this soldier holds a place at a raid's breach now (it stands out to fight there, not sheltered). */
+    public boolean holdsPlace(UUID soldier) {
+        return places.containsKey(soldier);
+    }
+
+    /** S3: a raid broke in and the alarm was calm or lower: how many soldiers come to it (a tenth, 1 to 12). */
+    private void startRaidWave(ServerLevel world) {
+        int soldiers = colony.getCount(Rank.MINOR.caste()) + colony.getCount(Rank.MAJOR.caste());
+        waveTarget = soldiers <= 0 ? 0 : Math.max(1, Math.min(MOST_IN_WAVES, (int) Math.round(soldiers * WAVE_SHARE)));
+        nextWaveAt = world.getGameTime() + FIRST_WAVE;
+        cameInWaves.clear();
+    }
+
+    /** The raid's break is over (the alarm dropped below 3): no more waves, no places. */
+    private void endRaidWave() {
+        waveTarget = -1;
+        cameInWaves.clear();
+        places.clear();
+        badPlaces.clear();
+        waveReach = 0;
+    }
+
+    /**
+     * S3, once a second: while a raid's break is up and fewer soldiers than its share have come, every
+     * {@link #WAVE_EVERY} ticks 2 or 3 more come out of the numbers in the gallery near the break (minors until a quarter
+     * of the share is left for majors, my pick: 3 minors to a major, as the colony raises them), and answer at once.
+     */
+    private void sendWave(ServerLevel world, long now) {
+        if (waveTarget <= 0 || spot == null || level < 3 || waveReach <= 0 || now < nextWaveAt) {
+            return;
+        }
+        nextWaveAt = now + WAVE_EVERY;
+        int missing = waveTarget - heard.size();
+        if (missing <= 0) {
+            return;
+        }
+        List<BlockPos> cells = colony.part(SavannaParts.RAID_DEFENCE).map(raid -> raid.waveCells(world, spot)).orElse(List.of());
+        if (cells.isEmpty()) {
+            return; // nowhere in the galleries near the break to come out from (or the seal is packed)
+        }
+        int majorsWanted = waveTarget / 4;
+        int wave = Math.min(missing, WAVE_LEAST + colony.random().nextInt(WAVE_MOST - WAVE_LEAST + 1));
+        for (int i = 0; i < wave; i++) {
+            int majors = (int) heard.values().stream().filter(h -> h.rank() == Rank.MAJOR).count();
+            int minors = heard.size() - majors;
+            Rank rank = minors < waveTarget - majorsWanted ? Rank.MINOR : Rank.MAJOR;
+            if (colony.population().inside(rank.caste()) <= 0) {
+                rank = rank == Rank.MINOR ? Rank.MAJOR : Rank.MINOR; // (none of that kind left in the numbers)
+            }
+            if (colony.population().inside(rank.caste()) <= 0) {
+                return;
+            }
+            BlockPos cell = cells.get(i % cells.size());
+            if (colony.population().comeOutAt(world, rank.caste(), cell) instanceof TermiteSoldierEntity soldier) {
+                heard.put(soldier.getUUID(), new Heard(cell, now, rank)); // (it comes running: it heard the drumming on its way)
+                cameInWaves.merge(rank, 1, Integer::sum);
+                tasksAt = Long.MIN_VALUE;
+            }
+        }
+    }
+
+    /** S3: how many soldiers of this kind came out of the numbers in waves at the raid's break now (kept real). */
+    public int cameInWaves(Rank rank) {
+        return cameInWaves.getOrDefault(rank, 0);
+    }
+
+    /** S3: whether more soldiers are still to come to a raid's break (the seal waits for them, as real workers do). */
+    public boolean wavesComing(Level world) {
+        return waveTarget > 0 && level(world) >= 3 && waveReach > 0 && heard.size() < waveTarget;
+    }
+
+    /** S3: how many soldiers come to this raid's break in all, or -1 (no raid's break). For the list and tests. */
+    public int waveTarget() {
+        return waveTarget;
     }
 
     /**
@@ -526,7 +787,13 @@ public class Alarm {
         return cells;
     }
 
-    private static boolean standable(Level world, BlockPos cell) {
+    /** Open to walk through: loaded, nothing solid, no water (S2's ring round a breach). */
+    private static boolean passable(Level world, BlockPos cell) {
+        return world.isLoaded(cell) && world.getBlockState(cell).getCollisionShape(world, cell).isEmpty()
+                && world.getBlockState(cell).getFluidState().isEmpty();
+    }
+
+    static boolean standable(Level world, BlockPos cell) {
         BlockPos floor = cell.below();
         return world.isLoaded(cell) && world.getBlockState(cell).getCollisionShape(world, cell).isEmpty()
                 && world.getBlockState(cell).getFluidState().isEmpty() && world.getBlockState(floor).isFaceSturdy(world, floor, Direction.UP);
@@ -559,8 +826,9 @@ public class Alarm {
             case 3 -> "break-in";
             default -> "repeated break-ins, everyone stays in";
         };
+        String waves = waveTarget > 0 ? ", " + waveTarget + " to come to the raid" : "";
         return " | alarm " + now + " (" + what + (spot != null ? " at " + spot.toShortString() : "") + ", " + heard.size()
-                + " soldiers alarmed)" + boost;
+                + " soldiers alarmed" + waves + ")" + boost;
     }
 
     /** Tests only: a sample in every saved number (the save and load check, {@code AwayKit.everyPartSavesAndLoads}). */
@@ -595,6 +863,7 @@ public class Alarm {
         breakIns.clear();
         boostUntil = Colony.NOT_SET;
         tasksAt = Long.MIN_VALUE;
+        endRaidWave();
     }
 
     /** The soldiers that have felt the current alarm (for tests). */

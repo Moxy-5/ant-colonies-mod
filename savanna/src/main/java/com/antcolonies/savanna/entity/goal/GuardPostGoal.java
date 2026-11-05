@@ -1,6 +1,8 @@
 package com.antcolonies.savanna.entity.goal;
 
+import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.goal.Errand;
+import com.antcolonies.fight.Fights;
 import java.util.EnumSet;
 
 import org.jetbrains.annotations.Nullable;
@@ -13,6 +15,7 @@ import com.antcolonies.savanna.entity.TermiteSoldierEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
 
 /**
@@ -31,6 +34,8 @@ public class GuardPostGoal extends Goal {
     private static final int MAX_TRIES = 3;
     /** How fast (degrees a tick) it turns to face out once it stands at its post. */
     private static final float TURN = 12.0F;
+    /** M8 step 3S, S1: ticks between two bites at a foe touching it at its post. */
+    private static final int BITE_INTERVAL = 20;
 
     private final TermiteSoldierEntity soldier;
     @Nullable
@@ -46,6 +51,7 @@ public class GuardPostGoal extends Goal {
     private int repath;
     private int tries;
     private boolean lost;
+    private int biteCooldown;
 
     public GuardPostGoal(TermiteSoldierEntity soldier) {
         this.soldier = soldier;
@@ -112,9 +118,19 @@ public class GuardPostGoal extends Goal {
             lost = true;
             return;
         }
+        if (biteCooldown > 0) {
+            biteCooldown--;
+        }
         if (atPost()) {
             errand.stop();
-            faceOut();
+            LivingEntity touching = biteCooldown <= 0 && (soldier.tickCount + soldier.getId()) % 5 == 0 ? touchingFoe(level) : null;
+            if (touching != null) {
+                // S1: a blind soldier bites whatever touches it, at its post too (it stays where it is).
+                soldier.bite(touching);
+                biteCooldown = BITE_INTERVAL;
+            } else {
+                faceOut();
+            }
             tries = 0;
         } else if (!errand.isWalking() && --repath <= 0) {
             repath = 40;
@@ -123,6 +139,18 @@ public class GuardPostGoal extends Goal {
                 lost = true;
             }
         }
+    }
+
+    /** S1: a foe of the colony its jaws reach (their boxes nearly touch), which it may bite; null for none. */
+    @Nullable
+    private LivingEntity touchingFoe(ServerLevel level) {
+        for (LivingEntity foe : level.getEntitiesOfClass(LivingEntity.class, soldier.getBoundingBox().inflate(0.3, 0.2, 0.3), LivingEntity::isAlive)) {
+            if (foe != soldier && !(foe instanceof AbstractAntEntity insect && insect.isDowned())
+                    && Fights.isFoe(colony.profile(), colony.getSpecies(), colony.getId(), foe) && Fights.mayAttack(soldier.profile(), foe)) {
+                return foe;
+            }
+        }
+        return null;
     }
 
     /** Whether it stands in its post's cell, on the floor. */

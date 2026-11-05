@@ -53,6 +53,14 @@ public class RaidDefence {
     private static final int TICKS = 10;
 
     /** The numbers when the species file has none (a test giving this part to another species). */
+    /**
+     * M8 step 3S: the longest the seal waits past its time for the soldiers still coming out of the galleries in waves
+     * (ticks, 30 s: 12 soldiers in waves of 2 or 3 every 5 s; my pick). Real: the workers seal behind the soldiers.
+     */
+    private static final int WAVE_WAIT = 600;
+    /** S3: how far (blocks) from a break with no tunnel of ours under it the soldiers come out of a gallery, least and most. */
+    private static final int WAVE_NEAREST = 2;
+    private static final int WAVE_FARTHEST = 8;
     private static final SavannaNumbers.RaidNumbers DEFAULT = new SavannaNumbers.RaidNumbers(16, 4, 40, 200, 8, 600);
 
     /** One break into a gallery, and its seal. */
@@ -209,7 +217,10 @@ public class RaidDefence {
         if (now < breach.due) {
             return;
         }
-        if (now - breach.due > numbers.plugGiveUpTicks() * 3L) {
+        if (now - breach.due < WAVE_WAIT && colony.part(SavannaParts.ALARM).map(alarm -> alarm.wavesComing(level)).orElse(false)) {
+            return; // soldiers are still coming out to the break (3S): the workers seal behind them
+        }
+        if (now - breach.due > numbers.plugGiveUpTicks() * 3L + WAVE_WAIT) {
             breaches.remove(breach); // never got shut (something sat in the way all along): forgotten
             return;
         }
@@ -327,6 +338,59 @@ public class RaidDefence {
     }
 
     /** Whether this soldier is shut out by a seal now. */
+    /**
+     * M8 step 3S: the cells the colony's soldiers come out of the numbers at for a raid's break at {@code spot}, the
+     * deepest first: the gallery's open cells between its planned seal and the break (so they run out to it, and are
+     * shut out with the others when it is packed); for a break with no seal of ours (a runway, a cast), the colony's
+     * tunnel cells {@link #WAVE_NEAREST} to {@link #WAVE_FARTHEST} blocks from it. Empty once the seal is packed.
+     */
+    public List<BlockPos> waveCells(ServerLevel level, BlockPos spot) {
+        Breach breach = null;
+        for (Breach one : breaches) {
+            if (breach == null || one.at.distSqr(spot) < breach.at.distSqr(spot)) {
+                breach = one;
+            }
+        }
+        if (breach != null && breach.at.distSqr(spot) > WAVE_FARTHEST * WAVE_FARTHEST) {
+            breach = null;
+        }
+        if (breach != null && breach.sealed) {
+            return List.of();
+        }
+        List<BlockPos> out = new ArrayList<>();
+        for (NestPlan.ForagingTunnel tunnel : colony.foragingHoles().tunnels(level)) {
+            List<BlockPos> cells = tunnel.tunnel();
+            if (breach != null) {
+                int plug = cells.indexOf(breach.plug);
+                if (plug < 0) {
+                    continue;
+                }
+                int last = Math.min(cells.size() - 1, plug + numbers().plugBack()); // (the break's own cell)
+                for (int i = plug + 1; i <= last; i++) {
+                    BlockPos cell = cells.get(i);
+                    if (level.isLoaded(cell) && Alarm.standable(level, cell)) {
+                        out.add(cell);
+                    }
+                }
+                if (!out.isEmpty()) {
+                    return out;
+                }
+                continue;
+            }
+            for (BlockPos cell : cells) {
+                double distance = cell.distSqr(spot);
+                if (distance >= WAVE_NEAREST * WAVE_NEAREST && distance <= WAVE_FARTHEST * WAVE_FARTHEST && level.isLoaded(cell)
+                        && Alarm.standable(level, cell)) {
+                    out.add(cell);
+                }
+            }
+        }
+        if (breach == null) {
+            out.sort(Comparator.comparingDouble((BlockPos cell) -> -cell.distSqr(spot)));
+        }
+        return out;
+    }
+
     public boolean isShutOut(UUID soldier) {
         return breaches.stream().anyMatch(breach -> breach.sealed && breach.shutOut.contains(soldier));
     }
