@@ -319,6 +319,12 @@ timings: all "my pick, to confirm" until then).
        end and small young ones to the near end (real: a bigger colony holds more ground round it). Watch: about 2.5
        times as many mounds as today (96 to about 60), so check `/antcolonies perf` and the giant trees kept 16 blocks
        off mounds after F1.
+       **Not every place gets a mound (the user's idea, 2026-11-04; my picks of the odds):** each place in the pattern
+       holds a mound only by chance, by the ground, as real mound numbers follow the soil: likely on flat, open,
+       well-drained ground, less likely on slopes, near water and where giant trees stand; about 2 in 3 places on
+       average, so about 1.7 times today's mounds, not 2.5. Empty places leave patches of open savanna. Next to an empty
+       place a mound leans bigger (real: its colony takes over the free ground). F5 checks the lonely dead mounds this
+       makes.
      - **F2 Find what limits the feeding spots** (first, before changing anything): read today, a gallery piece goes only
        to rich food and comes out of the tunnel budget (1 block per 4 workers), so most branches in range never get one.
      - **F3 10 to 15 by-day feeding spots for a big colony (the user's pick)**, fewer for small ones by worker count,
