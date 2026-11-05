@@ -303,6 +303,33 @@ timings: all "my pick, to confirm" until then).
      **about 1 new-land colony in 3 has no feeding spot it will take** (none within 90 blocks): moving house (step 6),
      or new land placing Matabele only in dead mounds with a living mound within about 90 (the user's call: fewer places
      with colonies).
+   - **3F Feeding spots for the raids (planned with the user 2026-11-04, questionnaire; before 3d).** The problem
+     (R8's balance pass): Matabele live in dead mounds, which sit in the gaps between living colonies, and each living
+     colony feeds by day at only about 4 spots, so the nearest is about 80 blocks off and 1 colony in 3 has none within 90.
+     Real Macrotermes feed at dozens of places at once, mostly on small dead wood (fallen branches, sticks); new land
+     already puts 1 to 3 branches (and often a big limb) under every grown tree, and living trees keep shedding more, but
+     the termites reach few of them. Pieces:
+     - **F1 Mounds random with a safety gap (the user):** two mounds land 40 to 80 blocks apart, at random within that,
+       not in loose rows as today (96-block squares, each mound in one corner). **Dead mounds too**: they are former
+       colonies, part of the same pattern (the user: "because it's realistic"). Real mound fields are evenly spread but
+       not in rows (neighbouring colonies fight over the ground between them). Minecraft's own spread rule only gives a
+       gap per square, so the mound check also measures the real distance to its neighbours (my note).
+     - **F2 Find what limits the feeding spots** (first, before changing anything): read today, a gallery piece goes only
+       to rich food and comes out of the tunnel budget (1 block per 4 workers), so most branches in range never get one.
+     - **F3 10 to 15 by-day feeding spots for a big colony (the user's pick)**, fewer for small ones by worker count,
+       mostly mud-cased fallen branches and limbs under the trees in the colony's range; small food gets cheaper pieces
+       (how, after F2). Nothing new to look at: the mud-cased branch is today's look, just more of them.
+     - **F4 Lonely dead mounds stay empty (the user's pick):** new land puts a Matabele colony only in a dead mound with
+       a living mound within reach (my pick to start: its foot within about 70 blocks, checked by F5); the others stay
+       empty and may be moved into later (step 6).
+     - **F5 The balance model again**, now counting the branches under trees and the new spacing; target: a Matabele
+       nest's nearest by-day feeding spot about 20 to 50 blocks off (like real raids) and no new-land colony without one.
+     - **Not in 3F (the user, 2026-11-04):** moving house stays whole in step 6 (no early starving move); **dung** as a
+       termite food (real: a main termite food in African savannas, it lands in the open grass between trees) waits for
+       the wildlife (M9.5); mud sheeting over dry grass dropped (ugly, and dry grass too scarce); Matabele homes in old
+       termite feeding tunnels dropped (the tunnels join the nest and get packed with soil, most dead trees are not
+       hollow, and it was a guess, not from the papers); a second termite species (Odontotermes, a top real Matabele
+       prey; Trinervitermes, the aardwolf's food) only a "maybe one day" idea, not a to-do.
    - **3d The termites' losses.** Termites in the galleries round the spot are numbers until broken into
      (`HiddenTrips`), so a raid takes from the colony's real count; plugging, closing and danger memory (2f, 4g) dry
      the spot up, so later scouts hunt farther. Young termite colonies can die from repeated raids; big ones shrug it off.
