@@ -41,7 +41,8 @@ import com.antcolonies.savanna.SavannaMod;
  *
  * <p><b>The ground's chance.</b> A place holds a mound only by chance, by the ground ({@link #holds}): real mound numbers
  * follow the soil, likely on flat, open, well-drained ground, less likely on a slope or by water; never in water, on a
- * steep slope or outside a savanna. About 2 in 3 places on average (my pick). The user's third ground, giant trees, is
+ * steep slope or outside a savanna. On Minecraft's rolling savanna about 1 place in 3 (the 2 in 3 first planned was a
+ * flat-ground guess, BUGS 104; dead mounds are kept among living ones by {@link TermiteMoundStructure#pickAt}). The user's third ground, giant trees, is
  * left out: the trees keep off the mounds' places themselves ({@link TermiteMoundStructure#crowds}), so asking the trees
  * would go round in a circle. Next to an empty place a mound leans bigger (real: its colony takes over the free ground).
  */
@@ -54,12 +55,12 @@ public final class MoundPlaces {
      * The pattern's and the ground's numbers (the structure's file, {@code numbers.places}; my picks, to confirm).
      * {@code territoryMin}, {@code territoryMax}: a place's territory (blocks), two places at least their two territories
      * apart. {@code groundChance}: a place's chance of a mound on flat, dry ground. {@code slopeCut}: the chance lost on
-     * the steepest ground a mound takes ({@link TermiteMoundStructure#MAX_UNEVEN}). {@code waterCut}: the chance lost
+     * the steepest ground a mound takes ({@code maxUneven}, the most the ground may rise and fall 8 blocks round the middle). {@code waterCut}: the chance lost
      * with water within {@code waterLook} blocks. {@code emptyLean}: next to each empty place within {@code leanReach},
      * a mound's size quantile's rest is times this (leaning bigger).
      */
     public record Numbers(double territoryMin, double territoryMax, double groundChance, double slopeCut, double waterCut,
-            int waterLook, double emptyLean, int leanReach) {
+            int waterLook, double emptyLean, int leanReach, int maxUneven) {
         public static final Codec<Numbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.DOUBLE.optionalFieldOf("territory_min", 21.0).forGetter(Numbers::territoryMin),
                 Codec.DOUBLE.optionalFieldOf("territory_max", 41.0).forGetter(Numbers::territoryMax),
@@ -68,10 +69,16 @@ public final class MoundPlaces {
                 Codec.DOUBLE.optionalFieldOf("water_cut", 0.6).forGetter(Numbers::waterCut),
                 Codec.INT.optionalFieldOf("water_look", 14).forGetter(Numbers::waterLook),
                 Codec.DOUBLE.optionalFieldOf("empty_lean", 0.75).forGetter(Numbers::emptyLean),
-                Codec.INT.optionalFieldOf("lean_reach", 90).forGetter(Numbers::leanReach)
+                Codec.INT.optionalFieldOf("lean_reach", 90).forGetter(Numbers::leanReach),
+                Codec.INT.optionalFieldOf("max_uneven", 6).forGetter(Numbers::maxUneven)
         ).apply(i, Numbers::new));
 
-        public static final Numbers DEFAULT = new Numbers(21, 41, 0.8, 0.5, 0.6, 14, 0.75, 90);
+        public static final Numbers DEFAULT = new Numbers(21, 41, 0.8, 0.5, 0.6, 14, 0.75, 90, 6);
+
+        /** These numbers with another {@link #maxUneven} (the survey game test's before and after, BUGS 104). */
+        public Numbers withUneven(int uneven) {
+            return new Numbers(territoryMin, territoryMax, groundChance, slopeCut, waterCut, waterLook, emptyLean, leanReach, uneven);
+        }
     }
 
     /** One place of the pattern: its chunk, middle (no height), territory (blocks), rank and its size quantile (0 to 1). */
@@ -210,17 +217,16 @@ public final class MoundPlaces {
         int[][] around = {{0, 0}, {8, 0}, {-8, 0}, {0, 8}, {0, -8}, {6, 6}, {-6, 6}, {6, -6}, {-6, -6}};
         for (int[] o : around) {
             int surface = land.height(x + o[0], z + o[1], Heightmap.Types.WORLD_SURFACE_WG);
-            int floor = land.height(x + o[0], z + o[1], Heightmap.Types.OCEAN_FLOOR_WG);
-            if (surface != floor) {
+            if (surface != land.height(x + o[0], z + o[1], Heightmap.Types.OCEAN_FLOOR_WG)) {
                 return null;
             }
             lowest = Math.min(lowest, surface);
             highest = Math.max(highest, surface);
+            if (highest - lowest > numbers.maxUneven()) {
+                return null;
+            }
         }
         int uneven = highest - lowest;
-        if (uneven > TermiteMoundStructure.MAX_UNEVEN) {
-            return null;
-        }
         BlockPos foot = new BlockPos(x, land.height(x, z, Heightmap.Types.WORLD_SURFACE_WG), z);
         if (land.biomes() != null) {
             Holder<Biome> biome = land.generator().getBiomeSource().getNoiseBiome(QuartPos.fromBlock(x), QuartPos.fromBlock(foot.getY()),
@@ -229,7 +235,7 @@ public final class MoundPlaces {
                 return null;
             }
         }
-        double chance = numbers.groundChance() * (1 - numbers.slopeCut() * uneven / TermiteMoundStructure.MAX_UNEVEN);
+        double chance = numbers.groundChance() * (1 - numbers.slopeCut() * uneven / numbers.maxUneven());
         int w = numbers.waterLook();
         int[][] shore = {{w, 0}, {-w, 0}, {0, w}, {0, -w}};
         for (int[] o : shore) {
@@ -255,9 +261,33 @@ public final class MoundPlaces {
         return 1 - (1 - place.size()) * Math.pow(numbers.emptyLean(), empty);
     }
 
-    /** Whether the place's mound is a living colony (its own dice). */
+    /** Whether the place's mound is a living colony by its own dice (a dead one may still live: {@link TermiteMoundStructure#pickAt}). */
     public static boolean living(long seed, Place place, double deadShare) {
         return unit(mix(seed, place.chunk().x, place.chunk().z, 6)) >= deadShare;
+    }
+
+    /** How near (blocks, foot to foot) a mound living by the dice must stand for a dead mound's Matabele (BUGS 104). */
+    public static final int LIVING_NEAR = 70;
+
+    /**
+     * Whether a mound living by its dice stands with its foot within {@link #LIVING_NEAR} of {@code foot} (the foot of the
+     * mound at {@code place}, left out). Only the dice count, never a dead mound turned living, so the question never goes
+     * round in a circle (BUGS 104).
+     */
+    public static boolean livingByDiceNear(Land land, Place place, BlockPos foot, Numbers numbers, double deadShare) {
+        for (Place other : near(land.seed(), foot.getX(), foot.getZ(), LIVING_NEAR, numbers)) {
+            if (other.chunk().equals(place.chunk()) || !living(land.seed(), other, deadShare)) {
+                continue;
+            }
+            BlockPos living = holds(land, other, numbers);
+            if (living != null) {
+                double dx = living.getX() - foot.getX(), dz = living.getZ() - foot.getZ();
+                if (dx * dx + dz * dz <= (double) LIVING_NEAR * LIVING_NEAR) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /** About how far a mound's foot reaches from its middle at a stage (a full one about 12, its washed soil 13). */

@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 
 import com.antcolonies.savanna.SavannaMod;
+import com.antcolonies.savanna.colony.MatabeleColonies;
 import com.antcolonies.savanna.registry.SavannaStructures;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
@@ -38,8 +39,6 @@ public class TermiteMoundStructure extends Structure {
             ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "termite_mounds"));
     /** A tree of new land stands no nearer than this to a mound's middle (a full mound and the soil washed round it reach about 13). */
     public static final int CLEAR = 16;
-    /** The ground under a mound may rise and fall at most this much (blocks) 8 blocks round its middle. */
-    static final int MAX_UNEVEN = 4;
 
     public static final MapCodec<TermiteMoundStructure> CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
             settingsCodec(i),
@@ -65,7 +64,7 @@ public class TermiteMoundStructure extends Structure {
     public static final int FULL_STAGE = 32;
 
     /**
-     * The real spreads, from the structure's file. {@code deadShare}: of the mounds, how many are dead.
+     * The real spreads, from the structure's file. {@code deadShare}: the dice for a dead mound (a Matabele one with no living mound near lives, so about a quarter end dead: {@link #pickAt}).
      * {@code livingStages}, {@code deadSizes}: bands of mound stage with their weights, for living colonies and for the
      * size dead mounds had stood to. {@code deadStages}: weights of freshly dead (days 0 to 3, the spires standing,
      * Xylaria on the comb), wearing (3 to 12), slumping (12 to 30) and old grassy humps (35 to 200). {@code humpWoods}:
@@ -75,7 +74,7 @@ public class TermiteMoundStructure extends Structure {
     public record Numbers(double deadShare, List<Band> livingStages, List<Band> deadSizes, List<Integer> deadStages,
             double humpWoods, double burrows, boolean humpGrass, MoundPlaces.Numbers places) {
         public static final Codec<Numbers> CODEC = RecordCodecBuilder.create(i -> i.group(
-                Codec.DOUBLE.optionalFieldOf("dead_share", 0.33).forGetter(Numbers::deadShare),
+                Codec.DOUBLE.optionalFieldOf("dead_share", 0.5).forGetter(Numbers::deadShare),
                 Band.CODEC.listOf().optionalFieldOf("living_stages", Band.LIVING).forGetter(Numbers::livingStages),
                 Band.CODEC.listOf().optionalFieldOf("dead_sizes", Band.DEAD).forGetter(Numbers::deadSizes),
                 Codec.INT.listOf().optionalFieldOf("dead_stages", List.of(10, 35, 35, 20)).forGetter(Numbers::deadStages),
@@ -85,7 +84,7 @@ public class TermiteMoundStructure extends Structure {
                 MoundPlaces.Numbers.CODEC.optionalFieldOf("places", MoundPlaces.Numbers.DEFAULT).forGetter(Numbers::places)
         ).apply(i, Numbers::new));
 
-        public static final Numbers DEFAULT = new Numbers(0.33, Band.LIVING, Band.DEAD, List.of(10, 35, 35, 20), 0.5, 0.4, true,
+        public static final Numbers DEFAULT = new Numbers(0.5, Band.LIVING, Band.DEAD, List.of(10, 35, 35, 20), 0.5, 0.4, true,
                 MoundPlaces.Numbers.DEFAULT);
     }
 
@@ -207,11 +206,23 @@ public class TermiteMoundStructure extends Structure {
      * The pick of a place of the pattern (F1), fixed by the world's seed and the place alone, so the server can work it
      * out again for a place not made yet (F4): living or dead by the place's dice, the stage at its size quantile
      * ({@code quantile}: its territory, leaning bigger next to empty places), the rest by its own dice as {@link #pick}.
+     *
+     * <p><b>Dead among the living (BUGS 104).</b> A dead mound whose dice give it a Matabele colony lives instead when no
+     * mound living by the dice stands within {@link MoundPlaces#LIVING_NEAR} of it: the Matabele settle a dead mound only
+     * with termites to raid in reach ({@code NewLandMounds.ANTS_NEAR_LIVING}, the same 70 to the living mound's edge, so
+     * every such dead mound now passes it). Real: Matabele nests sit in mound fields among the termites they raid, and a
+     * dead Macrotermes mound stands among living neighbours. Minecraft's rolling savanna holds a mound at only about 1
+     * place in 3, so by the dice alone 15 of 24 such dead mounds stood alone and were left empty. The dead mounds the dice
+     * leave without ants stay dead wherever they are (an empty dead mound far from termites is real too).
      */
-    public static Pick pickAt(Numbers numbers, long worldSeed, MoundPlaces.Place place, double quantile) {
-        RandomSource random = RandomSource.create(place.seed(worldSeed));
+    public static Pick pickAt(Numbers numbers, MoundPlaces.Land land, MoundPlaces.Place place, double quantile) {
+        RandomSource random = RandomSource.create(place.seed(land.seed()));
         long seed = random.nextLong() & 0xFFFFFFFFL;
-        boolean living = MoundPlaces.living(worldSeed, place, numbers.deadShare());
+        boolean living = MoundPlaces.living(land.seed(), place, numbers.deadShare());
+        if (!living && MatabeleColonies.wouldSettle(seed)) {
+            BlockPos foot = MoundPlaces.holds(land, place, numbers.places());
+            living = foot != null && !MoundPlaces.livingByDiceNear(land, place, foot, numbers.places(), numbers.deadShare());
+        }
         int stage = stageAt(living ? numbers.livingStages() : numbers.deadSizes(), quantile);
         return pick(numbers, random, seed, living, stage);
     }
@@ -291,7 +302,7 @@ public class TermiteMoundStructure extends Structure {
         if (foot == null) {
             return Optional.empty();
         }
-        Pick pick = pickAt(numbers, context.seed(), place, MoundPlaces.sizeQuantile(land, place, places));
+        Pick pick = pickAt(numbers, land, place, MoundPlaces.sizeQuantile(land, place, places));
         BoundingBox box = new BoundingBox(foot);
         return Optional.of(new GenerationStub(foot, builder -> builder.addPiece(new TermiteMoundPiece(pick, foot, box))));
     }
