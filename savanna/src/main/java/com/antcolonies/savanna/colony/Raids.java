@@ -131,6 +131,13 @@ public class Raids {
      */
     private final Map<UUID, Double> headings = new HashMap<>();
     private final Map<UUID, Integer> reaches = new HashMap<>();
+    /**
+     * R8's balance pass: a settled colony (one of new land, an old colony that has lived here for months: real colonies
+     * of 100 to 2,300 are years old, Yusuf 2026) whose scouts know their whole foraging range: a new scout's reach starts
+     * at {@code settled_range}, not {@code first_range} (a colony new to the place, the command's and the tests', and
+     * later a split-off daughter, M9). Saved.
+     */
+    private boolean settled;
     /** R5: finds passed over as too poor since the colony was loaded (not saved; tests and the diary). */
     private int passedOverCount;
     /** The scouts out now (not saved: after a reload they are just ants again). */
@@ -524,8 +531,25 @@ public class Raids {
      */
     public int range() {
         SavannaNumbers.ScoutNumbers numbers = numbers();
-        int first = numbers == null ? 0 : numbers.firstRange();
+        int first = numbers == null ? 0 : startReach(numbers);
         return reaches.values().stream().mapToInt(Integer::intValue).max().orElse(first);
+    }
+
+    /**
+     * R8's balance pass: where a new scout's reach starts: the whole foraging range for a settled colony (its scouts
+     * have searched this land for months), the first range for a colony new to the place.
+     */
+    public int startReach(SavannaNumbers.ScoutNumbers numbers) {
+        return settled ? Math.min(numbers.mostRange(), Math.max(numbers.firstRange(), numbers.settledRange())) : numbers.firstRange();
+    }
+
+    /** A settled colony: one that has lived here a long time (new land's), its scouts knowing their whole range. */
+    public void setSettled(boolean settled) {
+        this.settled = settled;
+    }
+
+    public boolean isSettled() {
+        return settled;
     }
 
     /**
@@ -738,7 +762,7 @@ public class Raids {
             return null;
         }
         long now = level.getGameTime();
-        ScoutMemoryView memory = new ScoutMemoryView(ant, numbers);
+        ScoutMemoryView memory = new ScoutMemoryView(ant, numbers, startReach(numbers));
         Find best = finds.stream().filter(find -> now - find.checkedAt >= RECHECK_AFTER && now - find.pickedAt >= RECHECK_AFTER
                         && (find.checking == null || !scouts.contains(find.checking)))
                 .max(Comparator.comparingInt(Find::worth)).orElse(null);
@@ -761,10 +785,10 @@ public class Raids {
         return new Trip(null, ant.scoutMemory().heading(), Math.max(4, out), reach);
     }
 
-    /** A scout's reach, its own or the first range. */
-    private record ScoutMemoryView(MatabeleEntity ant, SavannaNumbers.ScoutNumbers numbers) {
+    /** A scout's reach, its own or, before its first trip, the colony's start reach ({@link #startReach}). */
+    private record ScoutMemoryView(MatabeleEntity ant, SavannaNumbers.ScoutNumbers numbers, int start) {
         int reach() {
-            return Math.min(numbers.mostRange(), Math.max(numbers.firstRange() / 2, ant.scoutMemory().reach(numbers.firstRange())));
+            return Math.min(numbers.mostRange(), Math.max(numbers.firstRange() / 2, ant.scoutMemory().reach(start)));
         }
     }
 
@@ -851,7 +875,7 @@ public class Raids {
                     + least / 20 + " s it takes to count: its way and reach stay as they were");
             return false;
         }
-        ScoutMemoryView memory = new ScoutMemoryView(ant, numbers);
+        ScoutMemoryView memory = new ScoutMemoryView(ant, numbers, startReach(numbers));
         int from = memory.reach();
         double fromHeading = ant.scoutMemory().hasHeading() ? ant.scoutMemory().heading() : trip.heading();
         ant.scoutMemory().setEmptyTrips(ant.scoutMemory().emptyTrips() + 1);
@@ -871,7 +895,7 @@ public class Raids {
                     + Math.round(Math.toDegrees(ant.scoutMemory().heading())) + " degrees)";
         }
         headings.put(ant.getUUID(), ant.scoutMemory().heading());
-        reaches.put(ant.getUUID(), ant.scoutMemory().reach(numbers.firstRange()));
+        reaches.put(ant.getUUID(), ant.scoutMemory().reach(startReach(numbers)));
         say(level, name + " searched " + searchTicks / 20 + " s and found nothing worth a raid (" + why + ", "
                 + ant.scoutMemory().emptyTrips() + " empty trip(s) in a row): " + change);
         return true;
@@ -887,7 +911,7 @@ public class Raids {
             return;
         }
         int away = (int) Math.round(RaidGround.flat(at, colony.getCenter()));
-        int from = new ScoutMemoryView(ant, numbers).reach();
+        int from = new ScoutMemoryView(ant, numbers, startReach(numbers)).reach();
         int to = Math.max(numbers.firstRange(), Math.min(numbers.mostRange(), away + search().findMargin()));
         double fromHeading = ant.scoutMemory().hasHeading() ? ant.scoutMemory().heading() : angleOf(at);
         ant.scoutMemory().setReach(to);
@@ -1345,6 +1369,9 @@ public class Raids {
         ListTag old = new ListTag();
         veterans.forEach(id -> old.add(NbtUtils.createUUID(id)));
         tag.put("raidScouts", old);
+        if (settled) {
+            tag.putBoolean("raidSettled", true);
+        }
         trails.save(tag);
     }
 
@@ -1365,6 +1392,7 @@ public class Raids {
         }
         headings.clear();
         reaches.clear();
+        settled = tag.getBoolean("raidSettled");
         waiting = null;
         if (tag.contains("raidWaitingAt")) {
             BlockPos at = BlockPos.of(tag.getLong("raidWaitingAt"));

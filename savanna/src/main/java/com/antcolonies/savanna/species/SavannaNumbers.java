@@ -503,11 +503,13 @@ public final class SavannaNumbers {
      * 95 m; a block a metre for distances), and moves to just past its find after a find. It smells termites (out of
      * their mound, or in their feeding galleries and runways) within {@code smell} blocks, looks the find over
      * {@code inspectTicks}, and goes home; it gives up after {@code tripTicks}. A good spot is remembered
-     * {@code spotFadeTicks}, and forgotten after {@code spotMisses} empty checks. Every number my pick, to confirm.
+     * {@code spotFadeTicks}, and forgotten after {@code spotMisses} empty checks. R8's balance pass: a settled colony's
+     * (new land's) scouts start at {@code settledRange} (the whole range: they have searched this land for months), not
+     * {@code firstRange} (a colony new to the place). Every number my pick, to confirm.
      */
     public record ScoutNumbers(List<List<Double>> hours, int workersPerScout, int mostScouts, int firstRange, int rangeStep,
                                int mostRange, int smell, int inspectTicks, int tripTicks, int spotFadeTicks, int spotMisses,
-                               List<List<Double>> scoutHours) {
+                               List<List<Double>> scoutHours, int settledRange) {
         public static final Codec<ScoutNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.DOUBLE.listOf().listOf().optionalFieldOf("hours", List.of(List.of(6.0, 11.0), List.of(16.0, 19.0))).forGetter(ScoutNumbers::hours),
                 Codec.INT.optionalFieldOf("workers_per_scout", 50).forGetter(ScoutNumbers::workersPerScout),
@@ -520,7 +522,8 @@ public final class SavannaNumbers {
                 Codec.INT.optionalFieldOf("trip_ticks", 2400).forGetter(ScoutNumbers::tripTicks),
                 Codec.INT.optionalFieldOf("spot_fade_ticks", 72000).forGetter(ScoutNumbers::spotFadeTicks),
                 Codec.INT.optionalFieldOf("spot_misses", 2).forGetter(ScoutNumbers::spotMisses),
-                Codec.DOUBLE.listOf().listOf().optionalFieldOf("scout_hours", List.of(List.of(6.0, 19.5))).forGetter(ScoutNumbers::scoutHours)
+                Codec.DOUBLE.listOf().listOf().optionalFieldOf("scout_hours", List.of(List.of(6.0, 19.5))).forGetter(ScoutNumbers::scoutHours),
+                Codec.INT.optionalFieldOf("settled_range", 96).forGetter(ScoutNumbers::settledRange)
         ).apply(i, ScoutNumbers::new));
 
         /** Whether this time of day ({@code Level#getDayTime}'s scale: 0 is 6:00) is in the raid hours. */

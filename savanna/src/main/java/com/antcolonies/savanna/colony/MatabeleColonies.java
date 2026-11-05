@@ -71,6 +71,8 @@ public final class MatabeleColonies {
         if (colony == null) {
             return null;
         }
+        // (R8's balance pass: an old colony of this land, its scouts knowing their whole foraging range from the start)
+        colony.part(SavannaParts.RAIDS).ifPresent(raids -> raids.setSettled(true));
         int workers = colony.getCount(Caste.WORKER);
         int laid = colony.part(SavannaParts.PREY_PILE).map(pile -> pile.stock(level, dayOfFood(workers))).orElse(0);
         SavannaMod.LOGGER.info("[new-land] {}", String.format(Locale.ROOT,

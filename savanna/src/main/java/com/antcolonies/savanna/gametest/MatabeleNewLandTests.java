@@ -18,6 +18,7 @@ import com.antcolonies.savanna.colony.MatabeleNest;
 import com.antcolonies.savanna.colony.MoundPlan;
 import com.antcolonies.savanna.colony.NewLandMounds;
 import com.antcolonies.savanna.colony.PreyPile;
+import com.antcolonies.savanna.colony.Raids;
 import com.antcolonies.savanna.colony.SavannaParts;
 import com.antcolonies.savanna.command.MatabeleCommands;
 import com.antcolonies.savanna.entity.MatabeleEntity;
@@ -82,6 +83,11 @@ public class MatabeleNewLandTests {
                 PreyPile pile = colony.part(SavannaParts.PREY_PILE).orElseThrow();
                 helper.assertTrue(pile.edible() > 0, "a new-land colony with no prey on its pile");
                 helper.assertTrue(pile.edible() <= MatabeleColonies.dayOfFood(workers), pile.edible() + " layers of prey, more than a day's");
+                // R8's balance pass: an old colony of the land, its scouts knowing their whole foraging range from the start
+                Raids raids = colony.part(SavannaParts.RAIDS).orElseThrow();
+                helper.assertTrue(raids.isSettled(), "a new-land colony is not settled");
+                helper.assertTrue(raids.range() == raids.numbers().settledRange(),
+                        "a new-land colony's scouts start at " + raids.range() + " blocks, not the settled range " + raids.numbers().settledRange());
             }
             // The numbers come out as real ants, up to the cap; the rest stay numbers.
             List<MatabeleEntity> real = TestIsolation.insectsOf(level, colony, MatabeleEntity.class);
@@ -117,6 +123,10 @@ public class MatabeleNewLandTests {
                 helper.assertTrue(real == cap, real + " real workers round the queen, not " + cap);
                 helper.assertTrue(colony.population().inside(Caste.WORKER) == sizes[i] - cap,
                         colony.population().inside(Caste.WORKER) + " numbers inside, not " + (sizes[i] - cap));
+                // R8's balance pass: the command's colony is new to the place, its scouts starting at the first range
+                Raids raids = colony.part(SavannaParts.RAIDS).orElseThrow();
+                helper.assertTrue(!raids.isSettled() && raids.range() == raids.numbers().firstRange(),
+                        "the command's colony starts its scouts at " + raids.range() + " blocks, not the first range");
             }
             helper.succeed();
         });
