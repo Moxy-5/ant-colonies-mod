@@ -35,7 +35,7 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
  * Matabele colonies in new land (M8 step 1f): a dead mound handed over by world generation (queued, as new land does)
- * gets a Matabele colony when its dice say so, the queen in her room under the hump, 100 to 2,300 workers inside as
+ * gets a Matabele colony when its dice say so and a living termite mound stands within reach (M8 step 3F, F4), the queen in her room under the hump, 100 to 2,300 workers inside as
  * numbers who come out as real ants up to the cap, a day's prey on the pile; a dead mound whose dice say no gets none;
  * the dice give about two in three and the sizes lean small; and the command makes a colony of any real size, the
  * workers past the cap numbers.
@@ -56,14 +56,16 @@ public class MatabeleNewLandTests {
         while (MatabeleColonies.wouldSettle(no)) {
             no++;
         }
-        // A dead mound whose dice say no, put in as new land does: no Matabele in it.
+        // A dead mound whose dice say no: no Matabele in it.
         NewLandMounds book = NewLandMounds.get(level);
-        BlockPos empty = helper.absolutePos(new BlockPos(MIDDLE + 40, SURFACE, MIDDLE + 40));
-        helper.assertTrue(book.putWithAnts(level, empty, NewLandMounds.pickFor("dead", 30, no), UUID.randomUUID(), false) != null,
-                "no dead mound put in for the dice's no");
-        helper.assertTrue(book.lastAnts() == null, "a dead mound whose dice say no got a Matabele colony");
-        // The one whose dice say yes, the way world generation hands it over.
         BlockPos middle = helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE));
+        helper.assertTrue(MatabeleColonies.inNewLand(level, middle, no, false) == null, "a dead mound whose dice say no got a Matabele colony");
+        // M8 step 3F, F4: Matabele settle only near living termites, so a young living mound stands in the corner, about
+        // 57 blocks off (its foot within 70 of the dead one).
+        BlockPos living = helper.absolutePos(new BlockPos(MIDDLE + 40, SURFACE, MIDDLE + 40));
+        helper.assertTrue(book.put(level, living, NewLandMounds.pickFor("young", 0, 3L)) != null, "no living mound put in the corner");
+        helper.assertTrue(NewLandMounds.livingMoundNear(level, middle), "the living mound in the corner is not counted near the dead one");
+        // The one whose dice say yes, the way world generation hands it over.
         NewLandMounds.queue(level, middle, NewLandMounds.pickFor("dead", 30, yes));
         boolean[] checked = new boolean[1];
         helper.succeedWhen(() -> {

@@ -24,6 +24,17 @@
     "dead_stages": [15, 20, 20, 45],
     "hump_woods": 0.5,
     "aardvark_burrows": 0.4,
-    "hump_grass": true
+    "hump_grass": true,
+    "places": {
+      "_note": "M8 step 3F, F1 (worldgen/MoundPlaces; the user's decisions 2026-11-04, the numbers my picks, to confirm): every chunk offers a candidate place with its own territory, territory_min to territory_max blocks (its size: big territories hold big mounds); two places stand at least their two territories apart, so mounds land about 42 to 82 blocks apart, mostly round 60. A place holds a mound by the ground's chance: ground_chance on flat dry ground, slope_cut of it lost on the steepest ground a mound takes (4 blocks up and down), water_cut lost with water within water_look blocks; never in water, on a steep slope or outside a savanna (about 2 in 3 places). Next to each empty place within lean_reach a mound leans bigger (its size quantile's rest times empty_lean).",
+      "territory_min": 21,
+      "territory_max": 41,
+      "ground_chance": 0.8,
+      "slope_cut": 0.5,
+      "water_cut": 0.6,
+      "water_look": 14,
+      "empty_lean": 0.75,
+      "lean_reach": 90
+    }
   }
 }

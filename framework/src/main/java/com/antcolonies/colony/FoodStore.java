@@ -402,6 +402,34 @@ public class FoodStore {
         return grassTufts;
     }
 
+    /**
+     * M8 step 3F, F3: the rich food (dead wood, hay) on the loaded ground within {@code radius} blocks of the nest, found
+     * by a scan of its own (the plant list of {@link #plants} is left as it was). A colony new land puts in has fed round
+     * its mound for years, so it knows the wood about it from the start (the caller teaches it to the food map).
+     */
+    public List<BlockPos> richFoodAround(Level level, int radius) {
+        List<BlockPos> kept = new ArrayList<>(grassTufts);
+        grassTufts.clear();
+        for (int x = center.getX() - radius; x <= center.getX() + radius; x++) {
+            for (int z = center.getZ() - radius; z <= center.getZ() + radius; z++) {
+                int dx = x - center.getX(), dz = z - center.getZ();
+                if (dx * dx + dz * dz <= radius * radius) {
+                    scanColumn(level, x, z, true);
+                }
+            }
+        }
+        List<BlockPos> rich = new ArrayList<>();
+        for (BlockPos pos : grassTufts) {
+            SpeciesProfile.PlantFood plant = food().plantFor(level.getBlockState(pos));
+            if (plant != null && plant.rich() && !rich.contains(pos)) {
+                rich.add(pos.immutable());
+            }
+        }
+        grassTufts.clear();
+        grassTufts.addAll(kept);
+        return rich;
+    }
+
     /** A trail's band reaches this many blocks either side of its line (plus the searchers' wander). */
     private static final int BAND = 4;
 

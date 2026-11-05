@@ -66,6 +66,8 @@ public class ForagingHoles {
     private static final int NO_ROUTE_TICKS = 6000;
     /** How near (blocks) a rich plant must still be to the food a new tunnel was dug for, or its hole is spent. */
     private static final int FOOD_STILL_THERE = 4;
+    /** M8 step 3F: how many foods a check tries for a gallery piece, nearest first (each try plans a route). */
+    private static final int FOODS_TRIED = 6;
     private long newHolesCheckedAt = Long.MIN_VALUE;
     /** Plants the colony found no tunnel route to, and until when it leaves them. Not saved. */
     private final java.util.Map<BlockPos, Long> noRouteUntil = new java.util.HashMap<>();
@@ -377,7 +379,11 @@ public class ForagingHoles {
                         tunnel.food().toShortString(), hole.toShortString());
                 continue;
             }
-            active++;
+            // M8 step 3F: the count by workers limits the spots at small food only (with small_pieces set); the big wood
+            // is limited by the galleries' digging budget, so a log found once every spot is taken still gets one.
+            if (numbers.smallPieces() <= 0 || isSmall(level, tunnel.food(), numbers)) {
+                active++;
+            }
             boolean dug = isDug(level, tunnel.tunnel());
             digging |= !dug;
             if (dug && tunnel.gallery() == null && level.isLoaded(tunnel.food())) {
@@ -389,35 +395,46 @@ public class ForagingHoles {
                         tunnel.food().toShortString());
             }
         }
-        if (active >= numbers.max() || digging) {
+        boolean full = active >= numbers.mostFor(colony.getCount(Caste.WORKER));
+        if (full && numbers.smallPieces() <= 0 || digging) {
             return; // one new tunnel at a time
         }
         noRouteUntil.values().removeIf(until -> until <= now || until > now + NO_ROUTE_TICKS);
-        BlockPos food = pickFood(level, plants, numbers);
-        if (food == null) {
+        List<BlockPos> foods = pickFoods(level, plants, numbers);
+        if (full) {
+            foods.removeIf(food -> isSmall(level, food, numbers)); // (every spot for small food taken: only big wood now)
+        }
+        if (foods.isEmpty()) {
             return;
         }
         ColonyHooks.Underground galleries = colony.underground();
         if (galleries != null) {
             // Step 3 of termites underground: the way to the food is a piece of the galleries, from the nearest dug one.
-            ColonyHooks.GalleryPiece piece = galleries.pieceTo(level, food);
-            if (piece == null) {
-                noRouteUntil.put(food.immutable(), now + NO_ROUTE_TICKS);
-                ColonyFrameworkMod.LOGGER.debug("[new-hole] no gallery piece to the food at {}", food.toShortString());
+            // M8 step 3F: food the workers do not allow yet waits (food leads), and the next nearest is tried meanwhile, a
+            // few a check (a piece to a branch costs little, so the far log does not hold back every branch nearer).
+            for (int tried = 0; tried < Math.min(foods.size(), FOODS_TRIED); tried++) {
+                BlockPos food = foods.get(tried);
+                ColonyHooks.GalleryPiece piece = galleries.pieceTo(level, food);
+                if (piece == null) {
+                    noRouteUntil.put(food.immutable(), now + NO_ROUTE_TICKS);
+                    ColonyFrameworkMod.LOGGER.debug("[new-hole] no gallery piece to the food at {}", food.toShortString());
+                    continue;
+                }
+                if (!galleries.affords(level, piece, food)) {
+                    foodWaiting = true; // food leads: the galleries grow no other way until the workers allow this piece
+                    continue;
+                }
+                List<BlockPos> gallery = planGallery(level, piece.tunnel(), food);
+                colony.nest().foodWays().addNewTunnel(new FoodWays.NewTunnel(piece.tunnel(), food.immutable(), gallery));
+                galleries.addFoodPiece(level, piece);
+                ColonyManager.get(level).markChanged();
+                ColonyFrameworkMod.LOGGER.debug("[new-hole] a gallery piece to the food at {}, hole at {}, with a feeding gallery of {} blocks",
+                        food.toShortString(), piece.tunnel().hole().toShortString(), gallery.size());
                 return;
             }
-            if (!galleries.affords(level, piece, food)) {
-                foodWaiting = true; // food leads: the galleries grow no other way until the workers allow this piece
-                return;
-            }
-            List<BlockPos> gallery = planGallery(level, piece.tunnel(), food);
-            colony.nest().foodWays().addNewTunnel(new FoodWays.NewTunnel(piece.tunnel(), food.immutable(), gallery));
-            galleries.addFoodPiece(level, piece);
-            ColonyManager.get(level).markChanged();
-            ColonyFrameworkMod.LOGGER.debug("[new-hole] a gallery piece to the food at {}, hole at {}, with a feeding gallery of {} blocks",
-                    food.toShortString(), piece.tunnel().hole().toShortString(), gallery.size());
             return;
         }
+        BlockPos food = foods.get(0);
         List<BlockPos> starts = startsFor(level);
         TunnelRoute.Plan plan = starts.isEmpty() ? null : TunnelRoute.plan(starts, food, ground(level), numbers.reachMax() + 16);
         if (plan == null) {
@@ -678,13 +695,13 @@ public class ForagingHoles {
     }
 
     /**
-     * The rich plant to dig a new tunnel to, or null: one the colony knows, within its tunnels' reach of the nest's
+     * The rich plants to dig a new tunnel to, nearest first, one to each piece of food (M8 step 3F: the next is tried
+     * when the nearest waits for the workers), or none: ones the colony knows, within its tunnels' reach of the nest's
      * middle, more than {@code min_distance} blocks from every way out (planned or open) and from the food of every new
      * tunnel; the nearest to the nest first. With the galleries on, food near a hole is left only while a runway may
      * still come to it (fewer than the most runways, a free hole near it, no failed runway route).
      */
-    @Nullable
-    private BlockPos pickFood(Level level, List<BlockPos> plants, SpeciesProfile.NewHoles numbers) {
+    private List<BlockPos> pickFoods(Level level, List<BlockPos> plants, SpeciesProfile.NewHoles numbers) {
         BlockPos center = colony.getCenter();
         int reach = foodReach(numbers);
         List<BlockPos> holes = new java.util.ArrayList<>();
@@ -705,15 +722,14 @@ public class ForagingHoles {
         if (galleriesOn) {
             colony.nest().foodWays().getRunways().forEach(runway -> dugFor.add(runway.food()));
         }
-        BlockPos best = null;
-        double bestDistance = Double.MAX_VALUE;
+        List<java.util.Map.Entry<Double, BlockPos>> found = new java.util.ArrayList<>();
         for (BlockPos plant : plants) {
             if (!isRich(level, plant) || !colony.foodMap().knows(plant, null) || noRouteUntil.containsKey(plant)
                     || colony.keepsOff(level, plant)) { // (no gallery is dug toward where they were attacked: brain step 4g)
                 continue;
             }
             double fromNest = sideways(plant, center);
-            if (fromNest > reach || fromNest >= bestDistance || nearAny(plant, dugFor, FOOD_STILL_THERE)) {
+            if (fromNest > reach || nearAny(plant, dugFor, FOOD_STILL_THERE)) {
                 continue;
             }
             if (galleriesOn) {
@@ -725,10 +741,23 @@ public class ForagingHoles {
             } else if (nearAny(plant, holes, numbers.minDistance())) {
                 continue;
             }
-            best = plant;
-            bestDistance = fromNest;
+            found.add(java.util.Map.entry(fromNest, plant));
         }
-        return best;
+        found.sort(java.util.Map.Entry.comparingByKey());
+        if (galleriesOn) {
+            // M8 step 3F: the bigger food first (a log before the branches round it), then the nearer: with many spots by
+            // workers the near branches would otherwise take every one before the big dead wood (real termites are drawn
+            // to big rotting wood first, the wood call); a big piece not allowed yet waits while the branches are tried.
+            found.sort(java.util.Comparator.comparingInt((java.util.Map.Entry<Double, BlockPos> entry) -> -pieces(level, entry.getValue()))
+                    .thenComparing(java.util.Map.Entry.comparingByKey()));
+        }
+        List<BlockPos> picked = new java.util.ArrayList<>();
+        for (java.util.Map.Entry<Double, BlockPos> entry : found) {
+            if (!nearAny(entry.getValue(), picked, FOOD_STILL_THERE)) { // (one plant to each piece of food)
+                picked.add(entry.getValue());
+            }
+        }
+        return picked;
     }
 
     /** The holes a runway may leave from: dug, open for use, without a runway yet, loaded. */
@@ -769,6 +798,25 @@ public class ForagingHoles {
     }
 
     /** Whether the plant at this spot is a rich one (its profile entry says {@code rich}). */
+    /**
+     * Whether the food at {@code pos} is small food (M8 step 3F: {@code small_pieces} pieces or fewer, a branch), by the
+     * block there or, once that is eaten, the rich block left near it.
+     */
+    private boolean isSmall(Level level, BlockPos pos, SpeciesProfile.NewHoles numbers) {
+        int pieces = pieces(level, pos);
+        if (pieces == 0 && level.isLoaded(pos)) {
+            BlockPos near = richBlockNear(level, pos, FOOD_STILL_THERE);
+            pieces = near == null ? 0 : pieces(level, near);
+        }
+        return pieces <= numbers.smallPieces();
+    }
+
+    /** How many pieces the plant at {@code pos} gives (0 if none). */
+    private int pieces(Level level, BlockPos pos) {
+        SpeciesProfile.PlantFood plant = colony.profile().food().plantFor(level.getBlockState(pos));
+        return plant == null ? 0 : plant.pieces();
+    }
+
     private boolean isRich(Level level, BlockPos pos) {
         SpeciesProfile.PlantFood plant = colony.profile().food().plantFor(level.getBlockState(pos));
         return plant != null && plant.rich();

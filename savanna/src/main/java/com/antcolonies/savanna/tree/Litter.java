@@ -10,12 +10,14 @@ import static com.antcolonies.savanna.tree.TreeDraw.thinLine;
  * scattered in the grass; the open grass between trees has little dead wood. It is not part of a tree's own shape (the
  * tree book never moves or removes it, and termites eat it like any dead wood): new land puts it down once, with the
  * tree ({@code worldgen.GiantTreePiece}). Every block is a loose piece, lying on the land under it. The numbers are my
- * picks, to confirm.
+ * picks, to confirm. M8 step 3F, F3: more of it (3 to 6 branches out to the crown's edge, limbs from a little before
+ * grown, a branch or two under young trees too), as Macrotermes feed at dozens of small places round a big mound, most of
+ * them fallen branches under the trees (wind, browsing elephants and giraffes, and the trees' own shedding drop them).
  */
 public final class Litter {
     private static final double TAU = Math.PI * 2;
     /** The share of the crown's reach (from the trunk) where its dead wood lies. */
-    private static final double UNDER_CROWN = 0.8;
+    private static final double UNDER_CROWN = 1.0;
     /** Of the young trees in new land: how many are instead a dead young tree lying in the grass (my pick). */
     public static final double FALLEN_YOUNG_SHARE = 0.15;
 
@@ -23,21 +25,22 @@ public final class Litter {
     }
 
     /**
-     * The dead wood under a living tree of new land: 1 to 3 fallen branches under its crown, and for an old one often a
-     * fallen giant limb (from {@link #limbChance}). {@code reach}: how far the crown reaches from the trunk; {@code r0}:
+     * The dead wood under a living tree of new land: 3 to 6 fallen branches under its crown (0 to 2 under a young tree,
+     * none under a sapling), and for an old one often a fallen giant limb (from {@link #limbChance}). {@code reach}: how far the crown reaches from the trunk; {@code r0}:
      * the trunk's radius (nothing lies inside it). A baobab drops only branches (its soft wood rots away in months).
      */
     public static TreeVoxels underTree(long seed, double age, double reach, double r0, boolean baobab) {
         TreeVoxels v = new TreeVoxels();
-        if (age < TreeShapes.GROWN * 0.6) {
+        if (age < TreeShapes.GROWN * 0.2) {
             return v;
         }
+        boolean young = age < TreeShapes.GROWN * 0.6;
         TreeRandom r = new TreeRandom(seed * 7349 + 61);
         double out = Math.max(r0 + 3, reach * UNDER_CROWN);
         if (!baobab && r.next() < limbChance(age)) {
             limb(v, r, r0, out);
         }
-        int branches = 1 + (int) (r.next() * 3);
+        int branches = young ? (int) (r.next() * 3) : 3 + (int) (r.next() * 4);
         for (int i = 0; i < branches; i++) {
             double a = r.next() * TAU, d = r0 + 2 + r.next() * (out - r0 - 2);
             int x = (int) Math.round(Math.cos(a) * d), z = (int) Math.round(Math.sin(a) * d);
@@ -50,9 +53,9 @@ public final class Litter {
         return v;
     }
 
-    /** The chance a living tree of new land has a fallen giant limb under it: none before grown, often when old. */
+    /** The chance a living tree of new land has a fallen giant limb under it: none before nearly grown, often when old. */
     public static double limbChance(double age) {
-        return age < TreeShapes.GROWN ? 0 : 0.25 + 0.6 * TreeLife.old(age);
+        return age < TreeShapes.GROWN * 0.8 ? 0 : 0.25 + 0.6 * TreeLife.old(age);
     }
 
     /**

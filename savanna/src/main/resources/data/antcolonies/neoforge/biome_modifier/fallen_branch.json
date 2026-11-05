@@ -1,0 +1,6 @@
+{
+  "type": "neoforge:add_features",
+  "biomes": "#minecraft:is_savanna",
+  "features": "antcolonies:fallen_branch",
+  "step": "vegetal_decoration"
+}

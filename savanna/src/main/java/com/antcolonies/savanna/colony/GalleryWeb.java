@@ -99,6 +99,13 @@ final class GalleryWeb {
 
     /** Each piece's parent (by their holes; none for the first arms and pieces off the nest's own tunnels). Saved. */
     final Map<BlockPos, BlockPos> parents = new HashMap<>();
+    /**
+     * M8 step 3F: the holes of pieces dug out to small food (a fallen branch), which count only the species' small
+     * share of their length against what the workers allow ({@link #length}). Saved.
+     */
+    final java.util.Set<BlockPos> smallPieces = new java.util.HashSet<>();
+    /** The piece {@link #affords} last allowed as small food (its hole), marked when it joins the web. Not saved. */
+    private BlockPos smallAllowed;
 
     @Nullable
     Integer reachForTests;
@@ -267,13 +274,23 @@ final class GalleryWeb {
         return newFrom.containsKey(tunnel.hole()) ? ownCells(tunnel) : tunnel.tunnel();
     }
 
-    /** How many blocks long the galleries are in all (the arms' own blocks). */
+    /**
+     * How many blocks long the galleries are in all (the arms' own blocks), as the workers' allowance counts them: a piece
+     * out to small food counts only the small share of its length (M8 step 3F).
+     */
     public int length() {
-        int length = 0;
+        double share = g.numbers().smallFood().share();
+        double length = 0;
         for (NestPlan.ForagingTunnel arm : arms) {
-            length += ownCells(arm).size();
+            length += ownCells(arm).size() * (smallPieces.contains(arm.hole()) ? share : 1);
         }
-        return length;
+        return (int) Math.round(length);
+    }
+
+    /** Whether the food at {@code food} is small food (M8 step 3F: a branch, not a log). */
+    private boolean isSmallFood(ServerLevel level, BlockPos food) {
+        SpeciesProfile.PlantFood plant = colony.profile().food().plantFor(level.getBlockState(food));
+        return plant != null && g.numbers().smallFood().isSmall(plant.pieces());
     }
 
     /** How long the galleries may be with the colony's workers now (never shorter than the first arms). */
@@ -776,6 +793,14 @@ final class GalleryWeb {
     public boolean affords(ServerLevel level, ColonyHooks.GalleryPiece piece, BlockPos food) {
         int fresh = piece.tunnel().tunnel().size() - piece.from();
         int allowed = lengthAllowed() + g.numbers().pieceLength();
+        smallAllowed = null;
+        if (isSmallFood(level, food)) {
+            // M8 step 3F: a piece to small food counts only its small share (the spot count by workers limits them).
+            if (length() + fresh * g.numbers().smallFood().share() <= Math.max(allowed, length())) {
+                smallAllowed = piece.tunnel().hole().immutable();
+                return true;
+            }
+        }
         if (length() + fresh <= allowed) {
             return true;
         }
@@ -832,6 +857,10 @@ final class GalleryWeb {
         all.add(piece.tunnel());
         arms = List.copyOf(all);
         newFrom.put(hole, piece.from());
+        if (hole.equals(smallAllowed)) {
+            smallPieces.add(hole);
+        }
+        smallAllowed = null;
         if (parent != null) {
             parents.put(hole, parent);
             NestPlan.ForagingTunnel of = pieceAt(parent);
@@ -1110,6 +1139,8 @@ final class GalleryWeb {
             parentList.add(entry);
         });
         out.put("parents", parentList);
+        out.putLongArray("smallPieces", smallPieces.stream().filter(hole -> arms.stream().anyMatch(arm -> arm.hole().equals(hole)))
+                .mapToLong(BlockPos::asLong).toArray());
     }
 
     void load(CompoundTag in) {
@@ -1133,6 +1164,10 @@ final class GalleryWeb {
         for (Tag element : in.getList("parents", Tag.TAG_COMPOUND)) {
             CompoundTag entry = (CompoundTag) element;
             parents.put(BlockPos.of(entry.getLong("hole")), BlockPos.of(entry.getLong("parent")));
+        }
+        smallPieces.clear();
+        for (long hole : in.getLongArray("smallPieces")) {
+            smallPieces.add(BlockPos.of(hole));
         }
         base.clear();
         if (in.contains("base")) {

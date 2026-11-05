@@ -2,8 +2,8 @@
   "structures": [{"structure": "antcolonies:termite_mound", "weight": 1}],
   "placement": {
     "type": "minecraft:random_spread",
-    "spacing": 6,
-    "separation": 3,
+    "spacing": 1,
+    "separation": 0,
     "salt": 482911039
   }
 }

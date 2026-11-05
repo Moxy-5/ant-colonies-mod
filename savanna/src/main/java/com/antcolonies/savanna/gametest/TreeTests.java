@@ -308,8 +308,8 @@ public class TreeTests {
         for (int i = 0; i < litter.size(); i++) {
             branch += litter.states()[i].getBlock() instanceof FallenBranchBlock ? 1 : 0;
         }
-        if (branch < 2 || branch > 24) {
-            helper.fail("new land put " + branch + " blocks of fallen branch under a grown camel thorn (1 to 3 branches 2 or 3 long, more with a limb)");
+        if (branch < 6 || branch > 40) {
+            helper.fail("new land put " + branch + " blocks of fallen branch under a grown camel thorn (3 to 6 branches 2 or 3 long, more with a limb)");
         }
         int placed = TreePlacer.place(level, litter, foot, litter.box(foot), Block.UPDATE_CLIENTS);
         if (placed == 0) {

@@ -335,6 +335,18 @@ timings: all "my pick, to confirm" until then).
        empty and may be moved into later (step 6).
      - **F5 The balance model again**, now counting the branches under trees and the new spacing; target: a Matabele
        nest's nearest by-day feeding spot about 20 to 50 blocks off (like real raids) and no new-land colony without one.
+     - **As built (2026-11-04, branch `claude/m8-feeding-spots-e975b9`; details and my picks in `docs/HISTORY.md`):**
+       F2 found five limits (little wood in reach, every piece paid from the tunnel budget, the nearest unaffordable food
+       holding back the rest, new-land colonies knowing only their dead tree, at most 6 new holes). F1 `worldgen/
+       MoundPlaces` (every chunk a candidate with a territory of 21 to 41, a higher-ranked place within both territories
+       wins; places 42 to 82 apart, median 61; a mound by the ground's chance, about 2 in 3; stage by size quantile,
+       leaning bigger beside empty places). F3 one branch spot per 30 workers (3 to 15; logs first, by the digging budget), pieces to branches free of the tunnel
+       budget, the next food tried when one waits, new-land colonies knowing the rich food within 50, more branches under
+       trees (3 to 6, out to the crown's edge, young trees too) and a stick in 1 open chunk in 3. F4 a living mound's foot
+       within 70 (`NewLandMounds.livingMoundNear`). F5 (`tools/raid_balance.py`): big colonies a median 11 spots (8 to
+       14), a Matabele nest's nearest spot a median 40 (28 to 55), 83 percent within 50, none without one within 90;
+       Matabele in about 48 percent of dead mounds. Still not fitting: the prey a raid brings against the colony's
+       hunger (3d, step 4).
      - **Not in 3F (the user, 2026-11-04):** moving house stays whole in step 6 (no early starving move); **dung** as a
        termite food (real: a main termite food in African savannas, it lands in the open grass between trees) waits for
        the wildlife (M9.5); mud sheeting over dry grass dropped (ugly, and dry grass too scarce); Matabele homes in old

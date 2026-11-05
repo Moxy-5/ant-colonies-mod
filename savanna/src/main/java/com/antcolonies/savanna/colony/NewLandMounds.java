@@ -27,6 +27,7 @@ import com.antcolonies.savanna.species.SavannaNumbers.MoundNumbers;
 import com.antcolonies.species.SpeciesProfiles;
 import com.antcolonies.savanna.tree.Forest;
 import com.antcolonies.savanna.tree.TreeStage;
+import com.antcolonies.savanna.worldgen.MoundPlaces;
 import com.antcolonies.savanna.worldgen.TermiteMoundPiece;
 import com.antcolonies.savanna.worldgen.TermiteMoundStructure;
 import com.antcolonies.savanna.worldgen.TermiteMoundStructure.Pick;
@@ -107,6 +108,8 @@ public class NewLandMounds extends SavedData {
     private final List<BlockPos> lastTrees = new ArrayList<>();
     /** The game tests: the foot of the last mound's dead tree (null if it found no room), and a box its low parts must stay inside. */
     private BlockPos lastDeadTree, lastDeadWood;
+    /** The game tests: how many pieces of rich food the last living colony learnt round its mound (F3). */
+    private int learntWood;
     /** The game tests: how far (blocks) the last mound's foot reached from its middle, as its dead tree was placed. */
     private int lastDeadTreeReach;
     private static BoundingBox fence;
@@ -248,6 +251,12 @@ public class NewLandMounds extends SavedData {
         Colony colony = put(level, middle, pick, colonyId, treeNow);
         lastAnts = null;
         if (colony != null && !pick.living()) {
+            // M8 step 3F, F4: a lonely dead mound, no living termites within a raid's reach, stays empty (the command's always not asked)
+            if (!alwaysAnts && MatabeleColonies.wouldSettle(pick.seed()) && !livingMoundNear(level, colony.getCenter())) {
+                SavannaMod.LOGGER.info("[new-land] no Matabele colony in the dead mound at {}: no living termite mound within {} blocks",
+                        colony.getCenter().toShortString(), ANTS_NEAR_LIVING);
+                return colony;
+            }
             lastAnts = MatabeleColonies.inNewLand(level, colony.getCenter(), pick.seed(), alwaysAnts);
             if (lastAnts != null) {
                 ants++;
@@ -255,6 +264,56 @@ public class NewLandMounds extends SavedData {
             }
         }
         return colony;
+    }
+
+    /**
+     * M8 step 3F, F4 (my pick, to confirm): a dead mound of new land holds a Matabele colony only with a living termite
+     * mound's foot within this many blocks (real Matabele nests lie among the termite mounds they raid, their raids
+     * mostly within 50 metres; a colony with no termites in reach would starve).
+     */
+    static final int ANTS_NEAR_LIVING = 70;
+
+    /**
+     * Whether a living termite mound's foot lies within {@link #ANTS_NEAR_LIVING} blocks of {@code center}: a living
+     * Macrotermes colony there now, or a living mound new land will put at a place of the pattern
+     * ({@link MoundPlaces}), made yet or not (the same answer world generation gives).
+     */
+    public static boolean livingMoundNear(ServerLevel level, BlockPos center) {
+        for (Colony other : ColonyManager.get(level).getColonies()) {
+            if (other.getSpecies().equals(SavannaSpecies.MACROTERMES)) {
+                int stage = other.part(SavannaParts.MOUND).map(mound -> mound.getStage(level)).orElse(0);
+                if (sideways(other.getCenter(), center) - MoundPlaces.footReach(stage) <= ANTS_NEAR_LIVING) {
+                    return true;
+                }
+            }
+        }
+        if (!(level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.STRUCTURE)
+                .get(MoundPlaces.STRUCTURE) instanceof TermiteMoundStructure mounds)) {
+            return false;
+        }
+        TermiteMoundStructure.Numbers numbers = mounds.numbers();
+        long seed = level.getSeed();
+        MoundPlaces.Land land = MoundPlaces.Land.of(level, mounds.biomes());
+        int look = ANTS_NEAR_LIVING + (int) Math.ceil(MoundPlaces.footReach(TermiteMoundStructure.FULL_STAGE));
+        for (MoundPlaces.Place place : MoundPlaces.near(seed, center.getX(), center.getZ(), look, numbers.places())) {
+            if (!MoundPlaces.living(seed, place, numbers.deadShare())) {
+                continue; // (the cheap question first)
+            }
+            BlockPos foot = MoundPlaces.holds(land, place, numbers.places());
+            if (foot == null) {
+                continue;
+            }
+            Pick pick = TermiteMoundStructure.pickAt(numbers, seed, place, MoundPlaces.sizeQuantile(land, place, numbers.places()));
+            if (sideways(foot, center) - MoundPlaces.footReach(pick.stage()) <= ANTS_NEAR_LIVING) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static double sideways(BlockPos a, BlockPos b) {
+        double dx = a.getX() - b.getX(), dz = a.getZ() - b.getZ();
+        return Math.sqrt(dx * dx + dz * dz);
     }
 
     private static boolean crowded(ServerLevel level, BlockPos center) {
@@ -449,6 +508,14 @@ public class NewLandMounds extends SavedData {
         Colony living = pick.living() ? colony : null;
         lastDeadTree = deadTree(level, center, pick, living);
         if (living != null) {
+            // M8 step 3F, F3: a colony of years knows the dead wood round its mound (the branches under the trees in its
+            // reach), so its galleries go out to it in the catch-up below, a feeding place at each (my pick).
+            int reach = living.profile().section(SavannaNumbers.GALLERIES).map(SavannaNumbers.GalleryNumbers::reach).orElse(50);
+            List<BlockPos> wood = living.food().richFoodAround(level, reach);
+            for (BlockPos pos : wood) {
+                living.foodMap().learn(pos);
+            }
+            learntWood = wood.size();
             living.building().addWork(5_000_000L);
             ColonyManager.get(level).markChanged();
         }
@@ -846,6 +913,11 @@ public class NewLandMounds extends SavedData {
     /** The game tests: how many mounds put in wait for their dead tree's land. */
     public int treesWaitingForTests() {
         return treesWaiting.size();
+    }
+
+    /** The game tests: how many pieces of rich food the last living colony of new land knew from the start (F3). */
+    public int learntWoodForTests() {
+        return learntWood;
     }
 
     /** The game tests: the foot of the last mound's dead tree (null if it found no room). */

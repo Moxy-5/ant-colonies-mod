@@ -321,11 +321,12 @@ public final class SavannaNumbers {
      * food the colony knows within {@code foodRadius} blocks (or a remembered trail to food still there) open first, and
      * {@code explore} of them (none if only 1 opens, 1 if 2 or 3) go to the holes rested longest. Step 3, growing toward
      * food: known grass up to {@code pullReach} blocks past a tip pulls it; a far branch that led to no food for
-     * {@code fillDays} game days is packed with soil. My picks for the numbers, to confirm.
+     * {@code fillDays} game days is packed with soil. M8 step 3F: pieces out to small food are cheaper ({@code smallFood}).
+     * My picks for the numbers, to confirm.
      */
     public record GalleryNumbers(boolean enabled, int armLength, int holeSpacing, int foragersPerHole, double rainMore, int foodRadius, int explore,
             int workersPerBlock, int maxLength, int reach, int pieceLength, int forkMin, int forkMax, int forkAngle, int wander, int hiddenTrip,
-            int fillDays, int pullReach, WoodCall woodCall) {
+            int fillDays, int pullReach, WoodCall woodCall, SmallFood smallFood) {
         /** The first 16 numbers (a codec group holds at most 16), the step 3 ones at their defaults. */
         private static final com.mojang.serialization.MapCodec<GalleryNumbers> STEPS_1_TO_2 = RecordCodecBuilder.mapCodec(i -> i.group(
                 Codec.BOOL.optionalFieldOf("enabled", false).forGetter(GalleryNumbers::enabled),
@@ -349,8 +350,9 @@ public final class SavannaNumbers {
                 STEPS_1_TO_2.forGetter(numbers -> numbers),
                 Codec.INT.optionalFieldOf("fill_days", 10).forGetter(GalleryNumbers::fillDays),
                 Codec.INT.optionalFieldOf("pull_reach", 12).forGetter(GalleryNumbers::pullReach),
-                WoodCall.CODEC.optionalFieldOf("wood_call", WoodCall.DEFAULT).forGetter(GalleryNumbers::woodCall)
-        ).apply(i, (numbers, fillDays, pullReach, woodCall) -> numbers.withStep3(fillDays, pullReach, woodCall)));
+                WoodCall.CODEC.optionalFieldOf("wood_call", WoodCall.DEFAULT).forGetter(GalleryNumbers::woodCall),
+                SmallFood.CODEC.optionalFieldOf("small_food", SmallFood.DEFAULT).forGetter(GalleryNumbers::smallFood)
+        ).apply(i, (numbers, fillDays, pullReach, woodCall, smallFood) -> numbers.withStep3(fillDays, pullReach, woodCall, smallFood)));
 
         /** Step 1's numbers only (growing with the step 2 and 3 defaults). */
         public GalleryNumbers(boolean enabled, int armLength, int holeSpacing, int foragersPerHole, double rainMore, int foodRadius, int explore) {
@@ -361,24 +363,24 @@ public final class SavannaNumbers {
         public GalleryNumbers(boolean enabled, int armLength, int holeSpacing, int foragersPerHole, double rainMore, int foodRadius, int explore,
                 int workersPerBlock, int maxLength, int reach, int pieceLength, int forkMin, int forkMax, int forkAngle, int wander, int hiddenTrip) {
             this(enabled, armLength, holeSpacing, foragersPerHole, rainMore, foodRadius, explore, workersPerBlock, maxLength, reach, pieceLength,
-                    forkMin, forkMax, forkAngle, wander, hiddenTrip, 10, 12, WoodCall.DEFAULT);
+                    forkMin, forkMax, forkAngle, wander, hiddenTrip, 10, 12, WoodCall.DEFAULT, SmallFood.DEFAULT);
         }
 
-        GalleryNumbers withStep3(int fillDays, int pullReach, WoodCall woodCall) {
+        GalleryNumbers withStep3(int fillDays, int pullReach, WoodCall woodCall, SmallFood smallFood) {
             return new GalleryNumbers(enabled, armLength, holeSpacing, foragersPerHole, rainMore, foodRadius, explore, workersPerBlock, maxLength,
-                    reach, pieceLength, forkMin, forkMax, forkAngle, wander, hiddenTrip, fillDays, pullReach, woodCall);
+                    reach, pieceLength, forkMin, forkMax, forkAngle, wander, hiddenTrip, fillDays, pullReach, woodCall, smallFood);
         }
 
         /** The same numbers with another reach (tests keep a web inside their arena). */
         public GalleryNumbers withReach(int reach) {
             return new GalleryNumbers(enabled, armLength, holeSpacing, foragersPerHole, rainMore, foodRadius, explore, workersPerBlock, maxLength,
-                    reach, pieceLength, forkMin, forkMax, forkAngle, wander, hiddenTrip, fillDays, pullReach, woodCall);
+                    reach, pieceLength, forkMin, forkMax, forkAngle, wander, hiddenTrip, fillDays, pullReach, woodCall, smallFood);
         }
 
         /** The same numbers with another wander (a tip pulled toward food goes straight for it). */
         public GalleryNumbers withWander(int wander) {
             return new GalleryNumbers(enabled, armLength, holeSpacing, foragersPerHole, rainMore, foodRadius, explore, workersPerBlock, maxLength,
-                    reach, pieceLength, forkMin, forkMax, forkAngle, wander, hiddenTrip, fillDays, pullReach, woodCall);
+                    reach, pieceLength, forkMin, forkMax, forkAngle, wander, hiddenTrip, fillDays, pullReach, woodCall, smallFood);
         }
 
         /** How many blocks of gallery a colony with this many workers may have in all, at most max_length (0 when it does not grow). */
@@ -395,6 +397,26 @@ public final class SavannaNumbers {
         /** How many of {@code open} holes go to exploring (the rest to holes near known food): none of 1, 1 of 2 or 3. */
         public int exploreOf(int open) {
             return open <= 1 ? 0 : Math.min(open, open <= 3 ? 1 : explore);
+        }
+    }
+
+    /**
+     * M8 step 3F, F3 (my picks, to confirm): a gallery piece out to small food (a fallen branch, food of at most
+     * {@code pieces} pieces) counts only {@code share} of its length against what the workers allow, as a feeding gallery
+     * to a branch is short-lived and shallow (real Macrotermes feed at dozens of small places at once, mostly on sticks
+     * and branches); the colony's spot count by its workers (the new holes' {@code per_workers}) limits them instead.
+     */
+    public record SmallFood(int pieces, double share) {
+        public static final Codec<SmallFood> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.INT.optionalFieldOf("pieces", 8).forGetter(SmallFood::pieces),
+                Codec.DOUBLE.optionalFieldOf("share", 0.0).forGetter(SmallFood::share)
+        ).apply(i, SmallFood::new));
+
+        public static final SmallFood DEFAULT = new SmallFood(8, 0.0);
+
+        /** Whether food of this many pieces is small. */
+        public boolean isSmall(int foodPieces) {
+            return foodPieces > 0 && foodPieces <= pieces;
         }
     }
 

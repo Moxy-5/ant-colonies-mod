@@ -15,18 +15,17 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.levelgen.structure.Structure;
 import net.minecraft.world.level.levelgen.structure.StructureSet;
 import net.minecraft.world.level.levelgen.structure.StructureType;
-import net.minecraft.world.level.levelgen.structure.placement.RandomSpreadStructurePlacement;
 
 /**
  * A Macrotermes mound in new land (M8 step 1b, {@code docs/DESIGN.md}, "World generation, details"): living colonies
- * with dead mounds among them, spaced evenly about every 96 blocks (data/antcolonies/worldgen/structure_set/
- * termite_mounds.json: one to a square of 6 by 6 chunks, its place in it a little to either side), as real neighbouring
- * colonies fight over the ground between them and their mounds end up over-dispersed, about one to a hectare.
+ * with dead mounds among them, 40 to 80 blocks apart at random, mostly round 60, bigger mounds farther apart, and not
+ * every place holding one, by the ground (M8 step 3F, F1: {@link MoundPlaces}). The structure set
+ * (data/antcolonies/worldgen/structure_set/termite_mounds.json) offers every chunk; {@link MoundPlaces} says which are
+ * places and which places hold a mound.
  *
  * <p>World generation only picks what stands there ({@link Pick}) and where; the colony, its nest and its mound are put
  * in on the server once the land round it is loaded ({@code colony.NewLandMounds}), with the same code the termites
@@ -74,7 +73,7 @@ public class TermiteMoundStructure extends Structure {
      * has dug into. {@code humpGrass}: whether old humps carry the greener grass of real mound islands.
      */
     public record Numbers(double deadShare, List<Band> livingStages, List<Band> deadSizes, List<Integer> deadStages,
-            double humpWoods, double burrows, boolean humpGrass) {
+            double humpWoods, double burrows, boolean humpGrass, MoundPlaces.Numbers places) {
         public static final Codec<Numbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.DOUBLE.optionalFieldOf("dead_share", 0.33).forGetter(Numbers::deadShare),
                 Band.CODEC.listOf().optionalFieldOf("living_stages", Band.LIVING).forGetter(Numbers::livingStages),
@@ -82,10 +81,12 @@ public class TermiteMoundStructure extends Structure {
                 Codec.INT.listOf().optionalFieldOf("dead_stages", List.of(15, 20, 20, 45)).forGetter(Numbers::deadStages),
                 Codec.DOUBLE.optionalFieldOf("hump_woods", 0.5).forGetter(Numbers::humpWoods),
                 Codec.DOUBLE.optionalFieldOf("aardvark_burrows", 0.4).forGetter(Numbers::burrows),
-                Codec.BOOL.optionalFieldOf("hump_grass", true).forGetter(Numbers::humpGrass)
+                Codec.BOOL.optionalFieldOf("hump_grass", true).forGetter(Numbers::humpGrass),
+                MoundPlaces.Numbers.CODEC.optionalFieldOf("places", MoundPlaces.Numbers.DEFAULT).forGetter(Numbers::places)
         ).apply(i, Numbers::new));
 
-        public static final Numbers DEFAULT = new Numbers(0.33, Band.LIVING, Band.DEAD, List.of(15, 20, 20, 45), 0.5, 0.4, true);
+        public static final Numbers DEFAULT = new Numbers(0.33, Band.LIVING, Band.DEAD, List.of(15, 20, 20, 45), 0.5, 0.4, true,
+                MoundPlaces.Numbers.DEFAULT);
     }
 
     /** Sizes of mound (and colony). */
@@ -151,6 +152,31 @@ public class TermiteMoundStructure extends Structure {
         return from + random.nextInt(to - from + 1);
     }
 
+    /**
+     * The stage at quantile {@code q} (0 to 1) of the weighted bands, each stage of a band equally likely: the same
+     * spread as {@link #stageFrom}, drawn in order of size (F1: a place's size quantile, big territories big mounds).
+     */
+    static int stageAt(List<Band> bands, double q) {
+        double total = 0;
+        for (Band band : bands) {
+            total += Math.max(0, band.weight());
+        }
+        double acc = 0;
+        int last = 1;
+        for (Band band : bands) {
+            int from = Math.max(1, Math.min(band.from(), band.to())), to = Math.min(FULL_STAGE, Math.max(band.from(), band.to()));
+            double each = Math.max(0, band.weight()) / total / (to - from + 1);
+            for (int stage = from; stage <= to; stage++) {
+                acc += each;
+                last = stage;
+                if (q < acc) {
+                    return stage;
+                }
+            }
+        }
+        return last;
+    }
+
     /** Full, half grown or young, by stage: the names the command and the log use (and young colonies keep their deep levels shut). */
     public static int sizeOf(int stage) {
         return stage >= 20 ? FULL : stage >= 10 ? HALF : YOUNG;
@@ -174,6 +200,23 @@ public class TermiteMoundStructure extends Structure {
         long seed = random.nextLong() & 0xFFFFFFFFL;
         boolean living = random.nextDouble() >= numbers.deadShare();
         int stage = stageFrom(living ? numbers.livingStages() : numbers.deadSizes(), random);
+        return pick(numbers, random, seed, living, stage);
+    }
+
+    /**
+     * The pick of a place of the pattern (F1), fixed by the world's seed and the place alone, so the server can work it
+     * out again for a place not made yet (F4): living or dead by the place's dice, the stage at its size quantile
+     * ({@code quantile}: its territory, leaning bigger next to empty places), the rest by its own dice as {@link #pick}.
+     */
+    public static Pick pickAt(Numbers numbers, long worldSeed, MoundPlaces.Place place, double quantile) {
+        RandomSource random = RandomSource.create(place.seed(worldSeed));
+        long seed = random.nextLong() & 0xFFFFFFFFL;
+        boolean living = MoundPlaces.living(worldSeed, place, numbers.deadShare());
+        int stage = stageAt(living ? numbers.livingStages() : numbers.deadSizes(), quantile);
+        return pick(numbers, random, seed, living, stage);
+    }
+
+    private static Pick pick(Numbers numbers, RandomSource random, long seed, boolean living, int stage) {
         double height = (double) stage / FULL_STAGE;
         int size = sizeOf(stage);
         if (living) {
@@ -207,24 +250,23 @@ public class TermiteMoundStructure extends Structure {
     /**
      * Whether a tree of new land with this box (its crown and the wood lying round it) would stand on a mound's place:
      * then it is not grown there (the mound has the place; the trees on old humps are put there on purpose). Only a
-     * mound that will really be made counts (in a savanna, on dry, fairly flat land, {@link #stands}): a place the
-     * mounds' spacing offers but no mound takes is free for trees (the user's report, 2026-10-24: far fewer trees).
+     * place that really holds a mound counts ({@link MoundPlaces#holds}): a place the pattern offers but the ground leaves
+     * empty is free for trees (the user's report, 2026-10-24: far fewer trees).
      */
     public static boolean crowds(GenerationContext context, BoundingBox box) {
         StructureSet set = context.registryAccess().registryOrThrow(Registries.STRUCTURE_SET).get(SET);
-        if (set == null || !(set.placement() instanceof RandomSpreadStructurePlacement spread)) {
+        if (set == null || set.structures().isEmpty() || !(set.structures().get(0).structure().value() instanceof TermiteMoundStructure mounds)) {
             return false;
         }
-        int spacing = spread.spacing();
-        int minCx = (box.minX() - CLEAR) >> 4, maxCx = (box.maxX() + CLEAR) >> 4;
-        int minCz = (box.minZ() - CLEAR) >> 4, maxCz = (box.maxZ() + CLEAR) >> 4;
-        for (int cellX = Math.floorDiv(minCx, spacing); cellX <= Math.floorDiv(maxCx, spacing); cellX++) {
-            for (int cellZ = Math.floorDiv(minCz, spacing); cellZ <= Math.floorDiv(maxCz, spacing); cellZ++) {
-                ChunkPos chunk = spread.getPotentialStructureChunk(context.seed(), cellX * spacing, cellZ * spacing);
-                BlockPos middle = middle(context.seed(), chunk);
+        MoundPlaces.Numbers places = mounds.numbers().places();
+        MoundPlaces.Land land = land(context, mounds);
+        for (int cx = (box.minX() - CLEAR) >> 4; cx <= (box.maxX() + CLEAR) >> 4; cx++) {
+            for (int cz = (box.minZ() - CLEAR) >> 4; cz <= (box.maxZ() + CLEAR) >> 4; cz++) {
+                MoundPlaces.Place place = MoundPlaces.candidate(context.seed(), cx, cz, places);
+                BlockPos middle = place.middle();
                 if (middle.getX() >= box.minX() - CLEAR && middle.getX() <= box.maxX() + CLEAR
                         && middle.getZ() >= box.minZ() - CLEAR && middle.getZ() <= box.maxZ() + CLEAR
-                        && stands(context, set, middle) != null) {
+                        && MoundPlaces.isPlace(context.seed(), cx, cz, places) && MoundPlaces.holds(land, place, places) != null) {
                     return true;
                 }
             }
@@ -232,51 +274,25 @@ public class TermiteMoundStructure extends Structure {
         return false;
     }
 
+    private static MoundPlaces.Land land(GenerationContext context, TermiteMoundStructure mounds) {
+        return new MoundPlaces.Land(context.seed(), context.chunkGenerator(), context.heightAccessor(), context.randomState(), mounds.biomes());
+    }
+
     @Override
     protected Optional<GenerationStub> findGenerationPoint(GenerationContext context) {
-        BlockPos foot = stands(context, null, middle(context.seed(), context.chunkPos()));
+        MoundPlaces.Numbers places = numbers.places();
+        ChunkPos chunk = context.chunkPos();
+        if (!MoundPlaces.isPlace(context.seed(), chunk.x, chunk.z, places)) {
+            return Optional.empty();
+        }
+        MoundPlaces.Place place = MoundPlaces.candidate(context.seed(), chunk.x, chunk.z, places);
+        MoundPlaces.Land land = land(context, this);
+        BlockPos foot = MoundPlaces.holds(land, place, places);
         if (foot == null) {
             return Optional.empty();
         }
-        Pick pick = pick(numbers, context.random());
+        Pick pick = pickAt(numbers, context.seed(), place, MoundPlaces.sizeQuantile(land, place, places));
         BoundingBox box = new BoundingBox(foot);
         return Optional.of(new GenerationStub(foot, builder -> builder.addPiece(new TermiteMoundPiece(pick, foot, box))));
-    }
-
-    /**
-     * The foot of a mound whose middle is {@code middle}, or null if no mound stands there: never in water, never on a
-     * steep slope (the colony's queen would not have founded there), and, asked for a tree ({@code set} given), only in
-     * the mounds' biomes (the game checks those itself for the mound's own start).
-     */
-    private static BlockPos stands(GenerationContext context, StructureSet set, BlockPos middle) {
-        int x = middle.getX(), z = middle.getZ();
-        int lowest = Integer.MAX_VALUE, highest = Integer.MIN_VALUE;
-        int[][] around = {{0, 0}, {8, 0}, {-8, 0}, {0, 8}, {0, -8}, {6, 6}, {-6, 6}, {6, -6}, {-6, -6}};
-        for (int[] o : around) {
-            int surface = height(context, x + o[0], z + o[1], Heightmap.Types.WORLD_SURFACE_WG);
-            int floor = height(context, x + o[0], z + o[1], Heightmap.Types.OCEAN_FLOOR_WG);
-            if (surface != floor) {
-                return null;
-            }
-            lowest = Math.min(lowest, surface);
-            highest = Math.max(highest, surface);
-        }
-        if (highest - lowest > MAX_UNEVEN) {
-            return null;
-        }
-        BlockPos foot = new BlockPos(x, height(context, x, z, Heightmap.Types.WORLD_SURFACE_WG), z);
-        if (set != null && !set.structures().isEmpty()) {
-            net.minecraft.core.Holder<net.minecraft.world.level.biome.Biome> biome = context.biomeSource().getNoiseBiome(
-                    net.minecraft.core.QuartPos.fromBlock(x), net.minecraft.core.QuartPos.fromBlock(foot.getY()),
-                    net.minecraft.core.QuartPos.fromBlock(z), context.randomState().sampler());
-            if (!set.structures().get(0).structure().value().biomes().contains(biome)) {
-                return null;
-            }
-        }
-        return foot;
-    }
-
-    private static int height(GenerationContext context, int x, int z, Heightmap.Types type) {
-        return GroundHeights.at(context.chunkGenerator(), x, z, type, context.heightAccessor(), context.randomState());
     }
 }

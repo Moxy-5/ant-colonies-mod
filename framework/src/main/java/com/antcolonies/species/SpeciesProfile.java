@@ -899,16 +899,37 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * (a plant whose entry says {@code rich}) more than {@code minDistance} blocks from every hole, the workers dig a
      * tunnel underground out to it and open a hole beside it. The tunnels reach out from the nest up to
      * {@link #reach} blocks, growing with the colony from {@code reachMin} (a young colony) to {@code reachMax} (at
-     * {@code reachFullAtWorkers} workers); at most {@code max} new holes at a time (my picks).
+     * {@code reachFullAtWorkers} workers); at most {@code max} new holes at a time (my picks). With {@code perWorkers}
+     * above 0 (M8 step 3F), a colony keeps one for every {@code perWorkers} workers, at least {@code fewest}, at most
+     * {@code max} ({@link #mostFor}): a big colony feeds at many places at once, a young one at few. With
+     * {@code smallPieces} above 0 that count holds only for spots at small food (that many pieces or fewer: a branch);
+     * spots at bigger food are limited by the digging budget alone.
      */
-    public record NewHoles(int reachMin, int reachMax, int reachFullAtWorkers, int minDistance, int max) {
+    public record NewHoles(int reachMin, int reachMax, int reachFullAtWorkers, int minDistance, int max, int perWorkers, int fewest,
+            int smallPieces) {
         public static final Codec<NewHoles> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.optionalFieldOf("reach_min", 10).forGetter(NewHoles::reachMin),
                 Codec.INT.optionalFieldOf("reach_max", 40).forGetter(NewHoles::reachMax),
                 Codec.INT.optionalFieldOf("reach_full_at_workers", 500).forGetter(NewHoles::reachFullAtWorkers),
                 Codec.INT.optionalFieldOf("min_distance", 8).forGetter(NewHoles::minDistance),
-                Codec.INT.optionalFieldOf("max", 6).forGetter(NewHoles::max)
+                Codec.INT.optionalFieldOf("max", 6).forGetter(NewHoles::max),
+                Codec.INT.optionalFieldOf("per_workers", 0).forGetter(NewHoles::perWorkers),
+                Codec.INT.optionalFieldOf("fewest", 1).forGetter(NewHoles::fewest),
+                Codec.INT.optionalFieldOf("small_pieces", 0).forGetter(NewHoles::smallPieces)
         ).apply(i, NewHoles::new));
+
+        /** The numbers of before M8 step 3F (a fixed most). */
+        public NewHoles(int reachMin, int reachMax, int reachFullAtWorkers, int minDistance, int max) {
+            this(reachMin, reachMax, reachFullAtWorkers, minDistance, max, 0, 1, 0);
+        }
+
+        /** How many new holes a colony with this many workers keeps at most. */
+        public int mostFor(int workers) {
+            if (perWorkers <= 0) {
+                return max;
+            }
+            return Math.max(Math.min(fewest, max), Math.min(max, Math.max(0, workers) / perWorkers));
+        }
 
         /** How far (blocks, sideways from the nest's middle) the tunnels reach with this many workers. */
         public int reach(int workers) {
