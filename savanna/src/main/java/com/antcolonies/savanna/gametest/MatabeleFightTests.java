@@ -547,6 +547,86 @@ public class MatabeleFightTests {
         return count;
     }
 
+    /**
+     * BUGS 102 (the user's report of 2026-11-05: termite workers sealed Matabele in and they stood stuck for ever): three
+     * ants each shut in a little closed tunnel under the ground. A major under a roof of soil and a minor behind soil
+     * walls with a two-block roof bite their way out; a third, a major in a cell walled all round with termite mound
+     * soil that is no fresh seal of any colony, bites nothing (never the mound) and stays.
+     */
+    @GameTest(template = "arena", timeoutTicks = 2400, skyAccess = true)
+    public static void aMatabeleShutInUnderTheGroundBitesItsWayOutButNeverThroughTheMound(GameTestHelper helper) {
+        floor(helper);
+        // A bank of soil 3 high over the floor (y 1 to 3).
+        for (int x = 1; x <= 14; x++) {
+            for (int z = 1; z <= 12; z++) {
+                for (int y = 1; y <= 3; y++) {
+                    helper.setBlock(x, y, z, Blocks.DIRT);
+                }
+            }
+        }
+        // The major's tunnel: 3 long at y 2, one block of soil over it, then the sky.
+        for (int x = 3; x <= 5; x++) {
+            helper.setBlock(x, 2, 3, Blocks.AIR);
+        }
+        // The minor's tunnel: 3 long at y 1, two blocks of soil over it.
+        for (int x = 3; x <= 5; x++) {
+            helper.setBlock(x, 1, 8, Blocks.AIR);
+        }
+        // The mound cell: walled all round with termite mound soil, inside the bank.
+        for (int x = 9; x <= 13; x++) {
+            for (int z = 2; z <= 6; z++) {
+                for (int y = 1; y <= 3; y++) {
+                    helper.setBlock(x, y, z, SavannaBlocks.TERMITE_MOUND.get().defaultBlockState()
+                            .setValue(com.antcolonies.savanna.block.TermiteMoundBlock.LAYERS, com.antcolonies.savanna.block.TermiteMoundBlock.FINISHED));
+                }
+            }
+        }
+        for (int x = 10; x <= 12; x++) {
+            helper.setBlock(x, 2, 4, Blocks.AIR);
+        }
+        MatabeleEntity major = TestAnts.loneWithAMind(helper, SavannaEntities.MATABELE_MAJOR.get(), 4, 2, 3);
+        MatabeleEntity minor = TestAnts.loneWithAMind(helper, SavannaEntities.MATABELE_MINOR.get(), 4, 1, 8);
+        MatabeleEntity walledIn = TestAnts.loneWithAMind(helper, SavannaEntities.MATABELE_MAJOR.get(), 11, 2, 4);
+        ServerLevel level = helper.getLevel();
+        helper.assertTrue(com.antcolonies.fight.Fights.isShutIn(level, major.blockPosition())
+                && com.antcolonies.fight.Fights.isShutIn(level, minor.blockPosition()), "the tunnels are not shut in");
+        int[] moundLeft = {0};
+        // When each got out (game ticks from the start; -1 still shut in): once out a lone ant wanders where it likes.
+        long start = level.getGameTime();
+        long[] outAt = {-1, -1};
+        helper.onEachTick(() -> {
+            List<MatabeleEntity> two = List.of(major, minor);
+            for (int i = 0; i < 2; i++) {
+                if (outAt[i] < 0 && two.get(i).isAlive() && !com.antcolonies.fight.Fights.isShutIn(level, two.get(i).blockPosition())) {
+                    outAt[i] = level.getGameTime() - start;
+                    com.antcolonies.savanna.SavannaMod.LOGGER.info("[bite out test] the {} got out after {} s", i == 0 ? "major" : "minor", outAt[i] / 20);
+                }
+            }
+            int left = 0;
+            for (int x = 9; x <= 13; x++) {
+                for (int z = 2; z <= 6; z++) {
+                    for (int y = 1; y <= 3; y++) {
+                        if (helper.getBlockState(new BlockPos(x, y, z)).is(SavannaBlocks.TERMITE_MOUND.get())) {
+                            left++;
+                        }
+                    }
+                }
+            }
+            moundLeft[0] = left;
+        });
+        int moundAll = 5 * 5 * 3 - 3;
+        helper.runAfterDelay(2000, () -> {
+            helper.assertTrue(moundLeft[0] == moundAll, "a block of the mound was bitten: " + (moundAll - moundLeft[0]) + " gone");
+            helper.assertTrue(walledIn.isAlive() && com.antcolonies.fight.Fights.isShutIn(level, walledIn.blockPosition()),
+                    "the ant walled in by the mound got out (it may never bite the mound)");
+            helper.assertTrue(outAt[0] >= 0, "the major is still shut in at " + helper.relativePos(major.blockPosition()).toShortString());
+            helper.assertTrue(outAt[1] >= 0, "the minor is still shut in at " + helper.relativePos(minor.blockPosition()).toShortString());
+            // (it digs one straight way out, not a cave round itself: 2 blocks, about 12 s for a minor)
+            helper.assertTrue(outAt[0] <= 800 && outAt[1] <= 800, "too slow out: the major after " + outAt[0] / 20 + " s, the minor after " + outAt[1] / 20 + " s");
+            helper.succeed();
+        });
+    }
+
     private static void floor(GameTestHelper helper) {
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {

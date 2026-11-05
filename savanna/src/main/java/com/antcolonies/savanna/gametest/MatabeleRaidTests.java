@@ -593,6 +593,124 @@ public class MatabeleRaidTests {
     }
 
     /**
+     * BUGS 101 (the user's raid of 2026-11-05): from a tall dead mound (dead only a few days, the hump still high round
+     * its open chimney), a raid of about 24 forms. Real Megaponera: the scout goes in and recruits, the raiders pour out
+     * after it and the column leaves almost at once, the late ones following the trail. Here: the scout goes into the nest
+     * first; every recruit that came out of the nest counts as out, wherever round the hump it stands (none is left home
+     * standing at the place it was given, and none out of the nest is left home at all); the column sets out before the
+     * forming's longest time; and a recruit at its place stands there, never walking off and back again and again.
+     */
+    @GameTest(template = "arena", timeoutTicks = 6000, skyAccess = true, batch = "matabele_raids")
+    public static void aRaidFromATallDeadMoundSetsOutPromptlyWithEveryRecruitThatCameOut(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        TestClock.moving(helper, 7.0);
+        TestScenes.shapeGround(helper, 45, (x, z) -> 0);
+        Colony dead = NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(NEST, SURFACE, NEST)), NewLandMounds.pickFor("dead", 6, 5L));
+        helper.assertTrue(dead != null, "no dead mound put in");
+        Colony colony = MatabeleCommands.makeColony(level, helper.absolutePos(new BlockPos(NEST + 6, SURFACE, NEST)), 120);
+        helper.assertTrue(colony != null, "no Matabele colony made");
+        Raids raids = colony.part(SavannaParts.RAIDS).orElse(null);
+        helper.assertTrue(raids != null, "a Matabele colony has no raids part");
+        RaidColumn[] column = {null};
+        long[] formedAt = {-1};
+        long[] startedAt = {-1};
+        long[] milled = {-1};
+        int[] members = {0};
+        boolean[] scoutWentIn = {false};
+        // Each recruit's walks after it first stood at its place (BUGS 101: back and forth at the top of the hump).
+        java.util.Map<java.util.UUID, Integer> rewalks = new java.util.HashMap<>();
+        java.util.Set<java.util.UUID> settled = new java.util.HashSet<>();
+        java.util.Map<java.util.UUID, BlockPos> walkingTo = new java.util.HashMap<>();
+        helper.onEachTick(() -> {
+            RaidColumn raid = column[0];
+            if (raid == null || formedAt[0] >= 0) {
+                return;
+            }
+            if (raid.stage() != RaidColumn.Stage.FORMING) {
+                formedAt[0] = helper.getTick();
+                milled[0] = raid.recruitedAt() < 0 ? -1 : level.getGameTime() - raid.recruitedAt();
+                return;
+            }
+            for (java.util.UUID id : raid.members()) {
+                if (!(level.getEntity(id) instanceof MatabeleEntity ant)) {
+                    continue;
+                }
+                if (id.equals(raid.leader()) && colony.nest().isInside(level, ant.blockPosition())) {
+                    scoutWentIn[0] = true;
+                }
+                RaidColumn.Order order = raid.orderFor(level, ant);
+                if (order == null || order.to() == null || id.equals(raid.leader())) {
+                    continue;
+                }
+                boolean at = flat(ant.blockPosition(), order.to()) <= 1.5 && Math.abs(ant.getY() - order.to().getY()) <= 1.5;
+                boolean walking = !ant.getNavigator().isDone();
+                if (at && !walking) {
+                    settled.add(id);
+                    walkingTo.remove(id);
+                } else if (settled.contains(id) && walking && !order.to().equals(walkingTo.get(id))) {
+                    walkingTo.put(id, order.to());
+                    rewalks.merge(id, 1, Integer::sum);
+                }
+            }
+        });
+        helper.startSequence()
+                .thenIdle(40)
+                .thenExecute(() -> {
+                    BlockPos entrance = colony.getCenter();
+                    MatabeleEntity scout = colony.population().realMembers(level).stream()
+                            .filter(ant -> ant instanceof MatabeleEntity matabele && matabele.hasMajorBody() && !raids.isScouting(ant.getUUID())
+                                    && !colony.nest().isInside(level, ant.blockPosition()))
+                            .map(ant -> (MatabeleEntity) ant)
+                            .findFirst().orElse(null);
+                    helper.assertTrue(scout != null, "no real major outside to be the scout");
+                    BlockPos by = com.antcolonies.savanna.colony.RaidGround.standAt(level, entrance.getX() + 2.5, entrance.getZ() + 0.5, entrance.getY());
+                    helper.assertTrue(by != null, "no ground to stand on by the entrance");
+                    scout.moveTo(by.getX() + 0.5, by.getY(), by.getZ() + 0.5); // (home from its find, by the entrance)
+                    BlockPos at = helper.absolutePos(new BlockPos(NEST + 24, SURFACE, NEST));
+                    List<BlockPos> trail = new ArrayList<>();
+                    int steps = (int) Math.ceil(Math.hypot(at.getX() - entrance.getX(), at.getZ() - entrance.getZ()) / 2.0);
+                    for (int i = 0; i <= steps; i++) {
+                        double t = i / (double) steps;
+                        int x = entrance.getX() + (int) Math.round((at.getX() - entrance.getX()) * t);
+                        int z = entrance.getZ() + (int) Math.round((at.getZ() - entrance.getZ()) * t);
+                        trail.add(level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                                new BlockPos(x, entrance.getY(), z)));
+                    }
+                    RaidColumn raid = raids.raidForTests(level, at, 6, trail, scout.getUUID());
+                    helper.assertTrue(raid != null, "no raid set out; " + raids.describe(level));
+                    column[0] = raid;
+                    startedAt[0] = helper.getTick();
+                    members[0] = raid.members().size();
+                    StringBuilder ground = new StringBuilder();
+                    for (int dx = -6; dx <= 6; dx++) {
+                        BlockPos top = level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                                entrance.offset(dx, 0, 0));
+                        ground.append(top.getY() - entrance.getY()).append(' ');
+                    }
+                    SavannaMod.LOGGER.info("[raid form test] {} raiders, entrance {}, the ground west to east from it: {}", members[0],
+                            entrance.toShortString(), ground);
+                })
+                .thenWaitUntil(() -> helper.assertTrue(formedAt[0] >= 0, "still forming; " + column[0].describe()))
+                .thenExecute(() -> {
+                    RaidColumn raid = column[0];
+                    long took = formedAt[0] - startedAt[0];
+                    int rewalked = rewalks.values().stream().mapToInt(Integer::intValue).sum();
+                    SavannaMod.LOGGER.info("[raid form test] formed in {} s ({} s milling after the scout recruited), {} of {} set out, {} walk(s) off a place reached, the scout went in: {}; {}",
+                            took / 20, milled[0] / 20, raid.members().size(), members[0], rewalked, scoutWentIn[0], raid.endedWhy());
+                    helper.assertTrue(scoutWentIn[0], "the scout never went into the nest to recruit");
+                    helper.assertTrue(raid.formFaults() == 0, raid.formFaults() + " recruit(s) out of the nest left home: " + raid.describe());
+                    helper.assertTrue(milled[0] >= 0 && milled[0] < raid.columnNumbers().formTicks(), "the column milled the forming's longest time, "
+                            + milled[0] / 20 + " s after the scout recruited: " + raid.describe());
+                    helper.assertTrue(raid.members().size() * 10 >= members[0] * 9, "only " + raid.members().size() + " of " + members[0]
+                            + " recruits set out");
+                    helper.assertTrue(rewalked <= Math.max(2, members[0] / 6), rewalked + " walks off a place already reached while forming "
+                            + rewalks + " (back and forth)");
+                })
+                .thenSucceed();
+    }
+
+    /**
      * The raid code review, finding 18: a trail over a hill and round a bend, all of it a real scout's own. Between the
      * nest (a dead mound) and termites feeding under three logs about 20 blocks east lie a pond (a strip of water 3 wide
      * and 12 long, across the straight way) and a ridge 3 blocks high. The scout command's scout searches by itself,

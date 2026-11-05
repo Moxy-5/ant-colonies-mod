@@ -177,6 +177,8 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
     @Override
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));
+        // BUGS 102: shut in by the termites' seals, it bites its way out (ahead of the fight, see the goal).
+        this.goalSelector.addGoal(-1, new com.antcolonies.savanna.entity.goal.MatabeleBiteOutGoal(this));
         // M8 step 2b: sent to fight (the skirmish command; the raids later), or hurt by a termite, it fights.
         this.goalSelector.addGoal(0, new FightGoal(this));
         // Step 1e: they eat from the prey pile, feed the queen and the larvae from it, carry eggs and carry the waste out
@@ -442,6 +444,64 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
 
     /** One bite at the cover it is in reach of (its clip, the third bite opening it); false if it may not bite now. */
     private boolean bite(ServerLevel level, BlockPos cover) {
+        return bite(level, cover, BITES_TO_OPEN, true);
+    }
+
+    /**
+     * BUGS 102, shut in by the termites (a gallery packed behind it, a plug in a hole, a leak walled up while it was in
+     * the pocket): one bite at a block of its trap in reach (see {@link #mayBiteOut}). A major opens it in
+     * {@link #BITES_TO_OPEN} bites, a minor in {@link #MINOR_BITES_OUT} (my pick: the small jaws, slower; real Megaponera
+     * minors dig too). The termites hear nothing of it: it is a way out, not a break-in. False if it may not bite now.
+     */
+    public boolean biteOut(ServerLevel level, BlockPos block) {
+        if (distanceToSqr(Vec3.atCenterOf(block)) > BITE_REACH * BITE_REACH) {
+            return false;
+        }
+        return bite(level, block, hasMajorBody() ? BITES_TO_OPEN : MINOR_BITES_OUT, false);
+    }
+
+    /** BUGS 102: how many bites a minor needs to open a block of its trap. */
+    private static final int MINOR_BITES_OUT = 6;
+
+    /** BUGS 102: whether the block is in its bite reach. */
+    public boolean inBiteReach(BlockPos block) {
+        return distanceToSqr(Vec3.atCenterOf(block)) <= BITE_REACH * BITE_REACH;
+    }
+
+    /**
+     * BUGS 102: whether a Matabele shut in may bite through this block to get out: soil or termite mud (what it breaks open
+     * at a raid), or the termites' plug of mound soil where it is a fresh seal: a raid seal, or a plug in or beside the
+     * termites' tunnels and holes. Never the mound itself (its walls are hard, cemented with saliva), never wood or stone.
+     */
+    public static boolean mayBiteOut(ServerLevel level, BlockPos pos) {
+        BlockState state = level.getBlockState(pos);
+        if (state.is(SavannaTags.MATABELE_BREAKS_OPEN)) {
+            return true;
+        }
+        for (Colony colony : ColonyManager.get(level).getColonies()) {
+            if (!SavannaSpecies.MACROTERMES.equals(colony.getSpecies()) || colony.getCenter().distSqr(pos) > 96 * 96
+                    || !colony.profile().nest().isPlug(state)) {
+                continue;
+            }
+            if (colony.part(com.antcolonies.savanna.colony.SavannaParts.RAID_DEFENCE).map(part -> part.seals().contains(pos)).orElse(false)) {
+                return true;
+            }
+            if (colony.part(com.antcolonies.savanna.colony.SavannaParts.MOUND).map(part -> part.getParts(level).containsKey(pos)).orElse(false)) {
+                return false;
+            }
+            if (colony.nest().isInside(level, pos)) {
+                return true;
+            }
+            for (Direction side : Direction.values()) {
+                if (colony.nest().isInside(level, pos.relative(side))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean bite(ServerLevel level, BlockPos cover, int needed, boolean tellTermites) {
         getNavigator().stop();
         getLookControl().setLookAt(Vec3.atCenterOf(cover));
         if (isStriking()) {
@@ -456,9 +516,12 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         }
         playAttack(BITE_COVER);
         playSound(SoundEvents.ROOTED_DIRT_BREAK, 0.6F, 1.4F);
-        if (++bites >= BITES_TO_OPEN) {
+        if (++bites >= needed) {
             level.destroyBlock(cover, false, this);
             breaking = null;
+            if (!tellTermites) {
+                return true;
+            }
             opened++;
             // M8 step 2f: the colonies whose ground it is hear of it (the termites drum and seal the gallery behind them).
             for (Colony colony : com.antcolonies.colony.ColonyManager.get(level).getColonies()) {

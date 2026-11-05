@@ -270,6 +270,33 @@ public final class RaidColumn {
     private long homeBestAt = -1;
     /** R7: the line broke up on the way home (no headway): every ant walks in by its own way. */
     private boolean streamAll;
+    /**
+     * BUGS 101: each recruit's own number for its milling place, given once when the column is made (its place used to
+     * follow its index in the list of ants seen this update, so one ant dying or going out of sight moved every later
+     * ant's place: they walked off their places and back).
+     */
+    private final Map<UUID, Integer> formIndex = new HashMap<>();
+    /**
+     * BUGS 101, the scout recruits in the nest (real Megaponera: the scout home from a find runs into the nest, and the
+     * raiders it stirs pour out after it): the room cell it runs to (null for none), whether that was looked for, and when
+     * it got there (or gave up), -1 till then. The milling starts from then.
+     */
+    @Nullable
+    private BlockPos recruitAt;
+    private boolean recruitLooked;
+    private long recruitedAt = -1;
+    /** BUGS 101: how many recruits were out at the last update, and since when that count has not grown. */
+    private int outBefore = -1;
+    private long outSince;
+    /** The scout's longest run in to recruit (ticks; my pick, 15 s): then the raiders come out all the same. */
+    private static final long RECRUIT_MOST = 300;
+    /** A recruit this far (blocks, flat) from the entrance, out of the nest and not down its open chimney, is out (BUGS 101). */
+    private static final double FORM_REACH = 10.0;
+    /** Under the entrance, this near it (blocks, flat), and more than 1.5 below it: down a dead mound's open chimney. */
+    private static final double CHIMNEY = 1.5;
+    /** The column may leave once this share of the recruits is out and no more came out for {@link #OUT_QUIET} ticks. */
+    private static final double MOSTLY_OUT = 0.75;
+    private static final long OUT_QUIET = 60;
 
     RaidColumn(ServerLevel level, Colony colony, SavannaNumbers.ColumnNumbers numbers, @Nullable SavannaNumbers.CarryNumbers carry,
                SavannaNumbers.TrailNumbers trailNumbers, Raids.Find find, ScentTrails.Trail scent, List<MatabeleEntity> raiders,
@@ -285,6 +312,7 @@ public final class RaidColumn {
         for (MatabeleEntity raider : raiders) {
             members.add(raider.getUUID());
             memberSet.add(raider.getUUID());
+            formIndex.put(raider.getUUID(), formIndex.size());
         }
         this.leader = members.get(0);
         this.size = members.size() + numbersAlong;
@@ -961,45 +989,124 @@ public final class RaidColumn {
         frontAt = 0.0;
     }
 
-    /** The recruits come out and mill round the entrance; the scout waits at the head of its line. */
+    /**
+     * The raid forms (BUGS 101, the real way: Longhurst and Howse 1979, Hoelldobler et al. 1994). First the scout runs
+     * into the nest, to the room nearest the entrance, and recruits there; the others stand where they are, not yet
+     * stirred. Then the recruits pour out and mill round the entrance, the scout at the head of its line, and the column
+     * leaves as soon as they are all out, or most of them and no more coming; a recruit still on its way follows the
+     * trail after the column (the march brings it up to the line). Only one still in the nest when the forming's
+     * longest time is up stays home. Out means out of the nest and not down its open chimney, at any height round the
+     * hump: a tall dead mound's sides fall 4 to 8 blocks, and recruits given a place on them, at the trail's start, were
+     * never counted out, so every raid waited its longest time and left them home standing at their places.
+     */
     private void form(ServerLevel level, List<MatabeleEntity> ants, long now) {
-        BlockPos entrance = colony.getCenter();
+        MatabeleEntity scout = null;
+        for (MatabeleEntity ant : ants) {
+            if (ant.getUUID().equals(leader)) {
+                scout = ant;
+            }
+        }
+        if (recruitedAt < 0) {
+            if (!recruitLooked) {
+                recruitLooked = true;
+                recruitAt = recruitCell(level);
+            }
+            boolean there = scout == null || recruitAt == null || now - stageSince >= RECRUIT_MOST
+                    || Math.sqrt(scout.blockPosition().distSqr(recruitAt)) <= 2.0 && colony.nest().isInside(level, scout.blockPosition());
+            if (!there) {
+                for (MatabeleEntity ant : ants) {
+                    orders.put(ant.getUUID(), ant == scout ? new Order(recruitAt, HURRY_PACE, null) : new Order(null, 1.0, null));
+                }
+                return;
+            }
+            recruitedAt = now;
+            say(scout != null && recruitAt != null && now - stageSince < RECRUIT_MOST
+                    ? "the scout recruits in the nest after " + (now - stageSince) / 20 + " s: the raiders pour out"
+                    : "the scout did not get into the nest in " + (now - stageSince) / 20 + " s: the raiders come out all the same");
+        }
         int outside = 0;
-        for (int i = 0; i < ants.size(); i++) {
-            MatabeleEntity ant = ants.get(i);
-            if (flat(ant.blockPosition(), entrance) <= NEAR && ant.getY() >= entrance.getY() - 1 || draftedSince.containsKey(ant.getUUID())) {
+        for (MatabeleEntity ant : ants) {
+            boolean drafted = draftedSince.containsKey(ant.getUUID());
+            if (drafted || outOnTheMound(level, ant)) {
                 outside++; // (one called away to defend the nest is out: it rejoins)
             }
             BlockPos spot;
-            if (ant.getUUID().equals(leader)) {
+            if (ant == scout) {
                 spot = place(level, this.out, Math.min(2.0, this.out.length()), 0.0);
             } else {
-                spot = formSpot(level, i);
-                if (spot.getY() < entrance.getY() - 1 || colony.nest().isInside(level, spot)) {
-                    formFaults++; // (only the trail's start can give one, and it lies outside: never, the tests check)
+                spot = formSpot(level, formIndex.getOrDefault(ant.getUUID(), 0));
+                if (colony.nest().isInside(level, spot)) {
+                    formFaults++; // (a milling place in the nest: never, the tests check)
                 }
             }
             orders.put(ant.getUUID(), new Order(spot, 1.0, point(this.out, 4.0)));
         }
-        long since = now - stageSince;
-        if (outside >= ants.size() && since >= numbers.leastFormTicks() || since >= numbers.formTicks()) {
-            // Off they go; the recruits not out by now stay home.
+        if (outside != outBefore) {
+            if (outside > outBefore) {
+                outSince = now;
+            }
+            outBefore = outside;
+        }
+        long milling = now - recruitedAt;
+        boolean scoutOut = scout == null || outOnTheMound(level, scout);
+        boolean allOut = outside >= ants.size() && milling >= numbers.leastFormTicks();
+        boolean mostOut = outside >= ants.size() * MOSTLY_OUT && milling >= numbers.leastFormTicks() && now - outSince >= OUT_QUIET;
+        boolean timeUp = milling >= numbers.formTicks();
+        if (scoutOut && (allOut || mostOut) || timeUp) {
+            // Off they go. A recruit on its way out follows the column along the trail; one still in the nest at the
+            // forming's end stays home.
+            int following = 0;
             for (MatabeleEntity ant : ants) {
-                if (!ant.getUUID().equals(leader) && !draftedSince.containsKey(ant.getUUID())
-                        && !(flat(ant.blockPosition(), entrance) <= NEAR + 2 && ant.getY() >= entrance.getY() - 2)) {
-                    Order had = orders.get(ant.getUUID());
-                    if (had != null && had.to() != null && Math.sqrt(ant.blockPosition().distSqr(had.to())) <= 1.5) {
-                        formFaults++; // (left home standing at the place it was given: finding 2's bug)
-                    }
-                    say(shortId(ant.getUUID()) + " stays home, not out at the entrance in time: " + who(ant, out));
+                if (ant == scout || draftedSince.containsKey(ant.getUUID()) || outOnTheMound(level, ant)) {
+                    continue;
+                }
+                if (timeUp && colony.nest().isInside(level, ant.blockPosition())) {
+                    say(shortId(ant.getUUID()) + " stays home, still in the nest when the column left: " + who(ant, out));
                     drop(ant.getUUID());
+                } else {
+                    following++;
                 }
             }
+            say("the column leaves, " + outside + " of " + ants.size() + " out" + (following > 0 ? ", " + following + " following it out" : "")
+                    + (timeUp ? " (the forming's longest time)" : ""));
             next(Stage.MARCHING, now);
         }
     }
 
-    /** Tests (finding 2): milling places given in the nest or under the entrance, and ants left home standing at theirs. */
+    /** BUGS 101 (tests): when the scout got into the nest to recruit (or gave up), game time; -1 not yet. */
+    public long recruitedAt() {
+        return recruitedAt;
+    }
+
+    /**
+     * BUGS 101: whether a recruit is out for the forming: out of the nest, not down its open chimney (under the entrance
+     * and more than 1.5 below it), and within {@link #FORM_REACH} of the entrance, at any height round the hump.
+     */
+    private boolean outOnTheMound(ServerLevel level, MatabeleEntity ant) {
+        BlockPos at = ant.blockPosition();
+        BlockPos entrance = colony.getCenter();
+        if (colony.nest().isInside(level, at)) {
+            return false;
+        }
+        double away = flat(at, entrance);
+        return !(away < CHIMNEY && ant.getY() < entrance.getY() - 1.5) && away <= FORM_REACH;
+    }
+
+    /** BUGS 101: the room cell nearest the entrance, where the scout runs in to recruit; null for a nest with no rooms. */
+    @Nullable
+    private BlockPos recruitCell(ServerLevel level) {
+        BlockPos entrance = colony.getCenter();
+        BlockPos best = null;
+        for (BlockPos cell : colony.nest().getAllRoomCells(level)) {
+            if (level.hasChunkAt(cell) && RaidGround.canStand(level, cell)
+                    && (best == null || cell.distSqr(entrance) < best.distSqr(entrance))) {
+                best = cell;
+            }
+        }
+        return best == null ? null : best.immutable();
+    }
+
+    /** Tests (finding 2, BUGS 101): milling places given in the nest, and recruits out of the nest left home. */
     private int formFaults;
 
     /** Tests (the raid and fight review 2, finding 2): how often the forming went wrong as in the user's raid; 0. */
