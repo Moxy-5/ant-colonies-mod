@@ -123,7 +123,7 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * how many workers on there is one nurse, two nurses, and so on (one number per nurse, smallest first).
      */
     public record ColonyNumbers(int maxWorkers, List<Integer> nursesFrom, int realCap, int crew, int watchRadius, int swapsPerSecond,
-            Optional<DangerNumbers> danger, Optional<LostNumbers> lost, Optional<NeighbourNumbers> neighbours) {
+            Optional<DangerNumbers> danger, Optional<LostNumbers> lost, Optional<NeighbourNumbers> neighbours, boolean numbersWhenFar) {
         public static final Codec<ColonyNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("max_workers").forGetter(ColonyNumbers::maxWorkers),
                 Codec.INT.listOf().fieldOf("nurses_from_workers").forGetter(ColonyNumbers::nursesFrom),
@@ -133,16 +133,19 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 Codec.INT.optionalFieldOf("swaps_per_second", 2).forGetter(ColonyNumbers::swapsPerSecond),
                 DangerNumbers.CODEC.optionalFieldOf("danger").forGetter(ColonyNumbers::danger),
                 LostNumbers.CODEC.optionalFieldOf("lost").forGetter(ColonyNumbers::lost),
-                NeighbourNumbers.CODEC.optionalFieldOf("neighbours").forGetter(ColonyNumbers::neighbours)
+                NeighbourNumbers.CODEC.optionalFieldOf("neighbours").forGetter(ColonyNumbers::neighbours),
+                // Far colonies (2026-11-04): whether a loaded colony with no player within 64 blocks lives as numbers
+                // (colony.AwayLife). Off for a species whose away life is not finished yet (the Matabele until step 3f).
+                Codec.BOOL.optionalFieldOf("numbers_when_far", true).forGetter(ColonyNumbers::numbersWhenFar)
         ).apply(i, ColonyNumbers::new));
 
         public ColonyNumbers(int maxWorkers, List<Integer> nursesFrom, int realCap, int crew, int watchRadius, int swapsPerSecond,
                 Optional<DangerNumbers> danger) {
-            this(maxWorkers, nursesFrom, realCap, crew, watchRadius, swapsPerSecond, danger, Optional.empty(), Optional.empty());
+            this(maxWorkers, nursesFrom, realCap, crew, watchRadius, swapsPerSecond, danger, Optional.empty(), Optional.empty(), true);
         }
 
         public ColonyNumbers(int maxWorkers, List<Integer> nursesFrom, int realCap, int crew, int watchRadius, int swapsPerSecond) {
-            this(maxWorkers, nursesFrom, realCap, crew, watchRadius, swapsPerSecond, Optional.empty(), Optional.empty(), Optional.empty());
+            this(maxWorkers, nursesFrom, realCap, crew, watchRadius, swapsPerSecond, Optional.empty(), Optional.empty(), Optional.empty(), true);
         }
 
         /**

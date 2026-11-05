@@ -243,7 +243,9 @@ public class Colony {
      */
     void tickPartsAway(ServerLevel level) {
         for (ColonyPart<?> part : tickingAway) {
+            long started = System.nanoTime();
             part.tickAway(level);
+            com.antcolonies.debug.Perf.brainPart(part.name() + " (away)", System.nanoTime() - started);
         }
     }
 
@@ -697,7 +699,9 @@ public class Colony {
             bornAt = level.getGameTime(); // (founded now, or an older save: counted from its first load)
         }
         for (ColonyPart<?> part : ticking) {
+            long started = System.nanoTime();
             part.tick(level);
+            com.antcolonies.debug.Perf.brainPart(part.name(), System.nanoTime() - started);
         }
         return true;
     }

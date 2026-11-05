@@ -67,7 +67,22 @@ public class ColonyManager extends SavedData {
      * abandoned. A colony whose middle is out of range lives on as numbers (the brain, part 2: {@link AwayLife#tickAway}).
      */
     public void tickColonies(ServerLevel level) {
+        for (int slot = 0; slot < 20; slot++) {
+            tickColonies(level, slot);
+        }
+    }
+
+    /** Which of the second's 20 ticks this colony's brain runs on (spread by its id, the same every tick). */
+    public static int tickSlot(Colony colony) {
+        return Math.floorMod(colony.getId().hashCode(), 20);
+    }
+
+    /** The once-a-second tick of the colonies whose turn it is this tick of the second ({@link #tickSlot}). */
+    public void tickColonies(ServerLevel level, int slot) {
         for (Colony colony : java.util.List.copyOf(colonies.values())) {
+            if (tickSlot(colony) != slot) {
+                continue;
+            }
             if (!colony.away().isHere(level)) {
                 colony.away().tickAway(level);
                 continue;

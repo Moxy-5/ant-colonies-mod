@@ -56,6 +56,17 @@ public class AwayLife {
      * Public: a species' group job out in the field (a raid column) gives a member out of sight the same grace.
      */
     public static final long GRACE_TICKS = 1200;
+    /**
+     * Far colonies (the user's pick, 2026-11-04, for speed): a colony whose nest is loaded but has no player within this
+     * many blocks (sideways) counts as away, and after the grace minute its real insects in loaded land are folded into
+     * the numbers ({@link #foldLoaded}). Beyond 64 blocks a 2-block ant cannot be made out; about 2 to 4 colonies are
+     * real at once instead of every loaded one (about 16, 800 real insects).
+     */
+    public static final int NEAR = 64;
+    /** A colony that is here stays here until no player is within this many blocks (so the edge does not flicker). */
+    public static final int NEAR_KEEP = 80;
+    /** While far and loaded, how often the loaded land is looked over again for real members to fold in (ticks). */
+    private static final long FAR_LOOK_TICKS = 400;
 
     private final Colony colony;
     /** The game time the nest's middle was first seen out of range, or {@link Colony#NOT_SET} while it is here. Saved. */
@@ -75,6 +86,14 @@ public class AwayLife {
     /** Tests only: a shorter grace (null: {@link #GRACE_TICKS}). Not saved. */
     @Nullable
     private Long graceForTests;
+    /** Tests only: whether the far rule applies (null: in a game only). Not saved. */
+    @Nullable
+    private Boolean farForTests;
+    /** Tests only: pretend a player is near (true) or not (false); null: the real players. Not saved. */
+    @Nullable
+    private Boolean nearForTests;
+    /** When the loaded land was last looked over for real members while far ({@link #foldLoaded}). Not saved. */
+    private long lastFarLook = Colony.NOT_SET;
 
     /** What a frozen insect is. */
     enum Kind {
@@ -119,7 +138,40 @@ public class AwayLife {
         if (awayForTests != null) {
             return !awayForTests;
         }
-        return level.isLoaded(colony.getCenter());
+        if (!level.isLoaded(colony.getCenter())) {
+            return false;
+        }
+        // Far colonies (the user, 2026-11-04): loaded but with no player near, a colony lives as numbers like one in
+        // unloaded land. Here once a player comes within NEAR blocks; it stays here until none is within NEAR_KEEP, so
+        // walking along the edge does not flip it to and fro.
+        return !farCounts(level) || playerNear(level, awaySince == Colony.NOT_SET ? NEAR_KEEP : NEAR);
+    }
+
+    /**
+     * Whether the far rule applies: in a game, for a species whose file allows it ({@code colony.numbers_when_far}, on
+     * unless a species' away life is not finished yet); on the game test server only where a test turns it on.
+     */
+    private boolean farCounts(Level level) {
+        return farForTests != null ? farForTests : isOn(level) && colony.profile().colony().numbersWhenFar();
+    }
+
+    /** Whether a player (alive, any game mode) is within this many blocks of the nest's middle, sideways. */
+    private boolean playerNear(ServerLevel level, int radius) {
+        if (nearForTests != null) {
+            return nearForTests;
+        }
+        BlockPos center = colony.getCenter();
+        for (net.minecraft.world.entity.player.Player player : level.players()) {
+            if (!player.isAlive()) {
+                continue;
+            }
+            double dx = player.getX() - (center.getX() + 0.5);
+            double dz = player.getZ() - (center.getZ() + 0.5);
+            if (dx * dx + dz * dz <= (double) radius * radius) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Whether the colony is away: its middle has been out of range for the grace minute (its frozen insects are numbers now). */
@@ -142,6 +194,16 @@ public class AwayLife {
         if (!isOn(level)) {
             return;
         }
+        Frozen what = frozenOf(level, entity);
+        if (what != null) {
+            frozen.put(entity.getUUID(), what);
+            ColonyManager.get(level).markChanged();
+        }
+    }
+
+    /** What this insect, egg or larva is now, to be written down; null if it is none the colony folds in. */
+    @Nullable
+    private Frozen frozenOf(ServerLevel level, Entity entity) {
         long now = level.getGameTime();
         Frozen what = null;
         // (A paralysed insect is never folded in: it lies where it was stung and dies there in time, M8 step 2b.)
@@ -155,8 +217,43 @@ public class AwayLife {
             long hungry = larva.getLastFed() == Colony.NOT_SET ? 0 : Math.max(0, now - larva.getLastFed());
             what = new Frozen(Kind.LARVA, "", 0, Load.NONE, hungry, larva.getFed(), larva.getGrowsInto(colony), now, false, Colony.NOT_SET);
         }
-        if (what != null) {
-            frozen.put(entity.getUUID(), what);
+        return what;
+    }
+
+    /**
+     * Far colonies: the colony is away while its land is still loaded, so its real workers, soldiers, eggs and larvae
+     * there are folded into the numbers at once and leave the world quietly (as a hidden trip's traveller does, with what
+     * they carry counted in). The queen and king stay real, as in unloaded land. Looked over once on going away and every
+     * {@link #FAR_LOOK_TICKS} after (one walk over the loaded insects, rare).
+     */
+    private void foldLoaded(ServerLevel level) {
+        long now = level.getGameTime();
+        if (lastFarLook != Colony.NOT_SET && now - lastFarLook < FAR_LOOK_TICKS || !level.isLoaded(colony.getCenter())) {
+            return;
+        }
+        lastFarLook = now;
+        List<Entity> members = new ArrayList<>();
+        for (Entity entity : level.getAllEntities()) {
+            if (colony.getId().equals(ColonyManager.colonyOf(entity))) {
+                members.add(entity);
+            }
+        }
+        int folded = 0;
+        for (Entity entity : members) {
+            Frozen what = frozenOf(level, entity);
+            if (what == null) {
+                continue;
+            }
+            Frozen was = frozen.remove(entity.getUUID());
+            if (was == null || !was.folded()) {
+                foldIn(level, entity.getUUID(), what);
+            }
+            entity.discard();
+            folded++;
+        }
+        if (folded > 0) {
+            ColonyFrameworkMod.LOGGER.info("[away] colony {} is far from every player: {} real insects folded into the numbers",
+                    colony.getId(), folded);
             ColonyManager.get(level).markChanged();
         }
     }
@@ -216,6 +313,9 @@ public class AwayLife {
                 ColonyFrameworkMod.LOGGER.info("[away] colony {} is away: {}", colony.getId(), describe(level));
                 ColonyManager.get(level).markChanged();
             }
+        }
+        if (isAway(level) && farCounts(level)) {
+            foldLoaded(level);
         }
         if (isAway(level)) {
             colony.tickPartsAway(level);
@@ -308,6 +408,7 @@ public class AwayLife {
         if (awaySince != Colony.NOT_SET) {
             long away = level.getGameTime() - awaySince;
             awaySince = Colony.NOT_SET;
+            lastFarLook = Colony.NOT_SET;
             lastAwayFor = away;
             ColonyHooks.Underground web = colony.underground();
             if (web != null) {
@@ -411,6 +512,15 @@ public class AwayLife {
     /** Tests only: pretend the nest's middle is out of range (true) or in range (false); null: the real chunks. */
     public void setAwayForTests(@Nullable Boolean away) {
         awayForTests = away;
+    }
+
+    public void setFarForTests(@Nullable Boolean far) {
+        this.farForTests = far;
+    }
+
+    /** Tests only: pretend a player is within the far rule's reach (true) or not (false); null: the real players. */
+    public void setNearForTests(@Nullable Boolean near) {
+        this.nearForTests = near;
     }
 
     public void setGraceForTests(@Nullable Long ticks) {

@@ -1869,11 +1869,13 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             return; // it was frozen in unloaded land and is one of its colony's numbers now: it has left the world
         }
         boolean timed = !level().isClientSide && Perf.begin(Perf.Part.INSECTS);
+        long started = timed ? System.nanoTime() : 0L;
         try {
             tickBody();
         } finally {
             if (timed) {
                 Perf.end();
+                Perf.insectKind(getType().builtInRegistryHolder().key().location().getPath(), System.nanoTime() - started);
             }
         }
     }

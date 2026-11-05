@@ -59,14 +59,14 @@ public class ModEvents {
     @SubscribeEvent
     public static void onLevelTick(net.neoforged.neoforge.event.tick.LevelTickEvent.Post event) {
         if (event.getLevel() instanceof ServerLevel level) {
-            if (level.getGameTime() % 20 == 0) {
-                boolean timed = Perf.begin(Perf.Part.BRAIN);
-                try {
-                    ColonyManager.get(level).tickColonies(level);
-                } finally {
-                    if (timed) {
-                        Perf.end();
-                    }
+            // Each colony still once a second, but on its own tick of the second (by its id), so the colonies' brains are
+            // spread over the 20 ticks instead of all landing in one (a stutter every second with many colonies loaded).
+            boolean timed = Perf.begin(Perf.Part.BRAIN);
+            try {
+                ColonyManager.get(level).tickColonies(level, (int) (level.getGameTime() % 20));
+            } finally {
+                if (timed) {
+                    Perf.end();
                 }
             }
         }

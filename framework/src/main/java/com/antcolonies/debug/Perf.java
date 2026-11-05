@@ -49,6 +49,10 @@ public final class Perf {
     private static long longestSearchNanos;
     private static int ticks;
     private static String last = "No report yet: the stopwatch reports every 5 seconds.";
+    /** Who is asking for the route search running now (insect kind and goals), set by the navigator; null = unknown. */
+    private static String asker;
+    /** Per asker: searches, failed, steps, nanoseconds (this window). */
+    private static final Map<String, long[]> askers = new java.util.HashMap<>();
 
     private Perf() {
     }
@@ -83,11 +87,45 @@ public final class Perf {
         }
     }
 
+    /** Per colony part (brain): times ticked, nanoseconds, longest single tick (this window). */
+    private static final Map<String, long[]> brainParts = new java.util.HashMap<>();
+
+    /** One colony part's once-a-second tick took this long (only counted on the server thread). */
+    public static void brainPart(String name, long tookNanos) {
+        if (!onServerThread()) {
+            return;
+        }
+        long[] mine = brainParts.computeIfAbsent(name, k -> new long[3]);
+        mine[0]++;
+        mine[1] += tookNanos;
+        mine[2] = Math.max(mine[2], tookNanos);
+    }
+
+    /** Per insect kind: ticks, nanoseconds (with its walking and route searches) this window. */
+    private static final Map<String, long[]> kinds = new java.util.HashMap<>();
+
+    /** One insect's tick took this long (its walking and route searches included). */
+    public static void insectKind(String kind, long tookNanos) {
+        long[] mine = kinds.computeIfAbsent(kind, k -> new long[2]);
+        mine[0]++;
+        mine[1] += tookNanos;
+    }
+
+    /** Who asks for the next route searches (the navigator sets it before planning, clears it with null after). */
+    public static void asking(String who) {
+        asker = who;
+    }
+
     /** A finished route search: how many search steps it took and whether it found a route. */
     public static void search(int steps, boolean found, long tookNanos) {
         if (!onServerThread()) {
             return;
         }
+        long[] mine = askers.computeIfAbsent(asker == null ? "(no insect)" : asker, k -> new long[4]);
+        mine[0]++;
+        mine[1] += found ? 0 : 1;
+        mine[2] += steps;
+        mine[3] += tookNanos;
         searches++;
         expansions += steps;
         if (!found) {
@@ -119,6 +157,9 @@ public final class Perf {
         failedSearches = 0;
         expansions = 0;
         longestSearchNanos = 0;
+        askers.clear();
+        brainParts.clear();
+        kinds.clear();
         ticks = 0;
     }
 
@@ -137,8 +178,48 @@ public final class Perf {
         }
         out.append(String.format("Route searches: %.1f a second, %d failed, %.0f steps each, longest %.1f ms",
                 searches / (ticks / 20.0), failedSearches, searches == 0 ? 0.0 : (double) expansions / searches, ms(longestSearchNanos)));
+        reportKinds(out);
+        reportBrainParts(out);
+        reportAskers(out);
         reportNewLand(out);
         return out.toString();
+    }
+
+    /** The insects by kind: how many tick on average, and their time (walking and route searches included). */
+    private static void reportKinds(StringBuilder out) {
+        if (kinds.isEmpty()) {
+            return;
+        }
+        out.append("\nInsects by kind (how many, ms a tick with their walking and searches):");
+        kinds.entrySet().stream().sorted((a, b) -> Long.compare(b.getValue()[1], a.getValue()[1])).forEach(e -> {
+            long[] v = e.getValue();
+            out.append(String.format("\n  %.0f  %.2f ms  %s", (double) v[0] / ticks, ms(v[1]) / ticks, e.getKey()));
+        });
+    }
+
+    /** The colony brain's costliest parts, most time first (with the longest single tick of one colony's part). */
+    private static void reportBrainParts(StringBuilder out) {
+        if (brainParts.isEmpty()) {
+            return;
+        }
+        out.append("\nColony brain by part (ms a tick, longest single ms, times):");
+        brainParts.entrySet().stream().sorted((a, b) -> Long.compare(b.getValue()[1], a.getValue()[1])).limit(8).forEach(e -> {
+            long[] v = e.getValue();
+            out.append(String.format("\n  %.2f ms  longest %.1f  x%d  %s", ms(v[1]) / ticks, ms(v[2]), v[0], e.getKey()));
+        });
+    }
+
+    /** The route searches' costliest askers (insect kind and running goals), most time first. */
+    private static void reportAskers(StringBuilder out) {
+        if (askers.isEmpty()) {
+            return;
+        }
+        out.append("\nRoute searches by who asked (ms a tick, a second: searches / failed, steps each):");
+        askers.entrySet().stream().sorted((a, b) -> Long.compare(b.getValue()[3], a.getValue()[3])).limit(10).forEach(e -> {
+            long[] v = e.getValue();
+            out.append(String.format("\n  %.2f ms  %.1f / %.1f  %.0f  %s", ms(v[3]) / ticks, v[0] / (ticks / 20.0),
+                    v[1] / (ticks / 20.0), (double) v[2] / v[0], e.getKey()));
+        });
     }
 
     private static double ms(long nanos) {

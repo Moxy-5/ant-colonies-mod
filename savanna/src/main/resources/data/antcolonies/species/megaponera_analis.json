@@ -13,6 +13,8 @@
     ]
   },
   "colony": {
+    "_far_note": "numbers_when_far false (2026-11-04): the far rule (a loaded colony with no player within 64 blocks lives as numbers, colony.AwayLife) is off for the Matabele until M8 step 3f, the raids out of sight, is built; without it a far colony could not raid and would starve. Turn it on with 3f.",
+    "numbers_when_far": false,
     "max_workers": 2500,
     "real_cap": 50,
     "crew": 50,

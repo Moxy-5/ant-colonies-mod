@@ -211,7 +211,8 @@ public class NightSoil {
      * walls, as the soil dug once the hill is finished is (otherwise they would lie in the way for good).
      */
     void tick(ServerLevel level) {
-        if (level.getGameTime() % 400 != 0 || hill.hasMoundRoom(level)) {
+        // (Once in each 400 ticks: the brain ticks each colony on its own tick of the second, so not "% 400 == 0".)
+        if (level.getGameTime() % 400 >= 20 || hill.hasMoundRoom(level)) {
             return;
         }
         int packed = 0;

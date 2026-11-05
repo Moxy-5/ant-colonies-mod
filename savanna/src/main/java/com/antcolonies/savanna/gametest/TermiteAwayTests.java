@@ -991,4 +991,67 @@ public class TermiteAwayTests {
             h.runAfterDelay(5, () -> h.spawn(SavannaEntities.TERMITE_KING.get(), MIDDLE + 2, SURFACE, MIDDLE + 1));
         }, com.antcolonies.savanna.entity.TermiteKingEntity.class, com.antcolonies.savanna.entity.TermiteKingEntity.CASTE, true));
     }
+
+    /**
+     * Far colonies (the user, 2026-11-04, for speed): a colony whose nest is loaded but has no player within 64 blocks is
+     * away. After the grace its real workers fold into the numbers and leave the world, the headcount kept and the queen
+     * still real; once a player is near again it is back and real workers come out of the nest again.
+     */
+    @GameTest(template = "arena", timeoutTicks = 3000, skyAccess = true)
+    public static void aFarTermiteColonyLivesAsNumbersAndComesOutWhenAPlayerIsNear(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        TestScenes.deepGround(helper);
+        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        int[] stage = {0};
+        int[] headcount = new int[1];
+        helper.runAfterDelay(10, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(colony != null, "no termite colony");
+            TermiteSoldierTests.digNestAtOnce(level, colony);
+            colony.population().setOnForTests(true);
+            colony.population().setViewersForTests(List.of()); // nobody watching: workers come out anywhere unseen
+            colony.population().addNewMembers(Caste.WORKER, level.getGameTime(), 120);
+            colony.population().setStress(15);
+            stage[0] = 1;
+        });
+        helper.onEachTick(() -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            if (colony == null || stage[0] == 0) {
+                return;
+            }
+            List<AbstractAntEntity> real = com.antcolonies.gametest.TestIsolation.insectsOf(level, colony, AbstractAntEntity.class)
+                    .stream().filter(mob -> mob.nestCaste() != null && mob.isAlive()).toList();
+            switch (stage[0]) {
+                case 1 -> {
+                    if (real.size() >= 8) {
+                        // Far: the away rule on, nobody near, a short grace.
+                        headcount[0] = colony.population().insideTotal() + real.size();
+                        colony.away().setOnForTests(true);
+                        colony.away().setFarForTests(true);
+                        colony.away().setNearForTests(false);
+                        colony.away().setGraceForTests(40L);
+                        stage[0] = 2;
+                    }
+                }
+                case 2 -> {
+                    if (real.isEmpty() && colony.away().isAway(level)) {
+                        helper.assertTrue(colony.away().isHere(level) == false, "a far colony counts as here");
+                        int now = colony.population().insideTotal();
+                        helper.assertTrue(now == headcount[0], "the headcount changed when the far colony's workers were folded in: "
+                                + headcount[0] + " before, " + now + " after");
+                        helper.assertTrue(colony.getQueen(level) != null, "the queen of a far colony left the world");
+                        colony.away().setNearForTests(true); // a player comes near
+                        stage[0] = 3;
+                    }
+                }
+                case 3 -> {
+                    if (!colony.away().isComingBack() && real.size() >= 3) {
+                        helper.succeed();
+                    }
+                }
+                default -> {
+                }
+            }
+        });
+    }
 }

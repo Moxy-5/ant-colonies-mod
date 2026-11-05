@@ -1,5 +1,7 @@
 package com.antcolonies.nav;
 
+import com.antcolonies.debug.Perf;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -450,10 +452,16 @@ public class AntNavigator {
                 : mindCosts.and((from, to, kind) -> avoid.containsKey(to) ? 50.0 : 0.0);
         Route found = null;
         if (!starts.isEmpty() && mayHaveGoal()) {
-            // Keeping to its habits if it can; if no route does, without them.
-            found = habits == AntPathFinder.StepCosts.NONE ? null : search(map, starts, costs.and(habits));
-            if (found == null) {
-                found = search(map, starts, costs);
+            Perf.asking(ant.getType().builtInRegistryHolder().key().location().getPath() + " " + ant.runningGoals()
+                    + (replans > 0 ? " (again)" : ""));
+            try {
+                // Keeping to its habits if it can; if no route does, without them.
+                found = habits == AntPathFinder.StepCosts.NONE ? null : search(map, starts, costs.and(habits));
+                if (found == null) {
+                    found = search(map, starts, costs);
+                }
+            } finally {
+                Perf.asking(null);
             }
         }
         failed = found == null;

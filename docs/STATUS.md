@@ -24,4 +24,5 @@ Keep this short. The full story is in `docs/HISTORY.md`; the long status is at t
 Savanna loading step 4 (mounds made with the world itself), the test revamp, rescue and wound care, moving house, polish (M8.5), flying queens (M9), the savanna animals (M9.5), more species.
 
 ## Open bugs
+**Savanna lag (2026-11-04):** about 50 ms a tick with 1-second spikes; fix built on `claude/perf-far-colonies` (colonies with no player within 64 blocks live as numbers, brains spread over the second), not tried in-game yet; the Matabele join the far rule once away raids (3f) are built.
 Only rare test flakes (`docs/BUGS.md`); in play: the raid column freezing just out of a dead mound (in-game test 5, to be fixed in the raid rework). 2026-11-04: the raid test's crash (BUGS 95) and the messy column, recruits left home and attacks running on till dusk (BUGS 96) fixed on `claude/m8-raid-fixes-31ac6f`, not tried in-game yet.
