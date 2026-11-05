@@ -277,9 +277,61 @@ public class TermitePopulationTests {
                     helper.assertTrue(sawRipe[0], "the fresh comb never ripened before it crumbled");
                     helper.assertTrue(sawOld[0], "the comb never went old before it crumbled");
                     colony.part(SavannaParts.FUNGUS_GARDEN).orElseThrow().setAgeingSpeedForTests(1.0F);
+                    combWithNoFloorTakesNoForage(helper, level, colony);
                     helper.succeed();
                 }
             }
         });
+    }
+
+    /**
+     * docs/BUGS.md 95: the game crashed when a worker put forage on a comb whose floor was gone (dug away by a block
+     * change that told nobody): the new layer's block update took the comb next to it away, which took this one away
+     * too, and the squelch read the comb's height off air. Now a comb with no floor takes no forage, and nothing crashes.
+     */
+    private static void combWithNoFloorTakesNoForage(GameTestHelper helper, net.minecraft.server.level.ServerLevel level,
+            com.antcolonies.colony.Colony colony) {
+        com.antcolonies.savanna.block.FungusCombBlock combBlock = com.antcolonies.savanna.registry.SavannaBlocks.FUNGUS_COMB.get();
+        java.util.Set<BlockPos> young = colony.brood().getBroodCells(level);
+        BlockPos a = null;
+        BlockPos b = null;
+        for (BlockPos cell : colony.nest().getGardenCells(level)) {
+            if (young.contains(cell) || !level.getBlockState(cell.below()).isFaceSturdy(level, cell.below(), net.minecraft.core.Direction.UP)) {
+                continue;
+            }
+            for (net.minecraft.core.Direction side : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+                BlockPos next = cell.relative(side);
+                var there = level.getBlockState(next);
+                if (!young.contains(next) && (there.isAir() || there.is(combBlock))
+                        && level.getBlockState(next.below()).isFaceSturdy(level, next.below(), net.minecraft.core.Direction.UP)) {
+                    a = cell;
+                    b = next;
+                    break;
+                }
+            }
+            if (a != null) {
+                break;
+            }
+        }
+        helper.assertTrue(a != null, "no two garden cells side by side to check a comb with no floor");
+        int quiet = net.minecraft.world.level.block.Block.UPDATE_CLIENTS; // (a change that tells no neighbour, as some building does)
+        var oneLayer = combBlock.defaultBlockState().setValue(com.antcolonies.block.SeedPileBlock.LAYERS, 1);
+        var wasA = level.getBlockState(a);
+        var wasB = level.getBlockState(b);
+        var floorA = level.getBlockState(a.below());
+        var floorB = level.getBlockState(b.below());
+        level.setBlock(a, oneLayer, quiet);
+        level.setBlock(b, oneLayer, quiet);
+        level.setBlock(a.below(), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), quiet);
+        level.setBlock(b.below(), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), quiet);
+        int food = colony.food().getFood();
+        boolean put = colony.food().depositSeed(level, a); // (crashed the game before the fix)
+        helper.assertTrue(!put, "forage was put on a comb with no floor under it at " + a);
+        helper.assertTrue(colony.food().getFood() == food, "forage counted into the store though nothing was put down");
+        helper.assertTrue(!colony.food().foodSpots(level, level.getRandom()).contains(a), "a comb with no floor is still offered as a place for forage");
+        level.setBlock(a.below(), floorA, quiet);
+        level.setBlock(b.below(), floorB, quiet);
+        level.setBlock(a, wasA, quiet);
+        level.setBlock(b, wasB, quiet);
     }
 }

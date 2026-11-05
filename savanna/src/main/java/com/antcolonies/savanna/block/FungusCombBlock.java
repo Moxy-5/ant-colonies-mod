@@ -84,9 +84,13 @@ public class FungusCombBlock extends SeedPileBlock implements Slope, GardenBed {
     @Override
     public void laid(ServerLevel level, BlockPos spot) {
         // Fresh comb laid: a soft wet squelch and a few dark specks.
+        BlockState comb = level.getBlockState(spot);
+        if (!comb.is(this)) {
+            return; // (the comb is not there after all: nothing to show, never a crash, docs/BUGS.md 95)
+        }
         level.playSound(null, spot, net.minecraft.sounds.SoundEvents.MUD_PLACE, net.minecraft.sounds.SoundSource.BLOCKS, 0.25F, 1.6F);
         level.sendParticles(new net.minecraft.core.particles.BlockParticleOption(net.minecraft.core.particles.ParticleTypes.BLOCK,
-                level.getBlockState(spot)), spot.getX() + 0.5, spot.getY() + topOf(level.getBlockState(spot)),
+                comb), spot.getX() + 0.5, spot.getY() + topOf(comb),
                 spot.getZ() + 0.5, 4, 0.2, 0.02, 0.2, 0.0);
     }
 

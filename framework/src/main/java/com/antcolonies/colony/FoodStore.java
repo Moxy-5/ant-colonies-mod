@@ -148,10 +148,10 @@ public class FoodStore {
         for (BlockPos pos : colony.nest().getFoodStoreCells(level)) {
             BlockState state = level.getBlockState(pos);
             if (state.isAir()) {
-                if (!young.contains(pos)) {
+                if (!young.contains(pos) && holds(level, pos, pile)) {
                     empty.add(pos);
                 }
-            } else if (state.is(pile) && state.getValue(SeedPileBlock.LAYERS) < pile.maxLayers() && !young.contains(pos)) {
+            } else if (state.is(pile) && state.getValue(SeedPileBlock.LAYERS) < pile.maxLayers() && !young.contains(pos) && holds(level, pos, pile)) {
                 growing.add(pos); // (never under an egg or a nymph lying on a fungus comb)
             }
         }
@@ -207,6 +207,9 @@ public class FoodStore {
                 continue;
             }
             BlockState state = level.getBlockState(pos);
+            if (!holds(level, pos, pile)) {
+                continue; // (no floor that holds a heap: no room there, docs/BUGS.md 95)
+            }
             if (state.isAir()) {
                 room += pile.maxLayers();
             } else if (state.is(pile)) {
@@ -923,12 +926,18 @@ public class FoodStore {
         if (colony.brood().getBroodCells(level).contains(spot)) {
             return false; // an egg or a young one was put there meanwhile: the heap would bury it
         }
+        if (!holds(level, spot, pile)) {
+            return false; // no floor that holds a heap (its floor dug away or never solid): a heap there falls apart at once (docs/BUGS.md 95)
+        }
         if (state.isAir()) {
             level.setBlock(spot, pile.newHeap(), 3);
         } else if (state.is(pile) && state.getValue(SeedPileBlock.LAYERS) < pile.maxLayers()) {
             level.setBlock(spot, pile.oneLayerMore(state), 3); // (fungus comb: the new layer goes on top, fresh)
         } else {
             return false;
+        }
+        if (!level.getBlockState(spot).is(pile)) {
+            return false; // the heap did not stay (a block update round it took it away): nothing was put down (docs/BUGS.md 95)
         }
         double top = spot.getY() + level.getBlockState(spot).getCollisionShape(level, spot).max(net.minecraft.core.Direction.Axis.Y);
         for (net.minecraft.world.entity.LivingEntity living : level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class, new AABB(spot))) {
@@ -937,6 +946,15 @@ public class FoodStore {
             }
         }
         return true;
+    }
+
+    /**
+     * Whether a heap at {@code pos} would stand: the floor under it is solid on top. A heap on a floor that is not
+     * (a cell whose floor was dug away by a block change that told nobody, or a half comb under it) is taken away by
+     * the game at the next block update round it; laying on it crashed the game (docs/BUGS.md 95).
+     */
+    private static boolean holds(Level level, BlockPos pos, SeedPileBlock pile) {
+        return pile.newHeap().canSurvive(level, pos);
     }
 
     /** One more piece in the store, counted now; its layer is put down later (see {@link NestLedger}). */
