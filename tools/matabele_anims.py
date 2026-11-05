@@ -411,6 +411,65 @@ def idle(name=None):
     }
 
 
+
+# --- resting (M8 step 3Q, 2026-11-05) ----------------------------------------------------------------------------------
+# Real ants nap many times a day (fire ant workers about 250 naps of about a minute, Cassill et al. 2009), the queen
+# too; in a nap the body sinks toward the floor, the antennae fold back and droop, the head dips and the jaws hang a
+# little open; only the gaster breathes. sleep_twitch adds the quick antenna flicks of deeper sleep (Cassill's "rapid
+# antennal movement") and a twitch of the jaws. As the harvester's (ant_models.sleep), the body let down by the legs
+# (the feet stay where they stand), a Matabele's by about a tenth of its front leg. My picks, to confirm.
+NAP_SECONDS = 6.0
+NAP_DROP = 0.1              # how far the body sinks, a share of the front leg's length
+NAP_GAP = 0.05              # how near the floor the body may come (units)
+
+
+def nap(name, twitch=False):
+    """The sleep clip (or sleep_twitch) and the worst foot miss."""
+    T = NAP_SECONDS
+    r = rig(name)
+    leg = r.legs[r.front_left]
+    drop = NAP_DROP * (mo.length(mo.sub(leg.K, leg.H)) + mo.length(mo.sub(leg.A, leg.K)))
+    breath = [(0, [2.0 if name == mm.QUEEN else -2.0, 0, 0]), (T / 2, [4.0 if name == mm.QUEEN else -4.0, 0, 0]),
+              (T, [2.0 if name == mm.QUEEN else -2.0, 0, 0])]
+    flick_l = [(0, [0, 0, 0]), (1.4, [0, 0, 0]), (1.5, [-9, 0, 0]), (1.6, [0, 0, 0]), (1.7, [-7, 0, 0]), (1.8, [0, 0, 0]),
+               (4.2, [0, 0, 0]), (4.3, [-6, 0, 0]), (4.4, [0, 0, 0]), (T, [0, 0, 0])]
+    flick_r = [(0, [0, 0, 0]), (2.9, [0, 0, 0]), (3.0, [-8, 0, 0]), (3.1, [0, 0, 0]), (3.2, [-9, 0, 0]), (3.3, [0, 0, 0]),
+               (3.4, [-5, 0, 0]), (3.5, [0, 0, 0]), (T, [0, 0, 0])]
+    jaw_twitch = [(0, [0, 0, 0]), (5.0, [0, 0, 0]), (5.1, [0, 6, 0]), (5.3, [0, 0, 0]), (T, [0, 0, 0])]
+
+    def body_at(t):
+        pose = {'body_pos': [0, -drop, 0], 'head': [8, 0, 0], 'gaster_front': curve(breath, t),
+                'antenna_l_1': [24, -16, 0], 'antenna_r_1': [24, 16, 0], 'antenna_l_2': [30, 0, 0], 'antenna_r_2': [30, 0, 0]}
+        pose.update(jaws(-4))
+        if twitch:
+            pose['antenna_l_2'] = [30 + curve(flick_l, t)[0], 0, 0]
+            pose['antenna_r_2'] = [30 + curve(flick_r, t)[0], 0, 0]
+            j = curve(jaw_twitch, t)[1]
+            pose['mandible_l'] = [0, 4 + j, 0]
+            pose['mandible_r'] = [0, -4 - j, 0]
+        return gm.settle(r, pose, NAP_GAP)                 # the drooping whips laid just over the floor
+    import groom_motion as gm
+    return posed_clip(name, T, body_at, gap=NAP_GAP, loop=True, smooth=0.0)
+
+
+def rest_clips(name):
+    """M8 step 3Q: the naps, cleaning the antennae (groom_antenna_l, _r, _both: GroomGoal plays them) and cleaning a
+    nestmate (groom_nestmate), each checked: no planted foot off its place."""
+    import groom_motion as gm
+    clips = {}
+    for clip, twitch in (('sleep', False), ('sleep_twitch', True)):
+        made, miss = nap(name, twitch)
+        if miss > 0.05:
+            raise ValueError(f'{name} {clip}: a planted foot misses its place by {miss:.3f}')
+        clips[clip] = made
+    clips.update(gm.groom_clips(rig(name), gm.MATABELE))
+    if name != 'matabele_queen':   # (workers clean nestmates, AllogroomGoal; the queen is cleaned, never cleans)
+        made, miss = gm.groom_nestmate(rig(name))
+        if miss > 0.05:
+            raise ValueError(f'{name} groom_nestmate: a planted foot misses its place by {miss:.3f}')
+        clips['groom_nestmate'] = made
+    return clips
+
 # --- the attack, by where the termite is ---------------------------------------------------------------------------
 # A Matabele grabs a termite in its jaws and stings it: the sting paralyses (real; Frank's raids bring the termites home
 # alive and paralysed). The sting itself slides out of the gaster's tip only about a millimetre; a ponerine reaches its
@@ -691,6 +750,7 @@ def animations(name):
             clips[clip] = carry(name, clip)
         clips.update(clamp_clips(name))                     # M8 step 2c: a termite soldier clamped on a leg
     clips['climb_feel'] = climb_feel()
+    clips.update(rest_clips(name))                         # M8 step 3Q: naps and cleaning
     return {'format_version': '1.8.0', 'animations': clips}
 
 

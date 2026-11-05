@@ -3,6 +3,8 @@ package com.antcolonies.savanna.entity;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.AbstractAntEntity;
+import com.antcolonies.entity.goal.NapGoal;
+import com.antcolonies.entity.goal.GroomGoal;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.entity.goal.GoInsideGoal;
 import com.antcolonies.entity.goal.QueenToRoomGoal;
@@ -76,8 +78,11 @@ public class MatabeleQueenEntity extends AbstractAntEntity {
         this.goalSelector.addGoal(2, new QueenToRoomGoal(this));
         this.goalSelector.addGoal(3, new GoInsideGoal(this));
         this.goalSelector.addGoal(4, new WaitAtNestGoal(this));
-        this.goalSelector.addGoal(5, new AntWanderGoal(this, 0.6, 400, 3, () -> QueenToRoomGoal.findFinishedRoom(this) == null));
-        this.goalSelector.addGoal(6, new RandomLookAroundGoal(this));
+        // M8 3Q: at rest in her room, longer naps now and then, and cleaning her antennae
+        this.goalSelector.addGoal(5, new NapGoal(this, true));
+        this.goalSelector.addGoal(5, new GroomGoal(this));
+        this.goalSelector.addGoal(6, new AntWanderGoal(this, 0.6, 400, 3, () -> QueenToRoomGoal.findFinishedRoom(this) == null));
+        this.goalSelector.addGoal(7, new RandomLookAroundGoal(this));
     }
 
     /** She is the queen of this colony (made for her, by the command or new land). */
@@ -140,5 +145,11 @@ public class MatabeleQueenEntity extends AbstractAntEntity {
     @Override
     protected net.minecraft.sounds.SoundEvent squeakSound() {
         return com.antcolonies.savanna.registry.SavannaSounds.MATABELE_SQUEAK.get();
+    }
+
+    /** M8 step 3Q: its clip file has the cleaning clips (tools/groom_motion.py), not the digging and carrying ones. */
+    @Override
+    protected boolean hasGroomClips() {
+        return true;
     }
 }

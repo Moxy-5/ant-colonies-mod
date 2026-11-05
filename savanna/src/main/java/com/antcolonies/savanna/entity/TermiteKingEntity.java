@@ -6,6 +6,7 @@ import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.savanna.colony.SavannaParts;
 import com.antcolonies.savanna.colony.KingCare;
+import com.antcolonies.entity.goal.GroomGoal;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.entity.goal.DigGoal;
 import com.antcolonies.entity.goal.QueenToRoomGoal;
@@ -63,8 +64,9 @@ public class TermiteKingEntity extends AbstractAntEntity implements FedByNurses 
         this.goalSelector.addGoal(2, new StayWithQueenGoal(this));
         // He digs with her while they found the colony, until their chamber is finished.
         this.goalSelector.addGoal(3, new DigGoal(this, () -> QueenToRoomGoal.mayDig(this)));
-        this.goalSelector.addGoal(4, new AntWanderGoal(this, 0.8, 300, 3, () -> QueenToRoomGoal.findFinishedRoom(this) == null));
-        this.goalSelector.addGoal(5, new RandomLookAroundGoal(this));
+        this.goalSelector.addGoal(4, new GroomGoal(this)); // M8 3Q: cleaning his antennae at rest (termites rest standing: no naps)
+        this.goalSelector.addGoal(5, new AntWanderGoal(this, 0.8, 300, 3, () -> QueenToRoomGoal.findFinishedRoom(this) == null));
+        this.goalSelector.addGoal(6, new RandomLookAroundGoal(this));
     }
 
     // He digs, but leaves the soil where it falls (no mound yet: that is the workers' job).
@@ -192,5 +194,11 @@ public class TermiteKingEntity extends AbstractAntEntity implements FedByNurses 
     @Override
     public String fightBody() {
         return CASTE;
+    }
+
+    /** M8 step 3Q: its clip file has the cleaning clips (tools/groom_motion.py), not the digging and carrying ones. */
+    @Override
+    protected boolean hasGroomClips() {
+        return true;
     }
 }

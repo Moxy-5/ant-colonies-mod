@@ -322,7 +322,9 @@ public class MatabeleFightTests {
                 }
                 helper.assertTrue(tick - standsSince.get(ant.getUUID()) < 600, "a Matabele has stood at "
                         + helper.relativePos(ant.blockPosition()) + " for half a minute while the fight is on (the hay at "
-                        + helper.relativePos(hay[0]) + ")");
+                        + helper.relativePos(hay[0]) + "); it runs " + ant.runningGoals() + ", activity " + ant.getActivity()
+                        + ", idle " + ant.isIdle() + ", climbing " + ant.isClimbing() + ", on the ground " + ant.onGround()
+                        + ", fights no more " + ant.fightsNoMore() + " (badly wounded " + ant.badlyWounded() + ", health " + ant.getHealth() + ")");
             }
             long since = tick - cameAt[0];
             boolean on = ants.stream().anyMatch(ant -> ant.isAlive() && ant.getFightSpot() != null);

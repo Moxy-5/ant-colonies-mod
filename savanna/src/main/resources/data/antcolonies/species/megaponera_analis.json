@@ -65,8 +65,14 @@
     "dug": false
   },
   "body_language": {
-    "_note": "Personality ranges all open (as before 1c, when the ant read the termites' numbers); no naps, hot ground or noticing yet.",
-    "traits": { "boldness": [0.0, 1.0], "curiosity": [0.0, 1.0], "restlessness": [0.0, 1.0], "older_bolder": 0.3 }
+    "_note": "Personality ranges all open (as before 1c, when the ant read the termites' numbers); no hot ground or noticing yet (naps and cleaning since M8 step 3Q, below).",
+    "traits": { "boldness": [0.0, 1.0], "curiosity": [0.0, 1.0], "restlessness": [0.0, 1.0], "older_bolder": 0.3 },
+    "_idle_note": "M8 step 3Q, rest first (SpeciesProfile.Idle; real: about 40 percent of a colony's workers do nothing at any moment and some idle most of their lives, Charbonneau and Dornhaus 2015, 2017; Megaponera crowd the brood chamber between raids, Yusuf 2026). An ant with nothing to do stands, antennae moving, and strolls about strolls_per_minute times a minute (a calm one a quarter of it, the most restless 1.75 times) stroll_blocks (from, to) far; staying in, it settles within settle_within blocks of the queen's room (with the prey pile) and walks there first when farther. My picks, to confirm.",
+    "idle": { "strolls_per_minute": 1.0, "stroll_blocks": [1, 3], "settle_within": 4.0 },
+    "_rest_note": "M8 step 3Q, naps and cleaning (my picks, to confirm). naps: real ants sleep in many short naps (fire ant workers about 250 a day of about a minute, queens fewer and longer, Cassill et al. 2009); the harvester's numbers, the queen's naps longer; only inside the nest. groom: an idle ant now and then cleans one antenna, or both one after the other (both_share), with the front leg of its side, then the leg in its jaws (Farish 1972). allogroom: now and then it cleans a resting nestmate within reach blocks for ticks (from, to); ants do it far less than termites.",
+    "naps": { "chance_per_second": 0.033, "worker_ticks": [800, 1600], "queen_ticks": [3600, 7200] },
+    "groom": { "chance_per_second": 0.04, "both_share": 0.4 },
+    "allogroom": { "chance_per_second": 0.008, "reach": 4.0, "ticks": [60, 140] }
   },
   "fight": {
     "_note": "M8 step 2a, the shared fight system (fight.FightNumbers). Health and damage per body, my picks, to confirm in the user's first fight test (the numbers the bodies had in code before): a major 10 health (two to four soldier bites; real majors seldom die in a raid, minors more often), a minor 5, the queen 20. Damage only counts on what it does not hunt (a chicken; the player comes in step 2e): on termites, its prey, every blow is a paralysing sting that pricks for half a point and never kills (fight.Fights). prey: Macrotermes, the termites it lives on.",

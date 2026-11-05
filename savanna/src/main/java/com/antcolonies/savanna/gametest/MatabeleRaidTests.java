@@ -8,6 +8,7 @@ import java.util.List;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.gametest.TestAnts;
 import com.antcolonies.gametest.TestClock;
+import com.antcolonies.gametest.IdleWatch;
 import com.antcolonies.gametest.TestScenes;
 import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.colony.NewLandMounds;
@@ -173,11 +174,23 @@ public class MatabeleRaidTests {
         MatabeleEntity[] hidden = {null};
         long[] hiddenAt = {-1};
         boolean[] hiddenKept = {false};
+        // M8 step 3Q: how much the raiders walk while they wait at their places (milling, bunched, regrouping).
+        // (an ant counts as waiting once it has been at its place 2 s: the last steps of getting there are arriving)
+        IdleWatch waits = new IdleWatch("raid's waits");
+        java.util.Map<java.util.UUID, Long> atPlaceSince = new java.util.HashMap<>();
         helper.onEachTick(() -> {
             RaidColumn raid = column[0];
             if (raid == null) {
                 return;
             }
+            long tickNow = helper.getLevel().getGameTime();
+            waits.tick(raiders, ant -> {
+                if (!raid.waitingForTests(ant)) {
+                    atPlaceSince.remove(ant.getUUID());
+                    return false;
+                }
+                return tickNow - atPlaceSince.computeIfAbsent(ant.getUUID(), k -> tickNow) >= 40;
+            });
             // Finding 3: the hungry recruit never leaves the column to eat.
             if (hungry[0] != null && raid.has(hungry[0].getUUID()) && hungry[0].runsGoal(com.antcolonies.entity.goal.EatGoal.class)) {
                 helper.fail("a hungry raider in the column went to eat: " + hungry[0].runningGoals());
@@ -337,6 +350,14 @@ public class MatabeleRaidTests {
                     helper.assertTrue(anyDied ? pile.broughtIn() <= raid.carried() && pile.broughtIn() >= 1 : pile.broughtIn() == raid.carried(),
                             raid.carried() + " termites carried home but " + pile.broughtIn() + " laid on the pile; " + pile.describe(level));
                     SavannaMod.LOGGER.info("[raid test] on the pile: {}", pile.describe(level));
+                    waits.log();
+                    // Q5: at their places in the raid's waits they stand (each keeps its own place, walking only when
+                    // it moves more than 1.5 blocks): a kind counted long enough still at least 3 quarters of the time.
+                    for (String kind : waits.kinds()) {
+                        if (waits.waitingTicks(kind) >= 600) {
+                            helper.assertTrue(waits.stillShare(kind) >= IdleTests.STILL, "raiders walk about in the raid's waits: " + waits.report());
+                        }
+                    }
                 })
                 .thenSucceed();
     }

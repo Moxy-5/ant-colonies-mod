@@ -232,7 +232,7 @@
     "chimney_trip_chance": 0.1
   },
   "body_language": {
-    "_note": "How the bodies behave (the animation engine, 2026-10-16; every number my pick, to confirm). No naps or hot ground for termites yet. notice: Macrotermes workers are blind and feel the ground shake: a player walking within range blocks, or sprinting, jumping or landing within shake_range, makes an idle worker freeze with its antennae raised for look_ticks (from, to), with chance; it never turns to look. Then it does not freeze again for rest_ticks.",
+    "_note": "How the bodies behave (the animation engine, 2026-10-16; every number my pick, to confirm). No naps (termites rest standing) or hot ground for termites. notice: Macrotermes workers are blind and feel the ground shake: a player walking within range blocks, or sprinting, jumping or landing within shake_range, makes an idle worker freeze with its antennae raised for look_ticks (from, to), with chance; it never turns to look. Then it does not freeze again for rest_ticks.",
     "traits": {
       "boldness": [0.0, 1.0],
       "curiosity": [0.0, 1.0],
@@ -246,7 +246,12 @@
       "chance": 1.0,
       "look_ticks": [20, 40],
       "rest_ticks": 100
-    }
+    },
+    "_idle_note": "M8 step 3Q, rest first (SpeciesProfile.Idle; real: across social insects, termites included, often over half the workers are inactive at a time, Charbonneau and Dornhaus 2015). A worker with nothing to do stands where it stopped, antennae moving, and strolls about strolls_per_minute times a minute (a calm one a quarter of it, the most restless 1.75 times) stroll_blocks (from, to) far; a soldier with no post stands still (it only walks back inside by day). My picks, to confirm.",
+    "idle": { "strolls_per_minute": 1.0, "stroll_blocks": [1, 3] },
+    "_rest_note": "M8 step 3Q, cleaning (my picks, to confirm). Termites rest standing: no naps. groom: an idle termite now and then cleans one antenna, or both one after the other (both_share): it pulls the antenna down and back to its front leg and its mouth. allogroom: termites groom each other constantly (it spreads the colony's smell and takes fungus spores and mites off; a large share of a worker's time in the nest), so an idle worker cleans a resting nestmate within reach blocks for ticks (from, to) about five times as often as a Matabele; soldiers and the royals are cleaned, they do not clean others.",
+    "groom": { "chance_per_second": 0.04, "both_share": 0.3 },
+    "allogroom": { "chance_per_second": 0.04, "reach": 4.0, "ticks": [80, 200] }
   },
   "fight": {
     "_note": "M8 step 2a, the shared fight system (fight.FightNumbers). Health and damage per body, the same numbers the bodies had in code before (nothing changes in-game). stings_to_fall: how many Matabele stings paralyse it (M8 step 2b, my picks, to confirm): a worker or minor 1, a major soldier 2 (the biggest, its head armoured), king and queen 3 (never reached: raids hit feeding spots, never the mound). foe_types: chickens peck termites (step 6c). foe_species: the Matabele, the termites' real enemy, fought wherever it comes from. venom_ticks (M8 fight polish, round A; my picks, to confirm: the speed of Megaponera venom on termites is not measured in the papers): after the felling sting the termite staggers, slowed, this long, then flips onto its back paralysed; a worker 2.5 s, a minor soldier 3, a major soldier 5 (the biggest body), king 6, queen 8. paralysed_ticks: a stung termite nobody takes lies a day, then dies (my pick; real paralysed prey lives for days, but left in the open it is eaten or dries out).",

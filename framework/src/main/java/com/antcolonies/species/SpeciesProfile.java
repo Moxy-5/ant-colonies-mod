@@ -992,17 +992,72 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * confirm). {@code naps} (optional, none for a species that does not nap): see {@link Naps}. {@code hot} (optional):
      * see {@link Heat}. {@code traits} (optional, everyone in the middle without): see {@link Traits}. {@code notice}
      * (optional, none for a species that never notices a player): see {@link Notice}. {@code groom} (optional, none for
-     * a species whose model has no cleaning clips yet): see {@link Groom}.
+     * a species whose model has no cleaning clips yet): see {@link Groom}. {@code idle} (optional, M8 step 3Q; without it
+     * an idle insect strolls as before): see {@link Idle}. {@code allogroom} (optional, M8 step 3Q; none for a species
+     * that does not clean its nestmates yet): see {@link Allogroom}.
      */
     public record BodyLanguage(Optional<Naps> naps, Optional<Heat> heat, Optional<Traits> traits, Optional<Notice> notice,
-                               Optional<Groom> groom) {
+                               Optional<Groom> groom, Optional<Idle> idle, Optional<Allogroom> allogroom) {
         public static final Codec<BodyLanguage> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Naps.CODEC.optionalFieldOf("naps").forGetter(BodyLanguage::naps),
                 Heat.CODEC.optionalFieldOf("hot").forGetter(BodyLanguage::heat),
                 Traits.CODEC.optionalFieldOf("traits").forGetter(BodyLanguage::traits),
                 Notice.CODEC.optionalFieldOf("notice").forGetter(BodyLanguage::notice),
-                Groom.CODEC.optionalFieldOf("groom").forGetter(BodyLanguage::groom)
+                Groom.CODEC.optionalFieldOf("groom").forGetter(BodyLanguage::groom),
+                Idle.CODEC.optionalFieldOf("idle").forGetter(BodyLanguage::idle),
+                Allogroom.CODEC.optionalFieldOf("allogroom").forGetter(BodyLanguage::allogroom)
         ).apply(i, BodyLanguage::new));
+    }
+
+    /**
+     * Resting first (M8 step 3Q). Real ants and termites with nothing to do mostly stand still: at any moment about 40
+     * percent of a colony's workers do nothing at all, some workers idle most of their lives, a steady trait of each
+     * (Charbonneau and Dornhaus 2015, 2017). An idle insect stands where it is, antennae moving, and strolls only now and
+     * then: {@code strollsPerMinute} on average for one in the middle of the restlessness range (a calm one a quarter of
+     * it, the most restless 1.75 times), {@code strollBlocks} (from, to) far. One that has a place to settle (a Matabele:
+     * by the queen and the prey pile, as real ones crowd the brood chamber) and is farther than {@code settleWithin}
+     * blocks from it walks there first.
+     */
+    public record Idle(float strollsPerMinute, List<Integer> strollBlocks, float settleWithin) {
+        public static final Codec<Idle> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.FLOAT.optionalFieldOf("strolls_per_minute", 1.0F).forGetter(Idle::strollsPerMinute),
+                Codec.INT.listOf().optionalFieldOf("stroll_blocks", List.of(1, 3)).forGetter(Idle::strollBlocks),
+                Codec.FLOAT.optionalFieldOf("settle_within", 4.0F).forGetter(Idle::settleWithin)
+        ).apply(i, Idle::new));
+
+        /** How far one stroll goes (blocks), somewhere in the range; {@code share} is 0 to 1. */
+        public double strollFor(double share) {
+            if (strollBlocks.isEmpty()) {
+                return 2.0;
+            }
+            int from = strollBlocks.get(0);
+            int to = strollBlocks.size() > 1 ? strollBlocks.get(1) : from;
+            return from + (to - from) * Math.max(0.0, Math.min(1.0, share));
+        }
+    }
+
+    /**
+     * Cleaning a nestmate (M8 step 3Q, allogrooming). Real ants lick their nestmates now and then; termites do it
+     * constantly, much of their idle time (it spreads the colony's smell and keeps off fungus spores). An idle insect
+     * starts with {@code chancePerSecond} each second (times 0.5 to 1.5 by its restlessness) when a resting nestmate is
+     * within {@code reach} blocks; it walks up and cleans it {@code ticks} (from, to), the nestmate holding still.
+     */
+    public record Allogroom(float chancePerSecond, float reach, List<Integer> ticks) {
+        public static final Codec<Allogroom> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.FLOAT.optionalFieldOf("chance_per_second", 0.02F).forGetter(Allogroom::chancePerSecond),
+                Codec.FLOAT.optionalFieldOf("reach", 4.0F).forGetter(Allogroom::reach),
+                Codec.INT.listOf().optionalFieldOf("ticks", List.of(60, 140)).forGetter(Allogroom::ticks)
+        ).apply(i, Allogroom::new));
+
+        /** How long one cleaning lasts (ticks), somewhere in the range; {@code share} is 0 to 1. */
+        public int ticksFor(double share) {
+            if (ticks.isEmpty()) {
+                return 80;
+            }
+            int from = ticks.get(0);
+            int to = ticks.size() > 1 ? ticks.get(1) : from;
+            return from + (int) Math.round((to - from) * Math.max(0.0, Math.min(1.0, share)));
+        }
     }
 
     /**

@@ -428,6 +428,11 @@ timings: all "my pick, to confirm" until then).
      - **Q6 Tests.** Q1's counter again (idle at least 3 quarters still); the anim lab and guard films for the new clips;
        `colony,raids,away,soldiers` on 6 servers; **in-game test 5c** (the user: an idle nest of each kind, a raid's
        waits). Q2 and Q5 are small and may go with 3S; Q3 and Q4 are the slow part (clips).
+     - **Q1 to Q6 BUILT 2026-11-05** (branch `claude/m8-still-when-idle-07d154`; picks in `docs/DESIGN.md`, "Step 3Q";
+       change log in `docs/HISTORY.md`). Numbers (idle insects' share of idle time standing, before and after): calm
+       Matabele nest 89 to 99-100 percent, termite workers 79 to 87, the termite king 100; a raid's waits (majors
+       counted once 2 s at their place) 81 to 86. Termite soldiers got no cleaning clips (see DESIGN). Next: in-game
+       test 5c.
    - **Order (my pick):** S1 to S6, in-game test 5b, then Q1 to Q6, in-game test 5c (or the two tests as one if the
      user prefers), then 3d.
    - **3d The termites' losses.** Termites in the galleries round the spot are numbers until broken into

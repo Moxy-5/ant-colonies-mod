@@ -27,6 +27,7 @@ import com.antcolonies.entity.load.LoadKind;
 import com.antcolonies.entity.body.LostLegs;
 import com.antcolonies.fight.FightNumbers;
 import com.antcolonies.fight.Fights;
+import com.antcolonies.entity.goal.AllogroomGoal;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.entity.goal.GroomGoal;
 import com.antcolonies.entity.goal.NapGoal;
@@ -116,6 +117,11 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     private static final RawAnimation GROOM_R = RawAnimation.begin().thenPlayAndHold("groom_antenna_r");
     private static final RawAnimation GROOM_BOTH = RawAnimation.begin().thenPlayAndHold("groom_antenna_both");
     /**
+     * Cleaning a nestmate (M8 step 3Q, see {@code AllogroomGoal}): bowed over it, the jaws nibbling, the antennae tapping
+     * it. A loop, at the speed it was made.
+     */
+    private static final RawAnimation GROOM_NESTMATE = RawAnimation.begin().thenLoop("groom_nestmate");
+    /**
      * Digging (see {@code DigGoal}): the forebody and head down, the jaws biting, the front legs raking the loose soil
      * back by turns, the antennae tapping the face it digs. Ants only.
      */
@@ -181,6 +187,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     public static final byte ACTIVITY_GROOM_R = 2;
     public static final byte ACTIVITY_GROOM_BOTH = 3;
     public static final byte ACTIVITY_DIG = 4;
+    /** Cleaning a nestmate (M8 step 3Q, {@code AllogroomGoal}). */
+    public static final byte ACTIVITY_ALLOGROOM = 5;
     /** How pale a young worker is drawn, 0 (grown dark) to 100 (just grown up). Synced for the renderer. */
     private static final EntityDataAccessor<Byte> DATA_YOUTH =
             SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.BYTE);
@@ -1770,6 +1778,31 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return colony != null && hasColonyRole() && colony.profile().worker().restInRooms() && !mayGoOut();
     }
 
+    /**
+     * Where this insect settles when it has nothing to do (M8 step 3Q, {@code body_language.idle}), or null: it rests
+     * wherever it stopped. A species says (a Matabele: by its queen and the prey pile, as real ones crowd the brood chamber).
+     */
+    @Nullable
+    public BlockPos idlePlace() {
+        return null;
+    }
+
+    /** Who is cleaning it now ({@code AllogroomGoal}), and until when (game time): it holds still meanwhile. */
+    @Nullable
+    private java.util.UUID groomedBy;
+    private long groomedUntil;
+
+    /** Server: a nestmate cleans it until this game time (it holds still: no strolls), or says it is done (until 0). */
+    public void groomedBy(java.util.UUID groomer, long until) {
+        groomedBy = until > 0 ? groomer : null;
+        groomedUntil = until;
+    }
+
+    /** Whether a nestmate is cleaning it now (other than {@code except}, null for anyone). */
+    public boolean isBeingGroomed(@Nullable java.util.UUID except) {
+        return groomedBy != null && groomedUntil > level().getGameTime() && !groomedBy.equals(except);
+    }
+
     /** Whether this cell may be the end of a walk now: anywhere while it may go out (see {@link #mayGoOut}), otherwise only inside. */
     public boolean mayBeAt(BlockPos cell) {
         Colony colony = getColony();
@@ -1833,7 +1866,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             boolean busy = goalSelector.getAvailableGoals().stream().anyMatch(wrapped -> wrapped.isRunning()
                     && !(wrapped.getGoal() instanceof FloatGoal || wrapped.getGoal() instanceof AntWanderGoal
                     || wrapped.getGoal() instanceof RandomLookAroundGoal || wrapped.getGoal() instanceof NapGoal
-                    || wrapped.getGoal() instanceof NoticeGoal || wrapped.getGoal() instanceof GroomGoal));
+                    || wrapped.getGoal() instanceof NoticeGoal || wrapped.getGoal() instanceof GroomGoal
+                    || wrapped.getGoal() instanceof AllogroomGoal));
             idleSeconds = busy ? 0 : idleSeconds + 1;
             updateYouth();
             if (level() instanceof ServerLevel serverLevel) {
@@ -2650,16 +2684,23 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     /** The clip for the body work it is doing (cleaning an antenna, digging), or null for none (or no such clips). */
     @Nullable
     private RawAnimation activityClip() {
-        if (!hasWorkClips()) {
-            return null;
-        }
         return switch (getActivity()) {
-            case ACTIVITY_GROOM_L -> GROOM_L;
-            case ACTIVITY_GROOM_R -> GROOM_R;
-            case ACTIVITY_GROOM_BOTH -> GROOM_BOTH;
-            case ACTIVITY_DIG -> DIG;
+            case ACTIVITY_GROOM_L -> hasGroomClips() ? GROOM_L : null;
+            case ACTIVITY_GROOM_R -> hasGroomClips() ? GROOM_R : null;
+            case ACTIVITY_GROOM_BOTH -> hasGroomClips() ? GROOM_BOTH : null;
+            case ACTIVITY_ALLOGROOM -> hasGroomClips() ? GROOM_NESTMATE : null;
+            case ACTIVITY_DIG -> hasWorkClips() ? DIG : null;
             default -> null;
         };
+    }
+
+    /**
+     * Whether its animation file has the cleaning clips (groom_antenna_l, _r, _both, and groom_nestmate where its species
+     * cleans nestmates): every model with the work clips, and (M8 step 3Q) the Matabele and the termites, which have the
+     * cleaning clips but not the digging and carrying ones.
+     */
+    protected boolean hasGroomClips() {
+        return hasWorkClips();
     }
 
     /**
@@ -2683,7 +2724,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
 
     /** Whether this clip plays at the speed it was made (a piece of work played once), not at the insect's own pace. */
     private static boolean isMadeSpeed(RawAnimation clip) {
-        return clip == GROOM_L || clip == GROOM_R || clip == GROOM_BOTH;
+        return clip == GROOM_L || clip == GROOM_R || clip == GROOM_BOTH || clip == GROOM_NESTMATE;
     }
 
     /**

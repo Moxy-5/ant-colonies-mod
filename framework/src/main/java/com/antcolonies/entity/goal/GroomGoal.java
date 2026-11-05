@@ -13,7 +13,8 @@ import net.minecraft.world.entity.ai.goal.Goal;
  * ant stops, draws each antenna through the comb on the front leg of its side (the strigil) a few times, then cleans the
  * comb in its jaws (Farish 1972; Hackmann et al. 2015). Here an insect standing about with nothing to do now and then
  * stops and cleans one antenna, or both one after the other, with its profile's {@code body_language.groom}; a species
- * without it never does (the termites, whose model has no cleaning clips yet). Mind only: it says "stand still and clean
+ * without it never does (M8 step 3Q gave the Matabele and the termites their cleaning clips; a termite, whose antennae
+ * start far ahead of its short front legs, swings each antenna down and back to the leg and the mouth). Mind only: it says "stand still and clean
  * this side"; the body's clips do the rest. Every job comes before it, but a clean once begun is finished unless the
  * insect is hurt, gets wet, loses its footing or the alarm goes (a real ant breaks off at once).
  */
@@ -56,7 +57,7 @@ public class GroomGoal extends Goal {
     /** Whether it may stop and clean here: standing on a floor with empty jaws, awake, unhurt, dry, with no alarm. */
     private boolean mayCleanHere() {
         if (!insect.onGround() || insect.isClimbing() || insect.hasFullMandibles() || insect.hurtTime > 0 || insect.isInWater()
-                || insect.isAsleep() || insect.getNoticing() != AbstractAntEntity.NOTICE_NONE) {
+                || insect.isAsleep() || insect.getNoticing() != AbstractAntEntity.NOTICE_NONE || insect.getFightSpot() != null) {
             return false;
         }
         Colony colony = insect.getColony();
@@ -65,7 +66,7 @@ public class GroomGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        return ticksLeft > 0 && insect.onGround() && insect.hurtTime == 0 && !insect.isInWater()
+        return ticksLeft > 0 && insect.onGround() && insect.hurtTime == 0 && !insect.isInWater() && insect.getFightSpot() == null
                 && (insect.getColony() == null || !insect.getColony().isAlarmed(insect.level()));
     }
 

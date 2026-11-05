@@ -5,11 +5,13 @@ import java.util.EnumSet;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
+import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.savanna.colony.RaidColumn;
 import com.antcolonies.savanna.colony.RaidGround;
 import com.antcolonies.savanna.colony.Raids;
 import com.antcolonies.savanna.colony.SavannaParts;
 import com.antcolonies.savanna.entity.MatabeleEntity;
+import com.antcolonies.species.SpeciesProfile;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -47,6 +49,11 @@ public class MatabeleRaidGoal extends Goal {
     /** Step 3c: whether it limps home along a raid's trail (else it walks in its column), and whether it stands picking a termite up. */
     private boolean limping;
     private boolean picking;
+    /**
+     * Step 3Q, Q5: cleaning an antenna while it waits at its place (real raiders standing at a halt clean themselves
+     * between bouts of antenna-waving): the tick the clean ends, 0 for none.
+     */
+    private int cleaningUntil;
 
     public MatabeleRaidGoal(MatabeleEntity ant) {
         this.ant = ant;
@@ -104,6 +111,7 @@ public class MatabeleRaidGoal extends Goal {
     @Override
     public void stop() {
         ant.getNavigator().stop();
+        endCleaning();
         column = null;
         limping = false;
         walkingTo = null;
@@ -132,7 +140,10 @@ public class MatabeleRaidGoal extends Goal {
             return; // (picking a termite up: it stands)
         }
         picking = false;
-        if (order.lookAt() != null && ant.getNavigator().isDone()) {
+        if (cleaningUntil != 0 && ant.tickCount >= cleaningUntil) {
+            endCleaning();
+        }
+        if (order.lookAt() != null && ant.getNavigator().isDone() && cleaningUntil == 0) {
             ant.getLookControl().setLookAt(order.lookAt().getX() + 0.5, order.lookAt().getY() + 0.3, order.lookAt().getZ() + 0.5);
         }
         BlockPos to = order.to();
@@ -157,10 +168,18 @@ public class MatabeleRaidGoal extends Goal {
         // the entrance, counted as there by the flat distance and stood still 8 blocks down).
         boolean atPlace = flat(ant.blockPosition(), to) <= AT && Math.abs(ant.getY() - to.getY()) <= UP_DOWN;
         boolean moved = walkingTo == null || flat(walkingTo, to) >= MOVED || Math.abs(walkingTo.getY() - to.getY()) > UP_DOWN;
-        boolean idleAndOff = ant.getNavigator().isDone() && !atPlace;
+        // Step 3Q, Q5: one standing where it last walked to stays there while its place shifts less than MOVED (the
+        // column's places wobble a little as the line closes up: it used to walk off and back for every wobble).
+        boolean settled = walkingTo != null && flat(ant.blockPosition(), walkingTo) <= AT
+                && Math.abs(ant.getY() - walkingTo.getY()) <= UP_DOWN;
+        boolean idleAndOff = ant.getNavigator().isDone() && !atPlace && !settled;
         if (!moved && !idleAndOff || ant.tickCount < waitUntil) {
+            if (!moved && ant.getNavigator().isDone() && order.take() == null && (atPlace || settled)) {
+                maybeClean();
+            }
             return;
         }
+        endCleaning();
         if (atPlace && ant.getNavigator().isDone() && order.take() == null) {
             walkingTo = to;
             return;
@@ -169,6 +188,36 @@ public class MatabeleRaidGoal extends Goal {
             waitUntil = ant.tickCount + RETRY; // no way now: a little later (BUGS 76: never searched every tick)
             if (order.take() != null && column != null) {
                 column.noWayTo(level, ant, order.take()); // (another may reach it, or this one later)
+            }
+        }
+    }
+
+    /**
+     * Step 3Q, Q5: standing at its place, now and then it cleans an antenna (its species' {@code body_language.groom}
+     * chance, a restless one more often, asked once a second); never with jaws full, hurt or off the ground.
+     */
+    private void maybeClean() {
+        if (cleaningUntil != 0 || ant.tickCount % 20 != (ant.getId() + 8) % 20 || !ant.onGround() || ant.hasFullMandibles()
+                || ant.hurtTime > 0 || ant.isInWater()) {
+            return;
+        }
+        SpeciesProfile.Groom groom = ant.profile().bodyLanguage().flatMap(SpeciesProfile.BodyLanguage::groom).orElse(null);
+        if (groom == null || ant.getRandom().nextFloat() >= groom.chancePerSecond() * (0.5F + ant.restlessness())) {
+            return;
+        }
+        boolean both = ant.getRandom().nextFloat() < groom.bothShare();
+        ant.setActivity(both ? AbstractAntEntity.ACTIVITY_GROOM_BOTH
+                : ant.getRandom().nextBoolean() ? AbstractAntEntity.ACTIVITY_GROOM_L : AbstractAntEntity.ACTIVITY_GROOM_R);
+        cleaningUntil = ant.tickCount + (both ? AbstractAntEntity.GROOM_BOTH_TICKS : AbstractAntEntity.GROOM_ONE_TICKS)
+                + AbstractAntEntity.GROOM_SETTLE_TICKS + 2;
+    }
+
+    private void endCleaning() {
+        if (cleaningUntil != 0) {
+            cleaningUntil = 0;
+            byte now = ant.getActivity();
+            if (now == AbstractAntEntity.ACTIVITY_GROOM_L || now == AbstractAntEntity.ACTIVITY_GROOM_R || now == AbstractAntEntity.ACTIVITY_GROOM_BOTH) {
+                ant.setActivity(AbstractAntEntity.ACTIVITY_NONE);
             }
         }
     }

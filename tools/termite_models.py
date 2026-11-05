@@ -486,6 +486,8 @@ def soldier_animations(name, bones):
     out['clamp_hold'] = {'loop': True, 'animation_length': CLAMP_SECONDS, 'bones': clamp_hold()}
     out['paralysed_fall'] = clips['paralysed_fall']
     out['paralysed'] = clips['paralysed']
+    # (no cleaning clips, M8 step 3Q, my pick: the great head hangs over the front legs, which cannot reach the
+    # antennae past it; the workers clean the soldiers)
     return {'format_version': '1.8.0', 'animations': out}
 
 def render_head_bang(bones, path, frames=6):
@@ -753,7 +755,25 @@ def animations(name='termite_king', bones=None):
     clips['freeze'] = {'loop': True, 'animation_length': FREEZE_SECONDS, 'bones': freeze()}
     clips['paralysed_fall'] = {'loop': False, 'animation_length': FALL_SECONDS, 'bones': paralysed_fall(name)}
     clips['paralysed'] = {'loop': True, 'animation_length': PARALYSED_SECONDS, 'bones': paralysed(name)}
+    # (the swollen queen and the soldiers are cleaned by the workers, never themselves: M8 step 3Q)
+    if bones is not None and name in ('termite_worker', 'termite_king'):
+        clips.update(cleaning_clips(name, bones))
     return {'format_version': '1.8.0', 'animations': clips}
+
+
+def cleaning_clips(name, bones):
+    """M8 step 3Q: cleaning the antennae (groom_antenna_l, _r, _both: GroomGoal plays them) and cleaning a nestmate
+    (groom_nestmate: termites groom each other constantly, it spreads the colony's smell and clears off fungus spores),
+    made by tools/groom_motion.py, each checked. Termites rest standing: no nap clip."""
+    import groom_motion as gm
+    rig = rig_of(name, bones)
+    clips = gm.groom_clips(rig, gm.TERMITE)
+    if name == 'termite_worker':   # (only workers clean nestmates: AllogroomGoal; soldiers and royals are cleaned)
+        made, miss = gm.groom_nestmate(rig)
+        if miss > 0.05:
+            raise ValueError(f'{name} groom_nestmate: a planted foot misses its place by {miss:.3f}')
+        clips['groom_nestmate'] = made
+    return clips
 
 def sample(bones_anim, t):
     """The rotation of every bone of an animation at time t (straight lines between the key frames)."""

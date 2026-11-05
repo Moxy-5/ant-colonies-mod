@@ -515,6 +515,21 @@ public final class RaidColumn {
         hiddenForTests.remove(ant);
     }
 
+    /**
+     * Tests (M8 step 3Q): whether this raider is waiting now, at its place in one of the column's waits (milling at the
+     * entrance, bunched short of the termites, waiting out the attack, regrouping), not fighting and not sent anywhere far.
+     */
+    public boolean waitingForTests(AbstractAntEntity ant) {
+        if (stage != Stage.FORMING && stage != Stage.GATHERING && stage != Stage.ATTACKING && stage != Stage.REGROUPING) {
+            return false;
+        }
+        if (ant.getFightSpot() != null) {
+            return false;
+        }
+        Order order = orders.get(ant.getUUID());
+        return order != null && order.to() != null && flat(ant.blockPosition(), order.to()) <= 2.5;
+    }
+
     /** The gathering place, a few blocks short of the find. */
     public BlockPos gatheringPlace() {
         return out.end();
@@ -1466,8 +1481,11 @@ public final class RaidColumn {
             if (flat(ant.blockPosition(), middle) <= NEAR) {
                 there++;
             }
-            double angle = i * 2.39996;
-            double radius = i == 0 ? 0.0 : 1.0 + 1.5 * Math.sqrt(i / (double) ants.size());
+            // Step 3Q, Q5: its place by its own number, given once (as the milling places, BUGS 101), round a ring sized
+            // for the whole column: one raider dying, fighting or out of sight moves nobody else's place.
+            int n = formIndex.computeIfAbsent(ant.getUUID(), k -> formIndex.size());
+            double angle = n * 2.39996;
+            double radius = n == 0 ? 0.0 : 1.0 + 1.5 * Math.sqrt(n / (double) Math.max(1, formIndex.size()));
             if (flat(ant.blockPosition(), middle) > STRAGGLER_FAR) {
                 // (a straggler far behind, left by the march's time limit or a fight: it walks the trail up, not straight
                 // across; the raid code review, findings 2 and 17)
@@ -1669,8 +1687,9 @@ public final class RaidColumn {
                 ant.orderToFight(seen.blockPosition(), now + carry.spreadTicks(), com.antcolonies.entity.goal.FightGoal.SPOT_REACH, this);
                 continue;
             }
-            double angle = i * 2.39996;
-            double radius = 3.0 + (carry.spreadReach() - 3.0) * ((i * 7) % 10) / 10.0;
+            int n = formIndex.computeIfAbsent(ant.getUUID(), k -> formIndex.size()); // (its own number, Q5: places hold still)
+            double angle = n * 2.39996;
+            double radius = 3.0 + (carry.spreadReach() - 3.0) * ((n * 7) % 10) / 10.0;
             BlockPos spot = standAt(level, at.getX() + 0.5 + Math.cos(angle) * radius, at.getZ() + 0.5 + Math.sin(angle) * radius, at.getY());
             orders.put(ant.getUUID(), new Order(spot, 1.0, at));
         }

@@ -6,6 +6,9 @@ import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.ColonyBorn;
 import com.antcolonies.entity.WorkerHunger;
+import com.antcolonies.entity.goal.NapGoal;
+import com.antcolonies.entity.goal.AllogroomGoal;
+import com.antcolonies.entity.goal.GroomGoal;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.entity.goal.CarryEggGoal;
 import com.antcolonies.entity.goal.ClampCareGoal;
@@ -198,8 +201,13 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         this.goalSelector.addGoal(3, new DigGoal(this, () -> true));
         this.goalSelector.addGoal(4, new GoInsideGoal(this));
         this.goalSelector.addGoal(5, new WaitAtNestGoal(this));
-        this.goalSelector.addGoal(6, new AntWanderGoal(this, 1.0, 120, 8, () -> true));
-        this.goalSelector.addGoal(7, new RandomLookAroundGoal(this));
+        // M8 step 3Q: with nothing to do it mostly stands, by the queen and the prey pile (body_language.idle).
+        // M8 3Q: at rest, now and then a nap, cleaning its antennae or a nestmate (each when idle; the wander rests first)
+        this.goalSelector.addGoal(6, new NapGoal(this, false));
+        this.goalSelector.addGoal(6, new GroomGoal(this));
+        this.goalSelector.addGoal(6, new AllogroomGoal(this));
+        this.goalSelector.addGoal(7, new AntWanderGoal(this, 1.0, 120, 8, () -> true).restsFirst(1.0F));
+        this.goalSelector.addGoal(8, new RandomLookAroundGoal(this));
     }
 
     /** The body a new worker of the colony gets, by the dice: the major's or the minor's, as often as the size spread draws each. */
@@ -823,5 +831,22 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
     @Override
     protected net.minecraft.sounds.SoundEvent squeakSound() {
         return com.antcolonies.savanna.registry.SavannaSounds.MATABELE_SQUEAK.get();
+    }
+
+    /**
+     * M8 step 3Q: with nothing to do, staying in, it settles by the queen and the prey pile in her room (real Megaponera
+     * crowd the brood chamber between raids, Yusuf 2026); none while it may go out or before the room is open.
+     */
+    @Override
+    @Nullable
+    public BlockPos idlePlace() {
+        Colony colony = getColony();
+        return colony == null || !restsInRooms() ? null : colony.nest().getFinishedRoomCenter(level());
+    }
+
+    /** M8 step 3Q: its clip file has the cleaning clips (tools/groom_motion.py), not the digging and carrying ones. */
+    @Override
+    protected boolean hasGroomClips() {
+        return true;
     }
 }

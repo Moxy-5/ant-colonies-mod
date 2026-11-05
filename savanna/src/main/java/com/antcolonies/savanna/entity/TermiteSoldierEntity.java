@@ -179,7 +179,10 @@ public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurs
         this.goalSelector.addGoal(4, new GoInsideGoal(this));
         this.goalSelector.addGoal(5, new GuardPostGoal(this));
         // No post to guard (the nest is not dug that far yet, every post taken): it strolls about (inside unless it may be out).
-        this.goalSelector.addGoal(6, new AntWanderGoal(this, 0.8, 200, 4, () -> true));
+        // M8 step 3Q: a soldier with no post stands where it is (it only walks back to where it may be).
+        // No cleaning of its own (my pick): a soldier's great head hangs over its front legs, which cannot reach its
+        // antennae past it; the workers clean it (AllogroomGoal), as real Macrotermes workers tend their soldiers.
+        this.goalSelector.addGoal(6, new AntWanderGoal(this, 0.8, 200, 4, () -> true).restsFirst(0.0F));
         this.goalSelector.addGoal(7, new RandomLookAroundGoal(this));
     }
 

@@ -46,8 +46,9 @@ public class NapGoal extends Goal {
 
     /** Whether it may sleep here now: standing on a floor with empty jaws, inside its nest, unhurt, with no alarm. */
     private boolean mayRestHere() {
-        if (!insect.onGround() || insect.isClimbing() || insect.hasFullMandibles() || insect.hurtTime > 0 || insect.isInWater()) {
-            return false;
+        if (!insect.onGround() || insect.isClimbing() || insect.hasFullMandibles() || insect.hurtTime > 0 || insect.isInWater()
+                || insect.getFightSpot() != null) {
+            return false; // (never with a fight order, between bouts of its fight: M8 step 3Q, BUGS 97's skirmish found it)
         }
         Colony colony = insect.getColony();
         return colony == null || colony.nest().isInside(insect.level(), insect.blockPosition()) && !colony.isAlarmed(insect.level());

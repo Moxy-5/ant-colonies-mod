@@ -75,16 +75,7 @@
   240,
   136
  ],
- "findings": {
-  "jump leg_r3": [
-   1,
-   0.171
-  ],
-  "jump at walk_side_12": [
-   1,
-   0.171
-  ]
- },
+ "findings": {},
  "body_findings": {},
  "known_bugs": "the Matabele major's walk swings its legs faster than the jump limit (every leg, every stride; not the clamped head, which is what this scene checks)"
 }
