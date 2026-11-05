@@ -330,3 +330,5 @@ then the test revamp, then 5 and 6. This replaces "step 4 before step 3" above.
 
 Later (M9): splitting into daughter colonies nearby, winged males mating in other
 colonies. After M8: harvester ant territory fights with their neighbours.
+
+**Later, the long-run balance (the user, 2026-11-04, thinking ahead, not planned):** over hundreds of hours with no player, could the Matabele wipe out the Macrotermes? Real raids almost never kill a termite colony: they take foragers at the feeding spots (a few hundred a raid from a colony of a million or more), never reach the queen, and the termites seal their galleries and wait. Already in the mod: raids hit feeding spots only, galleries are sealed, termite numbers are huge and regrow, the Matabele are capped by their own hunger. To check later: a long unattended run (world ticking for 100+ game days) counting termite colonies, their workers and Matabele colonies, and a brake if needed (termites shifting feeding away from raided spots, the danger memory already does some of it; Matabele colonies starving or moving when prey thins). Tied to M9 (new colonies founding), when numbers can grow on both sides.
