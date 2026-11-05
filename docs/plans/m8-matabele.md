@@ -314,6 +314,11 @@ timings: all "my pick, to confirm" until then).
        colonies, part of the same pattern (the user: "because it's realistic"). Real mound fields are evenly spread but
        not in rows (neighbouring colonies fight over the ground between them). Minecraft's own spread rule only gives a
        gap per square, so the mound check also measures the real distance to its neighbours (my note).
+       **Not flat odds (the user's idea, my pick of the shape, 2026-11-04):** distances cluster round about 60 and grow
+       rarer toward 40 and 80 (real mound fields have a typical spacing with a spread); bigger mounds lean to the far
+       end and small young ones to the near end (real: a bigger colony holds more ground round it). Watch: about 2.5
+       times as many mounds as today (96 to about 60), so check `/antcolonies perf` and the giant trees kept 16 blocks
+       off mounds after F1.
      - **F2 Find what limits the feeding spots** (first, before changing anything): read today, a gallery piece goes only
        to rich food and comes out of the tunnel budget (1 block per 4 workers), so most branches in range never get one.
      - **F3 10 to 15 by-day feeding spots for a big colony (the user's pick)**, fewer for small ones by worker count,
