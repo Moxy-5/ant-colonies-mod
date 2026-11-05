@@ -48,7 +48,15 @@ public class AwayReport {
         FILLED_BLOCKS("blocks of gallery packed with soil"),
         DANGER_FORGOTTEN("dangerous places forgotten"),
         LOST_IN_DANGER("lost in danger"),
-        BODIES_FOUND("bodies of the lost found by nestmates");
+        BODIES_FOUND("bodies of the lost found by nestmates"),
+        // Raids (any raiding species: today the Matabele, M8 step 3f), and their prey's side.
+        RAIDS("raids"),
+        RAIDERS("raiders sent"),
+        PREY_BROUGHT("prey brought home"),
+        RAIDERS_LOST("raiders lost"),
+        RAIDERS_HURT("raiders home hurt"),
+        RAID_FINDS("feeding places found by the scouts"),
+        TAKEN_BY_RAIDERS("taken by raiders");
 
         private final String label;
 

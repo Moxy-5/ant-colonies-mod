@@ -40,6 +40,7 @@ public final class SavannaNumbers {
     public static final SpeciesSection<MoundClueNumbers> MOUND_CLUE = SpeciesSection.signUp("raids.mound_clue", MoundClueNumbers.CODEC);
     public static final SpeciesSection<SearchNumbers> SEARCH = SpeciesSection.signUp("raids.search", SearchNumbers.CODEC);
     public static final SpeciesSection<HoursSoundNumbers> HOURS_SOUND = SpeciesSection.signUp("raids.hours_and_sound", HoursSoundNumbers.CODEC);
+    public static final SpeciesSection<AwayRaidNumbers> AWAY_RAIDS = SpeciesSection.signUp("raids.away", AwayRaidNumbers.CODEC);
 
     private SavannaNumbers() {
     }
@@ -628,6 +629,42 @@ public final class SavannaNumbers {
         public int everyAt(double distance) {
             return (int) Math.round(squeakEveryFar + (squeakEveryNear - squeakEveryFar) * nearness(distance));
         }
+    }
+
+    /**
+     * M8 step 3f, raids out of sight ({@code colony.RaidsAway}): a colony away (in land not loaded, or loaded but far from
+     * every player) raids as numbers by the same rules as the real column (the raid hours, hunger, the find's worth, the
+     * raid's size), the time from the distance: the column walks out at {@code pace} blocks a second (the march in surges,
+     * slower than one ant) after mustering at the entrance ({@code column.form_ticks}), attacks {@code fightTicks}, regroups
+     * and walks home laden ({@code carry.laden_pace}). It brings home {@code catchPerRaider} termites a raider (the loads:
+     * majors 4 to 10, minors 1 to 3, not every raider carrying), never more than {@code mostTakeShare} of the termite
+     * colony's workers inside its nest, taken from its numbers (the workers feeding under the mud at the spot). A share
+     * {@code lostShare} of the raiders dies, {@code hurtShare} comes home hurt. At most {@code mostRaidsADay} raids a day
+     * (1 to 4, Yusuf 2026). A raid leaves only if its attack starts before dusk. A spot is the termite colony's within
+     * {@code termiteReach} blocks of its mound's middle. No raid out of sight to a spot a player is within
+     * {@code playerNear} blocks of (that one needs real ants). Out of sight the scouts are numbers too: each scouting hour
+     * each scout the colony would send finds, with {@code scoutFindChance}, one of the termites' feeding places it does
+     * not know yet within its reach (the termite colony's ways out to food), scored {@code scoutWorthLeast} to
+     * {@code scoutWorthMost}. Every number my pick, to confirm.
+     */
+    public record AwayRaidNumbers(double pace, int fightTicks, double catchPerRaider, double mostTakeShare, double lostShare,
+                                  double hurtShare, int mostRaidsADay, int termiteReach, int playerNear, double scoutFindChance,
+                                  int scoutWorthLeast, int scoutWorthMost) {
+        public static final AwayRaidNumbers DEFAULT = new AwayRaidNumbers(1.5, 1200, 1.5, 0.1, 0.01, 0.03, 4, 80, 64, 0.25, 6, 18);
+        public static final Codec<AwayRaidNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.DOUBLE.optionalFieldOf("pace", DEFAULT.pace()).forGetter(AwayRaidNumbers::pace),
+                Codec.INT.optionalFieldOf("fight_ticks", DEFAULT.fightTicks()).forGetter(AwayRaidNumbers::fightTicks),
+                Codec.DOUBLE.optionalFieldOf("catch_per_raider", DEFAULT.catchPerRaider()).forGetter(AwayRaidNumbers::catchPerRaider),
+                Codec.DOUBLE.optionalFieldOf("most_take_share", DEFAULT.mostTakeShare()).forGetter(AwayRaidNumbers::mostTakeShare),
+                Codec.DOUBLE.optionalFieldOf("lost_share", DEFAULT.lostShare()).forGetter(AwayRaidNumbers::lostShare),
+                Codec.DOUBLE.optionalFieldOf("hurt_share", DEFAULT.hurtShare()).forGetter(AwayRaidNumbers::hurtShare),
+                Codec.INT.optionalFieldOf("most_raids_a_day", DEFAULT.mostRaidsADay()).forGetter(AwayRaidNumbers::mostRaidsADay),
+                Codec.INT.optionalFieldOf("termite_reach", DEFAULT.termiteReach()).forGetter(AwayRaidNumbers::termiteReach),
+                Codec.INT.optionalFieldOf("player_near", DEFAULT.playerNear()).forGetter(AwayRaidNumbers::playerNear),
+                Codec.DOUBLE.optionalFieldOf("scout_find_chance", DEFAULT.scoutFindChance()).forGetter(AwayRaidNumbers::scoutFindChance),
+                Codec.INT.optionalFieldOf("scout_worth_least", DEFAULT.scoutWorthLeast()).forGetter(AwayRaidNumbers::scoutWorthLeast),
+                Codec.INT.optionalFieldOf("scout_worth_most", DEFAULT.scoutWorthMost()).forGetter(AwayRaidNumbers::scoutWorthMost)
+        ).apply(i, AwayRaidNumbers::new));
     }
 
     /**

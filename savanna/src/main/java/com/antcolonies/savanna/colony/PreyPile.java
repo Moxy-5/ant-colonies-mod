@@ -132,6 +132,23 @@ public class PreyPile implements NurseFood {
         ColonyManager.get(level).markChanged();
     }
 
+    /**
+     * M8 step 3f: a raid out of sight is home with this many termites: counted onto the pile at once, every
+     * {@code termites_per_layer} of them (with the odd ones brought before) a fresh layer, its block owed to the nest
+     * and laid once the nest is loaded and nobody sees ({@code NestLedger}). Never reads or changes a block.
+     */
+    public void bringInCounted(long now, int termites) {
+        int perLayer = termitesPerLayer();
+        looseTermites += Math.max(0, termites);
+        broughtIn += Math.max(0, termites);
+        lastTime = now;
+        while (looseTermites >= Math.max(1, perLayer)) {
+            looseTermites -= Math.max(1, perLayer);
+            edible.addLast(now);
+            colony.ledger().addNurseFood(1);
+        }
+    }
+
     /** Termites brought home by raiders since the colony was loaded (tests and the colony list), and the odd ones not yet a layer. */
     public int broughtIn() {
         return broughtIn;

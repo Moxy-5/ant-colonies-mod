@@ -293,23 +293,35 @@ public class Population {
      * it fell (not carried home). False if there was none inside to lose.
      */
     boolean lostOutside(ServerLevel level) {
-        String caste = Caste.WORKER;
+        return loseInside(level, Caste.WORKER, 1, AwayReport.What.LOST_IN_DANGER) > 0;
+    }
+
+    /**
+     * Up to {@code count} numbers of this caste die out of sight, any age (picked at random by how many of each age
+     * there are), taken out of the headcount; the away report counts them under {@code why}. No body is owed (they fell
+     * outside the nest). Returns how many died (never more than there are inside). Species-neutral: brain step 4g's
+     * losses, and M8 step 3f's raids out of sight (raiders lost, and the prey colony's workers taken).
+     */
+    public int loseInside(ServerLevel level, String caste, int count, AwayReport.What why) {
         TreeMap<Long, Integer> ages = inside.get(caste);
-        if (ages == null || ages.isEmpty()) {
-            return false;
-        }
-        int pick = colony.random().nextInt(Math.max(1, ages.values().stream().mapToInt(Integer::intValue).sum()));
-        for (Map.Entry<Long, Integer> entry : ages.entrySet()) {
-            pick -= entry.getValue();
-            if (pick < 0) {
-                takeInside(caste, entry.getKey(), 1);
-                break;
+        int lost = 0;
+        while (lost < count && ages != null && !ages.isEmpty()) {
+            int pick = colony.random().nextInt(Math.max(1, ages.values().stream().mapToInt(Integer::intValue).sum()));
+            for (Map.Entry<Long, Integer> entry : ages.entrySet()) {
+                pick -= entry.getValue();
+                if (pick < 0) {
+                    takeInside(caste, entry.getKey(), 1);
+                    break;
+                }
             }
+            lost++;
         }
-        colony.setCount(caste, colony.getCount(caste) - 1);
-        colony.away().note(level, AwayReport.What.LOST_IN_DANGER, 1);
-        ColonyManager.get(level).markChanged();
-        return true;
+        if (lost > 0) {
+            colony.setCount(caste, colony.getCount(caste) - lost);
+            colony.away().note(level, why, lost);
+            ColonyManager.get(level).markChanged();
+        }
+        return lost;
     }
 
     /**

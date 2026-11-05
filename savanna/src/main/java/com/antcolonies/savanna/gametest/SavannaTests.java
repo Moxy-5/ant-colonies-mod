@@ -49,8 +49,8 @@ public final class SavannaTests {
         TestFilter.addCategory("colony", TermiteTests.class, TermiteJobsByAgeTests.class, TermitePopulationTests.class,
                 TermiteNeighbourTests.class, MatabeleColonyTests.class, MatabeleNestTests.class, MatabeleFoodTests.class,
                 MatabeleNewLandTests.class);
-        // Colonies that live while the player is away: the termites' life while away.
-        TestFilter.addCategory("away", TermiteAwayTests.class);
+        // Colonies that live while the player is away: the termites' life while away; the Matabele raids out of sight (M8 step 3f).
+        TestFilter.addCategory("away", TermiteAwayTests.class, MatabeleAwayTests.class);
         // Hills and uneven ground: the side tunnels, the mound on a slope.
         TestFilter.addCategory("hills", TermiteHillTests.class);
         // The body (the animation engine): what the server decides about how a termite holds itself.

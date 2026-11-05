@@ -204,10 +204,97 @@ public class Raids {
     private int moundsNoticed;
     private int tunnelsFollowed;
     private int clueFinds;
+    /** M8 step 3f: the raids while the colony is away, as numbers (saved). */
+    private final RaidsAway away;
 
 
     public Raids(Colony colony) {
         this.colony = colony;
+        this.away = new RaidsAway(this, colony);
+    }
+
+    /** M8 step 3f: the raids out of sight. */
+    public RaidsAway away() {
+        return away;
+    }
+
+    /**
+     * M8 step 3f: once a second while the colony is away. The finds fade as at home; a real raid column out when the
+     * colony went away goes on as numbers; then the raids out of sight ({@link RaidsAway}).
+     */
+    void tickAway(ServerLevel level) {
+        SavannaNumbers.ScoutNumbers numbers = numbers();
+        if (numbers == null) {
+            return;
+        }
+        long now = level.getGameTime();
+        finds.removeIf(find -> now - find.checkedAt > numbers.spotFadeTicks());
+        if (waiting != null && !finds.contains(waiting)) {
+            waiting = null;
+        }
+        if (column != null) {
+            if (column.stage() != RaidColumn.Stage.DONE) {
+                away.fromColumn(level, column);
+            }
+            last = column;
+            column = null;
+            raidCheckAt = -1;
+        }
+        scouts.clear(); // (the real scouts are numbers now: out of sight the colony's scouts search as numbers)
+        sent.clear();
+        sentAnyHour.clear();
+        away.tick(level);
+    }
+
+    /** The diary for {@link RaidsAway}. */
+    void diary(ServerLevel level, String what) {
+        say(level, what);
+    }
+
+    /** The remembered find at this spot (within the trail reach), or null. */
+    @Nullable
+    Find findAt(BlockPos at) {
+        double within = trailReach();
+        return finds.stream().filter(find -> find.at.closerThan(at, within)).findFirst().orElse(null);
+    }
+
+    /** A remembered find was raided and termites were there: it counts as checked now. */
+    void checked(Find find, long now) {
+        find.checkedAt = now;
+        find.misses = 0;
+    }
+
+    /** A raid set out to this find: it no longer waits for the raid hours. */
+    void forgetWaiting(Find find) {
+        if (waiting == find) {
+            waiting = null;
+            waitingCommanded = false;
+        }
+    }
+
+    /** A raid walked the scent trail to this spot: it is fresh again (if one is still smelt). */
+    void walkTrail(BlockPos at, long now) {
+        ScentTrails.Trail trail = trails.liveTo(at, trailReach(), trailNumbers(), now);
+        if (trail != null) {
+            trail.walked(now);
+        }
+    }
+
+    /**
+     * M8 step 3f: a number scout out of sight found termites feeding here: the spot remembered, its line home laid as a
+     * scent trail only while the nest's land is loaded (no block of unloaded land is read).
+     */
+    void remember(ServerLevel level, BlockPos at, int worth, List<BlockPos> line) {
+        long now = level.getGameTime();
+        finds.add(new Find(at.immutable(), worth, now, now, 0, List.copyOf(line), null));
+        if (level.hasChunkAt(colony.getCenter()) && level.hasChunkAt(at) && trails.liveTo(at, trailReach(), trailNumbers(), now) == null) {
+            trails.lay(level, colony.getCenter(), at, line, now, false);
+        }
+    }
+
+    /** M8 step 3f, tests: a find remembered by hand (a scout's find, no trail laid). */
+    public void rememberForTests(BlockPos at, int worth, long now) {
+        finds.add(new Find(at.immutable(), worth, now, now, 0, RaidsAway.line(colony.getCenter(), at), null));
     }
 
     @Nullable
@@ -262,6 +349,7 @@ public class Raids {
     void tick(ServerLevel level) {
         RaidCost.begin();
         try {
+            away.tickHere(level); // (M8 step 3f: a raid out of sight when the colony came back finishes as numbers)
             tickTimed(level);
         } finally {
             RaidCost.end();
@@ -1169,6 +1257,12 @@ public class Raids {
         if (numbers == null) {
             return null;
         }
+        if (away.isOut()) {
+            // M8 step 3f: a raid out of sight is not home yet: the find waits for it (one raid at a time)
+            unloadedFind = true;
+            whyNoRaid = "a raid is still out of sight";
+            return null;
+        }
         if (!level.isPositionEntityTicking(find.at)) {
             // R7: no raid sets out to a spot in land not loaded (no ant can walk there till drawn-only ants, M8 step 4)
             unloadedFind = true;
@@ -1339,6 +1433,7 @@ public class Raids {
                     .append(" tunnel(s) followed, ").append(clueFinds).append(" find(s)");
         }
         line.append(trails.describe(trailNumbers(), level.getGameTime()));
+        line.append(away.describe(level));
         if (column != null) {
             line.append(column.describe());
         }
@@ -1373,6 +1468,7 @@ public class Raids {
             tag.putBoolean("raidSettled", true);
         }
         trails.save(tag);
+        away.save(tag);
     }
 
     void load(CompoundTag tag) {
@@ -1403,6 +1499,7 @@ public class Raids {
             veterans.add(NbtUtils.loadUUID(t));
         }
         trails.load(tag);
+        away.load(tag);
     }
 
     void fillForTests(ServerLevel level) {
@@ -1413,6 +1510,7 @@ public class Raids {
         veterans.add(new UUID(7, 11));
         veterans.add(new UUID(7, 12));
         trails.fillForTests(colony.getCenter());
+        away.fillForTests(level);
     }
 
     /** Whether a termite there counts as feeding (out of its mound): not within its colony's mound and a little round it. */

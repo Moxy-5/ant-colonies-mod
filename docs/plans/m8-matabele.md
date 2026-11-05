@@ -363,6 +363,10 @@ timings: all "my pick, to confirm" until then).
      then scouts search by day only (6:00 to 19:30, built 2026-11-03).
    - **3f Out of sight.** Raids happen while the player is away too, as numbers by the same rates (termites taken,
      ants hurt or lost, heads left clamped, holes plugged); the away report lists them.
+     **Built 2026-11-05** (`colony/RaidsAway`, `raids.away`; details and picks in `docs/DESIGN.md` "Step 3f, out of
+     sight, as built" and `docs/HISTORY.md`): number raids in the raid hours, termites taken from the nearest termite
+     colony's count (3d's simple fair loss), the spot shunned by the termites after, number scouts finding feeding places
+     from the termites' own record; heads left clamped are not shown as numbers (hurt raiders are only counted).
    - **3g Tests and the full run, then in-game test 6** (3d to 3f), then the merge.
 4. **Drawn-only ants** (brain step 4e, pulled forward): the column far from the
    player drawn by the player's game, almost free on the server.

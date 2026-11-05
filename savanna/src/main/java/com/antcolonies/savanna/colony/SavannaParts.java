@@ -293,7 +293,7 @@ public final class SavannaParts {
      * home, the slices searched empty lately and how far out they search ({@link Raids}).
      */
     public static final Type<Raids> RAIDS = listed("raids", Raids::new, part -> part
-            .ticks(117, Raids::tick)
+            .ticks(117, Raids::tick).ticksAway(87, Raids::tickAway) // (M8 step 3f: raids out of sight)
             .plugs(ColonyHooks.LIST_SEARCH, 40, raids -> raids::describe).plugs(ColonyHooks.REACH, 10, raids -> raids::reach)
             .answers(ColonyQuestions.KEEP_FROM_DEFENCE, 10, Raids::keptFromDefence) // (scouts out, raiders on their own fight)
             .saves(Raids::save, Raids::load)
