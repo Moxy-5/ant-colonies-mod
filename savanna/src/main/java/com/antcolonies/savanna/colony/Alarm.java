@@ -69,6 +69,12 @@ public class Alarm {
     private static final int LOOKERS = 2;
     /** How far (blocks) from the trouble the soldiers' spots may be. */
     private static final double BREACH_REACH = 24.0;
+    /**
+     * Soldiers go at an enemy only while it is this close (blocks) to where the trouble was: blind soldiers defend the
+     * spot, they do not hunt a raider walking home (the lingering lag of 2026-11-05: minors chased Matabeles back to
+     * their own nest for minutes, with no way there). The same reach as the Matabele defenders' (M8 step 2e).
+     */
+    private static final double CHASE_LEASH = 16.0;
     /** A minor this close (blocks) to an enemy goes at it even if it is inside the nest. */
     private static final double NEAR_ENEMY = 8.0;
     /** An enemy this close (blocks) to a forager outside, or to an open way out, raises the alarm. */
@@ -465,8 +471,9 @@ public class Alarm {
         if (now == 2) {
             LivingEntity foe = enemy != null && world.getEntity(enemy) instanceof LivingEntity living && living.isAlive() ? living : null;
             double reach = colony.foragingRadius() + 8.0;
-            if (foe == null || foe.blockPosition().distSqr(colony.getCenter()) > reach * reach) {
-                return Map.of(); // gone, or beyond the colony's ground: the soldiers stay near home
+            if (foe == null || foe.blockPosition().distSqr(colony.getCenter()) > reach * reach
+                    || foe.blockPosition().distSqr(spot) > CHASE_LEASH * CHASE_LEASH) {
+                return Map.of(); // gone, beyond the colony's ground, or away from the trouble: the soldiers stay near home
             }
             for (TermiteSoldierEntity soldier : soldiers) {
                 if (soldier.getRank() == Rank.MINOR && heard.containsKey(soldier.getUUID()) && !soldier.isDrumming()

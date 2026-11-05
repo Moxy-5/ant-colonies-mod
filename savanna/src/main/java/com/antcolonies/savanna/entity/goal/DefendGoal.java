@@ -6,6 +6,7 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.savanna.colony.Alarm;
 import com.antcolonies.colony.Colony;
+import com.antcolonies.entity.goal.Errand;
 import com.antcolonies.fight.Fights;
 import com.antcolonies.savanna.colony.RaidDefence;
 import com.antcolonies.savanna.colony.SavannaParts;
@@ -30,6 +31,12 @@ public class DefendGoal extends Goal {
     private static final int CHASE_REPLAN = 10;
     /** How fast (degrees a tick) it turns to face the trouble. */
     private static final float TURN = 15.0F;
+    /**
+     * An enemy or a spot it found no way to is left alone this long (ticks, 10 s): a blind soldier that has lost touch
+     * with a raider goes back to its post instead of searching the whole gallery web for it again and again (the lag
+     * spike of 2026-11-05: ten minors chasing Matabeles they could not reach ran 64 failed 6,000-step searches a second).
+     */
+    private static final int NO_WAY_TICKS = 200;
 
     private final TermiteSoldierEntity soldier;
     @Nullable
@@ -43,13 +50,15 @@ public class DefendGoal extends Goal {
     private BlockPos walkingTo;
     private int biteCooldown;
     private int replan;
-    private int failures;
+    /** Enemies (by id) and spots it found no way to, left alone for {@link #NO_WAY_TICKS}; kept from one alarm task to the next. */
+    private final Errand<Object> noWay;
     /** The spot it drummed at on arrival (kept while drumming stops this goal, so it drums there only once). */
     @Nullable
     private BlockPos drummedAt;
 
     public DefendGoal(TermiteSoldierEntity soldier) {
         this.soldier = soldier;
+        this.noWay = new Errand<>(soldier, NO_WAY_TICKS);
         setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
     }
 
@@ -62,19 +71,18 @@ public class DefendGoal extends Goal {
         colony = soldier.getColony();
         alarm = colony == null ? null : colony.part(SavannaParts.ALARM).orElse(null);
         task = alarm == null ? null : taskNow(level);
-        return task != null;
+        return task != null && !leftAlone(task);
     }
 
     @Override
     public boolean canContinueToUse() {
-        return colony != null && task != null && failures < 5;
+        return colony != null && task != null;
     }
 
     @Override
     public void start() {
         walkingTo = null;
         replan = 0;
-        failures = 0;
     }
 
     @Override
@@ -91,7 +99,7 @@ public class DefendGoal extends Goal {
             return;
         }
         Alarm.Task now = taskNow(level);
-        if (now == null) {
+        if (now == null || leftAlone(now)) {
             task = null;
             return;
         }
@@ -104,6 +112,12 @@ public class DefendGoal extends Goal {
         } else if (task.cell() != null) {
             stand(task.cell(), task.facing(), task.drumOnArrival());
         }
+    }
+
+    /** Whether the task's enemy or spot is one it found no way to a little while ago. */
+    private boolean leftAlone(Alarm.Task task) {
+        return task.enemy() != null ? noWay.isLeftAlone(task.enemy().getUUID())
+                : task.cell() != null && noWay.isLeftAlone(task.cell());
     }
 
     /**
@@ -139,10 +153,10 @@ public class DefendGoal extends Goal {
         if (--replan <= 0 || soldier.getNavigator().isDone() || walkingTo == null || walkingTo.distSqr(at) > 2) {
             replan = CHASE_REPLAN;
             walkingTo = at;
+            // No way there (behind a seal, up a wall, on a runway's top): the soldier lets it be for a while.
             if (!soldier.getNavigator().moveTo(at, 1.2)) {
-                failures++;
-            } else {
-                failures = 0;
+                noWay.leaveAlone(enemy.getUUID());
+                task = null;
             }
         }
     }
@@ -166,7 +180,8 @@ public class DefendGoal extends Goal {
         if (soldier.getNavigator().isDone() || !cell.equals(walkingTo)) {
             walkingTo = cell;
             if (!soldier.getNavigator().moveTo(cell, 1.2)) {
-                failures++;
+                noWay.leaveAlone(cell);
+                task = null;
             }
         }
     }
