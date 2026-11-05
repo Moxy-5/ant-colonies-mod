@@ -152,7 +152,13 @@ public class AwayLife {
      * unless a species' away life is not finished yet); on the game test server only where a test turns it on.
      */
     private boolean farCounts(Level level) {
-        return farForTests != null ? farForTests : isOn(level) && colony.profile().colony().numbersWhenFar();
+        if (farForTests != null) {
+            return farForTests;
+        }
+        // (Never on the game test server by itself, even where a test turns the away system on: those tests mean the
+        // colony's own land being unloaded, not the far rule.)
+        return !(level.getServer() instanceof net.minecraft.gametest.framework.GameTestServer) && isOn(level)
+                && colony.profile().colony().numbersWhenFar();
     }
 
     /** Whether a player (alive, any game mode) is within this many blocks of the nest's middle, sideways. */
