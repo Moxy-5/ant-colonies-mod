@@ -353,6 +353,83 @@ timings: all "my pick, to confirm" until then).
        termite feeding tunnels dropped (the tunnels join the nest and get packed with soil, most dead trees are not
        hollow, and it was a guess, not from the papers); a second termite species (Odontotermes, a top real Matabele
        prey; Trinervitermes, the aardwolf's food) only a "maybe one day" idea, not a to-do.
+   - **3S The termite soldiers fight back, the alarm rework (planned 2026-11-05, from the user's in-game raid test of
+     2026-11-05: "the termite major soldiers stand guard in a line and don't swarm the Matabele"; decisions and the real
+     behaviour in `docs/DESIGN.md`, "Step 3S"; branch to start from `claude/m8-raid-bugs`).** What the code does today:
+     a raid's break-in is alarm level 3, and at level 3 every soldier that hears the drumming is sent to a fixed cell
+     (the breach, then the nest cells nearest it, minors first, majors behind: the line the user saw), where
+     `DefendGoal.stand` stands without ever biting; only level 2 sends anyone at an enemy, and then only minors
+     (`Alarm.workOutTasks`); soldiers that did not hear it stay at their posts (`GuardPostGoal`); and the raiders rank
+     a soldier farther than 2.5 blocks below every worker (`MatabeleEntity.foeRank`) and leave a termite under cover
+     alone, so a major standing in a gallery cell is never fought. The steps:
+     - **S1 A standing soldier bites.** A soldier at its alarm spot (or its post) snaps at any foe touching it, and
+       lunges at one it feels within 2 blocks, never more than the leash from its spot (4 blocks from the breach, my
+       pick; today 16). Real: blind soldiers bite whatever touches them. Fixes "the majors ignore them back" on its own.
+     - **S2 The call to the breach.** Every soldier the drumming reaches (16 blocks, as built) comes to the breach,
+       majors too, leaving its post; the first few hold the gallery mouth jaws out (a major's head fills a gallery, so
+       the raiders must sting it to get past: the mouth cell counts as shut to raiders' routes while a living major
+       stands in it), the rest spill out and spread round the opening within the leash, facing out, each in a place of
+       its own (not a line). Minors first (quicker), majors after.
+     - **S3 Waves from the galleries.** The soldiers the colony keeps as numbers in the galleries come out as real
+       termites at the break, in waves (2 or 3 every 5 s, minors before majors, my picks) until a tenth of the colony's
+       soldiers have come, at least 1, at most 12 (the user's pick, 2026-11-05: "waves, up to about 12"; so about 2 to 3
+       for a young colony, 12 for a big one). The real-mob cap gives way: hiding workers go into the numbers first. Once
+       the raid has gone they stand guard at the seal and go in at night (2f, as built), back into the numbers.
+     - **S4 The ants' side.** Matabele majors take on the soldiers (Corbara and Dejean 2000: majors attack termite
+       soldiers more than minors do): for a major a soldier out of the gallery ranks with the workers; minors keep the
+       workers first and fight a soldier only in the way or clamped on a nestmate; a living major in a gallery mouth is a
+       major's job to sting. Stung soldiers are prey like the workers (carried after them, as built).
+     - **S5 The badly wounded go home (the user's call, 2026-11-05: "just retreat when badly wounded, no memorization
+       ... these raids and the ecosystem are already complicated enough").** No memory of costly spots: a spot is rated
+       only by its termites and distance, as built, so a colony never shuns its nearest feeding spots (the user's worry:
+       the next termite nest may be 100 to 150 blocks off, across water). Instead each raider that is badly hurt leaves
+       the fight and walks home along the trail (`WayHome`, as built): below a third of its health (new, my pick), 3 or
+       more legs gone or a soldier clamped on (both as built). Real: hurt Matabele call for help and are carried or limp
+       home (Frank et al. 2017); the carrying is step 5. The raid as a whole never pulls back for soldiers.
+     - **S6 Tests and balance.** In `soldiers` and `raids`: a soldier at a breach bites a raider walking past (S1);
+       soldiers within the drumming come out and spread (S2); waves stop at the colony's tenth (S3); a major stings a
+       soldier and a minor goes for a worker (S4); a raider below a third of its health leaves the fight and gets home
+       (S5). One whole-raid
+       measure against a big termite colony, 10 runs: hurt raiders (target 1 to 5 of 20 to 50, clamped or a leg off),
+       dead (0 to 2), soldiers stung (2 to 8), termites home; numbers tuned until they fall in. `soldiers,raids,away,
+       colony` on 6 servers, guard films (new soldier poses), then **in-game test 5b** (the user: a raid on a living
+       mound's feeding spot; watch the soldiers pour out and fight).
+     - Out of sight (3f) unchanged, but its lost and hurt shares grow with the soldiers that would have answered (a
+       tenth of the termite colony's soldiers, 1 to 12), so far raids cost what near ones do (my pick).
+   - **3Q Still when idle (planned 2026-11-05, from the same test: "lots of pointless pacing when there is nothing to
+     do"; decisions in `docs/DESIGN.md`, "Step 3Q").** What the code does today: for termites and Matabele the only
+     thing an insect with nothing to do can do is `AntWanderGoal`, a walk to a random spot every few seconds (a
+     Matabele every ~12 s up to 8 blocks, a termite worker ~16 s up to 5, a soldier with no post ~20 s up to 4);
+     resting (`NapGoal`) and antenna cleaning (`GroomGoal`) exist only for the red harvester ant, because the termite
+     and Matabele models have no clips for them; in a raid the gathering places are handed out by place in a list, so
+     when one ant leaves the list every ant's place moves and they all walk again (my reading of `RaidColumn.bunch`, to
+     prove in Q1). Real: at any time about 40 percent of a colony's workers do nothing at all, and some workers are
+     idle most of their lives (Charbonneau and Dornhaus 2015, 2017); ants sleep in many short naps (Cassill et al.
+     2009); idle ants and termites clean themselves and each other (termites very much: allogrooming). The steps:
+     - **Q1 Measure it.** A test counter: the share of time idle insects spend walking, per kind, in a calm nest and a
+       raid's waits; today's numbers written down (the target: idle insects still at least 3 quarters of the time).
+     - **Q2 Rest first (shared, framework).** An idle insect stands where it is, antennae moving (today's idle clip),
+       and strolls only now and then, a short way: numbers per species in `body_language.idle` (strolls a minute, how
+       far), my picks about 1 a minute and 1 to 3 blocks; its restlessness trait sets it (calm ones barely move, restless
+       ones more: real ants differ for life). Idle Matabele drift to sit near the queen and the prey pile in the brood
+       room (real: they crowd the brood chamber), idle termite workers settle in galleries and the garden; soldiers with
+       no post stand still where they are, not wander.
+     - **Q3 New clips: cleaning and rest.** Antenna cleaning for the Matabele (major, minor, queen) and the termites
+       (worker, both soldiers, king), and a nap pose for the Matabele (body down, antennae folded, twitches), made with
+       the motion tools and checked in the anim lab; `GroomGoal` and `NapGoal` turned on in both species files. Termites
+       get no naps (my pick: sleep is not shown in termites; they rest standing).
+     - **Q4 Helping a nestmate (shared).** An idle insect now and then walks to a resting nestmate within 4 blocks and
+       grooms it a few seconds, the nestmate holding still (a new clip each: head down, mouthparts over the other's
+       body); termites much more often than ants (my picks). Step 5's wound care will use the same goal (licking
+       wounds). Today's help (`ClampCareGoal`, the clamped head off in the nest) keeps first place.
+     - **Q5 Still in the raid's waits.** Each raider's waiting place is held by its own number (as the milling places,
+       BUGS 101), so one leaving moves nobody; at its place it stands facing the find, antennae working, now and then
+       cleaning; it walks only if its place moves more than 1.5 blocks.
+     - **Q6 Tests.** Q1's counter again (idle at least 3 quarters still); the anim lab and guard films for the new clips;
+       `colony,raids,away,soldiers` on 6 servers; **in-game test 5c** (the user: an idle nest of each kind, a raid's
+       waits). Q2 and Q5 are small and may go with 3S; Q3 and Q4 are the slow part (clips).
+   - **Order (my pick):** S1 to S6, in-game test 5b, then Q1 to Q6, in-game test 5c (or the two tests as one if the
+     user prefers), then 3d.
    - **3d The termites' losses.** Termites in the galleries round the spot are numbers until broken into
      (`HiddenTrips`), so a raid takes from the colony's real count; plugging, closing and danger memory (2f, 4g) dry
      the spot up, so later scouts hunt farther. Young termite colonies can die from repeated raids; big ones shrug it off.
