@@ -189,7 +189,8 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         this.goalSelector.addGoal(2, new ClampCareGoal(this)); // M8 2c: termites off nestmates' legs in the nest
         // (the raid code review, finding 3: priority 1, so a scout or raider is really taken off its nest chores; chores
         // that carry something are never called to a raid or a scout's trip, and eating stands aside while it is out)
-        this.goalSelector.addGoal(1, new MatabeleScoutGoal(this)); // M8 3a: a major out scouting for termites
+        scoutGoal = new MatabeleScoutGoal(this);
+        this.goalSelector.addGoal(1, scoutGoal); // M8 3a: a major out scouting for termites
         this.goalSelector.addGoal(1, new MatabeleRaidGoal(this)); // M8 3b: walking in a raid column (3c: fetching the stung, going home)
         this.goalSelector.addGoal(2, new BringPreyGoal(this)); // M8 3c: the termites carried home onto the prey pile
         this.goalSelector.addGoal(3, new DigGoal(this, () -> true));
@@ -310,17 +311,35 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         }
     }
 
+    /** What it remembers of its own scouting (its direction, its reach; saved). */
+    private final ScoutMemory scoutMemory = new ScoutMemory();
+    /** Its scouting goal (tests: the shape of its search walk). */
+    @org.jetbrains.annotations.Nullable
+    private MatabeleScoutGoal scoutGoal;
+
+    @org.jetbrains.annotations.Nullable
+    public MatabeleScoutGoal scoutGoalForTests() {
+        return scoutGoal;
+    }
+
+    /** What it remembers of its own scouting: its favourite direction, how far out it searches (saved). */
+    public ScoutMemory scoutMemory() {
+        return scoutMemory;
+    }
+
     @Override
     public void addAdditionalSaveData(CompoundTag tag) {
         super.addAdditionalSaveData(tag);
         hunger().save(tag);
         tag.putFloat(LENGTH_TAG, lengthMm);
+        scoutMemory.save(tag);
     }
 
     @Override
     public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
         hunger().load(tag);
+        scoutMemory.load(tag);
         if (tag.contains(LENGTH_TAG)) {
             setLengthMm(tag.getFloat(LENGTH_TAG));
         }

@@ -25,19 +25,23 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * M8 step 3a, a Matabele scout's trip ({@link Raids}; real Megaponera: a lone scout leaves the nest in the raid hours,
- * searches for termites feeding under cover, looks a find over, then runs home laying a scent line). Set out by its
- * colony's raids part ({@link Raids#mayScout}), a major walks out of the nest to its trip: a remembered good spot first
- * (rechecked; found empty, it searches that spot's slice instead), else a slice of the land round the nest, walked in
- * arcs {@code arc_step} apart, turning at each end, out to the colony's search range. All the way it smells for termites
- * within {@code smell} blocks: termites out of their mound (never the mound itself), and the feeding galleries and
- * runways of the termite colonies there. A find: it stops and looks it over, then walks home on the straightest way,
- * laying its scent line point by point, and tells the colony at the entrance. Nothing found by {@code trip_ticks}, or the
- * scouting hours over, or rain: home empty. Mind layer only: it says where to go, in hops, through the ant's navigator.
- * Raid rework R6, the mound as a clue (the user's idea): on a search, a scout that comes near a living termite mound
- * searches round it in widening rings (points put in front of the rest of its piece), and a tunnel of termites going to
- * food smelt on the way is followed outward to its end (points put in front again); what it finds there is chosen by
- * the same rules as any find.
+ * M8 step 3a, a Matabele scout's trip ({@link Raids}; real Megaponera: a lone scout leaves the nest, searches for
+ * termites feeding under cover, looks a find over, then runs home laying a scent line). Set out by its colony's raids
+ * part ({@link Raids#mayScout}), a major walks out of the nest to its trip: a remembered good spot first (rechecked;
+ * found empty, it searches round that spot), else a search of its own (raid scouts search like real ants, 2026-11-04,
+ * in place of R5's slices swept in arcs): it walks fairly straight out along its own favourite direction
+ * ({@code ScoutMemory}: route fidelity) to where its search starts, then searches there on a winding path (a correlated
+ * random walk: each step turned a little from the last, kept round where it started searching, never past its reach);
+ * where it smells termites faintly ({@code raids.search.scent}) it slows down and turns more, leaning toward the smell
+ * (area-restricted search). All the way it smells for termites within {@code smell} blocks: termites out of their
+ * mound (never the mound itself), and the feeding galleries and runways of the termite colonies there. A find: it stops
+ * and looks it over, then walks home on the straightest way (path integration), laying its scent line point by point,
+ * and tells the colony at the entrance. Nothing found by {@code trip_ticks}, or the scouting hours over, or rain: home
+ * empty, and its memory learns from it ({@link Raids#cameHomeEmpty}). Mind layer only: it says where to go, a step at a
+ * time, through the ant's navigator. Raid rework R6, the mound as a clue (the user's idea): on a search, a scout that
+ * comes near a living termite mound searches round it in widening rings (points put in front of its own walk), and a
+ * tunnel of termites going to food smelt on the way is followed outward to its end (points put in front again); what it
+ * finds there is chosen by the same rules as any find.
  */
 public class MatabeleScoutGoal extends Goal {
     /** The longest hop (blocks) it walks in one go; a farther point is reached hop by hop. */
@@ -57,17 +61,18 @@ public class MatabeleScoutGoal extends Goal {
     private static final double HOME = 2.5;
     /** Its pace home with a find (real scouts run home fast and straight, by path integration; my pick 1.3 times its walk). */
     private static final double FIND_PACE = 1.3;
+    /** The turns (degrees) it tries, in order, when its own next step has no way: straight on first. */
+    private static final double[] DODGES = {0, 45, -45, 90, -90, 135, -135, 180};
+    /** Its own search steps kept for the tests (the path's shape). */
+    private static final int MOST_KEPT_STEPS = 200;
 
     private enum Stage { OUT, INSPECT, HOME, DONE }
 
-    /** R6: what a point of its walk is for: its piece of land (or a recheck), a ring round a mound, a tunnel followed out. */
-    private enum Kind { SLICE, RING, FOLLOW }
+    /** What a point in front of its own walk is for: a recheck of a remembered spot, a ring round a mound (R6), a tunnel followed out (R6). */
+    private enum Kind { RECHECK, RING, FOLLOW }
 
     /** A point of its walk; {@code ring}: which ring round the mound (rings only). */
     private record Point(BlockPos at, Kind kind, int ring) {
-        static Point slice(BlockPos at) {
-            return new Point(at, Kind.SLICE, 0);
-        }
     }
 
     /** R6: a tunnel of termites out to food, and the mound it leaves from. */
@@ -82,15 +87,34 @@ public class MatabeleScoutGoal extends Goal {
     @Nullable
     private SavannaNumbers.ScoutNumbers numbers;
     @Nullable
+    private SavannaNumbers.SearchNumbers search;
+    @Nullable
     private Raids.Trip trip;
     private Stage stage = Stage.DONE;
-    /** The points of its search, in order, and the one it walks to now. */
+    /** The points in front of its own walk (a recheck, rings round a mound, a tunnel followed), and the one it walks to now. */
     private final List<Point> points = new ArrayList<>();
     private int next;
     private int tries;
     private int skips;
     private int ticks;
     private int stageTicks;
+    /** Its own walk: where its search starts (and is kept round), whether it is there yet (searching), the way it walks now. */
+    @Nullable
+    private BlockPos centre;
+    private boolean searchingNow;
+    private double walkHeading;
+    /** How far from the nest its search started (blocks): how far it may wander from there is a share of it. */
+    private double outDistance;
+    /** Its own steps in a row it found no way for. */
+    private int blocked;
+    /** Ticks it spent searching this trip (its memory learns only from a trip it really searched). */
+    private int searchTicks;
+    /** Area-restricted search: until when (game time) it searches closely, and the smell it leans toward. */
+    private long closeUntil;
+    @Nullable
+    private BlockPos scentAt;
+    /** Its own search steps this trip (tests: the path winds). */
+    private final List<BlockPos> steps = new ArrayList<>();
     /**
      * The living termite mounds near (never walked over, never smelt as a find) and, R5, the termites' feeding places fed
      * at by day near (a gallery under dead wood or a mud runway, termites eating there out of sight); a bare gallery cell
@@ -109,8 +133,7 @@ public class MatabeleScoutGoal extends Goal {
     private int lookTicks;
     /** R5: places it passed over this trip as too poor (not smelt again this trip). */
     private final List<BlockPos> passed = new ArrayList<>();
-    /** R5: how many points of its search it reached, and whether its recheck of a remembered spot is done. */
-    private int reached;
+    /** R5: whether its recheck of a remembered spot is done. */
     private boolean recheckDone;
     /** R6: the tunnels out to food near, the mound it is ringing (null none), the tunnel it follows (null none). */
     private final List<Way> ways = new ArrayList<>();
@@ -149,13 +172,14 @@ public class MatabeleScoutGoal extends Goal {
         if (part == null || part.numbers() == null || !part.mayScout(level, ant)) {
             return false;
         }
-        Raids.Trip planned = part.plan(level);
+        Raids.Trip planned = part.plan(level, ant);
         if (planned == null) {
             return false;
         }
         colony = mine;
         raids = part;
         numbers = part.numbers();
+        search = part.search();
         trip = planned;
         return true;
     }
@@ -177,7 +201,6 @@ public class MatabeleScoutGoal extends Goal {
         find = null;
         worth = 0;
         passed.clear();
-        reached = 0;
         recheckDone = false;
         line.clear();
         ringing = null;
@@ -186,13 +209,24 @@ public class MatabeleScoutGoal extends Goal {
         ringSaid = -1;
         followed.clear();
         extraTicks = 0;
+        searchingNow = false;
+        blocked = 0;
+        searchTicks = 0;
+        closeUntil = 0;
+        scentAt = null;
+        steps.clear();
         lookRound(level);
         points.clear();
+        BlockPos nest = colony.getCenter();
         if (trip.find() != null) {
-            points.add(Point.slice(trip.find().at()));
+            points.add(new Point(trip.find().at(), Kind.RECHECK, 0));
+            centre = trip.find().at();
         } else {
-            planSlice(trip.angle(), trip.inner(), trip.outer());
+            centre = new BlockPos(nest.getX() + Mth.floor(Math.cos(trip.heading()) * trip.out()), nest.getY(),
+                    nest.getZ() + Mth.floor(Math.sin(trip.heading()) * trip.out()));
         }
+        outDistance = flat(centre, nest);
+        walkHeading = trip.heading();
         walkOn(level);
     }
 
@@ -201,15 +235,16 @@ public class MatabeleScoutGoal extends Goal {
         mounds.clear();
         byDay.clear();
         ways.clear();
-        int far = Math.max(trip.range(), trip.outer());
+        int far = trip.reach();
         double reach = far + numbers.smell() + 32.0;
         java.util.List<Colony> near = Raids.termiteColonies(level, colony.getCenter(), reach); // (once: the review, finding 11)
         for (Colony termites : near) {
             mounds.add(new Raids.MoundAt(termites.getCenter(), FeedingSpots.moundReach(level, termites)));
         }
+        double scentReach = Math.max(numbers.smell(), search.scent());
         for (Colony termites : near) {
             for (FeedingSpots.ByDay place : FeedingSpots.byDayPlaces(level, termites)) {
-                if (place.food().closerThan(colony.getCenter(), far + numbers.smell() + 8.0) && Raids.outOfMound(place.food(), mounds)) {
+                if (place.food().closerThan(colony.getCenter(), far + scentReach + 8.0) && Raids.outOfMound(place.food(), mounds)) {
                     byDay.add(place);
                 }
             }
@@ -219,26 +254,6 @@ public class MatabeleScoutGoal extends Goal {
                     ways.add(new Way(termites.getCenter(), way));
                 }
             }
-        }
-    }
-
-    /**
-     * R5, the search of one ring of a slice: arcs {@code arc_step} apart across the slice, from {@code inner} out to
-     * {@code outer} (the near rings are searched on earlier trips: trips go from near to far), one way then back the
-     * other.
-     */
-    private void planSlice(double angle, int inner, int outer) {
-        double half = Math.toRadians(numbers.sliceDegrees()) / 2.0;
-        int step = Math.max(2, numbers.arcStep());
-        boolean forward = colony.random().nextBoolean();
-        for (int radius = inner + step / 2; radius <= outer; radius += step) {
-            int count = Math.max(1, (int) Math.ceil(half * 2 * radius / step));
-            for (int i = 0; i <= count; i++) {
-                double a = angle - half + half * 2 * (forward ? i : count - i) / count;
-                points.add(Point.slice(new BlockPos(colony.getCenter().getX() + Mth.floor(Math.cos(a) * radius), colony.getCenter().getY(),
-                        colony.getCenter().getZ() + Mth.floor(Math.sin(a) * radius))));
-            }
-            forward = !forward;
         }
     }
 
@@ -268,6 +283,9 @@ public class MatabeleScoutGoal extends Goal {
         }
         ticks++;
         stageTicks++;
+        if ((stage == Stage.OUT || stage == Stage.INSPECT) && (searchingNow || ringing != null || following != null)) {
+            searchTicks++;
+        }
         switch (stage) {
             case OUT -> searchOn(level);
             case INSPECT -> inspect(level);
@@ -277,11 +295,11 @@ public class MatabeleScoutGoal extends Goal {
         }
     }
 
-    /** Out on its trip: smelling as it goes, from point to point. */
+    /** Out on its trip: smelling as it goes, walking out, then searching. */
     private void searchOn(ServerLevel level) {
         boolean commanded = raids.wasSent(ant.getUUID());
         if (ticks > numbers.tripTicks() + extraTicks || !commanded && !raids.isScoutingTime(level)) {
-            goHome(); // nothing found in time, or the scouting hours are over: home empty
+            goHome(ticks > numbers.tripTicks() + extraTicks ? "its trip time is up" : "the scouting hours are over");
             return;
         }
         if (ticks % SMELL_EVERY == 0) {
@@ -296,6 +314,11 @@ public class MatabeleScoutGoal extends Goal {
                 walkOn(level);
                 return;
             }
+            if (sniff(level)) {
+                ant.getNavigator().stop(); // (a smell: it turns to search closely at once)
+                walkOn(level);
+                return;
+            }
         }
         if (!ant.getNavigator().isDone()) {
             return;
@@ -307,30 +330,41 @@ public class MatabeleScoutGoal extends Goal {
         walkOn(level);
     }
 
-    /** At a point of its trip: at a remembered spot it smelt nothing at, it searches that spot's piece of land instead. */
+    /** At a point in front of its walk: at a remembered spot it smelt nothing at, it searches round that spot instead. */
     private void arrived(ServerLevel level) {
-        if (points.get(next).kind() == Kind.SLICE) {
-            reached++; // (R6: only its own piece's points count toward searching it)
-        }
+        Kind kind = points.get(next).kind();
         next++;
         tries = 0;
         afterPoint(level);
-        if (trip.find() != null && !recheckDone && next >= points.size() && find == null) {
+        if (kind == Kind.RECHECK && !recheckDone && find == null) {
             raids.foundEmpty(level, trip.find());
-            searchRecheckedPiece();
+            searchRecheckedSpot(level);
         }
     }
 
-    /** R5: the recheck is done (empty or too poor): it searches the remembered spot's own piece of land. */
-    private void searchRecheckedPiece() {
+    /** R5: the recheck is done (empty or too poor): it searches round the remembered spot. */
+    private void searchRecheckedSpot(ServerLevel level) {
         recheckDone = true;
-        points.clear();
-        next = 0;
-        reached = 0;
-        planSlice(trip.angle(), trip.inner(), trip.outer());
+        points.removeIf(point -> point.kind() == Kind.RECHECK);
+        next = Math.min(next, points.size());
+        centre = trip.find().at();
+        outDistance = flat(centre, colony.getCenter());
+        startSearch(level, "round the remembered spot it rechecked");
     }
 
-    /** On to its next point, a hop at a time; a point it finds no way to is skipped after a few tries. */
+    /** It is where its search starts: from here on its walk winds. */
+    private void startSearch(ServerLevel level, String where) {
+        searchingNow = true;
+        blocked = 0;
+        BlockPos at = ant.blockPosition();
+        raids.scoutSays(level, ant.getUUID(), "starts searching " + Math.round(flat(at, colony.getCenter())) + " blocks out toward the "
+                + Raids.compass(raids.angleOf(at)) + " (" + where + "): a winding walk, never past " + trip.reach() + " blocks out");
+    }
+
+    /**
+     * On to the next point in front of its walk (a recheck, a ring, a tunnel), a hop at a time; a point it finds no way to
+     * is skipped after a few tries. With none, its own walk: out, then the winding search.
+     */
     private void walkOn(ServerLevel level) {
         while (next < points.size()) {
             if (hopToward(level, points.get(next).at(), 1.0)) {
@@ -338,22 +372,149 @@ public class MatabeleScoutGoal extends Goal {
             }
             if (++tries >= TRIES_PER_POINT) {
                 tries = 0;
+                Kind kind = points.get(next).kind();
                 next++;
                 afterPoint(level);
+                if (kind == Kind.RECHECK && !recheckDone) {
+                    // (no way to the remembered spot: it searches round it from as near as it got)
+                    searchRecheckedSpot(level);
+                }
                 if (++skips > MOST_SKIPS) {
-                    goHome();
+                    goHome("no way on");
                     return;
                 }
             } else {
                 return; // another try next time
             }
         }
-        // the whole piece searched: home empty. R5: it counts as searched empty only if most of it was walked (my pick:
-        // half its points or more); a scout cut off from most of it leaves it for another
-        if ((trip.find() == null || recheckDone) && find == null && reached * 2 >= slicePoints()) {
-            raids.searchedEmpty(level, trip, ant.getUUID());
+        ownStep(level);
+    }
+
+    /** Its own walk: out toward where its search starts, a little wavy, then the winding search there. */
+    private void ownStep(ServerLevel level) {
+        BlockPos at = ant.blockPosition();
+        if (!searchingNow) {
+            double left = flat(at, centre);
+            if (left <= AT_POINT + 1.0) {
+                startSearch(level, "where its walk out ends");
+            } else {
+                double toCentre = Math.atan2(centre.getZ() - at.getZ(), centre.getX() - at.getX());
+                double way = toCentre + ant.getRandom().nextGaussian() * Math.toRadians(search.outWiggle());
+                if (stepToward(level, at, way, Math.min(HOP, left), 1.0, false)) {
+                    blocked = 0;
+                    return;
+                }
+                if (++blocked > TRIES_PER_POINT * 2) {
+                    startSearch(level, "no way farther out: it searches where it is");
+                }
+                return;
+            }
         }
-        goHome();
+        boolean close = level.getGameTime() < closeUntil;
+        SavannaNumbers.AreaSearch ars = search.ars();
+        double step = close ? ars.step() : search.step();
+        double turn = close ? ars.turn() : search.turn();
+        double pace = close ? ars.pace() : 1.0;
+        double way = walkHeading + ant.getRandom().nextGaussian() * Math.toRadians(turn);
+        if (close && scentAt != null) {
+            // area-restricted search: leaning toward the smell
+            way += Raids.turnBetween(way, Math.atan2(scentAt.getZ() - at.getZ(), scentAt.getX() - at.getX())) * ars.toward();
+        } else {
+            // kept round where its search started: a soft pull back the farther it strays
+            double stay = Math.max(search.stayLeast(), outDistance * search.stayShare());
+            double off = flat(at, centre);
+            if (off > stay) {
+                double back = Math.atan2(centre.getZ() - at.getZ(), centre.getX() - at.getX());
+                way += Raids.turnBetween(way, back) * Math.min(0.8, (off - stay) / stay);
+            }
+        }
+        if (stepToward(level, at, way, step, pace, true)) {
+            blocked = 0;
+            if (steps.size() < MOST_KEPT_STEPS) {
+                steps.add(at.immutable());
+            }
+            return;
+        }
+        if (++blocked > MOST_SKIPS) {
+            goHome("hemmed in, no way on");
+        }
+    }
+
+    /**
+     * One step of its own walk this way (radians) and this long (blocks), dodging round what is in the way (straight on
+     * first, then wider and wider turns); in the search, never past its reach from the nest. True if it is off.
+     */
+    private boolean stepToward(ServerLevel level, BlockPos at, double way, double length, double pace, boolean searching) {
+        BlockPos nest = colony.getCenter();
+        for (double dodge : DODGES) {
+            double a = way + Math.toRadians(dodge);
+            double x = at.getX() + 0.5 + Math.cos(a) * length;
+            double z = at.getZ() + 0.5 + Math.sin(a) * length;
+            if (searching && Math.hypot(x - nest.getX(), z - nest.getZ()) > trip.reach()) {
+                continue; // (never past its reach: a step out there turns back in)
+            }
+            BlockPos cell = openGround(level, Mth.floor(x), Mth.floor(z));
+            if (cell != null && !cell.equals(at) && ant.getNavigator().moveTo(cell, pace)) {
+                walkHeading = a;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Area-restricted search: a faint smell of termites within {@code raids.search.scent} blocks (termites out feeding, a
+     * feeding place fed at by day, a tunnel of termites going to food) makes it search closely there for a while. True if
+     * it just began to (the diary says so).
+     */
+    private boolean sniff(ServerLevel level) {
+        if (!searchingNow || !searching()) {
+            return false;
+        }
+        double scent = search.scent();
+        BlockPos at = ant.blockPosition();
+        BlockPos smelt = null;
+        String what = null;
+        double best = Double.MAX_VALUE;
+        for (AbstractAntEntity termite : termitesNear(level, ant.getBoundingBox().inflate(scent))) {
+            double distance = termite.distanceToSqr(ant);
+            if (distance < best && distance <= scent * scent && !wasPassed(termite.blockPosition())) {
+                best = distance;
+                smelt = termite.blockPosition();
+                what = "termites out feeding";
+            }
+        }
+        for (FeedingSpots.ByDay place : byDay) {
+            BlockPos cell = nearestSmelt(level, place, at, (int) Math.ceil(scent));
+            if (cell != null && !wasPassed(cell) && cell.distSqr(at) < best) {
+                best = cell.distSqr(at);
+                smelt = cell;
+                what = "termites feeding under cover";
+            }
+        }
+        for (Way way : ways) {
+            if (followed.contains(way.way().food()) || wasPassed(way.way().food())) {
+                continue;
+            }
+            for (BlockPos cell : way.way().cells()) {
+                if (cell.distSqr(at) < best && cell.closerThan(at, scent)) {
+                    best = cell.distSqr(at);
+                    smelt = cell;
+                    what = "a termite tunnel";
+                }
+            }
+        }
+        if (smelt == null) {
+            return false;
+        }
+        boolean was = level.getGameTime() < closeUntil;
+        closeUntil = level.getGameTime() + search.ars().ticks();
+        scentAt = smelt.immutable();
+        if (!was) {
+            raids.scentNoticed(level, smelt, what, ant.getUUID());
+            return true;
+        }
+        return false;
     }
 
     /** One hop toward this point (straight to it when near, else {@link #HOP} blocks its way); false if no way was found. */
@@ -517,9 +678,10 @@ public class MatabeleScoutGoal extends Goal {
         double need = raids.need(find);
         if (worth > 0 && worth >= need) {
             raids.takes(level, find, worth, ant.getUUID());
+            raids.foundBy(level, ant, find); // (its own memory: it keeps to this way, its trips shrink back to the find)
             clueDone(level, true);
             ant.getNavigator().stop();
-            goHome();
+            goHome("a find");
             return;
         }
         // too poor for a raid this far out now: passed over (a recheck of a remembered spot counts as an empty check)
@@ -532,20 +694,9 @@ public class MatabeleScoutGoal extends Goal {
         stageTicks = 0;
         ant.getNavigator().stop();
         if (rechecking != null) {
-            searchRecheckedPiece();
+            searchRecheckedSpot(level);
         }
         walkOn(level);
-    }
-
-    /** R6: how many points of its walk belong to its own piece of land. */
-    private int slicePoints() {
-        int count = 0;
-        for (Point point : points) {
-            if (point.kind() == Kind.SLICE) {
-                count++;
-            }
-        }
-        return count;
     }
 
     /** R6: whether a point of this kind lies ahead in its walk. */
@@ -658,7 +809,7 @@ public class MatabeleScoutGoal extends Goal {
      * the colony's foraging range), one the colony has not ringed lately and no other scout is ringing: the scout
      * searches round it in rings {@code ring_step} apart, the first half a step past its foot, out to {@code past_foot}
      * blocks past it, each ring all the way round from the side it came from, one way then back the other (points on
-     * ground it can stand on, put in front of the rest of its piece). Once a trip; its trip is {@code extra_ticks} longer.
+     * ground it can stand on, put in front of its own walk). Once a trip; its trip is {@code extra_ticks} longer.
      */
     private boolean noticeMound(ServerLevel level) {
         if (ringing != null || rangThisTrip || !searching() || mounds.isEmpty()) {
@@ -717,13 +868,16 @@ public class MatabeleScoutGoal extends Goal {
         return out;
     }
 
-    private void goHome() {
+    /** Home, the straight way (path integration); with nothing found, its memory learns from the trip ({@link Raids#cameHomeEmpty}). */
+    private void goHome(String why) {
         stage = Stage.HOME;
         stageTicks = 0;
         tries = 0;
         ant.getNavigator().stop();
         if (find != null) {
             line.add(ant.blockPosition()); // (its scent line starts at the find)
+        } else if (ant.level() instanceof ServerLevel level && raids != null && trip != null) {
+            raids.cameHomeEmpty(level, ant, trip, searchTicks, why);
         }
     }
 
@@ -767,6 +921,16 @@ public class MatabeleScoutGoal extends Goal {
     @Nullable
     public BlockPos findForTests() {
         return find;
+    }
+
+    /** Its own search steps this trip, in order (tests: the path winds). */
+    public List<BlockPos> searchStepsForTests() {
+        return List.copyOf(steps);
+    }
+
+    /** Whether it is past its walk out, searching (tests). */
+    public boolean isSearchingForTests() {
+        return searchingNow;
     }
 
     private static double flat(BlockPos a, BlockPos b) {

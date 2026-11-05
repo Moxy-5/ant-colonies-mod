@@ -32,9 +32,9 @@ import net.minecraft.server.level.ServerLevel;
  * scouts out to search for termites feeding under cover; a scout that finds them looks the place over and runs home
  * laying a scent line, which the raid column follows out (step 3b). Here the colony keeps who is out scouting, what the
  * scouts have found (the good spots, each with the scent line home, rechecked first by later scouts and forgotten once
- * found empty twice or after a few days: the termites plug their holes and move their feeding away), which slices of
- * the land round the nest were searched empty lately, and how far out the scouts search (the range grows as the near
- * land comes up empty, up to the real ant's foraging range). Scouting is a job a few majors keep (real Megaponera
+ * found empty twice or after a few days: the termites plug their holes and move their feeding away). It keeps no map
+ * of the land searched: each scout remembers its own direction and how far out it searches ({@code ScoutMemory}, raid
+ * scouts search like real ants, 2026-11-04), and the colony's reach is what its scouts do. Scouting is a job a few majors keep (real Megaponera
  * scouts are a small set of workers who scout again and again): the colony remembers its scouts and sends them first.
  * Each find remembers the scout who found it, who leads the raid there (step 3b). The scout's walk itself is
  * {@code MatabeleScoutGoal}.
@@ -112,11 +112,11 @@ public class Raids {
     }
 
     /**
-     * What a scout does on a trip: recheck a remembered spot ({@code find}), or search a slice ({@code slice}, its middle
-     * {@code angle}) in one ring round the nest, from {@code inner} to {@code outer} blocks out ({@code ring}, 0 the
-     * nearest; R5: trips search the near rings first). {@code range} is the colony's search range when it set out.
+     * What a scout does on a trip: recheck a remembered spot ({@code find}), or search in its own direction
+     * ({@code heading}, radians): out about {@code out} blocks, then a winding search, never past {@code reach} blocks
+     * from the nest (its own reach when it set out).
      */
-    public record Trip(@Nullable Find find, int slice, double angle, int ring, int inner, int outer, int range) {
+    public record Trip(@Nullable Find find, double heading, int out, int reach) {
     }
 
     /** A remembered spot is not rechecked again for this long after a check (ticks: another scout just looked). */
@@ -125,21 +125,12 @@ public class Raids {
     private final Colony colony;
     private final List<Find> finds = new ArrayList<>();
     /**
-     * R5: the pieces of the land round the nest searched empty, and when: a slice of one ring, keyed
-     * {@code ring * slices + slice}. Marked only when a scout comes home empty from it (the raid rework's search range bug:
-     * before R5 a slice counted as searched as soon as a scout was sent there, so the range grew without anyone finding it
-     * empty).
+     * The colony's scouts' favourite directions and reaches, as last seen when they set out or came home (not saved: the
+     * ants keep their own, {@code ScoutMemory}; this is the colony's view, to spread new scouts' directions and for the
+     * colony list).
      */
-    private final Map<Integer, Long> searched = new HashMap<>();
-    /** R5: the pieces a scout is out searching now, and who (not saved: after a reload nobody is out). */
-    private final Map<Integer, UUID> taken = new HashMap<>();
-    /** How far out the scouts search now (blocks from the nest's middle; 0 before the first trip). */
-    private int range;
-    /** R5: when the range last grew, shrank, and when the last find was made (game time; -1 never), and the find's ring edge. */
-    private long grewAt = -1;
-    private long shrankAt = -1;
-    private long lastFindAt = -1;
-    private int findEdge;
+    private final Map<UUID, Double> headings = new HashMap<>();
+    private final Map<UUID, Integer> reaches = new HashMap<>();
     /** R5: finds passed over as too poor since the colony was loaded (not saved; tests and the diary). */
     private int passedOverCount;
     /** The scouts out now (not saved: after a reload they are just ants again). */
@@ -305,9 +296,8 @@ public class Raids {
         finds.removeIf(find -> now - find.checkedAt > numbers.spotFadeTicks());
         veterans.removeIf(id -> veteranGone(level, id, now));
         veteranMissingSince.keySet().retainAll(veterans);
-        searched.values().removeIf(when -> now - when > numbers.sliceFadeTicks());
-        taken.values().removeIf(id -> !scouts.contains(id));
-        shrinkAfterFinds(level, numbers, now);
+        headings.keySet().retainAll(veterans);
+        reaches.keySet().retainAll(veterans);
         if (waiting != null && !finds.contains(waiting)) {
             waiting = null; // (forgotten meanwhile)
         }
@@ -446,10 +436,6 @@ public class Raids {
         if (raid.carried() > 0) {
             find.checkedAt = level.getGameTime();
             find.misses = 0;
-            SavannaNumbers.ScoutNumbers numbers = numbers();
-            if (numbers != null) {
-                noteFind(numbers, find.at, level.getGameTime()); // (R5: prey brought home is a find too, for the range)
-            }
         } else if (raid.lostTrail() || raid.lostFromSight()) {
             // R4: turned home at a gap in the trail, or (the raid code review, finding 1) lost from sight: the spot was
             // never looked over, so it is no empty check (a scout rechecks it later and lays a new line).
@@ -527,58 +513,19 @@ public class Raids {
         return choosing().need(RaidGround.flat(at, colony.getCenter()), fedShare());
     }
 
-    /**
-     * R5: the rings the land round the nest is searched in: the first out to {@code first_range}, then one every
-     * {@code range_step} out to {@code most_range}. The outer edge of ring {@code ring} (blocks).
-     */
-    private static int edge(SavannaNumbers.ScoutNumbers numbers, int ring) {
-        return Math.min(numbers.mostRange(), numbers.firstRange() + ring * Math.max(1, numbers.rangeStep()));
-    }
-
-    /** R5: the ring this far out (blocks) lies in. */
-    private static int ringOf(SavannaNumbers.ScoutNumbers numbers, double distance) {
-        if (distance <= numbers.firstRange()) {
-            return 0;
-        }
-        return (int) Math.ceil((Math.min(distance, numbers.mostRange()) - numbers.firstRange()) / Math.max(1, numbers.rangeStep()));
-    }
-
-    /** R5: how many rings lie within this range. */
-    private static int ringsWithin(SavannaNumbers.ScoutNumbers numbers, int range) {
-        return ringOf(numbers, range) + 1;
+    /** The scouts' search numbers (the defaults if the species file has none). */
+    public SavannaNumbers.SearchNumbers search() {
+        return colony.profile().section(SavannaNumbers.SEARCH).orElse(SavannaNumbers.SearchNumbers.DEFAULT);
     }
 
     /**
-     * R5: the search range shrinks back over the days after finds: one ring every {@code shrink_ticks} since the last
-     * find (and since it last grew or shrank), down to the ring of the last find, never below {@code first_range}. Ground
-     * searched beyond the new range is forgotten (searched afresh if the range grows again).
+     * How far out the colony's scouts search now (blocks from the nest's middle): the farthest reach of its scouts (the
+     * colony's reach is what its scouts do), the first range before any scout has been out.
      */
-    private void shrinkAfterFinds(ServerLevel level, SavannaNumbers.ScoutNumbers numbers, long now) {
-        int shrinkTicks = choosing().shrinkTicks();
-        int floor = Math.max(numbers.firstRange(), findEdge);
-        if (lastFindAt < 0 || range() <= floor || lastFindAt < grewAt || now - lastFindAt < shrinkTicks
-                || now - Math.max(grewAt, shrankAt) < shrinkTicks) {
-            return;
-        }
-        int from = range();
-        range = Math.max(floor, edge(numbers, ringOf(numbers, from) - 1));
-        shrankAt = now;
-        int rings = ringsWithin(numbers, range);
-        int slices = slices(numbers);
-        searched.keySet().removeIf(key -> key / slices >= rings);
-        say(level, "the search range shrinks from " + from + " to " + range + " blocks (termites found " + (now - lastFindAt) / 1200
-                + " minutes ago, " + findEdge + " blocks out at most)");
-    }
-
-    /** How many slices the land round the nest is searched in. */
-    private int slices(SavannaNumbers.ScoutNumbers numbers) {
-        return Math.max(1, 360 / Math.max(1, numbers.sliceDegrees()));
-    }
-
-    /** The search range now (blocks). */
     public int range() {
         SavannaNumbers.ScoutNumbers numbers = numbers();
-        return range > 0 || numbers == null ? range : numbers.firstRange();
+        int first = numbers == null ? 0 : numbers.firstRange();
+        return reaches.values().stream().mapToInt(Integer::intValue).max().orElse(first);
     }
 
     /**
@@ -618,6 +565,11 @@ public class Raids {
     }
 
     /** Raid rework R1, the raid diary: one {@code [raid]} line in the log for the colony as a whole (the column says its own). */
+    /** The diary: a line about this scout (its walk: the search starting, cut short, ...). */
+    public void scoutSays(ServerLevel level, UUID scout, String what) {
+        say(level, "scout " + scout.toString().substring(0, 8) + " " + what);
+    }
+
     private void say(ServerLevel level, String what) {
         com.antcolonies.savanna.SavannaMod.LOGGER.info("[raid] nest {} at {} (tick {}): {}", colony.getCenter().toShortString(),
                 RaidGround.clock(colony, level), level.getGameTime(), what);
@@ -709,17 +661,17 @@ public class Raids {
         if (trip != null && trip.find() != null) {
             trip.find().checking = ant.getUUID();
         }
-        if (trip != null && trip.find() == null) {
-            SavannaNumbers.ScoutNumbers scouting = numbers();
-            if (scouting != null) {
-                taken.put(trip.ring() * slices(scouting) + trip.slice(), ant.getUUID());
-            }
+        if (trip != null) {
+            headings.put(ant.getUUID(), ant.scoutMemory().hasHeading() ? ant.scoutMemory().heading() : trip.heading());
+            reaches.put(ant.getUUID(), trip.reach());
         }
         if (ant.level() instanceof ServerLevel level) {
             say(level, "scout " + ant.getUUID().toString().substring(0, 8) + " sets out" + (sent.contains(ant.getUUID()) ? " (sent by the command)" : "")
-                    + (veterans.contains(ant.getUUID()) ? ", an old scout" : ", a new scout") + ", search range " + range()
+                    + (veterans.contains(ant.getUUID()) ? ", an old scout" : ", a new scout")
                     + (trip == null ? "" : trip.find() != null ? ", to recheck the spot at " + trip.find().at().toShortString()
-                    : ", to search " + trip.inner() + " to " + trip.outer() + " blocks out toward the " + compass(trip.angle())));
+                    + ", " + Math.round(RaidGround.flat(trip.find().at(), colony.getCenter())) + " blocks out"
+                    : ", toward the " + compass(trip.heading()) + " (its own way, " + Math.round(Math.toDegrees(trip.heading()))
+                    + " degrees), walking out about " + trip.out() + " blocks, then searching, never past " + trip.reach() + " blocks out"));
         }
         scouts.add(ant.getUUID());
         openSince = -1;
@@ -748,7 +700,6 @@ public class Raids {
                 find.checking = null;
             }
         }
-        taken.values().removeIf(id::equals);
         moundsTaken.values().removeIf(id::equals);
         if (scouts.contains(id) && ant.level() instanceof ServerLevel level) {
             say(level, "scout " + id.toString().substring(0, 8) + " is back or gave up, at " + ant.blockPosition().toShortString());
@@ -776,77 +727,184 @@ public class Raids {
 
     /**
      * What this scout's trip is: the best remembered spot not checked lately (rechecked first: real scouts return to
-     * their colony's good spots); otherwise, R5, the nearest piece of land not searched lately (a slice of the nearest
-     * ring with one left: trips search from near to far), its slice by the colony's dice. Only once every piece within
-     * the range came home searched empty does the range grow by a ring ({@code range_step}, up to {@code most_range}); a
-     * scout with nothing left to search while others are still out searches again the piece searched longest ago.
+     * their colony's good spots and recruit to them); otherwise a search in the scout's own favourite direction (a new
+     * scout is given one, {@link #newHeading}), walking out a share of its reach (usually near, now and then far:
+     * {@code raids.search}) and searching there, never past its reach. Null if no trip.
      */
     @Nullable
-    public Trip plan(ServerLevel level) {
+    public Trip plan(ServerLevel level, MatabeleEntity ant) {
         SavannaNumbers.ScoutNumbers numbers = numbers();
         if (numbers == null) {
             return null;
         }
         long now = level.getGameTime();
-        int slices = slices(numbers);
+        ScoutMemoryView memory = new ScoutMemoryView(ant, numbers);
         Find best = finds.stream().filter(find -> now - find.checkedAt >= RECHECK_AFTER && now - find.pickedAt >= RECHECK_AFTER
                         && (find.checking == null || !scouts.contains(find.checking)))
                 .max(Comparator.comparingInt(Find::worth)).orElse(null);
         if (best != null) {
             // (no second scout to it while one is on its way; its check time is set when the check really happens,
-            // finding 12; found empty, the scout searches the spot's own piece of land)
+            // finding 12; found empty, the scout searches round the spot)
             best.pickedAt = now;
-            int ring = ringOf(numbers, RaidGround.flat(best.at, colony.getCenter()));
-            return new Trip(best, sliceOf(best.at, slices), angleOf(best.at), ring, ring == 0 ? 0 : edge(numbers, ring - 1),
-                    edge(numbers, ring), range());
+            int away = (int) Math.round(RaidGround.flat(best.at, colony.getCenter()));
+            return new Trip(best, angleOf(best.at), away, Math.max(memory.reach(), Math.min(numbers.mostRange(), away + search().findMargin())));
         }
-        int rings = ringsWithin(numbers, range());
-        int cell = -1;
-        for (int ring = 0; ring < rings && cell < 0; ring++) {
-            List<Integer> free = new ArrayList<>();
-            for (int slice = 0; slice < slices; slice++) {
-                int key = ring * slices + slice;
-                if (!searched.containsKey(key) && !taken.containsKey(key)) {
-                    free.add(key);
-                }
-            }
-            if (!free.isEmpty()) {
-                cell = free.get(colony.random().nextInt(free.size()));
-            }
+        if (!ant.scoutMemory().hasHeading()) {
+            double heading = newHeading(ant.getUUID());
+            ant.scoutMemory().setHeading(heading);
+            say(level, "scout " + ant.getUUID().toString().substring(0, 8) + " takes its own way out: toward the " + compass(heading)
+                    + " (" + Math.round(Math.toDegrees(heading)) + " degrees; the colony's other scouts' ways " + otherWays(ant.getUUID()) + ")");
         }
-        if (cell < 0 && taken.isEmpty() && range() < numbers.mostRange()) {
-            int from = range();
-            range = edge(numbers, rings); // (every piece within the range came home searched empty: one ring further)
-            grewAt = now;
-            say(level, "every slice out to " + from + " blocks was searched empty: the search range grows to " + range);
-            cell = rings * slices + colony.random().nextInt(slices);
+        int reach = memory.reach();
+        SavannaNumbers.SearchNumbers search = search();
+        int out = (int) Math.round(reach * search.outShare(colony.random().nextDouble()));
+        return new Trip(null, ant.scoutMemory().heading(), Math.max(4, out), reach);
+    }
+
+    /** A scout's reach, its own or the first range. */
+    private record ScoutMemoryView(MatabeleEntity ant, SavannaNumbers.ScoutNumbers numbers) {
+        int reach() {
+            return Math.min(numbers.mostRange(), Math.max(numbers.firstRange() / 2, ant.scoutMemory().reach(numbers.firstRange())));
         }
-        if (cell < 0) {
-            // (nothing left unsearched: the piece searched longest ago, the nearest first if equal; null if all are taken)
-            cell = searched.entrySet().stream().filter(entry -> !taken.containsKey(entry.getKey()))
-                    .min(Map.Entry.<Integer, Long>comparingByValue().thenComparing(Map.Entry.comparingByKey()))
-                    .map(Map.Entry::getKey).orElse(-1);
-            if (cell < 0) {
-                return null;
-            }
-        }
-        int ring = cell / slices, slice = cell % slices;
-        double width = Math.toRadians(360.0 / slices);
-        return new Trip(null, slice, (slice + 0.5) * width, ring, ring == 0 ? 0 : edge(numbers, ring - 1), edge(numbers, ring), range());
     }
 
     /**
-     * R5: a scout came home from searching its piece of land (most of it walked) and found nothing worth a raid: the
-     * piece counts as searched empty (searched again after {@code slice_fade_ticks}).
+     * A new scout's favourite direction: at random, but spread from the colony's other scouts' (the best of
+     * {@code spread_tries} random directions, the one farthest from the nearest other; my pick: so the colony's scouts do
+     * not all share one side, as different real scouts head different ways).
      */
-    public void searchedEmpty(ServerLevel level, Trip trip, UUID scout) {
-        SavannaNumbers.ScoutNumbers numbers = numbers();
-        if (numbers == null || trip.outer() > range()) {
-            return; // (the range shrank meanwhile: that ground lies outside it now)
+    private double newHeading(UUID scout) {
+        List<Double> others = new ArrayList<>();
+        headings.forEach((id, heading) -> {
+            if (!id.equals(scout)) {
+                others.add(heading);
+            }
+        });
+        int tries = Math.max(1, search().spreadTries());
+        double best = colony.random().nextDouble() * Math.PI * 2;
+        double bestGap = gapTo(best, others);
+        for (int i = 1; i < tries && !others.isEmpty(); i++) {
+            double heading = colony.random().nextDouble() * Math.PI * 2;
+            double gap = gapTo(heading, others);
+            if (gap > bestGap) {
+                best = heading;
+                bestGap = gap;
+            }
         }
-        searched.put(trip.ring() * slices(numbers) + trip.slice(), level.getGameTime());
-        say(level, "scout " + scout.toString().substring(0, 8) + " searched " + trip.inner() + " to " + trip.outer() + " blocks out toward the "
-                + compass(trip.angle()) + " and found nothing worth a raid");
+        headings.put(scout, best);
+        return best;
+    }
+
+    /** How far (radians) this direction is from the nearest of these (a full half turn if none). */
+    public static double gapTo(double heading, List<Double> others) {
+        double gap = Math.PI;
+        for (double other : others) {
+            gap = Math.min(gap, Math.abs(turnBetween(heading, other)));
+        }
+        return gap;
+    }
+
+    /** The turn (radians, minus a half turn to a half turn) from one direction to another. */
+    public static double turnBetween(double from, double to) {
+        double turn = (to - from) % (Math.PI * 2);
+        if (turn > Math.PI) {
+            turn -= Math.PI * 2;
+        } else if (turn < -Math.PI) {
+            turn += Math.PI * 2;
+        }
+        return turn;
+    }
+
+    /** The diary: the colony's other scouts' ways, as compass words. */
+    private String otherWays(UUID scout) {
+        List<String> ways = new ArrayList<>();
+        headings.forEach((id, heading) -> {
+            if (!id.equals(scout)) {
+                ways.add(compass(heading));
+            }
+        });
+        return ways.isEmpty() ? "none yet" : String.join(", ", ways);
+    }
+
+    /** The colony's scouts' favourite directions it knows of (tests). */
+    public Map<UUID, Double> headingsForTests() {
+        return Map.copyOf(headings);
+    }
+
+    /**
+     * A scout is home (or gave up) from a search with nothing worth a raid. Only a trip it really searched counts (at
+     * least {@code searched_share} of its trip time searching: the raid rework's search range bug, in its new form: a
+     * scout that only set out, or was called home early by the hours, the rain or no way on, learns nothing). Then it
+     * goes a bit farther next time (its reach grows {@code range_step}, up to {@code most_range}) and its direction
+     * drifts a little; its reach already the most, its direction swings instead. True if it counted.
+     */
+    public boolean cameHomeEmpty(ServerLevel level, MatabeleEntity ant, Trip trip, int searchTicks, String why) {
+        SavannaNumbers.ScoutNumbers numbers = numbers();
+        if (numbers == null) {
+            return false;
+        }
+        SavannaNumbers.SearchNumbers search = search();
+        String name = "scout " + ant.getUUID().toString().substring(0, 8);
+        int least = (int) Math.ceil(numbers.tripTicks() * search.searchedShare());
+        if (searchTicks < least) {
+            say(level, name + " comes home with nothing (" + why + ") after searching only " + searchTicks / 20 + " s of the "
+                    + least / 20 + " s it takes to count: its way and reach stay as they were");
+            return false;
+        }
+        ScoutMemoryView memory = new ScoutMemoryView(ant, numbers);
+        int from = memory.reach();
+        double fromHeading = ant.scoutMemory().hasHeading() ? ant.scoutMemory().heading() : trip.heading();
+        ant.scoutMemory().setEmptyTrips(ant.scoutMemory().emptyTrips() + 1);
+        String change;
+        if (from < numbers.mostRange()) {
+            int to = Math.min(numbers.mostRange(), from + Math.max(1, numbers.rangeStep()));
+            ant.scoutMemory().setReach(to);
+            ant.scoutMemory().setHeading(fromHeading + colony.random().nextGaussian() * Math.toRadians(search.drift()));
+            change = "its reach grows from " + from + " to " + to + " blocks and its way drifts from the " + compass(fromHeading)
+                    + " to the " + compass(ant.scoutMemory().heading()) + " (" + Math.round(Math.toDegrees(fromHeading)) + " to "
+                    + Math.round(Math.toDegrees(ant.scoutMemory().heading())) + " degrees)";
+        } else {
+            ant.scoutMemory().setReach(from);
+            ant.scoutMemory().setHeading(fromHeading + colony.random().nextGaussian() * Math.toRadians(search.swing()));
+            change = "its reach is already the most, " + from + " blocks, so its way swings from the " + compass(fromHeading) + " to the "
+                    + compass(ant.scoutMemory().heading()) + " (" + Math.round(Math.toDegrees(fromHeading)) + " to "
+                    + Math.round(Math.toDegrees(ant.scoutMemory().heading())) + " degrees)";
+        }
+        headings.put(ant.getUUID(), ant.scoutMemory().heading());
+        reaches.put(ant.getUUID(), ant.scoutMemory().reach(numbers.firstRange()));
+        say(level, name + " searched " + searchTicks / 20 + " s and found nothing worth a raid (" + why + ", "
+                + ant.scoutMemory().emptyTrips() + " empty trip(s) in a row): " + change);
+        return true;
+    }
+
+    /**
+     * A scout took a find this far out: it keeps to that way (its direction turned to the find: site fidelity) and its
+     * trips shrink back (or reach out) to just past the find ({@code find_margin} blocks, never under the first range).
+     */
+    public void foundBy(ServerLevel level, MatabeleEntity ant, BlockPos at) {
+        SavannaNumbers.ScoutNumbers numbers = numbers();
+        if (numbers == null) {
+            return;
+        }
+        int away = (int) Math.round(RaidGround.flat(at, colony.getCenter()));
+        int from = new ScoutMemoryView(ant, numbers).reach();
+        int to = Math.max(numbers.firstRange(), Math.min(numbers.mostRange(), away + search().findMargin()));
+        double fromHeading = ant.scoutMemory().hasHeading() ? ant.scoutMemory().heading() : angleOf(at);
+        ant.scoutMemory().setReach(to);
+        ant.scoutMemory().setHeading(angleOf(at));
+        ant.scoutMemory().setEmptyTrips(0);
+        ant.scoutMemory().setLastFind(away);
+        headings.put(ant.getUUID(), ant.scoutMemory().heading());
+        reaches.put(ant.getUUID(), to);
+        say(level, "scout " + ant.getUUID().toString().substring(0, 8) + " found termites " + away + " blocks out toward the " + compass(angleOf(at))
+                + ": it keeps to that way (" + Math.round(Math.toDegrees(fromHeading)) + " to " + Math.round(Math.toDegrees(angleOf(at)))
+                + " degrees) and its reach " + (to < from ? "shrinks" : to > from ? "grows" : "stays") + " from " + from + " to " + to + " blocks");
+    }
+
+    /** The diary: a scout noticed a faint smell of termites and slows to search the place closely (area-restricted search). */
+    public void scentNoticed(ServerLevel level, BlockPos at, String what, UUID scout) {
+        say(level, "scout " + scout.toString().substring(0, 8) + " smells " + what + " near " + at.toShortString() + ", "
+                + Math.round(RaidGround.flat(at, colony.getCenter())) + " blocks out: it slows down and turns more, searching there closely");
     }
 
     /**
@@ -956,39 +1014,20 @@ public class Raids {
         return passedOverCount;
     }
 
-    /** R5, tests: the range's shrinking checked as if the game time were {@code now}. */
-    public void shrinkForTests(ServerLevel level, long now) {
-        SavannaNumbers.ScoutNumbers numbers = numbers();
-        if (numbers != null) {
-            shrinkAfterFinds(level, numbers, now);
-        }
-    }
-
-    /** R5, tests: whether this piece (ring, slice) counts as searched empty now. */
-    public boolean isSearchedForTests(int ring, int slice) {
-        SavannaNumbers.ScoutNumbers numbers = numbers();
-        return numbers != null && searched.containsKey(ring * slices(numbers) + slice);
-    }
-
-    /** The compass word for a slice's middle angle (the diary; Minecraft: +x east, +z south). */
-    private static String compass(double angle) {
+    /** The compass word for a direction (the diary; Minecraft: +x east, +z south). */
+    public static String compass(double angle) {
         String[] names = {"east", "south-east", "south", "south-west", "west", "north-west", "north", "north-east"};
         return names[Math.floorMod((int) Math.round(Math.toDegrees(angle) / 45.0), 8)];
     }
 
-    private int sliceOf(BlockPos at, int slices) {
-        double angle = angleOf(at);
-        return Math.floorMod((int) Math.floor(angle / (Math.PI * 2 / slices)), slices);
-    }
-
-    private double angleOf(BlockPos at) {
+    public double angleOf(BlockPos at) {
         double angle = Math.atan2(at.getZ() - colony.getCenter().getZ(), at.getX() - colony.getCenter().getX());
         return angle < 0 ? angle + Math.PI * 2 : angle;
     }
 
     /**
      * A scout is home from a find: the spot remembered (a known one refreshed), with its scent line home (nest end
-     * first), how much termite it smelt there and who found it. Its slice no longer counts as searched empty.
+     * first), how much termite it smelt there and who found it.
      */
     public void found(ServerLevel level, BlockPos at, int worth, List<BlockPos> trail, @Nullable UUID scout) {
         long now = level.getGameTime();
@@ -1002,12 +1041,6 @@ public class Raids {
             known.scout = scout;
         } else {
             finds.add(new Find(at.immutable(), worth, now, now, 0, List.copyOf(trail), scout));
-        }
-        if (numbers != null) {
-            // R5: its piece no longer counts as searched empty; the range shrinks back toward this find over the days
-            int ring = ringOf(numbers, RaidGround.flat(at, colony.getCenter()));
-            searched.remove(ring * slices(numbers) + sliceOf(at, slices(numbers)));
-            noteFind(numbers, at, now);
         }
         // R4: the scout's line home is a scent trail in the world now, unless a trail still smelt leads there already (the
         // raid follows that one: a column's trail is stronger than one scout's line).
@@ -1052,13 +1085,6 @@ public class Raids {
             say(level, "a scout is home from " + at.toShortString() + ", worth " + worth + ", no raid: " + (column != null ? "one is out already"
                     : colony.rainsNow(level) ? "it rains" : "the colony is not hungry"));
         }
-    }
-
-    /** R5: a find was made (or prey brought home from it): the range may shrink back to its ring over the days. */
-    private void noteFind(SavannaNumbers.ScoutNumbers numbers, BlockPos at, long now) {
-        int edge = edge(numbers, ringOf(numbers, RaidGround.flat(at, colony.getCenter())));
-        findEdge = lastFindAt >= 0 && now - lastFindAt < choosing().shrinkTicks() ? Math.max(findEdge, edge) : edge;
-        lastFindAt = now;
     }
 
     /** R4: a trail leads to a find if it ends this near it (blocks: two smelling distances). */
@@ -1266,7 +1292,7 @@ public class Raids {
 
     /** The colony list's line: scouts out, the good spots known, how far they search. */
     public String describe(ServerLevel level) {
-        StringBuilder line = new StringBuilder(", raids: ").append(scouts.size()).append(" scout(s) out, search range ")
+        StringBuilder line = new StringBuilder(", raids: ").append(scouts.size()).append(" scout(s) out, its scouts reach out to ")
                 .append(range()).append(" blocks, ").append(finds.size()).append(" good spot(s)");
         List<Find> best = finds();
         for (int i = 0; i < Math.min(3, best.size()); i++) {
@@ -1311,14 +1337,8 @@ public class Raids {
             list.add(one);
         }
         tag.put("raidFinds", list);
-        CompoundTag slices = new CompoundTag();
-        searched.forEach((slice, when) -> slices.putLong(Integer.toString(slice), when));
-        tag.put("raidSearchedRings", slices); // (R5: pieces of rings; the old slice-only "raidSearched" is not read)
-        tag.putInt("raidRange", range);
-        tag.putLong("raidGrewAt", grewAt);
-        tag.putLong("raidShrankAt", shrankAt);
-        tag.putLong("raidLastFindAt", lastFindAt);
-        tag.putInt("raidFindEdge", findEdge);
+        // (scouts search like real ants: no map of searched land; each scout keeps its own way and reach, saved on the
+        // ant; R5's "raidSearchedRings" and "raidRange" are no longer read: the user's test worlds may drop them)
         if (waiting != null) {
             tag.putLong("raidWaitingAt", waiting.at.asLong()); // (the find's place, not its place in the list: finding 16)
         }
@@ -1343,21 +1363,8 @@ public class Raids {
             finds.add(new Find(at, one.getInt("worth"), one.getLong("foundAt"), one.getLong("checkedAt"), one.getInt("misses"), trail,
                     one.hasUUID("scout") ? one.getUUID("scout") : null));
         }
-        searched.clear();
-        taken.clear();
-        CompoundTag slices = tag.getCompound("raidSearchedRings");
-        for (String key : slices.getAllKeys()) {
-            try {
-                searched.put(Integer.parseInt(key), slices.getLong(key));
-            } catch (NumberFormatException ignored) {
-                // (an odd key: skipped)
-            }
-        }
-        range = tag.getInt("raidRange");
-        grewAt = tag.contains("raidGrewAt") ? tag.getLong("raidGrewAt") : -1;
-        shrankAt = tag.contains("raidShrankAt") ? tag.getLong("raidShrankAt") : -1;
-        lastFindAt = tag.contains("raidLastFindAt") ? tag.getLong("raidLastFindAt") : -1;
-        findEdge = tag.getInt("raidFindEdge");
+        headings.clear();
+        reaches.clear();
         waiting = null;
         if (tag.contains("raidWaitingAt")) {
             BlockPos at = BlockPos.of(tag.getLong("raidWaitingAt"));
@@ -1374,13 +1381,6 @@ public class Raids {
         BlockPos at = colony.getCenter().offset(20, 0, 6);
         finds.add(new Find(at, 14, 100, 140, 1, List.of(colony.getCenter(), colony.getCenter().east(2), at.west(2)),
                 new UUID(7, 11)));
-        searched.put(2, 120L);
-        searched.put(5, 130L);
-        range = 48;
-        grewAt = 90;
-        shrankAt = 80;
-        lastFindAt = 100;
-        findEdge = 32;
         waiting = finds.get(finds.size() - 1);
         veterans.add(new UUID(7, 11));
         veterans.add(new UUID(7, 12));

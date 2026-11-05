@@ -38,6 +38,7 @@ public final class SavannaNumbers {
     public static final SpeciesSection<TrailNumbers> TRAILS = SpeciesSection.signUp("raids.trails", TrailNumbers.CODEC);
     public static final SpeciesSection<ChooseNumbers> CHOOSING = SpeciesSection.signUp("raids.choosing", ChooseNumbers.CODEC);
     public static final SpeciesSection<MoundClueNumbers> MOUND_CLUE = SpeciesSection.signUp("raids.mound_clue", MoundClueNumbers.CODEC);
+    public static final SpeciesSection<SearchNumbers> SEARCH = SpeciesSection.signUp("raids.search", SearchNumbers.CODEC);
     public static final SpeciesSection<HoursSoundNumbers> HOURS_SOUND = SpeciesSection.signUp("raids.hours_and_sound", HoursSoundNumbers.CODEC);
 
     private SavannaNumbers() {
@@ -496,30 +497,27 @@ public final class SavannaNumbers {
      * food; a raid only leaves in the raid {@code hours} (the mornings and evenings, Yusuf 2026), so a find made between
      * them is kept till the next raid hours:
      * one scout for every {@code workersPerScout} workers, at least 1, at most {@code mostScouts}, majors only. A scout
-     * checks the colony's remembered good spots first, then searches a slice of {@code sliceDegrees} round the nest in arcs
-     * {@code arcStep} blocks apart, out to the colony's search range ({@code firstRange}; every slice searched empty adds
-     * {@code rangeStep} once all are, up to {@code mostRange}, the real ant's foraging range of about 95 m); a searched
-     * slice is tried again after {@code sliceFadeTicks}. It smells termites (out of their mound, or in their feeding
-     * galleries and runways) within {@code smell} blocks, looks the find over {@code inspectTicks}, and goes home; it gives
-     * up after {@code tripTicks}. A good spot is remembered {@code spotFadeTicks}, and forgotten after {@code spotMisses}
-     * empty checks. Every number my pick, to confirm.
+     * checks the colony's remembered good spots first, else searches the land in its own direction (scouts search like
+     * real ants, {@link SearchNumbers}): each scout's reach starts at {@code firstRange}, grows {@code rangeStep} after
+     * each trip it really searched and came home empty, up to {@code mostRange} (the real ant's foraging range of about
+     * 95 m; a block a metre for distances), and moves to just past its find after a find. It smells termites (out of
+     * their mound, or in their feeding galleries and runways) within {@code smell} blocks, looks the find over
+     * {@code inspectTicks}, and goes home; it gives up after {@code tripTicks}. A good spot is remembered
+     * {@code spotFadeTicks}, and forgotten after {@code spotMisses} empty checks. Every number my pick, to confirm.
      */
     public record ScoutNumbers(List<List<Double>> hours, int workersPerScout, int mostScouts, int firstRange, int rangeStep,
-                               int mostRange, int sliceDegrees, int arcStep, int smell, int inspectTicks, int tripTicks,
-                               int sliceFadeTicks, int spotFadeTicks, int spotMisses, List<List<Double>> scoutHours) {
+                               int mostRange, int smell, int inspectTicks, int tripTicks, int spotFadeTicks, int spotMisses,
+                               List<List<Double>> scoutHours) {
         public static final Codec<ScoutNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.DOUBLE.listOf().listOf().optionalFieldOf("hours", List.of(List.of(6.0, 11.0), List.of(16.0, 19.0))).forGetter(ScoutNumbers::hours),
                 Codec.INT.optionalFieldOf("workers_per_scout", 50).forGetter(ScoutNumbers::workersPerScout),
                 Codec.INT.optionalFieldOf("most_scouts", 5).forGetter(ScoutNumbers::mostScouts),
                 Codec.INT.optionalFieldOf("first_range", 32).forGetter(ScoutNumbers::firstRange),
-                Codec.INT.optionalFieldOf("range_step", 16).forGetter(ScoutNumbers::rangeStep),
+                Codec.INT.optionalFieldOf("range_step", 8).forGetter(ScoutNumbers::rangeStep),
                 Codec.INT.optionalFieldOf("most_range", 96).forGetter(ScoutNumbers::mostRange),
-                Codec.INT.optionalFieldOf("slice_degrees", 90).forGetter(ScoutNumbers::sliceDegrees),
-                Codec.INT.optionalFieldOf("arc_step", 10).forGetter(ScoutNumbers::arcStep),
                 Codec.INT.optionalFieldOf("smell", 5).forGetter(ScoutNumbers::smell),
                 Codec.INT.optionalFieldOf("inspect_ticks", 40).forGetter(ScoutNumbers::inspectTicks),
                 Codec.INT.optionalFieldOf("trip_ticks", 2400).forGetter(ScoutNumbers::tripTicks),
-                Codec.INT.optionalFieldOf("slice_fade_ticks", 24000).forGetter(ScoutNumbers::sliceFadeTicks),
                 Codec.INT.optionalFieldOf("spot_fade_ticks", 72000).forGetter(ScoutNumbers::spotFadeTicks),
                 Codec.INT.optionalFieldOf("spot_misses", 2).forGetter(ScoutNumbers::spotMisses),
                 Codec.DOUBLE.listOf().listOf().optionalFieldOf("scout_hours", List.of(List.of(6.0, 19.5))).forGetter(ScoutNumbers::scoutHours)
@@ -720,20 +718,18 @@ public final class SavannaNumbers {
      * (nearly fed). A feeding gallery or runway fed at by day, with its termites inside out of sight, counts as
      * {@code byDayTermites} termites. The scout looks a find over from {@code inspectFrom} blocks (just outside the
      * termites' feel), counting all the while. A nearly fed colony sends {@code fedScouts} of its scouts (rounded up),
-     * a starving one all. The search range shrinks one ring every {@code shrinkTicks} after a find, back toward the find's
-     * ring. Every number my pick, to confirm.
+     * a starving one all. Every number my pick, to confirm.
      */
     public record ChooseNumbers(double leastWorth, double worthPerBlock, double hungryEase, int byDayTermites, double inspectFrom,
-                                double fedScouts, int shrinkTicks) {
-        public static final ChooseNumbers DEFAULT = new ChooseNumbers(3.0, 0.1, 0.5, 2, 3.5, 0.5, 24000);
+                                double fedScouts) {
+        public static final ChooseNumbers DEFAULT = new ChooseNumbers(3.0, 0.1, 0.5, 2, 3.5, 0.5);
         public static final Codec<ChooseNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.DOUBLE.optionalFieldOf("least_worth", DEFAULT.leastWorth()).forGetter(ChooseNumbers::leastWorth),
                 Codec.DOUBLE.optionalFieldOf("worth_per_block", DEFAULT.worthPerBlock()).forGetter(ChooseNumbers::worthPerBlock),
                 Codec.DOUBLE.optionalFieldOf("hungry_ease", DEFAULT.hungryEase()).forGetter(ChooseNumbers::hungryEase),
                 Codec.INT.optionalFieldOf("by_day_termites", DEFAULT.byDayTermites()).forGetter(ChooseNumbers::byDayTermites),
                 Codec.DOUBLE.optionalFieldOf("inspect_from", DEFAULT.inspectFrom()).forGetter(ChooseNumbers::inspectFrom),
-                Codec.DOUBLE.optionalFieldOf("fed_scouts", DEFAULT.fedScouts()).forGetter(ChooseNumbers::fedScouts),
-                Codec.INT.optionalFieldOf("shrink_ticks", DEFAULT.shrinkTicks()).forGetter(ChooseNumbers::shrinkTicks)
+                Codec.DOUBLE.optionalFieldOf("fed_scouts", DEFAULT.fedScouts()).forGetter(ChooseNumbers::fedScouts)
         ).apply(i, ChooseNumbers::new));
 
         /** The least worth a find this far from the nest (blocks, flat) must have, with the colony this well fed (0 to 1). */
@@ -760,5 +756,69 @@ public final class SavannaNumbers {
                 Codec.INT.optionalFieldOf("fade_ticks", DEFAULT.fadeTicks()).forGetter(MoundClueNumbers::fadeTicks),
                 Codec.INT.optionalFieldOf("follow_every", DEFAULT.followEvery()).forGetter(MoundClueNumbers::followEvery)
         ).apply(i, MoundClueNumbers::new));
+    }
+
+    /**
+     * Raid scouts search like real ants ({@code MatabeleScoutGoal}, {@code colony.Raids}; 2026-11-04, in place of R5's
+     * slices and bands). Each scout keeps its own favourite direction (a new scout gets one at random, the best spread of
+     * {@code spreadTries} tries from its colony's other scouts' directions) and goes back that way trip after trip (route
+     * and site fidelity, well known in ponerine ants: Fresneau 1985, Pachycondyla apicalis, each forager keeping its own
+     * sector). Out: it walks fairly straight along its direction, each hop turned a random {@code outWiggle} degrees or
+     * so, to where its search starts: a share of its reach, {@code outNear + (outFar - outNear) * u^outBias} for an even
+     * random u (usually near, now and then far). Search: a correlated random walk (Bell 1990, insect search paths), steps
+     * of {@code step} blocks each turned by a random {@code turn} degrees or so, kept round where it started searching (a
+     * soft pull back past {@code stayShare} of that distance, at least {@code stayLeast} blocks) and never past its reach
+     * from the nest. Area-restricted search ({@link AreaSearch}) where it smells termites within {@code scent} blocks.
+     * Home: the straight way (path integration, Wehner 2003; known in many ants, assumed for Megaponera). Memory: a trip
+     * counts as searched empty only if it searched at least {@code searchedShare} of its trip time; then the scout's reach
+     * grows ({@code raids.scouting.range_step}) and its direction drifts a random {@code drift} degrees or so, or, its
+     * reach already the most, swings a random {@code swing} degrees or so; after a find its direction turns to the find
+     * and its reach becomes the find's distance plus {@code findMargin}. Every number my pick, to confirm.
+     */
+    public record SearchNumbers(double outNear, double outFar, double outBias, double outWiggle, double step, double turn,
+                                double stayShare, double stayLeast, double scent, AreaSearch ars, double searchedShare, double drift,
+                                double swing, int findMargin, int spreadTries) {
+        public static final SearchNumbers DEFAULT = new SearchNumbers(0.25, 0.85, 2.0, 10.0, 4.0, 35.0, 0.5, 8.0, 12.0,
+                AreaSearch.DEFAULT, 0.5, 20.0, 60.0, 8, 8);
+        public static final Codec<SearchNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.DOUBLE.optionalFieldOf("out_near", DEFAULT.outNear()).forGetter(SearchNumbers::outNear),
+                Codec.DOUBLE.optionalFieldOf("out_far", DEFAULT.outFar()).forGetter(SearchNumbers::outFar),
+                Codec.DOUBLE.optionalFieldOf("out_bias", DEFAULT.outBias()).forGetter(SearchNumbers::outBias),
+                Codec.DOUBLE.optionalFieldOf("out_wiggle", DEFAULT.outWiggle()).forGetter(SearchNumbers::outWiggle),
+                Codec.DOUBLE.optionalFieldOf("step", DEFAULT.step()).forGetter(SearchNumbers::step),
+                Codec.DOUBLE.optionalFieldOf("turn", DEFAULT.turn()).forGetter(SearchNumbers::turn),
+                Codec.DOUBLE.optionalFieldOf("stay_share", DEFAULT.stayShare()).forGetter(SearchNumbers::stayShare),
+                Codec.DOUBLE.optionalFieldOf("stay_least", DEFAULT.stayLeast()).forGetter(SearchNumbers::stayLeast),
+                Codec.DOUBLE.optionalFieldOf("scent", DEFAULT.scent()).forGetter(SearchNumbers::scent),
+                AreaSearch.CODEC.optionalFieldOf("area_search", AreaSearch.DEFAULT).forGetter(SearchNumbers::ars),
+                Codec.DOUBLE.optionalFieldOf("searched_share", DEFAULT.searchedShare()).forGetter(SearchNumbers::searchedShare),
+                Codec.DOUBLE.optionalFieldOf("drift", DEFAULT.drift()).forGetter(SearchNumbers::drift),
+                Codec.DOUBLE.optionalFieldOf("swing", DEFAULT.swing()).forGetter(SearchNumbers::swing),
+                Codec.INT.optionalFieldOf("find_margin", DEFAULT.findMargin()).forGetter(SearchNumbers::findMargin),
+                Codec.INT.optionalFieldOf("spread_tries", DEFAULT.spreadTries()).forGetter(SearchNumbers::spreadTries)
+        ).apply(i, SearchNumbers::new));
+
+        /** Where a trip's search starts, as a share of the scout's reach, for an even random {@code u} (0 to 1). */
+        public double outShare(double u) {
+            return outNear + (outFar - outNear) * Math.pow(Math.max(0.0, Math.min(1.0, u)), outBias);
+        }
+    }
+
+    /**
+     * Area-restricted search (Bell 1990: a searching insect that meets a cue of food slows down and turns more, so it
+     * stays in the good patch): within {@code raids.search.scent} blocks of termites feeding, a feeding gallery or
+     * runway, or a tunnel of termites going to food, a scout walks at {@code pace} of its pace, takes steps of
+     * {@code step} blocks each turned a random {@code turn} degrees or so, leaning {@code toward} of the way toward the
+     * smell, for {@code ticks} after it last smelt it. Every number my pick, to confirm.
+     */
+    public record AreaSearch(double step, double turn, double pace, double toward, int ticks) {
+        public static final AreaSearch DEFAULT = new AreaSearch(2.0, 75.0, 0.7, 0.3, 400);
+        public static final Codec<AreaSearch> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.DOUBLE.optionalFieldOf("step", DEFAULT.step()).forGetter(AreaSearch::step),
+                Codec.DOUBLE.optionalFieldOf("turn", DEFAULT.turn()).forGetter(AreaSearch::turn),
+                Codec.DOUBLE.optionalFieldOf("pace", DEFAULT.pace()).forGetter(AreaSearch::pace),
+                Codec.DOUBLE.optionalFieldOf("toward", DEFAULT.toward()).forGetter(AreaSearch::toward),
+                Codec.INT.optionalFieldOf("ticks", DEFAULT.ticks()).forGetter(AreaSearch::ticks)
+        ).apply(i, AreaSearch::new));
     }
 }
