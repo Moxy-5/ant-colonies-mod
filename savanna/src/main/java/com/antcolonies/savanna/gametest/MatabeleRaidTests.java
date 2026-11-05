@@ -566,6 +566,17 @@ public class MatabeleRaidTests {
                             + " stung termite(s), but " + Math.max(0, dropped[0]) + " lie where it died at " + diedAt[0].toShortString());
                     helper.assertTrue(raid.cameHome() * 2 >= raid.members().size(),
                             "only " + raid.cameHome() + " of " + raid.members().size() + " came home with the column: " + raid.endedWhy());
+                    // The raid and fight review 2, finding 2 (the user's raid): every milling place out on the open ground,
+                    // and nobody left home while standing at the place it was given.
+                    helper.assertTrue(raid.formFaults() == 0, raid.formFaults() + " milling place(s) in the nest or under the entrance,"
+                            + " or ants left home standing at theirs: " + raid.endedWhy());
+                    // Finding 3: the attack ends once no termite the raiders would go for is about, not at its longest time
+                    // (the termites hidden in their galleries or shut in under the logs once no major still breaks in).
+                    Long attackAt = stageAt.get(RaidColumn.Stage.ATTACKING);
+                    Long afterAt = stageAt.get(RaidColumn.Stage.COLLECTING);
+                    helper.assertTrue(attackAt != null && afterAt != null && afterAt - attackAt < raid.columnNumbers().fightTicks(),
+                            "the attack ran to its longest time (" + (attackAt == null || afterAt == null ? "?" : (afterAt - attackAt) / 20)
+                                    + " s): hidden termites kept it going; stages " + stageAt);
                 })
                 .thenIdle(400) // (a little while to go in)
                 .thenExecute(() -> {

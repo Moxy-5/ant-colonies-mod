@@ -868,12 +868,21 @@ public final class RaidColumn {
      * R7: whether a termite still stands about the spot (alive, not stung, within {@code collect_reach} of the find): the
      * attack goes on while one does, and ends {@code quiet_ticks} after the last.
      */
-    private boolean termitesAbout(ServerLevel level) {
+    private boolean termitesAbout(ServerLevel level, List<MatabeleEntity> ants) {
         double reach = carry.collectReach();
         BlockPos at = find.at();
+        // The raid and fight review 2, finding 3: only termites the hunters would go for count (as FightGoal picks them):
+        // one hidden in its own nest past the feeding ways is left alone by every raider, and one shut in under mud, soil
+        // or wood only while a major still breaks the way in (its fight order kept); counting them kept the attack going
+        // with nobody fighting, the ants searching round on their own till the attack's longest time (the user's raid:
+        // 70 game minutes, till dusk).
+        boolean breaking = ants.stream().anyMatch(ant -> ant.breaksIn() && fightsForTheColumn(ant));
         return !level.getEntitiesOfClass(AbstractAntEntity.class, new AABB(at).inflate(reach, 6.0, reach),
                 insect -> insect.isAlive() && !insect.isParalysed() && !insect.isDowned() && !(insect instanceof MatabeleEntity)
-                        && !colony.getId().equals(insect.getColonyId()) && flat(insect.blockPosition(), at) <= reach).isEmpty();
+                        && !colony.getId().equals(insect.getColonyId()) && flat(insect.blockPosition(), at) <= reach
+                        && !insect.isSheltered()
+                        && (breaking || com.antcolonies.fight.Fights.isInTheOpen(level, insect.blockPosition())
+                                || !com.antcolonies.fight.Fights.isShutIn(level, insect.blockPosition()))).isEmpty();
     }
 
     /** The column's numbers (the species file's {@code raids.column}; the tests check the stages' times by them). */
@@ -965,10 +974,10 @@ public final class RaidColumn {
             if (ant.getUUID().equals(leader)) {
                 spot = place(level, this.out, Math.min(2.0, this.out.length()), 0.0);
             } else {
-                double angle = i * 2.39996; // (the golden angle: spread evenly round the entrance)
-                double radius = 1.5 + 1.5 * ((i * 7) % 10) / 10.0;
-                spot = standAt(level, entrance.getX() + 0.5 + Math.cos(angle) * radius, entrance.getZ() + 0.5 + Math.sin(angle) * radius,
-                        entrance.getY());
+                spot = formSpot(level, i);
+                if (spot.getY() < entrance.getY() - 1 || colony.nest().isInside(level, spot)) {
+                    formFaults++; // (only the trail's start can give one, and it lies outside: never, the tests check)
+                }
             }
             orders.put(ant.getUUID(), new Order(spot, 1.0, point(this.out, 4.0)));
         }
@@ -978,12 +987,55 @@ public final class RaidColumn {
             for (MatabeleEntity ant : ants) {
                 if (!ant.getUUID().equals(leader) && !draftedSince.containsKey(ant.getUUID())
                         && !(flat(ant.blockPosition(), entrance) <= NEAR + 2 && ant.getY() >= entrance.getY() - 2)) {
+                    Order had = orders.get(ant.getUUID());
+                    if (had != null && had.to() != null && Math.sqrt(ant.blockPosition().distSqr(had.to())) <= 1.5) {
+                        formFaults++; // (left home standing at the place it was given: finding 2's bug)
+                    }
                     say(shortId(ant.getUUID()) + " stays home, not out at the entrance in time: " + who(ant, out));
                     drop(ant.getUUID());
                 }
             }
             next(Stage.MARCHING, now);
         }
+    }
+
+    /** Tests (finding 2): milling places given in the nest or under the entrance, and ants left home standing at theirs. */
+    private int formFaults;
+
+    /** Tests (the raid and fight review 2, finding 2): how often the forming went wrong as in the user's raid; 0. */
+    public int formFaults() {
+        return formFaults;
+    }
+
+    /** The heights tried for a milling place, from the entrance's height: never more than a block below it (finding 2). */
+    private static final int[] FORM_HEIGHTS = {0, 1, -1, 2, 3};
+
+    /**
+     * The raid and fight review 2, finding 2 (the user's raid of 2026-11-04): where recruit {@code i} mills before the
+     * march: round the entrance on the golden angle, out on the open ground, never inside the nest. A dead mound's open
+     * chimney is a pit a few blocks across; a place "near the entrance's height" could be down in it (3 blocks under the
+     * entrance), where the ant stood exactly at its place but never counted as out, and was left home. A place a block
+     * or more under the entrance or in the nest is no place: farther out is tried, then the start of the trail.
+     */
+    private BlockPos formSpot(ServerLevel level, int i) {
+        BlockPos entrance = colony.getCenter();
+        double angle = i * 2.39996; // (the golden angle: spread evenly round the entrance)
+        double radius = 1.5 + 1.5 * ((i * 7) % 10) / 10.0;
+        for (double extra = 0.0; extra <= 4.5; extra += 1.5) {
+            double x = entrance.getX() + 0.5 + Math.cos(angle) * (radius + extra);
+            double z = entrance.getZ() + 0.5 + Math.sin(angle) * (radius + extra);
+            for (int dy : FORM_HEIGHTS) {
+                BlockPos cell = new BlockPos(Mth.floor(x), entrance.getY() + dy, Mth.floor(z));
+                if (!level.hasChunkAt(cell)) {
+                    break;
+                }
+                if (RaidGround.canStand(level, cell) && !colony.nest().isInside(level, cell)) {
+                    return cell;
+                }
+            }
+        }
+        // Nowhere round it: along the start of the trail (it lies beside the chimney, R3), a little apart.
+        return place(level, out, Math.min(out.length(), 2.0 + i % 6), i % 2 == 0 ? 1.0 : -1.0);
     }
 
     /**
@@ -1018,6 +1070,11 @@ public final class RaidColumn {
         for (MatabeleEntity ant : line) {
             at.put(ant.getUUID(), alongOf(route, ant));
         }
+        // The raid and fight review 2, finding 1 ("column stuck or messy"): each follows the ant really ahead of it on
+        // the trail, as on the way home (R7). Kept in the order they were called, an ant that came out of the nest first
+        // but stood "behind" a later one in that order waited, standing, until that one walked past it: the line moved
+        // in jerks, ants overtaking ants and stopping dead. (The scout still leads; the rest fall in as they come out.)
+        line.sort(java.util.Comparator.comparingDouble(ant -> -at.get(ant.getUUID())));
         int rows = (int) Math.ceil(line.size() / (double) Math.max(1, numbers.abreast()));
         double length = rows * numbers.spacing();
         double rear = frontAt;
@@ -1072,7 +1129,9 @@ public final class RaidColumn {
                 target = Math.min(target, castGap.near() - GAP_STOP); // (the rest wait behind the gap)
                 target = Math.max(0.0, target);
             }
-            double side = lanes == 1 ? 0.0 : k % lanes - (lanes - 1) / 2.0; // (a block apart side by side)
+            // (a block apart side by side; each ant keeps its own lane: with the line sorted by place, a lane by its place
+            // in the line swapped sides every time two ants passed, and they stepped sideways back and forth)
+            double side = lanes == 1 ? 0.0 : Math.floorMod(ant.getUUID().hashCode(), lanes) - (lanes - 1) / 2.0;
             double pace = own < target - HURRY_BEHIND ? HURRY_PACE : 1.0;
             orders.put(ant.getUUID(), new Order(place(level, route, target, side), pace, point(route, Math.min(route.length(), target + 3.0))));
         }
@@ -1350,7 +1409,7 @@ public final class RaidColumn {
         boolean stragglers = ants.stream().anyMatch(ant -> !sentIn.contains(ant.getUUID()));
         // R7: the attack is over once no termite has been about the spot for quiet_ticks (the R1 diary: each raider
         // searched round on its own for minutes after the last termite, the attack lasting about 4 minutes, 4 game hours)
-        if (termitesAbout(level)) {
+        if (termitesAbout(level, ants)) {
             termiteSeenAt = now;
         }
         long quietFor = now - Math.max(attackedAt, termiteSeenAt);
