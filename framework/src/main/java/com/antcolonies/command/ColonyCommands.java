@@ -7,6 +7,10 @@ import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.debug.Perf;
 import com.antcolonies.species.SpeciesProfile;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import com.antcolonies.watch.Labels;
+import com.antcolonies.watch.Reports;
+import com.antcolonies.watch.Watch;
 
 import java.util.Comparator;
 
@@ -43,8 +47,64 @@ public class ColonyCommands {
                 .then(Commands.literal("perf").executes(context -> {
                     context.getSource().sendSuccess(() -> Component.literal(Perf.report()), false);
                     return 1;
-                })));
+                }))
+                // The raid test bench (docs/plans/raid-test-bench.md): a report of the place you stand at (B2), the rules
+                // on, quiet or off (B1), and the labels over the insects (B6).
+                .then(Commands.literal("report").executes(context -> report(context.getSource(), "(no words)"))
+                        .then(Commands.argument("words", StringArgumentType.greedyString())
+                                .executes(context -> report(context.getSource(), StringArgumentType.getString(context, "words")))))
+                .then(Commands.literal("rules").executes(context -> rules(context.getSource()))
+                        .then(Commands.literal("on").executes(context -> rulesMode(context.getSource(), Watch.Mode.ON)))
+                        .then(Commands.literal("quiet").executes(context -> rulesMode(context.getSource(), Watch.Mode.QUIET)))
+                        .then(Commands.literal("off").executes(context -> rulesMode(context.getSource(), Watch.Mode.OFF))))
+                .then(Commands.literal("labels").executes(context -> labels(context.getSource()))));
         // (The termites' own commands, mound, mushrooms, drum, alarm, queensize and age: TermiteCommands; the trees: TreeCommands.)
+    }
+
+    private static int report(CommandSourceStack source, String words) {
+        ServerLevel level = source.getLevel();
+        net.minecraft.server.level.ServerPlayer player = source.getPlayer();
+        BlockPos where = BlockPos.containing(source.getPosition());
+        String saved = Reports.save(level, where, "player", "Player's report: " + words, player);
+        if (saved == null) {
+            source.sendFailure(Component.literal("The report could not be saved (see the log)."));
+            return 0;
+        }
+        source.sendSuccess(() -> Component.literal("Report saved: " + saved + " (in the game folder; say \"check the reports\")."), false);
+        return 1;
+    }
+
+    private static int rules(CommandSourceStack source) {
+        StringBuilder out = new StringBuilder("Rules " + Watch.mode() + " (/antcolonies rules on|quiet|off):");
+        for (Watch.Rule rule : Watch.rules()) {
+            out.append("\n- ").append(rule.name()).append(": ").append(rule.means());
+        }
+        java.util.List<Watch.Breach> broken = Watch.allBreaches();
+        out.append("\nBroken this game: ").append(broken.size());
+        for (Watch.Breach breach : broken.subList(Math.max(0, broken.size() - 8), broken.size())) {
+            out.append("\n- tick ").append(breach.tick()).append(' ').append(breach.rule()).append(" at ")
+                    .append(breach.where().toShortString()).append(": ").append(breach.text())
+                    .append(breach.report() == null ? "" : " (" + breach.report() + ")");
+        }
+        source.sendSuccess(() -> Component.literal(out.toString()), false);
+        return Watch.rules().size();
+    }
+
+    private static int rulesMode(CommandSourceStack source, Watch.Mode mode) {
+        Watch.setMode(mode);
+        source.sendSuccess(() -> Component.literal("Rules " + mode + switch (mode) {
+            case ON -> ": checked, written in the log, told here.";
+            case QUIET -> ": checked and written in the log, not told here.";
+            case OFF -> ": not checked.";
+        }), true);
+        return 1;
+    }
+
+    private static int labels(CommandSourceStack source) throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+        boolean on = Labels.toggle(source.getPlayerOrException());
+        source.sendSuccess(() -> Component.literal(on ? "Labels on: every insect within 32 blocks shows what it is doing (red: a rule broke)."
+                : "Labels off."), false);
+        return 1;
     }
 
     private static int kill(CommandSourceStack source) {
@@ -132,35 +192,40 @@ public class ColonyCommands {
         }
         source.sendSuccess(() -> Component.literal("Colonies in this dimension: " + colonies.size()), false);
         for (Colony colony : colonies) {
-            String line = "- " + colony.getId().toString().substring(0, 8)
-                    + " | " + colony.getSpecies()
-                    + " | center " + colony.getCenter().toShortString()
-                    + colony.nest().describeSite(level)
-                    + (colony.isQueenless() ? " | QUEENLESS: no new eggs, dwindling" : " | queen " + colony.getQueenId().toString().substring(0, 8))
-                    + (colony.profile().nest().levelUnlocks().isEmpty() ? ""
-                            : " | nest levels open " + Math.min(colony.nest().levelsUnlocked(level), colony.profile().nest().maxLevels()) + " of " + colony.profile().nest().maxLevels())
-                    + " | members " + colony.getMemberCount() + colony.population().describe(level) + colony.away().describe(level) + colony.field().describe()
-                    + " | " + colony.describeJobs(level)
-                    + (colony.profile().food().makesBread()
-                            ? " | food " + colony.food().getFood() + " (rich " + colony.food().getRichSeeds() + ", eaten " + colony.food().getSeedsEaten() + ")"
-                                    + lines(colony, ColonyHooks.LIST_STORE, level)
-                            : colony.hooks().first(ColonyHooks.LIST_FOOD) != null ? lines(colony, ColonyHooks.LIST_FOOD, level)
-                            : " | food " + colony.food().getFood() + " pieces in the store")
-                    + (colony.profile().laying().isPresent()
-                            ? " | queen holds " + colony.queenCare().getQueenBread() + "/" + colony.profile().queen().meal() + " nodules" + nextEgg(colony, level)
-                            : " | queen fed " + colony.queenCare().getQueenBread() + "/" + colony.profile().queen().meal() + ", rich " + colony.queenCare().getQueenRich() + "/"
-                                    + colony.profile().queen().richMeal() + incubation(colony, level))
-                    + " | queen unfed " + unfedMinutes(colony, level) + " of " + colony.profile().queen().starveTicks() / 1200 + " min"
-                    + " | eggs " + colony.brood().countEggs(level) + " | larvae " + colony.brood().countLarvae(level)
-                    + lines(colony, ColonyHooks.LIST_BROOD, level)
-                    + colony.foodMap().describe() + lines(colony, ColonyHooks.LIST_SEARCH, level)
-                    + colony.trails().describeMemory(level) + colony.danger().describe(level) + lines(colony, ColonyHooks.LIST_DANGER, level)
-                    + colony.neighbours().describe(level)
-                    + " | dead ants " + colony.refuse().getCorpses(level).size() + " (refuse chamber " + colony.refuse().getRefuseCorpses(level).size() + ")"
-                    + lines(colony, ColonyHooks.LIST_BUILDING, level) + foraging(colony, level);
+            String line = describe(colony, level);
             source.sendSuccess(() -> Component.literal(line), false);
         }
         return colonies.size();
+    }
+
+    /** One colony's line of {@code /antcolonies list} (the raid test bench's reports use it too). */
+    public static String describe(Colony colony, ServerLevel level) {
+        return "- " + colony.getId().toString().substring(0, 8)
+                + " | " + colony.getSpecies()
+                + " | center " + colony.getCenter().toShortString()
+                + colony.nest().describeSite(level)
+                + (colony.isQueenless() ? " | QUEENLESS: no new eggs, dwindling" : " | queen " + colony.getQueenId().toString().substring(0, 8))
+                + (colony.profile().nest().levelUnlocks().isEmpty() ? ""
+                        : " | nest levels open " + Math.min(colony.nest().levelsUnlocked(level), colony.profile().nest().maxLevels()) + " of " + colony.profile().nest().maxLevels())
+                + " | members " + colony.getMemberCount() + colony.population().describe(level) + colony.away().describe(level) + colony.field().describe()
+                + " | " + colony.describeJobs(level)
+                + (colony.profile().food().makesBread()
+                        ? " | food " + colony.food().getFood() + " (rich " + colony.food().getRichSeeds() + ", eaten " + colony.food().getSeedsEaten() + ")"
+                                + lines(colony, ColonyHooks.LIST_STORE, level)
+                        : colony.hooks().first(ColonyHooks.LIST_FOOD) != null ? lines(colony, ColonyHooks.LIST_FOOD, level)
+                        : " | food " + colony.food().getFood() + " pieces in the store")
+                + (colony.profile().laying().isPresent()
+                        ? " | queen holds " + colony.queenCare().getQueenBread() + "/" + colony.profile().queen().meal() + " nodules" + nextEgg(colony, level)
+                        : " | queen fed " + colony.queenCare().getQueenBread() + "/" + colony.profile().queen().meal() + ", rich " + colony.queenCare().getQueenRich() + "/"
+                                + colony.profile().queen().richMeal() + incubation(colony, level))
+                + " | queen unfed " + unfedMinutes(colony, level) + " of " + colony.profile().queen().starveTicks() / 1200 + " min"
+                + " | eggs " + colony.brood().countEggs(level) + " | larvae " + colony.brood().countLarvae(level)
+                + lines(colony, ColonyHooks.LIST_BROOD, level)
+                + colony.foodMap().describe() + lines(colony, ColonyHooks.LIST_SEARCH, level)
+                + colony.trails().describeMemory(level) + colony.danger().describe(level) + lines(colony, ColonyHooks.LIST_DANGER, level)
+                + colony.neighbours().describe(level)
+                + " | dead ants " + colony.refuse().getCorpses(level).size() + " (refuse chamber " + colony.refuse().getRefuseCorpses(level).size() + ")"
+                + lines(colony, ColonyHooks.LIST_BUILDING, level) + foraging(colony, level);
     }
 
     /** The parts' words for one slot of the list, in the parts' order: nothing for a species without such parts. */

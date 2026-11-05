@@ -368,6 +368,7 @@ public final class RaidColumn {
      * time of day, and the stage now ({@code docs/plans/m8-matabele.md}, 3R).
      */
     void say(String what) {
+        com.antcolonies.watch.Watch.note(lastLevel, colony, "[raid] " + stage.name().toLowerCase() + ": " + what);
         com.antcolonies.savanna.SavannaMod.LOGGER.info("[raid] nest {} at {} (tick {}), {}: {}", colony.getCenter().toShortString(),
                 RaidGround.clock(colony, lastLevel),
                 lastLevel == null ? -1 : lastLevel.getGameTime(), stage.name().toLowerCase(), what);
@@ -441,6 +442,53 @@ public final class RaidColumn {
 
     public long startedAt() {
         return startedAt;
+    }
+
+    /** The raid test bench (B1): when the stage now began (game time; moved on while the raid's clocks waited). */
+    public long stageSince() {
+        return stageSince;
+    }
+
+    /** The raid test bench (B1): when the column was last worked out (game time). */
+    public long updatedAt() {
+        return updatedAt;
+    }
+
+    /**
+     * The raid test bench (B1, the stage-limit rule): the longest the stage now can last by the column's own clocks
+     * (ticks), from the species file's numbers: the same table as the whole-chain raid test's, with the scout's
+     * recruiting before the forming and the time spent casting about at gaps in the march.
+     */
+    public long stageMostTicks() {
+        return switch (stage) {
+            case FORMING -> RECRUIT_MOST + numbers.formTicks();
+            case MARCHING -> marchLimit() + castTotal + (castingSince >= 0 && lastLevel != null ? lastLevel.getGameTime() - castingSince : 0);
+            case GATHERING -> numbers.gatherTicks();
+            case ATTACKING -> numbers.fightTicks() + 200; // (the fight's own hard end)
+            case COLLECTING -> carry.collectTicks();
+            case SPREADING -> carry.spreadTicks() + 200;
+            case REGROUPING -> numbers.regroupTicks();
+            case HOMING -> numbers.homeTicks();
+            case DONE -> Long.MAX_VALUE / 4;
+        };
+    }
+
+    /** The raid test bench: the order this raider was last given (null: none, or not a raider now). */
+    @Nullable
+    public Order orderNow(UUID ant) {
+        return orders.get(ant);
+    }
+
+    /** Tests (the raid test bench): the stage now as if it had begun {@code ticks} earlier, to break the stage-limit rule. */
+    public void ageStageForTests(long ticks) {
+        stageSince -= ticks;
+    }
+
+    /** Test only (the raid test bench): a raid that is never worked out any more, as a hang would leave it. */
+    private boolean hungForTests;
+
+    public void hangForTests() {
+        hungForTests = true;
     }
 
     /** When the attack began (game time, -1 not yet), and how many raiders were at the gathering place then. */
@@ -616,7 +664,7 @@ public final class RaidColumn {
     /** The column's stages and every raider's place, every {@link #EVERY} ticks (asked by the raiders and the colony). */
     void update(ServerLevel level) {
         long now = level.getGameTime();
-        if (now - updatedAt < EVERY || stage == Stage.DONE) {
+        if (now - updatedAt < EVERY || stage == Stage.DONE || hungForTests) {
             return;
         }
         long previous = updatedAt;

@@ -11,6 +11,8 @@ import com.antcolonies.gametest.TestClock;
 import com.antcolonies.gametest.IdleWatch;
 import com.antcolonies.gametest.TestScenes;
 import com.antcolonies.savanna.SavannaMod;
+import com.antcolonies.watch.GeneralRules;
+import com.antcolonies.watch.Watch;
 import com.antcolonies.savanna.colony.NewLandMounds;
 import com.antcolonies.savanna.colony.PreyPile;
 import com.antcolonies.savanna.colony.RaidColumn;
@@ -522,6 +524,8 @@ public class MatabeleRaidTests {
         helper.assertTrue(colony != null, "no Matabele colony made");
         Raids raids = colony.part(SavannaParts.RAIDS).orElse(null);
         helper.assertTrue(raids != null, "a Matabele colony has no raids part");
+        // The raid test bench, B1: the whole chain runs with every rule watching (none may break).
+        Watch.watchForTests(colony);
         scoutsHeadToward(helper, colony, 37, NEST + 5);
         RaidColumn[] column = {null};
         List<MatabeleEntity> raiders = new ArrayList<>();
@@ -636,6 +640,85 @@ public class MatabeleRaidTests {
                                     "a raider stands about outside at " + ant.blockPosition().toShortString() + ", "
                                             + Math.round(flat(ant.blockPosition(), colony.getCenter())) + " from the nest, doing " + ant.runningGoals());
                         }
+                    }
+                    List<Watch.Breach> broken = Watch.breaches(colony);
+                    helper.assertTrue(broken.isEmpty(), broken.size() + " raid rule(s) broken in the whole chain: " + broken);
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * The raid test bench, B1 and B2 ({@code docs/plans/raid-test-bench.md}): the rules catch a raid stage hanging (the
+     * attack of BUGS 111 never ending) and save a report: a folder with the summary, the black box's diary (the raid's
+     * own {@code [raid]} lines in it) and the place as a structure. And the not-walled-in rule's pocket finder: a hollow in
+     * stone is a closed pocket, a hollow with a way up to the sky is not.
+     */
+    @GameTest(template = "arena", timeoutTicks = 12000, skyAccess = true, batch = "matabele_raids")
+    public static void theRulesCatchAHangingRaidAndSaveAReport(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        TestClock.moving(helper, 7.0);
+        TestScenes.shapeGround(helper, 45, (x, z) -> 0);
+        Colony dead = NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(NEST, SURFACE, NEST)), NewLandMounds.pickFor("dead", 30, 5L));
+        helper.assertTrue(dead != null, "no dead mound put in");
+        feedingUnderALog(helper, 36, NEST + 5);
+        Colony colony = MatabeleCommands.makeColony(level, helper.absolutePos(new BlockPos(NEST + 6, SURFACE, NEST)), 60);
+        helper.assertTrue(colony != null, "no Matabele colony made");
+        Raids raids = colony.part(SavannaParts.RAIDS).orElse(null);
+        helper.assertTrue(raids != null, "a Matabele colony has no raids part");
+        Watch.watchForTests(colony);
+        scoutsHeadToward(helper, colony, 37, NEST + 5);
+
+        // The pocket finder: a hollow walled in stone, and the same with a shaft up to the sky.
+        BlockPos hollow = new BlockPos(6, SURFACE - 4, 6);
+        for (int dx = -1; dx <= 2; dx++) {
+            for (int dy = -1; dy <= 1; dy++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    helper.setBlock(hollow.offset(dx, dy, dz), Blocks.STONE);
+                }
+            }
+        }
+        helper.setBlock(hollow, Blocks.AIR);
+        helper.setBlock(hollow.east(), Blocks.AIR);
+        int closed = GeneralRules.closedPocket(level, colony, helper.absolutePos(hollow));
+        helper.assertTrue(closed == 2, "a 2-cell hollow walled in stone counted as a pocket of " + closed + " (0: open)");
+        for (int y = hollow.getY() + 1; y <= SURFACE + 1; y++) {
+            helper.setBlock(hollow.getX(), y, hollow.getZ(), Blocks.AIR);
+        }
+        int open = GeneralRules.closedPocket(level, colony, helper.absolutePos(hollow));
+        helper.assertTrue(open == 0, "a hollow with a shaft to the sky counted as a closed pocket of " + open);
+
+        RaidColumn[] column = {null};
+        helper.startSequence()
+                .thenExecute(() -> helper.assertTrue(raids.sendNow(level) != null, "the scout command found no fit major"))
+                .thenWaitUntil(() -> {
+                    column[0] = raids.column();
+                    helper.assertTrue(column[0] != null && column[0].stage() != RaidColumn.Stage.FORMING,
+                            "no raid on its way yet; " + raids.describe(level));
+                })
+                .thenExecute(() -> {
+                    // A hang, as BUGS 111 left one: the raid no longer worked out, its stage long past its longest.
+                    column[0].hangForTests();
+                    column[0].ageStageForTests(column[0].stageMostTicks() + 2000);
+                })
+                .thenWaitUntil(() -> helper.assertTrue(Watch.breaches(colony).stream().anyMatch(breach -> breach.rule().equals("stage-limit")),
+                        "the stage-limit rule did not see the raid's stage aged past its longest; broken: " + Watch.breaches(colony)))
+                .thenWaitUntil(() -> {
+                    Watch.Breach breach = Watch.breaches(colony).stream().filter(b -> b.rule().equals("stage-limit")).findFirst().orElseThrow();
+                    helper.assertTrue(breach.report() != null, "the stage-limit rule broke but saved no report");
+                    java.nio.file.Path dir = com.antcolonies.watch.Reports.folder(level).resolve(breach.report().substring("reports/".length()));
+                    for (String file : List.of("report.txt", "diary.txt", "colonies.nbt", "place.nbt")) {
+                        helper.assertTrue(java.nio.file.Files.exists(dir.resolve(file)), "the report " + dir + " has no " + file + " (yet)");
+                    }
+                    try {
+                        String diary = java.nio.file.Files.readString(dir.resolve("diary.txt"));
+                        String report = java.nio.file.Files.readString(dir.resolve("report.txt"));
+                        helper.assertTrue(diary.contains("[raid]"), "the report's diary holds no [raid] line");
+                        helper.assertTrue(diary.contains("[rule] stage-limit"), "the report's diary holds no [rule] line");
+                        helper.assertTrue(report.contains("stage-limit broken") && report.contains("matabele"),
+                                "the report's summary names neither the rule nor the raiders");
+                    } catch (java.io.IOException e) {
+                        helper.fail("could not read the report: " + e);
                     }
                 })
                 .thenSucceed();

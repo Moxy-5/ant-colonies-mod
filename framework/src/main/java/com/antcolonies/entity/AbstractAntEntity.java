@@ -886,6 +886,16 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return level().isClientSide ? (entityData.get(DATA_POSE_FLAGS) & PARALYSED) != 0 : paralysedAt != NOT_PARALYSED;
     }
 
+    /** Server: how long (ticks) it has lain paralysed (0 when it is not; the raid test bench's prey-ends rule). */
+    public long paralysedForTicks() {
+        return paralysedAt == NOT_PARALYSED ? 0 : level().getGameTime() - paralysedAt;
+    }
+
+    /** Server: how long its paralysis lasts before it dies where it lies, if nobody takes it (ticks). */
+    public int paralysisLasts() {
+        return FightNumbers.of(profile()).map(FightNumbers::paralysedTicks).orElse(FightNumbers.DEFAULT_PARALYSED_TICKS);
+    }
+
     /** Server: whether the dose that fells it is in and working (it staggers, not yet down). */
     public boolean isEnvenomed() {
         return venomAt != NO_VENOM && paralysedAt == NOT_PARALYSED;
@@ -2364,6 +2374,20 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
 
     protected void setColonyId(@Nullable UUID colonyId) {
         this.colonyId = colonyId;
+    }
+
+    /**
+     * The raid test bench's labels ({@link com.antcolonies.watch.Labels}) are custom names shown for a while; they are
+     * never saved (only insects with no name of their own are labelled).
+     */
+    @Override
+    public CompoundTag saveWithoutId(CompoundTag tag) {
+        CompoundTag saved = super.saveWithoutId(tag);
+        if (!level().isClientSide && com.antcolonies.watch.Labels.isLabelled(getUUID())) {
+            saved.remove("CustomName");
+            saved.remove("CustomNameVisible");
+        }
+        return saved;
     }
 
     @Override

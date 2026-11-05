@@ -395,6 +395,18 @@ public class RaidDefence {
         return breaches.stream().anyMatch(breach -> breach.sealed && breach.shutOut.contains(soldier));
     }
 
+    /**
+     * The raid test bench (the seals-open rule): a seal standing now, how long since it was due (ticks), how long since a
+     * foe was near it, and how many soldiers it shut out.
+     */
+    public record SealAge(BlockPos plug, long sinceDue, long sinceFoe, int shutOut, boolean ours) {
+    }
+
+    public List<SealAge> sealAges(long now) {
+        return breaches.stream().filter(breach -> breach.sealed)
+                .map(breach -> new SealAge(breach.plug, now - breach.due, now - breach.lastFoe, breach.shutOut.size(), breach.ours)).toList();
+    }
+
     /** The seals standing now (tests and the list). */
     public List<BlockPos> seals() {
         return breaches.stream().filter(breach -> breach.sealed).map(breach -> breach.plug).toList();

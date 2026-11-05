@@ -69,7 +69,23 @@ public class ModEvents {
                     Perf.end();
                 }
             }
+            // The raid test bench (docs/plans/raid-test-bench.md): the rules checked after the brain, the labels.
+            com.antcolonies.watch.Watch.tick(level);
+            com.antcolonies.watch.Labels.tick(level);
         }
+    }
+
+    /** The raid test bench forgets everything when the server stops (a new world starts afresh). */
+    @SubscribeEvent
+    public static void onServerStopped(net.neoforged.neoforge.event.server.ServerStoppedEvent event) {
+        com.antcolonies.watch.Watch.clear();
+        com.antcolonies.watch.Labels.clear();
+    }
+
+    /** A player who leaves takes their labels with them. */
+    @SubscribeEvent
+    public static void onLoggedOut(net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerLoggedOutEvent event) {
+        com.antcolonies.watch.Labels.forget(event.getEntity().getUUID());
     }
 
     /** The stopwatch closes each server tick (see {@link Perf}). */

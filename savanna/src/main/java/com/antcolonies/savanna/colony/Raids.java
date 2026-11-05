@@ -548,6 +548,20 @@ public class Raids {
     }
 
     /** Whether this ant goes home along a trail by itself (step 3c's limpers and every ant let go out in the field). */
+    /** The raid test bench (the raid-lists rule): how many finds are remembered, and how many ants go home by themselves. */
+    public int findsCount() {
+        return finds.size();
+    }
+
+    public int goingHomeCount() {
+        return wayHome.size();
+    }
+
+    /** The raid test bench: the ants going home by themselves now. */
+    public Set<UUID> goingHomeIds() {
+        return Set.copyOf(wayHome.ids());
+    }
+
     public boolean isGoingHome(UUID ant) {
         return wayHome.isGoingHome(ant);
     }
@@ -683,6 +697,7 @@ public class Raids {
     }
 
     private void say(ServerLevel level, String what) {
+        com.antcolonies.watch.Watch.note(level, colony, "[raid] " + what);
         com.antcolonies.savanna.SavannaMod.LOGGER.info("[raid] nest {} at {} (tick {}): {}", colony.getCenter().toShortString(),
                 RaidGround.clock(colony, level), level.getGameTime(), what);
     }

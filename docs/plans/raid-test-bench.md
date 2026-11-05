@@ -118,6 +118,55 @@ ends with its test category today.
 
 One in-game look at the end of round 1 (the user plays a raid with the rules on and tries `/antcolonies report`).
 
+## Round 1, BUILT 2026-11-05 (branch `claude/m8-still-when-idle-07d154`)
+What was built, and how it differs from the steps above (my picks):
+- **The checker** is `framework/.../watch/Watch.java` (not `colony/watch/`): once a second, on each colony's own tick of
+  the second and only for colonies the brain ticked, every signed-up rule looks at the colony and its insects within 120
+  blocks. A rule broken: a `[rule] <name> broken at x, y, z (colony ...)` warning in the log, a line in the colony's
+  black box, a gold `[ant rules]` chat line (rules `on`), red labels over its insects for a minute, and, at most once in
+  10 minutes per rule and colony and 20 a game, a report. The same thing is told again only after 5 minutes. A rule that
+  throws is switched off for the game (logged), so a checker's bug never crashes the game. On the game test server the
+  rules watch only colonies a test asks for (`Watch.watchForTests`).
+- **Rules built (12):** general, in the framework (`watch/GeneralRules`): **not-stuck** (a route but still 30 s),
+  **not-in-a-block** (inside a solid block over 3 s), **not-walled-in** (still a minute, out of the nest, in a closed
+  pocket: a flood over every cell that is not a full block finds no sky, no nest and no unloaded land within 32 blocks),
+  **prey-ends** (paralysed a minute past its paralysis' own end), **save-size** (a colony's save over 2 MB, looked at
+  every 5 minutes). Raid rules, in the savanna mod (`colony/RaidRules`): **stage-limit** (a stage 30 s past its own
+  longest, the same table as the whole-chain test), **heartbeat** (a raid not worked out for 10 s while its colony is
+  ticked), **raider-stuck** (a raider still 30 s more than 3 blocks from where it was told to go; one going home still a
+  minute and not home), **home-by-night** (from 21:00 to 5:00 a Matabele out of the nest a minute, not fighting and not
+  walking home; only while the queen is in her nest), **soldiers-go-back** (a termite soldier out in the open by day, 14
+  or more blocks from its mound, no alarm, no Matabele within 16, for 3 minutes), **seals-open** (a raid seal still shut
+  a day and a quarter after the last foe near it), **raid-lists** (over 64 trails, 64 finds or 300 ants going home).
+- **Moved to round 3:** books-add-up (the books are spread over the population, the away life and the raids; worth its
+  own careful step) and speed (route searches and milliseconds, best measured in the soak).
+- **The black box** (`watch/BlackBox`): each watched colony keeps 3 minutes: its diary lines (`[raid]` lines from
+  `RaidColumn.say` and `Raids.say`), each insect's line every 3 seconds (kind, id, place, health, paralysed, route or
+  standing, seconds still, fight spot, goals, and the species' words: raid stage, leader, its place's distance, casting,
+  called to defend, scouting, going home and why; a termite soldier shut out by a seal), and the rules broken.
+- **The report** (`watch/Reports`, `/antcolonies report [words]`): `reports/<date>-<rule or player>/` in the game
+  folder (`run/reports/` for `runClient`) with `report.txt` (what broke or your words, when, the colonies within 112
+  blocks as in `/antcolonies list`, the rules broken lately, every insect within 24 blocks), `diary.txt` (the black boxes
+  merged in time order), `colonies.nbt`, `place.nbt` (96 x 48 x 96 with the insects, 48 x 32 x 48 if the land is not all
+  loaded, none if still not) and, for your own report in single player, `screenshots/screenshot.png`. The newest 50 kept.
+  The world is read at once; the files are written in the background.
+- **Labels:** `/antcolonies labels` (not `raid show labels`: every insect, not only raiders), each insect within 32
+  blocks of you shows its line (the species' words, else its goals; "no way" when its last route search failed; seconds
+  still), red while a rule it broke is fresh. They are name tags changed twice a second, never saved, and an insect with a
+  name tag of its own keeps it.
+- **Commands:** `/antcolonies report [words]`, `/antcolonies rules` (the list and the last rules broken),
+  `/antcolonies rules on|quiet|off`, `/antcolonies labels`.
+- **First catch, a false alarm, fixed the same day:** the first run broke not-stuck and raider-stuck in the whole-chain
+  test: raiders standing rightly at their place in the homing queue (waiting their turn down the chimney) and a major
+  resting in the nest were each given a new place and counted as stuck the next second, their standing time already
+  counted. Now not-stuck counts stillness only from when the insect got its route, raider-stuck only from when it was put
+  off its place. The black box showed it at a glance (the ant's lines: "standing, place 0 off" for 45 s, then a new
+  place 8 off), which is the bench doing its job.
+- **Tests:** the whole-chain raid test now runs with the rules watching and fails on any rule broken; a new test,
+  `theRulesCatchAHangingRaidAndSaveAReport`, ages a raid's stage past its longest, checks the stage-limit rule saves a
+  report with its diary and place, and checks the pocket finder on a hollow in stone (closed) and with a shaft (open);
+  `BlackBoxTest` in `./gradlew test`.
+
 ## My picks (code choices; the user may skip this list)
 - The general watchers (stuck, walled in, in a block, books, black box, the report command, the soak driver) in the
   framework, so army ants and leafcutters get them for nothing; the raid rules in the savanna mod, signed up like
