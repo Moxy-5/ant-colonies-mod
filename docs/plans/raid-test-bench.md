@@ -162,6 +162,12 @@ What was built, and how it differs from the steps above (my picks):
   counted. Now not-stuck counts stillness only from when the insect got its route, raider-stuck only from when it was put
   off its place. The black box showed it at a glance (the ant's lines: "standing, place 0 off" for 45 s, then a new
   place 8 off), which is the bench doing its job.
+- **The report's picture taken first (the user, 2026-11-05: "that screenshot was delayed so it didnt capture the issue"):**
+  typing the command took seconds, and the picture was taken after the place was copied. Now the **report key, F7**
+  (changeable under Controls, "Ant Colonies"), takes the picture the moment it is pressed and sends
+  `/antcolonies report` itself; a typed report takes its picture first thing (`client/ReportShot`).
+- **Its first real catches in the user's game (2026-11-05):** termites standing in their nests with a route (BUGS 112)
+  and a Matabele shut in with nothing it may bite holding still for ever (BUGS 113).
 - **Tests:** the whole-chain raid test now runs with the rules watching and fails on any rule broken; a new test,
   `theRulesCatchAHangingRaidAndSaveAReport`, ages a raid's stage past its longest, checks the stage-limit rule saves a
   report with its diary and place, and checks the pocket finder on a hollow in stone (closed) and with a shaft (open);

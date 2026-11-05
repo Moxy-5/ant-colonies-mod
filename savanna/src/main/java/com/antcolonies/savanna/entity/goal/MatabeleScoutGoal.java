@@ -244,7 +244,7 @@ public class MatabeleScoutGoal extends Goal {
         double scentReach = Math.max(numbers.smell(), search.scent());
         for (Colony termites : near) {
             for (FeedingSpots.ByDay place : FeedingSpots.byDayPlaces(level, termites)) {
-                if (place.food().closerThan(colony.getCenter(), far + scentReach + 8.0) && Raids.outOfMound(place.food(), mounds)) {
+                if (place.food().closerThan(colony.getCenter(), far + scentReach + 8.0) && Raids.awayFromMoundDoor(place.food(), mounds)) {
                     byDay.add(place);
                 }
             }
@@ -592,11 +592,20 @@ public class MatabeleScoutGoal extends Goal {
         return true;
     }
 
-    /** The termites feeding (out of their mound, not sheltered, not downed) in this box. */
+    /**
+     * The termites feeding (out of their mound and off its doorstep, not sheltered, not downed) in this box. Only while
+     * the sun is up at the nest (the user's report, 2026-11-05): termites out in the open after dark are the night's
+     * foragers, gone in behind their plugs by the next raid hour, so after sunset a scout goes by the places fed at by day
+     * only (my pick: the sun, not the raid hours, so a find between the raid hours by day still counts).
+     */
     private List<AbstractAntEntity> termitesNear(ServerLevel level, AABB box) {
+        Colony home = ant.getColony();
+        if (home == null || !Colony.isSunUp(level, home.timeOfDay(level))) {
+            return List.of();
+        }
         return level.getEntitiesOfClass(AbstractAntEntity.class, box,
                 insect -> SavannaSpecies.MACROTERMES.equals(insect.species()) && insect.isAlive() && !insect.isDowned()
-                        && !insect.isSheltered() && Raids.outOfMound(insect.blockPosition(), mounds));
+                        && !insect.isSheltered() && Raids.awayFromMoundDoor(insect.blockPosition(), mounds));
     }
 
     /** A by-day feeding place's dug cell (or its food) within {@code smell} of here, the nearest; null if none. */

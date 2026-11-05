@@ -1538,6 +1538,24 @@ public class Raids {
         return true;
     }
 
+    /**
+     * Whether termites here are far enough from their mound to be a raid's prey (the user's report, 2026-11-05): not on
+     * the mound's own ground, its foot plus {@link #MOUND_DOOR} blocks, where the nest's own holes open and its soldiers
+     * stand guard (real Megaponera raid the termites' feeding places, not the mound's doorstep: there the termites are
+     * in at the first alarm). A raid sent there by a night's foragers found the holes plugged and nobody out.
+     */
+    public static boolean awayFromMoundDoor(BlockPos at, List<MoundAt> mounds) {
+        for (MoundAt mound : mounds) {
+            if (mound.center.closerThan(at, mound.reach + MOUND_DOOR)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Blocks past a living mound's foot still its own ground for {@link #awayFromMoundDoor} (my pick). */
+    public static final double MOUND_DOOR = 4.0;
+
     /** R4: a block dug or put here: every Matabele colony within 128 blocks hears of it (its scent trails may break). */
     public static void blockChangedNear(ServerLevel level, BlockPos pos) {
         for (Colony other : com.antcolonies.colony.ColonyManager.get(level).getColonies()) {

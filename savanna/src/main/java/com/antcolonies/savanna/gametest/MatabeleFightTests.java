@@ -552,8 +552,10 @@ public class MatabeleFightTests {
     /**
      * BUGS 102 (the user's report of 2026-11-05: termite workers sealed Matabele in and they stood stuck for ever): three
      * ants each shut in a little closed tunnel under the ground. A major under a roof of soil and a minor behind soil
-     * walls with a two-block roof bite their way out; a third, a major in a cell walled all round with termite mound
-     * soil that is no fresh seal of any colony, bites nothing (never the mound) and stays.
+     * walls with a two-block roof bite their way out; a third, a major in a cell walled all round with dry termite
+     * mound soil (hard as stone), bites nothing and stays. The user's rule (2026-11-05): fresh termite soil they bite
+     * through, aged they cannot: a fourth, a major in a cell of dry soil sealed by one block of setting soil (a plug
+     * packed during a raid), bites the plug and gets out.
      */
     @GameTest(template = "arena", timeoutTicks = 2400, skyAccess = true)
     public static void aMatabeleShutInUnderTheGroundBitesItsWayOutButNeverThroughTheMound(GameTestHelper helper) {
@@ -578,32 +580,56 @@ public class MatabeleFightTests {
         for (int x = 9; x <= 13; x++) {
             for (int z = 2; z <= 6; z++) {
                 for (int y = 1; y <= 3; y++) {
-                    helper.setBlock(x, y, z, SavannaBlocks.TERMITE_MOUND.get().defaultBlockState()
-                            .setValue(com.antcolonies.savanna.block.TermiteMoundBlock.LAYERS, com.antcolonies.savanna.block.TermiteMoundBlock.FINISHED));
+                    helper.setBlock(x, y, z, hardSoil());
                 }
             }
         }
         for (int x = 10; x <= 12; x++) {
             helper.setBlock(x, 2, 4, Blocks.AIR);
         }
+        // The plugged cell: the same, dry soil all round, but its east end a plug of setting soil, the bank's dirt past it.
+        for (int x = 9; x <= 13; x++) {
+            for (int z = 8; z <= 12; z++) {
+                for (int y = 1; y <= 3; y++) {
+                    helper.setBlock(x, y, z, hardSoil());
+                }
+            }
+        }
+        for (int x = 10; x <= 12; x++) {
+            helper.setBlock(x, 2, 10, Blocks.AIR);
+        }
+        helper.setBlock(13, 2, 10, hardSoil().setValue(com.antcolonies.savanna.block.MoundSoil.AGE, 1));
         MatabeleEntity major = TestAnts.loneWithAMind(helper, SavannaEntities.MATABELE_MAJOR.get(), 4, 2, 3);
         MatabeleEntity minor = TestAnts.loneWithAMind(helper, SavannaEntities.MATABELE_MINOR.get(), 4, 1, 8);
         MatabeleEntity walledIn = TestAnts.loneWithAMind(helper, SavannaEntities.MATABELE_MAJOR.get(), 11, 2, 4);
+        MatabeleEntity plugged = TestAnts.loneWithAMind(helper, SavannaEntities.MATABELE_MAJOR.get(), 11, 2, 10);
         ServerLevel level = helper.getLevel();
         helper.assertTrue(com.antcolonies.fight.Fights.isShutIn(level, major.blockPosition())
                 && com.antcolonies.fight.Fights.isShutIn(level, minor.blockPosition()), "the tunnels are not shut in");
         int[] moundLeft = {0};
         // When each got out (game ticks from the start; -1 still shut in): once out a lone ant wanders where it likes.
         long start = level.getGameTime();
-        long[] outAt = {-1, -1};
+        long[] outAt = {-1, -1, -1};
+        int[] plugCellLeft = {0};
         helper.onEachTick(() -> {
-            List<MatabeleEntity> two = List.of(major, minor);
-            for (int i = 0; i < 2; i++) {
-                if (outAt[i] < 0 && two.get(i).isAlive() && !com.antcolonies.fight.Fights.isShutIn(level, two.get(i).blockPosition())) {
+            List<MatabeleEntity> three = List.of(major, minor, plugged);
+            for (int i = 0; i < 3; i++) {
+                if (outAt[i] < 0 && three.get(i).isAlive() && !com.antcolonies.fight.Fights.isShutIn(level, three.get(i).blockPosition())) {
                     outAt[i] = level.getGameTime() - start;
-                    com.antcolonies.savanna.SavannaMod.LOGGER.info("[bite out test] the {} got out after {} s", i == 0 ? "major" : "minor", outAt[i] / 20);
+                    com.antcolonies.savanna.SavannaMod.LOGGER.info("[bite out test] the {} got out after {} s", new String[] {"major", "minor", "plugged major"}[i], outAt[i] / 20);
                 }
             }
+            int plugLeft = 0;
+            for (int x = 9; x <= 13; x++) {
+                for (int z = 8; z <= 12; z++) {
+                    for (int y = 1; y <= 3; y++) {
+                        if (helper.getBlockState(new BlockPos(x, y, z)).is(SavannaBlocks.TERMITE_MOUND.get())) {
+                            plugLeft++;
+                        }
+                    }
+                }
+            }
+            plugCellLeft[0] = plugLeft;
             int left = 0;
             for (int x = 9; x <= 13; x++) {
                 for (int z = 2; z <= 6; z++) {
@@ -623,10 +649,21 @@ public class MatabeleFightTests {
                     "the ant walled in by the mound got out (it may never bite the mound)");
             helper.assertTrue(outAt[0] >= 0, "the major is still shut in at " + helper.relativePos(major.blockPosition()).toShortString());
             helper.assertTrue(outAt[1] >= 0, "the minor is still shut in at " + helper.relativePos(minor.blockPosition()).toShortString());
+            helper.assertTrue(outAt[2] >= 0, "the major behind a plug of setting termite soil is still shut in at "
+                    + helper.relativePos(plugged.blockPosition()).toShortString() + " (it may bite fresh or setting soil)");
+            helper.assertTrue(plugCellLeft[0] == moundAll - 1, "the plugged cell lost " + (moundAll - plugCellLeft[0])
+                    + " blocks (only its plug may go: the dry soil round it is too hard)");
             // (it digs one straight way out, not a cave round itself: 2 blocks, about 12 s for a minor)
             helper.assertTrue(outAt[0] <= 800 && outAt[1] <= 800, "too slow out: the major after " + outAt[0] / 20 + " s, the minor after " + outAt[1] / 20 + " s");
             helper.succeed();
         });
+    }
+
+    /** Termite mound soil dried hard (age 2, a pickaxe for a player): too hard for a Matabele's jaws. */
+    private static net.minecraft.world.level.block.state.BlockState hardSoil() {
+        return SavannaBlocks.TERMITE_MOUND.get().defaultBlockState()
+                .setValue(com.antcolonies.savanna.block.TermiteMoundBlock.LAYERS, com.antcolonies.savanna.block.TermiteMoundBlock.FINISHED)
+                .setValue(com.antcolonies.savanna.block.MoundSoil.AGE, 2);
     }
 
     private static void floor(GameTestHelper helper) {

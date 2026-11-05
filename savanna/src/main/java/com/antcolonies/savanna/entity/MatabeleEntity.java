@@ -46,6 +46,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import com.antcolonies.savanna.block.MoundSoil;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.resources.ResourceLocation;
@@ -503,7 +504,7 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
      */
     public static boolean mayBiteOut(ServerLevel level, BlockPos pos) {
         BlockState state = level.getBlockState(pos);
-        if (state.is(SavannaTags.MATABELE_BREAKS_OPEN)) {
+        if (mayBite(level, pos, state)) {
             return true;
         }
         for (Colony colony : ColonyManager.get(level).getColonies()) {
@@ -642,7 +643,8 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         BlockPos best = null;
         double bestScore = Double.MAX_VALUE;
         for (BlockPos cell : scentCells(level, spot, reach, termites)) {
-            if (!Fights.isShutIn(level, cell) && !isMud(level.getBlockState(cell))) {
+            BlockState inCell = level.getBlockState(cell);
+            if (!Fights.isShutIn(level, cell) && !isMud(inCell) && !isSoftTermiteSoil(inCell)) {
                 continue; // open already: the minors go in
             }
             for (BlockPos cover : coversOf(level, cell)) {
@@ -665,8 +667,9 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
      */
     private static List<BlockPos> coversOf(ServerLevel level, BlockPos cell) {
         List<BlockPos> covers = new ArrayList<>();
-        if (isMud(level.getBlockState(cell))) {
-            covers.add(cell.immutable());
+        BlockState inCell = level.getBlockState(cell);
+        if (isMud(inCell) || isSoftTermiteSoil(inCell) && mayBite(level, cell, inCell)) {
+            covers.add(cell.immutable()); // the termites' own mud, or a soft plug packed into the gallery
         }
         BlockPos above = cell.above();
         if (isCover(level, above)) {
@@ -681,10 +684,40 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         return covers;
     }
 
-    /** Whether a major may bite this block open from above it: soil or termite mud, with open air over it. */
+    /**
+     * Whether a Matabele may bite this block open (the user's rule, 2026-11-05): soil and the termites' thin mud (crust and
+     * casts) always, and the termites' building soil while it is still soft: fresh or setting ({@link MoundSoil#AGE} 0 or
+     * 1, what a player digs with a shovel), as a plug packed into a hole or a gallery during the raid is. Real
+     * Macrotermes build with soil mixed with saliva that sets hard as it dries; dry and old soil (a pickaxe for a player)
+     * is too hard for the jaws. Never the mound's own standing pieces, however fresh (raiders do not attack the mound).
+     */
+    public static boolean mayBite(ServerLevel level, BlockPos pos, BlockState state) {
+        if (state.is(SavannaTags.MATABELE_BREAKS_OPEN)) {
+            return true;
+        }
+        return isSoftTermiteSoil(state) && !isMoundPiece(level, pos);
+    }
+
+    /** Termite building soil still soft: fresh or setting (a finished block, or one still being built up in layers). */
+    public static boolean isSoftTermiteSoil(BlockState state) {
+        return state.hasProperty(MoundSoil.AGE) && !MoundSoil.isStoneHard(state.getValue(MoundSoil.AGE));
+    }
+
+    /** Whether this is a standing piece of a living termite colony's mound. */
+    private static boolean isMoundPiece(ServerLevel level, BlockPos pos) {
+        for (Colony colony : ColonyManager.get(level).getColonies()) {
+            if (SavannaSpecies.MACROTERMES.equals(colony.getSpecies()) && colony.getCenter().distSqr(pos) <= 48 * 48
+                    && colony.part(com.antcolonies.savanna.colony.SavannaParts.MOUND).map(part -> part.getParts(level).containsKey(pos)).orElse(false)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Whether a major may bite this block open from above it: soil, termite mud or soft termite soil, with open air over it. */
     private static boolean isCover(ServerLevel level, BlockPos pos) {
         BlockState state = level.getBlockState(pos);
-        if (!state.is(SavannaTags.MATABELE_BREAKS_OPEN)) {
+        if (!mayBite(level, pos, state)) {
             return false;
         }
         BlockPos up = pos.above();
@@ -741,12 +774,13 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
     private static BlockPos coverOver(ServerLevel level, BlockPos cell) {
         BlockPos above = cell.above();
         BlockState roof = level.getBlockState(above);
-        if (roof.is(SavannaTags.MATABELE_BREAKS_OPEN) && (isMud(roof) || level.canSeeSky(above.above()))) {
+        if (mayBite(level, above, roof) && (isMud(roof) || isSoftTermiteSoil(roof) || level.canSeeSky(above.above()))) {
             return above;
         }
         for (Direction side : Direction.Plane.HORIZONTAL) {
             BlockPos beside = cell.relative(side);
-            if (isMud(level.getBlockState(beside))) {
+            BlockState wall = level.getBlockState(beside);
+            if (isMud(wall) || isSoftTermiteSoil(wall) && mayBite(level, beside, wall)) {
                 return beside;
             }
         }

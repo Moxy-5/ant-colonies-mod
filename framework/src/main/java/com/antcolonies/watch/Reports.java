@@ -88,6 +88,12 @@ public final class Reports {
         }
         String folderName = dir.getFileName().toString();
         long now = level.getGameTime();
+        // The picture first, before the place is copied (that takes a moment, and the scene moves on): the user's report.
+        Runnable shot = null;
+        if (player != null && FMLEnvironment.dist.isClient() && level.getServer().isSingleplayer()) {
+            shot = com.antcolonies.client.ReportShot.take(dir);
+        }
+        Runnable finalShot = shot;
 
         List<Colony> near = new ArrayList<>();
         for (Colony colony : ColonyManager.get(level).getColonies()) {
@@ -194,14 +200,14 @@ public final class Reports {
                 if (place != null) {
                     NbtIo.writeCompressed(place, finalDir.resolve("place.nbt"));
                 }
+                if (finalShot != null) {
+                    finalShot.run();
+                }
                 prune(root);
             } catch (IOException e) {
                 LOG.error("[rule] could not write the report {}", finalDir, e);
             }
         });
-        if (player != null && FMLEnvironment.dist.isClient() && level.getServer().isSingleplayer()) {
-            com.antcolonies.client.ReportShot.take(dir);
-        }
         LOG.info("[rule] report saved: reports/{} ({})", folderName, why);
         return "reports/" + folderName;
     }
