@@ -579,7 +579,10 @@ public class Population {
         if (mob == null) {
             return null;
         }
-        mob.moveTo(cell.getX() + 0.5, cell.getY(), cell.getZ() + 0.5, colony.random().nextFloat() * 360.0F, 0.0F);
+        // On top of a low floor in the cell (fungus comb, a heap), never inside it (BUGS 112: stuck in the comb).
+        double floorTop = NestWalls.lowFloorTop(level, cell);
+        double standY = Double.isNaN(floorTop) ? cell.getY() : floorTop;
+        mob.moveTo(cell.getX() + 0.5, standY, cell.getZ() + 0.5, colony.random().nextFloat() * 360.0F, 0.0F);
         // Somewhere in the minute it grew up, so the ones of the same minute are not all exactly the same age.
         mob.comeOutOfNest(colony, minute + colony.random().nextInt((int) AGE_STEP));
         if (meals.dietOf(caste) != null) {

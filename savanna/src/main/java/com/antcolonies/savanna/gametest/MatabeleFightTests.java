@@ -606,6 +606,15 @@ public class MatabeleFightTests {
         ServerLevel level = helper.getLevel();
         helper.assertTrue(com.antcolonies.fight.Fights.isShutIn(level, major.blockPosition())
                 && com.antcolonies.fight.Fights.isShutIn(level, minor.blockPosition()), "the tunnels are not shut in");
+        // docs/BUGS.md 113: open grass under a tree's crown is not shut in (our leaves are solid blocks, so the game's
+        // height map counted the crown as a roof, and a scout under a camel thorn stood still for ever looking for a bite).
+        for (int x = 16; x <= 22; x++) {
+            for (int z = 2; z <= 8; z++) {
+                helper.setBlock(x, 8, z, com.antcolonies.savanna.registry.TreeBlocks.CAMEL_THORN.leaves().get());
+            }
+        }
+        helper.assertTrue(!com.antcolonies.fight.Fights.isShutIn(level, helper.absolutePos(new BlockPos(19, 1, 5))),
+                "open ground under a tree's crown counts as shut in");
         int[] moundLeft = {0};
         // When each got out (game ticks from the start; -1 still shut in): once out a lone ant wanders where it likes.
         long start = level.getGameTime();

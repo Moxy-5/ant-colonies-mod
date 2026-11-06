@@ -253,6 +253,16 @@ public class TermitePopulationTests {
                         helper.assertTrue(com.antcolonies.savanna.block.FungusCombBlock.fresh(now2) == com.antcolonies.savanna.block.FungusCombBlock.fresh(was) + 1
                                 && com.antcolonies.savanna.block.FungusCombBlock.old(now2) == com.antcolonies.savanna.block.FungusCombBlock.old(was),
                                 "new forage should go on top as a fresh layer: " + was + " -> " + now2);
+                        // docs/BUGS.md 112: an insect put at the bottom of a comb's cell (as the numbers once came out) stood
+                        // inside the comb for ever. The numbers now come out on its top, and one found sunk is lifted.
+                        double combTop = aged.getY() + com.antcolonies.savanna.block.FungusCombBlock.topOf(now2);
+                        helper.assertTrue(Math.abs(com.antcolonies.colony.NestWalls.lowFloorTop(level, aged) - combTop) < 1.0E-6,
+                                "the comb's top as the numbers see it is " + com.antcolonies.colony.NestWalls.lowFloorTop(level, aged)
+                                        + ", not " + combTop);
+                        standing.setPos(aged.getX() + 0.5, aged.getY(), aged.getZ() + 0.5);
+                        standing.liftIfSunk();
+                        helper.assertTrue(standing.getY() >= combTop - 1.0E-6, "a worker sunk in the comb was not lifted onto it: "
+                                + standing.getY() + ", its top at " + combTop);
                     }
                     // A comb of 4 fresh layers, ageing fast.
                     ageing[0] = colony.part(SavannaParts.FUNGUS_GARDEN).orElseThrow().getCombs(level).stream().filter(pos -> !colony.brood().getBroodCells(level).contains(pos))

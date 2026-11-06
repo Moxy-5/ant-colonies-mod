@@ -52,10 +52,13 @@ public class MatabeleBiteOutGoal extends Goal {
     @Nullable
     private BlockPos standAt;
     private final Map<BlockPos, Long> noWay = new HashMap<>();
-    /** Nothing it may bite found: it looks again at this game time (a trap of hard mound soil, say). */
-    private long nextPick;
-    /** How long it waits before looking again when it found nothing to bite (ticks). */
-    private static final int NOTHING_TO_BITE_WAIT = 100;
+    /**
+     * BUGS 113: nothing it may bite found (a trap of hard soil, wood or stone, or a place only looking shut in): it lets
+     * go until this game time, so its walk home or a climb can try, instead of standing there for ever.
+     */
+    private long letGoUntil;
+    /** How long it lets go when it found nothing to bite (ticks; my pick, 30 s). */
+    private static final int NOTHING_TO_BITE_WAIT = 600;
 
     public MatabeleBiteOutGoal(MatabeleEntity ant) {
         this.ant = ant;
@@ -67,7 +70,7 @@ public class MatabeleBiteOutGoal extends Goal {
         if ((ant.tickCount + ant.getId()) % LOOK_EVERY != 0) {
             return false;
         }
-        if (!(ant.level() instanceof ServerLevel level) || !trapped(level)) {
+        if (!(ant.level() instanceof ServerLevel level) || level.getGameTime() < letGoUntil || !trapped(level)) {
             looksShut = 0;
             return false;
         }
@@ -76,7 +79,7 @@ public class MatabeleBiteOutGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        if (!(ant.level() instanceof ServerLevel level) || ant.isDowned() || foeNear()) {
+        if (!(ant.level() instanceof ServerLevel level) || ant.isDowned() || foeNear() || level.getGameTime() < letGoUntil) {
             return false;
         }
         if ((ant.tickCount + ant.getId()) % LOOK_EVERY == 0 && !trapped(level)) {
@@ -117,10 +120,10 @@ public class MatabeleBiteOutGoal extends Goal {
             block = null; // bitten open (or no longer ours to bite)
             standAt = null;
         }
-        if (block == null && (now < nextPick || !pick(level))) {
-            if (block == null && now >= nextPick) {
-                nextPick = now + NOTHING_TO_BITE_WAIT;
-            }
+        if (block == null && !pick(level)) {
+            letGoUntil = now + NOTHING_TO_BITE_WAIT; // (BUGS 113: no wait without a limit)
+            com.antcolonies.savanna.SavannaMod.LOGGER.debug("[raid] Matabele {} at {} finds nothing it may bite: it lets go for {} s",
+                    ant.getUUID().toString().substring(0, 8), ant.blockPosition().toShortString(), NOTHING_TO_BITE_WAIT / 20);
             return;
         }
         if (ant.inBiteReach(block) && ant.standsToFight()) {

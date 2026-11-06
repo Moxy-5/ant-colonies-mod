@@ -1860,6 +1860,25 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     }
 
     // Runs every tick, just before the move control: keeps the ant walking its planned route.
+    /**
+     * The safety net for BUGS 112: an insect found standing inside a low floor block (fungus comb grown round it, a heap,
+     * or put there by older code) is lifted onto it, as it cannot walk out of it. Once a second (public for the tests).
+     */
+    public void liftIfSunk() {
+        if (isPassenger() || navigator.isAttached() || isDeadOrDying()) {
+            return;
+        }
+        BlockPos feet = blockPosition();
+        double top = com.antcolonies.colony.NestWalls.lowFloorTop(level(), feet);
+        if (Double.isNaN(top)) {
+            return;
+        }
+        double sunk = top - getY();
+        if (sunk > 0.01 && sunk < 0.6) {
+            com.antcolonies.colony.NestWalls.liftOnto(level(), this, feet, top);
+        }
+    }
+
     @Override
     protected void customServerAiStep() {
         super.customServerAiStep();
@@ -1880,6 +1899,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
                     || wrapped.getGoal() instanceof AllogroomGoal));
             idleSeconds = busy ? 0 : idleSeconds + 1;
             updateYouth();
+            liftIfSunk();
             if (level() instanceof ServerLevel serverLevel) {
                 checkHeat(serverLevel);
                 lookForHostiles(serverLevel);

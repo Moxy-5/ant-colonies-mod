@@ -20,6 +20,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -182,11 +183,26 @@ public final class Fights {
     private static final int SHUT_IN_SEARCH = 40;
 
     /**
-     * Whether this cell is out in the open (M8 step 2g): nothing solid over it (the ground's top, leaves aside, is at or
-     * below it). A termite under a log, under its mud or in a gallery under the ground is not.
+     * Whether this cell is out in the open (M8 step 2g): nothing solid over it (the ground's top, leaves of any tree aside,
+     * is at or below it). A termite under a log, under its mud or in a gallery under the ground is not.
      */
     public static boolean isInTheOpen(Level level, BlockPos cell) {
-        return cell.getY() >= level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, cell.getX(), cell.getZ());
+        int top = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, cell.getX(), cell.getZ());
+        if (cell.getY() >= top) {
+            return true;
+        }
+        // BUGS 113: Minecraft's map leaves out only its own leaf blocks; leaves of other kinds (the giant savanna trees')
+        // count as a roof there, so under a crown 40 blocks wide every cell looked covered and a Matabele on open grass
+        // counted itself shut in. Anything in the leaves tag, or that nothing bumps into, is no roof.
+        BlockPos.MutableBlockPos at = new BlockPos.MutableBlockPos(cell.getX(), top - 1, cell.getZ());
+        for (int y = top - 1; y > cell.getY(); y--) {
+            at.setY(y);
+            BlockState state = level.getBlockState(at);
+            if ((state.blocksMotion() || !state.getFluidState().isEmpty()) && !state.is(BlockTags.LEAVES)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**

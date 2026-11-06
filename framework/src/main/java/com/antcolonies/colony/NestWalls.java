@@ -639,6 +639,28 @@ public class NestWalls {
     }
 
     /**
+     * The top of a low floor block filling the bottom of this cell edge to edge (fungus comb, a store's heap, a slab):
+     * its collision shape one box, full width, from the floor up to under a block. NaN for anything else (air, full
+     * blocks, ramps, stairs, posts). BUGS 112: an insect put at the bottom of such a cell stands inside it, stuck.
+     */
+    public static double lowFloorTop(Level level, BlockPos cell) {
+        net.minecraft.world.phys.shapes.VoxelShape shape = level.getBlockState(cell).getCollisionShape(level, cell);
+        if (shape.isEmpty()) {
+            return Double.NaN;
+        }
+        List<AABB> boxes = shape.toAabbs();
+        if (boxes.size() != 1) {
+            return Double.NaN;
+        }
+        AABB box = boxes.get(0);
+        if (box.minY > 1.0E-4 || box.maxY >= 1.0 - 1.0E-4 || box.minX > 1.0E-4 || box.minZ > 1.0E-4
+                || box.maxX < 1.0 - 1.0E-4 || box.maxZ < 1.0 - 1.0E-4) {
+            return Double.NaN;
+        }
+        return cell.getY() + box.maxY;
+    }
+
+    /**
      * Puts an insect in a cell that was just filled up on top of the new soil, or beside it if there is no room on top
      * (a store's heap or the termites' mound blocks growing round it).
      */
