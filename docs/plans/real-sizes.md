@@ -19,6 +19,30 @@ One scale: **a Matabele major (15 mm) is 0.5 blocks long, so 1 block = 30 mm of 
 
 Real lengths are my picks from the literature, without antennae. The harvester ant (desert mod) is left as it is until its rework.
 
+## Everything it touches (code audit, 2026-11-05)
+
+The user's ask: be sure we thought of everything this changes in raiding, gathering, raid numbers and tunnels. Read through the code; what already follows the body and what does not.
+
+**Already follows the body (no work):** clamping (where a soldier holds on, the head's size), grooming and clamp-care reach, feeding at the queen's and larvae's mouths (partly), the edge-over and climbing body (from the box), the walls the navigator keeps from (half the box), the tunnel channels (who fits is a tag, not a size), the ground distances (scout reach 96, defence 16, nest radius 3, mound spacing, trails): those are the ground scale and stay.
+
+**New finds, not in the steps before:**
+1. **Insects vanish closer (biggest).** Minecraft stops drawing a mob past 64 times its box's size; today a termite worker disappears at about 17 blocks and a major at about 23. At real sizes a termite worker would vanish at about 7 blocks and a major at about 14, so a raid column would blink out half way down. Fix: our insects draw out to a set distance (my pick 48 blocks, about where a column's squeak is heard), and past about 24 blocks they skip their leg animation (a speck, nobody sees the legs; a free speed gain).
+2. **Fight reach is a fixed 0.35 blocks past the body** (`AbstractAntEntity.reachesInFight`): a 0.15 termite worker would bite from two body lengths off, at air. Becomes a share of the body (my pick: a third of its length, the jaws' reach).
+3. **Fixed block reaches that were "a body length or so":** picking up a stung termite 1.6 blocks off (`RaidColumn.PICK_REACH`), biting a block open from 1.8 (`MatabeleEntity.BITE_REACH`), carrying a corpse, an egg, prey, remains (0.7 to 0.9), the queen's court ring (0.45), mouth to mouth (0.45), the retreat (0.3), arriving at a place (0.3). Each read: the ones about touching become body-based; the ones about reaching a block's middle stay (a body beside a block is still half a block from its middle).
+4. **The raid column's spacing is 1.2 blocks** (`raids.column.spacing`): at 0.5-block majors that is 2.4 body lengths, a thin dotted line. Real Megaponera columns run nose to tail, single file to 2 or 3 abreast. My pick: 0.6 blocks (a bit over a body length), so a 50-ant column is about 30 blocks long, not 60. With it: the gap look and stop at a broken trail (4 and 1.5 blocks), the bunching 4 blocks short of the spot, and the spread round an empty spot (8 blocks) checked against the shorter column.
+5. **Every insect walks the exact middle of each block.** The legs plan routes block by block through block middles, so ants following one route stand on one line, one on top of the next: half of why they stack today. Real columns are 1 to 3 abreast and termites pass each other in tunnels. Step 3 (personal space) gives each insect its own lane inside the block (a small sideways offset), and lets two pass in a 1-block tunnel; in a channel (the 0.375-block tube in tunnel blocks) they stay single file.
+6. **Places round a breach and waiting spots are whole blocks** (termite soldiers' places round an opening, raiders' waits at the entrance): one insect a block, so at real sizes a breach holds 8 soldiers with gaps between them. Real soldiers pack the opening shoulder to shoulder. Places become spots inside blocks (several soldiers to a block), up to the wave cap of 12.
+7. **The carried termite is drawn at a fixed size** (`CARRIED_TERMITE_SIZE`), shrunk by the carrier's scale; it must follow the new termite size, so a major's 4 to 10 termites make a real-looking bundle under its jaws (a worker is 0.3 of a major's length, as in life).
+8. **Times that hang on walking speed** (only if speeds change): the march time limit, `bring_ticks` 2400, `limp_ticks` 6000, `collect_ticks` 1200, the stray net's 3 minutes, scout trips in the raid hours. My pick now: keep the block speeds (2.5 a second for the Matabele) so none of these move; the legs simply step faster on a smaller body, which is how real small ants look (fast little steps). The stride is checked in the anim lab so no foot slides.
+
+**Raid numbers:** the real-mob caps stay (50 a colony, 50 raiders): drawing cost is per mob, not per size. At real sizes 50 ants take a quarter of the ground, so a raid looks smaller; that is what step 4 of M8 (drawn-only ants, 200 to 500 a column) is for, and smaller ants make those cheap stand-ins much harder to tell from real ones (good news for it). The numbers in the brain (prey per ant, catch per raider, hunger) are not about size and stay.
+
+**Gathering:** termite reaches to grass, wood and hay are reaches to a block's middle (0.9) and stay. Carried grass and loads are drawn with the insect's scale and shrink with it. The foraging holes and the prey pile are whole blocks; at real sizes a 1-block hole is about 6 termites wide (a real one is a few millimetres) and a full prey-pile block would be a couple of thousand termites. Known departure, kept: blocks are the ground scale (my pick; a small-hole block like the tunnel channel could come later if the holes look wrong in-game).
+
+**Tunnels:** termite tunnel and spire channels are 0.375 blocks across (11 mm at the new scale, close to real Macrotermes galleries), and who may crawl them is a tag, so they keep working. Matabele majors at 0.5 long would fit in open 1-block galleries, but who goes in is decided by caste (minors in, majors bite open from above, as real raids do), never by size, so nothing changes. The dead mound's chimney and rooms easily hold a colony.
+
+**Not changed, noted:** the player hitting a termite worker (a small box is hard to hit: accepted), insects in water (tiny boxes float the same), stepping on insects (not in the plan).
+
 ## Steps
 
 ### 1. One size rule (the drawing, the box, the climbing)
@@ -26,15 +50,18 @@ Real lengths are my picks from the literature, without antennae. The harvester a
 - Body plans re-measured (`python tools/body_plan.py measure`), so climbing, the waist bend and the edge tipping fit the new bodies.
 - Everything carried or left behind follows: carried termites and their stacks, corpses, lost legs, clamped soldier heads, eggs, larvae, nymphs, the prey pile's look stays a block.
 - The termite queen: she swells with age today; her full size checked against the real one (a mature queen is roughly 4 to 7 times the king's length) and kept below what fits her royal chamber. My pick: her swelling keeps its shape, scaled with the rest.
+- Drawn out to a set distance, not Minecraft's box-size rule (audit 1), legs still past about 24 blocks.
 - Checks: anim lab, body plans, guard films (every picture changes size: looked at, then approved), `legs`.
 
 ### 2. Reach and speed
 - Every distance measured from an insect's body in blocks (bite, sting and grab reach, "at its place", the march's gap, waiting spots round a breach, carrying) read through: the ones that meant "a body length" become body lengths, the ones about the ground stay blocks.
-- Walking speed: the legs must not race. Speeds set in body lengths a second from real ants where known (termites about 3, the walks plan), and checked against the game's distances so a raid's trip stays about as long as today (a balance check: scout reach 96, mounds 40 to 80 apart, raid hours). My pick: block speeds lowered a little, the walk clips' stride follows the body.
+- Fight reach a share of the body (audit 2); the fixed reaches read one by one (audit 3); the column's spacing 0.6 and the distances round it (audit 4); the carried termite's size (audit 7).
+- Walking speed: the legs must not race. Speeds set in body lengths a second from real ants where known (termites about 3, the walks plan), and checked against the game's distances so a raid's trip stays about as long as today (a balance check: scout reach 96, mounds 40 to 80 apart, raid hours). My pick (after the audit): block speeds kept, so no raid time limit moves (audit 8); the walk clips step faster on the smaller body, checked in the anim lab so no foot slides.
 - Checks: `raids`, `soldiers`, `termitefood`, `colony`, `away`.
 
 ### 3. Personal space (no more stacking)
 - Not Minecraft's pushing (costly with many mobs, fights the climbing bodies, would jam the 1-block tunnels). Instead, in the legs layer: an insect walking or standing next to another (bodies overlapping) steps aside or waits; standing insects choose free spots; a march keeps a body length or so between ants, as real columns do.
+- Each insect its own lane inside a block (audit 5) and places round a breach and waiting spots inside blocks, several to a block (audit 6).
 - Real details kept: ants pile up and climb over each other at a crowded breach, and termites squeeze past each other in tunnels, so a little overlap is allowed there (my pick); never one body standing inside another for long.
 - Cheap: neighbours looked up in a small grid per area, not every insect against every other. Measured with `/antcolonies perf` before and after.
 - Checks: a new game test (20 raiders milling at an entrance: no two overlapping for more than a second), the raid tests, guard film of a column.
@@ -52,4 +79,7 @@ Real lengths are my picks from the literature, without antennae. The harvester a
 - One scale in the species file, everything derived from it.
 - The queen's swelling scaled with the rest; checked against her chamber.
 - Personal space in the legs, not Minecraft's pushing; a little overlap allowed at a breach and in tunnels.
-- Block speeds lowered a little so legs do not race; raid trip times kept about the same.
+- Block speeds kept; the legs step faster on the smaller body (real small ants do).
+- Insects drawn out to 48 blocks, no legs moving past about 24.
+- Column spacing 0.6 blocks; fight reach a third of the body's length.
+- Foraging holes and the prey pile stay whole blocks.
