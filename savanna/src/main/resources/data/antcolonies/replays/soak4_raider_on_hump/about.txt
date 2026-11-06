@@ -1,0 +1,63 @@
+Report 2026-11-06_05-05-07-raider-stuck
+raider-stuck broken: 1 raider(s) stuck: 1848683c told to 942, 65, -13 (8 off), still 30 s
+Where: 936, 70, -13 in minecraft:overworld
+When: game tick 28054, day 2, 10:03
+Rules on: ON
+
+Colonies within 112 blocks (nearest first):
+- fd714cc2 | antcolonies:megaponera_analis | center 933, 72, -13 | nest in a dead termite mound, rooms open 6 of 6 | queen d1ac7e95 | members 471 | real 50 (wants 50), in the nest 421 (workers young 66, middle 177, old 178; hungry 420) | while away (1.3 hours): 1 eggs laid, 6 pieces fed to the queen | ages 8 young, 18 middle, 24 old, jobs 8 nurses, 18 builders, 24 foragers | food 0 pieces in the store | queen fed 6/6, rich 0/5 (egg in 0:00) | queen unfed 0 of 100 min | eggs 0 | larvae 0, raids: 4 scout(s) out, its scouts reach out to 96 blocks, 1 good spot(s) (989, 69, -7, 56 out, worth 18, line of 30); 1 raider(s) going home by themselves; 1 scent trail(s); a raid of 72 (46 real out, 25 as numbers) marching to 989, 69, -7, 39 s in this stage | dead ants 0 (refuse chamber 0) | staying in (out at: )
+- 5ccd9e33 | antcolonies:macrotermes | center 995, 70, 11 | queen 25b94601 | members 337 | real 50 (wants 50), in the nest 286 (workers young 54, middle 104, old 111; soldiers 10 minor, 7 major; hungry 9) | while away (1.3 hours): 2 eggs hatched, 1 pieces fed to the young, 10 blocks dug, 22 mound blocks built | foragers out as numbers 0 (remembers 1310 plants) | ages 9 young, 12 middle, 2 old, jobs 9 nurses, 7 builders, 7 foragers | gardens 6 dug (planned 6), comb 215 layers on 54 blocks, nodules 0, mushrooms after rain: 8 | queen holds 2/6 nodules, not laying | queen unfed 0 of 100 min | eggs 0 | larvae 10 | soldiers 22 minor (wants 23), 7 major (wants 8), nymphs growing into soldiers 2, posts held 14, minors in | calm | knows 1324 food plants | remembered trails: from 987, 70, 11 to 997, 86, 2 (strength 54) from 1003, 70, 11 to 997, 86, 2 (strength 54) from 1005, 70, 9 to 996, 87, 1 (strength 54) from 1003, 70, 20 to 996, 86, 1 (strength 54) from 997, 70, 25 to 996, 86, 1 (strength 49) from 996, 71, 2 to 989, 69, -8 (strength 47) from 993, 71, -5 to 988, 69, -5 (strength 14) from 974, 70, 8 to 974, 90, 7 (strength 1) | dead ants 0 (refuse chamber 0) | mound stage 20 (earned 20) of 32, 433/441 blocks finished, earned 460.7 blocks | staying in (out at: night, rain), holes open 2 of 25 | new holes 8 (0 spent, 0 being dug), reach 27 | runways 2 (2 finished) | galleries: 12 pieces (8 out to food), 11 tips, 112 of 76 blocks, reach 21, 25 holes, 18 in turn (last time) | hidden trips: 14 underway (104 made, 90 out at the far end, 0 broken into, 0 folded in), 2 eaten tufts growing back (2 on bare ground by the holes)
+
+Rules broken lately by these colonies:
+- tick 27874 (9 s ago) not-stuck at 936, 70, -14: 1 insect(s) with a route but not moving for 30 s or more: matabele_major 31071349 at 936, 70, -14
+
+Insects within 24 blocks (nearest first):
+- matabele_major fc0bad65 at 936, 70, -13 (936.1, 70.5, -12.5) hp 10.0/10 walking to 935, 72, -13, still 38 s, goals [MatabeleRaidGoal] | marching, place 2 off [colony fd714cc2]
+- matabele_major 1848683c at 936, 70, -13 (936.1, 70.5, -12.9) hp 10.0/10 walking to 942, 65, -13, still 30 s, goals [MatabeleRaidGoal] | marching, place 8 off [colony fd714cc2]
+- matabele_major 31071349 at 936, 70, -14 (936.1, 70.5, -13.3) hp 10.0/10 walking to 935, 72, -13, still 39 s, goals [MatabeleRaidGoal] | marching, place 2 off [colony fd714cc2]
+- matabele_major 6970640a at 935, 71, -12 (935.8, 71.0, -11.9) hp 10.0/10 standing, still 30 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_minor 137f0297 at 935, 71, -14 (935.5, 71.0, -13.1) hp 5.0/5 standing, still 30 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major 7e482afc at 935, 71, -12 (935.5, 71.0, -11.5) hp 10.0/10 standing, still 43 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major 71bfd6d8 at 935, 71, -14 (935.6, 71.0, -13.5) hp 10.0/10 standing, still 40 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major ca112179 at 935, 71, -12 (935.2, 71.0, -11.8) hp 10.0/10 standing, still 39 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major 8e8a260d at 935, 71, -14 (935.1, 71.0, -13.2) hp 10.0/10 standing, still 34 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major e7b5f359 at 935, 72, -13 (935.7, 72.0, -12.5) hp 10.0/10 standing, still 38 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_minor d83fc791 at 935, 71, -14 (935.2, 71.0, -13.6) hp 5.0/5 standing, still 39 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major 19d7de99 at 934, 71, -13 (934.8, 71.0, -12.7) hp 10.0/10 standing, still 35 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major e1a11b4a at 935, 72, -13 (935.5, 72.0, -12.3) hp 10.0/10 standing, still 39 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major 7704db17 at 935, 72, -13 (935.4, 72.0, -12.8) hp 10.0/10 standing, still 37 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major 5c4d8354 at 935, 72, -13 (935.1, 72.0, -12.3) hp 10.0/10 standing, still 36 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major 2019b8da at 934, 71, -13 (934.4, 71.0, -12.5) hp 10.0/10 standing, still 33 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major 89a67c8c at 934, 72, -13 (934.9, 72.0, -12.8) hp 10.0/10 standing, still 33 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major 2fb3e0ed at 935, 72, -14 (935.0, 72.0, -13.2) hp 10.0/10 standing, still 31 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major eafb4d25 at 934, 71, -13 (934.3, 71.0, -12.8) hp 10.0/10 standing, still 34 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_minor 9054888e at 934, 72, -12 (934.5, 72.0, -11.8) hp 5.0/5 standing, still 42 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major d8055752 at 934, 72, -14 (934.6, 72.0, -13.5) hp 10.0/10 standing, still 43 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major 289c6783 at 934, 72, -12 (934.5, 72.0, -11.4) hp 10.0/10 standing, still 44 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major 4c31e2ab at 935, 72, -15 (935.5, 72.0, -14.6) hp 10.0/10 standing, still 41 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major b7f6b01f at 934, 71, -11 (934.6, 71.0, -10.5) hp 10.0/10 standing, still 42 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major c9ac5a7d at 934, 71, -11 (934.2, 71.0, -10.4) hp 10.0/10 standing, still 41 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major 13676927 at 933, 71, -12 (933.5, 71.0, -11.3) hp 10.0/10 standing, still 44 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major f6bd230e at 933, 72, -11 (933.8, 72.0, -10.4) hp 10.0/10 standing, still 42 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major 3bb78c85 at 934, 73, -15 (934.5, 73.0, -14.6) hp 10.0/10 standing, still 43 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major 4da08842 at 933, 72, -11 (933.4, 72.0, -10.8) hp 10.0/10 standing, still 43 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_minor d6828a48 at 933, 72, -15 (933.4, 72.0, -14.2) hp 5.0/5 standing, still 44 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major 449d1ad3 at 933, 72, -15 (933.5, 72.0, -14.6) hp 10.0/10 standing, still 44 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major 9645005d at 933, 72, -11 (933.4, 72.0, -10.5) hp 10.0/10 standing, still 43 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major 4c6b5471 at 932, 71, -13 (932.4, 71.0, -12.5) hp 10.0/10 standing, still 43 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major 5772c7a4 at 932, 71, -14 (932.5, 71.0, -13.6) hp 10.0/10 standing, still 44 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major c2c555fd at 932, 71, -12 (932.3, 71.0, -11.4) hp 10.0/10 standing, still 41 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major 9710d1ee at 932, 72, -15 (932.4, 72.0, -14.5) hp 10.0/10 standing, still 39 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major f667cc13 at 931, 71, -12 (931.7, 71.0, -11.3) hp 10.0/10 standing, still 42 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major 970af0cd at 931, 71, -13 (931.4, 71.0, -12.5) hp 10.0/10 standing, still 42 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_minor d5295d3f at 931, 71, -11 (931.7, 71.0, -10.7) hp 5.0/5 standing, still 42 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major cf83f6d2 at 931, 71, -12 (931.4, 71.0, -11.6) hp 10.0/10 standing, still 42 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major d9012069 at 931, 71, -11 (931.5, 71.0, -10.4) hp 10.0/10 standing, still 43 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major 301fc0d5 at 932, 74, -14 (932.5, 74.0, -13.6) hp 10.0/10 standing, still 40 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major f4bf8615 at 931, 71, -11 (931.3, 71.0, -10.9) hp 10.0/10 standing, still 40 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major 0fc9f31f at 932, 73, -16 (932.4, 73.0, -15.6) hp 10.0/10 standing, still 42 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_major b2f6f24e at 931, 74, -14 (931.5, 74.0, -13.6) hp 10.0/10 standing, still 40 s, goals [MatabeleRaidGoal] | marching, told to stand [colony fd714cc2]
+- matabele_queen d1ac7e95 at 938, 61, -13 (938.5, 61.0, -12.5) hp 20.0/20 asleep standing, still 256 s, goals [NapGoal] [colony fd714cc2]
+- matabele_major 13c4e444 at 952, 69, -18 (952.9, 69.1, -17.1) hp 10.0/10 walking to 951, 70, -16, goals [MatabeleScoutGoal] | scouting [colony fd714cc2]
+
+The place: 916, 46, -49 (corner), size 96 x 48 x 96, in place.nbt.
