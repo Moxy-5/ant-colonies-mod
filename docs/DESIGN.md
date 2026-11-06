@@ -287,6 +287,12 @@ it.** If a decision changes, ask the user first, then update it here. The short 
   - **Scouts take open termites only while the sun is up (my pick):** termites out in the open after dark are the night foragers; by the next raid hour they are inside behind plugs, so a scout's find of them at night led a raid to an empty doorstep (the user's raid of 2026-11-05). After sunset a scout counts only by-day feeding places (under mud, at dead wood).
   - **No finds on a living mound's doorstep (my pick):** nothing within 4 blocks of a living mound's foot counts as a find; there the termites go straight indoors and the column would only walk up and down the holes. (The scout's own walking ground and the mound rings of R6 keep their 2 blocks.)
 
+### Insect sizes: real sizes (the user, 2026-11-05; plan `docs/plans/real-sizes.md`)
+- **Why:** at today's sizes the Matabele ants stacked into piles in a raid ("whats the point of realism if thats how they look").
+- **The rule:** a Matabele major (15 mm) is 0.5 blocks long, two to a block; every other savanna insect is drawn at its real length on the same scale (1 block = 30 mm of ant): Matabele minor 0.25 (7.5 mm model), queen 0.60 (1.2 times a major, the user's pick), termite worker 0.15 (4.5 mm), minor soldier 0.23 (7 mm), major soldier 0.40 (12 mm), king 0.47 (14 mm). Picked in the size viewer (`python tools/model_viewer.py sizes`); real lengths my picks from the literature. This is the body scale; the ground scale (a block a metre for ranges) is unchanged. The models and their detail stay as they are, only drawn smaller.
+- **Personal space:** insects keep a small gap and step aside or wait, never standing inside one another for long; not Minecraft's pushing. A little overlap allowed where real insects do it (a crowded breach, termites passing in a tunnel).
+- The harvester ant keeps its size until its rework.
+
 ### Later species (NOT version 1)
 - Leafcutter ants (cut leaf pieces, farm fungus) and army ants (living bivouacs, raiding swarms).
 
