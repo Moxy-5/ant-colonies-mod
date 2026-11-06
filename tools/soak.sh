@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The raid test bench, round 2, B4 (docs/plans/raid-test-bench.md): soak runs.
 #
-#   tools/soak.sh [servers] [game days]        (4 servers and 1 game day if not given)
+#   tools/soak.sh [servers] [game days]        (6 servers and 1 game day if not given)
 #
 # Each server is a headless Minecraft server in run-soak/<i>/ on a real world made from a seed of the fixed list below
 # (server i takes seed i), so a soak can be run again on the same land. The mod's soak driver (watch/Soak, on with
@@ -23,7 +23,7 @@
 set -u
 cd "$(dirname "$0")/.."
 
-servers="${1:-4}"
+servers="${1:-6}"
 days="${2:-1}"
 # The fixed seeds (my pick; any numbers do). Server i takes the i-th.
 SEEDS=(8675309 20261105 424242 1300 77777 31415926 2718281 5551212 1234567 9999991 4815162342 1618033)

@@ -3,8 +3,8 @@
 # split every server loads all three mods (framework, savanna, desert) and runs both species mods' tests, from the
 # root folder as before.
 #
-#   tools/run_game_tests.sh          every game test, split over 4 servers
-#   tools/run_game_tests.sh 8        the same over 8 servers (default 4, the user 2026-11-05)
+#   tools/run_game_tests.sh          every game test, split over 6 servers
+#   tools/run_game_tests.sh 8        the same over 8 servers (default 6, the user 2026-11-05: back from 4)
 #   ANTCOLONIES_TESTS=antnest,away tools/run_game_tests.sh
 #                                    only those categories or tests (see gametest/TestFilter), still split
 #   ANTCOLONIES_MODS=savanna tools/run_game_tests.sh
@@ -20,7 +20,7 @@
 set -u
 cd "$(dirname "$0")/.."
 
-shards="${1:-4}"
+shards="${1:-6}"
 start=$(date +%s)
 rm -rf run-test-shards/*/world
 mkdir -p run-test-shards
