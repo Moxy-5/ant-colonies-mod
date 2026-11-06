@@ -79,3 +79,7 @@ reach follows the real animal.
 
 None beyond the target itself (you asked for "uncommon, not rare"; 1 in 4 to 5 is my reading of it). Only new land
 changes; land already made keeps its mounds.
+
+## As built (2026-11-06, branch `claude/m8-termite-losses`)
+
+Steps 1 to 5 built as planned. Survey: 24 Matabele dead mounds of 113 mounds (1 in 4.7), 0 turned away; with the old numbers put back for one run the survey test failed ("too rare, 10% of mounds"), so the guard works. Balance model: nearest feeding spot median 55, 3 of 306 nests with none within the scouts' 96. Step 6, the in-game look in a new world, is the user's.

@@ -276,9 +276,9 @@ public class NewLandMounds extends SavedData {
         lastAnts = null;
         if (colony != null && !pick.living()) {
             // M8 step 3F, F4: a lonely dead mound, no living termites within a raid's reach, stays empty (the command's always not asked)
-            if (!alwaysAnts && MatabeleColonies.wouldSettle(pick.seed()) && !livingMoundNear(level, colony.getCenter())) {
+            if (!alwaysAnts && MatabeleColonies.wouldSettle(level, pick.seed()) && !livingMoundNear(level, colony.getCenter())) {
                 SavannaMod.LOGGER.info("[new-land] no Matabele colony in the dead mound at {}: no living termite mound within {} blocks",
-                        colony.getCenter().toShortString(), ANTS_NEAR_LIVING);
+                        colony.getCenter().toShortString(), antsNearLiving(level));
                 return colony;
             }
             lastAnts = MatabeleColonies.inNewLand(level, colony.getCenter(), pick.seed(), alwaysAnts);
@@ -291,22 +291,27 @@ public class NewLandMounds extends SavedData {
     }
 
     /**
-     * M8 step 3F, F4 (my pick, to confirm): a dead mound of new land holds a Matabele colony only with a living termite
-     * mound's foot within this many blocks (real Matabele nests lie among the termite mounds they raid, their raids
-     * mostly within 50 metres; a colony with no termites in reach would starve).
+     * M8 step 3F, F4: a dead mound of new land holds a Matabele colony only with a living termite mound's foot within this
+     * many blocks (the mound numbers' {@code matabele.living_near}, 90 since the commonness plan, 2026-11-06, was 70; real
+     * Matabele nests lie among the termite mounds they raid and forage out to about 95 m, Yusuf 2026; a colony with no
+     * termites in reach would starve). One number for world making and this check ({@link TermiteMoundStructure.Matabele}).
      */
-    static final int ANTS_NEAR_LIVING = 70;
+    public static int antsNearLiving(ServerLevel level) {
+        return TermiteMoundStructure.numbersOf(level.registryAccess()).matabele().livingNear();
+    }
 
     /**
-     * Whether a living termite mound's foot lies within {@link #ANTS_NEAR_LIVING} blocks of {@code center}: a living
+     * Whether a living termite mound's foot lies within {@link #antsNearLiving} blocks of {@code center}: a living
      * Macrotermes colony there now, or a living mound new land will put at a place of the pattern
-     * ({@link MoundPlaces}), made yet or not (the same answer world generation gives).
+     * ({@link MoundPlaces}), made yet or not (the same answer world generation gives, or a kinder one: this measures to
+     * the living mound's edge, world making middle to middle).
      */
     public static boolean livingMoundNear(ServerLevel level, BlockPos center) {
+        int reach = antsNearLiving(level);
         for (Colony other : ColonyManager.get(level).getColonies()) {
             if (other.getSpecies().equals(SavannaSpecies.MACROTERMES)) {
                 int stage = other.part(SavannaParts.MOUND).map(mound -> mound.getStage(level)).orElse(0);
-                if (sideways(other.getCenter(), center) - MoundPlaces.footReach(stage) <= ANTS_NEAR_LIVING) {
+                if (sideways(other.getCenter(), center) - MoundPlaces.footReach(stage) <= reach) {
                     return true;
                 }
             }
@@ -319,21 +324,22 @@ public class NewLandMounds extends SavedData {
     }
 
     /**
-     * Whether new land puts a living mound whose foot lies within {@link #ANTS_NEAR_LIVING} blocks of {@code center}, by
-     * the place pattern and the ground alone (made yet or not): the half of {@link #livingMoundNear} world generation
-     * answers, also asked of land no world holds (the survey game test, BUGS 104).
+     * Whether new land puts a living mound whose foot lies within the numbers' {@code matabele.living_near} blocks of
+     * {@code center}, by the place pattern and the ground alone (made yet or not): the half of {@link #livingMoundNear}
+     * world generation answers, also asked of land no world holds (the survey game test, BUGS 104).
      */
     public static boolean livingPlaceNear(MoundPlaces.Land land, TermiteMoundStructure.Numbers numbers, BlockPos center) {
         long seed = land.seed();
         MoundPlaces.Numbers places = numbers.places();
-        int look = ANTS_NEAR_LIVING + (int) Math.ceil(MoundPlaces.footReach(TermiteMoundStructure.FULL_STAGE));
+        int reach = numbers.matabele().livingNear();
+        int look = reach + (int) Math.ceil(MoundPlaces.footReach(TermiteMoundStructure.FULL_STAGE));
         for (MoundPlaces.Place place : MoundPlaces.near(seed, center.getX(), center.getZ(), look, places)) {
             BlockPos foot = MoundPlaces.holds(land, place, places);
             if (foot == null) {
                 continue;
             }
             Pick pick = TermiteMoundStructure.pickAt(numbers, land, place, MoundPlaces.sizeQuantile(land, place, places));
-            if (pick.living() && sideways(foot, center) - MoundPlaces.footReach(pick.stage()) <= ANTS_NEAR_LIVING) {
+            if (pick.living() && sideways(foot, center) - MoundPlaces.footReach(pick.stage()) <= reach) {
                 return true;
             }
         }

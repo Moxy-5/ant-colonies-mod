@@ -288,7 +288,8 @@ def main():
     ap.add_argument("--spots-min", dest="spots_min", type=int, default=3)
     ap.add_argument("--spots-max", dest="spots_max", type=int, default=15)
     ap.add_argument("--small-share", dest="small_share", type=float, default=0.3)
-    ap.add_argument("--within", type=float, default=70)
+    ap.add_argument("--within", type=float, default=90, help="matabele.living_near in termite_mound.json (70 before 2026-11-06)")
+    ap.add_argument("--share", type=float, default=0.85, help="matabele.share in termite_mound.json (2 in 3 before 2026-11-06)")
     ap.add_argument("--blocks", action="store_true", help="the nearest food that cannot be afforded blocks the rest (before 3F)")
     ap.add_argument("--young-from", dest="young_from", type=float, default=9.0, help="young trees this old drop branches (9: none, before 3F)")
     ap.add_argument("--young-branches", dest="young_branches", type=int, default=2)
@@ -326,11 +327,11 @@ def main():
         print(f"by-day spots, {k}: n {len(v)}, median {pct(v, .5)}, p10 {pct(v, .1)}, p90 {pct(v, .9)}")
     elig = [m for m in mat if m[0]]
     print(f"dead mounds: {len(mat)}, with a living mound's foot within {a.within:.0f}: {len(elig)} ({100 * len(elig) / max(1, len(mat)):.0f}%)"
-          f" -> with the 2 in 3 dice, Matabele in {100 * len(elig) * 2 / 3 / max(1, len(mat)):.0f}% of dead mounds")
+          f" -> with the {a.share:.2f} dice, Matabele in {100 * len(elig) * a.share / max(1, len(mat)):.0f}% of dead mounds")
     d = [m[1] for m in elig]
     print(f"Matabele nest's nearest by-day spot: p10 {pct(d, .1):.0f}, p25 {pct(d, .25):.0f}, median {pct(d, .5):.0f},"
           f" p75 {pct(d, .75):.0f}, p90 {pct(d, .9):.0f}, max {max(d) if d else 0:.0f}; within 50: {100 * sum(1 for x in d if x <= 50) / max(1, len(d)):.0f}%,"
-          f" none within 90: {sum(1 for x in d if x > 90)}")
+          f" none within 90: {sum(1 for x in d if x > 90)}, none within the scouts' 96: {sum(1 for x in d if x > 96)} of {len(d)}")
     lonely = [m[1] for m in mat if not m[0]]
     if lonely:
         print(f"(lonely dead mounds, left empty: nearest spot median {pct(lonely, .5):.0f})")

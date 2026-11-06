@@ -26,7 +26,7 @@
     "aardvark_burrows": 0.4,
     "hump_grass": true,
     "places": {
-      "_note": "M8 step 3F, F1 (worldgen/MoundPlaces; the user's decisions 2026-11-04, the numbers my picks, to confirm): every chunk offers a candidate place with its own territory, territory_min to territory_max blocks (its size: big territories hold big mounds); two places stand at least their two territories apart, so mounds land about 42 to 82 blocks apart, mostly round 60. A place holds a mound by the ground's chance: ground_chance on flat dry ground, slope_cut of it lost on the steepest ground a mound takes (max_uneven blocks up and down 8 blocks round the middle; 6 since BUGS 104, was 4), water_cut lost with water within water_look blocks; never in water, on a steep slope or outside a savanna. In Minecraft's rolling savanna that is about 1 place in 3 (BUGS 104; the 2 in 3 first planned was a flat-ground guess), so mounds stand about 60 to 100 apart. Next to each empty place within lean_reach a mound leans bigger (its size quantile's rest times empty_lean). A dead mound whose dice give it Matabele lives instead when no mound living by the dice stands within 70 blocks (BUGS 104: the Matabele settle only among the termites they raid), so dead_share is the dice (0.5), about a quarter of the mounds ending dead.",
+      "_note": "M8 step 3F, F1 (worldgen/MoundPlaces; the user's decisions 2026-11-04, the numbers my picks, to confirm): every chunk offers a candidate place with its own territory, territory_min to territory_max blocks (its size: big territories hold big mounds); two places stand at least their two territories apart, so mounds land about 42 to 82 blocks apart, mostly round 60. A place holds a mound by the ground's chance: ground_chance on flat dry ground, slope_cut of it lost on the steepest ground a mound takes (max_uneven blocks up and down 8 blocks round the middle; 6 since BUGS 104, was 4), water_cut lost with water within water_look blocks; never in water, on a steep slope or outside a savanna. In Minecraft's rolling savanna that is about 1 place in 3 (BUGS 104; the 2 in 3 first planned was a flat-ground guess), so mounds stand about 60 to 100 apart. Next to each empty place within lean_reach a mound leans bigger (its size quantile's rest times empty_lean). A dead mound whose dice give it Matabele lives instead when no mound living by the dice stands within matabele.living_near blocks (BUGS 104: the Matabele settle only among the termites they raid), so dead_share is the dice (0.5), about a quarter of the mounds ending dead.",
       "max_uneven": 6,
       "territory_min": 21,
       "territory_max": 41,
@@ -36,6 +36,11 @@
       "water_look": 14,
       "empty_lean": 0.75,
       "lean_reach": 90
+    },
+    "matabele": {
+      "_note": "The Matabele colonies of new land's dead mounds, both numbers in this one place (the commonness plan, the user 2026-11-06, 'uncommon, not rare', docs/plans/matabele-commonness.md; before, the reach was written twice in the code). share: the dice for a dead mound with termites in reach holding a colony (was 2 in 3; real: dead Macrotermes mounds among living colonies are prized homes, almost half of 73 Matabele nests in a Nigerian survey were in deserted mounds). living_near: how far (blocks) a living termite mound may stand for a dead one to get Matabele (was 70; real Matabele forage out to about 95 m, Yusuf 2026; scouts reach 96). A would-be Matabele mound with no living mound that near lives instead. Measured on real savanna land: about 1 mound in 4.7 holds Matabele (was 1 in 10); the survey game test fails outside 18 to 30 percent. My picks, to confirm.",
+      "share": 0.85,
+      "living_near": 90
     }
   }
 }

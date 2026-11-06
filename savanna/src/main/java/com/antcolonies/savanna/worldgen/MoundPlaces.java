@@ -266,23 +266,20 @@ public final class MoundPlaces {
         return unit(mix(seed, place.chunk().x, place.chunk().z, 6)) >= deadShare;
     }
 
-    /** How near (blocks, foot to foot) a mound living by the dice must stand for a dead mound's Matabele (BUGS 104). */
-    public static final int LIVING_NEAR = 70;
-
     /**
-     * Whether a mound living by its dice stands with its foot within {@link #LIVING_NEAR} of {@code foot} (the foot of the
-     * mound at {@code place}, left out). Only the dice count, never a dead mound turned living, so the question never goes
-     * round in a circle (BUGS 104).
+     * Whether a mound living by its dice stands with its foot within {@code reach} of {@code foot} (the foot of the mound
+     * at {@code place}, left out; {@code reach}: the mound numbers' {@code matabele.living_near}). Only the dice count,
+     * never a dead mound turned living, so the question never goes round in a circle (BUGS 104).
      */
-    public static boolean livingByDiceNear(Land land, Place place, BlockPos foot, Numbers numbers, double deadShare) {
-        for (Place other : near(land.seed(), foot.getX(), foot.getZ(), LIVING_NEAR, numbers)) {
+    public static boolean livingByDiceNear(Land land, Place place, BlockPos foot, Numbers numbers, double deadShare, int reach) {
+        for (Place other : near(land.seed(), foot.getX(), foot.getZ(), reach, numbers)) {
             if (other.chunk().equals(place.chunk()) || !living(land.seed(), other, deadShare)) {
                 continue;
             }
             BlockPos living = holds(land, other, numbers);
             if (living != null) {
                 double dx = living.getX() - foot.getX(), dz = living.getZ() - foot.getZ();
-                if (dx * dx + dz * dz <= (double) LIVING_NEAR * LIVING_NEAR) {
+                if (dx * dx + dz * dz <= (double) reach * reach) {
                     return true;
                 }
             }

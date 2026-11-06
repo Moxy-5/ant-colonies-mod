@@ -72,7 +72,7 @@ public class TermiteMoundStructure extends Structure {
      * has dug into. {@code humpGrass}: whether old humps carry the greener grass of real mound islands.
      */
     public record Numbers(double deadShare, List<Band> livingStages, List<Band> deadSizes, List<Integer> deadStages,
-            double humpWoods, double burrows, boolean humpGrass, MoundPlaces.Numbers places) {
+            double humpWoods, double burrows, boolean humpGrass, MoundPlaces.Numbers places, Matabele matabele) {
         public static final Codec<Numbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.DOUBLE.optionalFieldOf("dead_share", 0.5).forGetter(Numbers::deadShare),
                 Band.CODEC.listOf().optionalFieldOf("living_stages", Band.LIVING).forGetter(Numbers::livingStages),
@@ -81,11 +81,35 @@ public class TermiteMoundStructure extends Structure {
                 Codec.DOUBLE.optionalFieldOf("hump_woods", 0.5).forGetter(Numbers::humpWoods),
                 Codec.DOUBLE.optionalFieldOf("aardvark_burrows", 0.4).forGetter(Numbers::burrows),
                 Codec.BOOL.optionalFieldOf("hump_grass", true).forGetter(Numbers::humpGrass),
-                MoundPlaces.Numbers.CODEC.optionalFieldOf("places", MoundPlaces.Numbers.DEFAULT).forGetter(Numbers::places)
+                MoundPlaces.Numbers.CODEC.optionalFieldOf("places", MoundPlaces.Numbers.DEFAULT).forGetter(Numbers::places),
+                Matabele.CODEC.optionalFieldOf("matabele", Matabele.DEFAULT).forGetter(Numbers::matabele)
         ).apply(i, Numbers::new));
 
         public static final Numbers DEFAULT = new Numbers(0.5, Band.LIVING, Band.DEAD, List.of(10, 35, 35, 20), 0.5, 0.4, true,
-                MoundPlaces.Numbers.DEFAULT);
+                MoundPlaces.Numbers.DEFAULT, Matabele.DEFAULT);
+    }
+
+    /**
+     * The Matabele colonies of new land's dead mounds, one place for both numbers (the commonness plan, 2026-11-06,
+     * {@code docs/plans/matabele-commonness.md}; before, the reach lived twice in the code and could drift apart).
+     * {@code share}: the dice for a dead mound with termites in reach holding a colony. {@code livingNear}: how far
+     * (blocks) a living termite mound may stand for a dead one to get Matabele. World making measures it middle to middle
+     * ({@link MoundPlaces#livingByDiceNear}); the server's check at put time measures to the living mound's edge
+     * ({@code NewLandMounds.livingMoundNear}), never stricter, so a mound world making gave Matabele is never turned away.
+     */
+    public record Matabele(double share, int livingNear) {
+        public static final Codec<Matabele> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.doubleRange(0, 1).optionalFieldOf("share", 0.85).forGetter(Matabele::share),
+                Codec.intRange(1, 256).optionalFieldOf("living_near", 90).forGetter(Matabele::livingNear)
+        ).apply(i, Matabele::new));
+
+        public static final Matabele DEFAULT = new Matabele(0.85, 90);
+    }
+
+    /** The mound numbers of this world's data (the defaults if the structure is missing). */
+    public static Numbers numbersOf(net.minecraft.core.RegistryAccess registries) {
+        return registries.registryOrThrow(Registries.STRUCTURE).get(MoundPlaces.STRUCTURE) instanceof TermiteMoundStructure mounds
+                ? mounds.numbers() : Numbers.DEFAULT;
     }
 
     /** Sizes of mound (and colony). */
@@ -208,9 +232,9 @@ public class TermiteMoundStructure extends Structure {
      * ({@code quantile}: its territory, leaning bigger next to empty places), the rest by its own dice as {@link #pick}.
      *
      * <p><b>Dead among the living (BUGS 104).</b> A dead mound whose dice give it a Matabele colony lives instead when no
-     * mound living by the dice stands within {@link MoundPlaces#LIVING_NEAR} of it: the Matabele settle a dead mound only
-     * with termites to raid in reach ({@code NewLandMounds.ANTS_NEAR_LIVING}, the same 70 to the living mound's edge, so
-     * every such dead mound now passes it). Real: Matabele nests sit in mound fields among the termites they raid, and a
+     * mound living by the dice stands within {@link Matabele#livingNear} of it: the Matabele settle a dead mound only
+     * with termites to raid in reach (the server's check measures the same number to the living mound's edge, so every
+     * such dead mound passes it). Real: Matabele nests sit in mound fields among the termites they raid, and a
      * dead Macrotermes mound stands among living neighbours. Minecraft's rolling savanna holds a mound at only about 1
      * place in 3, so by the dice alone 15 of 24 such dead mounds stood alone and were left empty. The dead mounds the dice
      * leave without ants stay dead wherever they are (an empty dead mound far from termites is real too).
@@ -219,9 +243,10 @@ public class TermiteMoundStructure extends Structure {
         RandomSource random = RandomSource.create(place.seed(land.seed()));
         long seed = random.nextLong() & 0xFFFFFFFFL;
         boolean living = MoundPlaces.living(land.seed(), place, numbers.deadShare());
-        if (!living && MatabeleColonies.wouldSettle(seed)) {
+        if (!living && MatabeleColonies.wouldSettle(seed, numbers.matabele().share())) {
             BlockPos foot = MoundPlaces.holds(land, place, numbers.places());
-            living = foot != null && !MoundPlaces.livingByDiceNear(land, place, foot, numbers.places(), numbers.deadShare());
+            living = foot != null && !MoundPlaces.livingByDiceNear(land, place, foot, numbers.places(), numbers.deadShare(),
+                    numbers.matabele().livingNear());
         }
         int stage = stageAt(living ? numbers.livingStages() : numbers.deadSizes(), quantile);
         return pick(numbers, random, seed, living, stage);

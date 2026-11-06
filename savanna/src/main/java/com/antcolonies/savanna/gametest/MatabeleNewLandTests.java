@@ -61,10 +61,10 @@ public class MatabeleNewLandTests {
         cornerGround(helper);
         checkTheDice(helper);
         long yes = 1, no = 1;
-        while (!MatabeleColonies.wouldSettle(yes)) {
+        while (!MatabeleColonies.wouldSettle(level, yes)) {
             yes++;
         }
-        while (MatabeleColonies.wouldSettle(no)) {
+        while (MatabeleColonies.wouldSettle(level, no)) {
             no++;
         }
         // A dead mound whose dice say no: no Matabele in it.
@@ -152,6 +152,12 @@ public class MatabeleNewLandTests {
      * still stand at least 40 apart. The user's world (2026-11-05): 12 of 17 such dead mounds were turned away (only about
      * 1 place in 5 held a mound on its slopes and by its lakes). The land is fixed by the seeds, so the numbers are the same
      * every run. Its own batch: it holds the server about 20 seconds working out ground heights.
+     *
+     * <p><b>The commonness guard</b> (the user, 2026-11-06, "uncommon, not rare"; {@code docs/plans/matabele-commonness.md}):
+     * Matabele dead mounds stay between {@link #FEWEST_MATABELE} and {@link #MOST_MATABELE} of the mounds (about 1 in 4 to
+     * 5). Twice before a change to where mounds stand (spacing, ground rules) made them rare without a test failing; now
+     * such a change fails here, and the fix is in the mound numbers' {@code matabele} block
+     * ({@code worldgen/structure/termite_mound.json}: {@code share}, {@code living_near}).
      */
     @GameTest(template = "arena", timeoutTicks = 100, batch = "savanna_survey")
     public static void deadMoundsOfRealSavannaHaveLivingTermitesInReach(GameTestHelper helper) {
@@ -169,17 +175,26 @@ public class MatabeleNewLandTests {
                 t[i] += r[i];
             }
         }
-        String report = String.format("%d savanna places, %d hold a mound, %d dead, %d of them Matabele, %d turned away, %d Matabele dead"
-                + " mounds alone living instead, %d mounds nearer than 40, %d ms", t[0], t[1], t[2], t[3], t[4], t[6], t[5],
-                (System.nanoTime() - start) / 1_000_000);
+        String report = String.format("%d savanna places, %d hold a mound, %d dead, %d of them Matabele (1 mound in %.1f), %d turned away,"
+                + " %d Matabele dead mounds alone living instead, %d mounds nearer than 40, %d ms", t[0], t[1], t[2], t[3],
+                t[1] / (double) Math.max(1, t[3]), t[4], t[6], t[5], (System.nanoTime() - start) / 1_000_000);
         SavannaMod.LOGGER.info("[new-land] the savanna survey (BUGS 104): {}", report);
         helper.assertTrue(t[0] >= 300, "too few savanna places in the survey: " + report);
         helper.assertTrue(t[1] >= 0.28 * t[0], "too few places hold a mound (slopes up to 6 take one): " + report);
         double dead = t[2] / (double) t[1];
         helper.assertTrue(dead >= 0.2 && dead <= 0.4, "dead mounds not about a quarter of them: " + report);
-        helper.assertTrue(t[3] >= 8 && t[4] == 0, "Matabele dead mounds turned away by the 70-block rule: " + report);
+        helper.assertTrue(t[4] == 0, "Matabele dead mounds turned away at put time (world making and the server's check disagree): " + report);
+        double matabele = t[3] / (double) t[1];
+        helper.assertTrue(matabele >= FEWEST_MATABELE, String.format("Matabele dead mounds too rare (%.0f%% of mounds, want at least %.0f%%;"
+                + " look at the share and living_near in termite_mound.json's matabele block, or what changed where mounds stand): %s",
+                100 * matabele, 100 * FEWEST_MATABELE, report));
+        helper.assertTrue(matabele <= MOST_MATABELE, String.format("Matabele dead mounds too common (%.0f%% of mounds, want at most %.0f%%): %s",
+                100 * matabele, 100 * MOST_MATABELE, report));
         helper.succeed();
     }
+
+    /** The commonness band of Matabele dead mounds among all mounds of new land (the user, 2026-11-06: uncommon, not rare). */
+    static final double FEWEST_MATABELE = 0.18, MOST_MATABELE = 0.30;
 
     /** Minecraft's overworld for a seed, as the noise makes it (no chunks), with the mounds' biomes. */
     private static MoundPlaces.Land realLand(ServerLevel level, long seed, TermiteMoundStructure mounds) {
@@ -241,7 +256,7 @@ public class MatabeleNewLandTests {
                 continue;
             }
             out[2]++;
-            if (MatabeleColonies.wouldSettle(pick.seed())) {
+            if (MatabeleColonies.wouldSettle(pick.seed(), numbers.matabele().share())) {
                 out[3]++;
                 if (!NewLandMounds.livingPlaceNear(land, numbers, foot)) {
                     out[4]++;
@@ -261,17 +276,18 @@ public class MatabeleNewLandTests {
         return out;
     }
 
-    /** About two dead mounds in three get a colony; the sizes run 100 to 2,300, half under about 480. */
+    /** The dice give the data file's share of dead mounds a colony; the sizes run 100 to 2,300, half under about 480. */
     private static void checkTheDice(GameTestHelper helper) {
+        double share = MatabeleColonies.share(helper.getLevel());
         int rolls = 3000, yes = 0, small = 0;
         RandomSource random = RandomSource.create(7);
         for (int i = 0; i < rolls; i++) {
-            yes += MatabeleColonies.wouldSettle(random.nextLong()) ? 1 : 0;
+            yes += MatabeleColonies.wouldSettle(random.nextLong(), share) ? 1 : 0;
             int size = MatabeleColonies.sizeFor(random);
             helper.assertTrue(size >= MatabeleColonies.FEWEST && size <= MatabeleColonies.MOST, "a colony of " + size);
             small += size < 480 ? 1 : 0;
         }
-        helper.assertTrue(Math.abs(yes / (double) rolls - MatabeleColonies.SHARE) < 0.04, yes + " colonies in " + rolls + " dead mounds");
+        helper.assertTrue(Math.abs(yes / (double) rolls - share) < 0.04, yes + " colonies in " + rolls + " dead mounds");
         helper.assertTrue(Math.abs(small / (double) rolls - 0.5) < 0.04, small + " of " + rolls + " colonies under 480");
     }
 

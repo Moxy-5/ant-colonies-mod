@@ -12,6 +12,7 @@ import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.entity.MatabeleEntity;
 import com.antcolonies.savanna.entity.MatabeleQueenEntity;
 import com.antcolonies.savanna.registry.SavannaEntities;
+import com.antcolonies.savanna.worldgen.TermiteMoundStructure;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -29,11 +30,10 @@ import net.minecraft.world.phys.Vec3;
  * <p>New land, the real ants (Yusuf 2026, Annual Review of Entomology 71): colonies of 100 to 300, up to 2,300 workers;
  * in a Nigerian survey almost half the nests lay in deserted Macrotermes mounds; real nests sit among the termite
  * colonies they raid (nests 2 to 30 m apart, 4 to 22 a hectare, far more than the dead mounds). So most dead mounds of
- * new land in a savanna hold a colony ({@link #SHARE}), and the sizes lean small ({@link #sizeFor}).
+ * new land with termites in reach hold a colony (the mound numbers' {@code matabele.share}, 0.85 since the commonness
+ * plan, 2026-11-06; {@link TermiteMoundStructure.Matabele}), and the sizes lean small ({@link #sizeFor}).
  */
 public final class MatabeleColonies {
-    /** The share of new land's dead mounds (with a way in) that hold a Matabele colony (my pick, to confirm). */
-    public static final double SHARE = 2.0 / 3.0;
     /** A new-land colony's size, the real range (Yusuf 2026). */
     public static final int FEWEST = 100, MOST = 2300;
 
@@ -49,7 +49,7 @@ public final class MatabeleColonies {
     }
 
     /**
-     * New land: by the dice ({@link #SHARE}, from {@code seed}) a Matabele colony settled in the dead mound whose old
+     * New land: by the dice (the mound numbers' {@code matabele.share}, from {@code seed}) a Matabele colony settled in the dead mound whose old
      * entrance was {@code middle}, its queen in her room, all its workers numbers inside, the prey pile holding a day's
      * food (as if a raid came home this morning: real colonies keep no store, Yusuf 2026). With {@code always} (the
      * command) the dice are not asked. Null when the dice say no, the mound has no way in or no rooms, or the queen
@@ -58,7 +58,7 @@ public final class MatabeleColonies {
     @Nullable
     public static Colony inNewLand(ServerLevel level, BlockPos middle, long seed, boolean always) {
         RandomSource random = dice(seed);
-        if (random.nextDouble() >= SHARE && !always) {
+        if (random.nextDouble() >= share(level) && !always) {
             return null;
         }
         MatabeleNest.Site site = MatabeleNest.fromMound(level, middle);
@@ -80,9 +80,22 @@ public final class MatabeleColonies {
         return colony;
     }
 
-    /** Whether the dead mound of new land picked with this seed gets a Matabele colony (if it has a way in). */
-    public static boolean wouldSettle(long seed) {
-        return dice(seed).nextDouble() < SHARE;
+    /**
+     * Whether the dead mound of new land picked with this seed gets a Matabele colony (if it has a way in and termites in
+     * reach), by the dice {@code share} (the mound numbers' {@code matabele.share}).
+     */
+    public static boolean wouldSettle(long seed, double share) {
+        return dice(seed).nextDouble() < share;
+    }
+
+    /** As {@link #wouldSettle(long, double)}, with this world's share. */
+    public static boolean wouldSettle(ServerLevel level, long seed) {
+        return wouldSettle(seed, share(level));
+    }
+
+    /** This world's dice for a dead mound with termites in reach holding a colony (the mound numbers' {@code matabele.share}). */
+    public static double share(ServerLevel level) {
+        return TermiteMoundStructure.numbersOf(level.registryAccess()).matabele().share();
     }
 
     private static RandomSource dice(long seed) {
