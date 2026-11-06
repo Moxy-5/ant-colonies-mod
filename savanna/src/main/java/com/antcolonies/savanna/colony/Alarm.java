@@ -32,6 +32,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * The colony's alarm (species with {@code alarm} in their profile: termites). Species-neutral: it keeps the level and
@@ -69,11 +70,33 @@ public class Alarm {
      * place it guards (M8 step 3S, S1): standing, it snaps at a foe touching it and lunges at one it feels near, but
      * never one farther than {@link #STAND_LEASH} blocks from this place (its own cell, unless said).
      */
-    public record Task(@Nullable LivingEntity enemy, @Nullable BlockPos cell, BlockPos facing, boolean drumOnArrival, @Nullable BlockPos guard) {
+    public record Task(@Nullable LivingEntity enemy, @Nullable BlockPos cell, BlockPos facing, boolean drumOnArrival, @Nullable BlockPos guard,
+            @Nullable Vec3 spot) {
+        public Task(@Nullable LivingEntity enemy, @Nullable BlockPos cell, BlockPos facing, boolean drumOnArrival, @Nullable BlockPos guard) {
+            this(enemy, cell, facing, drumOnArrival, guard, null);
+        }
+
         public Task(@Nullable LivingEntity enemy, @Nullable BlockPos cell, BlockPos facing, boolean drumOnArrival) {
-            this(enemy, cell, facing, drumOnArrival, cell);
+            this(enemy, cell, facing, drumOnArrival, cell, null);
         }
     }
+
+    /**
+     * Real sizes, step 3: a place round a raid's breach is a spot inside a cell, several to a cell ({@link #SLOT_GAP}
+     * apart, a 3 by 3 grid), so the soldiers pack the opening shoulder to shoulder; {@code slot} 0 to 8, 4 the middle.
+     */
+    private record Place(BlockPos cell, int slot) {
+        Vec3 spot() {
+            return Vec3.atBottomCenterOf(cell).add((slot % 3 - 1) * SLOT_GAP, 0.0, (slot / 3 - 1) * SLOT_GAP);
+        }
+    }
+
+    /**
+     * Real sizes, step 3: the gap (blocks) between the soldiers' spots in a cell round a breach (my pick: real-size
+     * minor soldiers, 0.23 blocks long, stand side by side with a hair between; majors, 0.40 long, touch shoulders, a
+     * little overlap at a crowded breach).
+     */
+    private static final double SLOT_GAP = 0.3;
 
     /**
      * M8 step 3S, S1: a soldier standing at the trouble lunges only at a foe within this many blocks of the place it
@@ -156,7 +179,7 @@ public class Alarm {
     private BlockPos spotsFor;
     private long spotsAt = Long.MIN_VALUE;
     /** S2: each soldier's place round a raid's breach (kept, so one coming or going moves nobody), and places no way to. */
-    private final Map<UUID, BlockPos> places = new HashMap<>();
+    private final Map<UUID, Place> places = new HashMap<>();
     private final Map<BlockPos, Long> badPlaces = new HashMap<>();
     /** S2: the places round the breach, kept for a second. */
     private List<BlockPos> ring = List.of();
@@ -566,6 +589,8 @@ public class Alarm {
         long time = world.getGameTime();
         badPlaces.values().removeIf(until -> until <= time || until > time + BAD_PLACE_TICKS);
         List<BlockPos> cells = ringNear(world, spot);
+        List<Place> slots = slotsNear(cells);
+        Set<BlockPos> cellSet = new HashSet<>(cells);
         List<TermiteSoldierEntity> answering = new ArrayList<>();
         for (TermiteSoldierEntity soldier : soldiers) {
             if (heard.containsKey(soldier.getUUID())) {
@@ -575,10 +600,10 @@ public class Alarm {
         Set<UUID> ids = new HashSet<>();
         answering.forEach(soldier -> ids.add(soldier.getUUID()));
         places.keySet().retainAll(ids);
-        places.values().removeIf(cell -> !cells.contains(cell) || badPlaces.containsKey(cell));
-        Set<BlockPos> taken = new HashSet<>(places.values());
-        BlockPos mouth = !cells.isEmpty() && cells.get(0).equals(spot) ? spot : null;
-        if (mouth != null && !taken.contains(mouth) && !badPlaces.containsKey(mouth)) {
+        places.values().removeIf(place -> !cellSet.contains(place.cell()) || badPlaces.containsKey(place.cell()));
+        Set<Place> taken = new HashSet<>(places.values());
+        Place mouth = !cells.isEmpty() && cells.get(0).equals(spot) ? new Place(spot, 4) : null;
+        if (mouth != null && !taken.contains(mouth) && !badPlaces.containsKey(spot)) {
             TermiteSoldierEntity holder = null;
             for (TermiteSoldierEntity soldier : answering) {
                 if (!places.containsKey(soldier.getUUID()) && (holder == null || holder.getRank() != Rank.MAJOR && soldier.getRank() == Rank.MAJOR)) {
@@ -598,20 +623,21 @@ public class Alarm {
                 if (soldier.getRank() != rank) {
                     continue;
                 }
-                BlockPos place = places.get(soldier.getUUID());
+                Place place = places.get(soldier.getUUID());
                 if (place == null) {
-                    for (BlockPos cell : cells) {
-                        if (!taken.contains(cell) && !badPlaces.containsKey(cell)) {
-                            place = cell;
-                            places.put(soldier.getUUID(), cell);
-                            taken.add(cell);
+                    for (Place slot : slots) {
+                        if (!taken.contains(slot) && !badPlaces.containsKey(slot.cell())) {
+                            place = slot;
+                            places.put(soldier.getUUID(), slot);
+                            taken.add(slot);
                             break;
                         }
                     }
                 }
                 if (place != null) {
-                    BlockPos facing = place.equals(spot) ? spot : place.offset(place.getX() - spot.getX(), 0, place.getZ() - spot.getZ());
-                    out.put(soldier.getUUID(), new Task(null, place, facing, false, spot));
+                    BlockPos cell = place.cell();
+                    BlockPos facing = cell.equals(spot) ? spot : cell.offset(cell.getX() - spot.getX(), 0, cell.getZ() - spot.getZ());
+                    out.put(soldier.getUUID(), new Task(null, cell, facing, false, spot, place.spot()));
                     continue;
                 }
                 if (behind == null) {
@@ -672,9 +698,48 @@ public class Alarm {
         return ring;
     }
 
+    /**
+     * Real sizes, step 3: the spots round a breach, the nearest it first: the mouth holds one (its middle), every other
+     * cell of the ring {@link #SLOT_GAP}-apart spots, so the first dozen ring the opening shoulder to shoulder.
+     */
+    private List<Place> slotsNear(List<BlockPos> cells) {
+        if (cells == slotsFor && slots != null) {
+            return slots;
+        }
+        Vec3 middle = Vec3.atBottomCenterOf(spot);
+        List<Place> out = new ArrayList<>();
+        for (BlockPos cell : cells) {
+            if (cell.equals(spot)) {
+                out.add(new Place(cell, 4));
+                continue;
+            }
+            for (int slot = 0; slot < 9; slot++) {
+                out.add(new Place(cell, slot));
+            }
+        }
+        out.sort(Comparator.comparingDouble((Place place) -> flatSqr(place.spot(), middle))
+                .thenComparingInt(place -> Math.abs(place.cell().getY() - spot.getY()))
+                .thenComparingLong(place -> place.cell().asLong()).thenComparingInt(Place::slot));
+        slots = List.copyOf(out);
+        slotsFor = cells;
+        return slots;
+    }
+
+    private static double flatSqr(Vec3 a, Vec3 b) {
+        double dx = a.x - b.x;
+        double dz = a.z - b.z;
+        return dx * dx + dz * dz;
+    }
+
+    @Nullable
+    private List<Place> slots;
+    @Nullable
+    private List<BlockPos> slotsFor;
+
     /** S2: this soldier found no way to its place round the breach: nobody is given it for a while. */
     public void noWayTo(TermiteSoldierEntity soldier, BlockPos cell) {
-        if (cell.equals(places.get(soldier.getUUID()))) {
+        Place place = places.get(soldier.getUUID());
+        if (place != null && cell.equals(place.cell())) {
             places.remove(soldier.getUUID());
             badPlaces.put(cell.immutable(), soldier.level().getGameTime() + BAD_PLACE_TICKS);
             tasksAt = Long.MIN_VALUE;

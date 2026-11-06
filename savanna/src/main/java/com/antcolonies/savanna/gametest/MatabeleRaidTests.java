@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.antcolonies.colony.Colony;
+import com.antcolonies.gametest.CrowdWatch;
 import com.antcolonies.gametest.TestAnts;
 import com.antcolonies.gametest.TestClock;
 import com.antcolonies.gametest.IdleWatch;
@@ -731,6 +732,8 @@ public class MatabeleRaidTests {
      * first; every recruit that came out of the nest counts as out, wherever round the hump it stands (none is left home
      * standing at the place it was given, and none out of the nest is left home at all); the column sets out before the
      * forming's longest time; and a recruit at its place stands there, never walking off and back again and again.
+     * Real sizes, step 3: about 20 raiders milling at the entrance and the first 10 s of the march, no two out of the
+     * nest standing inside one another for more than a second ({@link CrowdWatch}).
      */
     @GameTest(template = "arena", timeoutTicks = 6000, skyAccess = true, batch = "matabele_raids")
     public static void aRaidFromATallDeadMoundSetsOutPromptlyWithEveryRecruitThatCameOut(GameTestHelper helper) {
@@ -754,6 +757,21 @@ public class MatabeleRaidTests {
         java.util.Map<java.util.UUID, Integer> rewalks = new java.util.HashMap<>();
         java.util.Set<java.util.UUID> settled = new java.util.HashSet<>();
         java.util.Map<java.util.UUID, BlockPos> walkingTo = new java.util.HashMap<>();
+        CrowdWatch crowd = new CrowdWatch(ant -> !colony.nest().isInside(level, ant.blockPosition()));
+        long[] watchUntil = {Long.MAX_VALUE};
+        helper.onEachTick(() -> {
+            RaidColumn raid = column[0];
+            if (raid == null || helper.getTick() > watchUntil[0]) {
+                return;
+            }
+            List<com.antcolonies.entity.AbstractAntEntity> raiders = new ArrayList<>();
+            for (java.util.UUID id : raid.members()) {
+                if (level.getEntity(id) instanceof com.antcolonies.entity.AbstractAntEntity ant) {
+                    raiders.add(ant);
+                }
+            }
+            crowd.tick(raiders);
+        });
         helper.onEachTick(() -> {
             RaidColumn raid = column[0];
             if (raid == null || formedAt[0] >= 0) {
@@ -838,6 +856,12 @@ public class MatabeleRaidTests {
                             + " recruits set out");
                     helper.assertTrue(rewalked <= Math.max(2, members[0] / 6), rewalked + " walks off a place already reached while forming "
                             + rewalks + " (back and forth)");
+                    watchUntil[0] = helper.getTick() + 200;
+                })
+                .thenIdle(200)
+                .thenExecute(() -> {
+                    SavannaMod.LOGGER.info("[raid form test] personal space: {}", crowd.describe());
+                    helper.assertTrue(crowd.keptApart(), "raiders stood inside one another: " + crowd.describe());
                 })
                 .thenSucceed();
     }

@@ -949,6 +949,14 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return pinnedBy != null;
     }
 
+    /**
+     * Server: whether its legs must keep it where it is now (felled, held in jaws, in a blow, riding): personal space
+     * never shuffles it aside, the others give way round it (real sizes, step 3, {@code nav/Crowd}).
+     */
+    public boolean holdsStill() {
+        return isDowned() || pinnedBy != null || attack != null || isPassenger();
+    }
+
     /** The legs bitten off, six bits in {@link LostLegs#LEGS}' order (0: all six; synced). */
     public int lostLegs() {
         return entityData.get(DATA_LOST_LEGS) & 0x3F;

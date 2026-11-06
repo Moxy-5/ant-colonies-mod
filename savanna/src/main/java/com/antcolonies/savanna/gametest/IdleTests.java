@@ -8,6 +8,7 @@ import java.util.List;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.entity.AbstractAntEntity;
+import com.antcolonies.gametest.CrowdWatch;
 import com.antcolonies.gametest.IdleWatch;
 import com.antcolonies.gametest.TestClock;
 import com.antcolonies.gametest.TestIsolation;
@@ -41,7 +42,10 @@ public class IdleTests {
     private static final int SETTLE = 600;
     private static final int COUNT = 2400;
 
-    /** A Matabele colony of 20 in a dead mound at night, its prey pile stocked: nothing to do but rest. */
+    /**
+     * A Matabele colony of 20 in a dead mound at night, its prey pile stocked: nothing to do but rest. Real sizes, step
+     * 3: the workers crowd the queen's room, yet no two stand inside one another for more than a second ({@link CrowdWatch}).
+     */
     @GameTest(template = "arena", timeoutTicks = 6000, skyAccess = true, batch = "idle")
     public static void aCalmMatabeleNestStandsStillMostOfTheTime(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
@@ -54,14 +58,17 @@ public class IdleTests {
         PreyPile pile = colony.part(SavannaParts.PREY_PILE).orElse(null);
         helper.assertTrue(pile != null, "a Matabele colony has no prey pile");
         IdleWatch watch = new IdleWatch("calm Matabele nest");
+        CrowdWatch crowd = new CrowdWatch(ant -> ant instanceof MatabeleEntity && !(ant instanceof com.antcolonies.savanna.entity.MatabeleQueenEntity));
         helper.startSequence()
                 .thenWaitUntil(() -> helper.assertTrue(colony.nest().getFinishedRoomCenter(level) != null, "the queen's room is not open yet"))
                 .thenExecute(() -> pile.stock(level, 6))
                 .thenIdle(SETTLE)
-                .thenExecute(() -> count(helper, level, colony, watch))
+                .thenExecute(() -> count(helper, level, colony, watch, crowd))
                 .thenIdle(COUNT)
                 .thenExecute(() -> {
                     check(helper, watch);
+                    SavannaMod.LOGGER.info("[idle] calm Matabele nest, personal space: {}", crowd.describe());
+                    helper.assertTrue(crowd.keptApart(), "Matabele stood inside one another: " + crowd.describe());
                     // Q2: the idle ones settled by the queen and the prey pile (real Megaponera crowd the brood chamber).
                     BlockPos room = colony.nest().getFinishedRoomCenter(level);
                     List<MatabeleEntity> idle = TestIsolation.insectsOf(level, colony, MatabeleEntity.class).stream()
@@ -90,14 +97,14 @@ public class IdleTests {
         IdleWatch watch = new IdleWatch("calm termite nest");
         helper.startSequence()
                 .thenIdle(SETTLE)
-                .thenExecute(() -> count(helper, level, colony, watch))
+                .thenExecute(() -> count(helper, level, colony, watch, null))
                 .thenIdle(COUNT)
                 .thenExecute(() -> check(helper, watch))
                 .thenSucceed();
     }
 
     /** Counts every tick from now (the colony's insects looked up once a second). */
-    private static void count(GameTestHelper helper, ServerLevel level, Colony colony, IdleWatch watch) {
+    private static void count(GameTestHelper helper, ServerLevel level, Colony colony, IdleWatch watch, @org.jetbrains.annotations.Nullable CrowdWatch crowd) {
         List<AbstractAntEntity> insects = new ArrayList<>();
         int[] tick = {0};
         helper.onEachTick(() -> {
@@ -106,6 +113,9 @@ public class IdleTests {
                 insects.addAll(TestIsolation.insectsOf(level, colony, AbstractAntEntity.class));
             }
             watch.tick(insects);
+            if (crowd != null) {
+                crowd.tick(insects);
+            }
         });
     }
 

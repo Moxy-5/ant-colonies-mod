@@ -186,6 +186,57 @@ public class AntNavigator {
     private Route underRoute;
     private int underFrom = -1;
 
+    // --- Personal space (real sizes, step 3, docs/plans/real-sizes.md; the grid of bodies is nav/Crowd) ---
+
+    /**
+     * How far (blocks) an insect's own lane lies off a cell's middle at most (my pick: a real Megaponera column runs
+     * single file to 2 or 3 abreast; with lanes spread over half a block, 0.2-block ants run 1 to 3 abreast and two can
+     * pass in a one-block tunnel).
+     */
+    private static final double LANE_ROOM = 0.25;
+    /** The gap kept between a lane and a cell's side wall (blocks). */
+    private static final double LANE_MARGIN = 0.08;
+    /** How far past touching (blocks) a walker looks ahead for a body in its way. */
+    private static final double LOOK = 0.15;
+    /** Ticks a walker keeps behind a nestmate that has stopped in front of it before it steps round it (my pick). */
+    private static final int FOLLOW_WAIT = 40;
+    /** Ticks a walker waits behind a standing body with no room to pass before it squeezes by (real termites push past in their tunnels). */
+    private static final int PASS_WAIT = 30;
+    /** Ticks it then squeezes past, bodies brushing, before it looks at the crowd again. */
+    private static final int SQUEEZE_TICKS = 20;
+    /** How far (blocks) from a floor goal's middle the free spot it stops on may lie. */
+    private static final double SPOT_REACH = 0.28;
+    /** Within this (blocks) of its free spot a walk is over. */
+    private static final double AT_SPOT = 0.06;
+    /** A standing insect closer than this share of the personal distance to an older stander shuffles aside. */
+    private static final double KEEP_APART = 0.85;
+    /** How far (blocks) one standing squeezed in looks for a free spot round it (my pick: a major's body and a half). */
+    private static final double FREE_REACH = 0.7;
+    /** The farther look when nothing is free near (blocks; my pick: a cell and a half, the room round a crowded spot). */
+    private static final double FREE_REACH_FAR = 1.5;
+    /** Ticks a packed-in insect waits before it looks for a free spot again (my pick; the look costs a few hundred checks). */
+    private static final int FREE_RETRY = 10;
+    /** At most this far (blocks) a shuffle aims in one go, and at this pace (my pick: a quick step aside, as a jostled ant does). */
+    private static final double SHUFFLE_MOST = 0.2;
+    private static final double SHUFFLE_PACE = 1.0;
+
+    /** The game time it stopped walking (the newcomer to a crowd gives way to those who stood there first); none while walking. */
+    /** {@link #keepApart}: packed in, it looks for a free spot again from this tick (its own tick count). */
+    private int freeSearchAfter;
+    private long standSince = Long.MAX_VALUE;
+    /** Ticks it has waited behind the body in front of it (following or with no room to pass). */
+    private int crowdWaitTicks;
+    /** Game time until which it squeezes past bodies in its way. */
+    private long squeezeUntil;
+    /** The free spot in the goal cell this walk ends on (picked on its first tick of arriving; null before). */
+    @Nullable
+    private Vec3 spot;
+    /** The way it walked last (a unit step: its lane lies at right angles to it). */
+    private int laneX;
+    private int laneZ = 1;
+    /** The mind stepped it up to something on purpose ({@link #stepToward}) since its last walk: never shuffled away from it. */
+    private boolean closedIn;
+
     public AntNavigator(AbstractAntEntity ant) {
         this.ant = ant;
     }
@@ -291,6 +342,7 @@ public class AntNavigator {
         }
         double dx = x - ant.getX();
         double dz = z - ant.getZ();
+        closedIn = true;
         if (dx * dx + dz * dz < 0.02 * 0.02) {
             return false;
         }
@@ -329,6 +381,10 @@ public class AntNavigator {
         this.replans = 0;
         this.habits = ant.walkHabits();
         this.mindCosts = mindCosts;
+        this.standSince = Long.MAX_VALUE;
+        this.crowdWaitTicks = 0;
+        this.spot = null;
+        this.closedIn = false;
         return plan();
     }
 
@@ -523,6 +579,7 @@ public class AntNavigator {
         arriveTicks = 0;
         blockedTicks = 0;
         blockedFrom = ant.position();
+        spot = null;
         at = start;
         return found != null;
     }
@@ -606,6 +663,12 @@ public class AntNavigator {
     /** Called every tick from the insect, before it moves. */
     public void tick() {
         CellMap map = new LevelCellMap(ant.level(), ant);
+        noteInCrowd();
+        if (route == null) {
+            standSince = Math.min(standSince, ant.level().getGameTime());
+        } else {
+            standSince = Long.MAX_VALUE;
+        }
         attached = false;
         exact = false;
         inChannel = false;
@@ -823,7 +886,24 @@ public class AntNavigator {
     /** At the end of the route: on a floor, walk to the middle of the cell; on a wall, hold on. */
     private void arrive(CellMap map) {
         Foothold end = route.end();
-        if (end.isFloor()) {
+        if (end.isFloor() && Crowd.keepsSpace(ant)) {
+            surface = Direction.DOWN;
+            long now = ant.level().getGameTime();
+            if (spot == null || arriveTicks % 5 == 4 && Crowd.of(ant.level()).clearance(ant, spot, spaceFor(Crowd.radius(ant)), now) < 0.0) {
+                spot = freeSpot(map, end.cell()); // (first, or someone has stopped on its spot meanwhile: another)
+            }
+            double dx = ant.getX() - spot.x;
+            double dz = ant.getZ() - spot.z;
+            double far = Math.sqrt(dx * dx + dz * dz);
+            // Pressing into one already standing there, it stops at once and steps aside as the newcomer ({@link #keepApart}),
+            // never walking on through it to its spot.
+            if (far > AT_SPOT && ++arriveTicks <= ARRIVE_TIMEOUT && !(arriveTicks > 2 && insideStander(now))) {
+                // (slowing as it nears, so a small body stops on its spot instead of circling it)
+                Vec3 aim = steer(spot, Math.min(speed, speed * Math.max(0.3, far / 0.3)));
+                ant.getMoveControl().setWantedPosition(aim.x, spot.y, aim.z, aimSpeed);
+                return;
+            }
+        } else if (end.isFloor()) {
             surface = Direction.DOWN;
             Vec3 aim = Vec3.atBottomCenterOf(end.cell());
             double dx = ant.getX() - aim.x;
@@ -863,6 +943,7 @@ public class AntNavigator {
             at = null; // its wall or ceiling is gone: let go
         }
         surface = Direction.DOWN;
+        keepApart();
     }
 
     // --- The moves on floors, walls and ceilings (one tick each; true once the move is done) ---
@@ -871,8 +952,345 @@ public class AntNavigator {
     private boolean walk(CellMap map, Foothold to) {
         surface = Direction.DOWN;
         Vec3 aim = Vec3.atBottomCenterOf(to.cell());
+        if (Crowd.keepsSpace(ant) && stepFrom != null) {
+            aim = lanePoint(map, stepFrom.cell(), to.cell(), aim);
+            Vec3 steered = steer(aim, speed);
+            ant.getMoveControl().setWantedPosition(steered.x, aim.y, steered.z, aimSpeed);
+            return inFloorCell(map, to.cell());
+        }
         ant.getMoveControl().setWantedPosition(aim.x, aim.y, aim.z, speed);
         return inFloorCell(map, to.cell());
+    }
+
+    // --- Personal space: lanes, stepping round, free spots, standing apart (real sizes, step 3) ---
+
+    /** The speed {@link #steer} last chose (slower behind a nestmate, 0 while waiting). */
+    private double aimSpeed;
+
+    /** Writes the insect into its world's crowd for this tick, if it keeps its space and stands on a floor. */
+    private void noteInCrowd() {
+        if (!Crowd.keepsSpace(ant) || surface != Direction.DOWN || inChannel || attached || ant.isPassenger()
+                || ant.isDowned() || ant.isPinned()) {
+            return; // (on a wall, a ceiling or in a channel it moves exactly; felled or held, the others step over it)
+        }
+        Vec3 v = ant.getDeltaMovement();
+        Crowd.of(ant.level()).note(new Crowd.Body(ant, ant.getX(), ant.getY(), ant.getZ(), Crowd.radius(ant), ant.getBbHeight(),
+                v.x, v.z, route == null, standSince), ant.level().getGameTime());
+    }
+
+    /**
+     * Its own lane, -1 to 1, from its id: fixed for life, more often near the middle than at the sides (two dice added),
+     * so a column of them runs mostly 1 to 3 abreast.
+     */
+    private double lane() {
+        long bits = ant.getUUID().getLeastSignificantBits() ^ ant.getUUID().getMostSignificantBits();
+        double a = ((bits >>> 8) & 0xFFFF) / 65536.0;
+        double b = ((bits >>> 32) & 0xFFFF) / 65536.0;
+        return a + b - 1.0;
+    }
+
+    /** How far its lane may lie off a cell's middle in a passage {@code width} wide sideways: up to {@link #LANE_ROOM}. */
+    private double laneRoom() {
+        return Mth.clamp((1.0 - ant.getBbWidth()) / 2.0 - LANE_MARGIN, 0.0, LANE_ROOM);
+    }
+
+    /**
+     * Where in the next cell its lane runs: the cell's middle moved sideways (at right angles to the step) by its lane.
+     * The middle itself on a slope or where its box would not fit there (a doorway, a narrow gap: single file).
+     */
+    private Vec3 lanePoint(CellMap map, BlockPos from, BlockPos to, Vec3 middle) {
+        if (laneRoute == route && laneStep == next && laneAim != null) {
+            return laneAim; // (worked out once a step)
+        }
+        laneRoute = route;
+        laneStep = next;
+        laneAim = laneFor(map, from, to, middle);
+        return laneAim;
+    }
+
+    @Nullable
+    private Route laneRoute;
+    private int laneStep = -1;
+    @Nullable
+    private Vec3 laneAim;
+
+    private Vec3 laneFor(CellMap map, BlockPos from, BlockPos to, Vec3 middle) {
+        int dx = Integer.signum(to.getX() - from.getX());
+        int dz = Integer.signum(to.getZ() - from.getZ());
+        if (dx != 0 && dz != 0 || dx == 0 && dz == 0) {
+            return middle;
+        }
+        laneX = dx;
+        laneZ = dz;
+        if (map.isSlope(to) || map.isSlope(from)) {
+            return middle;
+        }
+        double off = lane() * laneRoom();
+        Vec3 point = middle.add(-dz * off, 0.0, dx * off);
+        return fits(point) ? point : middle;
+    }
+
+    /** Whether its box fits standing at this point, at its own height (no block in the way). */
+    private boolean fits(Vec3 point) {
+        return ant.level().noCollision(ant, ant.getBoundingBox().move(point.x - ant.getX(), 0.0, point.z - ant.getZ()));
+    }
+
+    /**
+     * Where to aim this tick on the way to {@code aim} so as not to walk into anyone, and how fast ({@link #aimSpeed}): a
+     * nestmate walking ahead the same way is followed a little gap behind (slower, or waiting while it is too near); a
+     * body standing in the way, or one met head on, is stepped round on the side away from it, inside the cells it walks
+     * through; with no room it waits, and after {@link #PASS_WAIT} ticks squeezes past (bodies brushing, as termites
+     * push by in their tunnels). Only bodies on its floor within reach ahead count. Legs layer: no mind is asked.
+     */
+    private Vec3 steer(Vec3 aim, double pace) {
+        aimSpeed = pace;
+        long now = ant.level().getGameTime();
+        if (now < squeezeUntil) {
+            return aim;
+        }
+        double ox = aim.x - ant.getX();
+        double oz = aim.z - ant.getZ();
+        double toAim = Math.sqrt(ox * ox + oz * oz);
+        if (toAim < 1.0E-3) {
+            crowdWaitTicks = 0;
+            return aim;
+        }
+        double ux = ox / toAim;
+        double uz = oz / toAim;
+        double mine = Crowd.radius(ant);
+        Crowd.Body ahead = null;
+        double aheadAlong = Double.MAX_VALUE;
+        double aheadLat = 0.0;
+        for (Crowd.Body body : Crowd.of(ant.level()).near(ant, ant.getX(), ant.getY(), ant.getZ(), mine + 0.5 + LOOK, now)) {
+            double need = mine + body.radius();
+            double bx = body.x() - ant.getX();
+            double bz = body.z() - ant.getZ();
+            double along = bx * ux + bz * uz;
+            double lat = ux * bz - uz * bx;
+            if (along <= 0.0 || along >= Math.min(need + LOOK, toAim + need) || Math.abs(lat) >= need) {
+                continue;
+            }
+            if (along < aheadAlong) {
+                ahead = body;
+                aheadAlong = along;
+                aheadLat = lat;
+            }
+        }
+        if (ahead == null) {
+            crowdWaitTicks = 0;
+            return aim;
+        }
+        double need = mine + ahead.radius();
+        double goesMyWay = ahead.vx() * ux + ahead.vz() * uz;
+        if (!ahead.standing() && goesMyWay > 0.01 && crowdWaitTicks < FOLLOW_WAIT) {
+            // Following: keep a little gap behind it, slowing as it nears, holding while too close.
+            double gap = aheadAlong - need;
+            if (gap <= 0.0) {
+                crowdWaitTicks++;
+                aimSpeed = 0.0;
+                return ant.position();
+            }
+            aimSpeed = pace * Mth.clamp(gap / LOOK, 0.25, 1.0);
+            return aim;
+        }
+        // Stepping round it, on the side away from it (ties: by id), inside the cells it walks through.
+        double side = Math.abs(aheadLat) > 1.0E-3 ? -Math.signum(aheadLat) : (ant.getId() < ahead.ant().getId() ? 1.0 : -1.0);
+        double wantLat = aheadLat + side * need * 1.05;
+        double px = ant.getX() + ux * aheadAlong + (-uz) * wantLat;
+        double pz = ant.getZ() + uz * aheadAlong + ux * wantLat;
+        double half = ant.getBbWidth() / 2.0 + 0.01;
+        BlockPos cell = BlockPos.containing(aim.x, aim.y + 0.01, aim.z);
+        if (Math.abs(ux) > Math.abs(uz)) {
+            pz = Mth.clamp(pz, cell.getZ() + half, cell.getZ() + 1.0 - half); // walking along x: sideways is z
+        } else {
+            px = Mth.clamp(px, cell.getX() + half, cell.getX() + 1.0 - half);
+        }
+        Vec3 round = new Vec3(px, ant.getY(), pz);
+        double roomLat = Math.abs(ux * (pz - ahead.z()) - uz * (px - ahead.x()));
+        if (roomLat >= 0.75 * need && fits(round)) {
+            crowdWaitTicks = 0;
+            return round;
+        }
+        // (already inside it, pushed in by a shuffle or a turn: no waiting in there, it squeezes on past at once)
+        boolean inside = Math.hypot(ahead.x() - ant.getX(), ahead.z() - ant.getZ()) < Crowd.INSIDE * need;
+        if (inside || ++crowdWaitTicks > (ahead.standing() ? PASS_WAIT : FOLLOW_WAIT + PASS_WAIT)) {
+            crowdWaitTicks = 0;
+            squeezeUntil = now + SQUEEZE_TICKS;
+            return aim;
+        }
+        aimSpeed = 0.0;
+        return ant.position();
+    }
+
+    /**
+     * A free spot to stop on in a floor goal cell: its lane's point first, then the middle and rings round it (the
+     * nearest to it first), within {@link #SPOT_REACH} of the middle, its box fitting and clear of anyone standing there
+     * (several to a block: a waiting raid, a crowd at a door). With none clear, the nearest free spot round the cell
+     * (within {@link #FREE_REACH_FAR}), else the least crowded one.
+     */
+    private Vec3 freeSpot(CellMap map, BlockPos cell) {
+        Vec3 middle = Vec3.atBottomCenterOf(cell);
+        if (map.isSlope(cell)) {
+            return middle;
+        }
+        double mine = Crowd.radius(ant);
+        long now = ant.level().getGameTime();
+        Crowd crowd = Crowd.of(ant.level());
+        List<Vec3> spots = new ArrayList<>(17);
+        double off = lane() * laneRoom();
+        spots.add(middle.add(-laneZ * off, 0.0, laneX * off));
+        List<Vec3> ring = new ArrayList<>(16);
+        ring.add(middle);
+        for (int i = 0; i < 8; i++) {
+            double angle = i * Math.PI / 4.0;
+            ring.add(middle.add(Math.cos(angle) * SPOT_REACH * 0.55, 0.0, Math.sin(angle) * SPOT_REACH * 0.55));
+            ring.add(middle.add(Math.cos(angle + Math.PI / 8.0) * SPOT_REACH, 0.0, Math.sin(angle + Math.PI / 8.0) * SPOT_REACH));
+        }
+        Vec3 here = ant.position();
+        ring.sort(Comparator.comparingDouble(p -> p.distanceToSqr(here.x, p.y, here.z)));
+        spots.addAll(ring);
+        Vec3 best = middle;
+        double bestGap = -Double.MAX_VALUE;
+        for (Vec3 p : spots) {
+            if (!fits(p)) {
+                continue;
+            }
+            double gap = crowd.clearance(ant, p, mine, now);
+            if (gap >= 0.0) {
+                return p;
+            }
+            if (gap > bestGap) {
+                bestGap = gap;
+                best = p;
+            }
+        }
+        // The cell is full: the nearest free spot round it (the crowd spills into the cells round it), else the least crowded.
+        Vec3 spill = freeNear(middle, mine, FREE_REACH_FAR, 0.15);
+        return spill != null ? spill : best;
+    }
+
+    /**
+     * Standing on a floor with nothing to walk: if it stands inside the personal space of someone who stood there
+     * before it (or who must hold still), it shuffles a little aside, at most {@link #FREE_REACH} (so a mind waiting
+     * near its place still finds it there; a crowd overflowing a cell spills into the cells round it, onto ground only). Never while it holds still itself, closed in on something on purpose, or a mind
+     * moves it this tick.
+     */
+    private void keepApart() {
+        if (!Crowd.keepsSpace(ant) || closedIn || ant.holdsStill() || !ant.onGround() || ant.getMoveControl().hasWanted()) {
+            return;
+        }
+        double mine = Crowd.radius(ant);
+        double pushX = 0.0;
+        double pushZ = 0.0;
+        boolean pressed = false;
+        for (Crowd.Body body : Crowd.of(ant.level()).near(ant, ant.getX(), ant.getY(), ant.getZ(), mine + 0.5, ant.level().getGameTime())) {
+            if (!body.standing()) {
+                continue;
+            }
+            boolean givesWay = body.ant().holdsStill() || body.standSince() < standSince
+                    || body.standSince() == standSince && ant.getId() > body.ant().getId();
+            if (!givesWay) {
+                continue;
+            }
+            double need = (mine + body.radius()) * KEEP_APART;
+            double dx = ant.getX() - body.x();
+            double dz = ant.getZ() - body.z();
+            double dist = Math.sqrt(dx * dx + dz * dz);
+            if (dist >= need) {
+                continue;
+            }
+            pressed = true;
+            if (dist < 1.0E-3) {
+                double angle = (ant.getId() * 0.618034) * Math.PI * 2.0; // right on top: a way of its own
+                pushX += Math.cos(angle) * need;
+                pushZ += Math.sin(angle) * need;
+                continue;
+            }
+            pushX += dx / dist * (need - dist);
+            pushZ += dz / dist * (need - dist);
+        }
+        if (!pressed) {
+            return;
+        }
+        double push = Math.sqrt(pushX * pushX + pushZ * pushZ);
+        Vec3 to = null;
+        if (push >= 0.02) {
+            double scale = Math.min(1.0, SHUFFLE_MOST / push) * 1.2;
+            Vec3 want = new Vec3(ant.getX() + pushX * scale, ant.getY(), ant.getZ() + pushZ * scale);
+            if (standable(want) && Crowd.of(ant.level()).clearance(ant, want, spaceFor(mine), ant.level().getGameTime()) >= 0.0) {
+                to = want;
+            }
+        }
+        if (to == null && ant.tickCount >= freeSearchAfter) {
+            // Pushed into a wall, off an edge, into others, or squeezed from all sides alike: the nearest free spot round
+            // it, near first, then a little farther (a crowd overflowing a cell spills into the cells round it).
+            to = freeNear(ant.position(), mine, FREE_REACH, 0.1);
+            if (to == null) {
+                to = freeNear(ant.position(), mine, FREE_REACH_FAR, 0.15);
+            }
+            if (to == null) {
+                freeSearchAfter = ant.tickCount + FREE_RETRY; // (packed in: it stands, and looks again a little later)
+            }
+        }
+        if (to == null || to.distanceToSqr(ant.position()) < 0.02 * 0.02) {
+            return;
+        }
+        ant.getMoveControl().setWantedPosition(to.x, ant.getY(), to.z, SHUFFLE_PACE);
+    }
+
+    /**
+     * The radius to ask {@link Crowd#clearance} for so that the gap it wants from a body like its own is the
+     * {@link #KEEP_APART} share of their radii, as the shuffle's push wants it.
+     */
+    private static double spaceFor(double mine) {
+        return mine * (2.0 * KEEP_APART - 1.0);
+    }
+
+    /** Whether it stands inside the body of one standing still ({@link Crowd#inside}'s measure). */
+    private boolean insideStander(long now) {
+        double mine = Crowd.radius(ant);
+        for (Crowd.Body body : Crowd.of(ant.level()).near(ant, ant.getX(), ant.getY(), ant.getZ(), mine + 0.5, now)) {
+            if (body.standing() && Math.hypot(body.x() - ant.getX(), body.z() - ant.getZ()) < Crowd.INSIDE * (mine + body.radius())
+                    && Math.abs(body.y() - ant.getY()) <= Crowd.SAME_FLOOR) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Standing room: its box fits there at its height, with ground under it (never a shuffle off an edge). */
+    private boolean standable(Vec3 point) {
+        double dx = point.x - ant.getX();
+        double dz = point.z - ant.getZ();
+        return fits(point) && !ant.level().noCollision(ant, ant.getBoundingBox().move(dx, -0.2, dz));
+    }
+
+    /**
+     * The nearest spot within {@code reach} of {@code centre} (on a grid {@code grid} apart) where it stands clear of everyone
+     * standing, with room and ground; null if none. A crowd overflowing a cell spills into the cells round it.
+     */
+    @Nullable
+    private Vec3 freeNear(Vec3 centre, double mine, double reach, double grid) {
+        Crowd crowd = Crowd.of(ant.level());
+        long now = ant.level().getGameTime();
+        Vec3 best = null;
+        double bestDistance = Double.MAX_VALUE;
+        int steps = (int) Math.round(reach / grid);
+        for (int i = -steps; i <= steps; i++) {
+            for (int j = -steps; j <= steps; j++) {
+                double distance = (i * i + j * j) * grid * grid;
+                if (distance >= bestDistance || distance > reach * reach) {
+                    continue;
+                }
+                Vec3 p = new Vec3(centre.x + i * grid, ant.getY(), centre.z + j * grid);
+                if (crowd.clearance(ant, p, spaceFor(mine), now) >= 0.0 && standable(p)
+                        && fits(new Vec3((centre.x + p.x) / 2.0, ant.getY(), (centre.z + p.z) / 2.0))) { // (no spot past a wall)
+                    best = p;
+                    bestDistance = distance;
+                }
+            }
+        }
+        return best;
     }
 
     /** Lets go and drops: steered over the cell it lands in, until it is on the ground there. */

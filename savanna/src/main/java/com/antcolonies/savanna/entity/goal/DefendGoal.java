@@ -129,7 +129,7 @@ public class DefendGoal extends Goal {
             if (lungingAt != null) {
                 chase(lungingAt, false);
             } else {
-                stand(task.cell(), task.facing(), task.drumOnArrival());
+                stand(task.cell(), task.spot(), task.facing(), task.drumOnArrival());
             }
         }
     }
@@ -229,13 +229,23 @@ public class DefendGoal extends Goal {
         return soldier.touches(enemy);
     }
 
+    /** Real sizes, step 3: its spot in its cell round a breach, this near sideways (blocks), it steps onto. */
+    private static final double SPOT_NEAR = 1.5;
+
     /** Real sizes, step 2: an enemy this near sideways (blocks), its walk over, it steps straight at. */
     private static final double CLOSE_IN_NEAR = 1.2;
 
-    /** Walks to the cell and stands in it facing the trouble (drumming once on arrival, if asked). */
-    private void stand(BlockPos cell, BlockPos facing, boolean drumOnArrival) {
+    /**
+     * Walks to the cell and stands in it facing the trouble (drumming once on arrival, if asked); with a {@code spot}
+     * in the cell (real sizes, step 3: its place round a raid's breach, several to a cell), it steps onto that spot
+     * first, so the soldiers pack the opening shoulder to shoulder instead of one inside another.
+     */
+    private void stand(BlockPos cell, @Nullable Vec3 spot, BlockPos facing, boolean drumOnArrival) {
         if (soldier.blockPosition().equals(cell) && !soldier.isClimbing()) {
             soldier.getNavigator().stop();
+            if (spot != null && soldier.closeIn(spot, SPOT_NEAR) == AbstractAntEntity.CloseIn.STEPPING) {
+                return;
+            }
             face(facing.getX() + 0.5, facing.getZ() + 0.5);
             if (drumOnArrival && !cell.equals(drummedAt)) {
                 drummedAt = cell;
