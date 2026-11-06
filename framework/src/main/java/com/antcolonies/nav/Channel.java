@@ -18,6 +18,11 @@ import net.minecraft.world.level.block.state.BlockState;
 public interface Channel {
     /** Where the channel's floor is, above the bottom of the block (in blocks): an insect in it lies with its feet there. */
     double FLOOR = 5.0 / 16.0;
+    /**
+     * Half the channel's width (in blocks, from its middle line to a side wall): the channel is 6 pixels across, 5 to 11.
+     * An insect going up or down the channel holds one of its side walls this far out (less half its own width).
+     */
+    double HALF_WIDTH = 3.0 / 16.0;
 
     /** Whether this insect fits through the channel (a termite worker does; a soldier, an ant or a player does not). */
     boolean fits(@Nullable Entity insect);

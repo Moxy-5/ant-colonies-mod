@@ -108,9 +108,21 @@ public class TermiteTunnelTests {
         boolean[] seen = new boolean[3]; // in a channel, crawling with the route through the tunnel, looking round
         int[] lookingOut = {0};
         net.minecraft.world.phys.Vec3[] peekedAt = {null};
+        BlockPos base = helper.absolutePos(BASE);
+        int[] heldWall = new int[5]; // per part: ticks seen going up or down inside the spire's base and thick pieces
         helper.onEachTick(() -> {
             if (termite.getNavigator().isInChannel()) {
                 seen[0] = true;
+            }
+            // Up or down the spire's channel it holds one of its side walls, never hanging in its middle (BUGS 129: at
+            // real sizes a worker in the middle of the 6-pixel channel floated up and down a mud cast).
+            double y = termite.getY() - base.getY();
+            if (termite.getNavigator().isInChannel() && y > -0.4 && y < 0.9 && termite.blockPosition().getX() == base.getX()
+                    && termite.blockPosition().getZ() == base.getZ()) {
+                double off = Math.max(Math.abs(termite.getX() - (base.getX() + 0.5)), Math.abs(termite.getZ() - (base.getZ() + 0.5)));
+                helper.assertTrue(off > 0.1, "the termite hangs in the middle of the spire's channel (" + off
+                        + " from its middle line) instead of holding its wall, part " + phase[0]);
+                heldWall[phase[0]]++;
             }
             if (termite.getNavigator().isPeeking()) {
                 seen[2] |= phase[0] == 2;
@@ -177,6 +189,8 @@ public class TermiteTunnelTests {
         helper.succeedWhen(() -> {
             helper.assertTrue(phase[0] == 4, "still walking (part " + phase[0] + ")");
             helper.assertTrue(seen[2], "it never looked round out of the mouth");
+            helper.assertTrue(heldWall[1] > 0 && heldWall[3] > 0, "it was never seen climbing inside the spire, up "
+                    + heldWall[1] + " and down " + heldWall[3] + " ticks");
             helper.assertTrue(termite.blockPosition().equals(window), "it ended at " + termite.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO))
                     + " instead of back at the window");
         });

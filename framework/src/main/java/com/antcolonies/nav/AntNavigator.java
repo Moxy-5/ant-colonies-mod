@@ -83,6 +83,8 @@ public class AntNavigator {
     private static final double SLOPE_TO_WALL = 0.06;
     /** A body this close (in blocks, sideways) to the middle line of a channel it is in counts as in the channel. */
     private static final double IN_THE_CHANNEL = 0.1;
+    /** Left between the body and a channel's side wall it holds (in blocks). */
+    private static final double CHANNEL_GAP = 0.01;
     /** Out of a hole in a floor, the body steps this far (in blocks) off the hole's middle, so it stands on the floor round it. */
     private static final double OFF_THE_HOLE = 0.25;
 
@@ -1588,9 +1590,34 @@ public class AntNavigator {
 
     // --- Channels (termite tunnels, see Channel): the body lies in the channel's middle, its feet on its floor ---
 
-    /** Where the body is in the channel of a cell: in the middle, its feet on the channel's floor. */
+    /**
+     * Where the body is in the channel of a cell: lying on its floor, in the middle; holding one of its side walls
+     * (going up or down it), pressed against that wall, feet at the channel's floor height. (Before real sizes the body
+     * filled the channel, so its middle touched every wall; a 0.15-block worker in the middle of a 6-pixel channel hung in
+     * the air, "floating" up and down a mud cast, docs/BUGS.md 129.)
+     */
     private Vec3 channelPoint(BlockPos cell) {
-        return new Vec3(cell.getX() + 0.5, cell.getY() + Channel.FLOOR + EPS, cell.getZ() + 0.5);
+        return channelPoint(cell, cell.getY() + Channel.FLOOR + EPS);
+    }
+
+    /** {@link #channelPoint(BlockPos)} with its feet at height {@code y}. */
+    private Vec3 channelPoint(BlockPos cell, double y) {
+        Vec3 middle = new Vec3(cell.getX() + 0.5, y, cell.getZ() + 0.5);
+        if (!surface.getAxis().isHorizontal()) {
+            return middle;
+        }
+        double out = channelWallOffset();
+        return middle.add(surface.getStepX() * out, 0.0, surface.getStepZ() * out);
+    }
+
+    /** How far from a channel's middle line the body's middle is when it holds a side wall of the channel (0 if it fills it). */
+    private double channelWallOffset() {
+        return Math.max(0.0, Channel.HALF_WIDTH - half() - CHANNEL_GAP);
+    }
+
+    /** The wall of a channel an insect going up or down it holds: the one it is on already, else {@code fresh}. */
+    private Direction channelWall(Direction fresh) {
+        return surface.getAxis().isHorizontal() ? surface : fresh;
     }
 
     /** Just outside the opening of the channel in {@code cell} on the horizontal side {@code d}, feet at {@code y}: the body touches the face. */
@@ -1616,7 +1643,9 @@ public class AntNavigator {
             surface = Direction.DOWN;
             channelFacing = d;
         } else {
-            surface = d == Direction.UP ? channelFacing : channelFacing.getOpposite();
+            // Up the wall in front of it, or head first down the wall under the edge it goes over; one already on a
+            // wall of the channel keeps to it (it turns round on it at the top to come back down, as a real termite).
+            surface = channelWall(d == Direction.UP ? channelFacing : channelFacing.getOpposite());
         }
         return moveAttached(channelPoint(next));
     }
@@ -1697,8 +1726,9 @@ public class AntNavigator {
         if (d == Direction.UP) {
             if (leg == 0) {
                 inChannel = true;
-                surface = channelFacing;
-                if (moveAttached(new Vec3(c.getX() + 0.5, c.getY() + 1 + EPS, c.getZ() + 0.5))) {
+                surface = channelWall(channelFacing);
+                channelFacing = surface; // it comes out over the rim of the wall it holds
+                if (moveAttached(channelPoint(c, c.getY() + 1 + EPS))) {
                     leg = 1;
                 }
                 return false;
@@ -1713,8 +1743,8 @@ public class AntNavigator {
         if (d == Direction.DOWN) {
             if (leg == 0) {
                 inChannel = true;
-                surface = channelFacing.getOpposite();
-                if (moveAttached(new Vec3(c.getX() + 0.5, ceilingY(to.cell()), c.getZ() + 0.5))) {
+                surface = channelWall(channelFacing.getOpposite());
+                if (moveAttached(channelPoint(c, ceilingY(to.cell())))) {
                     leg = 1;
                 }
                 return false;
@@ -1902,10 +1932,12 @@ public class AntNavigator {
     @Nullable
     private Foothold currentFoothold(CellMap map) {
         BlockPos feet = ant.blockPosition();
-        if (map.channelSides(feet) != 0 && Math.abs(ant.getX() - (feet.getX() + 0.5)) < IN_THE_CHANNEL
-                && Math.abs(ant.getZ() - (feet.getZ() + 0.5)) < IN_THE_CHANNEL) {
-            // In a channel (a termite tunnel): it lies in the channel's middle. (A body hugging the outside of a narrow
-            // hollow spire piece can have its feet in the piece's block, but never on the channel's middle line.)
+        double inChannelReach = Math.max(IN_THE_CHANNEL, channelWallOffset() + 2 * CHANNEL_GAP);
+        if (map.channelSides(feet) != 0 && Math.abs(ant.getX() - (feet.getX() + 0.5)) < inChannelReach
+                && Math.abs(ant.getZ() - (feet.getZ() + 0.5)) < inChannelReach) {
+            // In a channel (a termite tunnel): it lies in the channel's middle, or holds one of its side walls. (A body
+            // hugging the outside of a narrow hollow spire piece can have its feet in the piece's block, but always
+            // outside the channel: at least the channel's half width plus its own half width from the middle line.)
             return Foothold.channel(feet);
         }
         BlockPos cell = BlockPos.containing(pos());

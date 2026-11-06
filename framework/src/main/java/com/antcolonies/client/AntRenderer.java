@@ -21,8 +21,6 @@ import net.minecraft.client.renderer.entity.EntityRendererProvider;
  * {@code AbstractAntEntity.turnBody} and {@code tiltOnSlope}).
  */
 public class AntRenderer<T extends AbstractAntEntity> extends GeoEntityRenderer<T> {
-    /** How far the model is moved toward the wall inside a narrow channel (a termite tunnel): less, so the body stays in the channel's middle. */
-    private static final float CHANNEL_INTO_WALL = 0.08F;
 
     /**
      * How far the model is moved up while climbing, so the tail doesn't sink into the floor, and toward the wall, so the
@@ -137,7 +135,7 @@ public class AntRenderer<T extends AbstractAntEntity> extends GeoEntityRenderer<
             // already put in place above
         } else if (tilt <= 90.0F) {
             float share = tilt / 90.0F;
-            poseStack.translate(0.0F, climbLift * share, -(ant.isInChannel() ? CHANNEL_INTO_WALL : climbIntoWall) * share);
+            poseStack.translate(0.0F, climbLift * share, -climbIntoWall * share);
         } else {
             // From the wall onto the ceiling: the feet go up to the top of the hitbox, against the ceiling.
             float share = (tilt - 90.0F) / 90.0F;
